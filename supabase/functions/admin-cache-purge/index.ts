@@ -43,8 +43,9 @@ const TARKOV_LANGUAGES = [
   'zh',
 ];
 const TARKOV_GAME_MODES = ['regular', 'pve'];
+type PurgeType = 'all' | 'tarkov-data' | 'twitch-config';
 interface PurgeRequest {
-  purgeType: 'all' | 'tarkov-data' | 'twitch-config';
+  purgeType: PurgeType;
 }
 interface CloudflarePurgeResponse {
   success: boolean;
@@ -212,7 +213,7 @@ function combinePurgeFailures(
     messages: [],
   };
 }
-function purgeSuccessMessage(purgeType: PurgeRequest['purgeType']): string {
+function purgeSuccessMessage(purgeType: PurgeType): string {
   if (purgeType === 'all') return 'All cache purged successfully';
   if (purgeType === 'twitch-config') return 'Twitch config cache purged successfully';
   return 'Tarkov data cache purged successfully';
@@ -296,11 +297,9 @@ Deno.serve(async (req) => {
     }
     // Parse request body
     const rawBody = await req.text();
-    let body: Partial<PurgeRequest & { purge_type?: 'all' | 'tarkov-data' | 'twitch-config' }>;
+    let body: Partial<PurgeRequest & { purge_type?: PurgeType }>;
     try {
-      body = JSON.parse(rawBody) as Partial<
-        PurgeRequest & { purge_type?: 'all' | 'tarkov-data' | 'twitch-config' }
-      >;
+      body = JSON.parse(rawBody) as Partial<PurgeRequest & { purge_type?: PurgeType }>;
       // Support both camelCase (new) and snake_case (legacy) for backward compatibility
       if (!body.purgeType && !body.purge_type) {
         body.purgeType = 'tarkov-data';
