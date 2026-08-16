@@ -915,11 +915,14 @@ flowchart LR
    missing table, missing row, malformed override, or unavailable database falls back safely instead
    of breaking the embed. The route reads the database only when the Pages Function executes — i.e.
    on cache fills. Its response carries `Cache-Tag: promoted-twitch-config` with a browser TTL of
-   five minutes (`max-age=300`) and a Cloudflare edge TTL of one year
-   (`s-maxage=31536000` / `cloudflare-cdn-cache-control: public, max-age=31536000`), so Cloudflare
-   serves cache hits without invoking the Function. When the database read fails, the fallback
+   five minutes (`max-age=300`) and a bounded Cloudflare edge TTL of one hour
+   (`s-maxage=3600` / `cloudflare-cdn-cache-control: public, max-age=3600`), so Cloudflare
+   serves cache hits without invoking the Function. The bounded TTL keeps a stale entry
+   self-healing: even if an in-flight cache fill stores a pre-purge response after the tag purge, or
+   a purge fails entirely, the stale value expires within an hour instead of pinning for a year. When
+   the database read fails, the fallback
    response is sent with `no-store` so a transient outage never pins the env-default fallback at the
-   edge for a year. Missing or invalid Supabase credentials are treated as the same uncacheable
+   edge. Missing or invalid Supabase credentials are treated as the same uncacheable
    failure. Successful responses include the settings version.
 5. `PromotedTwitchEmbed` fetches config once on mount and again on tab focus (an edge-cache hit),
    watches the shared client state for immediate propagation of admin saves in the same tab, and
@@ -965,9 +968,11 @@ flowchart LR
   promote a stream without a database override or admin write. The admin-managed override can change
   the effective channel, display name, and enabled state. A missing or malformed build-time flag
   resolves to disabled.
-- The config response must carry the `promoted-twitch-config` cache tag and long edge TTLs so
+- The config response must carry the `promoted-twitch-config` cache tag and a bounded edge TTL so
   Cloudflare serves cache hits without executing the Pages Function; the route and its database read
-  run only on cache fills. A failed database read must not be cached (`no-store`), so a transient
+  run only on cache fills. The bounded TTL bounds staleness: an in-flight fill that lands after a
+  purge, or a failed purge, recovers within the TTL instead of pinning a stale value indefinitely.
+  A failed database read must not be cached (`no-store`), so a transient
   outage cannot pin the env-default fallback at the edge.
 - The admin route must purge the `promoted-twitch-config` tag only after the database transaction
   commits. If invalidation fails, it must return the committed config with an explicit warning flag;

@@ -5,8 +5,8 @@ import { createLogger } from '@/server/utils/logger';
 const logger = createLogger('twitch-config');
 const CACHE_TAG = 'promoted-twitch-config';
 const CACHE_HEADERS = {
-  'cache-control': 'public, max-age=300, s-maxage=31536000',
-  'cloudflare-cdn-cache-control': 'public, max-age=31536000',
+  'cache-control': 'public, max-age=300, s-maxage=3600',
+  'cloudflare-cdn-cache-control': 'public, max-age=3600',
   'cache-tag': CACHE_TAG,
   vary: 'Origin',
 };
