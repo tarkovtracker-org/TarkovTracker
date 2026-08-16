@@ -57,6 +57,8 @@
     "twitch_display_name_placeholder": "Отображаемое имя канала",
     "twitch_config_saved_title": "Настройки Twitch обновлены",
     "twitch_config_saved_description": "Повышенный поток теперь {channel}.",
+    "twitch_config_saved_with_warning_title": "Twitch конфигурация сохранена",
+    "twitch_config_saved_with_warning_description": "Конфигурация сохранена, но кэшированные посетители все еще видят предыдущее значение.",
     "twitch_config_failed_description": "Не удалось обновить конфигурацию Twitch.",
     "twitch_config_load_failed_title": "Настройки Twitch недоступны",
     "twitch_config_load_failed_description": "Не удалось загрузить текущую конфигурацию Twitch.",
