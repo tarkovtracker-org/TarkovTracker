@@ -243,6 +243,22 @@ describe('mergeModeCorrections (via applyOverlay integration)', () => {
     ]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+  it('drops level trader requirements with non-finite thresholds', async () => {
+    const fetchMock = stubOverlayFetch(
+      JSON.parse(
+        '{"$meta":{"version":"nonfinite-split-test-v1"},"modes":{"pve":{"tasks":{"task-1":{"traderRequirements":[{"id":"inf-level","requirementType":"level","compareMethod":">=","value":1e999,"trader":{"id":"trader-1","name":"Prapor"}}]}}}}}'
+      )
+    );
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const result = await applyOverlay(
+      { data: { tasks: [{ id: 'task-1', name: 'Base Task' }] } },
+      { gameMode: 'pve', bypassCache: true }
+    );
+    const task = result.data?.tasks?.[0] as Record<string, unknown> | undefined;
+    expect(task?.traderLevelRequirements).toBeUndefined();
+    expect(task?.traderRequirements).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
 describe('applyLocaleOverlay', () => {
   it('shallow-merges locale patches (name/wikiLink) over matching entities', () => {
