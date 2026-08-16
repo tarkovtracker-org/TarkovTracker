@@ -574,7 +574,7 @@
             >
               <span
                 class="h-2 w-2 shrink-0 rounded-full"
-                :class="chip.isOn ? '' : 'box-border border-[1.5px]'"
+                :class="chip.isOn ? '' : 'box-border border-2'"
                 :style="chip.isOn ? { backgroundColor: chip.color } : { borderColor: chip.color }"
               />
               <span

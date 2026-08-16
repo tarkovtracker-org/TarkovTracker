@@ -38,41 +38,43 @@ const hashZoneOutline = (outline: Array<{ x: number; z: number }>): number => {
   }
   return zoneHash;
 };
-const hashLocationPositions = (positions?: Array<{ x: number; y?: number; z: number }>): number => {
-  let locationHash = updateFnv1a(FNV1A_OFFSET_BASIS, positions?.length ?? 0);
-  for (const point of positions ?? []) {
+const hashLocationPositions = (positions: Array<{ x: number; y?: number; z: number }>): number => {
+  let locationHash = updateFnv1a(FNV1A_OFFSET_BASIS, positions.length);
+  for (const point of positions) {
     locationHash = updateFnv1a(locationHash, point.x);
     locationHash = updateFnv1a(locationHash, point.z);
   }
   return locationHash;
 };
+const hashSortedValues = (hash: number, values: Array<string | number>): number => {
+  let next = updateFnv1a(hash, values.length);
+  for (const value of values) {
+    next = updateFnv1a(next, value);
+  }
+  return next;
+};
+const markZoneHashes = (mark: MapMark, mapId: string): number[] =>
+  mark.zones
+    .filter((zone) => zone.map.id === mapId)
+    .map((zone) => hashZoneOutline(zone.outline))
+    .sort((a, b) => a - b);
+const markLocationHashes = (mark: MapMark, mapId: string): number[] =>
+  (mark.possibleLocations ?? [])
+    .filter((location) => location.map.id === mapId)
+    .map((location) => hashLocationPositions(location.positions ?? []))
+    .sort((a, b) => a - b);
+const hashMark = (hash: number, mark: MapMark, mapId: string): number => {
+  let next = updateFnv1a(hash, mark.id ?? '');
+  next = updateFnv1a(next, mark.pinned ? '1' : '0');
+  next = hashSortedValues(next, [...(mark.users ?? [])].sort(compareCodeUnits));
+  next = hashSortedValues(next, markZoneHashes(mark, mapId));
+  return hashSortedValues(next, markLocationHashes(mark, mapId));
+};
 export function getMarksHash(marks: MapMark[], mapId: string): string {
   let hash = updateFnv1a(FNV1A_OFFSET_BASIS, mapId);
   hash = updateFnv1a(hash, marks.length);
   for (const mark of marks) {
-    hash = updateFnv1a(hash, mark.id ?? '');
-    hash = updateFnv1a(hash, mark.pinned ? '1' : '0');
-    const sortedUsers = [...(mark.users ?? [])].sort(compareCodeUnits);
-    hash = updateFnv1a(hash, sortedUsers.length);
-    for (const user of sortedUsers) {
-      hash = updateFnv1a(hash, user);
-    }
-    const zoneHashes = mark.zones
-      .filter((zone) => zone.map.id === mapId)
-      .map((zone) => hashZoneOutline(zone.outline))
-      .sort((a, b) => a - b);
-    hash = updateFnv1a(hash, zoneHashes.length);
-    for (const zoneHash of zoneHashes) {
-      hash = updateFnv1a(hash, zoneHash);
-    }
-    const locationHashes = (mark.possibleLocations ?? [])
-      .filter((location) => location.map.id === mapId)
-      .map((location) => hashLocationPositions(location.positions))
-      .sort((a, b) => a - b);
-    hash = updateFnv1a(hash, locationHashes.length);
-    for (const locationHash of locationHashes) {
-      hash = updateFnv1a(hash, locationHash);
-    }
+    hash = hashMark(hash, mark, mapId);
   }
   return hash.toString(16).padStart(8, '0');
 }
