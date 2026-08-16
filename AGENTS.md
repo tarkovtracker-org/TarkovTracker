@@ -222,9 +222,10 @@ Naming:
   admin write. `public.app_settings` is service-role-only; `/api/twitch/config` resolves the
   admin-managed `promoted_twitch` override over that fallback, and `/api/admin/twitch-config` is the
   only writer. `/api/twitch/config` is edge-cached with the `promoted-twitch-config` tag and is
-  invalidated by the `admin-cache-purge` edge function (`twitch-config` purge type, tag purge with a
-  purge-by-URL fallback) after a committed admin update. Purge failures return the committed config
-  with an explicit warning flag so clients reconcile without repeating the write. Config responses
+  invalidated by the `admin-cache-purge` edge function after a committed admin update. A successful
+  immediate tag purge (with purge-by-URL fallback) schedules the same purge six seconds later to
+  clear stale in-flight fills. Purge failures return the committed config with an explicit warning
+  flag so clients reconcile without repeating the write. Config responses
   carry the settings version so stale browser cache entries cannot overwrite a newer admin save. The
   admin form disables browser caching when loading config so it cannot submit stale settings. See the
   Promoted Twitch configuration section of `docs/SYSTEMS.md`.

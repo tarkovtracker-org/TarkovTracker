@@ -885,9 +885,9 @@ flowchart LR
     Write --> Gate[Admin membership check]
     Gate --> Settings[(public.app_settings)]
     Write --> Audit[(admin_audit_log)]
-    Write -->|purge tag after commit| Purge[Cloudflare Purge API<br/>promoted-twitch-config]
+    Write -->|immediate + delayed purge| Purge[Cloudflare Purge API<br/>promoted-twitch-config]
     Embed[PromotedTwitchEmbed] -->|once per mount + focus| Read[GET /api/twitch/config]
-    Read --> Edge[Edge cache, 1h TTL]
+    Read --> Edge[Edge cache, 30d TTL]
     Edge --> Settings
     Edge --> Fallback[Public runtime config fallback]
     Embed -->|every 60s while enabled| Live[GET /api/twitch/live]
@@ -908,22 +908,25 @@ flowchart LR
 3. Only after the transaction commits does the route invoke the `admin-cache-purge` edge function
    with `purgeType: 'twitch-config'`, which calls the Cloudflare Purge API with the
    `promoted-twitch-config` cache tag. If the tag purge fails, the edge function falls back
-   to purging the `/api/twitch/config` URL (apex and `www` variants). If both purges fail, the route
-   returns the committed config with `cacheInvalidated: false`; the admin UI applies the saved value
-   locally and shows an explicit warning instead of encouraging a duplicate database write.
+   to purging the `/api/twitch/config` URL (apex and `www` variants). After a successful immediate
+   purge, `EdgeRuntime.waitUntil()` schedules the same purge six seconds later. That delay exceeds
+   the config route's five-second Supabase timeout, so a request that read the previous version before
+   the commit cannot refill the cache after both purges. If the immediate tag and URL purges both
+   fail, the route returns the committed config with `cacheInvalidated: false`; the admin UI applies
+   the saved value locally and shows an explicit warning instead of encouraging a duplicate database
+   write. A delayed purge failure is logged without changing the already returned save result.
 4. `GET /api/twitch/config` combines the build-time fallback with a validated database override. A
    missing table, missing row, malformed override, or unavailable database falls back safely instead
    of breaking the embed. The route reads the database only when the Pages Function executes — i.e.
    on cache fills. Its response carries `Cache-Tag: promoted-twitch-config` with a browser TTL of
-   five minutes (`max-age=300`) and a bounded Cloudflare edge TTL of one hour
-   (`s-maxage=3600` / `cloudflare-cdn-cache-control: public, max-age=3600`), so Cloudflare
-   serves cache hits without invoking the Function. The bounded TTL keeps a stale entry
-   self-healing: even if an in-flight cache fill stores a pre-purge response after the tag purge, or
-   a purge fails entirely, the stale value expires within an hour instead of pinning for a year. When
-   the database read fails, the fallback
-   response is sent with `no-store` so a transient outage never pins the env-default fallback at the
-   edge. Missing or invalid Supabase credentials are treated as the same uncacheable
-   failure. Successful responses include the settings version.
+   five minutes (`max-age=300`) and a bounded Cloudflare edge TTL of 30 days
+   (`s-maxage=2592000` / `cloudflare-cdn-cache-control: public, max-age=2592000`), so Cloudflare
+   serves cache hits without invoking the Function. The bounded TTL remains the final recovery path
+   if invalidation fails, while the delayed second purge prevents a successful invalidation from
+   being undone by an in-flight stale fill. When the database read fails, the fallback response is
+   sent with `no-store` so a transient outage never pins the env-default fallback at the edge.
+   Missing or invalid Supabase credentials are treated as the same uncacheable failure. Successful
+   responses include the settings version.
 5. `PromotedTwitchEmbed` fetches config once on mount and again on tab focus (an edge-cache hit),
    watches the shared client state for immediate propagation of admin saves in the same tab, and
    polls only `/api/twitch/live` every 60 seconds while `enabled === true`, pausing the timer while
@@ -948,7 +951,7 @@ flowchart LR
 - `app/composables/usePromotedTwitch.ts` — shared client config state for cross-component
   propagation.
 - `supabase/functions/admin-cache-purge/index.ts` — Cloudflare Purge API calls, including the
-  `twitch-config` tag purge with a purge-by-URL fallback.
+  immediate and delayed `twitch-config` tag purges with purge-by-URL fallbacks.
 - `supabase/migrations/20260814120000_add_app_settings.sql` — service-role-only settings table and
   transactional update/audit RPC.
 
@@ -970,13 +973,14 @@ flowchart LR
   resolves to disabled.
 - The config response must carry the `promoted-twitch-config` cache tag and a bounded edge TTL so
   Cloudflare serves cache hits without executing the Pages Function; the route and its database read
-  run only on cache fills. The bounded TTL bounds staleness: an in-flight fill that lands after a
-  purge, or a failed purge, recovers within the TTL instead of pinning a stale value indefinitely.
-  A failed database read must not be cached (`no-store`), so a transient
+  run only on cache fills. A failed database read must not be cached (`no-store`), so a transient
   outage cannot pin the env-default fallback at the edge.
 - The admin route must purge the `promoted-twitch-config` tag only after the database transaction
-  commits. If invalidation fails, it must return the committed config with an explicit warning flag;
-  the client must apply that config and visibly warn the admin without retrying the database write.
+  commits, then schedule a second purge after a delay longer than the config read timeout so an
+  in-flight stale fill cannot survive successful invalidation. If immediate invalidation fails, it
+  must return the committed config with an explicit warning flag; the client must apply that config
+  and visibly warn the admin without retrying the database write. The bounded TTL remains the final
+  recovery path when invalidation fails.
 - Mounted clients must never poll the config endpoint: they fetch it once per mount/focus and poll
   live status only while enabled, stopping while the tab is hidden. Older config versions and stale
   live-request generations must never overwrite the latest shared configuration or player state.

@@ -74,8 +74,8 @@ describe('/api/twitch/config', () => {
     expect(setResponseHeadersMock).toHaveBeenCalledWith(
       {},
       {
-        'cache-control': 'public, max-age=300, s-maxage=3600',
-        'cloudflare-cdn-cache-control': 'public, max-age=3600',
+        'cache-control': 'public, max-age=300, s-maxage=2592000',
+        'cloudflare-cdn-cache-control': 'public, max-age=2592000',
         'cache-tag': 'promoted-twitch-config',
         vary: 'Origin',
       }

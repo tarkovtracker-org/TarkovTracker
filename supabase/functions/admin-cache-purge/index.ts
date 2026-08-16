@@ -11,6 +11,7 @@ const CLOUDFLARE_API_URL = 'https://api.cloudflare.com/client/v4';
 const EDGE_CACHE_PATH = '/__edge-cache/tarkov';
 const TWITCH_CONFIG_CACHE_TAG = 'promoted-twitch-config';
 const TWITCH_CONFIG_PATH = '/api/twitch/config';
+const TWITCH_CONFIG_REPURGE_DELAY_MS = 6000;
 const PURGE_TIMEOUT_MS = 8000;
 const PURGE_CHUNK_SIZE = 30;
 const TARKOV_CACHE_KEYS = [
@@ -52,6 +53,11 @@ interface CloudflarePurgeResponse {
   errors: Array<{ code: number; message: string }>;
   messages: string[];
   result?: { id: string } | null;
+}
+interface EdgeRuntimeGlobal {
+  EdgeRuntime?: {
+    waitUntil<T>(promise: Promise<T>): Promise<T>;
+  };
 }
 type SupabaseClient = AuthSuccess['supabase'];
 /**
@@ -239,6 +245,36 @@ async function purgeTwitchConfigCache(
   if (urlPurge.success) return urlPurge;
   return combinePurgeFailures(tagPurge, urlPurge);
 }
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+function scheduleBackgroundTask(task: () => Promise<unknown>): void {
+  const { EdgeRuntime } = globalThis as unknown as EdgeRuntimeGlobal;
+  if (!EdgeRuntime) {
+    console.error('[admin-cache-purge] EdgeRuntime unavailable; delayed purge not scheduled');
+    return;
+  }
+  try {
+    void EdgeRuntime.waitUntil(task());
+  } catch (error) {
+    console.error('[admin-cache-purge] Failed to schedule delayed purge:', error);
+  }
+}
+async function repurgeTwitchConfigCache(
+  zoneId: string,
+  apiToken: string,
+  baseUrl: string
+): Promise<void> {
+  try {
+    await wait(TWITCH_CONFIG_REPURGE_DELAY_MS);
+    const result = await purgeTwitchConfigCache(zoneId, apiToken, baseUrl);
+    if (!result.success) {
+      console.error('[admin-cache-purge] Delayed Twitch config purge failed:', result.errors);
+    }
+  } catch (error) {
+    console.error('[admin-cache-purge] Delayed Twitch config purge failed:', error);
+  }
+}
 function markPurgeFailure(
   aggregate: CloudflarePurgeResponse,
   result: CloudflarePurgeResponse
@@ -356,6 +392,9 @@ Deno.serve(async (req) => {
       purgeResult = await purgeTwitchConfigCache(zoneId, apiToken, baseUrl);
     } else {
       purgeResult = await purgeTarkovDataCache(zoneId, apiToken, baseUrl);
+    }
+    if (purgeType === 'twitch-config' && purgeResult.success) {
+      scheduleBackgroundTask(() => repurgeTwitchConfigCache(zoneId, apiToken, baseUrl));
     }
     // Log the admin action
     await logAdminAction(
