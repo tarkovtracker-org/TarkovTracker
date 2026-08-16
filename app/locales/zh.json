@@ -319,7 +319,7 @@
     "import_failed": "导入失败",
     "delete_archived_run": "删除已存档的运行",
     "validation_error": "验证错误",
-    "got_it": "Got it"
+    "got_it": "明白了"
   },
   "page_help": {
     "button": "帮助",
@@ -505,42 +505,42 @@
       "coop_extract": "合作撤离点（PMC + Scav）"
     },
     "tooltips": {
-      "zoom_in": "Zoom in",
-      "zoom_out": "Zoom out",
+      "zoom_in": "缩放",
+      "zoom_out": "缩放",
       "reset_view": "重置视图",
-      "open_fullscreen": "Open map full screen",
-      "exit_fullscreen": "Exit full screen",
-      "drag_to_resize": "Drag to resize map",
-      "switch_floor": "Switch floor (Ctrl + Scroll)"
+      "open_fullscreen": "打开全屏地图",
+      "exit_fullscreen": "退出全屏",
+      "drag_to_resize": "拖动以调整地图大小",
+      "switch_floor": "切换底部(Ctrl + 滚动)"
     },
     "controls": {
       "help": {
-        "pan": "or drag to pan",
-        "zoom": "to zoom",
-        "reset": "to reset view",
-        "cycle_floors": "to cycle floors",
-        "floor_panel": "or use the floor panel",
-        "click_at_cursor": "to click at cursor",
-        "click_marker": "Click a marker for details",
-        "fullscreen": "Use the full screen button in the map controls",
-        "resize": "Drag the bottom edge of the map to resize"
+        "pan": "或拖动以pan",
+        "zoom": "缩放",
+        "reset": "重置视图",
+        "cycle_floors": "循环楼层",
+        "floor_panel": "或使用地板面板",
+        "click_at_cursor": "点击光标",
+        "click_marker": "点击标记查看详细信息",
+        "fullscreen": "使用地图控制中的全屏按钮",
+        "resize": "拖动地图的底部边缘以调整大小"
       }
     },
     "help": {
-      "title": "Map controls",
+      "title": "地图控制",
       "groups": {
         "navigate": "Navigate",
         "floors": "楼层",
-        "interact": "Interact",
-        "view": "View"
+        "interact": "交互功能",
+        "view": "查看"
       }
     },
     "hint": {
-      "title": "Quick map controls",
-      "drag_to_pan": "Drag to pan",
-      "shift_scroll_zoom": "Shift + Scroll to zoom",
-      "ctrl_scroll_floors": "Ctrl + Scroll to change floors",
-      "all_controls": "All controls"
+      "title": "快速地图控制",
+      "drag_to_pan": "拖动以pan",
+      "shift_scroll_zoom": "Shift + 滚动以缩放",
+      "ctrl_scroll_floors": "Ctrl + 滚动以更改楼层",
+      "all_controls": "所有控制"
     },
     "aria": {
       "tooltip_density": "Tooltip density"
@@ -939,9 +939,9 @@
       "loading": "加载任务中",
       "map": {
         "resize_handle": "调整地图高度",
-        "show_map": "Show map",
-        "hide_map": "Hide map",
-        "fullscreen_label": "Full screen",
+        "show_map": "显示地图",
+        "hide_map": "隐藏地图",
+        "fullscreen_label": "全屏",
         "required_items_summary": "活跃任务所需物品",
         "required_keys_summary": "活跃任务所需钥匙",
         "time_period": {
@@ -955,8 +955,8 @@
         "map_complete_tasks_showing": "该地图上有 {count} 个地图目标已完成任务正在显示。",
         "map_complete_tasks_toggle_show": "显示隐藏项",
         "map_complete_tasks_toggle_hide": "隐藏地图已完成",
-        "map_hidden_hint": "Map hidden — click to show",
-        "raid_time_tooltip": "Current in-game raid time"
+        "map_hidden_hint": "隐藏地图 - 点击显示",
+        "raid_time_tooltip": "当前游戏内搜查时间"
       },
       "pinned_tasks_section": "已固定任务",
       "focused_task_section": "当前聚焦任务",
