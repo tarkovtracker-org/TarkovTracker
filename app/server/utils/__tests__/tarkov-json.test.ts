@@ -547,6 +547,27 @@ describe('tarkov JSON adapters', () => {
       },
     ]);
   });
+  it('drops level trader requirements without a finite threshold', () => {
+    const payload = structuredClone(tasksPayload) as typeof tasksPayload;
+    const task = payload.tasks['task1'];
+    task?.traderRequirements?.push({
+      id: 'bad-level',
+      requirementType: 'level',
+      compareMethod: '>=',
+      value: Number.POSITIVE_INFINITY,
+      trader: 'trader1',
+    });
+    const tasks = adaptTasksCoreResponse(payload, mapsPayload, tradersPayload).data.tasks;
+    expect(tasks[0]?.traderLevelRequirements).toEqual([
+      {
+        id: 'level-req1',
+        trader: { id: 'trader1', name: 'Prapor' },
+        level: 2,
+        requirementType: 'level',
+        compareMethod: '>=',
+      },
+    ]);
+  });
   it('adapts hideout and prestige data without items lookup', () => {
     const hideout = adaptHideoutResponse(hideoutPayload, { tradersPayload }).data;
     expect(hideout.hideoutStations[0]?.levels[0]?.itemRequirements[0]).toMatchObject({

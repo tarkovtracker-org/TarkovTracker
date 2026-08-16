@@ -759,23 +759,29 @@ function adaptTraderRequirement(raw: unknown, context: AdapterContext) {
   });
 }
 const onlyIfPopulated = <T>(items: T[]): T[] | undefined => (items.length > 0 ? items : undefined);
+function readFiniteLevel(adapted: TraderRequirement & { level?: number }): number | undefined {
+  const level = adapted.level ?? adapted.value;
+  return typeof level === 'number' && Number.isFinite(level) ? level : undefined;
+}
 function pushTraderRequirement(
   adapted: (TraderRequirement & { level?: number }) | undefined,
   traderLevelRequirements: TaskTraderLevelRequirement[],
   traderRequirements: TraderRequirement[]
 ): void {
   if (!adapted) return;
-  if (adapted.requirementType === 'level') {
-    traderLevelRequirements.push({
-      id: adapted.id,
-      trader: adapted.trader,
-      level: adapted.level ?? adapted.value,
-      requirementType: 'level',
-      compareMethod: adapted.compareMethod,
-    });
+  if (adapted.requirementType !== 'level') {
+    traderRequirements.push(adapted);
     return;
   }
-  traderRequirements.push(adapted);
+  const level = readFiniteLevel(adapted);
+  if (level === undefined) return;
+  traderLevelRequirements.push({
+    id: adapted.id,
+    trader: adapted.trader,
+    level,
+    requirementType: 'level',
+    compareMethod: adapted.compareMethod,
+  });
 }
 function adaptTraderRequirements(
   raw: unknown,
