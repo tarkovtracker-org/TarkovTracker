@@ -450,7 +450,12 @@ function applyTraderRequirementSplit(task: Record<string, unknown>): void {
   const raw = task.traderRequirements;
   if (!Array.isArray(raw)) return;
   const traderLevelRequirements = raw
-    .filter((requirement) => isPlainObject(requirement) && requirement.requirementType === 'level')
+    .filter(
+      (requirement) =>
+        isPlainObject(requirement) &&
+        requirement.requirementType === 'level' &&
+        (typeof requirement.level === 'number' || typeof requirement.value === 'number')
+    )
     .map((requirement) => ({ ...requirement, level: requirement.level ?? requirement.value }));
   const traderRequirements = raw.filter(
     (requirement) => isPlainObject(requirement) && requirement.requirementType !== 'level'

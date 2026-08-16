@@ -198,6 +198,51 @@ describe('mergeModeCorrections (via applyOverlay integration)', () => {
     ]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+  it('drops malformed trader requirement entries during the split', async () => {
+    const fetchMock = stubOverlayFetch({
+      $meta: { version: 'malformed-split-test-v1' },
+      modes: {
+        pve: {
+          tasks: {
+            'task-1': {
+              traderRequirements: [
+                {
+                  id: 'bad-level',
+                  requirementType: 'level',
+                  trader: { id: 'trader-1', name: 'Prapor' },
+                },
+                null,
+                {
+                  id: 'good-rep',
+                  requirementType: 'reputation',
+                  compareMethod: '>=',
+                  value: 0.1,
+                  trader: { id: 'trader-1', name: 'Prapor' },
+                },
+              ],
+            },
+          },
+        },
+      },
+    });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const result = await applyOverlay(
+      { data: { tasks: [{ id: 'task-1', name: 'Base Task' }] } },
+      { gameMode: 'pve', bypassCache: true }
+    );
+    const task = result.data?.tasks?.[0] as Record<string, unknown> | undefined;
+    expect(task?.traderLevelRequirements).toBeUndefined();
+    expect(task?.traderRequirements).toEqual([
+      {
+        id: 'good-rep',
+        requirementType: 'reputation',
+        compareMethod: '>=',
+        value: 0.1,
+        trader: { id: 'trader-1', name: 'Prapor' },
+      },
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
 describe('applyLocaleOverlay', () => {
   it('shallow-merges locale patches (name/wikiLink) over matching entities', () => {
