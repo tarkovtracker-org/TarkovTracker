@@ -318,7 +318,8 @@
     "reset_all_data": "重置所有数据",
     "import_failed": "导入失败",
     "delete_archived_run": "删除已存档的运行",
-    "validation_error": "验证错误"
+    "validation_error": "验证错误",
+    "got_it": "Got it"
   },
   "page_help": {
     "button": "帮助",
@@ -503,15 +504,43 @@
       "shared_extract": "共享撤离点（任一阵营）",
       "coop_extract": "合作撤离点（PMC + Scav）"
     },
+    "tooltips": {
+      "zoom_in": "Zoom in",
+      "zoom_out": "Zoom out",
+      "reset_view": "重置视图",
+      "open_fullscreen": "Open map full screen",
+      "exit_fullscreen": "Exit full screen",
+      "drag_to_resize": "Drag to resize map",
+      "switch_floor": "Switch floor (Ctrl + Scroll)"
+    },
     "controls": {
-      "keyboard": {
-        "pan": "平移视图",
-        "zoom_keys": "键盘缩放",
-        "click": "在光标处点击",
-        "reset": "重置视图",
-        "cycle_floors": "+ 滚轮切换楼层",
-        "zoom": "+ 滚轮缩放"
+      "help": {
+        "pan": "or drag to pan",
+        "zoom": "to zoom",
+        "reset": "to reset view",
+        "cycle_floors": "to cycle floors",
+        "floor_panel": "or use the floor panel",
+        "click_at_cursor": "to click at cursor",
+        "click_marker": "Click a marker for details",
+        "fullscreen": "Use the full screen button in the map controls",
+        "resize": "Drag the bottom edge of the map to resize"
       }
+    },
+    "help": {
+      "title": "Map controls",
+      "groups": {
+        "navigate": "Navigate",
+        "floors": "楼层",
+        "interact": "Interact",
+        "view": "View"
+      }
+    },
+    "hint": {
+      "title": "Quick map controls",
+      "drag_to_pan": "Drag to pan",
+      "shift_scroll_zoom": "Shift + Scroll to zoom",
+      "ctrl_scroll_floors": "Ctrl + Scroll to change floors",
+      "all_controls": "All controls"
     },
     "aria": {
       "tooltip_density": "Tooltip density"
@@ -910,7 +939,9 @@
       "loading": "加载任务中",
       "map": {
         "resize_handle": "调整地图高度",
-        "toggle_panel": "显示或隐藏地图面板",
+        "show_map": "Show map",
+        "hide_map": "Hide map",
+        "fullscreen_label": "Full screen",
         "required_items_summary": "活跃任务所需物品",
         "required_keys_summary": "活跃任务所需钥匙",
         "time_period": {
@@ -923,7 +954,9 @@
         "map_complete_tasks_hidden": "该地图上有 {count} 个已完成任务被隐藏。",
         "map_complete_tasks_showing": "该地图上有 {count} 个地图目标已完成任务正在显示。",
         "map_complete_tasks_toggle_show": "显示隐藏项",
-        "map_complete_tasks_toggle_hide": "隐藏地图已完成"
+        "map_complete_tasks_toggle_hide": "隐藏地图已完成",
+        "map_hidden_hint": "Map hidden — click to show",
+        "raid_time_tooltip": "Current in-game raid time"
       },
       "pinned_tasks_section": "已固定任务",
       "focused_task_section": "当前聚焦任务",
