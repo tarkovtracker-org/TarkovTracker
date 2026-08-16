@@ -318,7 +318,8 @@
     "reset_all_data": "Reimposta Tutti I Dati",
     "import_failed": "Importazione Non Riuscita",
     "delete_archived_run": "Elimina Esecuzione Archiviata",
-    "validation_error": "Errore Di Convalida"
+    "validation_error": "Errore Di Convalida",
+    "got_it": "Ho capito"
   },
   "page_help": {
     "button": "Aiuto",
@@ -503,15 +504,43 @@
       "shared_extract": "Estrazione PMC/Scav",
       "coop_extract": "Estrazione Co-Op"
     },
+    "tooltips": {
+      "zoom_in": "Aumenta ingrandimento",
+      "zoom_out": "Riduci ingrandimento",
+      "reset_view": "Reset vista",
+      "open_fullscreen": "Apri mappa a schermo intero",
+      "exit_fullscreen": "Esci dallo schermo intero",
+      "drag_to_resize": "Trascina per ridimensionare la mappa",
+      "switch_floor": "Interruttore a pavimento (Ctrl + Scorrimento)"
+    },
     "controls": {
-      "keyboard": {
-        "pan": "per muovere",
-        "zoom_keys": "per zoomare",
-        "click": "per cliccare sul cursore",
+      "help": {
+        "pan": "o trascina su pan",
+        "zoom": "per ingrandire",
         "reset": "per resettare la vista",
-        "cycle_floors": "+ rotella per cambiare piano",
-        "zoom": "+ rotella per zoom"
+        "cycle_floors": "per ciclare i piani",
+        "floor_panel": "o utilizzare il pannello del pavimento",
+        "click_at_cursor": "per cliccare sul cursore",
+        "click_marker": "Fare clic su un marcatore per i dettagli",
+        "fullscreen": "Usa il pulsante a schermo intero nei controlli mappa",
+        "resize": "Trascinare il bordo inferiore della mappa per ridimensionare"
       }
+    },
+    "help": {
+      "title": "Controlli mappa",
+      "groups": {
+        "navigate": "Navigate",
+        "floors": "Piani",
+        "interact": "Interact",
+        "view": "View"
+      }
+    },
+    "hint": {
+      "title": "Quick map controls",
+      "drag_to_pan": "Drag to pan",
+      "shift_scroll_zoom": "Shift + Scroll to zoom",
+      "ctrl_scroll_floors": "Ctrl + Scroll to change floors",
+      "all_controls": "All controls"
     },
     "aria": {
       "tooltip_density": "Densità dei suggerimenti"
@@ -910,7 +939,9 @@
       "loading": "Caricamento missioni",
       "map": {
         "resize_handle": "Ridimensiona altezza mappa",
-        "toggle_panel": "Attiva/Disattiva pannello mappa",
+        "show_map": "Show map",
+        "hide_map": "Hide map",
+        "fullscreen_label": "Full screen",
         "required_items_summary": "Oggetti richiesti per le missioni attive",
         "required_keys_summary": "Chiavi richieste per le missioni attive",
         "time_period": {
@@ -923,7 +954,9 @@
         "map_complete_tasks_hidden": "{count} missioni nascoste sulla mappa.",
         "map_complete_tasks_showing": "{count} missioni complete per mappa mostrate.",
         "map_complete_tasks_toggle_show": "Mostra nascoste",
-        "map_complete_tasks_toggle_hide": "Nascondi complete per mappa"
+        "map_complete_tasks_toggle_hide": "Nascondi complete per mappa",
+        "map_hidden_hint": "Map hidden — click to show",
+        "raid_time_tooltip": "Current in-game raid time"
       },
       "pinned_tasks_section": "Missioni in evidenza",
       "focused_task_section": "Missioni focus",
