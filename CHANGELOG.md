@@ -1,3 +1,23 @@
+# [1.72.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.71.2...v1.72.0) (2026-08-16)
+
+
+### Bug Fixes
+
+* **maps:** carry floor across fullscreen map instances and persist help flag ([2d54e0a](https://github.com/tarkovtracker-org/TarkovTracker/commit/2d54e0a75b5ccafb3a75e972f6d91008a1929140))
+* **maps:** keep fractional zoom when capturing and restoring map views ([2679e2a](https://github.com/tarkovtracker-org/TarkovTracker/commit/2679e2a8aca6852197812e08a042f726075a7e82))
+* **tasks:** make the fullscreen map dialog safe for assistive tech ([18d509b](https://github.com/tarkovtracker-org/TarkovTracker/commit/18d509b56dbe9370e4df07f9ab8a1716dd3adf90))
+* **maps:** mark map help as seen whenever the help popover opens ([53f2ade](https://github.com/tarkovtracker-org/TarkovTracker/commit/53f2ade4e9e02564edeb62562f72148d6abb3298))
+* **tasks:** name the map heading after the map and pair both toggles ([b1efd2e](https://github.com/tarkovtracker-org/TarkovTracker/commit/b1efd2e7d144a123ed2126c0c0aaf815b75f46aa))
+* **maps:** sync map help seen flag across mounted map instances ([33cfcf4](https://github.com/tarkovtracker-org/TarkovTracker/commit/33cfcf4e4fe40efade7eaa5d5844c7d5514b1688))
+* **tasks:** use a native dialog element for the fullscreen map overlay ([f0608de](https://github.com/tarkovtracker-org/TarkovTracker/commit/f0608de7f1643170c091e567bb4c9422412144e4))
+* **tasks:** validate initialView center coordinates and trap focus in map fullscreen ([ca33825](https://github.com/tarkovtracker-org/TarkovTracker/commit/ca3382574cd02092f6629a29e1421c7f3452ef8e))
+
+
+### Features
+
+* **tasks:** expand task map panel by default with obvious toggle and fullscreen view ([e3d7d65](https://github.com/tarkovtracker-org/TarkovTracker/commit/e3d7d652ad9751f1c91cc1460ca25acd98725833))
+* **maps:** redesign map controls and fit the fullscreen map to the viewport ([979e70c](https://github.com/tarkovtracker-org/TarkovTracker/commit/979e70c84e448412d1bd700892aa8afe9770e4b7))
+
 ## [1.71.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.71.1...v1.71.2) (2026-08-15)
 
 
