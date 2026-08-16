@@ -531,16 +531,16 @@
       "groups": {
         "navigate": "Navigate",
         "floors": "Pisos",
-        "interact": "Interact",
-        "view": "View"
+        "interact": "Interactuar",
+        "view": "Ver"
       }
     },
     "hint": {
-      "title": "Quick map controls",
-      "drag_to_pan": "Drag to pan",
-      "shift_scroll_zoom": "Shift + Scroll to zoom",
-      "ctrl_scroll_floors": "Ctrl + Scroll to change floors",
-      "all_controls": "All controls"
+      "title": "Controles rápidos del mapa",
+      "drag_to_pan": "Arrastra para tirar",
+      "shift_scroll_zoom": "Mayús + Desplazamiento para acercar",
+      "ctrl_scroll_floors": "Ctrl + Desplazarse para cambiar de piso",
+      "all_controls": "Todos los controles"
     },
     "aria": {
       "tooltip_density": "Tooltip density"
@@ -939,9 +939,9 @@
       "loading": "Cargando misiones",
       "map": {
         "resize_handle": "Ajustar altura del mapa",
-        "show_map": "Show map",
-        "hide_map": "Hide map",
-        "fullscreen_label": "Full screen",
+        "show_map": "Mostrar mapa",
+        "hide_map": "Ocultar mapa",
+        "fullscreen_label": "Pantalla completa",
         "required_items_summary": "Objetos necesarios para tareas activas",
         "required_keys_summary": "Llaves necesarias para tareas activas",
         "time_period": {
@@ -955,8 +955,8 @@
         "map_complete_tasks_showing": "{count} tareas completadas en este mapa se están mostrando.",
         "map_complete_tasks_toggle_show": "Mostrar ocultas",
         "map_complete_tasks_toggle_hide": "Ocultar completadas en mapa",
-        "map_hidden_hint": "Map hidden — click to show",
-        "raid_time_tooltip": "Current in-game raid time"
+        "map_hidden_hint": "Mapa oculto — haga clic para mostrar",
+        "raid_time_tooltip": "Tiempo actual de la banda del juego"
       },
       "pinned_tasks_section": "Tareas fijadas",
       "focused_task_section": "Tarea enfocada",
