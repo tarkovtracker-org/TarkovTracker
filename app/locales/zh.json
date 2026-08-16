@@ -57,6 +57,8 @@
     "twitch_display_name_placeholder": "频道显示名称",
     "twitch_config_saved_title": "Twitch配置已更新",
     "twitch_config_saved_description": "Promoted stream is now {channel}.",
+    "twitch_config_saved_with_warning_title": "Twitch配置已保存",
+    "twitch_config_saved_with_warning_description": "配置已保存，但缓存的访客仍可能看到上一个值。",
     "twitch_config_failed_description": "无法更新 Twitch 配置。",
     "twitch_config_load_failed_title": "Twitch配置不可用",
     "twitch_config_load_failed_description": "无法加载当前Twitch配置。",
