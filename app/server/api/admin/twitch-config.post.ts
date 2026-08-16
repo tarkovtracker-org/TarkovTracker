@@ -1,8 +1,10 @@
-import { createError, defineEventHandler, readBody } from 'h3';
+import { createError, defineEventHandler, getRequestHeader, readBody } from 'h3';
 import { adminSupabaseFetch, getIsAdmin, normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
 import { createLogger } from '@/server/utils/logger';
 import type { H3Event } from 'h3';
 const logger = createLogger('AdminTwitchConfig');
+const EDGE_FUNCTION_PATH = '/functions/v1/admin-cache-purge';
+const PURGE_TIMEOUT_MS = 25_000;
 const CHANNEL_REGEX = /^[a-z0-9_]{1,25}$/;
 const DISPLAY_NAME_MAX_LENGTH = 50;
 interface AdminTwitchConfigBody {
@@ -23,21 +25,24 @@ interface AdminAuthUser {
   id?: string;
   email?: string;
 }
-export default defineEventHandler(
-  async (event): Promise<{ config: TwitchConfig; version: number }> => {
-    try {
-      return await handleUpdate(event);
-    } catch (error) {
-      logger.error('[AdminTwitchConfig] Failed to update Twitch config', {
-        action: 'update_promoted_twitch_config',
-        adminUserId: readAdminUserIdForLog(event),
-        error,
-      });
-      throw error;
-    }
+interface UpdateResult {
+  cacheInvalidated: boolean;
+  config: TwitchConfig;
+  version: number;
+}
+export default defineEventHandler(async (event): Promise<UpdateResult> => {
+  try {
+    return await handleUpdate(event);
+  } catch (error) {
+    logger.error('[AdminTwitchConfig] Failed to update Twitch config', {
+      action: 'update_promoted_twitch_config',
+      adminUserId: readAdminUserIdForLog(event),
+      error,
+    });
+    throw error;
   }
-);
-async function handleUpdate(event: H3Event): Promise<{ config: TwitchConfig; version: number }> {
+});
+async function handleUpdate(event: H3Event): Promise<UpdateResult> {
   const runtime = useRuntimeConfig(event) as Record<string, unknown>;
   const supabaseUrl = readSupabaseUrl(runtime);
   const serviceKey = readServiceKey(runtime);
@@ -54,7 +59,63 @@ async function handleUpdate(event: H3Event): Promise<{ config: TwitchConfig; ver
     readAdminEmail(event),
     input
   );
-  return { config: saved.value, version: saved.version };
+  const cacheInvalidated = await purgeConfigCache(runtime, event);
+  return { cacheInvalidated, config: saved.value, version: saved.version };
+}
+async function purgeConfigCache(
+  runtime: Record<string, unknown>,
+  event: H3Event
+): Promise<boolean> {
+  try {
+    const supabaseUrl = readSupabaseUrl(runtime);
+    if (!supabaseUrl) throw new Error('Cache purge config missing');
+    await invokeCachePurge(supabaseUrl, readAnonKey(runtime), readAuthHeader(event));
+    return true;
+  } catch (error) {
+    logger.error('[AdminTwitchConfig] Failed to purge Twitch config cache', {
+      action: 'purge_promoted_twitch_config',
+      adminUserId: readAdminUserIdForLog(event),
+      error,
+    });
+    return false;
+  }
+}
+function readAnonKey(runtime: Record<string, unknown>): string {
+  return typeof runtime.supabaseAnonKey === 'string' ? runtime.supabaseAnonKey : '';
+}
+function readAuthHeader(event: H3Event): string {
+  const authHeader = getRequestHeader(event, 'authorization');
+  if (!authHeader) throw new Error('Cache purge authorization missing');
+  return authHeader;
+}
+async function invokeCachePurge(
+  supabaseUrl: string,
+  anonKey: string,
+  authHeader: string
+): Promise<void> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), PURGE_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${supabaseUrl}${EDGE_FUNCTION_PATH}`, {
+      method: 'POST',
+      headers: {
+        Authorization: authHeader,
+        apikey: anonKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ purgeType: 'twitch-config' }),
+      signal: controller.signal,
+    });
+    if (response.ok) return;
+    throw await buildPurgeFailureError(response);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+async function buildPurgeFailureError(response: Response): Promise<Error> {
+  const detail = await response.text().catch(() => '');
+  const suffix = detail ? `: ${detail}` : '';
+  return new Error(`Cache purge failed (${response.status})${suffix}`);
 }
 async function updateConfig(
   supabaseUrl: string,

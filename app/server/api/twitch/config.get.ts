@@ -3,7 +3,15 @@ import { useRuntimeConfig } from '#imports';
 import { adminSupabaseFetch, normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
 import { createLogger } from '@/server/utils/logger';
 const logger = createLogger('twitch-config');
-const REVALIDATE_HEADERS = { 'cache-control': 'public, max-age=0, must-revalidate' };
+const CACHE_TAG = 'promoted-twitch-config';
+const EDGE_CACHE_TTL_SECONDS = 3_600;
+const CACHE_HEADERS = {
+  'cache-control': `public, max-age=300, s-maxage=${EDGE_CACHE_TTL_SECONDS}`,
+  'cloudflare-cdn-cache-control': `public, max-age=${EDGE_CACHE_TTL_SECONDS}`,
+  'cache-tag': CACHE_TAG,
+  vary: 'Origin',
+};
+const NO_STORE_HEADERS = { 'cache-control': 'no-store' };
 const SETTING_KEY = 'promoted_twitch';
 const DEFAULT_CHANNEL = 'honeyxxo';
 const CHANNEL_REGEX = /^[a-z0-9_]{1,25}$/;
@@ -12,6 +20,7 @@ interface TwitchConfig {
   channel: string;
   displayName: string;
   enabled: boolean;
+  version: number;
 }
 interface TwitchFallback {
   channel?: string;
@@ -20,9 +29,12 @@ interface TwitchFallback {
 }
 interface SettingRow {
   value?: Record<string, unknown>;
+  version?: number;
 }
 interface OverrideResult {
   value?: Record<string, unknown>;
+  version?: number;
+  failed?: boolean;
 }
 function normalizeChannel(value: unknown): string {
   if (typeof value !== 'string') return '';
@@ -42,9 +54,12 @@ function displayNameOr(value: unknown, fallback: string): string {
 function boolOr(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
 }
-function resolveConfig(fallback: TwitchFallback, override?: Record<string, unknown>): TwitchConfig {
+function resolveConfig(
+  fallback: TwitchFallback,
+  override?: Record<string, unknown>
+): Omit<TwitchConfig, 'version'> {
   const channel = normalizeChannel(fallback.channel) || DEFAULT_CHANNEL;
-  const base: TwitchConfig = {
+  const base = {
     channel,
     displayName: displayNameOr(fallback.displayName, channel),
     enabled: boolOr(fallback.enabled, false),
@@ -66,7 +81,7 @@ function readServiceKey(runtime: Record<string, unknown>): string {
 async function readOverride(runtime: Record<string, unknown>): Promise<OverrideResult> {
   const supabaseUrl = readSupabaseUrl(runtime);
   const serviceKey = readServiceKey(runtime);
-  if (!supabaseUrl || !serviceKey) return {};
+  if (!supabaseUrl || !serviceKey) return { failed: true };
   return fetchSetting(supabaseUrl, serviceKey);
 }
 async function fetchSetting(supabaseUrl: string, serviceKey: string): Promise<OverrideResult> {
@@ -74,12 +89,12 @@ async function fetchSetting(supabaseUrl: string, serviceKey: string): Promise<Ov
     const rows = await adminSupabaseFetch<SettingRow[]>(
       supabaseUrl,
       serviceKey,
-      `/rest/v1/app_settings?select=value&key=eq.${SETTING_KEY}&limit=1`
+      `/rest/v1/app_settings?select=value,version&key=eq.${SETTING_KEY}&limit=1`
     );
-    return { value: rows?.[0]?.value };
+    return { value: rows?.[0]?.value, version: rows?.[0]?.version };
   } catch (err) {
     logger.warn('Failed to read Twitch config override, falling back to env defaults', err);
-    return {};
+    return { failed: true };
   }
 }
 function readFallback(runtime: Record<string, unknown>): TwitchFallback {
@@ -91,6 +106,9 @@ export default defineEventHandler(async (event): Promise<TwitchConfig> => {
   const fallback = readFallback(runtime);
   const override = await readOverride(runtime);
   const config = resolveConfig(fallback, override.value);
-  setResponseHeaders(event, REVALIDATE_HEADERS);
-  return config;
+  setResponseHeaders(event, override.failed ? NO_STORE_HEADERS : CACHE_HEADERS);
+  return {
+    ...config,
+    version: Number.isSafeInteger(override.version) ? (override.version as number) : 0,
+  };
 });

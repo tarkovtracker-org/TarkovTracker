@@ -1,16 +1,19 @@
 <script setup lang="ts">
+  import { usePromotedTwitch, type PromotedTwitchConfig } from '@/composables/usePromotedTwitch';
   import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   import { logger } from '@/utils/logger';
   const { $supabase } = useNuxtApp();
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
   const { systemStore } = useSystemStoreWithSupabase();
+  const { applyConfig: applySharedConfig } = usePromotedTwitch();
   const CHANNEL_MAX_LENGTH = 25;
   const DISPLAY_NAME_MAX_LENGTH = 50;
-  interface TwitchConfig {
-    channel: string;
-    displayName: string;
-    enabled: boolean;
+  type TwitchConfig = Omit<PromotedTwitchConfig, 'version'>;
+  interface TwitchConfigSaveResult {
+    cacheInvalidated: boolean;
+    config: TwitchConfig;
+    version: number;
   }
   const channel = ref('');
   const displayName = ref('');
@@ -28,7 +31,7 @@
   const loadConfig = async () => {
     isLoading.value = true;
     try {
-      applyConfig(await $fetch<TwitchConfig>('/api/twitch/config'));
+      applyConfig(await $fetch<TwitchConfig>('/api/twitch/config', { cache: 'no-store' }));
     } catch (error) {
       logger.warn('[AdminTwitchConfigCard] Failed to load Twitch config', error);
       toast.add({
@@ -63,26 +66,8 @@
     if (error instanceof Error) return serverMessage(error) ?? error.message;
     return t('admin.twitch_config_failed_description', 'Could not update Twitch config.');
   };
-  const saveConfig = async () => {
-    if (!canSave.value) return;
-    isSaving.value = true;
-    try {
-      const token = await getAuthToken();
-      if (!token) {
-        throw new Error(
-          t('admin.twitch_config_login_required', 'You must be signed in to update Twitch config.')
-        );
-      }
-      const saved = await $fetch<{ config: TwitchConfig }>('/api/admin/twitch-config', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: {
-          channel: channel.value.trim().toLowerCase(),
-          displayName: displayName.value.trim(),
-          enabled: enabled.value,
-        },
-      });
-      applyConfig(saved.config);
+  const showSaveResult = (saved: TwitchConfigSaveResult): void => {
+    if (saved.cacheInvalidated) {
       toast.add({
         title: t('admin.twitch_config_saved_title', 'Twitch config updated'),
         description: t(
@@ -93,6 +78,40 @@
         color: 'success',
         icon: 'i-mdi-check-circle',
       });
+      return;
+    }
+    toast.add({
+      title: t('admin.twitch_config_saved_with_warning_title', 'Twitch config saved'),
+      description: t(
+        'admin.twitch_config_saved_with_warning_description',
+        'The config was saved, but cached visitors may still see the previous value.'
+      ),
+      color: 'warning',
+      icon: 'i-mdi-alert',
+    });
+  };
+  const saveConfig = async () => {
+    if (!canSave.value) return;
+    isSaving.value = true;
+    try {
+      const token = await getAuthToken();
+      if (!token) {
+        throw new Error(
+          t('admin.twitch_config_login_required', 'You must be signed in to update Twitch config.')
+        );
+      }
+      const saved = await $fetch<TwitchConfigSaveResult>('/api/admin/twitch-config', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: {
+          channel: channel.value.trim().toLowerCase(),
+          displayName: displayName.value.trim(),
+          enabled: enabled.value,
+        },
+      });
+      applyConfig(saved.config);
+      applySharedConfig({ ...saved.config, version: saved.version });
+      showSaveResult(saved);
     } catch (error) {
       logger.warn('[AdminTwitchConfigCard] Failed to save Twitch config', error);
       toast.add({
@@ -122,7 +141,7 @@
           {{
             t(
               'admin.twitch_config_description',
-              'Set the Twitch channel promoted in the corner of the site. Visitors pick up the change within a couple of minutes.'
+              'Set the Twitch channel promoted in the corner of the site. Visitors pick up the change within five minutes.'
             )
           }}
         </p>

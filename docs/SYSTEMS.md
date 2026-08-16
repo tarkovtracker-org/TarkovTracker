@@ -873,8 +873,9 @@ flowchart LR
 
 **Summary.** The promoted Twitch embed uses build-time public runtime config as a safe fallback, but
 an administrator can change the active channel, display name, and enabled state without a frontend
-redeploy. The override is stored in a service-role-only settings table, resolved by a public Nitro
-route, and refreshed by mounted clients once per minute.
+redeploy. The override is stored in a service-role-only settings table. The public config route is
+cached at the edge with a bounded TTL and explicitly invalidated after an admin update; live status is
+also edge-cached per TTL, so mounted clients do not invoke the Pages Function for every poll.
 
 ### Diagram
 
@@ -884,36 +885,76 @@ flowchart LR
     Write --> Gate[Admin membership check]
     Gate --> Settings[(public.app_settings)]
     Write --> Audit[(admin_audit_log)]
-    Embed[PromotedTwitchEmbed] -->|every 60s| Read[GET /api/twitch/config]
-    Read --> Settings
-    Read --> Fallback[Public runtime config fallback]
-    Embed --> Live[GET /api/twitch/live]
+    Write -->|immediate + delayed purge| Purge[Cloudflare Purge API<br/>promoted-twitch-config]
+    Embed[PromotedTwitchEmbed] -->|mount, focus + every 5m| Read[GET /api/twitch/config]
+    Read --> Edge[Edge cache, 1h TTL]
+    Edge --> Settings
+    Edge --> Fallback[Public runtime config fallback]
+    Embed -->|every 60s while enabled| Live[GET /api/twitch/live]
+    Live --> LiveEdge[Edge cache, 30s TTL]
 ```
 
 ### Flow
 
-1. `AdminTwitchConfigCard` loads the effective public configuration and obtains the current Supabase
-   access token before saving.
+1. `AdminTwitchConfigCard` loads the effective public configuration with browser caching disabled,
+   so a previously cached response cannot make a later save revert newer settings. It obtains the
+   current Supabase access token before saving. After a successful save it also publishes the saved
+   config to the shared `usePromotedTwitch` client state, so the embed in the same tab adopts the
+   change immediately without waiting for a poll.
 2. `POST /api/admin/twitch-config` requires authenticated admin membership and validates the Twitch
    channel, display name, and enabled flag. It calls `update_promoted_twitch_config`, which updates the
    `promoted_twitch` JSON value, advances its shared version, and writes the admin audit row in one
    database transaction. A failure rolls back both writes.
-3. `GET /api/twitch/config` combines the build-time fallback with a validated database override. A
+3. Only after the transaction commits does the route invoke the `admin-cache-purge` edge function
+   with `purgeType: 'twitch-config'`, which calls the Cloudflare Purge API with the
+   `promoted-twitch-config` cache tag. If the tag purge fails, the edge function falls back
+   to purging the `/api/twitch/config` URL (apex and `www` variants). After a successful immediate
+   purge, `EdgeRuntime.waitUntil()` schedules the same purge six seconds later. That delay exceeds
+   the config route's five-second Supabase timeout, so a request that read the previous version before
+   the commit cannot refill the cache after both purges. If the immediate tag and URL purges both
+   fail, the route returns the committed config with `cacheInvalidated: false`; the admin UI applies
+   the saved value locally and shows an explicit warning instead of encouraging a duplicate database
+   write. The edge function records Twitch-only invalidations as `twitch_config_cache_purge`, not the
+   `cache_purge` action consumed by Tarkov game-data cache metadata. A delayed purge failure is logged
+   without changing the already returned save result.
+4. `GET /api/twitch/config` combines the build-time fallback with a validated database override. A
    missing table, missing row, malformed override, or unavailable database falls back safely instead
-   of breaking the embed. The route reads the database on every request and sends
-   `cache-control: public, max-age=0, must-revalidate`, so neither a Nitro isolate nor the edge can
-   serve an update without revalidating the database-backed value.
-4. `PromotedTwitchEmbed` refreshes the configuration before each live-status poll. Channel changes
-   replace the player URL and clear a stored dismissal, disabling hides an active player, and an
-   unavailable config endpoint keeps the build-time fallback working. Refreshes are single-flight, so
-   a slow request cannot be overtaken by the next 60-second tick.
+   of breaking the embed. The route reads the database only when the Pages Function executes — i.e.
+   on cache fills. Its response carries `Cache-Tag: promoted-twitch-config` with a browser TTL of
+   five minutes (`max-age=300`) and a bounded Cloudflare edge TTL of one hour
+   (`s-maxage=3600` / `cloudflare-cdn-cache-control: public, max-age=3600`), so Cloudflare serves
+   cache hits without invoking the Function. The bounded TTL remains the final recovery path
+   if invalidation fails, while the delayed second purge prevents a successful invalidation from
+   being undone by an in-flight stale fill. When the database read fails, the fallback response is
+   sent with `no-store` so a transient outage never pins the env-default fallback at the edge.
+   Missing or invalid Supabase credentials are treated as the same uncacheable failure. Successful
+   responses include the settings version.
+5. `PromotedTwitchEmbed` fetches config on mount, every five minutes while visible, and again on tab
+   focus. Browser and edge caching absorb those refreshes between fills. It watches the shared client
+   state for immediate propagation of admin saves in the same tab and polls `/api/twitch/live` every
+   60 seconds while `enabled === true`, pausing both timers while the tab is hidden. It ignores
+   fetched configs older than the latest shared version, so a browser cache hit or overlapping focus
+   request cannot revert an admin save. Live responses are edge-cached for 30 seconds, so the CDN
+   absorbs the polling traffic instead of the Function.
+   Channel changes advance a request generation so stale live results cannot apply after a channel
+   cycles back. Channel changes replace the player URL and clear a stored dismissal, disabling hides
+   an active player, and an unavailable config endpoint keeps the build-time fallback working.
 
 ### Files
 
-- `app/features/admin/AdminTwitchConfigCard.vue` — admin form and authenticated save flow.
-- `app/server/api/admin/twitch-config.post.ts` — validation, admin authorization, upsert, and audit.
-- `app/server/api/twitch/config.get.ts` — public fallback/override resolution and revalidation.
-- `app/components/PromotedTwitchEmbed.vue` — minute polling and player state updates.
+- `app/features/admin/AdminTwitchConfigCard.vue` — admin form, authenticated save flow, and shared
+  state publish.
+- `app/server/api/admin/twitch-config.post.ts` — validation, admin authorization, upsert, audit, and
+  post-commit cache purge.
+- `app/server/api/twitch/config.get.ts` — public fallback/override resolution and edge-cache
+  headers.
+- `app/server/api/twitch/live.get.ts` — live-status check with short edge caching.
+- `app/components/PromotedTwitchEmbed.vue` — bounded config refresh, live polling, and player state
+  updates.
+- `app/composables/usePromotedTwitch.ts` — shared client config state for cross-component
+  propagation.
+- `supabase/functions/admin-cache-purge/index.ts` — Cloudflare Purge API calls, including the
+  immediate and delayed `twitch-config` tag purges with purge-by-URL fallbacks.
 - `supabase/migrations/20260814120000_add_app_settings.sql` — service-role-only settings table and
   transactional update/audit RPC.
 
@@ -933,10 +974,24 @@ flowchart LR
   promote a stream without a database override or admin write. The admin-managed override can change
   the effective channel, display name, and enabled state. A missing or malformed build-time flag
   resolves to disabled.
-- Public responses must re-read the database-backed value instead of relying on module-local or
-  independently stale edge state.
-- Mounted clients re-read configuration on the same 60-second cadence as live status, so an admin
-  change takes effect without reload or redeploy within the next client poll after revalidation.
+- The config response must carry the `promoted-twitch-config` cache tag and a bounded edge TTL so
+  Cloudflare serves cache hits without executing the Pages Function; the route and its database read
+  run only on cache fills. A failed database read must not be cached (`no-store`), so a transient
+  outage cannot pin the env-default fallback at the edge.
+- The admin route must purge the `promoted-twitch-config` tag only after the database transaction
+  commits, then schedule a second purge after a delay longer than the config read timeout so an
+  in-flight stale fill cannot survive successful invalidation. If immediate invalidation fails, it
+  must return the committed config with an explicit warning flag; the client must apply that config
+  and visibly warn the admin without retrying the database write. The bounded TTL remains the final
+  recovery path when invalidation fails.
+- Mounted clients must refresh config every five minutes while visible and on mount/focus so remote
+  enable, disable, and channel changes reach continuously open tabs. Config refreshes and live-status
+  checks stop while the tab is hidden, and pending lifecycle work must not start timers after unmount.
+  Older config versions and stale live-request generations must never overwrite the latest shared
+  configuration or player state.
+- Twitch-only invalidations must use the `twitch_config_cache_purge` audit action. The `cache_purge`
+  action is reserved for `all` and `tarkov-data` purges because `/api/tarkov/cache-meta` treats its
+  latest successful row as a signal to clear browser game-data caches.
 
 ## 11. Boot-time asset-failure recovery
 
