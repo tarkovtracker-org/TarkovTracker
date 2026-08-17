@@ -44,14 +44,25 @@
     "supporter_target_user_label": "User ID",
     "supporter_target_user_placeholder": "Supabase auth user UUID",
     "supporter_tier_label": "Tier",
-    "supporter_enabled_label": "Enabled",
-    "supporter_disabled_label": "Disabled",
     "supporter_override_login_required": "You must be signed in to update supporter access.",
     "supporter_override_saved_title": "Supporter access updated",
     "supporter_override_enabled_description": "Enabled {tier} supporter access.",
     "supporter_override_disabled_description": "Disabled active supporter access.",
-    "supporter_override_failed_title": "Update failed",
-    "supporter_override_failed_description": "Could not update supporter access."
+    "supporter_override_failed_description": "Could not update supporter access.",
+    "twitch_config_title": "Поток Twitch",
+    "twitch_config_description": "Установите Twitch канал, продвигаемый в углу сайта. Посетители забирают изменения в течение нескольких минут.",
+    "twitch_channel_label": "Канал",
+    "twitch_channel_placeholder": "Название канала Twitch",
+    "twitch_display_name_label": "Отображать имя",
+    "twitch_display_name_placeholder": "Отображаемое имя канала",
+    "twitch_config_saved_title": "Настройки Twitch обновлены",
+    "twitch_config_saved_description": "Повышенный поток теперь {channel}.",
+    "twitch_config_saved_with_warning_title": "Twitch конфигурация сохранена",
+    "twitch_config_saved_with_warning_description": "Конфигурация сохранена, но кэшированные посетители все еще видят предыдущее значение.",
+    "twitch_config_failed_description": "Не удалось обновить конфигурацию Twitch.",
+    "twitch_config_load_failed_title": "Настройки Twitch недоступны",
+    "twitch_config_load_failed_description": "Не удалось загрузить текущую конфигурацию Twitch.",
+    "twitch_config_login_required": "Вы должны войти для обновления Twitch конфигурации."
   },
   "alerts": {
     "no_map_data": "Для этого выбора нет данных карты."
@@ -198,6 +209,9 @@
     "refresh_button": "Попробовать снова",
     "opens_in_new_tab": "Открыть в новой вкладке",
     "available": "Доступно",
+    "enabled": "Включено",
+    "disabled": "Отключено",
+    "update_failed": "Не удалось обновить",
     "tasks": "Задачи",
     "level": "Уровень",
     "locked": "Заблокировано",
@@ -306,7 +320,8 @@
     "reset_all_data": "Сбросить все данные",
     "import_failed": "Не удалось импортировать",
     "delete_archived_run": "Удалить Запуск в Архив",
-    "validation_error": "Ошибка проверки"
+    "validation_error": "Ошибка проверки",
+    "got_it": "Понятно"
   },
   "page_help": {
     "button": "Помощь",
@@ -491,15 +506,43 @@
       "shared_extract": "Общий выход (любая фракция)",
       "coop_extract": "Совместный выход (ЧВК + Дикий)"
     },
+    "tooltips": {
+      "zoom_in": "Увеличить",
+      "zoom_out": "Уменьшить",
+      "reset_view": "Сбросить вид",
+      "open_fullscreen": "Открыть весь экран карты",
+      "exit_fullscreen": "Выйти из полноэкранного режима",
+      "drag_to_resize": "Перетащите для изменения размера карты",
+      "switch_floor": "Переключатель пола (Ctrl + свиток)"
+    },
     "controls": {
-      "keyboard": {
-        "pan": "чтобы переместить",
-        "zoom_keys": "чтобы изменить масштаб",
-        "click": "чтобы нажать на курсор",
-        "reset": "чтобы сбросить вид",
-        "cycle_floors": "+ Прокрутка для смены этажей",
-        "zoom": "+ Прокрутка для изменения масштаба"
+      "help": {
+        "pan": "или перетащите для перемещения",
+        "zoom": "увеличить",
+        "reset": "сбросить вид",
+        "cycle_floors": "велосипедные этажи",
+        "floor_panel": "или используйте нижнюю панель",
+        "click_at_cursor": "кликать под курсором",
+        "click_marker": "Нажмите на маркер для подробностей",
+        "fullscreen": "Использовать полноэкранную кнопку в панели управления картой",
+        "resize": "Перетащите нижний край карты для изменения размера"
       }
+    },
+    "help": {
+      "title": "Управление картой",
+      "groups": {
+        "navigate": "Navigate",
+        "floors": "Этажи",
+        "interact": "Взаимодействие",
+        "view": "Вид"
+      }
+    },
+    "hint": {
+      "title": "Быстрое управление картой",
+      "drag_to_pan": "Перетащите для закрепления",
+      "shift_scroll_zoom": "Shift + прокрутка до масштаба",
+      "ctrl_scroll_floors": "Ctrl + Прокрутка для изменения этажей",
+      "all_controls": "Все элементы управления"
     },
     "aria": {
       "tooltip_density": "Tooltip density"
@@ -898,7 +941,9 @@
       "loading": "Загружаем задания",
       "map": {
         "resize_handle": "Изменить высоту карты",
-        "toggle_panel": "Показать или скрыть панель карты",
+        "show_map": "Показать карту",
+        "hide_map": "Скрыть карту",
+        "fullscreen_label": "Полный экран",
         "required_items_summary": "Необходимые предметы для активных заданий",
         "required_keys_summary": "Необходимые ключи для активных заданий",
         "time_period": {
@@ -911,7 +956,9 @@
         "map_complete_tasks_hidden": "{count} заданий скрыто на этой карте.",
         "map_complete_tasks_showing": "{count} выполненных заданий показано на этой карте.",
         "map_complete_tasks_toggle_show": "Показать скрытые",
-        "map_complete_tasks_toggle_hide": "Скрыть выполненные"
+        "map_complete_tasks_toggle_hide": "Скрыть выполненные",
+        "map_hidden_hint": "Карта скрыта — нажмите, чтобы показать",
+        "raid_time_tooltip": "Время рейда в игре"
       },
       "pinned_tasks_section": "Закреплённые задания",
       "focused_task_section": "Выбранное задание",

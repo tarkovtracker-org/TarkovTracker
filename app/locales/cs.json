@@ -44,14 +44,25 @@
     "supporter_target_user_label": "User ID",
     "supporter_target_user_placeholder": "Supabase auth user UUID",
     "supporter_tier_label": "Tier",
-    "supporter_enabled_label": "Enabled",
-    "supporter_disabled_label": "Disabled",
     "supporter_override_login_required": "You must be signed in to update supporter access.",
     "supporter_override_saved_title": "Supporter access updated",
     "supporter_override_enabled_description": "Enabled {tier} supporter access.",
     "supporter_override_disabled_description": "Disabled active supporter access.",
-    "supporter_override_failed_title": "Update failed",
-    "supporter_override_failed_description": "Could not update supporter access."
+    "supporter_override_failed_description": "Could not update supporter access.",
+    "twitch_config_title": "Stream Twitch",
+    "twitch_config_description": "Nastavte kanál Twitch povýšený v rohu webu. Návštěvníci si tuto změnu vyzvednou během několika minut.",
+    "twitch_channel_label": "Kanál",
+    "twitch_channel_placeholder": "Název kanálu Twitch",
+    "twitch_display_name_label": "Zobrazovaný název",
+    "twitch_display_name_placeholder": "Název zobrazení kanálu",
+    "twitch_config_saved_title": "Nastavení Twitch aktualizováno",
+    "twitch_config_saved_description": "Propagovaný stream je nyní {channel}.",
+    "twitch_config_saved_with_warning_title": "Nastavení Twitch uloženo",
+    "twitch_config_saved_with_warning_description": "Konfigurace byla uložena, ale návštěvníci v mezipaměti mohou stále vidět předchozí hodnotu.",
+    "twitch_config_failed_description": "Nelze aktualizovat konfiguraci Twitch.",
+    "twitch_config_load_failed_title": "Nastavení Twitch není k dispozici",
+    "twitch_config_load_failed_description": "Nelze načíst aktuální konfiguraci Twitch.",
+    "twitch_config_login_required": "Pro aktualizaci konfigurace Twitch musíte být přihlášeni."
   },
   "alerts": {
     "no_map_data": "Pro tento výběr nejsou k dispozici žádná mapová data."
@@ -198,6 +209,9 @@
     "refresh_button": "Zkuste to znovu",
     "opens_in_new_tab": "Otevře se v nové kartě",
     "available": "Dostupné",
+    "enabled": "Povoleno",
+    "disabled": "Zakázáno",
+    "update_failed": "Aktualizace se nezdařila",
     "tasks": "Úkoly",
     "level": "Úrovně",
     "locked": "Uzamčeno",
@@ -306,7 +320,8 @@
     "reset_all_data": "Resetovat všechna data",
     "import_failed": "Import se nezdařil",
     "delete_archived_run": "Odstranit archivovaný běh",
-    "validation_error": "Chyba ověření"
+    "validation_error": "Chyba ověření",
+    "got_it": "Rozumím"
   },
   "page_help": {
     "button": "Nápověda",
@@ -491,15 +506,43 @@
       "shared_extract": "Sdílený extrakt (frakce buď)",
       "coop_extract": "Koop extrakt (PMC + Scav)"
     },
+    "tooltips": {
+      "zoom_in": "Přiblížit",
+      "zoom_out": "Oddálit",
+      "reset_view": "Obnovit zobrazení",
+      "open_fullscreen": "Otevřít mapu na celé obrazovce",
+      "exit_fullscreen": "Ukončit celou obrazovku",
+      "drag_to_resize": "Přetažením změníte velikost mapy",
+      "switch_floor": "Přepínací podlaha (Ctrl + Scroll)"
+    },
     "controls": {
-      "keyboard": {
-        "pan": "přivolat",
-        "zoom_keys": "Přiblížení",
-        "click": "pro kliknutí na kurzor",
-        "reset": "Resetovat zobrazení",
-        "cycle_floors": "+ Přejít na cyklus podlahy",
-        "zoom": "+ Přejít na přiblížení"
+      "help": {
+        "pan": "nebo přetáhněte k pánvi",
+        "zoom": "Zvětšit",
+        "reset": "pro obnovení zobrazení",
+        "cycle_floors": "K cyklování podlah",
+        "floor_panel": "nebo použijte podlahovou desku",
+        "click_at_cursor": "pro kliknutí na kurzor",
+        "click_marker": "Pro podrobnosti klikněte na značku",
+        "fullscreen": "Použít tlačítko na celou obrazovku v ovládacích prvcích mapy",
+        "resize": "Přetažením dolního okraje mapy změníte velikost"
       }
+    },
+    "help": {
+      "title": "Ovládání mapy",
+      "groups": {
+        "navigate": "Navigate",
+        "floors": "Podlahy",
+        "interact": "Interakce",
+        "view": "Zobrazit"
+      }
+    },
+    "hint": {
+      "title": "Ovládání rychlých map",
+      "drag_to_pan": "Přetáhněte k pánvi",
+      "shift_scroll_zoom": "Přesunout + posunout na přiblížení",
+      "ctrl_scroll_floors": "Ctrl + Posunutím změníte podlahy",
+      "all_controls": "Všechny ovládací prvky"
     },
     "aria": {
       "tooltip_density": "Tooltip density"
@@ -898,7 +941,9 @@
       "loading": "Načítání úkolů",
       "map": {
         "resize_handle": "Změnit velikost výšky mapy",
-        "toggle_panel": "Přepnout panel mapy",
+        "show_map": "Zobrazit mapu",
+        "hide_map": "Skrýt mapu",
+        "fullscreen_label": "Celá obrazovka",
         "required_items_summary": "Požadované položky pro aktivní úkoly",
         "required_keys_summary": "Požadované klíče pro aktivní úkoly",
         "time_period": {
@@ -911,7 +956,9 @@
         "map_complete_tasks_hidden": "{count} úkoly skryté na této mapě.",
         "map_complete_tasks_showing": "Úlohy úplné {count} na mapě zobrazené na této mapě.",
         "map_complete_tasks_toggle_show": "Zobrazit skryté",
-        "map_complete_tasks_toggle_hide": "Skrýt mapu kompletní"
+        "map_complete_tasks_toggle_hide": "Skrýt mapu kompletní",
+        "map_hidden_hint": "Mapa skrytá — klikněte pro zobrazení",
+        "raid_time_tooltip": "Aktuální čas nájezdu ve hře"
       },
       "pinned_tasks_section": "Připnuté úkoly",
       "focused_task_section": "Zaměřený úkol",

@@ -44,14 +44,25 @@
     "supporter_target_user_label": "User ID",
     "supporter_target_user_placeholder": "Supabase auth user UUID",
     "supporter_tier_label": "Tier",
-    "supporter_enabled_label": "Enabled",
-    "supporter_disabled_label": "Disabled",
     "supporter_override_login_required": "You must be signed in to update supporter access.",
     "supporter_override_saved_title": "Supporter access updated",
     "supporter_override_enabled_description": "Enabled {tier} supporter access.",
     "supporter_override_disabled_description": "Disabled active supporter access.",
-    "supporter_override_failed_title": "Update failed",
-    "supporter_override_failed_description": "Could not update supporter access."
+    "supporter_override_failed_description": "Could not update supporter access.",
+    "twitch_config_title": "Twitch-Stream",
+    "twitch_config_description": "Legen Sie den Twitch-Kanal in der Ecke der Seite fest. Besucher nehmen die Änderung innerhalb weniger Minuten auf.",
+    "twitch_channel_label": "Kanal",
+    "twitch_channel_placeholder": "Twitch-Kanalname",
+    "twitch_display_name_label": "Anzeigename",
+    "twitch_display_name_placeholder": "Name der Kanalanzeige",
+    "twitch_config_saved_title": "Twitch-Konfiguration aktualisiert",
+    "twitch_config_saved_description": "Promoted Stream ist jetzt {channel}.",
+    "twitch_config_saved_with_warning_title": "Twitch-Konfiguration gespeichert",
+    "twitch_config_saved_with_warning_description": "Die Konfiguration wurde gespeichert, aber zwischengespeicherte Besucher sehen möglicherweise noch den vorherigen Wert.",
+    "twitch_config_failed_description": "Twitch-Konfiguration konnte nicht aktualisiert werden.",
+    "twitch_config_load_failed_title": "Twitch-Konfiguration nicht verfügbar",
+    "twitch_config_load_failed_description": "Konnte die aktuelle Twitch-Konfiguration nicht laden.",
+    "twitch_config_login_required": "Sie müssen angemeldet sein, um die Twitch-Konfiguration zu aktualisieren."
   },
   "alerts": {
     "no_map_data": "Für diese Auswahl sind keine Kartendaten verfügbar."
@@ -198,6 +209,9 @@
     "refresh_button": "Erneut versuchen",
     "opens_in_new_tab": "Öffnet in neuem Tab",
     "available": "Verfügbar",
+    "enabled": "Aktiviert",
+    "disabled": "Deaktiviert",
+    "update_failed": "Update fehlgeschlagen",
     "tasks": "Aufgaben",
     "level": "Level",
     "locked": "Gesperrt",
@@ -306,7 +320,8 @@
     "reset_all_data": "Alle Daten zurücksetzen",
     "import_failed": "Import fehlgeschlagen",
     "delete_archived_run": "Archivierten Lauf löschen",
-    "validation_error": "Validierungsfehler"
+    "validation_error": "Validierungsfehler",
+    "got_it": "Verstanden"
   },
   "page_help": {
     "button": "Hilfe",
@@ -491,15 +506,43 @@
       "shared_extract": "Gemeinsamer Extrakt (beide Fraktionen)",
       "coop_extract": "Co-op-Extrakt (PMC + Scav)"
     },
+    "tooltips": {
+      "zoom_in": "Vergrößern",
+      "zoom_out": "Verkleinern",
+      "reset_view": "Ansicht zurücksetzen",
+      "open_fullscreen": "Karte im Vollbild öffnen",
+      "exit_fullscreen": "Vollbild beenden",
+      "drag_to_resize": "Ziehen, um Karte zu skalieren",
+      "switch_floor": "Boden wechseln (Strg + Scroll)"
+    },
     "controls": {
-      "keyboard": {
-        "pan": "Zum Verschieben",
-        "zoom_keys": "Zum Zoomen",
-        "click": "Zum Klicken am Cursor",
-        "reset": "Ansicht zurücksetzen",
-        "cycle_floors": "+ Scrollen zum Ebenenwechsel",
-        "zoom": "+ Scrollen zum Zoomen"
+      "help": {
+        "pan": "oder ziehen zum Pan",
+        "zoom": "zoomen",
+        "reset": "um die Ansicht zurückzusetzen",
+        "cycle_floors": "um Böden zu fahren",
+        "floor_panel": "oder verwenden Sie die Bodenplatte",
+        "click_at_cursor": "um am Cursor zu klicken",
+        "click_marker": "Klicken Sie auf einen Marker für Details",
+        "fullscreen": "Den Vollbild-Button in den Kartensteuerungen verwenden",
+        "resize": "Ziehen Sie den unteren Rand der Karte um die Größe zu ändern"
       }
+    },
+    "help": {
+      "title": "Kartensteuerung",
+      "groups": {
+        "navigate": "Navigate",
+        "floors": "Stockwerke",
+        "interact": "Interagieren",
+        "view": "Ansicht"
+      }
+    },
+    "hint": {
+      "title": "Schnellkarten-Steuerung",
+      "drag_to_pan": "In Pfanne ziehen",
+      "shift_scroll_zoom": "Shift + Scrollen zum Zoomen",
+      "ctrl_scroll_floors": "Strg + Scrollen um Etagen zu wechseln",
+      "all_controls": "Alle Steuerelemente"
     },
     "aria": {
       "tooltip_density": "Tooltip density"
@@ -898,7 +941,9 @@
       "loading": "Lade Aufgaben",
       "map": {
         "resize_handle": "Kartenhöhe anpassen",
-        "toggle_panel": "Kartenbereich ein-/ausblenden",
+        "show_map": "Karte anzeigen",
+        "hide_map": "Karte ausblenden",
+        "fullscreen_label": "Vollbild",
         "required_items_summary": "Benötigte Gegenstände für aktive Aufgaben",
         "required_keys_summary": "Benötigte Schlüssel für aktive Aufgaben",
         "time_period": {
@@ -911,7 +956,9 @@
         "map_complete_tasks_hidden": "{count} kartenziel-erledigte Aufgaben auf dieser Karte ausgeblendet.",
         "map_complete_tasks_showing": "{count} kartenziel-erledigte Aufgaben werden auf dieser Karte angezeigt.",
         "map_complete_tasks_toggle_show": "Ausgeblendete anzeigen",
-        "map_complete_tasks_toggle_hide": "Kartenziel-erledigte ausblenden"
+        "map_complete_tasks_toggle_hide": "Kartenziel-erledigte ausblenden",
+        "map_hidden_hint": "Karte versteckt — klicke zum Anzeigen",
+        "raid_time_tooltip": "Aktuelle Schlachtzugszeit im Spiel"
       },
       "pinned_tasks_section": "Angeheftete Aufgaben",
       "focused_task_section": "Fokussierte Aufgabe",
