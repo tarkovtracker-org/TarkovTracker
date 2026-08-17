@@ -44,14 +44,25 @@
     "supporter_target_user_label": "User ID",
     "supporter_target_user_placeholder": "Supabase auth user UUID",
     "supporter_tier_label": "Tier",
-    "supporter_enabled_label": "Enabled",
-    "supporter_disabled_label": "Disabled",
     "supporter_override_login_required": "You must be signed in to update supporter access.",
     "supporter_override_saved_title": "Supporter access updated",
     "supporter_override_enabled_description": "Enabled {tier} supporter access.",
     "supporter_override_disabled_description": "Disabled active supporter access.",
-    "supporter_override_failed_title": "Update failed",
-    "supporter_override_failed_description": "Could not update supporter access."
+    "supporter_override_failed_description": "Could not update supporter access.",
+    "twitch_config_title": "Flujo de Twitch",
+    "twitch_config_description": "Establece el canal de Twitch promocionado en la esquina del sitio. Los visitantes recogen el cambio en un par de minutos.",
+    "twitch_channel_label": "Canal",
+    "twitch_channel_placeholder": "Nombre del canal Twitch",
+    "twitch_display_name_label": "Nombre mostrado",
+    "twitch_display_name_placeholder": "Nombre para mostrar canal",
+    "twitch_config_saved_title": "Configuración de Twitch actualizada",
+    "twitch_config_saved_description": "La transmisión promocionada es ahora {channel}.",
+    "twitch_config_saved_with_warning_title": "Configuración de Twitch guardada",
+    "twitch_config_saved_with_warning_description": "La configuración fue guardada, pero los visitantes en caché pueden ver el valor anterior.",
+    "twitch_config_failed_description": "No se pudo actualizar la configuración de Twitch.",
+    "twitch_config_load_failed_title": "Configuración de Twitch no disponible",
+    "twitch_config_load_failed_description": "No se pudo cargar la configuración actual de Twitch.",
+    "twitch_config_login_required": "Debes iniciar sesión para actualizar la configuración de Twitch."
   },
   "alerts": {
     "no_map_data": "No hay datos de mapa disponibles para esta selección."
@@ -198,6 +209,9 @@
     "refresh_button": "Intentar de nuevo",
     "opens_in_new_tab": "Abrir en una pestaña nueva",
     "available": "Disponible",
+    "enabled": "Activado",
+    "disabled": "Deshabilitado",
+    "update_failed": "Error al actualizar",
     "tasks": "Tareas",
     "level": "Nivel",
     "locked": "Bloqueado",
@@ -306,7 +320,8 @@
     "reset_all_data": "Restablecer todos los datos",
     "import_failed": "Error al importar",
     "delete_archived_run": "Eliminar Ejecuta Archivada",
-    "validation_error": "Error de validación"
+    "validation_error": "Error de validación",
+    "got_it": "Entendido"
   },
   "page_help": {
     "button": "Ayuda",
@@ -491,15 +506,43 @@
       "shared_extract": "Extracción compartida (cualquiera de las facciones)",
       "coop_extract": "Extracción cooperativa (PMC + Scav)"
     },
+    "tooltips": {
+      "zoom_in": "Acercarse en",
+      "zoom_out": "Apagar",
+      "reset_view": "Restablecer vista",
+      "open_fullscreen": "Abrir pantalla completa del mapa",
+      "exit_fullscreen": "Salir de pantalla completa",
+      "drag_to_resize": "Arrastre para cambiar el tamaño del mapa",
+      "switch_floor": "Cambiar piso (Ctrl + desplazamiento)"
+    },
     "controls": {
-      "keyboard": {
-        "pan": "para mover",
-        "zoom_keys": "para zoom",
-        "click": "para hacer clic en el cursor",
-        "reset": "para reiniciar vista",
-        "cycle_floors": "+ Desplazar para cambiar de piso",
-        "zoom": "+ Desplazar para hacer zoom"
+      "help": {
+        "pan": "o arrastre a paneles",
+        "zoom": "para acercar",
+        "reset": "para resetear vista",
+        "cycle_floors": "a ciclos de pisos",
+        "floor_panel": "o usar el panel del suelo",
+        "click_at_cursor": "para hacer clic en el cursor",
+        "click_marker": "Haga clic en un marcador para más detalles",
+        "fullscreen": "Usar el botón de pantalla completa en los controles de mapa",
+        "resize": "Arrastra el borde inferior del mapa para redimensionar"
       }
+    },
+    "help": {
+      "title": "Controles del mapa",
+      "groups": {
+        "navigate": "Navigate",
+        "floors": "Pisos",
+        "interact": "Interactuar",
+        "view": "Ver"
+      }
+    },
+    "hint": {
+      "title": "Controles rápidos del mapa",
+      "drag_to_pan": "Arrastra para tirar",
+      "shift_scroll_zoom": "Mayús + Desplazamiento para acercar",
+      "ctrl_scroll_floors": "Ctrl + Desplazarse para cambiar de piso",
+      "all_controls": "Todos los controles"
     },
     "aria": {
       "tooltip_density": "Tooltip density"
@@ -898,7 +941,9 @@
       "loading": "Cargando misiones",
       "map": {
         "resize_handle": "Ajustar altura del mapa",
-        "toggle_panel": "Mostrar u ocultar panel del mapa",
+        "show_map": "Mostrar mapa",
+        "hide_map": "Ocultar mapa",
+        "fullscreen_label": "Pantalla completa",
         "required_items_summary": "Objetos necesarios para tareas activas",
         "required_keys_summary": "Llaves necesarias para tareas activas",
         "time_period": {
@@ -911,7 +956,9 @@
         "map_complete_tasks_hidden": "{count} tareas completadas en este mapa están ocultas.",
         "map_complete_tasks_showing": "{count} tareas completadas en este mapa se están mostrando.",
         "map_complete_tasks_toggle_show": "Mostrar ocultas",
-        "map_complete_tasks_toggle_hide": "Ocultar completadas en mapa"
+        "map_complete_tasks_toggle_hide": "Ocultar completadas en mapa",
+        "map_hidden_hint": "Mapa oculto — haga clic para mostrar",
+        "raid_time_tooltip": "Tiempo actual de la banda del juego"
       },
       "pinned_tasks_section": "Tareas fijadas",
       "focused_task_section": "Tarea enfocada",

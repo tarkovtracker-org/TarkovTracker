@@ -44,14 +44,25 @@
     "supporter_target_user_label": "User ID",
     "supporter_target_user_placeholder": "Supabase auth user UUID",
     "supporter_tier_label": "Tier",
-    "supporter_enabled_label": "Enabled",
-    "supporter_disabled_label": "Disabled",
     "supporter_override_login_required": "You must be signed in to update supporter access.",
     "supporter_override_saved_title": "Supporter access updated",
     "supporter_override_enabled_description": "Enabled {tier} supporter access.",
     "supporter_override_disabled_description": "Disabled active supporter access.",
-    "supporter_override_failed_title": "Update failed",
-    "supporter_override_failed_description": "Could not update supporter access."
+    "supporter_override_failed_description": "Could not update supporter access.",
+    "twitch_config_title": "Twitch 流",
+    "twitch_config_description": "在站点的角落设置推广的Twitch频道。游客在几分钟内接听更改消息。",
+    "twitch_channel_label": "频道",
+    "twitch_channel_placeholder": "Twitch频道名称",
+    "twitch_display_name_label": "显示名称",
+    "twitch_display_name_placeholder": "频道显示名称",
+    "twitch_config_saved_title": "Twitch配置已更新",
+    "twitch_config_saved_description": "Promoted stream is now {channel}.",
+    "twitch_config_saved_with_warning_title": "Twitch配置已保存",
+    "twitch_config_saved_with_warning_description": "配置已保存，但缓存的访客仍可能看到上一个值。",
+    "twitch_config_failed_description": "无法更新 Twitch 配置。",
+    "twitch_config_load_failed_title": "Twitch配置不可用",
+    "twitch_config_load_failed_description": "无法加载当前Twitch配置。",
+    "twitch_config_login_required": "您必须登录才能更新 Twitch 配置。"
   },
   "alerts": {
     "no_map_data": "此选择没有可用地图数据。"
@@ -198,6 +209,9 @@
     "refresh_button": "重试",
     "opens_in_new_tab": "在新选项卡中打开",
     "available": "可用",
+    "enabled": "已启用",
+    "disabled": "已禁用",
+    "update_failed": "更新失败",
     "tasks": "任务",
     "level": "等级",
     "locked": "已锁定",
@@ -306,7 +320,8 @@
     "reset_all_data": "重置所有数据",
     "import_failed": "导入失败",
     "delete_archived_run": "删除已存档的运行",
-    "validation_error": "验证错误"
+    "validation_error": "验证错误",
+    "got_it": "明白了"
   },
   "page_help": {
     "button": "帮助",
@@ -491,15 +506,43 @@
       "shared_extract": "共享撤离点（任一阵营）",
       "coop_extract": "合作撤离点（PMC + Scav）"
     },
+    "tooltips": {
+      "zoom_in": "缩放",
+      "zoom_out": "缩放",
+      "reset_view": "重置视图",
+      "open_fullscreen": "打开全屏地图",
+      "exit_fullscreen": "退出全屏",
+      "drag_to_resize": "拖动以调整地图大小",
+      "switch_floor": "切换底部(Ctrl + 滚动)"
+    },
     "controls": {
-      "keyboard": {
-        "pan": "平移视图",
-        "zoom_keys": "键盘缩放",
-        "click": "在光标处点击",
+      "help": {
+        "pan": "或拖动以pan",
+        "zoom": "缩放",
         "reset": "重置视图",
-        "cycle_floors": "+ 滚轮切换楼层",
-        "zoom": "+ 滚轮缩放"
+        "cycle_floors": "循环楼层",
+        "floor_panel": "或使用地板面板",
+        "click_at_cursor": "点击光标",
+        "click_marker": "点击标记查看详细信息",
+        "fullscreen": "使用地图控制中的全屏按钮",
+        "resize": "拖动地图的底部边缘以调整大小"
       }
+    },
+    "help": {
+      "title": "地图控制",
+      "groups": {
+        "navigate": "Navigate",
+        "floors": "楼层",
+        "interact": "交互功能",
+        "view": "查看"
+      }
+    },
+    "hint": {
+      "title": "快速地图控制",
+      "drag_to_pan": "拖动以pan",
+      "shift_scroll_zoom": "Shift + 滚动以缩放",
+      "ctrl_scroll_floors": "Ctrl + 滚动以更改楼层",
+      "all_controls": "所有控制"
     },
     "aria": {
       "tooltip_density": "Tooltip density"
@@ -898,7 +941,9 @@
       "loading": "加载任务中",
       "map": {
         "resize_handle": "调整地图高度",
-        "toggle_panel": "显示或隐藏地图面板",
+        "show_map": "显示地图",
+        "hide_map": "隐藏地图",
+        "fullscreen_label": "全屏",
         "required_items_summary": "活跃任务所需物品",
         "required_keys_summary": "活跃任务所需钥匙",
         "time_period": {
@@ -911,7 +956,9 @@
         "map_complete_tasks_hidden": "该地图上有 {count} 个已完成任务被隐藏。",
         "map_complete_tasks_showing": "该地图上有 {count} 个地图目标已完成任务正在显示。",
         "map_complete_tasks_toggle_show": "显示隐藏项",
-        "map_complete_tasks_toggle_hide": "隐藏地图已完成"
+        "map_complete_tasks_toggle_hide": "隐藏地图已完成",
+        "map_hidden_hint": "隐藏地图 - 点击显示",
+        "raid_time_tooltip": "当前游戏内搜查时间"
       },
       "pinned_tasks_section": "已固定任务",
       "focused_task_section": "当前聚焦任务",
