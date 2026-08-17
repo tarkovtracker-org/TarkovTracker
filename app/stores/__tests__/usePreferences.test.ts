@@ -281,10 +281,11 @@ describe('usePreferencesStore', () => {
       expect(migratedValue.data.neededItemsHideCollected).toBeUndefined();
     });
     it('should migrate untouched legacy map marker defaults', () => {
-      const legacyMapMarkerColors = {
+      const legacyMapMarkerColors: Record<string, string> = {
         ...MAP_MARKER_COLORS,
         SELF_OBJECTIVE: '#ef4444',
       };
+      delete legacyMapMarkerColors.PINNED_OBJECTIVE;
       const persistedState = {
         mapMarkerColors: legacyMapMarkerColors,
       };

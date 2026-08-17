@@ -553,7 +553,7 @@
         >
           <div class="flex flex-wrap items-center gap-2">
             <span class="text-surface-400 text-[10px] font-medium tracking-wide uppercase">
-              {{ t('maps.legend.tasks') }}
+              {{ t('common.tasks') }}
             </span>
             <button
               v-for="chip in objectiveChips"

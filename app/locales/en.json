@@ -501,7 +501,6 @@
       "pmc_spawns": "PMC Spawns"
     },
     "legend": {
-      "tasks": "Tasks",
       "regular": "Regular",
       "pinned": "Pinned",
       "team": "Team",

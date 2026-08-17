@@ -158,6 +158,7 @@ const normalizeHex = (value: string): string => value.trim().toLowerCase();
 const hasExactLegacyDefaults = (value: unknown): value is MapMarkerColors => {
   if (!value || typeof value !== 'object') return false;
   const candidateColors = value as Record<string, unknown>;
+  if ('PINNED_OBJECTIVE' in candidateColors) return false;
   for (const key of LEGACY_MAP_MARKER_COLOR_KEYS) {
     const rawCandidate = candidateColors[key];
     if (typeof rawCandidate !== 'string') return false;

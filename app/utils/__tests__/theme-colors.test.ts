@@ -40,4 +40,11 @@ describe('theme-colors', () => {
     };
     expect(migrateLegacyMapMarkerColors(tampered)).toBeNull();
   });
+  it('does not migrate a legacy-shaped palette that already carries a customized PINNED_OBJECTIVE', () => {
+    const withPinnedKey: Record<string, string> = {
+      ...LEGACY_MAP_MARKER_COLORS,
+      PINNED_OBJECTIVE: '#123456',
+    };
+    expect(migrateLegacyMapMarkerColors(withPinnedKey)).toBeNull();
+  });
 });

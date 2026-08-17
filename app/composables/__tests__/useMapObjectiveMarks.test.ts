@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { computed, isRef, ref } from 'vue';
 import type { Task } from '@/types/tarkov';
 const objectiveCompletions = ref<Record<string, Record<string, boolean>>>({});
@@ -87,9 +87,6 @@ const objectiveWithLocation = (id: string, mapId: string) => ({
   ],
 });
 describe('useMapObjectiveMarks', () => {
-  beforeEach(async () => {
-    await setup();
-  });
   it('marks a pinned task objective as pinned:true and an unpinned one as pinned:false', async () => {
     const { useMapObjectiveMarks } = await setup();
     const tasks: Task[] = [
