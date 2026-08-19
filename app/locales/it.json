@@ -501,8 +501,9 @@
       "pmc_spawns": "Spawn PMC"
     },
     "legend": {
-      "your_objectives": "Tuoi obiettivi",
-      "team_objectives": "Obiettivi Team",
+      "regular": "Regolare",
+      "pinned": "Bloccato",
+      "team": "Squadra",
       "shared_extract": "Estrazione PMC/Scav",
       "coop_extract": "Estrazione Co-Op"
     },
@@ -1829,6 +1830,7 @@
           "title": "Colori mappa",
           "description": "Imposta i colori degli indicatori per una migliore leggibilità e accessibilità.",
           "self_objective": "Il tuo obiettivo",
+          "pinned_objective": "Attività Bloccata",
           "team_objective": "Obiettivi team",
           "selected": "Obiettivo marcato",
           "shared_extract": "Estrazione condivisa",
