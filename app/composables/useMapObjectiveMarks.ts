@@ -15,6 +15,7 @@ export type MapObjectiveMark = {
   zones: MapObjectiveZone[];
   possibleLocations?: MapObjectiveLocation[];
   users?: string[];
+  pinned?: boolean;
 };
 interface MapObjectiveMarksOptions {
   mapId: ComputedRef<string | null | undefined>;
@@ -42,6 +43,7 @@ export function useMapObjectiveMarks({
     const teammateIds = includeTeammates
       ? Object.keys(progressStore.visibleTeamStores).filter((id) => id !== 'self')
       : [];
+    const pinnedTaskIds = new Set(preferencesStore.getPinnedTaskIds);
     tasks.value.forEach((task) => {
       if (!task.objectives) return;
       const objectiveMaps = metadataStore.objectiveMaps?.[task.id] ?? [];
@@ -126,6 +128,7 @@ export function useMapObjectiveMarks({
             zones,
             possibleLocations,
             users,
+            pinned: pinnedTaskIds.has(task.id),
           });
         }
       });

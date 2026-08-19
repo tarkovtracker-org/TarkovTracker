@@ -514,6 +514,9 @@ export type Database = {
           locale_override: string | null
           map_marker_colors: Json
           map_pan_speed: number | null
+          map_show_pinned_objectives: boolean
+          map_show_self_objectives: boolean
+          map_show_team_objectives: boolean
           map_team_hide_all: boolean | null
           map_zone_opacity: number
           map_zoom_speed: number | null
@@ -590,6 +593,9 @@ export type Database = {
           locale_override?: string | null
           map_marker_colors?: Json
           map_pan_speed?: number | null
+          map_show_pinned_objectives?: boolean
+          map_show_self_objectives?: boolean
+          map_show_team_objectives?: boolean
           map_team_hide_all?: boolean | null
           map_zone_opacity?: number
           map_zoom_speed?: number | null
@@ -666,6 +672,9 @@ export type Database = {
           locale_override?: string | null
           map_marker_colors?: Json
           map_pan_speed?: number | null
+          map_show_pinned_objectives?: boolean
+          map_show_self_objectives?: boolean
+          map_show_team_objectives?: boolean
           map_team_hide_all?: boolean | null
           map_zone_opacity?: number
           map_zoom_speed?: number | null

@@ -501,8 +501,9 @@
       "pmc_spawns": "PMC Spawns"
     },
     "legend": {
-      "your_objectives": "Your Objectives",
-      "team_objectives": "Team Objectives",
+      "regular": "Regular",
+      "pinned": "Pinned",
+      "team": "Team",
       "shared_extract": "Shared Extract (Either Faction)",
       "coop_extract": "Co-op Extract (PMC + Scav)"
     },
@@ -1829,6 +1830,7 @@
           "title": "Map Colors",
           "description": "Set marker colors for better readability and accessibility.",
           "self_objective": "Your Objective",
+          "pinned_objective": "Pinned Task",
           "team_objective": "Team Objective",
           "selected": "Pinned Objective",
           "shared_extract": "Shared Extract",
