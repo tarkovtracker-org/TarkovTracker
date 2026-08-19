@@ -501,8 +501,9 @@
       "pmc_spawns": "PMC出生点"
     },
     "legend": {
-      "your_objectives": "你的目标",
-      "team_objectives": "团队目标",
+      "regular": "常规的",
+      "pinned": "固定的",
+      "team": "团队",
       "shared_extract": "共享撤离点（任一阵营）",
       "coop_extract": "合作撤离点（PMC + Scav）"
     },
@@ -1829,6 +1830,7 @@
           "title": "地图颜色",
           "description": "自定义标记颜色以提升可读性和无障碍体验。",
           "self_objective": "你的目标",
+          "pinned_objective": "固定任务",
           "team_objective": "队伍目标",
           "selected": "已固定目标",
           "shared_extract": "共享撤离点",
