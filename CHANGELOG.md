@@ -1,3 +1,16 @@
+# [1.73.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.72.2...v1.73.0) (2026-08-19)
+
+
+### Bug Fixes
+
+* **maps:** resolve SonarCloud findings in marks hash and colour test ([aaaac5e](https://github.com/tarkovtracker-org/TarkovTracker/commit/aaaac5e2d702f9dd71c639d7ae9c1780fe49b453))
+* **maps:** sync objective chip prefs and harden legacy palette migration ([a8a7a0c](https://github.com/tarkovtracker-org/TarkovTracker/commit/a8a7a0c6195fbcc736e481d56d029058be273286))
+
+
+### Features
+
+* **maps:** add pinned marker colour and objective legend chips ([5e77b72](https://github.com/tarkovtracker-org/TarkovTracker/commit/5e77b72b5c8ab1b6483760cc526a05af4475b6df))
+
 ## [1.72.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.72.1...v1.72.2) (2026-08-16)
 
 
