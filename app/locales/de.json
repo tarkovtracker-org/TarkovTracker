@@ -501,8 +501,9 @@
       "pmc_spawns": "PMC-Spawns"
     },
     "legend": {
-      "your_objectives": "Deine Ziele",
-      "team_objectives": "Teamziele",
+      "regular": "Normal",
+      "pinned": "Angeheftet",
+      "team": "Team",
       "shared_extract": "Gemeinsamer Extrakt (beide Fraktionen)",
       "coop_extract": "Co-op-Extrakt (PMC + Scav)"
     },
@@ -1829,6 +1830,7 @@
           "title": "Kartenfarben",
           "description": "Passe Markerfarben für bessere Lesbarkeit und Barrierefreiheit an.",
           "self_objective": "Dein Ziel",
+          "pinned_objective": "Angepinnte Aufgabe",
           "team_objective": "Teamziel",
           "selected": "Angeheftetes Ziel",
           "shared_extract": "Geteilte Extraktion",
