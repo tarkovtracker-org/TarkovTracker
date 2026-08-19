@@ -501,8 +501,9 @@
       "pmc_spawns": "PMC Spawns"
     },
     "legend": {
-      "your_objectives": "Vaše cíle",
-      "team_objectives": "Cíle týmu",
+      "regular": "Běžný",
+      "pinned": "Připnuté",
+      "team": "Tým",
       "shared_extract": "Sdílený extrakt (frakce buď)",
       "coop_extract": "Koop extrakt (PMC + Scav)"
     },
@@ -1829,6 +1830,7 @@
           "title": "Barvy mapy",
           "description": "Nastavte barvy značky pro lepší čitelnost a dostupnost.",
           "self_objective": "Váš cíl",
+          "pinned_objective": "Připnutý úkol",
           "team_objective": "Týmový cíl",
           "selected": "Připnutý cíl",
           "shared_extract": "Sdílený extrakt",
