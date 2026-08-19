@@ -650,6 +650,10 @@
   } from '@/features/maps/composables/useLeafletMapControls';
   import LeafletObjectiveTooltip from '@/features/maps/LeafletObjectiveTooltip.vue';
   import { getMarksHash, type MapMark } from '@/features/maps/utils/marksHash';
+  import {
+    getObjectiveCategory,
+    type ObjectiveCategory,
+  } from '@/features/maps/utils/objectiveCategory';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { logger } from '@/utils/logger';
   import { clusterSpawns } from '@/utils/mapClustering';
@@ -743,11 +747,6 @@
   const isMapUnavailable = computed(() => {
     return props.map?.unavailable === true;
   });
-  type ObjectiveCategory = 'self' | 'pinned' | 'team';
-  const getObjectiveCategory = (mark: MapMark): ObjectiveCategory => {
-    if (mark.pinned) return 'pinned';
-    return mark.users?.includes('self') ? 'self' : 'team';
-  };
   const mapShowSelfObjectives = computed({
     get: () => preferencesStore.getMapShowSelfObjectives,
     set: (value: boolean) => preferencesStore.setMapShowSelfObjectives(value),

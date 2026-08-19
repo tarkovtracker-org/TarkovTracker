@@ -7,7 +7,7 @@ import {
 } from '@/utils/theme-colors';
 const t = (key: string) => key;
 describe('theme-colors', () => {
-  it('defines a distinct PINNED_OBJECTIVE color separate from SELECTED', () => {
+  it('defines PINNED_OBJECTIVE with the selection accent and keeps a separate SELECTED key', () => {
     expect(MAP_MARKER_COLORS.PINNED_OBJECTIVE).toBe('#7c3bed');
     expect('SELECTED' in MAP_MARKER_COLORS).toBe(true);
   });
