@@ -501,8 +501,9 @@
       "pmc_spawns": "Spawns PMC"
     },
     "legend": {
-      "your_objectives": "Vos objectifs",
-      "team_objectives": "Objectifs de l'équipe",
+      "regular": "Régulièrement",
+      "pinned": "Épinglé",
+      "team": "Equipe",
       "shared_extract": "Extraction partagée (n'importe quelle faction)",
       "coop_extract": "Extraction coop (PMC + Scav)"
     },
@@ -1829,6 +1830,7 @@
           "title": "Couleurs de carte",
           "description": "Ajustez les couleurs des marqueurs pour améliorer lisibilité et accessibilité.",
           "self_objective": "Votre objectif",
+          "pinned_objective": "Tâche épinglée",
           "team_objective": "Objectif d'équipe",
           "selected": "Objectif épinglé",
           "shared_extract": "Extraction partagée",

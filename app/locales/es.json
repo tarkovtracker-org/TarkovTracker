@@ -501,8 +501,9 @@
       "pmc_spawns": "Spawns de PMC"
     },
     "legend": {
-      "your_objectives": "Tus objetivos",
-      "team_objectives": "Objetivos del equipo",
+      "regular": "Regular",
+      "pinned": "Fijado",
+      "team": "Equipo",
       "shared_extract": "Extracción compartida (cualquiera de las facciones)",
       "coop_extract": "Extracción cooperativa (PMC + Scav)"
     },
@@ -1829,6 +1830,7 @@
           "title": "Colores del mapa",
           "description": "Ajusta los colores de los marcadores para mejorar legibilidad y accesibilidad.",
           "self_objective": "Tu objetivo",
+          "pinned_objective": "Tarea Anclada",
           "team_objective": "Objetivo del equipo",
           "selected": "Objetivo fijado",
           "shared_extract": "Extracción compartida",
