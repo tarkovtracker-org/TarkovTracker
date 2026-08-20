@@ -11,7 +11,7 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { H3Event, H3EventContext } from 'h3';
 type SiteConfigStackEntry = Record<string, unknown>;
-const VALID_TEAM_ID = '33333333-3333-4333-8333-333333333333';
+const VALID_TEAM_ID = 'a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5';
 const { mockGetQuery, mockGetRequestHeader, mockFetch } = vi.hoisted(() => ({
   mockGetQuery: vi.fn(),
   mockGetRequestHeader: vi.fn(),
@@ -196,6 +196,7 @@ describe('Team Members API', () => {
       mockGetQuery.mockReturnValue({ teamId });
       const { default: handler } = await import('@/server/api/team/members');
       await expect(handler(mockEvent as H3Event)).rejects.toThrow('Invalid teamId');
+      expect(mockFetch).not.toHaveBeenCalled();
     });
     it('should reject a whitespace-only teamId as missing', async () => {
       mockGetQuery.mockReturnValue({ teamId: '   ' });
