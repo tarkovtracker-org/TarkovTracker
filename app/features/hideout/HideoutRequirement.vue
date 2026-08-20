@@ -201,9 +201,7 @@
     isCurrency.value ? formattedCurrency.value : props.requirement.item.name
   );
   const itemLabelClass = computed(() =>
-    isCurrency.value
-      ? 'text-[9px] whitespace-nowrap sm:text-[10px]'
-      : 'line-clamp-2 text-[11px] sm:text-xs'
+    isCurrency.value ? 'break-all text-[9px] sm:text-[10px]' : 'line-clamp-2 text-[11px] sm:text-xs'
   );
   // Context menu
   const contextMenu = ref<InstanceType<typeof ContextMenuType>>();

@@ -99,6 +99,23 @@ describe('HideoutRequirement', () => {
     expect(gameItem.props('itemId')).toBe(itemId);
     expect(wrapper.find('input[type="number"]').exists()).toBe(false);
   });
+  it('allows long currency amounts to wrap inside the requirement card', () => {
+    const wrapper = mount(HideoutRequirement, {
+      props: {
+        ...defaultProps,
+        requirement: {
+          count: 10000000,
+          id: 'large-roubles-requirement',
+          item: { id: '5449016a4bdc2d6f028b456f', name: 'Roubles' },
+        },
+      },
+      global: globalOptions,
+    });
+    const label = wrapper.find('.text-surface-200.w-full');
+    expect(label.text()).toBe('₽10,000,000');
+    expect(label.classes()).toContain('break-all');
+    expect(label.classes()).not.toContain('whitespace-nowrap');
+  });
   it('passes currency image metadata to the in-game item display', () => {
     const wrapper = mount(HideoutRequirement, {
       props: {
