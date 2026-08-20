@@ -201,7 +201,9 @@ const getEditions = async (): Promise<GameEdition[]> => {
   }
   editionsFetchPromise = (async () => {
     try {
-      const overlay = await $fetch<{ editions?: Record<string, GameEdition> }>(OVERLAY_URL);
+      const overlay = await $fetch<{ editions?: Record<string, GameEdition> }>(OVERLAY_URL, {
+        redirect: 'error',
+      });
       const editions = overlay?.editions ? Object.values(overlay.editions) : [];
       if (editions.length > 0) {
         const entry: EditionsCachePayload = {

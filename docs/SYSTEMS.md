@@ -393,9 +393,13 @@ sequenceDiagram
   `FETCH_TIMEOUT_MS = 5000`. On timeout, fall back to the cached overlay.
 - A missing or malformed overlay must never cause a 5xx; the base payload is returned with
   `X-Overlay-Status: missing`.
-- Overlay data must only be fetched over HTTPS. A non-HTTPS `OVERLAY_URL` must resolve to the
-  trusted default, and no redirect hop may downgrade the transport — the fetch must fail rather than
-  read a payload served over plaintext.
+- Overlay data must only be fetched over HTTPS on every server path. A non-HTTPS `OVERLAY_URL` must
+  resolve to the trusted default, and no redirect hop may downgrade the transport — the fetch must
+  fail rather than read a payload served over plaintext. `applyOverlay` follows HTTPS redirects
+  manually; the streamer Kappa editions fetch in
+  `app/server/api/streamer/[userId]/[mode]/kappa.get.ts` uses `redirect: 'error'` because its URL is
+  a hardcoded constant that never redirects. Any new server-side overlay consumer must do one or the
+  other.
 - Overlay metadata (`status`, `version`, `generated`, `sha256`) must be propagated to response
   headers so we can debug which correction was applied. Routes that apply an overlay after
   `edgeCache()` must call `setOverlayResponseHeaders()` before returning.

@@ -199,6 +199,12 @@ Naming:
   stale overlay immediately while one Cloudflare-lifetime refresh runs in the background; failed
   deferred refreshes back off for one minute. Other overlay-enabled Tarkov-data routes cache their
   final corrected payload. Preserve this ordering so no cache layer pins stale hideout corrections.
+- Overlay data must be fetched over HTTPS on every server path. `OVERLAY_URL` must be HTTPS
+  (anything else falls back to the trusted `raw.githubusercontent.com` default), and no redirect may
+  downgrade to plaintext: `app/server/utils/overlay.ts` follows redirects manually with a per-hop
+  HTTPS check and a 3-hop cap, and the streamer Kappa editions fetch passes `redirect: 'error'`. New
+  server-side overlay consumers must do one or the other. See the Overlay corrections section of
+  `docs/SYSTEMS.md`.
 - Task adaptation and overlay patches carry trader requirements in the raw upstream shape (one
   `traderRequirements` list discriminated by `requirementType`). The adapter and `applyOverlay`
   split them into `traderLevelRequirements` (level gates) and reputation-only `traderRequirements`;
