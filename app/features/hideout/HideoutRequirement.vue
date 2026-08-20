@@ -12,7 +12,14 @@
   >
     <!-- Item Image -->
     <div class="relative mb-1.5 h-14 w-14 shrink-0 sm:mb-2 sm:h-16 sm:w-16">
+      <div
+        v-if="isCurrency"
+        class="border-surface-700 bg-surface-900/80 text-primary-300 flex h-full w-full items-center justify-center rounded border text-2xl font-bold sm:text-3xl"
+      >
+        {{ currencySymbol }}
+      </div>
       <GameItem
+        v-else
         :item-id="requirement.item.id"
         :item-name="requirement.item.name"
         :dev-link="requirement.item.link"
@@ -29,14 +36,17 @@
         <UIcon name="i-mdi-check-circle" class="text-success-300 h-6 w-6 sm:h-8 sm:w-8" />
       </div>
       <!-- FiR Badge -->
-      <AppTooltip v-if="isFoundInRaid" :text="$t('common.found_in_raid_required')">
+      <AppTooltip v-if="!isCurrency && isFoundInRaid" :text="$t('common.found_in_raid_required')">
         <UIcon
           name="i-mdi-checkbox-marked-circle-outline"
           class="text-warning-400 absolute -top-1 -right-1 h-3 w-3"
         />
       </AppTooltip>
       <!-- Count Badge for multi-count items -->
-      <div v-if="requiredCount > 1" class="absolute right-0 -bottom-1 left-0 flex justify-center">
+      <div
+        v-if="!isCurrency && requiredCount > 1"
+        class="absolute right-0 -bottom-1 left-0 flex justify-center"
+      >
         <div
           class="border-surface-700 bg-surface-900/90 rounded border px-1 py-0.5 text-[9px] font-bold sm:px-1.5 sm:text-[10px]"
           :class="isComplete ? 'text-success-400' : 'text-surface-300'"
@@ -47,9 +57,14 @@
     </div>
     <!-- Item Name -->
     <div
-      class="text-surface-200 line-clamp-2 w-full text-center text-[11px] leading-tight font-medium sm:text-xs"
+      class="text-surface-200 w-full text-center leading-tight font-medium"
+      :class="
+        isCurrency
+          ? 'text-[9px] whitespace-nowrap sm:text-[10px]'
+          : 'line-clamp-2 text-[11px] sm:text-xs'
+      "
     >
-      {{ requirement.item.name }}
+      {{ isCurrency ? formattedCurrency : requirement.item.name }}
     </div>
   </div>
   <!-- Context Menu for Manual Count Adjustment -->
@@ -80,8 +95,8 @@
           close();
         "
       />
-      <div v-if="requiredCount > 1" class="border-surface-700 my-1 border-t" />
-      <template v-if="requiredCount > 1">
+      <div v-if="!isCurrency && requiredCount > 1" class="border-surface-700 my-1 border-t" />
+      <template v-if="!isCurrency && requiredCount > 1">
         <div class="space-y-2 px-3 py-2">
           <div class="text-surface-400 text-xs">
             {{ $t('page.hideout.stationcard.requirement.set_custom_amount') }}
@@ -155,6 +170,7 @@
   import GameItem from '@/components/ui/GameItem.vue';
   import { useWikiLink } from '@/composables/useWikiLink';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { getCurrencySymbol } from '@/utils/constants';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { openExternalUrl } from '@/utils/redirect';
   import type ContextMenuType from '@/components/ui/ContextMenu.vue';
@@ -185,6 +201,11 @@
   const formatNumber = useLocaleNumberFormatter();
   const requirementId = computed(() => props.requirement.id);
   const requiredCount = computed(() => props.requirement.count);
+  const currencySymbol = computed(() => getCurrencySymbol(props.requirement.item.id) ?? '');
+  const isCurrency = computed(() => currencySymbol.value !== '');
+  const formattedCurrency = computed(
+    () => `${currencySymbol.value}${formatNumber(requiredCount.value)}`
+  );
   // Context menu
   const contextMenu = ref<InstanceType<typeof ContextMenuType>>();
   const pendingContextEvent = ref<MouseEvent | null>(null);

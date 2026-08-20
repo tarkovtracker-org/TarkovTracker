@@ -1,3 +1,4 @@
+import { isCurrencyItemId } from '@/utils/constants';
 import {
   createGraph,
   type TaskGraph,
@@ -308,7 +309,7 @@ export function useGraphBuilder() {
     const neededItems: NeededItemHideoutModule[] = [];
     modules.forEach((module) => {
       module.itemRequirements?.forEach((req) => {
-        if (req?.item?.id) {
+        if (req?.item?.id && !isCurrencyItemId(req.item.id)) {
           // Parse FIR status from attributes field
           let foundInRaid = false;
           if (req.attributes && Array.isArray(req.attributes)) {

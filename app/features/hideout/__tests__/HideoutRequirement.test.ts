@@ -16,7 +16,7 @@ vi.mock('@/stores/useTarkov', () => ({
   }),
 }));
 vi.mock('@/utils/formatters', () => ({
-  useLocaleNumberFormatter: () => (value: number) => String(value),
+  useLocaleNumberFormatter: () => (value: number) => value.toLocaleString('en-US'),
 }));
 describe('HideoutRequirement', () => {
   const defaultProps = {
@@ -35,11 +35,18 @@ describe('HideoutRequirement', () => {
   };
   const defaultStubs = {
     AppTooltip: true,
-    ContextMenu: true,
+    ContextMenu: {
+      template: '<div><slot :close="close" /></div>',
+      methods: { close: vi.fn(), open: vi.fn() },
+    },
     ContextMenuItem: true,
     GameItem: true,
     UButton: true,
     UIcon: true,
+  };
+  const globalOptions = {
+    mocks: { $t: (key: string) => key },
+    stubs: defaultStubs,
   };
   beforeEach(() => {
     vi.clearAllMocks();
@@ -49,7 +56,7 @@ describe('HideoutRequirement', () => {
   it('marks requirement complete when clicked while incomplete', async () => {
     const wrapper = mount(HideoutRequirement, {
       props: defaultProps,
-      global: { stubs: defaultStubs },
+      global: globalOptions,
     });
     await wrapper.find('.group').trigger('click');
     expect(setHideoutPartCountMock).toHaveBeenCalledWith('req-1', 3);
@@ -60,16 +67,53 @@ describe('HideoutRequirement', () => {
     isComplete = true;
     const wrapper = mount(HideoutRequirement, {
       props: defaultProps,
-      global: { stubs: defaultStubs },
+      global: globalOptions,
     });
     await wrapper.find('.group').trigger('click');
     expect(setHideoutPartCountMock).toHaveBeenCalledWith('req-1', 0);
     expect(setHideoutPartUncompleteMock).toHaveBeenCalledWith('req-1');
   });
+  it.each([
+    ['5449016a4bdc2d6f028b456f', 'Roubles', 400000, '₽400,000'],
+    ['5696686a4bdc2da3298b456a', 'Dollars', 25000, '$25,000'],
+    ['569668774bdc2da2298b4568', 'Euros', 200000, '€200,000'],
+  ])('renders %s as a formatted money requirement', (itemId, name, count, expected) => {
+    const wrapper = mount(HideoutRequirement, {
+      props: {
+        ...defaultProps,
+        requirement: {
+          count,
+          id: `currency-${itemId}`,
+          item: { id: itemId, name },
+        },
+      },
+      global: globalOptions,
+    });
+    expect(wrapper.text()).toContain(expected);
+    expect(wrapper.findComponent({ name: 'GameItem' }).exists()).toBe(false);
+    expect(wrapper.find('input[type="number"]').exists()).toBe(false);
+  });
+  it('keeps currency requirements manually completable without partial counters', async () => {
+    const wrapper = mount(HideoutRequirement, {
+      props: {
+        ...defaultProps,
+        requirement: {
+          count: 400000,
+          id: 'roubles-requirement',
+          item: { id: '5449016a4bdc2d6f028b456f', name: 'Roubles' },
+        },
+      },
+      global: globalOptions,
+    });
+    expect(wrapper.text()).not.toContain('0/400,000');
+    await wrapper.find('.group').trigger('click');
+    expect(setHideoutPartCountMock).toHaveBeenCalledWith('roubles-requirement', 400000);
+    expect(setHideoutPartCompleteMock).toHaveBeenCalledWith('roubles-requirement');
+  });
   it('suppresses native context menu on right-click', async () => {
     const wrapper = mount(HideoutRequirement, {
       props: defaultProps,
-      global: { stubs: defaultStubs },
+      global: globalOptions,
     });
     const element = wrapper.find('.group');
     const event = new MouseEvent('contextmenu', {
