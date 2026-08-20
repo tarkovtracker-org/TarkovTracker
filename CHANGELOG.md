@@ -1,3 +1,13 @@
+## [1.73.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.1...v1.73.2) (2026-08-20)
+
+
+### Bug Fixes
+
+* **api:** reject non-HTTPS overlay redirect targets ([4c2b82d](https://github.com/tarkovtracker-org/TarkovTracker/commit/4c2b82ddc01e2543b0659341fffe3ab4b4431d4c))
+* **api:** reject redirects on the streamer kappa overlay fetch ([8b6c05e](https://github.com/tarkovtracker-org/TarkovTracker/commit/8b6c05e5351c0947e5c4d94466b26e25b13b91eb))
+* **api:** release overlay redirect bodies before the next hop ([82122aa](https://github.com/tarkovtracker-org/TarkovTracker/commit/82122aaf6889a16228775a9411194194a5ceab04))
+* **api:** require HTTPS for overlay data ([de77ab6](https://github.com/tarkovtracker-org/TarkovTracker/commit/de77ab6f2d56f3753334482fc4a66c674bef8ae3))
+
 ## [1.73.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.0...v1.73.1) (2026-08-20)
 
 
