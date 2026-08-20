@@ -45,6 +45,12 @@ describe('overlay URL validation', () => {
 describe('overlay redirect handling', () => {
   const redirectTo = (location: string) =>
     new Response(null, { status: 302, headers: { location } });
+  const redirectWithBody = (location: string, cancel: () => Promise<undefined>) =>
+    ({
+      status: 302,
+      headers: new Headers({ location }),
+      body: { cancel },
+    }) as unknown as Response;
   it('rejects a redirect to a non-HTTPS overlay target', async () => {
     const fetchMock = vi
       .fn()
@@ -95,6 +101,22 @@ describe('overlay redirect handling', () => {
     const result = await applyOverlay({ data: { tasks: [] } });
     expect(fetchMock).toHaveBeenCalledTimes(4);
     expect(result.dataOverlay).toMatchObject({ status: 'missing' });
+  });
+  it.each([
+    ['follows', 'https://overlay.example.com/redirected.json'],
+    ['rejects', 'http://overlay.example.com/overlay.json'],
+  ])('releases the redirect body when it %s the next target', async (_outcome, location) => {
+    const cancel = vi.fn(async () => undefined);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(redirectWithBody(location, cancel))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ $meta: { version: 'redirect-v2' } }), { status: 200 })
+      );
+    vi.stubGlobal('fetch', fetchMock as typeof fetch);
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    await applyOverlay({ data: { tasks: [] } });
+    expect(cancel).toHaveBeenCalledTimes(1);
   });
 });
 describe('applyOverlay locale integration', () => {

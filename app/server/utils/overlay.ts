@@ -179,6 +179,7 @@ async function fetchOverlayOverHttps(signal: AbortSignal): Promise<Response> {
       headers: { Accept: 'application/json', 'User-Agent': TARKOVTRACKER_USER_AGENT },
     });
     if (!OVERLAY_REDIRECT_STATUSES.has(response.status)) return response;
+    await response.body?.cancel();
     currentUrl = resolveOverlayRedirect(response, currentUrl);
   }
   throw new Error(`overlay_redirect_limit_exceeded (${MAX_OVERLAY_REDIRECTS})`);
