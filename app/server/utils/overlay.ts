@@ -67,7 +67,7 @@ const FETCH_TIMEOUT_MS = 5000; // 5 seconds
 // Note: Using raw.githubusercontent.com directly until jsDelivr cache propagates
 const DEFAULT_OVERLAY_URL =
   'https://raw.githubusercontent.com/tarkovtracker-org/tarkov-data-overlay/main/dist/overlay.json';
-const ALLOWED_OVERLAY_PROTOCOLS = ['https:', 'http:'];
+const OVERLAY_PROTOCOL = 'https:';
 function resolveOverlayUrl(value: string | undefined): string {
   const candidate = value ? value.trim() : DEFAULT_OVERLAY_URL;
   let url: URL;
@@ -76,7 +76,7 @@ function resolveOverlayUrl(value: string | undefined): string {
   } catch {
     return DEFAULT_OVERLAY_URL;
   }
-  if (!ALLOWED_OVERLAY_PROTOCOLS.includes(url.protocol)) return DEFAULT_OVERLAY_URL;
+  if (url.protocol !== OVERLAY_PROTOCOL) return DEFAULT_OVERLAY_URL;
   return url.toString();
 }
 const OVERLAY_URL = resolveOverlayUrl(process.env.OVERLAY_URL);

@@ -342,6 +342,8 @@ sequenceDiagram
 
 - Module-level cache (`cachedOverlay`, `cacheTimestamp`) with a 1-hour TTL
   (`OVERLAY_CACHE_TTL = 3600000`).
+- The configured overlay URL must use HTTPS. Invalid URLs and non-HTTPS schemes fall back to the
+  trusted `raw.githubusercontent.com` source so corrections cannot be modified in transit.
 - Overlay task patches carry trader requirements in the raw upstream shape: one
   `traderRequirements` list discriminated by `requirementType` (`level` gates
   trader loyalty level, `reputation` gates standing). `applyOverlay` re-splits
@@ -387,6 +389,8 @@ sequenceDiagram
   `FETCH_TIMEOUT_MS = 5000`. On timeout, fall back to the cached overlay.
 - A missing or malformed overlay must never cause a 5xx; the base payload is returned with
   `X-Overlay-Status: missing`.
+- Overlay data must only be fetched over HTTPS; a non-HTTPS `OVERLAY_URL` must resolve to the
+  trusted default instead.
 - Overlay metadata (`status`, `version`, `generated`, `sha256`) must be propagated to response
   headers so we can debug which correction was applied. Routes that apply an overlay after
   `edgeCache()` must call `setOverlayResponseHeaders()` before returning.

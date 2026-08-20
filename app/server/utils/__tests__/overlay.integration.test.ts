@@ -11,8 +11,36 @@ const stubOverlayFetch = (overlay: unknown) => {
 };
 afterEach(() => {
   vi.resetModules();
+  vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   vi.useRealTimers();
+});
+describe('overlay URL validation', () => {
+  it.each([
+    'http://overlay.example.com/overlay.json',
+    'ftp://overlay.example.com/overlay.json',
+    'file:///tmp/overlay.json',
+    'not-a-url',
+  ])('falls back to the trusted HTTPS overlay for %s', async (overlayUrl) => {
+    vi.stubEnv('OVERLAY_URL', overlayUrl);
+    const fetchMock = stubOverlayFetch({ $meta: { version: 'url-test-v1' } });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    await applyOverlay({ data: { tasks: [] } });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://raw.githubusercontent.com/tarkovtracker-org/tarkov-data-overlay/main/dist/overlay.json',
+      expect.any(Object)
+    );
+  });
+  it('uses a configured HTTPS overlay URL', async () => {
+    vi.stubEnv('OVERLAY_URL', 'https://overlay.example.com/custom.json');
+    const fetchMock = stubOverlayFetch({ $meta: { version: 'url-test-v1' } });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    await applyOverlay({ data: { tasks: [] } });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://overlay.example.com/custom.json',
+      expect.any(Object)
+    );
+  });
 });
 describe('applyOverlay locale integration', () => {
   it('applies the selected locale after global and mode corrections', async () => {
