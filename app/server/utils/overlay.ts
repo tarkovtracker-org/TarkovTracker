@@ -67,7 +67,9 @@ const FETCH_TIMEOUT_MS = 5000; // 5 seconds
 // Note: Using raw.githubusercontent.com directly until jsDelivr cache propagates
 const DEFAULT_OVERLAY_URL =
   'https://raw.githubusercontent.com/tarkovtracker-org/tarkov-data-overlay/main/dist/overlay.json';
-const ALLOWED_OVERLAY_PROTOCOLS = ['https:', 'http:'];
+const OVERLAY_PROTOCOL = 'https:';
+const MAX_OVERLAY_REDIRECTS = 3;
+const OVERLAY_REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 function resolveOverlayUrl(value: string | undefined): string {
   const candidate = value ? value.trim() : DEFAULT_OVERLAY_URL;
   let url: URL;
@@ -76,7 +78,7 @@ function resolveOverlayUrl(value: string | undefined): string {
   } catch {
     return DEFAULT_OVERLAY_URL;
   }
-  if (!ALLOWED_OVERLAY_PROTOCOLS.includes(url.protocol)) return DEFAULT_OVERLAY_URL;
+  if (url.protocol !== OVERLAY_PROTOCOL) return DEFAULT_OVERLAY_URL;
   return url.toString();
 }
 const OVERLAY_URL = resolveOverlayUrl(process.env.OVERLAY_URL);
@@ -154,6 +156,34 @@ function buildOverlayFailure(error: string): OverlayFetchResult {
   lastOverlayMeta = buildOverlayMeta(cachedOverlay, cachedOverlay ? 'stale' : 'missing', { error });
   return { overlay: cachedOverlay, meta: lastOverlayMeta };
 }
+function resolveOverlayRedirect(response: Response, currentUrl: string): string {
+  const location = response.headers.get('location');
+  if (!location) throw new Error(`overlay_redirect_without_location (${response.status})`);
+  let target: URL;
+  try {
+    target = new URL(location, currentUrl);
+  } catch {
+    throw new Error('overlay_redirect_malformed_location');
+  }
+  if (target.protocol !== OVERLAY_PROTOCOL) {
+    throw new Error(`overlay_redirect_insecure_scheme (${target.protocol})`);
+  }
+  return target.toString();
+}
+async function fetchOverlayOverHttps(signal: AbortSignal): Promise<Response> {
+  let currentUrl = OVERLAY_URL_WITH_BUSTER;
+  for (let hop = 0; hop <= MAX_OVERLAY_REDIRECTS; hop += 1) {
+    const response = await fetch(currentUrl, {
+      signal,
+      redirect: 'manual',
+      headers: { Accept: 'application/json', 'User-Agent': TARKOVTRACKER_USER_AGENT },
+    });
+    if (!OVERLAY_REDIRECT_STATUSES.has(response.status)) return response;
+    await response.body?.cancel();
+    currentUrl = resolveOverlayRedirect(response, currentUrl);
+  }
+  throw new Error(`overlay_redirect_limit_exceeded (${MAX_OVERLAY_REDIRECTS})`);
+}
 function createOverlayRequest(): {
   clearTimeout: () => void;
   response: Promise<Response>;
@@ -162,12 +192,7 @@ function createOverlayRequest(): {
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   return {
     clearTimeout: () => clearTimeout(timeoutId),
-    response: Promise.resolve().then(() =>
-      fetch(OVERLAY_URL_WITH_BUSTER, {
-        signal: controller.signal,
-        headers: { Accept: 'application/json', 'User-Agent': TARKOVTRACKER_USER_AGENT },
-      })
-    ),
+    response: Promise.resolve().then(() => fetchOverlayOverHttps(controller.signal)),
   };
 }
 async function processOverlayResponse(
