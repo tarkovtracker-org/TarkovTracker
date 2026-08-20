@@ -1,3 +1,10 @@
+## [1.73.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.0...v1.73.1) (2026-08-20)
+
+
+### Bug Fixes
+
+* **hideout:** handle EFT 1.1 currency requirements ([#754](https://github.com/tarkovtracker-org/TarkovTracker/issues/754)) ([cfcd82b](https://github.com/tarkovtracker-org/TarkovTracker/commit/cfcd82bf79207eb0e14abb8053249b2995ec0895))
+
 # [1.73.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.72.2...v1.73.0) (2026-08-19)
 
 
