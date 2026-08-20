@@ -3,7 +3,7 @@ import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import type { HideoutStation, Task } from '@/types/tarkov';
 describe('useGraphBuilder hideout requirements', () => {
   it.each(['5449016a4bdc2d6f028b456f', '5696686a4bdc2da3298b456a', '569668774bdc2da2298b4568'])(
-    'excludes currency item %s from needed inventory items',
+    'preserves currency item %s in hideout requirement metadata',
     (itemId) => {
       const stations: HideoutStation[] = [
         {
@@ -31,7 +31,13 @@ describe('useGraphBuilder hideout requirements', () => {
         },
       ];
       const { processHideoutData } = useGraphBuilder();
-      expect(processHideoutData(stations).neededItemHideoutModules).toEqual([]);
+      expect(processHideoutData(stations).neededItemHideoutModules).toMatchObject([
+        {
+          id: `currency-${itemId}`,
+          item: { id: itemId, name: 'Currency' },
+          count: 25000,
+        },
+      ]);
     }
   );
 });

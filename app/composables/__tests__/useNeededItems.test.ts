@@ -278,6 +278,20 @@ describe('useNeededItems', () => {
       const { neededItems } = await setup();
       expect(neededItems.allItems.value.length).toBe(6);
     });
+    it('excludes currency requirements from needed inventory items', async () => {
+      const currency = createItem('5449016a4bdc2d6f028b456f', 'Roubles');
+      const currencyRequirement = createHideoutModule(
+        'currency-roubles',
+        'station-1',
+        1,
+        currency,
+        400000
+      );
+      const { neededItems } = await setup({
+        metadataStore: { neededItemHideoutModules: [currencyRequirement] },
+      });
+      expect(neededItems.allItems.value).not.toContainEqual(currencyRequirement);
+    });
     it('preserves separate progress keys for objectives that need the same item', async () => {
       const sharedMod = createItem('560d657b4bdc2da74d8b4572', 'Shared weapon mod');
       const firstObjectiveId = '676529af9c90953d090882ea';

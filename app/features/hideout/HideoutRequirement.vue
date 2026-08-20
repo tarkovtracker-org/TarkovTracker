@@ -31,17 +31,14 @@
         <UIcon name="i-mdi-check-circle" class="text-success-300 h-6 w-6 sm:h-8 sm:w-8" />
       </div>
       <!-- FiR Badge -->
-      <AppTooltip v-if="!isCurrency && isFoundInRaid" :text="$t('common.found_in_raid_required')">
+      <AppTooltip v-if="showFoundInRaidBadge" :text="$t('common.found_in_raid_required')">
         <UIcon
           name="i-mdi-checkbox-marked-circle-outline"
           class="text-warning-400 absolute -top-1 -right-1 h-3 w-3"
         />
       </AppTooltip>
       <!-- Count Badge for multi-count items -->
-      <div
-        v-if="!isCurrency && requiredCount > 1"
-        class="absolute right-0 -bottom-1 left-0 flex justify-center"
-      >
+      <div v-if="showPartialCount" class="absolute right-0 -bottom-1 left-0 flex justify-center">
         <div
           class="border-surface-700 bg-surface-900/90 rounded border px-1 py-0.5 text-[9px] font-bold sm:px-1.5 sm:text-[10px]"
           :class="isComplete ? 'text-success-400' : 'text-surface-300'"
@@ -53,13 +50,9 @@
     <!-- Item Name -->
     <div
       class="text-surface-200 w-full text-center leading-tight font-medium"
-      :class="
-        isCurrency
-          ? 'text-[9px] whitespace-nowrap sm:text-[10px]'
-          : 'line-clamp-2 text-[11px] sm:text-xs'
-      "
+      :class="itemLabelClass"
     >
-      {{ isCurrency ? formattedCurrency : requirement.item.name }}
+      {{ itemLabel }}
     </div>
   </div>
   <!-- Context Menu for Manual Count Adjustment -->
@@ -90,8 +83,8 @@
           close();
         "
       />
-      <div v-if="!isCurrency && requiredCount > 1" class="border-surface-700 my-1 border-t" />
-      <template v-if="!isCurrency && requiredCount > 1">
+      <div v-if="showPartialCount" class="border-surface-700 my-1 border-t" />
+      <template v-if="showPartialCount">
         <div class="space-y-2 px-3 py-2">
           <div class="text-surface-400 text-xs">
             {{ $t('page.hideout.stationcard.requirement.set_custom_amount') }}
@@ -200,8 +193,17 @@
   const requiredCount = computed(() => props.requirement.count);
   const currencySymbol = computed(() => getCurrencySymbol(props.requirement.item.id) ?? '');
   const isCurrency = computed(() => currencySymbol.value !== '');
+  const showPartialCount = computed(() => !isCurrency.value && requiredCount.value > 1);
   const formattedCurrency = computed(
     () => `${currencySymbol.value}${formatNumber(requiredCount.value)}`
+  );
+  const itemLabel = computed(() =>
+    isCurrency.value ? formattedCurrency.value : props.requirement.item.name
+  );
+  const itemLabelClass = computed(() =>
+    isCurrency.value
+      ? 'text-[9px] whitespace-nowrap sm:text-[10px]'
+      : 'line-clamp-2 text-[11px] sm:text-xs'
   );
   // Context menu
   const contextMenu = ref<InstanceType<typeof ContextMenuType>>();
@@ -214,6 +216,7 @@
     );
     return firAttribute?.value === 'true';
   });
+  const showFoundInRaidBadge = computed(() => !isCurrency.value && isFoundInRaid.value);
   // Get current count from store (synced with needed items page)
   const currentCount = computed(() => {
     const storeCount = tarkovStore.getHideoutPartCount(requirementId.value);
