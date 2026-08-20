@@ -8,6 +8,7 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { isCurrencyItemId } from '@/utils/constants';
 import { fuzzyMatch } from '@/utils/fuzzySearch';
 import { logger } from '@/utils/logger';
 import { perfNow, roundPerfMs } from '@/utils/perf';
@@ -26,6 +27,10 @@ import type {
 const DEFAULT_FULL_LOAD_TIMEOUT_MS = 5000;
 const DEFAULT_FULL_LOAD_MIN_TIME_MS = 16;
 const DEFAULT_FULL_LOAD_DELAY_MS = 1500;
+const isTrackableHideoutRequirement = (need: NeededItemHideoutModule): boolean => {
+  const itemId = getNeededItemId(need);
+  return !itemId || !isCurrencyItemId(itemId);
+};
 type FullItemsLoadOptions = {
   priority?: 'normal' | 'high';
   timeout?: number;
@@ -95,7 +100,9 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     logger.info(`[NeededItemsPerf] ${event}`, payload);
   };
   const neededItemTaskObjectives = computed(() => metadataStore.neededItemTaskObjectives);
-  const neededItemHideoutModules = computed(() => metadataStore.neededItemHideoutModules);
+  const neededItemHideoutModules = computed(() =>
+    metadataStore.neededItemHideoutModules.filter(isTrackableHideoutRequirement)
+  );
   const itemsFullLoaded = computed(() => metadataStore.itemsFullLoaded);
   const items = computed(() => metadataStore.items);
   const viewMode = computed({

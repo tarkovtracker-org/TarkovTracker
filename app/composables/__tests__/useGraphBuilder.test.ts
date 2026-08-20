@@ -1,6 +1,46 @@
 import { describe, expect, it } from 'vitest';
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
-import type { Task } from '@/types/tarkov';
+import type { HideoutStation, Task } from '@/types/tarkov';
+describe('useGraphBuilder hideout requirements', () => {
+  it.each(['5449016a4bdc2d6f028b456f', '5696686a4bdc2da3298b456a', '569668774bdc2da2298b4568'])(
+    'preserves currency item %s in hideout requirement metadata',
+    (itemId) => {
+      const stations: HideoutStation[] = [
+        {
+          id: 'station-1',
+          name: 'Heating',
+          levels: [
+            {
+              id: 'station-1-level-1',
+              level: 1,
+              constructionTime: 0,
+              itemRequirements: [
+                {
+                  id: `currency-${itemId}`,
+                  item: { id: itemId, name: 'Currency' },
+                  count: 25000,
+                  quantity: 25000,
+                },
+              ],
+              stationLevelRequirements: [],
+              skillRequirements: [],
+              traderRequirements: [],
+              crafts: [],
+            },
+          ],
+        },
+      ];
+      const { processHideoutData } = useGraphBuilder();
+      expect(processHideoutData(stations).neededItemHideoutModules).toMatchObject([
+        {
+          id: `currency-${itemId}`,
+          item: { id: itemId, name: 'Currency' },
+          count: 25000,
+        },
+      ]);
+    }
+  );
+});
 describe('useGraphBuilder alternatives', () => {
   it('does not create alternatives from failed-only requirements', () => {
     const prerequisite: Task = {
