@@ -12,18 +12,13 @@
   >
     <!-- Item Image -->
     <div class="relative mb-1.5 h-14 w-14 shrink-0 sm:mb-2 sm:h-16 sm:w-16">
-      <div
-        v-if="isCurrency"
-        class="border-surface-700 bg-surface-900/80 text-primary-300 flex h-full w-full items-center justify-center rounded border text-2xl font-bold sm:text-3xl"
-      >
-        {{ currencySymbol }}
-      </div>
       <GameItem
-        v-else
         :item-id="requirement.item.id"
         :item-name="requirement.item.name"
         :dev-link="requirement.item.link"
         :wiki-link="requirement.item.wikiLink"
+        :icon-link="requirement.item.iconLink"
+        :image512px-link="requirement.item.image512pxLink"
         size="small"
         :show-actions="false"
         simple-mode
@@ -184,6 +179,8 @@
         name?: string;
         link?: string | null;
         wikiLink?: string | null;
+        iconLink?: string;
+        image512pxLink?: string;
       };
       count: number;
       attributes?: Array<{

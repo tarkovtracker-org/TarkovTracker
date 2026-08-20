@@ -40,7 +40,11 @@ describe('HideoutRequirement', () => {
       methods: { close: vi.fn(), open: vi.fn() },
     },
     ContextMenuItem: true,
-    GameItem: true,
+    GameItem: {
+      name: 'GameItem',
+      props: ['iconLink', 'image512pxLink', 'itemId'],
+      template: '<div />',
+    },
     UButton: true,
     UIcon: true,
   };
@@ -90,8 +94,31 @@ describe('HideoutRequirement', () => {
       global: globalOptions,
     });
     expect(wrapper.text()).toContain(expected);
-    expect(wrapper.findComponent({ name: 'GameItem' }).exists()).toBe(false);
+    const gameItem = wrapper.findComponent({ name: 'GameItem' });
+    expect(gameItem.exists()).toBe(true);
+    expect(gameItem.props('itemId')).toBe(itemId);
     expect(wrapper.find('input[type="number"]').exists()).toBe(false);
+  });
+  it('passes currency image metadata to the in-game item display', () => {
+    const wrapper = mount(HideoutRequirement, {
+      props: {
+        ...defaultProps,
+        requirement: {
+          count: 400000,
+          id: 'roubles-image-requirement',
+          item: {
+            id: '5449016a4bdc2d6f028b456f',
+            iconLink: 'https://assets.tarkov.dev/roubles-icon.webp',
+            image512pxLink: 'https://assets.tarkov.dev/roubles-512.webp',
+            name: 'Roubles',
+          },
+        },
+      },
+      global: globalOptions,
+    });
+    const gameItem = wrapper.findComponent({ name: 'GameItem' });
+    expect(gameItem.props('iconLink')).toBe('https://assets.tarkov.dev/roubles-icon.webp');
+    expect(gameItem.props('image512pxLink')).toBe('https://assets.tarkov.dev/roubles-512.webp');
   });
   it('keeps currency requirements manually completable without partial counters', async () => {
     const wrapper = mount(HideoutRequirement, {
