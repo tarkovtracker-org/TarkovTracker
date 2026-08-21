@@ -54,12 +54,12 @@
     "twitch_channel_label": "Canale",
     "twitch_channel_placeholder": "Nome canale Twitch",
     "twitch_display_name_label": "Nome visualizzato",
-    "twitch_display_name_placeholder": "Nome display canale",
-    "twitch_config_saved_title": "Configurazione di Twitch aggiornata",
+    "twitch_display_name_placeholder": "Nome canale visualizzato",
+    "twitch_config_saved_title": "Configurazione Twitch aggiornata",
     "twitch_config_saved_description": "Lo stream in evidenza è ora{channel}.",
     "twitch_config_saved_with_warning_title": "Configurazione Twitch salvata",
-    "twitch_config_saved_with_warning_description": "La configurazione è stata salvata, ma i visitatori nella cache possono ancora vedere il valore precedente.",
-    "twitch_config_failed_description": "Impossibile aggiornare la configurazione di Twitch.",
+    "twitch_config_saved_with_warning_description": "La configurazione è stata salvata, ma i visitatori in cache possono ancora vedere il valore precedente.",
+    "twitch_config_failed_description": "Impossibile aggiornare la configurazione Twitch.",
     "twitch_config_load_failed_title": "Configurazione Twitch non disponibile",
     "twitch_config_load_failed_description": "Impossibile caricare l'attuale configurazione di Twitch.",
     "twitch_config_login_required": "Devi essere connesso per aggiornare la configurazione di Twitch."
@@ -143,7 +143,7 @@
     "something_went_wrong": "Qualcosa è andato storto",
     "unexpected_description": "Si è verificato un errore imprevisto durante l'elaborazione della richiesta.",
     "invalid_host_hint": "Questo host di anteprima è bloccato dalla convalida dell'host API. Aggiungi il nome dell'host di anteprima a API_ALLOWED_HOSTS o derivalo da CF_PAGES_URL.",
-    "supabase_config_hint": "Questa distribuzione manca della configurazione pubblica di Supabase. Imposta NUXT_PUBLIC_SUPABASE_URL e NUXT_PUBLIC_SUPABASE_ANON_KEY per le anteprime, o consente alle build di anteprima di funzionare in modalità offline.",
+    "supabase_config_hint": "Questa distribuzione manca della configurazione pubblica di Supabase. Imposta NUXT_PUBLIC_SUPABASE_URL e NUXT_PUBLIC_SUPABASE_ANON_KEY per le anteprime, o consenti alle build di anteprima di funzionare in modalità offline.",
     "request_blocked_hint": "Una richiesta necessaria per visualizzare questa pagina è stata bloccata. Aprire i dettagli tecnici e includere l'URL della richiesta fallita quando si segnala il problema."
   },
   "toast": {
@@ -212,17 +212,17 @@
     "enabled": "Abilitato",
     "disabled": "Disabilitato",
     "update_failed": "Aggiornamento non riuscito",
-    "tasks": "Compiti",
+    "tasks": "Missioni",
     "level": "Livello",
     "locked": "Bloccato",
     "all": "Tutti",
     "completed": "Completato",
     "status_completed": "completato",
-    "hideout": "Hideout",
+    "hideout": "Rifugio",
     "unknown": "Sconosciuto",
     "failed": "Fallito",
     "status_failed": "fallito",
-    "complete": "Complete",
+    "complete": "Completato",
     "pvp": "PvP",
     "pve": "PvE",
     "seasonal_pvp": "PvP Stagionale",
@@ -230,73 +230,73 @@
     "pve_description": "Giocatore vs Ambiente (Co-op)",
     "seasonal_pvp_description": "Stagione {season}",
     "retry": "Riprova",
-    "open_tasks": "Apri attività",
-    "view_on_tarkov_dev": "Vista su Tarkov.dev",
+    "open_tasks": "Apri missioni",
+    "view_on_tarkov_dev": "Visualizza su Tarkov.dev",
     "reset": "Reset",
     "scav": "Scav",
     "apply": "Applica",
     "more": "Altro",
     "needed_items": "Oggetti Necessari",
-    "task": "Attività",
+    "task": "Missione",
     "lightkeeper": "Lightkeeper",
     "kappa": "Kappa",
     "storyline": "Storyline",
-    "mark_complete": "Marchio completato",
+    "mark_complete": "Segna come completato",
     "maps": "Mappe",
     "clear_search": "Cancella ricerca",
     "settings": "Impostazioni",
     "credits": "Riconoscimenti",
     "support": "Supporto",
-    "privacy_policy": "Politica Sulla Privacy",
-    "terms_of_service": "Termini di servizio",
+    "privacy_policy": "Politica sulla Privacy",
+    "terms_of_service": "Termini di Servizio",
     "tarkov_dev": "Tarkov.dev",
     "streamer_tools": "Strumenti Streamer",
-    "prestige": "Prestige",
-    "backup_restore": "Backup E Ripristino",
+    "prestige": "Prestigio",
+    "backup_restore": "Backup e ripristino",
     "confirm_import": "Conferma Importazione",
     "admin_panel": "Pannello Amministratore",
     "supporter": "Sostenitore",
     "timmy": "Timmy",
     "chad": "Chad",
-    "activity_log": "Registro Attività",
+    "activity_log": "Registro attività",
     "manual": "Manuale",
     "page_not_found": "Pagina Non Trovata",
-    "open_hideout": "Apri nascosto",
-    "zoom_speed": "Velocità ingrandimento",
-    "pan_speed": "Velocità di padella",
-    "zone_opacity": "Opacità zona",
+    "open_hideout": "Apri Rifugio",
+    "zoom_speed": "Velocità zoom",
+    "pan_speed": "Velocità scorrimento",
+    "zone_opacity": "Opacità obiettivo",
     "default": "Predefinito",
     "compact": "Compatto",
-    "pmc_spawn": "PMC Spawn",
-    "pmc_extract": "Estratto PMC",
-    "scav_extract": "Estratto Di Scav",
+    "pmc_spawn": "Spawn PMC",
+    "pmc_extract": "Estrazione PMC",
+    "scav_extract": "Estrazione Scav",
     "dashboard": "Dashboard",
-    "meet_the_fence_reputation_requirement_required": "Soddisfa il requisito di reputazione della recinzione ({required}).",
+    "meet_the_fence_reputation_requirement_required": "Soddisfa il requisito di reputazione Fence ({required}).",
     "objectives": "Obiettivi",
-    "kappa_tasks": "Compiti Di Kappa",
-    "getting_started": "Per Iniziare",
-    "progress": "Avanzamento",
+    "kappa_tasks": "Missioni Kappa",
+    "getting_started": "Primi passi",
+    "progress": "Progresso",
     "blocked": "Bloccato",
-    "optional": "Facoltativo",
+    "optional": "Opzionale",
     "lv": "Lv",
     "kappa_lightkeeper": "Kappa & Lightkeeper",
     "list": "Elenco",
-    "traders": "Commercianti",
+    "traders": "Traders",
     "clear_focus": "Cancella focus",
     "lvl_level": "Lvl {level}",
     "impact": "Impatto",
     "appearance": "Aspetto",
     "requires": "Richiede",
-    "view_on_wiki": "Visualizza su Wiki",
-    "item": "Elemento",
-    "reset_failed": "Ripristino Fallito",
+    "view_on_wiki": "Visualizza sulla Wiki",
+    "item": "Oggetto",
+    "reset_failed": "Reset Fallito",
     "was_status": "era {status}",
     "fail": "Fallito",
     "accept": "Accetta",
     "ready_to_hand_over": "Pronto a consegnare",
     "objective": "Obiettivo",
     "maxed": "Maxed",
-    "found_in_raid_required": "Trovato in Raid richiesto",
+    "found_in_raid_required": "Found in Raid richiesto",
     "fir": "FIR",
     "priority": "Priorità",
     "team": "Squadra",
@@ -307,21 +307,21 @@
     "api_documentation": "Documentazione API",
     "tarkov_changes": "Modifiche Tarkov",
     "api": "API",
-    "game_settings": "Impostazioni Di Gioco",
-    "custom_scale": "Scala Personalizzata",
-    "self_contained": "Auto Contenuta",
-    "progress_track": "Traccia D'Avanzamento",
+    "game_settings": "Impostazioni di gioco",
+    "custom_scale": "Risoluzione personalizzata",
+    "self_contained": "Autocontenuto",
+    "progress_track": "Progresso",
     "account": "Account",
     "preferences": "Preferenze",
-    "game_edition": "Edizione Di Gioco",
-    "reset_pvp_data": "Ripristina Dati PvP",
-    "reset_pve_data": "Ripristina Dati PvE",
-    "reset_seasonal_data": "Ripristina Dati Stagionali Pvp",
-    "reset_all_data": "Reimposta Tutti I Dati",
-    "import_failed": "Importazione Non Riuscita",
-    "delete_archived_run": "Elimina Esecuzione Archiviata",
-    "validation_error": "Errore Di Convalida",
-    "got_it": "Ho capito"
+    "game_edition": "Edizione di gioco",
+    "reset_pvp_data": "Reimposta dati PvP",
+    "reset_pve_data": "Reimposta dati PvE",
+    "reset_seasonal_data": "Ripristina dati stagionali PvP",
+    "reset_all_data": "Ripristina tutti i dati",
+    "import_failed": "Importazione fallita",
+    "delete_archived_run": "Elimina run archiviata",
+    "validation_error": "Errore di convalida",
+    "got_it": "Capito"
   },
   "page_help": {
     "button": "Aiuto",
@@ -502,47 +502,47 @@
     },
     "legend": {
       "regular": "Regolare",
-      "pinned": "Bloccato",
+      "pinned": "Fissato",
       "team": "Squadra",
       "shared_extract": "Estrazione PMC/Scav",
       "coop_extract": "Estrazione Co-Op"
     },
     "tooltips": {
-      "zoom_in": "Aumenta ingrandimento",
-      "zoom_out": "Riduci ingrandimento",
+      "zoom_in": "Aumenta zoom",
+      "zoom_out": "Diminuisci zoom",
       "reset_view": "Reset vista",
       "open_fullscreen": "Apri mappa a schermo intero",
-      "exit_fullscreen": "Esci dallo schermo intero",
+      "exit_fullscreen": "Esci da schermo intero",
       "drag_to_resize": "Trascina per ridimensionare la mappa",
-      "switch_floor": "Interruttore a pavimento (Ctrl + Scorrimento)"
+      "switch_floor": "Cambia piano (Ctrl + Rotella mouse)"
     },
     "controls": {
       "help": {
-        "pan": "o trascina su pan",
+        "pan": "o trascina per spostare la visuale",
         "zoom": "per ingrandire",
         "reset": "per resettare la vista",
         "cycle_floors": "per ciclare i piani",
-        "floor_panel": "o utilizzare il pannello del pavimento",
+        "floor_panel": "o utilizza il pannello dei piani",
         "click_at_cursor": "per cliccare sul cursore",
-        "click_marker": "Fare clic su un marcatore per i dettagli",
+        "click_marker": "Fai clic su un marcatore per i dettagli",
         "fullscreen": "Usa il pulsante a schermo intero nei controlli mappa",
-        "resize": "Trascinare il bordo inferiore della mappa per ridimensionare"
+        "resize": "Trascina il bordo inferiore della mappa per ridimensionare"
       }
     },
     "help": {
       "title": "Controlli mappa",
       "groups": {
-        "navigate": "Navigate",
+        "navigate": "Naviga",
         "floors": "Piani",
         "interact": "Interagisci",
         "view": "Visualizza"
       }
     },
     "hint": {
-      "title": "Controlli delle mappe rapide",
-      "drag_to_pan": "Trascina per pan",
-      "shift_scroll_zoom": "Maiusc + Scorri per ingrandire",
-      "ctrl_scroll_floors": "Ctrl + Scorrimento per cambiare piano",
+      "title": "Controlli rapidi mappa",
+      "drag_to_pan": "Trascina per spostare la visuale",
+      "shift_scroll_zoom": "Maiusc + Scorrimento per ingrandire",
+      "ctrl_scroll_floors": "Ctrl + Scorrimento per cambiare piani",
       "all_controls": "Tutti i controlli"
     },
     "aria": {
@@ -959,7 +959,7 @@
         "map_complete_tasks_toggle_show": "Mostra nascoste",
         "map_complete_tasks_toggle_hide": "Nascondi complete per mappa",
         "map_hidden_hint": "Mappa nascosta — clicca per mostrare",
-        "raid_time_tooltip": "Tempo di incursione corrente"
+        "raid_time_tooltip": "Orario di incursione corrente"
       },
       "pinned_tasks_section": "Missioni in evidenza",
       "focused_task_section": "Missioni focus",
@@ -1231,7 +1231,7 @@
           "create_team_error_ui_update": "Lo stato del team non si è aggiornato. Ricarica per vedere il tuo team o riprova.",
           "leave_team_success": "Sei uscito dal team con successo.",
           "leave_team_error": "Impossibile lasciare il team.",
-          "already_in_team": "Sei già in una squadra {mode} . Lascia prima la tua squadra attuale.",
+          "already_in_team": "Sei già in una squadra {mode}. Lascia prima la tua squadra attuale.",
           "url_copied": "URL copiato negli appunti",
           "copy_url_failed": "Impossibile copiare l'URL negli appunti",
           "no_team": "Non fai parte di nessuna squadra.",
@@ -1250,11 +1250,11 @@
     },
     "credits": {
       "sections": {
-        "original_creator": "Creatore originale del progetto:",
-        "staff": "Staff di TarkovTracker.org:",
-        "support_members": "Membri di supporto:",
-        "beta_testers": "Nuxt - Tester Closed Beta:",
-        "contributors": "Contributors Open Source:"
+        "original_creator": "Creatore originale del progetto",
+        "staff": "Staff di TarkovTracker.org",
+        "support_members": "Membri del Supporto",
+        "beta_testers": "Tester Nuxt - Closed Beta",
+        "contributors": "Contributori Open Source"
       },
       "notes": {
         "alphabetical": "Elencato alfabeticamente; l'ordine non riflette il contributo.",
@@ -1264,10 +1264,10 @@
         "loading": "Caricamento contributori...",
         "error": "Impossibile caricare i contributori in questo momento.",
         "empty": "Nessun contributore trovato.",
-        "contributions": "{count} contribuzioni",
+        "contributions": "{count} contributo | {count} contributi",
         "total": "{count} donatore | {count} donatori"
       },
-      "description": "Incontra creatori, personale, membri di supporto, beta tester e collaboratori open source dietro Tarkov Tracker."
+      "description": "Incontra creatori, staff, membri di supporto, beta tester e collaboratori open source dietro Tarkov Tracker."
     },
     "login": {
       "subtitle": "Accedi al tuo account",
@@ -1392,11 +1392,11 @@
       "suggest_description": "Suggerisci un tool o una guida per l'inclusione in questa pagina.",
       "suggest_cta": "Suggerisci una risorsa",
       "migration_banner": {
-        "title": "Passando da TarkovTracker.io?",
+        "title": "Ti stai trasferendo da TarkovTracker.io?",
         "cta": "Leggi la guida alla migrazione"
       },
       "categories": {
-        "tarkovtracker_guides": "Guide Di TarkovTracker.org",
+        "tarkovtracker_guides": "Guide di TarkovTracker.org",
         "companion_apps": "Companion Apps",
         "data_and_apis": "Dati & Strumenti Sviluppatori",
         "calculators_and_reference": "Calcolatori & Riferimenti"
@@ -1447,7 +1447,7 @@
       "items": {
         "tarkovtracker_org_vs_io": {
           "name": "TarkovTracker.org vs TarkovTracker.io",
-          "description": "Quale sito TarkovTracker dovresti usare? Come TarkovTracker.org si riferisce al sito originale .io, e come spostare i tuoi progressi sopra."
+          "description": "Quale sito TarkovTracker dovresti usare? Il rapporto tra TarkovTracker.org e il sito originale .io, e come trasferire i tuoi progressi."
         },
         "tarkovdev": {
           "name": "Tarkov.dev",
@@ -1472,25 +1472,25 @@
       },
       "guides": {
         "tarkovtracker_org_vs_io": {
-          "overview": "TarkovTracker esiste su due domini. TarkovTracker.io è il sito originale creato dal fondatore del progetto TarkovTracker e ospita il codice originale. TarkovTracker. rg è la continuazione attivamente mantenuta gestito da un contribuente di lunga data ed ex manutentore del progetto originale, come fork libero e open-source sotto la stessa licenza GNU GPLv3. Questa guida spiega le differenze e i modi supportati per ricostruire i vostri progressi su TarkovTracker.org.",
+          "overview": "TarkovTracker è presente su due domini. TarkovTracker.io è il sito originale, creato dal fondatore del progetto TarkovTracker, e ospita la codebase originale. TarkovTracker.org è la versione che prosegue il progetto con manutenzione attiva, gestita da un collaboratore di lunga data ed ex manutentore del progetto originale; si tratta di un fork gratuito e open source, rilasciato sotto la medesima licenza GNU GPLv3. Questa guida illustra le differenze e le modalità supportate per ricostruire i propri progressi su TarkovTracker.org.",
           "step_1_title": "Crea o accedi al tuo account TarkovTracker.org",
-          "step_1_desc": "Crea un account TarkovTracker.org o accedi all'account in cui vuoi tenere traccia dei tuoi progressi di cancellazione.",
-          "step_2_title": "Importa i metadati del tuo profilo Tarkov.dev",
-          "step_2_desc": "Aprire Impostazioni, scegliere Importazioni e utilizzare l'importazione del profilo Tarkov.dev per ripristinare i dettagli del profilo supportati come livello, fazione e abilità.",
+          "step_1_desc": "Crea un account su TarkovTracker.org o accedi all'account su cui desideri tenere traccia dei tuoi progressi nell'attuale wipe.",
+          "step_2_title": "Importa i metadata del tuo profilo Tarkov.dev",
+          "step_2_desc": "Apri le Impostazioni, seleziona Importazioni e utilizza la funzione di importazione profilo di Tarkov.dev per ripristinare i dettagli del profilo supportati, come livello, fazione e abilità.",
           "step_3_title": "Importa i tuoi registri di gioco EFT",
-          "step_3_desc": "Nella stessa scheda Importazioni, selezionare la cartella di log EFT per recuperare gli eventi di avvio e completamento della missione che sono ancora presenti nei log locali.",
-          "step_4_title": "Verifica le attività e nascondi i progressi",
-          "step_4_desc": "Controlla la tua lista di attività e hideout, quindi ripristina manualmente i progressi che Tarkov.dev e i log di gioco disponibili non potevano recuperare.",
-          "step_5_title": "Connetti gli strumenti di accompagnamento supportati",
-          "step_5_desc": "Impostare TarkovMonitor con un nuovo TarkovTracker.org read-write API token così futuri aggiornamenti di progresso supportati andare al tuo account .org.",
+          "step_3_desc": "Nella stessa scheda Importazioni, seleziona la cartella dei log di EFT per recuperare gli eventi di inizio e completamento delle missioni ancora presenti nei log locali.",
+          "step_4_title": "Verifica le missioni e i progressi del rifugio",
+          "step_4_desc": "Controlla la tua lista di missioni e rifugio, quindi ripristina manualmente i progressi che Tarkov.dev e i log di gioco disponibili non hanno potuto recuperare.",
+          "step_5_title": "Collega gli strumenti esterni compatibili",
+          "step_5_desc": "Configura TarkovMonitor con un nuovo token API lettura/scrittura di TarkovTracker.org, in modo che i futuri aggiornamenti dei progressi vengano inviati al tuo account .org.",
           "faq_1_q": "Qual è la differenza tra TarkovTracker.io e TarkovTracker.org?",
-          "faq_1_a": "TarkovTracker.io è il sito originale. È relativamente stabile, ma ha problemi noti e non è più mantenuto: il suo ultimo impiego è avvenuto nell'agosto 2024 e non vi è sviluppo o sostegno attivo. TarkovTracker. rg è il fork attivamente mantenuto: riceve aggiornamenti regolari, supporta i cambiamenti di gioco dopo EFT 0.15, e aggiunge nuove funzionalità. Poiché è in fase di sviluppo attivo può occasionalmente avere bug o tempi di inattività, e mentre lavoriamo sodo per prevenirlo, la perdita di dati non può essere esclusa del tutto.",
+          "faq_1_a": "TarkovTracker.io è il sito originale. È relativamente stabile, ma presenta problemi noti e non è più oggetto di manutenzione: l'ultimo aggiornamento risale all'agosto 2024 e non vi sono attività di sviluppo o supporto in corso. TarkovTracker.org è il fork attivamente mantenuto: riceve aggiornamenti regolari, supporta le modifiche al gioco introdotte dopo la versione 0.15 e introduce nuove funzionalità. Essendo in fase di sviluppo attivo, potrebbe occasionalmente presentare bug o interruzioni del servizio; sebbene ci impegniamo al massimo per evitarlo, non è possibile escludere del tutto la perdita di dati.",
           "faq_2_q": "Quale sito dovrei usare?",
-          "faq_2_a": "Usa TarkovTracker.org. È l'unica versione che riceve aggiornamenti, correzioni di bug e supporto per l'attuale Escape dal contenuto di Tarkov. Nuovi account dovrebbero essere sempre creati su TarkovTracker.org.",
+          "faq_2_a": "Usa TarkovTracker.org. È l'unica versione che riceve aggiornamenti, correzioni di bug e supporto per il contenuto attuale di Escape from Tarkov. Nuovi account dovrebbero essere sempre creati su TarkovTracker.org.",
           "faq_3_q": "Come posso migrare i miei progressi da .io a .org?",
-          "faq_3_a": "TarkovTracker.org al momento non fornisce un'importazione .io token diretta. Crea o accedi al tuo . rg account, quindi utilizzare il profilo Tarkov.dev supportato e EFT game-log import in Impostazioni. Verifica le attività e nascondi manualmente i progressi perché queste fonti potrebbero non contenere tutto quello che è stato registrato su .io. Progresso non sincronizza tra i due siti.",
-          "faq_4_q": "Il team di TarkovTracker.org gestisce TarkovTracker.io?",
-          "faq_4_a": "No. Il dominio .io e la distribuzione sono di proprietà e controllati dal fondatore del progetto originario. Non abbiamo accesso ad esso e non possiamo correggere, aggiornare o fornire supporto per qualsiasi cosa su .io."
+          "faq_3_a": "TarkovTracker.org al momento non fornisce un'importazione diretta da .io. Crea o accedi al tuo account .org, quindi utilizza le importazioni del profilo da Tarkov.dev e i log in-game in Impostazioni. Verifica missioni e progressi del rifugio manualmente perché queste fonti potrebbero non contenere tutto quello che è stato registrato su .io. I progressi non sono sincronizzati tra i due siti.",
+          "faq_4_q": "Il team di TarkovTracker.org gestisce anche TarkovTracker.io?",
+          "faq_4_a": "No. Dominio e distribuzione di .io sono di proprietà e controllati dal fondatore del progetto originario. Non vi abbiamo accesso e non possiamo correggere, aggiornare o fornire supporto per qualsiasi cosa su .io."
         },
         "tarkovdev": {
           "overview": "Tarkov.dev è la spina dorsale dell'ecosistema di dati della comunità. Mantiene un set di dati open-source di oggetti, missioni, trader, stazioni del rifugio e altro ancora, tutte accessibili tramite un'API gratuita GraphQL. TarkovTracker stesso utilizza questa API per rimanere aggiornato con gli ultimi dati di gioco. Se crei strumenti, guide, o semplicemente desideri cercare statistiche, Tarkov.dev è la fonte più autorevole.",
@@ -1560,8 +1560,8 @@
           "faq_2_a": "Sì. Mostra i prezzi correnti del flea market e può aiutare a confrontare il prezzo flea e quello dei trader.",
           "faq_3_q": "RatScanner può mostrare gli oggetti necessari per TarkovTracker?",
           "faq_3_a": "Può mostrare le informazioni generali ricevute dal fornitore di dati. Per i requisiti in base ai progressi personali di TarkovTracker, utilizzare la pagina Oggetti.",
-          "faq_4_q": "RatScanner lavora con TarkovTracker.org?",
-          "faq_4_a": "Sì. Installa RatScanner, apri la sezione TarkovTracker nelle sue impostazioni e cambia il backend TarkovTracker da .io a .org prima di entrare nel tuo tarkovtracker. rg API token. Il team TarkovTracker.org ora aiuta a mantenere RatScanner, così l'integrazione .org e le impostazioni predefinite continueranno a migliorare nelle versioni future."
+          "faq_4_q": "RatScanner funziona con TarkovTracker.org?",
+          "faq_4_a": "Sì. Installa RatScanner, apri le impostazioni, scorri alla sezione TarkovTracker e cambia da .io a .org prima di inserire il token API di tarkovtracker.org. Il team TarkovTracker.org ora aiuta a mantenere RatScanner, così l'integrazione .org e le impostazioni predefinite continueranno a migliorare nelle versioni future."
         },
         "cultistcircle": {
           "overview": "CultistCircle è un sito web sviluppato gratuitamente dalla community da utilizzare per il Circolo Cultista in Escape from Tarkov. Ti permette di cercare ricette — quali oggetti sacrificare e quello che ottieni in cambio — senza dover sperimentare in gioco. Costruito da uno sviluppatore solista, è un riferimento utile per pianificare i tuoi scambi nel Circolo Cultista in modo efficiente.",
@@ -1578,11 +1578,11 @@
         }
       },
       "video": {
-        "walkthrough_title": "Passeggiata video {name}",
-        "caption": "Passeggiata video della comunità. I passi possono differire leggermente dalla guida scritta.",
+        "walkthrough_title": "Video walkthrough {name}",
+        "caption": "Video walkthrough della community. I passaggi potrebbero differire leggermente dalla guida scritta.",
         "play": "Riproduci video: {title}"
       },
-      "official_guide_label": "Guida Di TarkovTracker.org"
+      "official_guide_label": "Guida di TarkovTracker.org"
     }
   },
   "footer": {
@@ -1592,11 +1592,11 @@
     },
     "analytics_preferences": "Preferenze analitiche",
     "game_attribution": "Escape from Tarkov e i contenuti e materiali correlati al gioco sono marchi registrati e opere protette da copyright di Battlestate Games Limited e dei suoi licenziatari. Tutti i diritti riservati. TarkovTracker è un progetto fan non ufficiale e non è affiliato né approvato da Battlestate Games.",
-    "tagline": "Traccia la tua fuga dalle missioni di Tarkov, gli aggiornamenti nascosti e i requisiti dell'articolo in un unico posto.",
+    "tagline": "Traccia le tue missioni di Escape from Tarkov, gli aggiornamenti rifugio e gli oggetti di cui hai bisogno in un unico posto.",
     "sections": {
       "explore": "Esplora",
       "project": "Progetto",
-      "legal": "Legale"
+      "legal": "Informazioni legali"
     }
   },
   "navigation_drawer": {
@@ -1629,7 +1629,7 @@
     "title_with_mode": "Profilo {name} {mode}",
     "mode_pvp": "PVP",
     "mode_pve": "PVE",
-    "mode_seasonal_pvp": "PVP SEASONALE",
+    "mode_seasonal_pvp": "PVP STAGIONALE",
     "season_short": "S{season}"
   },
   "streamer_tools": {
@@ -1752,11 +1752,11 @@
       "imports": "Importazioni"
     },
     "tab_groups": {
-      "game_progress": "Progresso Di Gioco",
+      "game_progress": "Progressi di gioco",
       "app": "App",
       "data": "Dati",
       "account": "Account",
-      "tools_integrations": "Strumenti E Integrazioni"
+      "tools_integrations": "Strumenti & Integrazioni"
     },
     "tab_seo": {
       "progression": {
@@ -1780,7 +1780,7 @@
         "description": "Importa progressi TarkovTracker da profili Tarkov.dev e log di gioco EFT."
       },
       "backup_restore": {
-        "title": "Backup E Ripristino",
+        "title": "Backup e ripristino",
         "description": "Esporta o ripristina i dati di avanzamento di TarkovTracker e snapshots di supporto."
       },
       "api": {
@@ -1805,7 +1805,7 @@
     },
     "general": {
       "title": "Preferenze Generali",
-      "privacy_mode": "Modalità Streamer",
+      "privacy_mode": "Modalità Privacy",
       "privacy_mode_hint": "Nasconde informazioni sensibili durante lo streaming."
     },
     "interface": {
@@ -1817,8 +1817,8 @@
         "show_prev": "Mostra missioni precedenti",
         "density": "Densità pannello",
         "require_trader_levels": "Richiede livello di fedeltà trader e reputazione per la disponibilità della missione",
-        "flags_section": "Visualizzazione Attività",
-        "availability_section": "Disponibilità Attività",
+        "flags_section": "Schermata Missioni",
+        "availability_section": "Disponibilità Missioni",
         "view_defaults_section": "Viste Predefinite"
       },
       "maps": {
@@ -1830,7 +1830,7 @@
           "title": "Colori mappa",
           "description": "Imposta i colori degli indicatori per una migliore leggibilità e accessibilità.",
           "self_objective": "Il tuo obiettivo",
-          "pinned_objective": "Attività Bloccata",
+          "pinned_objective": "Missioni in evidenza",
           "team_objective": "Obiettivi team",
           "selected": "Obiettivo marcato",
           "shared_extract": "Estrazione condivisa",
@@ -1870,7 +1870,7 @@
       "reset_seasonal_warning": "Questo eliminerà definitivamente tutti i tuoi progressi stagionali in PvP per la stagione attiva. I tuoi dati persistenti PvP e PvE non saranno influenzati.",
       "reset_all_confirmation": "Sei sicuro di voler resettare TUTTI i tuoi progressi?",
       "reset_all_warning": "Questo eliminerà definitivamente TUTTI i progressi per le modalità PvP e PvE. Questa azione non può essere annullata!",
-      "prestige_mode_warning": "La tua attuale esecuzione {mode} verrà archiviata, quindi la sua progressione verrà ripristinata per il prossimo livello di prestigio. Altre modalità non sono influenzate.",
+      "prestige_mode_warning": "La tua run {mode} attuale verrà archiviata, quindi la sua progressione verrà ripristinata per il prossimo livello di prestigio. Altre modalità non sono influenzate.",
       "reset_confirm": "Reimposta dati",
       "export_description": "Scarica un backup dei tuoi dati di avanzamento per le modalità PvP e PvE.",
       "export_button": "Esporta Backup",
@@ -1897,21 +1897,21 @@
       "import_preview_pvp_tasks": "Missioni PvP",
       "import_preview_pve_level": "Livello PvE",
       "import_preview_pve_tasks": "Missioni PvE",
-      "import_preview_seasonal_level": "Livello Stagionale Di Pvp",
+      "import_preview_seasonal_level": "Livello Stagionale PvP",
       "import_preview_seasonal_tasks": "Attività Stagionali PvP",
       "import_target_label": "Target importazione",
       "import_target_pvp": "Solo PvP",
       "import_target_pve": "Solo PvE",
-      "import_target_all": "Tutti Disponibili",
-      "seasonal_import_locked": "Le importazioni stagionali di PvP sono temporaneamente bloccate fino a quando i dati di origine non saranno verificati per la Stagione {season}.",
+      "import_target_all": "Tutti disponibili",
+      "seasonal_import_locked": "Le importazioni stagionali di PvP sono temporaneamente bloccate fino a quando i dati originali non saranno verificati per la Stagione {season}.",
       "import_success_title": "Backup importato",
       "import_success_description": "I tuoi dati di avanzamento sono stati ripristinati con successo.",
-      "import_error_title": "Importazione Backup Non Riuscita",
+      "import_error_title": "Importazione Backup Fallita",
       "import_error_description": "Il backup non può essere importato. Per favore riprova.",
       "export_error_title": "Esportazione fallita",
       "debug_export_error_title": "Esportazione Debug fallita",
       "reset_title": "Azzera progressi",
-      "danger_zone_title": "Zona Pericolosa",
+      "danger_zone_title": "Zona pericolosa",
       "danger_zone_hint": "Il ripristino di tutti i progressi elimina permanentemente i tuoi dati per PvP, PvE e PvP stagionale. Questo non può essere annullato.",
       "prestige_history_title": "Timeline Prestigio",
       "prestige_history_loading": "Caricamento cronologia prestigio...",
@@ -1931,10 +1931,10 @@
       "prestige_history_compare_subtitle": "Prestigio attuale ({from}) in confronto a {to}"
     },
     "prestige_pvp": {
-      "success_title": "Prestigio PvP completo",
-      "success_description": "Il tuo profilo PvP ha raggiunto il Prestigio {level}.",
+      "success_title": "Prestigio {mode} completo",
+      "success_description": "Il tuo profilo {mode} ha raggiunto il Prestigio {level}.",
       "error_title": "Prestigio Fallito",
-      "error_description": "Impossibile aggiornare Prestigio PvP. Si prega di riprovare."
+      "error_description": "Impossibile aggiornare il prestigio del profilo {mode}. Per favore riprova."
     },
     "reset_pvp": {
       "success_title": "Ripristino dati PvP",
@@ -1947,7 +1947,7 @@
       "error_description": "Impossibile reimpostare i dati PvE. Per favore riprova."
     },
     "reset_seasonal": {
-      "success_title": "Ripristino Dati Stagionali Pvp",
+      "success_title": "Ripristino Dati Stagionali PvP",
       "success_description": "Il progresso della stagione attiva è stato ripristinato con successo.",
       "error_description": "Impossibile ripristinare i dati stagionali PvP. Si prega di riprovare."
     },
@@ -2023,7 +2023,7 @@
       "pvp_only": "Prestigio in Escape from Tarkov attualmente esiste solo per i profili PvP. Passa la modalità attiva a PvP per gestire il prestigio e le run archiviate.",
       "persistent_mode_unsupported_title": "Prestigio non disponibile",
       "persistent_mode_unsupported": "Prestigio non è disponibile per la modalità PvE persistente.",
-      "seasonal_mode_unsupported": "Prestige non è disponibile in PvP stagionale.",
+      "seasonal_mode_unsupported": "Prestigio non è disponibile in PvP stagionale.",
       "current_level": "Livello Prestigio attuale",
       "set_current": "Imposta Prestigio attuale",
       "set_current_hint": "Usa questo quando hai già effettuato il Prestigio in gioco e hai solo bisogno che il tracker combaci. Questo non reimposta i progressi.",
@@ -2036,16 +2036,16 @@
       "requirements_description": "Il tracker controlla per il tuo prossimo prestigio: Prestigio {level}.",
       "requirements_empty": "Per questo livello di prestigio non sono disponibili requisiti aggiuntivi per il tracker.",
       "archive_title": "Archivia questa run e avvia il prossimo Prestigio",
-      "archive_description_mode": "Usalo solo quando si sta effettivamente prestigiando ora. La tua attuale esecuzione {mode} verrà archiviata e la sua progressione verrà ripristinata per il prossimo livello di prestigio.",
+      "archive_description_mode": "Usalo solo quando se stai effettivamente prestigiando. La tua attuale run {mode} verrà archiviata e la sua progressione verrà ripristinata per il prossimo livello di prestigio.",
       "archive_cta": "Archivia la run e comincia il Prestigio {level}",
       "archive_cta_disabled": "Prestigio non disponibile",
-      "archive_dialog_title_mode": "Archivio Attuale {mode} Esegui",
+      "archive_dialog_title_mode": "Archivia la run {mode} attuale",
       "archive_sync_hint": "Se hai solo bisogno che il tracker combaci un prestigio già in corso in-game, utilizza Imposta prestigio attuale qui in alto.",
       "archive_soft_gate_unmet": "{count} requisiti tracciati sembrano incompleti. Puoi continuare comunque.",
       "archive_soft_gate_manual": "{count} requisiti devo ancora essere completati manualmente in-game.",
-      "archived_runs_description": "Qui appaiono solo le run PvP archiviate dai tracker. Impostare il prestigio corrente in seguito non crea voci in cronologia.",
+      "archived_runs_description": "Qui appaiono solo le run {mode} archiviate dal tracker. Impostare il tuo livello prestigio in seguito non crea voci in cronologia.",
       "delete_history_cta": "Elimina la run selezionata",
-      "delete_history_warning": "Questo rimuove solo la voce della cronologia archiviata. Non ripristina o reimposta i tuoi attuali progressi in PvP.",
+      "delete_history_warning": "Questo rimuove solo le voci della cronologia archiviate. Non ripristina o reimposta i tuoi attuali progressi {mode}.",
       "delete_history_selected_label": "Run selezionata",
       "delete_history_success_title": "Run archiviata eliminata",
       "delete_history_success_description": "La cronologia prestigio selezionata è stata rimossa.",
@@ -2077,7 +2077,7 @@
       "summary_description_manual": "{count} requisiti richiedono ancora la verifica manuale."
     },
     "display_name": {
-      "explanation": "Il tuo username viene mostrato ai compagni di squadra e nella navigazione. Ogni modalità di gioco (PvP/PvE) ha un username separato.",
+      "explanation": "Il tuo nome visualizzato viene mostrato ai compagni di squadra e nella navigazione. Ogni modalità di gioco (PvP, PvE, Stagionale PvP) ha un nome di visualizzazione separato. Il pannello per la modalità attiva è evidenziato.",
       "label": "Username in-game",
       "placeholder": "Username...",
       "save": "Salva",
@@ -2107,7 +2107,7 @@
         "ingame": "In gioco"
       },
       "quest_tooltip": "Livello di abilità concesso automaticamente con ricompense di missione completate.",
-      "offset_tooltip": "Regolazione manuale in cima al livello della ricompensa della missione. Positivo significa che hai addestrato le ricompense della missione sopra",
+      "offset_tooltip": "Regolazione manuale rispetto al livello della ricompensa della missione. Un valore positivo indica che hai allenato l'abilità oltre il livello previsto dalla ricompensa della missione.",
       "collapsed_hint": "Mostrando {shown} di {total} abilità. Mostra tutte per vedere ogni abilità."
     },
     "keybinds": {
@@ -2221,8 +2221,8 @@
       "skills_count": "{count} abilità rilevate",
       "last_refreshed": "Dati Tarkov.dev aggiornati",
       "last_refreshed_unknown": "Sconosciuto",
-      "data_age_warning": "Questa istantanea di Tarkov.dev è {days} giorni di età. Se hai giocato da allora, apri il tuo profilo su Tarkov.dev quindi si aggiorna, quindi recupera di nuovo prima dell'importazione.",
-      "cooldown_hint": "Importato di recente. Puoi re-importare questo profilo in circa {minutes} min.",
+      "data_age_warning": "Questa istantanea di Tarkov.dev risale a {days} giorni fa. Se hai giocato nel frattempo, apri il tuo profilo su Tarkov.dev per aggiornarlo, quindi recupera nuovamente i dati prima di importarli.",
+      "cooldown_hint": "Importato di recente. Puoi re-importare questo profilo fra circa {minutes} min.",
       "turnstile_hint": "Completa la verifica umana qui sotto per recuperare il tuo profilo.",
       "skills_details_toggle": "Visualizza valori abilità",
       "skills_details_skill": "Abilità",
@@ -2240,12 +2240,12 @@
       "unlink_profile": "Scollega",
       "errors": {
         "unexpected_profile_flow": "Qualcosa è andato storto durante il recupero del profilo Tarkov.dev. Riprova.",
-        "cooldown_active": "Hai importato questo profilo di recente. Puoi reimportarlo in circa {minutes} min.",
-        "profile_stale": "Tarkov.dev ultimo aggiornato questo profilo {days} giorni fa, che è troppo vecchio per importare. Aprire la pagina del profilo su Tarkov.dev, lasciarlo caricare, poi recuperare di nuovo.",
+        "cooldown_active": "Hai importato questo profilo di recente. Puoi reimportarlo fra circa {minutes} min.",
+        "profile_stale": "Tarkov.dev ha aggiornato questo profilo l'ultima volta {days} giorni fa; il dato è troppo vecchio per essere importato. Apri la pagina del profilo su Tarkov.dev, attendi che si carichi, quindi riprova a recuperare i dati.",
         "profile_not_generated": "Tarkov.dev non ha ancora nessuna istantanea per questo profilo. Aprire la pagina del profilo su Tarkov.dev una volta, lasciarlo caricare, quindi recuperare di nuovo.",
-        "rate_limited": "Troppi tentativi di importazione. Attendere {minutes} min, quindi riprovare.",
+        "rate_limited": "Troppi tentativi di importazione. Attendi circa {minutes} min, quindi riprova.",
         "verification_failed": "Verifica umana non riuscita. Ricarica la pagina e riprova.",
-        "fetch_failed": "Impossibile recuperare il profilo Tarkov.dev. Aprire il profilo su Tarkov.dev, quindi riprovare."
+        "fetch_failed": "Impossibile recuperare il profilo Tarkov.dev. Apri il profilo su Tarkov.dev, quindi riprova."
       }
     }
   },
@@ -2318,7 +2318,7 @@
     "toggle_game_mode_label": "Cambia modalità di gioco",
     "select_game_mode_label": "Seleziona modalità di gioco",
     "select_faction_label": "Seleziona fazione",
-    "season_ends_in": "Stagione {season} termina in {days}d {hours}h {minutes}m",
+    "season_ends_in": "Stagione {season} termina in {days}g {hours}h {minutes}m",
     "season_ended": "Stagione {season} è terminata"
   },
   "oauth": {
