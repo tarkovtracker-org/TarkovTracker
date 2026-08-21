@@ -49,14 +49,14 @@
     "supporter_override_enabled_description": "Enabled {tier} supporter access.",
     "supporter_override_disabled_description": "Disabled active supporter access.",
     "supporter_override_failed_description": "Could not update supporter access.",
-    "twitch_config_title": "Twitch Stream",
-    "twitch_config_description": "Impostare il canale Twitch promosso nell'angolo del sito. I visitatori raccolgono il cambiamento entro un paio di minuti.",
+    "twitch_config_title": "Stream Twitch",
+    "twitch_config_description": "Imposta il canale Twitch da promuovere nell'angolo del sito. I visitatori recepiranno la modifica entro cinque minuti.",
     "twitch_channel_label": "Canale",
     "twitch_channel_placeholder": "Nome canale Twitch",
     "twitch_display_name_label": "Nome visualizzato",
     "twitch_display_name_placeholder": "Nome display canale",
     "twitch_config_saved_title": "Configurazione di Twitch aggiornata",
-    "twitch_config_saved_description": "Promoted stream is now {channel}.",
+    "twitch_config_saved_description": "Lo stream in evidenza è ora{channel}.",
     "twitch_config_saved_with_warning_title": "Configurazione Twitch salvata",
     "twitch_config_saved_with_warning_description": "La configurazione è stata salvata, ma i visitatori nella cache possono ancora vedere il valore precedente.",
     "twitch_config_failed_description": "Impossibile aggiornare la configurazione di Twitch.",
@@ -290,7 +290,7 @@
     "view_on_wiki": "Visualizza su Wiki",
     "item": "Elemento",
     "reset_failed": "Ripristino Fallito",
-    "was_status": "was {status}",
+    "was_status": "era {status}",
     "fail": "Fallito",
     "accept": "Accetta",
     "ready_to_hand_over": "Pronto a consegnare",
@@ -1265,7 +1265,7 @@
         "error": "Impossibile caricare i contributori in questo momento.",
         "empty": "Nessun contributore trovato.",
         "contributions": "{count} contribuzioni",
-        "total": "{count} contributor | {count} contributors"
+        "total": "{count} donatore | {count} donatori"
       },
       "description": "Incontra creatori, personale, membri di supporto, beta tester e collaboratori open source dietro Tarkov Tracker."
     },
@@ -2108,7 +2108,7 @@
       },
       "quest_tooltip": "Livello di abilità concesso automaticamente con ricompense di missione completate.",
       "offset_tooltip": "Regolazione manuale in cima al livello della ricompensa della missione. Positivo significa che hai addestrato le ricompense della missione sopra",
-      "collapsed_hint": "Showing {shown} of {total} skills. Show all to see every skill."
+      "collapsed_hint": "Mostrando {shown} di {total} abilità. Mostra tutte per vedere ogni abilità."
     },
     "keybinds": {
       "title": "Scorciatoie tastiera",
