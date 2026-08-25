@@ -212,6 +212,20 @@ describe('LeafletMap controls', () => {
     expect(wrapper.text()).toMatch(/R\s+to reset view/);
     expect(wrapper.text()).toMatch(/Ctrl\s*Scroll\s+to cycle floors/);
     expect(wrapper.text()).toMatch(/F\s+to click at cursor/);
+    const hint = wrapper.find('[data-testid="map-first-use-hint"]');
+    expect(hint.exists()).toBe(true);
+    expect(hint.text()).toMatch(/Ctrl \+ Scroll to change floors/);
+    wrapper.unmount();
+  });
+  it('hides floor help and the floor shortcut from the hint on single-floor maps', async () => {
+    const wrapper = await mountMap();
+    expect(wrapper.findAll('kbd')).toHaveLength(7);
+    expect(wrapper.text()).not.toContain('to cycle floors');
+    expect(wrapper.text()).not.toContain('Or use the floor panel.');
+    const hint = wrapper.find('[data-testid="map-first-use-hint"]');
+    expect(hint.exists()).toBe(true);
+    expect(hint.text()).toContain('Drag to pan · Shift + Scroll to zoom');
+    expect(hint.text()).not.toContain('Ctrl');
     wrapper.unmount();
   });
   it('dismisses the first-use hint and remembers it', async () => {

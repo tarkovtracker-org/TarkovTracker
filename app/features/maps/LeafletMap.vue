@@ -543,7 +543,7 @@
         >
           <p class="text-surface-100 text-xs font-semibold">{{ t('maps.hint.title') }}</p>
           <p class="text-surface-300 mt-1 text-xs">
-            {{ t('maps.hint.summary') }}
+            {{ hasMultipleFloors ? t('maps.hint.summary_multi_floor') : t('maps.hint.summary') }}
           </p>
           <div class="mt-2.5 flex items-center gap-3">
             <button

@@ -536,7 +536,8 @@
     },
     "hint": {
       "title": "Quick map controls",
-      "summary": "Drag to pan · Shift + Scroll to zoom · Ctrl + Scroll to change floors",
+      "summary": "Drag to pan · Shift + Scroll to zoom",
+      "summary_multi_floor": "Drag to pan · Shift + Scroll to zoom · Ctrl + Scroll to change floors",
       "all_controls": "All controls"
     },
     "aria": {
