@@ -281,6 +281,7 @@ jobs:
       - name: Validate api-gateway
         if: hashFiles('workers/api-gateway/package.json') != ''
         run: |
+          pnpm --filter api-gateway run types:check
           pnpm --filter api-gateway run typecheck
           pnpm --filter api-gateway run validate:openapi
       - name: Test api-gateway
