@@ -17,39 +17,35 @@ VALUES
   ((SELECT job_user FROM deletion_test_fixture), 'account-delete-719@example.invalid'),
   ((SELECT fence_user FROM deletion_test_fixture), 'account-delete-720@example.invalid');
 
-SELECT is(
-  (SELECT allowed FROM public.consume_account_deletion_attempt(
+CREATE FUNCTION pg_temp.consume_test_attempt()
+RETURNS BOOLEAN
+LANGUAGE SQL
+AS $$
+  SELECT allowed
+  FROM public.consume_account_deletion_attempt(
     (SELECT rate_user FROM deletion_test_fixture),
     (SELECT request_ip FROM deletion_test_fixture),
     (SELECT test_agent FROM deletion_test_fixture)
-  )),
+  );
+$$;
+
+SELECT is(
+  pg_temp.consume_test_attempt(),
   TRUE,
   'allows the first deletion attempt'
 );
 SELECT is(
-  (SELECT allowed FROM public.consume_account_deletion_attempt(
-    (SELECT rate_user FROM deletion_test_fixture),
-    (SELECT request_ip FROM deletion_test_fixture),
-    (SELECT test_agent FROM deletion_test_fixture)
-  )),
+  pg_temp.consume_test_attempt(),
   TRUE,
   'allows the second deletion attempt'
 );
 SELECT is(
-  (SELECT allowed FROM public.consume_account_deletion_attempt(
-    (SELECT rate_user FROM deletion_test_fixture),
-    (SELECT request_ip FROM deletion_test_fixture),
-    (SELECT test_agent FROM deletion_test_fixture)
-  )),
+  pg_temp.consume_test_attempt(),
   TRUE,
   'allows the third deletion attempt'
 );
 SELECT is(
-  (SELECT allowed FROM public.consume_account_deletion_attempt(
-    (SELECT rate_user FROM deletion_test_fixture),
-    (SELECT request_ip FROM deletion_test_fixture),
-    (SELECT test_agent FROM deletion_test_fixture)
-  )),
+  pg_temp.consume_test_attempt(),
   FALSE,
   'rejects a fourth deletion attempt in the same minute'
 );
