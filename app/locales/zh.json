@@ -1867,7 +1867,7 @@
       "reset_pve_confirmation": "确定要重置你的 PvE 进度吗？",
       "reset_pve_warning": "这将永久删除你的 PvE 进度，包括任务、藏身处和等级。你的 PvP 数据不会受到影响。",
       "reset_seasonal_confirmation": "您确定要重置您的赛季PvP进度吗？",
-      "reset_seasonal_warning": "这将永久删除活动季节的所有赛季PvP进度。您的持续PvP和PvE数据不会受到影响。",
+      "reset_seasonal_warning": "这将永久删除当前赛季的赛季PvP进度。您的非赛季PvP和PvE数据不会受到影响。",
       "reset_all_confirmation": "确定要重置你的全部进度吗？",
       "reset_all_warning": "这将永久删除PvP，PvE和赛季PvP模式的全部进度。此操作无法撤销！",
       "prestige_mode_warning": "Your current {mode} run will be archived, then its progression will reset for the next prestige level. Other modes are not affected.",
@@ -2318,7 +2318,7 @@
     "toggle_game_mode_label": "Toggle game mode",
     "select_game_mode_label": "选择游戏模式",
     "select_faction_label": "Select faction",
-    "season_ends_in": "第{season}赛季距离结束还有{days}天{hours}小时{minutes}分钟",
+    "season_ends_in": "第{season}赛季剩余{days}天{hours}小时{minutes}分钟",
     "season_ended": "Season {season} has ended"
   },
   "oauth": {
