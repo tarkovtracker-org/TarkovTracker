@@ -2140,6 +2140,7 @@
       "xp_progress_value": "{percent}% к следующему уровню"
     },
     "danger_zone": {
+      "confirm_instruction": "Введите {word} , чтобы подтвердить сброс всех данных:",
       "confirm_word": "УДАЛИТЬ"
     },
     "log_import": {
