@@ -1,3 +1,10 @@
+## [1.73.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.5...v1.73.6) (2026-08-25)
+
+
+### Bug Fixes
+
+* **api:** harden account deletion concurrency ([#771](https://github.com/tarkovtracker-org/TarkovTracker/issues/771)) ([51d883b](https://github.com/tarkovtracker-org/TarkovTracker/commit/51d883bf8a130d99a3429ed5e9a6b417c9a86ddd))
+
 ## [1.73.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.4...v1.73.5) (2026-08-25)
 
 
