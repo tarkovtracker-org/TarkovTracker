@@ -2140,6 +2140,7 @@
       "xp_progress_value": "{percent}% toward the next level"
     },
     "danger_zone": {
+      "confirm_instruction": "Type {word} to confirm resetting all data:",
       "confirm_word": "删除账户"
     },
     "log_import": {
