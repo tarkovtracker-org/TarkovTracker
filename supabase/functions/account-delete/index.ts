@@ -16,6 +16,21 @@ import {
   serializeError,
   type AccountDeletionClient,
 } from '../_shared/account-deletion-lifecycle.ts';
+const createLeaseLostResponse = (req: Request) =>
+  createSuccessResponse(
+    {
+      success: false,
+      cleanupScheduled: true,
+      message: 'Account deletion is already in progress.',
+    },
+    202,
+    req
+  );
+const createTransitionResponse = async (
+  transition: Promise<boolean>,
+  response: Response,
+  req: Request
+) => ((await transition) ? response : createLeaseLostResponse(req));
 Deno.serve(async (req) => {
   const corsResponse = handleCorsPreflight(req);
   if (corsResponse) return corsResponse;
@@ -79,7 +94,7 @@ Deno.serve(async (req) => {
       .eq('owner_id', user.id);
     if (teamQueryError) {
       console.error('[account-delete] Failed to fetch owned teams:', teamQueryError);
-      await recordDeletionFailure(
+      const transition = recordDeletionFailure(
         supabase,
         user.id,
         claim.claimToken,
@@ -87,7 +102,11 @@ Deno.serve(async (req) => {
         { stage: 'team_transfer', error: serializeError(teamQueryError) },
         '[account-delete]'
       );
-      return createErrorResponse('Failed to fetch owned teams', 500, req);
+      return createTransitionResponse(
+        transition,
+        createErrorResponse('Failed to fetch owned teams', 500, req),
+        req
+      );
     }
     // Process all owned teams and collect errors before proceeding
     const teamErrors: Array<{ teamId: string; error: string }> = [];
@@ -139,7 +158,7 @@ Deno.serve(async (req) => {
       }
     }
     if (teamErrors.length > 0) {
-      await recordDeletionFailure(
+      const transition = recordDeletionFailure(
         supabase,
         user.id,
         claim.claimToken,
@@ -147,16 +166,20 @@ Deno.serve(async (req) => {
         { stage: 'team_transfer', errors: teamErrors },
         '[account-delete]'
       );
-      return createErrorResponse(
-        'Failed to process team ownership transfers. Please try again.',
-        500,
+      return createTransitionResponse(
+        transition,
+        createErrorResponse(
+          'Failed to process team ownership transfers. Please try again.',
+          500,
+          req
+        ),
         req
       );
     }
     const authDeleteResult = await deleteUserWithRetry(supabase, user.id);
     if (!authDeleteResult.ok) {
       console.error('[account-delete] Failed to delete auth user:', authDeleteResult.lastError);
-      await recordDeletionFailure(
+      const transition = recordDeletionFailure(
         supabase,
         user.id,
         claim.claimToken,
@@ -168,7 +191,11 @@ Deno.serve(async (req) => {
         },
         '[account-delete]'
       );
-      return createErrorResponse('Failed to delete account', 500, req);
+      return createTransitionResponse(
+        transition,
+        createErrorResponse('Failed to delete account', 500, req),
+        req
+      );
     }
     const cleanupErrors = await cleanupUserData(supabase, user.id);
     if (Object.keys(cleanupErrors).length > 0) {
@@ -181,7 +208,7 @@ Deno.serve(async (req) => {
         ])
       );
       console.error('[account-delete] Cleanup errors after auth delete:', sanitizedErrors);
-      await recordDeletionFailure(
+      const transition = recordDeletionFailure(
         supabase,
         user.id,
         claim.claimToken,
@@ -190,18 +217,25 @@ Deno.serve(async (req) => {
         '[account-delete]'
       );
       // Return 202 Accepted to indicate auth deletion succeeded but cleanup is async
-      return createSuccessResponse(
-        {
-          success: true,
-          cleanupScheduled: true,
-          message: 'Account deleted. Data cleanup will complete shortly.',
-        },
-        202,
+      return createTransitionResponse(
+        transition,
+        createSuccessResponse(
+          {
+            success: true,
+            cleanupScheduled: true,
+            message: 'Account deleted. Data cleanup will complete shortly.',
+          },
+          202,
+          req
+        ),
         req
       );
     }
-    await markDeletionCompleted(supabase, user.id, claim.claimToken, '[account-delete]');
-    return createSuccessResponse({ success: true }, 200, req);
+    return createTransitionResponse(
+      markDeletionCompleted(supabase, user.id, claim.claimToken, '[account-delete]'),
+      createSuccessResponse({ success: true }, 200, req),
+      req
+    );
   } catch (error) {
     console.error('[account-delete] Unexpected error:', error);
     return createErrorResponse('Internal server error', 500, req);

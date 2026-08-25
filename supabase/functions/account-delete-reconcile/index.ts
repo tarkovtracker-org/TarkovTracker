@@ -70,21 +70,25 @@ const listJobs = async (
   }
   return { data: data ?? [], error: null } as const;
 };
+const getTransitionResult = async <T>(transition: Promise<boolean>, result: T, userId: string) =>
+  (await transition) ? result : { userId, status: 'lease_lost', skipped: true };
+const TERMINAL_DELETION_STATUSES = new Set(['completed', 'dead_lettered']);
+const getSkippedJobResult = (status: string | null, userId: string, dryRun: boolean) => {
+  const normalizedStatus = status ?? 'pending';
+  if (TERMINAL_DELETION_STATUSES.has(normalizedStatus)) {
+    return { userId, status: normalizedStatus, skipped: true };
+  }
+  if (!dryRun) return null;
+  return { userId, status: normalizedStatus, dryRun: true };
+};
 const processDeletionJob = async (
   supabase: AccountDeletionClient,
   userId: string,
   dryRun: boolean
 ) => {
   const { status } = await getDeletionJobState(supabase, userId, '[account-delete-reconcile]');
-  if (status === 'completed') {
-    return { userId, status: 'completed', skipped: true };
-  }
-  if (status === 'dead_lettered') {
-    return { userId, status: 'dead_lettered', skipped: true };
-  }
-  if (dryRun) {
-    return { userId, status: status ?? 'pending', dryRun: true };
-  }
+  const skippedResult = getSkippedJobResult(status, userId, dryRun);
+  if (skippedResult) return skippedResult;
   const claim = await claimDeletionJob(supabase, userId, false);
   if (claim.error) {
     console.error('[account-delete-reconcile] Failed to claim deletion job:', claim.error);
@@ -95,34 +99,43 @@ const processDeletionJob = async (
   }
   const authDeleteResult = await deleteUserWithRetry(supabase, userId);
   if (!authDeleteResult.ok) {
-    await recordDeletionFailure(
-      supabase,
-      userId,
-      claim.claimToken,
-      'auth_delete_failed',
-      {
-        stage: 'auth_delete',
-        attempts: authDeleteResult.attempts,
-        error: serializeError(authDeleteResult.lastError),
-      },
-      '[account-delete-reconcile]'
+    return getTransitionResult(
+      recordDeletionFailure(
+        supabase,
+        userId,
+        claim.claimToken,
+        'auth_delete_failed',
+        {
+          stage: 'auth_delete',
+          attempts: authDeleteResult.attempts,
+          error: serializeError(authDeleteResult.lastError),
+        },
+        '[account-delete-reconcile]'
+      ),
+      { userId, status: 'failed', stage: 'auth_delete' },
+      userId
     );
-    return { userId, status: 'failed', stage: 'auth_delete' };
   }
   const cleanupErrors = await cleanupUserData(supabase, userId);
   if (Object.keys(cleanupErrors).length > 0) {
-    await recordDeletionFailure(
-      supabase,
-      userId,
-      claim.claimToken,
-      'cleanup_failed',
-      { stage: 'cleanup', errors: cleanupErrors },
-      '[account-delete-reconcile]'
+    return getTransitionResult(
+      recordDeletionFailure(
+        supabase,
+        userId,
+        claim.claimToken,
+        'cleanup_failed',
+        { stage: 'cleanup', errors: cleanupErrors },
+        '[account-delete-reconcile]'
+      ),
+      { userId, status: 'failed', stage: 'cleanup', errors: cleanupErrors },
+      userId
     );
-    return { userId, status: 'failed', stage: 'cleanup', errors: cleanupErrors };
   }
-  await markDeletionCompleted(supabase, userId, claim.claimToken, '[account-delete-reconcile]');
-  return { userId, status: 'completed' };
+  return getTransitionResult(
+    markDeletionCompleted(supabase, userId, claim.claimToken, '[account-delete-reconcile]'),
+    { userId, status: 'completed' },
+    userId
+  );
 };
 Deno.serve(async (req) => {
   const corsResponse = handleCorsPreflight(req);

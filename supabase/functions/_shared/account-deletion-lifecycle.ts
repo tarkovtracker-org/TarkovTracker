@@ -20,6 +20,7 @@ export interface AccountDeletionFilterBuilder<T> {
 interface AccountDeletionTransformBuilder extends PromiseLike<{ error: unknown }> {
   eq(column: string, value: unknown): AccountDeletionTransformBuilder;
   or(filter: string): AccountDeletionTransformBuilder;
+  select(columns?: string): AccountDeletionFilterBuilder<Record<string, unknown>>;
 }
 export interface AccountDeletionClient {
   from<T extends keyof Database['public']['Tables']>(
@@ -183,6 +184,8 @@ const getFailureTransition = (attempt: number, deadLetter: boolean, now: string)
     deadLetteredAt: null,
   } as const;
 };
+const hasPersistedTransition = (data: unknown, error: unknown) =>
+  !error && Array.isArray(data) && data.length === 1;
 export const recordDeletionFailure = async (
   supabase: AccountDeletionClient,
   userId: string,
@@ -196,7 +199,7 @@ export const recordDeletionFailure = async (
   const nextAttempts = attempts + 1;
   const deadLetter = nextAttempts >= maxAttempts;
   const transition = getFailureTransition(nextAttempts, deadLetter, now);
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('account_deletion_jobs')
     .update({
       status: transition.status,
@@ -211,11 +214,15 @@ export const recordDeletionFailure = async (
       claim_token: null,
     })
     .eq('user_id', userId)
-    .eq('claim_token', claimToken);
+    .eq('claim_token', claimToken)
+    .select('user_id')
+    .limit(1);
   if (error) console.error(`${logPrefix} Failed to update deletion job:`, error);
-  if (deadLetter) {
+  const persisted = hasPersistedTransition(data, error);
+  if (deadLetter && persisted) {
     console.error(`${logPrefix} Deletion job dead-lettered:`, { userId, reason, details });
   }
+  return persisted;
 };
 export const markDeletionCompleted = async (
   supabase: AccountDeletionClient,
@@ -224,7 +231,7 @@ export const markDeletionCompleted = async (
   logPrefix: string
 ) => {
   const now = new Date().toISOString();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('account_deletion_jobs')
     .update({
       status: 'completed',
@@ -238,8 +245,11 @@ export const markDeletionCompleted = async (
       claim_token: null,
     })
     .eq('user_id', userId)
-    .eq('claim_token', claimToken);
+    .eq('claim_token', claimToken)
+    .select('user_id')
+    .limit(1);
   if (error) console.error(`${logPrefix} Failed to mark deletion job completed:`, error);
+  return hasPersistedTransition(data, error);
 };
 export const claimDeletionJob = async (
   supabase: AccountDeletionClient,

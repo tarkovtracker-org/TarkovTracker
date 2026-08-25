@@ -7,6 +7,7 @@ import {
   deleteUserWithRetry,
   getErrorMessage,
   isNotFoundError,
+  markDeletionCompleted,
   type AccountDeletionClient,
 } from './account-deletion-lifecycle.ts';
 const asClient = (value: unknown) => value as AccountDeletionClient;
@@ -112,5 +113,20 @@ describe('account deletion lifecycle', () => {
         },
       },
     ]);
+  });
+  it('reports a lost lease when a fenced completion updates no rows', async () => {
+    const filter = {
+      limit: () => Promise.resolve({ data: [], error: null }),
+    };
+    const update: Record<string, unknown> = {};
+    update.eq = () => update;
+    update.select = () => filter;
+    const client = asClient({
+      from: () => ({ update: () => update }),
+    });
+    assertEquals(
+      await markDeletionCompleted(client, 'user-id', 'stale-token', '[account-delete-test]'),
+      false
+    );
   });
 });
