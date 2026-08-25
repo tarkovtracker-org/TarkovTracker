@@ -76,7 +76,7 @@
     "wrangler": "^4.81.0"
   },
   "engines": {
-    "node": ">=24.12.0",
+    "node": ">=24.19.0",
     "pnpm": ">=10.34.5 <12"
   },
   "name": "tarkovtracker-nuxt",
