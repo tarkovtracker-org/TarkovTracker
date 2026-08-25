@@ -1,3 +1,10 @@
+## [1.73.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.3...v1.73.4) (2026-08-25)
+
+
+### Bug Fixes
+
+* **i18n:** add missing danger_zone confirm_instruction key ([9a52d94](https://github.com/tarkovtracker-org/TarkovTracker/commit/9a52d9411bcd3efb79b32f0671d570c2c0f2d9e2))
+
 ## [1.73.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.2...v1.73.3) (2026-08-25)
 
 
