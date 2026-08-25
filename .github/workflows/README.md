@@ -15,7 +15,7 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 - `Type Check` — `vue-tsc` / Nuxt type checking
 - `Test (shard 1/4)` … `Test (shard 4/4)` — Vitest with coverage, sharded across 4 parallel jobs. The `github-actions` reporter annotates failed tests directly on the PR diff so the failing test name and assertion are visible without digging into logs. Per-shard coverage is merged by Codecov.
 - `Validate` — Production Nuxt build + artifact upload (main branch only)
-- `Supabase DB` — Reset + lint local migrations
+- `Supabase DB` — Reset + pgTAP regressions + lint local migrations
 - `Systems drift check` — verifies `docs/SYSTEMS.md` invariants against the codebase
 - `Workers` — Validate api-gateway (typecheck, OpenAPI, tests)
 
@@ -107,7 +107,7 @@ normal code PRs. Socket PR alerts are limited to dependency manifest changes by 
 gh run list              # List recent runs
 gh run view <run-id>     # View run details
 gh run watch             # Watch running workflow
-pnpm run supabase:check   # Validate local Supabase migration reset + lint
+pnpm run supabase:check   # Reset, run pgTAP regressions, and lint Supabase migrations
 ```
 
 ## Local Testing

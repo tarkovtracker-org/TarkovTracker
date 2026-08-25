@@ -12,4 +12,5 @@ if ! pnpm exec supabase status >/dev/null 2>&1; then
   started_local_stack=true
 fi
 pnpm exec supabase db reset --no-seed
+pnpm exec supabase test db supabase/tests/database
 pnpm exec supabase db lint --schema public --fail-on error

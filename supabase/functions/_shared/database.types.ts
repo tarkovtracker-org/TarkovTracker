@@ -61,6 +61,7 @@ export type Database = {
       account_deletion_jobs: {
         Row: {
           attempts: number
+          claim_token: string | null
           completed_at: string | null
           created_at: string | null
           dead_lettered_at: string | null
@@ -75,6 +76,7 @@ export type Database = {
         }
         Insert: {
           attempts?: number
+          claim_token?: string | null
           completed_at?: string | null
           created_at?: string | null
           dead_lettered_at?: string | null
@@ -89,6 +91,7 @@ export type Database = {
         }
         Update: {
           attempts?: number
+          claim_token?: string | null
           completed_at?: string | null
           created_at?: string | null
           dead_lettered_at?: string | null
@@ -932,11 +935,30 @@ export type Database = {
         }
         Returns: undefined
       }
+      claim_account_deletion_job: {
+        Args: { p_create_if_missing?: boolean; p_user_id: string }
+        Returns: {
+          claim_token: string | null
+          claimed: boolean
+          status: string
+        }[]
+      }
       cleanup_old_deletion_attempts: {
         Args: { retention_days?: number }
         Returns: {
           deleted_count: number
           oldest_remaining: string
+        }[]
+      }
+      consume_account_deletion_attempt: {
+        Args: {
+          p_ip_address: string
+          p_user_agent: string
+          p_user_id: string
+        }
+        Returns: {
+          allowed: boolean
+          retry_after_seconds: number
         }[]
       }
       consume_mutation_rate_limit: {
