@@ -2140,6 +2140,7 @@
       "xp_progress_value": "{percent}% směrem k další úrovni"
     },
     "danger_zone": {
+      "confirm_instruction": "Zadejte {word} pro potvrzení resetování všech dat:",
       "confirm_word": "ODSTRANIT"
     },
     "log_import": {
