@@ -2140,6 +2140,7 @@
       "xp_progress_value": "{percent}% verso il livello successivo"
     },
     "danger_zone": {
+      "confirm_instruction": "Digita {word} per confermare il ripristino di tutti i dati:",
       "confirm_word": "ELIMINA"
     },
     "log_import": {
