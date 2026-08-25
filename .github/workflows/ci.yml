@@ -284,6 +284,7 @@ jobs:
           pnpm --filter api-gateway run types:check
           pnpm --filter api-gateway run typecheck
           pnpm --filter api-gateway run validate:openapi
+          pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run
       - name: Test api-gateway
         if: hashFiles('workers/api-gateway/package.json') != ''
         run: pnpm run test:api-gateway
