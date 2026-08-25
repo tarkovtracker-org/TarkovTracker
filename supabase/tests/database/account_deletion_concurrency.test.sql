@@ -2,117 +2,137 @@ BEGIN;
 
 SELECT plan(18);
 
-\set rate_user '00000000-0000-0000-0000-000000000718'
-\set job_user '00000000-0000-0000-0000-000000000719'
-\set fence_user '00000000-0000-0000-0000-000000000720'
-\set request_ip '127.0.0.1'
-\set test_agent 'pgTAP'
-\set execute_privilege 'EXECUTE'
+CREATE TEMP TABLE deletion_test_fixture AS
+SELECT
+  '00000000-0000-0000-0000-000000000718'::UUID AS rate_user,
+  '00000000-0000-0000-0000-000000000719'::UUID AS job_user,
+  '00000000-0000-0000-0000-000000000720'::UUID AS fence_user,
+  '127.0.0.1'::TEXT AS request_ip,
+  'pgTAP'::TEXT AS test_agent,
+  'EXECUTE'::TEXT AS execute_privilege;
 
 INSERT INTO auth.users (id, email)
 VALUES
-  (:'rate_user', 'account-delete-718@example.invalid'),
-  (:'job_user', 'account-delete-719@example.invalid'),
-  (:'fence_user', 'account-delete-720@example.invalid');
+  ((SELECT rate_user FROM deletion_test_fixture), 'account-delete-718@example.invalid'),
+  ((SELECT job_user FROM deletion_test_fixture), 'account-delete-719@example.invalid'),
+  ((SELECT fence_user FROM deletion_test_fixture), 'account-delete-720@example.invalid');
 
-SELECT results_eq(
-  FORMAT(
-    'SELECT allowed FROM public.consume_account_deletion_attempt(%L, %L, %L)',
-    :'rate_user', :'request_ip', :'test_agent'
-  ),
-  $$ VALUES (TRUE) $$,
+SELECT is(
+  (SELECT allowed FROM public.consume_account_deletion_attempt(
+    (SELECT rate_user FROM deletion_test_fixture),
+    (SELECT request_ip FROM deletion_test_fixture),
+    (SELECT test_agent FROM deletion_test_fixture)
+  )),
+  TRUE,
   'allows the first deletion attempt'
 );
-SELECT results_eq(
-  FORMAT(
-    'SELECT allowed FROM public.consume_account_deletion_attempt(%L, %L, %L)',
-    :'rate_user', :'request_ip', :'test_agent'
-  ),
-  $$ VALUES (TRUE) $$,
+SELECT is(
+  (SELECT allowed FROM public.consume_account_deletion_attempt(
+    (SELECT rate_user FROM deletion_test_fixture),
+    (SELECT request_ip FROM deletion_test_fixture),
+    (SELECT test_agent FROM deletion_test_fixture)
+  )),
+  TRUE,
   'allows the second deletion attempt'
 );
-SELECT results_eq(
-  FORMAT(
-    'SELECT allowed FROM public.consume_account_deletion_attempt(%L, %L, %L)',
-    :'rate_user', :'request_ip', :'test_agent'
-  ),
-  $$ VALUES (TRUE) $$,
+SELECT is(
+  (SELECT allowed FROM public.consume_account_deletion_attempt(
+    (SELECT rate_user FROM deletion_test_fixture),
+    (SELECT request_ip FROM deletion_test_fixture),
+    (SELECT test_agent FROM deletion_test_fixture)
+  )),
+  TRUE,
   'allows the third deletion attempt'
 );
-SELECT results_eq(
-  FORMAT(
-    'SELECT allowed FROM public.consume_account_deletion_attempt(%L, %L, %L)',
-    :'rate_user', :'request_ip', :'test_agent'
-  ),
-  $$ VALUES (FALSE) $$,
+SELECT is(
+  (SELECT allowed FROM public.consume_account_deletion_attempt(
+    (SELECT rate_user FROM deletion_test_fixture),
+    (SELECT request_ip FROM deletion_test_fixture),
+    (SELECT test_agent FROM deletion_test_fixture)
+  )),
+  FALSE,
   'rejects a fourth deletion attempt in the same minute'
 );
 SELECT is(
   (
     SELECT COUNT(*)::INTEGER
     FROM public.account_deletion_attempts
-    WHERE user_id = :'rate_user'
+    WHERE user_id = (SELECT rate_user FROM deletion_test_fixture)
   ),
   3,
   'records only allowed deletion attempts'
 );
 
-SELECT results_eq(
-  FORMAT('SELECT claimed FROM public.claim_account_deletion_job(%L, TRUE)', :'job_user'),
-  $$ VALUES (TRUE) $$,
+SELECT is(
+  (SELECT claimed FROM public.claim_account_deletion_job(
+    (SELECT job_user FROM deletion_test_fixture), TRUE
+  )),
+  TRUE,
   'creates and claims a missing deletion job'
 );
-SELECT results_eq(
-  FORMAT('SELECT claimed FROM public.claim_account_deletion_job(%L, TRUE)', :'job_user'),
-  $$ VALUES (FALSE) $$,
+SELECT is(
+  (SELECT claimed FROM public.claim_account_deletion_job(
+    (SELECT job_user FROM deletion_test_fixture), TRUE
+  )),
+  FALSE,
   'does not claim a job with an active lease twice'
 );
 
 UPDATE public.account_deletion_jobs
 SET status = 'failed', next_run_at = NOW() + INTERVAL '1 minute'
-WHERE user_id = :'job_user';
-SELECT results_eq(
-  FORMAT('SELECT claimed FROM public.claim_account_deletion_job(%L, FALSE)', :'job_user'),
-  $$ VALUES (FALSE) $$,
+WHERE user_id = (SELECT job_user FROM deletion_test_fixture);
+SELECT is(
+  (SELECT claimed FROM public.claim_account_deletion_job(
+    (SELECT job_user FROM deletion_test_fixture), FALSE
+  )),
+  FALSE,
   'does not claim a failed job before its retry time'
 );
 
 UPDATE public.account_deletion_jobs
 SET next_run_at = NOW() - INTERVAL '1 second'
-WHERE user_id = :'job_user';
-SELECT results_eq(
-  FORMAT('SELECT claimed FROM public.claim_account_deletion_job(%L, FALSE)', :'job_user'),
-  $$ VALUES (TRUE) $$,
+WHERE user_id = (SELECT job_user FROM deletion_test_fixture);
+SELECT is(
+  (SELECT claimed FROM public.claim_account_deletion_job(
+    (SELECT job_user FROM deletion_test_fixture), FALSE
+  )),
+  TRUE,
   'claims a failed job after its retry time'
 );
 
 UPDATE public.account_deletion_jobs
 SET status = 'in_progress', updated_at = NOW() - INTERVAL '16 minutes'
-WHERE user_id = :'job_user';
-SELECT results_eq(
-  FORMAT('SELECT claimed FROM public.claim_account_deletion_job(%L, FALSE)', :'job_user'),
-  $$ VALUES (TRUE) $$,
+WHERE user_id = (SELECT job_user FROM deletion_test_fixture);
+SELECT is(
+  (SELECT claimed FROM public.claim_account_deletion_job(
+    (SELECT job_user FROM deletion_test_fixture), FALSE
+  )),
+  TRUE,
   'recovers a deletion job after its lease expires'
 );
 
 UPDATE public.account_deletion_jobs
 SET status = 'dead_lettered', attempts = 5, dead_lettered_at = NOW()
-WHERE user_id = :'job_user';
-SELECT results_eq(
-  FORMAT('SELECT claimed FROM public.claim_account_deletion_job(%L, FALSE)', :'job_user'),
-  $$ VALUES (FALSE) $$,
+WHERE user_id = (SELECT job_user FROM deletion_test_fixture);
+SELECT is(
+  (SELECT claimed FROM public.claim_account_deletion_job(
+    (SELECT job_user FROM deletion_test_fixture), FALSE
+  )),
+  FALSE,
   'the reconciler cannot revive a dead-lettered job'
 );
-SELECT results_eq(
-  FORMAT('SELECT claimed FROM public.claim_account_deletion_job(%L, TRUE)', :'job_user'),
-  $$ VALUES (TRUE) $$,
+SELECT is(
+  (SELECT claimed FROM public.claim_account_deletion_job(
+    (SELECT job_user FROM deletion_test_fixture), TRUE
+  )),
+  TRUE,
   'an explicit user request revives a dead-lettered job'
 );
 SELECT is(
   (
     SELECT attempts
     FROM public.account_deletion_jobs
-    WHERE user_id = :'job_user'
+    WHERE user_id = (SELECT job_user FROM deletion_test_fixture)
   ),
   0,
   'reviving a dead-lettered job resets its attempt budget'
@@ -121,16 +141,16 @@ SELECT is(
 CREATE TEMP TABLE first_claim AS
 SELECT claim_token
 FROM public.claim_account_deletion_job(
-  :'fence_user',
+  (SELECT fence_user FROM deletion_test_fixture),
   TRUE
 );
 UPDATE public.account_deletion_jobs
 SET updated_at = NOW() - INTERVAL '16 minutes'
-WHERE user_id = :'fence_user';
+WHERE user_id = (SELECT fence_user FROM deletion_test_fixture);
 CREATE TEMP TABLE second_claim AS
 SELECT claim_token
 FROM public.claim_account_deletion_job(
-  :'fence_user',
+  (SELECT fence_user FROM deletion_test_fixture),
   FALSE
 );
 SELECT isnt(
@@ -142,7 +162,7 @@ CREATE TEMP TABLE stale_update_result AS
 WITH stale_update AS (
   UPDATE public.account_deletion_jobs
   SET status = 'completed'
-  WHERE user_id = :'fence_user'
+  WHERE user_id = (SELECT fence_user FROM deletion_test_fixture)
     AND claim_token = (SELECT claim_token FROM first_claim)
   RETURNING 1
 )
@@ -157,7 +177,7 @@ SELECT ok(
   NOT has_function_privilege(
     'anon',
     'public.consume_account_deletion_attempt(uuid,text,text)',
-    :'execute_privilege'
+    (SELECT execute_privilege FROM deletion_test_fixture)
   ),
   'anonymous callers cannot consume deletion attempts'
 );
@@ -165,7 +185,7 @@ SELECT ok(
   NOT has_function_privilege(
     'authenticated',
     'public.claim_account_deletion_job(uuid,boolean)',
-    :'execute_privilege'
+    (SELECT execute_privilege FROM deletion_test_fixture)
   ),
   'authenticated callers cannot claim deletion jobs'
 );
@@ -173,7 +193,7 @@ SELECT ok(
   has_function_privilege(
     'service_role',
     'public.claim_account_deletion_job(uuid,boolean)',
-    :'execute_privilege'
+    (SELECT execute_privilege FROM deletion_test_fixture)
   ),
   'the service role can claim deletion jobs'
 );
