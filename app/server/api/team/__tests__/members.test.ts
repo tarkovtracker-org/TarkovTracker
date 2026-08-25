@@ -11,6 +11,7 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { H3Event, H3EventContext } from 'h3';
 type SiteConfigStackEntry = Record<string, unknown>;
+const VALID_TEAM_ID = 'a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5';
 const { mockGetQuery, mockGetRequestHeader, mockFetch } = vi.hoisted(() => ({
   mockGetQuery: vi.fn(),
   mockGetRequestHeader: vi.fn(),
@@ -79,7 +80,7 @@ describe('Team Members API', () => {
       const originalNodeEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'production';
       vi.resetModules();
-      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       try {
         mockFetch
           .mockResolvedValueOnce({
@@ -132,13 +133,13 @@ describe('Team Members API', () => {
     });
     it('should throw error when supabaseUrl is missing', async () => {
       runtimeConfig.supabaseUrl = '';
-      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       const { default: handler } = await import('@/server/api/team/members');
       await expect(handler(mockEvent as H3Event)).rejects.toThrow('Service configuration error');
     });
     it('should allow missing supabaseServiceKey when auth header exists', async () => {
       runtimeConfig.supabaseServiceKey = '';
-      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       mockGetRequestHeader.mockImplementation((_, header: string) => {
         if (header === 'authorization') return 'Bearer valid-token';
         return undefined;
@@ -166,14 +167,14 @@ describe('Team Members API', () => {
     });
     it('should require auth token when supabaseServiceKey is missing', async () => {
       runtimeConfig.supabaseServiceKey = '';
-      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       mockGetRequestHeader.mockReturnValue(undefined);
       const { default: handler } = await import('@/server/api/team/members');
       await expect(handler(mockEvent as H3Event)).rejects.toThrow('Missing auth token');
     });
     it('should throw error when supabaseAnonKey is missing', async () => {
       runtimeConfig.supabaseAnonKey = '';
-      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       const { default: handler } = await import('@/server/api/team/members');
       await expect(handler(mockEvent as H3Event)).rejects.toThrow('Service configuration error');
     });
@@ -184,13 +185,43 @@ describe('Team Members API', () => {
       const { default: handler } = await import('@/server/api/team/members');
       await expect(handler(mockEvent as H3Event)).rejects.toThrow('teamId is required');
     });
-    it('should reject invalid teamId format', async () => {
-      mockGetQuery.mockReturnValue({ teamId: 'team-1&select=*' });
+    it.each([
+      ['a query-injection payload', 'team-1&select=*'],
+      ['a non-UUID alphanumeric id', 'abc'],
+      ['a placeholder non-UUID string', 'not-a-uuid'],
+      ['a UUID missing a segment', '33333333-3333-4333-8333'],
+      ['a UUID with invalid characters', '33333333-3333-4333-8333-33333333333g'],
+      ['an oversized string', 'a'.repeat(200)],
+    ])('should reject %s as teamId', async (_description, teamId) => {
+      mockGetQuery.mockReturnValue({ teamId });
       const { default: handler } = await import('@/server/api/team/members');
       await expect(handler(mockEvent as H3Event)).rejects.toThrow('Invalid teamId');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+    it('should reject a whitespace-only teamId as missing', async () => {
+      mockGetQuery.mockReturnValue({ teamId: '   ' });
+      const { default: handler } = await import('@/server/api/team/members');
+      await expect(handler(mockEvent as H3Event)).rejects.toThrow('teamId is required');
+    });
+    it('should accept a valid UUID teamId regardless of case', async () => {
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID.toUpperCase() });
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ game_mode: 'pvp', user_id: '11111111-1111-4111-8111-111111111111' }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
+        })
+        .mockResolvedValueOnce({ ok: true, json: async () => [] })
+        .mockResolvedValueOnce({ ok: true, json: async () => [] });
+      const { default: handler } = await import('@/server/api/team/members');
+      const result = await handler(mockEvent as H3Event);
+      expect(result.members).toEqual(['11111111-1111-4111-8111-111111111111']);
     });
     it('should require user to be team member', async () => {
-      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       // Mock empty membership check
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -200,7 +231,7 @@ describe('Team Members API', () => {
       await expect(handler(mockEvent as H3Event)).rejects.toThrow('Not a team member');
     });
     it('should handle failed membership check', async () => {
-      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       // Mock failed membership check
       mockFetch.mockResolvedValueOnce({
         ok: false,
@@ -210,7 +241,7 @@ describe('Team Members API', () => {
       await expect(handler(mockEvent as H3Event)).rejects.toThrow('Failed membership check');
     });
     it('should handle failed members fetch', async () => {
-      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       mockFetch
         // Mock successful membership check
         .mockResolvedValueOnce({
@@ -226,7 +257,7 @@ describe('Team Members API', () => {
       await expect(handler(mockEvent as H3Event)).rejects.toThrow('Failed to load members');
     });
     it('should return members when user is valid team member', async () => {
-      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       // Mock successful membership check
       mockFetch
         .mockResolvedValueOnce({
@@ -297,7 +328,7 @@ describe('Team Members API', () => {
   });
   describe('Profile fallback handling', () => {
     it('returns a partial team response when the legacy fallback fetch throws', async () => {
-      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
@@ -319,7 +350,7 @@ describe('Team Members API', () => {
       expect(result.profiles).toEqual({});
     });
     it('falls back to legacy progress when the summary row has no level', async () => {
-      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
@@ -368,7 +399,7 @@ describe('Team Members API', () => {
       });
     });
     it('summarizes legacy persistent progress when normalized team rows are missing', async () => {
-      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
@@ -411,7 +442,7 @@ describe('Team Members API', () => {
       });
     });
     it('reads the season-aware summary view instead of progress blobs', async () => {
-      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
@@ -451,7 +482,7 @@ describe('Team Members API', () => {
     it('keeps profiles available when optional edition metadata fails', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       try {
-        mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+        mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
         mockFetch
           .mockResolvedValueOnce({
             ok: true,
@@ -487,7 +518,7 @@ describe('Team Members API', () => {
         expect(warnSpy).toHaveBeenCalledWith(
           '[TeamMembers]',
           'Team edition metadata fetch failed',
-          { status: 503, teamId: 'team-456' }
+          { status: 503, teamId: VALID_TEAM_ID }
         );
       } finally {
         warnSpy.mockRestore();
@@ -496,7 +527,7 @@ describe('Team Members API', () => {
     it('should fall back to individual fetches if bulk fetch fails', async () => {
       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       try {
-        mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+        mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
         mockFetch
           // Mock successful membership check
           .mockResolvedValueOnce({
@@ -566,13 +597,13 @@ describe('Team Members API', () => {
         },
         ...BASE_SITE_CONTEXT,
       };
-      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       const { default: handler } = await import('@/server/api/team/members');
       await expect(handler(mockEvent as H3Event)).rejects.toThrow('Invalid token');
     });
     it('should validate auth token when context.auth is missing', async () => {
       mockEvent.context = { ...BASE_SITE_CONTEXT };
-      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       mockGetRequestHeader.mockImplementation((_, header: string) => {
         if (header === 'authorization') return 'Bearer valid-token';
         return undefined;
@@ -612,14 +643,14 @@ describe('Team Members API', () => {
     });
     it('should reject requests without auth token or context', async () => {
       mockEvent.context = { ...BASE_SITE_CONTEXT };
-      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       mockGetRequestHeader.mockReturnValue(undefined); // No auth header
       const { default: handler } = await import('@/server/api/team/members');
       await expect(handler(mockEvent as H3Event)).rejects.toThrow('Missing auth token');
     });
     it('should reject requests with invalid auth token format', async () => {
       mockEvent.context = { ...BASE_SITE_CONTEXT };
-      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       mockGetRequestHeader.mockImplementation((_, header: string) => {
         if (header === 'authorization') return 'InvalidFormat token123';
         return undefined;
@@ -629,7 +660,7 @@ describe('Team Members API', () => {
     });
     it('should reject requests when token validation fails', async () => {
       mockEvent.context = { ...BASE_SITE_CONTEXT };
-      mockGetQuery.mockReturnValue({ teamId: 'team-456' });
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       mockGetRequestHeader.mockImplementation((_, header: string) => {
         if (header === 'authorization') return 'Bearer invalid-token';
         return undefined;

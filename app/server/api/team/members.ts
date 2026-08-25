@@ -21,7 +21,6 @@ import {
 import type { ApiProtectionConfig } from '@/server/middleware/api-protection';
 const logger = createLogger('TeamMembers');
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const TEAM_ID_REGEX = /^[a-zA-Z0-9-]{1,64}$/;
 const REST_FETCH_TIMEOUT_MS = 8000;
 const RATE_LIMIT_WINDOW_MS = 60000;
 const DEFAULT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE = 120;
@@ -30,7 +29,6 @@ const TEAM_MEMBERS_CACHE_PREFIX = 'team-members';
 const TEAM_MEMBERS_RATE_LIMIT_PREFIX = 'team-members-rate';
 const isTestEnvironment = process.env.NODE_ENV === 'test';
 const isValidUuid = (value: string): boolean => UUID_REGEX.test(value);
-const isValidTeamId = (value: string): boolean => TEAM_ID_REGEX.test(value);
 const buildRestPath = (resource: string, params: Record<string, string | number>): string => {
   const searchParams = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -231,7 +229,7 @@ export default defineEventHandler(async (event) => {
   if (!teamId) {
     throw createError({ statusCode: 400, statusMessage: 'teamId is required' });
   }
-  if (!isValidTeamId(teamId)) {
+  if (!isValidUuid(teamId)) {
     throw createError({ statusCode: 400, statusMessage: 'Invalid teamId' });
   }
   const teamMembersRateLimitPerMinute = toPositiveInteger(
