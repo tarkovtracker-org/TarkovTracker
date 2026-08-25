@@ -78,6 +78,10 @@ Install: `pnpm install` | Worktree bootstrap: `bash scripts/setup-worktree.sh` |
 
 Test: `pnpm run test` | Watch: `pnpm run test:watch` | Coverage: `pnpm run test:coverage` | API gateway: `pnpm run test:api-gateway` | Production observer: `pnpm run prod-db:test` | Single file: `pnpm exec vitest run path/to/file.test.ts` | By name: `pnpm exec vitest run -t "pattern"`
 
+API gateway bindings: `pnpm --filter api-gateway run types` regenerates the checked-in
+`workers/api-gateway/worker-configuration.d.ts`; `pnpm --filter api-gateway run types:check` detects
+configuration or dashboard-secret declaration drift.
+
 Lint: `pnpm run lint` (zero warnings) | Fallow audit: `pnpm run lint:fallow` (changed-file dead code, duplication, and complexity gate) | Blank-line lint: `pnpm run lint:blank-lines` | Fix: `pnpm run lint:fix` | Format: `pnpm run format` (Prettier + ESLint + blank-line fix) | Typecheck: `pnpm run typecheck`
 
 i18n check: `pnpm run i18n:check` | Supabase types: `pnpm run supabase:types` | OpenAPI validate: `pnpm run validate:openapi` | Deps: `pnpm run deps` | KV precompute: `pnpm run precompute:tarkov` (needs Cloudflare env vars; normally run by CI)
@@ -89,6 +93,8 @@ Before finishing any agent task:
 - Run the smallest relevant validation (typecheck for TS changes, lint for code changes, i18n:check for locale changes).
 - `pnpm run lint:blank-lines` checks supported source and configuration files while preserving Markdown, generated files, and blank lines inside multiline strings/comments.
 - State what validation was run and what passed/failed.
+- API gateway changes also require `pnpm --filter api-gateway run types:check` and
+  `pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run`.
 - Do not run the full test suite unless you changed test logic or executable code that could break tests.
 - Respect existing lint warnings; do not introduce new ones.
 - Formatting is handled by the pre-commit hook. Do not run `pnpm run format` manually unless the hook is bypassed. CI `format:check` is the gate.

@@ -1,5 +1,6 @@
-import { logger } from './utils/logger';
+import { DurableObject } from 'cloudflare:workers';
 import type { Env } from './types';
+import { logger } from './utils/logger';
 type RateLimitAnchor = 'utc-day';
 type RateLimitOptions = {
   anchor?: RateLimitAnchor;
@@ -94,10 +95,12 @@ function createRateLimitState(config: RateLimitConfig, now: number): RateLimitSt
     ...(config.ephemeral && { ephemeral: true }),
   };
 }
-export class ApiGatewayRateLimiter {
+export class ApiGatewayRateLimiter extends DurableObject<Env> {
   private data?: RateLimitState;
   private loaded = false;
-  constructor(private readonly state: DurableObjectState) {}
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+  }
   private json(body: RateLimitResponse): Response {
     return new Response(JSON.stringify(body), {
       status: 200,
@@ -107,11 +110,11 @@ export class ApiGatewayRateLimiter {
   private async load(): Promise<void> {
     if (this.loaded) return;
     try {
-      const stored = await this.state.storage.get<RateLimitState>('state');
+      const stored = await this.ctx.storage.get<RateLimitState>('state');
       this.loaded = true;
       this.data = stored && Date.now() < stored.resetAt ? stored : undefined;
     } catch (error) {
-      logger.error('rate limiter storage load failed', { id: this.state.id.toString(), error });
+      logger.error('rate limiter storage load failed', { id: this.ctx.id.toString(), error });
       throw error;
     }
   }
@@ -126,8 +129,8 @@ export class ApiGatewayRateLimiter {
   }
   private async scheduleCleanup(resetAt: number): Promise<void> {
     const cleanupAt = resetAt + 1000;
-    const existingAlarm = await this.state.storage.getAlarm();
-    if (existingAlarm !== cleanupAt) await this.state.storage.setAlarm(cleanupAt);
+    const existingAlarm = await this.ctx.storage.getAlarm();
+    if (existingAlarm !== cleanupAt) await this.ctx.storage.setAlarm(cleanupAt);
   }
   private async consume(config: RateLimitConfig, data: RateLimitState): Promise<Response> {
     if (config.ephemeral) await this.scheduleCleanup(data.resetAt);
@@ -135,7 +138,7 @@ export class ApiGatewayRateLimiter {
       return this.json({ allowed: false, remaining: 0, resetAt: data.resetAt });
     }
     data.count += 1;
-    await this.state.storage.put('state', data);
+    await this.ctx.storage.put('state', data);
     return this.json({
       allowed: true,
       remaining: Math.max(config.limit - data.count, 0),
@@ -151,11 +154,11 @@ export class ApiGatewayRateLimiter {
   }
   async alarm(): Promise<void> {
     try {
-      const stored = await this.state.storage.get<RateLimitState>('state');
+      const stored = await this.ctx.storage.get<RateLimitState>('state');
       const now = Date.now();
       if (stored && now < stored.resetAt) {
         if (stored.ephemeral === true) {
-          await this.state.storage.setAlarm(stored.resetAt + 1000);
+          await this.ctx.storage.setAlarm(stored.resetAt + 1000);
           return;
         }
         this.data = undefined;
@@ -164,10 +167,10 @@ export class ApiGatewayRateLimiter {
       }
       this.data = undefined;
       this.loaded = false;
-      await this.state.storage.deleteAlarm();
-      await this.state.storage.deleteAll();
+      await this.ctx.storage.deleteAlarm();
+      await this.ctx.storage.deleteAll();
     } catch (error) {
-      logger.error('rate limiter alarm cleanup failed', { id: this.state.id.toString(), error });
+      logger.error('rate limiter alarm cleanup failed', { id: this.ctx.id.toString(), error });
       throw error;
     }
   }

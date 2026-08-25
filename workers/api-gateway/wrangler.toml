@@ -1,6 +1,6 @@
 name = "api-gateway"
 main = "src/index.ts"
-compatibility_date = "2024-12-01"
+compatibility_date = "2026-08-25"
 workers_dev = false
 preview_urls = false
 routes = [
