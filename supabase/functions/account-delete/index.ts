@@ -16,37 +16,6 @@ import {
   serializeError,
   type AccountDeletionClient,
 } from '../_shared/account-deletion-lifecycle.ts';
-import type { Database } from '../_shared/database.types.ts';
-// Interfaces to mock Supabase client typing locally
-interface PostgrestFilterBuilder<T> {
-  eq(column: string, value: unknown): PostgrestFilterBuilder<T>;
-  neq(column: string, value: unknown): PostgrestFilterBuilder<T>;
-  gte(column: string, value: unknown): PostgrestFilterBuilder<T>;
-  order(column: string, options?: unknown): PostgrestFilterBuilder<T>;
-  then<TResult1 = { data: T[] | null; error: unknown }>(
-    onfulfilled?:
-      ((value: { data: T[] | null; error: unknown }) => TResult1 | PromiseLike<TResult1>) | null
-  ): PromiseLike<TResult1>;
-}
-interface PostgrestTransformBuilder {
-  eq(column: string, value: unknown): Promise<{ error: unknown }>;
-  or(filter: string): Promise<{ error: unknown }>;
-}
-interface TypedSupabaseClient {
-  from<T extends keyof Database['public']['Tables']>(
-    table: T
-  ): {
-    select(columns?: string): PostgrestFilterBuilder<Database['public']['Tables'][T]['Row']>;
-    update(values: unknown): PostgrestTransformBuilder;
-    delete(): PostgrestTransformBuilder;
-  };
-  auth: {
-    admin: {
-      deleteUser(id: string): Promise<{ error: unknown }>;
-    };
-  };
-  rpc(fn: string, args?: Record<string, unknown>): Promise<{ data: unknown; error: unknown }>;
-}
 Deno.serve(async (req) => {
   const corsResponse = handleCorsPreflight(req);
   if (corsResponse) return corsResponse;
@@ -58,11 +27,10 @@ Deno.serve(async (req) => {
       return createErrorResponse(authResult.error, authResult.status, req);
     }
     const { user, supabase: sbClient } = authResult;
-    const supabase = sbClient as unknown as TypedSupabaseClient;
-    const lifecycleClient = supabase as unknown as AccountDeletionClient;
+    const supabase = sbClient as unknown as AccountDeletionClient;
     const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || null;
     const userAgent = req.headers.get('user-agent') || null;
-    const attempt = await consumeDeletionAttempt(lifecycleClient, user.id, ipAddress, userAgent);
+    const attempt = await consumeDeletionAttempt(supabase, user.id, ipAddress, userAgent);
     if (attempt.error) {
       console.error('[account-delete] Failed to enforce deletion rate limit:', attempt.error);
       return createErrorResponse(
@@ -79,7 +47,7 @@ Deno.serve(async (req) => {
         req
       );
     }
-    const claim = await claimDeletionJob(lifecycleClient, user.id, true);
+    const claim = await claimDeletionJob(supabase, user.id, true);
     if (claim.error) {
       console.error('[account-delete] FATAL: Failed to initialize deletion job tracking:', {
         error: serializeError(claim.error),
@@ -112,7 +80,7 @@ Deno.serve(async (req) => {
     if (teamQueryError) {
       console.error('[account-delete] Failed to fetch owned teams:', teamQueryError);
       await recordDeletionFailure(
-        lifecycleClient,
+        supabase,
         user.id,
         'team_query_failed',
         { stage: 'team_transfer', error: serializeError(teamQueryError) },
@@ -171,7 +139,7 @@ Deno.serve(async (req) => {
     }
     if (teamErrors.length > 0) {
       await recordDeletionFailure(
-        lifecycleClient,
+        supabase,
         user.id,
         'team_transfer_failed',
         { stage: 'team_transfer', errors: teamErrors },
@@ -183,11 +151,11 @@ Deno.serve(async (req) => {
         req
       );
     }
-    const authDeleteResult = await deleteUserWithRetry(lifecycleClient, user.id);
+    const authDeleteResult = await deleteUserWithRetry(supabase, user.id);
     if (!authDeleteResult.ok) {
       console.error('[account-delete] Failed to delete auth user:', authDeleteResult.lastError);
       await recordDeletionFailure(
-        lifecycleClient,
+        supabase,
         user.id,
         'auth_delete_failed',
         {
@@ -199,7 +167,7 @@ Deno.serve(async (req) => {
       );
       return createErrorResponse('Failed to delete account', 500, req);
     }
-    const cleanupErrors = await cleanupUserData(lifecycleClient, user.id);
+    const cleanupErrors = await cleanupUserData(supabase, user.id);
     if (Object.keys(cleanupErrors).length > 0) {
       // Sanitize errors - log table names but not error details from sensitive tables
       const SENSITIVE_TABLES = ['api_tokens'];
@@ -211,7 +179,7 @@ Deno.serve(async (req) => {
       );
       console.error('[account-delete] Cleanup errors after auth delete:', sanitizedErrors);
       await recordDeletionFailure(
-        lifecycleClient,
+        supabase,
         user.id,
         'cleanup_failed',
         { stage: 'cleanup', errors: cleanupErrors },
@@ -228,7 +196,7 @@ Deno.serve(async (req) => {
         req
       );
     }
-    await markDeletionCompleted(lifecycleClient, user.id, '[account-delete]');
+    await markDeletionCompleted(supabase, user.id, '[account-delete]');
     return createSuccessResponse({ success: true }, 200, req);
   } catch (error) {
     console.error('[account-delete] Unexpected error:', error);

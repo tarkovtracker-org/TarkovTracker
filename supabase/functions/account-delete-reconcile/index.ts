@@ -16,37 +16,8 @@ import {
   serializeError,
   type AccountDeletionClient,
 } from '../_shared/account-deletion-lifecycle.ts';
-import type { Database } from '../_shared/database.types.ts';
 const DEFAULT_BATCH_LIMIT = 20;
 const MAX_BATCH_LIMIT = 100;
-interface PostgrestFilterBuilder<T> {
-  eq(column: string, value: unknown): PostgrestFilterBuilder<T>;
-  order(column: string, options?: unknown): PostgrestFilterBuilder<T>;
-  or(filter: string): PostgrestFilterBuilder<T>;
-  limit(count: number): PostgrestFilterBuilder<T>;
-  then<TResult1 = { data: T[] | null; error: unknown }>(
-    onfulfilled?:
-      ((value: { data: T[] | null; error: unknown }) => TResult1 | PromiseLike<TResult1>) | null
-  ): PromiseLike<TResult1>;
-}
-interface PostgrestTransformBuilder {
-  eq(column: string, value: unknown): Promise<{ error: unknown }>;
-  or(filter: string): Promise<{ error: unknown }>;
-}
-interface TypedSupabaseClient {
-  from<T extends keyof Database['public']['Tables']>(
-    table: T
-  ): {
-    select(columns?: string): PostgrestFilterBuilder<Database['public']['Tables'][T]['Row']>;
-    update(values: unknown): PostgrestTransformBuilder;
-    delete(): PostgrestTransformBuilder;
-  };
-  auth: {
-    admin: {
-      deleteUser(id: string): Promise<{ error: unknown }>;
-    };
-  };
-}
 interface ReconcileRequest {
   action?: 'list' | 'process';
   userId?: string;
@@ -54,7 +25,10 @@ interface ReconcileRequest {
   includeDeadLettered?: boolean;
   dryRun?: boolean;
 }
-async function verifyAdminStatus(supabase: TypedSupabaseClient, userId: string): Promise<boolean> {
+async function verifyAdminStatus(
+  supabase: AccountDeletionClient,
+  userId: string
+): Promise<boolean> {
   const { data, error } = await supabase
     .from('user_system')
     .select('is_admin')
@@ -67,7 +41,7 @@ async function verifyAdminStatus(supabase: TypedSupabaseClient, userId: string):
   return data[0]?.is_admin === true;
 }
 const listJobs = async (
-  supabase: TypedSupabaseClient,
+  supabase: AccountDeletionClient,
   limit: number,
   includeDeadLettered: boolean
 ) => {
@@ -97,16 +71,11 @@ const listJobs = async (
   return { data: data ?? [], error: null } as const;
 };
 const processDeletionJob = async (
-  supabase: TypedSupabaseClient,
+  supabase: AccountDeletionClient,
   userId: string,
   dryRun: boolean
 ) => {
-  const lifecycleClient = supabase as unknown as AccountDeletionClient;
-  const { status } = await getDeletionJobState(
-    lifecycleClient,
-    userId,
-    '[account-delete-reconcile]'
-  );
+  const { status } = await getDeletionJobState(supabase, userId, '[account-delete-reconcile]');
   if (status === 'completed') {
     return { userId, status: 'completed', skipped: true };
   }
@@ -116,7 +85,7 @@ const processDeletionJob = async (
   if (dryRun) {
     return { userId, status: status ?? 'pending', dryRun: true };
   }
-  const claim = await claimDeletionJob(lifecycleClient, userId, false);
+  const claim = await claimDeletionJob(supabase, userId, false);
   if (claim.error) {
     console.error('[account-delete-reconcile] Failed to claim deletion job:', claim.error);
     return { userId, status: 'claim_failed' };
@@ -124,10 +93,10 @@ const processDeletionJob = async (
   if (!claim.claimed) {
     return { userId, status: claim.status ?? 'missing', skipped: true };
   }
-  const authDeleteResult = await deleteUserWithRetry(lifecycleClient, userId);
+  const authDeleteResult = await deleteUserWithRetry(supabase, userId);
   if (!authDeleteResult.ok) {
     await recordDeletionFailure(
-      lifecycleClient,
+      supabase,
       userId,
       'auth_delete_failed',
       {
@@ -139,10 +108,10 @@ const processDeletionJob = async (
     );
     return { userId, status: 'failed', stage: 'auth_delete' };
   }
-  const cleanupErrors = await cleanupUserData(lifecycleClient, userId);
+  const cleanupErrors = await cleanupUserData(supabase, userId);
   if (Object.keys(cleanupErrors).length > 0) {
     await recordDeletionFailure(
-      lifecycleClient,
+      supabase,
       userId,
       'cleanup_failed',
       { stage: 'cleanup', errors: cleanupErrors },
@@ -150,7 +119,7 @@ const processDeletionJob = async (
     );
     return { userId, status: 'failed', stage: 'cleanup', errors: cleanupErrors };
   }
-  await markDeletionCompleted(lifecycleClient, userId, '[account-delete-reconcile]');
+  await markDeletionCompleted(supabase, userId, '[account-delete-reconcile]');
   return { userId, status: 'completed' };
 };
 Deno.serve(async (req) => {
@@ -164,7 +133,7 @@ Deno.serve(async (req) => {
       return createErrorResponse(authResult.error, authResult.status, req);
     }
     const { user, supabase: sbClient } = authResult as AuthSuccess;
-    const supabase = sbClient as unknown as TypedSupabaseClient;
+    const supabase = sbClient as unknown as AccountDeletionClient;
     const isAdmin = await verifyAdminStatus(supabase, user.id);
     if (!isAdmin) {
       return createErrorResponse('Forbidden', 403, req);

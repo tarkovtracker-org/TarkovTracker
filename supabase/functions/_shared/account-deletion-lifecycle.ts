@@ -5,16 +5,19 @@ const AUTH_DELETE_MAX_DELAY_MS = 5000;
 const CLEANUP_MAX_ATTEMPTS = 5;
 const CLEANUP_BASE_DELAY_MS = 5 * 60 * 1000;
 const CLEANUP_MAX_DELAY_MS = 60 * 60 * 1000;
-interface FilterBuilder<T> {
-  eq(column: string, value: unknown): FilterBuilder<T>;
-  or(filter: string): Promise<{ error: unknown }>;
-  limit(count: number): FilterBuilder<T>;
+export interface AccountDeletionFilterBuilder<T> {
+  eq(column: string, value: unknown): AccountDeletionFilterBuilder<T>;
+  neq(column: string, value: unknown): AccountDeletionFilterBuilder<T>;
+  gte(column: string, value: unknown): AccountDeletionFilterBuilder<T>;
+  order(column: string, options?: unknown): AccountDeletionFilterBuilder<T>;
+  or(filter: string): AccountDeletionFilterBuilder<T>;
+  limit(count: number): AccountDeletionFilterBuilder<T>;
   then<TResult1 = { data: T[] | null; error: unknown }>(
     onfulfilled?:
       ((value: { data: T[] | null; error: unknown }) => TResult1 | PromiseLike<TResult1>) | null
   ): PromiseLike<TResult1>;
 }
-interface TransformBuilder {
+interface AccountDeletionTransformBuilder {
   eq(column: string, value: unknown): Promise<{ error: unknown }>;
   or(filter: string): Promise<{ error: unknown }>;
 }
@@ -22,9 +25,9 @@ export interface AccountDeletionClient {
   from<T extends keyof Database['public']['Tables']>(
     table: T
   ): {
-    select(columns?: string): FilterBuilder<Database['public']['Tables'][T]['Row']>;
-    update(values: unknown): TransformBuilder;
-    delete(): TransformBuilder;
+    select(columns?: string): AccountDeletionFilterBuilder<Database['public']['Tables'][T]['Row']>;
+    update(values: unknown): AccountDeletionTransformBuilder;
+    delete(): AccountDeletionTransformBuilder;
   };
   auth: {
     admin: {
@@ -38,26 +41,36 @@ export interface DeletionJobState {
   maxAttempts: number;
   status: string | null;
 }
+const DEFAULT_DELETION_JOB_STATE: DeletionJobState = {
+  attempts: 0,
+  maxAttempts: CLEANUP_MAX_ATTEMPTS,
+  status: null,
+};
 const getRpcResult = (data: unknown) => {
   if (!Array.isArray(data)) return null;
   const result: unknown = data[0];
   return result && typeof result === 'object' ? (result as Record<string, unknown>) : null;
 };
-export const sleep = (ms: number) =>
+const sleep = (ms: number) =>
   new Promise<void>((resolve) => {
     setTimeout(resolve, ms);
   });
-export const getErrorMessage = (error: unknown) => {
-  if (typeof error === 'string') return error;
-  if (error instanceof Error) return error.message;
-  if (error && typeof error === 'object' && 'message' in error) {
-    return String((error as { message?: unknown }).message);
-  }
+const getObjectErrorMessage = (error: object) => {
+  if (!('message' in error)) return null;
+  return String((error as { message?: unknown }).message);
+};
+const stringifyUnknown = (error: unknown) => {
   try {
     return JSON.stringify(error);
   } catch {
     return String(error);
   }
+};
+const isObject = (value: unknown): value is object => typeof value === 'object' && value !== null;
+export const getErrorMessage = (error: unknown) => {
+  if (typeof error === 'string') return error;
+  if (isObject(error)) return getObjectErrorMessage(error) ?? stringifyUnknown(error);
+  return stringifyUnknown(error);
 };
 export const serializeError = (error: unknown) => {
   if (error instanceof Error) {
@@ -66,21 +79,21 @@ export const serializeError = (error: unknown) => {
   if (error && typeof error === 'object') return error;
   return { message: String(error) };
 };
-export const isNotFoundError = (error: unknown) => {
-  if (error && typeof error === 'object') {
-    if ('status' in error && (error as { status?: number }).status === 404) return true;
-    if ('code' in error) {
-      const code = (error as { code?: string }).code;
-      if (code === 'user_not_found' || code === '404') return true;
-    }
-  }
+const hasNotFoundStatus = (error: unknown) =>
+  Boolean(error && typeof error === 'object' && 'status' in error && error.status === 404);
+const hasNotFoundCode = (error: unknown) => {
+  if (!error || typeof error !== 'object' || !('code' in error)) return false;
+  return ['user_not_found', '404'].includes(String(error.code));
+};
+const hasNotFoundMessage = (error: unknown) => {
   const message = getErrorMessage(error).toLowerCase();
   return (
-    message === 'user not found' ||
-    message.includes('no user') ||
-    (message.includes('user') && message.includes('not found'))
+    ['user not found', 'no user'].some((pattern) => message.includes(pattern)) ||
+    /user.*not found|not found.*user/.test(message)
   );
 };
+export const isNotFoundError = (error: unknown) =>
+  [hasNotFoundStatus(error), hasNotFoundCode(error), hasNotFoundMessage(error)].some(Boolean);
 export const computeBackoffMs = (
   attempt: number,
   baseMs: number,
@@ -91,6 +104,7 @@ export const computeBackoffMs = (
   const delay = baseMs * Math.pow(2, Math.max(0, attempt - 1)) + jitter;
   return Math.min(delay, maxMs);
 };
+const isDeletionComplete = (error: unknown) => !error || isNotFoundError(error);
 export const deleteUserWithRetry = async (
   supabase: AccountDeletionClient,
   userId: string,
@@ -99,7 +113,7 @@ export const deleteUserWithRetry = async (
   let lastError: unknown | null = null;
   for (let attempt = 1; attempt <= AUTH_DELETE_MAX_ATTEMPTS; attempt += 1) {
     const { error } = await supabase.auth.admin.deleteUser(userId);
-    if (!error || isNotFoundError(error)) {
+    if (isDeletionComplete(error)) {
       return { ok: true, attempts: attempt, lastError: null };
     }
     lastError = error;
@@ -147,12 +161,20 @@ export const getDeletionJobState = async (
     .eq('user_id', userId)
     .limit(1);
   if (error) console.error(`${logPrefix} Failed to fetch deletion job state:`, error);
-  const job = data?.[0];
+  const job = Array.isArray(data) ? data[0] : undefined;
+  if (!job) return DEFAULT_DELETION_JOB_STATE;
+  return { attempts: job.attempts, maxAttempts: job.max_attempts, status: job.status };
+};
+const getFailureTransition = (attempt: number, deadLetter: boolean, now: string) => {
+  if (deadLetter) {
+    return { status: 'dead_lettered', nextRunAt: null, deadLetteredAt: now } as const;
+  }
+  const delay = computeBackoffMs(attempt, CLEANUP_BASE_DELAY_MS, CLEANUP_MAX_DELAY_MS);
   return {
-    attempts: job?.attempts ?? 0,
-    maxAttempts: job?.max_attempts ?? CLEANUP_MAX_ATTEMPTS,
-    status: job?.status ?? null,
-  };
+    status: 'failed',
+    nextRunAt: new Date(Date.now() + delay).toISOString(),
+    deadLetteredAt: null,
+  } as const;
 };
 export const recordDeletionFailure = async (
   supabase: AccountDeletionClient,
@@ -165,23 +187,19 @@ export const recordDeletionFailure = async (
   const { attempts, maxAttempts } = await getDeletionJobState(supabase, userId, logPrefix);
   const nextAttempts = attempts + 1;
   const deadLetter = nextAttempts >= maxAttempts;
-  const nextRunAt = deadLetter
-    ? null
-    : new Date(
-        Date.now() + computeBackoffMs(nextAttempts, CLEANUP_BASE_DELAY_MS, CLEANUP_MAX_DELAY_MS)
-      ).toISOString();
+  const transition = getFailureTransition(nextAttempts, deadLetter, now);
   const { error } = await supabase
     .from('account_deletion_jobs')
     .update({
-      status: deadLetter ? 'dead_lettered' : 'failed',
+      status: transition.status,
       attempts: nextAttempts,
       last_error: reason,
       last_error_details: details,
       last_error_at: now,
-      next_run_at: nextRunAt,
+      next_run_at: transition.nextRunAt,
       updated_at: now,
       completed_at: null,
-      dead_lettered_at: deadLetter ? now : null,
+      dead_lettered_at: transition.deadLetteredAt,
     })
     .eq('user_id', userId);
   if (error) console.error(`${logPrefix} Failed to update deletion job:`, error);
