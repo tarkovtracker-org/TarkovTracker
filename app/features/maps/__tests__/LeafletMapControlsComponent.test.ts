@@ -207,10 +207,10 @@ describe('LeafletMap controls', () => {
     mapState.hasMultipleFloors = true;
     const wrapper = await mountMap();
     expect(wrapper.findAll('kbd')).toHaveLength(9);
-    expect(wrapper.text()).toMatch(/WASD\s+\/\s+←↑↓→\s+or drag to pan/);
-    expect(wrapper.text()).toMatch(/Shift\s+Scroll\s+\/ Q\/E\s+to zoom/);
+    expect(wrapper.text()).toMatch(/WASD\s*\/\s*←↑↓→\s+or drag to pan/);
+    expect(wrapper.text()).toMatch(/Shift\s*Scroll\s*\/\s*Q\/E\s+to zoom/);
     expect(wrapper.text()).toMatch(/R\s+to reset view/);
-    expect(wrapper.text()).toMatch(/Ctrl\s+Scroll\s+to cycle floors/);
+    expect(wrapper.text()).toMatch(/Ctrl\s*Scroll\s+to cycle floors/);
     expect(wrapper.text()).toMatch(/F\s+to click at cursor/);
     wrapper.unmount();
   });

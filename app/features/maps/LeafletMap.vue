@@ -338,13 +338,13 @@
                           <kbd
                             class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
                           >
-                            WASD
+                            {{ 'WASD' }}
                           </kbd>
                           <span>/</span>
                           <kbd
                             class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
                           >
-                            ←↑↓→
+                            {{ '←↑↓→' }}
                           </kbd>
                         </template>
                       </i18n-t>
@@ -358,18 +358,18 @@
                           <kbd
                             class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
                           >
-                            Shift
+                            {{ 'Shift' }}
                           </kbd>
                           <kbd
                             class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
                           >
-                            Scroll
+                            {{ 'Scroll' }}
                           </kbd>
                           <span>/</span>
                           <kbd
                             class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
                           >
-                            Q/E
+                            {{ 'Q/E' }}
                           </kbd>
                         </template>
                       </i18n-t>
@@ -383,7 +383,7 @@
                           <kbd
                             class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
                           >
-                            R
+                            {{ 'R' }}
                           </kbd>
                         </template>
                       </i18n-t>
@@ -405,12 +405,12 @@
                             <kbd
                               class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
                             >
-                              Ctrl
+                              {{ 'Ctrl' }}
                             </kbd>
                             <kbd
                               class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
                             >
-                              Scroll
+                              {{ 'Scroll' }}
                             </kbd>
                           </template>
                         </i18n-t>
@@ -433,7 +433,7 @@
                           <kbd
                             class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
                           >
-                            F
+                            {{ 'F' }}
                           </kbd>
                         </template>
                       </i18n-t>
