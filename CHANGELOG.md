@@ -1,3 +1,10 @@
+## [1.73.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.4...v1.73.5) (2026-08-25)
+
+
+### Bug Fixes
+
+* **api:** modernize api-gateway runtime contract ([#767](https://github.com/tarkovtracker-org/TarkovTracker/issues/767)) ([b73fcc2](https://github.com/tarkovtracker-org/TarkovTracker/commit/b73fcc20b60b5169f48e1b1f9ee09567def18321))
+
 ## [1.73.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.3...v1.73.4) (2026-08-25)
 
 
