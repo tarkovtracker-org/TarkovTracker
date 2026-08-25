@@ -7,7 +7,7 @@ conventions for TarkovTracker. For the contribution workflow overview, see
 
 ## Prerequisites
 
-- **Node.js** >= 24.12.0
+- **Node.js** >= 24.19.0
 - **pnpm** 11.14.0 (via Corepack; matches `packageManager` in `package.json`)
 - **Git**
 
