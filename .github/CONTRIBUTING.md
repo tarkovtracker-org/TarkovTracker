@@ -33,7 +33,7 @@ automation, see [`PROJECT_BOARD.md`](PROJECT_BOARD.md).
 
 ## Development Setup (Summary)
 
-**Prerequisites:** Node.js >= 24.12.0, pnpm 11.14.0 (via Corepack), Git.
+**Prerequisites:** Node.js >= 24.19.0, pnpm 11.14.0 (via Corepack), Git.
 
 ```bash
 corepack enable && pnpm run setup   # installs deps + creates .env
