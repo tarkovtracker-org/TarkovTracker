@@ -15,6 +15,7 @@ import {
   recordDeletionFailure,
   serializeError,
   type AccountDeletionClient,
+  type DeletionTransitionResult,
 } from '../_shared/account-deletion-lifecycle.ts';
 const createLeaseLostResponse = (req: Request) =>
   createSuccessResponse(
@@ -27,10 +28,15 @@ const createLeaseLostResponse = (req: Request) =>
     req
   );
 const createTransitionResponse = async (
-  transition: Promise<boolean>,
+  transition: Promise<DeletionTransitionResult>,
   response: Response,
   req: Request
-) => ((await transition) ? response : createLeaseLostResponse(req));
+) => {
+  const result = await transition;
+  if (result === 'persisted') return response;
+  if (result === 'lease_lost') return createLeaseLostResponse(req);
+  return createErrorResponse('Failed to update account deletion status.', 500, req);
+};
 Deno.serve(async (req) => {
   const corsResponse = handleCorsPreflight(req);
   if (corsResponse) return corsResponse;

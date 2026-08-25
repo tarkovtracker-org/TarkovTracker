@@ -938,7 +938,7 @@ export type Database = {
       claim_account_deletion_job: {
         Args: { p_create_if_missing?: boolean; p_user_id: string }
         Returns: {
-          claim_token: string
+          claim_token: string | null
           claimed: boolean
           status: string
         }[]

@@ -15,6 +15,7 @@ import {
   recordDeletionFailure,
   serializeError,
   type AccountDeletionClient,
+  type DeletionTransitionResult,
 } from '../_shared/account-deletion-lifecycle.ts';
 const DEFAULT_BATCH_LIMIT = 20;
 const MAX_BATCH_LIMIT = 100;
@@ -70,8 +71,18 @@ const listJobs = async (
   }
   return { data: data ?? [], error: null } as const;
 };
-const getTransitionResult = async <T>(transition: Promise<boolean>, result: T, userId: string) =>
-  (await transition) ? result : { userId, status: 'lease_lost', skipped: true };
+const getTransitionResult = async <T>(
+  transition: Promise<DeletionTransitionResult>,
+  result: T,
+  userId: string
+) => {
+  const transitionResult = await transition;
+  if (transitionResult === 'persisted') return result;
+  if (transitionResult === 'lease_lost') {
+    return { userId, status: 'lease_lost', skipped: true };
+  }
+  return { userId, status: 'transition_failed' };
+};
 const TERMINAL_DELETION_STATUSES = new Set(['completed', 'dead_lettered']);
 const getSkippedJobResult = (status: string | null, userId: string, dryRun: boolean) => {
   const normalizedStatus = status ?? 'pending';

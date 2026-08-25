@@ -184,8 +184,11 @@ const getFailureTransition = (attempt: number, deadLetter: boolean, now: string)
     deadLetteredAt: null,
   } as const;
 };
-const hasPersistedTransition = (data: unknown, error: unknown) =>
-  !error && Array.isArray(data) && data.length === 1;
+export type DeletionTransitionResult = 'persisted' | 'lease_lost' | 'error';
+const getDeletionTransitionResult = (data: unknown, error: unknown): DeletionTransitionResult => {
+  if (error) return 'error';
+  return Array.isArray(data) && data.length === 1 ? 'persisted' : 'lease_lost';
+};
 export const recordDeletionFailure = async (
   supabase: AccountDeletionClient,
   userId: string,
@@ -218,11 +221,11 @@ export const recordDeletionFailure = async (
     .select('user_id')
     .limit(1);
   if (error) console.error(`${logPrefix} Failed to update deletion job:`, error);
-  const persisted = hasPersistedTransition(data, error);
-  if (deadLetter && persisted) {
+  const result = getDeletionTransitionResult(data, error);
+  if (deadLetter && result === 'persisted') {
     console.error(`${logPrefix} Deletion job dead-lettered:`, { userId, reason, details });
   }
-  return persisted;
+  return result;
 };
 export const markDeletionCompleted = async (
   supabase: AccountDeletionClient,
@@ -249,7 +252,7 @@ export const markDeletionCompleted = async (
     .select('user_id')
     .limit(1);
   if (error) console.error(`${logPrefix} Failed to mark deletion job completed:`, error);
-  return hasPersistedTransition(data, error);
+  return getDeletionTransitionResult(data, error);
 };
 export const claimDeletionJob = async (
   supabase: AccountDeletionClient,

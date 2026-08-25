@@ -114,7 +114,7 @@ describe('account deletion lifecycle', () => {
       },
     ]);
   });
-  it('reports a lost lease when a fenced completion updates no rows', async () => {
+  it('distinguishes a lost lease from a fenced transition error', async () => {
     const filter = {
       limit: () => Promise.resolve({ data: [], error: null }),
     };
@@ -126,7 +126,20 @@ describe('account deletion lifecycle', () => {
     });
     assertEquals(
       await markDeletionCompleted(client, 'user-id', 'stale-token', '[account-delete-test]'),
-      false
+      'lease_lost'
+    );
+    const errorFilter = {
+      limit: () => Promise.resolve({ data: null, error: new Error('database unavailable') }),
+    };
+    const errorUpdate: Record<string, unknown> = {};
+    errorUpdate.eq = () => errorUpdate;
+    errorUpdate.select = () => errorFilter;
+    const errorClient = asClient({
+      from: () => ({ update: () => errorUpdate }),
+    });
+    assertEquals(
+      await markDeletionCompleted(errorClient, 'user-id', 'claim-token', '[account-delete-test]'),
+      'error'
     );
   });
 });
