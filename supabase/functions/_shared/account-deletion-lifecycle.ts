@@ -17,9 +17,9 @@ export interface AccountDeletionFilterBuilder<T> {
       ((value: { data: T[] | null; error: unknown }) => TResult1 | PromiseLike<TResult1>) | null
   ): PromiseLike<TResult1>;
 }
-interface AccountDeletionTransformBuilder {
-  eq(column: string, value: unknown): Promise<{ error: unknown }>;
-  or(filter: string): Promise<{ error: unknown }>;
+interface AccountDeletionTransformBuilder extends PromiseLike<{ error: unknown }> {
+  eq(column: string, value: unknown): AccountDeletionTransformBuilder;
+  or(filter: string): AccountDeletionTransformBuilder;
 }
 export interface AccountDeletionClient {
   from<T extends keyof Database['public']['Tables']>(
@@ -50,6 +50,13 @@ const getRpcResult = (data: unknown) => {
   if (!Array.isArray(data)) return null;
   const result: unknown = data[0];
   return result && typeof result === 'object' ? (result as Record<string, unknown>) : null;
+};
+const getRpcBoolean = (result: Record<string, unknown> | null, field: string) =>
+  Boolean(result && result[field] === true);
+const getRpcString = (result: Record<string, unknown> | null, field: string) => {
+  if (!result) return null;
+  const value = result[field];
+  return typeof value === 'string' ? value : null;
 };
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => {
@@ -179,6 +186,7 @@ const getFailureTransition = (attempt: number, deadLetter: boolean, now: string)
 export const recordDeletionFailure = async (
   supabase: AccountDeletionClient,
   userId: string,
+  claimToken: string,
   reason: string,
   details: Record<string, unknown>,
   logPrefix: string
@@ -200,8 +208,10 @@ export const recordDeletionFailure = async (
       updated_at: now,
       completed_at: null,
       dead_lettered_at: transition.deadLetteredAt,
+      claim_token: null,
     })
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .eq('claim_token', claimToken);
   if (error) console.error(`${logPrefix} Failed to update deletion job:`, error);
   if (deadLetter) {
     console.error(`${logPrefix} Deletion job dead-lettered:`, { userId, reason, details });
@@ -210,6 +220,7 @@ export const recordDeletionFailure = async (
 export const markDeletionCompleted = async (
   supabase: AccountDeletionClient,
   userId: string,
+  claimToken: string,
   logPrefix: string
 ) => {
   const now = new Date().toISOString();
@@ -224,8 +235,10 @@ export const markDeletionCompleted = async (
       last_error_at: null,
       next_run_at: null,
       dead_lettered_at: null,
+      claim_token: null,
     })
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .eq('claim_token', claimToken);
   if (error) console.error(`${logPrefix} Failed to mark deletion job completed:`, error);
 };
 export const claimDeletionJob = async (
@@ -239,8 +252,9 @@ export const claimDeletionJob = async (
   });
   const result = getRpcResult(data);
   return {
-    claimed: result?.claimed === true,
-    status: typeof result?.status === 'string' ? result.status : null,
+    claimed: getRpcBoolean(result, 'claimed'),
+    status: getRpcString(result, 'status'),
+    claimToken: getRpcString(result, 'claim_token'),
     error,
   };
 };

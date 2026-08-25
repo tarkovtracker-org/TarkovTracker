@@ -90,7 +90,7 @@ const processDeletionJob = async (
     console.error('[account-delete-reconcile] Failed to claim deletion job:', claim.error);
     return { userId, status: 'claim_failed' };
   }
-  if (!claim.claimed) {
+  if (!claim.claimed || !claim.claimToken) {
     return { userId, status: claim.status ?? 'missing', skipped: true };
   }
   const authDeleteResult = await deleteUserWithRetry(supabase, userId);
@@ -98,6 +98,7 @@ const processDeletionJob = async (
     await recordDeletionFailure(
       supabase,
       userId,
+      claim.claimToken,
       'auth_delete_failed',
       {
         stage: 'auth_delete',
@@ -113,13 +114,14 @@ const processDeletionJob = async (
     await recordDeletionFailure(
       supabase,
       userId,
+      claim.claimToken,
       'cleanup_failed',
       { stage: 'cleanup', errors: cleanupErrors },
       '[account-delete-reconcile]'
     );
     return { userId, status: 'failed', stage: 'cleanup', errors: cleanupErrors };
   }
-  await markDeletionCompleted(supabase, userId, '[account-delete-reconcile]');
+  await markDeletionCompleted(supabase, userId, claim.claimToken, '[account-delete-reconcile]');
   return { userId, status: 'completed' };
 };
 Deno.serve(async (req) => {

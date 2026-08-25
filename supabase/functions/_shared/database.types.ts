@@ -61,6 +61,7 @@ export type Database = {
       account_deletion_jobs: {
         Row: {
           attempts: number
+          claim_token: string | null
           completed_at: string | null
           created_at: string | null
           dead_lettered_at: string | null
@@ -75,6 +76,7 @@ export type Database = {
         }
         Insert: {
           attempts?: number
+          claim_token?: string | null
           completed_at?: string | null
           created_at?: string | null
           dead_lettered_at?: string | null
@@ -89,6 +91,7 @@ export type Database = {
         }
         Update: {
           attempts?: number
+          claim_token?: string | null
           completed_at?: string | null
           created_at?: string | null
           dead_lettered_at?: string | null
@@ -942,6 +945,7 @@ export type Database = {
       claim_account_deletion_job: {
         Args: { p_create_if_missing?: boolean; p_user_id: string }
         Returns: {
+          claim_token: string
           claimed: boolean
           status: string
         }[]

@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
         req
       );
     }
-    if (!claim.claimed) {
+    if (!claim.claimed || !claim.claimToken) {
       return createSuccessResponse(
         {
           success: claim.status === 'completed',
@@ -82,6 +82,7 @@ Deno.serve(async (req) => {
       await recordDeletionFailure(
         supabase,
         user.id,
+        claim.claimToken,
         'team_query_failed',
         { stage: 'team_transfer', error: serializeError(teamQueryError) },
         '[account-delete]'
@@ -141,6 +142,7 @@ Deno.serve(async (req) => {
       await recordDeletionFailure(
         supabase,
         user.id,
+        claim.claimToken,
         'team_transfer_failed',
         { stage: 'team_transfer', errors: teamErrors },
         '[account-delete]'
@@ -157,6 +159,7 @@ Deno.serve(async (req) => {
       await recordDeletionFailure(
         supabase,
         user.id,
+        claim.claimToken,
         'auth_delete_failed',
         {
           stage: 'auth_delete',
@@ -181,6 +184,7 @@ Deno.serve(async (req) => {
       await recordDeletionFailure(
         supabase,
         user.id,
+        claim.claimToken,
         'cleanup_failed',
         { stage: 'cleanup', errors: cleanupErrors },
         '[account-delete]'
@@ -196,7 +200,7 @@ Deno.serve(async (req) => {
         req
       );
     }
-    await markDeletionCompleted(supabase, user.id, '[account-delete]');
+    await markDeletionCompleted(supabase, user.id, claim.claimToken, '[account-delete]');
     return createSuccessResponse({ success: true }, 200, req);
   } catch (error) {
     console.error('[account-delete] Unexpected error:', error);

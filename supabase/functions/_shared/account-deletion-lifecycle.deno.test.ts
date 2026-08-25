@@ -74,7 +74,10 @@ Deno.test('maps atomic claim and rate-limit RPC results', async () => {
     rpc: (fn: string, args?: Record<string, unknown>) => {
       calls.push({ fn, args });
       if (fn === 'claim_account_deletion_job') {
-        return Promise.resolve({ data: [{ claimed: false, status: 'in_progress' }], error: null });
+        return Promise.resolve({
+          data: [{ claimed: false, status: 'in_progress', claim_token: 'claim-token' }],
+          error: null,
+        });
       }
       return Promise.resolve({
         data: [{ allowed: false, retry_after_seconds: 42 }],
@@ -85,6 +88,7 @@ Deno.test('maps atomic claim and rate-limit RPC results', async () => {
   assertEquals(await claimDeletionJob(client, 'user-id', true), {
     claimed: false,
     status: 'in_progress',
+    claimToken: 'claim-token',
     error: null,
   });
   assertEquals(await consumeDeletionAttempt(client, 'user-id', '127.0.0.1', 'agent'), {

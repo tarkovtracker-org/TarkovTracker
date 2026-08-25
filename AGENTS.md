@@ -238,7 +238,9 @@ Naming:
 - Account deletion requests consume their three-per-minute limit and record the allowed attempt in
   one `consume_account_deletion_attempt` transaction. Both the initiating function and reconciler
   must atomically claim work through `claim_account_deletion_job`; a fresh `in_progress` claim has a
-  15-minute lease before reconciliation can recover it. Both RPCs remain service-role-only.
+  15-minute lease before reconciliation can recover it. Completion and failure writes must match
+  the current claim's fencing token. Only a new user request can revive a dead-lettered job. Both
+  RPCs remain service-role-only.
 - The promoted Twitch stream supports a build-time fallback and an admin-managed override.
   `NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED=true` directly enables the build-time fallback without an
   admin write. `public.app_settings` is service-role-only; `/api/twitch/config` resolves the

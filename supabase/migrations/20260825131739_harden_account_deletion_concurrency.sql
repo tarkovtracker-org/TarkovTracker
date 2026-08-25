@@ -62,13 +62,17 @@ GRANT EXECUTE ON FUNCTION public.consume_account_deletion_attempt(UUID, TEXT, TE
 COMMENT ON FUNCTION public.consume_account_deletion_attempt(UUID, TEXT, TEXT) IS
   'Atomically enforces and records the three-per-minute account deletion attempt limit.';
 
+ALTER TABLE public.account_deletion_jobs
+  ADD COLUMN claim_token UUID;
+
 CREATE OR REPLACE FUNCTION public.claim_account_deletion_job(
   p_user_id UUID,
   p_create_if_missing BOOLEAN DEFAULT FALSE
 )
 RETURNS TABLE (
   claimed BOOLEAN,
-  status TEXT
+  status TEXT,
+  claim_token UUID
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -92,11 +96,15 @@ BEGIN
 
   UPDATE public.account_deletion_jobs AS adj
   SET status = 'in_progress',
+      attempts = CASE WHEN adj.status = 'dead_lettered' THEN 0 ELSE adj.attempts END,
       updated_at = v_now,
       next_run_at = NULL,
       last_error = NULL,
       last_error_details = NULL,
-      last_error_at = NULL
+      last_error_at = NULL,
+      completed_at = NULL,
+      dead_lettered_at = NULL,
+      claim_token = gen_random_uuid()
   WHERE adj.user_id = p_user_id
     AND (
       (
@@ -107,17 +115,18 @@ BEGIN
         adj.status = 'in_progress'
         AND adj.updated_at <= v_now - INTERVAL '15 minutes'
       )
+      OR (p_create_if_missing AND adj.status = 'dead_lettered')
     )
-  RETURNING TRUE, adj.status
-  INTO claimed, status;
+  RETURNING TRUE, adj.status, adj.claim_token
+  INTO claimed, status, claim_token;
 
   IF FOUND THEN
     RETURN NEXT;
     RETURN;
   END IF;
 
-  SELECT FALSE, adj.status
-  INTO claimed, status
+  SELECT FALSE, adj.status, adj.claim_token
+  INTO claimed, status, claim_token
   FROM public.account_deletion_jobs AS adj
   WHERE adj.user_id = p_user_id;
 
@@ -133,4 +142,4 @@ GRANT EXECUTE ON FUNCTION public.claim_account_deletion_job(UUID, BOOLEAN)
   TO service_role;
 
 COMMENT ON FUNCTION public.claim_account_deletion_job(UUID, BOOLEAN) IS
-  'Atomically claims a due account deletion job and recovers in-progress jobs after a 15-minute lease.';
+  'Atomically claims deletion work with a fencing token and recovers jobs after a 15-minute lease.';
