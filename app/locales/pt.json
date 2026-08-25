@@ -2140,6 +2140,7 @@
       "xp_progress_value": "{percent}% em direção ao próximo nível"
     },
     "danger_zone": {
+      "confirm_instruction": "Digite {word} para confirmar a redefinição de todos os dados:",
       "confirm_word": "DELETE"
     },
     "log_import": {
