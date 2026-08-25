@@ -935,19 +935,19 @@ export type Database = {
         }
         Returns: undefined
       }
-      cleanup_old_deletion_attempts: {
-        Args: { retention_days?: number }
-        Returns: {
-          deleted_count: number
-          oldest_remaining: string
-        }[]
-      }
       claim_account_deletion_job: {
         Args: { p_create_if_missing?: boolean; p_user_id: string }
         Returns: {
           claim_token: string
           claimed: boolean
           status: string
+        }[]
+      }
+      cleanup_old_deletion_attempts: {
+        Args: { retention_days?: number }
+        Returns: {
+          deleted_count: number
+          oldest_remaining: string
         }[]
       }
       consume_account_deletion_attempt: {

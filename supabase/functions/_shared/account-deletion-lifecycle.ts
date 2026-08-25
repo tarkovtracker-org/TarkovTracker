@@ -52,7 +52,7 @@ const getRpcResult = (data: unknown) => {
   return result && typeof result === 'object' ? (result as Record<string, unknown>) : null;
 };
 const getRpcBoolean = (result: Record<string, unknown> | null, field: string) =>
-  Boolean(result && result[field] === true);
+  result?.[field] === true;
 const getRpcString = (result: Record<string, unknown> | null, field: string) => {
   if (!result) return null;
   const value = result[field];
@@ -116,8 +116,8 @@ export const deleteUserWithRetry = async (
   supabase: AccountDeletionClient,
   userId: string,
   wait = sleep
-): Promise<{ ok: boolean; attempts: number; lastError: unknown | null }> => {
-  let lastError: unknown | null = null;
+): Promise<{ ok: boolean; attempts: number; lastError: unknown }> => {
+  let lastError: unknown;
   for (let attempt = 1; attempt <= AUTH_DELETE_MAX_ATTEMPTS; attempt += 1) {
     const { error } = await supabase.auth.admin.deleteUser(userId);
     if (isDeletionComplete(error)) {
