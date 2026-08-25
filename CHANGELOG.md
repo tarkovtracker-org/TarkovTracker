@@ -1,3 +1,10 @@
+## [1.73.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.2...v1.73.3) (2026-08-25)
+
+
+### Bug Fixes
+
+* **api:** validate teamId as a UUID before the membership query ([#756](https://github.com/tarkovtracker-org/TarkovTracker/issues/756)) ([7da84f2](https://github.com/tarkovtracker-org/TarkovTracker/commit/7da84f224d174bcbca6a76130d38652e8bd3caa8))
+
 ## [1.73.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.1...v1.73.2) (2026-08-20)
 
 
