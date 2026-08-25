@@ -34,9 +34,12 @@ type ValidatedTokenFields = TokenRequestFields & {
 };
 type MutationGuard =
   { response: Response } | { user: AuthSuccess['user']; supabase: SupabaseClient };
+const isJsonObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 const parseJsonBody = async (req: Request): Promise<Record<string, unknown>> => {
   try {
-    return (await req.json()) as Record<string, unknown>;
+    const body: unknown = await req.json();
+    return isJsonObject(body) ? body : {};
   } catch {
     return {};
   }
@@ -48,7 +51,7 @@ const parseRequestFields = (body: Record<string, unknown>): TokenRequestFields =
   tokenValue: (body.tokenValue as string | undefined) || '',
 });
 const gameModePresenceError = (gameMode: string): string | null =>
-  gameMode ? null : 'gameMode and permissions are required';
+  gameMode ? null : 'gameMode is required';
 const permissionsError = (permissions: TokenPermission[] | null): string | null =>
   permissions ? null : `permissions must be a non-empty array of: ${TOKEN_PERMISSIONS.join(', ')}`;
 const gameModeValueError = (gameMode: string): string | null =>
