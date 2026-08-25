@@ -8,6 +8,7 @@
     "scripts/precompute/__tests__/*.test.ts",
     "supabase/functions/**/*.test.ts",
     "tests/**/*.test.ts",
+    "workers/api-gateway/src/__tests__/cloudflare-workers.ts",
     "eslint.config.mjs",
     "app/i18n.config.ts",
     "app/server/api/**/*.ts",

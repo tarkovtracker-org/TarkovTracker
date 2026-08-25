@@ -35,7 +35,6 @@
     "vue-router": "^5.2.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260409.1",
     "@codecov/nuxt-plugin": "^2.0.1",
     "@commitlint/cli": "^21.0.2",
     "@commitlint/config-conventional": "^21.1.0",
