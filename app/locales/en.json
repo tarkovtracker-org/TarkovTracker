@@ -516,19 +516,6 @@
       "drag_to_resize": "Drag to resize map",
       "switch_floor": "Switch floor (Ctrl + Scroll)"
     },
-    "controls": {
-      "help": {
-        "pan": "or drag to pan",
-        "zoom": "to zoom",
-        "reset": "to reset view",
-        "cycle_floors": "to cycle floors",
-        "floor_panel": "or use the floor panel",
-        "click_at_cursor": "to click at cursor",
-        "click_marker": "Click a marker for details",
-        "fullscreen": "Use the full screen button in the map controls",
-        "resize": "Drag the bottom edge of the map to resize"
-      }
-    },
     "help": {
       "title": "Map controls",
       "groups": {
@@ -536,13 +523,20 @@
         "floors": "Floors",
         "interact": "Interact",
         "view": "View"
-      }
+      },
+      "pan": "{keys} or drag to pan",
+      "zoom": "{keys} to zoom",
+      "reset": "{key} to reset view",
+      "cycle_floors": "{keys} to cycle floors",
+      "floor_panel": "Or use the floor panel.",
+      "click_at_cursor": "{key} to click at cursor",
+      "click_marker": "Click a marker for details.",
+      "fullscreen": "Use the full screen button in the map controls.",
+      "resize": "Drag the bottom edge of the map to resize."
     },
     "hint": {
       "title": "Quick map controls",
-      "drag_to_pan": "Drag to pan",
-      "shift_scroll_zoom": "Shift + Scroll to zoom",
-      "ctrl_scroll_floors": "Ctrl + Scroll to change floors",
+      "summary": "Drag to pan · Shift + Scroll to zoom · Ctrl + Scroll to change floors",
       "all_controls": "All controls"
     },
     "aria": {

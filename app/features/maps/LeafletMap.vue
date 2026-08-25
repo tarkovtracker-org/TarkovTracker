@@ -328,53 +328,65 @@
                       <p class="text-surface-400 text-[10px] font-semibold tracking-wide uppercase">
                         {{ t('maps.help.groups.navigate') }}
                       </p>
-                      <p
+                      <i18n-t
+                        keypath="maps.help.pan"
+                        tag="p"
+                        scope="global"
                         class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
                       >
-                        <kbd
-                          class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                        >
-                          WASD
-                        </kbd>
-                        <span>/</span>
-                        <kbd
-                          class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                        >
-                          ←↑↓→
-                        </kbd>
-                        <span>{{ t('maps.controls.help.pan') }}</span>
-                      </p>
-                      <p
+                        <template #keys>
+                          <kbd
+                            class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                          >
+                            WASD
+                          </kbd>
+                          <span>/</span>
+                          <kbd
+                            class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                          >
+                            ←↑↓→
+                          </kbd>
+                        </template>
+                      </i18n-t>
+                      <i18n-t
+                        keypath="maps.help.zoom"
+                        tag="p"
+                        scope="global"
                         class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
                       >
-                        <kbd
-                          class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                        >
-                          Shift
-                        </kbd>
-                        <kbd
-                          class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                        >
-                          Scroll
-                        </kbd>
-                        <span>/</span>
-                        <kbd
-                          class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                        >
-                          Q/E
-                        </kbd>
-                        <span>{{ t('maps.controls.help.zoom') }}</span>
-                      </p>
-                      <p
+                        <template #keys>
+                          <kbd
+                            class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                          >
+                            Shift
+                          </kbd>
+                          <kbd
+                            class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                          >
+                            Scroll
+                          </kbd>
+                          <span>/</span>
+                          <kbd
+                            class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                          >
+                            Q/E
+                          </kbd>
+                        </template>
+                      </i18n-t>
+                      <i18n-t
+                        keypath="maps.help.reset"
+                        tag="p"
+                        scope="global"
                         class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
                       >
-                        <kbd
-                          class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                        >
-                          R
-                        </kbd>
-                        <span>{{ t('maps.controls.help.reset') }}</span>
-                      </p>
+                        <template #key>
+                          <kbd
+                            class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                          >
+                            R
+                          </kbd>
+                        </template>
+                      </i18n-t>
                     </div>
                     <div class="space-y-1">
                       <div v-if="hasMultipleFloors" class="space-y-1">
@@ -383,23 +395,27 @@
                         >
                           {{ t('maps.help.groups.floors') }}
                         </p>
-                        <p
+                        <i18n-t
+                          keypath="maps.help.cycle_floors"
+                          tag="p"
+                          scope="global"
                           class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
                         >
-                          <kbd
-                            class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                          >
-                            Ctrl
-                          </kbd>
-                          <kbd
-                            class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                          >
-                            Scroll
-                          </kbd>
-                          <span>{{ t('maps.controls.help.cycle_floors') }}</span>
-                        </p>
+                          <template #keys>
+                            <kbd
+                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                            >
+                              Ctrl
+                            </kbd>
+                            <kbd
+                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                            >
+                              Scroll
+                            </kbd>
+                          </template>
+                        </i18n-t>
                         <p class="text-surface-400 text-[11px]">
-                          {{ t('maps.controls.help.floor_panel') }}
+                          {{ t('maps.help.floor_panel') }}
                         </p>
                       </div>
                       <p
@@ -407,18 +423,22 @@
                       >
                         {{ t('maps.help.groups.interact') }}
                       </p>
-                      <p
+                      <i18n-t
+                        keypath="maps.help.click_at_cursor"
+                        tag="p"
+                        scope="global"
                         class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
                       >
-                        <kbd
-                          class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                        >
-                          F
-                        </kbd>
-                        <span>{{ t('maps.controls.help.click_at_cursor') }}</span>
-                      </p>
+                        <template #key>
+                          <kbd
+                            class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                          >
+                            F
+                          </kbd>
+                        </template>
+                      </i18n-t>
                       <p class="text-surface-300 text-[11px]">
-                        {{ t('maps.controls.help.click_marker') }}
+                        {{ t('maps.help.click_marker') }}
                       </p>
                     </div>
                     <div class="col-span-2 space-y-1">
@@ -426,10 +446,10 @@
                         {{ t('maps.help.groups.view') }}
                       </p>
                       <p class="text-surface-300 text-[11px]">
-                        {{ t('maps.controls.help.fullscreen') }}
+                        {{ t('maps.help.fullscreen') }}
                       </p>
                       <p class="text-surface-300 text-[11px]">
-                        {{ t('maps.controls.help.resize') }}
+                        {{ t('maps.help.resize') }}
                       </p>
                     </div>
                   </div>
@@ -523,8 +543,7 @@
         >
           <p class="text-surface-100 text-xs font-semibold">{{ t('maps.hint.title') }}</p>
           <p class="text-surface-300 mt-1 text-xs">
-            {{ t('maps.hint.drag_to_pan') }} · {{ t('maps.hint.shift_scroll_zoom') }} ·
-            {{ t('maps.hint.ctrl_scroll_floors') }}
+            {{ t('maps.hint.summary') }}
           </p>
           <div class="mt-2.5 flex items-center gap-3">
             <button

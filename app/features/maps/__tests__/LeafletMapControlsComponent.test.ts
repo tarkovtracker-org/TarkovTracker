@@ -41,7 +41,7 @@ const { mapState, mockMapInstance, resetMapMarkerColorsSpy } = vi.hoisted(() => 
   return {
     mockMapInstance: mapInstance,
     resetMapMarkerColorsSpy: vi.fn(),
-    mapState: { isLoading: false },
+    mapState: { hasMultipleFloors: false, isLoading: false },
   };
 });
 const refreshViewSpy = vi.fn();
@@ -64,7 +64,7 @@ vi.mock('@/composables/useLeafletMap', () => ({
       leaflet: shallowRef(null),
       selectedFloor: ref(''),
       floors: ref([]),
-      hasMultipleFloors: ref(false),
+      hasMultipleFloors: ref(mapState.hasMultipleFloors),
       isLoading: ref(mapState.isLoading),
       isIdle: ref(false),
       svgLayer: shallowRef(null),
@@ -128,6 +128,7 @@ const mountMap = async (props: Record<string, unknown> = {}) => {
 };
 describe('LeafletMap controls', () => {
   beforeEach(() => {
+    mapState.hasMultipleFloors = false;
     localStorage.clear();
     refreshViewSpy.mockClear();
     setFloorSpy.mockClear();
@@ -200,6 +201,17 @@ describe('LeafletMap controls', () => {
         .find('[data-testid="map-help-unseen-dot"]')
         .exists()
     ).toBe(false);
+    wrapper.unmount();
+  });
+  it('renders localized help rows with their keyboard shortcuts in message slots', async () => {
+    mapState.hasMultipleFloors = true;
+    const wrapper = await mountMap();
+    expect(wrapper.findAll('kbd')).toHaveLength(9);
+    expect(wrapper.text()).toMatch(/WASD\s+\/\s+←↑↓→\s+or drag to pan/);
+    expect(wrapper.text()).toMatch(/Shift\s+Scroll\s+\/ Q\/E\s+to zoom/);
+    expect(wrapper.text()).toMatch(/R\s+to reset view/);
+    expect(wrapper.text()).toMatch(/Ctrl\s+Scroll\s+to cycle floors/);
+    expect(wrapper.text()).toMatch(/F\s+to click at cursor/);
     wrapper.unmount();
   });
   it('dismisses the first-use hint and remembers it', async () => {
