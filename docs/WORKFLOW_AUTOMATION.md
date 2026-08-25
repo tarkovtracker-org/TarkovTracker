@@ -46,7 +46,8 @@ Semantic versioning with automated releases:
 **Jobs:**
 
 - Runs tests and build
-- Validates local Supabase migrations with `pnpm run supabase:check`
+- Resets and lints local Supabase migrations and runs pgTAP database regressions with
+  `pnpm run supabase:check`
 - Generates changelog from conventional commits
 - Creates GitHub releases
 - Updates version in package.json

@@ -76,7 +76,7 @@ can read it and an agent can verify any claim against the code. Each system sect
 
 Install: `pnpm install` | Worktree bootstrap: `bash scripts/setup-worktree.sh` | Dev: `pnpm run dev` (localhost:3000) | Build: `pnpm run build` | Preview: `pnpm run preview` | Static: `pnpm run generate`
 
-Test: `pnpm run test` | Watch: `pnpm run test:watch` | Coverage: `pnpm run test:coverage` | API gateway: `pnpm run test:api-gateway` | Production observer: `pnpm run prod-db:test` | Single file: `pnpm exec vitest run path/to/file.test.ts` | By name: `pnpm exec vitest run -t "pattern"`
+Test: `pnpm run test` | Watch: `pnpm run test:watch` | Coverage: `pnpm run test:coverage` | API gateway: `pnpm run test:api-gateway` | Supabase DB: `pnpm run supabase:check` (reset + pgTAP + lint) | Production observer: `pnpm run prod-db:test` | Single file: `pnpm exec vitest run path/to/file.test.ts` | By name: `pnpm exec vitest run -t "pattern"`
 
 API gateway bindings: `pnpm --filter api-gateway run types` regenerates the checked-in
 `workers/api-gateway/worker-configuration.d.ts`; `pnpm --filter api-gateway run types:check` detects
@@ -235,6 +235,10 @@ Naming:
 - API token renames update only `api_tokens.note` through authenticated owner-scoped RLS. They
   must never rotate or replace the token or change its ID, value or hash, permissions, game mode,
   or usage data.
+- Account deletion requests consume their three-per-minute limit and record the allowed attempt in
+  one `consume_account_deletion_attempt` transaction. Both the initiating function and reconciler
+  must atomically claim work through `claim_account_deletion_job`; a fresh `in_progress` claim has a
+  15-minute lease before reconciliation can recover it. Both RPCs remain service-role-only.
 - The promoted Twitch stream supports a build-time fallback and an admin-managed override.
   `NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED=true` directly enables the build-time fallback without an
   admin write. `public.app_settings` is service-role-only; `/api/twitch/config` resolves the

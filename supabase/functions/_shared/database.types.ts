@@ -939,6 +939,24 @@ export type Database = {
           oldest_remaining: string
         }[]
       }
+      claim_account_deletion_job: {
+        Args: { p_create_if_missing?: boolean; p_user_id: string }
+        Returns: {
+          claimed: boolean
+          status: string
+        }[]
+      }
+      consume_account_deletion_attempt: {
+        Args: {
+          p_ip_address: string
+          p_user_agent: string
+          p_user_id: string
+        }
+        Returns: {
+          allowed: boolean
+          retry_after_seconds: number
+        }[]
+      }
       consume_mutation_rate_limit: {
         Args: {
           p_limit: number

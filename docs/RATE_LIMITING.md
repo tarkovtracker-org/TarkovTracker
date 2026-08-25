@@ -279,12 +279,14 @@ Important:
 
 `account-delete` currently uses a **dedicated** path:
 
-1. Query recent rows in `account_deletion_attempts` for the user
-2. Allow max **3 attempts / 60s**
-3. Insert an attempt row, then enqueue deletion work
+1. Call `consume_account_deletion_attempt` to serialize each user's requests in Postgres
+2. Allow and record max **3 attempts / 60s** in the same transaction
+3. Atomically claim the deletion job through `claim_account_deletion_job`
 
-This is **not** wired through `consume_mutation_rate_limit` today. Functionally fine, but it is a
-second pattern for “sensitive mutation limiting.”
+This is **not** wired through `consume_mutation_rate_limit` today. It remains a second pattern for
+“sensitive mutation limiting” because the dedicated table also retains the deletion audit history.
+Both RPCs are service-role-only. A job claim holds a 15-minute lease; the reconciler can recover a
+stale `in_progress` job after that lease, but parallel workers cannot process a fresh claim.
 
 Preferred future shape: add an `account-delete` scope to the shared mutation limiter and keep
 `account_deletion_attempts` only if audit history is still needed.
