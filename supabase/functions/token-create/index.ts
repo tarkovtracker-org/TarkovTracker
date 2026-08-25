@@ -7,6 +7,7 @@ import {
   type AuthSuccess,
 } from '../_shared/auth.ts';
 import { enforceUserMutationRateLimit } from '../_shared/rate-limit.ts';
+import { parseTokenPermissions, TOKEN_PERMISSIONS } from './permissions.ts';
 import {
   generateToken,
   isTokenGameMode,
@@ -44,12 +45,19 @@ Deno.serve(async (req) => {
     } catch {
       // ignore, handled below
     }
-    const permissions = (body.permissions as string[]) || [];
+    const permissions = parseTokenPermissions(body.permissions);
     const gameMode = (body.gameMode as string) || '';
     const note = (body.note as string | null) || null;
     let tokenValue = (body.tokenValue as string | undefined) || '';
-    if (!permissions.length || !gameMode) {
+    if (!gameMode) {
       return createErrorResponse('gameMode and permissions are required', 400, req);
+    }
+    if (!permissions) {
+      return createErrorResponse(
+        `permissions must be a non-empty array of: ${TOKEN_PERMISSIONS.join(', ')}`,
+        400,
+        req
+      );
     }
     if (!isTokenGameMode(gameMode)) {
       return createErrorResponse(
