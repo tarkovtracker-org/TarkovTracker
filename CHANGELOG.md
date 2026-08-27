@@ -1,3 +1,10 @@
+## [1.73.7](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.6...v1.73.7) (2026-08-27)
+
+
+### Bug Fixes
+
+* **i18n:** localize map control help ([b82d812](https://github.com/tarkovtracker-org/TarkovTracker/commit/b82d812cdce9037c72f441327ba92c5e9dbb2eab))
+
 ## [1.73.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.5...v1.73.6) (2026-08-25)
 
 
