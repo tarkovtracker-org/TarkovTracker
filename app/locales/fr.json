@@ -516,19 +516,6 @@
       "drag_to_resize": "Glisser pour redimensionner la carte",
       "switch_floor": "Commuter le plancher (Ctrl + défilement)"
     },
-    "controls": {
-      "help": {
-        "pan": "ou faites glisser vers le panoramique",
-        "zoom": "zoomer",
-        "reset": "pour réinitialiser la vue",
-        "cycle_floors": "aux planchers à vélo",
-        "floor_panel": "ou utilisez le panneau de plancher",
-        "click_at_cursor": "pour cliquer sur le curseur",
-        "click_marker": "Cliquez sur un marqueur pour plus de détails",
-        "fullscreen": "Utilisez le bouton plein écran dans les commandes de la carte",
-        "resize": "Faites glisser le bord inférieur de la carte pour redimensionner"
-      }
-    },
     "help": {
       "title": "Contrôles de la carte",
       "groups": {
@@ -536,13 +523,21 @@
         "floors": "Étages",
         "interact": "Interagir",
         "view": "Voir"
-      }
+      },
+      "pan": "{keys} ou faites glisser vers la poêle",
+      "zoom": "{keys} pour zoomer",
+      "reset": "{key} pour réinitialiser la vue",
+      "cycle_floors": "{keys} to cycle floors",
+      "floor_panel": "Ou utilisez le panneau de plancher.",
+      "click_at_cursor": "{key} pour cliquer au curseur",
+      "click_marker": "Cliquez sur un marqueur pour plus de détails.",
+      "fullscreen": "Utilisez le bouton plein écran dans les commandes de la carte.",
+      "resize": "Faites glisser le bord inférieur de la carte pour redimensionner."
     },
     "hint": {
       "title": "Contrôles de la carte rapide",
-      "drag_to_pan": "Glisser pour faire une casserole",
-      "shift_scroll_zoom": "Maj + Défiler pour zoomer",
-      "ctrl_scroll_floors": "Ctrl + Défiler pour changer de sol",
+      "summary": "Faites glisser vers le panoramique · Maj + Défilement pour zoomer",
+      "summary_multi_floor": "Faites glisser pour faire glisser vers la pan · Maj + Défilement pour zoomer · Ctrl + Défilement pour changer de plancher",
       "all_controls": "Tous les contrôles"
     },
     "aria": {
