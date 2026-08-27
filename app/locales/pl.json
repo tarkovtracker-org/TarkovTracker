@@ -516,19 +516,6 @@
       "drag_to_resize": "Przeciągnij, aby zmienić rozmiar mapy",
       "switch_floor": "Przełącz piętro (Ctrl + przewijanie)"
     },
-    "controls": {
-      "help": {
-        "pan": "lub przeciągnij do panewki",
-        "zoom": "powiększyć",
-        "reset": "zresetować widok",
-        "cycle_floors": "Cykl podłogi",
-        "floor_panel": "lub użyj podłogi",
-        "click_at_cursor": "aby kliknąć na kursor",
-        "click_marker": "Kliknij znacznik po szczegóły",
-        "fullscreen": "Użyj przycisku pełnoekranowego na mapie",
-        "resize": "Przeciągnij dolną krawędź mapy, aby zmienić rozmiar"
-      }
-    },
     "help": {
       "title": "Sterowanie mapą",
       "groups": {
@@ -536,13 +523,21 @@
         "floors": "Podłogi",
         "interact": "Interakcja",
         "view": "Widok"
-      }
+      },
+      "pan": "{keys} lub przeciągnij do panewki",
+      "zoom": "{keys} do powiększenia",
+      "reset": "{key} do zresetowania widoku",
+      "cycle_floors": "{keys} do rowerów",
+      "floor_panel": "Lub użyj płyty podłogowej.",
+      "click_at_cursor": "{key} kliknąć na kursor",
+      "click_marker": "Kliknij znacznik po szczegóły.",
+      "fullscreen": "Użyj przycisku pełnoekranowego w sterownikach mapy.",
+      "resize": "Przeciągnij dolną krawędź mapy, aby zmienić rozmiar."
     },
     "hint": {
       "title": "Szybkie ustawienia mapy",
-      "drag_to_pan": "Przeciągnij do panewki",
-      "shift_scroll_zoom": "Przesuń + przewiń do przybliżenia",
-      "ctrl_scroll_floors": "Ctrl + przewiń aby zmienić podłogę",
+      "summary": "Przeciągnij do panewki · Shift + Przewiń do przybliżenia",
+      "summary_multi_floor": "Przeciągnij do panewki· Shift + Przewiń do przybliżenia · Ctrl + Przewiń, aby zmienić podłogę",
       "all_controls": "Wszystkie ustawienia"
     },
     "aria": {
