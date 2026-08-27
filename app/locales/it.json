@@ -516,19 +516,6 @@
       "drag_to_resize": "Trascina per ridimensionare la mappa",
       "switch_floor": "Cambia piano (Ctrl + Rotella mouse)"
     },
-    "controls": {
-      "help": {
-        "pan": "o trascina per spostare la visuale",
-        "zoom": "per ingrandire",
-        "reset": "per resettare la vista",
-        "cycle_floors": "per ciclare i piani",
-        "floor_panel": "o utilizza il pannello dei piani",
-        "click_at_cursor": "per cliccare sul cursore",
-        "click_marker": "Fai clic su un marcatore per i dettagli",
-        "fullscreen": "Usa il pulsante a schermo intero nei controlli mappa",
-        "resize": "Trascina il bordo inferiore della mappa per ridimensionare"
-      }
-    },
     "help": {
       "title": "Controlli mappa",
       "groups": {
@@ -536,13 +523,21 @@
         "floors": "Piani",
         "interact": "Interagisci",
         "view": "Visualizza"
-      }
+      },
+      "pan": "{keys} o trascina su pan",
+      "zoom": "{keys} per ingrandire",
+      "reset": "{key} per resettare la vista",
+      "cycle_floors": "{keys} per i piani ciclabili",
+      "floor_panel": "Oppure utilizzare il pannello del pavimento.",
+      "click_at_cursor": "{key} per cliccare sul cursore",
+      "click_marker": "Fare clic su un indicatore per i dettagli.",
+      "fullscreen": "Utilizzare il pulsante a schermo intero nei controlli della mappa.",
+      "resize": "Trascinare il bordo inferiore della mappa per ridimensionare."
     },
     "hint": {
       "title": "Controlli rapidi mappa",
-      "drag_to_pan": "Trascina per spostare la visuale",
-      "shift_scroll_zoom": "Maiusc + Scorrimento per ingrandire",
-      "ctrl_scroll_floors": "Ctrl + Scorrimento per cambiare piani",
+      "summary": "Trascina per pan · Maiusc + Scorrimento per ingrandire",
+      "summary_multi_floor": "Trascina per passare · Maiusc + Scorrere per ingrandire · Ctrl + Scorrimento per cambiare piano",
       "all_controls": "Tutti i controlli"
     },
     "aria": {
