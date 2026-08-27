@@ -516,19 +516,6 @@
       "drag_to_resize": "Ziehen, um Karte zu skalieren",
       "switch_floor": "Boden wechseln (Strg + Scroll)"
     },
-    "controls": {
-      "help": {
-        "pan": "oder ziehen zum Pan",
-        "zoom": "zoomen",
-        "reset": "um die Ansicht zurückzusetzen",
-        "cycle_floors": "um Böden zu fahren",
-        "floor_panel": "oder verwenden Sie die Bodenplatte",
-        "click_at_cursor": "um am Cursor zu klicken",
-        "click_marker": "Klicken Sie auf einen Marker für Details",
-        "fullscreen": "Den Vollbild-Button in den Kartensteuerungen verwenden",
-        "resize": "Ziehen Sie den unteren Rand der Karte um die Größe zu ändern"
-      }
-    },
     "help": {
       "title": "Kartensteuerung",
       "groups": {
@@ -536,13 +523,21 @@
         "floors": "Stockwerke",
         "interact": "Interagieren",
         "view": "Ansicht"
-      }
+      },
+      "pan": "{keys} oder ziehen in Pfanne",
+      "zoom": "{keys} um zu zoomen",
+      "reset": "{key} um die Ansicht zurückzusetzen",
+      "cycle_floors": "{keys} um Böden zu schliessen",
+      "floor_panel": "Oder verwenden Sie die Bodenplatte.",
+      "click_at_cursor": "{key} um am Cursor zu klicken",
+      "click_marker": "Klicken Sie auf einen Marker für Details.",
+      "fullscreen": "Benutzen Sie den Vollbild-Button in den Kartensteuerelementen.",
+      "resize": "Ziehen Sie die untere Kante der Karte, um sie zu vergrößern."
     },
     "hint": {
       "title": "Schnellkarten-Steuerung",
-      "drag_to_pan": "In Pfanne ziehen",
-      "shift_scroll_zoom": "Shift + Scrollen zum Zoomen",
-      "ctrl_scroll_floors": "Strg + Scrollen um Etagen zu wechseln",
+      "summary": "Ziehen in die Pan · Shift + Scrollen zum zoomen",
+      "summary_multi_floor": "Ziehen in die Pan · Umschalt+Scrollen zum Zoomen · Strg + Scrollen um Böden zu wechseln",
       "all_controls": "Alle Steuerelemente"
     },
     "aria": {
