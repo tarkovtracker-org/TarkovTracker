@@ -13,7 +13,7 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 - `Lint & Format` — ESLint + Prettier checks
 - `Fallow audit` — changed-file dead code, duplication, and complexity gate
 - `Type Check` — `vue-tsc` / Nuxt type checking
-- `Test (shard 1/4)` … `Test (shard 4/4)` — Vitest with coverage, sharded across 4 parallel jobs. The `github-actions` reporter annotates failed tests directly on the PR diff so the failing test name and assertion are visible without digging into logs. Per-shard coverage is merged by Codecov.
+- `Test (shard 1/4)` … `Test (shard 4/4)` — Vitest with coverage, sharded across 4 parallel jobs. The `github-actions` reporter annotates failed tests directly on the PR diff so the failing test name and assertion are visible without digging into logs. Shards report imported files only to avoid duplicate zero-filled entries, and Codecov merges the per-shard coverage. Unsharded local coverage retains the full `app/**/*.{ts,vue}` denominator.
 - `Validate` — Production Nuxt build + artifact upload (main branch only)
 - `Supabase DB` — Reset + pgTAP regressions + lint local migrations
 - `Systems drift check` — verifies `docs/SYSTEMS.md` invariants against the codebase
