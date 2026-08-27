@@ -516,19 +516,6 @@
       "drag_to_resize": "拖动以调整地图大小",
       "switch_floor": "切换底部(Ctrl + 滚动)"
     },
-    "controls": {
-      "help": {
-        "pan": "或拖动以pan",
-        "zoom": "缩放",
-        "reset": "重置视图",
-        "cycle_floors": "循环楼层",
-        "floor_panel": "或使用地板面板",
-        "click_at_cursor": "点击光标",
-        "click_marker": "点击标记查看详细信息",
-        "fullscreen": "使用地图控制中的全屏按钮",
-        "resize": "拖动地图的底部边缘以调整大小"
-      }
-    },
     "help": {
       "title": "地图控制",
       "groups": {
@@ -536,13 +523,21 @@
         "floors": "楼层",
         "interact": "交互功能",
         "view": "查看"
-      }
+      },
+      "pan": "{keys} or drag to pan",
+      "zoom": "{keys} to zoom",
+      "reset": "{key} to reset view",
+      "cycle_floors": "{keys} to cycle floors",
+      "floor_panel": "或使用地面板。",
+      "click_at_cursor": "{key} to click at cursor",
+      "click_marker": "点击标记查看详细信息。",
+      "fullscreen": "在地图控制中使用全屏按钮。",
+      "resize": "拖动地图的底部边缘来调整大小。"
     },
     "hint": {
       "title": "快速地图控制",
-      "drag_to_pan": "拖动以pan",
-      "shift_scroll_zoom": "Shift + 滚动以缩放",
-      "ctrl_scroll_floors": "Ctrl + 滚动以更改楼层",
+      "summary": "拖动以平移 · Shift + 滚动以缩放",
+      "summary_multi_floor": "拖动以平移 · Shift + 卷轴来缩放 · Ctrl + 卷轴来更改楼层。",
       "all_controls": "所有控制"
     },
     "aria": {
