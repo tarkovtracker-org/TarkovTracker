@@ -516,19 +516,6 @@
       "drag_to_resize": "Přetažením změníte velikost mapy",
       "switch_floor": "Přepínací podlaha (Ctrl + Scroll)"
     },
-    "controls": {
-      "help": {
-        "pan": "nebo přetáhněte k pánvi",
-        "zoom": "Zvětšit",
-        "reset": "pro obnovení zobrazení",
-        "cycle_floors": "K cyklování podlah",
-        "floor_panel": "nebo použijte podlahovou desku",
-        "click_at_cursor": "pro kliknutí na kurzor",
-        "click_marker": "Pro podrobnosti klikněte na značku",
-        "fullscreen": "Použít tlačítko na celou obrazovku v ovládacích prvcích mapy",
-        "resize": "Přetažením dolního okraje mapy změníte velikost"
-      }
-    },
     "help": {
       "title": "Ovládání mapy",
       "groups": {
@@ -536,13 +523,21 @@
         "floors": "Podlahy",
         "interact": "Interakce",
         "view": "Zobrazit"
-      }
+      },
+      "pan": "{keys} nebo přetáhněte k pánvi",
+      "zoom": "{keys} pro přiblížení",
+      "reset": "{key} pro obnovení zobrazení",
+      "cycle_floors": "{keys} k cyklování podlaží",
+      "floor_panel": "Nebo použijte podlahovou desku.",
+      "click_at_cursor": "{key} klikněte na kurzor",
+      "click_marker": "Pro podrobnosti klikněte na značku.",
+      "fullscreen": "Použijte tlačítko na celou obrazovku v ovládacích prvcích mapy.",
+      "resize": "Přetažením dolního okraje mapy změníte velikost."
     },
     "hint": {
       "title": "Ovládání rychlých map",
-      "drag_to_pan": "Přetáhněte k pánvi",
-      "shift_scroll_zoom": "Přesunout + posunout na přiblížení",
-      "ctrl_scroll_floors": "Ctrl + Posunutím změníte podlahy",
+      "summary": "Přetažením posouvat · Shift + posunutím přiblížit",
+      "summary_multi_floor": "Přetažením prstu · Shift + Posunutím přiblížíte · Ctrl + Posunutím změnit podlahu",
       "all_controls": "Všechny ovládací prvky"
     },
     "aria": {
