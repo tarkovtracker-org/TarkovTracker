@@ -516,19 +516,6 @@
       "drag_to_resize": "Arrastre para cambiar el tamaño del mapa",
       "switch_floor": "Cambiar piso (Ctrl + desplazamiento)"
     },
-    "controls": {
-      "help": {
-        "pan": "o arrastre a paneles",
-        "zoom": "para acercar",
-        "reset": "para resetear vista",
-        "cycle_floors": "a ciclos de pisos",
-        "floor_panel": "o usar el panel del suelo",
-        "click_at_cursor": "para hacer clic en el cursor",
-        "click_marker": "Haga clic en un marcador para más detalles",
-        "fullscreen": "Usar el botón de pantalla completa en los controles de mapa",
-        "resize": "Arrastra el borde inferior del mapa para redimensionar"
-      }
-    },
     "help": {
       "title": "Controles del mapa",
       "groups": {
@@ -536,13 +523,21 @@
         "floors": "Pisos",
         "interact": "Interactuar",
         "view": "Ver"
-      }
+      },
+      "pan": "{keys} o arrastre a una sartén",
+      "zoom": "{keys} para acercar",
+      "reset": "{key} para restablecer la vista",
+      "cycle_floors": "{keys} a los pisos de ciclo",
+      "floor_panel": "O utilice el panel del suelo.",
+      "click_at_cursor": "{key} para hacer clic en el cursor",
+      "click_marker": "Haga clic en un marcador para más detalles.",
+      "fullscreen": "Utilice el botón de pantalla completa en los controles de mapas.",
+      "resize": "Arrastre el borde inferior del mapa para cambiar el tamaño."
     },
     "hint": {
       "title": "Controles rápidos del mapa",
-      "drag_to_pan": "Arrastra para tirar",
-      "shift_scroll_zoom": "Mayús + Desplazamiento para acercar",
-      "ctrl_scroll_floors": "Ctrl + Desplazarse para cambiar de piso",
+      "summary": "Arrastre al sartén · Mayúsculas + Desplazamiento para acercar",
+      "summary_multi_floor": "Arrastre al pan · Mayúsculas + Desplazarse para acercar · Ctrl + Desplazarse para cambiar de piso",
       "all_controls": "Todos los controles"
     },
     "aria": {
