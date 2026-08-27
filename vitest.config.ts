@@ -37,6 +37,7 @@ export default defineVitestConfig({
       provider: 'v8',
       reportsDirectory: './coverage',
       reporter: ['text', 'json-summary', 'lcov', 'cobertura'],
+      include: isSharded ? undefined : ['app/**/*.{ts,vue}'],
       exclude: [
         'app/**/*.d.ts',
         'app/**/__tests__/**',
@@ -47,11 +48,8 @@ export default defineVitestConfig({
         'tests/**',
         'workers/**',
       ],
-      // Per-shard coverage is partial; Codecov merges the lcov uploads and
-      // enforces thresholds via codecov.yml status checks on the full result.
-      // No `include` glob on purpose: with one set, every shard zero-fills every
-      // file it never imported, and those phantom entries poison Codecov's
-      // merged and diff coverage for Vue SFC template lines.
+      // Shards report only imported files so Codecov can merge them without
+      // zero-filled duplicates. Unsharded runs retain the full app denominator.
       ...(isSharded
         ? {}
         : {
