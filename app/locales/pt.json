@@ -516,19 +516,6 @@
       "drag_to_resize": "Arraste para redimensionar o mapa",
       "switch_floor": "Trocar chão (Ctrl + Scroll)"
     },
-    "controls": {
-      "help": {
-        "pan": "ou arraste para pan",
-        "zoom": "para ampliar",
-        "reset": "para resetar visão",
-        "cycle_floors": "ciclo de andares",
-        "floor_panel": "ou use o painel do chão",
-        "click_at_cursor": "para clicar no cursor",
-        "click_marker": "Clique em um marcador para detalhes",
-        "fullscreen": "Use o botão de tela cheia nos controles do mapa",
-        "resize": "Arraste a borda inferior do mapa para redimensionar"
-      }
-    },
     "help": {
       "title": "Controles do mapa",
       "groups": {
@@ -536,13 +523,21 @@
         "floors": "Andares",
         "interact": "Interagir",
         "view": "Visualizar"
-      }
+      },
+      "pan": "{keys} ou arraste para subir",
+      "zoom": "{keys} para ampliar",
+      "reset": "{key} para redefinir a visão",
+      "cycle_floors": "{keys} para ciclo de andares",
+      "floor_panel": "Ou use o painel do chão.",
+      "click_at_cursor": "{key} para clicar no cursor",
+      "click_marker": "Clique em um marcador para detalhes.",
+      "fullscreen": "Use o botão de tela cheia nos controles do mapa.",
+      "resize": "Arraste a borda inferior do mapa para redimensionar."
     },
     "hint": {
       "title": "Controles rápidos de mapa",
-      "drag_to_pan": "Arrastar para virar",
-      "shift_scroll_zoom": "Shift + Rolar para ampliar",
-      "ctrl_scroll_floors": "Ctrl + Role para alterar os andares",
+      "summary": "Arraste para pan · Shift + Rolar para ampliar",
+      "summary_multi_floor": "Arraste para pan · Shift + Role para ampliar · Ctrl + Role para alterar os andares",
       "all_controls": "Todos os controles"
     },
     "aria": {
