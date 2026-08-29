@@ -14,6 +14,21 @@ describe('createAdminError', () => {
 describe('getAdminErrorCode', () => {
   it.each([
     {
+      label: 'nested response data',
+      error: { data: { data: { code: ADMIN_ERROR_CODES.INVALID_CHANNEL } } },
+    },
+    {
+      label: 'direct response data',
+      error: { data: { code: ADMIN_ERROR_CODES.INVALID_CHANNEL } },
+    },
+  ])('returns the allowlisted code from $label', ({ error }) => {
+    expect(getAdminErrorCode(error)).toBe(ADMIN_ERROR_CODES.INVALID_CHANNEL);
+  });
+  it('returns null for unknown codes', () => {
+    expect(getAdminErrorCode({ data: { data: { code: 'unknown_admin_error' } } })).toBeNull();
+  });
+  it.each([
+    {
       label: 'top-level data getter',
       error: {
         get data(): unknown {
