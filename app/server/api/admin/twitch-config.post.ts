@@ -1,6 +1,8 @@
-import { createError, defineEventHandler, getRequestHeader, readBody } from 'h3';
+import { defineEventHandler, getRequestHeader } from 'h3';
+import { createAdminError, readAdminBody } from '@/server/utils/adminError';
 import { adminSupabaseFetch, getIsAdmin, normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
 import { createLogger } from '@/server/utils/logger';
+import { ADMIN_ERROR_CODES } from '@/utils/adminErrors';
 import type { H3Event } from 'h3';
 const logger = createLogger('AdminTwitchConfig');
 const EDGE_FUNCTION_PATH = '/functions/v1/admin-cache-purge';
@@ -47,11 +49,15 @@ async function handleUpdate(event: H3Event): Promise<UpdateResult> {
   const supabaseUrl = readSupabaseUrl(runtime);
   const serviceKey = readServiceKey(runtime);
   if (!supabaseUrl || !serviceKey) {
-    throw createError({ statusCode: 500, message: 'Supabase service config missing' });
+    throw createAdminError(
+      500,
+      ADMIN_ERROR_CODES.SERVICE_CONFIG_MISSING,
+      'Supabase service config missing'
+    );
   }
   const adminUserId = readAdminUserId(event);
   await requireAdmin(supabaseUrl, serviceKey, adminUserId);
-  const input = readInput((await readBody(event)) ?? {});
+  const input = readInput(await readAdminBody<AdminTwitchConfigBody>(event));
   const saved = await updateConfig(
     supabaseUrl,
     serviceKey,
@@ -139,7 +145,11 @@ async function updateConfig(
   );
   const saved = rows?.[0];
   if (!saved) {
-    throw createError({ statusCode: 502, message: 'Twitch config update returned no row' });
+    throw createAdminError(
+      502,
+      ADMIN_ERROR_CODES.TWITCH_CONFIG_UPDATE_FAILED,
+      'Twitch config update returned no row'
+    );
   }
   return saved;
 }
@@ -150,13 +160,21 @@ async function requireAdmin(
 ): Promise<void> {
   const isAdmin = await getIsAdmin(supabaseUrl, serviceKey, adminUserId);
   if (!isAdmin) {
-    throw createError({ statusCode: 403, message: 'Admin privileges required' });
+    throw createAdminError(
+      403,
+      ADMIN_ERROR_CODES.ADMIN_PRIVILEGES_REQUIRED,
+      'Admin privileges required'
+    );
   }
 }
 function readAdminUserId(event: H3Event): string {
   const user = (event.context as { auth?: { user?: AdminAuthUser } }).auth?.user;
   if (!user?.id) {
-    throw createError({ statusCode: 401, message: 'Authentication required' });
+    throw createAdminError(
+      401,
+      ADMIN_ERROR_CODES.AUTHENTICATION_REQUIRED,
+      'Authentication required'
+    );
   }
   return user.id;
 }
@@ -185,32 +203,32 @@ function readServiceKey(runtime: Record<string, unknown>): string {
 }
 function readChannel(value: unknown): string {
   if (typeof value !== 'string') {
-    throw createError({ statusCode: 400, message: 'Invalid channel' });
+    throw createAdminError(400, ADMIN_ERROR_CODES.INVALID_CHANNEL, 'Invalid channel');
   }
   const channel = value.trim().toLowerCase();
   if (!channel || !CHANNEL_REGEX.test(channel)) {
-    throw createError({ statusCode: 400, message: 'Invalid channel' });
+    throw createAdminError(400, ADMIN_ERROR_CODES.INVALID_CHANNEL, 'Invalid channel');
   }
   return channel;
 }
-function readOptionalString(value: unknown, message: string): string {
+function readOptionalString(value: unknown): string {
   if (value === undefined || value === null) return '';
   if (typeof value !== 'string') {
-    throw createError({ statusCode: 400, message });
+    throw createAdminError(400, ADMIN_ERROR_CODES.INVALID_DISPLAY_NAME, 'Invalid display name');
   }
   return value.trim();
 }
 function readDisplayName(value: unknown, channel: string): string {
-  const trimmed = readOptionalString(value, 'Invalid display name');
+  const trimmed = readOptionalString(value);
   if (!trimmed) return channel;
   if (trimmed.length > DISPLAY_NAME_MAX_LENGTH) {
-    throw createError({ statusCode: 400, message: 'Invalid display name' });
+    throw createAdminError(400, ADMIN_ERROR_CODES.INVALID_DISPLAY_NAME, 'Invalid display name');
   }
   return trimmed;
 }
 function readEnabled(value: unknown): boolean {
   if (typeof value !== 'boolean') {
-    throw createError({ statusCode: 400, message: 'Invalid enabled flag' });
+    throw createAdminError(400, ADMIN_ERROR_CODES.INVALID_ENABLED_FLAG, 'Invalid enabled flag');
   }
   return value;
 }
