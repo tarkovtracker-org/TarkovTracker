@@ -126,7 +126,7 @@ describe('AdminTwitchConfigCard', () => {
       }
       return Promise.reject(
         Object.assign(new Error('Bad Request'), {
-          data: { code: 'invalid_channel', message: 'Invalid channel' },
+          data: { data: { code: 'invalid_channel' }, statusMessage: 'Invalid channel' },
         })
       );
     });
@@ -158,7 +158,7 @@ describe('AdminTwitchConfigCard', () => {
   it('logs a save failure before displaying the existing error toast', async () => {
     const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const error = Object.assign(new Error('Bad Request'), {
-      data: { code: 'invalid_channel', message: 'Invalid channel' },
+      data: { data: { code: 'invalid_channel' }, statusMessage: 'Invalid channel' },
     });
     fetchMock.mockImplementation((url: string) => {
       if (url === '/api/twitch/config') {

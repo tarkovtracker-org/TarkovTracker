@@ -74,6 +74,26 @@ describe('POST /api/admin/supporter', () => {
       ADMIN_ERROR_CODES.SUPABASE_REQUEST_FAILED
     );
   });
+  it.each([null, undefined])('rejects an empty body (%s) with a stable code', async (body) => {
+    mockReadBody.mockResolvedValue(body);
+    mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: true }]));
+    const { default: handler } = await import('@/server/api/admin/supporter.post');
+    await expectAdminError(
+      handler(makeEvent({ id: 'admin-1' })),
+      400,
+      ADMIN_ERROR_CODES.INVALID_REQUEST_BODY
+    );
+  });
+  it('normalizes malformed request body errors', async () => {
+    mockReadBody.mockRejectedValue(new Error('Malformed JSON'));
+    mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: true }]));
+    const { default: handler } = await import('@/server/api/admin/supporter.post');
+    await expectAdminError(
+      handler(makeEvent({ id: 'admin-1' })),
+      400,
+      ADMIN_ERROR_CODES.INVALID_REQUEST_BODY
+    );
+  });
   it('upserts an active supporter tier for admins', async () => {
     mockReadBody.mockResolvedValue({
       enabled: true,

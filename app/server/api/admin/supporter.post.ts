@@ -1,5 +1,5 @@
-import { defineEventHandler, readBody } from 'h3';
-import { createAdminError } from '@/server/utils/adminError';
+import { defineEventHandler } from 'h3';
+import { createAdminError, readAdminBody } from '@/server/utils/adminError';
 import { adminSupabaseFetch, getIsAdmin } from '@/server/utils/adminSupabase';
 import { createLogger } from '@/server/utils/logger';
 import { VALID_TIERS } from '@/server/utils/stripeCheckoutValidation';
@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
       'Admin privileges required'
     );
   }
-  const body = (await readBody(event)) as AdminSupporterBody;
+  const body = await readAdminBody<AdminSupporterBody>(event);
   const targetUserId = readUuid(body.targetUserId, 'targetUserId');
   const tier = readTier(body.tier);
   const enabled = readEnabled(body.enabled);

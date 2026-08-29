@@ -10,6 +10,7 @@
       "invalid_channel": "Enter a valid Twitch channel name.",
       "invalid_display_name": "Enter a valid display name.",
       "invalid_enabled_flag": "The enabled value is invalid.",
+      "invalid_request_body": "The request body is invalid.",
       "invalid_target_user_id": "Enter a valid user ID.",
       "invalid_tier": "Select a valid supporter tier.",
       "service_config_missing": "The admin service is not configured.",

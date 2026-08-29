@@ -26,13 +26,18 @@ export function defineAdminAccessTests(
   loadHandler: AdminHandlerLoader
 ): void {
   it('requires service config', async () => {
+    const originalServiceKey = runtimeConfig.supabaseServiceKey;
     runtimeConfig.supabaseServiceKey = '';
-    const { default: handler } = await loadHandler();
-    await expectAdminError(
-      handler(makeEvent({ id: 'admin-1' })),
-      500,
-      ADMIN_ERROR_CODES.SERVICE_CONFIG_MISSING
-    );
+    try {
+      const { default: handler } = await loadHandler();
+      await expectAdminError(
+        handler(makeEvent({ id: 'admin-1' })),
+        500,
+        ADMIN_ERROR_CODES.SERVICE_CONFIG_MISSING
+      );
+    } finally {
+      runtimeConfig.supabaseServiceKey = originalServiceKey;
+    }
   });
   it('requires authentication', async () => {
     const { default: handler } = await loadHandler();

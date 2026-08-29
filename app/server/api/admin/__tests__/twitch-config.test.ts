@@ -265,9 +265,11 @@ describe('POST /api/admin/twitch-config', () => {
     mockReadBody.mockResolvedValue(body);
     mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: true }]));
     const { default: handler } = await import('@/server/api/admin/twitch-config.post');
-    await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
-      statusCode: 400,
-    });
+    await expectAdminError(
+      handler(makeEvent({ id: 'admin-1' })),
+      400,
+      ADMIN_ERROR_CODES.INVALID_REQUEST_BODY
+    );
   });
   it('normalizes a Supabase URL that carries a query string', async () => {
     runtimeConfig.supabaseUrl = 'https://test.supabase.co/?apikey=leaked';

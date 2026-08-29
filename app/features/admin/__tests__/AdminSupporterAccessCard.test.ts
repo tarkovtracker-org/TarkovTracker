@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { flushPromises, mount } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import AdminSupporterAccessCard from '@/features/admin/AdminSupporterAccessCard.vue';
 import { ADMIN_CARD_STUBS } from './adminCardStubs';
@@ -13,7 +13,6 @@ const { fetchMock, getSessionMock, refreshSessionMock, toastAddMock } = vi.hoist
 }));
 const systemStore = reactive({ isAdmin: true });
 const supabaseUser = reactive({ id: 'user-1' });
-vi.stubGlobal('$fetch', fetchMock);
 vi.mock('@/composables/useSupporter', () => ({
   useSupporter: () => ({ fetchStatus: vi.fn() }),
 }));
@@ -47,14 +46,18 @@ const mountCard = () =>
 describe('AdminSupporterAccessCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal('$fetch', fetchMock);
     systemStore.isAdmin = true;
     getSessionMock.mockResolvedValue({ data: { session: { access_token: 'admin-token' } } });
     refreshSessionMock.mockResolvedValue({ data: { session: null } });
     fetchMock.mockRejectedValue(
       Object.assign(new Error('Bad Request'), {
-        data: { code: 'invalid_tier', message: 'Invalid tier' },
+        data: { data: { code: 'invalid_tier' }, statusMessage: 'Invalid tier' },
       })
     );
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
   it('maps the server error code to localized copy on failure', async () => {
     const wrapper = mountCard();
@@ -62,6 +65,22 @@ describe('AdminSupporterAccessCard', () => {
     await flushPromises();
     expect(toastAddMock).toHaveBeenCalledWith(
       expect.objectContaining({ color: 'error', description: 'admin.error.invalid_tier' })
+    );
+  });
+  it('uses generic localized copy for unknown codes', async () => {
+    fetchMock.mockRejectedValue(
+      Object.assign(new Error('Bad Request'), {
+        data: { data: { code: 'unknown_admin_error' } },
+      })
+    );
+    const wrapper = mountCard();
+    await wrapper.find('button').trigger('click');
+    await flushPromises();
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        color: 'error',
+        description: 'admin.supporter_override_failed_description',
+      })
     );
   });
 });

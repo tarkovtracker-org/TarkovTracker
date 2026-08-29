@@ -458,10 +458,10 @@ Nuxt/Pages `/api/*` routes return errors in this format:
 }
 ```
 
-Admin routes also include a stable machine-readable code in `data.code`. The English `error`
-message remains for API clients that do not localize responses; the admin UI maps these codes to
+Admin routes also include a stable machine-readable code in `data.code`. The English serialized
+`statusMessage` fallback remains for API clients that do not localize responses; the admin UI maps these codes to
 locale keys instead of rendering server text. Current admin codes are `admin_privileges_required`,
-`authentication_required`, `invalid_channel`, `invalid_display_name`, `invalid_enabled_flag`,
+`authentication_required`, `invalid_channel`, `invalid_display_name`, `invalid_enabled_flag`, `invalid_request_body`,
 `invalid_target_user_id`, `invalid_tier`, `service_config_missing`, `supabase_request_failed`,
 `supporter_update_failed`, and `twitch_config_update_failed`.
 

@@ -923,7 +923,7 @@ flowchart LR
    change immediately without waiting for a poll.
 2. `POST /api/admin/twitch-config` requires authenticated admin membership and validates the Twitch
    channel, display name, and enabled flag. Validation and operational failures include a stable
-   `data.code` for clients; the English error message remains a non-localized fallback. It calls
+   `data.code` for clients; the English `statusMessage` remains a non-localized fallback. It calls
    `update_promoted_twitch_config`, which updates the `promoted_twitch` JSON value, advances its
    shared version, and writes the admin audit row in one database transaction. A failure rolls back
    both writes.

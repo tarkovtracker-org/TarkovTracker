@@ -1,5 +1,5 @@
-import { defineEventHandler, getRequestHeader, readBody } from 'h3';
-import { createAdminError } from '@/server/utils/adminError';
+import { defineEventHandler, getRequestHeader } from 'h3';
+import { createAdminError, readAdminBody } from '@/server/utils/adminError';
 import { adminSupabaseFetch, getIsAdmin, normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
 import { createLogger } from '@/server/utils/logger';
 import { ADMIN_ERROR_CODES } from '@/utils/adminErrors';
@@ -57,7 +57,7 @@ async function handleUpdate(event: H3Event): Promise<UpdateResult> {
   }
   const adminUserId = readAdminUserId(event);
   await requireAdmin(supabaseUrl, serviceKey, adminUserId);
-  const input = readInput((await readBody(event)) ?? {});
+  const input = readInput(await readAdminBody<AdminTwitchConfigBody>(event));
   const saved = await updateConfig(
     supabaseUrl,
     serviceKey,
