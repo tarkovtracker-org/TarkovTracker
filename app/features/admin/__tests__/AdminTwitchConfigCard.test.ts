@@ -178,4 +178,18 @@ describe('AdminTwitchConfigCard', () => {
       expect.objectContaining({ color: 'error', description: 'admin.error.invalid_channel' })
     );
   });
+  it('shows the localized sign-in prompt when no session token is available', async () => {
+    getSessionMock.mockResolvedValue({ data: { session: null } });
+    const wrapper = mountCard();
+    await flushPromises();
+    await wrapper.find('button').trigger('click');
+    await flushPromises();
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        color: 'error',
+        description: 'admin.error.authentication_required',
+      })
+    );
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/admin/twitch-config', expect.anything());
+  });
 });

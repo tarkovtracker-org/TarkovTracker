@@ -223,7 +223,7 @@ describe('POST /api/admin/twitch-config', () => {
       p_value: { channel: 'onlychannel', displayName: 'onlychannel', enabled: true },
     });
   });
-  it.each(['bad name!', 'a'.repeat(26)])('validates the channel name %s', async (channel) => {
+  it.each(['bad name!', 'a'.repeat(26), 123])('validates the channel name %s', async (channel) => {
     mockReadBody.mockResolvedValue({ channel, enabled: true });
     mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: true }]));
     const { default: handler } = await import('@/server/api/admin/twitch-config.post');
