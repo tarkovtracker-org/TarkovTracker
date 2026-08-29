@@ -11,7 +11,7 @@ const runtimeConfig = {
     supabaseUrl: 'https://test.supabase.co',
   },
 };
-const { loggerMock, mockCreateClient } = vi.hoisted(() => ({
+const { loggerMock, mockCreateClient, offlineFallbackMock } = vi.hoisted(() => ({
   loggerMock: {
     debug: vi.fn(),
     error: vi.fn(),
@@ -19,10 +19,14 @@ const { loggerMock, mockCreateClient } = vi.hoisted(() => ({
     warn: vi.fn(),
   },
   mockCreateClient: vi.fn(),
+  offlineFallbackMock: vi.fn(() => true),
 }));
 mockNuxtImport('useRuntimeConfig', () => () => runtimeConfig);
 vi.mock('@supabase/supabase-js', () => ({
   createClient: mockCreateClient,
+}));
+vi.mock('@/utils/runtimeConfig', () => ({
+  shouldUseOfflineSupabaseFallback: offlineFallbackMock,
 }));
 vi.mock('@/utils/logger', () => ({
   logger: loggerMock,
@@ -107,6 +111,7 @@ describe('supabase plugin', () => {
     vi.clearAllMocks();
     localStorage.clear();
     sessionStorage.clear();
+    offlineFallbackMock.mockReturnValue(true);
     runtimeConfig.public.supabaseAnonKey = 'test-anon-key';
     runtimeConfig.public.supabaseUrl = 'https://test.supabase.co';
     localStorage.setItem('sb-test-auth-token', 'token');
@@ -434,6 +439,66 @@ describe('supabase plugin', () => {
     } finally {
       window.history.replaceState(null, '', '/');
     }
+  });
+  it('throws when config is missing and offline fallback is disallowed', async () => {
+    runtimeConfig.public.supabaseUrl = '';
+    runtimeConfig.public.supabaseAnonKey = '';
+    offlineFallbackMock.mockReturnValue(false);
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    await expect(
+      plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])
+    ).rejects.toThrow('Missing SUPABASE_URL or SUPABASE_ANON_KEY');
+    expect(mockCreateClient).not.toHaveBeenCalled();
+  });
+  it('hydrates from a hash-token callback and cleans the OAuth hash', async () => {
+    localStorage.removeItem('sb-test-auth-token');
+    window.history.replaceState(null, '', '/');
+    try {
+      window.history.replaceState(null, '', '/#access_token=abc&refresh_token=def');
+      mockAuthClient({
+        getSession: vi.fn().mockResolvedValue({
+          data: { session: createSession('user-hash') },
+          error: null,
+        }),
+      });
+      const plugin = (await import('@/plugins/supabase.client')).default;
+      const result = (await plugin.setup?.(
+        {} as Parameters<NonNullable<typeof plugin.setup>>[0]
+      )) as SupabasePluginProvide | undefined;
+      await flushPlugin();
+      expect(result?.provide.supabase.user.id).toBe('user-hash');
+      expect(result?.provide.supabase.user.loggedIn).toBe(true);
+      expect(window.location.hash).toBe('');
+    } finally {
+      window.history.replaceState(null, '', '/');
+    }
+  });
+  it('rejects signInWithOAuth when the client returns an error', async () => {
+    const oauthError = new Error('oauth_denied');
+    mockAuthClient({
+      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      signInWithOAuth: vi.fn().mockResolvedValue({ data: null, error: oauthError }),
+    });
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    await flushPlugin();
+    await expect(result?.provide.supabase.signInWithOAuth('github')).rejects.toThrow(
+      'oauth_denied'
+    );
+  });
+  it('rejects signOut when the client returns an error', async () => {
+    const signOutError = new Error('signout_failed');
+    mockAuthClient({
+      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      signOut: vi.fn().mockResolvedValue({ error: signOutError }),
+    });
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    await flushPlugin();
+    await result?.provide.supabase.ready();
+    await expect(result?.provide.supabase.signOut()).rejects.toThrow('signout_failed');
   });
   it('rejects ready when client initialization fails', async () => {
     const initError = new Error('create client failed');
