@@ -244,9 +244,9 @@ describe('POST /api/admin/twitch-config', () => {
     );
   });
   it.each([
-    { displayName: 'x'.repeat(51), label: 'length', expectSingleFetch: false },
-    { displayName: 123, label: 'type', expectSingleFetch: true },
-  ])('validates the display name $label', async ({ displayName, expectSingleFetch }) => {
+    { displayName: 'x'.repeat(51), label: 'length' },
+    { displayName: 123, label: 'type' },
+  ])('validates the display name $label', async ({ displayName }) => {
     mockReadBody.mockResolvedValue({
       channel: 'validchannel',
       displayName,
@@ -259,7 +259,7 @@ describe('POST /api/admin/twitch-config', () => {
       400,
       ADMIN_ERROR_CODES.INVALID_DISPLAY_NAME
     );
-    if (expectSingleFetch) expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
   it.each([null, undefined])('rejects an empty body (%s) with a 400', async (body) => {
     mockReadBody.mockResolvedValue(body);

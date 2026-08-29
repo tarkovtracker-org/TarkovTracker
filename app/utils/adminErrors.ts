@@ -28,11 +28,21 @@ export const ADMIN_ERROR_LOCALE_KEYS: Record<AdminErrorCode, string> = {
   [ADMIN_ERROR_CODES.TWITCH_CONFIG_UPDATE_FAILED]: 'admin.error.twitch_config_update_failed',
 };
 const ADMIN_ERROR_CODE_SET = new Set<AdminErrorCode>(Object.values(ADMIN_ERROR_CODES));
+function isObjectLike(value: unknown): value is object {
+  return value !== null && (typeof value === 'object' || typeof value === 'function');
+}
 function readProperty(value: unknown, key: string): unknown {
-  if (value === null || (typeof value !== 'object' && typeof value !== 'function')) {
+  if (!isObjectLike(value)) {
     return undefined;
   }
-  return Reflect.get(value, key);
+  return readPropertySafely(value, key);
+}
+function readPropertySafely(value: object, key: string): unknown {
+  try {
+    return Reflect.get(value, key);
+  } catch {
+    return undefined;
+  }
 }
 function readAdminErrorCode(error: unknown): unknown {
   const errorData = readProperty(error, 'data');

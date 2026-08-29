@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
     );
   }
   const body = await readAdminBody<AdminSupporterBody>(event);
-  const targetUserId = readUuid(body.targetUserId, 'targetUserId');
+  const targetUserId = readTargetUserId(body.targetUserId);
   const tier = readTier(body.tier);
   const enabled = readEnabled(body.enabled);
   const expiresAt = enabled ? null : new Date().toISOString();
@@ -123,9 +123,9 @@ async function writeAuditLog(
     logger.warn('[AdminSupporter] Failed to write audit log', { error, action: payload.action });
   }
 }
-function readUuid(value: unknown, field: string): string {
+function readTargetUserId(value: unknown): string {
   if (typeof value !== 'string' || !UUID_REGEX.test(value)) {
-    throw createAdminError(400, ADMIN_ERROR_CODES.INVALID_TARGET_USER_ID, `Invalid ${field}`);
+    throw createAdminError(400, ADMIN_ERROR_CODES.INVALID_TARGET_USER_ID, 'Invalid targetUserId');
   }
   return value;
 }
