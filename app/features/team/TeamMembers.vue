@@ -31,7 +31,9 @@
             data-testid="copy-team-members-invite"
             @click="copyInvite"
           >
-            {{ copied ? $t('page.team.members.copied') : $t('page.team.members.copy_invite') }}
+            <span aria-live="polite">
+              {{ copied ? $t('page.team.members.copied') : $t('page.team.members.copy_invite') }}
+            </span>
           </UButton>
         </div>
       </div>
@@ -42,14 +44,14 @@
   </TeamCard>
 </template>
 <script setup lang="ts">
-  import { useCopyToClipboard } from '@/composables/useCopyToClipboard';
   import TeamCard from '@/features/team/TeamCard.vue';
   import TeamMemberCard from '@/features/team/TeamMemberCard.vue';
+  import { useTeamInviteCopyFeedback } from '@/features/team/useTeamInviteCopyFeedback';
   import { useTeamInviteLink } from '@/features/team/useTeamInviteLink';
   import { useTeamStoreWithSupabase } from '@/stores/useTeamStore';
   const { $supabase } = useNuxtApp();
   const { teamStore } = useTeamStoreWithSupabase();
-  const { copyToClipboard } = useCopyToClipboard();
+  const { copied, copyInviteLink } = useTeamInviteCopyFeedback();
   const { teamUrl } = useTeamInviteLink();
   const teamMembers = computed<string[]>(() => teamStore.members || []);
   const isCurrentUserTeamOwner = computed(() => {
@@ -71,19 +73,7 @@
       return [currentUID, ...teamMembers.value];
     }
   });
-  const copied = ref(false);
-  let copyResetTimer: ReturnType<typeof setTimeout> | null = null;
   const copyInvite = async () => {
-    if (!teamUrl.value) return;
-    if (await copyToClipboard(teamUrl.value)) {
-      copied.value = true;
-      if (copyResetTimer) clearTimeout(copyResetTimer);
-      copyResetTimer = setTimeout(() => {
-        copied.value = false;
-      }, 2000);
-    }
+    await copyInviteLink(teamUrl.value);
   };
-  onUnmounted(() => {
-    if (copyResetTimer) clearTimeout(copyResetTimer);
-  });
 </script>

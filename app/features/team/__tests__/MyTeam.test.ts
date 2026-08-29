@@ -54,6 +54,7 @@ const mockSystemStore = {
   $patch: vi.fn((patch: Partial<SystemState>) => Object.assign(mockSystemState, patch)),
 };
 const mockTeamState = reactive({
+  id: null as string | null,
   owner: null as string | null,
   owner_id: null as string | null,
   joinCode: null as string | null,
@@ -62,11 +63,21 @@ const mockTeamState = reactive({
 });
 const mockTeamStore = {
   $state: mockTeamState,
+  get id() {
+    return mockTeamState.id;
+  },
   get inviteCode() {
     return mockTeamState.joinCode ?? mockTeamState.join_code ?? null;
   },
-  $patch: vi.fn((patch: Record<string, unknown>) => Object.assign(mockTeamState, patch)),
+  $patch: vi.fn((patch: Record<string, unknown> | ((state: typeof mockTeamState) => void)) => {
+    if (typeof patch === 'function') {
+      patch(mockTeamState);
+      return;
+    }
+    Object.assign(mockTeamState, patch);
+  }),
   $reset: vi.fn(() => {
+    mockTeamState.id = null;
     mockTeamState.owner = null;
     mockTeamState.owner_id = null;
     mockTeamState.joinCode = null;
@@ -228,6 +239,21 @@ describe('MyTeam store interactions', () => {
       wrapper.unmount();
     });
   });
+  describe('invite link', () => {
+    it('copies without revealing the invite token in toast feedback', async () => {
+      mockSystemState.pvp_team_id = 'team-123';
+      mockTeamState.id = 'team-123';
+      mockTeamState.joinCode = 'private-code';
+      const wrapper = await mountMyTeam();
+      await wrapper.find('[data-testid="copy-team-invite"]').trigger('click');
+      await flushPromises();
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+        expect.stringContaining('code=private-code'),
+        { revealValue: false }
+      );
+      wrapper.unmount();
+    });
+  });
   describe('team name generation', () => {
     it('calls createTeam with display name and random suffix', async () => {
       setupMembershipQueries('team-123');
@@ -248,6 +274,11 @@ describe('MyTeam store interactions', () => {
         5,
         'pvp'
       );
+      expect(mockTeamState.owner).toBe(mockSupabaseUser.id);
+      expect(mockTeamState.id).toBe('team-123');
+      expect(mockTeamState.joinCode).toBe('JOIN1');
+      expect(mockTeamState.owner_id).toBeNull();
+      expect(mockTeamState.join_code).toBeNull();
       randomSpy.mockRestore();
       wrapper.unmount();
     });

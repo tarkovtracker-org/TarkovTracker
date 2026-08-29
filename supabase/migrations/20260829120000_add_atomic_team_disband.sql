@@ -8,10 +8,24 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  v_deleted_team_id UUID;
+  v_team_owner_id UUID;
 BEGIN
   IF p_team_id IS NULL OR p_owner_id IS NULL THEN
     RAISE EXCEPTION 'Team and owner are required';
+  END IF;
+
+  SELECT owner_id
+  INTO v_team_owner_id
+  FROM public.teams
+  WHERE id = p_team_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Team not found';
+  END IF;
+
+  IF v_team_owner_id IS DISTINCT FROM p_owner_id THEN
+    RAISE EXCEPTION 'Only team owners can disband this team';
   END IF;
 
   UPDATE public.user_system
@@ -26,20 +40,9 @@ BEGIN
      OR pve_team_id = p_team_id
      OR seasonal_team_id = p_team_id;
 
-  DELETE FROM public.teams
-  WHERE id = p_team_id
-    AND owner_id = p_owner_id
-  RETURNING id INTO v_deleted_team_id;
+  DELETE FROM public.teams WHERE id = p_team_id;
 
-  IF v_deleted_team_id IS NOT NULL THEN
-    RETURN TRUE;
-  END IF;
-
-  IF EXISTS (SELECT 1 FROM public.teams WHERE id = p_team_id) THEN
-    RAISE EXCEPTION 'Only team owners can disband this team';
-  END IF;
-
-  RAISE EXCEPTION 'Team not found';
+  RETURN TRUE;
 END;
 $$;
 

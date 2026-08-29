@@ -1196,7 +1196,7 @@
         "description": "Collaborate with teammates on Escape from Tarkov progress. Share quest completions, hideout status, and coordinate item gathering."
       },
       "page_title": "Team",
-      "page_description": "Invite teammates, manage what they see, and track progress together.",
+      "page_description": "Invite teammates, choose which team progress you see, and track together.",
       "invite": {
         "title": "Invite link",
         "subtitle": "Share your team with trusted teammates.",
@@ -1216,7 +1216,7 @@
       },
       "visibility": {
         "title": "Visibility settings",
-        "description": "Control what your teammates see on your tracker.",
+        "description": "Control which teammates' progress appears on your tracker.",
         "items_section": "Items",
         "show_tasks": "Show team members' tasks",
         "show_items": "Show team members' needed items",
@@ -1253,6 +1253,7 @@
             "level_badge_alt": "Level {level} badge",
             "hide_progress": "Hide {name}'s progress from me",
             "show_progress": "Show {name}'s progress to me",
+            "enable_team_tasks": "Show team members' tasks before changing an individual member",
             "remove_member": "Remove {name} from team"
           }
         },

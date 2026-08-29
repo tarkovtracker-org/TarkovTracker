@@ -29,8 +29,10 @@ const mockSystemStore = {
   }),
 };
 const mockTeamStore = {
+  id: null as string | null,
   owner: null as string | null,
   $reset: vi.fn(() => {
+    mockTeamStore.id = null;
     mockTeamStore.owner = null;
   }),
 };
@@ -81,9 +83,13 @@ describe('TeamDangerZone', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSystemState.pvp_team_id = 'team-1';
+    mockSystemState.pve_team_id = null;
+    mockSystemState.seasonal_team_id = null;
     mockSystemState.team = 'team-1';
     mockSystemState.team_id = 'team-1';
+    mockTeamStore.id = 'team-1';
     mockTeamStore.owner = 'user-1';
+    mockTarkovStore.getCurrentGameMode.mockReturnValue('pvp');
     mockDisbandTeam.mockResolvedValue({ success: true });
     mockLeaveTeam.mockResolvedValue({ success: true });
   });
@@ -108,6 +114,45 @@ describe('TeamDangerZone', () => {
     expect(mockLeaveTeam).toHaveBeenCalledWith('team-1');
     expect(mockDisbandTeam).not.toHaveBeenCalled();
     expect(mockSystemState.pvp_team_id).toBeNull();
+    wrapper.unmount();
+  });
+  it('does not expose a membership action until the team owner is resolved', async () => {
+    mockTeamStore.owner = null;
+    const wrapper = await mountDangerZone();
+    expect(wrapper.find('[data-testid="team-danger-zone"]').exists()).toBe(false);
+    expect(mockDisbandTeam).not.toHaveBeenCalled();
+    expect(mockLeaveTeam).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('keeps the confirmation and local state when disbanding fails', async () => {
+    mockDisbandTeam.mockRejectedValue(new Error('Network unavailable'));
+    const wrapper = await mountDangerZone();
+    await wrapper.find('[data-testid="open-team-danger-confirmation"]').trigger('click');
+    await wrapper.find('[data-testid="confirm-team-danger-action"]').trigger('click');
+    await flushPromises();
+    expect(mockToast.add).toHaveBeenCalledWith({ color: 'error', title: 'Network unavailable' });
+    expect(wrapper.find('[data-testid="confirm-team-danger-action"]').exists()).toBe(true);
+    expect(mockSystemState.pvp_team_id).toBe('team-1');
+    expect(mockTeamStore.$reset).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('clears persistent legacy aliases without disturbing another mode team', async () => {
+    mockTarkovStore.getCurrentGameMode.mockReturnValue('pve');
+    mockSystemState.pvp_team_id = 'pvp-team';
+    mockSystemState.pve_team_id = 'pve-team';
+    mockSystemState.team = 'pvp-team';
+    mockSystemState.team_id = 'pvp-team';
+    mockTeamStore.id = 'pve-team';
+    mockTeamStore.owner = 'other-user';
+    const wrapper = await mountDangerZone();
+    await wrapper.find('[data-testid="open-team-danger-confirmation"]').trigger('click');
+    await wrapper.find('[data-testid="confirm-team-danger-action"]').trigger('click');
+    await flushPromises();
+    expect(mockLeaveTeam).toHaveBeenCalledWith('pve-team');
+    expect(mockSystemState.pve_team_id).toBeNull();
+    expect(mockSystemState.pvp_team_id).toBe('pvp-team');
+    expect(mockSystemState.team).toBeNull();
+    expect(mockSystemState.team_id).toBeNull();
     wrapper.unmount();
   });
 });

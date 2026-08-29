@@ -545,15 +545,27 @@ describe('AppBar authenticated state', () => {
     expect(nameSpan.attributes('title')).toBe(displayName);
     wrapper.unmount();
   });
-  it('allows short display names to wrap without truncation', async () => {
+  it('keeps short display names on one line within the fixed-height account button', async () => {
     mockTarkovStore.getDisplayName.mockReturnValue('Short name');
     const wrapper = await mountAppBar();
     const trigger = wrapper.find('button[aria-label="navigation_drawer.account_menu"]');
     const nameSpan = trigger.find('span[data-long-name="false"]');
     expect(nameSpan.exists()).toBe(true);
-    const classAttr = nameSpan.attributes('class') || '';
-    expect(classAttr).toContain('break-words');
-    expect(classAttr).not.toContain(' truncate');
+    expect(nameSpan.attributes('data-long-name')).toBe('false');
+    expect(nameSpan.classes()).toContain('truncate');
+    expect(nameSpan.classes()).toContain('whitespace-nowrap');
+    wrapper.unmount();
+  });
+  it('keeps a 24-character wide display name on one line', async () => {
+    const displayName = 'W'.repeat(24);
+    mockTarkovStore.getDisplayName.mockReturnValue(displayName);
+    const wrapper = await mountAppBar();
+    const trigger = wrapper.find('button[aria-label="navigation_drawer.account_menu"]');
+    const nameSpan = trigger.find('span[data-long-name="false"]');
+    expect(nameSpan.text()).toBe(displayName);
+    expect(nameSpan.classes()).toContain('truncate');
+    expect(nameSpan.classes()).toContain('whitespace-nowrap');
+    expect(nameSpan.attributes('title')).toBe(displayName);
     wrapper.unmount();
   });
   it('falls back to default avatar when avatar image fails to load', async () => {

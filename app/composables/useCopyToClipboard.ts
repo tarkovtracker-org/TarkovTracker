@@ -1,6 +1,9 @@
 import { logger } from '@/utils/logger';
 export interface UseCopyToClipboardReturn {
-  copyToClipboard: (text: string) => Promise<boolean>;
+  copyToClipboard: (text: string, options?: CopyToClipboardOptions) => Promise<boolean>;
+}
+export interface CopyToClipboardOptions {
+  revealValue?: boolean;
 }
 async function writeToClipboard(text: string): Promise<boolean> {
   try {
@@ -28,18 +31,25 @@ async function writeToClipboard(text: string): Promise<boolean> {
 export function useCopyToClipboard(): UseCopyToClipboardReturn {
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
-  const copyToClipboard = async (text: string): Promise<boolean> => {
+  const copyToClipboard = async (
+    text: string,
+    { revealValue = true }: CopyToClipboardOptions = {}
+  ): Promise<boolean> => {
     const success = await writeToClipboard(text);
     if (success) {
       toast.add({
         title: t('toast.clipboard_copied.title'),
-        description: t('toast.clipboard_copied.description', { value: text }),
+        description: revealValue
+          ? t('toast.clipboard_copied.description', { value: text })
+          : undefined,
         color: 'success',
       });
     } else {
       toast.add({
         title: t('toast.clipboard_error.title'),
-        description: t('toast.clipboard_error.description', { value: text }),
+        description: revealValue
+          ? t('toast.clipboard_error.description', { value: text })
+          : undefined,
         color: 'error',
       });
     }

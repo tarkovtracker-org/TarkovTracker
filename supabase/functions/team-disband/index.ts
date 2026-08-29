@@ -6,18 +6,9 @@ import {
 } from '../_shared/auth.ts';
 import {
   authenticateMutation,
+  readJsonObject,
   type AuthenticatedMutation,
 } from '../_shared/authenticated-mutation.ts';
-const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value && typeof value === 'object' && !Array.isArray(value));
-const getRequestBody = async (req: Request): Promise<Record<string, unknown>> => {
-  try {
-    const body: unknown = await req.json();
-    return isObjectRecord(body) ? body : {};
-  } catch {
-    return {};
-  }
-};
 const getRpcErrorResponse = (req: Request, error: Error): Response => {
   if (error.message.includes('Only team owners')) {
     return createErrorResponse(error.message, 403, req);
@@ -29,7 +20,7 @@ const getRpcErrorResponse = (req: Request, error: Error): Response => {
   return createErrorResponse('Failed to disband team', 500, req);
 };
 const disbandTeam = async (req: Request, auth: AuthenticatedMutation): Promise<Response> => {
-  const body = await getRequestBody(req);
+  const body = await readJsonObject(req);
   const fieldsError = validateRequiredFields(req, body, ['teamId']);
   if (fieldsError) return fieldsError;
   const uuidError = validateUUIDs(req, body, ['teamId']);
@@ -48,7 +39,12 @@ const disbandTeam = async (req: Request, auth: AuthenticatedMutation): Promise<R
   return getRpcErrorResponse(req, error);
 };
 Deno.serve(async (req) => {
-  const auth = await authenticateMutation(req, 'team-disband');
-  if (auth.response) return auth.response;
-  return disbandTeam(req, auth);
+  try {
+    const auth = await authenticateMutation(req, 'team-disband');
+    if (auth.response) return auth.response;
+    return await disbandTeam(req, auth);
+  } catch (error) {
+    console.error('Team disband error:', error);
+    return createErrorResponse('Internal server error', 500, req);
+  }
 });

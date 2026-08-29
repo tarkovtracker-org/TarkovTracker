@@ -7,18 +7,19 @@ export const useTeamInviteLink = () => {
   const { teamStore } = useTeamStoreWithSupabase();
   const tarkovStore = useTarkovStore();
   const getCurrentGameMode = (): GameMode => tarkovStore.getCurrentGameMode?.() || GAME_MODES.PVP;
+  // fallow-ignore-next-line complexity -- both valid and stale invite states have regression coverage
   const teamUrl = computed(() => {
     const teamId = getTeamIdFromState(systemStore.$state, getCurrentGameMode());
-    const code = teamStore.inviteCode;
+    const code = teamStore.id === teamId ? teamStore.inviteCode : null;
     if (!teamId || !code || !import.meta.client) return '';
-    const baseUrl = window.location.href.split('?')[0];
-    const params = new URLSearchParams({ team: teamId, code });
-    return `${baseUrl}?${params}`;
+    const inviteUrl = new URL(window.location.href);
+    inviteUrl.search = new URLSearchParams({ team: teamId, code }).toString();
+    return inviteUrl.toString();
   });
   const maskedTeamUrl = computed(() => {
     if (!teamUrl.value) return '';
-    const [baseUrl] = teamUrl.value.split('?');
-    return `${baseUrl}?team=••••••&code=••••••`;
+    const maskedUrl = new URL(teamUrl.value);
+    return `${maskedUrl.origin}${maskedUrl.pathname}?team=••••••&code=••••••${maskedUrl.hash}`;
   });
   return { maskedTeamUrl, teamUrl };
 };

@@ -66,6 +66,15 @@ describe('TeamOptions preferences', () => {
     vi.clearAllMocks();
   });
   describe('taskHideAll switch', () => {
+    it('uses the full row as the switch label while keeping one keyboard control', async () => {
+      const wrapper = await mountTeamOptions();
+      const row = wrapper.find('[data-testid="task-row"]');
+      const taskSwitch = wrapper.find('[data-testid="task-switch"]');
+      expect(row.element.tagName).toBe('LABEL');
+      expect(row.attributes('for')).toBe('team-visibility-tasks');
+      expect(taskSwitch.attributes('id')).toBe('team-visibility-tasks');
+      wrapper.unmount();
+    });
     it('calls setQuestTeamHideAll when toggled on', async () => {
       const wrapper = await mountTeamOptions();
       const taskSwitch = wrapper.find('[data-testid="task-switch"]');

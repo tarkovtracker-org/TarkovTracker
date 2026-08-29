@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(14);
+SELECT plan(16);
 
 CREATE TEMP TABLE team_disband_fixture AS
 SELECT
@@ -10,6 +10,11 @@ SELECT
   '00000000-0000-0000-0000-000000000734'::UUID AS team_id,
   '00000000-0000-0000-0000-000000000735'::UUID AS second_team_id;
 
+CREATE TEMP TABLE team_disband_privilege_fixture AS
+SELECT
+  'public.disband_team(uuid,uuid)'::TEXT AS function_signature,
+  'EXECUTE'::TEXT AS privilege;
+
 INSERT INTO auth.users (id, email)
 VALUES
   ((SELECT owner_id FROM team_disband_fixture), 'team-disband-owner@example.invalid'),
@@ -17,15 +22,27 @@ VALUES
   ((SELECT outsider_id FROM team_disband_fixture), 'team-disband-outsider@example.invalid');
 
 SELECT ok(
-  NOT has_function_privilege('anon', 'public.disband_team(uuid,uuid)', 'EXECUTE'),
+  NOT has_function_privilege(
+    'anon',
+    (SELECT function_signature FROM team_disband_privilege_fixture),
+    (SELECT privilege FROM team_disband_privilege_fixture)
+  ),
   'anonymous callers cannot disband teams'
 );
 SELECT ok(
-  NOT has_function_privilege('authenticated', 'public.disband_team(uuid,uuid)', 'EXECUTE'),
+  NOT has_function_privilege(
+    'authenticated',
+    (SELECT function_signature FROM team_disband_privilege_fixture),
+    (SELECT privilege FROM team_disband_privilege_fixture)
+  ),
   'authenticated callers cannot disband teams directly'
 );
 SELECT ok(
-  has_function_privilege('service_role', 'public.disband_team(uuid,uuid)', 'EXECUTE'),
+  has_function_privilege(
+    'service_role',
+    (SELECT function_signature FROM team_disband_privilege_fixture),
+    (SELECT privilege FROM team_disband_privilege_fixture)
+  ),
   'the service role can disband teams'
 );
 
@@ -43,6 +60,17 @@ INSERT INTO public.team_memberships (team_id, user_id, role, game_mode)
 VALUES
   ((SELECT team_id FROM team_disband_fixture), (SELECT owner_id FROM team_disband_fixture), 'owner', 'pvp'),
   ((SELECT team_id FROM team_disband_fixture), (SELECT member_id FROM team_disband_fixture), 'member', 'pvp');
+
+SELECT is(
+  (SELECT pvp_team_id FROM public.user_system WHERE user_id = (SELECT owner_id FROM team_disband_fixture)),
+  (SELECT team_id FROM team_disband_fixture),
+  'the owner team reference exists before disbanding'
+);
+SELECT is(
+  (SELECT pvp_team_id FROM public.user_system WHERE user_id = (SELECT member_id FROM team_disband_fixture)),
+  (SELECT team_id FROM team_disband_fixture),
+  'the member team reference exists before disbanding'
+);
 
 INSERT INTO public.team_events (team_id, event_type, initiated_by)
 VALUES ((SELECT team_id FROM team_disband_fixture), 'team_created', (SELECT owner_id FROM team_disband_fixture));

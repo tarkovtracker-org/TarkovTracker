@@ -532,6 +532,7 @@ export interface SystemGetters extends _GettersTree<SystemState> {
   isAdmin: (state: SystemState) => boolean;
 }
 export interface TeamState extends StateTree {
+  id?: string | null;
   owner?: string | null;
   joinCode?: string | null;
   members?: string[];

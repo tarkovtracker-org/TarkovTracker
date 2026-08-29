@@ -663,6 +663,8 @@ flowchart LR
   `app/stores/useTarkov.ts` — load, merge, write, and realtime flow
 - `app/stores/useSystemStore.ts`, `app/stores/useTeamStore.ts` — mode-specific teams and teammate
   hydration
+- `app/features/team/TeamDangerZone.vue`, `app/features/team/useTeamInviteLink.ts` — resolved active
+  team actions and mode-scoped invite links
 - `app/composables/useDataBackup.ts` — season-aware native backups
 - `app/server/api/profile/[userId]/[mode].get.ts`,
   `app/server/api/streamer/[userId]/[mode]/kappa.get.ts`, `app/server/api/team/members.ts` —
@@ -673,6 +675,11 @@ flowchart LR
 ### Invariants
 
 - `pvp` and `pve` always use season `0`; `seasonal` always uses a positive season.
+- Legacy `user_system.team` / `team_id` values are used only when neither persistent mode-specific
+  team ID exists. They must never make a PvP team appear as the active PvE team or vice versa.
+- Team actions and invite links are unavailable until the active team row has loaded and its ID
+  matches the mode-specific system-store team ID; stale owner or join-code state is never combined
+  with another team's ID.
 - App `ACTIVE_SEASON` metadata must match the database's `private.active_season_*()` functions;
   the Worker resolves the active Seasonal number through the database instead of carrying a
   second runtime constant.

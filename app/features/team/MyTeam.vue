@@ -83,8 +83,8 @@
 <script setup lang="ts">
   import LoginRequiredAlert from '@/components/ui/LoginRequiredAlert.vue';
   import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
-  import { useCopyToClipboard } from '@/composables/useCopyToClipboard';
   import TeamCard from '@/features/team/TeamCard.vue';
+  import { useTeamInviteCopyFeedback } from '@/features/team/useTeamInviteCopyFeedback';
   import { useTeamInviteLink } from '@/features/team/useTeamInviteLink';
   import {
     getTeamIdFromState,
@@ -96,7 +96,6 @@
   import { delay } from '@/utils/async';
   import { GAME_MODES, LIMITS, type GameMode } from '@/utils/constants';
   import { logger } from '@/utils/logger';
-  import type { TeamState } from '@/types/tarkov';
   import type { CreateTeamResponse } from '@/types/team';
   const { t } = useI18n({ useScope: 'global' });
   const { teamStore } = useTeamStoreWithSupabase();
@@ -108,7 +107,7 @@
   const { $supabase } = useNuxtApp();
   const toast = useToast();
   const { createTeam } = useEdgeFunctions();
-  const { copyToClipboard } = useCopyToClipboard();
+  const { copied, copyInviteLink } = useTeamInviteCopyFeedback();
   const { maskedTeamUrl, teamUrl } = useTeamInviteLink();
   const setLocalTeamId = (mode: GameMode, teamId: string | null) => {
     const key = getTeamIdStateKey(mode);
@@ -175,20 +174,14 @@
     generatedJoinCode: string,
     mode: GameMode
   ) => {
-    const teamWithLegacyJoinCode = team as typeof team & {
-      join_code?: string;
-      joinCode?: string;
-    };
-    const joinCode =
-      teamWithLegacyJoinCode.joinCode ?? teamWithLegacyJoinCode.join_code ?? generatedJoinCode;
+    const joinCode = team.joinCode ?? generatedJoinCode;
     setLocalTeamId(mode, team.id);
-    teamStore.$patch({
-      joinCode,
-      join_code: joinCode,
-      owner: team.ownerId,
-      owner_id: team.ownerId,
-      members: [team.ownerId],
-    } as Partial<TeamState>);
+    teamStore.$patch((state) => {
+      state.id = team.id;
+      state.joinCode = joinCode;
+      state.owner = team.ownerId;
+      state.members = [team.ownerId];
+    });
   };
   const verifyCreatedMembership = async (teamId: string, mode: GameMode) => {
     await delay(500);
@@ -261,19 +254,7 @@
       loading.value.createTeam = false;
     }
   };
-  const copied = ref(false);
-  let copyResetTimer: ReturnType<typeof setTimeout> | null = null;
   const copyUrl = async () => {
-    if (!teamUrl.value) return;
-    if (await copyToClipboard(teamUrl.value)) {
-      copied.value = true;
-      if (copyResetTimer) clearTimeout(copyResetTimer);
-      copyResetTimer = setTimeout(() => {
-        copied.value = false;
-      }, 2000);
-    }
+    await copyInviteLink(teamUrl.value);
   };
-  onUnmounted(() => {
-    if (copyResetTimer) clearTimeout(copyResetTimer);
-  });
 </script>

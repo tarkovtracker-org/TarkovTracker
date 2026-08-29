@@ -67,8 +67,9 @@
               color="neutral"
               size="md"
               class="h-11 w-11 justify-center"
+              :disabled="preferencesStore.taskTeamAllHidden"
               :aria-label="progressVisibilityLabel"
-              @click="preferencesStore.toggleHidden(props.teammember)"
+              @click="toggleProgressVisibility"
             />
           </AppTooltip>
           <AppTooltip
@@ -133,11 +134,18 @@
     return fromProfile || fromProgress || props.teammember;
   });
   const isLongDisplayName = computed(() => displayName.value.length > 24);
-  const progressVisibilityLabel = computed(() =>
-    preferencesStore.teamIsHidden(props.teammember)
+  const progressVisibilityLabel = computed(() => {
+    if (preferencesStore.taskTeamAllHidden) {
+      return t('page.team.card.manageteam.membercard.enable_team_tasks');
+    }
+    return preferencesStore.teamIsHidden(props.teammember)
       ? t('page.team.card.manageteam.membercard.show_progress', { name: displayName.value })
-      : t('page.team.card.manageteam.membercard.hide_progress', { name: displayName.value })
-  );
+      : t('page.team.card.manageteam.membercard.hide_progress', { name: displayName.value });
+  });
+  const toggleProgressVisibility = () => {
+    if (preferencesStore.taskTeamAllHidden) return;
+    preferencesStore.toggleHidden(props.teammember);
+  };
   const removeMemberLabel = computed(() =>
     t('page.team.card.manageteam.membercard.remove_member', { name: displayName.value })
   );

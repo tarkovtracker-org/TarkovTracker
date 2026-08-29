@@ -1,6 +1,6 @@
 <template>
   <section
-    v-if="hasTeam"
+    v-if="hasTeam && teamOwnerResolved"
     class="border-error-500/30 bg-error-950/15 font-ui space-y-4 rounded-xl border p-5 shadow-md sm:p-6"
     data-testid="team-danger-zone"
   >
@@ -29,7 +29,7 @@
       icon="i-mdi-account-cancel-outline"
       class="min-h-11 w-full justify-center sm:w-auto"
       data-testid="open-team-danger-confirmation"
-      @click="confirmationOpen = true"
+      @click="openConfirmation"
     >
       {{ isTeamOwner ? $t('page.team.danger_zone.disband') : $t('page.team.danger_zone.leave') }}
     </UButton>
@@ -40,7 +40,7 @@
         <UIcon name="i-mdi-alert-circle-outline" class="text-error-400 h-5 w-5" />
         <h3 class="text-lg font-semibold">
           {{
-            isTeamOwner
+            confirmationIsOwner
               ? $t('page.team.danger_zone.confirm_disband_title')
               : $t('page.team.danger_zone.confirm_leave_title')
           }}
@@ -50,7 +50,7 @@
     <template #body>
       <p class="text-surface-200 text-sm leading-6">
         {{
-          isTeamOwner
+          confirmationIsOwner
             ? $t('page.team.danger_zone.confirm_disband_description')
             : $t('page.team.danger_zone.confirm_leave_description')
         }}
@@ -77,7 +77,7 @@
           @click="confirmDangerousAction"
         >
           {{
-            isTeamOwner
+            confirmationIsOwner
               ? $t('page.team.danger_zone.confirm_disband')
               : $t('page.team.danger_zone.confirm_leave')
           }}
@@ -106,17 +106,35 @@
   const tarkovStore = useTarkovStore();
   const confirmationOpen = ref(false);
   const actionPending = ref(false);
+  const pendingAction = ref<{ isOwner: boolean; mode: GameMode; teamId: string } | null>(null);
   const getCurrentGameMode = (): GameMode => tarkovStore.getCurrentGameMode?.() || GAME_MODES.PVP;
   const currentTeamId = computed(() =>
     getTeamIdFromState(systemStore.$state, getCurrentGameMode())
   );
   const hasTeam = computed(() => Boolean(currentTeamId.value));
+  const teamOwnerResolved = computed(
+    () => teamStore.id === currentTeamId.value && typeof teamStore.owner === 'string'
+  );
   const isTeamOwner = computed(() => teamStore.owner === $supabase.user.id && hasTeam.value);
+  const confirmationIsOwner = computed(() => pendingAction.value?.isOwner ?? isTeamOwner.value);
+  const openConfirmation = () => {
+    const teamId = currentTeamId.value;
+    if (!teamId || !teamOwnerResolved.value) return;
+    pendingAction.value = {
+      isOwner: isTeamOwner.value,
+      mode: getCurrentGameMode(),
+      teamId,
+    };
+    confirmationOpen.value = true;
+  };
+  watch(confirmationOpen, (isOpen) => {
+    if (!isOpen) pendingAction.value = null;
+  });
   const clearLocalTeam = (mode: GameMode) => {
     const key = getTeamIdStateKey(mode);
     systemStore.$patch((state) => {
       state[key] = null;
-      if (mode === GAME_MODES.PVP) {
+      if (mode !== GAME_MODES.SEASONAL) {
         state.team = null;
         state.team_id = null;
       }
@@ -163,8 +181,8 @@
     }
   };
   const confirmDangerousAction = async () => {
-    const teamId = currentTeamId.value;
-    if (actionPending.value || !teamId) return;
-    await executeDangerousAction(teamId, getCurrentGameMode(), isTeamOwner.value);
+    const action = pendingAction.value;
+    if (actionPending.value || !action) return;
+    await executeDangerousAction(action.teamId, action.mode, action.isOwner);
   };
 </script>
