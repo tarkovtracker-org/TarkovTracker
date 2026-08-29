@@ -1,3 +1,12 @@
+## [1.73.8](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.7...v1.73.8) (2026-08-29)
+
+
+### Bug Fixes
+
+* **api:** harden token body parsing and clarify gameMode error ([d26a72b](https://github.com/tarkovtracker-org/TarkovTracker/commit/d26a72baa7adcd9d15f112e18a2d842aa59e9269))
+* **api:** sync agent contract and split token-create handlers ([6980807](https://github.com/tarkovtracker-org/TarkovTracker/commit/69808072d66a9a7880f1b905d7822d8592b5bec2))
+* **api:** validate token permissions in token-create ([fd717e1](https://github.com/tarkovtracker-org/TarkovTracker/commit/fd717e17f57616c9278fe3d5bf459eb4b0e0d41f)), closes [#620](https://github.com/tarkovtracker-org/TarkovTracker/issues/620)
+
 ## [1.73.7](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.6...v1.73.7) (2026-08-27)
 
 
