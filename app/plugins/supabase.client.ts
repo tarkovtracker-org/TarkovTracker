@@ -19,6 +19,20 @@ type SupabaseUser = {
   providers: string[] | null; // All linked OAuth providers
 };
 type OAuthCallbackCode = { code: string; flowId?: string };
+const createSupabaseUserState = () =>
+  reactive<SupabaseUser>({
+    id: null,
+    loggedIn: false,
+    email: null,
+    displayName: null,
+    username: null,
+    avatarUrl: null,
+    photoURL: null,
+    lastLoginAt: null,
+    createdAt: null,
+    provider: null,
+    providers: null,
+  });
 const OAUTH_CALLBACK_PATH = '/auth/callback';
 const OAUTH_HASH_TOKEN_KEYS = ['access_token', 'refresh_token', 'error'] as const;
 const currentSearchParams = () => new URLSearchParams(window.location.search || '');
@@ -136,19 +150,7 @@ const buildStubClient = (): SupabaseClient => {
   } as unknown as SupabaseClient;
 };
 const buildStub = () => {
-  const stubUser = reactive<SupabaseUser>({
-    id: null,
-    loggedIn: false,
-    email: null,
-    displayName: null,
-    username: null,
-    avatarUrl: null,
-    photoURL: null,
-    lastLoginAt: null,
-    createdAt: null,
-    provider: null,
-    providers: null,
-  });
+  const stubUser = createSupabaseUserState();
   return {
     client: buildStubClient(),
     user: stubUser,
@@ -191,19 +193,7 @@ export default defineNuxtPlugin({
       const stub = buildStub();
       return { provide: { supabase: stub } };
     }
-    const user = reactive<SupabaseUser>({
-      id: null,
-      loggedIn: false,
-      email: null,
-      displayName: null,
-      username: null,
-      avatarUrl: null,
-      photoURL: null,
-      lastLoginAt: null,
-      createdAt: null,
-      provider: null,
-      providers: null,
-    });
+    const user = createSupabaseUserState();
     const stub = buildStub();
     let initPromise: Promise<void> | null = null;
     let supabaseClient: SupabaseClient | null = null;

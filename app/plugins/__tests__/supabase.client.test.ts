@@ -409,6 +409,54 @@ describe('supabase plugin', () => {
     expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe('progress-state');
     expect(localStorage.getItem(STORAGE_KEYS.preferences)).toBe('preferences-state');
   });
+  it('provides an offline stub when supabase config is missing', async () => {
+    localStorage.removeItem('sb-test-auth-token');
+    runtimeConfig.public.supabaseUrl = '';
+    runtimeConfig.public.supabaseAnonKey = '';
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    const supabase = result?.provide.supabase;
+    expect(supabase?.isOfflineMode).toBe(true);
+    expect(supabase?.user.loggedIn).toBe(false);
+    expect(mockCreateClient).not.toHaveBeenCalled();
+    const stubClient = supabase?.client as unknown as {
+      from: (table: string) => { select?: () => unknown };
+      channel: (name: string) => { subscribe: () => unknown; unsubscribe: () => Promise<string> };
+      rpc: (fn: string) => Promise<{ data: null; error: null }>;
+      auth: {
+        getSession: () => Promise<{ data: { session: null }; error: null }>;
+        exchangeCodeForSession: () => Promise<{ error: Error }>;
+      };
+    };
+    expect(typeof stubClient.from('teams').select).toBe('function');
+    const channel = stubClient.channel('team:1');
+    expect(channel.subscribe()).toBe(channel);
+    await expect(channel.unsubscribe()).resolves.toBe('ok');
+    await expect(stubClient.rpc('noop')).resolves.toEqual({ data: null, error: null });
+    await expect(stubClient.auth.getSession()).resolves.toEqual({
+      data: { session: null },
+      error: null,
+    });
+    const exchangeResult = await stubClient.auth.exchangeCodeForSession();
+    expect(exchangeResult.error).toBeInstanceOf(Error);
+    const fullClient = stubClient as unknown as {
+      removeChannel: () => void;
+      removeAllChannels: () => void;
+      functions: { invoke: (fn: string) => Promise<{ data: null; error: null }> };
+      auth: { signOut: () => Promise<{ error: null }>; onAuthStateChange: () => unknown };
+    };
+    expect(() => fullClient.removeChannel()).not.toThrow();
+    expect(() => fullClient.removeAllChannels()).not.toThrow();
+    await expect(fullClient.functions.invoke('noop')).resolves.toEqual({ data: null, error: null });
+    await expect(fullClient.auth.signOut()).resolves.toEqual({ error: null });
+    expect(fullClient.auth.onAuthStateChange()).toBeDefined();
+    await expect(supabase?.ready()).resolves.toBeUndefined();
+    await expect(supabase?.signOut()).resolves.toBeUndefined();
+    await expect(supabase?.signInWithOAuth('github')).rejects.toThrow(
+      'Supabase not configured - login unavailable in offline mode'
+    );
+  });
   it('rejects ready when client initialization fails', async () => {
     const initError = new Error('create client failed');
     localStorage.removeItem('sb-test-auth-token');
