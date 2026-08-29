@@ -44,6 +44,12 @@ const readOAuthCallbackCode = (): OAuthCallbackCode | null => {
   const code = searchParams.get('code');
   return code ? { code, flowId: searchParams.get('sb_flow_id') || undefined } : null;
 };
+const clearOAuthCallbackCode = () => {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('code');
+  url.searchParams.delete('sb_flow_id');
+  window.history.replaceState(window.history.state, '', url.toString());
+};
 const currentHashParams = (): URLSearchParams => {
   const rawHash = window.location.hash.replace(/^#/, '').replace(/^\?/, '');
   return new URLSearchParams(rawHash);
@@ -258,6 +264,7 @@ export default defineNuxtPlugin({
         throw result.error;
       }
       hydrateFromSession(result.data.session);
+      clearOAuthCallbackCode();
     };
     const refreshFromStoredSession = async () => {
       if (!supabaseClient) {

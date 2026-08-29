@@ -206,7 +206,9 @@ Naming:
   present so PKCE codes are exchanged explicitly. The PKCE exchange runs inside `$supabase.ready()`
   (deferred, exactly once), never in top-level plugin `setup()`, so an expired/replayed/invalid code
   rejects `ready()` for `auth/callback.vue` to surface and post `OAUTH_ERROR` to the login opener
-  instead of aborting plugin initialization and stalling the popup until its abandonment timeout.
+  instead of aborting plugin initialization and stalling the popup until its abandonment timeout. A
+  successful exchange removes `code` and `sb_flow_id` from the callback URL before the page redirects
+  or closes.
 - API endpoints: `app/server/api/`. Use composables for shared data access patterns.
 - Admin Pages API routes return stable machine-readable error codes in `data.code`; keep the
   English `statusMessage` as a client fallback and map known codes to localized UI copy.

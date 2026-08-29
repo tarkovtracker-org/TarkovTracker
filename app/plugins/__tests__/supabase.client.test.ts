@@ -162,7 +162,11 @@ describe('supabase plugin', () => {
     localStorage.removeItem('sb-test-auth-token');
     window.history.replaceState(null, '', '/');
     try {
-      window.history.replaceState(null, '', '/auth/callback?code=oauth-code');
+      window.history.replaceState(
+        null,
+        '',
+        '/auth/callback?code=oauth-code&sb_flow_id=flow-id&redirect=%2Ftasks'
+      );
       const exchangeCodeForSession = vi.fn().mockResolvedValue({
         data: { session: createSession('user-code') },
         error: null,
@@ -183,9 +187,11 @@ describe('supabase plugin', () => {
       expect(result?.provide.supabase.user.loggedIn).toBe(false);
       await result?.provide.supabase.ready();
       expect(exchangeCodeForSession).toHaveBeenCalledTimes(1);
-      expect(exchangeCodeForSession).toHaveBeenCalledWith('oauth-code', undefined);
+      expect(exchangeCodeForSession).toHaveBeenCalledWith('oauth-code', { flowId: 'flow-id' });
       expect(result?.provide.supabase.user.id).toBe('user-code');
       expect(result?.provide.supabase.user.loggedIn).toBe(true);
+      expect(window.location.pathname).toBe('/auth/callback');
+      expect(window.location.search).toBe('?redirect=%2Ftasks');
       expect(mockCreateClient).toHaveBeenCalledWith(
         'https://test.supabase.co',
         'test-anon-key',
