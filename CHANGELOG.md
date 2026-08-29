@@ -1,3 +1,14 @@
+## [1.73.9](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.8...v1.73.9) (2026-08-29)
+
+
+### Bug Fixes
+
+* **test:** consolidate admin access coverage ([900ee96](https://github.com/tarkovtracker-org/TarkovTracker/commit/900ee9681dca8173417c8f5d51f3b5713d1ef169))
+* **api:** harden admin error handling ([830eb37](https://github.com/tarkovtracker-org/TarkovTracker/commit/830eb374b5a022f9d051e0ab7e7fd80125757f10))
+* **api:** normalize admin error payloads ([c824dc1](https://github.com/tarkovtracker-org/TarkovTracker/commit/c824dc12f14a05127954512d252843953230a20c))
+* **test:** reduce admin error assertion duplication ([72c9c09](https://github.com/tarkovtracker-org/TarkovTracker/commit/72c9c0973671d9b4f9c7d9211f55d1b56f1f0683))
+* **api:** return stable admin error codes ([92a72e9](https://github.com/tarkovtracker-org/TarkovTracker/commit/92a72e9e7856fb09ba0ec88c70ff8990405a8723))
+
 ## [1.73.8](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.7...v1.73.8) (2026-08-29)
 
 
