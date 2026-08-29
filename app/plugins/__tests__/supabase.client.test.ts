@@ -153,21 +153,23 @@ describe('supabase plugin', () => {
       })
     );
   });
-  it('waits for code-based oauth callback hydration before setup resolves', async () => {
+  it('exchanges an oauth callback code when ready is called', async () => {
     localStorage.removeItem('sb-test-auth-token');
     window.history.replaceState(null, '', '/');
     try {
       window.history.replaceState(null, '', '/auth/callback?code=oauth-code');
+      const exchangeCodeForSession = vi.fn().mockResolvedValue({
+        data: { session: createSession('user-code') },
+        error: null,
+      });
+      const getSession = vi.fn().mockResolvedValue({
+        data: { session: null },
+        error: null,
+      });
       mockCreateClient.mockReturnValue({
         auth: {
-          exchangeCodeForSession: vi.fn().mockResolvedValue({
-            data: { session: createSession('user-code') },
-            error: null,
-          }),
-          getSession: vi.fn().mockResolvedValue({
-            data: { session: null },
-            error: null,
-          }),
+          exchangeCodeForSession,
+          getSession,
           onAuthStateChange: vi.fn(() => ({
             data: {
               subscription: {
@@ -180,18 +182,105 @@ describe('supabase plugin', () => {
         },
       });
       const plugin = (await import('@/plugins/supabase.client')).default;
-      let resolved = false;
-      const setupPromise = Promise.resolve(
-        plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])
-      ).then((value) => {
-        resolved = true;
-        return value;
-      });
+      const result = (await plugin.setup?.(
+        {} as Parameters<NonNullable<typeof plugin.setup>>[0]
+      )) as SupabasePluginProvide | undefined;
       await flushPlugin();
-      expect(resolved).toBe(true);
-      const result = (await setupPromise) as SupabasePluginProvide | undefined;
+      expect(result?.provide.supabase.user.loggedIn).toBe(false);
+      await result?.provide.supabase.ready();
+      expect(exchangeCodeForSession).toHaveBeenCalledTimes(1);
+      expect(exchangeCodeForSession).toHaveBeenCalledWith('oauth-code', undefined);
       expect(result?.provide.supabase.user.id).toBe('user-code');
       expect(result?.provide.supabase.user.loggedIn).toBe(true);
+      expect(mockCreateClient).toHaveBeenCalledWith(
+        'https://test.supabase.co',
+        'test-anon-key',
+        expect.objectContaining({
+          auth: {
+            detectSessionInUrl: false,
+            flowType: 'pkce',
+          },
+        })
+      );
+    } finally {
+      window.history.replaceState(null, '', '/');
+    }
+  });
+  it('surfaces the exchange error through ready without aborting setup', async () => {
+    localStorage.removeItem('sb-test-auth-token');
+    window.history.replaceState(null, '', '/');
+    try {
+      window.history.replaceState(null, '', '/auth/callback?code=expired-code');
+      const exchangeError = new Error('invalid_grant');
+      const exchangeCodeForSession = vi.fn().mockResolvedValue({
+        data: { session: null },
+        error: exchangeError,
+      });
+      mockCreateClient.mockReturnValue({
+        auth: {
+          exchangeCodeForSession,
+          getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+          onAuthStateChange: vi.fn(() => ({
+            data: {
+              subscription: {
+                unsubscribe: vi.fn(),
+              },
+            },
+          })),
+          signInWithOAuth: vi.fn(),
+          signOut: vi.fn(),
+        },
+      });
+      const plugin = (await import('@/plugins/supabase.client')).default;
+      const result = (await plugin.setup?.(
+        {} as Parameters<NonNullable<typeof plugin.setup>>[0]
+      )) as SupabasePluginProvide | undefined;
+      await flushPlugin();
+      await expect(result?.provide.supabase.ready()).rejects.toThrow('invalid_grant');
+      expect(result?.provide.supabase.user.loggedIn).toBe(false);
+    } finally {
+      window.history.replaceState(null, '', '/');
+    }
+  });
+  it('ignores a team invite code outside the auth callback route', async () => {
+    localStorage.removeItem('sb-test-auth-token');
+    window.history.replaceState(null, '', '/');
+    try {
+      window.history.replaceState(null, '', '/team?team=team-1&code=invite-code');
+      const exchangeCodeForSession = vi.fn();
+      const getSession = vi.fn().mockResolvedValue({ data: { session: null }, error: null });
+      mockCreateClient.mockReturnValue({
+        auth: {
+          exchangeCodeForSession,
+          getSession,
+          onAuthStateChange: vi.fn(() => ({
+            data: {
+              subscription: {
+                unsubscribe: vi.fn(),
+              },
+            },
+          })),
+          signInWithOAuth: vi.fn(),
+          signOut: vi.fn(),
+        },
+      });
+      const plugin = (await import('@/plugins/supabase.client')).default;
+      const result = (await plugin.setup?.(
+        {} as Parameters<NonNullable<typeof plugin.setup>>[0]
+      )) as SupabasePluginProvide | undefined;
+      await flushPlugin();
+      await result?.provide.supabase.ready();
+      expect(exchangeCodeForSession).not.toHaveBeenCalled();
+      expect(mockCreateClient).toHaveBeenCalledWith(
+        'https://test.supabase.co',
+        'test-anon-key',
+        expect.objectContaining({
+          auth: {
+            detectSessionInUrl: true,
+            flowType: 'pkce',
+          },
+        })
+      );
     } finally {
       window.history.replaceState(null, '', '/');
     }

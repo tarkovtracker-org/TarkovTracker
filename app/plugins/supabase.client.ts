@@ -18,6 +18,155 @@ type SupabaseUser = {
   provider: string | null; // 'discord', 'twitch', etc.
   providers: string[] | null; // All linked OAuth providers
 };
+type OAuthCallbackCode = { code: string; flowId?: string };
+const OAUTH_CALLBACK_PATH = '/auth/callback';
+const OAUTH_HASH_TOKEN_KEYS = ['access_token', 'refresh_token', 'error'] as const;
+const currentSearchParams = () => new URLSearchParams(window.location.search || '');
+const readOAuthCallbackCode = (): OAuthCallbackCode | null => {
+  if (window.location.pathname !== OAUTH_CALLBACK_PATH) {
+    return null;
+  }
+  const searchParams = currentSearchParams();
+  const code = searchParams.get('code');
+  return code ? { code, flowId: searchParams.get('sb_flow_id') || undefined } : null;
+};
+const currentHashParams = (): URLSearchParams => {
+  const rawHash = window.location.hash.replace(/^#/, '').replace(/^\?/, '');
+  return new URLSearchParams(rawHash);
+};
+const hasHashCallbackTokens = (): boolean => {
+  const hashParams = currentHashParams();
+  return OAUTH_HASH_TOKEN_KEYS.some((key) => hashParams.has(key));
+};
+const hasOAuthCallbackParams = (): boolean => {
+  return (
+    Boolean(readOAuthCallbackCode()) ||
+    currentSearchParams().has('error') ||
+    hasHashCallbackTokens()
+  );
+};
+const buildStubBuilder = () => {
+  const result = Promise.resolve({ data: null, error: null });
+  const proxy = new Proxy(
+    {},
+    {
+      get(_target, prop) {
+        if (prop === 'then') {
+          return result.then.bind(result);
+        }
+        if (prop === 'catch') {
+          return result.catch.bind(result);
+        }
+        if (prop === 'finally') {
+          return result.finally.bind(result);
+        }
+        return () => proxy;
+      },
+    }
+  );
+  return proxy;
+};
+const buildStubChannel = () => {
+  return {
+    on() {
+      return this;
+    },
+    subscribe(_callback?: (status: string) => void) {
+      return this;
+    },
+    async unsubscribe() {
+      return 'ok';
+    },
+  };
+};
+const buildStubClient = (): SupabaseClient => {
+  return {
+    from(table: string) {
+      logger.debug(`[Supabase Stub] from('${table}') called in offline mode`);
+      return buildStubBuilder();
+    },
+    channel(channelName: string) {
+      logger.debug(`[Supabase Stub] channel('${channelName}') called in offline mode`);
+      return buildStubChannel();
+    },
+    async rpc(fnName: string) {
+      logger.debug(`[Supabase Stub] rpc('${fnName}') called in offline mode`);
+      return { data: null, error: null };
+    },
+    removeChannel() {
+      logger.debug('[Supabase Stub] removeChannel called in offline mode');
+    },
+    removeAllChannels() {
+      logger.debug('[Supabase Stub] removeAllChannels called in offline mode');
+    },
+    functions: {
+      async invoke(fnName: string) {
+        logger.debug(`[Supabase Stub] functions.invoke('${fnName}') called in offline mode`);
+        return { data: null, error: null };
+      },
+    },
+    auth: {
+      async getSession() {
+        logger.debug('[Supabase Stub] auth.getSession called in offline mode');
+        return { data: { session: null }, error: null };
+      },
+      async exchangeCodeForSession() {
+        logger.debug('[Supabase Stub] auth.exchangeCodeForSession called in offline mode');
+        return {
+          data: { session: null },
+          error: new Error('OAuth not available in offline mode'),
+        };
+      },
+      onAuthStateChange() {
+        logger.debug('[Supabase Stub] auth.onAuthStateChange called in offline mode');
+        return { data: { subscription: { unsubscribe() {} } } };
+      },
+      async signInWithOAuth() {
+        logger.debug('[Supabase Stub] auth.signInWithOAuth called in offline mode');
+        return {
+          data: { provider: '', url: null },
+          error: new Error('OAuth not available in offline mode'),
+        };
+      },
+      async signOut() {
+        logger.debug('[Supabase Stub] auth.signOut called in offline mode');
+        return { error: null };
+      },
+    },
+  } as unknown as SupabaseClient;
+};
+const buildStub = () => {
+  const stubUser = reactive<SupabaseUser>({
+    id: null,
+    loggedIn: false,
+    email: null,
+    displayName: null,
+    username: null,
+    avatarUrl: null,
+    photoURL: null,
+    lastLoginAt: null,
+    createdAt: null,
+    provider: null,
+    providers: null,
+  });
+  return {
+    client: buildStubClient(),
+    user: stubUser,
+    isOfflineMode: true,
+    signInWithOAuth: async (
+      _provider: OAuthProvider,
+      _options?: { skipBrowserRedirect?: boolean; redirectTo?: string }
+    ) => {
+      logger.error('[Supabase] Offline OAuth sign-in attempted', {
+        provider: _provider,
+        options: _options,
+      });
+      throw new Error('Supabase not configured - login unavailable in offline mode');
+    },
+    signOut: async () => {},
+    ready: async () => {},
+  };
+};
 export default defineNuxtPlugin({
   name: 'supabase',
   async setup() {
@@ -25,126 +174,6 @@ export default defineNuxtPlugin({
     const supabaseUrl = String(runtimeConfig.public.supabaseUrl || '').trim();
     const supabaseKey = String(runtimeConfig.public.supabaseAnonKey || '').trim();
     const missingConfigMessage = '[Supabase] Missing SUPABASE_URL or SUPABASE_ANON_KEY';
-    const buildStubBuilder = () => {
-      const result = Promise.resolve({ data: null, error: null });
-      const proxy = new Proxy(
-        {},
-        {
-          get(_target, prop) {
-            if (prop === 'then') {
-              return result.then.bind(result);
-            }
-            if (prop === 'catch') {
-              return result.catch.bind(result);
-            }
-            if (prop === 'finally') {
-              return result.finally.bind(result);
-            }
-            return () => proxy;
-          },
-        }
-      );
-      return proxy;
-    };
-    const buildStubChannel = () => {
-      return {
-        on() {
-          return this;
-        },
-        subscribe(_callback?: (status: string) => void) {
-          return this;
-        },
-        async unsubscribe() {
-          return 'ok';
-        },
-      };
-    };
-    const buildStub = () => {
-      const stubUser = reactive<SupabaseUser>({
-        id: null,
-        loggedIn: false,
-        email: null,
-        displayName: null,
-        username: null,
-        avatarUrl: null,
-        photoURL: null,
-        lastLoginAt: null,
-        createdAt: null,
-        provider: null,
-        providers: null,
-      });
-      const stubClient = {
-        from(table: string) {
-          logger.debug(`[Supabase Stub] from('${table}') called in offline mode`);
-          return buildStubBuilder();
-        },
-        channel(channelName: string) {
-          logger.debug(`[Supabase Stub] channel('${channelName}') called in offline mode`);
-          return buildStubChannel();
-        },
-        async rpc(fnName: string) {
-          logger.debug(`[Supabase Stub] rpc('${fnName}') called in offline mode`);
-          return { data: null, error: null };
-        },
-        removeChannel() {
-          logger.debug('[Supabase Stub] removeChannel called in offline mode');
-        },
-        removeAllChannels() {
-          logger.debug('[Supabase Stub] removeAllChannels called in offline mode');
-        },
-        functions: {
-          async invoke(fnName: string) {
-            logger.debug(`[Supabase Stub] functions.invoke('${fnName}') called in offline mode`);
-            return { data: null, error: null };
-          },
-        },
-        auth: {
-          async getSession() {
-            logger.debug('[Supabase Stub] auth.getSession called in offline mode');
-            return { data: { session: null }, error: null };
-          },
-          async exchangeCodeForSession() {
-            logger.debug('[Supabase Stub] auth.exchangeCodeForSession called in offline mode');
-            return {
-              data: { session: null },
-              error: new Error('OAuth not available in offline mode'),
-            };
-          },
-          onAuthStateChange() {
-            logger.debug('[Supabase Stub] auth.onAuthStateChange called in offline mode');
-            return { data: { subscription: { unsubscribe() {} } } };
-          },
-          async signInWithOAuth() {
-            logger.debug('[Supabase Stub] auth.signInWithOAuth called in offline mode');
-            return {
-              data: { provider: '', url: null },
-              error: new Error('OAuth not available in offline mode'),
-            };
-          },
-          async signOut() {
-            logger.debug('[Supabase Stub] auth.signOut called in offline mode');
-            return { error: null };
-          },
-        },
-      } as unknown as SupabaseClient;
-      return {
-        client: stubClient,
-        user: stubUser,
-        isOfflineMode: true,
-        signInWithOAuth: async (
-          _provider: OAuthProvider,
-          _options?: { skipBrowserRedirect?: boolean; redirectTo?: string }
-        ) => {
-          logger.error('[Supabase] Offline OAuth sign-in attempted', {
-            provider: _provider,
-            options: _options,
-          });
-          throw new Error('Supabase not configured - login unavailable in offline mode');
-        },
-        signOut: async () => {},
-        ready: async () => {},
-      };
-    };
     if (!supabaseUrl || !supabaseKey) {
       const allowOfflineFallback = shouldUseOfflineSupabaseFallback({
         hostname: import.meta.client ? window.location.hostname : undefined,
@@ -178,22 +207,7 @@ export default defineNuxtPlugin({
     const stub = buildStub();
     let initPromise: Promise<void> | null = null;
     let supabaseClient: SupabaseClient | null = null;
-    const hasOAuthCodeCallback = () => {
-      return new URLSearchParams(window.location.search || '').has('code');
-    };
-    const hasOAuthCallbackParams = () => {
-      const searchParams = new URLSearchParams(window.location.search || '');
-      if (searchParams.has('code') || searchParams.has('error')) {
-        return true;
-      }
-      const hash = window.location.hash.startsWith('#')
-        ? window.location.hash.slice(1)
-        : window.location.hash;
-      const hashParams = new URLSearchParams(hash.startsWith('?') ? hash.slice(1) : hash);
-      return (
-        hashParams.has('access_token') || hashParams.has('refresh_token') || hashParams.has('error')
-      );
-    };
+    const oauthCallbackCode = readOAuthCallbackCode();
     const hasStoredSession = () => {
       try {
         return hasSupabaseAuthSessionHint();
@@ -216,7 +230,7 @@ export default defineNuxtPlugin({
           const { createClient } = await import('@supabase/supabase-js');
           const client = createClient(supabaseUrl, supabaseKey, {
             auth: {
-              detectSessionInUrl: !hasOAuthCodeCallback(),
+              detectSessionInUrl: !oauthCallbackCode,
               flowType: 'pkce',
             },
           });
@@ -241,16 +255,8 @@ export default defineNuxtPlugin({
     const initializeClientInBackground = () => {
       void ensureClientInitialized().catch(() => {});
     };
-    const ready = async () => {
-      await ensureClientInitialized();
-      if (!supabaseClient) {
-        return;
-      }
-      const sessionResult = await supabaseClient.auth.getSession();
-      hydrateFromSession(sessionResult.data?.session ?? null);
-    };
-    const exchangeOAuthCode = async (code: string, flowId?: string) => {
-      await ensureClientInitialized();
+    let oauthCodeConsumed = false;
+    const exchangeOAuthCode = async ({ code, flowId }: OAuthCallbackCode) => {
       if (!supabaseClient) {
         throw new Error('Supabase client unavailable');
       }
@@ -262,6 +268,28 @@ export default defineNuxtPlugin({
         throw result.error;
       }
       hydrateFromSession(result.data.session);
+    };
+    const refreshFromStoredSession = async () => {
+      if (!supabaseClient) {
+        return;
+      }
+      const sessionResult = await supabaseClient.auth.getSession();
+      hydrateFromSession(sessionResult.data?.session ?? null);
+    };
+    const consumeOAuthCallbackCode = async () => {
+      if (!oauthCallbackCode || oauthCodeConsumed) {
+        return false;
+      }
+      oauthCodeConsumed = true;
+      await exchangeOAuthCode(oauthCallbackCode);
+      return true;
+    };
+    const ready = async () => {
+      await ensureClientInitialized();
+      if (await consumeOAuthCallbackCode()) {
+        return;
+      }
+      await refreshFromStoredSession();
     };
     const signInWithOAuth = async (
       provider: OAuthProvider,
@@ -298,16 +326,10 @@ export default defineNuxtPlugin({
       signOut,
       ready,
     });
-    if (hasOAuthCallbackParams() || hasStoredSession()) {
-      if (hasOAuthCodeCallback()) {
-        const searchParams = new URLSearchParams(window.location.search || '');
-        await exchangeOAuthCode(
-          searchParams.get('code') || '',
-          searchParams.get('sb_flow_id') || undefined
-        );
-      } else {
-        await ready();
-      }
+    if (oauthCallbackCode) {
+      initializeClientInBackground();
+    } else if (hasOAuthCallbackParams() || hasStoredSession()) {
+      await ready();
     } else {
       initializeClientInBackground();
     }
