@@ -401,6 +401,40 @@ describe('supabase plugin', () => {
       'Supabase not configured - login unavailable in offline mode'
     );
   });
+  it('shares a single exchange across concurrent ready callers', async () => {
+    localStorage.removeItem('sb-test-auth-token');
+    window.history.replaceState(null, '', '/');
+    try {
+      window.history.replaceState(null, '', '/auth/callback?code=oauth-code');
+      const exchangeDeferred = createDeferred<{
+        data: { session: ReturnType<typeof createSession> };
+        error: null;
+      }>();
+      const exchangeCodeForSession = vi.fn(() => exchangeDeferred.promise);
+      const getSession = vi.fn().mockResolvedValue({ data: { session: null }, error: null });
+      mockAuthClient({
+        exchangeCodeForSession,
+        getSession,
+      });
+      const plugin = (await import('@/plugins/supabase.client')).default;
+      const result = (await plugin.setup?.(
+        {} as Parameters<NonNullable<typeof plugin.setup>>[0]
+      )) as SupabasePluginProvide | undefined;
+      await flushPlugin();
+      const first = result?.provide.supabase.ready();
+      const second = result?.provide.supabase.ready();
+      exchangeDeferred.resolve({
+        data: { session: createSession('user-code') },
+        error: null,
+      });
+      await Promise.all([first, second]);
+      expect(exchangeCodeForSession).toHaveBeenCalledTimes(1);
+      expect(result?.provide.supabase.user.id).toBe('user-code');
+      expect(result?.provide.supabase.user.loggedIn).toBe(true);
+    } finally {
+      window.history.replaceState(null, '', '/');
+    }
+  });
   it('rejects ready when client initialization fails', async () => {
     const initError = new Error('create client failed');
     localStorage.removeItem('sb-test-auth-token');

@@ -245,7 +245,7 @@ export default defineNuxtPlugin({
     const initializeClientInBackground = () => {
       void ensureClientInitialized().catch(() => {});
     };
-    let oauthCodeConsumed = false;
+    let oauthExchangePromise: Promise<void> | null = null;
     const exchangeOAuthCode = async ({ code, flowId }: OAuthCallbackCode) => {
       if (!supabaseClient) {
         throw new Error('Supabase client unavailable');
@@ -267,11 +267,13 @@ export default defineNuxtPlugin({
       hydrateFromSession(sessionResult.data?.session ?? null);
     };
     const consumeOAuthCallbackCode = async () => {
-      if (!oauthCallbackCode || oauthCodeConsumed) {
+      if (!oauthCallbackCode) {
         return false;
       }
-      oauthCodeConsumed = true;
-      await exchangeOAuthCode(oauthCallbackCode);
+      if (!oauthExchangePromise) {
+        oauthExchangePromise = exchangeOAuthCode(oauthCallbackCode);
+      }
+      await oauthExchangePromise;
       return true;
     };
     const ready = async () => {
