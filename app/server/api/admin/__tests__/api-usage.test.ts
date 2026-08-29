@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ADMIN_ERROR_CODES } from '@/utils/adminErrors';
+import { expectAdminError } from './testUtils';
 import type { H3Event, H3EventContext } from 'h3';
 const runtimeConfig = {
   supabaseServiceKey: 'service-key',
@@ -51,25 +53,28 @@ describe('GET /api/admin/api-usage', () => {
   it('returns a stable code when service config is missing', async () => {
     runtimeConfig.supabaseServiceKey = '';
     const { default: handler } = await import('@/server/api/admin/api-usage.get');
-    await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
-      statusCode: 500,
-      data: { code: 'service_config_missing' },
-    });
+    await expectAdminError(
+      handler(makeEvent({ id: 'admin-1' })),
+      500,
+      ADMIN_ERROR_CODES.SERVICE_CONFIG_MISSING
+    );
   });
   it('requires authentication', async () => {
     const { default: handler } = await import('@/server/api/admin/api-usage.get');
-    await expect(handler(makeEvent(null))).rejects.toMatchObject({
-      statusCode: 401,
-      data: { code: 'authentication_required' },
-    });
+    await expectAdminError(
+      handler(makeEvent(null)),
+      401,
+      ADMIN_ERROR_CODES.AUTHENTICATION_REQUIRED
+    );
   });
   it('rejects non-admin users', async () => {
     mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: false }]));
     const { default: handler } = await import('@/server/api/admin/api-usage.get');
-    await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({
-      statusCode: 403,
-      data: { code: 'admin_privileges_required' },
-    });
+    await expectAdminError(
+      handler(makeEvent({ id: 'user-1' })),
+      403,
+      ADMIN_ERROR_CODES.ADMIN_PRIVILEGES_REQUIRED
+    );
   });
   it('returns the top consumers from the SQL aggregation RPC', async () => {
     mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: true }])).mockResolvedValueOnce(

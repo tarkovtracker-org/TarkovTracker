@@ -4,6 +4,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import AdminSupporterAccessCard from '@/features/admin/AdminSupporterAccessCard.vue';
+import { ADMIN_CARD_STUBS } from './adminCardStubs';
 const { fetchMock, getSessionMock, refreshSessionMock, toastAddMock } = vi.hoisted(() => ({
   fetchMock: vi.fn(),
   getSessionMock: vi.fn(),
@@ -40,28 +41,7 @@ vi.mock('vue-i18n', async (importOriginal) => ({
 const mountCard = () =>
   mount(AdminSupporterAccessCard, {
     global: {
-      stubs: {
-        GenericCard: { template: '<div><slot name="content" /></div>' },
-        SelectMenuFixed: { template: '<div />' },
-        UButton: {
-          props: ['disabled', 'loading'],
-          emits: ['click'],
-          template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
-        },
-        UFormField: { template: '<label><slot /></label>' },
-        UInput: {
-          props: ['modelValue'],
-          emits: ['update:modelValue'],
-          template:
-            '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-        },
-        USwitch: {
-          props: ['modelValue'],
-          emits: ['update:modelValue'],
-          template:
-            '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
-        },
-      },
+      stubs: ADMIN_CARD_STUBS,
     },
   });
 describe('AdminSupporterAccessCard', () => {

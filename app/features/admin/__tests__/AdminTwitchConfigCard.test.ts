@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import AdminTwitchConfigCard from '@/features/admin/AdminTwitchConfigCard.vue';
 import { logger } from '@/utils/logger';
+import { ADMIN_CARD_STUBS } from './adminCardStubs';
 const { fetchMock, getSessionMock, refreshSessionMock, toastAddMock } = vi.hoisted(() => ({
   fetchMock: vi.fn(),
   getSessionMock: vi.fn(),
@@ -36,28 +37,7 @@ vi.mock('vue-i18n', async (importOriginal) => ({
 const mountCard = () =>
   mount(AdminTwitchConfigCard, {
     global: {
-      stubs: {
-        GenericCard: { template: '<div><slot name="content" /></div>' },
-        UButton: {
-          props: ['disabled', 'loading'],
-          emits: ['click'],
-          template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
-        },
-        UFormField: { template: '<label><slot /></label>' },
-        UIcon: true,
-        UInput: {
-          props: ['modelValue'],
-          emits: ['update:modelValue'],
-          template:
-            '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-        },
-        USwitch: {
-          props: ['modelValue'],
-          emits: ['update:modelValue'],
-          template:
-            '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
-        },
-      },
+      stubs: ADMIN_CARD_STUBS,
     },
   });
 describe('AdminTwitchConfigCard', () => {
