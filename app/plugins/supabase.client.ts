@@ -270,9 +270,7 @@ export default defineNuxtPlugin({
       if (!oauthCallbackCode) {
         return false;
       }
-      if (!oauthExchangePromise) {
-        oauthExchangePromise = exchangeOAuthCode(oauthCallbackCode);
-      }
+      oauthExchangePromise ??= exchangeOAuthCode(oauthCallbackCode);
       await oauthExchangePromise;
       return true;
     };
