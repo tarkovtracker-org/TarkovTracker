@@ -41,6 +41,23 @@ const flushPlugin = async () => {
   await flushPromises();
   await flushPromises();
 };
+const stubAuthSubscription = () => ({
+  data: {
+    subscription: {
+      unsubscribe: vi.fn(),
+    },
+  },
+});
+const mockAuthClient = (auth: Record<string, unknown>) => {
+  mockCreateClient.mockReturnValue({
+    auth: {
+      onAuthStateChange: vi.fn(() => stubAuthSubscription()),
+      signInWithOAuth: vi.fn(),
+      signOut: vi.fn(),
+      ...auth,
+    },
+  });
+};
 const createSession = (userId: string | null) => {
   if (!userId) {
     return null;
@@ -72,13 +89,7 @@ const createClientMock = (initialUserId: string) => {
       }),
       onAuthStateChange: vi.fn((callback: MockAuthStateChangeCallback) => {
         authStateChangeCallback = callback;
-        return {
-          data: {
-            subscription: {
-              unsubscribe: vi.fn(),
-            },
-          },
-        };
+        return stubAuthSubscription();
       }),
       signInWithOAuth,
       signOut,
@@ -110,19 +121,8 @@ describe('supabase plugin', () => {
     const sessionDeferred = createDeferred<{
       data: { session: ReturnType<typeof createSession> };
     }>();
-    mockCreateClient.mockReturnValue({
-      auth: {
-        getSession: vi.fn(() => sessionDeferred.promise),
-        onAuthStateChange: vi.fn(() => ({
-          data: {
-            subscription: {
-              unsubscribe: vi.fn(),
-            },
-          },
-        })),
-        signInWithOAuth: vi.fn(),
-        signOut: vi.fn(),
-      },
+    mockAuthClient({
+      getSession: vi.fn(() => sessionDeferred.promise),
     });
     const plugin = (await import('@/plugins/supabase.client')).default;
     let resolved = false;
@@ -166,20 +166,9 @@ describe('supabase plugin', () => {
         data: { session: null },
         error: null,
       });
-      mockCreateClient.mockReturnValue({
-        auth: {
-          exchangeCodeForSession,
-          getSession,
-          onAuthStateChange: vi.fn(() => ({
-            data: {
-              subscription: {
-                unsubscribe: vi.fn(),
-              },
-            },
-          })),
-          signInWithOAuth: vi.fn(),
-          signOut: vi.fn(),
-        },
+      mockAuthClient({
+        exchangeCodeForSession,
+        getSession,
       });
       const plugin = (await import('@/plugins/supabase.client')).default;
       const result = (await plugin.setup?.(
@@ -216,20 +205,9 @@ describe('supabase plugin', () => {
         data: { session: null },
         error: exchangeError,
       });
-      mockCreateClient.mockReturnValue({
-        auth: {
-          exchangeCodeForSession,
-          getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
-          onAuthStateChange: vi.fn(() => ({
-            data: {
-              subscription: {
-                unsubscribe: vi.fn(),
-              },
-            },
-          })),
-          signInWithOAuth: vi.fn(),
-          signOut: vi.fn(),
-        },
+      mockAuthClient({
+        exchangeCodeForSession,
+        getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
       });
       const plugin = (await import('@/plugins/supabase.client')).default;
       const result = (await plugin.setup?.(
@@ -249,20 +227,9 @@ describe('supabase plugin', () => {
       window.history.replaceState(null, '', '/team?team=team-1&code=invite-code');
       const exchangeCodeForSession = vi.fn();
       const getSession = vi.fn().mockResolvedValue({ data: { session: null }, error: null });
-      mockCreateClient.mockReturnValue({
-        auth: {
-          exchangeCodeForSession,
-          getSession,
-          onAuthStateChange: vi.fn(() => ({
-            data: {
-              subscription: {
-                unsubscribe: vi.fn(),
-              },
-            },
-          })),
-          signInWithOAuth: vi.fn(),
-          signOut: vi.fn(),
-        },
+      mockAuthClient({
+        exchangeCodeForSession,
+        getSession,
       });
       const plugin = (await import('@/plugins/supabase.client')).default;
       const result = (await plugin.setup?.(
@@ -291,22 +258,12 @@ describe('supabase plugin', () => {
       data: { session: ReturnType<typeof createSession> };
     }>();
     let authStateChangeCallback: MockAuthStateChangeCallback | null = null;
-    mockCreateClient.mockReturnValue({
-      auth: {
-        getSession: vi.fn(() => sessionDeferred.promise),
-        onAuthStateChange: vi.fn((callback: MockAuthStateChangeCallback) => {
-          authStateChangeCallback = callback;
-          return {
-            data: {
-              subscription: {
-                unsubscribe: vi.fn(),
-              },
-            },
-          };
-        }),
-        signInWithOAuth: vi.fn(),
-        signOut: vi.fn(),
-      },
+    mockAuthClient({
+      getSession: vi.fn(() => sessionDeferred.promise),
+      onAuthStateChange: vi.fn((callback: MockAuthStateChangeCallback) => {
+        authStateChangeCallback = callback;
+        return stubAuthSubscription();
+      }),
     });
     const plugin = (await import('@/plugins/supabase.client')).default;
     let resolved = false;
@@ -373,20 +330,7 @@ describe('supabase plugin', () => {
           session: createSession('user-3'),
         },
       });
-    mockCreateClient.mockReturnValue({
-      auth: {
-        getSession,
-        onAuthStateChange: vi.fn(() => ({
-          data: {
-            subscription: {
-              unsubscribe: vi.fn(),
-            },
-          },
-        })),
-        signInWithOAuth: vi.fn(),
-        signOut: vi.fn(),
-      },
-    });
+    mockAuthClient({ getSession });
     const plugin = (await import('@/plugins/supabase.client')).default;
     const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
       SupabasePluginProvide | undefined;
