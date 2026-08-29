@@ -103,6 +103,13 @@ export default defineNuxtPlugin({
             logger.debug('[Supabase Stub] auth.getSession called in offline mode');
             return { data: { session: null }, error: null };
           },
+          async exchangeCodeForSession() {
+            logger.debug('[Supabase Stub] auth.exchangeCodeForSession called in offline mode');
+            return {
+              data: { session: null },
+              error: new Error('OAuth not available in offline mode'),
+            };
+          },
           onAuthStateChange() {
             logger.debug('[Supabase Stub] auth.onAuthStateChange called in offline mode');
             return { data: { subscription: { unsubscribe() {} } } };
@@ -171,6 +178,9 @@ export default defineNuxtPlugin({
     const stub = buildStub();
     let initPromise: Promise<void> | null = null;
     let supabaseClient: SupabaseClient | null = null;
+    const hasOAuthCodeCallback = () => {
+      return new URLSearchParams(window.location.search || '').has('code');
+    };
     const hasOAuthCallbackParams = () => {
       const searchParams = new URLSearchParams(window.location.search || '');
       if (searchParams.has('code') || searchParams.has('error')) {
@@ -206,7 +216,7 @@ export default defineNuxtPlugin({
           const { createClient } = await import('@supabase/supabase-js');
           const client = createClient(supabaseUrl, supabaseKey, {
             auth: {
-              detectSessionInUrl: true,
+              detectSessionInUrl: !hasOAuthCodeCallback(),
               flowType: 'pkce',
             },
           });
@@ -238,6 +248,20 @@ export default defineNuxtPlugin({
       }
       const sessionResult = await supabaseClient.auth.getSession();
       hydrateFromSession(sessionResult.data?.session ?? null);
+    };
+    const exchangeOAuthCode = async (code: string, flowId?: string) => {
+      await ensureClientInitialized();
+      if (!supabaseClient) {
+        throw new Error('Supabase client unavailable');
+      }
+      const result = await supabaseClient.auth.exchangeCodeForSession(
+        code,
+        flowId ? { flowId } : undefined
+      );
+      if (result.error) {
+        throw result.error;
+      }
+      hydrateFromSession(result.data.session);
     };
     const signInWithOAuth = async (
       provider: OAuthProvider,
@@ -275,7 +299,15 @@ export default defineNuxtPlugin({
       ready,
     });
     if (hasOAuthCallbackParams() || hasStoredSession()) {
-      await ready();
+      if (hasOAuthCodeCallback()) {
+        const searchParams = new URLSearchParams(window.location.search || '');
+        await exchangeOAuthCode(
+          searchParams.get('code') || '',
+          searchParams.get('sb_flow_id') || undefined
+        );
+      } else {
+        await ready();
+      }
     } else {
       initializeClientInBackground();
     }

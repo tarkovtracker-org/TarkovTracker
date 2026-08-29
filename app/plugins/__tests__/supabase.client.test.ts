@@ -158,12 +158,16 @@ describe('supabase plugin', () => {
     window.history.replaceState(null, '', '/');
     try {
       window.history.replaceState(null, '', '/auth/callback?code=oauth-code');
-      const sessionDeferred = createDeferred<{
-        data: { session: ReturnType<typeof createSession> };
-      }>();
       mockCreateClient.mockReturnValue({
         auth: {
-          getSession: vi.fn(() => sessionDeferred.promise),
+          exchangeCodeForSession: vi.fn().mockResolvedValue({
+            data: { session: createSession('user-code') },
+            error: null,
+          }),
+          getSession: vi.fn().mockResolvedValue({
+            data: { session: null },
+            error: null,
+          }),
           onAuthStateChange: vi.fn(() => ({
             data: {
               subscription: {
@@ -184,12 +188,7 @@ describe('supabase plugin', () => {
         return value;
       });
       await flushPlugin();
-      expect(resolved).toBe(false);
-      sessionDeferred.resolve({
-        data: {
-          session: createSession('user-code'),
-        },
-      });
+      expect(resolved).toBe(true);
       const result = (await setupPromise) as SupabasePluginProvide | undefined;
       expect(result?.provide.supabase.user.id).toBe('user-code');
       expect(result?.provide.supabase.user.loggedIn).toBe(true);
