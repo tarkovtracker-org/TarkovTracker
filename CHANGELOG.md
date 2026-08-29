@@ -1,3 +1,10 @@
+## [1.73.10](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.9...v1.73.10) (2026-08-29)
+
+
+### Bug Fixes
+
+* **supabase:** secure team membership delete trigger ([e76bb68](https://github.com/tarkovtracker-org/TarkovTracker/commit/e76bb68880bb05a3e76ee7426bf89a9fffbaba65))
+
 ## [1.73.9](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.8...v1.73.9) (2026-08-29)
 
 
