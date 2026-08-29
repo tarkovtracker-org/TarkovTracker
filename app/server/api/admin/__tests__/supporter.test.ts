@@ -2,7 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ADMIN_ERROR_CODES } from '@/utils/adminErrors';
-import { expectAdminError } from './testUtils';
+import { defineAdminAccessTests, expectAdminError } from './testUtils';
 import type { H3Event, H3EventContext } from 'h3';
 const runtimeConfig = {
   supabaseServiceKey: 'service-key',
@@ -58,32 +58,13 @@ describe('POST /api/admin/supporter', () => {
     vi.resetModules();
     vi.unstubAllGlobals();
   });
-  it('requires service config', async () => {
-    runtimeConfig.supabaseServiceKey = '';
-    const { default: handler } = await import('@/server/api/admin/supporter.post');
-    await expectAdminError(
-      handler(makeEvent({ id: 'admin-1' })),
-      500,
-      ADMIN_ERROR_CODES.SERVICE_CONFIG_MISSING
-    );
-  });
-  it('requires authentication', async () => {
-    const { default: handler } = await import('@/server/api/admin/supporter.post');
-    await expectAdminError(
-      handler(makeEvent(null)),
-      401,
-      ADMIN_ERROR_CODES.AUTHENTICATION_REQUIRED
-    );
-  });
-  it('rejects non-admin users', async () => {
-    mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: false }]));
-    const { default: handler } = await import('@/server/api/admin/supporter.post');
-    await expectAdminError(
-      handler(makeEvent({ id: 'user-1' })),
-      403,
-      ADMIN_ERROR_CODES.ADMIN_PRIVILEGES_REQUIRED
-    );
-  });
+  defineAdminAccessTests(
+    runtimeConfig,
+    mockFetch,
+    makeEvent,
+    jsonResponse,
+    () => import('@/server/api/admin/supporter.post')
+  );
   it('normalizes Supabase fetch failures', async () => {
     mockFetch.mockRejectedValueOnce(new Error('network unavailable'));
     const { default: handler } = await import('@/server/api/admin/supporter.post');
