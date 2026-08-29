@@ -233,6 +233,9 @@ Naming:
   unauthenticated or over-quota client answers `401`/`429`, never `400`. Pass `auth.rlHeaders` into
   the resulting `400` responses so validation errors carry the same `X-RateLimit-*` headers as
   successful ones (empty on the fail-open path, where no quota decision exists).
+- The `token-create` Edge Function accepts `permissions` only as a non-empty array of supported
+  values (`GP`/`TP`/`WP`, matching the api-gateway `Permission` enum and the frontend
+  `API_PERMISSIONS` map); any other shape is rejected with `400` before token insertion.
 - API token renames update only `api_tokens.note` through authenticated owner-scoped RLS. They
   must never rotate or replace the token or change its ID, value or hash, permissions, game mode,
   or usage data.

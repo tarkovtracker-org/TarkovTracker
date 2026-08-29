@@ -420,7 +420,7 @@ Polling integrators (TarkovMonitor, tarkov.dev, RatScanner) should poll read end
 
 ### Active Token Cap
 
-Each account may have at most **3 active API tokens**. This is enforced by a database trigger, so token rotation cannot bypass it. The `token-create` Edge Function returns `409` with `error: "Token limit reached (3 active)"` when the cap is reached. Revoke an existing token before creating a new one. Token creation is only allowed through the `token-create` Edge Function (authenticated clients cannot insert into `api_tokens` directly) and is rate-limited to 3 creates per hour per account.
+Each account may have at most **3 active API tokens**. This is enforced by a database trigger, so token rotation cannot bypass it. The `token-create` Edge Function returns `409` with `error: "Token limit reached (3 active)"` when the cap is reached. Revoke an existing token before creating a new one. Token creation is only allowed through the `token-create` Edge Function (authenticated clients cannot insert into `api_tokens` directly) and is rate-limited to 3 creates per hour per account. The `permissions` field must be a non-empty array of `GP`/`TP`/`WP`; any other shape or value is rejected with `400` before insertion.
 
 Token names can be changed from Settings → API Tokens without rotating the token. Renaming updates
 only the token's optional `note`: authenticated users receive column-level `UPDATE (note)` permission,
