@@ -4,6 +4,7 @@ export const useTeamInviteCopyFeedback = () => {
   const { copyToClipboard } = useCopyToClipboard();
   const copied = ref(false);
   let disposed = false;
+  let latestRequestId = 0;
   let resetTimer: ReturnType<typeof setTimeout> | null = null;
   const clearResetTimer = () => {
     if (!resetTimer) return;
@@ -11,11 +12,12 @@ export const useTeamInviteCopyFeedback = () => {
     resetTimer = null;
   };
   const copyInviteLink = async (inviteUrl: string): Promise<boolean> => {
+    const requestId = ++latestRequestId;
     clearResetTimer();
     copied.value = false;
     if (!inviteUrl) return false;
     const success = await copyToClipboard(inviteUrl, { revealValue: false });
-    if (disposed || !success) return false;
+    if (disposed || requestId !== latestRequestId || !success) return false;
     copied.value = true;
     resetTimer = setTimeout(() => {
       copied.value = false;

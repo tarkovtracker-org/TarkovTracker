@@ -7,6 +7,44 @@ vi.mock('@/composables/useCopyToClipboard', () => ({
   useCopyToClipboard: () => ({ copyToClipboard: mockCopyToClipboard }),
 }));
 describe('useTeamInviteCopyFeedback', () => {
+  it('ignores stale success when a newer copy fails', async () => {
+    let resolveFirstCopy!: (success: boolean) => void;
+    let resolveSecondCopy!: (success: boolean) => void;
+    mockCopyToClipboard
+      .mockReturnValueOnce(
+        new Promise<boolean>((resolve) => {
+          resolveFirstCopy = resolve;
+        })
+      )
+      .mockReturnValueOnce(
+        new Promise<boolean>((resolve) => {
+          resolveSecondCopy = resolve;
+        })
+      );
+    const { useTeamInviteCopyFeedback } = await import('@/features/team/useTeamInviteCopyFeedback');
+    let copiedText = '';
+    let firstCopy: Promise<boolean> | null = null;
+    let secondCopy: Promise<boolean> | null = null;
+    const Harness = defineComponent({
+      setup() {
+        const { copied, copyInviteLink } = useTeamInviteCopyFeedback();
+        firstCopy = copyInviteLink('https://example.test/team?code=first');
+        secondCopy = copyInviteLink('https://example.test/team?code=second');
+        return () => {
+          copiedText = copied.value ? 'copied' : 'idle';
+          return h('span', copiedText);
+        };
+      },
+    });
+    const wrapper = mount(Harness);
+    resolveSecondCopy(false);
+    expect(await secondCopy).toBe(false);
+    resolveFirstCopy(true);
+    expect(await firstCopy).toBe(false);
+    await wrapper.vm.$nextTick();
+    expect(copiedText).toBe('idle');
+    wrapper.unmount();
+  });
   it('does not schedule feedback after the consumer unmounts', async () => {
     let resolveCopy!: (success: boolean) => void;
     mockCopyToClipboard.mockReturnValueOnce(
