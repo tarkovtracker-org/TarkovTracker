@@ -15,7 +15,7 @@
       "invalid_tier": "Seleccione un nivel de seguidor válido.",
       "service_config_missing": "El servicio de administración no está configurado.",
       "supabase_request_failed": "El servicio de administración no pudo completar la solicitud.",
-      "supporter_update_failed": "Could not update supporter access.",
+      "supporter_update_failed": "No se pudo actualizar el acceso del seguidor.",
       "twitch_config_update_failed": "No se pudo actualizar la configuración de Twitch."
     },
     "access_warning_title": "Acceso de administrador",
