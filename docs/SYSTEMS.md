@@ -922,9 +922,11 @@ flowchart LR
    config to the shared `usePromotedTwitch` client state, so the embed in the same tab adopts the
    change immediately without waiting for a poll.
 2. `POST /api/admin/twitch-config` requires authenticated admin membership and validates the Twitch
-   channel, display name, and enabled flag. It calls `update_promoted_twitch_config`, which updates the
-   `promoted_twitch` JSON value, advances its shared version, and writes the admin audit row in one
-   database transaction. A failure rolls back both writes.
+   channel, display name, and enabled flag. Validation and operational failures include a stable
+   `data.code` for clients; the English error message remains a non-localized fallback. It calls
+   `update_promoted_twitch_config`, which updates the `promoted_twitch` JSON value, advances its
+   shared version, and writes the admin audit row in one database transaction. A failure rolls back
+   both writes.
 3. Only after the transaction commits does the route invoke the `admin-cache-purge` edge function
    with `purgeType: 'twitch-config'`, which calls the Cloudflare Purge API with the
    `promoted-twitch-config` cache tag. If the tag purge fails, the edge function falls back

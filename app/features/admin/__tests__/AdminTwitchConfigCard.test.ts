@@ -138,14 +138,16 @@ describe('AdminTwitchConfigCard', () => {
       })
     );
   });
-  it('surfaces the server validation message on failure', async () => {
+  it('maps the server error code to localized copy on failure', async () => {
     vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     fetchMock.mockImplementation((url: string) => {
       if (url === '/api/twitch/config') {
         return Promise.resolve({ channel: 'streamer', displayName: 'Streamer', enabled: true });
       }
       return Promise.reject(
-        Object.assign(new Error('Bad Request'), { data: { message: 'Invalid channel' } })
+        Object.assign(new Error('Bad Request'), {
+          data: { code: 'invalid_channel', message: 'Invalid channel' },
+        })
       );
     });
     const wrapper = mountCard();
@@ -153,7 +155,7 @@ describe('AdminTwitchConfigCard', () => {
     await wrapper.find('button').trigger('click');
     await flushPromises();
     expect(toastAddMock).toHaveBeenCalledWith(
-      expect.objectContaining({ color: 'error', description: 'Invalid channel' })
+      expect.objectContaining({ color: 'error', description: 'admin.error.invalid_channel' })
     );
   });
   it('reports and logs a load failure separately from a save failure', async () => {
@@ -175,7 +177,9 @@ describe('AdminTwitchConfigCard', () => {
   });
   it('logs a save failure before displaying the existing error toast', async () => {
     const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
-    const error = Object.assign(new Error('Bad Request'), { data: { message: 'Invalid channel' } });
+    const error = Object.assign(new Error('Bad Request'), {
+      data: { code: 'invalid_channel', message: 'Invalid channel' },
+    });
     fetchMock.mockImplementation((url: string) => {
       if (url === '/api/twitch/config') {
         return Promise.resolve({ channel: 'streamer', displayName: 'Streamer', enabled: true });
@@ -191,7 +195,7 @@ describe('AdminTwitchConfigCard', () => {
       error
     );
     expect(toastAddMock).toHaveBeenCalledWith(
-      expect.objectContaining({ color: 'error', description: 'Invalid channel' })
+      expect.objectContaining({ color: 'error', description: 'admin.error.invalid_channel' })
     );
   });
 });

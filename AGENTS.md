@@ -200,6 +200,8 @@ Naming:
 - Pinia stores in `app/stores/`, auto-registered by Nuxt. Use `pinia-plugin-persistedstate` where applicable.
 - Supabase client: `app/plugins/supabase.client.ts`. Regenerate types: `pnpm run supabase:types`.
 - API endpoints: `app/server/api/`. Use composables for shared data access patterns.
+- Admin Pages API routes return stable machine-readable error codes in `data.code`; keep the
+  English `message` as a client fallback and map known codes to localized UI copy.
 - The hideout Tarkov-data route caches the adapted base payload, then applies the current overlay
   after `edgeCache()` and calls `setOverlayResponseHeaders()` before returning. Its browser
   IndexedDB entry uses the matching `json-v4` version and a one-hour TTL. Warm requests serve a

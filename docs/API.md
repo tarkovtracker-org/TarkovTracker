@@ -458,6 +458,13 @@ Nuxt/Pages `/api/*` routes return errors in this format:
 }
 ```
 
+Admin routes also include a stable machine-readable code in `data.code`. The English `error`
+message remains for API clients that do not localize responses; the admin UI maps these codes to
+locale keys instead of rendering server text. Current admin codes are `admin_privileges_required`,
+`authentication_required`, `invalid_channel`, `invalid_display_name`, `invalid_enabled_flag`,
+`invalid_target_user_id`, `invalid_tier`, `service_config_missing`, `supabase_request_failed`,
+`supporter_update_failed`, and `twitch_config_update_failed`.
+
 The public API gateway (`api.tarkovtracker.org`) uses its own envelope,
 `{"success": false, "error": "..."}`. Unexpected gateway failures always return `500` with the fixed
 body `{"success": false, "error": "Internal server error"}`; the underlying exception is logged

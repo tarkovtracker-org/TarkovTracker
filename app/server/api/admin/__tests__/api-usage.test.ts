@@ -48,14 +48,28 @@ describe('GET /api/admin/api-usage', () => {
     vi.resetModules();
     vi.unstubAllGlobals();
   });
+  it('returns a stable code when service config is missing', async () => {
+    runtimeConfig.supabaseServiceKey = '';
+    const { default: handler } = await import('@/server/api/admin/api-usage.get');
+    await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
+      statusCode: 500,
+      data: { code: 'service_config_missing' },
+    });
+  });
   it('requires authentication', async () => {
     const { default: handler } = await import('@/server/api/admin/api-usage.get');
-    await expect(handler(makeEvent(null))).rejects.toMatchObject({ statusCode: 401 });
+    await expect(handler(makeEvent(null))).rejects.toMatchObject({
+      statusCode: 401,
+      data: { code: 'authentication_required' },
+    });
   });
   it('rejects non-admin users', async () => {
     mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: false }]));
     const { default: handler } = await import('@/server/api/admin/api-usage.get');
-    await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 403 });
+    await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({
+      statusCode: 403,
+      data: { code: 'admin_privileges_required' },
+    });
   });
   it('returns the top consumers from the SQL aggregation RPC', async () => {
     mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: true }])).mockResolvedValueOnce(

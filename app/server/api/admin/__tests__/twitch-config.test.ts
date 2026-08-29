@@ -61,6 +61,7 @@ describe('POST /api/admin/twitch-config', () => {
     const { default: handler } = await import('@/server/api/admin/twitch-config.post');
     await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
       statusCode: 500,
+      data: { code: 'service_config_missing' },
     });
   });
   it.each(['http://test.supabase.co', 'ftp://test.supabase.co'])(
@@ -70,19 +71,24 @@ describe('POST /api/admin/twitch-config', () => {
       const { default: handler } = await import('@/server/api/admin/twitch-config.post');
       await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
         statusCode: 500,
+        data: { code: 'service_config_missing' },
       });
       expect(mockFetch).not.toHaveBeenCalled();
     }
   );
   it('requires authentication', async () => {
     const { default: handler } = await import('@/server/api/admin/twitch-config.post');
-    await expect(handler(makeEvent(null))).rejects.toMatchObject({ statusCode: 401 });
+    await expect(handler(makeEvent(null))).rejects.toMatchObject({
+      statusCode: 401,
+      data: { code: 'authentication_required' },
+    });
   });
   it('rejects non-admin users', async () => {
     mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: false }]));
     const { default: handler } = await import('@/server/api/admin/twitch-config.post');
     await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({
       statusCode: 403,
+      data: { code: 'admin_privileges_required' },
     });
   });
   it('upserts the Twitch config, writes an audit log, and purges the cache tag', async () => {
@@ -127,8 +133,22 @@ describe('POST /api/admin/twitch-config', () => {
       .mockResolvedValueOnce(jsonResponse([{ is_admin: true }]))
       .mockResolvedValueOnce(jsonResponse({}, { ok: false, status: 500 }));
     const { default: handler } = await import('@/server/api/admin/twitch-config.post');
-    await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({ statusCode: 502 });
+    await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
+      statusCode: 502,
+      data: { code: 'supabase_request_failed' },
+    });
     expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+  it('returns a stable code when the config update returns no row', async () => {
+    mockReadBody.mockResolvedValue({ channel: 'validchannel', enabled: true });
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse([{ is_admin: true }]))
+      .mockResolvedValueOnce(jsonResponse([]));
+    const { default: handler } = await import('@/server/api/admin/twitch-config.post');
+    await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
+      statusCode: 502,
+      data: { code: 'twitch_config_update_failed' },
+    });
   });
   it('returns the committed config with a warning when the cache purge fails', async () => {
     mockReadBody.mockResolvedValue({ channel: 'validchannel', enabled: true });
@@ -220,6 +240,7 @@ describe('POST /api/admin/twitch-config', () => {
     const { default: handler } = await import('@/server/api/admin/twitch-config.post');
     await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
       statusCode: 400,
+      data: { code: 'invalid_channel' },
     });
   });
   it('validates the enabled flag', async () => {
@@ -228,6 +249,7 @@ describe('POST /api/admin/twitch-config', () => {
     const { default: handler } = await import('@/server/api/admin/twitch-config.post');
     await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
       statusCode: 400,
+      data: { code: 'invalid_enabled_flag' },
     });
   });
   it('validates the display name length', async () => {
@@ -240,6 +262,7 @@ describe('POST /api/admin/twitch-config', () => {
     const { default: handler } = await import('@/server/api/admin/twitch-config.post');
     await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
       statusCode: 400,
+      data: { code: 'invalid_display_name' },
     });
   });
   it('rejects a non-string display name', async () => {
@@ -248,6 +271,7 @@ describe('POST /api/admin/twitch-config', () => {
     const { default: handler } = await import('@/server/api/admin/twitch-config.post');
     await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
       statusCode: 400,
+      data: { code: 'invalid_display_name' },
     });
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });

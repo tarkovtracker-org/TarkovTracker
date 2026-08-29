@@ -61,17 +61,22 @@ describe('POST /api/admin/supporter', () => {
     const { default: handler } = await import('@/server/api/admin/supporter.post');
     await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
       statusCode: 500,
+      data: { code: 'service_config_missing' },
     });
   });
   it('requires authentication', async () => {
     const { default: handler } = await import('@/server/api/admin/supporter.post');
-    await expect(handler(makeEvent(null))).rejects.toMatchObject({ statusCode: 401 });
+    await expect(handler(makeEvent(null))).rejects.toMatchObject({
+      statusCode: 401,
+      data: { code: 'authentication_required' },
+    });
   });
   it('rejects non-admin users', async () => {
     mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: false }]));
     const { default: handler } = await import('@/server/api/admin/supporter.post');
     await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({
       statusCode: 403,
+      data: { code: 'admin_privileges_required' },
     });
   });
   it('normalizes Supabase fetch failures', async () => {
@@ -79,6 +84,7 @@ describe('POST /api/admin/supporter', () => {
     const { default: handler } = await import('@/server/api/admin/supporter.post');
     await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
       statusCode: 502,
+      data: { code: 'supabase_request_failed' },
     });
   });
   it('upserts an active supporter tier for admins', async () => {
@@ -157,6 +163,21 @@ describe('POST /api/admin/supporter', () => {
     });
     expect(typeof payload.expires_at).toBe('string');
   });
+  it('returns a stable code when the supporter update returns no row', async () => {
+    mockReadBody.mockResolvedValue({
+      enabled: true,
+      targetUserId: 'c191868d-26e3-40f0-87e0-b2bc07d95d4c',
+      tier: 'chad',
+    });
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse([{ is_admin: true }]))
+      .mockResolvedValueOnce(jsonResponse([]));
+    const { default: handler } = await import('@/server/api/admin/supporter.post');
+    await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
+      statusCode: 502,
+      data: { code: 'supporter_update_failed' },
+    });
+  });
   it('validates target user id', async () => {
     mockReadBody.mockResolvedValue({
       enabled: true,
@@ -167,6 +188,7 @@ describe('POST /api/admin/supporter', () => {
     const { default: handler } = await import('@/server/api/admin/supporter.post');
     await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
       statusCode: 400,
+      data: { code: 'invalid_target_user_id' },
     });
   });
   it('validates tier', async () => {
@@ -179,6 +201,20 @@ describe('POST /api/admin/supporter', () => {
     const { default: handler } = await import('@/server/api/admin/supporter.post');
     await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
       statusCode: 400,
+      data: { code: 'invalid_tier' },
+    });
+  });
+  it('validates the enabled flag', async () => {
+    mockReadBody.mockResolvedValue({
+      enabled: 'yes',
+      targetUserId: 'c191868d-26e3-40f0-87e0-b2bc07d95d4c',
+      tier: 'chad',
+    });
+    mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: true }]));
+    const { default: handler } = await import('@/server/api/admin/supporter.post');
+    await expect(handler(makeEvent({ id: 'admin-1' }))).rejects.toMatchObject({
+      statusCode: 400,
+      data: { code: 'invalid_enabled_flag' },
     });
   });
 });
