@@ -7,7 +7,7 @@ const mockSystemState = reactive<SystemState>({
   team: 'team-1',
   team_id: 'team-1',
 });
-const mockTeamStore = { id: 'team-1', inviteCode: 'private-code' };
+const mockTeamStore = reactive({ id: 'team-1', inviteCode: 'private-code' });
 vi.mock('@/stores/useSystemStore', async () => {
   const actual =
     await vi.importActual<typeof import('@/stores/useSystemStore')>('@/stores/useSystemStore');
@@ -25,6 +25,8 @@ vi.mock('@/stores/useTeamStore', () => ({
 describe('useTeamInviteLink', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/team#members');
+    mockTeamStore.id = 'team-1';
+    mockTeamStore.inviteCode = 'private-code';
   });
   it('places invite parameters before an existing fragment', async () => {
     const { useTeamInviteLink } = await import('@/features/team/useTeamInviteLink');
@@ -36,11 +38,11 @@ describe('useTeamInviteLink', () => {
     expect(teamUrl.value.indexOf('?')).toBeLessThan(teamUrl.value.indexOf('#'));
     expect(maskedTeamUrl.value).not.toContain('private-code');
   });
-  it('does not combine an active team with a stale invite code', async () => {
-    mockTeamStore.id = 'different-team';
+  it('reactively removes an invite URL when the loaded team becomes stale', async () => {
     const { useTeamInviteLink } = await import('@/features/team/useTeamInviteLink');
     const { teamUrl } = useTeamInviteLink();
+    expect(teamUrl.value).toContain('code=private-code');
+    mockTeamStore.id = 'different-team';
     expect(teamUrl.value).toBe('');
-    mockTeamStore.id = 'team-1';
   });
 });

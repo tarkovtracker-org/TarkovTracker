@@ -34,10 +34,10 @@ vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => mockPreferencesStore,
 }));
 const TeamVisibilitySwitchStub = {
-  props: ['modelValue', 'disabled'],
+  props: ['id', 'modelValue', 'disabled'],
   emits: ['update:modelValue'],
   template:
-    '<button :data-state="modelValue ? \'on\' : \'off\'" :disabled="disabled" @click="$emit(\'update:modelValue\', !modelValue)"></button>',
+    '<button :id="id" :data-state="modelValue ? \'on\' : \'off\'" :disabled="disabled" @click="$emit(\'update:modelValue\', !modelValue)"></button>',
 };
 const mountTeamOptions = async () => {
   const { default: TeamOptions } = await import('@/features/team/TeamOptions.vue');
@@ -66,13 +66,18 @@ describe('TeamOptions preferences', () => {
     vi.clearAllMocks();
   });
   describe('taskHideAll switch', () => {
-    it('uses the full row as the switch label while keeping one keyboard control', async () => {
+    it('toggles when the row text is clicked without duplicating switch events', async () => {
       const wrapper = await mountTeamOptions();
       const row = wrapper.find('[data-testid="task-row"]');
+      const taskToggle = wrapper.find('[data-testid="task-toggle"]');
       const taskSwitch = wrapper.find('[data-testid="task-switch"]');
-      expect(row.element.tagName).toBe('LABEL');
-      expect(row.attributes('for')).toBe('team-visibility-tasks');
-      expect(taskSwitch.attributes('id')).toBe('team-visibility-tasks');
+      await taskToggle.trigger('click');
+      expect(mockPreferencesStore.setQuestTeamHideAll).toHaveBeenCalledTimes(1);
+      expect(mockPreferencesStore.setQuestTeamHideAll).toHaveBeenLastCalledWith(true);
+      vi.clearAllMocks();
+      await taskSwitch.trigger('click');
+      expect(mockPreferencesStore.setQuestTeamHideAll).toHaveBeenCalledTimes(1);
+      expect(row.element.tagName).toBe('DIV');
       wrapper.unmount();
     });
     it('calls setQuestTeamHideAll when toggled on', async () => {

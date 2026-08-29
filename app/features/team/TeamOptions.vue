@@ -11,10 +11,10 @@
         <h3 class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
           {{ $t('common.tasks') }}
         </h3>
-        <label
-          for="team-visibility-tasks"
+        <div
           class="bg-surface-800/50 border-surface-700 hover:border-surface-600 flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2 transition-colors duration-200"
           data-testid="task-row"
+          @click="showTasks = !showTasks"
         >
           <span class="text-surface-200 text-sm font-medium" data-testid="task-toggle">
             {{ $t('page.team.visibility.show_tasks') }}
@@ -24,18 +24,19 @@
             v-model="showTasks"
             data-testid="task-switch"
             :label="$t('page.team.visibility.show_tasks')"
+            @click.stop
           />
-        </label>
+        </div>
       </div>
       <div class="space-y-3">
         <h3 class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
           {{ $t('page.team.visibility.items_section') }}
         </h3>
         <div class="space-y-2">
-          <label
-            for="team-visibility-items"
+          <div
             class="bg-surface-800/50 border-surface-700 hover:border-surface-600 flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2 transition-colors duration-200"
             data-testid="items-row"
+            @click="showItems = !showItems"
           >
             <span class="text-surface-200 text-sm font-medium">
               {{ $t('page.team.visibility.show_items') }}
@@ -45,16 +46,17 @@
               v-model="showItems"
               data-testid="items-switch"
               :label="$t('page.team.visibility.show_items')"
+              @click.stop
             />
-          </label>
-          <label
-            for="team-visibility-non-fir"
+          </div>
+          <div
             class="bg-surface-800/50 border-surface-700 flex min-h-11 items-center justify-between gap-3 rounded-lg border px-3 py-2 transition-colors duration-200"
             :class="{
               'hover:border-surface-600 cursor-pointer': !itemsHideAll,
               'cursor-not-allowed opacity-50': itemsHideAll,
             }"
             data-testid="nonfir-row"
+            @click="toggleNonFIR"
           >
             <span class="text-surface-200 text-sm font-medium">
               {{ $t('page.team.visibility.show_non_fir') }}
@@ -65,16 +67,17 @@
               :disabled="itemsHideAll"
               data-testid="nonfir-switch"
               :label="$t('page.team.visibility.show_non_fir')"
+              @click.stop
             />
-          </label>
-          <label
-            for="team-visibility-hideout"
+          </div>
+          <div
             class="bg-surface-800/50 border-surface-700 flex min-h-11 items-center justify-between gap-3 rounded-lg border px-3 py-2 transition-colors duration-200"
             :class="{
               'hover:border-surface-600 cursor-pointer': !itemsHideAll,
               'cursor-not-allowed opacity-50': itemsHideAll,
             }"
             data-testid="hideout-row"
+            @click="toggleHideout"
           >
             <span class="text-surface-200 text-sm font-medium">
               {{ $t('page.team.visibility.show_hideout') }}
@@ -85,18 +88,19 @@
               :disabled="itemsHideAll"
               data-testid="hideout-switch"
               :label="$t('page.team.visibility.show_hideout')"
+              @click.stop
             />
-          </label>
+          </div>
         </div>
       </div>
       <div class="space-y-3">
         <h3 class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
           {{ $t('common.maps') }}
         </h3>
-        <label
-          for="team-visibility-maps"
+        <div
           class="bg-surface-800/50 border-surface-700 hover:border-surface-600 flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2 transition-colors duration-200"
           data-testid="map-row"
+          @click="showMaps = !showMaps"
         >
           <span class="text-surface-200 text-sm font-medium">
             {{ $t('page.team.visibility.show_maps') }}
@@ -106,8 +110,9 @@
             v-model="showMaps"
             data-testid="map-switch"
             :label="$t('page.team.visibility.show_maps')"
+            @click.stop
           />
-        </label>
+        </div>
       </div>
     </div>
   </TeamCard>
@@ -138,4 +143,10 @@
     get: () => !preferencesStore.mapTeamAllHidden,
     set: (value: boolean) => preferencesStore.setMapTeamHideAll(!value),
   });
+  const toggleNonFIR = () => {
+    if (!itemsHideAll.value) showNonFIR.value = !showNonFIR.value;
+  };
+  const toggleHideout = () => {
+    if (!itemsHideAll.value) showHideout.value = !showHideout.value;
+  };
 </script>

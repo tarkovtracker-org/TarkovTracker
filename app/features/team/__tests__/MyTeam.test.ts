@@ -184,6 +184,7 @@ describe('MyTeam store interactions', () => {
     mockSystemState.pvp_team_id = null;
     mockSystemState.pve_team_id = null;
     mockSystemState.is_admin = false;
+    mockTeamState.id = null;
     mockTeamState.owner = null;
     mockTeamState.owner_id = null;
     mockTeamState.joinCode = null;
