@@ -3,6 +3,7 @@
     v-if="isNuxtLink"
     :to="props.to ?? undefined"
     :aria-label="props.labelText ?? ''"
+    :aria-current="isActive ? 'page' : undefined"
     class="group flex min-h-10 items-center rounded-sm border-l-2 px-3 py-2 text-sm font-medium transition-colors duration-150"
     :class="[
       props.isCollapsed ? 'justify-center' : '',

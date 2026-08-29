@@ -1,6 +1,6 @@
 <template>
-  <footer class="bg-surface-900/60 border-surface-800/70 w-full border-t px-4 py-8 sm:px-6">
-    <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <footer class="bg-surface-900/60 border-surface-800/70 w-full border-t px-4 py-8 sm:px-6 lg:px-8">
+    <div class="mx-auto flex w-full max-w-7xl flex-col gap-6">
       <div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-5">
         <div class="min-w-0 lg:col-span-2">
           <NuxtLink

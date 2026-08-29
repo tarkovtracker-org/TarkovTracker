@@ -630,7 +630,9 @@ flowchart LR
    audit event together. `user_system` keeps legacy persistent PvP/PvE columns plus the active
    Seasonal team column. The team-members endpoint reads the `team_member_mode_summary` view, which
    derives display name, level, and completed-task count inside the database so teammate progress
-   blobs never cross the wire.
+   blobs never cross the wire. Owners disband through the authenticated `team-disband` function,
+   which calls an atomic service-role-only RPC; regular `team-leave` remains the non-owner leave
+   path.
 6. The active season definition carries its number, start date, and exact end timestamp. The UI
    counts down to that end timestamp. Advancing the number starts each account on a fresh empty row;
    historical rows remain retained and cannot be merged into the new season. Locally persisted
@@ -649,6 +651,9 @@ flowchart LR
 
 - `supabase/migrations/20260804043342_normalize_game_mode_progress_and_add_seasonal.sql` — schema,
   RLS, compatibility triggers, `team_member_mode_summary`, sync/sharing/prestige RPCs
+- `supabase/migrations/20260829120000_add_atomic_team_disband.sql` — owner-scoped atomic team
+  disband RPC and grants
+- `supabase/functions/team-disband/index.ts` — authenticated owner disband endpoint
 - `supabase/migrations/20260806120000_add_game_mode_progress_backfill_helper.sql` — retained,
   revoked helper for optional one-range-at-a-time operational maintenance. Correctness does not
   depend on running it; see the Database Migrations section of `docs/runbook.md`

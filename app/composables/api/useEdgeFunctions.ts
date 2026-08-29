@@ -9,6 +9,7 @@ import type { PurgeCacheResponse } from '@/types/edge';
 import type { MemberProfile } from '@/types/tarkov';
 import type {
   CreateTeamResponse,
+  DisbandTeamResponse,
   JoinTeamResponse,
   KickMemberResponse,
   LeaveTeamResponse,
@@ -234,6 +235,10 @@ export const useEdgeFunctions = () => {
     assertValidTeamId(teamId);
     return await callSupabaseFunction<LeaveTeamResponse>('team-leave', { teamId });
   };
+  const disbandTeam = async (teamId: string): Promise<DisbandTeamResponse> => {
+    assertValidTeamId(teamId);
+    return await callSupabaseFunction<DisbandTeamResponse>('team-disband', { teamId });
+  };
   /**
    * Kick a member from a team (owner only)
    * @param teamId The ID of the team
@@ -305,6 +310,7 @@ export const useEdgeFunctions = () => {
     createTeam,
     joinTeam,
     leaveTeam,
+    disbandTeam,
     kickTeamMember,
     getTeamMembers,
     // API token management

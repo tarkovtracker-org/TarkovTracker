@@ -292,6 +292,20 @@ Authorization: Bearer <supabase_jwt_token>
 | 401    | Invalid token      | Invalid or expired JWT   |
 | 403    | Not a team member  | User not in team         |
 
+### Team mutation Edge Functions
+
+Team mutations are invoked with an authenticated Supabase JWT through the client composable. The
+`team-disband` operation is owner-only and removes the team, memberships, and team-owned records in
+one database transaction after confirmation in the UI.
+
+| Function       | Purpose                                |
+| -------------- | -------------------------------------- |
+| `team-create`  | Create a team and its owner membership |
+| `team-join`    | Join a team with an invite code        |
+| `team-leave`   | Leave a team as a non-owner            |
+| `team-kick`    | Remove a member as the owner           |
+| `team-disband` | Atomically remove an owned team        |
+
 ---
 
 ## Supporter / Stripe Endpoints

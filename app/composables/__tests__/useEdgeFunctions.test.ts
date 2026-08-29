@@ -153,6 +153,11 @@ describe('useEdgeFunctions.team mutations', () => {
     runtimeConfig.public = {
       teamGatewayUrl: 'https://legacy-gateway.tarkovtracker.test',
     };
+    mockSupabaseReady.mockResolvedValue(undefined);
+    mockSupabaseClient.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'token-1' } },
+      error: null,
+    });
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -177,6 +182,21 @@ describe('useEdgeFunctions.team mutations', () => {
       method: 'POST',
     });
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+  it('invokes the atomic team disband function', async () => {
+    mockSupabaseClient.functions.invoke.mockResolvedValue({
+      data: { success: true, message: 'Team disbanded successfully' },
+      error: null,
+    });
+    const { useEdgeFunctions } = await import('@/composables/api/useEdgeFunctions');
+    const edgeFunctions = useEdgeFunctions();
+    await expect(
+      edgeFunctions.disbandTeam('00000000-0000-0000-0000-000000000001')
+    ).resolves.toEqual({ success: true, message: 'Team disbanded successfully' });
+    expect(mockSupabaseClient.functions.invoke).toHaveBeenCalledWith('team-disband', {
+      body: { teamId: '00000000-0000-0000-0000-000000000001' },
+      method: 'POST',
+    });
   });
 });
 describe('useEdgeFunctions.createToken', () => {

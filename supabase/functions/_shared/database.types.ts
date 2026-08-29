@@ -974,6 +974,10 @@ export type Database = {
           reset_at: string
         }[]
       }
+      disband_team: {
+        Args: { p_owner_id: string; p_team_id: string }
+        Returns: boolean
+      }
       get_api_usage_summary: {
         Args: { p_limit?: number; p_since: string }
         Returns: {

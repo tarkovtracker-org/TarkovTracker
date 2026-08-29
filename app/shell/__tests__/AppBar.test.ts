@@ -531,15 +531,29 @@ describe('AppBar authenticated state', () => {
     expect(trigger.find('.i-mdi-chevron-down').exists()).toBe(true);
     wrapper.unmount();
   });
-  it('truncates the display name with sm:inline and truncate class', async () => {
-    mockTarkovStore.getDisplayName.mockReturnValue('A'.repeat(50));
+  it('truncates long display names and exposes the full name as a tooltip', async () => {
+    const displayName = 'A'.repeat(50);
+    mockTarkovStore.getDisplayName.mockReturnValue(displayName);
     const wrapper = await mountAppBar();
     const trigger = wrapper.find('button[aria-label="navigation_drawer.account_menu"]');
-    const nameSpan = trigger.find('span.truncate');
+    const nameSpan = trigger.find('span[data-long-name="true"]');
     expect(nameSpan.exists()).toBe(true);
     const classAttr = nameSpan.attributes('class') || '';
     expect(classAttr).toContain('hidden');
     expect(classAttr).toContain('sm:inline');
+    expect(classAttr).toContain('truncate');
+    expect(nameSpan.attributes('title')).toBe(displayName);
+    wrapper.unmount();
+  });
+  it('allows short display names to wrap without truncation', async () => {
+    mockTarkovStore.getDisplayName.mockReturnValue('Short name');
+    const wrapper = await mountAppBar();
+    const trigger = wrapper.find('button[aria-label="navigation_drawer.account_menu"]');
+    const nameSpan = trigger.find('span[data-long-name="false"]');
+    expect(nameSpan.exists()).toBe(true);
+    const classAttr = nameSpan.attributes('class') || '';
+    expect(classAttr).toContain('break-words');
+    expect(classAttr).not.toContain(' truncate');
     wrapper.unmount();
   });
   it('falls back to default avatar when avatar image fails to load', async () => {

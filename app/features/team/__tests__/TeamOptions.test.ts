@@ -33,7 +33,7 @@ const mockPreferencesStore = {
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => mockPreferencesStore,
 }));
-const USwitchStub = {
+const TeamVisibilitySwitchStub = {
   props: ['modelValue', 'disabled'],
   emits: ['update:modelValue'],
   template:
@@ -44,10 +44,8 @@ const mountTeamOptions = async () => {
   const wrapper = mount(TeamOptions, {
     global: {
       stubs: {
-        GenericCard: {
-          template: '<div><slot name="title" /><slot name="content" /><slot name="footer" /></div>',
-        },
-        USwitch: USwitchStub,
+        TeamCard: { template: '<div><slot name="icon" /><slot /></div>' },
+        TeamVisibilitySwitch: TeamVisibilitySwitchStub,
         USeparator: { template: '<hr />' },
       },
       mocks: {
@@ -134,14 +132,14 @@ describe('TeamOptions preferences', () => {
       mockPreferencesState.taskTeamAllHidden = true;
       const wrapper = await mountTeamOptions();
       const taskToggle = wrapper.find('[data-testid="task-toggle"]');
-      expect(taskToggle.text()).toContain('page.team.card.teamoptions.toggle_tasks');
+      expect(taskToggle.text()).toContain('page.team.visibility.show_tasks');
       wrapper.unmount();
     });
     it('renders same static label when preference is false', async () => {
       mockPreferencesState.taskTeamAllHidden = false;
       const wrapper = await mountTeamOptions();
       const taskToggle = wrapper.find('[data-testid="task-toggle"]');
-      expect(taskToggle.text()).toContain('page.team.card.teamoptions.toggle_tasks');
+      expect(taskToggle.text()).toContain('page.team.visibility.show_tasks');
       wrapper.unmount();
     });
   });

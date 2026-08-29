@@ -149,7 +149,7 @@
             >
               <button
                 type="button"
-                class="bg-surface-800/50 border-surface-600 hover:bg-surface-800 flex h-9 items-center gap-2 rounded-md border px-2 py-1.5 transition-colors sm:max-w-40"
+                class="bg-surface-800/50 border-surface-600 hover:bg-surface-800 flex h-9 items-center gap-2 rounded-md border px-2 py-1.5 transition-colors sm:max-w-56"
                 :aria-label="t('navigation_drawer.account_menu')"
               >
                 <img
@@ -160,7 +160,9 @@
                   @error="handleAvatarError"
                 />
                 <span
-                  class="text-surface-200 hidden min-w-0 flex-1 truncate text-[13px] leading-none font-medium sm:inline"
+                  class="text-surface-200 hidden min-w-0 flex-1 text-[13px] leading-tight font-medium break-words data-[long-name=true]:truncate data-[long-name=true]:leading-none sm:inline"
+                  :data-long-name="userDisplayName.length > 24"
+                  :title="userDisplayName"
                 >
                   {{ userDisplayName }}
                 </span>

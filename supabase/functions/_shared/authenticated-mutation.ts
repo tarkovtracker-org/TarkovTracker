@@ -6,7 +6,7 @@ import {
   validateMethod,
 } from './auth.ts';
 import { enforceUserMutationRateLimit, type MutationRateLimitAction } from './rate-limit.ts';
-type AuthenticatedMutation = {
+export type AuthenticatedMutation = {
   response: null;
   supabase: SupabaseClient;
   user: { email?: string; id: string };

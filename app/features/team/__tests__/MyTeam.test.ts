@@ -18,6 +18,7 @@ const mockSupabaseClient = {
 const mockToast = {
   add: vi.fn(),
 };
+const mockCopyToClipboard = vi.fn(async () => true);
 mockNuxtImport('useRouter', () => () => ({
   beforeEach: vi.fn(),
   beforeResolve: vi.fn(),
@@ -38,7 +39,6 @@ const mockTarkovStore = {
 };
 const mockEdgeFunctions = {
   createTeam: vi.fn(),
-  leaveTeam: vi.fn(),
 };
 const mockSystemState = reactive<SystemState>({
   user_id: null,
@@ -76,6 +76,9 @@ const mockTeamStore = {
 };
 vi.mock('@/composables/api/useEdgeFunctions', () => ({
   useEdgeFunctions: () => mockEdgeFunctions,
+}));
+vi.mock('@/composables/useCopyToClipboard', () => ({
+  useCopyToClipboard: () => ({ copyToClipboard: mockCopyToClipboard }),
 }));
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => mockTarkovStore,
@@ -120,9 +123,7 @@ const mountMyTeam = async () => {
   return mount(MyTeam, {
     global: {
       stubs: {
-        GenericCard: {
-          template: '<div><slot name="title" /><slot name="content" /><slot name="footer" /></div>',
-        },
+        TeamCard: { template: '<div><slot name="icon" /><slot /></div>' },
         UButton: UButtonStub,
         UIcon: true,
       },
@@ -164,7 +165,6 @@ describe('MyTeam store interactions', () => {
     mockSupabaseUser.username = 'user';
     mockSupabaseUser.email = 'user@example.com';
     mockEdgeFunctions.createTeam.mockReset();
-    mockEdgeFunctions.leaveTeam.mockReset();
     mockTarkovStore.getCurrentGameMode.mockReturnValue('pvp');
     mockTarkovStore.getDisplayName.mockReturnValue('TestPMC');
     mockSystemState.user_id = null;
@@ -179,6 +179,8 @@ describe('MyTeam store interactions', () => {
     mockTeamState.join_code = null;
     mockTeamState.members = [];
     mockHasInitiallyLoaded.value = true;
+    mockCopyToClipboard.mockReset();
+    mockCopyToClipboard.mockResolvedValue(true);
   });
   describe('getTeamIdFromState', () => {
     it('returns pvp_team_id for pvp game mode', async () => {
@@ -217,25 +219,12 @@ describe('MyTeam store interactions', () => {
       expect(getTeamIdFromState(state, 'pve')).toBe('team-pve-456');
     });
   });
-  describe('team ownership detection', () => {
-    it('shows disband action when user owns the team', async () => {
+  describe('destructive actions', () => {
+    it('keeps destructive membership actions outside the invite card', async () => {
       mockSystemState.pvp_team_id = 'team-123';
       mockTeamState.owner_id = 'user-123';
       const wrapper = await mountMyTeam();
-      const disbandButton = wrapper
-        .findAll('button')
-        .find((button) => button.text().includes('page.team.card.myteam.disband_team'));
-      expect(disbandButton).toBeTruthy();
-      wrapper.unmount();
-    });
-    it('shows leave action when user is not the owner', async () => {
-      mockSystemState.pvp_team_id = 'team-123';
-      mockTeamState.owner_id = 'other-user';
-      const wrapper = await mountMyTeam();
-      const leaveButton = wrapper
-        .findAll('button')
-        .find((button) => button.text().includes('page.team.card.myteam.leave_team'));
-      expect(leaveButton).toBeTruthy();
+      expect(wrapper.find('[data-testid="open-team-danger-confirmation"]').exists()).toBe(false);
       wrapper.unmount();
     });
   });

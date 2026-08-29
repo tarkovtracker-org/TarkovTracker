@@ -239,6 +239,9 @@ Naming:
 - API token renames update only `api_tokens.note` through authenticated owner-scoped RLS. They
   must never rotate or replace the token or change its ID, value or hash, permissions, game mode,
   or usage data.
+- Team owners disband through the authenticated `team-disband` Edge Function, which calls the
+  owner-scoped atomic `disband_team` RPC. The UI must require confirmation; regular `team-leave`
+  remains the non-owner leave path.
 - Account deletion requests consume their three-per-minute limit and record the allowed attempt in
   one `consume_account_deletion_attempt` transaction. Both the initiating function and reconciler
   must atomically claim work through `claim_account_deletion_job`; a fresh `in_progress` claim has a
