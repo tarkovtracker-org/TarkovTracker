@@ -1,11 +1,14 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mockToast = { add: vi.fn() };
 mockNuxtImport('useToast', () => () => mockToast);
 mockNuxtImport('useI18n', () => () => ({
   t: (key: string, params?: { value?: string }) => (params?.value ? `${key}:${params.value}` : key),
 }));
+const originalExecCommand = typeof document !== 'undefined' ? document.execCommand : undefined;
+const originalCreateElement =
+  typeof document !== 'undefined' ? document.createElement.bind(document) : undefined;
 describe('useCopyToClipboard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -13,6 +16,20 @@ describe('useCopyToClipboard', () => {
       configurable: true,
       value: { writeText: vi.fn().mockResolvedValue(undefined) },
     });
+  });
+  afterEach(() => {
+    if (originalExecCommand !== undefined) {
+      Object.defineProperty(document, 'execCommand', {
+        configurable: true,
+        value: originalExecCommand,
+      });
+    }
+    if (originalCreateElement !== undefined) {
+      Object.defineProperty(document, 'createElement', {
+        configurable: true,
+        value: originalCreateElement,
+      });
+    }
   });
   it('copies text and can hide sensitive values from success feedback', async () => {
     const { useCopyToClipboard } = await import('@/composables/useCopyToClipboard');
