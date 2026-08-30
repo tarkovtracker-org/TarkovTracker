@@ -1209,6 +1209,51 @@
       "meta": {
         "description": "Arbeite mit Teamkameraden am Escape from Tarkov Fortschritt zusammen. Teile Quest-Abschlüsse, Versteck-Status und koordiniere das Sammeln von Gegenständen."
       },
+      "page_title": "Team",
+      "page_description": "Lade Teammitglieder ein, wähle aus, welchen Teamfortschritt du siehst und trage zusammen ein.",
+      "invite": {
+        "title": "Einladungslink",
+        "subtitle": "Teilen Sie Ihr Team mit vertrauenswürdigen Teammitgliedern.",
+        "link_label": "Team-Einladungs-URL",
+        "helper": "Jeder mit diesem Link kann Ihrem Team beitreten.",
+        "show": "Link anzeigen",
+        "hide": "Link ausblenden",
+        "copy": "Link kopieren",
+        "copied": "Kopiert!"
+      },
+      "members": {
+        "title": "Mitglieder ({count})",
+        "no_members": "Noch keine Mitglieder in diesem Team. Teile deinen Einladungslink, um Teammitglieder hinzuzufügen.",
+        "alone": "Sie sind hier allein – teilen Sie Ihren Einladungslink, um Teammitglieder hinzuzufügen.",
+        "copy_invite": "Einladungslink kopieren",
+        "copied": "Kopiert!"
+      },
+      "visibility": {
+        "title": "Sichtbarkeitseinstellungen",
+        "description": "Bestimme den Fortschritt der Teammitglieder auf deinem Tracker.",
+        "items_section": "Artikel",
+        "show_tasks": "Teammitglieder Aufgaben anzeigen",
+        "show_items": "Benötigte Elemente der Teammitglieder anzeigen",
+        "show_non_fir": "Nicht-FIR benötigte Elemente anzeigen",
+        "show_hideout": "Verstecke benötigte Elemente anzeigen",
+        "show_maps": "Kartenziele von Teammitgliedern anzeigen"
+      },
+      "danger_zone": {
+        "title": "Gefahrenzone",
+        "disband_description": "Das Auflösen entfernt das Team für alle Mitglieder. Dies kann nicht rückgängig gemacht werden.",
+        "leave_description": "Das Verlassen entfernt dich von diesem Team. Dein Fortschritt bleibt auf deinem Konto.",
+        "disband": "Team auflösen",
+        "leave": "Team verlassen",
+        "confirm_disband_title": "Team auflösen?",
+        "confirm_disband_description": "Dies entfernt das Team und seine Mitgliedschaft für alle. Dies kann nicht rückgängig gemacht werden.",
+        "confirm_leave_title": "Team verlassen?",
+        "confirm_leave_description": "Du wirst dieses Team verlassen und den Fortschritt mit seinen Mitgliedern beenden.",
+        "confirm_disband": "Ja, Team auflösen",
+        "confirm_leave": "Ja, Team verlassen",
+        "disband_success": "Team wurde erfolgreich aufgelöst.",
+        "disband_error": "Team konnte nicht aufgelöst werden.",
+        "action_error": "Teammitgliedschaft konnte nicht aktualisiert werden."
+      },
       "card": {
         "manageteam": {
           "title": "Teammitglieder",
@@ -1218,7 +1263,12 @@
             "owner": "Besitzer",
             "taskscomplete": "{completed}/{total} Aufgaben erledigt",
             "kick_success": "Teammitglied erfolgreich entfernt.",
-            "kick_error": "Fehler beim Entfernen des Teammitglieds."
+            "kick_error": "Fehler beim Entfernen des Teammitglieds.",
+            "level_badge_alt": "Level {level} Abzeichen",
+            "hide_progress": "Verstecke {name}Fortschritt von mir",
+            "show_progress": "{name}Fortschritt für mich anzeigen",
+            "enable_team_tasks": "Teammitglieder Aufgaben vor dem Ändern eines einzelnen Mitglieds anzeigen",
+            "remove_member": "Entferne {name} vom Team"
           }
         },
         "teamoptions": {
