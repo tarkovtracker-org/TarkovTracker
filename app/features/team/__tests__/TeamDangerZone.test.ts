@@ -109,6 +109,7 @@ describe('TeamDangerZone', () => {
     mockTeamStore.owner = 'other-user';
     const wrapper = await mountDangerZone();
     await wrapper.find('[data-testid="open-team-danger-confirmation"]').trigger('click');
+    expect(wrapper.text()).toContain('page.team.danger_zone.confirm_leave_title');
     await wrapper.find('[data-testid="confirm-team-danger-action"]').trigger('click');
     await flushPromises();
     expect(mockLeaveTeam).toHaveBeenCalledWith('team-1');
@@ -134,6 +135,33 @@ describe('TeamDangerZone', () => {
     expect(wrapper.find('[data-testid="confirm-team-danger-action"]').exists()).toBe(true);
     expect(mockSystemState.pvp_team_id).toBe('team-1');
     expect(mockTeamStore.$reset).not.toHaveBeenCalled();
+    const confirmButton = wrapper.find('[data-testid="confirm-team-danger-action"]');
+    expect((confirmButton.element as HTMLButtonElement).disabled).toBe(false);
+    wrapper.unmount();
+  });
+  it('shows the translated error when a membership operation returns failure', async () => {
+    mockDisbandTeam.mockResolvedValue({ success: false });
+    const wrapper = await mountDangerZone();
+    await wrapper.find('[data-testid="open-team-danger-confirmation"]').trigger('click');
+    await wrapper.find('[data-testid="confirm-team-danger-action"]').trigger('click');
+    await flushPromises();
+    expect(mockToast.add).toHaveBeenCalledWith({
+      color: 'error',
+      title: 'page.team.danger_zone.disband_error',
+    });
+    expect(wrapper.find('[data-testid="confirm-team-danger-action"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+  it('shows a generic error when a membership action rejects with a non-error value', async () => {
+    mockDisbandTeam.mockRejectedValue('request failed');
+    const wrapper = await mountDangerZone();
+    await wrapper.find('[data-testid="open-team-danger-confirmation"]').trigger('click');
+    await wrapper.find('[data-testid="confirm-team-danger-action"]').trigger('click');
+    await flushPromises();
+    expect(mockToast.add).toHaveBeenCalledWith({
+      color: 'error',
+      title: 'page.team.danger_zone.action_error',
+    });
     wrapper.unmount();
   });
   it('does not clear a replacement team when the membership action resolves late', async () => {
@@ -163,6 +191,10 @@ describe('TeamDangerZone', () => {
     expect(mockSystemState.team_id).toBe('replacement-team');
     expect(mockTeamStore.id).toBe('replacement-team');
     expect(mockTeamStore.$reset).not.toHaveBeenCalled();
+    expect(mockToast.add).toHaveBeenCalledWith({
+      color: 'success',
+      title: 'page.team.card.myteam.leave_team_success',
+    });
     wrapper.unmount();
   });
   it('clears persistent legacy aliases without disturbing another mode team', async () => {

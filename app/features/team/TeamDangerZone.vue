@@ -131,8 +131,8 @@
     if (!isOpen) pendingAction.value = null;
   });
   const clearLocalTeam = (mode: GameMode, removedTeamId: string) => {
-    if (getTeamIdFromState(systemStore.$state, mode) !== removedTeamId) return;
     const key = getTeamIdStateKey(mode);
+    if (getTeamIdFromState(systemStore.$state, mode) !== removedTeamId) return;
     systemStore.$patch((state) => {
       if (getTeamIdFromState(state, mode) !== removedTeamId) return;
       state[key] = null;
