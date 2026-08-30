@@ -1,3 +1,10 @@
+## [1.73.12](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.11...v1.73.12) (2026-08-30)
+
+
+### Bug Fixes
+
+* **ui:** resolve shell contrast failures ([#780](https://github.com/tarkovtracker-org/TarkovTracker/issues/780)) ([9ad8d12](https://github.com/tarkovtracker-org/TarkovTracker/commit/9ad8d127077297ee36b5871eab77e778bab424d3))
+
 ## [1.73.11](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.10...v1.73.11) (2026-08-30)
 
 
