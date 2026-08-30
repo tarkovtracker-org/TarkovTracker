@@ -1209,6 +1209,51 @@
       "meta": {
         "description": "Spolupracujte s týmovými spolupracovníky na útěku od Tarkovu. Sdílejte dokončení úkolů, skrývejte stav a koordinujte shromažďování položek."
       },
+      "page_title": "Tým",
+      "page_description": "Pozvěte týmové spoluhráče, zvolte, jaký tým postupuje a sledujte společně.",
+      "invite": {
+        "title": "Odkaz na pozvání",
+        "subtitle": "Sdílejte svůj tým s důvěryhodnými týmovými spolupracovníky.",
+        "link_label": "URL pozvánky týmu",
+        "helper": "Kdokoli s tímto odkazem se může připojit k vašemu týmu.",
+        "show": "Zobrazit odkaz",
+        "hide": "Skrýt odkaz",
+        "copy": "Kopírovat odkaz",
+        "copied": "Zkopírováno!"
+      },
+      "members": {
+        "title": "Členové ({count})",
+        "no_members": "Zatím žádní členové tohoto týmu. Sdílejte svůj odkaz pro přidání týmových spolupracovníků.",
+        "alone": "Jste zde sami — sdílejte svůj pozvánkový odkaz pro přidání týmových spolupracovníků.",
+        "copy_invite": "Kopírovat pozvánku",
+        "copied": "Zkopírováno!"
+      },
+      "visibility": {
+        "title": "Nastavení viditelnosti",
+        "description": "Kontrolujte průběh týmů na vašem trackeru.",
+        "items_section": "Položky",
+        "show_tasks": "Zobrazit úkoly členů týmu",
+        "show_items": "Zobrazit potřebné položky členů týmu",
+        "show_non_fir": "Zobrazit nevyžadované položky",
+        "show_hideout": "Zobrazit potřebné položky",
+        "show_maps": "Zobrazit mapové cíle členů týmu"
+      },
+      "danger_zone": {
+        "title": "Nebezpečná zóna",
+        "disband_description": "Zrušení odebere tým pro všechny členy. Tuto akci nelze vrátit zpět.",
+        "leave_description": "Necháte-li vás odebrat z tohoto týmu. Váš postup zůstává na vašem účtu.",
+        "disband": "Spárovat tým",
+        "leave": "Opustit tým",
+        "confirm_disband_title": "Zrušit tým?",
+        "confirm_disband_description": "Tím se odstraní tým a jeho členství pro všechny. Tuto akci nelze vrátit zpět.",
+        "confirm_leave_title": "Opustit týmu?",
+        "confirm_leave_description": "Opustíte tento tým a přestanete sdílet pokrok s jeho členy.",
+        "confirm_disband": "Ano, rozštěpovat tým",
+        "confirm_leave": "Ano, odejít z týmu",
+        "disband_success": "Tým úspěšně odstraněn.",
+        "disband_error": "Nepodařilo se rozptýlit tým.",
+        "action_error": "Nelze aktualizovat členství v týmu."
+      },
       "card": {
         "manageteam": {
           "title": "Členové týmu",
@@ -1218,7 +1263,12 @@
             "owner": "Vlastník",
             "taskscomplete": "{completed}/{total} úkoly dokončeny",
             "kick_success": "Teamy úspěšně vyhozeny.",
-            "kick_error": "Chyba při vybírání týmového partnera."
+            "kick_error": "Chyba při vybírání týmového partnera.",
+            "level_badge_alt": "Úroveň {level} odznak",
+            "hide_progress": "Skrýt postup {name}od mě",
+            "show_progress": "Zobrazit postup {name}pro mě",
+            "enable_team_tasks": "Zobrazit úkoly členů týmu před změnou jednotlivého člena",
+            "remove_member": "Odstranit {name} z týmu"
           }
         },
         "teamoptions": {
