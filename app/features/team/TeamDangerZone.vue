@@ -133,6 +133,7 @@
   const clearLocalTeam = (mode: GameMode, removedTeamId: string) => {
     const key = getTeamIdStateKey(mode);
     if (getTeamIdFromState(systemStore.$state, mode) !== removedTeamId) return;
+    // fallow-ignore-next-line complexity -- cleanup guards protect replacement team state
     systemStore.$patch((state) => {
       if (getTeamIdFromState(state, mode) !== removedTeamId) return;
       state[key] = null;
