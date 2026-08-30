@@ -46,7 +46,7 @@
               <span class="text-surface-500 text-[0.5rem]">·</span>
               <span
                 class="text-[0.55rem]"
-                :class="useAutomaticLevel ? 'text-accent-400' : 'text-surface-500'"
+                :class="useAutomaticLevel ? 'text-accent-400' : 'text-surface-400'"
               >
                 {{ useAutomaticLevel ? t('navigation_drawer.mode_auto') : t('common.manual') }}
               </span>
