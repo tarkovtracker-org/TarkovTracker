@@ -1,3 +1,10 @@
+## [1.74.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.74.0...v1.74.1) (2026-08-30)
+
+
+### Bug Fixes
+
+* **supabase:** align migration history filename ([7c9f3ec](https://github.com/tarkovtracker-org/TarkovTracker/commit/7c9f3ece57b0e9a509f65ed91187e789c0301e96))
+
 # [1.74.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.12...v1.74.0) (2026-08-30)
 
 
