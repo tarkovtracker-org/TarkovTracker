@@ -1004,6 +1004,8 @@
         "available_button": "Mark Available",
         "uncomplete_button": "Mark Uncompleted",
         "reset_item_counts": "Reset item counts",
+        "collapse_task": "Collapse task",
+        "expand_task": "Expand task",
         "reset_item_counts_disabled_complete": "Uncomplete this task to reset item counts",
         "reset_item_counts_disabled_failed": "Mark this task as available to reset item counts",
         "reset_item_counts_disabled_nothing_to_reset": "There are no item counts to reset",

@@ -18,21 +18,7 @@
       :class="{ 'opacity-80': isComplete && !isFailed }"
     >
       <!-- 1) Identity + Header (Padded) -->
-      <div
-        class="flex flex-col"
-        :class="[
-          compactClasses.header,
-          isCollapsible
-            ? 'hover:bg-surface-700/20 focus-visible:ring-primary-500/40 focus-visible:ring-offset-surface-900 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
-            : '',
-        ]"
-        :aria-expanded="isCollapsible ? taskExpanded : undefined"
-        :aria-controls="isCollapsible ? `task-content-${task.id}` : undefined"
-        :role="isCollapsible ? 'button' : undefined"
-        :tabindex="isCollapsible ? 0 : undefined"
-        @click="onTaskHeaderClick"
-        @keydown="onTaskHeaderKeydown"
-      >
+      <div data-testid="task-card-header" class="flex flex-col" :class="compactClasses.header">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
           <div class="flex min-w-0 items-center justify-between gap-2 sm:flex-1">
             <TaskCardHeader
@@ -82,13 +68,26 @@
                 />
               </template>
             </TaskCardBadges>
-            <UIcon
+            <button
               v-if="isCollapsible"
-              name="i-mdi-chevron-down"
-              aria-hidden="true"
-              class="pointer-events-none h-4 w-4 shrink-0 self-center transition-transform duration-200"
-              :class="{ 'rotate-180': taskExpanded }"
-            />
+              type="button"
+              class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex h-7 w-7 shrink-0 items-center justify-center rounded transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              :aria-label="
+                taskExpanded
+                  ? t('page.tasks.questcard.collapse_task', 'Collapse task')
+                  : t('page.tasks.questcard.expand_task', 'Expand task')
+              "
+              :aria-expanded="taskExpanded"
+              :aria-controls="`task-content-${task.id}`"
+              @click="toggleTaskVisibility"
+            >
+              <UIcon
+                name="i-mdi-chevron-down"
+                aria-hidden="true"
+                class="pointer-events-none h-4 w-4 transition-transform duration-200"
+                :class="{ 'rotate-180': taskExpanded }"
+              />
+            </button>
           </div>
         </div>
         <!-- Extra Info Strips (padded area) -->
@@ -507,22 +506,6 @@
     objectivesExpanded.value = !objectivesExpanded.value;
   };
   const route = useRoute();
-  const shouldIgnoreTaskHeaderToggle = (event: MouseEvent): boolean => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) return false;
-    const interactiveAncestor = target.closest('a,button,input,select,textarea,[role="button"]');
-    return Boolean(interactiveAncestor && interactiveAncestor !== event.currentTarget);
-  };
-  const onTaskHeaderClick = (event: MouseEvent) => {
-    if (shouldIgnoreTaskHeaderToggle(event)) return;
-    toggleTaskVisibility();
-  };
-  const onTaskHeaderKeydown = (event: KeyboardEvent) => {
-    if (event.target !== event.currentTarget) return;
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    toggleTaskVisibility();
-  };
   const OBJECTIVES_ENTER_MS = 150;
   const OBJECTIVES_LEAVE_MS = 120;
   const onObjectivesBeforeEnter = (el: Element) => {
