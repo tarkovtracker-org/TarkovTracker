@@ -1,12 +1,15 @@
 <template>
-  <div class="bg-surface-850 rounded-lg border border-white/10 p-4 shadow-md sm:p-6">
+  <article
+    class="bg-surface-850 hover:border-primary-500/40 font-ui rounded-xl border border-white/10 p-4 shadow-md transition-colors duration-200 sm:p-5"
+  >
     <div class="space-y-4">
       <div class="flex items-start justify-between gap-4">
         <div class="min-w-0 flex-1">
           <div class="flex flex-wrap items-center gap-2">
-            <h3 class="truncate text-xl font-bold sm:text-2xl">
-              {{ displayName }}
-            </h3>
+            <AppTooltip v-if="isLongDisplayName" :text="displayName">
+              <h3 class="truncate text-xl font-bold sm:text-2xl">{{ displayName }}</h3>
+            </AppTooltip>
+            <h3 v-else class="text-xl font-bold break-words sm:text-2xl">{{ displayName }}</h3>
             <UBadge v-if="isOwner" color="primary" variant="solid" size="sm">
               {{ $t('page.team.card.manageteam.membercard.owner') }}
             </UBadge>
@@ -21,7 +24,7 @@
           <img
             :src="groupIcon"
             class="h-12 w-12 object-contain sm:h-16 sm:w-16"
-            alt="Level badge"
+            :alt="$t('page.team.card.manageteam.membercard.level_badge_alt', { level })"
           />
           <div class="text-center">
             <div class="text-surface-400 text-xs tracking-wide uppercase">
@@ -53,38 +56,42 @@
           </i18n-t>
         </div>
         <div class="flex gap-2">
-          <UButton
-            :disabled="props.teammember === $supabase.user.id || preferencesStore.taskTeamAllHidden"
-            variant="outline"
-            :icon="
-              props.teammember !== $supabase.user.id &&
-              preferencesStore.teamIsHidden(props.teammember)
-                ? 'i-mdi-eye-off'
-                : 'i-mdi-eye'
-            "
-            :color="
-              props.teammember !== $supabase.user.id &&
-              preferencesStore.teamIsHidden(props.teammember)
-                ? 'error'
-                : 'success'
-            "
-            size="sm"
-            @click="preferencesStore.toggleHidden(props.teammember)"
-          />
-          <UButton
+          <AppTooltip v-if="props.teammember !== $supabase.user.id" :text="progressVisibilityLabel">
+            <UButton
+              variant="outline"
+              :icon="
+                preferencesStore.teamIsHidden(props.teammember)
+                  ? 'i-mdi-eye-off-outline'
+                  : 'i-mdi-eye-outline'
+              "
+              color="neutral"
+              size="md"
+              class="h-11 w-11 justify-center"
+              :disabled="preferencesStore.taskTeamAllHidden"
+              :aria-label="progressVisibilityLabel"
+              @click="toggleProgressVisibility"
+            />
+          </AppTooltip>
+          <AppTooltip
             v-if="props.teammember !== $supabase.user.id && isTeamOwnerView"
-            variant="outline"
-            icon="i-mdi-account-minus"
-            color="error"
-            size="sm"
-            :loading="kickingTeammate"
-            :disabled="kickingTeammate"
-            @click="kickTeammate()"
-          />
+            :text="removeMemberLabel"
+          >
+            <UButton
+              variant="outline"
+              icon="i-mdi-account-minus"
+              color="error"
+              size="md"
+              class="h-11 w-11 justify-center"
+              :loading="kickingTeammate"
+              :disabled="kickingTeammate"
+              :aria-label="removeMemberLabel"
+              @click="kickTeammate()"
+            />
+          </AppTooltip>
         </div>
       </div>
     </div>
-  </div>
+  </article>
 </template>
 <script setup lang="ts">
   import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
@@ -126,6 +133,22 @@
     const fromProgress = progressStore.getDisplayName(props.teammember);
     return fromProfile || fromProgress || props.teammember;
   });
+  const isLongDisplayName = computed(() => displayName.value.length > 24);
+  const progressVisibilityLabel = computed(() => {
+    if (preferencesStore.taskTeamAllHidden) {
+      return t('page.team.card.manageteam.membercard.enable_team_tasks');
+    }
+    return preferencesStore.teamIsHidden(props.teammember)
+      ? t('page.team.card.manageteam.membercard.show_progress', { name: displayName.value })
+      : t('page.team.card.manageteam.membercard.hide_progress', { name: displayName.value });
+  });
+  const toggleProgressVisibility = () => {
+    if (preferencesStore.taskTeamAllHidden) return;
+    preferencesStore.toggleHidden(props.teammember);
+  };
+  const removeMemberLabel = computed(() =>
+    t('page.team.card.manageteam.membercard.remove_member', { name: displayName.value })
+  );
   const level = computed(() => {
     if (props.teammember === $supabase.user.id) {
       return progressStore.getLevel(props.teammember);

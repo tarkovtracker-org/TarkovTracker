@@ -29,6 +29,10 @@ html.no-smooth-scroll {
 }
 /* Tailwind v4 + Nuxt UI v4 theme tokens */
 @theme static {
+  --font-ui:
+    ui-sans-serif, system-ui, -apple-system, blinkmacsystemfont, 'Segoe UI', roboto,
+    'Helvetica Neue', arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    'Segoe UI Symbol', 'Noto Color Emoji';
   --font-sans:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
     monospace;

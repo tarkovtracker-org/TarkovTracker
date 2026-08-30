@@ -68,13 +68,13 @@ Handlers: `progress.ts`, `team.ts`, `token.ts`. Validate with `pnpm run validate
 
 Invoked via `app/composables/api/useEdgeFunctions.ts` or Stripe webhooks. Auth: `_shared/auth.ts`. Rate limit: `_shared/rate-limit.ts` (RPC).
 
-| Function                                                                  | Trigger      | Purpose                                    |
-| ------------------------------------------------------------------------- | ------------ | ------------------------------------------ |
-| `team-create` / `team-join` / `team-leave` / `team-kick` / `team-members` | Client       | Team lifecycle                             |
-| `token-create` / `token-revoke`                                           | Client       | API token management                       |
-| `account-delete` / `account-delete-reconcile`                             | Client / job | Account deletion                           |
-| `stripe-webhook`                                                          | Stripe       | Supporter grant/revoke + Discord role sync |
-| `admin-cache-purge`                                                       | Admin client | Purge Cloudflare + data caches             |
+| Function                                                                                   | Trigger      | Purpose                                    |
+| ------------------------------------------------------------------------------------------ | ------------ | ------------------------------------------ |
+| `team-create` / `team-join` / `team-leave` / `team-kick` / `team-disband` / `team-members` | Client       | Team lifecycle                             |
+| `token-create` / `token-revoke`                                                            | Client       | API token management                       |
+| `account-delete` / `account-delete-reconcile`                                              | Client / job | Account deletion                           |
+| `stripe-webhook`                                                                           | Stripe       | Supporter grant/revoke + Discord role sync |
+| `admin-cache-purge`                                                                        | Admin client | Purge Cloudflare + data caches             |
 
 ## External Integrations
 

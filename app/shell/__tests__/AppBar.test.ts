@@ -533,15 +533,41 @@ describe('AppBar authenticated state', () => {
     expect(trigger.find('.i-mdi-chevron-down').exists()).toBe(true);
     wrapper.unmount();
   });
-  it('truncates the display name with sm:inline and truncate class', async () => {
-    mockTarkovStore.getDisplayName.mockReturnValue('A'.repeat(50));
+  it('truncates long display names and exposes the full name as a tooltip', async () => {
+    const displayName = 'A'.repeat(50);
+    mockTarkovStore.getDisplayName.mockReturnValue(displayName);
     const wrapper = await mountAppBar();
     const trigger = wrapper.find('button[aria-label="navigation_drawer.account_menu"]');
-    const nameSpan = trigger.find('span.truncate');
+    const nameSpan = trigger.find('span[data-long-name="true"]');
     expect(nameSpan.exists()).toBe(true);
     const classAttr = nameSpan.attributes('class') || '';
     expect(classAttr).toContain('hidden');
     expect(classAttr).toContain('sm:inline');
+    expect(classAttr).toContain('truncate');
+    expect(nameSpan.attributes('title')).toBe(displayName);
+    wrapper.unmount();
+  });
+  it('keeps short display names on one line within the fixed-height account button', async () => {
+    mockTarkovStore.getDisplayName.mockReturnValue('Short name');
+    const wrapper = await mountAppBar();
+    const trigger = wrapper.find('button[aria-label="navigation_drawer.account_menu"]');
+    const nameSpan = trigger.find('span[data-long-name="false"]');
+    expect(nameSpan.exists()).toBe(true);
+    expect(nameSpan.attributes('data-long-name')).toBe('false');
+    expect(nameSpan.classes()).toContain('truncate');
+    expect(nameSpan.classes()).toContain('whitespace-nowrap');
+    wrapper.unmount();
+  });
+  it('keeps a 24-character wide display name on one line', async () => {
+    const displayName = 'W'.repeat(24);
+    mockTarkovStore.getDisplayName.mockReturnValue(displayName);
+    const wrapper = await mountAppBar();
+    const trigger = wrapper.find('button[aria-label="navigation_drawer.account_menu"]');
+    const nameSpan = trigger.find('span[data-long-name="false"]');
+    expect(nameSpan.text()).toBe(displayName);
+    expect(nameSpan.classes()).toContain('truncate');
+    expect(nameSpan.classes()).toContain('whitespace-nowrap');
+    expect(nameSpan.attributes('title')).toBe(displayName);
     wrapper.unmount();
   });
   it('falls back to default avatar when avatar image fails to load', async () => {

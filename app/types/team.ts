@@ -20,6 +20,10 @@ export interface LeaveTeamResponse {
   success: boolean;
   message: string;
 }
+export interface DisbandTeamResponse {
+  success: boolean;
+  message: string;
+}
 export interface JoinTeamResponse {
   success: boolean;
   message: string;

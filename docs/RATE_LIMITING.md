@@ -82,14 +82,14 @@ flowchart TB
 
 ### Ownership matrix
 
-| Traffic class               | Examples                                         | Primary enforcer                        | Secondary / hard stop                    | Storage / implementation                   |
-| --------------------------- | ------------------------------------------------ | --------------------------------------- | ---------------------------------------- | ------------------------------------------ |
-| External progress API       | `/api/v2/*` on `api.tarkovtracker.org`           | Worker DO daily quota + IP abuse gate   | Supporter tier resolution, token auth    | `ApiGatewayRateLimiter`, `api_usage_daily` |
-| Authenticated app mutations | team create/join/leave/kick, token create/revoke | Edge Function mutation limiter          | DB token cap (3 active), RLS             | `mutation_rate_limits` + RPC               |
-| Public / shared app reads   | shared profile, team members, tarkov-dev profile | Pages/Nitro shared limiter              | CDN/cache TTLs, Cloudflare WAF if needed | `sharedEdgeStore` (+ DO if bound)          |
-| Destructive account ops     | account delete                                   | Edge Function (dedicated table for now) | Deletion jobs queue                      | `account_deletion_attempts`                |
-| Auth platform               | signup, sign-in, refresh, OTP                    | Supabase Auth                           | Captcha (optional)                       | GoTrue `[auth.rate_limit]`                 |
-| Outbound third parties      | Discord API, Stripe                              | Provider `Retry-After` / SDK rules      | Circuit breakers, job retries            | not user quotas                            |
+| Traffic class               | Examples                                                 | Primary enforcer                        | Secondary / hard stop                    | Storage / implementation                   |
+| --------------------------- | -------------------------------------------------------- | --------------------------------------- | ---------------------------------------- | ------------------------------------------ |
+| External progress API       | `/api/v2/*` on `api.tarkovtracker.org`                   | Worker DO daily quota + IP abuse gate   | Supporter tier resolution, token auth    | `ApiGatewayRateLimiter`, `api_usage_daily` |
+| Authenticated app mutations | team create/join/leave/kick/disband, token create/revoke | Edge Function mutation limiter          | DB token cap (3 active), RLS             | `mutation_rate_limits` + RPC               |
+| Public / shared app reads   | shared profile, team members, tarkov-dev profile         | Pages/Nitro shared limiter              | CDN/cache TTLs, Cloudflare WAF if needed | `sharedEdgeStore` (+ DO if bound)          |
+| Destructive account ops     | account delete                                           | Edge Function (dedicated table for now) | Deletion jobs queue                      | `account_deletion_attempts`                |
+| Auth platform               | signup, sign-in, refresh, OTP                            | Supabase Auth                           | Captcha (optional)                       | GoTrue `[auth.rate_limit]`                 |
+| Outbound third parties      | Discord API, Stripe                                      | Provider `Retry-After` / SDK rules      | Circuit breakers, job retries            | not user quotas                            |
 
 ---
 
@@ -135,6 +135,7 @@ sequenceDiagram
 | `team-join`    | `team-join`    |    30 | 10 min |
 | `team-leave`   | `team-leave`   |    30 | 1 hour |
 | `team-kick`    | `team-kick`    |    20 | 1 hour |
+| `team-disband` | `team-disband` |    10 | 1 hour |
 | `token-create` | `token-create` |     3 | 1 hour |
 | `token-revoke` | `token-revoke` |    50 | 10 min |
 
@@ -439,7 +440,7 @@ Treat these deliberately; do not “make everything fail open” without underst
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Mutation limit constants + Edge helper | `supabase/functions/_shared/rate-limit.ts`                                                                                                                          |
 | Mutation RPC + table                   | `supabase/migrations/20260404120000_add_mutation_rate_limit_rpc.sql`                                                                                                |
-| Edge consumers                         | `supabase/functions/{token-create,token-revoke,team-create,team-join,team-leave,team-kick}/`                                                                        |
+| Edge consumers                         | `supabase/functions/{token-create,token-revoke,team-create,team-join,team-leave,team-kick,team-disband}/`                                                           |
 | Frontend mutation callers              | `app/composables/api/useEdgeFunctions.ts`                                                                                                                           |
 | Worker tier constants                  | `workers/api-gateway/src/limits.ts`                                                                                                                                 |
 | Worker entrypoint and routing          | `workers/api-gateway/src/index.ts`, `workers/api-gateway/src/router.ts`                                                                                             |
