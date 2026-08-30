@@ -1209,6 +1209,51 @@
       "meta": {
         "description": "Colabora con tus compañeros en el progreso de Escape from Tarkov. Comparte misiones completadas, estado del escondite y coordina la recolección de objetos."
       },
+      "page_title": "Equipo",
+      "page_description": "Invita a tus compañeros, elige el progreso del equipo que ves y sigue juntos.",
+      "invite": {
+        "title": "Enlace de invitación",
+        "subtitle": "Comparte tu equipo con compañeros de equipo de confianza.",
+        "link_label": "URL de invitación al equipo",
+        "helper": "Cualquiera con este enlace puede unirse a su equipo.",
+        "show": "Mostrar enlace",
+        "hide": "Ocultar enlace",
+        "copy": "Copiar enlace",
+        "copied": "¡Copiado!"
+      },
+      "members": {
+        "title": "Miembros ({count})",
+        "no_members": "Aún no hay miembros en este equipo. Comparte tu enlace de invitación para añadir compañeros.",
+        "alone": "Estás solo aquí: comparte tu enlace de invitación para añadir compañeros.",
+        "copy_invite": "Copiar enlace de invitación",
+        "copied": "¡Copiado!"
+      },
+      "visibility": {
+        "title": "Ajustes de visibilidad",
+        "description": "Controla el progreso de tus compañeros de equipo que aparecen en tu rastreador.",
+        "items_section": "Items",
+        "show_tasks": "Mostrar tareas de los miembros del equipo",
+        "show_items": "Mostrar elementos necesarios de los miembros del equipo",
+        "show_non_fir": "Mostrar elementos que no son necesarios",
+        "show_hideout": "Mostrar elementos necesarios para ocultar",
+        "show_maps": "Mostrar los objetivos del mapa de los miembros del equipo"
+      },
+      "danger_zone": {
+        "title": "Zona de peligro",
+        "disband_description": "La disolución elimina el equipo para todos los miembros. Esto no se puede deshacer.",
+        "leave_description": "Dejar te elimina de este equipo. Tu progreso permanece en tu cuenta.",
+        "disband": "Disolver equipo",
+        "leave": "Dejar equipo",
+        "confirm_disband_title": "¿Disolver equipo?",
+        "confirm_disband_description": "Esto elimina el equipo y su membresía para todos. Esto no se puede deshacer.",
+        "confirm_leave_title": "¿Abandonar equipo?",
+        "confirm_leave_description": "Dejarás este equipo y dejarás de compartir el progreso con sus miembros.",
+        "confirm_disband": "Sí, equipo de disolver",
+        "confirm_leave": "Sí, dejar equipo",
+        "disband_success": "Equipo disuelto correctamente.",
+        "disband_error": "Error al disolver el equipo.",
+        "action_error": "No se puede actualizar la membresía del equipo."
+      },
       "card": {
         "manageteam": {
           "title": "Miembros del Equipo",
@@ -1218,7 +1263,12 @@
             "owner": "Dueño",
             "taskscomplete": "{completed}/{total} misiones completadas",
             "kick_success": "El compañero de equipo pateó con éxito.",
-            "kick_error": "Error al patear a un compañero."
+            "kick_error": "Error al patear a un compañero.",
+            "level_badge_alt": "Insignia {level} de nivel",
+            "hide_progress": "Hide {name}'s progress from me",
+            "show_progress": "Mostrar el progreso de {name}para mí",
+            "enable_team_tasks": "Mostrar tareas de los miembros del equipo antes de cambiar un miembro individual",
+            "remove_member": "Eliminar {name} del equipo"
           }
         },
         "teamoptions": {
