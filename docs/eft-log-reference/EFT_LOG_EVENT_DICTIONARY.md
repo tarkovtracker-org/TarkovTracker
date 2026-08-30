@@ -80,32 +80,32 @@ Legend used throughout:
 
 ### Economy / items
 
-| Goal                                          | Primary signal                                                                                                                                         | Cautions                                      |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- |
-| Flea sale                                     | `push-notifications`: `RagfairOfferSold` (sold item, count, buyer nickname, handbookId)                                                                | Buyer nickname is PII                         |
-| Flea rating change                            | `RagfairNewRating` (`isRatingGrowing`, rating)                                                                                                         | —                                             |
-| Balance / purchase / stash rows / battle-pass | `ExpansionsAccountBalanceIncreased`, `ExpansionsAccountOfferPurchased`, `ExpansionsAccountTarcoinBalance`, `StashRows`, `BattlePassUniversalDocuments` | Amounts are account data                      |
-| Insurance cost                                | `backend` `/client/insurance/items/list/cost` (E and P)                                                                                                | Only cost route exists                        |
-| Insurance reconciliation problem              | `insurance`: `Items to insure does not contain: <ITEM>` (C: 5 builds)                                                                                  | No success/payment/expiry/return events exist |
-| Inventory rejected                            | `inventory`: `[<ID>                                                                                                                                    | <NICK>                                        | Profile]<CORR> - Client operation rejected by server:<CODE> - OperationType:<OP>` | Failure-only evidence; no universal commit marker |
-| Queued inventory command failed               | `backend_queue` JSON fragments: `Move`, `ApplyInventoryChanges`, `Repair`, `buy_from_trader`                                                           | Fragments; boundaries unreliable              |
-| Cache mismatch of static data                 | `backend`: `cache: mis-matched, old etag:…, new etag:…` (C: 4 builds `1.0.6.0.46010`+)                                                                 | Signals stale local cache                     |
+| Goal                                          | Primary signal                                                                                                                                         | Cautions                                          |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| Flea sale                                     | `push-notifications`: `RagfairOfferSold` (sold item, count, buyer nickname, handbookId)                                                                | Buyer nickname is PII                             |
+| Flea rating change                            | `RagfairNewRating` (`isRatingGrowing`, rating)                                                                                                         | —                                                 |
+| Balance / purchase / stash rows / battle-pass | `ExpansionsAccountBalanceIncreased`, `ExpansionsAccountOfferPurchased`, `ExpansionsAccountTarcoinBalance`, `StashRows`, `BattlePassUniversalDocuments` | Amounts are account data                          |
+| Insurance cost                                | `backend` `/client/insurance/items/list/cost` (E and P)                                                                                                | Only cost route exists                            |
+| Insurance reconciliation problem              | `insurance`: `Items to insure does not contain: <ITEM>` (C: 5 builds)                                                                                  | No success/payment/expiry/return events exist     |
+| Inventory rejected                            | `inventory`: `[<ID>\|<NICK>\|Profile]<CORR> - Client operation rejected by server:<CODE> - OperationType:<OP>`                                         | Failure-only evidence; no universal commit marker |
+| Queued inventory command failed               | `backend_queue` JSON fragments: `Move`, `ApplyInventoryChanges`, `Repair`, `buy_from_trader`                                                           | Fragments; boundaries unreliable                  |
+| Cache mismatch of static data                 | `backend`: `cache: mis-matched, old etag:…, new etag:…` (C: 4 builds `1.0.6.0.46010`+)                                                                 | Signals stale local cache                         |
 
 ### Client/runtime health
 
-| Goal                                 | Primary signal                                                                                                                                                                                                 | Cautions                                                                |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Anti-cheat lifecycle                 | `application`: `Start loading dll '<BATTLEYE_DLL>'` … `BEClient exit successfully`                                                                                                                             | —                                                                       |
-| File integrity                       | `files-checker`: `ExecutablePath:`, `Consistency ensurance is launched`, `Consistency ensurance is succeed. ElapsedMilliseconds:<N>`                                                                           | Channel absent from all 0.16.x sessions in C; no failure shape retained |
-| Audio ready                          | `spatial-audio`: `SpatialAudioSystem Initialized`, `Success initialize BetterAudio`, DSP buffer/quality lines                                                                                                  | Loading context, not a raid boundary                                    |
-| Audio degradation                    | `ReverbPluginChecker enabled:…`, reverb reset attempts (C: `1.0.1.0.42625`), exhaustion, mic failure                                                                                                           | —                                                                       |
-| Link quality                         | `network-connection` `Statistics (… rtt/lose/sent/received)`; `network-messages` `rpi:                                                                                                                         | rwi:                                                                    | rsi:                                    | rci:            | ui:       | lui:               | lud:`         | Abbreviations are opaque; loss may be scientific notation |
-| Processing overload                  | `network-connection`: `Thread processing exceeded the limit [<N>/<N>]` (C: `1.0.1.0.42625`); `Thread was being aborted.`                                                                                       | Cause not exposed                                                       |
-| Asset/pool failures                  | `objectPool`: `Returning asset to pool when the pool is already destroyed`; `Failed to create item with ID:…` (C: `1.0.0.2.42157`); bundle-not-loaded; `assetBundle` missing-manifest/duplicate-release errors | —                                                                       |
-| Item lookup / quest-condition errors | `player`: `Could not find item with id:…`; `Conditional is not available for finish…`                                                                                                                          | —                                                                       |
-| Spawn-marker fixes                   | `maperrors` (H-only channel; none in C): `SpawnPointMarker … fix message:…`, `SpawnPointMarkers fixes:<N>`, `… will be deleted … not on backend`                                                               | Channel absence ≠ removal                                               |
-| Uncategorized 0.16.x chatter         | `Default` channel (0.16.x only): locale duplicates, hideout `Address not found`, `Already registered object`, weapon-shell warnings, exceptions, `[Transit]` lines                                             | Not an error channel per se; never present in 1.0.0.0+ envelopes        |
-| Arena match state                    | Arena `lifecycle`/`web_socket`: `ApplicationState: Idle                                                                                                                                                        | Matching                                                                | Gameplay`, `MatchingProgressState: None | MatchingStarted | GameFound | ConnectingToServer | WorldCreating | Leaving                                                   | Participation recreate`, `GameplayState: None | Running | Dead | Finished` | Use before generic Unity timing mirrors; short sessions log only subsets |
+| Goal                                 | Primary signal                                                                                                                                                                                                                                              | Cautions                                                                 |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Anti-cheat lifecycle                 | `application`: `Start loading dll '<BATTLEYE_DLL>'` … `BEClient exit successfully`                                                                                                                                                                          | —                                                                        |
+| File integrity                       | `files-checker`: `ExecutablePath:`, `Consistency ensurance is launched`, `Consistency ensurance is succeed. ElapsedMilliseconds:<N>`                                                                                                                        | Channel absent from all 0.16.x sessions in C; no failure shape retained  |
+| Audio ready                          | `spatial-audio`: `SpatialAudioSystem Initialized`, `Success initialize BetterAudio`, DSP buffer/quality lines                                                                                                                                               | Loading context, not a raid boundary                                     |
+| Audio degradation                    | `ReverbPluginChecker enabled:…`, reverb reset attempts (C: `1.0.1.0.42625`), exhaustion, mic failure                                                                                                                                                        | —                                                                        |
+| Link quality                         | `network-connection` `Statistics (… rtt/lose/sent/received)`; `network-messages` `rpi:<N>\|rwi:<N>\|rsi:<N>\|rci:<N>\|ui:<N>\|lui:<N>\|lud:<N>`                                                                                                             | Abbreviations are opaque; loss may be scientific notation                |
+| Processing overload                  | `network-connection`: `Thread processing exceeded the limit [<N>/<N>]` (C: `1.0.1.0.42625`); `Thread was being aborted.`                                                                                                                                    | Cause not exposed                                                        |
+| Asset/pool failures                  | `objectPool`: `Returning asset to pool when the pool is already destroyed`; `Failed to create item with ID:…` (C: `1.0.0.2.42157`); bundle-not-loaded; `assetBundle` missing-manifest/duplicate-release errors                                              | —                                                                        |
+| Item lookup / quest-condition errors | `player`: `Could not find item with id:…`; `Conditional is not available for finish…`                                                                                                                                                                       | —                                                                        |
+| Spawn-marker fixes                   | `maperrors` (H-only channel; none in C): `SpawnPointMarker … fix message:…`, `SpawnPointMarkers fixes:<N>`, `… will be deleted … not on backend`                                                                                                            | Channel absence ≠ removal                                                |
+| Uncategorized 0.16.x chatter         | `Default` channel (0.16.x only): locale duplicates, hideout `Address not found`, `Already registered object`, weapon-shell warnings, exceptions, `[Transit]` lines                                                                                          | Not an error channel per se; never present in 1.0.0.0+ envelopes         |
+| Arena match state                    | Arena `lifecycle`/`web_socket`: `ApplicationState: Idle\|Matching\|Gameplay`, `MatchingProgressState: None\|MatchingStarted\|GameFound\|ConnectingToServer\|WorldCreating\|Leaving\|Participation recreate`, `GameplayState: None\|Running\|Dead\|Finished` | Use before generic Unity timing mirrors; short sessions log only subsets |
 
 ---
 
@@ -237,7 +237,7 @@ Filename convention: `notifications.log` in 0.16.x (record channel may still say
 | `Statistics (… rtt:<N>, lose:<N>, sent:<N>, received:<N>)`            | Link health snapshot                     | 14 raid builds + Arena                                  |
 | `Thread was being aborted.`                                           | Network worker termination               | 10 builds                                               |
 | `Thread processing exceeded the limit [<N>/<N>]`                      | Processing overrun                       | C: `1.0.1.0.42625`; H: `1.0.2.5.43579`, `1.0.5.0.45464` |
-| `rpi:<N>                                                              | rwi:<N>                                  | rsi:<N>                                                 | rci:<N> | ui:<N> | lui:<N> | lud:<N>` | Periodic 7-value counter record | All builds; abbreviations opaque |
+| `rpi:<N>\|rwi:<N>\|rsi:<N>\|rci:<N>\|ui:<N>\|lui:<N>\|lud:<N>`        | Periodic 7-value counter record          | All builds; abbreviations opaque                        |
 
 ### `output` (umbrella transcript — dedupe against source channels)
 
@@ -274,16 +274,16 @@ failures, script serialization-layout mismatch, embedded browser/audio-driver fa
 
 ### `inventory`
 
-| Event literal (shape)                                    | Meaning                          | Direct versions                                                                   |
-| -------------------------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------- |
-| `[<ID>                                                   | <NICK>                           | Profile]<CORR> - Client operation rejected by server:<CODE> - OperationType:<OP>` | Server rejected move/magazine/search/note ops | 7 C builds |
-| `Cannot put item … to slot … because it contains item …` | Slot/attachment occupied         | C: `1.1.0.0.46657`                                                                |
-| `No parent inventory … activity from item:…`             | Orphaned item activity           | C: `0.16.8.0.37972`, `1.0.0.2.42157`                                              |
-| `operation can't be created … cant find by …`            | Stale server-side item reference | 4 C builds                                                                        |
-| `… is blocked … with <WORLD_OBJECT>`                     | Physical constraint              | Channel-set                                                                       |
-| `… is too far away from <POSITION>`                      | Range validation                 | C: `1.0.1.0.42625`, `1.0.2.0.43037`                                               |
-| `Cloned item ID desync. Expected ID:…, real ID:…`        | Replication mismatch             | Channel-set                                                                       |
-| Quest note/link conflicts                                | Note already read / missing      | Channel-set                                                                       |
+| Event literal (shape)                                                                             | Meaning                                       | Direct versions                      |
+| ------------------------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------ |
+| `[<ID>\|<NICK>\|Profile]<CORR> - Client operation rejected by server:<CODE> - OperationType:<OP>` | Server rejected move/magazine/search/note ops | 7 C builds                           |
+| `Cannot put item … to slot … because it contains item …`                                          | Slot/attachment occupied                      | C: `1.1.0.0.46657`                   |
+| `No parent inventory … activity from item:…`                                                      | Orphaned item activity                        | C: `0.16.8.0.37972`, `1.0.0.2.42157` |
+| `operation can't be created … cant find by …`                                                     | Stale server-side item reference              | 4 C builds                           |
+| `… is blocked … with <WORLD_OBJECT>`                                                              | Physical constraint                           | Channel-set                          |
+| `… is too far away from <POSITION>`                                                               | Range validation                              | C: `1.0.1.0.42625`, `1.0.2.0.43037`  |
+| `Cloned item ID desync. Expected ID:…, real ID:…`                                                 | Replication mismatch                          | Channel-set                          |
+| Quest note/link conflicts                                                                         | Note already read / missing                   | Channel-set                          |
 
 ### `player`, `insurance`, `files-checker`, `maperrors`, `objectPool`, `spatial-audio`
 
@@ -330,16 +330,16 @@ failures, script serialization-layout mismatch, embedded browser/audio-driver fa
 
 ## Part 3 — What the logs cannot answer (do not automate off these)
 
-| Question                                               | Status                                                                                                      |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| "When exactly did the player extract?"                 | Only survival-class `ExitStatus` proves it — **H-only**. In C, outcome is not directly logged; keep unknown |
-| "Was the player killed?"                               | `DeathScreen_Shown` is a timing label, not proof; no direct killed marker in C                              |
-| "Which quest did the user just accept?"                | No accept event/route; correlate `ChatMessageReceived` quest-template text + `profileChangeEvents`          |
-| "Did the user hand over the task item?"                | No handover event; `/client/game/profile/items/moving` is generic                                           |
-| "Did insurance pay out / items return?"                | No success, payment, expiry, return-timer, or returned-item event exists                                    |
-| "Is the player ready?" (single event)                  | No universal `PlayerReady`; use the readiness cluster                                                       |
-| "What exactly happened at raid end in current builds?" | Only `OnGameSessionEnd` (4 C builds) + `UserMatchOver` + `/client/match/local/end                           | exit`; not every raid logs them |
-| "What do `rpi/rwi/rsi/rci/ui/lui/lud` mean?"           | Opaque in all evidence; treat as opaque counters                                                            |
+| Question                                               | Status                                                                                                               |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| "When exactly did the player extract?"                 | Only survival-class `ExitStatus` proves it — **H-only**. In C, outcome is not directly logged; keep unknown          |
+| "Was the player killed?"                               | `DeathScreen_Shown` is a timing label, not proof; no direct killed marker in C                                       |
+| "Which quest did the user just accept?"                | No accept event/route; correlate `ChatMessageReceived` quest-template text + `profileChangeEvents`                   |
+| "Did the user hand over the task item?"                | No handover event; `/client/game/profile/items/moving` is generic                                                    |
+| "Did insurance pay out / items return?"                | No success, payment, expiry, return-timer, or returned-item event exists                                             |
+| "Is the player ready?" (single event)                  | No universal `PlayerReady`; use the readiness cluster                                                                |
+| "What exactly happened at raid end in current builds?" | Only `OnGameSessionEnd` (4 C builds) + `UserMatchOver` + `/client/match/local/end \| exit`; not every raid logs them |
+| "What do `rpi/rwi/rsi/rci/ui/lui/lud` mean?"           | Opaque in all evidence; treat as opaque counters                                                                     |
 
 ## Part 4 — Maintaining these docs (no manual log reading)
 

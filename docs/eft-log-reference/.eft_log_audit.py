@@ -11,6 +11,7 @@ import argparse
 import collections
 import json
 import re
+import sys
 from pathlib import Path
 
 
@@ -48,7 +49,6 @@ SIGNATURES: list[tuple[str, list[bytes], list[bytes]]] = [
     ("game_spawn", [b"gamespawn"], []),
     ("game_runned", [b"gamerunned"], []),
     ("game_starting", [b"gamestarting"], []),
-    ("start_game", [b"startgame"], []),
     ("game_started", [b"gamestarted"], []),
     ("transit", [b"[transit]"], []),
     ("scene_preset", [b"scene preset path"], []),
@@ -62,7 +62,7 @@ SIGNATURES: list[tuple[str, list[bytes], list[bytes]]] = [
     ("interactive_menu_ready", [b"interactivemenuready"], []),
     ("http_request", [b"---> request https"], []),
     ("http_response", [b"<--- response https"], []),
-    ("http_crc", [b"crc:", b"crc :"], []),
+    ("http_crc", [b"crc:", b"crc :"], [b"https"]),
     ("http_error", [b"<--- error https", b"<--- error! https"], []),
     ("http_retry", [b"will be retried after"], []),
     ("backend_cache_mismatch", [b"cache: mis-matched", b"cache: mismatched"], []),
@@ -122,14 +122,28 @@ SIGNATURE_ANCHOR_RE = re.compile(
 ENDPOINT_RE = re.compile(rb"(?:(?:https?|wss)://[^/\s\"']+)?((?:/v2)?/client/[A-Za-z0-9_./-]+|/router)(?:\?[^\s\"']*)?", re.I)
 NOTIFICATION_RE = re.compile(rb"Got notification\s*\|\s*([A-Za-z][A-Za-z0-9_]*)", re.I)
 SERVICE_NOTIFICATION_RE = re.compile(rb"Service Notifications\s+([A-Za-z][A-Za-z0-9_]*)", re.I)
-ARENA_EVENT_RE = re.compile(rb"\b(?:event|message|type|method|action)\b\s*[:=]\s*[\"']?([A-Za-z][A-Za-z0-9_.-]{2,80})", re.I)
+ARENA_EVENT_RE = re.compile(
+    rb"\b(?:event|message|type|method|action|ApplicationState|MatchingProgressState|GameplayState)\b\s*[:=]\s*[\"']?([A-Za-z][A-Za-z0-9_.-]{2,80})",
+    re.I,
+)
 
 
 def sanitized_shape(raw: bytes) -> str:
+    """Sanitize and normalize raw log messages for privacy-safe aggregate shape reporting.
+
+    Replaces URLs, network endpoints (IPv4/IPv6), emails, file paths (UNC/drive),
+    unique identifiers, session tokens, profile IDs, nicknames, strings, and numeric
+    values with standardized placeholders.
+    """
     text = raw.decode("utf-8", "replace")
     text = re.sub(r"https?://\S+|wss?://\S+", "<URL>", text, flags=re.I)
     text = re.sub(r"\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b", "<ENDPOINT>", text)
+    text = re.sub(r"\[[0-9a-f:]{2,45}\](?::\d+)?", "<ENDPOINT>", text, flags=re.I)
+    text = re.sub(r"\b(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}(?::\d+)?\b", "<ENDPOINT>", text, flags=re.I)
+    text = re.sub(r"[^\s@]+@[^\s@]+\.[A-Za-z]{2,}", "<EMAIL>", text)
+    text = re.sub(r"\\\\[^\s\\]+(?:\\\S+)?", "<PATH>", text)
     text = re.sub(r"[A-Za-z]:\\\S+", "<PATH>", text)
+    text = re.sub(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b", "<ID>", text, flags=re.I)
     text = re.sub(r"\b[0-9a-f]{8}-[0-9a-f-]{27,}\b", "<ID>", text, flags=re.I)
     text = re.sub(r"\b[0-9a-f]{16,}\b", "<ID>", text, flags=re.I)
     text = re.sub(r"\b(?=[A-Za-z0-9_-]{20,}\b)(?=.*\d)[A-Za-z0-9_-]+", "<TOKEN>", text)
@@ -144,16 +158,19 @@ def sanitized_shape(raw: bytes) -> str:
 
 
 def session_version(path: Path) -> str:
+    """Extract the game version string from the parent session directory name."""
     match = VERSION_RE.search(path.parent.name)
     return match.group(1) if match else "unparsed"
 
 
 def directory_version(path: Path) -> str:
+    """Extract the game version string from a session directory name."""
     match = VERSION_RE.search(path.name)
     return match.group(1) if match else "unparsed"
 
 
 def filename_channel(path: Path) -> str:
+    """Extract the logical channel name from a log filename."""
     stem = path.stem
     version_match = re.search(r"\d+\.\d+\.\d+\.\d+\.\d+", stem)
     channel = stem[version_match.end():].lstrip(" _-") if version_match else stem
@@ -161,19 +178,28 @@ def filename_channel(path: Path) -> str:
 
 
 def normalize_endpoint(raw: bytes) -> str:
+    """Normalize dynamic identifiers in API endpoints to generic <ID> placeholders."""
     text = raw.decode("ascii", "ignore").rstrip(".,;:)]}")
-    text = re.sub(r"/[0-9a-f]{16,}(?=/|$)", "/<ID>", text, flags=re.I)
+    text = re.sub(
+        r"/(?:[0-9a-f]{16,}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{8}-[0-9a-f-]{15,})(?=/|$)",
+        "/<ID>",
+        text,
+        flags=re.I,
+    )
     text = re.sub(r"/\d{4,}(?=/|$)", "/<ID>", text)
     return text.rstrip("/") or "/"
 
 
 def normalize_documented_endpoint(text: str) -> str:
+    """Normalize angle-bracket placeholders in documented endpoint paths to <ID>."""
     text = re.sub(r"<[^>]+>", "<ID>", text)
     return text.rstrip("/") or "/"
 
 
-def sorted_versions(values) -> list[str]:
+def sorted_versions(values: collections.abc.Iterable[str]) -> list[str]:
+    """Sort version strings chronologically/semantically by dot-separated numeric tuple."""
     def key(value: str):
+        """Map version string to tuple of integers for sorting."""
         try:
             return tuple(int(part) for part in value.split("."))
         except ValueError:
@@ -182,6 +208,7 @@ def sorted_versions(values) -> list[str]:
 
 
 def main() -> None:
+    """Parse command-line arguments and run the EFT log audit pipeline."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--main-root", type=Path, required=True)
     parser.add_argument("--arena-root", type=Path, required=True)
@@ -206,6 +233,8 @@ def main() -> None:
     for game, root in roots:
         if root.is_dir():
             files.extend((game, path) for path in root.rglob("*.log"))
+        else:
+            sys.stderr.write(f"Warning: root directory for '{game}' not found or not a directory: {root}\n")
 
     version_sessions: dict[tuple[str, str], set[Path]] = collections.defaultdict(set)
     channel_files: collections.Counter[tuple[str, str, str]] = collections.Counter()
@@ -219,6 +248,7 @@ def main() -> None:
     session_notifications: dict[Path, set[tuple[str, str]]] = collections.defaultdict(set)
     arena_fields: dict[Path, set[tuple[str, str]]] = collections.defaultdict(set)
     shapes: collections.Counter[tuple[str, str, str]] = collections.Counter()
+    unreadable: collections.Counter[str] = collections.Counter()
 
     for game, path in files:
         version = session_version(path)
@@ -270,7 +300,7 @@ def main() -> None:
                             session_modes[session].add("E")
                         if b"pvp-season" in lower or b"pvp_season" in lower:
                             session_modes[session].add("S")
-                        if (b"gw-pvp" in lower or b"wsn-pvp" in lower) and b"pvp-season" not in lower:
+                        if (b"gw-pvp" in lower or b"wsn-pvp" in lower) and b"pvp-season" not in lower and b"pvp_season" not in lower:
                             session_modes[session].add("P")
 
                     if scan_signatures:
@@ -306,8 +336,9 @@ def main() -> None:
                         shape = sanitized_shape(message)
                         if shape:
                             shapes[(game, file_channel, shape)] += 1
-        except (OSError, PermissionError) as exc:
-            raise SystemExit(f"Could not read a log file: {type(exc).__name__}") from exc
+        except OSError as exc:
+            unreadable[type(exc).__name__] += 1
+            continue
 
     signature_evidence: dict[tuple[str, str, str], set[str]] = collections.defaultdict(set)
     endpoint_evidence: dict[tuple[str, str], set[str]] = collections.defaultdict(set)
@@ -357,6 +388,7 @@ def main() -> None:
             }
             for game, _ in roots
         },
+        "unreadable_files": dict(unreadable),
         "channels": [
             {
                 "game": game,
@@ -404,8 +436,13 @@ def main() -> None:
         ],
     }
     if args.section == "endpoints" and args.reference:
+        if not args.reference.is_file():
+            raise SystemExit(f"Reference file not found: {args.reference}")
         reference_text = args.reference.read_text(encoding="utf-8")
-        endpoint_section = reference_text.split("#### Complete observed endpoint inventory", 1)[1].split("### `backendCache`", 1)[0]
+        start_anchor = "#### Complete observed endpoint inventory"
+        if start_anchor not in reference_text:
+            raise SystemExit(f"Reference file has no '{start_anchor}' section")
+        endpoint_section = reference_text.split(start_anchor, 1)[1].split("### `backendCache`", 1)[0]
         documented_paths = {
             normalize_documented_endpoint(value)
             for value in re.findall(r"`((?:/v2)?/client/[^`?]+|/router)(?:\?[^`]*)?`", endpoint_section)
@@ -420,7 +457,7 @@ def main() -> None:
             "historical_not_current": sorted(documented_paths - current_paths),
         }
     section_keys = {
-        "corpus": ("corpus",),
+        "corpus": ("corpus", "unreadable_files"),
         "channels": ("channels",),
         "modes": ("mode_session_counts",),
         "signatures": ("signatures",),
