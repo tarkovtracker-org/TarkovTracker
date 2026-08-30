@@ -1,5 +1,6 @@
-import { createError } from 'h3';
+import { createAdminError } from '@/server/utils/adminError';
 import { createLogger } from '@/server/utils/logger';
+import { ADMIN_ERROR_CODES } from '@/utils/adminErrors';
 const logger = createLogger('AdminSupabase');
 const SUPABASE_ADMIN_FETCH_TIMEOUT_MS = 5000;
 function isHttpError(error: unknown): error is { statusCode: number } {
@@ -60,7 +61,11 @@ export async function adminSupabaseFetch<T>(
         status: response.status,
         body: body.slice(0, 300),
       });
-      throw createError({ statusCode: 502, message: 'Supabase request failed' });
+      throw createAdminError(
+        502,
+        ADMIN_ERROR_CODES.SUPABASE_REQUEST_FAILED,
+        'Supabase request failed'
+      );
     }
     if (response.status === 204) {
       return null;
@@ -75,7 +80,11 @@ export async function adminSupabaseFetch<T>(
       throw error;
     }
     logger.error('Supabase request failed', { path, error });
-    throw createError({ statusCode: 502, message: 'Supabase request failed' });
+    throw createAdminError(
+      502,
+      ADMIN_ERROR_CODES.SUPABASE_REQUEST_FAILED,
+      'Supabase request failed'
+    );
   } finally {
     clearTimeout(timeout);
   }

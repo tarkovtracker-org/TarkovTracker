@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import AdminTwitchConfigCard from '@/features/admin/AdminTwitchConfigCard.vue';
 import { logger } from '@/utils/logger';
+import { ADMIN_CARD_STUBS } from './adminCardStubs';
 const { fetchMock, getSessionMock, refreshSessionMock, toastAddMock } = vi.hoisted(() => ({
   fetchMock: vi.fn(),
   getSessionMock: vi.fn(),
@@ -36,28 +37,7 @@ vi.mock('vue-i18n', async (importOriginal) => ({
 const mountCard = () =>
   mount(AdminTwitchConfigCard, {
     global: {
-      stubs: {
-        GenericCard: { template: '<div><slot name="content" /></div>' },
-        UButton: {
-          props: ['disabled', 'loading'],
-          emits: ['click'],
-          template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
-        },
-        UFormField: { template: '<label><slot /></label>' },
-        UIcon: true,
-        UInput: {
-          props: ['modelValue'],
-          emits: ['update:modelValue'],
-          template:
-            '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-        },
-        USwitch: {
-          props: ['modelValue'],
-          emits: ['update:modelValue'],
-          template:
-            '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
-        },
-      },
+      stubs: ADMIN_CARD_STUBS,
     },
   });
 describe('AdminTwitchConfigCard', () => {
@@ -138,14 +118,16 @@ describe('AdminTwitchConfigCard', () => {
       })
     );
   });
-  it('surfaces the server validation message on failure', async () => {
+  it('maps the server error code to localized copy on failure', async () => {
     vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     fetchMock.mockImplementation((url: string) => {
       if (url === '/api/twitch/config') {
         return Promise.resolve({ channel: 'streamer', displayName: 'Streamer', enabled: true });
       }
       return Promise.reject(
-        Object.assign(new Error('Bad Request'), { data: { message: 'Invalid channel' } })
+        Object.assign(new Error('Bad Request'), {
+          data: { data: { code: 'invalid_channel' }, statusMessage: 'Invalid channel' },
+        })
       );
     });
     const wrapper = mountCard();
@@ -153,7 +135,7 @@ describe('AdminTwitchConfigCard', () => {
     await wrapper.find('button').trigger('click');
     await flushPromises();
     expect(toastAddMock).toHaveBeenCalledWith(
-      expect.objectContaining({ color: 'error', description: 'Invalid channel' })
+      expect.objectContaining({ color: 'error', description: 'admin.error.invalid_channel' })
     );
   });
   it('reports and logs a load failure separately from a save failure', async () => {
@@ -175,7 +157,9 @@ describe('AdminTwitchConfigCard', () => {
   });
   it('logs a save failure before displaying the existing error toast', async () => {
     const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
-    const error = Object.assign(new Error('Bad Request'), { data: { message: 'Invalid channel' } });
+    const error = Object.assign(new Error('Bad Request'), {
+      data: { data: { code: 'invalid_channel' }, statusMessage: 'Invalid channel' },
+    });
     fetchMock.mockImplementation((url: string) => {
       if (url === '/api/twitch/config') {
         return Promise.resolve({ channel: 'streamer', displayName: 'Streamer', enabled: true });
@@ -191,7 +175,21 @@ describe('AdminTwitchConfigCard', () => {
       error
     );
     expect(toastAddMock).toHaveBeenCalledWith(
-      expect.objectContaining({ color: 'error', description: 'Invalid channel' })
+      expect.objectContaining({ color: 'error', description: 'admin.error.invalid_channel' })
     );
+  });
+  it('shows the localized sign-in prompt when no session token is available', async () => {
+    getSessionMock.mockResolvedValue({ data: { session: null } });
+    const wrapper = mountCard();
+    await flushPromises();
+    await wrapper.find('button').trigger('click');
+    await flushPromises();
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        color: 'error',
+        description: 'admin.error.authentication_required',
+      })
+    );
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/admin/twitch-config', expect.anything());
   });
 });

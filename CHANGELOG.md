@@ -1,3 +1,32 @@
+## [1.73.11](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.10...v1.73.11) (2026-08-30)
+
+
+### Bug Fixes
+
+* **app:** clear exchanged OAuth callback code ([d6f7f92](https://github.com/tarkovtracker-org/TarkovTracker/commit/d6f7f9244a8cbc0a3bf092eec0251b12779121c5))
+* **app:** make OAuth PKCE callback exchange explicit ([a936466](https://github.com/tarkovtracker-org/TarkovTracker/commit/a93646692e4ee91bf350b430e240dbefc52a3e4a))
+* **app:** reset OAuth callback state after exchange ([21f9aaf](https://github.com/tarkovtracker-org/TarkovTracker/commit/21f9aaf38299a61f8277b0f2b561fb8e330ba04c))
+* **app:** scope OAuth PKCE exchange to callback route and defer to ready ([521ddef](https://github.com/tarkovtracker-org/TarkovTracker/commit/521ddefec9aa226bd1046d17df710f6dfc6514b0))
+* **app:** share the pending OAuth exchange across ready callers ([3c58493](https://github.com/tarkovtracker-org/TarkovTracker/commit/3c58493326dc5a8d6d461c96443203b26c5c8bd8))
+
+## [1.73.10](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.9...v1.73.10) (2026-08-29)
+
+
+### Bug Fixes
+
+* **supabase:** secure team membership delete trigger ([e76bb68](https://github.com/tarkovtracker-org/TarkovTracker/commit/e76bb68880bb05a3e76ee7426bf89a9fffbaba65))
+
+## [1.73.9](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.8...v1.73.9) (2026-08-29)
+
+
+### Bug Fixes
+
+* **test:** consolidate admin access coverage ([900ee96](https://github.com/tarkovtracker-org/TarkovTracker/commit/900ee9681dca8173417c8f5d51f3b5713d1ef169))
+* **api:** harden admin error handling ([830eb37](https://github.com/tarkovtracker-org/TarkovTracker/commit/830eb374b5a022f9d051e0ab7e7fd80125757f10))
+* **api:** normalize admin error payloads ([c824dc1](https://github.com/tarkovtracker-org/TarkovTracker/commit/c824dc12f14a05127954512d252843953230a20c))
+* **test:** reduce admin error assertion duplication ([72c9c09](https://github.com/tarkovtracker-org/TarkovTracker/commit/72c9c0973671d9b4f9c7d9211f55d1b56f1f0683))
+* **api:** return stable admin error codes ([92a72e9](https://github.com/tarkovtracker-org/TarkovTracker/commit/92a72e9e7856fb09ba0ec88c70ff8990405a8723))
+
 ## [1.73.8](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.7...v1.73.8) (2026-08-29)
 
 
