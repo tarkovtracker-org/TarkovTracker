@@ -203,7 +203,8 @@ export default defineNuxtPlugin({
     const stub = buildStub();
     let initPromise: Promise<void> | null = null;
     let supabaseClient: SupabaseClient | null = null;
-    const oauthCallbackCode = readOAuthCallbackCode();
+    let oauthCallbackCode = readOAuthCallbackCode();
+    const hasCodeQueryParam = currentSearchParams().has('code');
     const hasStoredSession = () => {
       try {
         return hasSupabaseAuthSessionHint();
@@ -226,7 +227,7 @@ export default defineNuxtPlugin({
           const { createClient } = await import('@supabase/supabase-js');
           const client = createClient(supabaseUrl, supabaseKey, {
             auth: {
-              detectSessionInUrl: !oauthCallbackCode,
+              detectSessionInUrl: !hasCodeQueryParam,
               flowType: 'pkce',
             },
           });
@@ -277,7 +278,9 @@ export default defineNuxtPlugin({
       if (!oauthCallbackCode) {
         return false;
       }
-      oauthExchangePromise ??= exchangeOAuthCode(oauthCallbackCode);
+      oauthExchangePromise ??= exchangeOAuthCode(oauthCallbackCode).finally(() => {
+        oauthCallbackCode = null;
+      });
       await oauthExchangePromise;
       return true;
     };

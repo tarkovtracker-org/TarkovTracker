@@ -171,10 +171,16 @@ describe('supabase plugin', () => {
         data: { session: createSession('user-code') },
         error: null,
       });
-      const getSession = vi.fn().mockResolvedValue({
-        data: { session: null },
-        error: null,
-      });
+      const getSession = vi
+        .fn()
+        .mockResolvedValueOnce({
+          data: { session: null },
+          error: null,
+        })
+        .mockResolvedValue({
+          data: { session: createSession('user-refreshed') },
+          error: null,
+        });
       mockAuthClient({
         exchangeCodeForSession,
         getSession,
@@ -192,6 +198,18 @@ describe('supabase plugin', () => {
       expect(result?.provide.supabase.user.loggedIn).toBe(true);
       expect(window.location.pathname).toBe('/auth/callback');
       expect(window.location.search).toBe('?redirect=%2Ftasks');
+      await result?.provide.supabase.ready();
+      expect(getSession).toHaveBeenCalledTimes(2);
+      expect(result?.provide.supabase.user.id).toBe('user-refreshed');
+      vi.resetModules();
+      const reloadedPlugin = (await import('@/plugins/supabase.client')).default;
+      const reloadedResult = (await reloadedPlugin.setup?.(
+        {} as Parameters<NonNullable<typeof reloadedPlugin.setup>>[0]
+      )) as SupabasePluginProvide | undefined;
+      await flushPlugin();
+      expect(exchangeCodeForSession).toHaveBeenCalledTimes(1);
+      expect(reloadedResult?.provide.supabase.user.id).toBe('user-refreshed');
+      expect(mockCreateClient).toHaveBeenCalledTimes(2);
       expect(mockCreateClient).toHaveBeenCalledWith(
         'https://test.supabase.co',
         'test-anon-key',
@@ -216,9 +234,16 @@ describe('supabase plugin', () => {
         data: { session: null },
         error: exchangeError,
       });
+      const getSession = vi
+        .fn()
+        .mockResolvedValueOnce({ data: { session: null }, error: null })
+        .mockResolvedValue({
+          data: { session: createSession('user-after-retry') },
+          error: null,
+        });
       mockAuthClient({
         exchangeCodeForSession,
-        getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+        getSession,
       });
       const plugin = (await import('@/plugins/supabase.client')).default;
       const result = (await plugin.setup?.(
@@ -226,7 +251,11 @@ describe('supabase plugin', () => {
       )) as SupabasePluginProvide | undefined;
       await flushPlugin();
       await expect(result?.provide.supabase.ready()).rejects.toThrow('invalid_grant');
+      expect(window.location.search).toBe('?code=expired-code');
       expect(result?.provide.supabase.user.loggedIn).toBe(false);
+      await expect(result?.provide.supabase.ready()).resolves.toBeUndefined();
+      expect(getSession).toHaveBeenCalledTimes(2);
+      expect(result?.provide.supabase.user.id).toBe('user-after-retry');
     } finally {
       window.history.replaceState(null, '', '/');
     }
@@ -254,7 +283,7 @@ describe('supabase plugin', () => {
         'test-anon-key',
         expect.objectContaining({
           auth: {
-            detectSessionInUrl: true,
+            detectSessionInUrl: false,
             flowType: 'pkce',
           },
         })
