@@ -57,14 +57,14 @@
           <div
             class="bg-surface-800/50 border-surface-700 flex min-h-11 items-center justify-between gap-3 rounded-lg border px-3 py-2 transition-colors duration-200"
             :class="{
-              'hover:border-surface-600 cursor-pointer': !itemsHideAll,
+              'hover:border-surface-600': !itemsHideAll,
               'cursor-not-allowed opacity-50': itemsHideAll,
             }"
             data-testid="nonfir-row"
           >
             <button
               type="button"
-              class="text-surface-200 focus-visible:outline-primary-500 min-h-11 flex-1 text-left text-sm font-medium focus-visible:outline-3 focus-visible:outline-offset-2 disabled:cursor-not-allowed"
+              class="text-surface-200 focus-visible:outline-primary-500 min-h-11 flex-1 cursor-pointer text-left text-sm font-medium focus-visible:outline-3 focus-visible:outline-offset-2 disabled:cursor-not-allowed"
               :disabled="itemsHideAll"
               @click="toggleNonFIR"
             >
@@ -81,14 +81,14 @@
           <div
             class="bg-surface-800/50 border-surface-700 flex min-h-11 items-center justify-between gap-3 rounded-lg border px-3 py-2 transition-colors duration-200"
             :class="{
-              'hover:border-surface-600 cursor-pointer': !itemsHideAll,
+              'hover:border-surface-600': !itemsHideAll,
               'cursor-not-allowed opacity-50': itemsHideAll,
             }"
             data-testid="hideout-row"
           >
             <button
               type="button"
-              class="text-surface-200 focus-visible:outline-primary-500 min-h-11 flex-1 text-left text-sm font-medium focus-visible:outline-3 focus-visible:outline-offset-2 disabled:cursor-not-allowed"
+              class="text-surface-200 focus-visible:outline-primary-500 min-h-11 flex-1 cursor-pointer text-left text-sm font-medium focus-visible:outline-3 focus-visible:outline-offset-2 disabled:cursor-not-allowed"
               :disabled="itemsHideAll"
               @click="toggleHideout"
             >
