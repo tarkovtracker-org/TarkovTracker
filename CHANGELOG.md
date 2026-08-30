@@ -1,3 +1,20 @@
+# [1.74.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.12...v1.74.0) (2026-08-30)
+
+
+### Bug Fixes
+
+* **team:** address PR review findings ([45f942c](https://github.com/tarkovtracker-org/TarkovTracker/commit/45f942c6bb9bc60b3f14177dbac637fb2d16edd1))
+* **team:** align visibility row interaction states ([6b0f19a](https://github.com/tarkovtracker-org/TarkovTracker/commit/6b0f19a3aa6b8cee69260797ff788f7f41314af5))
+* **team:** guard delayed membership cleanup ([03669a7](https://github.com/tarkovtracker-org/TarkovTracker/commit/03669a7cefe9e3c20ddf8764471e06f43b912281))
+* **team:** harden collaboration page interactions ([3b2abbd](https://github.com/tarkovtracker-org/TarkovTracker/commit/3b2abbda8f0fea514e7ba2111a2f6a09d42f6463))
+* **team:** ignore stale invite copy results ([37cc754](https://github.com/tarkovtracker-org/TarkovTracker/commit/37cc7540f45c4ca8430cae2dd94a4c1c8c0321a6))
+* **team:** keep clipboard helper within audit limits ([26d2d7a](https://github.com/tarkovtracker-org/TarkovTracker/commit/26d2d7a3ad7e609bc90150ea020f095d3ba55053))
+
+
+### Features
+
+* **ui:** modernize Team collaboration page ([13db1d8](https://github.com/tarkovtracker-org/TarkovTracker/commit/13db1d8ecd06e708adc587908449802cadf5fd39))
+
 ## [1.73.12](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.11...v1.73.12) (2026-08-30)
 
 
