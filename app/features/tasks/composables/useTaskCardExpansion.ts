@@ -1,3 +1,4 @@
+import type { ComputedRef } from '#imports';
 type ComputedRefLike<T> = Readonly<{ value: T }>;
 type TaskCardExpansionInputs = {
   taskId: () => string;
@@ -7,6 +8,12 @@ type TaskCardExpansionInputs = {
   hideTaskRewards: () => boolean;
   routeTaskId: () => string | undefined;
 };
+export type UseTaskCardExpansionReturn = {
+  isCollapsible: ComputedRef<boolean>;
+  rewardsHidden: ComputedRef<boolean>;
+  taskExpanded: ComputedRef<boolean>;
+  toggleTaskVisibility: () => void;
+};
 export function useTaskCardExpansion({
   taskId,
   isCompact,
@@ -14,7 +21,7 @@ export function useTaskCardExpansion({
   collapseByDefault,
   hideTaskRewards,
   routeTaskId,
-}: TaskCardExpansionInputs) {
+}: TaskCardExpansionInputs): UseTaskCardExpansionReturn {
   const taskToggle = ref(true);
   const isDeepLinkedTask = computed(() => routeTaskId() === taskId());
   const isCollapsible = computed(() => onMapView.value || isCompact.value);
