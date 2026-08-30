@@ -1209,6 +1209,51 @@
       "meta": {
         "description": "Collaborate with teammates on Escape from Tarkov progress. Share quest completions, hideout status, and coordinate item gathering."
       },
+      "page_title": "Team",
+      "page_description": "Invite teammates, choose which team progress you see, and track together.",
+      "invite": {
+        "title": "Invite link",
+        "subtitle": "Share your team with trusted teammates.",
+        "link_label": "Team invite URL",
+        "helper": "Anyone with this link can join your team.",
+        "show": "Show link",
+        "hide": "Hide link",
+        "copy": "Copy link",
+        "copied": "Copied!"
+      },
+      "members": {
+        "title": "Members ({count})",
+        "no_members": "No members in this team yet. Share your invite link to add teammates.",
+        "alone": "You're alone here — share your invite link to add teammates.",
+        "copy_invite": "Copy invite link",
+        "copied": "Copied!"
+      },
+      "visibility": {
+        "title": "Visibility settings",
+        "description": "Control which teammates' progress appears on your tracker.",
+        "items_section": "Items",
+        "show_tasks": "Show team members' tasks",
+        "show_items": "Show team members' needed items",
+        "show_non_fir": "Show non-FIR needed items",
+        "show_hideout": "Show hideout needed items",
+        "show_maps": "Show team members' map objectives"
+      },
+      "danger_zone": {
+        "title": "Danger zone",
+        "disband_description": "Disbanding removes the team for all members. This cannot be undone.",
+        "leave_description": "Leaving removes you from this team. Your progress stays on your account.",
+        "disband": "Disband team",
+        "leave": "Leave team",
+        "confirm_disband_title": "Disband team?",
+        "confirm_disband_description": "This removes the team and its membership for everyone. This cannot be undone.",
+        "confirm_leave_title": "Leave team?",
+        "confirm_leave_description": "You will leave this team and stop sharing progress with its members.",
+        "confirm_disband": "Yes, disband team",
+        "confirm_leave": "Yes, leave team",
+        "disband_success": "Team disbanded successfully.",
+        "disband_error": "Failed to disband team.",
+        "action_error": "Unable to update team membership."
+      },
       "card": {
         "manageteam": {
           "title": "Team Members",
@@ -1218,7 +1263,12 @@
             "owner": "Owner",
             "taskscomplete": "{completed}/{total} tasks completed",
             "kick_success": "Teammate kicked successfully.",
-            "kick_error": "Error kicking teammate."
+            "kick_error": "Error kicking teammate.",
+            "level_badge_alt": "Level {level} badge",
+            "hide_progress": "Hide {name}'s progress from me",
+            "show_progress": "Show {name}'s progress to me",
+            "enable_team_tasks": "Show team members' tasks before changing an individual member",
+            "remove_member": "Remove {name} from team"
           }
         },
         "teamoptions": {
