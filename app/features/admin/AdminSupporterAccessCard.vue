@@ -1,6 +1,7 @@
 <script setup lang="ts">
   import { useSupporter } from '@/composables/useSupporter';
   import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
+  import { refreshSupabaseSession } from '@/utils/supabaseAuth';
   const { $supabase } = useNuxtApp();
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
@@ -27,8 +28,8 @@
       const sessionResp = await $supabase.client.auth.getSession();
       let token = sessionResp.data.session?.access_token ?? null;
       if (!token) {
-        const refreshed = await $supabase.client.auth.refreshSession();
-        token = refreshed.data.session?.access_token ?? null;
+        const refreshed = await refreshSupabaseSession($supabase.client);
+        token = refreshed?.access_token ?? null;
       }
       if (!token) {
         throw new Error(t('admin.supporter_override_login_required'));

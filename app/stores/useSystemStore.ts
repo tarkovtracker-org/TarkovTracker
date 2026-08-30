@@ -105,6 +105,7 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
   }
   const systemStore = useSystemStore();
   const { $supabase } = useNuxtApp();
+  const listenerScope = effectScope(true);
   const membershipChannel = ref<RealtimeChannel | null>(null);
   let membershipRequestId = 0;
   let membershipSessionId = 0;
@@ -194,17 +195,27 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
       : undefined;
   });
   // Setup Supabase listener with reactive filter ref
-  const { cleanup, isSubscribed, hasInitiallyLoaded, loadError } = useSupabaseListener({
-    store: systemStore,
-    table: 'user_system',
-    filter: systemFilter,
-    storeId: 'system',
-    onData: handleSystemSnapshot,
-  });
+  const listenerState = listenerScope.run(() =>
+    useSupabaseListener({
+      store: systemStore,
+      table: 'user_system',
+      filter: systemFilter,
+      storeId: 'system',
+      onData: handleSystemSnapshot,
+      scope: listenerScope,
+    })
+  );
+  if (!listenerState) throw new Error('Failed to create system realtime listener');
+  const { cleanup, isSubscribed, hasInitiallyLoaded, loadError } = listenerState;
   const cleanupMembershipChannel = async () => {
-    if (!membershipChannel.value) return;
-    await $supabase.client.removeChannel(membershipChannel.value as unknown as RealtimeChannel);
+    const channelToRemove = membershipChannel.value;
     membershipChannel.value = null;
+    if (!channelToRemove) return;
+    try {
+      await $supabase.client.removeChannel(channelToRemove as unknown as RealtimeChannel);
+    } catch (error) {
+      logger.warn('[SystemStore] Failed to remove membership realtime channel:', error);
+    }
   };
   const setupMembershipChannel = async () => {
     const sessionId = ++membershipSessionId;
@@ -228,22 +239,24 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
       )
       .subscribe();
   };
-  const stopMembershipAuthWatch = watch(
-    () => [$supabase.user?.loggedIn, $supabase.user?.id] as const,
-    () => {
-      systemStore.$patch({
-        user_id: getAuthenticatedUserId(),
-        pvp_team_id: null,
-        pve_team_id: null,
-        seasonal_team_id: null,
-        team: null,
-        team_id: null,
-        is_admin: false,
-      } as Partial<SystemState>);
-      void setupMembershipChannel();
-    },
-    { immediate: true }
-  );
+  listenerScope.run(() => {
+    watch(
+      () => [$supabase.user?.loggedIn, $supabase.user?.id] as const,
+      () => {
+        systemStore.$patch({
+          user_id: getAuthenticatedUserId(),
+          pvp_team_id: null,
+          pve_team_id: null,
+          seasonal_team_id: null,
+          team: null,
+          team_id: null,
+          is_admin: false,
+        } as Partial<SystemState>);
+        void setupMembershipChannel();
+      },
+      { immediate: true }
+    );
+  });
   // Helper functions that provide properly typed access to team state
   const getTeamId = (): string | null => {
     // Pinia guarantees $state is always an object
@@ -261,9 +274,10 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
     loadError,
     cleanup: () => {
       membershipSessionId += 1;
-      stopMembershipAuthWatch();
       cleanup();
       void cleanupMembershipChannel();
+      listenerScope.stop();
+      if (systemStoreInstance === instance) systemStoreInstance = null;
     },
     getTeamId,
     hasTeam,

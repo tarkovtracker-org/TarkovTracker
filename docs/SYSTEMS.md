@@ -615,10 +615,15 @@ flowchart LR
    clients, and upserts each normalized row. The caller passes the season number its bundle was
    built for; the function writes the Seasonal row only when that number equals the database's
    active season, so a cached client from a previous season cannot upload stale Seasonal state.
-   Persistent PvP and PvE still sync in that case. API gateway reads resolve the active Seasonal
-   number through the database before selecting a row.
+   Persistent PvP and PvE still sync in that case. The RPC rejects payloads larger than 512 KiB and
+   allows at most 60 direct client syncs per user per minute. API gateway reads resolve the active
+   Seasonal number through the database before selecting a row.
 3. Realtime listens to both the account row and normalized rows. A normalized event is applied only
-   when its mode is supported and its season equals the active season.
+   when its mode is supported and its season equals the active season. The long-lived system and team
+   listeners run in detached scopes so route unmounts cannot orphan their channels. The team store
+   uses one private `team:<id>` channel for membership changes and multiplexed normalized progress
+   events; teammate stores consume those events locally instead of opening one channel per teammate
+   or trusting client-supplied broadcast state. Signing out removes all remaining Realtime channels.
 4. Profile sharing is stored per normalized row in `profile_public`. Public profile and streamer
    routes select the exact mode and season; teammates receive same-mode progress through RLS. The
    sharing RPC also mirrors persistent PvP/PvE visibility back to the legacy
@@ -651,6 +656,10 @@ flowchart LR
 
 - `supabase/migrations/20260804043342_normalize_game_mode_progress_and_add_seasonal.sql` — schema,
   RLS, compatibility triggers, `team_member_mode_summary`, sync/sharing/prestige RPCs
+- `supabase/migrations/20260830120000_secure_team_realtime_channels.sql` — private team broadcast
+  authorization and `user_system` Realtime publication
+- `supabase/migrations/20260830130000_harden_client_progress_access.sql` — authenticated progress
+  sync limits, client mutation revocation, and mode-scoped legacy teammate progress RPC
 - `supabase/migrations/20260829120000_add_atomic_team_disband.sql` — owner-scoped atomic team
   disband RPC and grants
 - `supabase/functions/team-disband/index.ts` — authenticated owner disband endpoint
@@ -712,11 +721,20 @@ flowchart LR
   progress server-side and returns only the derived display name, level, and completed-task count;
   progress blobs never reach the client in the team-members payload. That fallback is best-effort — a
   failed or timed-out legacy read is logged and the endpoint still returns the members it resolved.
-- Authenticated users can write only their own progress. Teammate reads require a shared team in
-  the same game mode; cross-mode teammates and outsiders cannot read a row.
-- New clients read teammate progress from mode rows. The teammate policy on `user_progress` is a
-  permanent dependency, not a rolling-deploy leftover: `useTeamStore` reads a teammate's legacy
-  persistent column when their normalized row is missing or carries no `level`. Account-wide metadata
+- Authenticated users can write only their own progress through the bounded sync RPC; direct client
+  mutations of team, membership, legacy progress, and normalized progress tables are revoked.
+  Teammate reads require a shared team in the same game mode; cross-mode teammates and outsiders
+  cannot read a row.
+- Team broadcast channels are private, and `realtime.messages` permits team members to send and
+  receive only the `team:<id>` topic for a team they belong to.
+- The team channel carries teammate mode-progress changes for all authorized rows; the client does
+  not create one Postgres Changes channel per teammate.
+- System and team singleton listeners own detached effect scopes and stop those scopes during explicit
+  cleanup, so their channel lifetime is independent of the route that first created them.
+- `user_system` is included in `supabase_realtime`, and sign-out tears down all client channels.
+- New clients read teammate progress from mode rows. When a persistent normalized row is missing or
+  carries no `level`, `useTeamStore` calls `get_teammate_legacy_progress` for only the teammate's
+  authorized mode column; the raw `user_progress` teammate policy is not used. Account-wide metadata
   for new clients is exposed through the authenticated team-members endpoint after explicit
   membership validation.
 - The public API, profile sharing, teams, backups, and streamer tools use the exact mode and active

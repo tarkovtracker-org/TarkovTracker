@@ -7,6 +7,7 @@
   import { useTeamStore } from '@/stores/useTeamStore';
   import { clearUserScopedAppStorage } from '@/utils/clientStorage';
   import { logger } from '@/utils/logger';
+  import { refreshSupabaseSession } from '@/utils/supabaseAuth';
   defineOptions({
     inheritAttrs: false,
   });
@@ -154,13 +155,8 @@
       if (!sessionData.session) {
         throw new Error('You must be logged in to delete your account.');
       }
-      const { data: refreshData, error: refreshError } =
-        await $supabase.client.auth.refreshSession();
-      if (refreshError) {
-        logger.error('Session refresh failed:', refreshError);
-        throw new Error('Your session has expired. Please refresh the page and try again.');
-      }
-      if (!refreshData.session) {
+      const refreshedSession = await refreshSupabaseSession($supabase.client);
+      if (!refreshedSession) {
         throw new Error('Unable to verify your session. Please refresh the page and try again.');
       }
       const { data, error } = await $supabase.client.functions.invoke('account-delete');

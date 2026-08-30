@@ -1,5 +1,5 @@
 // eslint-disable-next-line import-x/order
-import type { SupabaseClient, User } from '@supabase/supabase-js';
+import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
 import { hasSupabaseAuthSessionHint } from '@/utils/clientStorage';
 import { logger } from '@/utils/logger';
 import { shouldUseOfflineSupabaseFallback } from '@/utils/runtimeConfig';
@@ -135,7 +135,7 @@ export default defineNuxtPlugin({
           throw new Error('Supabase not configured - login unavailable in offline mode');
         },
         signOut: async () => {},
-        ready: async () => {},
+        ready: async () => null,
       };
     };
     if (!supabaseUrl || !supabaseKey) {
@@ -170,19 +170,15 @@ export default defineNuxtPlugin({
     });
     const stub = buildStub();
     let initPromise: Promise<void> | null = null;
+    let readySessionPromise: Promise<Session | null> | null = null;
     let supabaseClient: SupabaseClient | null = null;
+    let currentSession: Session | null = null;
     const hasOAuthCallbackParams = () => {
       const searchParams = new URLSearchParams(window.location.search || '');
-      if (searchParams.has('code') || searchParams.has('error')) {
-        return true;
-      }
-      const hash = window.location.hash.startsWith('#')
-        ? window.location.hash.slice(1)
-        : window.location.hash;
-      const hashParams = new URLSearchParams(hash.startsWith('?') ? hash.slice(1) : hash);
-      return (
-        hashParams.has('access_token') || hashParams.has('refresh_token') || hashParams.has('error')
-      );
+      if (['code', 'error'].some((key) => searchParams.has(key))) return true;
+      const hash = window.location.hash.replace(/^#/, '');
+      const hashParams = new URLSearchParams(hash.replace(/^\?/, ''));
+      return ['access_token', 'refresh_token', 'error'].some((key) => hashParams.has(key));
     };
     const hasStoredSession = () => {
       try {
@@ -193,51 +189,84 @@ export default defineNuxtPlugin({
       return false;
     };
     const hydrateFromSession = (session: { user?: User } | null) => {
+      currentSession = session as Session | null;
       hydrateUserFromSession(user, session?.user ?? null);
       if (session && window.location.hash.includes('access_token')) {
         window.history.replaceState(null, '', window.location.pathname + window.location.search);
         logger.debug('[Supabase] Cleaned OAuth hash from URL');
       }
     };
-    const ensureClientInitialized = async () => {
-      if (supabaseClient) return;
-      if (!initPromise) {
-        initPromise = (async () => {
-          const { createClient } = await import('@supabase/supabase-js');
-          const client = createClient(supabaseUrl, supabaseKey, {
-            auth: {
-              detectSessionInUrl: true,
-              flowType: 'pkce',
-            },
-          });
-          supabaseClient = client;
-          api.client = client;
-          client.auth.onAuthStateChange((_event, session) => {
-            hydrateFromSession(session);
-          });
-          const sessionResult = await client.auth.getSession();
-          hydrateFromSession(sessionResult.data?.session ?? null);
-        })()
-          .catch((error) => {
-            logger.error('[Supabase] Failed to initialize client', error);
-            throw error;
-          })
-          .finally(() => {
-            initPromise = null;
-          });
+    const removeAllRealtimeChannels = async () => {
+      if (!supabaseClient || typeof supabaseClient.removeAllChannels !== 'function') return;
+      try {
+        await supabaseClient.removeAllChannels();
+      } catch (error) {
+        logger.warn('[Supabase] Failed to remove realtime channels after sign-out', error);
       }
+    };
+    const ensureClientInitialized = async (): Promise<'created' | 'waited' | 'existing'> => {
+      if (initPromise) {
+        await initPromise;
+        return 'waited';
+      }
+      if (supabaseClient) return 'existing';
+      initPromise = (async () => {
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient(supabaseUrl, supabaseKey, {
+          auth: {
+            detectSessionInUrl: true,
+            flowType: 'pkce',
+          },
+        });
+        supabaseClient = client;
+        api.client = client;
+        client.auth.onAuthStateChange((event, session) => {
+          hydrateFromSession(session);
+          if (event === 'SIGNED_OUT') {
+            setTimeout(() => {
+              void removeAllRealtimeChannels();
+            }, 0);
+          }
+        });
+        const sessionResult = await client.auth.getSession();
+        hydrateFromSession(sessionResult.data?.session ?? null);
+      })()
+        .catch((error) => {
+          logger.error('[Supabase] Failed to initialize client', error);
+          throw error;
+        })
+        .finally(() => {
+          initPromise = null;
+        });
       await initPromise;
+      return 'created';
     };
     const initializeClientInBackground = () => {
       void ensureClientInitialized().catch(() => {});
     };
-    const ready = async () => {
-      await ensureClientInitialized();
-      if (!supabaseClient) {
-        return;
+    const readReadySession = async (client: SupabaseClient): Promise<Session | null> => {
+      if (!readySessionPromise) {
+        readySessionPromise = (async () => {
+          const sessionResult = await client.auth.getSession();
+          const session = sessionResult.data?.session ?? null;
+          hydrateFromSession(session);
+          return session;
+        })();
       }
-      const sessionResult = await supabaseClient.auth.getSession();
-      hydrateFromSession(sessionResult.data?.session ?? null);
+      const sessionPromise = readySessionPromise;
+      try {
+        await sessionPromise;
+      } finally {
+        if (readySessionPromise === sessionPromise) readySessionPromise = null;
+      }
+      return currentSession;
+    };
+    const ready = async (): Promise<Session | null> => {
+      const initializationState = await ensureClientInitialized();
+      if (initializationState !== 'existing') return currentSession;
+      const client = supabaseClient;
+      if (!client) return currentSession;
+      return readReadySession(client);
     };
     const signInWithOAuth = async (
       provider: OAuthProvider,
@@ -265,6 +294,7 @@ export default defineNuxtPlugin({
       }
       const { error } = await supabaseClient.auth.signOut();
       if (error) throw error;
+      await removeAllRealtimeChannels();
     };
     const api = reactive({
       client: stub.client,

@@ -1,5 +1,6 @@
 import { isSupporterActivityActive } from '@/features/supporter/supporterStatus';
 import { logger } from '@/utils/logger';
+import { refreshSupabaseSession } from '@/utils/supabaseAuth';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 export interface SupporterStatus {
   tier: 'supporter' | 'scav' | 'timmy' | 'chad';
@@ -87,14 +88,22 @@ export function useSupporter() {
       }
     }
   }
-  function subscribe(userId: string) {
+  async function removeRealtimeChannel(channelToRemove: RealtimeChannel | null) {
+    if (!channelToRemove) return;
+    try {
+      await $supabase.client.removeChannel(channelToRemove);
+    } catch (err) {
+      logger.warn('Failed to remove supporter realtime channel', { err });
+    }
+  }
+  async function subscribe(userId: string) {
     if (!$supabase || !userId) return;
     if (channel && channelUserId === userId) return;
-    if (channel) {
-      channel.unsubscribe();
-      channel = null;
-      channelUserId = null;
-    }
+    const previousChannel = channel;
+    channel = null;
+    channelUserId = null;
+    await removeRealtimeChannel(previousChannel);
+    if ($supabase.user?.loggedIn === false || $supabase.user?.id !== userId) return;
     channel = $supabase.client
       .channel(`supporters:${userId}`)
       .on(
@@ -115,11 +124,10 @@ export function useSupporter() {
     channelUserId = userId;
   }
   function unsubscribe() {
-    if (channel) {
-      channel.unsubscribe();
-      channel = null;
-      channelUserId = null;
-    }
+    const channelToRemove = channel;
+    channel = null;
+    channelUserId = null;
+    void removeRealtimeChannel(channelToRemove);
   }
   function reset() {
     statusRequestVersion += 1;
@@ -156,8 +164,8 @@ export function useSupporter() {
       const sessionResp = await $supabase.client.auth.getSession();
       token = sessionResp.data.session?.access_token ?? null;
       if (!token) {
-        const refreshed = await $supabase.client.auth.refreshSession();
-        token = refreshed.data.session?.access_token ?? null;
+        const refreshed = await refreshSupabaseSession($supabase.client);
+        token = refreshed?.access_token ?? null;
       }
       if (!token) {
         const message = 'You must be signed in to support TarkovTracker.';

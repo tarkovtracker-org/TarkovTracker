@@ -63,7 +63,9 @@ const createClientMock = (initialUserId: string) => {
     error: null,
   });
   const signOut = vi.fn().mockResolvedValue({ error: null });
+  const removeAllChannels = vi.fn().mockResolvedValue([]);
   mockCreateClient.mockReturnValue({
+    removeAllChannels,
     auth: {
       getSession: vi.fn().mockResolvedValue({
         data: {
@@ -86,6 +88,7 @@ const createClientMock = (initialUserId: string) => {
   });
   return {
     getAuthStateChangeCallback: () => authStateChangeCallback,
+    removeAllChannels,
     signInWithOAuth,
     signOut,
   };
@@ -309,8 +312,50 @@ describe('supabase plugin', () => {
     expect(result?.provide.supabase.user.id).toBe('user-3');
     expect(result?.provide.supabase.user.loggedIn).toBe(true);
   });
+  it('deduplicates concurrent ready session reads', async () => {
+    const sessionDeferred = createDeferred<{
+      data: { session: ReturnType<typeof createSession> };
+    }>();
+    const getSession = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: {
+          session: createSession('user-1'),
+        },
+      })
+      .mockReturnValue(sessionDeferred.promise);
+    mockCreateClient.mockReturnValue({
+      auth: {
+        getSession,
+        onAuthStateChange: vi.fn(() => ({
+          data: {
+            subscription: {
+              unsubscribe: vi.fn(),
+            },
+          },
+        })),
+        signInWithOAuth: vi.fn(),
+        signOut: vi.fn(),
+      },
+    });
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    await flushPlugin();
+    const firstReady = result?.provide.supabase.ready();
+    const secondReady = result?.provide.supabase.ready();
+    await flushPlugin();
+    expect(getSession).toHaveBeenCalledTimes(2);
+    sessionDeferred.resolve({
+      data: {
+        session: createSession('user-1'),
+      },
+    });
+    await Promise.all([firstReady, secondReady]);
+    expect(result?.provide.supabase.user.id).toBe('user-1');
+  });
   it('preserves scoped local state after signOut', async () => {
-    const { signOut } = createClientMock('user-1');
+    const { removeAllChannels, signOut } = createClientMock('user-1');
     const plugin = (await import('@/plugins/supabase.client')).default;
     const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
       SupabasePluginProvide | undefined;
@@ -318,6 +363,7 @@ describe('supabase plugin', () => {
     await result?.provide.supabase.ready();
     await result?.provide.supabase.signOut();
     expect(signOut).toHaveBeenCalledTimes(1);
+    expect(removeAllChannels).toHaveBeenCalledTimes(1);
     expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe('progress-state');
     expect(localStorage.getItem(STORAGE_KEYS.preferences)).toBe('preferences-state');
   });

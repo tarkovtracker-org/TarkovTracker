@@ -1,7 +1,7 @@
 import { logger } from '@/utils/logger';
 import { hydrateUserFromSession, type HydratableUser } from '@/utils/userHydration';
 type SupabaseGuardContext = {
-  ready: () => Promise<void>;
+  ready: () => Promise<unknown>;
   user: HydratableUser;
 };
 export async function ensureSupabaseReadyForRoute(

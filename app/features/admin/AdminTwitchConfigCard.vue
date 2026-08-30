@@ -2,6 +2,7 @@
   import { usePromotedTwitch, type PromotedTwitchConfig } from '@/composables/usePromotedTwitch';
   import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   import { logger } from '@/utils/logger';
+  import { refreshSupabaseSession } from '@/utils/supabaseAuth';
   const { $supabase } = useNuxtApp();
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
@@ -51,8 +52,8 @@
     const sessionResp = await $supabase.client.auth.getSession();
     const token = sessionResp.data.session?.access_token;
     if (token) return token;
-    const refreshed = await $supabase.client.auth.refreshSession();
-    return refreshed.data.session?.access_token;
+    const refreshed = await refreshSupabaseSession($supabase.client);
+    return refreshed?.access_token;
   };
   const serverDetail = (error: unknown): unknown => {
     const data = (error as { data?: { message?: unknown; statusMessage?: unknown } }).data;

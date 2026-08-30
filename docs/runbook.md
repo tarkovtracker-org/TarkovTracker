@@ -235,9 +235,10 @@ These show up in Supabase logs / query performance and are expected. Do not trea
    - Health checks: replication slots are `active`/`streaming` with `0 GB` lag, and the
      `supabase_realtime` publication is explicitly scoped to a named table list (not
      `FOR ALL TABLES`). This is the desired configuration. The current list is
-     `public.user_progress` (added by `20251205120619`), `public.supporters` (added by
-     `20260714065213`), and `public.user_game_mode_progress` plus `public.team_memberships` (both
-     added by `20260804043342`). Verify with
+     `public.user_progress` (added by `20251205120619`), `public.user_system` (added by
+     `20260830120000`), `public.supporters` (added by `20260714065213`), and
+     `public.user_game_mode_progress` plus `public.team_memberships` (both added by
+     `20260804043342`). Verify with
      `SELECT tablename FROM pg_publication_tables WHERE pubname = 'supabase_realtime';` and update
      this list whenever a migration adds or removes a table.
    - Watch for: occasional high max-time correlates with an inactive/lagging replication slot.

@@ -22,6 +22,7 @@ export interface SupabaseListenerConfig<
   patchStore?: boolean;
   /** Optional sync controller to pause during remote updates */
   syncController?: { pause: () => void; resume: () => void };
+  scope?: ListenerScope;
 }
 interface SupabaseListenerReturn {
   isSubscribed: Ref<boolean>;
@@ -30,6 +31,7 @@ interface SupabaseListenerReturn {
   cleanup: () => void;
   fetchData: () => Promise<void>;
 }
+type ListenerScope = { run<T>(fn: () => T): T | undefined };
 interface QueryBuilderWithAbortSignal<TData extends Record<string, unknown>> {
   abortSignal?: (signal: AbortSignal) => PromiseLike<{
     data: TData | null;
@@ -41,6 +43,15 @@ interface QueryBuilderWithAbortSignal<TData extends Record<string, unknown>> {
   }>['then'];
 }
 const VUE_REACTIVITY_SETTLE_MS = 100;
+const runFilterWatch = (
+  scope: ListenerScope | undefined,
+  watchFilter: () => () => void
+): (() => void) | undefined => (scope ? scope.run(watchFilter) : watchFilter());
+const registerComponentCleanup = (scope: ListenerScope | undefined, cleanup: () => void): void => {
+  if (getCurrentInstance() && !scope) {
+    onUnmounted(cleanup);
+  }
+};
 const isAbortError = (error: unknown): boolean => {
   if (error instanceof Error && error.name === 'AbortError') {
     return true;
@@ -70,6 +81,7 @@ export function useSupabaseListener<
   onData,
   patchStore = true,
   syncController,
+  scope,
 }: SupabaseListenerConfig<TStoreState, TData>): SupabaseListenerReturn {
   const { $supabase } = useNuxtApp();
   const channel = ref<RealtimeChannel | null>(null);
@@ -196,10 +208,14 @@ export function useSupabaseListener<
     latestFetchVersion += 1;
     activeFetchController?.abort();
     activeFetchController = null;
-    if (channel.value) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      $supabase.client.removeChannel(channel.value as any);
-      channel.value = null;
+    const channelToRemove = channel.value;
+    channel.value = null;
+    if (channelToRemove) {
+      void $supabase.client
+        .removeChannel(channelToRemove as unknown as RealtimeChannel)
+        .catch((error) => {
+          logger.warn(`[${storeIdForLogging}] Failed to remove realtime channel:`, error);
+        });
       isSubscribed.value = false;
       // Note: Don't reset hasInitiallyLoaded here - it should persist as long as store has data
       // This prevents showing loading spinner when navigating back to a page
@@ -207,35 +223,36 @@ export function useSupabaseListener<
   };
   // Watch for filter changes - supports both static strings and reactive refs
   const filterSource = isRef(filter) ? filter : () => filter;
-  watch(
-    filterSource,
-    (newFilter) => {
-      cleanup();
-      if (!newFilter) {
-        if (patchStore) {
-          resetStore(store);
+  const watchFilter = () =>
+    watch(
+      filterSource,
+      (newFilter) => {
+        cleanup();
+        if (!newFilter) {
+          if (patchStore) {
+            resetStore(store);
+          }
+          if (onData) onData(null);
+          hasInitiallyLoaded.value = true;
+          return;
         }
-        if (onData) onData(null);
-        hasInitiallyLoaded.value = true;
-        return;
-      }
-      hasInitiallyLoaded.value = false;
-      fetchData();
-      setupSubscription();
-    },
-    { immediate: true }
-  );
+        hasInitiallyLoaded.value = false;
+        fetchData();
+        setupSubscription();
+      },
+      { immediate: true }
+    );
+  const stopFilterWatch = runFilterWatch(scope, watchFilter);
   // If used inside a component, clean up on unmount; otherwise caller must clean up manually.
-  if (getCurrentInstance()) {
-    onUnmounted(() => {
-      cleanup();
-    });
-  }
+  registerComponentCleanup(scope, cleanup);
   return {
     isSubscribed,
     hasInitiallyLoaded,
     loadError,
-    cleanup,
+    cleanup: () => {
+      stopFilterWatch?.();
+      cleanup();
+    },
     fetchData,
   };
 }
