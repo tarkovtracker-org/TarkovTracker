@@ -1209,6 +1209,51 @@
       "meta": {
         "description": "Collabora con i compagni sui progressi in Escape from Tarkov. Condividi completamenti di missioni, stato del rifugio e coordina la raccolta di oggetti."
       },
+      "page_title": "Squadra",
+      "page_description": "Invita compagni di squadra, scegli quale progresso di squadra vedi, e traccia insieme.",
+      "invite": {
+        "title": "Link di invito",
+        "subtitle": "Condividi la tua squadra con compagni di squadra affidabili.",
+        "link_label": "Url invito di squadra",
+        "helper": "Chiunque con questo link può unirsi alla tua squadra.",
+        "show": "Mostra link",
+        "hide": "Nascondi link",
+        "copy": "Copia link",
+        "copied": "Copiato!"
+      },
+      "members": {
+        "title": "Membri ({count})",
+        "no_members": "Ancora nessun membro in questa squadra. Condividi il tuo link di invito per aggiungere compagni di squadra.",
+        "alone": "Sei solo qui — condividi il tuo link di invito per aggiungere compagni di squadra.",
+        "copy_invite": "Copia link di invito",
+        "copied": "Copiato!"
+      },
+      "visibility": {
+        "title": "Impostazioni di visibilità",
+        "description": "Controlla i progressi dei tuoi compagni di squadra sul tuo tracker.",
+        "items_section": "Oggetti",
+        "show_tasks": "Mostra le attività dei membri del team",
+        "show_items": "Mostra gli elementi necessari dei membri del team",
+        "show_non_fir": "Mostra elementi necessari non FIR",
+        "show_hideout": "Mostra gli elementi necessari nascosti",
+        "show_maps": "Mostra gli obiettivi della mappa dei membri del team"
+      },
+      "danger_zone": {
+        "title": "Zona di pericolo",
+        "disband_description": "Lo smantellamento rimuove la squadra per tutti i membri. Questo non può essere annullato.",
+        "leave_description": "Lasciando ti rimuove da questa squadra. I tuoi progressi rimangono sul tuo account.",
+        "disband": "Sciogli team",
+        "leave": "Abbandona il team",
+        "confirm_disband_title": "Abbandonare il team?",
+        "confirm_disband_description": "Questo rimuove la squadra e i suoi membri per tutti. Questo non può essere annullato.",
+        "confirm_leave_title": "Abbandona la squadra?",
+        "confirm_leave_description": "Lascerai questo team e smetterai di condividere i progressi con i suoi membri.",
+        "confirm_disband": "Sì, disband team",
+        "confirm_leave": "Sì, lascia il team",
+        "disband_success": "Squadra sciolta con successo.",
+        "disband_error": "Impossibile disboscare il team.",
+        "action_error": "Impossibile aggiornare l'appartenenza al team."
+      },
       "card": {
         "manageteam": {
           "title": "Membri del team",
@@ -1218,7 +1263,12 @@
             "owner": "Proprietario",
             "taskscomplete": "{completed}/{total} missioni completate",
             "kick_success": "Compagno di team espulso con successo.",
-            "kick_error": "Errore nell'espellere il compagno di team."
+            "kick_error": "Errore nell'espellere il compagno di team.",
+            "level_badge_alt": "Livello {level} badge",
+            "hide_progress": "Nascondi i progressi di {name}da me",
+            "show_progress": "Mostra i progressi di {name}per me",
+            "enable_team_tasks": "Mostra i compiti dei membri del team prima di cambiare un singolo membro",
+            "remove_member": "Rimuovi {name} dal team"
           }
         },
         "teamoptions": {
