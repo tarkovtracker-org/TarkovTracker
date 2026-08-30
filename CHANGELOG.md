@@ -1,3 +1,14 @@
+## [1.73.11](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.10...v1.73.11) (2026-08-30)
+
+
+### Bug Fixes
+
+* **app:** clear exchanged OAuth callback code ([d6f7f92](https://github.com/tarkovtracker-org/TarkovTracker/commit/d6f7f9244a8cbc0a3bf092eec0251b12779121c5))
+* **app:** make OAuth PKCE callback exchange explicit ([a936466](https://github.com/tarkovtracker-org/TarkovTracker/commit/a93646692e4ee91bf350b430e240dbefc52a3e4a))
+* **app:** reset OAuth callback state after exchange ([21f9aaf](https://github.com/tarkovtracker-org/TarkovTracker/commit/21f9aaf38299a61f8277b0f2b561fb8e330ba04c))
+* **app:** scope OAuth PKCE exchange to callback route and defer to ready ([521ddef](https://github.com/tarkovtracker-org/TarkovTracker/commit/521ddefec9aa226bd1046d17df710f6dfc6514b0))
+* **app:** share the pending OAuth exchange across ready callers ([3c58493](https://github.com/tarkovtracker-org/TarkovTracker/commit/3c58493326dc5a8d6d461c96443203b26c5c8bd8))
+
 ## [1.73.10](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.9...v1.73.10) (2026-08-29)
 
 
