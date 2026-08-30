@@ -18,6 +18,7 @@ const createExpansionHarness = (options: {
   hideTaskRewards?: boolean;
   routeTaskId?: string;
   onMapView?: boolean;
+  ownTaskId?: string;
 }): ExpansionHarness => {
   const density = ref(options.density ?? 'comfortable');
   const collapseDefault = ref(options.collapseDefault ?? false);
@@ -26,7 +27,7 @@ const createExpansionHarness = (options: {
   const onMapView = ref(options.onMapView ?? false);
   const isCompact = computed(() => density.value === 'compact');
   const expansion = useTaskCardExpansion({
-    taskId: () => 'task-1',
+    taskId: () => options.ownTaskId ?? 'task-1',
     isCompact,
     onMapView,
     collapseByDefault: () => collapseDefault.value,
@@ -99,6 +100,22 @@ describe('useTaskCardExpansion', () => {
     await nextTick();
     expect(state.taskExpanded.value).toBe(true);
     state.setRouteTaskId(undefined);
+    await nextTick();
+    expect(state.taskExpanded.value).toBe(true);
+  });
+  it('keeps a card collapsed when the deep link targets a different task', async () => {
+    const state = createExpansionHarness({
+      density: 'compact',
+      collapseDefault: true,
+      ownTaskId: 'task-2',
+      routeTaskId: 'task-1',
+    });
+    await nextTick();
+    expect(state.taskExpanded.value).toBe(false);
+    state.setRouteTaskId('task-3');
+    await nextTick();
+    expect(state.taskExpanded.value).toBe(false);
+    state.setRouteTaskId('task-2');
     await nextTick();
     expect(state.taskExpanded.value).toBe(true);
   });
