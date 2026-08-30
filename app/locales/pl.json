@@ -1209,6 +1209,51 @@
       "meta": {
         "description": "Collaborate with teammates on Escape from Tarkov progress. Share quest completions, hideout status, and coordinate item gathering."
       },
+      "page_title": "Drużyna",
+      "page_description": "Zaproś znajomych z drużyny, wybierz jakiego zespołu postępu widzisz i śledź razem.",
+      "invite": {
+        "title": "Link zaproszenia",
+        "subtitle": "Podziel się swoim zespołem z zaufanymi kolegami.",
+        "link_label": "Adres URL zaproszenia zespołu",
+        "helper": "Każdy z tym linkiem może dołączyć do twojej drużyny.",
+        "show": "Pokaż link",
+        "hide": "Ukryj link",
+        "copy": "Kopiuj link",
+        "copied": "Skopiowano!"
+      },
+      "members": {
+        "title": "Członkowie ({count})",
+        "no_members": "Nie ma jeszcze członków w tym zespole. Udostępnij link z zaproszeniem, aby dodać znajomych.",
+        "alone": "Jesteś tu sam — udostępnij link z zaproszeniem, aby dodać znajomych z drużyny.",
+        "copy_invite": "Skopiuj link zaproszenia",
+        "copied": "Skopiowano!"
+      },
+      "visibility": {
+        "title": "Ustawienia widoczności",
+        "description": "Kontroluj, który postęp drużyny pojawia się na Twoim trackerze.",
+        "items_section": "Przedmioty",
+        "show_tasks": "Pokaż zadania członków zespołu",
+        "show_items": "Pokaż potrzebne przedmioty dla członków zespołu",
+        "show_non_fir": "Pokaż niepotrzebne elementy",
+        "show_hideout": "Pokaż potrzebne elementy",
+        "show_maps": "Pokaż cele mapy członków zespołu"
+      },
+      "danger_zone": {
+        "title": "Strefa zagrożenia",
+        "disband_description": "Rozwiązanie usuwa zespół dla wszystkich użytkowników. Tej operacji nie można cofnąć.",
+        "leave_description": "Pozostawienie cię usuwa z tego zespołu. Twoje postępy pozostają na Twoim koncie.",
+        "disband": "Rozwiąż zespół",
+        "leave": "Leave team",
+        "confirm_disband_title": "Rozłączyć drużynę?",
+        "confirm_disband_description": "To usuwa zespół i jego członkostwo dla wszystkich. Tej operacji nie można cofnąć.",
+        "confirm_leave_title": "Opuścić zespół?",
+        "confirm_leave_description": "Opuścisz ten zespół i przestaniesz udostępniać postępy jego członkom.",
+        "confirm_disband": "Tak, rozwiąż zespół",
+        "confirm_leave": "Tak, opuść zespół",
+        "disband_success": "Zespół rozwiązany pomyślnie.",
+        "disband_error": "Nie udało się rozwiązać drużyny.",
+        "action_error": "Nie można zaktualizować członkostwa zespołu."
+      },
       "card": {
         "manageteam": {
           "title": "Team Members",
@@ -1218,7 +1263,12 @@
             "owner": "Owner",
             "taskscomplete": "{completed}/{total} tasks completed",
             "kick_success": "Teammate kicked successfully.",
-            "kick_error": "Error kicking teammate."
+            "kick_error": "Error kicking teammate.",
+            "level_badge_alt": "Odznaka {level} poziomu",
+            "hide_progress": "Ukryj mi postęp {name}",
+            "show_progress": "Pokaż mi postęp {name}",
+            "enable_team_tasks": "Pokaż zadania członków zespołu przed zmianą indywidualnego użytkownika",
+            "remove_member": "Usuń {name} z drużyny"
           }
         },
         "teamoptions": {
