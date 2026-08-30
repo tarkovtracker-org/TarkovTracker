@@ -131,15 +131,17 @@
     if (!isOpen) pendingAction.value = null;
   });
   const clearLocalTeam = (mode: GameMode, removedTeamId: string) => {
+    if (getTeamIdFromState(systemStore.$state, mode) !== removedTeamId) return;
     const key = getTeamIdStateKey(mode);
     systemStore.$patch((state) => {
+      if (getTeamIdFromState(state, mode) !== removedTeamId) return;
       state[key] = null;
       if (mode !== GAME_MODES.SEASONAL) {
         if (state.team === removedTeamId) state.team = null;
         if (state.team_id === removedTeamId) state.team_id = null;
       }
     });
-    teamStore.$reset();
+    if (teamStore.id === removedTeamId) teamStore.$reset();
   };
   const showActionError = (error: unknown) => {
     logger.error('[TeamDangerZone] Team membership action failed:', error);

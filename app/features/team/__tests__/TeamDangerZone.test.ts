@@ -136,6 +136,35 @@ describe('TeamDangerZone', () => {
     expect(mockTeamStore.$reset).not.toHaveBeenCalled();
     wrapper.unmount();
   });
+  it('does not clear a replacement team when the membership action resolves late', async () => {
+    let resolveLeave!: (value: { success: boolean }) => void;
+    mockTeamStore.owner = 'other-user';
+    mockLeaveTeam.mockReturnValueOnce(
+      new Promise<{ success: boolean }>((resolve) => {
+        resolveLeave = resolve;
+      })
+    );
+    const wrapper = await mountDangerZone();
+    await wrapper.find('[data-testid="open-team-danger-confirmation"]').trigger('click');
+    const actionPromise = wrapper
+      .find('[data-testid="confirm-team-danger-action"]')
+      .trigger('click');
+    await vi.waitFor(() => expect(mockLeaveTeam).toHaveBeenCalledWith('team-1'));
+    mockSystemState.pvp_team_id = 'replacement-team';
+    mockSystemState.team = 'replacement-team';
+    mockSystemState.team_id = 'replacement-team';
+    mockTeamStore.id = 'replacement-team';
+    mockTeamStore.owner = 'user-1';
+    resolveLeave({ success: true });
+    await actionPromise;
+    await flushPromises();
+    expect(mockSystemState.pvp_team_id).toBe('replacement-team');
+    expect(mockSystemState.team).toBe('replacement-team');
+    expect(mockSystemState.team_id).toBe('replacement-team');
+    expect(mockTeamStore.id).toBe('replacement-team');
+    expect(mockTeamStore.$reset).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
   it('clears persistent legacy aliases without disturbing another mode team', async () => {
     mockTarkovStore.getCurrentGameMode.mockReturnValue('pve');
     mockSystemState.pvp_team_id = 'pvp-team';
