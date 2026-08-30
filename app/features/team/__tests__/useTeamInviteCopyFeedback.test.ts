@@ -52,38 +52,35 @@ describe('useTeamInviteCopyFeedback', () => {
   });
   it('ignores stale success when a newer copy fails', async () => {
     let resolveFirstCopy!: (success: boolean) => void;
-    let resolveSecondCopy!: (success: boolean) => void;
     mockCopyToClipboard
       .mockReturnValueOnce(
         new Promise<boolean>((resolve) => {
           resolveFirstCopy = resolve;
         })
       )
-      .mockReturnValueOnce(
-        new Promise<boolean>((resolve) => {
-          resolveSecondCopy = resolve;
-        })
-      );
+      .mockResolvedValueOnce(false);
     const { useTeamInviteCopyFeedback } = await import('@/features/team/useTeamInviteCopyFeedback');
     let copiedText = '';
-    let firstCopy: Promise<boolean> | null = null;
-    let secondCopy: Promise<boolean> | null = null;
+    let copyInviteLink!: (inviteUrl: string) => Promise<boolean>;
     const Harness = defineComponent({
       setup() {
-        const { copied, copyInviteLink } = useTeamInviteCopyFeedback();
-        firstCopy = copyInviteLink('https://example.test/team?code=first');
-        secondCopy = copyInviteLink('https://example.test/team?code=second');
+        const feedback = useTeamInviteCopyFeedback();
+        copyInviteLink = feedback.copyInviteLink;
         return () => {
-          copiedText = copied.value ? 'copied' : 'idle';
+          copiedText = feedback.copied.value ? 'copied' : 'idle';
           return h('span', copiedText);
         };
       },
     });
     const wrapper = mount(Harness);
-    resolveSecondCopy(false);
-    expect(await secondCopy).toBe(false);
+    const firstCopy = copyInviteLink('https://example.test/team?code=first');
+    await vi.waitFor(() => expect(mockCopyToClipboard).toHaveBeenCalledTimes(1));
+    const secondCopy = copyInviteLink('https://example.test/team?code=second');
+    expect(mockCopyToClipboard).toHaveBeenCalledTimes(1);
     resolveFirstCopy(true);
     expect(await firstCopy).toBe(false);
+    expect(await secondCopy).toBe(false);
+    expect(mockCopyToClipboard).toHaveBeenCalledTimes(2);
     await wrapper.vm.$nextTick();
     expect(copiedText).toBe('idle');
     wrapper.unmount();

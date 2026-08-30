@@ -78,6 +78,7 @@ describe('TeamOptions preferences', () => {
       await taskSwitch.trigger('click');
       expect(mockPreferencesStore.setQuestTeamHideAll).toHaveBeenCalledTimes(1);
       expect(row.element.tagName).toBe('DIV');
+      expect(taskToggle.element.tagName).toBe('BUTTON');
       wrapper.unmount();
     });
     it('calls setQuestTeamHideAll when toggled on', async () => {

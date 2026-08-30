@@ -151,8 +151,8 @@ describe('TeamDangerZone', () => {
     expect(mockLeaveTeam).toHaveBeenCalledWith('pve-team');
     expect(mockSystemState.pve_team_id).toBeNull();
     expect(mockSystemState.pvp_team_id).toBe('pvp-team');
-    expect(mockSystemState.team).toBeNull();
-    expect(mockSystemState.team_id).toBeNull();
+    expect(mockSystemState.team).toBe('pvp-team');
+    expect(mockSystemState.team_id).toBe('pvp-team');
     wrapper.unmount();
   });
 });

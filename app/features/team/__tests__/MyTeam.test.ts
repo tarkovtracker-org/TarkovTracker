@@ -250,7 +250,7 @@ describe('MyTeam store interactions', () => {
       await flushPromises();
       expect(mockCopyToClipboard).toHaveBeenCalledWith(
         expect.stringContaining('code=private-code'),
-        { revealValue: false }
+        expect.objectContaining({ revealValue: false, shouldNotify: expect.any(Function) })
       );
       wrapper.unmount();
     });

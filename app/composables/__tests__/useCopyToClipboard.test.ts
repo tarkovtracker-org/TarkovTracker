@@ -6,9 +6,24 @@ mockNuxtImport('useToast', () => () => mockToast);
 mockNuxtImport('useI18n', () => () => ({
   t: (key: string, params?: { value?: string }) => (params?.value ? `${key}:${params.value}` : key),
 }));
-const originalExecCommand = typeof document !== 'undefined' ? document.execCommand : undefined;
-const originalCreateElement =
-  typeof document !== 'undefined' ? document.createElement.bind(document) : undefined;
+const originalExecCommandDescriptor =
+  typeof document !== 'undefined'
+    ? Object.getOwnPropertyDescriptor(document, 'execCommand')
+    : undefined;
+const originalCreateElementDescriptor =
+  typeof document !== 'undefined'
+    ? Object.getOwnPropertyDescriptor(document, 'createElement')
+    : undefined;
+const restoreDocumentProperty = (
+  property: 'execCommand' | 'createElement',
+  descriptor?: PropertyDescriptor
+) => {
+  if (descriptor) {
+    Object.defineProperty(document, property, descriptor);
+  } else {
+    Reflect.deleteProperty(document, property);
+  }
+};
 describe('useCopyToClipboard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -18,18 +33,8 @@ describe('useCopyToClipboard', () => {
     });
   });
   afterEach(() => {
-    if (originalExecCommand !== undefined) {
-      Object.defineProperty(document, 'execCommand', {
-        configurable: true,
-        value: originalExecCommand,
-      });
-    }
-    if (originalCreateElement !== undefined) {
-      Object.defineProperty(document, 'createElement', {
-        configurable: true,
-        value: originalCreateElement,
-      });
-    }
+    restoreDocumentProperty('execCommand', originalExecCommandDescriptor);
+    restoreDocumentProperty('createElement', originalCreateElementDescriptor);
   });
   it('copies text and can hide sensitive values from success feedback', async () => {
     const { useCopyToClipboard } = await import('@/composables/useCopyToClipboard');
@@ -41,6 +46,14 @@ describe('useCopyToClipboard', () => {
       description: undefined,
       title: 'toast.clipboard_copied.title',
     });
+  });
+  it('can suppress feedback for superseded copy operations', async () => {
+    const { useCopyToClipboard } = await import('@/composables/useCopyToClipboard');
+    const { copyToClipboard } = useCopyToClipboard();
+    await expect(copyToClipboard('superseded invite', { shouldNotify: () => false })).resolves.toBe(
+      true
+    );
+    expect(mockToast.add).not.toHaveBeenCalled();
   });
   it('falls back to execCommand when the Clipboard API rejects', async () => {
     const execCommand = vi.fn(() => true);

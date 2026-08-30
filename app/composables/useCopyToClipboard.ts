@@ -4,6 +4,7 @@ export interface UseCopyToClipboardReturn {
 }
 export interface CopyToClipboardOptions {
   revealValue?: boolean;
+  shouldNotify?: () => boolean;
 }
 async function writeToClipboard(text: string): Promise<boolean> {
   try {
@@ -33,25 +34,27 @@ export function useCopyToClipboard(): UseCopyToClipboardReturn {
   const toast = useToast();
   const copyToClipboard = async (
     text: string,
-    { revealValue = true }: CopyToClipboardOptions = {}
+    { revealValue = true, shouldNotify = () => true }: CopyToClipboardOptions = {}
   ): Promise<boolean> => {
     const success = await writeToClipboard(text);
-    if (success) {
-      toast.add({
-        title: t('toast.clipboard_copied.title'),
-        description: revealValue
-          ? t('toast.clipboard_copied.description', { value: text })
-          : undefined,
-        color: 'success',
-      });
-    } else {
-      toast.add({
-        title: t('toast.clipboard_error.title'),
-        description: revealValue
-          ? t('toast.clipboard_error.description', { value: text })
-          : undefined,
-        color: 'error',
-      });
+    if (shouldNotify()) {
+      if (success) {
+        toast.add({
+          title: t('toast.clipboard_copied.title'),
+          description: revealValue
+            ? t('toast.clipboard_copied.description', { value: text })
+            : undefined,
+          color: 'success',
+        });
+      } else {
+        toast.add({
+          title: t('toast.clipboard_error.title'),
+          description: revealValue
+            ? t('toast.clipboard_error.description', { value: text })
+            : undefined,
+          color: 'error',
+        });
+      }
     }
     return success;
   };

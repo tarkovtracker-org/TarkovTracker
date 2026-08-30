@@ -69,7 +69,10 @@ describe('TeamMembers', () => {
     expect(wrapper.find('[data-testid="team-members-empty-state"]').exists()).toBe(true);
     await wrapper.find('[data-testid="copy-team-members-invite"]').trigger('click');
     await flushPromises();
-    expect(mockCopyToClipboard).toHaveBeenCalledWith(mockTeamUrl.value, { revealValue: false });
+    expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      mockTeamUrl.value,
+      expect.objectContaining({ revealValue: false, shouldNotify: expect.any(Function) })
+    );
     expect(wrapper.find('[aria-live="polite"]').text()).toContain('page.team.members.copied');
     mockCopyToClipboard.mockResolvedValueOnce(false);
     await wrapper.find('[data-testid="copy-team-members-invite"]').trigger('click');

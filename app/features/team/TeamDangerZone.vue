@@ -130,13 +130,13 @@
   watch(confirmationOpen, (isOpen) => {
     if (!isOpen) pendingAction.value = null;
   });
-  const clearLocalTeam = (mode: GameMode) => {
+  const clearLocalTeam = (mode: GameMode, removedTeamId: string) => {
     const key = getTeamIdStateKey(mode);
     systemStore.$patch((state) => {
       state[key] = null;
       if (mode !== GAME_MODES.SEASONAL) {
-        state.team = null;
-        state.team_id = null;
+        if (state.team === removedTeamId) state.team = null;
+        if (state.team_id === removedTeamId) state.team_id = null;
       }
     });
     teamStore.$reset();
@@ -161,8 +161,8 @@
     const result = await getMembershipAction(wasOwner)(teamId);
     if (!result?.success) throw new Error(getFailureMessage(wasOwner));
   };
-  const completeMembershipAction = (mode: GameMode, wasOwner: boolean) => {
-    clearLocalTeam(mode);
+  const completeMembershipAction = (mode: GameMode, wasOwner: boolean, teamId: string) => {
+    clearLocalTeam(mode, teamId);
     confirmationOpen.value = false;
     toast.add({
       title: getSuccessMessage(wasOwner),
@@ -173,7 +173,7 @@
     actionPending.value = true;
     try {
       await runMembershipAction(teamId, wasOwner);
-      completeMembershipAction(mode, wasOwner);
+      completeMembershipAction(mode, wasOwner, teamId);
     } catch (error: unknown) {
       showActionError(error);
     } finally {
