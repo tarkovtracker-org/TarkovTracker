@@ -52,17 +52,19 @@
       </label>
       <template v-if="isCompact">
         <label
+          for="task-settings-collapse-default"
           class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
         >
-          <UCheckbox v-model="taskCollapseDefaultModel" />
+          <UCheckbox id="task-settings-collapse-default" v-model="taskCollapseDefaultModel" />
           <span class="text-surface-200 text-sm">
             {{ t('page.tasks.settings.appearance.collapse_by_default') }}
           </span>
         </label>
         <label
+          for="task-settings-hide-rewards"
           class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
         >
-          <UCheckbox v-model="hideTaskRewardsModel" />
+          <UCheckbox id="task-settings-hide-rewards" v-model="hideTaskRewardsModel" />
           <span class="text-surface-200 text-sm">
             {{ t('page.tasks.settings.appearance.hide_rewards') }}
           </span>
