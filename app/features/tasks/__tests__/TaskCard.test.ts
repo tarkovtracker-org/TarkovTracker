@@ -236,6 +236,6 @@ describe('TaskCard expansion controls', () => {
     preferencesState.primaryView = 'maps';
     const wrapper = await mountTaskCard();
     expect(wrapper.find('#task-content-task-1').exists()).toBe(true);
-    expect(wrapper.get('button[aria-label="Collapse task"]').exists()).toBe(true);
+    expect(wrapper.get('button[aria-label="Collapse task"]')).toBeDefined();
   });
 });
