@@ -24,7 +24,9 @@ Runs on every push and PR:
 **Jobs:**
 
 - `validate` - Lint, type checking, format check, tests, production build (sequential steps)
-- `workers` - Cloudflare Workers typecheck and OpenAPI validation
+- `workers` - Cloudflare Worker generated-type drift check, typecheck, OpenAPI validation,
+  deployment dry-run, and API gateway tests (Node unit tests plus a workerd smoke using the
+  production Wrangler configuration)
 
 **Triggers:** Push to `main`, `develop`, `wip/**` branches and all PRs
 
