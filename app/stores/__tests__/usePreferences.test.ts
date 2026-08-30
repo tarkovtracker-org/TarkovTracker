@@ -114,7 +114,9 @@ describe('usePreferencesStore', () => {
       expect(store.showExperienceRewards).toBe(true);
       expect(store.showNextQuests).toBe(true);
       expect(store.showPreviousQuests).toBe(true);
-      expect(store.taskCardDensity).toBe('compact');
+      expect(store.taskCardDensity).toBe('comfortable');
+      expect(store.taskCollapseDefault).toBe(false);
+      expect(store.hideTaskRewards).toBe(false);
       expect(store.enableManualTaskFail).toBe(false);
       expect(store.hideCompletedTaskObjectives).toBe(true);
     });
@@ -896,9 +898,17 @@ describe('usePreferencesStore', () => {
       const store = usePreferencesStore();
       expect(store.getShowPreviousQuests).toBe(true);
     });
-    it('should return taskCardDensity state with default compact', () => {
+    it('should return taskCardDensity state with default comfortable', () => {
       const store = usePreferencesStore();
-      expect(store.getTaskCardDensity).toBe('compact');
+      expect(store.getTaskCardDensity).toBe('comfortable');
+    });
+    it('should return taskCollapseDefault state with default false', () => {
+      const store = usePreferencesStore();
+      expect(store.getTaskCollapseDefault).toBe(false);
+    });
+    it('should return hideTaskRewards state with default false', () => {
+      const store = usePreferencesStore();
+      expect(store.getHideTaskRewards).toBe(false);
     });
     it('should return enableManualTaskFail state', () => {
       const store = usePreferencesStore();
@@ -1267,8 +1277,18 @@ describe('usePreferencesStore', () => {
     });
     it('should set task card density', () => {
       const store = usePreferencesStore();
-      store.setTaskCardDensity('comfortable');
-      expect(store.taskCardDensity).toBe('comfortable');
+      store.setTaskCardDensity('compact');
+      expect(store.taskCardDensity).toBe('compact');
+    });
+    it('should set task collapse default', () => {
+      const store = usePreferencesStore();
+      store.setTaskCollapseDefault(true);
+      expect(store.taskCollapseDefault).toBe(true);
+    });
+    it('should set hide task rewards', () => {
+      const store = usePreferencesStore();
+      store.setHideTaskRewards(true);
+      expect(store.hideTaskRewards).toBe(true);
     });
     it('should set enable manual task fail', () => {
       const store = usePreferencesStore();
@@ -1518,7 +1538,9 @@ describe('usePreferencesStore', () => {
       expect(preferencesDefaultState.streamerMode).toBe(false);
       expect(preferencesDefaultState.taskTeamHideAll).toBe(false);
       expect(preferencesDefaultState.showNonSpecialTasks).toBe(true);
-      expect(preferencesDefaultState.taskCardDensity).toBe('compact');
+      expect(preferencesDefaultState.taskCardDensity).toBe('comfortable');
+      expect(preferencesDefaultState.taskCollapseDefault).toBe(false);
+      expect(preferencesDefaultState.hideTaskRewards).toBe(false);
     });
     it('should have saving state in default state', () => {
       expect(preferencesDefaultState.saving).toBeDefined();

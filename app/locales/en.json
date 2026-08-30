@@ -921,7 +921,9 @@
           "experience_rewards": "Experience Rewards",
           "next_tasks": "Next Tasks",
           "previous_tasks": "Previous Tasks",
-          "collapse_completed_objectives": "Collapse Objectives on Completed Tasks"
+          "collapse_completed_objectives": "Collapse Objectives on Completed Tasks",
+          "collapse_by_default": "Collapse Quests by Default",
+          "hide_rewards": "Hide Rewards"
         },
         "filter_bar": {
           "hint": "Toggle task status filters on or off to control which tasks are visible.",
@@ -1825,6 +1827,8 @@
         "show_next": "Show Next Quests",
         "show_prev": "Show Previous Quests",
         "density": "Card Density",
+        "collapse_by_default": "Collapse Quests by Default",
+        "hide_rewards": "Hide Rewards",
         "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
         "flags_section": "Task Display",
         "availability_section": "Task Availability",

@@ -169,6 +169,8 @@ const buildPreferencesSyncPayload = (
     show_next_quests: preferencesState.showNextQuests,
     show_previous_quests: preferencesState.showPreviousQuests,
     task_card_density: preferencesState.taskCardDensity,
+    task_collapse_default: preferencesState.taskCollapseDefault,
+    hide_task_rewards: preferencesState.hideTaskRewards,
     dashboard_notice_dismissed: preferencesState.dashboardNoticeDismissed,
     show_map_extracts: preferencesState.showMapExtracts,
     map_marker_colors: normalizeMapMarkerColors(preferencesState.mapMarkerColors),

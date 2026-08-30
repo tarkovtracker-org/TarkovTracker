@@ -175,7 +175,7 @@
               <div
                 v-if="focusedTaskInSlice.length > 0"
                 data-testid="focused-task-section"
-                class="mb-6"
+                :class="taskSectionGapClass"
               >
                 <div class="mb-3 flex items-center justify-between gap-3">
                   <div class="flex min-w-0 items-center gap-2">
@@ -200,7 +200,11 @@
                   </UButton>
                 </div>
                 <div>
-                  <div v-for="task in focusedTaskInSlice" :key="`focused-${task.id}`" class="pb-4">
+                  <div
+                    v-for="task in focusedTaskInSlice"
+                    :key="`focused-${task.id}`"
+                    :class="taskCardGapClass"
+                  >
                     <TaskCard
                       :accent-variant="
                         shouldGroupGlobalTasks && isGlobalTask(task) ? 'global' : 'default'
@@ -211,7 +215,7 @@
                   </div>
                 </div>
               </div>
-              <div v-if="pinnedTasksInSlice.length > 0" class="mb-6">
+              <div v-if="pinnedTasksInSlice.length > 0" :class="taskSectionGapClass">
                 <div class="mb-3 flex items-center gap-2">
                   <div class="bg-surface-700 h-px flex-1" />
                   <div class="flex items-center gap-2">
@@ -223,7 +227,11 @@
                   <div class="bg-surface-700 h-px flex-1" />
                 </div>
                 <div>
-                  <div v-for="task in pinnedTasksInSlice" :key="`pinned-${task.id}`" class="pb-4">
+                  <div
+                    v-for="task in pinnedTasksInSlice"
+                    :key="`pinned-${task.id}`"
+                    :class="taskCardGapClass"
+                  >
                     <TaskCard
                       :accent-variant="
                         shouldGroupGlobalTasks && isGlobalTask(task) ? 'global' : 'default'
@@ -249,11 +257,15 @@
                 @toggle="toggleMapTaskVisibilityFilter"
               />
               <div>
-                <div v-for="task in mapSpecificTasksInSlice" :key="`task-${task.id}`" class="pb-4">
+                <div
+                  v-for="task in mapSpecificTasksInSlice"
+                  :key="`task-${task.id}`"
+                  :class="taskCardGapClass"
+                >
                   <TaskCard :task="task" @on-task-action="handleTaskAction" />
                 </div>
               </div>
-              <div v-if="globalTasksInSlice.length > 0" class="mt-2 mb-6">
+              <div v-if="globalTasksInSlice.length > 0" class="mt-2" :class="taskSectionGapClass">
                 <div class="mb-3 flex items-center gap-2">
                   <div class="bg-surface-700 h-px flex-1" />
                   <div class="flex items-center gap-2">
@@ -265,7 +277,11 @@
                   <div class="bg-surface-700 h-px flex-1" />
                 </div>
                 <div>
-                  <div v-for="task in globalTasksInSlice" :key="`global-${task.id}`" class="pb-4">
+                  <div
+                    v-for="task in globalTasksInSlice"
+                    :key="`global-${task.id}`"
+                    :class="taskCardGapClass"
+                  >
                     <TaskCard
                       accent-variant="global"
                       :task="task"
@@ -576,6 +592,9 @@
   const showMapDisplay = computed(() => {
     return getTaskPrimaryView.value === 'maps' && getTaskMapView.value !== 'all';
   });
+  const isCompactTaskCards = computed(() => preferencesStore.getTaskCardDensity === 'compact');
+  const taskCardGapClass = computed(() => (isCompactTaskCards.value ? 'pb-2' : 'pb-4'));
+  const taskSectionGapClass = computed(() => (isCompactTaskCards.value ? 'mb-4' : 'mb-6'));
   const showGraphView = computed(() => {
     return getTaskPrimaryView.value === 'graph';
   });

@@ -22,14 +22,14 @@
         class="flex flex-col"
         :class="[
           compactClasses.header,
-          onMapView
+          isCollapsible
             ? 'hover:bg-surface-700/20 focus-visible:ring-primary-500/40 focus-visible:ring-offset-surface-900 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
             : '',
         ]"
-        :aria-expanded="onMapView ? taskExpanded : undefined"
-        :aria-controls="onMapView ? `task-content-${task.id}` : undefined"
-        :role="onMapView ? 'button' : undefined"
-        :tabindex="onMapView ? 0 : undefined"
+        :aria-expanded="isCollapsible ? taskExpanded : undefined"
+        :aria-controls="isCollapsible ? `task-content-${task.id}` : undefined"
+        :role="isCollapsible ? 'button' : undefined"
+        :tabindex="isCollapsible ? 0 : undefined"
         @click="onTaskHeaderClick"
         @keydown="onTaskHeaderKeydown"
       >
@@ -83,7 +83,7 @@
               </template>
             </TaskCardBadges>
             <UIcon
-              v-if="onMapView"
+              v-if="isCollapsible"
               name="i-mdi-chevron-down"
               aria-hidden="true"
               class="pointer-events-none h-4 w-4 shrink-0 self-center transition-transform duration-200"
@@ -327,7 +327,7 @@
     <!-- 3) Rewards Summary Section (Fixed to bottom, Full Width) -->
     <template #footer>
       <TaskCardRewards
-        v-if="taskExpanded"
+        v-if="taskExpanded && !rewardsHidden"
         :is-compact="isCompact"
         :trader-standing-rewards="traderStandingRewards"
         :skill-rewards="skillRewards"
@@ -429,6 +429,7 @@
   import { useTarkovStore } from '@/stores/useTarkov';
   import { HOT_WHEELS_TASK_ID } from '@/utils/constants';
   import { getExclusiveEditionsForTask } from '@/utils/editionHelpers';
+  import { getQueryString } from '@/utils/routeHelpers';
   import { countIncompleteSuccessors, resolveImpactTeamIds } from '@/utils/taskImpact';
   import { isFailedOnlyRequirement } from '@/utils/taskProgress';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
@@ -505,9 +506,8 @@
     objectivesExpanded.value = !objectivesExpanded.value;
   };
   const taskToggle = ref(true);
-  const taskExpanded = computed(() => {
-    return !onMapView.value || taskToggle.value;
-  });
+  const route = useRoute();
+  const isDeepLinkedTask = computed(() => getQueryString(route.query.task) === props.task.id);
   const shouldIgnoreTaskHeaderToggle = (event: MouseEvent): boolean => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return false;
@@ -515,7 +515,7 @@
     return Boolean(interactiveAncestor && interactiveAncestor !== event.currentTarget);
   };
   const toggleTaskVisibility = () => {
-    if (!onMapView.value) return;
+    if (!isCollapsible.value) return;
     taskToggle.value = !taskToggle.value;
   };
   const onTaskHeaderClick = (event: MouseEvent) => {
@@ -948,6 +948,21 @@
     return 'available';
   });
   const onMapView = computed(() => preferencesStore.getTaskPrimaryView === 'maps');
+  const isCollapsible = computed(() => onMapView.value || isCompact.value);
+  const rewardsHidden = computed(() => isCompact.value && preferencesStore.getHideTaskRewards);
+  watch(
+    () => isCompact.value && !onMapView.value && preferencesStore.getTaskCollapseDefault,
+    (collapseByDefault) => {
+      taskToggle.value = !(collapseByDefault && !isDeepLinkedTask.value);
+    },
+    { immediate: true }
+  );
+  watch(isDeepLinkedTask, (linked) => {
+    if (linked) taskToggle.value = true;
+  });
+  const taskExpanded = computed(() => {
+    return !isCollapsible.value || taskToggle.value;
+  });
   const selectedMapIds = computed(() => {
     return resolveSelectedMapIds(
       preferencesStore.getTaskMapView,

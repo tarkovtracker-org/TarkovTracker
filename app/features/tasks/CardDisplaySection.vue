@@ -50,6 +50,24 @@
           {{ t('page.tasks.settings.appearance.collapse_completed_objectives') }}
         </span>
       </label>
+      <template v-if="isCompact">
+        <label
+          class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
+        >
+          <UCheckbox v-model="taskCollapseDefaultModel" />
+          <span class="text-surface-200 text-sm">
+            {{ t('page.tasks.settings.appearance.collapse_by_default') }}
+          </span>
+        </label>
+        <label
+          class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
+        >
+          <UCheckbox v-model="hideTaskRewardsModel" />
+          <span class="text-surface-200 text-sm">
+            {{ t('page.tasks.settings.appearance.hide_rewards') }}
+          </span>
+        </label>
+      </template>
     </div>
   </section>
 </template>
@@ -60,6 +78,9 @@
     showNextQuests: boolean;
     showPreviousQuests: boolean;
     hideCompletedTaskObjectives: boolean;
+    taskCollapseDefault: boolean;
+    hideTaskRewards: boolean;
+    isCompact: boolean;
   }>();
   const emit = defineEmits<{
     'update:showRequiredLabels': [value: boolean];
@@ -67,6 +88,8 @@
     'update:showNextQuests': [value: boolean];
     'update:showPreviousQuests': [value: boolean];
     'update:hideCompletedTaskObjectives': [value: boolean];
+    'update:taskCollapseDefault': [value: boolean];
+    'update:hideTaskRewards': [value: boolean];
   }>();
   const { t } = useI18n({ useScope: 'global' });
   const showRequiredLabelsModel = computed({
@@ -88,5 +111,13 @@
   const hideCompletedTaskObjectivesModel = computed({
     get: () => props.hideCompletedTaskObjectives,
     set: (value: boolean) => emit('update:hideCompletedTaskObjectives', value),
+  });
+  const taskCollapseDefaultModel = computed({
+    get: () => props.taskCollapseDefault,
+    set: (value: boolean) => emit('update:taskCollapseDefault', value),
+  });
+  const hideTaskRewardsModel = computed({
+    get: () => props.hideTaskRewards,
+    set: (value: boolean) => emit('update:hideTaskRewards', value),
   });
 </script>

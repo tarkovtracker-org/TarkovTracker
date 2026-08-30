@@ -27,6 +27,16 @@
               v-model="showPreviousQuests"
               :label="$t('settings.interface.tasks.show_prev')"
             />
+            <template v-if="isCompactDensity">
+              <UCheckbox
+                v-model="taskCollapseDefault"
+                :label="$t('settings.interface.tasks.collapse_by_default')"
+              />
+              <UCheckbox
+                v-model="hideTaskRewards"
+                :label="$t('settings.interface.tasks.hide_rewards')"
+              />
+            </template>
           </div>
         </section>
         <USeparator />
@@ -117,6 +127,15 @@
   const taskCardDensity = computed({
     get: () => preferencesStore.getTaskCardDensity,
     set: (val) => preferencesStore.setTaskCardDensity(val),
+  });
+  const isCompactDensity = computed(() => preferencesStore.getTaskCardDensity === 'compact');
+  const taskCollapseDefault = computed({
+    get: () => preferencesStore.getTaskCollapseDefault,
+    set: (val) => preferencesStore.setTaskCollapseDefault(val),
+  });
+  const hideTaskRewards = computed({
+    get: () => preferencesStore.getHideTaskRewards,
+    set: (val) => preferencesStore.setHideTaskRewards(val),
   });
   const densityOptions = computed(() => [
     { label: t('common.compact'), value: 'compact' },
