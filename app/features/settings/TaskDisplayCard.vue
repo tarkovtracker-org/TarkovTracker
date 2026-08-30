@@ -30,11 +30,13 @@
             <template v-if="isCompactDensity">
               <UCheckbox
                 v-model="taskCollapseDefault"
-                :label="$t('settings.interface.tasks.collapse_by_default')"
+                :label="
+                  $t('settings.interface.tasks.collapse_by_default', 'Collapse Quests by Default')
+                "
               />
               <UCheckbox
                 v-model="hideTaskRewards"
-                :label="$t('settings.interface.tasks.hide_rewards')"
+                :label="$t('settings.interface.tasks.hide_rewards', 'Hide Rewards')"
               />
             </template>
           </div>

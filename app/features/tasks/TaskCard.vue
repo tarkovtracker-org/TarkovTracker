@@ -403,6 +403,7 @@
   import { useTaskCardLinks } from '@/composables/useTaskCardLinks';
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
   import { isTaskSuccessful, useTaskState } from '@/composables/useTaskState';
+  import { useTaskCardExpansion } from '@/features/tasks/composables/useTaskCardExpansion';
   import QuestObjectives from '@/features/tasks/QuestObjectives.vue';
   import QuestObjectivesSkeleton from '@/features/tasks/QuestObjectivesSkeleton.vue';
   import { impactEligibleTaskIdsKey } from '@/features/tasks/task-context';
@@ -505,18 +506,12 @@
   const toggleObjectivesVisibility = () => {
     objectivesExpanded.value = !objectivesExpanded.value;
   };
-  const taskToggle = ref(true);
   const route = useRoute();
-  const isDeepLinkedTask = computed(() => getQueryString(route.query.task) === props.task.id);
   const shouldIgnoreTaskHeaderToggle = (event: MouseEvent): boolean => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return false;
     const interactiveAncestor = target.closest('a,button,input,select,textarea,[role="button"]');
     return Boolean(interactiveAncestor && interactiveAncestor !== event.currentTarget);
-  };
-  const toggleTaskVisibility = () => {
-    if (!isCollapsible.value) return;
-    taskToggle.value = !taskToggle.value;
   };
   const onTaskHeaderClick = (event: MouseEvent) => {
     if (shouldIgnoreTaskHeaderToggle(event)) return;
@@ -948,21 +943,16 @@
     return 'available';
   });
   const onMapView = computed(() => preferencesStore.getTaskPrimaryView === 'maps');
-  const isCollapsible = computed(() => onMapView.value || isCompact.value);
-  const rewardsHidden = computed(() => isCompact.value && preferencesStore.getHideTaskRewards);
-  watch(
-    () => isCompact.value && !onMapView.value && preferencesStore.getTaskCollapseDefault,
-    (collapseByDefault) => {
-      taskToggle.value = !(collapseByDefault && !isDeepLinkedTask.value);
-    },
-    { immediate: true }
+  const { isCollapsible, rewardsHidden, taskExpanded, toggleTaskVisibility } = useTaskCardExpansion(
+    {
+      taskId: () => props.task.id,
+      isCompact,
+      onMapView,
+      collapseByDefault: () => preferencesStore.getTaskCollapseDefault,
+      hideTaskRewards: () => preferencesStore.getHideTaskRewards,
+      routeTaskId: () => getQueryString(route.query.task),
+    }
   );
-  watch(isDeepLinkedTask, (linked) => {
-    if (linked) taskToggle.value = true;
-  });
-  const taskExpanded = computed(() => {
-    return !isCollapsible.value || taskToggle.value;
-  });
   const selectedMapIds = computed(() => {
     return resolveSelectedMapIds(
       preferencesStore.getTaskMapView,
