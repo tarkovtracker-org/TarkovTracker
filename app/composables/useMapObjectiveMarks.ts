@@ -17,6 +17,11 @@ export type MapObjectiveMark = {
   users?: string[];
   pinned?: boolean;
 };
+export type MapObjectiveCategory = 'self' | 'pinned' | 'team';
+export type MapObjectiveVisibility = {
+  category: MapObjectiveCategory;
+  hasActiveObjective: boolean;
+};
 interface MapObjectiveMarksOptions {
   mapId: ComputedRef<string | null | undefined>;
   shouldShowCompletedObjectives: ComputedRef<boolean>;
@@ -28,6 +33,7 @@ export function useMapObjectiveMarks({
   tasks,
 }: MapObjectiveMarksOptions): {
   mapObjectiveMarks: ComputedRef<MapObjectiveMark[]>;
+  mapObjectiveVisibility: ComputedRef<ReadonlyMap<string, MapObjectiveVisibility>>;
 } {
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
@@ -35,8 +41,9 @@ export function useMapObjectiveMarks({
   const tarkovStore = useTarkovStore();
   const { objectiveCompletions, tasksCompletions, tasksFailed, unlockedTasks } =
     storeToRefs(progressStore);
-  const mapObjectiveMarks = computed(() => {
-    if (!mapId.value) return [];
+  const mapObjectiveData = computed(() => {
+    const objectiveVisibility = new Map<string, MapObjectiveVisibility>();
+    if (!mapId.value) return { marks: [], objectiveVisibility };
     const selectedMapId = mapId.value;
     const marks: MapObjectiveMark[] = [];
     const includeTeammates = !preferencesStore.mapTeamAllHidden;
@@ -57,6 +64,7 @@ export function useMapObjectiveMarks({
           selfTaskUnlocked && !selfTaskComplete && !selfTaskFailed && !selfComplete;
         const users: string[] = [];
         const teammateUsers: string[] = [];
+        let hasActiveObjective = selfNeedsObjective;
         if (selfNeedsObjective) {
           users.push('self');
         }
@@ -70,6 +78,7 @@ export function useMapObjectiveMarks({
           }
         }
         if (teammateUsers.length > 0) {
+          hasActiveObjective = true;
           users.push(...teammateUsers);
         } else if (
           selfComplete &&
@@ -80,6 +89,11 @@ export function useMapObjectiveMarks({
           users.push('self');
         }
         if (users.length === 0) return;
+        const pinned = pinnedTaskIds.has(task.id);
+        objectiveVisibility.set(obj.id, {
+          category: pinned ? 'pinned' : users.includes('self') ? 'self' : 'team',
+          hasActiveObjective,
+        });
         const zones: MapObjectiveZone[] = [];
         const possibleLocations: MapObjectiveLocation[] = [];
         if (Array.isArray(obj.zones)) {
@@ -128,14 +142,17 @@ export function useMapObjectiveMarks({
             zones,
             possibleLocations,
             users,
-            pinned: pinnedTaskIds.has(task.id),
+            pinned,
           });
         }
       });
     });
-    return marks;
+    return { marks, objectiveVisibility };
   });
+  const mapObjectiveMarks = computed(() => mapObjectiveData.value.marks);
+  const mapObjectiveVisibility = computed(() => mapObjectiveData.value.objectiveVisibility);
   return {
     mapObjectiveMarks,
+    mapObjectiveVisibility,
   };
 }

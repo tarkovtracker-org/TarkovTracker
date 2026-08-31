@@ -108,7 +108,7 @@ describe('useMapObjectiveMarks', () => {
     pinnedTaskIds.value = ['task-pinned'];
     const mapId = computed(() => 'customs');
     const shouldShowCompletedObjectives = computed(() => false);
-    const { mapObjectiveMarks } = useMapObjectiveMarks({
+    const { mapObjectiveMarks, mapObjectiveVisibility } = useMapObjectiveMarks({
       mapId,
       shouldShowCompletedObjectives,
       tasks: computed(() => tasks),
@@ -117,6 +117,10 @@ describe('useMapObjectiveMarks', () => {
     const unpinnedMark = mapObjectiveMarks.value.find((mark) => mark.id === 'obj-unpinned');
     expect(pinnedMark?.pinned).toBe(true);
     expect(unpinnedMark?.pinned).toBe(false);
+    expect(mapObjectiveVisibility.value.get('obj-pinned')).toEqual({
+      category: 'pinned',
+      hasActiveObjective: true,
+    });
   });
   it('determines pinned state from task.id, not obj.id', async () => {
     const { useMapObjectiveMarks } = await setup();

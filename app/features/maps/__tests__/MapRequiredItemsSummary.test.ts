@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import MapRequiredItemsSummary from '@/features/maps/MapRequiredItemsSummary.vue';
+import type { MapObjectiveVisibility } from '@/composables/useMapObjectiveMarks';
 import type { Task, TaskObjective } from '@/types/tarkov';
 import type { ComponentCustomProperties } from 'vue';
 vi.mock('@/features/tasks/ObjectiveRequiredItems.vue', () => ({
@@ -55,10 +56,14 @@ describe('MapRequiredItemsSummary', () => {
       },
     ] as TaskObjective[],
   } as Task;
-  const mountSummary = (tasks: Task[]) =>
+  const mountSummary = (
+    tasks: Task[],
+    objectiveVisibility?: ReadonlyMap<string, MapObjectiveVisibility>
+  ) =>
     mount(MapRequiredItemsSummary, {
       props: {
         mapId,
+        objectiveVisibility,
         tasks,
       },
       global: {
@@ -190,6 +195,7 @@ describe('MapRequiredItemsSummary', () => {
   it('hides the active group when the regular chip is off', () => {
     mockPreferencesStore.getPinnedTaskIds = ['task-pinned'];
     mockPreferencesStore.getMapShowSelfObjectives = false;
+    mockPreferencesStore.getMapShowTeamObjectives = false;
     const wrapper = mountSummary([task, pinnedTask]);
     const groups = wrapper.findAll('[data-variant="equipment"]');
     expect(groups).toHaveLength(1);
@@ -200,15 +206,49 @@ describe('MapRequiredItemsSummary', () => {
     mockPreferencesStore.getPinnedTaskIds = ['task-pinned'];
     mockPreferencesStore.getMapShowPinnedObjectives = false;
     mockPreferencesStore.getMapShowSelfObjectives = false;
+    mockPreferencesStore.getMapShowTeamObjectives = false;
     const wrapper = mountSummary([task, pinnedTask]);
     expect(wrapper.findAll('[data-variant]')).toHaveLength(0);
     expect(wrapper.text().trim()).toBe('');
   });
-  it('ignores the team chip', () => {
-    mockPreferencesStore.getPinnedTaskIds = ['task-pinned'];
-    const withTeam = mountSummary([task, pinnedTask]).html();
+  it('respects the team chip for team-only objectives', () => {
+    const teamTask: Task = {
+      id: 'team-task',
+      objectives: [
+        {
+          id: 'team-obj',
+          type: 'plantItem',
+          maps: [{ id: 'customs' }],
+          items: [{ id: 'item-team', name: 'Team Item', shortName: 'TI' }],
+        },
+      ] as TaskObjective[],
+    } as Task;
+    const objectiveVisibility = new Map<string, MapObjectiveVisibility>([
+      ['team-obj', { category: 'team', hasActiveObjective: true }],
+    ]);
+    const withTeam = mountSummary([teamTask], objectiveVisibility);
+    expect(equipmentIds(withTeam.get('[data-variant="equipment"]'))).toEqual(['item-team']);
     mockPreferencesStore.getMapShowTeamObjectives = false;
-    const withoutTeam = mountSummary([task, pinnedTask]).html();
-    expect(withoutTeam).toBe(withTeam);
+    const withoutTeam = mountSummary([teamTask], objectiveVisibility);
+    expect(withoutTeam.find('[data-variant="equipment"]').exists()).toBe(false);
+  });
+  it('retains a teammate objective when self already completed it', () => {
+    mockProgressStore.objectiveCompletions = { 'team-obj': { self: true } };
+    const teamTask: Task = {
+      id: 'team-task',
+      objectives: [
+        {
+          id: 'team-obj',
+          type: 'plantItem',
+          maps: [{ id: 'customs' }],
+          items: [{ id: 'item-team', name: 'Team Item', shortName: 'TI' }],
+        },
+      ] as TaskObjective[],
+    } as Task;
+    const objectiveVisibility = new Map<string, MapObjectiveVisibility>([
+      ['team-obj', { category: 'team', hasActiveObjective: true }],
+    ]);
+    const wrapper = mountSummary([teamTask], objectiveVisibility);
+    expect(equipmentIds(wrapper.get('[data-variant="equipment"]'))).toEqual(['item-team']);
   });
 });

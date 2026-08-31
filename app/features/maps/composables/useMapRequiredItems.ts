@@ -5,6 +5,7 @@ import type { TarkovItem, Task, TaskObjective } from '@/types/tarkov';
 interface MapRequiredItemsOptions {
   mapId: ComputedRef<string>;
   tasks: ComputedRef<Task[]>;
+  objectiveFilter?: (objective: TaskObjective, selfComplete: boolean) => boolean;
 }
 interface EquipmentCount {
   item: TarkovItem;
@@ -84,7 +85,7 @@ const aggregateKeyGroups = (objectives: TaskObjective[]): TarkovItem[][] => {
   }
   return Array.from(groups.values()).sort((a, b) => compareByDisplayName(a[0], b[0]));
 };
-export function useMapRequiredItems({ mapId, tasks }: MapRequiredItemsOptions): {
+export function useMapRequiredItems({ mapId, objectiveFilter, tasks }: MapRequiredItemsOptions): {
   equipment: ComputedRef<TarkovItem[]>;
   equipmentCounts: ComputedRef<Record<string, number>>;
   keyGroups: ComputedRef<TarkovItem[][]>;
@@ -93,11 +94,11 @@ export function useMapRequiredItems({ mapId, tasks }: MapRequiredItemsOptions): 
   const progressStore = useProgressStore();
   const eligibleObjectives = computed(() =>
     tasks.value.flatMap((task) =>
-      (task.objectives ?? []).filter(
-        (objective) =>
-          objective.maps?.some((map) => map.id === mapId.value) &&
-          !progressStore.objectiveCompletions[objective.id]?.['self']
-      )
+      (task.objectives ?? []).filter((objective) => {
+        if (!objective.maps?.some((map) => map.id === mapId.value)) return false;
+        const selfComplete = progressStore.objectiveCompletions[objective.id]?.['self'] === true;
+        return objectiveFilter ? objectiveFilter(objective, selfComplete) : !selfComplete;
+      })
     )
   );
   const aggregatedItems = computed(() => aggregateEquipment(eligibleObjectives.value));
