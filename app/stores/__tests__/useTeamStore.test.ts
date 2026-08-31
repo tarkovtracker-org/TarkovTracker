@@ -1,10 +1,14 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  applyLegacyPersistentProgressResult,
+  buildMemberProgressFilter,
+  fetchLegacyTeammateProgress,
   mergeMemberProfileBroadcast,
   resolveTeammateIdentity,
   useTeamStore,
 } from '@/stores/useTeamStore';
+import { GAME_MODES, type GameMode } from '@/utils/constants';
 import type { TeamState, MemberProfile } from '@/types/tarkov';
 type TeamPatch = Omit<Partial<TeamState>, 'members'> & {
   join_code?: string | null;
@@ -604,5 +608,62 @@ describe('Team Store Getter Logic', () => {
       patchTeamState(store, { members: ['user-1', 'user-3'] });
       expect(store.teammates).toEqual(['user-3']);
     });
+  });
+});
+describe('Teammate progress helpers', () => {
+  it('builds a filtered membership expression from valid unique IDs', () => {
+    const firstMember = '11111111-1111-4111-8111-111111111111';
+    const secondMember = '22222222-2222-4222-8222-222222222222';
+    expect(buildMemberProgressFilter([firstMember, 'not-a-uuid', firstMember, secondMember])).toBe(
+      `user_id=in.(${firstMember},${secondMember})`
+    );
+  });
+  it('omits the progress filter when no valid members are present', () => {
+    expect(buildMemberProgressFilter(null)).toBeUndefined();
+    expect(buildMemberProgressFilter(['not-a-uuid'])).toBeUndefined();
+  });
+  it('applies a legacy progress result only when it is usable', () => {
+    const applyProgress = vi.fn();
+    const appliedModes = new Set<GameMode>();
+    applyLegacyPersistentProgressResult(
+      { data: { level: 12 }, error: null },
+      appliedModes,
+      'teammate-1',
+      GAME_MODES.PVP,
+      applyProgress
+    );
+    expect(applyProgress).toHaveBeenCalledWith(GAME_MODES.PVP, { level: 12 });
+    appliedModes.add(GAME_MODES.PVE);
+    applyLegacyPersistentProgressResult(
+      { data: { level: 20 }, error: null },
+      appliedModes,
+      'teammate-1',
+      GAME_MODES.PVE,
+      applyProgress
+    );
+    expect(applyProgress).toHaveBeenCalledTimes(1);
+    applyLegacyPersistentProgressResult(
+      { data: null, error: new Error('denied') },
+      appliedModes,
+      'teammate-1',
+      GAME_MODES.PVP,
+      applyProgress
+    );
+    expect(applyProgress).toHaveBeenCalledTimes(1);
+  });
+  it('uses the teammate RPC for persistent modes and skips Seasonal', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { level: 12 }, error: null });
+    const client = { rpc };
+    await expect(
+      fetchLegacyTeammateProgress(client, 'teammate-1', GAME_MODES.PVP)
+    ).resolves.toEqual({ data: { level: 12 }, error: null });
+    expect(rpc).toHaveBeenCalledWith('get_teammate_legacy_progress', {
+      p_game_mode: GAME_MODES.PVP,
+      p_user_id: 'teammate-1',
+    });
+    await expect(
+      fetchLegacyTeammateProgress(client, 'teammate-1', GAME_MODES.SEASONAL)
+    ).resolves.toEqual({ data: null, error: null });
+    expect(rpc).toHaveBeenCalledTimes(1);
   });
 });

@@ -81,13 +81,15 @@ const logTeammateModeProgressHydrationFailure = (error: unknown, teammateId: str
 };
 const TEAM_MEMBER_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const buildMemberProgressFilter = (members: string[] | null | undefined): string | undefined => {
+export const buildMemberProgressFilter = (
+  members: string[] | null | undefined
+): string | undefined => {
   const memberIds = Array.from(
     new Set((members ?? []).filter((member) => TEAM_MEMBER_ID_PATTERN.test(member)))
   );
   return memberIds.length > 0 ? `user_id=in.(${memberIds.join(',')})` : undefined;
 };
-const applyLegacyPersistentProgressResult = (
+export const applyLegacyPersistentProgressResult = (
   result: { data: unknown; error: unknown },
   appliedModes: Set<GameMode>,
   teammateId: string,
@@ -101,11 +103,11 @@ const applyLegacyPersistentProgressResult = (
   if (appliedModes.has(mode)) return;
   if (result.data !== null) applyProgress(mode, result.data);
 };
-const fetchLegacyTeammateProgress = async (
+export const fetchLegacyTeammateProgress = async (
   client: Pick<SupabaseClient, 'rpc'>,
   teammateId: string,
   mode: GameMode
-) => {
+): Promise<{ data: unknown; error: unknown }> => {
   if (mode === GAME_MODES.SEASONAL) return { data: null, error: null };
   return client.rpc('get_teammate_legacy_progress', {
     p_game_mode: mode,
