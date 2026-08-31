@@ -554,12 +554,16 @@ export function useTeammateStores() {
       });
       const storeInstance = storeDefinition();
       teammateStores.value[teammateId] = storeInstance;
+      let hydrationActive = true;
+      const isHydrationActive = () =>
+        hydrationActive && teammateStores.value[teammateId] === storeInstance;
       const memberProfile = teamStore.memberProfiles?.[teammateId];
       storeInstance.$patch((state) => {
         Object.assign(state, resolveTeammateIdentity(memberProfile, getCurrentGameMode()));
       });
       const appliedModes = new Set<GameMode>();
       const applyProgressData = (mode: GameMode, progress: unknown, authoritative = false) => {
+        if (!isHydrationActive()) return;
         if (authoritative || hasMaterializedProgress(progress)) appliedModes.add(mode);
         storeInstance.$patch((state) => {
           state[mode] = {
@@ -589,14 +593,17 @@ export function useTeammateStores() {
               .eq('user_id', teammateId),
             fetchLegacyTeammateProgress($supabase.client, teammateId, legacyMode),
           ]);
+          if (!isHydrationActive()) return;
           if (modeRows.error) {
             logTeammateModeProgressHydrationFailure(modeRows.error, teammateId);
             return;
           }
           modeRows.data?.forEach((row) => {
+            if (!isHydrationActive()) return;
             if (isGameMode(row.game_mode) && appliedModes.has(row.game_mode)) return;
             applyModeProgress(row as Record<string, unknown>);
           });
+          if (!isHydrationActive()) return;
           applyLegacyPersistentProgressResult(
             legacyRow,
             appliedModes,
@@ -604,6 +611,7 @@ export function useTeammateStores() {
             legacyMode,
             applyProgressData
           );
+          if (!isHydrationActive()) return;
           replayProgressMetadataMigration();
         } catch (error) {
           logTeammateModeProgressHydrationFailure(error, teammateId);
@@ -617,12 +625,13 @@ export function useTeammateStores() {
       if (typeof window !== 'undefined') {
         window.addEventListener('teammate-mode-progress', handleModeProgress);
       }
-      void hydrateModeProgress();
       teammateUnsubscribes.value[teammateId] = () => {
+        hydrationActive = false;
         if (typeof window !== 'undefined') {
           window.removeEventListener('teammate-mode-progress', handleModeProgress);
         }
       };
+      void hydrateModeProgress();
     } catch (error) {
       logger.error(`Error creating store for teammate ${teammateId}:`, error);
     }

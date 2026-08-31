@@ -256,7 +256,9 @@ describe('supabase plugin', () => {
       await expect(result?.provide.supabase.ready()).rejects.toThrow('invalid_grant');
       expect(window.location.search).toBe('?code=expired-code');
       expect(result?.provide.supabase.user.loggedIn).toBe(false);
-      await expect(result?.provide.supabase.ready()).resolves.toBeUndefined();
+      await expect(result?.provide.supabase.ready()).resolves.toMatchObject({
+        user: { id: 'user-after-retry' },
+      });
       expect(getSession).toHaveBeenCalledTimes(2);
       expect(result?.provide.supabase.user.id).toBe('user-after-retry');
     } finally {
@@ -379,8 +381,9 @@ describe('supabase plugin', () => {
       SupabasePluginProvide | undefined;
     await flushPlugin();
     expect(result?.provide.supabase.user.loggedIn).toBe(false);
-    await result?.provide.supabase.ready();
+    const session = await result?.provide.supabase.ready();
     expect(getSession).toHaveBeenCalledTimes(2);
+    expect(session?.user.id).toBe('user-3');
     expect(result?.provide.supabase.user.id).toBe('user-3');
     expect(result?.provide.supabase.user.loggedIn).toBe(true);
   });
@@ -489,7 +492,7 @@ describe('supabase plugin', () => {
     await flushPlugin();
     expect(mockCreateClient).toHaveBeenCalledTimes(1);
     sessionDeferred.resolve({ data: { session: null } });
-    await expect(readyPromise).resolves.toBeUndefined();
+    await expect(readyPromise).resolves.toBeNull();
     await expect(signInPromise).resolves.toEqual({ provider: 'github', url: null });
     expect(signInWithOAuth).toHaveBeenCalledTimes(1);
   });
@@ -535,7 +538,7 @@ describe('supabase plugin', () => {
     await expect(fullClient.functions.invoke('noop')).resolves.toEqual({ data: null, error: null });
     await expect(fullClient.auth.signOut()).resolves.toEqual({ error: null });
     expect(fullClient.auth.onAuthStateChange()).toBeDefined();
-    await expect(supabase?.ready()).resolves.toBeUndefined();
+    await expect(supabase?.ready()).resolves.toBeNull();
     await expect(supabase?.signOut()).resolves.toBeUndefined();
     await expect(supabase?.signInWithOAuth('github')).rejects.toThrow(
       'Supabase not configured - login unavailable in offline mode'
@@ -648,6 +651,21 @@ describe('supabase plugin', () => {
     expect(loggerMock.error).toHaveBeenCalledWith(
       '[Supabase] Failed to initialize client',
       initError
+    );
+  });
+  it('logs and rejects initial session read failures', async () => {
+    const sessionError = new Error('initial session read failed');
+    localStorage.removeItem('sb-test-auth-token');
+    mockAuthClient({
+      getSession: vi.fn().mockRejectedValue(sessionError),
+    });
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    await expect(result?.provide.supabase.ready()).rejects.toBe(sessionError);
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      '[Supabase] Failed to read initial session',
+      sessionError
     );
   });
 });

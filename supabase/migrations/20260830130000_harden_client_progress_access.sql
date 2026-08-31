@@ -172,7 +172,7 @@ BEGIN
     END IF;
     IF v_mode = v_seasonal_mode
       AND (p_seasonal_season_number IS NULL OR p_seasonal_season_number <> v_active_season) THEN
-      CONTINUE;
+      RAISE EXCEPTION 'Invalid season number for seasonal progress';
     END IF;
     v_season_number := CASE
       WHEN v_mode = v_seasonal_mode THEN v_active_season

@@ -95,6 +95,8 @@ export function useSupabaseListener<
   const storeIdForLogging = storeId || store.$id;
   let activeFetchController: AbortController | null = null;
   let latestFetchVersion = 0;
+  let cleanupVersion = 0;
+  let pendingSyncResumeTimeout: ReturnType<typeof setTimeout> | null = null;
   // Helper to get current filter value (supports both string and ref)
   const getFilterValue = (): string | undefined => unref(filter);
   // Initial fetch
@@ -170,6 +172,7 @@ export function useSupabaseListener<
     const currentFilter = getFilterValue();
     if (channel.value) return;
     if (!currentFilter) return;
+    const subscriptionVersion = cleanupVersion;
     channel.value = $supabase.client
       .channel(`public:${table}:${currentFilter}`)
       .on(
@@ -181,9 +184,10 @@ export function useSupabaseListener<
           filter: currentFilter,
         },
         (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-          // Pause sync to prevent bounce loop
+          if (subscriptionVersion !== cleanupVersion) return;
           syncController?.pause();
           try {
+            if (subscriptionVersion !== cleanupVersion) return;
             if (payload.eventType === 'DELETE') {
               if (patchStore) {
                 resetStore(store);
@@ -199,8 +203,13 @@ export function useSupabaseListener<
               if (onData) onData(newData);
             }
           } finally {
-            // Resume sync after a small delay to let Vue reactivity settle
-            setTimeout(() => syncController?.resume(), VUE_REACTIVITY_SETTLE_MS);
+            if (subscriptionVersion === cleanupVersion) {
+              if (pendingSyncResumeTimeout) clearTimeout(pendingSyncResumeTimeout);
+              pendingSyncResumeTimeout = setTimeout(() => {
+                pendingSyncResumeTimeout = null;
+                if (subscriptionVersion === cleanupVersion) syncController?.resume();
+              }, VUE_REACTIVITY_SETTLE_MS);
+            }
           }
         }
       )
@@ -209,6 +218,12 @@ export function useSupabaseListener<
       });
   };
   const cleanup = () => {
+    cleanupVersion += 1;
+    if (pendingSyncResumeTimeout) {
+      clearTimeout(pendingSyncResumeTimeout);
+      pendingSyncResumeTimeout = null;
+    }
+    syncController?.resume();
     latestFetchVersion += 1;
     activeFetchController?.abort();
     activeFetchController = null;

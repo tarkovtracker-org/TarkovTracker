@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(15);
+SELECT plan(17);
 
 CREATE TEMP TABLE client_progress_fixture AS
 SELECT
@@ -203,6 +203,28 @@ SELECT lives_ok(
     1::SMALLINT
   )$$,
   'authenticated clients can sync through the bounded RPC'
+);
+SELECT throws_ok(
+  $$SELECT public.sync_user_game_mode_progress(
+    'seasonal'::TEXT,
+    1::INTEGER,
+    NULL::BIGINT,
+    '{"seasonal":{"level":11}}'::JSONB,
+    NULL::SMALLINT
+  )$$,
+  'Invalid season number for seasonal progress',
+  'seasonal progress requires the active season number'
+);
+SELECT throws_ok(
+  $$SELECT public.sync_user_game_mode_progress(
+    'seasonal'::TEXT,
+    1::INTEGER,
+    NULL::BIGINT,
+    '{"seasonal":{"level":11}}'::JSONB,
+    0::SMALLINT
+  )$$,
+  'Invalid season number for seasonal progress',
+  'seasonal progress rejects stale season numbers'
 );
 RESET ROLE;
 SELECT is(
