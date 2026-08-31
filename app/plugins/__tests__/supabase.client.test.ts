@@ -354,6 +354,39 @@ describe('supabase plugin', () => {
     await Promise.all([firstReady, secondReady]);
     expect(result?.provide.supabase.user.id).toBe('user-1');
   });
+  it('logs and rethrows ready session read failures', async () => {
+    const readyError = new Error('ready session failed');
+    const getSession = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: {
+          session: createSession('user-1'),
+        },
+      })
+      .mockRejectedValueOnce(readyError);
+    mockCreateClient.mockReturnValue({
+      auth: {
+        getSession,
+        onAuthStateChange: vi.fn(() => ({
+          data: {
+            subscription: {
+              unsubscribe: vi.fn(),
+            },
+          },
+        })),
+        signInWithOAuth: vi.fn(),
+        signOut: vi.fn(),
+      },
+    });
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    await expect(result?.provide.supabase.ready()).rejects.toBe(readyError);
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      '[Supabase] Failed to read ready session',
+      readyError
+    );
+  });
   it('preserves scoped local state after signOut', async () => {
     const { removeAllChannels, signOut } = createClientMock('user-1');
     const plugin = (await import('@/plugins/supabase.client')).default;

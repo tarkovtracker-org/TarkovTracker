@@ -246,10 +246,15 @@ export default defineNuxtPlugin({
     };
     const readReadySession = async (client: SupabaseClient): Promise<Session | null> => {
       readySessionPromise ??= (async () => {
-        const sessionResult = await client.auth.getSession();
-        const session = sessionResult.data?.session ?? null;
-        hydrateFromSession(session);
-        return session;
+        try {
+          const sessionResult = await client.auth.getSession();
+          const session = sessionResult.data?.session ?? null;
+          hydrateFromSession(session);
+          return session;
+        } catch (error) {
+          logger.error('[Supabase] Failed to read ready session', error);
+          throw error;
+        }
       })();
       const sessionPromise = readySessionPromise;
       try {
