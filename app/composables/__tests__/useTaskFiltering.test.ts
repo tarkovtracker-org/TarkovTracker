@@ -546,6 +546,42 @@ describe('useTaskFiltering', () => {
       'task-failed',
     ]);
   });
+  it('does not rank active trader tasks as available', async () => {
+    const { taskFiltering, tasks, progressStore } = await setup();
+    const activeTask = tasks.find((task) => task.id === 'task-map')!;
+    const completedTask = tasks.find((task) => task.id === 'task-trader')!;
+    const failedTask = tasks.find((task) => task.id === 'task-failed')!;
+    completedTask.trader = { id: 'trader-1', name: 'Trader One' };
+    failedTask.trader = { id: 'trader-1', name: 'Trader One' };
+    progressStore.getTaskStatus = (_teamId: string, taskId: string) => {
+      if (taskId === activeTask.id) return 'active';
+      if (taskId === completedTask.id) return 'completed';
+      if (taskId === failedTask.id) return 'failed';
+      return 'incomplete';
+    };
+    for (const userView of ['self', 'all']) {
+      await taskFiltering.updateVisibleTasks(
+        {
+          primaryView: 'traders',
+          secondaryView: 'all',
+          userView,
+          mapView: 'all',
+          traderView: 'trader-1',
+          mergedMaps: [],
+          sortMode: 'alphabetical',
+          sortDirection: 'asc',
+        },
+        false
+      );
+      expect(taskFiltering.visibleTasks.value.map((task) => task.id)).toEqual([
+        'task-kappa',
+        'task-locked',
+        'task-map',
+        'task-trader',
+        'task-failed',
+      ]);
+    }
+  });
   it('keeps pinned tasks first while preserving status rank within pinned and unpinned groups', async () => {
     const { taskFiltering, tasks, preferencesStore } = await setup();
     preferencesStore.getPinnedTaskIds = ['task-failed', 'task-trader'];
