@@ -31,6 +31,8 @@ interface ObjectiveLocations {
   zones: MapObjectiveZone[];
   possibleLocations: MapObjectiveLocation[];
 }
+type ObjectiveZone = NonNullable<TaskObjective['zones']>[number];
+type ObjectivePossibleLocation = NonNullable<TaskObjective['possibleLocations']>[number];
 type BooleanProgressMap = Record<string, Record<string, boolean>>;
 interface ObjectiveUsersOptions {
   taskId: string;
@@ -76,6 +78,17 @@ const getTeammateUsers = ({
     const taskFailed = tasksFailed[taskId]?.[teammateId] === true;
     return taskUnlocked && !objectiveDone && !taskDone && !taskFailed;
   });
+const canShowCompletedObjective = (
+  selfComplete: boolean,
+  selfTaskComplete: boolean,
+  selfTaskFailed: boolean,
+  shouldShowCompletedObjectives: boolean
+): boolean => {
+  if (!shouldShowCompletedObjectives) return false;
+  if (!selfComplete) return false;
+  if (!selfTaskComplete) return false;
+  return !selfTaskFailed;
+};
 const getObjectiveUsers = ({
   taskId,
   objectiveId,
@@ -99,15 +112,106 @@ const getObjectiveUsers = ({
     tasksCompletions,
     tasksFailed,
   });
-  const users = selfNeedsObjective ? ['self'] : [];
-  let hasActiveObjective = selfNeedsObjective;
-  if (teammateUsers.length > 0) {
-    hasActiveObjective = true;
-    users.push(...teammateUsers);
-  } else if (selfComplete && selfTaskComplete && !selfTaskFailed && shouldShowCompletedObjectives) {
-    users.push('self');
+  const users: string[] = [];
+  if (selfNeedsObjective) users.push('self');
+  users.push(...teammateUsers);
+  if (users.length > 0) {
+    return { users, hasActiveObjective: true };
   }
-  return { users, hasActiveObjective };
+  return {
+    users: canShowCompletedObjective(
+      selfComplete,
+      selfTaskComplete,
+      selfTaskFailed,
+      shouldShowCompletedObjectives
+    )
+      ? ['self']
+      : [],
+    hasActiveObjective: false,
+  };
+};
+const getZoneLocation = (
+  zone: ObjectiveZone,
+  selectedMapId: string
+): { zone?: MapObjectiveZone; possibleLocation?: MapObjectiveLocation } | null => {
+  const outline = getObjectiveOutline(zone);
+  if (outline.length >= 3) {
+    return { zone: { map: { id: selectedMapId }, outline } };
+  }
+  if (!zone.position) return null;
+  return {
+    possibleLocation: {
+      map: { id: selectedMapId },
+      positions: [{ x: zone.position.x, y: zone.position.y, z: zone.position.z }],
+    },
+  };
+};
+const getObjectiveOutline = (zone: ObjectiveZone): { x: number; z: number }[] =>
+  Array.isArray(zone.outline) ? zone.outline.map((point) => ({ x: point.x, z: point.z })) : [];
+const appendZoneLocation = (
+  locations: ObjectiveLocations,
+  location: { zone?: MapObjectiveZone; possibleLocation?: MapObjectiveLocation }
+) => {
+  if (location.zone) locations.zones.push(location.zone);
+  if (location.possibleLocation) locations.possibleLocations.push(location.possibleLocation);
+};
+const getZoneLocations = (zones: NonNullable<TaskObjective['zones']>, selectedMapId: string) => {
+  const locations: ObjectiveLocations = { zones: [], possibleLocations: [] };
+  for (const zone of zones.filter((zone) => zone?.map?.id === selectedMapId)) {
+    const location = getZoneLocation(zone, selectedMapId);
+    if (!location) continue;
+    appendZoneLocation(locations, location);
+  }
+  return locations;
+};
+const getPossibleLocation = (
+  location: ObjectivePossibleLocation,
+  selectedMapId: string
+): MapObjectiveLocation | null => {
+  const positions = getObjectivePositions(location);
+  if (positions.length === 0) return null;
+  return { map: { id: selectedMapId }, positions };
+};
+const getObjectivePositions = (
+  location: ObjectivePossibleLocation
+): Array<{ x: number; y?: number; z: number }> =>
+  Array.isArray(location.positions)
+    ? location.positions.map((pos) => ({ x: pos.x, y: pos.y, z: pos.z }))
+    : [];
+const getPossibleLocations = (
+  locations: NonNullable<TaskObjective['possibleLocations']>,
+  selectedMapId: string
+): MapObjectiveLocation[] => {
+  const possibleLocations: MapObjectiveLocation[] = [];
+  for (const location of locations.filter((location) => location?.map?.id === selectedMapId)) {
+    const possibleLocation = getPossibleLocation(location, selectedMapId);
+    if (possibleLocation) possibleLocations.push(possibleLocation);
+  }
+  return possibleLocations;
+};
+const isObjectiveOnMap = (
+  objectiveId: string,
+  selectedMapId: string,
+  objectiveMaps: ObjectiveMapInfo[]
+): boolean =>
+  objectiveMaps.some(
+    (mapInfo) => mapInfo.objectiveID === objectiveId && mapInfo.mapID === selectedMapId
+  );
+const getGpsLocation = (
+  objectiveId: string,
+  selectedMapId: string,
+  objectiveGps: ObjectiveGPSInfo[]
+): MapObjectiveLocation[] => {
+  const gpsInfo = objectiveGps.find((gps) => gps.objectiveID === objectiveId);
+  if (!gpsInfo) return [];
+  if (gpsInfo.x == null) return [];
+  if (gpsInfo.y == null) return [];
+  return [
+    {
+      map: { id: selectedMapId },
+      positions: [{ x: gpsInfo.x, y: 0, z: gpsInfo.y }],
+    },
+  ];
 };
 const getObjectiveLocations = (
   objective: TaskObjective,
@@ -115,49 +219,21 @@ const getObjectiveLocations = (
   objectiveMaps: ObjectiveMapInfo[],
   objectiveGps: ObjectiveGPSInfo[]
 ): ObjectiveLocations => {
-  const zones: MapObjectiveZone[] = [];
-  const possibleLocations: MapObjectiveLocation[] = [];
-  if (Array.isArray(objective.zones)) {
-    objective.zones.forEach((zone) => {
-      if (zone?.map?.id !== selectedMapId) return;
-      const outline = Array.isArray(zone.outline)
-        ? zone.outline.map((point) => ({ x: point.x, z: point.z }))
-        : [];
-      if (outline.length >= 3) {
-        zones.push({ map: { id: selectedMapId }, outline });
-      } else if (zone.position) {
-        possibleLocations.push({
-          map: { id: selectedMapId },
-          positions: [{ x: zone.position.x, y: zone.position.y, z: zone.position.z }],
-        });
-      }
-    });
-  }
-  if (Array.isArray(objective.possibleLocations)) {
-    objective.possibleLocations.forEach((location) => {
-      if (location?.map?.id !== selectedMapId) return;
-      const positions = Array.isArray(location.positions)
-        ? location.positions.map((pos) => ({ x: pos.x, y: pos.y, z: pos.z }))
-        : [];
-      if (positions.length > 0) {
-        possibleLocations.push({
-          map: { id: selectedMapId },
-          positions,
-        });
-      }
-    });
-  }
-  const gpsInfo = objectiveGps.find((gps) => gps.objectiveID === objective.id);
-  const isOnThisMap = objectiveMaps.some(
-    (mapInfo) => mapInfo.objectiveID === objective.id && mapInfo.mapID === selectedMapId
-  );
-  if (isOnThisMap && gpsInfo && gpsInfo.x != null && gpsInfo.y != null) {
-    possibleLocations.push({
-      map: { id: selectedMapId },
-      positions: [{ x: gpsInfo.x, y: 0, z: gpsInfo.y }],
-    });
-  }
-  return { zones, possibleLocations };
+  const zoneLocations = Array.isArray(objective.zones)
+    ? getZoneLocations(objective.zones, selectedMapId)
+    : { zones: [], possibleLocations: [] };
+  const directPossibleLocations = Array.isArray(objective.possibleLocations)
+    ? getPossibleLocations(objective.possibleLocations, selectedMapId)
+    : [];
+  const gpsLocations = isObjectiveOnMap(objective.id, selectedMapId, objectiveMaps)
+    ? getGpsLocation(objective.id, selectedMapId, objectiveGps)
+    : [];
+  const possibleLocations = [
+    ...zoneLocations.possibleLocations,
+    ...directPossibleLocations,
+    ...gpsLocations,
+  ];
+  return { zones: zoneLocations.zones, possibleLocations };
 };
 export function useMapObjectiveMarks({
   mapId,
