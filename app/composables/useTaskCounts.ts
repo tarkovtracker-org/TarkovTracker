@@ -42,25 +42,35 @@ const isAvailableTeamTask = ({
   isFailed,
 }: TeamTaskStatus): boolean => isUnlocked && !isActive && !isCompleted && !isFailed;
 const taskHasRequiredKeys = (task: Task): boolean => (task.requiredKeys?.length ?? 0) > 0;
+const isKappaTaskVisible = (task: Task, context: TaskCountFilterContext): boolean =>
+  task.kappaRequired === true && context.showKappa;
+const isLightkeeperTaskVisible = (task: Task, context: TaskCountFilterContext): boolean =>
+  task.lightkeeperRequired === true && context.showLightkeeper;
+const isNonSpecialTaskVisible = (task: Task, context: TaskCountFilterContext): boolean => {
+  if (task.kappaRequired === true) return false;
+  if (task.lightkeeperRequired === true) return false;
+  return context.showNonSpecial;
+};
 const isTaskTypeVisible = (task: Task, context: TaskCountFilterContext): boolean => {
   if (!context.hasTypeSelection) return true;
-  const isKappaRequired = task.kappaRequired === true;
-  const isLightkeeperRequired = task.lightkeeperRequired === true;
-  const isNonSpecial = !isKappaRequired && !isLightkeeperRequired;
-  return (
-    (isKappaRequired && context.showKappa) ||
-    (isLightkeeperRequired && context.showLightkeeper) ||
-    (isNonSpecial && context.showNonSpecial)
-  );
+  if (isKappaTaskVisible(task, context)) return true;
+  if (isLightkeeperTaskVisible(task, context)) return true;
+  return isNonSpecialTaskVisible(task, context);
+};
+const isTaskAtUserPrestigeLevel = (task: Task, context: TaskCountFilterContext): boolean => {
+  const taskPrestigeLevel = context.prestigeTaskMap.get(task.id);
+  if (taskPrestigeLevel === undefined) return true;
+  return taskPrestigeLevel === context.userPrestigeLevel;
+};
+const passesRequiredKeysFilter = (task: Task, context: TaskCountFilterContext): boolean => {
+  if (!context.onlyTasksWithRequiredKeys) return true;
+  return taskHasRequiredKeys(task);
 };
 const isTaskIncluded = (task: Task, context: TaskCountFilterContext): boolean => {
   if (context.excludedTaskIds.has(task.id)) return false;
-  const taskPrestigeLevel = context.prestigeTaskMap.get(task.id);
-  if (taskPrestigeLevel !== undefined && taskPrestigeLevel !== context.userPrestigeLevel) {
-    return false;
-  }
+  if (!isTaskAtUserPrestigeLevel(task, context)) return false;
   if (!isTaskTypeVisible(task, context)) return false;
-  return !context.onlyTasksWithRequiredKeys || taskHasRequiredKeys(task);
+  return passesRequiredKeysFilter(task, context);
 };
 const resolveUnstartedTaskStatus = (
   isUnlocked: boolean,
@@ -149,24 +159,48 @@ export function useTaskCounts() {
       status: resolveUserTaskStatus(status, isUnlocked, isInvalid),
     };
   };
+  const getTaskCountResult = (
+    task: Task,
+    userView: string,
+    isAllUsers: boolean,
+    visibleTeamIds: string[]
+  ): TaskCountResult | null =>
+    isAllUsers ? getAllUsersTaskCount(task, visibleTeamIds) : getUserTaskCount(task, userView);
+  const addTaskStatusCount = (counts: TaskStatusCounts, result: TaskCountResult): void => {
+    counts.all++;
+    if (result.status) counts[result.status]++;
+  };
+  const countTaskStatuses = (
+    tasks: Task[],
+    userView: string,
+    taskFilterContext: TaskCountFilterContext,
+    isAllUsers: boolean,
+    visibleTeamIds: string[]
+  ): TaskStatusCounts => {
+    const counts = { all: 0, active: 0, available: 0, locked: 0, completed: 0, failed: 0 };
+    for (const task of tasks) {
+      if (!isTaskIncluded(task, taskFilterContext)) continue;
+      const result = getTaskCountResult(task, userView, isAllUsers, visibleTeamIds);
+      if (!result) continue;
+      addTaskStatusCount(counts, result);
+    }
+    return counts;
+  };
   const calculateStatusCounts = (userView: string): TaskStatusCounts => {
     const perfTimer = perfStart('[Tasks] calculateStatusCounts', {
       tasks: metadataStore.tasks.length,
       userView,
     });
-    const counts = { all: 0, active: 0, available: 0, locked: 0, completed: 0, failed: 0 };
     const taskFilterContext = getTaskFilterContext();
     const isAllUsers = isAllUsersView(userView);
     const visibleTeamIds = isAllUsers ? Object.keys(progressStore.visibleTeamStores || {}) : [];
-    for (const task of metadataStore.tasks) {
-      if (!isTaskIncluded(task, taskFilterContext)) continue;
-      const result = isAllUsers
-        ? getAllUsersTaskCount(task, visibleTeamIds)
-        : getUserTaskCount(task, userView);
-      if (!result) continue;
-      counts.all++;
-      if (result.status) counts[result.status]++;
-    }
+    const counts = countTaskStatuses(
+      metadataStore.tasks,
+      userView,
+      taskFilterContext,
+      isAllUsers,
+      visibleTeamIds
+    );
     perfEnd(perfTimer, { total: counts.all });
     return counts;
   };
