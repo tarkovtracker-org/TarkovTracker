@@ -551,24 +551,24 @@ describe('api-gateway', () => {
   it.each(['active', 'failed'] as const)(
     'materializes %s-only successors as neutral for a single update',
     async (state) => {
-    let mergePayload: MergeRpcPayload | null = null;
-    vi.stubGlobal(
-      'fetch',
-      createBaseFetchMock({
-        onMerge: (payload) => {
-          mergePayload = payload;
-        },
-        tasks: tasksWithRequirement([state]),
-      })
-    );
-    const res = await worker.fetch(postTaskRequest('task-main', { state }), BASE_ENV);
-    expect(res.status).toBe(200);
-    const payload = mergePayload as unknown as MergeRpcPayload;
-    expect(payload.p_task_completions?.['task-dependent']).toMatchObject({
-      active: false,
-      complete: false,
-      failed: false,
-    });
+      let mergePayload: MergeRpcPayload | null = null;
+      vi.stubGlobal(
+        'fetch',
+        createBaseFetchMock({
+          onMerge: (payload) => {
+            mergePayload = payload;
+          },
+          tasks: tasksWithRequirement([state]),
+        })
+      );
+      const res = await worker.fetch(postTaskRequest('task-main', { state }), BASE_ENV);
+      expect(res.status).toBe(200);
+      const payload = mergePayload as unknown as MergeRpcPayload;
+      expect(payload.p_task_completions?.['task-dependent']).toMatchObject({
+        active: false,
+        complete: false,
+        failed: false,
+      });
     }
   );
   it('materializes active-only successors as neutral in a batch update', async () => {
@@ -660,7 +660,7 @@ describe('api-gateway', () => {
             { id: 'task-main', taskRequirements: [] },
             {
               id: 'task-dependent',
-            taskRequirements: [{ task: 'task-main', status: ['active'] }],
+              taskRequirements: [{ task: 'task-main', status: ['active'] }],
             },
           ],
           userProgress: {
