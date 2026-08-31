@@ -1,5 +1,12 @@
 # TarkovTracker Architecture Documentation
 
+<!-- AGENT QUICK REFERENCE
+Canonical env var map: §Environment Variables (~40 vars with descriptions).
+Naming: SUPABASE_* shared, NUXT_* private server, NUXT_PUBLIC_* browser-exposed.
+wrangler.toml is source of truth for Cloudflare Pages vars/bindings.
+Quoting: quote in TOML, unquoted in .env/.dev.vars unless dotenv requires it.
+-->
+
 ## Overview
 
 TarkovTracker is a sophisticated single-page application (SPA) for tracking progress in Escape from Tarkov. Built with Nuxt 4, Vue 3, and Supabase, it provides real-time multi-device synchronization, team collaboration, and comprehensive task/hideout tracking.
@@ -142,12 +149,13 @@ TarkovTracker uses a **three-store pattern** with Pinia plus a computed facade:
 
 **Location:** `app/stores/useTarkov.ts`
 
-Manages user progress data with dual game mode support (PvP/PvE).
+Manages isolated progress for persistent PvP, persistent PvE, and numbered Seasonal PvP.
 
 **Key Features:**
 
 - localStorage persistence with user ID validation
 - Supabase real-time sync with debouncing (5s)
+- Normalized Supabase rows keyed by `(user_id, game_mode, season_number)`
 - Multi-device conflict resolution
 - Data migration for legacy formats
 - Task repair mechanisms
@@ -160,19 +168,20 @@ Manages user progress data with dual game mode support (PvP/PvE).
 - The app does **not** persist a long-lived "linked mode" or "imported mode" field.
 - Unlinking a tarkov.dev account clears only the saved `tarkovUid`; it does not roll back imported
   progress, profile, skill, level, edition, or prestige fields.
-- Refetching a linked profile asks for the profile mode first because PvP, PvE, and future Arena
-  profile JSON use the same account id but different tarkov.dev mode routes.
-- Tarkov.dev imports always ask the user which mode to write into and default that choice to the
-  current active mode.
-- The import UI accepts a full `tarkov.dev/players/{regular|pve}/{uid}` profile URL, fetches
-  `players.tarkov.dev/profile/{uid}.json` through the public `/api/tarkov-dev/profile` proxy, and
-  parses that JSON with the existing Tarkov.dev profile parser.
+- Refetching a linked profile asks for a profile mode because PvP, PvE, and Seasonal profile JSON
+  use the same account id but different tarkov.dev mode routes.
+- Tarkov.dev imports default to the current mode when the pasted source does not identify a mode.
+  Mode-specific profile URLs fix the target to prevent cross-mode writes.
+- The import UI accepts a full `tarkov.dev/players/{regular|pve|pvp-season}/{uid}` profile URL,
+  fetches `players.tarkov.dev/{profile|pve|pvp-season}/{uid}.json` through the public
+  `/api/tarkov-dev/profile` proxy, and parses that JSON with the existing Tarkov.dev profile parser.
 - The import preview keeps parsed skill values collapsed by default, but exposes the exact
   skill-id and level pairs that will be applied.
 - Tarkov.dev only refreshes that public JSON after the user opens their profile page on tarkov.dev,
   so the UI asks users to open the profile before importing.
 - Tarkov.dev links use the currently viewed or selected mode only to choose the URL slug:
-  `regular` for PvP, `pve` for PvE.
+  `regular` for PvP, `pve` for PvE, and `pvp-season` for Seasonal.
+- EFT-log imports are also locked for Seasonal until the active-season data source is verified.
 - Legacy embedded `tarkovDevProfile` payloads are sanitized out of stored progress data and should
   not be reintroduced as long-lived state.
 
@@ -220,8 +229,9 @@ sequenceDiagram
     Note over UI,DB: Initial Load
     UI->>Store: initializeTarkovSync()
     Store->>Local: Load cached state
-    Store->>DB: Fetch user_progress
-    DB-->>Store: Return data
+    Store->>DB: Fetch user_progress account metadata
+    Store->>DB: Fetch user_game_mode_progress rows
+    DB-->>Store: Return account metadata + active mode rows
     Store->>Store: Merge & resolve conflicts
     Store->>Local: Persist state
     Store->>RT: Subscribe to changes
@@ -230,10 +240,10 @@ sequenceDiagram
     UI->>Store: Update task completion
     Store->>Local: Persist immediately
     Store->>Sync: Queue debounced sync
-    Sync->>DB: Upsert (after 5s debounce)
+    Sync->>DB: RPC upsert exact mode/season rows (after 5s debounce)
 
     Note over UI,DB: Remote Update
-    RT-->>Store: Postgres change event
+    RT-->>Store: Account or exact mode/season change event
     Store->>Store: Detect self-origin
     Store->>Store: Merge with local
     Store->>UI: Trigger re-render
@@ -245,6 +255,12 @@ sequenceDiagram
 2. **Timestamp-Based Merging**: Newer entries take precedence
 3. **Max Value Preservation**: For counts and levels, keep the higher value
 4. **Self-Origin Filtering**: Ignore echoed updates from own device (< 3s threshold)
+
+Persistent PvP and PvE use season number `0`. Seasonal PvP uses the active positive season number
+(`1` for the initial integration). The legacy `user_progress` row remains the account-metadata
+source and temporarily mirrors PvP/PvE for rolling compatibility; Seasonal progress exists only in
+`user_game_mode_progress`. See [`SYSTEMS.md`](./SYSTEMS.md#7-game-mode-and-seasonal-progress-storage)
+for the storage, RLS, team, sharing, prestige, backup, and compatibility invariants.
 
 ## Authentication
 
@@ -303,6 +319,8 @@ sequenceDiagram
 ### Tarkov Data API
 
 All game data is fetched through Nuxt server routes that proxy to `json.tarkov.dev` static data.
+Internal modes map to upstream endpoints as `pvp` → `regular`, `pve` → `pve`, and
+`seasonal` → `pvp-season`.
 
 | Endpoint                       | Purpose              | Cache TTL |
 | ------------------------------ | -------------------- | --------- |
@@ -422,80 +440,133 @@ Node.js version: 24.x
 
 ### Environment Variables
 
-Naming convention: `NUXT_*` for Nuxt private runtime config (server-only), `NUXT_PUBLIC_*`
-for Nuxt public runtime config (browser-exposed), plain names for platform/build-time or
-Supabase Edge Functions.
+Naming convention: `SUPABASE_*` for shared Supabase project settings, `NUXT_*` for Nuxt private
+runtime config (server-only), `NUXT_PUBLIC_*` for Nuxt public runtime config (browser-exposed), and
+plain names for platform/build-time or Supabase Edge Function settings.
+
+`SUPABASE_URL` and `SUPABASE_ANON_KEY` are the canonical shared Supabase values. Nuxt, Cloudflare
+Pages/Workers, and Supabase Edge Functions can all consume them, so they must not be duplicated as
+`NUXT_PUBLIC_*` or `VITE_*` values.
 
 Full resolution logic is in `app/utils/runtimeConfig.ts`.
 
+### Environment value entry standard
+
+Quote syntax depends on where a value is entered:
+
+- In `wrangler.toml`, write string values as TOML strings, for example
+  `APP_URL = "https://tarkovtracker.org"`. The TOML parser treats the quotation marks as syntax;
+  they are not part of the resulting value.
+- In `.env`, `.env.*`, and `.dev.vars*` files, use unquoted values by default, for example
+  `APP_URL=https://tarkovtracker.org`. Dotenv permits both quoted and unquoted values, but matching
+  dashboard entry style reduces copy/paste mistakes. Add quotes only when they are semantically
+  required, such as preserving leading or trailing whitespace, including `#` as data, or expressing
+  a supported multiline value.
+- In a Cloudflare Pages or Workers dashboard **Value** field, enter only the raw value, for example
+  `https://tarkovtracker.org`. Cloudflare stores and passes dashboard values as entered; quotation
+  marks typed into the field become part of the value.
+- At an interactive `wrangler secret put` value prompt, enter only the raw secret. Shell quotes used
+  around command arguments are shell syntax, but quotation marks pasted or piped as secret content
+  are data and are preserved.
+- Never place private credentials in `[vars]` or commit them to `wrangler.toml`. Store them as
+  encrypted Cloudflare secrets. It is safe for intentionally public identifiers such as the
+  Supabase anon key and Turnstile sitekey to remain plaintext configuration.
+
+Therefore, TOML strings stay quoted because TOML requires a string delimiter. Dotenv and dashboard
+values stay unquoted unless the dotenv value specifically requires quoting. Interactive secret
+fields never include decorative wrapping quotes.
+
+References: Cloudflare's Pages bindings and Workers secrets documentation, Cloudflare's Pages API
+(`env_vars.*.value` is the stored string), Node.js's dotenv specification, and TOML v1.0.
+
+Cloudflare Pages production and preview configuration is sourced from `wrangler.toml`. Dashboard
+entries are reserved for encrypted secrets; do not duplicate plaintext `[vars]` there. Smart
+Placement is enabled for both environments through the top-level `[placement]` block.
+
 **Client-side (browser) — Nuxt public runtime config:**
 
-| Variable                          | Description                                              | Required   |
-| --------------------------------- | -------------------------------------------------------- | ---------- |
-| `NUXT_PUBLIC_SUPABASE_URL`        | Supabase project URL for auth and sync                   | Yes¹       |
-| `NUXT_PUBLIC_SUPABASE_ANON_KEY`   | Supabase anon key for auth and sync                      | Yes¹       |
-| `NUXT_PUBLIC_APP_URL`             | Application URL                                          | Yes (prod) |
-| `NUXT_PUBLIC_CLIENT_LOG_SINK_URL` | Optional browser log collector URL (disabled by default) | No         |
+| Variable                                         | Description                                              | Required |
+| ------------------------------------------------ | -------------------------------------------------------- | -------- |
+| `SUPABASE_URL`                                   | Shared Supabase project URL for auth and sync            | Yes¹     |
+| `SUPABASE_ANON_KEY`                              | Shared Supabase anon key for auth and sync               | Yes¹     |
+| `NUXT_PUBLIC_CLIENT_LOG_SINK_URL`                | Optional browser log collector URL (disabled by default) | No       |
+| `NUXT_PUBLIC_TURNSTILE_SITE_KEY`                 | Turnstile widget sitekey for Tarkov.dev profile imports  | No²      |
+| `NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES` | Browser cooldown after a confirmed profile import        | No       |
 
-> **¹ Required in production.** `SUPABASE_URL` and `SUPABASE_ANON_KEY` work as cross-platform
-> build-time fallbacks. Without Supabase configuration, auth, sync, realtime, and team features
-> are unavailable; the app runs in offline mode with localStorage only.
+> **¹ Required in production.** These shared names are consumed by Nuxt, Pages, Workers, and Edge
+> Functions. Without Supabase configuration, auth, sync, realtime, and team features are unavailable;
+> the app runs in offline mode with localStorage only.
+>
+> **² Turnstile is optional, but its public sitekey and private secret must be configured together.
+> Local development uses Cloudflare's always-pass test keys automatically.**
+
+`VITE_PERF_DEBUG` is an opt-in client performance debugging switch. Set it to `1`, `true`, `yes`,
+or `on` before starting the dev server or building the app to enable timing logs from
+`app/utils/perf.ts` through the shared client logger. Leave it unset or set it to `false` for normal
+builds. This is a Vite build-time variable, not Nuxt runtime configuration.
 
 **Server-side (Nuxt private runtime config):**
 
-| Variable                           | Description                                       | Required   |
-| ---------------------------------- | ------------------------------------------------- | ---------- |
-| `NUXT_SUPABASE_SERVICE_KEY`        | Supabase service role key                         | Yes (prod) |
-| `NUXT_TARKOV_JSON_BASE_URL`        | Static game-data JSON base URL override           | No         |
-| `NUXT_LOG_SINK_URL`                | Centralized server log sink (HTTPS)               | No         |
-| `NUXT_TWITCH_CLIENT_ID`            | Twitch API client ID                              | No         |
-| `NUXT_GITHUB_CONTRIBUTORS_EXCLUDE` | Bot accounts excluded from contributors           | No         |
-| `NUXT_GITHUB_TIMEOUT_MS`           | GitHub API timeout                                | No         |
-| `NUXT_CACHE_BYPASS_ENABLED`        | Enable server-side cache bypass header            | No         |
-| `API_ALLOWED_HOSTS`                | Allowed origin hosts                              | No         |
-| `API_TRUSTED_IP_RANGES`            | Trusted IP ranges (CIDR)                          | No         |
-| `API_REQUIRE_AUTH`                 | Require auth for protected routes (default true)  | No         |
-| `API_PUBLIC_ROUTES`                | Routes exempt from auth                           | No         |
-| `API_TRUST_PROXY`                  | Trust proxy headers (auto-detected on Cloudflare) | No         |
-| `STRIPE_SECRET_KEY`                | Stripe API secret key                             | Yes (prod) |
-| `STRIPE_PRICE_SCAV_MONTHLY`        | Stripe price ID for Scav monthly plan             | Yes (prod) |
-| `STRIPE_PRICE_SCAV_6MONTH`         | Stripe price ID for Scav 6-month plan             | Yes (prod) |
-| `STRIPE_PRICE_SCAV_YEARLY`         | Stripe price ID for Scav yearly plan              | Yes (prod) |
-| `STRIPE_PRICE_TIMMY_MONTHLY`       | Stripe price ID for Timmy monthly plan            | Yes (prod) |
-| `STRIPE_PRICE_TIMMY_6MONTH`        | Stripe price ID for Timmy 6-month plan            | Yes (prod) |
-| `STRIPE_PRICE_TIMMY_YEARLY`        | Stripe price ID for Timmy yearly plan             | Yes (prod) |
-| `STRIPE_PRICE_CHAD_MONTHLY`        | Stripe price ID for Chad monthly plan             | Yes (prod) |
-| `STRIPE_PRICE_CHAD_6MONTH`         | Stripe price ID for Chad 6-month plan             | Yes (prod) |
-| `STRIPE_PRICE_CHAD_YEARLY`         | Stripe price ID for Chad yearly plan              | Yes (prod) |
-| `NUXT_ACCOUNT_IP_HASH_SECRET`      | HMAC secret for account-level IP audit records    | Yes (prod) |
+| Variable                                        | Description                                         | Required   |
+| ----------------------------------------------- | --------------------------------------------------- | ---------- |
+| `NUXT_SUPABASE_SERVICE_KEY`                     | Supabase service role key                           | Yes (prod) |
+| `NUXT_TARKOV_JSON_BASE_URL`                     | Static game-data JSON base URL override             | No         |
+| `NUXT_LOG_SINK_URL`                             | Centralized server log sink (HTTPS)                 | No         |
+| `NUXT_TWITCH_CLIENT_ID`                         | Twitch API client ID                                | No         |
+| `NUXT_GITHUB_CONTRIBUTORS_EXCLUDE`              | Bot accounts excluded from contributors             | No         |
+| `NUXT_GITHUB_TIMEOUT_MS`                        | GitHub API timeout                                  | No         |
+| `NUXT_GITHUB_TOKEN`                             | GitHub API token                                    | No         |
+| `NUXT_CACHE_BYPASS_ENABLED`                     | Enable server-side cache bypass header              | No         |
+| `API_ALLOWED_HOSTS`                             | Allowed origin hosts                                | No         |
+| `API_TRUSTED_IP_RANGES`                         | Trusted IP ranges (CIDR)                            | No         |
+| `API_REQUIRE_AUTH`                              | Require auth for protected routes (default true)    | No         |
+| `API_PUBLIC_ROUTES`                             | Routes exempt from auth                             | No         |
+| `API_TRUST_PROXY`                               | Trust proxy headers (auto-detected on Cloudflare)   | No         |
+| `STRIPE_SECRET_KEY`                             | Stripe API secret key                               | Yes (prod) |
+| `STRIPE_PRICE_SCAV_MONTHLY`                     | Stripe price ID for Scav monthly plan               | Yes (prod) |
+| `STRIPE_PRICE_SCAV_6MONTH`                      | Stripe price ID for Scav 6-month plan               | Yes (prod) |
+| `STRIPE_PRICE_SCAV_YEARLY`                      | Stripe price ID for Scav yearly plan                | Yes (prod) |
+| `STRIPE_PRICE_TIMMY_MONTHLY`                    | Stripe price ID for Timmy monthly plan              | Yes (prod) |
+| `STRIPE_PRICE_TIMMY_6MONTH`                     | Stripe price ID for Timmy 6-month plan              | Yes (prod) |
+| `STRIPE_PRICE_TIMMY_YEARLY`                     | Stripe price ID for Timmy yearly plan               | Yes (prod) |
+| `STRIPE_PRICE_CHAD_MONTHLY`                     | Stripe price ID for Chad monthly plan               | Yes (prod) |
+| `STRIPE_PRICE_CHAD_6MONTH`                      | Stripe price ID for Chad 6-month plan               | Yes (prod) |
+| `STRIPE_PRICE_CHAD_YEARLY`                      | Stripe price ID for Chad yearly plan                | Yes (prod) |
+| `NUXT_ACCOUNT_IP_HASH_SECRET`                   | HMAC secret for account-level IP audit records      | Yes (prod) |
+| `NUXT_TARKOV_DEV_PROFILE_CACHE_TTL_MS`          | Tarkov.dev profile shared-cache TTL in milliseconds | No         |
+| `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_MINUTE` | Per-IP profile-import requests per minute           | No         |
+| `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_HOUR`   | Per-IP profile-import requests per hour             | No         |
+| `NUXT_TARKOV_DEV_PROFILE_MAX_UPDATED_AGE_DAYS`  | Reject older profile snapshots; `0` disables        | No         |
+| `NUXT_TURNSTILE_SECRET_KEY`                     | Server-side Turnstile secret for profile imports    | No²        |
 
 **Build-time / platform:**
 
-| Variable             | Description                     |
-| -------------------- | ------------------------------- |
-| `APP_URL`            | App URL (CF Pages / CI)         |
-| `CF_PAGES_URL`       | Cloudflare Pages deploy URL     |
-| `GA_MEASUREMENT_ID`  | Google Analytics measurement ID |
-| `CLARITY_PROJECT_ID` | Microsoft Clarity project ID    |
-| `GITHUB_TOKEN`       | GitHub API token                |
+| Variable             | Description                            |
+| -------------------- | -------------------------------------- |
+| `APP_URL`            | Canonical production application URL   |
+| `CF_PAGES_URL`       | Automatic Cloudflare Pages preview URL |
+| `GA_MEASUREMENT_ID`  | Google Analytics measurement ID        |
+| `CLARITY_PROJECT_ID` | Microsoft Clarity project ID           |
+| `VITE_PERF_DEBUG`    | Client performance timing logs         |
 
 **Supabase Edge Functions** (set in Supabase Dashboard, not Cloudflare Pages):
 
-`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` — all canonical for Edge
-Functions. (`SUPABASE_SERVICE_ROLE_KEY` is deprecated only as a Nuxt app fallback; use
-`NUXT_SUPABASE_SERVICE_KEY` for Nuxt.) `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are shared
-canonical names used by both Nuxt and Edge Functions. `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`,
-`DISCORD_SUPPORTER_ROLE_ID`, `DISCORD_LINKED_ROLE_ID`, `CLOUDFLARE_ZONE_ID`,
-`CLOUDFLARE_API_TOKEN` are Edge-only. See `supabase/functions/.env.example`.
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are platform-managed canonical
+Edge Function values. Nuxt uses `NUXT_SUPABASE_SERVICE_KEY` for the privileged key. `APP_URL` is the
+canonical application URL used by `admin-cache-purge`; it has no alias fallback.
+`STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are shared canonical names used by both Nuxt and
+Edge Functions. `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_SUPPORTER_ROLE_ID`,
+`DISCORD_LINKED_ROLE_ID`, `CLOUDFLARE_ZONE_ID`, and `CLOUDFLARE_API_TOKEN` are Edge-only. See
+`supabase/functions/.env.example`.
 
 **Cloudflare Workers** (`workers/api-gateway`, set via `wrangler secret put`):
 
-| Variable                    | Description                                             | Required   |
-| --------------------------- | ------------------------------------------------------- | ---------- |
-| `SUPABASE_URL`              | Supabase project URL                                    | Yes        |
-| `SUPABASE_ANON_KEY`         | Supabase anon key                                       | Yes        |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key                               | Yes        |
-| `IP_HASH_SECRET`            | HMAC secret for pseudo-anonymizing IPs in 429 log lines | Yes (prod) |
+| Variable                    | Description                                                    | Required   |
+| --------------------------- | -------------------------------------------------------------- | ---------- |
+| `SUPABASE_URL`              | Supabase project URL                                           | Yes        |
+| `SUPABASE_ANON_KEY`         | Supabase anon key                                              | Yes        |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key                                      | Yes        |
+| `IP_HASH_SECRET`            | HMAC secret for pseudo-anonymizing IPs in abuse-gate log lines | Yes (prod) |
 
 ## Code Conventions
 

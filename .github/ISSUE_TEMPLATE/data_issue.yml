@@ -1,7 +1,7 @@
 name: Data Issue
 description: Report incorrect quest, item, or game data
-title: "[Data]: "
-labels: ["upstream"]
+title: '[Data]: '
+labels: ['upstream']
 body:
   - type: markdown
     attributes:
@@ -11,7 +11,6 @@ body:
         Only use this template if the data source is correct but our tracker isn't displaying or handling it properly. Otherwise, please report at the data-overlay repo.
 
         Thanks for reporting a data issue! Please provide specific details about the incorrect data.
-
   - type: dropdown
     id: data-type
     attributes:
@@ -26,7 +25,25 @@ body:
         - Other
     validations:
       required: true
-
+  - type: dropdown
+    id: product-area
+    attributes:
+      label: Which area of TarkovTracker is affected?
+      options:
+        - Dashboard
+        - Tasks
+        - Hideout
+        - Needed items
+        - Maps
+        - Team
+        - Profile or account
+        - Login
+        - Settings
+        - API or integrations
+        - Translations
+        - Other / not sure
+    validations:
+      required: true
   - type: input
     id: item-name
     attributes:
@@ -35,7 +52,6 @@ body:
       placeholder: e.g., "Chemical - Part 4", "Secure Flash Drive"
     validations:
       required: true
-
   - type: textarea
     id: incorrect
     attributes:
@@ -47,7 +63,6 @@ body:
         The item image is incorrect.
     validations:
       required: true
-
   - type: textarea
     id: correct
     attributes:
@@ -56,7 +71,6 @@ body:
       placeholder: The correct requirement is...
     validations:
       required: true
-
   - type: input
     id: source
     attributes:
@@ -65,7 +79,6 @@ body:
       placeholder: https://escapefromtarkov.fandom.com/wiki/...
     validations:
       required: false
-
   - type: dropdown
     id: game-mode
     attributes:
@@ -78,7 +91,6 @@ body:
         - Not Applicable
     validations:
       required: true
-
   - type: textarea
     id: screenshots
     attributes:
@@ -87,7 +99,6 @@ body:
       placeholder: Drag and drop images here or paste URLs
     validations:
       required: false
-
   - type: input
     id: discord
     attributes:
@@ -96,7 +107,6 @@ body:
       placeholder: username#1234
     validations:
       required: false
-
   - type: textarea
     id: additional
     attributes:

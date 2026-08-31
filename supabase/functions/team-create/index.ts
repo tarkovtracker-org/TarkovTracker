@@ -1,207 +1,193 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
-  authenticateUser,
-  handleCorsPreflight,
-  validateMethod,
-  validateRequiredFields,
   createErrorResponse,
   createSuccessResponse,
-  type AuthSuccess,
-} from 'shared/auth';
-import { enforceUserMutationRateLimit } from '../_shared/rate-limit.ts';
-
-const MAX_TEAM_MEMBERS = 5;
-const VALID_GAME_MODES = ['pvp', 'pve'] as const;
-type GameMode = (typeof VALID_GAME_MODES)[number];
-
-Deno.serve(async (req) => {
-  // Handle CORS preflight requests
-  const corsResponse = handleCorsPreflight(req);
-  if (corsResponse) return corsResponse;
-
-  try {
-    // Validate HTTP method
-    const methodError = validateMethod(req, ['POST']);
-    if (methodError) return methodError;
-
-    // Authenticate user
-    const authResult = await authenticateUser(req);
-    if ('error' in authResult) {
-      return createErrorResponse(authResult.error, authResult.status, req);
-    }
-
-    const { user, supabase } = authResult as AuthSuccess;
-    const rateLimitResponse = await enforceUserMutationRateLimit(
-      req,
-      supabase,
-      user.id,
-      'team-create'
-    );
-    if (rateLimitResponse) return rateLimitResponse;
-
-    // Parse and validate request body
-    const body = await req.json();
-    // Accept legacy "password" as alias for join_code for backward compatibility
-    const joinCode =
-      typeof body.join_code === 'string'
-        ? body.join_code
-        : typeof (body as Record<string, unknown>).password === 'string'
-          ? (body as { password: string }).password
-          : undefined;
-
-    const fieldsError = validateRequiredFields(req, { ...body, join_code: joinCode }, [
-      'name',
-      'join_code',
-    ]);
-    if (fieldsError) return fieldsError;
-
-    const { name, maxMembers = MAX_TEAM_MEMBERS } = body;
-    const join_code = joinCode as string;
-
-    // Extract and validate game_mode (default to 'pvp' for backwards compatibility)
-    const rawGameMode = typeof body.game_mode === 'string' ? body.game_mode.toLowerCase() : 'pvp';
-    const game_mode: GameMode = VALID_GAME_MODES.includes(rawGameMode as GameMode)
-      ? (rawGameMode as GameMode)
-      : 'pvp';
-
-    // Validate team name length
-    if (typeof name !== 'string' || name.trim().length === 0) {
-      return createErrorResponse('Team name cannot be empty', 400, req);
-    }
-    if (name.length > 100) {
-      return createErrorResponse('Team name cannot exceed 100 characters', 400, req);
-    }
-
-    // Validate join_code length
-    if (typeof join_code !== 'string' || join_code.length < 4) {
-      return createErrorResponse('Join code must be at least 4 characters', 400, req);
-    }
-    if (join_code.length > 255) {
-      return createErrorResponse('Join code cannot exceed 255 characters', 400, req);
-    }
-
-    // Validate maxMembers
-    if (typeof maxMembers !== 'number' || maxMembers < 2 || maxMembers > 10) {
-      return createErrorResponse('Max members must be between 2 and 10', 400, req);
-    }
-
-    // Check if user is already in a team for this specific game mode
-    const { data: existingMembership, error: membershipCheckError } = await supabase
-      .from('team_memberships')
-      .select('team_id, game_mode')
-      .eq('user_id', user.id)
-      .eq('game_mode', game_mode)
-      .limit(1);
-
-    if (membershipCheckError) {
-      console.error('Membership check failed:', membershipCheckError);
-      return createErrorResponse('Failed to check existing team membership', 500, req);
-    }
-
-    if (existingMembership && existingMembership.length > 0) {
-      // Heal stale state: ensure user_system reflects existing team for UI sync
-      const existingTeamId = existingMembership[0].team_id;
-      if (existingTeamId) {
-        const teamIdColumn = game_mode === 'pve' ? 'pve_team_id' : 'pvp_team_id';
-        const { error: systemHealError } = await supabase.from('user_system').upsert({
-          user_id: user.id,
-          [teamIdColumn]: existingTeamId,
-          updated_at: new Date().toISOString(),
-        });
-        if (systemHealError) {
-          console.error('user_system heal failed:', systemHealError);
-        }
-      }
-      return createErrorResponse(
-        `You are already a member of a ${game_mode.toUpperCase()} team. Leave your current team first.`,
-        400,
-        req
-      );
-    }
-
-    // Create the team with game_mode
-    const { data: team, error: teamError } = await supabase
-      .from('teams')
-      .insert({
-        name: name.trim(),
-        join_code: join_code,
-        max_members: maxMembers,
-        owner_id: user.id,
-        game_mode: game_mode,
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (teamError) {
-      console.error('Team creation failed:', teamError);
-
-      // Check for unique constraint violation
-      if (teamError.code === '23505') {
-        return createErrorResponse('A team with this name or join code already exists', 409, req);
-      }
-
-      return createErrorResponse('Failed to create team', 500, req);
-    }
-
-    // Add creator as owner to team_memberships (game_mode is set by trigger)
-    const { error: membershipError } = await supabase.from('team_memberships').insert({
-      team_id: team.id,
-      user_id: user.id,
-      role: 'owner',
-      game_mode: game_mode,
-      joined_at: new Date().toISOString(),
-    });
-
-    if (membershipError) {
-      console.error('Membership creation failed:', membershipError);
-
-      // Rollback: delete the team if membership creation fails
-      await supabase.from('teams').delete().eq('id', team.id);
-
-      return createErrorResponse('Failed to create team membership', 500, req);
-    }
-
-    // Upsert user_system with the correct team_id column based on game mode
-    const teamIdColumn = game_mode === 'pve' ? 'pve_team_id' : 'pvp_team_id';
-    const { error: systemError } = await supabase.from('user_system').upsert({
-      user_id: user.id,
-      [teamIdColumn]: team.id,
-      updated_at: new Date().toISOString(),
-    });
-
-    if (systemError) {
-      console.error('user_system upsert failed:', systemError);
-      return createErrorResponse('Failed to update user system state', 500, req);
-    }
-
-    // Log team creation event
-    await supabase.from('team_events').insert({
-      team_id: team.id,
-      event_type: 'team_created',
-      initiated_by: user.id,
-      event_data: { team_name: team.name, max_members: maxMembers },
-      created_at: new Date().toISOString(),
-    });
-
-    return createSuccessResponse(
-      {
-        success: true,
-        message: 'Team created successfully',
-        team: {
-          id: team.id,
-          name: team.name,
-          maxMembers: team.max_members,
-          ownerId: team.owner_id,
-          createdAt: team.created_at,
-          joinCode: team.join_code,
-          gameMode: game_mode,
-        },
-      },
-      201,
+  validateRequiredFields,
+} from '../_shared/auth.ts';
+import {
+  acceptMutationStep,
+  authenticateMutation,
+  readJoinCodeBody,
+  rejectMutationStep,
+  type MutationStep,
+} from '../_shared/authenticated-mutation.ts';
+import { isTeamGameMode, type TeamGameMode } from '../_shared/team-mode.ts';
+import { rejectExistingTeamMembership } from '../_shared/team-membership.ts';
+const DEFAULT_MAX_TEAM_MEMBERS = 5;
+type TeamRow = {
+  created_at: string;
+  id: string;
+  join_code: string;
+  max_members: number;
+  name: string;
+  owner_id: string;
+};
+type CreateContext = {
+  gameMode: TeamGameMode;
+  joinCode: string;
+  maxMembers: number;
+  name: string;
+  req: Request;
+  supabase: SupabaseClient;
+  userId: string;
+};
+type PersistedCreateContext = CreateContext & { team: TeamRow };
+const validateTeamName = (req: Request, name: unknown): Response | null => {
+  if (typeof name !== 'string') return createErrorResponse('Team name cannot be empty', 400, req);
+  if (!name.trim()) return createErrorResponse('Team name cannot be empty', 400, req);
+  if (name.length > 100) {
+    return createErrorResponse('Team name cannot exceed 100 characters', 400, req);
+  }
+  return null;
+};
+const validateJoinCode = (req: Request, joinCode: string): Response | null => {
+  if (joinCode.length < 4) {
+    return createErrorResponse('Join code must be at least 4 characters', 400, req);
+  }
+  if (joinCode.length > 255) {
+    return createErrorResponse('Join code cannot exceed 255 characters', 400, req);
+  }
+  return null;
+};
+const validateMaxMembers = (req: Request, maxMembers: unknown): Response | null => {
+  if (typeof maxMembers !== 'number') {
+    return createErrorResponse('Max members must be between 2 and 10', 400, req);
+  }
+  if (maxMembers < 2) return createErrorResponse('Max members must be between 2 and 10', 400, req);
+  if (maxMembers > 10) return createErrorResponse('Max members must be between 2 and 10', 400, req);
+  return null;
+};
+const getMaxMembers = (value: unknown): unknown =>
+  value === undefined ? DEFAULT_MAX_TEAM_MEMBERS : value;
+const getRequestedGameMode = (value: unknown): TeamGameMode | null => {
+  if (value === undefined) return 'pvp';
+  if (typeof value !== 'string') return null;
+  const normalized = value.toLowerCase();
+  return isTeamGameMode(normalized) ? normalized : null;
+};
+const parseCreateInput = async (
+  req: Request,
+  supabase: SupabaseClient,
+  userId: string
+): Promise<MutationStep<CreateContext>> => {
+  const { body, joinCode } = await readJoinCodeBody(req);
+  const fieldsError = validateRequiredFields(req, { ...body, join_code: joinCode }, [
+    'name',
+    'join_code',
+  ]);
+  if (fieldsError) return rejectMutationStep(fieldsError);
+  const maxMembers = getMaxMembers(body.maxMembers);
+  const validationError = [
+    validateTeamName(req, body.name),
+    validateJoinCode(req, joinCode as string),
+    validateMaxMembers(req, maxMembers),
+  ].find(Boolean);
+  if (validationError) return rejectMutationStep(validationError);
+  const gameMode = getRequestedGameMode(body.game_mode);
+  if (!gameMode) {
+    return rejectMutationStep(createErrorResponse('Invalid game_mode', 400, req));
+  }
+  return acceptMutationStep({
+    gameMode,
+    joinCode: joinCode as string,
+    maxMembers: maxMembers as number,
+    name: body.name as string,
+    req,
+    supabase,
+    userId,
+  });
+};
+const prepareCreate = async (req: Request): Promise<MutationStep<CreateContext>> => {
+  const auth = await authenticateMutation(req, 'team-create');
+  if (auth.response) return rejectMutationStep(auth.response);
+  return parseCreateInput(req, auth.supabase, auth.user.id);
+};
+const isMembershipConflict = (
+  error: {
+    code?: string;
+    details?: string | null;
+    message?: string;
+  } | null
+): boolean => {
+  if (error?.code !== '23505') return false;
+  return [error.message, error.details].some((value) =>
+    value?.includes('team_memberships_user_mode_unique')
+  );
+};
+const createTeamInsertError = (
+  req: Request,
+  error: { code?: string; details?: string | null; message?: string } | null,
+  gameMode: TeamGameMode
+): Response => {
+  console.error('Team creation failed:', error);
+  if (isMembershipConflict(error)) {
+    return createErrorResponse(
+      `You are already a member of a ${gameMode.toUpperCase()} team. Leave your current team first.`,
+      400,
       req
     );
-  } catch (error) {
+  }
+  if (error?.code === '23505') {
+    return createErrorResponse('A team with this name or join code already exists', 409, req);
+  }
+  return createErrorResponse('Failed to create team', 500, req);
+};
+const insertTeam = async (context: CreateContext): Promise<MutationStep<TeamRow>> => {
+  const { data, error } = await context.supabase.rpc('create_team_with_owner', {
+    p_game_mode: context.gameMode,
+    p_join_code: context.joinCode,
+    p_max_members: context.maxMembers,
+    p_name: context.name.trim(),
+    p_owner_id: context.userId,
+  });
+  if (error || !data) {
+    return rejectMutationStep(createTeamInsertError(context.req, error, context.gameMode));
+  }
+  return acceptMutationStep(data as TeamRow);
+};
+const persistTeamCreate = async (
+  context: CreateContext
+): Promise<MutationStep<PersistedCreateContext>> => {
+  const inserted = await insertTeam(context);
+  if (inserted.response) return rejectMutationStep(inserted.response);
+  const persisted = { ...context, team: inserted.value };
+  return acceptMutationStep(persisted);
+};
+const createTeamResponse = (context: PersistedCreateContext) =>
+  createSuccessResponse(
+    {
+      success: true,
+      message: 'Team created successfully',
+      team: {
+        id: context.team.id,
+        name: context.team.name,
+        maxMembers: context.team.max_members,
+        ownerId: context.team.owner_id,
+        createdAt: context.team.created_at,
+        joinCode: context.team.join_code,
+        gameMode: context.gameMode,
+      },
+    },
+    201,
+    context.req
+  );
+const handleTeamCreate = async (req: Request): Promise<Response> => {
+  const prepared = await prepareCreate(req);
+  if (prepared.response) return prepared.response;
+  const membershipError = await rejectExistingTeamMembership(
+    req,
+    prepared.value.supabase,
+    prepared.value.userId,
+    prepared.value.gameMode
+  );
+  if (membershipError) return membershipError;
+  const persisted = await persistTeamCreate(prepared.value);
+  if (persisted.response) return persisted.response;
+  return createTeamResponse(persisted.value);
+};
+Deno.serve((req) =>
+  handleTeamCreate(req).catch((error) => {
     console.error('Team creation error:', error);
     return createErrorResponse('Internal server error', 500, req);
-  }
-});
+  })
+);

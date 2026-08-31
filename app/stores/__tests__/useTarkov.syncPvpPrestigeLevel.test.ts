@@ -3,13 +3,10 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTarkovStore } from '@/stores/useTarkov';
-const { from, upsert, supabaseContext } = vi.hoisted(() => {
-  const upsert = vi.fn(async (): Promise<{ data: null; error: { message: string } | null }> => ({
-    data: null,
+import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
+const { rpc, supabaseContext } = vi.hoisted(() => {
+  const rpc = vi.fn(async (): Promise<{ error: { message: string } | null }> => ({
     error: null,
-  }));
-  const from = vi.fn(() => ({
-    upsert,
   }));
   const supabaseContext = {
     user: {
@@ -17,10 +14,10 @@ const { from, upsert, supabaseContext } = vi.hoisted(() => {
       loggedIn: true,
     },
     client: {
-      from,
+      rpc,
     },
   };
-  return { from, upsert, supabaseContext };
+  return { rpc, supabaseContext };
 });
 mockNuxtImport('useNuxtApp', () => () => ({
   $supabase: supabaseContext,
@@ -39,7 +36,7 @@ describe('useTarkov syncPvpPrestigeLevel', () => {
     vi.clearAllMocks();
     supabaseContext.user.loggedIn = true;
     supabaseContext.user.id = 'user-1';
-    upsert.mockResolvedValue({ data: null, error: null });
+    rpc.mockResolvedValue({ error: null });
   });
   it('updates only PvP prestige data without bumping the PvP epoch', async () => {
     const store = useTarkovStore();
@@ -63,25 +60,28 @@ describe('useTarkov syncPvpPrestigeLevel', () => {
       };
     });
     await store.syncPvpPrestigeLevel(2);
-    expect(from).toHaveBeenCalledWith('user_progress');
-    expect(upsert).toHaveBeenCalledWith(
+    expect(rpc).toHaveBeenCalledWith(
+      'sync_user_game_mode_progress',
       expect.objectContaining({
-        current_game_mode: 'pve',
-        game_edition: 5,
-        pve_data: expect.objectContaining({
-          displayName: 'Offline',
-          level: 21,
-          prestigeLevel: 0,
-          progressEpoch: 2,
+        p_current_game_mode: 'pve',
+        p_game_edition: 5,
+        p_seasonal_season_number: ACTIVE_SEASON_NUMBER,
+        p_modes: expect.objectContaining({
+          pve: expect.objectContaining({
+            displayName: 'Offline',
+            level: 21,
+            prestigeLevel: 0,
+            progressEpoch: 2,
+          }),
+          pvp: expect.objectContaining({
+            displayName: 'Raider',
+            level: 33,
+            prestigeLevel: 2,
+            progressEpoch: 9,
+          }),
+          seasonal: expect.any(Object),
         }),
-        pvp_data: expect.objectContaining({
-          displayName: 'Raider',
-          level: 33,
-          prestigeLevel: 2,
-          progressEpoch: 9,
-        }),
-        tarkov_uid: 12345,
-        user_id: 'user-1',
+        p_tarkov_uid: 12345,
       })
     );
     expect(store.pvp.level).toBe(33);
@@ -99,7 +99,7 @@ describe('useTarkov syncPvpPrestigeLevel', () => {
       state.pvp.progressEpoch = 4;
     });
     await store.syncPvpPrestigeLevel(3);
-    expect(from).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
     expect(store.pvp.prestigeLevel).toBe(3);
     expect(store.pvp.progressEpoch).toBe(4);
   });
@@ -109,12 +109,11 @@ describe('useTarkov syncPvpPrestigeLevel', () => {
       state.pvp.prestigeLevel = 4;
       state.pvp.progressEpoch = 7;
     });
-    upsert.mockResolvedValueOnce({
-      data: null,
+    rpc.mockResolvedValueOnce({
       error: { message: 'write failed' },
     });
     await expect(store.syncPvpPrestigeLevel(1)).rejects.toThrow(
-      'Failed to sync PvP prestige level: write failed'
+      'Failed to sync prestige level: write failed'
     );
     expect(store.pvp.prestigeLevel).toBe(4);
     expect(store.pvp.progressEpoch).toBe(7);

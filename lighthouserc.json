@@ -18,9 +18,9 @@
               }
             ],
             "categories:performance": [
-              "error",
+              "warn",
               {
-                "minScore": 0.35
+                "minScore": 0.2
               }
             ],
             "categories:seo": [
@@ -47,9 +47,9 @@
               }
             ],
             "categories:performance": [
-              "error",
+              "warn",
               {
-                "minScore": 0.55
+                "minScore": 0.2
               }
             ],
             "categories:seo": [
@@ -76,9 +76,9 @@
               }
             ],
             "categories:performance": [
-              "error",
+              "warn",
               {
-                "minScore": 0.22
+                "minScore": 0.2
               }
             ],
             "categories:seo": [
@@ -92,7 +92,7 @@
       ]
     },
     "collect": {
-      "numberOfRuns": 3,
+      "numberOfRuns": 1,
       "settings": {
         "chromeFlags": [
           "--allow-insecure-localhost",

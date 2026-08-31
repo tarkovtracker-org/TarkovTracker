@@ -1,4 +1,10 @@
-import { GAME_MODES, MAX_SKILL_LEVEL, type GameMode } from '@/utils/constants';
+import {
+  ACTIVE_SEASON_NUMBER,
+  GAME_MODE_VALUES,
+  GAME_MODES,
+  MAX_SKILL_LEVEL,
+  type GameMode,
+} from '@/utils/constants';
 import type { ApiTaskUpdate, ApiUpdateMeta, UserState } from '@/stores/progressState';
 type UserProgressData = UserState['pvp'];
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -239,7 +245,7 @@ export const sanitizeApiUpdateHistory = (value: unknown): ApiUpdateMeta[] => {
     .slice(0, API_UPDATE_HISTORY_LIMIT);
 };
 const sanitizeGameMode = (value: unknown): GameMode => {
-  return value === GAME_MODES.PVE ? GAME_MODES.PVE : GAME_MODES.PVP;
+  return GAME_MODE_VALUES.includes(value as GameMode) ? (value as GameMode) : GAME_MODES.PVP;
 };
 export const sanitizeGameEdition = (value: unknown): number => {
   const edition =
@@ -266,9 +272,7 @@ export const hasDeprecatedTarkovDevProfileData = (value: unknown): boolean => {
   if (Object.prototype.hasOwnProperty.call(value, 'tarkovDevProfile')) {
     return true;
   }
-  return (
-    hasDeprecatedTarkovDevProfileData(value.pvp) || hasDeprecatedTarkovDevProfileData(value.pve)
-  );
+  return ['pvp', 'pve', 'seasonal'].some((mode) => hasDeprecatedTarkovDevProfileData(value[mode]));
 };
 // Keep this canonical sanitizer aligned with the persisted DB sanitizer in the
 // tarkovDevProfile cleanup migration when changing stored progress fields.
@@ -321,6 +325,15 @@ export const sanitizeOwnedProgressData = (value: unknown): UserProgressData => {
   }
   return sanitized;
 };
+const isStaleSeasonNumber = (value: unknown): boolean =>
+  typeof value === 'number' && Number.isFinite(value) && value !== ACTIVE_SEASON_NUMBER;
+export const reconcileSeasonalProgressSeason = (
+  seasonal: UserProgressData,
+  storedSeasonNumber: unknown
+): { seasonal: UserProgressData; seasonalSeasonNumber: number } => ({
+  seasonal: isStaleSeasonNumber(storedSeasonNumber) ? createDefaultOwnedProgressData() : seasonal,
+  seasonalSeasonNumber: ACTIVE_SEASON_NUMBER,
+});
 export const sanitizeOwnedUserState = (value: unknown): UserState => {
   if (!isRecord(value)) {
     return {
@@ -329,6 +342,8 @@ export const sanitizeOwnedUserState = (value: unknown): UserState => {
       tarkovUid: null,
       pvp: createDefaultOwnedProgressData(),
       pve: createDefaultOwnedProgressData(),
+      seasonal: createDefaultOwnedProgressData(),
+      seasonalSeasonNumber: ACTIVE_SEASON_NUMBER,
     };
   }
   return {
@@ -337,6 +352,10 @@ export const sanitizeOwnedUserState = (value: unknown): UserState => {
     tarkovUid: sanitizeTarkovUid(value.tarkovUid),
     pvp: sanitizeOwnedProgressData(value.pvp),
     pve: sanitizeOwnedProgressData(value.pve),
+    ...reconcileSeasonalProgressSeason(
+      sanitizeOwnedProgressData(value.seasonal),
+      value.seasonalSeasonNumber
+    ),
   };
 };
 export const sanitizeTeammateProgressData = (value: unknown): Partial<UserProgressData> => {

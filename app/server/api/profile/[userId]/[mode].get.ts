@@ -5,6 +5,7 @@ import {
   getRouterParam,
   setResponseHeader,
 } from 'h3';
+import { fetchWithTimeout, isAbortError } from '@/server/utils/fetchWithTimeout';
 import { createLogger } from '@/server/utils/logger';
 import { getProxyAwareClientIdentifier } from '@/server/utils/requestIdentity';
 import {
@@ -16,7 +17,13 @@ import {
   type SharedCacheHandle,
 } from '@/server/utils/sharedEdgeStore';
 import { fetchTarkovJsonEndpoint, type JsonTasksPayload } from '@/server/utils/tarkov-json';
-import { GAME_MODES, type GameMode } from '@/utils/constants';
+import {
+  API_GAME_MODES,
+  getGameModeSeasonNumber,
+  isGameMode,
+  type GameMode,
+} from '@/utils/constants';
+import { getLegacyModeProgressField, resolveModeProgressData } from '@/utils/modeProgressFallback';
 import {
   isRecord,
   sanitizeDisplayName,
@@ -50,14 +57,19 @@ type JsonTaskFailureMetadata = {
   failConditions?: JsonFailCondition[] | null;
 };
 type PreferencesRow = {
-  streamer_mode?: boolean | null;
   profile_share_pve_public?: boolean | null;
   profile_share_pvp_public?: boolean | null;
+  streamer_mode?: boolean | null;
 };
 type ProgressRow = {
   game_edition?: number | null;
   pve_data?: unknown | null;
   pvp_data?: unknown | null;
+  user_id: string;
+};
+type ModeProgressRow = {
+  profile_public?: boolean | null;
+  progress_data?: unknown | null;
   user_id: string;
 };
 type SanitizedTaskCompletion = {
@@ -123,15 +135,8 @@ type TaskFailureSourcesCacheEntry = {
 const taskFailureSourcesCache: Partial<Record<GameMode, TaskFailureSourcesCacheEntry>> = {};
 const taskFailureSourcesPromises: Partial<Record<GameMode, Promise<TaskFailureSourcesMap | null>>> =
   {};
-const normalizeMode = (value: string | undefined): GameMode | null => {
-  if (value === GAME_MODES.PVE) {
-    return GAME_MODES.PVE;
-  }
-  if (value === GAME_MODES.PVP) {
-    return GAME_MODES.PVP;
-  }
-  return null;
-};
+const normalizeMode = (value: string | undefined): GameMode | null =>
+  isGameMode(value) ? value : null;
 const toCleanString = (value: unknown, maxLength = 128): string | null => {
   if (typeof value !== 'string') {
     return null;
@@ -293,7 +298,7 @@ const getTaskFailureSources = async (mode: GameMode): Promise<TaskFailureSources
   const requestPromise = (async () => {
     try {
       const payload = await fetchTarkovJsonEndpoint<JsonTasksPayload>('tasks', {
-        gameMode: mode === GAME_MODES.PVE ? 'pve' : 'regular',
+        gameMode: API_GAME_MODES[mode],
       });
       const tasksMap = payload.tasks;
       if (!tasksMap || typeof tasksMap !== 'object' || Array.isArray(tasksMap)) {
@@ -405,15 +410,6 @@ const enrichProgressTaskFailures = async (
     taskCompletions: value,
   };
 };
-const isAbortError = (error: unknown): boolean => {
-  return (
-    (error instanceof Error && error.name === 'AbortError') ||
-    (typeof error === 'object' &&
-      error !== null &&
-      'name' in error &&
-      (error as { name?: unknown }).name === 'AbortError')
-  );
-};
 const toPositiveInteger = (value: unknown, fallback: number): number => {
   const numeric = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(numeric)) {
@@ -429,7 +425,7 @@ const isSharedProfilePayload = (value: unknown): value is SharedProfilePayload =
   const candidate = value as SharedProfilePayload;
   return (
     typeof candidate.userId === 'string' &&
-    (candidate.mode === GAME_MODES.PVP || candidate.mode === GAME_MODES.PVE) &&
+    isGameMode(candidate.mode) &&
     (candidate.visibility === 'owner' || candidate.visibility === 'public') &&
     typeof candidate.gameEdition === 'number'
   );
@@ -492,25 +488,6 @@ const setCachedProfile = async (
       });
     }
   );
-};
-const fetchWithTimeout = async (
-  url: string,
-  init: RequestInit,
-  timeoutMs: number,
-  timeoutMessage: string
-): Promise<Response> => {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } catch (error) {
-    if (isAbortError(error)) {
-      throw createError({ statusCode: 504, statusMessage: timeoutMessage });
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeout);
-  }
 };
 const resolveRequesterUserId = async (
   authHeader: string | undefined,
@@ -655,6 +632,7 @@ export default defineEventHandler(async (event) => {
     });
   };
   const progressController = new AbortController();
+  const modeProgressController = new AbortController();
   const preferencesController = new AbortController();
   const progressTimeout = setTimeout(() => {
     progressController.abort();
@@ -662,21 +640,32 @@ export default defineEventHandler(async (event) => {
   const preferencesTimeout = setTimeout(() => {
     preferencesController.abort();
   }, REST_FETCH_TIMEOUT_MS);
+  const modeProgressTimeout = setTimeout(() => {
+    modeProgressController.abort();
+  }, REST_FETCH_TIMEOUT_MS);
   let progressResponse: Response;
+  let modeProgressResponse: Response;
   let preferencesResponse: Response;
+  const legacyProgressField = getLegacyModeProgressField(mode);
+  const progressSelect = ['user_id', 'game_edition', legacyProgressField].filter(Boolean).join(',');
   try {
-    [progressResponse, preferencesResponse] = await Promise.all([
+    [progressResponse, modeProgressResponse, preferencesResponse] = await Promise.all([
       restFetch(
-        `user_progress?select=user_id,game_edition,pvp_data,pve_data&user_id=eq.${userId}&limit=1`,
+        `user_progress?select=${progressSelect}&user_id=eq.${userId}&limit=1`,
         progressController.signal
       ),
       restFetch(
-        `user_preferences?select=profile_share_pvp_public,profile_share_pve_public,streamer_mode&user_id=eq.${userId}&limit=1`,
+        `user_game_mode_progress?select=user_id,progress_data,profile_public&user_id=eq.${userId}&game_mode=eq.${mode}&season_number=eq.${getGameModeSeasonNumber(mode)}&limit=1`,
+        modeProgressController.signal
+      ),
+      restFetch(
+        `user_preferences?select=streamer_mode,profile_share_pvp_public,profile_share_pve_public&user_id=eq.${userId}&limit=1`,
         preferencesController.signal
       ),
     ]);
   } catch (error) {
     progressController.abort();
+    modeProgressController.abort();
     preferencesController.abort();
     if (isAbortError(error)) {
       throw createError({
@@ -691,9 +680,10 @@ export default defineEventHandler(async (event) => {
     });
   } finally {
     clearTimeout(progressTimeout);
+    clearTimeout(modeProgressTimeout);
     clearTimeout(preferencesTimeout);
   }
-  if (!progressResponse.ok) {
+  if (!progressResponse.ok || !modeProgressResponse.ok) {
     throw createError({ statusCode: 500, statusMessage: 'Failed to load profile data' });
   }
   const progressRows = (await progressResponse.json()) as ProgressRow[];
@@ -701,6 +691,8 @@ export default defineEventHandler(async (event) => {
   if (!progressRow) {
     throw createError({ statusCode: 404, statusMessage: 'Profile not found' });
   }
+  const modeProgressRows = (await modeProgressResponse.json()) as ModeProgressRow[];
+  const modeProgressRow = modeProgressRows[0] ?? null;
   let preferencesRow: PreferencesRow | null = null;
   if (preferencesResponse.ok) {
     const preferenceRows = (await preferencesResponse.json()) as PreferencesRow[];
@@ -712,15 +704,17 @@ export default defineEventHandler(async (event) => {
     });
   }
   const isOwner = requesterUserId === userId;
-  const isModePublic =
-    mode === GAME_MODES.PVE
-      ? preferencesRow?.profile_share_pve_public === true
-      : preferencesRow?.profile_share_pvp_public === true;
+  const legacyModePublic =
+    mode === 'pvp'
+      ? preferencesRow?.profile_share_pvp_public === true
+      : mode === 'pve'
+        ? preferencesRow?.profile_share_pve_public === true
+        : false;
+  const isModePublic = modeProgressRow ? modeProgressRow.profile_public === true : legacyModePublic;
   if (!isOwner && !isModePublic) {
     throw createError({ statusCode: 403, statusMessage: 'Profile is private for this mode' });
   }
-  const profileData =
-    mode === GAME_MODES.PVE ? (progressRow.pve_data ?? null) : (progressRow.pvp_data ?? null);
+  const profileData = resolveModeProgressData(mode, modeProgressRow?.progress_data, progressRow);
   const hideDisplayName = !isOwner && preferencesRow?.streamer_mode === true;
   const sanitizedData = sanitizeProgressPayload(profileData, {
     includeDisplayName: !hideDisplayName,

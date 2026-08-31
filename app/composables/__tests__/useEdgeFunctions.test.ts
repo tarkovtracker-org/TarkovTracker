@@ -124,6 +124,26 @@ describe('useEdgeFunctions.getTeamMembers', () => {
     await expect(edgeFunctions.getTeamMembers('team-1')).rejects.toBe(secondError);
     expect(mockSupabaseClient.functions.invoke).not.toHaveBeenCalled();
   });
+  it('requests fresh team members when force refresh is enabled', async () => {
+    mockFetch.mockResolvedValueOnce({
+      members: ['member-1'],
+      profiles: {},
+    });
+    const { useEdgeFunctions } = await import('@/composables/api/useEdgeFunctions');
+    const edgeFunctions = useEdgeFunctions();
+    await expect(edgeFunctions.getTeamMembers('team-1', true)).resolves.toEqual({
+      members: ['member-1'],
+      profiles: {},
+    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/team/members',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer token-1' },
+        method: 'GET',
+        query: { refresh: '1', teamId: 'team-1' },
+      })
+    );
+  });
 });
 describe('useEdgeFunctions.team mutations', () => {
   beforeEach(() => {
@@ -133,6 +153,11 @@ describe('useEdgeFunctions.team mutations', () => {
     runtimeConfig.public = {
       teamGatewayUrl: 'https://legacy-gateway.tarkovtracker.test',
     };
+    mockSupabaseReady.mockResolvedValue(undefined);
+    mockSupabaseClient.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'token-1' } },
+      error: null,
+    });
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -157,6 +182,21 @@ describe('useEdgeFunctions.team mutations', () => {
       method: 'POST',
     });
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+  it('invokes the atomic team disband function', async () => {
+    mockSupabaseClient.functions.invoke.mockResolvedValue({
+      data: { success: true, message: 'Team disbanded successfully' },
+      error: null,
+    });
+    const { useEdgeFunctions } = await import('@/composables/api/useEdgeFunctions');
+    const edgeFunctions = useEdgeFunctions();
+    await expect(
+      edgeFunctions.disbandTeam('00000000-0000-0000-0000-000000000001')
+    ).resolves.toEqual({ success: true, message: 'Team disbanded successfully' });
+    expect(mockSupabaseClient.functions.invoke).toHaveBeenCalledWith('team-disband', {
+      body: { teamId: '00000000-0000-0000-0000-000000000001' },
+      method: 'POST',
+    });
   });
 });
 describe('useEdgeFunctions.createToken', () => {

@@ -1,30 +1,32 @@
 name: Enhancement
 description: Suggest an improvement to an existing feature
-title: "[Enhancement]: "
-labels: ["enhancement"]
+title: '[Enhancement]: '
+labels: ['enhancement']
 body:
   - type: markdown
     attributes:
       value: |
         Thanks for suggesting an enhancement! This is for improvements to existing features.
-
   - type: dropdown
-    id: area
+    id: product-area
     attributes:
-      label: Technical Area
-      description: Which technical system does this enhancement affect? (Maintainers will add area labels during triage)
+      label: Which area of TarkovTracker is affected?
       multiple: true
       options:
-        - UI/Frontend (Vue components, pages, styling)
-        - API (Server routes, workers, endpoints)
-        - Database (Supabase, queries, schema)
-        - Auth (Login, permissions, sessions)
-        - Realtime (Team sync, broadcasts)
-        - i18n (Translations)
-        - Not Sure
+        - Dashboard
+        - Tasks
+        - Hideout
+        - Needed items
+        - Maps
+        - Team
+        - Profile or account
+        - Login
+        - Settings
+        - API or integrations
+        - Translations
+        - Other / not sure
     validations:
-      required: false
-
+      required: true
   - type: textarea
     id: current
     attributes:
@@ -33,7 +35,6 @@ body:
       placeholder: Currently, when I...
     validations:
       required: true
-
   - type: textarea
     id: proposed
     attributes:
@@ -42,7 +43,6 @@ body:
       placeholder: It would be better if...
     validations:
       required: true
-
   - type: textarea
     id: benefits
     attributes:
@@ -51,7 +51,31 @@ body:
       placeholder: This would improve...
     validations:
       required: true
-
+  - type: textarea
+    id: impact
+    attributes:
+      label: What does this prevent you from doing?
+      description: Describe the problem or limitation this enhancement would solve.
+    validations:
+      required: true
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: How often does this affect you?
+      options:
+        - Always
+        - Frequently
+        - Occasionally
+        - Rarely
+    validations:
+      required: true
+  - type: textarea
+    id: beneficiaries
+    attributes:
+      label: Who would benefit from this change?
+      description: E.g., all users, team leaders, streamers, API consumers, etc.
+    validations:
+      required: false
   - type: textarea
     id: screenshots
     attributes:
@@ -60,7 +84,6 @@ body:
       placeholder: Drag and drop images here or paste URLs
     validations:
       required: false
-
   - type: input
     id: discord
     attributes:
@@ -69,7 +92,6 @@ body:
       placeholder: username#1234
     validations:
       required: false
-
   - type: textarea
     id: additional
     attributes:

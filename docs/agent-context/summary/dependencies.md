@@ -2,7 +2,7 @@
 
 > External dependencies and how/why they are used. Versions live in `package.json` (root and
 > `workers/api-gateway/`) — this file explains _roles_, not exact versions, to stay durable.
-> Engines: Node `>=24.12.0`, pnpm `>=10.34.5 <12` (`packageManager: pnpm@11.14.0`).
+> Engines: Node `>=24.19.0`, pnpm `>=10.34.5 <12` (`packageManager: pnpm@11.14.0`).
 
 ## Runtime Dependencies (root)
 
@@ -14,9 +14,8 @@
 | `vue`, `vue-router`                              | Vue 3 runtime + routing.                                                           |
 | `@nuxt/ui`                                       | Primary component library.                                                         |
 | `@nuxt/image`                                    | Image optimization.                                                                |
+| `@vueuse/core`                                   | Composition utility library (sensors, state, browser APIs).                        |
 | `reka-ui`, `tailwind-merge`, `tailwind-variants` | UI primitives + class composition (transitive via `@nuxt/ui`, used in components). |
-| `motion-v` / `framer-motion`                     | Animations.                                                                        |
-| `embla-carousel*`                                | Carousels.                                                                         |
 
 ### Styling
 

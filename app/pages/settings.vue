@@ -1,7 +1,22 @@
 <template>
   <div class="px-3 py-6 sm:px-6">
-    <div class="mx-auto max-w-[1400px]">
-      <div class="mx-auto max-w-[1160px] space-y-4 lg:space-y-0">
+    <div class="mx-auto max-w-350">
+      <div class="mx-auto max-w-290 space-y-4 lg:space-y-0">
+        <div class="flex items-center justify-between pb-4">
+          <div>
+            <h1 class="text-surface-100 text-xl font-bold">
+              {{ $t('common.settings', 'Settings') }}
+            </h1>
+            <p class="text-surface-400 mt-1 text-sm">
+              {{
+                $t(
+                  'settings.page_description',
+                  'Manage your account, game progression, and application preferences.'
+                )
+              }}
+            </p>
+          </div>
+        </div>
         <UTabs
           :items="settingsTabItems"
           :model-value="activeTab"
@@ -19,7 +34,7 @@
             <div class="sticky top-24">
               <nav
                 class="bg-surface-900/85 w-full rounded-xl border border-white/8 p-1.5 shadow-sm"
-                :aria-label="$t('settings.title')"
+                :aria-label="$t('common.settings')"
               >
                 <div
                   v-for="(group, groupIndex) in settingsTabGroups"
@@ -67,12 +82,12 @@
               <ResetProgressCard />
             </section>
             <section
-              v-if="visitedTabs.prestige"
+              v-if="visitedTabs.prestige && showPrestigeTab"
               v-show="activeTab === 'prestige'"
               id="prestige"
               class="scroll-mt-24 space-y-4"
               role="tabpanel"
-              :aria-label="$t('settings.tabs.prestige')"
+              :aria-label="$t('common.prestige')"
             >
               <PrestigeCard />
             </section>
@@ -82,12 +97,11 @@
               id="preferences"
               class="scroll-mt-24 space-y-4"
               role="tabpanel"
-              :aria-label="$t('settings.tabs.preferences')"
+              :aria-label="$t('common.preferences')"
             >
-              <PrivacyCard />
+              <GeneralPreferencesCard />
               <TaskDisplayCard />
               <MapSettingsCard />
-              <ExternalLinksCard />
               <div id="keybinds" class="scroll-mt-24">
                 <KeybindsCard />
               </div>
@@ -98,11 +112,10 @@
               id="account"
               class="scroll-mt-24 space-y-4"
               role="tabpanel"
-              :aria-label="$t('settings.tabs.account')"
+              :aria-label="$t('common.account')"
             >
               <ProfileSharingCard />
               <DiscordLinkCard />
-              <DebugStateCard />
               <AccountDeletionCard />
               <div v-if="isAdmin" class="flex justify-center pt-4">
                 <NuxtLink
@@ -110,7 +123,7 @@
                   class="hover:text-error-400 text-surface-500 flex items-center gap-1.5 text-xs transition-colors"
                 >
                   <UIcon name="i-mdi-shield-crown" class="size-3.5" />
-                  {{ $t('settings.general.admin_panel') }}
+                  {{ $t('common.admin_panel') }}
                 </NuxtLink>
               </div>
             </section>
@@ -130,9 +143,10 @@
               id="backup-restore"
               class="scroll-mt-24 space-y-4"
               role="tabpanel"
-              :aria-label="$t('settings.tabs.backup_restore')"
+              :aria-label="$t('common.backup_restore')"
             >
               <DataManagementCard view="backup" :session="dataManagementSession" />
+              <DebugStateCard />
             </section>
             <section
               v-if="visitedTabs.api"
@@ -140,7 +154,7 @@
               id="api"
               class="scroll-mt-24 space-y-4"
               role="tabpanel"
-              :aria-label="$t('settings.tabs.api')"
+              :aria-label="$t('common.api')"
             >
               <ApiTokensCard />
             </section>
@@ -150,7 +164,7 @@
               id="streamer-tools"
               class="scroll-mt-24 space-y-4"
               role="tabpanel"
-              :aria-label="$t('settings.tabs.streamer_tools')"
+              :aria-label="$t('common.streamer_tools')"
             >
               <StreamerToolsPanel />
             </section>
@@ -168,11 +182,10 @@
   import DiscordLinkCard from '@/features/settings/DiscordLinkCard.vue';
   import DisplayNameCard from '@/features/settings/DisplayNameCard.vue';
   import ExperienceCard from '@/features/settings/ExperienceCard.vue';
-  import ExternalLinksCard from '@/features/settings/ExternalLinksCard.vue';
+  import GeneralPreferencesCard from '@/features/settings/GeneralPreferencesCard.vue';
   import KeybindsCard from '@/features/settings/KeybindsCard.vue';
   import MapSettingsCard from '@/features/settings/MapSettingsCard.vue';
   import PrestigeCard from '@/features/settings/PrestigeCard.vue';
-  import PrivacyCard from '@/features/settings/PrivacyCard.vue';
   import ProfileSharingCard from '@/features/settings/ProfileSharingCard.vue';
   import ResetProgressCard from '@/features/settings/ResetProgressCard.vue';
   import SkillsCard from '@/features/settings/SkillsCard.vue';
@@ -180,6 +193,8 @@
   import { useDataManagementSession } from '@/features/settings/useDataManagementSession';
   import StreamerToolsPanel from '@/features/streamer-tools/StreamerToolsPanel.vue';
   import { useSystemStore, useSystemStoreWithSupabase } from '@/stores/useSystemStore';
+  import { useTarkovStore } from '@/stores/useTarkov';
+  import { GAME_MODES } from '@/utils/constants';
   import type { TabsProps } from '@nuxt/ui';
   definePageMeta({
     alias: ['/progression', '/prestige', '/preferences'],
@@ -189,6 +204,7 @@
   const router = useRouter();
   const { hasInitiallyLoaded } = useSystemStoreWithSupabase();
   const systemStore = useSystemStore();
+  const tarkovStore = useTarkovStore();
   type SettingsTabId =
     | 'progression'
     | 'prestige'
@@ -200,11 +216,11 @@
     | 'streamer-tools';
   const settingsTabIds = [
     'progression',
+    'prestige',
     'preferences',
     'imports',
-    'prestige',
-    'account',
     'backup-restore',
+    'account',
     'api',
     'streamer-tools',
   ] as const;
@@ -278,11 +294,16 @@
     }
     return nestedTabHashes[hash] ?? legacyTabHashes[hash] ?? null;
   };
+  const showPrestigeTab = computed(() => tarkovStore.currentGameMode !== GAME_MODES.SEASONAL);
+  const canonicalizeTab = (tab: SettingsTabId): SettingsTabId =>
+    tab === 'prestige' && !showPrestigeTab.value ? 'progression' : tab;
   const resolveTabFromRoute = (path: string, hash: string): SettingsTabId => {
     if (shouldRedirectLegacyAccountHash(path, hash)) {
       return getDefaultTabFromPath(path);
     }
-    return resolveTabFromHash(hash) ?? settingsRouteTabs[path] ?? getDefaultTabFromPath(path);
+    const resolved =
+      resolveTabFromHash(hash) ?? settingsRouteTabs[path] ?? getDefaultTabFromPath(path);
+    return canonicalizeTab(resolved);
   };
   const activeTab = ref<SettingsTabId>(resolveTabFromRoute(route.path, route.hash));
   const settingsSeo = computed(() => {
@@ -297,62 +318,50 @@
     description: computed(() => settingsSeo.value.description),
     robots: 'noindex, nofollow',
   });
-  const settingsTabItems = computed(() => [
-    {
-      value: 'progression',
-      label: t('settings.tabs.progression'),
-      icon: 'i-mdi-account-cog-outline',
-    },
-    {
-      value: 'preferences',
-      label: t('settings.tabs.preferences'),
-      icon: 'i-mdi-tune-variant',
-    },
-    {
-      value: 'imports',
-      label: t('settings.tabs.imports'),
-      icon: 'i-mdi-database-import-outline',
-    },
-    {
-      value: 'prestige',
-      label: t('settings.tabs.prestige'),
-      icon: 'i-mdi-medal-outline',
-    },
-    {
-      value: 'account',
-      label: t('settings.tabs.account'),
-      icon: 'i-mdi-account-circle-outline',
-    },
-    {
-      value: 'backup-restore',
-      label: t('settings.tabs.backup_restore'),
-      icon: 'i-mdi-backup-restore',
-    },
-    {
-      value: 'api',
-      label: t('settings.tabs.api'),
-      icon: 'i-mdi-api',
-    },
-    {
-      value: 'streamer-tools',
-      label: t('settings.tabs.streamer_tools'),
-      icon: 'i-heroicons-video-camera',
-    },
-  ]);
-  const settingsTabGroups = computed(() => [
-    {
-      label: t('settings.tab_groups.game'),
+  const settingsTabLabels = computed<Record<SettingsTabId, string>>(() => ({
+    progression: t('settings.tabs.progression'),
+    prestige: t('common.prestige'),
+    preferences: t('common.preferences'),
+    imports: t('settings.tabs.imports'),
+    'backup-restore': t('common.backup_restore'),
+    account: t('common.account'),
+    api: t('common.api'),
+    'streamer-tools': t('common.streamer_tools'),
+  }));
+  const settingsTabIcons: Record<SettingsTabId, string> = {
+    progression: 'i-mdi-account-cog-outline',
+    prestige: 'i-mdi-medal-outline',
+    preferences: 'i-mdi-tune-variant',
+    imports: 'i-mdi-database-import-outline',
+    'backup-restore': 'i-mdi-backup-restore',
+    account: 'i-mdi-account-circle-outline',
+    api: 'i-mdi-api',
+    'streamer-tools': 'i-heroicons-video-camera',
+  };
+  const settingsTabItems = computed(() =>
+    settingsTabIds
+      .filter((value) => value !== 'prestige' || showPrestigeTab.value)
+      .map((value) => ({
+        value,
+        label: settingsTabLabels.value[value],
+        icon: settingsTabIcons[value],
+      }))
+  );
+  const settingsTabGroupDefinitions = [
+    ['game_progress', ['progression', 'prestige']],
+    ['app', ['preferences']],
+    ['data', ['imports', 'backup-restore']],
+    ['account', ['account']],
+    ['tools_integrations', ['api', 'streamer-tools']],
+  ] as const;
+  const settingsTabGroups = computed(() =>
+    settingsTabGroupDefinitions.map(([group, values]) => ({
+      label: t(`settings.tab_groups.${group}`),
       items: settingsTabItems.value.filter((item) =>
-        ['progression', 'preferences', 'imports', 'prestige'].includes(item.value)
+        (values as readonly string[]).includes(item.value)
       ),
-    },
-    {
-      label: t('settings.tab_groups.account_advanced'),
-      items: settingsTabItems.value.filter((item) =>
-        ['account', 'backup-restore', 'api', 'streamer-tools'].includes(item.value)
-      ),
-    },
-  ]);
+    }))
+  );
   const visitedTabs = reactive<Record<SettingsTabId, boolean>>({
     progression: false,
     prestige: false,
@@ -390,6 +399,21 @@
       block: 'start',
     });
   };
+  const hiddenPrestigeTarget = (
+    path: string,
+    hash: string
+  ): { path?: string; hash?: string } | null => {
+    if (showPrestigeTab.value) {
+      return null;
+    }
+    if (path === '/prestige') {
+      return { path: '/progression', hash };
+    }
+    if (hash === settingsTabHashes.prestige) {
+      return { hash: settingsTabHashes.progression };
+    }
+    return null;
+  };
   const onTabChange = (value: string | number) => {
     if (!isSettingsTabId(value)) {
       return;
@@ -405,6 +429,15 @@
     });
   };
   watch(
+    showPrestigeTab,
+    (visible) => {
+      if (!visible && activeTab.value === 'prestige') {
+        onTabChange('progression');
+      }
+    },
+    { immediate: true }
+  );
+  watch(
     activeTab,
     (tab) => {
       visitedTabs[tab] = true;
@@ -418,6 +451,14 @@
         await router.replace({
           hash: '',
           path: '/account',
+          query: route.query,
+        });
+        return;
+      }
+      const hiddenTarget = hiddenPrestigeTarget(path, hash);
+      if (hiddenTarget) {
+        await router.replace({
+          ...hiddenTarget,
           query: route.query,
         });
         return;

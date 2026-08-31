@@ -46,6 +46,7 @@ const routeState = reactive({
 const mockTarkovStore = {
   getCurrentGameMode: vi.fn(() => 'pvp'),
   getDisplayName: vi.fn(() => ''),
+  getModeDisplayName: vi.fn((): string | null => null),
   getPvEProgressData: vi.fn((): { displayName: string | null } => ({ displayName: null })),
   getPvPProgressData: vi.fn((): { displayName: string | null } => ({ displayName: null })),
 };
@@ -56,17 +57,20 @@ vi.mock('vue-i18n', async (importOriginal) => ({
     locale: localeRef,
     setLocale,
     t: (key: string, params?: Record<string, unknown> | string) => {
+      const templates: Record<string, string> = {
+        'common.pve': 'PVE',
+        'common.pvp': 'PVP',
+        'common.seasonal_pvp': 'SEASONAL PVP',
+        'profile.title_with_mode': '{name} Profile {mode}',
+      };
       if (params && typeof params === 'object' && !Array.isArray(params)) {
-        const templates: Record<string, string> = {
-          'profile.title_with_mode': '{name} Profile {mode}',
-        };
         const template = templates[key] ?? key;
         return Object.entries(params).reduce(
           (result, [k, v]) => result.replaceAll(`{${k}}`, String(v)),
           template
         );
       }
-      return key;
+      return templates[key] ?? key;
     },
     te: () => false,
   }),
@@ -320,8 +324,8 @@ describe('AppBar account menu', () => {
   });
   it('does not include a duplicate account settings menu item', async () => {
     const wrapper = await mountAppBar();
-    expect(wrapper.find('[data-menu-item="settings.tabs.account"]').exists()).toBe(false);
-    expect(wrapper.find('[data-menu-item="navigation_drawer.settings"]').exists()).toBe(true);
+    expect(wrapper.find('[data-menu-item="common.account"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-menu-item="common.settings"]')).toHaveLength(1);
     wrapper.unmount();
   });
   it('logs out when selecting the logout menu item', async () => {
@@ -341,7 +345,7 @@ describe('AppBar logged out actions', () => {
     const wrapper = await mountAppBar();
     expect(wrapper.find('[aria-label="app_bar.login_aria"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('navigation_drawer.login');
-    expect(wrapper.find('[aria-label="navigation_drawer.settings"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="common.settings"]').exists()).toBe(false);
     wrapper.unmount();
   });
 });
@@ -351,7 +355,7 @@ describe('AppBar supporter badge', () => {
   });
   it('renders the green Support Development CTA when there is no active tier', async () => {
     const wrapper = await mountAppBar();
-    expect(wrapper.text()).toContain('footer.support_button');
+    expect(wrapper.text()).toContain('common.support');
     expect(wrapper.text()).not.toContain('page.supporter.tier_chad_name');
     wrapper.unmount();
   });
@@ -364,7 +368,7 @@ describe('AppBar supporter badge', () => {
     // The More menu always contains the support label, so we check the CTA link specifically.
     const supportCtaLinks = wrapper.findAll('a').filter((a) => {
       const text = a.text();
-      return text.includes('footer.support_button') && !a.attributes('data-menu-item');
+      return text.includes('common.support') && !a.attributes('data-menu-item');
     });
     expect(supportCtaLinks.length).toBe(0);
     wrapper.unmount();
@@ -372,7 +376,7 @@ describe('AppBar supporter badge', () => {
   it('falls back to the generic Supporter label for past supporters', async () => {
     supporterTierRef.value = 'supporter';
     const wrapper = await mountAppBar();
-    expect(wrapper.text()).toContain('app_bar.supporter_badge_label');
+    expect(wrapper.text()).toContain('common.supporter');
     wrapper.unmount();
   });
 });
@@ -387,6 +391,7 @@ describe('AppBar page title', () => {
     mockSupabase.user.username = '';
     mockTarkovStore.getCurrentGameMode.mockReturnValue('pvp');
     mockTarkovStore.getDisplayName.mockReturnValue('');
+    mockTarkovStore.getModeDisplayName.mockReturnValue(null);
     mockTarkovStore.getPvEProgressData.mockReturnValue({ displayName: null });
     mockTarkovStore.getPvPProgressData.mockReturnValue({ displayName: null });
   });
@@ -397,6 +402,21 @@ describe('AppBar page title', () => {
     mockSupabase.user.username = 'Alpha';
     const wrapper = await mountAppBar();
     expect(wrapper.text()).toContain('Alpha Profile PVE');
+    wrapper.unmount();
+  });
+  it.each([
+    ['tasks', 'common.tasks'],
+    ['hideout', 'common.hideout'],
+    ['team', 'common.team'],
+    ['settings', 'common.settings'],
+    ['storyline', 'common.storyline'],
+    ['credits', 'common.credits'],
+    ['needed-items', 'common.needed_items'],
+    ['kappa', 'common.kappa_lightkeeper'],
+  ])('uses the consolidated title for %s', async (routeName, expectedTitle) => {
+    routeState.name = routeName;
+    const wrapper = await mountAppBar();
+    expect(wrapper.text()).toContain(expectedTitle);
     wrapper.unmount();
   });
   it('renders shared profile title from route user id instead of local progress data', async () => {
@@ -428,6 +448,7 @@ describe('AppBar page title', () => {
     mockSupabase.user.id = 'user-1';
     mockSupabase.user.username = 'AccountUsername';
     mockTarkovStore.getDisplayName.mockReturnValue('OwnDisplayName');
+    mockTarkovStore.getModeDisplayName.mockReturnValue('OwnProgressName');
     mockTarkovStore.getPvPProgressData.mockReturnValue({ displayName: 'OwnProgressName' });
     const wrapper = await mountAppBar();
     expect(wrapper.text()).toContain('app_bar.hidden_label Profile PVP');
@@ -448,7 +469,7 @@ describe('AppBar responsive layout', () => {
     const moreMenuItems = wrapper.findAll('[data-menu-item]');
     const labels = moreMenuItems.map((el) => el.attributes('data-menu-item'));
     expect(labels).toContain('settings.locale');
-    expect(labels).toContain('footer.support_button');
+    expect(labels).toContain('common.support');
     expect(labels).toContain('footer.call_to_action.discord');
     expect(labels).toContain('footer.call_to_action.github');
     wrapper.unmount();
@@ -473,19 +494,21 @@ describe('AppBar responsive layout', () => {
   });
   it('gives the bell a 36x36 hit target with aria-label and tooltip', async () => {
     const wrapper = await mountAppBar();
-    const bell = wrapper.find('button[aria-label="activity_log.aria_label"]');
+    const bell = wrapper.find('button[aria-label="common.activity_log"]');
     expect(bell.exists()).toBe(true);
     const classAttr = bell.attributes('class') || '';
     expect(classAttr).toContain('h-9');
     expect(classAttr).toContain('w-9');
     wrapper.unmount();
   });
-  it('renders the Log In button with a filled primary background', async () => {
+  it('renders the Log In button with an accessible primary treatment', async () => {
     const wrapper = await mountAppBar();
     const loginLink = wrapper.find('a[aria-label="app_bar.login_aria"]');
     expect(loginLink.exists()).toBe(true);
     const classAttr = loginLink.attributes('class') || '';
-    expect(classAttr).toContain('bg-primary-600');
+    expect(classAttr).toContain('bg-primary-500');
+    expect(classAttr).toContain('hover:bg-primary-400');
+    expect(classAttr).toContain('text-surface-950');
     expect(classAttr).toContain('h-9');
     wrapper.unmount();
   });
@@ -510,15 +533,41 @@ describe('AppBar authenticated state', () => {
     expect(trigger.find('.i-mdi-chevron-down').exists()).toBe(true);
     wrapper.unmount();
   });
-  it('truncates the display name with sm:inline and truncate class', async () => {
-    mockTarkovStore.getDisplayName.mockReturnValue('A'.repeat(50));
+  it('truncates long display names and exposes the full name as a tooltip', async () => {
+    const displayName = 'A'.repeat(50);
+    mockTarkovStore.getDisplayName.mockReturnValue(displayName);
     const wrapper = await mountAppBar();
     const trigger = wrapper.find('button[aria-label="navigation_drawer.account_menu"]');
-    const nameSpan = trigger.find('span.truncate');
+    const nameSpan = trigger.find('span[data-long-name="true"]');
     expect(nameSpan.exists()).toBe(true);
     const classAttr = nameSpan.attributes('class') || '';
     expect(classAttr).toContain('hidden');
     expect(classAttr).toContain('sm:inline');
+    expect(classAttr).toContain('truncate');
+    expect(nameSpan.attributes('title')).toBe(displayName);
+    wrapper.unmount();
+  });
+  it('keeps short display names on one line within the fixed-height account button', async () => {
+    mockTarkovStore.getDisplayName.mockReturnValue('Short name');
+    const wrapper = await mountAppBar();
+    const trigger = wrapper.find('button[aria-label="navigation_drawer.account_menu"]');
+    const nameSpan = trigger.find('span[data-long-name="false"]');
+    expect(nameSpan.exists()).toBe(true);
+    expect(nameSpan.attributes('data-long-name')).toBe('false');
+    expect(nameSpan.classes()).toContain('truncate');
+    expect(nameSpan.classes()).toContain('whitespace-nowrap');
+    wrapper.unmount();
+  });
+  it('keeps a 24-character wide display name on one line', async () => {
+    const displayName = 'W'.repeat(24);
+    mockTarkovStore.getDisplayName.mockReturnValue(displayName);
+    const wrapper = await mountAppBar();
+    const trigger = wrapper.find('button[aria-label="navigation_drawer.account_menu"]');
+    const nameSpan = trigger.find('span[data-long-name="false"]');
+    expect(nameSpan.text()).toBe(displayName);
+    expect(nameSpan.classes()).toContain('truncate');
+    expect(nameSpan.classes()).toContain('whitespace-nowrap');
+    expect(nameSpan.attributes('title')).toBe(displayName);
     wrapper.unmount();
   });
   it('falls back to default avatar when avatar image fails to load', async () => {

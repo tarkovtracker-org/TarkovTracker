@@ -8,6 +8,7 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { isCurrencyItemId } from '@/utils/constants';
 import { fuzzyMatch } from '@/utils/fuzzySearch';
 import { logger } from '@/utils/logger';
 import { perfNow, roundPerfMs } from '@/utils/perf';
@@ -26,6 +27,10 @@ import type {
 const DEFAULT_FULL_LOAD_TIMEOUT_MS = 5000;
 const DEFAULT_FULL_LOAD_MIN_TIME_MS = 16;
 const DEFAULT_FULL_LOAD_DELAY_MS = 1500;
+const isTrackableHideoutRequirement = (need: NeededItemHideoutModule): boolean => {
+  const itemId = getNeededItemId(need);
+  return !itemId || !isCurrencyItemId(itemId);
+};
 type FullItemsLoadOptions = {
   priority?: 'normal' | 'high';
   timeout?: number;
@@ -83,10 +88,10 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   const preferencesStore = usePreferencesStore();
   const tarkovStore = useTarkovStore();
   const defaultTranslations: Record<string, string> = {
-    'needed_items.filters.all': 'All',
-    'needed_items.filters.tasks': 'Tasks',
-    'needed_items.filters.hideout': 'Hideout',
-    'needed_items.filters.completed': 'Completed',
+    'common.all': 'All',
+    'common.tasks': 'Tasks',
+    'common.hideout': 'Hideout',
+    'common.completed': 'Completed',
   };
   const translate = (key: string) => (t ? t(key) : defaultTranslations[key] || key);
   const perfDebug = computed(() => Boolean(toValue(perfDebugOption)));
@@ -95,7 +100,9 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     logger.info(`[NeededItemsPerf] ${event}`, payload);
   };
   const neededItemTaskObjectives = computed(() => metadataStore.neededItemTaskObjectives);
-  const neededItemHideoutModules = computed(() => metadataStore.neededItemHideoutModules);
+  const neededItemHideoutModules = computed(() =>
+    metadataStore.neededItemHideoutModules.filter(isTrackableHideoutRequirement)
+  );
   const itemsFullLoaded = computed(() => metadataStore.itemsFullLoaded);
   const items = computed(() => metadataStore.items);
   const viewMode = computed({
@@ -307,7 +314,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
           logger.warn('[NeededItems] Skipping objective without item/markerItem:', need);
           continue;
         }
-        key = `task:${need.taskId}:${itemId}`;
+        key = `task:${need.taskId}:${itemId}:${need.id}`;
       } else {
         itemId = getNeededItemId(need);
         if (!itemId) {
@@ -359,25 +366,25 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     }
     return [
       {
-        label: translate('needed_items.filters.all'),
+        label: translate('common.all'),
         value: 'all' as NeededItemsFilterType,
         icon: 'i-mdi-clipboard-list',
         count: counts.incomplete,
       },
       {
-        label: translate('needed_items.filters.tasks'),
+        label: translate('common.tasks'),
         value: 'tasks' as NeededItemsFilterType,
         icon: 'i-mdi-checkbox-marked-circle-outline',
         count: counts.tasks,
       },
       {
-        label: translate('needed_items.filters.hideout'),
+        label: translate('common.hideout'),
         value: 'hideout' as NeededItemsFilterType,
         icon: 'i-mdi-home',
         count: counts.hideout,
       },
       {
-        label: translate('needed_items.filters.completed'),
+        label: translate('common.completed'),
         value: 'completed' as NeededItemsFilterType,
         icon: 'i-mdi-check-all',
         count: counts.completed,

@@ -1,13 +1,14 @@
 // @vitest-environment nuxt
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
 import SettingsPage from '@/pages/settings.vue';
 const { mockFns, mockState } = vi.hoisted(() => ({
   mockState: {
     isLoggedIn: false,
     isAdmin: false,
     gameEdition: 1,
+    gameMode: 'pvp',
     prestigeLevel: 0,
     routeHash: '',
     routePath: '/settings',
@@ -64,7 +65,10 @@ vi.mock('@/stores/useSystemStore', () => ({
 }));
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
-    getCurrentGameMode: () => 'pvp',
+    get currentGameMode() {
+      return mockState.gameMode;
+    },
+    getCurrentGameMode: () => mockState.gameMode,
     getGameEdition: () => mockState.gameEdition,
     setGameEdition: mockFns.setGameEdition,
     getPvPProgressData: () => ({ prestigeLevel: mockState.prestigeLevel }),
@@ -114,11 +118,10 @@ const defaultGlobalStubs = {
   },
   'i18n-t': { template: '<span><slot /><slot name="word" /></span>' },
   ExperienceCard: { template: '<div data-testid="experience-card" />' },
-  ExternalLinksCard: { template: '<div data-testid="external-links-card" />' },
+  GeneralPreferencesCard: { template: '<div data-testid="general-preferences-card" />' },
   KeybindsCard: { template: '<div data-testid="keybinds-card" />' },
   MapSettingsCard: { template: '<div data-testid="map-settings-card" />' },
   PrestigeCard: { template: '<div data-testid="prestige-card" />' },
-  PrivacyCard: { template: '<div data-testid="privacy-card" />' },
   ProfileSharingCard: { template: '<div data-testid="profile-sharing-card" />' },
   ResetProgressCard: { template: '<div data-testid="reset-progress-card" />' },
   SkillsCard: { template: '<div id="skills" data-testid="skills-card" />' },
@@ -164,6 +167,7 @@ const configureMockState = (
     isLoggedIn?: boolean;
     isAdmin?: boolean;
     gameEdition?: number;
+    gameMode?: string;
     prestigeLevel?: number;
     routeHash?: string;
     routePath?: string;
@@ -172,6 +176,7 @@ const configureMockState = (
   mockState.isLoggedIn = options.isLoggedIn ?? false;
   mockState.isAdmin = options.isAdmin ?? false;
   mockState.gameEdition = options.gameEdition ?? 1;
+  mockState.gameMode = options.gameMode ?? 'pvp';
   mockState.prestigeLevel = options.prestigeLevel ?? 0;
   mockState.routeHash = options.routeHash ?? '';
   mockState.routePath = options.routePath ?? '/settings';
@@ -247,7 +252,7 @@ describe('settings page', () => {
         global: globalConfig,
       });
       await vi.dynamicImportSettled();
-      expect(wrapper.find('[data-testid="privacy-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="general-preferences-card"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="task-display-card"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="keybinds-card"]').exists()).toBe(true);
       expect(wrapper.find('#progression').exists()).toBe(false);
@@ -297,7 +302,7 @@ describe('settings page', () => {
         global: globalConfig,
       });
       await vi.dynamicImportSettled();
-      expect(wrapper.find('[data-testid="privacy-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="general-preferences-card"]').exists()).toBe(true);
     });
     it('opens the account tab from the route hash without remounting', async () => {
       configureMockState({ routeHash: '#account' });
@@ -341,26 +346,93 @@ describe('settings page', () => {
         global: globalConfig,
       });
       await vi.dynamicImportSettled();
-      expect(wrapper.text()).toContain('settings.general.admin_panel');
+      expect(wrapper.text()).toContain('common.admin_panel');
     });
     it('groups desktop settings tabs and keeps mobile tabs in priority order', async () => {
       const wrapper = await mountSuspended(SettingsPage, {
         global: globalConfig,
       });
-      expect(wrapper.text()).toContain('settings.tab_groups.game');
-      expect(wrapper.text()).toContain('settings.tab_groups.account_advanced');
+      expect(wrapper.text()).toContain('settings.tab_groups.game_progress');
+      expect(wrapper.text()).toContain('settings.tab_groups.app');
+      expect(wrapper.text()).toContain('settings.tab_groups.data');
+      expect(wrapper.text()).toContain('settings.tab_groups.account');
+      expect(wrapper.text()).toContain('settings.tab_groups.tools_integrations');
       expect(wrapper.findAll('[data-testid="tabs"] button').map((button) => button.text())).toEqual(
         [
           'settings.tabs.progression',
-          'settings.tabs.preferences',
+          'common.prestige',
+          'common.preferences',
           'settings.tabs.imports',
-          'settings.tabs.prestige',
-          'settings.tabs.account',
-          'settings.tabs.backup_restore',
-          'settings.tabs.api',
-          'settings.tabs.streamer_tools',
+          'common.backup_restore',
+          'common.account',
+          'common.api',
+          'common.streamer_tools',
         ]
       );
+    });
+    it('hides the prestige tab in Seasonal PvP mode', async () => {
+      configureMockState({ gameMode: 'seasonal' });
+      const wrapper = await mountSuspended(SettingsPage, {
+        global: globalConfig,
+      });
+      await vi.dynamicImportSettled();
+      expect(wrapper.find('[data-testid="desktop-tab-prestige"]').exists()).toBe(false);
+      expect(wrapper.findAll('[data-testid="tabs"] button').map((button) => button.text())).toEqual(
+        [
+          'settings.tabs.progression',
+          'common.preferences',
+          'settings.tabs.imports',
+          'common.backup_restore',
+          'common.account',
+          'common.api',
+          'common.streamer_tools',
+        ]
+      );
+    });
+    it('redirects seasonal prestige deep links to the progression tab', async () => {
+      configureMockState({ gameMode: 'seasonal', routeHash: '#prestige' });
+      const wrapper = await mountSuspended(SettingsPage, {
+        global: globalConfig,
+      });
+      await vi.dynamicImportSettled();
+      await nextTick();
+      expect(wrapper.find('#prestige').exists()).toBe(false);
+      expect(wrapper.find('#progression').exists()).toBe(true);
+      expect(mockFns.routerReplace).toHaveBeenCalledWith({ hash: '#progression', query: {} });
+    });
+    it('redirects the seasonal prestige route to the progression route', async () => {
+      configureMockState({ gameMode: 'seasonal', routePath: '/prestige' });
+      const wrapper = await mountSuspended(SettingsPage, {
+        global: globalConfig,
+      });
+      await vi.dynamicImportSettled();
+      await nextTick();
+      expect(wrapper.find('#prestige').exists()).toBe(false);
+      expect(wrapper.find('#progression').exists()).toBe(true);
+      expect(mockFns.routerReplace).toHaveBeenCalledWith({
+        path: '/progression',
+        hash: '',
+        query: {},
+      });
+    });
+    it('preserves a non-prestige hash when redirecting the seasonal prestige route', async () => {
+      configureMockState({
+        gameMode: 'seasonal',
+        routePath: '/prestige',
+        routeHash: '#preferences',
+      });
+      const wrapper = await mountSuspended(SettingsPage, {
+        global: globalConfig,
+      });
+      await vi.dynamicImportSettled();
+      await nextTick();
+      expect(wrapper.find('#prestige').exists()).toBe(false);
+      expect(wrapper.find('#preferences').exists()).toBe(true);
+      expect(mockFns.routerReplace).toHaveBeenCalledWith({
+        path: '/progression',
+        hash: '#preferences',
+        query: {},
+      });
     });
     it('marks settings control routes as noindex', async () => {
       configureMockState({ routePath: '/progression' });

@@ -66,7 +66,7 @@ Hard rules the reviewer must verify for every diff:
 
 ### Cloudflare Workers / Durable Objects
 
-- **Where:** `workers/api-gateway/src/index.ts` (rate limiter DO), `workers/tarkov-precompute/`
+- **Where:** `workers/api-gateway/src/rateLimiter.ts` (rate limiter DO), `workers/tarkov-precompute/`
 - **Check:** DO alarm lifecycle — no orphaned alarms, no double-fire without
   idempotency, no alarm leaks on cleanup. The current branch (`fix-do-alarm-overhead`)
   is specifically addressing alarm overhead — verify that lazy expiration does not

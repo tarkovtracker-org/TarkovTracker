@@ -1,3 +1,508 @@
+## [1.74.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.74.0...v1.74.1) (2026-08-30)
+
+
+### Bug Fixes
+
+* **supabase:** align migration history filename ([7c9f3ec](https://github.com/tarkovtracker-org/TarkovTracker/commit/7c9f3ece57b0e9a509f65ed91187e789c0301e96))
+
+# [1.74.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.12...v1.74.0) (2026-08-30)
+
+
+### Bug Fixes
+
+* **team:** address PR review findings ([45f942c](https://github.com/tarkovtracker-org/TarkovTracker/commit/45f942c6bb9bc60b3f14177dbac637fb2d16edd1))
+* **team:** align visibility row interaction states ([6b0f19a](https://github.com/tarkovtracker-org/TarkovTracker/commit/6b0f19a3aa6b8cee69260797ff788f7f41314af5))
+* **team:** guard delayed membership cleanup ([03669a7](https://github.com/tarkovtracker-org/TarkovTracker/commit/03669a7cefe9e3c20ddf8764471e06f43b912281))
+* **team:** harden collaboration page interactions ([3b2abbd](https://github.com/tarkovtracker-org/TarkovTracker/commit/3b2abbda8f0fea514e7ba2111a2f6a09d42f6463))
+* **team:** ignore stale invite copy results ([37cc754](https://github.com/tarkovtracker-org/TarkovTracker/commit/37cc7540f45c4ca8430cae2dd94a4c1c8c0321a6))
+* **team:** keep clipboard helper within audit limits ([26d2d7a](https://github.com/tarkovtracker-org/TarkovTracker/commit/26d2d7a3ad7e609bc90150ea020f095d3ba55053))
+
+
+### Features
+
+* **ui:** modernize Team collaboration page ([13db1d8](https://github.com/tarkovtracker-org/TarkovTracker/commit/13db1d8ecd06e708adc587908449802cadf5fd39))
+
+## [1.73.12](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.11...v1.73.12) (2026-08-30)
+
+
+### Bug Fixes
+
+* **ui:** resolve shell contrast failures ([#780](https://github.com/tarkovtracker-org/TarkovTracker/issues/780)) ([9ad8d12](https://github.com/tarkovtracker-org/TarkovTracker/commit/9ad8d127077297ee36b5871eab77e778bab424d3))
+
+## [1.73.11](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.10...v1.73.11) (2026-08-30)
+
+
+### Bug Fixes
+
+* **app:** clear exchanged OAuth callback code ([d6f7f92](https://github.com/tarkovtracker-org/TarkovTracker/commit/d6f7f9244a8cbc0a3bf092eec0251b12779121c5))
+* **app:** make OAuth PKCE callback exchange explicit ([a936466](https://github.com/tarkovtracker-org/TarkovTracker/commit/a93646692e4ee91bf350b430e240dbefc52a3e4a))
+* **app:** reset OAuth callback state after exchange ([21f9aaf](https://github.com/tarkovtracker-org/TarkovTracker/commit/21f9aaf38299a61f8277b0f2b561fb8e330ba04c))
+* **app:** scope OAuth PKCE exchange to callback route and defer to ready ([521ddef](https://github.com/tarkovtracker-org/TarkovTracker/commit/521ddefec9aa226bd1046d17df710f6dfc6514b0))
+* **app:** share the pending OAuth exchange across ready callers ([3c58493](https://github.com/tarkovtracker-org/TarkovTracker/commit/3c58493326dc5a8d6d461c96443203b26c5c8bd8))
+
+## [1.73.10](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.9...v1.73.10) (2026-08-29)
+
+
+### Bug Fixes
+
+* **supabase:** secure team membership delete trigger ([e76bb68](https://github.com/tarkovtracker-org/TarkovTracker/commit/e76bb68880bb05a3e76ee7426bf89a9fffbaba65))
+
+## [1.73.9](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.8...v1.73.9) (2026-08-29)
+
+
+### Bug Fixes
+
+* **test:** consolidate admin access coverage ([900ee96](https://github.com/tarkovtracker-org/TarkovTracker/commit/900ee9681dca8173417c8f5d51f3b5713d1ef169))
+* **api:** harden admin error handling ([830eb37](https://github.com/tarkovtracker-org/TarkovTracker/commit/830eb374b5a022f9d051e0ab7e7fd80125757f10))
+* **api:** normalize admin error payloads ([c824dc1](https://github.com/tarkovtracker-org/TarkovTracker/commit/c824dc12f14a05127954512d252843953230a20c))
+* **test:** reduce admin error assertion duplication ([72c9c09](https://github.com/tarkovtracker-org/TarkovTracker/commit/72c9c0973671d9b4f9c7d9211f55d1b56f1f0683))
+* **api:** return stable admin error codes ([92a72e9](https://github.com/tarkovtracker-org/TarkovTracker/commit/92a72e9e7856fb09ba0ec88c70ff8990405a8723))
+
+## [1.73.8](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.7...v1.73.8) (2026-08-29)
+
+
+### Bug Fixes
+
+* **api:** harden token body parsing and clarify gameMode error ([d26a72b](https://github.com/tarkovtracker-org/TarkovTracker/commit/d26a72baa7adcd9d15f112e18a2d842aa59e9269))
+* **api:** sync agent contract and split token-create handlers ([6980807](https://github.com/tarkovtracker-org/TarkovTracker/commit/69808072d66a9a7880f1b905d7822d8592b5bec2))
+* **api:** validate token permissions in token-create ([fd717e1](https://github.com/tarkovtracker-org/TarkovTracker/commit/fd717e17f57616c9278fe3d5bf459eb4b0e0d41f)), closes [#620](https://github.com/tarkovtracker-org/TarkovTracker/issues/620)
+
+## [1.73.7](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.6...v1.73.7) (2026-08-27)
+
+
+### Bug Fixes
+
+* **i18n:** localize map control help ([b82d812](https://github.com/tarkovtracker-org/TarkovTracker/commit/b82d812cdce9037c72f441327ba92c5e9dbb2eab))
+
+## [1.73.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.5...v1.73.6) (2026-08-25)
+
+
+### Bug Fixes
+
+* **api:** harden account deletion concurrency ([#771](https://github.com/tarkovtracker-org/TarkovTracker/issues/771)) ([51d883b](https://github.com/tarkovtracker-org/TarkovTracker/commit/51d883bf8a130d99a3429ed5e9a6b417c9a86ddd))
+
+## [1.73.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.4...v1.73.5) (2026-08-25)
+
+
+### Bug Fixes
+
+* **api:** modernize api-gateway runtime contract ([#767](https://github.com/tarkovtracker-org/TarkovTracker/issues/767)) ([b73fcc2](https://github.com/tarkovtracker-org/TarkovTracker/commit/b73fcc20b60b5169f48e1b1f9ee09567def18321))
+
+## [1.73.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.3...v1.73.4) (2026-08-25)
+
+
+### Bug Fixes
+
+* **i18n:** add missing danger_zone confirm_instruction key ([9a52d94](https://github.com/tarkovtracker-org/TarkovTracker/commit/9a52d9411bcd3efb79b32f0671d570c2c0f2d9e2))
+
+## [1.73.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.2...v1.73.3) (2026-08-25)
+
+
+### Bug Fixes
+
+* **api:** validate teamId as a UUID before the membership query ([#756](https://github.com/tarkovtracker-org/TarkovTracker/issues/756)) ([7da84f2](https://github.com/tarkovtracker-org/TarkovTracker/commit/7da84f224d174bcbca6a76130d38652e8bd3caa8))
+
+## [1.73.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.1...v1.73.2) (2026-08-20)
+
+
+### Bug Fixes
+
+* **api:** reject non-HTTPS overlay redirect targets ([4c2b82d](https://github.com/tarkovtracker-org/TarkovTracker/commit/4c2b82ddc01e2543b0659341fffe3ab4b4431d4c))
+* **api:** reject redirects on the streamer kappa overlay fetch ([8b6c05e](https://github.com/tarkovtracker-org/TarkovTracker/commit/8b6c05e5351c0947e5c4d94466b26e25b13b91eb))
+* **api:** release overlay redirect bodies before the next hop ([82122aa](https://github.com/tarkovtracker-org/TarkovTracker/commit/82122aaf6889a16228775a9411194194a5ceab04))
+* **api:** require HTTPS for overlay data ([de77ab6](https://github.com/tarkovtracker-org/TarkovTracker/commit/de77ab6f2d56f3753334482fc4a66c674bef8ae3))
+
+## [1.73.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.0...v1.73.1) (2026-08-20)
+
+
+### Bug Fixes
+
+* **hideout:** handle EFT 1.1 currency requirements ([#754](https://github.com/tarkovtracker-org/TarkovTracker/issues/754)) ([cfcd82b](https://github.com/tarkovtracker-org/TarkovTracker/commit/cfcd82bf79207eb0e14abb8053249b2995ec0895))
+
+# [1.73.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.72.2...v1.73.0) (2026-08-19)
+
+
+### Bug Fixes
+
+* **maps:** resolve SonarCloud findings in marks hash and colour test ([aaaac5e](https://github.com/tarkovtracker-org/TarkovTracker/commit/aaaac5e2d702f9dd71c639d7ae9c1780fe49b453))
+* **maps:** sync objective chip prefs and harden legacy palette migration ([a8a7a0c](https://github.com/tarkovtracker-org/TarkovTracker/commit/a8a7a0c6195fbcc736e481d56d029058be273286))
+
+
+### Features
+
+* **maps:** add pinned marker colour and objective legend chips ([5e77b72](https://github.com/tarkovtracker-org/TarkovTracker/commit/5e77b72b5c8ab1b6483760cc526a05af4475b6df))
+
+## [1.72.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.72.1...v1.72.2) (2026-08-16)
+
+
+### Bug Fixes
+
+* **app:** drop level trader requirements without a numeric level ([51dd545](https://github.com/tarkovtracker-org/TarkovTracker/commit/51dd545e29f2eab21a27daf45242fc5d5171ed3c))
+* **app:** drop malformed overlay trader requirements and unstub fetch ([fbcb4d2](https://github.com/tarkovtracker-org/TarkovTracker/commit/fbcb4d258dfc5f687ebfae0998428bce38bd2f4a))
+* **app:** drop non-finite trader level requirements in adapter ([0aad054](https://github.com/tarkovtracker-org/TarkovTracker/commit/0aad05474a6d1444c577dfd7f36c490787b5e560))
+* **app:** reduce trader requirement and overlay URL complexity ([9d24823](https://github.com/tarkovtracker-org/TarkovTracker/commit/9d24823bae074f7db8383b0fe06cdd00ba8ddc7e))
+* **app:** reject non-finite overlay trader level thresholds ([4bfa570](https://github.com/tarkovtracker-org/TarkovTracker/commit/4bfa570345ea9d6333a5c2991b78fe1b4c20df72))
+* **app:** restore .env.example and commit-msg hook mode ([f8cb77d](https://github.com/tarkovtracker-org/TarkovTracker/commit/f8cb77dd6ae90a4cf00e5331e83a5f6d9bbd2051))
+* **app:** set level on overlaid trader gates and split tasksAdd requirements ([a64fc4f](https://github.com/tarkovtracker-org/TarkovTracker/commit/a64fc4f8145d2349fd7c0477d89ff67c46e49b5c))
+* **app:** split trader requirements by type for tasks and overlay patches ([8f6853f](https://github.com/tarkovtracker-org/TarkovTracker/commit/8f6853fa19d5c4157c5c3ae3884d9e35198deb56))
+
+## [1.72.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.72.0...v1.72.1) (2026-08-16)
+
+
+### Bug Fixes
+
+* **admin:** add Twitch cache purge URL fallback and dedupe purge calls ([1e16aec](https://github.com/tarkovtracker-org/TarkovTracker/commit/1e16aec621c3b21f3be5c442f70d9c00e1dfbca2))
+* **admin:** address Twitch cache-and-invalidate review findings ([1e099b7](https://github.com/tarkovtracker-org/TarkovTracker/commit/1e099b7fdb85f1ba38827026e2605b097914e554))
+* **admin:** avoid duplicate Twitch saves ([4b1afd2](https://github.com/tarkovtracker-org/TarkovTracker/commit/4b1afd2e4ef863be4ca3906b0a2b83399a0d226c))
+* **admin:** bound the purge route timeout above the edge fn worst case ([2e4a9b6](https://github.com/tarkovtracker-org/TarkovTracker/commit/2e4a9b619693693dbb8919d3bfa221a217bcbf4f))
+* **admin:** bound Twitch config edge TTL to one hour ([dfff07a](https://github.com/tarkovtracker-org/TarkovTracker/commit/dfff07a4db54bd1b2a119b87471e452df8b12fbc))
+* **admin:** bypass stale Twitch config cache ([fbcdd87](https://github.com/tarkovtracker-org/TarkovTracker/commit/fbcdd871edab48e76544eeb47d982cff5f2631dc))
+* **admin:** clarify Twitch purge recovery ([1b22cf9](https://github.com/tarkovtracker-org/TarkovTracker/commit/1b22cf91f34c52030af5175893250c7e10b05a60))
+* **admin:** close Twitch lifecycle races ([128e13a](https://github.com/tarkovtracker-org/TarkovTracker/commit/128e13ab3646dde555128f972556bddb8b1a761d))
+* **admin:** complete Twitch cache hardening ([72e359c](https://github.com/tarkovtracker-org/TarkovTracker/commit/72e359cb59e69580e9c38b5861b94d8bc600bef5))
+* **admin:** edge-cache promoted Twitch config with tag purge ([088e1ef](https://github.com/tarkovtracker-org/TarkovTracker/commit/088e1ef3ff68f17689c4bbf4391cd3bf31dac2f3))
+* **admin:** harden long-lived Twitch config cache ([4b60a26](https://github.com/tarkovtracker-org/TarkovTracker/commit/4b60a26699a7acbee10c3b6081a171cc48f3e458))
+* **admin:** harden Twitch cache synchronization ([cc27c95](https://github.com/tarkovtracker-org/TarkovTracker/commit/cc27c958575f427b530d81e6a55eae347b76b40e))
+* **admin:** only require APP_URL for the Twitch tag-purge fallback ([d686c9b](https://github.com/tarkovtracker-org/TarkovTracker/commit/d686c9b69f42c1bea1cc413faabb915ec2fc8365))
+* **admin:** register handled purge task ([0b870f1](https://github.com/tarkovtracker-org/TarkovTracker/commit/0b870f1e305974f422d25a0a3c4d9f50ea39d57c))
+
+# [1.72.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.71.2...v1.72.0) (2026-08-16)
+
+
+### Bug Fixes
+
+* **maps:** carry floor across fullscreen map instances and persist help flag ([2d54e0a](https://github.com/tarkovtracker-org/TarkovTracker/commit/2d54e0a75b5ccafb3a75e972f6d91008a1929140))
+* **maps:** keep fractional zoom when capturing and restoring map views ([2679e2a](https://github.com/tarkovtracker-org/TarkovTracker/commit/2679e2a8aca6852197812e08a042f726075a7e82))
+* **tasks:** make the fullscreen map dialog safe for assistive tech ([18d509b](https://github.com/tarkovtracker-org/TarkovTracker/commit/18d509b56dbe9370e4df07f9ab8a1716dd3adf90))
+* **maps:** mark map help as seen whenever the help popover opens ([53f2ade](https://github.com/tarkovtracker-org/TarkovTracker/commit/53f2ade4e9e02564edeb62562f72148d6abb3298))
+* **tasks:** name the map heading after the map and pair both toggles ([b1efd2e](https://github.com/tarkovtracker-org/TarkovTracker/commit/b1efd2e7d144a123ed2126c0c0aaf815b75f46aa))
+* **maps:** sync map help seen flag across mounted map instances ([33cfcf4](https://github.com/tarkovtracker-org/TarkovTracker/commit/33cfcf4e4fe40efade7eaa5d5844c7d5514b1688))
+* **tasks:** use a native dialog element for the fullscreen map overlay ([f0608de](https://github.com/tarkovtracker-org/TarkovTracker/commit/f0608de7f1643170c091e567bb4c9422412144e4))
+* **tasks:** validate initialView center coordinates and trap focus in map fullscreen ([ca33825](https://github.com/tarkovtracker-org/TarkovTracker/commit/ca3382574cd02092f6629a29e1421c7f3452ef8e))
+
+
+### Features
+
+* **tasks:** expand task map panel by default with obvious toggle and fullscreen view ([e3d7d65](https://github.com/tarkovtracker-org/TarkovTracker/commit/e3d7d652ad9751f1c91cc1460ca25acd98725833))
+* **maps:** redesign map controls and fit the fullscreen map to the viewport ([979e70c](https://github.com/tarkovtracker-org/TarkovTracker/commit/979e70c84e448412d1bd700892aa8afe9770e4b7))
+
+## [1.71.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.71.1...v1.71.2) (2026-08-15)
+
+
+### Bug Fixes
+
+* **api:** authenticate before decoding URL params in gateway write routes ([c5b7365](https://github.com/tarkovtracker-org/TarkovTracker/commit/c5b736520d841f8514a46c413639990a6e457838))
+* **api:** stop leaking internal error messages in gateway 500 responses ([fca6504](https://github.com/tarkovtracker-org/TarkovTracker/commit/fca6504ad19e0fd03905dcc42366cca72d6ba215))
+
+## [1.71.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.71.0...v1.71.1) (2026-08-15)
+
+
+### Bug Fixes
+
+* **app:** recover when the entry module fails to load after a deploy ([#737](https://github.com/tarkovtracker-org/TarkovTracker/issues/737)) ([dd659b7](https://github.com/tarkovtracker-org/TarkovTracker/commit/dd659b76ed957140cbdf2dd3061a966923c83255)), closes [#697](https://github.com/tarkovtracker-org/TarkovTracker/issues/697)
+
+# [1.71.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.70.2...v1.71.0) (2026-08-15)
+
+
+### Features
+
+* **admin:** manage promoted Twitch stream ([#731](https://github.com/tarkovtracker-org/TarkovTracker/issues/731)) ([4ab7312](https://github.com/tarkovtracker-org/TarkovTracker/commit/4ab73121c5d3e62b8f37ce834ca0844dafc3d64e))
+
+## [1.70.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.70.1...v1.70.2) (2026-08-14)
+
+
+### Bug Fixes
+
+* **api:** improve locale overlay coverage and cache freshness ([#725](https://github.com/tarkovtracker-org/TarkovTracker/issues/725)) ([d1de3fe](https://github.com/tarkovtracker-org/TarkovTracker/commit/d1de3fec225f0c424fa24d7f7a68ff1b64eeec14))
+
+## [1.70.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.70.0...v1.70.1) (2026-08-14)
+
+
+### Bug Fixes
+
+* **i18n:** apply per-locale overlay corrections to tarkov.dev data ([27cd16d](https://github.com/tarkovtracker-org/TarkovTracker/commit/27cd16d86db0111d2c512894936159d68f2f9604))
+
+# [1.70.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.69.4...v1.70.0) (2026-08-14)
+
+
+### Bug Fixes
+
+* **i18n:** add pl and pt to llms.txt UI locales line ([973b5f2](https://github.com/tarkovtracker-org/TarkovTracker/commit/973b5f21b58f83194a7530a3ff0391f0e48295ab))
+* **settings:** apply review feedback to settings cards and locale copy ([49bfe5b](https://github.com/tarkovtracker-org/TarkovTracker/commit/49bfe5baed299b68806482d04357ed8627fdf7ab))
+* **settings:** canonicalize hidden prestige deep links and simplify routing ([cd685a2](https://github.com/tarkovtracker-org/TarkovTracker/commit/cd685a2e225f76c515c4e06f8f988f106f001c06))
+* **i18n:** enable Polish and Portuguese locales in supported list ([1049bdc](https://github.com/tarkovtracker-org/TarkovTracker/commit/1049bdce09f594796f4fa92b0ccc322ede38aa46))
+* **settings:** extract keybind listening indicator to reduce template complexity ([f8d66ba](https://github.com/tarkovtracker-org/TarkovTracker/commit/f8d66ba88b19db8ccde412080afbce73dd8b3df1))
+* **settings:** keep required skills visible when collapsed ([edbb774](https://github.com/tarkovtracker-org/TarkovTracker/commit/edbb774984e23db94983ee4ed749ce340e9460cb))
+* **ui:** label general preference switches ([94be44c](https://github.com/tarkovtracker-org/TarkovTracker/commit/94be44c5725f061ecdb2eeee3c806e87dccb14a5))
+* **ui:** preserve redirect path on login-required cards ([cf76e00](https://github.com/tarkovtracker-org/TarkovTracker/commit/cf76e00ec45e550b02e950b2fb10d7b064a4bdf1))
+* **settings:** preserve tab hash when redirecting hidden prestige route ([95acb33](https://github.com/tarkovtracker-org/TarkovTracker/commit/95acb33067bbb23ccc7253246a8e32cd11c04b72))
+* **ui:** refine settings navigation and locale support ([c1ef41b](https://github.com/tarkovtracker-org/TarkovTracker/commit/c1ef41b8343a829767acf6e499dae56f478fb0fa))
+* **ui:** remove inert tabindex from SkillsCard tooltip triggers ([1da1621](https://github.com/tarkovtracker-org/TarkovTracker/commit/1da16214b90658a218b264253e7c466cd118fc07))
+* **ui:** rewrite slider-thumb as scoped CSS utilities ([e3cb5cd](https://github.com/tarkovtracker-org/TarkovTracker/commit/e3cb5cddae0edda6c780585013ac341a8460ec6d))
+* **settings:** stop click propagation on skill tooltip triggers ([a6eed57](https://github.com/tarkovtracker-org/TarkovTracker/commit/a6eed57b73d9fb854133bc45ee219b13e1ceb1fc))
+* **settings:** use focusable non-actionable tooltip trigger in skills card ([fe01439](https://github.com/tarkovtracker-org/TarkovTracker/commit/fe0143954eb24c2cf2609140fc9360d35189aa5d))
+* **settings:** use native progress/output elements and sync locale docs ([0807914](https://github.com/tarkovtracker-org/TarkovTracker/commit/0807914fd712544b75ffa8ee60f14a51ebaf6a86))
+
+
+### Features
+
+* **ui:** centralize login-required states into LoginRequiredAlert ([4ef35be](https://github.com/tarkovtracker-org/TarkovTracker/commit/4ef35bef1264a2741587fb58acd58523402ca81a))
+* **ui:** improve settings page layout hierarchy and interaction feedback ([3af94d2](https://github.com/tarkovtracker-org/TarkovTracker/commit/3af94d2ca1181b8ea4108ef723bb22c85d98bc5b))
+
+## [1.69.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.69.3...v1.69.4) (2026-08-14)
+
+
+### Bug Fixes
+
+* **api:** harden gateway input validation and CORS caching ([b3f697e](https://github.com/tarkovtracker-org/TarkovTracker/commit/b3f697ec117212d6b85d56cb4f871bacb9311d2d))
+
+## [1.69.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.69.2...v1.69.3) (2026-08-12)
+
+## [1.69.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.69.1...v1.69.2) (2026-08-12)
+
+
+### Bug Fixes
+
+* **settings:** support Seasonal Tarkov.dev profile imports ([#712](https://github.com/tarkovtracker-org/TarkovTracker/issues/712)) ([4da4ddf](https://github.com/tarkovtracker-org/TarkovTracker/commit/4da4ddfdd761af5170650893373c5caf4e7a703f))
+
+## [1.69.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.69.0...v1.69.1) (2026-08-11)
+
+
+### Bug Fixes
+
+* **ui:** centralize scroll root route state ([49564ae](https://github.com/tarkovtracker-org/TarkovTracker/commit/49564ae1a37bfb4f512312fbd03ad977d2bd5453))
+* **ui:** respect active back-to-top scroll root ([ff0dd47](https://github.com/tarkovtracker-org/TarkovTracker/commit/ff0dd47b23af615602713ffa2f5a69a915f9edca))
+* **ui:** share main scroll container lookup ([56bd353](https://github.com/tarkovtracker-org/TarkovTracker/commit/56bd353c808f656b69147d41ff1b70238034bd18))
+* **ui:** track layout content scroll container in BackToTop ([edad24c](https://github.com/tarkovtracker-org/TarkovTracker/commit/edad24c664bb73ab8e3891c420a160239ffb2f3a))
+
+# [1.69.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.8...v1.69.0) (2026-08-11)
+
+
+### Bug Fixes
+
+* **ci:** preserve Lighthouse regression coverage ([8a9d4ee](https://github.com/tarkovtracker-org/TarkovTracker/commit/8a9d4ee6037fa837c1902ea18cbded1ae01c0a66))
+* **ci:** stabilize single-run Lighthouse gate ([ad18fd6](https://github.com/tarkovtracker-org/TarkovTracker/commit/ad18fd6f40185975a44831e5b70ca23cde9f837f))
+* **ci:** validate Lighthouse config changes ([71f28b6](https://github.com/tarkovtracker-org/TarkovTracker/commit/71f28b667a2e55456de21b193a7f64e0dae4ab8c))
+
+
+### Features
+
+* **tasks:** add buildWeapon containsAll mods to needed items ([#706](https://github.com/tarkovtracker-org/TarkovTracker/issues/706)) ([a13fa59](https://github.com/tarkovtracker-org/TarkovTracker/commit/a13fa5997f817ae081ce183d2db11ef827d41649)), closes [tarkovtracker-org/TarkovTracker#587](https://github.com/tarkovtracker-org/TarkovTracker/issues/587)
+
+
+### Performance Improvements
+
+* **ci:** reduce Lighthouse PR audit runs ([d468b5d](https://github.com/tarkovtracker-org/TarkovTracker/commit/d468b5d469ecf674821fc4e9da379fa834e0ee10))
+
+## [1.68.8](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.7...v1.68.8) (2026-08-11)
+
+
+### Bug Fixes
+
+* **ui:** clarify analytics consent status ([4adb7ef](https://github.com/tarkovtracker-org/TarkovTracker/commit/4adb7efb40b4d872380ea124ff53959a6839bf2d))
+
+## [1.68.7](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.6...v1.68.7) (2026-08-11)
+
+
+### Performance Improvements
+
+* **app:** fix CLS, LCP, and INP core web vitals ([#701](https://github.com/tarkovtracker-org/TarkovTracker/issues/701)) ([f29c84a](https://github.com/tarkovtracker-org/TarkovTracker/commit/f29c84a5421fe0fcdd0cc00970d21baafaa0f039))
+
+## [1.68.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.5...v1.68.6) (2026-08-11)
+
+
+### Bug Fixes
+
+* **ui:** align compact credit member cards ([#704](https://github.com/tarkovtracker-org/TarkovTracker/issues/704)) ([8ba8d4e](https://github.com/tarkovtracker-org/TarkovTracker/commit/8ba8d4ef1b9583b05a9a5e974b0c5541db16c460))
+
+## [1.68.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.4...v1.68.5) (2026-08-10)
+
+
+### Performance Improvements
+
+* **app:** remove spa-loading-template and LoadingScreen blocking layers ([#699](https://github.com/tarkovtracker-org/TarkovTracker/issues/699)) ([3142352](https://github.com/tarkovtracker-org/TarkovTracker/commit/31423527cf21e2d6d59f8ee00d15f5e74d06286f))
+
+## [1.68.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.3...v1.68.4) (2026-08-10)
+
+
+### Performance Improvements
+
+* **ui:** bundle all icons locally to eliminate Iconify CDN calls ([#698](https://github.com/tarkovtracker-org/TarkovTracker/issues/698)) ([d492bba](https://github.com/tarkovtracker-org/TarkovTracker/commit/d492bba56e33007884547cde8c74b9077ee67f6e))
+
+## [1.68.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.2...v1.68.3) (2026-08-10)
+
+
+### Bug Fixes
+
+* **hideout:** stop context menu event propagation before async queue ([#696](https://github.com/tarkovtracker-org/TarkovTracker/issues/696)) ([a4654a8](https://github.com/tarkovtracker-org/TarkovTracker/commit/a4654a80c8bb02f507d176a6afe0502d25842cf5))
+
+## [1.68.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.1...v1.68.2) (2026-08-10)
+
+
+### Performance Improvements
+
+* **hideout:** eliminate async component waterfalls and reduce initial render cost ([#695](https://github.com/tarkovtracker-org/TarkovTracker/issues/695)) ([b2299a9](https://github.com/tarkovtracker-org/TarkovTracker/commit/b2299a9913276d0e2beb7455c358632b1d17602d))
+
+## [1.68.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.68.0...v1.68.1) (2026-08-10)
+
+
+### Bug Fixes
+
+* **ui:** align contributor leaderboard rows ([#694](https://github.com/tarkovtracker-org/TarkovTracker/issues/694)) ([841210c](https://github.com/tarkovtracker-org/TarkovTracker/commit/841210cffb375694bef1fee3b48105dec602b24a))
+
+# [1.68.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.67.0...v1.68.0) (2026-08-10)
+
+
+### Features
+
+* **ui:** add official .org-vs-.io guide and video walkthroughs to resources ([#683](https://github.com/tarkovtracker-org/TarkovTracker/issues/683)) ([9d77252](https://github.com/tarkovtracker-org/TarkovTracker/commit/9d77252d2903f58de811d0df8e334953849ff750))
+
+# [1.67.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.66.0...v1.67.0) (2026-08-10)
+
+
+### Features
+
+* **api:** allow renaming API tokens ([#685](https://github.com/tarkovtracker-org/TarkovTracker/issues/685)) ([0cfac2c](https://github.com/tarkovtracker-org/TarkovTracker/commit/0cfac2cecc0b17e6d590fe798c99ba3e20094af6))
+
+# [1.66.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.65.0...v1.66.0) (2026-08-10)
+
+
+### Features
+
+* **api:** add read-only production database observer ([#667](https://github.com/tarkovtracker-org/TarkovTracker/issues/667)) ([24d3b41](https://github.com/tarkovtracker-org/TarkovTracker/commit/24d3b41942bf00c7cba4efa5549a5c16efee527e))
+
+# [1.65.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.64.2...v1.65.0) (2026-08-10)
+
+
+### Features
+
+* **ui:** improve credits and footer navigation ([#681](https://github.com/tarkovtracker-org/TarkovTracker/issues/681)) ([5d1940b](https://github.com/tarkovtracker-org/TarkovTracker/commit/5d1940b98b8809dbc9c4aa5c9acb61e2a55c80d2))
+
+## [1.64.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.64.1...v1.64.2) (2026-08-09)
+
+## [1.64.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.64.0...v1.64.1) (2026-08-08)
+
+# [1.64.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.63.3...v1.64.0) (2026-08-08)
+
+
+### Bug Fixes
+
+* **api:** revoke anon and authenticated EXECUTE on legacy share trigger ([#659](https://github.com/tarkovtracker-org/TarkovTracker/issues/659)) ([4db5e76](https://github.com/tarkovtracker-org/TarkovTracker/commit/4db5e76b1bb75723a4dce64b7cc4d252feeb0235))
+* **api:** stop blocking backfill and support missing mode rows ([a02f81c](https://github.com/tarkovtracker-org/TarkovTracker/commit/a02f81c197c55ce66ea1e9667b148b6221383675))
+
+
+### Features
+
+* **ui:** add GitHub avatar and profile link for Giribaldi_TTV ([ec72b83](https://github.com/tarkovtracker-org/TarkovTracker/commit/ec72b83d2b99d8299a3520564e7619b0151927d0))
+
+## [1.63.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.63.2...v1.63.3) (2026-08-06)
+
+
+### Bug Fixes
+
+* **api:** backfill normalized progress for accounts that predate the seasonal deploy ([#655](https://github.com/tarkovtracker-org/TarkovTracker/issues/655)) ([23d7cd1](https://github.com/tarkovtracker-org/TarkovTracker/commit/23d7cd12ded42b64fef751a0b27fa227bf832feb)), closes [#650](https://github.com/tarkovtracker-org/TarkovTracker/issues/650)
+
+## [1.63.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.63.1...v1.63.2) (2026-08-06)
+
+
+### Bug Fixes
+
+* **workers:** use a redirect mode workerd accepts for the active-season lookup ([#653](https://github.com/tarkovtracker-org/TarkovTracker/issues/653)) ([911d27a](https://github.com/tarkovtracker-org/TarkovTracker/commit/911d27acdf78297d05e2eed5cec569468d6a3972))
+
+## [1.63.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.63.0...v1.63.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* **api:** move the seasonal progress backfill out of the schema migration ([#649](https://github.com/tarkovtracker-org/TarkovTracker/issues/649)) ([02e019a](https://github.com/tarkovtracker-org/TarkovTracker/commit/02e019ae055a9bc397df3efc7292ba1a65045ded)), closes [#641](https://github.com/tarkovtracker-org/TarkovTracker/issues/641)
+
+# [1.63.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.62.3...v1.63.0) (2026-08-06)
+
+
+### Features
+
+* add Seasonal PvP game mode ([#641](https://github.com/tarkovtracker-org/TarkovTracker/issues/641)) ([5eabd39](https://github.com/tarkovtracker-org/TarkovTracker/commit/5eabd39f518a98bc240659e6c9bc43b06da306ac)), closes [#643](https://github.com/tarkovtracker-org/TarkovTracker/issues/643) [#644](https://github.com/tarkovtracker-org/TarkovTracker/issues/644) [#645](https://github.com/tarkovtracker-org/TarkovTracker/issues/645) [#646](https://github.com/tarkovtracker-org/TarkovTracker/issues/646) [#647](https://github.com/tarkovtracker-org/TarkovTracker/issues/647) [#648](https://github.com/tarkovtracker-org/TarkovTracker/issues/648)
+
+## [1.62.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.62.2...v1.62.3) (2026-08-03)
+
+## [1.62.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.62.1...v1.62.2) (2026-08-03)
+
+
+### Bug Fixes
+
+* **ui:** gate profile fetch buttons on Turnstile completion ([32ea531](https://github.com/tarkovtracker-org/TarkovTracker/commit/32ea53168c66b19105897b5816956905188218bf))
+
+## [1.62.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.62.0...v1.62.1) (2026-08-03)
+
+
+### Bug Fixes
+
+* **ui:** make Turnstile widget visible beside the profile fetch ([40a5027](https://github.com/tarkovtracker-org/TarkovTracker/commit/40a5027c2f818859d15968f1b88aa35daa34af9c))
+
+# [1.62.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.61.1...v1.62.0) (2026-08-03)
+
+
+### Features
+
+* **api:** harden Tarkov.dev profile imports ([#628](https://github.com/tarkovtracker-org/TarkovTracker/issues/628)) ([0e8baaf](https://github.com/tarkovtracker-org/TarkovTracker/commit/0e8baaf1b808dc7ce3983cb2ce4769d024be84bd))
+
+## [1.61.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.61.0...v1.61.1) (2026-08-03)
+
+
+### Bug Fixes
+
+* **release:** publish patch versions for refactors ([#617](https://github.com/tarkovtracker-org/TarkovTracker/issues/617)) ([f3c393d](https://github.com/tarkovtracker-org/TarkovTracker/commit/f3c393dd6f423b29c65a2e2d4317dd2b0d5d624d))
+* **ci:** require manual review for action bumps ([#627](https://github.com/tarkovtracker-org/TarkovTracker/issues/627)) ([423040b](https://github.com/tarkovtracker-org/TarkovTracker/commit/423040beeb8f5652f1e653a373415ea2d9012fcd))
+
+# [1.61.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.5...v1.61.0) (2026-07-31)
+
+
+### Features
+
+* **api:** add ETag/304 conditional reads and gzip to progress endpoints ([9d2ec7e](https://github.com/tarkovtracker-org/TarkovTracker/commit/9d2ec7edb87e9a8f67ce38b73cee64ccc3662232))
+
+## [1.60.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.4...v1.60.5) (2026-07-31)
+
+
+### Bug Fixes
+
+* **api:** bind token prefix to stored game mode, drop tt_ tokens ([#608](https://github.com/tarkovtracker-org/TarkovTracker/issues/608)) ([0f65796](https://github.com/tarkovtracker-org/TarkovTracker/commit/0f6579653337f75eb586bc14a5cc8efbdb9411b0))
+
+## [1.60.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.3...v1.60.4) (2026-07-29)
+
+
+### Performance Improvements
+
+* **api:** select only the active game mode blob on progress reads ([#590](https://github.com/tarkovtracker-org/TarkovTracker/issues/590)) ([6437bd0](https://github.com/tarkovtracker-org/TarkovTracker/commit/6437bd02b5eb407791f8b9717497f181319389b5)), closes [#589](https://github.com/tarkovtracker-org/TarkovTracker/issues/589)
+
+## [1.60.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.2...v1.60.3) (2026-07-29)
+
+
+### Bug Fixes
+
+* **api:** harden abuse-gate error logging ([#596](https://github.com/tarkovtracker-org/TarkovTracker/issues/596)) ([1b46103](https://github.com/tarkovtracker-org/TarkovTracker/commit/1b461036cd8561e4927893f7563c277a62d78f11))
+
+## [1.60.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.1...v1.60.2) (2026-07-27)
+
+
+### Bug Fixes
+
+* **deps:** pin postcss >=8.5.18 to patch directory traversal (SNYK-JS-POSTCSS-18313038) ([#605](https://github.com/tarkovtracker-org/TarkovTracker/issues/605)) ([5a2808b](https://github.com/tarkovtracker-org/TarkovTracker/commit/5a2808bfaedc4d02761fdddf50dedd7e1c49d04d)), closes [#603](https://github.com/tarkovtracker-org/TarkovTracker/issues/603) [#600](https://github.com/tarkovtracker-org/TarkovTracker/issues/600)
+
+## [1.60.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.60.0...v1.60.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* **api:** finish User-Agent rollout safeguards ([#581](https://github.com/tarkovtracker-org/TarkovTracker/issues/581)) ([123d641](https://github.com/tarkovtracker-org/TarkovTracker/commit/123d6414cde3f9cfdb15cebe08d0fdcabe5e1c71)), closes [#565](https://github.com/tarkovtracker-org/TarkovTracker/issues/565)
+
+# [1.60.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.59.4...v1.60.0) (2026-07-21)
+
+
+### Features
+
+* **api:** enforce inbound User-Agent and propagate shared UA to upstream fetches ([#572](https://github.com/tarkovtracker-org/TarkovTracker/issues/572)) ([90657a8](https://github.com/tarkovtracker-org/TarkovTracker/commit/90657a814fe78e3747b6bccbc81cfb484823883d))
+
 ## [1.59.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.59.3...v1.59.4) (2026-07-21)
 
 

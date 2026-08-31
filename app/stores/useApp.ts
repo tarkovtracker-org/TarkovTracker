@@ -1,27 +1,14 @@
 import { useStorage } from '@vueuse/core';
 import { defineStore } from 'pinia';
+import { SHELL_DRAWER_RAIL_STORAGE_KEY } from '@/utils/shellConfig';
 const state = () => ({
-  drawerRail: useStorage<boolean>('app_drawerRail', false),
+  drawerRail: useStorage<boolean>(SHELL_DRAWER_RAIL_STORAGE_KEY, false),
   drawerShow: useStorage<boolean>('app_drawerShow', true),
   mobileDrawerExpanded: false,
 });
 export const useAppStore = defineStore('app', {
   state,
-  getters: {
-    isDrawerRailMode(): boolean {
-      return this.drawerRail;
-    },
-  },
   actions: {
-    setDrawerShow(show: boolean) {
-      this.drawerShow = show;
-    },
-    toggleDrawerShow() {
-      this.drawerShow = !this.drawerShow;
-    },
-    setDrawerRail(val: boolean) {
-      this.drawerRail = val;
-    },
     toggleDrawerRail() {
       this.drawerRail = !this.drawerRail;
     },

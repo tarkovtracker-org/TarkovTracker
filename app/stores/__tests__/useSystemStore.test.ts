@@ -71,6 +71,21 @@ describe('useSystemStore', () => {
         };
         expect(getTeamIdFromState(state, GAME_MODES.PVE)).toBe('pve-team-456');
       });
+      it('should return seasonal_team_id for Seasonal mode', () => {
+        const state: SystemState = {
+          pvp_team_id: 'pvp-team-123',
+          seasonal_team_id: 'seasonal-team-789',
+        };
+        expect(getTeamIdFromState(state, GAME_MODES.SEASONAL)).toBe('seasonal-team-789');
+      });
+      it('should not fall back to a persistent team for Seasonal mode', () => {
+        const state: SystemState = {
+          pvp_team_id: 'pvp-team-123',
+          team: 'legacy-team-789',
+          team_id: 'legacy-team-id-999',
+        };
+        expect(getTeamIdFromState(state, GAME_MODES.SEASONAL)).toBeNull();
+      });
       it('should fall back to legacy team field if mode-specific field is missing', () => {
         const state: SystemState = {
           team: 'legacy-team-789',
@@ -85,10 +100,21 @@ describe('useSystemStore', () => {
         expect(getTeamIdFromState(state, GAME_MODES.PVP)).toBe('legacy-team-id-999');
         expect(getTeamIdFromState(state, GAME_MODES.PVE)).toBe('legacy-team-id-999');
       });
+      it('should not reuse a mode-specific team through legacy aliases in another mode', () => {
+        const state: SystemState = {
+          pvp_team_id: 'pvp-team-123',
+          pve_team_id: null,
+          team: 'pvp-team-123',
+          team_id: 'pvp-team-123',
+        };
+        expect(getTeamIdFromState(state, GAME_MODES.PVP)).toBe('pvp-team-123');
+        expect(getTeamIdFromState(state, GAME_MODES.PVE)).toBeNull();
+      });
       it('should return null if no team ID is found', () => {
         const state: SystemState = {};
         expect(getTeamIdFromState(state, GAME_MODES.PVP)).toBeNull();
         expect(getTeamIdFromState(state, GAME_MODES.PVE)).toBeNull();
+        expect(getTeamIdFromState(state, GAME_MODES.SEASONAL)).toBeNull();
       });
     });
     describe('hasTeamInState', () => {
@@ -102,6 +128,7 @@ describe('useSystemStore', () => {
         const state: SystemState = {};
         expect(hasTeamInState(state, GAME_MODES.PVP)).toBe(false);
         expect(hasTeamInState(state, GAME_MODES.PVE)).toBe(false);
+        expect(hasTeamInState(state, GAME_MODES.SEASONAL)).toBe(false);
       });
       it('should return true for legacy team field', () => {
         const state: SystemState = {
@@ -109,41 +136,6 @@ describe('useSystemStore', () => {
         };
         expect(hasTeamInState(state, GAME_MODES.PVP)).toBe(true);
       });
-    });
-  });
-  describe('Token Getters', () => {
-    /**
-     * NOTE: These tests verify the userTokens and userTokenCount getter logic.
-     * Pinia getters in the Nuxt test environment don't properly react to state changes,
-     * so we test the getter logic directly against different state configurations.
-     */
-    it('should return empty array when tokens is undefined', () => {
-      const store = useSystemStore();
-      const result = store.userTokens;
-      expect(result).toEqual([]);
-    });
-    it('should return token array when tokens exist', () => {
-      const store = useSystemStore();
-      const mockTokens = ['token1', 'token2'];
-      store.$patch({ tokens: mockTokens } as Partial<SystemState>);
-      // Verify state was updated
-      expect(store.$state.tokens).toEqual(mockTokens);
-      const result = store.userTokens;
-      expect(result).toEqual(mockTokens);
-    });
-    it('should return 0 count when no tokens', () => {
-      const store = useSystemStore();
-      const result = store.userTokenCount;
-      expect(result).toBe(0);
-    });
-    it('should return correct token count', () => {
-      const store = useSystemStore();
-      const mockTokens = ['token1', 'token2', 'token3'];
-      store.$patch({ tokens: mockTokens } as Partial<SystemState>);
-      // Verify state was updated
-      expect(store.$state.tokens).toEqual(mockTokens);
-      const result = store.userTokenCount;
-      expect(result).toBe(3);
     });
   });
 });

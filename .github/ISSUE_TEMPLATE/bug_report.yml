@@ -1,13 +1,12 @@
 name: Bug Report
 description: Report a bug or unexpected behavior
-title: "[Bug]: "
-labels: ["bug"]
+title: '[Bug]: '
+labels: ['bug']
 body:
   - type: markdown
     attributes:
       value: |
         Thanks for taking the time to report a bug! Please fill out the information below to help us investigate.
-
   - type: textarea
     id: description
     attributes:
@@ -16,7 +15,6 @@ body:
       placeholder: Tell us what you see!
     validations:
       required: true
-
   - type: textarea
     id: reproduction
     attributes:
@@ -29,7 +27,6 @@ body:
         4. See error
     validations:
       required: true
-
   - type: textarea
     id: expected
     attributes:
@@ -38,7 +35,6 @@ body:
       placeholder: Tell us what should have happened
     validations:
       required: true
-
   - type: textarea
     id: actual
     attributes:
@@ -47,7 +43,6 @@ body:
       placeholder: Tell us what actually happened
     validations:
       required: true
-
   - type: dropdown
     id: game-mode
     attributes:
@@ -60,24 +55,26 @@ body:
         - Not Applicable
     validations:
       required: true
-
   - type: dropdown
-    id: area
+    id: product-area
     attributes:
-      label: Technical Area
-      description: Which technical system is affected? (Maintainers will add area labels during triage)
+      label: Which area of TarkovTracker is affected?
       multiple: true
       options:
-        - UI/Frontend (Vue components, pages, styling)
-        - API (Server routes, workers, endpoints)
-        - Database (Supabase, queries, schema)
-        - Auth (Login, permissions, sessions)
-        - Realtime (Team sync, broadcasts)
-        - i18n (Translations)
-        - Not Sure
+        - Dashboard
+        - Tasks
+        - Hideout
+        - Needed items
+        - Maps
+        - Team
+        - Profile or account
+        - Login
+        - Settings
+        - API or integrations
+        - Translations
+        - Other / not sure
     validations:
-      required: false
-
+      required: true
   - type: textarea
     id: screenshots
     attributes:
@@ -86,7 +83,6 @@ body:
       placeholder: Drag and drop images here or paste URLs
     validations:
       required: false
-
   - type: input
     id: browser
     attributes:
@@ -95,7 +91,6 @@ body:
       placeholder: e.g., Chrome 120, Firefox 121, Safari 17
     validations:
       required: false
-
   - type: input
     id: discord
     attributes:
@@ -104,7 +99,6 @@ body:
       placeholder: username#1234
     validations:
       required: false
-
   - type: textarea
     id: additional
     attributes:

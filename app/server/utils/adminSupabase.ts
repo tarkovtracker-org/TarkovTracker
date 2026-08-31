@@ -1,5 +1,6 @@
-import { createError } from 'h3';
+import { createAdminError } from '@/server/utils/adminError';
 import { createLogger } from '@/server/utils/logger';
+import { ADMIN_ERROR_CODES } from '@/utils/adminErrors';
 const logger = createLogger('AdminSupabase');
 const SUPABASE_ADMIN_FETCH_TIMEOUT_MS = 5000;
 function isHttpError(error: unknown): error is { statusCode: number } {
@@ -8,6 +9,24 @@ function isHttpError(error: unknown): error is { statusCode: number } {
     error !== null &&
     typeof (error as { statusCode?: unknown }).statusCode === 'number'
   );
+}
+/**
+ * Normalize a configured Supabase base URL into a safe prefix for REST paths.
+ * Drops any query string or fragment and the trailing slash so appending
+ * `/rest/v1/...` cannot land after a `?` or `#`. Returns `''` when the value is
+ * missing, is not a parseable absolute URL, or does not use HTTPS so callers fail closed.
+ */
+export function normalizeSupabaseUrl(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== 'https:') return '';
+    url.search = '';
+    url.hash = '';
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return '';
+  }
 }
 /**
  * Shared Supabase REST helper for admin server routes. Uses the service-role
@@ -42,7 +61,11 @@ export async function adminSupabaseFetch<T>(
         status: response.status,
         body: body.slice(0, 300),
       });
-      throw createError({ statusCode: 502, message: 'Supabase request failed' });
+      throw createAdminError(
+        502,
+        ADMIN_ERROR_CODES.SUPABASE_REQUEST_FAILED,
+        'Supabase request failed'
+      );
     }
     if (response.status === 204) {
       return null;
@@ -57,7 +80,11 @@ export async function adminSupabaseFetch<T>(
       throw error;
     }
     logger.error('Supabase request failed', { path, error });
-    throw createError({ statusCode: 502, message: 'Supabase request failed' });
+    throw createAdminError(
+      502,
+      ADMIN_ERROR_CODES.SUPABASE_REQUEST_FAILED,
+      'Supabase request failed'
+    );
   } finally {
     clearTimeout(timeout);
   }

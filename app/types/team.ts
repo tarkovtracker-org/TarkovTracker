@@ -1,3 +1,4 @@
+import type { GameMode } from '@/utils/constants';
 /**
  * Team API response types
  */
@@ -7,6 +8,7 @@ export interface TeamData {
   maxMembers: number;
   ownerId: string;
   createdAt: string;
+  gameMode?: GameMode;
   joinCode?: string;
 }
 export interface CreateTeamResponse {
@@ -15,6 +17,10 @@ export interface CreateTeamResponse {
   team: TeamData;
 }
 export interface LeaveTeamResponse {
+  success: boolean;
+  message: string;
+}
+export interface DisbandTeamResponse {
   success: boolean;
   message: string;
 }

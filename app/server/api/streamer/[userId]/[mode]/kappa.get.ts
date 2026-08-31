@@ -8,8 +8,9 @@ import {
 } from 'h3';
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import { createLogger } from '@/server/utils/logger';
+import { getSharedCache, resolveSharedCacheOrigin } from '@/server/utils/sharedEdgeStore';
 import { computeStreamerKappaMetrics } from '@/server/utils/streamerKappa';
-import { API_GAME_MODES, GAME_MODES, type GameMode } from '@/utils/constants';
+import { API_GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
 import type {
   GameEdition,
   TarkovTaskObjectivesQueryResult,
@@ -49,13 +50,7 @@ type SharedProgressData = {
   taskObjectives: Record<string, TaskObjectiveProgress>;
 };
 const normalizeMode = (value: string | undefined): GameMode | null => {
-  if (value === GAME_MODES.PVE) {
-    return GAME_MODES.PVE;
-  }
-  if (value === GAME_MODES.PVP) {
-    return GAME_MODES.PVP;
-  }
-  return null;
+  return isGameMode(value) ? value : null;
 };
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -122,33 +117,9 @@ const buildSharedProfileRequestHeaders = (event: H3Event): Record<string, string
 const isFreshTimestamp = (timestamp: number): boolean => {
   return Date.now() - timestamp < EDITIONS_CACHE_TTL_MS;
 };
-const getSharedCache = (): Cache | null => {
-  const cacheStorage = (
-    globalThis as typeof globalThis & { caches?: CacheStorage & { default?: Cache } }
-  ).caches;
-  return cacheStorage?.default ?? null;
-};
 const getSharedCacheOrigin = (): { host: string; protocol: string } => {
   const runtimeConfig = useRuntimeConfig();
-  const appUrl = runtimeConfig?.public?.appUrl;
-  if (!appUrl) {
-    return { host: 'tarkovtracker.org', protocol: 'https:' };
-  }
-  try {
-    const parsedAppUrl = new URL(appUrl);
-    const hostname = parsedAppUrl.hostname;
-    const isLocalhost =
-      hostname === 'localhost' ||
-      hostname === '0.0.0.0' ||
-      hostname === '::1' ||
-      /^127\./.test(hostname);
-    if (isLocalhost) {
-      return { host: 'tarkovtracker.org', protocol: 'https:' };
-    }
-    return { host: parsedAppUrl.host, protocol: parsedAppUrl.protocol || 'https:' };
-  } catch {
-    return { host: 'tarkovtracker.org', protocol: 'https:' };
-  }
+  return resolveSharedCacheOrigin(runtimeConfig?.public?.appUrl);
 };
 const buildSharedEditionsCacheRequest = (): Request => {
   const { host, protocol } = getSharedCacheOrigin();
@@ -230,7 +201,9 @@ const getEditions = async (): Promise<GameEdition[]> => {
   }
   editionsFetchPromise = (async () => {
     try {
-      const overlay = await $fetch<{ editions?: Record<string, GameEdition> }>(OVERLAY_URL);
+      const overlay = await $fetch<{ editions?: Record<string, GameEdition> }>(OVERLAY_URL, {
+        redirect: 'error',
+      });
       const editions = overlay?.editions ? Object.values(overlay.editions) : [];
       if (editions.length > 0) {
         const entry: EditionsCachePayload = {

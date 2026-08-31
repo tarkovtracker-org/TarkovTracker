@@ -2,6 +2,7 @@ import { JSONPath } from 'jsonpath-plus';
 import { $fetch } from 'ofetch';
 import { useRuntimeConfig } from '#imports';
 import { createLogger } from '@/server/utils/logger';
+import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
 import { buildSkillImageUrl } from '@/utils/tarkovUrls';
 import type { ValidGameMode } from '@/server/utils/tarkov-cache-config';
 import type {
@@ -21,7 +22,9 @@ import type {
   TarkovTasksCoreQueryResult,
   Task,
   TaskObjective,
+  TaskTraderLevelRequirement,
   Trader,
+  TraderRequirement,
 } from '@/types/tarkov';
 const logger = createLogger('TarkovJson');
 const TARKOV_JSON_BASE_URL = 'https://json.tarkov.dev';
@@ -55,9 +58,7 @@ type TarkovJsonEnvelope<T = unknown> = {
   translations?: string[];
 };
 type TarkovJsonRequest = {
-  headers: {
-    Accept: string;
-  };
+  headers: Record<string, string>;
   timeout: number;
   retry: number;
 };
@@ -235,7 +236,7 @@ async function fetchEnvelopePayload(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await fetcher<unknown>(url, {
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', 'User-Agent': TARKOVTRACKER_USER_AGENT },
         timeout: timeoutMs,
         retry: 0,
       });
@@ -662,35 +663,6 @@ function adaptHideoutRef(value: unknown, context: AdapterContext) {
     name: typeof raw.name === 'string' ? raw.name : undefined,
   });
 }
-function inferObjectiveTypename(type: unknown): string | undefined {
-  if (typeof type !== 'string') return undefined;
-  const typenameByType: Record<string, string> = {
-    buildItem: 'TaskObjectiveBuildItem',
-    buildWeapon: 'TaskObjectiveBuildItem',
-    experience: 'TaskObjectiveExperience',
-    extract: 'TaskObjectiveExtract',
-    findItem: 'TaskObjectiveItem',
-    findQuestItem: 'TaskObjectiveQuestItem',
-    giveItem: 'TaskObjectiveItem',
-    giveQuestItem: 'TaskObjectiveQuestItem',
-    haveItem: 'TaskObjectiveItem',
-    hideoutStation: 'TaskObjectiveHideoutStation',
-    mark: 'TaskObjectiveMark',
-    playerLevel: 'TaskObjectivePlayerLevel',
-    plantItem: 'TaskObjectiveItem',
-    plantQuestItem: 'TaskObjectiveQuestItem',
-    questItem: 'TaskObjectiveQuestItem',
-    sellItem: 'TaskObjectiveItem',
-    shoot: 'TaskObjectiveShoot',
-    skill: 'TaskObjectiveSkill',
-    taskStatus: 'TaskObjectiveTaskStatus',
-    traderLevel: 'TaskObjectiveTraderLevel',
-    traderStanding: 'TaskObjectiveTraderStanding',
-    useItem: 'TaskObjectiveUseItem',
-    visit: 'TaskObjectiveBasic',
-  };
-  return typenameByType[type];
-}
 function adaptRequiredKeys(value: unknown, context: AdapterContext): TarkovItem[][] | undefined {
   if (!Array.isArray(value)) return undefined;
   return value
@@ -721,8 +693,6 @@ function adaptObjective(raw: JsonRecord, context: AdapterContext): TaskObjective
   return compactObject({
     ...raw,
     id: stringId(raw) ?? '',
-    __typename:
-      typeof raw.__typename === 'string' ? raw.__typename : inferObjectiveTypename(raw.type),
     maps: Array.isArray(raw.maps)
       ? raw.maps.map((map) => adaptMapRef(map, context)).filter(Boolean)
       : undefined,
@@ -788,8 +758,56 @@ function adaptTraderRequirement(raw: unknown, context: AdapterContext) {
     trader: adaptTraderRef(raw.trader, context),
   });
 }
-// json.tarkov.dev serializes requiredPrestige as a bare Prestige id string, while
-// the GraphQL API returns an object ref. Accept both.
+const onlyIfPopulated = <T>(items: T[]): T[] | undefined => (items.length > 0 ? items : undefined);
+function readFiniteLevel(adapted: TraderRequirement & { level?: number }): number | undefined {
+  const level = adapted.level ?? adapted.value;
+  return typeof level === 'number' && Number.isFinite(level) ? level : undefined;
+}
+function pushTraderRequirement(
+  adapted: (TraderRequirement & { level?: number }) | undefined,
+  traderLevelRequirements: TaskTraderLevelRequirement[],
+  traderRequirements: TraderRequirement[]
+): void {
+  if (!adapted) return;
+  if (adapted.requirementType !== 'level') {
+    traderRequirements.push(adapted);
+    return;
+  }
+  const level = readFiniteLevel(adapted);
+  if (level === undefined) return;
+  traderLevelRequirements.push({
+    id: adapted.id,
+    trader: adapted.trader,
+    level,
+    requirementType: 'level',
+    compareMethod: adapted.compareMethod,
+  });
+}
+function adaptTraderRequirements(
+  raw: unknown,
+  context: AdapterContext
+): {
+  traderLevelRequirements?: TaskTraderLevelRequirement[];
+  traderRequirements?: TraderRequirement[];
+} {
+  if (!Array.isArray(raw)) return {};
+  const traderLevelRequirements: TaskTraderLevelRequirement[] = [];
+  const traderRequirements: TraderRequirement[] = [];
+  for (const requirement of raw) {
+    pushTraderRequirement(
+      adaptTraderRequirement(requirement, context) as
+        (TraderRequirement & { level?: number }) | undefined,
+      traderLevelRequirements,
+      traderRequirements
+    );
+  }
+  return {
+    traderLevelRequirements: onlyIfPopulated(traderLevelRequirements),
+    traderRequirements: onlyIfPopulated(traderRequirements),
+  };
+}
+// json.tarkov.dev may serialize requiredPrestige as a bare id string or as an object ref.
+// Accept both shapes.
 function adaptRequiredPrestigeRef(value: unknown): { id: string } | undefined {
   if (typeof value === 'string' && value) return { id: value };
   if (isRecord(value) && value.id != null) return { id: String(value.id) };
@@ -813,9 +831,7 @@ function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
       : undefined,
     objectives: [],
     failConditions: [],
-    traderRequirements: Array.isArray(raw.traderRequirements)
-      ? raw.traderRequirements.map((requirement) => adaptTraderRequirement(requirement, context))
-      : undefined,
+    ...adaptTraderRequirements(raw.traderRequirements, context),
     factionName: typeof raw.factionName === 'string' ? raw.factionName : undefined,
   }) as Task;
 }

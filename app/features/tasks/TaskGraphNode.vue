@@ -114,7 +114,7 @@
       </span>
       <div class="text-surface-400 flex items-center gap-1.5 text-[10px]">
         <span v-if="data.minPlayerLevel > 0">
-          {{ t('page.tasks.graph.node_level', { level: data.minPlayerLevel }) }}
+          {{ t('common.lvl_level', { level: data.minPlayerLevel }) }}
         </span>
         <span
           v-if="data.kappaRequired"

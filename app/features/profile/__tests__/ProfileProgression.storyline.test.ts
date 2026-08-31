@@ -69,6 +69,8 @@ vi.mock('@/stores/useTarkov', () => ({
     setStoryObjectiveUncomplete: setStoryObjectiveUncompleteMock,
     getCurrentGameMode: () => 'pvp',
     getGameEdition: () => 1,
+    getModeProgressData: (mode: 'pvp' | 'pve' | 'seasonal') =>
+      createProgressData(mode === 'pvp' ? pvpOverrides : mode === 'pve' ? pveOverrides : {}),
     getPvPProgressData: () => createProgressData(pvpOverrides),
     getPvEProgressData: () => createProgressData(pveOverrides),
     getDisplayName: () => 'User',

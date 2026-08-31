@@ -91,11 +91,15 @@ export interface TraderRequirement {
   id: string;
   trader: { id: string; name: string };
   value: number;
+  requirementType?: 'level' | 'reputation';
+  compareMethod?: '>=' | '<' | '<=' | '>';
 }
 export interface TaskTraderLevelRequirement {
   id: string;
   trader: { id: string; name: string };
   level: number;
+  requirementType?: 'level' | 'reputation';
+  compareMethod?: '>=' | '<' | '<=' | '>';
 }
 export interface TraderLevelRequirementWithMet extends TaskTraderLevelRequirement {
   met: boolean;
@@ -133,7 +137,6 @@ export interface HideoutModule extends HideoutLevel {
 }
 export interface TaskObjective {
   id: string;
-  __typename?: string;
   description?: string;
   location?: { id: string; name?: string };
   maps?: { id: string; name?: string }[];
@@ -385,9 +388,10 @@ export interface StoryChapter {
 }
 export interface MemberProfile {
   displayName: string | null;
+  gameEdition?: number;
+  gameMode?: import('@/utils/constants').GameMode;
   level: number | null;
   tasksCompleted: number | null;
-  gameMode?: 'pvp' | 'pve';
 }
 // Query Result Types
 export interface TarkovDataQueryResult {
@@ -440,6 +444,13 @@ export interface NeededItemTaskObjective extends NeededItemBase {
    * the UI can show that alternatives are allowed.
    */
   acceptedItems?: TarkovItem[];
+  /**
+   * Objective this need was derived from, when `id` is synthetic rather than a
+   * real objective id (e.g. one need per `containsAll` weapon-build mod). Set
+   * only on derived needs; use it for lookups keyed by real objective ids, such
+   * as `objectiveCompletions`, while `id` stays the progress key.
+   */
+  sourceObjectiveId?: string;
 }
 export interface NeededItemHideoutModule extends NeededItemBase {
   needType: 'hideoutModule';
@@ -506,24 +517,22 @@ export interface StaticMapData {
 // Store Types
 export interface SystemState extends StateTree {
   user_id?: string | null;
-  tokens?: string[];
   team?: string | null;
   // Keep raw team_id from Supabase for backwards/compat and reactivity
   team_id?: string | null;
   // Game-mode-specific team IDs
   pvp_team_id?: string | null;
   pve_team_id?: string | null;
+  seasonal_team_id?: string | null;
   // Admin status
   is_admin?: boolean;
 }
 export interface SystemGetters extends _GettersTree<SystemState> {
-  userTokens: (state: SystemState) => string[];
-  userTokenCount: (state: SystemState) => number;
   userTeam: (state: SystemState) => string | null;
-  userTeamIsOwn: (state: SystemState) => boolean;
   isAdmin: (state: SystemState) => boolean;
 }
 export interface TeamState extends StateTree {
+  id?: string | null;
   owner?: string | null;
   joinCode?: string | null;
   members?: string[];

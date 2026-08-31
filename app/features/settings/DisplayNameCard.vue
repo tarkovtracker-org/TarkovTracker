@@ -3,7 +3,7 @@
     icon="mdi-gamepad-variant"
     icon-color="accent"
     highlight-color="accent"
-    :title="$t('settings.game_settings.title')"
+    :title="$t('common.game_settings')"
     title-classes="text-lg font-semibold"
   >
     <template #content>
@@ -17,7 +17,7 @@
               <UIcon name="i-mdi-information" class="text-surface-400 h-4 w-4" />
             </UTooltip>
           </div>
-          <div class="grid gap-3 md:grid-cols-2">
+          <div class="grid gap-3 lg:grid-cols-3">
             <form
               v-for="mode in DISPLAY_NAME_MODES"
               :key="mode"
@@ -34,6 +34,14 @@
                   >
                     {{ getModeLabel(mode) }}
                   </label>
+                  <UBadge
+                    v-if="currentGameMode === mode"
+                    :color="getModeColor(mode)"
+                    variant="soft"
+                    size="xs"
+                  >
+                    {{ $t('settings.display_name.active_mode', 'Active') }}
+                  </UBadge>
                 </div>
                 <UFormField
                   :name="`${mode}-display-name`"
@@ -52,7 +60,7 @@
                     <UButton
                       type="submit"
                       icon="i-mdi-check"
-                      :color="mode"
+                      :color="getModeColor(mode)"
                       variant="soft"
                       size="sm"
                       class="min-w-24"
@@ -69,12 +77,24 @@
         </section>
         <div class="h-px bg-white/6" />
         <section class="max-w-sm space-y-2">
-          <label
-            :for="gameEditionInputId"
-            class="text-surface-200 block cursor-pointer text-sm font-semibold"
-          >
-            {{ $t('settings.game_profile.game_edition') }}
-          </label>
+          <div class="flex items-center gap-2">
+            <label
+              :for="gameEditionInputId"
+              class="text-surface-200 block cursor-pointer text-sm font-semibold"
+            >
+              {{ $t('common.game_edition') }}
+            </label>
+            <UTooltip
+              :text="
+                $t(
+                  'settings.display_name.game_edition_hint',
+                  'Select the game edition you own so tracking matches your available content.'
+                )
+              "
+            >
+              <UIcon name="i-mdi-information" class="text-surface-400 h-4 w-4" />
+            </UTooltip>
+          </div>
           <SelectMenuFixed
             :id="gameEditionInputId"
             v-model="selectedGameEdition"
@@ -94,12 +114,13 @@
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import { GAME_MODES, type GameMode } from '@/utils/constants';
+  import { GAME_MODE_UI, GAME_MODES, type GameMode } from '@/utils/constants';
   import { LIMITS } from '@/utils/constants';
   import { logger } from '@/utils/logger';
   const DISPLAY_NAME_MODES = [
     GAME_MODES.PVP,
     GAME_MODES.PVE,
+    GAME_MODES.SEASONAL,
   ] as const satisfies readonly GameMode[];
   type DisplayNameMode = (typeof DISPLAY_NAME_MODES)[number];
   const { t } = useI18n({ useScope: 'global' });
@@ -113,9 +134,15 @@
   const localDisplayNames = reactive<Record<DisplayNameMode, string>>({
     [GAME_MODES.PVP]: '',
     [GAME_MODES.PVE]: '',
+    [GAME_MODES.SEASONAL]: '',
   });
   const getDisplayNameInputId = (mode: DisplayNameMode) => `settings-display-name-input-${mode}`;
-  const getModeLabel = (mode: DisplayNameMode) => t(`settings.game_settings.${mode}`);
+  const getModeLabel = (mode: DisplayNameMode) => {
+    if (mode === GAME_MODES.PVE) return t('common.pve');
+    if (mode === GAME_MODES.SEASONAL) return t('common.seasonal_pvp');
+    return t('common.pvp');
+  };
+  const getModeColor = (mode: DisplayNameMode) => GAME_MODE_UI[mode].color;
   const getStoredDisplayName = (mode: DisplayNameMode) =>
     tarkovStore.getModeDisplayName(mode) || '';
   const getDisplayNameValidationError = (mode: DisplayNameMode) => {
@@ -138,23 +165,30 @@
     const trimmed = localDisplayNames[mode].trim();
     return trimmed !== getStoredDisplayName(mode) && trimmed.length > 0;
   };
-  const getModeBadgeClass = (mode: DisplayNameMode) =>
-    mode === GAME_MODES.PVE
-      ? 'border-pve-500/30 bg-pve-700/25 text-pve-200'
-      : 'border-pvp-500/30 bg-pvp-700/25 text-pvp-200';
+  const getModeBadgeClass = (mode: DisplayNameMode) => {
+    if (mode === GAME_MODES.PVE) return 'border-pve-500/30 bg-pve-700/25 text-pve-200';
+    if (mode === GAME_MODES.SEASONAL) {
+      return 'border-warning-500/30 bg-warning-700/20 text-warning-200';
+    }
+    return 'border-pvp-500/30 bg-pvp-700/25 text-pvp-200';
+  };
   const getModePanelClass = (mode: DisplayNameMode) => {
     if (currentGameMode.value !== mode) {
       return 'border-white/8 bg-surface-950/40';
     }
-    return mode === GAME_MODES.PVE
-      ? 'border-pve-500/30 bg-pve-950/15 ring-1 ring-pve-500/20'
-      : 'border-pvp-500/30 bg-pvp-950/15 ring-1 ring-pvp-500/20';
+    if (mode === GAME_MODES.PVE) {
+      return 'border-pve-500/30 bg-pve-950/15 ring-1 ring-pve-500/20';
+    }
+    if (mode === GAME_MODES.SEASONAL) {
+      return 'border-warning-500/30 bg-warning-950/15 ring-1 ring-warning-500/20';
+    }
+    return 'border-pvp-500/30 bg-pvp-950/15 ring-1 ring-pvp-500/20';
   };
   const saveDisplayName = (mode: DisplayNameMode) => {
     const validationError = getDisplayNameValidationError(mode);
     if (validationError) {
       toast.add({
-        title: t('settings.display_name.validation_error'),
+        title: t('common.validation_error'),
         description: validationError,
         color: 'error',
       });

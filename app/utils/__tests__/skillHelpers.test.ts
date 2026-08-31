@@ -1,9 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildSkillKeyAliases,
   collapseSkillOffsets,
   getCanonicalSkillKey,
   normalizeSkillToken,
+  readSkillObjective,
+  resolveSkillKey,
 } from '@/utils/skillHelpers';
+import type { Task, TaskObjective } from '@/types/tarkov';
+const skillObjective = (overrides: Partial<TaskObjective> = {}): TaskObjective => ({
+  id: 'objective-1',
+  type: 'skill',
+  skillLevel: {
+    id: 'skill-requirement-1',
+    name: 'Vitality',
+    level: 5,
+    skill: { id: 'Vitality', name: 'Vitality', imageLink: 'https://example.com/vitality.webp' },
+  },
+  ...overrides,
+});
 describe('normalizeSkillToken', () => {
   it('returns null for null', () => {
     expect(normalizeSkillToken(null)).toBeNull();
@@ -45,6 +60,201 @@ describe('getCanonicalSkillKey', () => {
   });
   it('returns null when both are empty', () => {
     expect(getCanonicalSkillKey('', '')).toBeNull();
+  });
+});
+describe('readSkillObjective', () => {
+  it('reads name, id, level and image from a skill objective', () => {
+    expect(readSkillObjective(skillObjective())).toEqual({
+      skillKey: 'Vitality',
+      skillName: 'Vitality',
+      skillId: 'Vitality',
+      requiredLevel: 5,
+      imageLink: 'https://example.com/vitality.webp',
+    });
+  });
+  it.each(['giveItem', 'findQuestItem', 'shoot', 'visit', 'taskStatus', 'playerLevel'])(
+    'ignores the %s objective type',
+    (type) => {
+      expect(readSkillObjective(skillObjective({ type }))).toBeNull();
+    }
+  );
+  it('ignores an objective with no type', () => {
+    expect(readSkillObjective(skillObjective({ type: undefined }))).toBeNull();
+  });
+  it('ignores a skill objective with no skillLevel', () => {
+    expect(readSkillObjective(skillObjective({ skillLevel: undefined }))).toBeNull();
+  });
+  it('ignores a skill objective with a blank skill name', () => {
+    const objective = skillObjective();
+    objective.skillLevel = { id: 'req', name: '', level: 5 };
+    expect(readSkillObjective(objective)).toBeNull();
+  });
+  it('ignores a whitespace-only skill name that has no usable id', () => {
+    const objective = skillObjective();
+    objective.skillLevel = { id: 'req', name: '   ', level: 5 };
+    expect(readSkillObjective(objective)).toBeNull();
+  });
+  it('ignores a whitespace-only skill name even when a nested skill id exists', () => {
+    const objective = skillObjective();
+    objective.skillLevel = {
+      id: 'req',
+      name: '   ',
+      level: 5,
+      skill: { id: 'endurance', name: 'Endurance' },
+    };
+    expect(readSkillObjective(objective)).toBeNull();
+  });
+  it('falls back to the skill name when the nested skill ref is absent', () => {
+    const objective = skillObjective();
+    objective.skillLevel = { id: 'req', name: 'Endurance', level: 3 };
+    expect(readSkillObjective(objective)).toMatchObject({
+      skillKey: 'Endurance',
+      skillName: 'Endurance',
+      skillId: undefined,
+      requiredLevel: 3,
+      imageLink: undefined,
+    });
+  });
+  it('prefers the nested skill id over the name as the canonical key', () => {
+    const objective = skillObjective();
+    objective.skillLevel = {
+      id: 'req',
+      name: 'Vitalität',
+      level: 2,
+      skill: { id: 'Vitality', name: 'Vitality' },
+    };
+    expect(readSkillObjective(objective)).toMatchObject({
+      skillKey: 'Vitality',
+      skillName: 'Vitalität',
+    });
+  });
+  it('defaults a missing level to 0', () => {
+    const objective = skillObjective();
+    objective.skillLevel = { id: 'req', name: 'Strength', level: 0 };
+    expect(readSkillObjective(objective)?.requiredLevel).toBe(0);
+  });
+});
+describe('buildSkillKeyAliases', () => {
+  it('returns an empty map for tasks with no objectives or rewards', () => {
+    expect(buildSkillKeyAliases([{ id: 'task-1', name: 'Debut' }] as Task[]).size).toBe(0);
+  });
+  it('aliases the localized name and the id onto the canonical key', () => {
+    const tasks = [
+      {
+        id: 'task-1',
+        name: 'Debut',
+        objectives: [
+          {
+            id: 'objective-1',
+            type: 'skill',
+            skillLevel: {
+              id: 'req',
+              name: 'Vitalität',
+              level: 5,
+              skill: { id: 'Vitality', name: 'Vitality' },
+            },
+          },
+        ],
+      },
+    ] as Task[];
+    const aliases = buildSkillKeyAliases(tasks);
+    expect(aliases.get('Vitalität')).toBe('Vitality');
+    expect(aliases.get('Vitality')).toBe('Vitality');
+  });
+  it('skips non-skill objectives', () => {
+    const tasks = [
+      {
+        id: 'task-1',
+        name: 'Debut',
+        objectives: [
+          { id: 'objective-1', type: 'giveItem', items: [{ id: 'item-1', name: 'Salewa' }] },
+        ],
+      },
+    ] as Task[];
+    expect(buildSkillKeyAliases(tasks).size).toBe(0);
+  });
+  it('aliases skill level rewards as well as objectives', () => {
+    const tasks = [
+      {
+        id: 'task-1',
+        name: 'Debut',
+        objectives: [],
+        finishRewards: {
+          skillLevelReward: [
+            { name: 'Stärke', level: 1, skill: { id: 'Strength', name: 'Strength' } },
+          ],
+        },
+      },
+    ] as Task[];
+    const aliases = buildSkillKeyAliases(tasks);
+    expect(aliases.get('Stärke')).toBe('Strength');
+    expect(aliases.get('Strength')).toBe('Strength');
+  });
+  it('ignores rewards with no name', () => {
+    const tasks = [
+      {
+        id: 'task-1',
+        name: 'Debut',
+        objectives: [],
+        finishRewards: { skillLevelReward: [{ name: '', level: 1 }] },
+      },
+    ] as unknown as Task[];
+    expect(buildSkillKeyAliases(tasks).size).toBe(0);
+  });
+  it('ignores rewards with a whitespace-only name and no skill id', () => {
+    const tasks = [
+      {
+        id: 'task-1',
+        name: 'Debut',
+        objectives: [],
+        finishRewards: { skillLevelReward: [{ name: '   ', level: 1 }] },
+      },
+    ] as unknown as Task[];
+    expect(buildSkillKeyAliases(tasks).size).toBe(0);
+  });
+  it('merges aliases across multiple tasks', () => {
+    const tasks = [
+      {
+        id: 'task-1',
+        name: 'Debut',
+        objectives: [
+          {
+            id: 'objective-1',
+            type: 'skill',
+            skillLevel: { id: 'req', name: 'Vitality', level: 5 },
+          },
+        ],
+      },
+      {
+        id: 'task-2',
+        name: 'Shootout Picnic',
+        objectives: [
+          {
+            id: 'objective-2',
+            type: 'skill',
+            skillLevel: { id: 'req', name: 'Endurance', level: 2 },
+          },
+        ],
+      },
+    ] as Task[];
+    const aliases = buildSkillKeyAliases(tasks);
+    expect(aliases.get('Vitality')).toBe('Vitality');
+    expect(aliases.get('Endurance')).toBe('Endurance');
+  });
+});
+describe('resolveSkillKey', () => {
+  it('returns the original name when it is empty or whitespace-only', () => {
+    const aliases = new Map<string, string>([['Strength', 'Strength']]);
+    expect(resolveSkillKey('', aliases)).toBe('');
+    expect(resolveSkillKey('   ', aliases)).toBe('   ');
+  });
+  it('falls back to the normalized name when no alias exists', () => {
+    const aliases = new Map<string, string>();
+    expect(resolveSkillKey('Endurance', aliases)).toBe('Endurance');
+  });
+  it('returns an alias when present', () => {
+    const aliases = new Map<string, string>([['Starke', 'Strength']]);
+    expect(resolveSkillKey('Starke', aliases)).toBe('Strength');
   });
 });
 describe('collapseSkillOffsets', () => {

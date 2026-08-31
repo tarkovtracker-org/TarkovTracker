@@ -20,31 +20,28 @@ to decide which detailed file(s) to read for a given question.
 
 ## Documents in This Knowledge Base
 
-| File               | Purpose                                                                                     | Read when you need…                       |
-| ------------------ | ------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `index.md`         | This file — navigation + routing                                                            | To orient and decide what to read         |
-| `codebase_info.md` | Stack, directory map, feature slices, tooling, hierarchical diagram                         | A structural overview / where code lives  |
-| `architecture.md`  | System architecture, patterns, state model, sync, caching, security                         | How the system fits together and _why_    |
-| `components.md`    | Major components (stores, composables, server utils, features, worker) and responsibilities | What a specific module/component does     |
-| `interfaces.md`    | HTTP endpoints, public API gateway, Edge Functions, MCP servers, integration points         | Request/response shapes and boundaries    |
-| `data_models.md`   | Core TypeScript types and Supabase data model                                               | Data shapes (Task, progress, DB tables)   |
-| `workflows.md`     | Key processes: data fetch, sync, auth, teams, imports, payments, deploy                     | How an end-to-end flow works step by step |
-| `dependencies.md`  | External dependencies and how/why they are used                                             | Why a library is present / its role       |
-| `review_notes.md`  | Consistency + completeness review and recommendations                                       | Known gaps and doc-quality caveats        |
+| File              | Purpose                                                                                     | Read when you need…                       |
+| ----------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `index.md`        | This file — navigation + routing                                                            | To orient and decide what to read         |
+| `components.md`   | Major components (stores, composables, server utils, features, worker) and responsibilities | What a specific module/component does     |
+| `interfaces.md`   | HTTP endpoints, public API gateway, Edge Functions, MCP servers, integration points         | Request/response shapes and boundaries    |
+| `data_models.md`  | Core TypeScript types and Supabase data model                                               | Data shapes (Task, progress, DB tables)   |
+| `workflows.md`    | Key processes: data fetch, sync, auth, teams, imports, payments, deploy                     | How an end-to-end flow works step by step |
+| `dependencies.md` | External dependencies and how/why they are used                                             | Why a library is present / its role       |
 
 ## Question Routing
 
-| If the question is about…                             | Read                                                           |
-| ----------------------------------------------------- | -------------------------------------------------------------- |
-| "Where does X live?" / project structure              | `codebase_info.md`                                             |
-| "How is state managed?" / sync / conflict resolution  | `architecture.md`, `components.md`, `workflows.md`             |
-| "What does this store/composable/util do?"            | `components.md`                                                |
-| "What endpoints exist?" / API contract / rate limits  | `interfaces.md`, `workflows.md`                                |
-| "What fields does a Task / progress record have?"     | `data_models.md`                                               |
-| "How does login / team join / import / payment work?" | `workflows.md`                                                 |
-| "Why is dependency Y here?" / build tooling           | `dependencies.md`                                              |
-| "What conventions/guardrails must I follow?"          | root `AGENTS.md`, `docs/agent-context/style-and-validation.md` |
-| Environment variables                                 | `architecture.md` + `docs/ARCHITECTURE.md` (canonical env map) |
+| If the question is about…                             | Read                                       |
+| ----------------------------------------------------- | ------------------------------------------ |
+| "Where does X live?" / project structure              | root `AGENTS.md` (Project Map section)     |
+| "How is state managed?" / sync / conflict resolution  | `components.md`, `workflows.md`            |
+| "What does this store/composable/util do?"            | `components.md`                            |
+| "What endpoints exist?" / API contract / rate limits  | `interfaces.md`, `workflows.md`            |
+| "What fields does a Task / progress record have?"     | `data_models.md`                           |
+| "How does login / team join / import / payment work?" | `workflows.md`                             |
+| "Why is dependency Y here?" / build tooling           | `dependencies.md`                          |
+| "What conventions/guardrails must I follow?"          | root `AGENTS.md`                           |
+| Environment variables                                 | `docs/ARCHITECTURE.md` (canonical env map) |
 
 ## Cross-References (Repository Docs)
 
@@ -53,31 +50,24 @@ These generated docs complement — and do not replace — the hand-maintained d
 - Root `AGENTS.md` — canonical agent contract (commands, hard rules, conventions).
 - `docs/ARCHITECTURE.md` — authoritative architecture + canonical environment variable map.
 - `docs/API.md` — authoritative API reference (endpoints, caching, languages, game modes).
-- `docs/agent-context/README.md` + `style-and-validation.md` — task-oriented agent guidance.
-- `.github/CONTRIBUTING.md`, `docs/runbook.md`, `docs/WORKFLOW_AUTOMATION.md`,
-  `docs/agent-context/codex-analytics-setup.md`, `DESIGN.md`.
+- `docs/agent-context/codex-analytics-setup.md` — Codex/MCP analytics access (GA4, Clarity, Cloudflare).
+- `.github/CONTRIBUTING.md`, `docs/runbook.md`, `docs/WORKFLOW_AUTOMATION.md`, `DESIGN.md`.
 
 ## Relationships Between Documents
 
 ```mermaid
 graph LR
-    Index[index.md] --> Info[codebase_info.md]
-    Index --> Arch[architecture.md]
-    Index --> Comp[components.md]
+    Index[index.md] --> Comp[components.md]
     Index --> Iface[interfaces.md]
     Index --> Data[data_models.md]
     Index --> Flow[workflows.md]
     Index --> Deps[dependencies.md]
-    Index --> Review[review_notes.md]
 
-    Arch --> Comp
-    Arch --> Flow
     Comp --> Iface
     Comp --> Data
     Iface --> Data
     Flow --> Iface
 
-    Arch -. summarizes .-> ARCH[docs/ARCHITECTURE.md]
     Iface -. summarizes .-> API[docs/API.md]
 ```
 

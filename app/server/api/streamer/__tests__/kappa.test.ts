@@ -154,6 +154,10 @@ describe('Streamer Kappa API', () => {
       'no-store, max-age=0'
     );
     expect(mockComputeStreamerKappaMetrics).toHaveBeenCalled();
+    expect(mockDollarFetch).toHaveBeenCalledWith(
+      expect.stringContaining('tarkov-data-overlay/main/dist/overlay.json'),
+      { redirect: 'error' }
+    );
     expect(result).toMatchObject({
       displayName: 'PublicPlayer',
       items: { collected: 10, percentage: 50, remaining: 10, total: 20 },

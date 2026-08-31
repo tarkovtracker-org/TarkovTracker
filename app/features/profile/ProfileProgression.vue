@@ -1,6 +1,6 @@
 <template>
   <div class="min-h-[calc(100vh-250px)] px-3 py-6 sm:px-6">
-    <div class="mx-auto max-w-[1400px] space-y-4 sm:space-y-6">
+    <div class="mx-auto max-w-350 space-y-4 sm:space-y-6">
       <section
         class="bg-surface-900 relative overflow-hidden rounded-xl border border-white/10 p-4 shadow-md sm:p-6"
       >
@@ -34,7 +34,7 @@
                   class="bg-info-700/25 text-info-200 border-info-500/30 hover:bg-info-700/40 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium transition-colors"
                 >
                   <UIcon name="i-mdi-open-in-new" class="h-3 w-3" />
-                  {{ t('page.profile.view_tarkov_dev') }}
+                  {{ t('common.view_on_tarkov_dev', 'View on Tarkov.dev') }}
                 </NuxtLink>
               </div>
               <p class="text-surface-300 text-sm sm:text-base">
@@ -59,7 +59,7 @@
                 @click="selectedMode = GAME_MODES.PVP"
               >
                 <UIcon name="i-mdi-sword-cross" class="h-3.5 w-3.5 shrink-0" />
-                <span class="leading-none">PvP</span>
+                <span class="leading-none">{{ t('common.pvp', 'PvP') }}</span>
               </button>
               <button
                 type="button"
@@ -69,7 +69,19 @@
                 @click="selectedMode = GAME_MODES.PVE"
               >
                 <UIcon name="i-mdi-account-group" class="h-3.5 w-3.5 shrink-0" />
-                <span class="leading-none">PvE</span>
+                <span class="leading-none">{{ t('common.pve', 'PvE') }}</span>
+              </button>
+              <button
+                type="button"
+                :aria-pressed="selectedMode === GAME_MODES.SEASONAL"
+                class="focus:ring-warning-400 flex min-h-8 flex-1 items-center justify-center gap-1.5 px-2 py-2 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:outline-none"
+                :class="seasonalToggleClass"
+                @click="selectedMode = GAME_MODES.SEASONAL"
+              >
+                <UIcon name="i-mdi-calendar-star" class="h-3.5 w-3.5 shrink-0" />
+                <span class="leading-none">
+                  {{ t('profile.season_short', { season: ACTIVE_SEASON_NUMBER }, 'S{season}') }}
+                </span>
               </button>
             </div>
             <div class="flex flex-wrap gap-2">
@@ -247,10 +259,16 @@
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import { GAME_MODES, type GameMode } from '@/utils/constants';
+  import { ACTIVE_SEASON_NUMBER, GAME_MODES, type GameMode } from '@/utils/constants';
   import { isTaskAvailableForEdition as checkTaskEdition } from '@/utils/editionHelpers';
   import { calculatePercentageNum, useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
+  import {
+    createProfileVisibility,
+    fetchProfileVisibilityRows,
+    isCurrentProfileVisibilityRequest,
+    loadCurrentProfileVisibility,
+  } from '@/utils/profileVisibility';
   import { computeInvalidProgress } from '@/utils/progressInvalidation';
   import {
     orderedStoryObjectives,
@@ -306,7 +324,6 @@
     heroBackdrop: string;
     icon: string;
     iconTint: string;
-    label: string;
     modeBadgeClass: string;
     storyHighlight: 'info' | 'pve' | 'pvp';
     timelineHighlight: 'info' | 'pve' | 'pvp';
@@ -316,7 +333,6 @@
       heroBackdrop: 'bg-gradient-to-r from-pvp-900 via-primary-900/35 to-surface-900',
       icon: 'i-mdi-sword-cross',
       iconTint: 'text-pvp-300',
-      label: 'PvP',
       modeBadgeClass: 'border border-pvp-500/30 bg-pvp-700/25 text-pvp-200',
       storyHighlight: 'pvp',
       timelineHighlight: 'pvp',
@@ -325,10 +341,17 @@
       heroBackdrop: 'bg-gradient-to-r from-pve-900 via-secondary-900/35 to-surface-900',
       icon: 'i-mdi-account-group',
       iconTint: 'text-pve-300',
-      label: 'PvE',
       modeBadgeClass: 'border border-pve-500/30 bg-pve-700/25 text-pve-200',
       storyHighlight: 'pve',
       timelineHighlight: 'pve',
+    },
+    seasonal: {
+      heroBackdrop: 'bg-gradient-to-r from-warning-950 via-warning-900/25 to-surface-900',
+      icon: 'i-mdi-calendar-star',
+      iconTint: 'text-warning-300',
+      modeBadgeClass: 'border border-warning-500/30 bg-warning-700/20 text-warning-200',
+      storyHighlight: 'pvp',
+      timelineHighlight: 'pvp',
     },
   };
   const statToneClasses = {
@@ -401,6 +424,47 @@
     normalizeMode(route.params.mode) ??
       normalizeMode(route.query.mode) ??
       tarkovStore.getCurrentGameMode()
+  );
+  const profileVisibility = reactive(createProfileVisibility());
+  let profileVisibilityLoadId = 0;
+  const currentProfileUserId = () => ($supabase.user.loggedIn ? $supabase.user.id : null);
+  const applyLoadedProfileVisibility = (
+    result: Awaited<ReturnType<typeof loadCurrentProfileVisibility>>,
+    userId: string
+  ) => {
+    if (!result.current) return;
+    if (result.error) {
+      logger.warn('[Profile] Failed to load profile visibility:', { error: result.error, userId });
+      return;
+    }
+    Object.assign(profileVisibility, result.visibility);
+  };
+  const loadProfileVisibility = async () => {
+    const requestId = ++profileVisibilityLoadId;
+    Object.assign(profileVisibility, createProfileVisibility());
+    const userId = currentProfileUserId();
+    if (!userId) return;
+    const result = await loadCurrentProfileVisibility(
+      () =>
+        fetchProfileVisibilityRows($supabase.client, userId, [
+          GAME_MODES.PVP,
+          GAME_MODES.PVE,
+          GAME_MODES.SEASONAL,
+        ]),
+      () =>
+        isCurrentProfileVisibilityRequest(
+          requestId,
+          profileVisibilityLoadId,
+          userId,
+          currentProfileUserId()
+        )
+    );
+    applyLoadedProfileVisibility(result, userId);
+  };
+  watch(
+    () => ($supabase.user.loggedIn ? $supabase.user.id : null),
+    () => void loadProfileVisibility(),
+    { immediate: true }
   );
   watch(
     () => [route.params.mode, route.query.mode] as const,
@@ -537,24 +601,33 @@
     return sharedProfileData.value !== null;
   });
   const modeTheme = computed(() => MODE_THEMES[selectedMode.value]);
-  const modeLabel = computed(() => modeTheme.value.label);
+  const modeLabel = computed(() => {
+    if (selectedMode.value === GAME_MODES.PVE) return t('common.pve', 'PvE');
+    if (selectedMode.value === GAME_MODES.SEASONAL) {
+      return t('common.seasonal_pvp', 'Seasonal PvP');
+    }
+    return t('common.pvp', 'PvP');
+  });
   const pvpToggleClass = computed(() =>
     selectedMode.value === GAME_MODES.PVP
-      ? 'bg-pvp-800 text-pvp-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]'
+      ? 'bg-pvp-800 text-pvp-100 shadow-inner'
       : 'bg-transparent text-pvp-500 hover:bg-pvp-950/50 hover:text-pvp-300'
   );
   const pveToggleClass = computed(() =>
     selectedMode.value === GAME_MODES.PVE
-      ? 'bg-pve-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]'
+      ? 'bg-pve-600 text-white shadow-inner'
       : 'bg-transparent text-pve-500 hover:bg-pve-950/50 hover:text-pve-300'
+  );
+  const seasonalToggleClass = computed(() =>
+    selectedMode.value === GAME_MODES.SEASONAL
+      ? 'bg-warning-700 text-warning-50 shadow-inner'
+      : 'bg-transparent text-warning-500 hover:bg-warning-950/50 hover:text-warning-300'
   );
   const modeData = computed<UserProgressData>(() => {
     if (isViewingSharedProfile.value) {
       return sharedProfileData.value ?? DEFAULT_PROGRESS_DATA;
     }
-    return selectedMode.value === GAME_MODES.PVE
-      ? tarkovStore.getPvEProgressData()
-      : tarkovStore.getPvPProgressData();
+    return tarkovStore.getModeProgressData(selectedMode.value);
   });
   const isViewingCurrentMode = computed(
     () => !isViewingSharedProfile.value && selectedMode.value === tarkovStore.getCurrentGameMode()
@@ -732,13 +805,13 @@
       }
     >();
     for (const task of countedTasks.value) {
-      const taskName = task.name || t('page.profile.task_fallback', 'Task');
+      const taskName = task.name || t('common.task', 'Task');
       for (const objective of task.objectives ?? []) {
         if (!objective?.id) {
           continue;
         }
         lookup.set(objective.id, {
-          description: objective.description || t('page.profile.objective_fallback', 'Objective'),
+          description: objective.description || t('common.objective', 'Objective'),
           taskName,
         });
       }
@@ -758,7 +831,7 @@
   const hideoutModuleLabelById = computed(() => {
     const lookup = new Map<string, string>();
     for (const station of metadataStore.hideoutStations ?? []) {
-      const stationName = station.name || t('page.profile.hideout_fallback');
+      const stationName = station.name || t('common.hideout', 'Hideout');
       for (const level of station.levels ?? []) {
         if (!level?.id) {
           continue;
@@ -978,7 +1051,7 @@
           icon: 'i-mdi-checkbox-marked-circle-outline',
           subtitle: task.trader?.name || t('page.profile.timeline_task', 'Task completion'),
           timestamp,
-          title: task.name || t('page.profile.task_fallback', 'Task'),
+          title: task.name || t('common.task', 'Task'),
           tone: 'success',
         });
         continue;
@@ -989,7 +1062,7 @@
           icon: 'i-mdi-close-circle-outline',
           subtitle: t('page.profile.timeline_failed', 'Task branch failed'),
           timestamp,
-          title: task.name || t('page.profile.task_fallback', 'Task'),
+          title: task.name || t('common.task', 'Task'),
           tone: 'error',
         });
       }
@@ -1360,10 +1433,7 @@
     if (isViewingSharedProfile.value) {
       return false;
     }
-    const modeIsPublic =
-      selectedMode.value === GAME_MODES.PVE
-        ? preferencesStore.getProfileSharePvePublic
-        : preferencesStore.getProfileSharePvpPublic;
+    const modeIsPublic = profileVisibility[selectedMode.value];
     return !modeIsPublic;
   });
   const shareAccessLabel = computed(() => {
@@ -1403,7 +1473,7 @@
     {
       id: 'level',
       icon: 'i-mdi-account-star-outline',
-      label: t('navigation_drawer.level', 'Level'),
+      label: t('common.level', 'Level'),
       meta: t('page.profile.level_meta', {
         faction: modeFaction.value,
         mode: modeLabel.value,
@@ -1415,7 +1485,7 @@
     {
       id: 'tasks',
       icon: 'i-mdi-clipboard-check-outline',
-      label: t('page.dashboard.progress.tasks', 'Tasks'),
+      label: t('common.tasks', 'Tasks'),
       meta: t('page.profile.tasks_meta', {
         failed: formatNumber(failedTasks.value),
         remaining: formatNumber(remainingTasks.value),
@@ -1427,7 +1497,7 @@
     {
       id: 'objectives',
       icon: 'i-mdi-target',
-      label: t('page.dashboard.progress.objectives', 'Objectives'),
+      label: t('common.objectives', 'Objectives'),
       meta: t('page.profile.objectives_meta', {
         completion_pct: objectiveCompletionPct.value.toFixed(1),
       }),
@@ -1438,7 +1508,7 @@
     {
       id: 'hideout',
       icon: 'i-mdi-home-city-outline',
-      label: t('navigation_drawer.hideout', 'Hideout'),
+      label: t('common.hideout', 'Hideout'),
       meta: t('page.profile.hideout_meta', {
         completed_parts: formatNumber(completedHideoutParts.value),
       }),
@@ -1465,7 +1535,7 @@
       iconClass: 'text-kappa-300',
       id: 'kappa',
       percentage: calculatePercentageNum(completedKappaTasks.value, totalKappaTasks.value),
-      title: t('page.dashboard.progress.kappa', 'Kappa Tasks'),
+      title: t('common.kappa_tasks', 'Kappa Tasks'),
       total: totalKappaTasks.value,
     },
     {
@@ -1478,7 +1548,7 @@
         completedLightkeeperTasks.value,
         totalLightkeeperTasks.value
       ),
-      title: t('page.dashboard.progress.lightkeeper', 'Lightkeeper'),
+      title: t('common.lightkeeper', 'Lightkeeper'),
       total: totalLightkeeperTasks.value,
     },
     {
@@ -1498,21 +1568,21 @@
   const selectedTabIndex = ref(0);
   const profileTabItems = computed(() => [
     {
-      label: t('page.profile.tab_overview'),
+      label: t('common.overview', 'Overview'),
       icon: 'i-mdi-view-dashboard-outline',
     },
     {
-      label: t('page.profile.tab_tasks'),
+      label: t('common.tasks', 'Tasks'),
       icon: 'i-mdi-clipboard-check-outline',
       badge: `${formatNumber(completedTasks.value)}/${formatNumber(totalTasks.value)}`,
     },
     {
-      label: t('page.profile.tab_hideout'),
+      label: t('common.hideout', 'Hideout'),
       icon: 'i-mdi-home-city-outline',
       badge: `${formatNumber(completedHideoutModules.value)}/${formatNumber(totalHideoutModules.value)}`,
     },
     {
-      label: t('page.profile.tab_storyline'),
+      label: t('common.storyline', 'Storyline'),
       icon: 'i-mdi-book-open-variant',
       badge:
         totalStoryMainObjectives.value > 0

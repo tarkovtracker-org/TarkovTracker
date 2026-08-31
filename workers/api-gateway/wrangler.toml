@@ -1,6 +1,6 @@
 name = "api-gateway"
 main = "src/index.ts"
-compatibility_date = "2024-12-01"
+compatibility_date = "2026-08-25"
 workers_dev = false
 preview_urls = false
 routes = [
@@ -37,6 +37,18 @@ enabled = true
 bindings = [
   { name = "API_GATEWAY_LIMITER", class_name = "ApiGatewayRateLimiter" },
 ]
+
+# Pre-authentication abuse gate keyed on CF-Connecting-IP. Coarse by design:
+# it shields the api_tokens lookup from floods and is not a customer quota.
+# Counters are per-location and eventually consistent. `period` must be 10 or
+# 60 and must stay in sync with ABUSE_GATE_PERIOD_SEC in src/limits.ts.
+[[ratelimits]]
+name = "API_ABUSE_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 300
+  period = 60
 
 [[migrations]]
 tag = "v1"

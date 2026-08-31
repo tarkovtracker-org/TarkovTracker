@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, writeFileSync, type Dirent } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveTrustProxySetting } from './app/utils/apiProtectionConfig';
+import { ENTRY_RECOVERY_SCRIPT } from './app/utils/entryRecoveryScript';
 import { SUPPORTED_LOCALES } from './app/utils/locales';
 import {
   assertCloudflarePagesOutput,
@@ -16,8 +17,16 @@ import {
   resolvePublicAppUrl,
   resolveSupabaseRuntimeConfig,
   TARKOV_IMAGE_DOMAINS,
+  YOUTUBE_IMAGE_DOMAINS,
 } from './app/utils/runtimeConfig';
+import {
+  SHELL_DESKTOP_BREAKPOINT_PX,
+  SHELL_DRAWER_COLLAPSED_WIDTH,
+  SHELL_DRAWER_EXPANDED_WIDTH,
+  SHELL_DRAWER_RAIL_STORAGE_KEY,
+} from './app/utils/shellConfig';
 import { stripBareNodeImports } from './app/utils/stripBareNodeImports';
+import { TURNSTILE_TEST_SECRET_KEY, TURNSTILE_TEST_SITE_KEY } from './app/utils/turnstileKeys';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const appDir = resolve(__dirname, 'app');
 const testsDir = resolve(__dirname, 'tests');
@@ -62,11 +71,27 @@ if (IS_PRODUCTION_BUILD && IS_BUILD_COMMAND && !IS_CF_PREVIEW && !IS_CI) {
     throw new Error(`[Config] Missing required Stripe env vars: ${missingKeys.join(', ')}`);
   }
 }
+// Sitekeys are public identifiers; the secret stays in the Pages project env.
+// Production and preview builds require explicit configuration so a secret can never
+// be deployed without the matching client widget. Local builds use Cloudflare test keys.
+const TURNSTILE_SITE_KEY = (
+  process.env.NUXT_PUBLIC_TURNSTILE_SITE_KEY ??
+  (!IS_PRODUCTION_BUILD ? TURNSTILE_TEST_SITE_KEY : '')
+).trim();
+const TURNSTILE_SECRET_KEY = (
+  process.env.NUXT_TURNSTILE_SECRET_KEY ?? (IS_PRODUCTION_BUILD ? '' : TURNSTILE_TEST_SECRET_KEY)
+).trim();
+if (IS_PRODUCTION_BUILD && Boolean(TURNSTILE_SITE_KEY) !== Boolean(TURNSTILE_SECRET_KEY)) {
+  throw new Error(
+    '[Config] NUXT_PUBLIC_TURNSTILE_SITE_KEY and NUXT_TURNSTILE_SECRET_KEY must be configured together'
+  );
+}
 const cspRouteRules = buildContentSecurityPolicyRouteRules({
   clientLogSinkUrl,
   clarityInstrumentationKey: IS_PRODUCTION_BUILD ? MICROSOFT_CLARITY_PROJECT_ID : '',
   gaMeasurementId: IS_PRODUCTION_BUILD ? GOOGLE_ANALYTICS_MEASUREMENT_ID : '',
   supabaseUrl: PUBLIC_SUPABASE_URL,
+  turnstileSiteKey: TURNSTILE_SITE_KEY,
 });
 const webApplicationSchema = {
   '@context': 'https://schema.org',
@@ -94,71 +119,27 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   telemetry: false,
   ssr: false,
-  spaLoadingTemplate: true,
   srcDir: 'app',
   ignore: ['**/__tests__/**', '**/*.test.*', '**/*.spec.*'],
   runtimeConfig: {
     // Server-only (private) runtime config
     supabaseUrl: PRIVATE_SUPABASE_URL,
-    supabaseServiceKey:
-      process.env.NUXT_SUPABASE_SERVICE_KEY ||
-      // deprecated — remove after 2026-07-31
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      '',
+    supabaseServiceKey: process.env.NUXT_SUPABASE_SERVICE_KEY || '',
     supabaseAnonKey: PRIVATE_SUPABASE_ANON_KEY,
-    githubToken: process.env.GITHUB_TOKEN || '',
+    githubToken: process.env.NUXT_GITHUB_TOKEN?.trim() || '',
     githubContributorsExclude:
       process.env.NUXT_GITHUB_CONTRIBUTORS_EXCLUDE ||
-      // deprecated — remove after 2026-07-31
-      process.env.GITHUB_CONTRIBUTORS_EXCLUDE ||
       'claude,claude[bot],semantic-release-bot,semantic-release[bot]',
     githubContributorsCacheTtlMs:
-      Number(
-        process.env.NUXT_GITHUB_CONTRIBUTORS_CACHE_TTL_MS ||
-          // deprecated — remove after 2026-07-31
-          process.env.GITHUB_CONTRIBUTORS_CACHE_TTL_MS ||
-          '1800000'
-      ) || 1800000,
-    githubTimeoutMs:
-      Number(
-        process.env.NUXT_GITHUB_TIMEOUT_MS ||
-          // deprecated — remove after 2026-07-31
-          process.env.GITHUB_TIMEOUT_MS ||
-          '8000'
-      ) || 8000,
-    tarkovJsonBaseUrl:
-      process.env.NUXT_TARKOV_JSON_BASE_URL ||
-      // deprecated — remove after 2026-07-31
-      process.env.TARKOV_JSON_BASE_URL ||
-      '',
-    logSinkUrl:
-      process.env.NUXT_LOG_SINK_URL ||
-      // deprecated — remove after 2026-07-31
-      process.env.LOG_SINK_URL ||
-      '',
-    twitchClientId:
-      process.env.NUXT_TWITCH_CLIENT_ID ||
-      // deprecated — remove after 2026-07-31
-      process.env.TWITCH_CLIENT_ID ||
-      'kimne78kx3ncx6brgo4mv6wki5h1ko',
-    publicCacheBypassEnabled:
-      process.env.NUXT_CACHE_BYPASS_ENABLED === 'true' ||
-      // deprecated — remove after 2026-07-31
-      process.env.NUXT_PUBLIC_CACHE_BYPASS_ENABLED === 'true',
-    teamMembersCacheTtlMs:
-      Number(
-        process.env.NUXT_TEAM_MEMBERS_CACHE_TTL_MS ||
-          // deprecated — remove after 2026-07-31
-          process.env.TEAM_MEMBERS_CACHE_TTL_MS ||
-          '5000'
-      ) || 5000,
+      Number(process.env.NUXT_GITHUB_CONTRIBUTORS_CACHE_TTL_MS || '1800000') || 1800000,
+    githubTimeoutMs: Number(process.env.NUXT_GITHUB_TIMEOUT_MS || '8000') || 8000,
+    tarkovJsonBaseUrl: process.env.NUXT_TARKOV_JSON_BASE_URL || '',
+    logSinkUrl: process.env.NUXT_LOG_SINK_URL || '',
+    twitchClientId: process.env.NUXT_TWITCH_CLIENT_ID || 'kimne78kx3ncx6brgo4mv6wki5h1ko',
+    publicCacheBypassEnabled: process.env.NUXT_CACHE_BYPASS_ENABLED === 'true',
+    teamMembersCacheTtlMs: Number(process.env.NUXT_TEAM_MEMBERS_CACHE_TTL_MS || '5000') || 5000,
     teamMembersRateLimitPerMinute:
-      Number(
-        process.env.NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE ||
-          // deprecated — remove after 2026-07-31
-          process.env.TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE ||
-          '120'
-      ) || 120,
+      Number(process.env.NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE || '120') || 120,
     stripeSecretKey: (process.env.STRIPE_SECRET_KEY ?? '').trim(),
     stripePriceScavMonthly: (process.env.STRIPE_PRICE_SCAV_MONTHLY ?? '').trim(),
     stripePriceScav6month: (process.env.STRIPE_PRICE_SCAV_6MONTH ?? '').trim(),
@@ -170,20 +151,21 @@ export default defineNuxtConfig({
     stripePriceChad6month: (process.env.STRIPE_PRICE_CHAD_6MONTH ?? '').trim(),
     stripePriceChadYearly: (process.env.STRIPE_PRICE_CHAD_YEARLY ?? '').trim(),
     accountIpHashSecret: (process.env.NUXT_ACCOUNT_IP_HASH_SECRET ?? '').trim(),
-    sharedProfileCacheTtlMs:
-      Number(
-        process.env.NUXT_SHARED_PROFILE_CACHE_TTL_MS ||
-          // deprecated — remove after 2026-07-31
-          process.env.SHARED_PROFILE_CACHE_TTL_MS ||
-          '5000'
-      ) || 5000,
+    sharedProfileCacheTtlMs: Number(process.env.NUXT_SHARED_PROFILE_CACHE_TTL_MS || '5000') || 5000,
     sharedProfileRateLimitPerMinute:
-      Number(
-        process.env.NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE ||
-          // deprecated — remove after 2026-07-31
-          process.env.SHARED_PROFILE_RATE_LIMIT_PER_MINUTE ||
-          '120'
-      ) || 120,
+      Number(process.env.NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE || '120') || 120,
+    tarkovDevProfileCacheTtlMs:
+      Number(process.env.NUXT_TARKOV_DEV_PROFILE_CACHE_TTL_MS || '900000') || 900000,
+    tarkovDevProfileRateLimitPerMinute:
+      Number(process.env.NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_MINUTE || '5') || 5,
+    tarkovDevProfileRateLimitPerHour:
+      Number(process.env.NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_HOUR || '20') || 20,
+    // 0 disables the freshness gate, so the raw value must survive without a truthiness fallback;
+    // an empty-string env var must not silently disable the gate either.
+    tarkovDevProfileMaxUpdatedAgeDays: Number(
+      process.env.NUXT_TARKOV_DEV_PROFILE_MAX_UPDATED_AGE_DAYS?.trim() || '7'
+    ),
+    turnstileSecretKey: TURNSTILE_SECRET_KEY,
     // API protection configuration (server-only)
     apiProtection: {
       // Comma-separated list of allowed hosts (e.g., "tarkovtracker.org,www.tarkovtracker.org")
@@ -207,11 +189,7 @@ export default defineNuxtConfig({
     },
     public: {
       NODE_ENV: process.env.NODE_ENV || 'production',
-      logLevel:
-        process.env.NUXT_PUBLIC_LOG_LEVEL ||
-        // deprecated — remove after 2026-07-31
-        process.env.VITE_LOG_LEVEL ||
-        '',
+      logLevel: process.env.NUXT_PUBLIC_LOG_LEVEL || '',
       appUrl: PUBLIC_APP_URL,
       appVersion,
       googleAnalyticsMeasurementId: IS_PRODUCTION_BUILD ? GOOGLE_ANALYTICS_MEASUREMENT_ID : '',
@@ -219,6 +197,10 @@ export default defineNuxtConfig({
       supabaseAnonKey: PUBLIC_SUPABASE_ANON_KEY,
       supabaseUrl: PUBLIC_SUPABASE_URL,
       clientLogSinkUrl,
+      turnstileSiteKey: TURNSTILE_SITE_KEY,
+      tarkovDevImportCooldownMinutes: Number(
+        process.env.NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES?.trim() || '60'
+      ),
       allowDirectTokenCreateFallback:
         process.env.NUXT_PUBLIC_ALLOW_DIRECT_TOKEN_CREATE_FALLBACK === 'true',
       adminWatchTimeoutMs: Number(process.env.ADMIN_WATCH_TIMEOUT_MS || '5000') || 5000,
@@ -227,8 +209,7 @@ export default defineNuxtConfig({
       promotedTwitch: {
         channel: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_CHANNEL || 'honeyxxo',
         displayName: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_DISPLAY_NAME || 'honeyxxo',
-        enabled: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED !== 'false',
-        endsAt: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_ENDS_AT || '2026-06-09T00:00:00+00:00',
+        enabled: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED === 'true',
       },
     },
   },
@@ -301,7 +282,52 @@ export default defineNuxtConfig({
     head: {
       titleTemplate: '%s | Tarkov Tracker',
       title: 'Escape from Tarkov Quest, Hideout, and Item Tracker',
+      style: [
+        {
+          textContent: [
+            `:root{--shell-w:${SHELL_DRAWER_EXPANDED_WIDTH}}`,
+            'body{background:var(--color-surface-950,hsl(0 0% 4%))}',
+            '#__nuxt:empty::before{',
+            'content:"";',
+            'display:block;',
+            'position:fixed;',
+            'inset:0;',
+            'width:var(--shell-w);',
+            'background:var(--color-surface-900,hsl(0 0% 9%));',
+            'border-right:1px solid var(--color-surface-700,hsl(0 0% 25%));',
+            'z-index:50',
+            '}',
+            '#__nuxt:empty::after{',
+            'content:"";',
+            'display:block;',
+            'position:fixed;',
+            'top:0;',
+            'left:var(--shell-w);',
+            'right:0;',
+            'height:44px;',
+            'background:var(--color-surface-900,hsl(0 0% 9%));',
+            'border-bottom:1px solid var(--color-surface-700,hsl(0 0% 25%));',
+            'z-index:40',
+            '}',
+            `@media(width < ${SHELL_DESKTOP_BREAKPOINT_PX}px){`,
+            `:root{--shell-w:${SHELL_DRAWER_COLLAPSED_WIDTH}}`,
+            '}',
+          ].join(''),
+        },
+      ],
       script: [
+        {
+          innerHTML: ENTRY_RECOVERY_SCRIPT,
+        },
+        {
+          innerHTML: [
+            'try{',
+            `if(window.localStorage.getItem(${JSON.stringify(SHELL_DRAWER_RAIL_STORAGE_KEY)})==="true"`,
+            `&&window.matchMedia("(min-width:${SHELL_DESKTOP_BREAKPOINT_PX}px)").matches)`,
+            `{document.documentElement.style.setProperty("--shell-w",${JSON.stringify(SHELL_DRAWER_COLLAPSED_WIDTH)})}`,
+            '}catch(e){}',
+          ].join(''),
+        },
         {
           type: 'application/ld+json',
           textContent: JSON.stringify(webApplicationSchema),
@@ -442,6 +468,7 @@ export default defineNuxtConfig({
         { names: new Set(['string']), sourcePattern: '/app/utils/constants' },
         { names: new Set(['string']), sourcePattern: '/app/utils/mapTime' },
         { names: new Set(['string']), sourcePattern: '/app/utils/skillHelpers' },
+        { names: new Set(['actions']), sourcePattern: '/app/stores/useApp' },
         { names: new Set(['getters']), sourcePattern: '/app/stores/useApp' },
         { names: new Set(['actions']), sourcePattern: '/app/stores/useTarkov' },
         {
@@ -463,7 +490,12 @@ export default defineNuxtConfig({
     },
   },
   image: {
-    domains: [...GITHUB_IMAGE_DOMAINS, ...TARKOV_IMAGE_DOMAINS],
+    domains: [...GITHUB_IMAGE_DOMAINS, ...TARKOV_IMAGE_DOMAINS, ...YOUTUBE_IMAGE_DOMAINS],
+  },
+  icon: {
+    clientBundle: {
+      scan: true,
+    },
   },
   ui: {
     theme: {
@@ -557,25 +589,17 @@ export default defineNuxtConfig({
       },
     },
     build: {
-      rollupOptions: {
+      rolldownOptions: {
         output: {
-          manualChunks: (id) => {
-            if (id.includes('node_modules/leaflet')) {
-              return 'vendor-leaflet';
-            }
-            if (id.includes('node_modules/@supabase')) {
-              return 'vendor-supabase';
-            }
-            if (
-              id.includes('node_modules/vue') ||
-              id.includes('node_modules/pinia') ||
-              id.includes('node_modules/ufo') ||
-              id.includes('node_modules/ofetch') ||
-              id.includes('node_modules/defu') ||
-              id.includes('node_modules/h3')
-            ) {
-              return 'vendor-core';
-            }
+          codeSplitting: {
+            groups: [
+              { name: 'vendor-leaflet', test: /node_modules[\\/]leaflet/ },
+              { name: 'vendor-supabase', test: /node_modules[\\/]@supabase/ },
+              {
+                name: 'vendor-core',
+                test: /node_modules[\\/](vue|pinia|ufo|ofetch|defu|h3)/,
+              },
+            ],
           },
         },
       },

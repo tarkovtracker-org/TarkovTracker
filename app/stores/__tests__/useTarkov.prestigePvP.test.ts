@@ -142,3 +142,63 @@ describe('useTarkov prestigePvP', () => {
     expect(store.pve.progressEpoch).toBe(8);
   });
 });
+describe('useTarkov prestigeMode seasonal', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    rpc.mockResolvedValue({ data: null, error: null });
+  });
+  const seedModes = () => {
+    const store = useTarkovStore();
+    store.$patch((state) => {
+      state.currentGameMode = 'seasonal';
+      state.gameEdition = 3;
+      state.pvp = { ...state.pvp, level: 42, progressEpoch: 7 };
+      state.pve = { ...state.pve, level: 9, progressEpoch: 4 };
+      state.seasonal = {
+        ...state.seasonal,
+        level: 30,
+        prestigeLevel: 1,
+        progressEpoch: 2,
+        taskCompletions: { 'task-s': { complete: true, failed: false, timestamp: 1000 } },
+      };
+    });
+    return store;
+  };
+  const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+  const snapshotModes = (store: ReturnType<typeof useTarkovStore>) =>
+    clone({ pve: store.pve, pvp: store.pvp, seasonal: store.seasonal });
+  it('refuses to prestige Seasonal PvP and leaves every mode untouched', async () => {
+    const store = seedModes();
+    const before = snapshotModes(store);
+    await expect(store.prestigeMode('seasonal')).rejects.toThrow(
+      'Prestige is not supported for Seasonal PvP.'
+    );
+    expect(rpc).not.toHaveBeenCalled();
+    expect(snapshotModes(store)).toEqual(before);
+  });
+  it('refuses to sync a Seasonal prestige level and leaves every mode untouched', async () => {
+    const store = seedModes();
+    const before = snapshotModes(store);
+    await expect(store.syncPrestigeLevel('seasonal', 2)).rejects.toThrow(
+      'Prestige is not supported for Seasonal PvP.'
+    );
+    expect(rpc).not.toHaveBeenCalled();
+    expect(snapshotModes(store)).toEqual(before);
+  });
+  it('archives a PvP prestige without sending seasonal data', async () => {
+    const store = seedModes();
+    const seasonalBefore = clone(store.seasonal);
+    const pveBefore = clone(store.pve);
+    await store.prestigeMode('pvp');
+    expect(rpc).toHaveBeenCalledWith(
+      'archive_prestige_run_and_reset_progress',
+      expect.objectContaining({ p_mode: 'pvp' })
+    );
+    const [, args] = rpc.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(args).not.toHaveProperty('p_seasonal_data');
+    expect(args).not.toHaveProperty('p_season_number');
+    expect(clone(store.seasonal)).toEqual(seasonalBefore);
+    expect(clone(store.pve)).toEqual(pveBefore);
+  });
+});

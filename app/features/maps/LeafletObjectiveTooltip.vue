@@ -22,8 +22,8 @@
           target="_blank"
           rel="noopener noreferrer"
           :class="linkButtonClass"
-          :title="translate('page.tasks.questcard.view_on_tarkov_dev')"
-          :aria-label="translate('page.tasks.questcard.view_on_tarkov_dev')"
+          :title="translate('common.view_on_tarkov_dev')"
+          :aria-label="translate('common.view_on_tarkov_dev')"
           @click.stop
         >
           <img
@@ -71,7 +71,7 @@
           data-testid="objective-close-button"
           class="inline-flex items-center justify-center rounded-md text-gray-300 hover:bg-white/10"
           :class="isCompact ? 'h-5 w-5' : 'h-7 w-7'"
-          :aria-label="translate('generic.close_button')"
+          :aria-label="translate('common.close')"
           @click.stop="emitClose"
         >
           <UIcon name="i-mdi-close" :class="isCompact ? 'h-3 w-3' : 'h-4 w-4'" />
@@ -156,7 +156,7 @@
     if (!taskId) return null;
     return metadataStore.tasks.find((t) => t.id === taskId) ?? null;
   });
-  const taskName = computed(() => task.value?.name ?? translate('maps.tooltip.task_fallback'));
+  const taskName = computed(() => task.value?.name ?? translate('common.task'));
   const taskTarkovDevUrl = computed(() => {
     if (!task.value?.id) return '';
     return `https://tarkov.dev/task/${task.value.id}`;

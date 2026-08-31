@@ -17,6 +17,8 @@
         :item-name="requirement.item.name"
         :dev-link="requirement.item.link"
         :wiki-link="requirement.item.wikiLink"
+        :icon-link="requirement.item.iconLink"
+        :image512px-link="requirement.item.image512pxLink"
         size="small"
         :show-actions="false"
         simple-mode
@@ -29,17 +31,14 @@
         <UIcon name="i-mdi-check-circle" class="text-success-300 h-6 w-6 sm:h-8 sm:w-8" />
       </div>
       <!-- FiR Badge -->
-      <AppTooltip
-        v-if="isFoundInRaid"
-        :text="$t('page.hideout.stationcard.requirement.found_in_raid')"
-      >
+      <AppTooltip v-if="showFoundInRaidBadge" :text="$t('common.found_in_raid_required')">
         <UIcon
           name="i-mdi-checkbox-marked-circle-outline"
           class="text-warning-400 absolute -top-1 -right-1 h-3 w-3"
         />
       </AppTooltip>
       <!-- Count Badge for multi-count items -->
-      <div v-if="requiredCount > 1" class="absolute right-0 -bottom-1 left-0 flex justify-center">
+      <div v-if="showPartialCount" class="absolute right-0 -bottom-1 left-0 flex justify-center">
         <div
           class="border-surface-700 bg-surface-900/90 rounded border px-1 py-0.5 text-[9px] font-bold sm:px-1.5 sm:text-[10px]"
           :class="isComplete ? 'text-success-400' : 'text-surface-300'"
@@ -50,9 +49,10 @@
     </div>
     <!-- Item Name -->
     <div
-      class="text-surface-200 line-clamp-2 w-full text-center text-[11px] leading-tight font-medium sm:text-xs"
+      class="text-surface-200 w-full text-center leading-tight font-medium"
+      :class="itemLabelClass"
     >
-      {{ requirement.item.name }}
+      {{ itemLabel }}
     </div>
   </div>
   <!-- Context Menu for Manual Count Adjustment -->
@@ -83,8 +83,8 @@
           close();
         "
       />
-      <div v-if="requiredCount > 1" class="border-surface-700 my-1 border-t" />
-      <template v-if="requiredCount > 1">
+      <div v-if="showPartialCount" class="border-surface-700 my-1 border-t" />
+      <template v-if="showPartialCount">
         <div class="space-y-2 px-3 py-2">
           <div class="text-surface-400 text-xs">
             {{ $t('page.hideout.stationcard.requirement.set_custom_amount') }}
@@ -128,7 +128,7 @@
               close();
             "
           >
-            {{ $t('page.hideout.stationcard.requirement.apply') }}
+            {{ $t('common.apply') }}
           </UButton>
         </div>
       </template>
@@ -136,7 +136,7 @@
       <ContextMenuItem
         v-if="requirement.item.link"
         icon="/img/logos/tarkovdevlogo.webp"
-        :label="$t('page.hideout.stationcard.requirement.view_tarkov_dev')"
+        :label="$t('common.view_on_tarkov_dev')"
         @click="
           openTarkovDev();
           close();
@@ -145,7 +145,7 @@
       <ContextMenuItem
         v-if="requirement.item.wikiLink"
         icon="/img/logos/wikilogo.webp"
-        :label="$t('page.hideout.stationcard.requirement.view_wiki')"
+        :label="$t('common.view_on_wiki')"
         @click="
           openWiki();
           close();
@@ -155,13 +155,15 @@
   </ContextMenu>
 </template>
 <script setup lang="ts">
-  import ContextMenu from '@/components/ui/ContextMenu.vue';
-  import ContextMenuItem from '@/components/ui/ContextMenuItem.vue';
   import GameItem from '@/components/ui/GameItem.vue';
   import { useWikiLink } from '@/composables/useWikiLink';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { getCurrencySymbol } from '@/utils/constants';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { openExternalUrl } from '@/utils/redirect';
+  import type ContextMenuType from '@/components/ui/ContextMenu.vue';
+  const ContextMenu = defineAsyncComponent(() => import('@/components/ui/ContextMenu.vue'));
+  const ContextMenuItem = defineAsyncComponent(() => import('@/components/ui/ContextMenuItem.vue'));
   interface Props {
     requirement: {
       id: string;
@@ -170,6 +172,8 @@
         name?: string;
         link?: string | null;
         wikiLink?: string | null;
+        iconLink?: string;
+        image512pxLink?: string;
       };
       count: number;
       attributes?: Array<{
@@ -187,8 +191,21 @@
   const formatNumber = useLocaleNumberFormatter();
   const requirementId = computed(() => props.requirement.id);
   const requiredCount = computed(() => props.requirement.count);
+  const currencySymbol = computed(() => getCurrencySymbol(props.requirement.item.id) ?? '');
+  const isCurrency = computed(() => currencySymbol.value !== '');
+  const showPartialCount = computed(() => !isCurrency.value && requiredCount.value > 1);
+  const formattedCurrency = computed(
+    () => `${currencySymbol.value}${formatNumber(requiredCount.value)}`
+  );
+  const itemLabel = computed(() =>
+    isCurrency.value ? formattedCurrency.value : props.requirement.item.name
+  );
+  const itemLabelClass = computed(() =>
+    isCurrency.value ? 'break-all text-[9px] sm:text-[10px]' : 'line-clamp-2 text-[11px] sm:text-xs'
+  );
   // Context menu
-  const contextMenu = ref<InstanceType<typeof ContextMenu>>();
+  const contextMenu = ref<InstanceType<typeof ContextMenuType>>();
+  const pendingContextEvent = ref<MouseEvent | null>(null);
   const editValue = ref(0);
   // Check if item requires Found in Raid status
   const isFoundInRaid = computed(() => {
@@ -197,6 +214,7 @@
     );
     return firAttribute?.value === 'true';
   });
+  const showFoundInRaidBadge = computed(() => !isCurrency.value && isFoundInRaid.value);
   // Get current count from store (synced with needed items page)
   const currentCount = computed(() => {
     const storeCount = tarkovStore.getHideoutPartCount(requirementId.value);
@@ -260,8 +278,19 @@
   };
   const openContextMenu = (event: MouseEvent): void => {
     editValue.value = currentCount.value;
-    contextMenu.value?.open(event);
+    event.stopPropagation();
+    if (contextMenu.value) {
+      contextMenu.value.open(event);
+    } else {
+      pendingContextEvent.value = event;
+    }
   };
+  watch(contextMenu, (menu) => {
+    if (menu && pendingContextEvent.value) {
+      menu.open(pendingContextEvent.value);
+      pendingContextEvent.value = null;
+    }
+  });
   const openTarkovDev = (): void => {
     if (props.requirement.item.link) {
       openExternalUrl(props.requirement.item.link);

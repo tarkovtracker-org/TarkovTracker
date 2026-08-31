@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_SKILL_LEVEL } from '@/utils/constants';
+import { ACTIVE_SEASON_NUMBER, MAX_SKILL_LEVEL } from '@/utils/constants';
 import {
   hasDeprecatedTarkovDevProfileData,
   sanitizeOwnedProgressData,
@@ -165,5 +165,27 @@ describe('hasDeprecatedTarkovDevProfileData', () => {
         },
       })
     ).toBe(false);
+  });
+});
+describe('sanitizeOwnedUserState seasonal season reconciliation', () => {
+  it('stamps the active season and keeps seasonal progress for the active season', () => {
+    const result = sanitizeOwnedUserState({
+      currentGameMode: 'seasonal',
+      seasonal: { level: 14 },
+      seasonalSeasonNumber: ACTIVE_SEASON_NUMBER,
+    });
+    expect(result.seasonal.level).toBe(14);
+    expect(result.seasonalSeasonNumber).toBe(ACTIVE_SEASON_NUMBER);
+  });
+  it('drops seasonal progress stamped with a previous season', () => {
+    const result = sanitizeOwnedUserState({
+      currentGameMode: 'seasonal',
+      pvp: { level: 42 },
+      seasonal: { level: 14 },
+      seasonalSeasonNumber: ACTIVE_SEASON_NUMBER - 1,
+    });
+    expect(result.seasonal.level).toBe(1);
+    expect(result.pvp.level).toBe(42);
+    expect(result.seasonalSeasonNumber).toBe(ACTIVE_SEASON_NUMBER);
   });
 });

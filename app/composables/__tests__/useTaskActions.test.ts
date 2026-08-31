@@ -59,6 +59,7 @@ const createMetadataStore = (
   tasks: Task[],
   traders: Array<{ id: string; name: string; normalizedName: string }> = []
 ) => ({
+  taskById: new Map(tasks.map((task) => [task.id, task])),
   tasks,
   traders,
 });
@@ -333,23 +334,68 @@ describe('useTaskActions', () => {
     );
   });
   it('tracks manual-fail metadata when resetting a failed task', async () => {
+    const alternative: Task = {
+      id: 'completed-alternative',
+      name: 'Completed Alternative',
+    };
     const task: Task = {
       id: 'task-reset-failed',
       name: 'Task Reset Failed',
       objectives: [{ id: 'obj-reset', count: 2 }],
+      alternatives: [alternative.id],
     };
-    const { actions, onAction } = await setup(task, [task], {
+    const { actions, onAction, tarkovStore } = await setup(task, [task, alternative], {
       isTaskFailed: true,
       taskCompletions: {
+        [alternative.id]: { complete: true, failed: false },
         'task-reset-failed': { complete: true, failed: true, manual: true },
       },
     });
     actions.markTaskUncomplete();
+    expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledOnce();
+    expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith('task-reset-failed');
     expect(onAction).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'reset_failed',
         taskId: 'task-reset-failed',
         wasManualFail: true,
+      })
+    );
+  });
+  it('emits undo payloads for completed, reset, and failed task actions', async () => {
+    const task: Task = {
+      id: 'task-undo-actions',
+      name: 'Task Undo Actions',
+    };
+    const { actions, onAction } = await setup(task, [task], {
+      isTaskFailed: true,
+      taskCompletions: {
+        'task-undo-actions': { complete: true, failed: true, manual: true },
+      },
+    });
+    actions.markTaskComplete(true);
+    actions.markTaskUncomplete(true);
+    actions.markTaskFailed(true);
+    expect(onAction).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        action: 'complete',
+        undoKey: 'page.tasks.questcard.undo_complete',
+      })
+    );
+    expect(onAction).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        action: 'reset_failed',
+        undoKey: 'page.tasks.questcard.undo_reset_failed',
+        wasManualFail: true,
+      })
+    );
+    expect(onAction).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({
+        action: 'fail',
+        undoKey: 'page.tasks.questcard.undo_failed',
       })
     );
   });

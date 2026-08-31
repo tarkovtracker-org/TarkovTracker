@@ -169,7 +169,7 @@ export function useItemDistribution(): UseItemDistributionReturn {
     }
     try {
       tarkovStore.$patch((state) => {
-        const currentData = state.currentGameMode === 'pve' ? state.pve : state.pvp;
+        const currentData = state[state.currentGameMode];
         if (!currentData.taskObjectives) {
           currentData.taskObjectives = {};
         }
@@ -200,7 +200,7 @@ export function useItemDistribution(): UseItemDistributionReturn {
   ): void {
     if (taskObjectives.length === 0 && hideoutModules.length === 0) return;
     tarkovStore.$patch((state) => {
-      const currentData = state.currentGameMode === 'pve' ? state.pve : state.pvp;
+      const currentData = state[state.currentGameMode];
       if (!currentData.taskObjectives) {
         currentData.taskObjectives = {};
       }

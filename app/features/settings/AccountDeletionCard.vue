@@ -1,4 +1,5 @@
 <script setup lang="ts">
+  import LoginRequiredAlert from '@/components/ui/LoginRequiredAlert.vue';
   import { useActivityLogStore } from '@/stores/useActivityLogStore';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useSystemStore } from '@/stores/useSystemStore';
@@ -277,30 +278,19 @@
 <template>
   <div :class="rootClass">
     <GenericCard
-      icon="mdi-database-cog"
-      icon-color="warning"
-      highlight-color="warning"
+      icon="mdi-account-circle"
+      icon-color="info"
+      highlight-color="info"
       :title="$t('settings.account_data.title')"
       title-classes="text-lg font-semibold"
     >
       <template #content>
         <div class="p-4">
           <template v-if="!isLoggedIn">
-            <UAlert
-              color="warning"
-              variant="soft"
-              icon="i-mdi-lock"
+            <LoginRequiredAlert
               :title="$t('settings.account_data.login_required_delete')"
-            >
-              <template #description>
-                <NuxtLink
-                  to="/login"
-                  class="text-warning-300 hover:text-warning-200 underline transition-colors"
-                >
-                  {{ $t('navigation_drawer.login') }}
-                </NuxtLink>
-              </template>
-            </UAlert>
+              redirect-path="/settings#account"
+            />
           </template>
           <template v-else>
             <div class="border-surface-700 bg-surface-800/50 mb-6 rounded-lg border p-4">
@@ -317,13 +307,7 @@
                       </span>
                       <span class="ml-1 font-mono font-medium">{{ maskedUsername }}</span>
                     </span>
-                    <AppTooltip
-                      :text="
-                        showUsername
-                          ? $t('settings.account_data.action_hide')
-                          : $t('settings.account_data.action_show')
-                      "
-                    >
+                    <AppTooltip :text="showUsername ? $t('common.hide') : $t('common.show')">
                       <UButton
                         size="xs"
                         variant="ghost"
@@ -347,13 +331,7 @@
                       </span>
                       <span class="ml-1 font-mono font-medium">{{ maskedEmail }}</span>
                     </span>
-                    <AppTooltip
-                      :text="
-                        showEmail
-                          ? $t('settings.account_data.action_hide')
-                          : $t('settings.account_data.action_show')
-                      "
-                    >
+                    <AppTooltip :text="showEmail ? $t('common.hide') : $t('common.show')">
                       <UButton
                         size="xs"
                         variant="ghost"
@@ -389,7 +367,7 @@
                         </UBadge>
                       </template>
                       <span v-else class="text-surface-500">
-                        {{ $t('settings.account_data.unknown_label') }}
+                        {{ $t('common.unknown') }}
                       </span>
                     </span>
                   </div>
@@ -413,13 +391,7 @@
                   {{ $t('settings.account_data.account_id_label') }}:
                 </span>
                 <code class="bg-surface-700 rounded px-2 py-1 text-xs">{{ maskedAccountId }}</code>
-                <AppTooltip
-                  :text="
-                    showAccountId
-                      ? $t('settings.account_data.action_hide')
-                      : $t('settings.account_data.action_show')
-                  "
-                >
+                <AppTooltip :text="showAccountId ? $t('common.hide') : $t('common.show')">
                   <UButton
                     size="xs"
                     variant="ghost"
@@ -457,9 +429,14 @@
                 </AppTooltip>
               </div>
             </div>
-            <div class="border-surface-700 border-t pt-6">
-              <div class="text-surface-300 mb-3 text-sm font-semibold">
-                {{ $t('settings.account_data.account_deletion_title') }}
+            <div class="border-error-500/25 bg-error-950/15 mt-6 space-y-4 rounded-lg border p-4">
+              <div class="flex items-start gap-2">
+                <UIcon name="i-mdi-account-remove" class="text-error-400 mt-0.5 h-4 w-4 shrink-0" />
+                <div class="space-y-0.5">
+                  <p class="text-error-300 text-sm font-semibold">
+                    {{ $t('settings.account_data.account_deletion_title') }}
+                  </p>
+                </div>
               </div>
               <div class="flex justify-center">
                 <UButton
@@ -575,7 +552,7 @@
     <template #footer="{ close }">
       <div class="flex justify-end">
         <UButton variant="ghost" color="neutral" :disabled="isDeleting" @click="close">
-          {{ $t('settings.data_management.reset_cancel') }}
+          {{ $t('common.cancel') }}
         </UButton>
         <UButton
           color="error"

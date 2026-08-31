@@ -1,10 +1,24 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, afterEach } from 'vitest';
 import { deepMerge } from '@/server/utils/deepMerge';
 import {
+  applyLocaleOverlay,
   applyTaskObjectiveAdditions,
   expandObjectiveAdditions,
   getObjectiveItemIds,
 } from '@/server/utils/overlay';
+const stubOverlayFetch = (overlay: unknown) => {
+  const fetchMock = vi.fn(async () => {
+    return new Response(JSON.stringify(overlay), {
+      headers: { 'Content-Type': 'application/json' },
+      status: 200,
+    });
+  });
+  vi.stubGlobal('fetch', fetchMock as typeof fetch);
+  return fetchMock;
+};
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 describe('deepMerge id-keyed arrays', () => {
   it('deep merges plain-object patches by id and leaves non-object patches unchanged', () => {
     const target = {
@@ -65,6 +79,235 @@ describe('mergeModeCorrections (via applyOverlay integration)', () => {
       task1: { name: 'fixed' },
       task2: { name: 'pve-only' },
     });
+  });
+  it('splits overlaid trader requirements into level and reputation fields', async () => {
+    const fetchMock = stubOverlayFetch({
+      $meta: { version: 'split-test-v1' },
+      modes: {
+        pve: {
+          tasks: {
+            'task-1': {
+              traderRequirements: [
+                {
+                  id: 'overlay.1',
+                  requirementType: 'level',
+                  compareMethod: '>=',
+                  value: 1,
+                  trader: { id: 'trader-1', name: 'Prapor' },
+                },
+                {
+                  id: 'overlay.2',
+                  requirementType: 'reputation',
+                  compareMethod: '>=',
+                  value: 0.2,
+                  trader: { id: 'trader-1', name: 'Prapor' },
+                },
+              ],
+            },
+          },
+        },
+      },
+    });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const payload = {
+      data: {
+        tasks: [
+          {
+            id: 'task-1',
+            name: 'Base Task',
+            traderLevelRequirements: [{ id: 'api-level', trader: { id: 'trader-1' }, level: 3 }],
+            traderRequirements: [{ id: 'api-rep', trader: { id: 'trader-1' }, value: 0.5 }],
+          },
+        ],
+      },
+    };
+    const result = await applyOverlay(payload, { gameMode: 'pve' });
+    const task = result.data?.tasks?.[0];
+    expect(task?.traderLevelRequirements).toEqual([
+      {
+        id: 'overlay.1',
+        requirementType: 'level',
+        compareMethod: '>=',
+        value: 1,
+        level: 1,
+        trader: { id: 'trader-1', name: 'Prapor' },
+      },
+    ]);
+    expect(task?.traderRequirements).toEqual([
+      {
+        id: 'overlay.2',
+        requirementType: 'reputation',
+        compareMethod: '>=',
+        value: 0.2,
+        trader: { id: 'trader-1', name: 'Prapor' },
+      },
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('splits trader requirements on tasksAdd entries', async () => {
+    const fetchMock = stubOverlayFetch({
+      $meta: { version: 'tasksadd-split-test-v1' },
+      tasksAdd: {
+        'new-task': {
+          id: 'new-task',
+          name: 'Added Task',
+          traderRequirements: [
+            {
+              id: 'add.1',
+              requirementType: 'level',
+              compareMethod: '>=',
+              value: 2,
+              trader: { id: 'trader-2', name: 'Therapist' },
+            },
+            {
+              id: 'add.2',
+              requirementType: 'reputation',
+              compareMethod: '>=',
+              value: 0.3,
+              trader: { id: 'trader-2', name: 'Therapist' },
+            },
+          ],
+        },
+      },
+    });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const result = await applyOverlay(
+      { data: { tasks: [{ id: 'existing-task', name: 'Existing' }] } },
+      { gameMode: 'pve', bypassCache: true }
+    );
+    const added = result.data?.tasks?.find((task) => task.id === 'new-task') as
+      Record<string, unknown> | undefined;
+    expect(added?.traderLevelRequirements).toEqual([
+      {
+        id: 'add.1',
+        requirementType: 'level',
+        compareMethod: '>=',
+        value: 2,
+        level: 2,
+        trader: { id: 'trader-2', name: 'Therapist' },
+      },
+    ]);
+    expect(added?.traderRequirements).toEqual([
+      {
+        id: 'add.2',
+        requirementType: 'reputation',
+        compareMethod: '>=',
+        value: 0.3,
+        trader: { id: 'trader-2', name: 'Therapist' },
+      },
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('drops malformed trader requirement entries during the split', async () => {
+    const fetchMock = stubOverlayFetch({
+      $meta: { version: 'malformed-split-test-v1' },
+      modes: {
+        pve: {
+          tasks: {
+            'task-1': {
+              traderRequirements: [
+                {
+                  id: 'bad-level',
+                  requirementType: 'level',
+                  trader: { id: 'trader-1', name: 'Prapor' },
+                },
+                null,
+                {
+                  id: 'good-rep',
+                  requirementType: 'reputation',
+                  compareMethod: '>=',
+                  value: 0.1,
+                  trader: { id: 'trader-1', name: 'Prapor' },
+                },
+              ],
+            },
+          },
+        },
+      },
+    });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const result = await applyOverlay(
+      { data: { tasks: [{ id: 'task-1', name: 'Base Task' }] } },
+      { gameMode: 'pve', bypassCache: true }
+    );
+    const task = result.data?.tasks?.[0] as Record<string, unknown> | undefined;
+    expect(task?.traderLevelRequirements).toBeUndefined();
+    expect(task?.traderRequirements).toEqual([
+      {
+        id: 'good-rep',
+        requirementType: 'reputation',
+        compareMethod: '>=',
+        value: 0.1,
+        trader: { id: 'trader-1', name: 'Prapor' },
+      },
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('drops level trader requirements with non-finite thresholds', async () => {
+    const fetchMock = stubOverlayFetch(
+      JSON.parse(
+        '{"$meta":{"version":"nonfinite-split-test-v1"},"modes":{"pve":{"tasks":{"task-1":{"traderRequirements":[{"id":"inf-level","requirementType":"level","compareMethod":">=","value":1e999,"trader":{"id":"trader-1","name":"Prapor"}}]}}}}}'
+      )
+    );
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const result = await applyOverlay(
+      { data: { tasks: [{ id: 'task-1', name: 'Base Task' }] } },
+      { gameMode: 'pve', bypassCache: true }
+    );
+    const task = result.data?.tasks?.[0] as Record<string, unknown> | undefined;
+    expect(task?.traderLevelRequirements).toBeUndefined();
+    expect(task?.traderRequirements).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+describe('applyLocaleOverlay', () => {
+  it('shallow-merges locale patches (name/wikiLink) over matching entities', () => {
+    const tasks = [
+      {
+        id: '6761f28a022f60bb320f3e95',
+        name: 'Neuanfang',
+        wikiLink: 'https://escapefromtarkov.fandom.com/wiki/Neuanfang',
+      },
+      { id: 'other-task', name: 'Unchanged' },
+    ];
+    const patches = {
+      '6761f28a022f60bb320f3e95': {
+        name: 'New Beginning',
+        wikiLink: 'https://escapefromtarkov.fandom.com/wiki/New_Beginning_(Prestige_1)',
+      },
+    };
+    expect(applyLocaleOverlay(tasks, patches)).toEqual([
+      {
+        id: '6761f28a022f60bb320f3e95',
+        name: 'New Beginning',
+        wikiLink: 'https://escapefromtarkov.fandom.com/wiki/New_Beginning_(Prestige_1)',
+      },
+      { id: 'other-task', name: 'Unchanged' },
+    ]);
+  });
+  it('applies ID-keyed objective description patches', () => {
+    const tasks = [
+      {
+        id: 'task-1',
+        name: 'Task',
+        objectives: [{ id: 'obj-1', description: 'old description' }],
+      },
+    ];
+    const patches = {
+      'task-1': { objectives: { 'obj-1': { description: 'new description' } } },
+    };
+    expect(applyLocaleOverlay(tasks, patches)).toEqual([
+      {
+        id: 'task-1',
+        name: 'Task',
+        objectives: [{ id: 'obj-1', description: 'new description' }],
+      },
+    ]);
+  });
+  it('returns entities unchanged when no locale patches are provided', () => {
+    const tasks = [{ id: 'task-1', name: 'Task' }];
+    expect(applyLocaleOverlay(tasks, undefined)).toBe(tasks);
+    expect(applyLocaleOverlay(tasks, {})).toEqual(tasks);
   });
 });
 describe('getObjectiveItemIds', () => {

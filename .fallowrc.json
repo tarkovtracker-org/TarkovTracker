@@ -1,0 +1,88 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "autoImports": true,
+  "entry": [
+    "scripts/measure-pageload.mjs",
+    "scripts/prod-db.mjs",
+    "scripts/stripe-import-test.mjs",
+    "scripts/precompute/__tests__/*.test.ts",
+    "supabase/functions/**/*.test.ts",
+    "tests/**/*.test.ts",
+    "workers/api-gateway/src/__tests__/cloudflare-workers.ts",
+    "eslint.config.mjs",
+    "app/i18n.config.ts",
+    "app/server/api/**/*.ts",
+    "app/server/routes/**/*.ts",
+    "app/server/middleware/**/*.ts",
+    "app/**/*.test.ts",
+    "scripts/**/*.test.mjs"
+  ],
+  "ignoreDependencies": [
+    "@iconify-json/heroicons",
+    "@iconify-json/lucide",
+    "@nuxt/image",
+    "@nuxtjs/i18n",
+    "@nuxtjs/sitemap",
+    "@pinia/nuxt",
+    "@codecov/nuxt-plugin",
+    "@nuxt/eslint"
+  ],
+  "ignoreDependencyOverrides": [
+    {
+      "package": "es-define-property",
+      "source": "pnpm-workspace.yaml"
+    },
+    {
+      "package": "function-bind",
+      "source": "pnpm-workspace.yaml"
+    },
+    {
+      "package": "gopd",
+      "source": "pnpm-workspace.yaml"
+    },
+    {
+      "package": "has-symbols",
+      "source": "pnpm-workspace.yaml"
+    },
+    {
+      "package": "has-tostringtag",
+      "source": "pnpm-workspace.yaml"
+    },
+    {
+      "package": "safer-buffer",
+      "source": "pnpm-workspace.yaml"
+    }
+  ],
+  "ignoreUnresolvedImports": ["@/data/maps.json", "./.nuxt/eslint.config.mjs"],
+  "rules": {
+    "circular-dependency": "warn"
+  },
+  "duplicates": {
+    "mode": "mild",
+    "minTokens": 80,
+    "minLines": 8,
+    "minOccurrences": 2,
+    "skipLocal": true,
+    "ignoreImports": true
+  },
+  "overrides": [
+    {
+      "files": ["**/__tests__/**", "**/*.test.ts", "**/*.spec.ts"],
+      "rules": {
+        "unprovided-injects": "off"
+      }
+    },
+    {
+      "files": ["app/features/neededitems/NeededItemsFilterBar.vue"],
+      "rules": {
+        "unused-component-emits": "off"
+      }
+    }
+  ],
+  "health": {
+    "ignore": ["**/*.test.ts", "**/__tests__/**", "**/*.spec.ts", ".nuxt/**"]
+  },
+  "audit": {
+    "gate": "new-only"
+  }
+}

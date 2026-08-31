@@ -8,7 +8,7 @@ tracker focused on bugs and features.
 
 | Need                                      | Where                                                                                                                                          |
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Usage question or general discussion      | [Discord](https://discord.gg/M8nBgA2sT6) or [GitHub Discussions](https://github.com/tarkovtracker-org/TarkovTracker/discussions)               |
+| Usage question or general discussion      | [Discord](https://discord.gg/M8nBgA2sT6)                                                                                                       |
 | Reproducible bug                          | [Bug report form](https://github.com/tarkovtracker-org/TarkovTracker/issues/new?template=bug_report.yml)                                       |
 | Feature idea (something new)              | [Feature request form](https://github.com/tarkovtracker-org/TarkovTracker/issues/new?template=feature_request.yml)                             |
 | Improvement to an existing feature        | [Enhancement form](https://github.com/tarkovtracker-org/TarkovTracker/issues/new?template=enhancement.yml)                                     |

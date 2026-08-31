@@ -14,7 +14,7 @@
       <template #header>
         <div class="flex flex-col items-center px-8 pt-8 pb-6 text-center">
           <h1 class="mb-4 text-4xl font-bold tracking-tight text-white">
-            {{ $t('page.login.title') }}
+            {{ $t('common.login') }}
           </h1>
           <p class="text-surface-200 text-lg">
             {{ $t('page.login.subtitle') }}
@@ -169,7 +169,7 @@
               size="sm"
               class="text-surface-500 hover:text-surface-300 transition-colors"
             >
-              {{ $t('page.login.privacy_policy') }}
+              {{ $t('common.privacy_policy') }}
             </UButton>
             <UButton
               to="/terms-of-service"
@@ -179,7 +179,7 @@
               size="sm"
               class="text-surface-500 hover:text-surface-300 transition-colors"
             >
-              {{ $t('page.login.terms_of_service') }}
+              {{ $t('common.terms_of_service') }}
             </UButton>
           </div>
         </div>
@@ -205,7 +205,7 @@
   const route = useRoute();
   const { t } = useI18n({ useScope: 'global' });
   useSeoMeta({
-    title: () => t('page.login.meta_title', 'Login'),
+    title: () => t('common.login', 'Login'),
     description: () =>
       t(
         'page.login.meta_description',

@@ -1,6 +1,46 @@
 import { describe, expect, it } from 'vitest';
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
-import type { Task } from '@/types/tarkov';
+import type { HideoutStation, Task } from '@/types/tarkov';
+describe('useGraphBuilder hideout requirements', () => {
+  it.each(['5449016a4bdc2d6f028b456f', '5696686a4bdc2da3298b456a', '569668774bdc2da2298b4568'])(
+    'preserves currency item %s in hideout requirement metadata',
+    (itemId) => {
+      const stations: HideoutStation[] = [
+        {
+          id: 'station-1',
+          name: 'Heating',
+          levels: [
+            {
+              id: 'station-1-level-1',
+              level: 1,
+              constructionTime: 0,
+              itemRequirements: [
+                {
+                  id: `currency-${itemId}`,
+                  item: { id: itemId, name: 'Currency' },
+                  count: 25000,
+                  quantity: 25000,
+                },
+              ],
+              stationLevelRequirements: [],
+              skillRequirements: [],
+              traderRequirements: [],
+              crafts: [],
+            },
+          ],
+        },
+      ];
+      const { processHideoutData } = useGraphBuilder();
+      expect(processHideoutData(stations).neededItemHideoutModules).toMatchObject([
+        {
+          id: `currency-${itemId}`,
+          item: { id: itemId, name: 'Currency' },
+          count: 25000,
+        },
+      ]);
+    }
+  );
+});
 describe('useGraphBuilder alternatives', () => {
   it('does not create alternatives from failed-only requirements', () => {
     const prerequisite: Task = {
@@ -229,5 +269,51 @@ describe('useGraphBuilder needed item accepted items', () => {
     const need = result.neededItemTaskObjectives.find((n) => n.id === 'obj-single');
     expect(need?.item?.id).toBe('bitcoin');
     expect(need?.acceptedItems).toBeUndefined();
+  });
+});
+describe('useGraphBuilder buildWeapon containsAll needs', () => {
+  const buildTask = (foundInRaid?: boolean): Task =>
+    ({
+      id: 'gunsmith-11',
+      name: 'Gunsmith - Part 11',
+      failConditions: [],
+      objectives: [
+        {
+          id: 'obj-build',
+          type: 'buildWeapon',
+          count: 1,
+          ...(foundInRaid === undefined ? {} : { foundInRaid }),
+          item: { id: 'vector', name: 'KRISS Vector' },
+          containsAll: [
+            { id: 'rail', name: 'Vector modular rail' },
+            { name: 'Missing id mod' },
+            { id: 'foregrip', name: 'Skeletonized foregrip' },
+          ],
+        },
+      ],
+      taskRequirements: [],
+    }) as unknown as Task;
+  it('emits a need per explicit mod alongside the base weapon', () => {
+    const { processTaskData } = useGraphBuilder();
+    const needs = processTaskData([buildTask()]).neededItemTaskObjectives;
+    const byId = [...needs].sort((a, b) => a.id.localeCompare(b.id));
+    expect(byId.map((need) => [need.id, need.item?.id])).toEqual([
+      ['obj-build', 'vector'],
+      ['obj-build:foregrip', 'foregrip'],
+      ['obj-build:rail', 'rail'],
+    ]);
+    expect(needs.every((need) => need.taskId === 'gunsmith-11' && need.count === 1)).toBe(true);
+  });
+  it('keeps mod progress separate from the objective while pointing back to it', () => {
+    const { processTaskData } = useGraphBuilder();
+    const needs = processTaskData([buildTask()]).neededItemTaskObjectives;
+    const mods = needs.filter((need) => need.id !== 'obj-build');
+    expect(mods.map((need) => need.sourceObjectiveId)).toEqual(['obj-build', 'obj-build']);
+    expect(needs.find((need) => need.id === 'obj-build')?.sourceObjectiveId).toBeUndefined();
+  });
+  it('mirrors the objective found-in-raid flag onto its mods', () => {
+    const { processTaskData } = useGraphBuilder();
+    const needs = processTaskData([buildTask(true)]).neededItemTaskObjectives;
+    expect(needs.every((need) => need.foundInRaid === true)).toBe(true);
   });
 });

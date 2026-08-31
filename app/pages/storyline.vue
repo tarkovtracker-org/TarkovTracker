@@ -1,10 +1,10 @@
 <template>
   <div class="min-h-[calc(100vh-250px)] px-3 py-6 sm:px-6">
-    <div class="mx-auto max-w-[1400px] space-y-4">
+    <div class="mx-auto max-w-350 space-y-4">
       <div class="flex items-center justify-between">
         <div>
           <h1 class="text-xl font-bold text-white sm:text-2xl">
-            {{ t('page.storyline.title') }}
+            {{ t('common.storyline', 'Storyline') }}
           </h1>
           <p class="text-surface-400 mt-1 text-sm">
             {{ t('page.storyline.subtitle') }}
@@ -62,9 +62,9 @@
     layout: 'default',
   });
   useSeoMeta({
-    title: () => t('page.storyline.title'),
+    title: () => t('common.storyline', 'Storyline'),
     description: () => t('page.storyline.subtitle'),
-    ogTitle: () => t('page.storyline.title'),
+    ogTitle: () => t('common.storyline', 'Storyline'),
     ogDescription: () => t('page.storyline.subtitle'),
   });
   const tarkovStore = useTarkovStore();

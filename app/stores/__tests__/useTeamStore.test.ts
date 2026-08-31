@@ -1,6 +1,10 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useTeamStore } from '@/stores/useTeamStore';
+import {
+  mergeMemberProfileBroadcast,
+  resolveTeammateIdentity,
+  useTeamStore,
+} from '@/stores/useTeamStore';
 import type { TeamState, MemberProfile } from '@/types/tarkov';
 type TeamPatch = Omit<Partial<TeamState>, 'members'> & {
   join_code?: string | null;
@@ -476,10 +480,27 @@ describe('useTeamStore', () => {
     });
   });
   describe('Profile Data Updates', () => {
+    it('refreshes a retained teammate identity when mode and edition change', () => {
+      const initial = resolveTeammateIdentity(undefined, 'pvp');
+      const refreshed = resolveTeammateIdentity(
+        {
+          displayName: 'Player',
+          gameEdition: 4,
+          gameMode: 'seasonal',
+          level: 10,
+          tasksCompleted: 5,
+        },
+        initial.currentGameMode
+      );
+      expect(initial).toEqual({ currentGameMode: 'pvp', gameEdition: 1 });
+      expect(refreshed).toEqual({ currentGameMode: 'seasonal', gameEdition: 4 });
+    });
     it('should handle progress broadcast update pattern', () => {
       const store = useTeamStore();
       const initialProfile: MemberProfile = {
         displayName: 'Player',
+        gameEdition: 4,
+        gameMode: 'seasonal',
         level: 10,
         tasksCompleted: 5,
       };
@@ -487,21 +508,21 @@ describe('useTeamStore', () => {
       const broadcastData = {
         userId: 'user-1',
         displayName: 'UpdatedPlayer',
+        gameEdition: 99,
+        gameMode: 'pve' as const,
         level: 15,
         tasksCompleted: 10,
       };
       store.$patch((state) => {
-        state.memberProfiles = {
-          ...state.memberProfiles,
-          [broadcastData.userId]: {
-            displayName: broadcastData.displayName ?? null,
-            level: broadcastData.level ?? null,
-            tasksCompleted: broadcastData.tasksCompleted ?? null,
-          },
-        } as Record<string, MemberProfile>;
+        state.memberProfiles = mergeMemberProfileBroadcast(
+          state.memberProfiles || {},
+          broadcastData
+        );
       });
       expect(store.memberProfiles?.['user-1']?.level).toBe(15);
       expect(store.memberProfiles?.['user-1']?.tasksCompleted).toBe(10);
+      expect(store.memberProfiles?.['user-1']?.gameEdition).toBe(4);
+      expect(store.memberProfiles?.['user-1']?.gameMode).toBe('seasonal');
     });
   });
 });

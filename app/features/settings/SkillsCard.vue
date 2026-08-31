@@ -12,7 +12,7 @@
         <div class="flex items-center gap-1">
           <UButton
             size="xs"
-            :label="$t('settings.skills.sort.priority')"
+            :label="$t('common.priority')"
             :variant="skillSortMode === 'priority' ? 'solid' : 'outline'"
             :color="skillSortMode === 'priority' ? 'primary' : 'neutral'"
             @click="setSkillSortMode('priority')"
@@ -28,14 +28,24 @@
       </template>
       <template #content>
         <div class="space-y-4 px-4 py-4">
-          <p class="text-surface-400 text-xs">
-            {{
-              $t(
-                'settings.skills.explanation',
-                `Quest rewards are auto-calculated. Enter your total skill level (max ${MAX_SKILL_LEVEL}) to adjust the offset.`
-              )
-            }}
-          </p>
+          <div class="space-y-1">
+            <p class="text-surface-400 text-xs">
+              {{
+                $t(
+                  'settings.skills.explanation',
+                  `Quest rewards are auto-calculated. Enter your total skill level (max ${MAX_SKILL_LEVEL}) to adjust the offset.`
+                )
+              }}
+            </p>
+            <p v-if="hasShowAllToggle && !showAllSkills" class="text-surface-400 text-xs">
+              {{
+                $t('settings.skills.collapsed_hint', {
+                  shown: visibleSkills.length,
+                  total: allGameSkills.length,
+                })
+              }}
+            </p>
+          </div>
           <div
             v-if="allGameSkills.length > 0"
             class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
@@ -84,7 +94,7 @@
                       "
                     >
                       <UBadge color="accent" variant="soft" size="xs">
-                        {{ $t('skills.lv') }} {{ formatRequiredLevels(skill.requiredLevels) }}
+                        {{ $t('common.lv') }} {{ formatRequiredLevels(skill.requiredLevels) }}
                       </UBadge>
                     </UTooltip>
                   </div>
@@ -116,20 +126,42 @@
                 </span>
               </div>
               <div class="mb-2 flex gap-3 text-xs">
-                <div class="text-surface-400 flex-1">
-                  {{ $t('settings.skills.quest') }}
-                  <span class="text-surface-200 font-medium">
-                    {{ getQuestSkillLevel(skill.key) }}
-                  </span>
-                </div>
-                <div class="text-surface-400 flex-1">
-                  {{ $t('settings.skills.offset') }}
-                  <span class="text-surface-200 font-medium">{{ getSkillOffset(skill.key) }}</span>
-                </div>
+                <UTooltip
+                  :text="
+                    $t(
+                      'settings.skills.quest_tooltip',
+                      'Skill level granted automatically by completed quest rewards.'
+                    )
+                  "
+                  class="flex-1"
+                >
+                  <div class="text-surface-400 cursor-default" @click.stop>
+                    {{ $t('settings.skills.quest') }}
+                    <span class="text-surface-200 font-medium">
+                      {{ getQuestSkillLevel(skill.key) }}
+                    </span>
+                  </div>
+                </UTooltip>
+                <UTooltip
+                  :text="
+                    $t(
+                      'settings.skills.offset_tooltip',
+                      'Manual adjustment on top of the quest reward level. Positive means you trained the skill above quest rewards.'
+                    )
+                  "
+                  class="flex-1"
+                >
+                  <div class="text-surface-400 cursor-default" @click.stop>
+                    {{ $t('settings.skills.offset') }}
+                    <span class="text-surface-200 font-medium">
+                      {{ formatSkillOffset(getSkillOffset(skill.key)) }}
+                    </span>
+                  </div>
+                </UTooltip>
               </div>
               <div class="flex items-center gap-2">
                 <label :for="getSkillInputId(skill.key)" class="sr-only">
-                  {{ formatSkillName(skill.name) }} {{ $t('settings.skills.level') }}
+                  {{ formatSkillName(skill.name) }} {{ $t('common.level') }}
                 </label>
                 <UInput
                   :id="getSkillInputId(skill.key)"
@@ -159,7 +191,7 @@
                   :disabled="getSkillOffset(skill.key) === 0"
                   @click="resetOffset(skill.key)"
                 >
-                  {{ $t('settings.skills.reset') }}
+                  {{ $t('common.reset') }}
                 </UButton>
               </div>
             </div>
@@ -210,6 +242,15 @@
     if (smAndUp.value) return 2;
     return 1;
   });
+  const collapsedSkills = computed(() => {
+    const requiredSkills = allGameSkills.value.filter(
+      (skill) => (skill.requiredLevels?.length ?? 0) > 0
+    );
+    const optionalSkills = allGameSkills.value.filter(
+      (skill) => (skill.requiredLevels?.length ?? 0) === 0
+    );
+    return [...requiredSkills, ...optionalSkills];
+  });
   const skillsWithRequirementsCount = computed(() => {
     return allGameSkills.value.filter((skill) => (skill.requiredLevels?.length ?? 0) > 0).length;
   });
@@ -225,7 +266,7 @@
   });
   const visibleSkills = computed(() => {
     if (showAllSkills.value) return allGameSkills.value;
-    return allGameSkills.value.slice(0, collapsedVisibleCount.value);
+    return collapsedSkills.value.slice(0, collapsedVisibleCount.value);
   });
   const getSkillCardId = (skillKey: string): string =>
     `settings-skill-${skillKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
@@ -282,6 +323,8 @@
   const getSkillLevel = (skillKey: string) => skillCalculation.getSkillLevel(skillKey);
   const getQuestSkillLevel = (skillKey: string) => skillCalculation.getQuestSkillLevel(skillKey);
   const getSkillOffset = (skillKey: string) => skillCalculation.getSkillOffset(skillKey);
+  const formatSkillOffset = (offset: number): string =>
+    offset > 0 ? `+${offset}` : String(offset);
   const getDisplayLevel = (skillKey: string) => {
     const level = getSkillLevel(skillKey);
     return level >= MAX_SKILL_LEVEL ? t('skills.elite_level') : level;
@@ -289,7 +332,7 @@
   const showInvalidSkillValueToast = () => {
     toast.add({
       id: 'skill-invalid-value-error',
-      title: t('settings.skills.validation_error'),
+      title: t('common.validation_error'),
       description: t('settings.skills.valid_range', `Valid range: 0-${MAX_SKILL_LEVEL}`),
       color: 'error',
       icon: 'i-mdi-alert-circle',

@@ -4,6 +4,7 @@ describe('validateGameMode', () => {
   it('returns valid game mode values', () => {
     expect(validateGameMode('regular')).toBe('regular');
     expect(validateGameMode('pve')).toBe('pve');
+    expect(validateGameMode('pvp-season')).toBe('pvp-season');
   });
   it('normalizes case and whitespace', () => {
     expect(validateGameMode('  PvE  ')).toBe('pve');

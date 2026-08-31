@@ -318,12 +318,14 @@
 </template>
 <script setup lang="ts">
   import { useToast } from '#imports';
+  import GenericCard from '@/components/ui/GenericCard.vue';
   import { useAnalyticsEvents } from '@/composables/useAnalyticsEvents';
   import { useHideoutStationStatus } from '@/composables/useHideoutStationStatus';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { SPECIAL_STATIONS } from '@/utils/constants';
+  import HideoutRequirement from './HideoutRequirement.vue';
   import type {
     HideoutLevel,
     HideoutStation,
@@ -332,8 +334,6 @@
     StationLevelRequirement,
     TraderRequirement,
   } from '@/types/tarkov';
-  const GenericCard = defineAsyncComponent(() => import('@/components/ui/GenericCard.vue'));
-  const HideoutRequirement = defineAsyncComponent(() => import('./HideoutRequirement.vue'));
   const props = withDefaults(
     defineProps<{
       station: HideoutStation;

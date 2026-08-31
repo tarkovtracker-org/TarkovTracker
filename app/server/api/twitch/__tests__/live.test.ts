@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
 const { fetchMock, getQueryMock, setResponseHeadersMock, useRuntimeConfigMock } = vi.hoisted(
   () => ({
     fetchMock: vi.fn(),
@@ -45,9 +46,17 @@ describe('/api/twitch/live', () => {
     const handler = await loadHandler();
     const result = await handler({});
     expect(result).toEqual({ isLive: true });
+    expect(setResponseHeadersMock).toHaveBeenCalledWith(
+      {},
+      {
+        'cache-control': 'public, max-age=30, s-maxage=60',
+        'cloudflare-cdn-cache-control': 'public, max-age=30',
+      }
+    );
     const [url, init] = fetchMock.mock.calls[0] ?? [];
     expect(url).toBe('https://gql.twitch.tv/gql');
     expect((init.headers as Record<string, string>)['Client-ID']).toBe('test-client-id');
+    expect((init.headers as Record<string, string>)['User-Agent']).toBe(TARKOVTRACKER_USER_AGENT);
     // Channel must be lowercased before querying.
     expect(init.body).toContain('"login":"teststreamer"');
   });

@@ -1,3 +1,5 @@
+// @vitest-environment happy-dom
+import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GameMode } from '@/utils/constants';
 import type { TarkovDevImportResult } from '@/utils/tarkovDevProfileParser';
@@ -5,6 +7,18 @@ const mockFetch = vi.fn();
 const mockParseTarkovDevProfile = vi.fn();
 const mockSetTotalSkillLevel = vi.fn();
 const mockSetTotalXP = vi.fn();
+const { mockGetImportCooldownRemainingMs, mockRecordImportCompletion, mockUseRuntimeConfig } =
+  vi.hoisted(() => ({
+    mockGetImportCooldownRemainingMs: vi.fn(),
+    mockRecordImportCompletion: vi.fn(),
+    mockUseRuntimeConfig: vi.fn(),
+  }));
+mockNuxtImport('useRuntimeConfig', () => mockUseRuntimeConfig);
+mockNuxtImport('useI18n', () => () => ({ t: (key: string) => key }));
+vi.mock('@/utils/tarkovDevImportCooldown', () => ({
+  getImportCooldownRemainingMs: mockGetImportCooldownRemainingMs,
+  recordImportCompletion: mockRecordImportCompletion,
+}));
 const mockLogger = {
   debug: vi.fn(),
   error: vi.fn(),
@@ -64,6 +78,7 @@ const createImportData = (
   },
   tarkovUid: 1234567,
   totalXP: 3000,
+  updatedAt: null,
   ...overrides,
 });
 const createFile = (text: string): File =>
@@ -79,6 +94,10 @@ describe('useTarkovDevImport', () => {
     vi.resetAllMocks();
     vi.stubGlobal('$fetch', mockFetch);
     tarkovStore.getCurrentGameMode.mockReturnValue('pvp');
+    mockGetImportCooldownRemainingMs.mockReturnValue(0);
+    mockUseRuntimeConfig.mockReturnValue({
+      public: { tarkovDevImportCooldownMinutes: 60 },
+    });
     metadataStore.playerLevels = [
       { exp: 0, level: 1 },
       { exp: 1000, level: 5 },
@@ -133,6 +152,7 @@ describe('useTarkovDevImport', () => {
     const source = await composable.parseProfileUrl('https://tarkov.dev/players/regular/8560316');
     expect(mockFetch).toHaveBeenCalledWith('/api/tarkov-dev/profile', {
       query: { url: 'https://players.tarkov.dev/profile/8560316.json' },
+      retry: 0,
     });
     expect(mockParseTarkovDevProfile).toHaveBeenCalledWith({ aid: 8560316 });
     expect(source).toEqual({
@@ -154,6 +174,7 @@ describe('useTarkovDevImport', () => {
     const source = await composable.parseProfileUrl('https://tarkov.dev/players/pve/8560316');
     expect(mockFetch).toHaveBeenCalledWith('/api/tarkov-dev/profile', {
       query: { url: 'https://players.tarkov.dev/pve/8560316.json' },
+      retry: 0,
     });
     expect(source).toEqual({
       mode: 'pve',
@@ -181,10 +202,142 @@ describe('useTarkovDevImport', () => {
     expect(composable.importError.value).toBe(
       'Unable to fetch Tarkov.dev profile. Open the profile on Tarkov.dev, then try again.'
     );
+    expect(composable.importErrorCode.value).toBe('fetch_failed');
     expect(mockLogger.error).toHaveBeenCalledWith(
       '[TarkovDevImport] Profile URL fetch error:',
       expect.any(Error)
     );
+  });
+  it('sends the Turnstile token header when a token is provided', async () => {
+    mockFetch.mockResolvedValue({ aid: 8560316 });
+    mockParseTarkovDevProfile.mockReturnValue({
+      data: createImportData({ tarkovUid: 8560316 }),
+      ok: true,
+    });
+    const composable = await loadComposable();
+    await composable.parseProfileUrl('https://tarkov.dev/players/regular/8560316', {
+      turnstileToken: 'turnstile-token',
+    });
+    expect(mockFetch).toHaveBeenCalledWith('/api/tarkov-dev/profile', {
+      headers: { 'x-turnstile-token': 'turnstile-token' },
+      query: { url: 'https://players.tarkov.dev/profile/8560316.json' },
+      retry: 0,
+    });
+  });
+  it('blocks re-imports while the client cooldown is active', async () => {
+    mockGetImportCooldownRemainingMs.mockReturnValue(30 * 60_000);
+    const composable = await loadComposable();
+    const source = await composable.parseProfileUrl('https://tarkov.dev/players/regular/8560316');
+    expect(source).toBeNull();
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(composable.importErrorCode.value).toBe('cooldown_active');
+    expect(composable.importErrorMeta.value).toEqual({ minutes: 30 });
+  });
+  it('maps upstream 404 responses to the profile_not_generated code', async () => {
+    mockFetch.mockRejectedValue(
+      Object.assign(new Error('not found'), {
+        data: { data: { code: 'profile_not_generated' } },
+        statusCode: 404,
+      })
+    );
+    const composable = await loadComposable();
+    await composable.parseProfileUrl('https://tarkov.dev/players/regular/8560316');
+    expect(composable.importErrorCode.value).toBe('profile_not_generated');
+  });
+  it('maps rate limit responses to a minutes hint', async () => {
+    mockFetch.mockRejectedValue(
+      Object.assign(new Error('too many requests'), {
+        data: { data: { code: 'rate_limited', retryAfterSeconds: 3600 } },
+        statusCode: 429,
+      })
+    );
+    const composable = await loadComposable();
+    await composable.parseProfileUrl('https://tarkov.dev/players/regular/8560316');
+    expect(composable.importErrorCode.value).toBe('rate_limited');
+    expect(composable.importErrorMeta.value).toEqual({ minutes: 60 });
+  });
+  it('requests a fresh copy after a stale-profile rejection', async () => {
+    mockFetch.mockRejectedValueOnce(
+      Object.assign(new Error('stale'), {
+        data: { data: { ageDays: 12, code: 'profile_stale' } },
+        statusCode: 422,
+      })
+    );
+    const composable = await loadComposable();
+    await composable.parseProfileUrl('https://tarkov.dev/players/regular/8560316');
+    expect(composable.importErrorCode.value).toBe('profile_stale');
+    expect(composable.importErrorMeta.value).toEqual({ days: 12 });
+    mockFetch.mockResolvedValueOnce({ aid: 8560316 });
+    mockParseTarkovDevProfile.mockReturnValue({
+      data: createImportData({ tarkovUid: 8560316 }),
+      ok: true,
+    });
+    await composable.parseProfileUrl('https://tarkov.dev/players/regular/8560316');
+    expect(mockFetch).toHaveBeenLastCalledWith('/api/tarkov-dev/profile', {
+      query: { fresh: '1', url: 'https://players.tarkov.dev/profile/8560316.json' },
+      retry: 0,
+    });
+  });
+  it('clears a pending stale retry when the import flow is reset', async () => {
+    mockFetch.mockRejectedValueOnce(
+      Object.assign(new Error('stale'), {
+        data: { data: { ageDays: 12, code: 'profile_stale' } },
+        statusCode: 422,
+      })
+    );
+    const composable = await loadComposable();
+    await composable.parseProfileUrl('https://tarkov.dev/players/regular/8560316');
+    composable.reset();
+    mockFetch.mockResolvedValueOnce({ aid: 8560316 });
+    mockParseTarkovDevProfile.mockReturnValue({
+      data: createImportData({ tarkovUid: 8560316 }),
+      ok: true,
+    });
+    await composable.parseProfileUrl('https://tarkov.dev/players/regular/8560316');
+    expect(mockFetch).toHaveBeenLastCalledWith('/api/tarkov-dev/profile', {
+      query: { url: 'https://players.tarkov.dev/profile/8560316.json' },
+      retry: 0,
+    });
+  });
+  it('records the client cooldown after confirming a url import', async () => {
+    mockFetch.mockResolvedValue({ aid: 8560316 });
+    mockParseTarkovDevProfile.mockReturnValue({
+      data: createImportData({ tarkovUid: 8560316 }),
+      ok: true,
+    });
+    const composable = await loadComposable();
+    await composable.parseProfileUrl('https://tarkov.dev/players/pve/8560316');
+    await composable.confirmImport('pve');
+    expect(mockRecordImportCompletion).toHaveBeenCalledWith(8560316, 'pve', 60 * 60_000);
+  });
+  it('fetches and imports a seasonal pvp profile into seasonal progress', async () => {
+    mockFetch.mockResolvedValue({ aid: 8560316 });
+    mockParseTarkovDevProfile.mockReturnValue({
+      data: createImportData({ tarkovUid: 8560316 }),
+      ok: true,
+    });
+    const composable = await loadComposable();
+    await composable.parseProfileUrl('https://tarkov.dev/players/pvp-season/8560316');
+    await composable.confirmImport('seasonal');
+    expect(mockFetch).toHaveBeenCalledWith('/api/tarkov-dev/profile', {
+      query: { url: 'https://players.tarkov.dev/pvp-season/8560316.json' },
+      retry: 0,
+    });
+    expect(tarkovStore.switchGameMode).toHaveBeenNthCalledWith(1, 'seasonal');
+    expect(tarkovStore.setTarkovUid).toHaveBeenCalledWith(8560316);
+    expect(mockRecordImportCompletion).toHaveBeenCalledWith(8560316, 'seasonal', 60 * 60_000);
+    expect(tarkovStore.switchGameMode).toHaveBeenNthCalledWith(2, 'pvp');
+    expect(composable.importState.value).toBe('success');
+  });
+  it('does not record a cooldown for file imports', async () => {
+    mockParseTarkovDevProfile.mockReturnValue({
+      data: createImportData(),
+      ok: true,
+    });
+    const composable = await loadComposable();
+    await composable.parseFile(createFile('{"aid":123}'));
+    await composable.confirmImport('pvp');
+    expect(mockRecordImportCompletion).not.toHaveBeenCalled();
   });
   it('applies imported profile data and restores the original mode', async () => {
     const parsedData = createImportData({

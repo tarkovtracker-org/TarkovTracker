@@ -4,12 +4,12 @@
 
 Naming: `NUXT_*` = Nuxt private (server-only), `NUXT_PUBLIC_*` = Nuxt public (browser-exposed).
 
-**Nuxt app (set in Cloudflare Pages):**
+**Nuxt app (Cloudflare Pages):**
 
-- `NUXT_PUBLIC_SUPABASE_URL` — Supabase project URL (`SUPABASE_URL` also works as fallback)
-- `NUXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase anon key (`SUPABASE_ANON_KEY` also works)
-- `NUXT_SUPABASE_SERVICE_KEY` — Supabase service role key
-- `NUXT_PUBLIC_APP_URL` — Application URL (`APP_URL` / `CF_PAGES_URL` also work)
+- `SUPABASE_URL` — Supabase project URL, managed as plaintext in `wrangler.toml`
+- `SUPABASE_ANON_KEY` — Supabase anon key, managed as plaintext in `wrangler.toml`
+- `NUXT_SUPABASE_SERVICE_KEY` — encrypted Supabase service role key in the Pages dashboard
+- `APP_URL` — production application URL in `wrangler.toml`; previews use `CF_PAGES_URL`
 - `API_ALLOWED_HOSTS` — production host allowlist
 - `API_TRUST_PROXY` — only when overriding proxy auto-detection (forwarded headers are trusted
   only when `API_TRUST_PROXY=true` or `NITRO_PRESET` is explicitly set to a `cloudflare*`
@@ -39,6 +39,7 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
   (per-tier role IDs `DISCORD_SCAV_ROLE_ID` / `DISCORD_TIMMY_ROLE_ID` / `DISCORD_CHAD_ROLE_ID`
   are optional)
 - `DISCORD_LINKED_ROLE_ID` for the role applied after a user links Discord from Settings.
+- `APP_URL` for `admin-cache-purge` cache-key construction.
 
 Configure the Stripe webhook endpoint to send:
 
@@ -92,28 +93,83 @@ product.
 8. For the tarkov.dev profile cleanup rollout, snapshot `public.user_progress` before applying the
    destructive cleanup migration.
 
+## Seasonal Rollover
+
+Seasonal progress is reset by advancing the active season number, not by deleting rows. The new
+number selects a fresh `(user_id, seasonal, season_number)` row for every account; historical rows
+remain available for rollback and audit but are excluded from active progress, teams, profiles,
+backups, prestige, realtime, and public API reads.
+
+Prepare and deploy each rollover in two releases during the no-write gap between seasons:
+
+1. Prepare the next `ACTIVE_SEASON` values, matching database functions, metadata assertions, and
+   displayed season copy on separate application and database branches. Run the normal pre-deploy
+   validation plus the Supabase DB and API gateway suites for both final states.
+2. After the previous season's announced cutoff, deploy only the database migration that replaces
+   `private.active_season_number()`, `private.active_season_starts_on()`, and
+   `private.active_season_ends_at()`. Verify all three functions before continuing. Existing clients
+   fail closed on old-season writes during this gap instead of writing into the new season.
+3. Deploy the application release that updates `ACTIVE_SEASON` in `app/utils/constants.ts`. Verify
+   the app countdown and `/progress` Seasonal row selection before announcing the new season open.
+4. Do not combine the database flip and application constants in one merge because their production
+   deployment order is uncontrolled. Do not delete the previous season's rows.
+
 ## Deployment
+
+Merging to `main` deploys everything automatically. Three integrations do the work — none of them
+GitHub Actions — and each surfaces as a check on the merge commit:
+
+| What                                 | Mechanism                    | Check on the merge commit     |
+| ------------------------------------ | ---------------------------- | ----------------------------- |
+| Frontend                             | Cloudflare Pages Git build   | `Cloudflare Pages`            |
+| `api-gateway` Worker                 | Cloudflare Workers Git build | `Workers Builds: api-gateway` |
+| DB migrations **and** Edge Functions | Supabase GitHub integration  | `Supabase Preview`            |
+
+The Supabase check keeps the name `Supabase Preview` on `main`, where it targets the **production**
+project rather than a preview branch. Per-PR preview deploys are intentionally disabled to avoid
+per-preview billing, which is why the same check reports `skipping` on pull requests.
+
+The steps below are therefore mostly verification. The manual commands are a fallback for when an
+integration fails or is unavailable, not the normal path.
 
 1. Merge to `main` and verify CI workflow `Validate`, `Supabase DB`, and `Workers` jobs are green.
 2. Confirm the Pages project remains **fail open** so the static SPA shell still serves if the
    Functions daily quota is exhausted.
-3. **Apply DB migrations manually** (CI does not deploy them; Supabase branch/preview deploy is
-   intentionally disabled to avoid per-preview billing):
+3. **Verify DB migrations applied.** The Supabase integration applies pending migrations on merge.
+   Confirm rather than assume:
 
    ```bash
-   supabase migration list --linked   # any row with a blank REMOTE column is pending
-   supabase db push --linked          # apply pending migrations to production
+   supabase migration list --linked   # any row with a blank REMOTE column is still pending
    ```
 
-   Skip only if `migration list` shows nothing pending. Verify the change landed afterward.
-   **Ordering caveat:** workers auto-deploy from `main` (step 1) while migrations are manual, so
-   a worker that depends on a new DB object (e.g. the `merge_progress_data` RPC) breaks production
-   for the gap between merge and `db push`. For such changes, apply the pending migration to
-   production **before** merging the worker change; adding a function ahead of its caller is safe.
+   If a migration is still pending, apply it manually:
+
+   ```bash
+   supabase db push --linked
+   ```
+
+   `db push` is safe to run when nothing is pending — it reports `Remote database is up to date`.
+   Verify the object itself landed, not just the version row; for a constraint, check
+   `pg_constraint` (`convalidated = false` is expected for `NOT VALID`).
+
+   **Ordering caveat:** migrations, Workers and Edge Functions all deploy from the same merge and
+   you cannot control the order between them. Code that depends on a new DB object (e.g. a worker
+   calling the `merge_progress_data` RPC) can briefly run against a database that does not have it
+   yet. When the dependency matters, land the migration in an **earlier release** than the code
+   that uses it; adding a DB object ahead of its caller is safe, the reverse is not.
+
+   **Constraint/validation ordering:** the same applies when a migration adds a CHECK constraint
+   that an Edge Function also enforces in application code (e.g.
+   `api_tokens_token_value_game_mode_match` and the `tokenValue` guards in `token-create`). If the
+   constraint lands first, the still-unvalidated function can attempt a write the constraint
+   rejects, and the resulting Postgres `23514` (`check_violation`) surfaces as whatever that
+   function maps `23514` to — `token-create` reports it as `409 Token limit reached (3 active)`,
+   which sends debugging the wrong way. Ship the function validation in an earlier release than the
+   constraint when that distinction matters.
 
 4. **Pre-deploy secret check (api-gateway Worker):** before merging a change that relies on
-   `IP_HASH_SECRET` (e.g. any change to IP-backstop logging), confirm the secret is already
-   provisioned on the production `api-gateway` Worker:
+   `IP_HASH_SECRET` (e.g. any change to abuse-gate logs that emit `ip_hash`), confirm the secret is
+   already provisioned on the production `api-gateway` Worker:
 
    ```bash
    wrangler secret list --config workers/api-gateway/wrangler.toml   # confirm IP_HASH_SECRET is listed
@@ -121,19 +177,26 @@ product.
    ```
 
    The api-gateway Worker auto-deploys from `main` on merge. If `IP_HASH_SECRET` is absent at
-   deploy time, every 429 and `ip_backstop_unavailable` log line emits `ip_hash: null`, defeating
-   the IP-level abuse observability the change introduced. Provision the secret **before** merging
-   so the first post-merge request already has a non-null HMAC identifier. Do not commit the value.
+   deploy time, `abuse_gate_429` and `abuse_gate_unavailable` log lines emit `ip_hash: null`,
+   defeating the IP-level abuse observability the change introduced. Provision the secret **before**
+   merging so the first post-merge request already has a non-null HMAC identifier.
+   Do not commit the value.
 
-5. Confirm Cloudflare Pages and Cloudflare Workers Git deployments completed for `main`.
-6. Deploy Supabase Edge Functions after every change under `supabase/functions/`:
+5. Confirm the `Cloudflare Pages`, `Workers Builds: api-gateway` and `Supabase Preview` checks all
+   succeeded on the merge commit.
+6. **Verify Edge Functions deployed.** The Supabase integration deploys every function under
+   `supabase/functions/` on merge; confirm each changed function reports a new version in the
+   Supabase dashboard. Manual fallback:
 
    ```bash
    supabase functions deploy --use-api
    ```
 
-   This deploys all functions using the per-function JWT settings in `supabase/config.toml`. Confirm
-   every changed function reports the expected version in the Supabase dashboard.
+   Deploy **all** functions, not one. A scoped `supabase functions deploy <name>` omits
+   `supabase/functions/deno.json`, so the bare specifiers it maps (`shared/auth`) fail to resolve
+   and the deploy is rejected with a `Relative import path ... not prefixed with / or ./ or ../`
+   bundling error. `--use-api` applies the per-function `verify_jwt` settings from
+   `supabase/config.toml`.
 
 7. Confirm workers are serving the expected revision:
    - `workers/api-gateway`
@@ -170,8 +233,13 @@ These show up in Supabase logs / query performance and are expected. Do not trea
    - Source: Supabase Realtime's continuous WAL poller. Tops the chart by call volume, not
      latency (low mean time, ~99.9999% cache hit). Expected for an always-on poller.
    - Health checks: replication slots are `active`/`streaming` with `0 GB` lag, and the
-     `supabase_realtime` publication is narrowly scoped to `public.user_progress` only (not
-     `FOR ALL TABLES`). This is the desired configuration.
+     `supabase_realtime` publication is explicitly scoped to a named table list (not
+     `FOR ALL TABLES`). This is the desired configuration. The current list is
+     `public.user_progress` (added by `20251205120619`), `public.supporters` (added by
+     `20260714065213`), and `public.user_game_mode_progress` plus `public.team_memberships` (both
+     added by `20260804043342`). Verify with
+     `SELECT tablename FROM pg_publication_tables WHERE pubname = 'supabase_realtime';` and update
+     this list whenever a migration adds or removes a table.
    - Watch for: occasional high max-time correlates with an inactive/lagging replication slot.
      Verify with `supabase inspect db replication-slots --linked` (lag should stay ~0).
 
@@ -184,18 +252,52 @@ These show up in Supabase logs / query performance and are expected. Do not trea
 
 ## Database Migrations
 
+- **Never put a bulk data rewrite in a migration.** Migrations run in a transaction, so a
+  statement that exceeds `statement_timeout` rolls the whole file back — schema included — while the
+  Cloudflare Pages deploy from the same merge still succeeds. That is what took production down on
+  2026-08-06: the seasonal backfill timed out, `user_game_mode_progress` and
+  `sync_user_game_mode_progress` never got created, and the new frontend shipped against the old
+  schema, so every signed-in client got `404`s. Ship the schema first and make the app tolerate rows
+  that do not exist yet. If materialization is later required, use the approved operational process
+  below rather than another migration.
+- **Do not run a whole-table backfill through the migration runner on this project.** It was tried
+  twice on 2026-08-06 and failed both times, the second time taking user-facing writes with it. The
+  retry held an open transaction inserting into `user_game_mode_progress` for 30+ minutes, so every
+  signed-in client blocked on conflicting inserts during its startup sync and the app looked like a
+  broken login while auth itself was healthy. Two properties make this worse than it sounds: a
+  migration file is applied atomically even with `-- supabase:disable-transaction` (verified with a
+  probe whose earlier statements were rolled back by a later failure), so a backfill cannot be staged
+  inside one file; and the runner retries a failed migration on **every** later push to `main`,
+  including `chore(release)` commits, so a failing backfill re-runs unattended.
+  Prefer avoiding the data movement by making every read path fall back to the old source. If a
+  complete materialization later becomes a product requirement, treat it as approved operational
+  data maintenance rather than a schema migration: wait for a healthy Disk I/O Budget, invoke one
+  small key range per independently committed SQL Editor operation during low traffic, record
+  completed ranges in the incident/change log, and stop if database latency, CPU, memory, lock waits,
+  or I/O pressure rises.
+  This is a narrow exception for idempotent data maintenance; schema changes still require migration
+  files. Never put multiple range calls in one migration file because the deployment runner applies
+  the file atomically.
+- **Raise `statement_timeout` explicitly when a migration scans or rewrites whole tables**, and pair
+  the `SET` with a trailing `RESET statement_timeout;`.
+- **Nothing in CI runs a migration against production-sized data.** `supabase:check` resets an empty
+  local database, so per-row cost is invisible. Before merging a migration that touches every row,
+  estimate the row count and the per-row work by hand.
 - **Migrations are the source of truth. Do not change the production schema directly** via the
   Supabase dashboard / SQL editor. Direct edits cause drift: a fresh environment built from
   migrations no longer matches production, and the next `db push` can fail or apply destructive
   changes. Always write a migration.
-- **CI does NOT apply migrations to production.** The `Supabase DB` job only validates
-  (`supabase:check` = local reset + lint); no workflow runs `db push`. Supabase branch/preview
-  auto-deploy is intentionally **disabled** (it bills per ephemeral preview DB). Applying to prod
-  is a **manual step** after merge to `main` (see Deployment checklist):
+- **GitHub Actions does not apply migrations — the Supabase integration does.** The `Supabase DB`
+  job only validates (`supabase:check` = local reset + lint) and no workflow runs `db push`.
+  Application to production happens automatically on merge to `main` via the Supabase GitHub
+  integration, which surfaces as the `Supabase Preview` check on the merge commit. Per-PR preview
+  databases are intentionally **disabled** (they bill per ephemeral preview DB), so that same check
+  reports `skipping` on pull requests. Confirm the result after every merge and apply manually only
+  if something is still pending:
 
   ```bash
-  supabase migration list --linked   # confirm the new migration is pending (blank REMOTE column)
-  supabase db push --linked          # applies pending migrations to production
+  supabase migration list --linked   # blank REMOTE column = still pending
+  supabase db push --linked          # fallback if the integration did not apply it
   ```
 
   Then verify the change landed (e.g. catalog query / `has_column_privilege`).
@@ -223,6 +325,74 @@ These show up in Supabase logs / query performance and are expected. Do not trea
 - `supabase db diff` / `db pull` (shadow-DB based) fail in some CLI builds with
   `unknown flag: --mode`. `db dump`, `db query`, `db reset`, and `migration` work. The 2.101
   Go binary (`supabase-2.101` in `~/.local/bin`) can run `db diff` when the 2.108 wrapper cannot.
+
+## Production database observer
+
+The repository-owned `scripts/prod-db` command is the canonical read-only production inspection
+interface for agents and developers. It uses the Supabase CLI for the built-in inspection reports
+and a restricted SQL library for schema and bounded data-shape reports. It always emits normalized
+JSON and never applies migrations.
+
+Use a TLS-protected direct database connection for `PROD_DB_URL` (`:5432`, or session-mode Supavisor when direct
+IPv6 connectivity is unavailable). The transaction pooler is unsupported; the wrapper rejects a
+`:6543` URL because that is the documented default transaction-pooler endpoint, even though Supavisor
+can be configured differently. The URL must set `sslmode=verify-full` so both encryption and server
+certificate identity are enforced.
+The credential must belong to a dedicated observer role with no
+data-write or DDL privileges; the environment must not contain `service_role`, `postgres`, migration,
+or Management API credentials. The wrapper removes the URL password before invoking the Supabase
+CLI, supplies it through a temporary mode-`0600` `PGPASSFILE`, removes the file after each command,
+and redacts the password from command failures.
+
+```bash
+PROD_DB_TARGET=local scripts/prod-db health
+chmod 600 .prod-db.env
+set -a
+. ./.prod-db.env
+set +a
+scripts/prod-db canary
+scripts/prod-db table-stats
+scripts/prod-db preflight --migration supabase/migrations/20260807_example.sql
+```
+
+Store `PROD_DB_URL=postgresql://pi_prod_observer:...@...:5432/postgres?sslmode=verify-full` in the
+mode-`0600` `.prod-db.env` file so the password does not enter shell history. An inline environment
+assignment remains supported for non-interactive automation whose secret store masks command input.
+
+Available reports include `health`, `schema`, `db-stats`, `table-stats`, `index-stats`, `traffic`,
+`outliers`, `calls`, `locks`, `blocking`, `long-running`, `vacuum`, `bloat`, `role-stats`, bounded
+`sample`, `distribution`, and `count`. `sample` excludes columns matching the sensitive-column
+policy and is capped at 20 rows; `distribution` is capped at 50 groups. `EXPLAIN ANALYZE`, arbitrary
+SQL, writes, DDL, migration commands, and unbounded row access are not supported.
+
+`canary` is the first production validation command. It runs only health and telemetry reports:
+`db-stats`, `role-stats`, `table-stats`, `index-stats`, and `outliers`. It does not sample rows,
+run distributions, or execute migration preflight. Before collecting telemetry it rejects
+privileged or write-capable roles, persistent-object creation privileges, disabled default
+read-only transactions, and unbounded statement or lock timeouts. Every report includes an
+`observation` object with capture time, observer application name, database statistics reset time,
+statement statistics reset time, and I/O statistics reset time. These reset times are required to
+interpret cumulative counters.
+
+`preflight` parses the proposed migration to identify referenced relations and operation classes,
+then combines that information with production table/index, traffic, vacuum, query, lock, and
+blocking reports. The result is evidence-only and must be reviewed by a human before a migration is
+merged. It does not execute the migration. If the parser sees dynamic SQL, unsupported statements,
+quoted identifiers, multiple statements, or any unclassified syntax, it returns
+`assessment: incomplete`, `risk: unknown`, and `requires_manual_review: true`; it never treats an
+unrecognized migration as safe.
+
+Provision the observer role out of band through the Supabase SQL editor or approved database
+operation. Grant only `CONNECT`, required schema/catalog visibility, and `pg_monitor`; Supabase CLI
+inspection reports such as `db-stats` call monitoring functions that `pg_read_all_stats` alone does
+not permit. Grant `USAGE` on `extensions` and only explicit low-risk column-level `SELECT` when
+bounded samples or distributions are required. Set conservative connection defaults for
+`statement_timeout`, `lock_timeout`, `default_transaction_read_only`, and `application_name`;
+database privileges, not `default_transaction_read_only`, are the hard safety boundary.
+
+The production canary should be run manually after provisioning, using only the telemetry commands
+above. Confirm the role, reset timestamps, timeouts, and negligible observer impact before enabling
+Pi access. Do not make production role provisioning or the canary an automatic migration step.
 
 ## Incident Triage
 

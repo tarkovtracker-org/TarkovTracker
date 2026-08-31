@@ -13,7 +13,7 @@ Complete workflow automation setup for TarkovTracker with CI/CD pipelines, quali
 - Pre-commit hooks for code quality
 - Dependency update automation via Dependabot
 - Conservative auto-merge for low-risk Dependabot updates
-- AI review bots are manual-only; CodeRabbit is disabled in repo config, while CodeAnt and Kilo Code must stay disabled in their GitHub App dashboards unless explicitly requested.
+- AI review integrations are configured in their GitHub App dashboards. Cubic is currently the most consistent automatic reviewer; Greptile is a useful secondary reviewer. CodeRabbit remains useful when available but is frequently rate-limited. Kilo Code is disabled because its signal was low.
 
 ## GitHub Actions Workflows
 
@@ -24,7 +24,9 @@ Runs on every push and PR:
 **Jobs:**
 
 - `validate` - Lint, type checking, format check, tests, production build (sequential steps)
-- `workers` - Cloudflare Workers typecheck and OpenAPI validation
+- `workers` - Cloudflare Worker generated-type drift check, typecheck, OpenAPI validation,
+  deployment dry-run, and API gateway tests (Node unit tests plus a workerd smoke using the
+  production Wrangler configuration)
 
 **Triggers:** Push to `main`, `develop`, `wip/**` branches and all PRs
 
@@ -46,7 +48,8 @@ Semantic versioning with automated releases:
 **Jobs:**
 
 - Runs tests and build
-- Validates local Supabase migrations with `pnpm run supabase:check`
+- Resets and lints local Supabase migrations and runs pgTAP database regressions with
+  `pnpm run supabase:check`
 - Generates changelog from conventional commits
 - Creates GitHub releases
 - Updates version in package.json
@@ -58,6 +61,8 @@ Semantic versioning with automated releases:
 - `feat:` → minor version bump
 - `fix:` → patch version bump
 - `perf:` → patch version bump
+- `refactor:` → patch version bump
+- `revert:` → patch version bump
 - `BREAKING CHANGE:` → major version bump
 
 ### 4. PR Checks (`.github/workflows/pr-checks.yml`)
@@ -69,7 +74,18 @@ Enhanced PR validation:
 - `labeler` - Auto-label based on file changes
 - `size` - PR size classification (S/M/L/XL/XXL)
 - `conventional-commits` - Commit message validation
-- `lighthouse` - Performance checks (when `performance` label present)
+- `lighthouse` - Performance checks (runs when the PR touches `app/components/`, `app/features/`,
+  `lighthouserc.json`, or the PR Checks workflow, or carries the `performance` or `ui` label)
+
+**Lighthouse collection (`lighthouserc.json`):** each selected URL is audited once per Lighthouse
+job. Repeated runs are reserved for investigating a failure or for dedicated performance analysis;
+running each of three routes three times made the Lighthouse job the dominant PR bottleneck.
+
+**Lighthouse floors:** accessibility, best-practices and SEO are held at 0.90. Performance floors
+are per route and are set from measured CI values, not aspiration, because GitHub runners are noisy.
+The `/hideout` floor remains `0.20`; raising it requires fixing the underlying `/hideout` LCP
+regression first (about 5.1s before the Nuxt 4.5 / Vite 8 migration versus about 11.7s after — see
+issue #647), not re-tightening the gate.
 
 ### 5. Dependabot Auto Merge (`.github/workflows/dependabot-auto-merge.yml`)
 
@@ -81,16 +97,20 @@ Merges known low-risk Dependabot PRs after the normal PR checks complete:
 - testing tooling
 - tailwind tooling
 - release tooling
-- official GitHub Actions
-- third-party GitHub Actions minor/patch updates
 
 **Safety rules:**
 
 - Dependabot-only, `main`-targeted PRs only
 - No repository checkout in the privileged `pull_request_target` workflow
-- Only package lockfiles, package manifests, and workflow files are allowed
-- Runtime Nuxt, Cloudflare, TypeScript compiler, and catch-all dependency updates stay manual
-- PR must be mergeable and all standard CI/security checks must finish without failures
+- Only package lockfiles, package manifests, and `pnpm-workspace.yaml` are allowed; any workflow
+  change stays manual
+- Runtime Nuxt, Cloudflare, TypeScript compiler, catch-all dependencies, and all GitHub Actions
+  updates stay manual
+- GitHub Actions updates may require a repository or organization Actions allowlist change for the
+  new pinned SHA, which CI on the Dependabot branch cannot validate reliably
+- PR must stay on the validated head SHA and finish all check runs and the latest result for each
+  legacy status context without failures or pending results; the merge command also matches the
+  validated head commit to close the final race
 
 ### 6. Stale Management (`.github/workflows/stale.yml`)
 
@@ -140,7 +160,8 @@ bash scripts/setup-worktree.sh
 
 That runs `pnpm install --frozen-lockfile` and `pnpm exec husky`. If install is
 impossible, format staged paths yourself before committing (for example
-`prettier --write` on touched markdown, `eslint --fix` on touched app files).
+`prettier --write` on touched markdown, `eslint --fix` on touched app files, and
+`node scripts/lint-blank-lines.mjs --fix` on supported source/config files).
 
 ### Hooks
 
@@ -185,8 +206,9 @@ Automated via Dependabot (`.github/dependabot.yml`):
 **Features:**
 
 - Weekly dependency update batches for the pnpm workspace (root + `workers/api-gateway`)
-- Monthly grouped GitHub Actions updates
-- Official GitHub Actions are allowed to take major updates so runtime migrations do not get stuck behind a minor/patch-only rule
+- Monthly grouped GitHub Actions updates for manual review
+- Official GitHub Actions are allowed to propose major updates so runtime migrations do not get stuck
+  behind a minor/patch-only rule
 - Cooldown windows to avoid immediate churn from fresh releases
 - Patch cooldown is short so safe patch updates do not sit for a full week
 - Grouped minor/patch updates for low-risk tooling families
@@ -209,9 +231,12 @@ Automated via Dependabot (`.github/dependabot.yml`):
 **Review strategy:**
 
 - Let Dependabot batch low-risk tooling updates for scheduled review windows
-- Let the auto-merge workflow clear allowlisted tooling/action PRs after checks pass
+- Let the auto-merge workflow clear allowlisted npm tooling PRs after checks pass
+- Review every GitHub Actions PR manually, including minor and patch updates; update repository and
+  organization Actions allowlists first when the pinned SHA is restricted
 - Keep major upgrades explicit
-- Allow official GitHub-maintained actions to take major updates when GitHub changes required action runtimes
+- Allow official GitHub-maintained actions to propose major updates when GitHub changes required
+  action runtimes, but do not auto-merge them
 - Keep transitive lockfile churn out of version-update PRs unless GitHub raises a security fix
 - Keep Nuxt/runtime, Cloudflare deployment tooling, TypeScript compiler, and catch-all dependency updates manual
 - Review security PRs promptly; they remain separate from the scheduled version-update batches unless GitHub grouped security updates are enabled in repository settings
@@ -251,9 +276,18 @@ Push to `main` triggers:
 1. CI validation in GitHub Actions
 2. Cloudflare Pages deploy for the connected branch
 3. Cloudflare-managed worker deploys for the connected branch
-4. Smoke tests in production
+4. Supabase GitHub integration — applies pending DB migrations and deploys Edge Functions
+   (surfaces as the `Supabase Preview` check on the merge commit)
+5. Smoke tests in production
+
+GitHub Actions itself deploys nothing; items 2-4 are separate Git integrations. See the Deployment
+section of [`runbook.md`](./runbook.md) for what to verify after each merge.
 
 ### Manual Deployment
+
+Fallback only, for when an integration fails. Supabase fallbacks (`supabase db push --linked`,
+`supabase functions deploy --use-api`) are documented in [`runbook.md`](./runbook.md) rather than
+duplicated here:
 
 ```bash
 # Local deployment (run from project root: /home/lab/TarkovTracker or equivalent)
@@ -267,11 +301,11 @@ pnpm --filter api-gateway exec wrangler deploy
 
 ### Coverage Reports
 
-Coverage reporting can be enabled by:
-
-- Adding `CODECOV_TOKEN` secret to repository
-- Configuring vitest with coverage options
-- Adding coverage upload step to CI workflow
+- Coverage is uploaded to Codecov by the CI `test` job. Repo-level config is in `codecov.yml`. Uses the org-level `CODECOV_TOKEN` secret for token-authenticated uploads (required on protected branches).
+- Bundle analysis is uploaded by the CI `validate` job during `pnpm run build` via `@codecov/nuxt-plugin` (configured in `nuxt.config.ts`). The plugin only activates when `CODECOV_TOKEN` is set, so local builds are unaffected.
+- Test results (JUnit XML) are uploaded via `codecov/codecov-action` with `report_type: test_results`. Vitest outputs `test-report.junit.xml` when `CI=true` (configured in `vitest.config.ts`). The upload step is `!cancelled()`-gated so failing shards' reports still reach Codecov.
+- The CI `test` job runs as a 4-way shard matrix (`Test (shard 1/4)` through `Test (shard 4/4)`). Each shard sets `VITEST_SHARD=N/4`, which enables the `github-actions` reporter (annotates failed tests on the PR diff), disables per-shard coverage thresholds, and reports only files imported by that shard. Codecov merges the per-shard lcov uploads and enforces an absolute floor via the `absolute-floor` project status in `codecov.yml`.
+- Local `pnpm run test` / `pnpm run test:coverage` remain unsharded. Coverage runs retain the full `app/**/*.{ts,vue}` denominator and enforce the Vitest thresholds.
 
 ## Local Development Workflow
 
@@ -306,8 +340,9 @@ pnpm exec vitest --ui        # UI dashboard
 ### Format & Lint
 
 ```bash
-pnpm run format         # Prettier + ESLint fix
-pnpm run lint           # Lint check
+pnpm run format         # Prettier + ESLint + blank-line fix
+pnpm run lint           # Lint
+pnpm run lint:blank-lines # Blank-line check only
 pnpm run lint:fix       # Auto-fix issues
 ```
 

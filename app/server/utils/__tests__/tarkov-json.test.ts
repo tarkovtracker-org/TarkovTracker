@@ -14,7 +14,7 @@ import {
 } from '@/server/utils/tarkov-json';
 type TestJsonFetcher = <T = unknown>(
   url: string,
-  request: { headers: { Accept: string }; retry: number; timeout: number }
+  request: { headers: Record<string, string>; retry: number; timeout: number }
 ) => Promise<T>;
 const createFetcher = (responses: Record<string, unknown>) =>
   vi.fn(async (url: string) => {
@@ -396,7 +396,16 @@ describe('tarkov JSON adapters', () => {
         map: 'map1',
         requiredPrestige: 'prestige1',
         taskRequirements: [{ task: 'task0', status: ['complete'] }],
-        traderRequirements: [{ trader: 'trader1', value: 0.2 }],
+        traderRequirements: [
+          { trader: 'trader1', value: 0.2 },
+          {
+            id: 'level-req1',
+            requirementType: 'level',
+            compareMethod: '>=',
+            value: 2,
+            trader: 'trader1',
+          },
+        ],
         objectives: [
           {
             id: 'objective1',
@@ -469,12 +478,12 @@ describe('tarkov JSON adapters', () => {
       [{ id: 'item1' }],
       [{ id: 'item2' }, { id: 'missing-item' }],
     ]);
-    expect(objectives?.objectives?.[0]?.__typename).toBe('TaskObjectiveItem');
+    expect(objectives?.objectives?.[0]?.type).toBe('giveItem');
     expect(objectives?.objectives?.[0]?.items?.[0]).toEqual({ id: 'item1' });
     expect(objectives?.objectives?.[0]?.items?.[24]).toEqual({ id: 'bulk-item-23' });
     expect(objectives?.objectives?.[0]?.items?.[25]).toEqual({ id: 'bulk-item-24' });
     expect(objectives?.objectives?.[1]).toMatchObject({
-      __typename: 'TaskObjectiveQuestItem',
+      type: 'findQuestItem',
       questItem: { id: 'questItem1', name: 'Bronze pocket watch' },
     });
     const rewards = adaptTaskRewardsResponse(tasksPayload, { tradersPayload }).data.tasks[0];
@@ -489,7 +498,7 @@ describe('tarkov JSON adapters', () => {
       tradersPayload,
     }).data.tasks[0];
     expect(objectives?.objectives?.[2]).toMatchObject({
-      __typename: 'TaskObjectiveSkill',
+      type: 'skill',
       skillLevel: {
         name: 'Vitality',
         level: 5,
@@ -515,10 +524,49 @@ describe('tarkov JSON adapters', () => {
       tradersPayload,
     }).data.tasks[0];
     expect(objectives?.objectives?.[0]).toMatchObject({
-      __typename: 'TaskObjectiveItem',
+      type: 'giveItem',
       maps: [{ id: 'map1', name: 'Customs' }],
       items: expect.arrayContaining([expect.objectContaining({ id: 'item1', name: 'Salewa' })]),
     });
+  });
+  it('splits trader requirements by requirementType (level vs reputation)', () => {
+    const tasks = adaptTasksCoreResponse(tasksPayload, mapsPayload, tradersPayload).data.tasks;
+    expect(tasks[0]?.traderLevelRequirements).toEqual([
+      {
+        id: 'level-req1',
+        trader: { id: 'trader1', name: 'Prapor' },
+        level: 2,
+        requirementType: 'level',
+        compareMethod: '>=',
+      },
+    ]);
+    expect(tasks[0]?.traderRequirements).toEqual([
+      {
+        trader: { id: 'trader1', name: 'Prapor' },
+        value: 0.2,
+      },
+    ]);
+  });
+  it('drops level trader requirements without a finite threshold', () => {
+    const payload = structuredClone(tasksPayload) as typeof tasksPayload;
+    const task = payload.tasks['task1'];
+    task?.traderRequirements?.push({
+      id: 'bad-level',
+      requirementType: 'level',
+      compareMethod: '>=',
+      value: Number.POSITIVE_INFINITY,
+      trader: 'trader1',
+    });
+    const tasks = adaptTasksCoreResponse(payload, mapsPayload, tradersPayload).data.tasks;
+    expect(tasks[0]?.traderLevelRequirements).toEqual([
+      {
+        id: 'level-req1',
+        trader: { id: 'trader1', name: 'Prapor' },
+        level: 2,
+        requirementType: 'level',
+        compareMethod: '>=',
+      },
+    ]);
   });
   it('adapts hideout and prestige data without items lookup', () => {
     const hideout = adaptHideoutResponse(hideoutPayload, { tradersPayload }).data;
@@ -543,11 +591,11 @@ describe('tarkov JSON adapters', () => {
       hideoutPayload,
       tradersPayload,
     }).data.prestige[0];
-    expect(prestige?.conditions?.map((condition) => condition.__typename)).toEqual([
-      'TaskObjectivePlayerLevel',
-      'TaskObjectiveTaskStatus',
-      'TaskObjectiveHideoutStation',
-      'TaskObjectiveItem',
+    expect(prestige?.conditions?.map((condition) => condition.type)).toEqual([
+      'playerLevel',
+      'taskStatus',
+      'hideoutStation',
+      'haveItem',
     ]);
     expect(prestige?.conditions?.[1]?.task).toMatchObject({ id: 'task1', name: 'Debut' });
   });

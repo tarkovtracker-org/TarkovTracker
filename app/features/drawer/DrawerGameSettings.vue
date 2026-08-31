@@ -1,36 +1,31 @@
 <template>
   <div class="flex flex-col gap-1.5 px-3 py-1">
-    <div
-      class="flex w-full overflow-hidden rounded-md border border-white/10"
-      role="group"
-      :aria-label="t('game_settings.toggle_game_mode_label')"
+    <SelectMenuFixed
+      :model-value="currentGameMode"
+      :items="modeOptions"
+      value-key="value"
+      label-key="label"
+      :disabled="dataLoading"
+      :aria-label="t('game_settings.select_game_mode_label', 'Select game mode')"
+      class="w-full"
+      :ui="{ base: 'min-h-9 w-full' }"
+      @update:model-value="switchMode($event as GameMode)"
     >
-      <button
-        type="button"
-        class="focus:ring-pvp-400 flex min-h-8 flex-1 items-center justify-center gap-1 px-2 py-1.5 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:outline-none"
-        :class="pvpClasses"
-        :disabled="dataLoading"
-        :aria-pressed="currentGameMode === GAME_MODES.PVP"
-        @click="switchMode(GAME_MODES.PVP)"
-      >
-        <UIcon name="i-mdi-sword-cross" class="h-3.5 w-3.5 shrink-0" />
-        <span class="leading-none">{{ t('game_settings.pvp') }}</span>
-      </button>
-      <button
-        type="button"
-        class="focus:ring-pve-400 flex min-h-8 flex-1 items-center justify-center gap-1 px-2 py-1.5 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:outline-none"
-        :class="pveClasses"
-        :disabled="dataLoading"
-        :aria-pressed="currentGameMode === GAME_MODES.PVE"
-        @click="switchMode(GAME_MODES.PVE)"
-      >
-        <UIcon name="i-mdi-account-group" class="h-3.5 w-3.5 shrink-0" />
-        <span class="leading-none">{{ t('game_settings.pve') }}</span>
-      </button>
-    </div>
+      <template #leading>
+        <UIcon :name="currentModeOption.icon" class="h-4 w-4" />
+      </template>
+    </SelectMenuFixed>
     <div v-if="switchModeError" class="text-error-400 text-xs" role="alert">
       {{ switchModeError }}
     </div>
+    <time
+      v-if="currentGameMode === GAME_MODES.SEASONAL"
+      :datetime="ACTIVE_SEASON.endsAt"
+      class="text-warning-300 text-xs"
+      :title="seasonEndDate"
+    >
+      {{ seasonCountdownLabel }}
+    </time>
     <div
       class="flex w-full overflow-hidden rounded-md border border-white/10"
       role="group"
@@ -59,14 +54,23 @@
 </template>
 <script setup lang="ts">
   import { storeToRefs } from 'pinia';
+  import SelectMenuFixed from '@/components/SelectMenuFixed.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import { GAME_MODES, PMC_FACTIONS, type GameMode, type PMCFaction } from '@/utils/constants';
+  import {
+    ACTIVE_SEASON,
+    GAME_MODES,
+    getActiveSeasonTimeRemaining,
+    PMC_FACTIONS,
+    type GameMode,
+    type PMCFaction,
+  } from '@/utils/constants';
   import { logger } from '@/utils/logger';
   const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
   const { t } = useI18n({ useScope: 'global' });
   const switchModeError = ref('');
+  const seasonCountdownNow = ref(Date.now());
   const factions = PMC_FACTIONS;
   const currentFaction = computed<PMCFaction>(() => tarkovStore.getPMCFaction());
   function setFaction(faction: PMCFaction) {
@@ -75,15 +79,55 @@
     }
   }
   const currentGameMode = computed(() => tarkovStore.getCurrentGameMode());
-  const pveClasses = computed(() =>
-    currentGameMode.value === GAME_MODES.PVE
-      ? 'bg-pve-500 hover:bg-pve-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]'
-      : 'bg-transparent text-pve-600 hover:bg-pve-950/50 hover:text-pve-400'
+  const seasonEndDate = computed(() => new Date(ACTIVE_SEASON.endsAt).toLocaleString());
+  const seasonCountdownLabel = computed(() => {
+    const remaining = getActiveSeasonTimeRemaining(seasonCountdownNow.value);
+    if (remaining.expired) {
+      return t(
+        'game_settings.season_ended',
+        { season: ACTIVE_SEASON.number },
+        'Season {season} has ended'
+      );
+    }
+    return t(
+      'game_settings.season_ends_in',
+      {
+        days: remaining.days,
+        hours: remaining.hours,
+        minutes: remaining.minutes,
+        season: ACTIVE_SEASON.number,
+      },
+      'Season {season} ends in {days}d {hours}h {minutes}m'
+    );
+  });
+  watch(
+    currentGameMode,
+    (mode, _, onCleanup) => {
+      if (mode !== GAME_MODES.SEASONAL) return;
+      seasonCountdownNow.value = Date.now();
+      const timer = setInterval(() => {
+        seasonCountdownNow.value = Date.now();
+      }, 60_000);
+      onCleanup(() => clearInterval(timer));
+    },
+    { immediate: true }
   );
-  const pvpClasses = computed(() =>
-    currentGameMode.value === GAME_MODES.PVP
-      ? 'bg-pvp-800 hover:bg-pvp-700 text-pvp-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]'
-      : 'bg-transparent text-pvp-600 hover:bg-pvp-950/50 hover:text-pvp-400'
+  const modeOptions = computed(() => [
+    { icon: 'i-mdi-sword-cross', label: t('common.pvp', 'PvP'), value: GAME_MODES.PVP },
+    { icon: 'i-mdi-account-group', label: t('common.pve', 'PvE'), value: GAME_MODES.PVE },
+    {
+      icon: 'i-mdi-calendar-star',
+      label: t('common.seasonal_pvp', 'Seasonal PvP'),
+      value: GAME_MODES.SEASONAL,
+    },
+  ]);
+  const currentModeOption = computed(
+    () =>
+      modeOptions.value.find((option) => option.value === currentGameMode.value) ?? {
+        icon: 'i-mdi-sword-cross',
+        label: t('common.pvp', 'PvP'),
+        value: GAME_MODES.PVP,
+      }
   );
   const { loading: dataLoading } = storeToRefs(metadataStore);
   async function switchMode(mode: GameMode) {

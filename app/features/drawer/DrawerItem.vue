@@ -46,7 +46,7 @@
     isActive.value ? 'text-white' : 'text-surface-300 group-hover:text-white'
   );
   const labelText = computed(() => {
-    if (props.localeKey) return t(`navigation_drawer.${props.localeKey}`);
+    if (props.localeKey) return t(props.localeKey);
     return props.text ?? '';
   });
 </script>

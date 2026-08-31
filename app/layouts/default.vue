@@ -49,22 +49,31 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useScrollRoot } from '@/composables/useScrollRoot';
   import { useSharedBreakpoints } from '@/composables/useSharedBreakpoints';
+  import AppBar from '@/shell/AppBar.vue';
+  import AppFooter from '@/shell/AppFooter.vue';
+  import NavDrawer from '@/shell/NavDrawer.vue';
   import { useAppStore } from '@/stores/useApp';
-  const DRAWER_EXPANDED_WIDTH = '224px';
-  const DRAWER_COLLAPSED_WIDTH = '64px';
+  import { logger } from '@/utils/logger';
+  import { SHELL_DRAWER_COLLAPSED_WIDTH, SHELL_DRAWER_EXPANDED_WIDTH } from '@/utils/shellConfig';
+  const consentBannerImport = () => import('@/components/analytics/AnalyticsConsentBanner.vue');
+  const AnalyticsConsentBanner = defineAsyncComponent(consentBannerImport);
+  if (import.meta.client) {
+    consentBannerImport().catch((error) => {
+      logger.error('[AnalyticsConsentBanner] Failed to preload chunk:', error);
+    });
+  }
   const appStore = useAppStore();
-  const route = useRoute();
-  // Use shared breakpoints to avoid duplicate listeners
   const { belowMd } = useSharedBreakpoints();
+  const { usesWindowScroll } = useScrollRoot();
   const mainMarginLeft = computed(() => {
     if (belowMd.value) {
-      return appStore.mobileDrawerExpanded ? DRAWER_EXPANDED_WIDTH : DRAWER_COLLAPSED_WIDTH;
+      return appStore.mobileDrawerExpanded
+        ? SHELL_DRAWER_EXPANDED_WIDTH
+        : SHELL_DRAWER_COLLAPSED_WIDTH;
     }
-    return appStore.drawerRail ? DRAWER_COLLAPSED_WIDTH : DRAWER_EXPANDED_WIDTH;
-  });
-  const usesWindowScroll = computed(() => {
-    return Boolean(route.meta?.usesWindowScroll);
+    return appStore.drawerRail ? SHELL_DRAWER_COLLAPSED_WIDTH : SHELL_DRAWER_EXPANDED_WIDTH;
   });
   useHead(
     computed(() => ({
@@ -77,11 +86,4 @@
     'flex min-h-0 flex-1 flex-col p-0',
     usesWindowScroll.value ? 'overflow-visible' : 'overflow-y-auto',
   ]);
-  // Lazy-load shell components
-  const NavDrawer = defineAsyncComponent(() => import('@/shell/NavDrawer.vue'));
-  const AppFooter = defineAsyncComponent(() => import('@/shell/AppFooter.vue'));
-  const AppBar = defineAsyncComponent(() => import('@/shell/AppBar.vue'));
-  const AnalyticsConsentBanner = defineAsyncComponent(
-    () => import('@/components/analytics/AnalyticsConsentBanner.vue')
-  );
 </script>

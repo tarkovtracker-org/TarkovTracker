@@ -103,7 +103,14 @@ const mockFetch = vi.fn(
     throw new Error(`Unmocked fetch call to: ${url}. Add a mock for this URL in test-setup.ts`);
   }
 );
-vi.stubGlobal('$fetch', mockFetch);
+const delegator = vi.fn(async (input: FetchInput, init?: RequestInit): Promise<unknown> => {
+  const current = (globalThis as Record<string, unknown>).$fetch;
+  if (current && current !== delegator && vi.isMockFunction(current)) {
+    return (current as (i: FetchInput, init?: RequestInit) => unknown)(input, init);
+  }
+  return mockFetch(input, init);
+});
+vi.stubGlobal('$fetch', delegator);
 // Auto-unmount VTU wrappers after each test
 try {
   enableAutoUnmount(afterEach);

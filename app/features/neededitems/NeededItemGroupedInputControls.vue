@@ -3,7 +3,7 @@
     <div v-if="firNeeded > 0" class="flex items-center justify-between gap-4">
       <div class="flex items-center gap-2">
         <UIcon name="i-mdi-checkbox-marked-circle-outline" class="text-warning-400 h-4 w-4" />
-        <span class="text-sm font-medium">{{ $t('needed_items.fir') }}</span>
+        <span class="text-sm font-medium">{{ $t('common.fir') }}</span>
       </div>
       <div class="flex items-center gap-2">
         <div class="bg-surface-700 flex items-center rounded-lg border border-white/20">

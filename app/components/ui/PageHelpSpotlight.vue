@@ -133,7 +133,7 @@
   </Teleport>
 </template>
 <script setup lang="ts">
-  export interface PageHelpSpotlightStep {
+  interface PageHelpSpotlightStep {
     avoidSelector?: string;
     advanceOnSelector?: string;
     bullets?: string[];

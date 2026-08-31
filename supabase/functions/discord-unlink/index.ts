@@ -11,23 +11,18 @@ import {
   removeLinkedAccountRole,
   removeSupporterRole,
 } from '../_shared/discord.ts';
-
 type DiscordAccountLink = {
   discord_user_id: string;
 };
-
 Deno.serve(async (req: Request) => {
   const cors = handleCorsPreflight(req);
   if (cors) return cors;
-
   const methodError = validateMethod(req, ['POST']);
   if (methodError) return methodError;
-
   const auth = await authenticateUser(req);
   if ('error' in auth) {
     return createErrorResponse(auth.error, auth.status, req);
   }
-
   const { data: link, error: linkError } = await auth.supabase
     .from('discord_account_links')
     .select('discord_user_id')
@@ -40,7 +35,6 @@ Deno.serve(async (req: Request) => {
   if (!link) {
     return createSuccessResponse({ revoked: false, reason: 'not_linked' }, 200, req);
   }
-
   try {
     await removeAllTierRoles(link.discord_user_id);
     await removeSupporterRole(link.discord_user_id);
@@ -52,6 +46,5 @@ Deno.serve(async (req: Request) => {
     console.error('[discord-unlink] Failed to revoke managed Discord roles:', error);
     return createErrorResponse('Unable to revoke managed Discord roles', 502, req);
   }
-
   return createSuccessResponse({ revoked: true }, 200, req);
 });

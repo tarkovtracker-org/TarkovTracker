@@ -9,19 +9,16 @@
  */
 function getAllowedOrigins(): string[] {
   const defaults = ['https://tarkovtracker.org', 'https://www.tarkovtracker.org'];
-
   const extra =
     Deno.env
       .get('SUPABASE_ALLOWED_ORIGINS')
       ?.split(',')
       .map((s) => s.trim())
       .filter(Boolean) ?? [];
-
   const local: string[] = [];
   if (Deno.env.get('ALLOW_LOCALHOST_CORS') === 'true') {
     local.push('http://localhost:3000', 'http://127.0.0.1:3000');
   }
-
   const set = new Set<string>([...defaults, ...extra, ...local]);
   return Array.from(set);
 }
@@ -43,12 +40,3 @@ export function corsHeadersFor(req: Request): Record<string, string> {
   }
   return headers;
 }
-// Backward-compat export to avoid immediate runtime breakage in places where
-// a Request object is not available. This intentionally does NOT include an
-// origin and should only be used for pre-flight responses that aren't
-// security-sensitive. Prefer using corsHeadersFor(req) everywhere.
-export const corsHeaders: Record<string, string> = {
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  Vary: 'Origin',
-};

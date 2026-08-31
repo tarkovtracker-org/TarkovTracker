@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mergeProgressData } from '@/stores/useTarkov';
-import type { UserProgressData } from '@/stores/progressState';
+import { hasProgress, mergeProgressData } from '@/stores/tarkov/progressMerge';
+import type { UserProgressData, UserState } from '@/stores/progressState';
 const createProgressData = (
   storyChapters: UserProgressData['storyChapters']
 ): UserProgressData => ({
@@ -88,6 +88,21 @@ describe('mergeProgressData story chapters', () => {
       complete: true,
       timestamp: 2000,
     });
+  });
+});
+describe('hasProgress metadata state', () => {
+  it('treats prestige and reset epochs as progress', () => {
+    const empty = createProgressData({});
+    const state = {
+      currentGameMode: 'seasonal',
+      gameEdition: 1,
+      tarkovUid: null,
+      pvp: empty,
+      pve: empty,
+      seasonal: { ...empty, prestigeLevel: 1, progressEpoch: 0 },
+    } as UserState;
+    expect(hasProgress(state)).toBe(true);
+    expect(hasProgress({ ...state, seasonal: { ...empty, progressEpoch: 1 } })).toBe(true);
   });
 });
 describe('mergeProgressData progress epoch', () => {

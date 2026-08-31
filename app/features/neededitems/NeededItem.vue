@@ -294,7 +294,8 @@
     }
     if (props.need.needType == 'taskObjective') {
       // Safely get completions, defaulting to empty object
-      const objectiveCompletions = progressStore.objectiveCompletions?.[props.need.id] || {};
+      const objectiveCompletions =
+        progressStore.objectiveCompletions?.[props.need.sourceObjectiveId ?? props.need.id] || {};
       const taskCompletions = progressStore.tasksCompletions?.[props.need.taskId] || {};
       // Find all teammates (not self) that need this objective
       Object.entries(objectiveCompletions).forEach(([user, completed]) => {

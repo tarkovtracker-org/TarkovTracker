@@ -1,12 +1,14 @@
 import { getMemoryCache, setMemoryCache } from '../utils/memory-cache';
 import { TARKOVTRACKER_USER_AGENT } from '../utils/userAgent';
-import type { TarkovHideoutStation, TarkovTask } from '../types';
+import type { GameMode, TarkovHideoutStation, TarkovTask } from '../types';
 const CACHE_TTL = 3600; // 1 hour
 const FETCH_TIMEOUT_MS = 30_000;
 const JSON_BASE_URL = 'https://json.tarkov.dev';
-type GameMode = 'pvp' | 'pve';
-const getApiGameMode = (gameMode: GameMode): 'regular' | 'pve' =>
-  gameMode === 'pve' ? 'pve' : 'regular';
+const getApiGameMode = (gameMode: GameMode): 'regular' | 'pve' | 'pvp-season' => {
+  if (gameMode === 'pve') return 'pve';
+  if (gameMode === 'seasonal') return 'pvp-season';
+  return 'regular';
+};
 // Fetch a json.tarkov.dev endpoint and unwrap the { data: ... } envelope.
 // Returns null on any error so callers degrade to empty data instead of
 // throwing.

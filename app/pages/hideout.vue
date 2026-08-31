@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-full overflow-x-hidden">
     <div class="px-3 py-5 sm:px-5 sm:py-6">
-      <div class="mx-auto max-w-[1400px] space-y-3 sm:space-y-4">
+      <div class="mx-auto max-w-350 space-y-3 sm:space-y-4">
         <div class="flex flex-col gap-4">
           <div class="flex justify-center">
             <div
@@ -58,13 +58,13 @@
                     variant="ghost"
                     size="sm"
                     data-help-target="hideout-settings-button"
-                    :aria-label="t('settings.title')"
+                    :aria-label="t('common.settings')"
                     :aria-pressed="isSettingsOpen"
                     :class="isSettingsOpen ? 'bg-white/10 text-white' : 'text-surface-400'"
                     @click="toggleSettingsDrawer"
                   >
                     <span class="hidden sm:inline">
-                      {{ t('settings.title').toUpperCase() }}
+                      {{ t('common.settings').toUpperCase() }}
                     </span>
                   </UButton>
                 </div>
@@ -92,7 +92,7 @@
               <template #footer>
                 <div class="flex justify-end gap-2 px-4 pb-4">
                   <UButton color="neutral" variant="ghost" @click="cancelPrereqToggle">
-                    {{ helpText('page.hideout.prereq_filters.confirm_cancel', 'Cancel') }}
+                    {{ helpText('common.cancel', 'Cancel') }}
                   </UButton>
                   <UButton color="warning" variant="solid" @click="confirmPrereqToggle">
                     {{ helpText('page.hideout.prereq_filters.confirm_confirm', 'Enable') }}
@@ -240,23 +240,20 @@
   import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
   import { usePageSettingsDrawer } from '@/composables/usePageSettingsDrawer';
   import { usePrereqModal, type PrereqType } from '@/composables/usePrereqModal';
+  import HideoutCard from '@/features/hideout/HideoutCard.vue';
+  import HideoutSettingsDrawer from '@/features/hideout/HideoutSettingsDrawer.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
   import type { HideoutStation } from '@/types/tarkov';
-  // Page metadata
   useSeoMeta({
     title: 'Hideout',
     description:
       'Track your hideout module upgrades and requirements. See what items you need to complete each station upgrade.',
   });
-  const HideoutCard = defineAsyncComponent(() => import('@/features/hideout/HideoutCard.vue'));
   const HideoutHelpDemoCard = defineAsyncComponent(
     () => import('@/features/hideout/HideoutHelpDemoCard.vue')
-  );
-  const HideoutSettingsDrawer = defineAsyncComponent(
-    () => import('@/features/hideout/HideoutSettingsDrawer.vue')
   );
   const RefreshButton = defineAsyncComponent(() => import('@/components/ui/RefreshButton.vue'));
   const route = useRoute();
@@ -297,6 +294,7 @@
     return value === key ? fallback : value;
   };
   const hideoutHelpSteps = computed(() => {
+    if (!isHelpOpen.value) return [];
     return [
       {
         advanceOnSelector: '[data-help-target="hideout-filter-available"]',
@@ -522,7 +520,7 @@
     }
     activePrimaryView.value = view;
   };
-  const BATCH_SIZE = 4;
+  const BATCH_SIZE = 6;
   const visibleStationCount = ref(BATCH_SIZE);
   const loadMoreSentinel = ref<HTMLElement | null>(null);
   const visibleStationsSlice = computed(() =>
@@ -541,8 +539,8 @@
   const { checkAndLoadMore } = useInfiniteScroll(loadMoreSentinel, loadMoreStations, {
     autoLoadOnReady: true,
     enabled: hasMoreStations,
-    maxAutoLoads: 4,
-    rootMargin: '300px',
+    maxAutoLoads: 3,
+    rootMargin: '150px',
   });
   const debouncedCheckAndLoadMore = useDebounceFn(() => {
     void nextTick(() => {
@@ -642,28 +640,28 @@
   };
   const primaryViews = computed<HideoutPrimaryViewOption[]>(() => [
     {
-      title: t('page.hideout.primary_views.all'),
+      title: t('common.all'),
       icon: 'mdi-clipboard-check',
       view: 'all',
       count: stationCounts.value.all,
       badgeColor: 'bg-secondary-600',
     },
     {
-      title: t('page.hideout.primary_views.available'),
+      title: t('common.available'),
       icon: 'mdi-tag-arrow-up-outline',
       view: 'available',
       count: stationCounts.value.available,
       badgeColor: 'bg-info-600',
     },
     {
-      title: t('page.hideout.primary_views.locked'),
+      title: t('common.locked'),
       icon: 'mdi-lock',
       view: 'locked',
       count: stationCounts.value.locked,
       badgeColor: 'bg-surface-600',
     },
     {
-      title: t('page.hideout.primary_views.maxed'),
+      title: t('common.maxed'),
       icon: 'mdi-arrow-collapse-up',
       view: 'maxed',
       count: stationCounts.value.maxed,

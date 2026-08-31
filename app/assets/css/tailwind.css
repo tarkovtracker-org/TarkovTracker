@@ -8,8 +8,31 @@ html {
 html.no-smooth-scroll {
   scroll-behavior: auto;
 }
+@layer utilities {
+  .slider-thumb::-webkit-slider-thumb {
+    appearance: none;
+    height: 0.875rem;
+    width: 0.875rem;
+    cursor: pointer;
+    border-radius: 9999px;
+    border: 2px solid var(--color-surface-950);
+    background: var(--color-surface-200);
+  }
+  .slider-thumb::-moz-range-thumb {
+    height: 0.875rem;
+    width: 0.875rem;
+    cursor: pointer;
+    border-radius: 9999px;
+    border: 2px solid var(--color-surface-950);
+    background: var(--color-surface-200);
+  }
+}
 /* Tailwind v4 + Nuxt UI v4 theme tokens */
 @theme static {
+  --font-ui:
+    ui-sans-serif, system-ui, -apple-system, blinkmacsystemfont, 'Segoe UI', roboto,
+    'Helvetica Neue', arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    'Segoe UI Symbol', 'Noto Color Emoji';
   --font-sans:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
     monospace;
@@ -672,7 +695,6 @@ html.no-smooth-scroll {
     background-color: var(--color-surface-900);
   }
 }
-
 @layer utilities {
   .scrollbar-none {
     scrollbar-width: none;
@@ -710,7 +732,6 @@ html.no-smooth-scroll {
   }
 }
 /* Text colors now use warm surface tokens (see @theme --color-surface-*) */
-
 /* Restore pointer cursor on interactive elements (reset by Tailwind preflight) */
 button:not(:disabled),
 [role='button']:not([disabled]):not([aria-disabled='true']),
@@ -721,7 +742,6 @@ select:not(:disabled),
 summary {
   cursor: pointer;
 }
-
 @layer base {
   :where(
     a[href],
@@ -737,7 +757,6 @@ summary {
     outline-offset: 2px;
   }
 }
-
 @layer utilities {
   .fade-enter-active,
   .fade-leave-active {
@@ -841,18 +860,6 @@ summary {
 }
 .leaflet-popup-content {
   margin: 0.75rem;
-}
-.leaflet-control-zoom a {
-  background-color: var(--color-surface-800) !important;
-  color: var(--color-gray-200) !important;
-  border-color: var(--color-surface-700) !important;
-}
-.leaflet-control-zoom a:hover {
-  background-color: var(--color-surface-700) !important;
-}
-.leaflet-control-zoom-reset {
-  border-top: 1px solid var(--color-surface-700) !important;
-  font-size: 18px;
 }
 .map-zone-tooltip {
   background-color: var(--color-surface-900) !important;

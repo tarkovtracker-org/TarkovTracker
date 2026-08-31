@@ -257,6 +257,40 @@ describe('preferences sync plugin', () => {
     expect(useSupabaseSync).toHaveBeenCalledTimes(1);
     expect(cleanup).not.toHaveBeenCalled();
   });
+  it('omits legacy profile sharing columns from the preferences sync payload', async () => {
+    vi.mocked(useSupabaseSync).mockReturnValue({
+      isSyncing: ref(false),
+      isPaused: ref(false),
+      cleanup: vi.fn(),
+      pause: vi.fn(),
+      resume: vi.fn(),
+      syncToSupabase: vi.fn().mockResolvedValue(null),
+    });
+    const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116' } });
+    const preferencesStore = createPreferencesStore({
+      profileSharePvpPublic: true,
+      profileSharePvePublic: true,
+    });
+    vi.mocked(usePreferencesStore).mockReturnValue(preferencesStore as never);
+    const from = vi.fn(() => ({
+      select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle })) })),
+    }));
+    const plugin = (await import('@/plugins/zz.preferences-sync.client')).default as (
+      nuxtApp: unknown
+    ) => unknown;
+    plugin({
+      $pinia: {},
+      $supabase: { client: { from }, user: { id: 'user-1', loggedIn: true } },
+    });
+    await waitForWatchCallback();
+    const syncOptions = vi.mocked(useSupabaseSync).mock.calls.at(-1)?.[0] as {
+      transform: (state: Record<string, unknown>) => Record<string, unknown>;
+    };
+    const payload = syncOptions.transform(preferencesStore.$state);
+    expect(payload).not.toHaveProperty('profile_share_pvp_public');
+    expect(payload).not.toHaveProperty('profile_share_pve_public');
+    expect(payload.user_id).toBe('user-1');
+  });
   it('prefers the preserved scoped snapshot over guest preferences after logout', async () => {
     const cleanup = vi.fn();
     vi.mocked(useSupabaseSync).mockReturnValue({

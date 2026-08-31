@@ -1,5 +1,5 @@
 import { logger } from '@/utils/logger';
-import type { SkillRequirement, Task, TaskObjective } from '@/types/tarkov';
+import type { Task, TaskObjective } from '@/types/tarkov';
 export const normalizeSkillToken = (value: string | null | undefined): string | null => {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -11,25 +11,38 @@ export const getCanonicalSkillKey = (
 ): string | null => {
   return normalizeSkillToken(skillId) ?? normalizeSkillToken(skillName);
 };
+export type SkillObjectiveDetails = {
+  skillKey: string;
+  skillName: string;
+  skillId?: string;
+  requiredLevel: number;
+  imageLink?: string;
+};
+export const readSkillObjective = (objective: TaskObjective): SkillObjectiveDetails | null => {
+  const { skillLevel } = objective;
+  const skillName = normalizeSkillToken(skillLevel?.name);
+  if (objective.type !== 'skill' || !skillLevel || !skillName) return null;
+  const skillId = skillLevel.skill?.id;
+  const skillKey = getCanonicalSkillKey(skillName, skillId);
+  if (!skillKey) return null;
+  return {
+    skillKey,
+    skillName,
+    skillId,
+    requiredLevel: skillLevel.level || 0,
+    imageLink: skillLevel.skill?.imageLink,
+  };
+};
 export const buildSkillKeyAliases = (tasks: Task[]): Map<string, string> => {
   const aliases = new Map<string, string>();
   tasks.forEach((task) => {
     task.objectives?.forEach((objective) => {
-      const objectiveData = objective as TaskObjective & {
-        __typename?: string;
-        skillLevel?: SkillRequirement & { skill?: { id?: string | null } };
-      };
-      if (objectiveData.__typename !== 'TaskObjectiveSkill' || !objectiveData.skillLevel?.name) {
-        return;
-      }
-      const skillName = objectiveData.skillLevel.name;
-      const skillId = objectiveData.skillLevel.skill?.id;
-      const skillKey = getCanonicalSkillKey(skillName, skillId);
-      if (!skillKey) return;
-      aliases.set(skillKey, skillKey);
-      aliases.set(skillName, skillKey);
-      if (skillId) {
-        aliases.set(skillId, skillKey);
+      const skill = readSkillObjective(objective);
+      if (!skill) return;
+      aliases.set(skill.skillKey, skill.skillKey);
+      aliases.set(skill.skillName, skill.skillKey);
+      if (skill.skillId) {
+        aliases.set(skill.skillId, skill.skillKey);
       }
     });
     task.finishRewards?.skillLevelReward?.forEach((reward) => {

@@ -113,7 +113,6 @@ export interface PreferencesState {
   hideGlobalTasks: boolean;
   hideNonKappaTasks: boolean;
   hideCompletedMapObjectives: boolean;
-  neededitemsStyle: string | null;
   hideoutPrimaryView?: string | null;
   hideoutCollapseCompleted: boolean;
   hideoutSortReadyFirst: boolean;
@@ -153,6 +152,9 @@ export interface PreferencesState {
   mapZoneOpacity: number;
   mapTooltipDensity: 'default' | 'compact';
   pinnedTaskIds: string[];
+  mapShowSelfObjectives: boolean;
+  mapShowPinnedObjectives: boolean;
+  mapShowTeamObjectives: boolean;
   // Skills settings
   skillSortMode: SkillSortMode | null;
   traderSortMode: TraderSortMode | null;
@@ -165,7 +167,6 @@ export interface PreferencesState {
     hideGlobalTasks: boolean;
     hideNonKappaTasks: boolean;
     hideCompletedMapObjectives: boolean;
-    itemsNeededHideNonFIR: boolean;
   };
 }
 // Export the default state with type annotation
@@ -201,7 +202,6 @@ export const preferencesDefaultState: PreferencesState = {
   hideGlobalTasks: false,
   hideNonKappaTasks: false,
   hideCompletedMapObjectives: false,
-  neededitemsStyle: null,
   hideoutPrimaryView: null,
   hideoutCollapseCompleted: false,
   hideoutSortReadyFirst: false,
@@ -241,6 +241,9 @@ export const preferencesDefaultState: PreferencesState = {
   mapZoneOpacity: 0.24,
   mapTooltipDensity: 'default',
   pinnedTaskIds: [],
+  mapShowSelfObjectives: true,
+  mapShowPinnedObjectives: true,
+  mapShowTeamObjectives: true,
   // Skills settings
   skillSortMode: null,
   traderSortMode: null,
@@ -253,7 +256,6 @@ export const preferencesDefaultState: PreferencesState = {
     hideGlobalTasks: false,
     hideNonKappaTasks: false,
     hideCompletedMapObjectives: false,
-    itemsNeededHideNonFIR: false,
   },
 };
 // Per-toggle saving state (not persisted)
@@ -262,7 +264,6 @@ const initialSavingState = {
   hideGlobalTasks: false,
   hideNonKappaTasks: false,
   hideCompletedMapObjectives: false,
-  itemsNeededHideNonFIR: false,
 };
 export type PersistedPreferencesSnapshot = {
   ownerUserId: string | null;
@@ -522,9 +523,6 @@ export const usePreferencesStore = defineStore('preferences', {
     getNeededItemsCardStyle: (state) => {
       return normalizeNeededItemsCardStyle(state.neededItemsCardStyle);
     },
-    itemsNeededHideNonFIR: (state) => {
-      return state.itemsHideNonFIR ?? false;
-    },
     getHideGlobalTasks: (state) => {
       return state.hideGlobalTasks ?? false;
     },
@@ -534,14 +532,8 @@ export const usePreferencesStore = defineStore('preferences', {
     getHideCompletedMapObjectives: (state) => {
       return state.hideCompletedMapObjectives ?? false;
     },
-    getNeededItemsStyle: (state) => {
-      return state.neededitemsStyle ?? 'mediumCard';
-    },
     getHideoutPrimaryView: (state) => {
       return state.hideoutPrimaryView ?? 'available';
-    },
-    getHideoutCollapseCompleted: (state) => {
-      return state.hideoutCollapseCompleted ?? false;
     },
     getHideoutSortReadyFirst: (state) => {
       return state.hideoutSortReadyFirst ?? false;
@@ -630,9 +622,6 @@ export const usePreferencesStore = defineStore('preferences', {
     getUseAutomaticLevelCalculation: (state) => {
       return state.useAutomaticLevelCalculation ?? false;
     },
-    getDashboardNoticeDismissed: (state) => {
-      return state.dashboardNoticeDismissed ?? false;
-    },
     // Map display getters
     getShowMapExtracts: (state) => {
       return state.showMapExtracts ?? true;
@@ -643,8 +632,14 @@ export const usePreferencesStore = defineStore('preferences', {
     getPinnedTaskIds: (state) => {
       return state.pinnedTaskIds ?? [];
     },
-    getTaskFilterPresets: (state) => {
-      return state.taskFilterPresets ?? [];
+    getMapShowSelfObjectives: (state) => {
+      return state.mapShowSelfObjectives ?? true;
+    },
+    getMapShowPinnedObjectives: (state) => {
+      return state.mapShowPinnedObjectives ?? true;
+    },
+    getMapShowTeamObjectives: (state) => {
+      return state.mapShowTeamObjectives ?? true;
     },
     // Skills getters
     getSkillSortMode: (state) => {
@@ -680,6 +675,9 @@ export const usePreferencesStore = defineStore('preferences', {
     },
     setStreamerMode(mode: boolean) {
       this.streamerMode = mode;
+    },
+    setDashboardNoticeDismissed(dismissed: boolean) {
+      this.dashboardNoticeDismissed = dismissed;
     },
     setProfileSharePvpPublic(value: boolean) {
       this.profileSharePvpPublic = value;
@@ -741,6 +739,8 @@ export const usePreferencesStore = defineStore('preferences', {
       const clamped = Math.min(0.5, Math.max(0.05, opacity));
       this.mapZoneOpacity = clamped;
     },
+    // Fallow cannot follow this action through the typed map-controls composable boundary.
+    // fallow-ignore-next-line unused-store-member -- accessed through typed map-controls composable
     setMapTooltipDensity(density: 'default' | 'compact') {
       this.mapTooltipDensity = density;
     },
@@ -797,12 +797,6 @@ export const usePreferencesStore = defineStore('preferences', {
     setNeededItemsCardStyle(style: 'compact' | 'expanded') {
       this.neededItemsCardStyle = normalizeNeededItemsCardStyle(style);
     },
-    setItemsNeededHideNonFIR(hide: boolean) {
-      this.itemsHideNonFIR = hide;
-      // Persistence handled automatically by plugin
-      this.saving = this.saving ?? { ...initialSavingState };
-      this.saving.itemsNeededHideNonFIR = true;
-    },
     setHideGlobalTasks(hide: boolean) {
       this.hideGlobalTasks = hide;
       // Persistence handled automatically by plugin
@@ -821,17 +815,8 @@ export const usePreferencesStore = defineStore('preferences', {
       this.saving = this.saving ?? { ...initialSavingState };
       this.saving.hideCompletedMapObjectives = true;
     },
-    setNeededItemsStyle(style: string) {
-      this.neededitemsStyle = style;
-    },
     setHideoutPrimaryView(view: string) {
       this.hideoutPrimaryView = view;
-    },
-    setHideoutCollapseCompleted(enabled: boolean) {
-      this.hideoutCollapseCompleted = enabled;
-    },
-    setHideoutSortReadyFirst(enabled: boolean) {
-      this.hideoutSortReadyFirst = enabled;
     },
     setHideoutRequireStationLevels(enabled: boolean) {
       this.hideoutRequireStationLevels = enabled;
@@ -902,11 +887,17 @@ export const usePreferencesStore = defineStore('preferences', {
     setShowFailedFilter(show: boolean) {
       this.showFailedFilter = show;
     },
+    setMapShowSelfObjectives(show: boolean) {
+      this.mapShowSelfObjectives = show;
+    },
+    setMapShowPinnedObjectives(show: boolean) {
+      this.mapShowPinnedObjectives = show;
+    },
+    setMapShowTeamObjectives(show: boolean) {
+      this.mapShowTeamObjectives = show;
+    },
     setUseAutomaticLevelCalculation(use: boolean) {
       this.useAutomaticLevelCalculation = use;
-    },
-    setDashboardNoticeDismissed(dismissed: boolean) {
-      this.dashboardNoticeDismissed = dismissed;
     },
     // Map display actions
     setShowMapExtracts(show: boolean) {
@@ -930,23 +921,6 @@ export const usePreferencesStore = defineStore('preferences', {
       } else {
         this.pinnedTaskIds = current.filter((id) => id !== taskId);
       }
-    },
-    addTaskFilterPreset(preset: TaskFilterPreset) {
-      this.taskFilterPresets ??= [];
-      const existingIndex = this.taskFilterPresets.findIndex(
-        (existing) => existing.id === preset.id
-      );
-      if (existingIndex !== -1) {
-        this.taskFilterPresets = this.taskFilterPresets.map((existing) =>
-          existing.id === preset.id ? preset : existing
-        );
-        return;
-      }
-      this.taskFilterPresets = [...this.taskFilterPresets, preset];
-    },
-    removeTaskFilterPreset(id: string) {
-      if (!this.taskFilterPresets) return;
-      this.taskFilterPresets = this.taskFilterPresets.filter((p) => p.id !== id);
     },
     // Skills actions
     setSkillSortMode(mode: SkillSortMode) {
@@ -1018,7 +992,6 @@ export const usePreferencesStore = defineStore('preferences', {
       'hideGlobalTasks',
       'hideNonKappaTasks',
       'hideCompletedMapObjectives',
-      'neededitemsStyle',
       'hideoutPrimaryView',
       'localeOverride',
       'wikiUseAntifandom',
@@ -1040,6 +1013,9 @@ export const usePreferencesStore = defineStore('preferences', {
       'showLockedFilter',
       'showCompletedFilter',
       'showFailedFilter',
+      'mapShowSelfObjectives',
+      'mapShowPinnedObjectives',
+      'mapShowTeamObjectives',
       'useAutomaticLevelCalculation',
       'dashboardNoticeDismissed',
       'hideoutCollapseCompleted',

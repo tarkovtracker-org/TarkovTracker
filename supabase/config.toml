@@ -383,6 +383,9 @@ verify_jwt = false
 [functions.team-leave]
 verify_jwt = false
 
+[functions.team-disband]
+verify_jwt = false
+
 [functions.token-create]
 verify_jwt = false
 

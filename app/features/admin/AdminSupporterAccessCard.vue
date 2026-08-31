@@ -1,6 +1,11 @@
 <script setup lang="ts">
   import { useSupporter } from '@/composables/useSupporter';
   import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
+  import {
+    ADMIN_ERROR_CODES,
+    ADMIN_ERROR_LOCALE_KEYS,
+    getAdminErrorCode,
+  } from '@/utils/adminErrors';
   const { $supabase } = useNuxtApp();
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
@@ -12,14 +17,20 @@
   const enabled = ref(true);
   const isSaving = ref(false);
   const tierOptions = computed<Array<{ label: string; value: SupporterTier }>>(() => [
-    { label: t('admin.supporter_tier_supporter'), value: 'supporter' },
-    { label: t('admin.supporter_tier_scav'), value: 'scav' },
-    { label: t('admin.supporter_tier_timmy'), value: 'timmy' },
-    { label: t('admin.supporter_tier_chad'), value: 'chad' },
+    { label: t('common.supporter'), value: 'supporter' },
+    { label: t('common.scav'), value: 'scav' },
+    { label: t('common.timmy'), value: 'timmy' },
+    { label: t('common.chad'), value: 'chad' },
   ]);
   const canSave = computed(() => {
     return systemStore.isAdmin && targetUserId.value.trim().length > 0 && !isSaving.value;
   });
+  const errorDescription = (error: unknown): string => {
+    const code = getAdminErrorCode(error);
+    return code
+      ? t(ADMIN_ERROR_LOCALE_KEYS[code], 'Could not update supporter access.')
+      : t('admin.supporter_override_failed_description');
+  };
   const applySupporterOverride = async () => {
     if (!canSave.value) return;
     isSaving.value = true;
@@ -31,7 +42,16 @@
         token = refreshed.data.session?.access_token ?? null;
       }
       if (!token) {
-        throw new Error(t('admin.supporter_override_login_required'));
+        toast.add({
+          title: t('common.update_failed', 'Update failed'),
+          description: t(
+            ADMIN_ERROR_LOCALE_KEYS[ADMIN_ERROR_CODES.AUTHENTICATION_REQUIRED],
+            'You must be signed in to continue.'
+          ),
+          color: 'error',
+          icon: 'i-mdi-alert-circle',
+        });
+        return;
       }
       await $fetch('/api/admin/supporter', {
         method: 'POST',
@@ -55,9 +75,8 @@
       });
     } catch (error) {
       toast.add({
-        title: t('admin.supporter_override_failed_title'),
-        description:
-          error instanceof Error ? error.message : t('admin.supporter_override_failed_description'),
+        title: t('common.update_failed', 'Update failed'),
+        description: errorDescription(error),
         color: 'error',
         icon: 'i-mdi-alert-circle',
       });
@@ -94,9 +113,7 @@
           <div class="flex items-end">
             <USwitch
               v-model="enabled"
-              :label="
-                enabled ? t('admin.supporter_enabled_label') : t('admin.supporter_disabled_label')
-              "
+              :label="enabled ? t('common.enabled', 'Enabled') : t('common.disabled', 'Disabled')"
             />
           </div>
         </div>
@@ -108,7 +125,7 @@
             :loading="isSaving"
             @click="applySupporterOverride"
           >
-            {{ t('admin.supporter_override_save_button') }}
+            {{ t('common.apply') }}
           </UButton>
         </div>
       </div>

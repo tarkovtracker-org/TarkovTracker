@@ -10,6 +10,8 @@ const mockMapInstance = {
   off: vi.fn(),
   remove: vi.fn(),
   fitBounds: vi.fn(),
+  setView: vi.fn(),
+  panTo: vi.fn(),
   invalidateSize: vi.fn(),
   createPane: vi.fn(() => ({ style: {} })),
   options: { zoomDelta: 1, zoomSnap: 1 },
@@ -138,7 +140,8 @@ let useLeafletMapForTest: UseLeafletMapFn;
 let containerRefForTest: Ref<HTMLElement | null>;
 const mountUseLeafletMap = async (
   mapValue: TarkovMap | null,
-  initialFloor?: string
+  initialFloor?: string,
+  initialView?: { center: [number, number]; zoom: number } | null
 ): Promise<{
   result: ReturnType<UseLeafletMapFn>;
   wrapper: ReturnType<typeof mount>;
@@ -154,6 +157,7 @@ const mountUseLeafletMap = async (
           containerRef: containerRefForTest,
           map: mapRef,
           initialFloor,
+          initialView,
           enableIdleDetection: false,
         });
         return () => null;
@@ -172,6 +176,9 @@ const mountUseLeafletMap = async (
 describe('useLeafletMap', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockMapInstance.setView.mockReset();
+    mockMapInstance.options.zoomDelta = 1;
+    mockMapInstance.options.zoomSnap = 1;
     vi.useFakeTimers();
     lastSvgElement = null;
     containerRefForTest = ref(document.createElement('div')) as Ref<HTMLElement | null>;
@@ -240,6 +247,110 @@ describe('useLeafletMap', () => {
       const { result, wrapper } = await mountUseLeafletMap(mapData, 'parking');
       expect(result.floors.value).toEqual(['parking', 'ground', 'second']);
       expect(result.selectedFloor.value).toBe('parking');
+      wrapper.unmount();
+    });
+    it('restores an initialView instead of fitting bounds when provided', async () => {
+      const mapData = {
+        id: 'customs',
+        name: 'Customs',
+        normalizedName: 'customs',
+        svg: {
+          file: 'customs.svg',
+          floors: ['ground'],
+          defaultFloor: 'ground',
+          coordinateRotation: 0,
+          bounds: [
+            [0, 0],
+            [100, 100],
+          ],
+        },
+      } as TarkovMap;
+      const initialView: { center: [number, number]; zoom: number } = {
+        center: [55.5, 37.6],
+        zoom: 6,
+      };
+      const { wrapper } = await mountUseLeafletMap(mapData, undefined, initialView);
+      expect(mockMapInstance.fitBounds).not.toHaveBeenCalled();
+      expect(mockMapInstance.setView).toHaveBeenCalledWith(initialView.center, initialView.zoom, {
+        animate: false,
+      });
+      wrapper.unmount();
+    });
+    it('disables zoom snapping while restoring a fractional initialView zoom', async () => {
+      const mapData = {
+        id: 'customs',
+        name: 'Customs',
+        normalizedName: 'customs',
+        svg: {
+          file: 'customs.svg',
+          floors: ['ground'],
+          defaultFloor: 'ground',
+          coordinateRotation: 0,
+          bounds: [
+            [0, 0],
+            [100, 100],
+          ],
+        },
+      } as TarkovMap;
+      mockMapInstance.options.zoomSnap = 1;
+      let zoomSnapDuringSetView: number | undefined;
+      mockMapInstance.setView.mockImplementation(() => {
+        zoomSnapDuringSetView = mockMapInstance.options.zoomSnap;
+        return mockMapInstance;
+      });
+      const initialView: { center: [number, number]; zoom: number } = {
+        center: [55.5, 37.6],
+        zoom: 6.4,
+      };
+      const { wrapper } = await mountUseLeafletMap(mapData, undefined, initialView);
+      expect(zoomSnapDuringSetView).toBe(0);
+      expect(mockMapInstance.options.zoomSnap).toBe(1);
+      wrapper.unmount();
+    });
+    it('falls back to fitting bounds when initialView is missing', async () => {
+      const mapData = {
+        id: 'customs',
+        name: 'Customs',
+        normalizedName: 'customs',
+        svg: {
+          file: 'customs.svg',
+          floors: ['ground'],
+          defaultFloor: 'ground',
+          coordinateRotation: 0,
+          bounds: [
+            [0, 0],
+            [100, 100],
+          ],
+        },
+      } as TarkovMap;
+      const { wrapper } = await mountUseLeafletMap(mapData);
+      expect(mockMapInstance.setView).not.toHaveBeenCalled();
+      expect(mockMapInstance.fitBounds).toHaveBeenCalled();
+      wrapper.unmount();
+    });
+    it('falls back to fitting bounds when initialView has a non-finite center coordinate', async () => {
+      const mapData = {
+        id: 'customs',
+        name: 'Customs',
+        normalizedName: 'customs',
+        svg: {
+          file: 'customs.svg',
+          floors: ['ground'],
+          defaultFloor: 'ground',
+          coordinateRotation: 0,
+          bounds: [
+            [0, 0],
+            [100, 100],
+          ],
+        },
+      } as TarkovMap;
+      const initialView: { center: [number, number]; zoom: number } = {
+        center: [Number.NaN, 37.6],
+        zoom: 6,
+      };
+      const { wrapper } = await mountUseLeafletMap(mapData, undefined, initialView);
+      expect(mockMapInstance.setView).not.toHaveBeenCalled();
+      expect(mockMapInstance.fitBounds).toHaveBeenCalled();
       wrapper.unmount();
     });
     it('ignores stale async init when map becomes unavailable before layer setup', async () => {

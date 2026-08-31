@@ -15,6 +15,7 @@ const createPreferencesStore = () => {
         DEFAULT_EXTRACT: '#64748b',
         EXTRACT_DOT_BORDER: '#ffffff',
         MARKER_BORDER: '#000000',
+        PINNED_OBJECTIVE: '#7c3bed',
         PMC_EXTRACT: '#f97316',
         PMC_SPAWN: '#ef4444',
         SCAV_EXTRACT: '#3b82f6',

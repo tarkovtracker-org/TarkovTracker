@@ -88,6 +88,28 @@ describe('nuxt.config CSP', () => {
     const csp = buildContentSecurityPolicy({ allowUnsafeInlineScripts: true });
     expect(getDirectiveSources(csp, 'script-src')).toContain("'unsafe-inline'");
   });
+  it('includes Turnstile origins only when a sitekey is configured', () => {
+    const withTurnstile = buildContentSecurityPolicy({
+      turnstileSiteKey: '1x00000000000000000000AA',
+    });
+    expect(getDirectiveSources(withTurnstile, 'script-src')).toContain(
+      'https://challenges.cloudflare.com'
+    );
+    expect(getDirectiveSources(withTurnstile, 'frame-src')).toContain(
+      'https://challenges.cloudflare.com'
+    );
+    const withoutTurnstile = buildContentSecurityPolicy({});
+    expect(getDirectiveSources(withoutTurnstile, 'script-src')).not.toContain(
+      'https://challenges.cloudflare.com'
+    );
+    expect(getDirectiveSources(withoutTurnstile, 'frame-src')).not.toContain(
+      'https://challenges.cloudflare.com'
+    );
+  });
+  it('allows privacy-enhanced YouTube walkthrough frames', () => {
+    const csp = buildContentSecurityPolicy();
+    expect(getDirectiveSources(csp, 'frame-src')).toContain('https://www.youtube-nocookie.com');
+  });
   it('builds a stricter overlay policy and requires explicit inline bootstrap opt-in', () => {
     const csp = buildOverlayContentSecurityPolicy();
     expect(getDirectiveSources(csp, 'default-src')).toEqual(["'none'"]);

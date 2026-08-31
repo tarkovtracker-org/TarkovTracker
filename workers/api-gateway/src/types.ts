@@ -1,22 +1,18 @@
-// Environment bindings
-export interface Env {
-  API_GATEWAY_LIMITER: DurableObjectNamespace;
-  SUPABASE_URL: string;
-  SUPABASE_ANON_KEY: string;
-  SUPABASE_SERVICE_ROLE_KEY: string;
-  ALLOWED_ORIGIN?: string;
-  API_HOST?: string;
-  LEGACY_API_REDIRECT?: string;
-  IP_HASH_SECRET?: string;
-}
+type RequiredEnv = Pick<
+  CloudflareEnv,
+  'API_GATEWAY_LIMITER' | 'SUPABASE_URL' | 'SUPABASE_ANON_KEY' | 'SUPABASE_SERVICE_ROLE_KEY'
+>;
+export type Env = RequiredEnv & Partial<Omit<CloudflareEnv, keyof RequiredEnv>>;
 // API Token from database
+export type GameMode = 'pvp' | 'pve' | 'seasonal';
+export type ProgressDataField = 'pvp_data' | 'pve_data' | 'seasonal_data';
 export interface ApiToken {
   token_id: string;
   user_id: string;
   token_hash: string;
   token_value?: string | null;
   permissions: string[];
-  game_mode: 'pvp' | 'pve';
+  game_mode: GameMode;
   note?: string | null;
   is_active: boolean;
   usage_count: number;
@@ -80,15 +76,13 @@ export interface TraderProgress {
   level?: number;
   reputation?: number;
 }
-// User progress row from Supabase
-export interface UserProgressRow {
+/**
+ * Read-path projection composed from normalized mode progress and account metadata.
+ */
+export interface UserProgressModeRow {
   user_id: string;
-  current_game_mode: 'pvp' | 'pve' | null;
   game_edition: number | null;
-  pvp_data: UserProgressData | null;
-  pve_data: UserProgressData | null;
-  created_at?: string | null;
-  updated_at?: string | null;
+  progress_data: UserProgressData | null;
 }
 // Legacy token response format (matching old API)
 export interface LegacyTokenResponse {
@@ -97,7 +91,7 @@ export interface LegacyTokenResponse {
   owner: string;
   note: string;
   calls: number;
-  gameMode: 'pvp' | 'pve';
+  gameMode: GameMode;
 }
 export interface ProgressResponseTask {
   id: string;

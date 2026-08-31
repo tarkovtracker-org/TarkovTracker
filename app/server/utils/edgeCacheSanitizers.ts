@@ -54,32 +54,6 @@ export const sanitizeErrorMessage = (message: string): string => {
   }
   return sanitized;
 };
-export const sanitizeGraphQLErrors = (errors: unknown): string => {
-  try {
-    if (Array.isArray(errors)) {
-      const sanitized = errors.map((err) => {
-        if (typeof err === 'object' && err !== null) {
-          const e = err as Record<string, unknown>;
-          return {
-            code:
-              e.extensions && typeof e.extensions === 'object'
-                ? (e.extensions as Record<string, unknown>).code
-                : undefined,
-            type: typeof e.message === 'string' ? e.message.slice(0, 100) : 'Unknown error',
-          };
-        }
-        return { type: 'Unknown error' };
-      });
-      return JSON.stringify(sanitized);
-    }
-    if (typeof errors === 'object' && errors !== null) {
-      return JSON.stringify({ type: 'Non-array error object' });
-    }
-    return 'Unknown error format';
-  } catch {
-    return 'Error sanitization failed';
-  }
-};
 export function sanitizeVariables(variables: Record<string, unknown>): Record<string, unknown> {
   const sanitizeValue = (value: unknown): unknown => {
     if (Array.isArray(value)) {

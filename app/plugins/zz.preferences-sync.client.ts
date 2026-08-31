@@ -135,8 +135,6 @@ const buildPreferencesSyncPayload = (
   return {
     user_id: userId,
     streamer_mode: preferencesState.streamerMode,
-    profile_share_pvp_public: preferencesState.profileSharePvpPublic,
-    profile_share_pve_public: preferencesState.profileSharePvePublic,
     team_hide: preferencesState.teamHide,
     task_team_hide_all: preferencesState.taskTeamHideAll,
     items_team_hide_all: preferencesState.itemsTeamHideAll,
@@ -174,7 +172,6 @@ const buildPreferencesSyncPayload = (
     dashboard_notice_dismissed: preferencesState.dashboardNoticeDismissed,
     show_map_extracts: preferencesState.showMapExtracts,
     map_marker_colors: normalizeMapMarkerColors(preferencesState.mapMarkerColors),
-    neededitems_style: preferencesState.neededitemsStyle,
     hideout_primary_view: preferencesState.hideoutPrimaryView,
     hideout_collapse_completed: preferencesState.hideoutCollapseCompleted,
     hideout_sort_ready_first: preferencesState.hideoutSortReadyFirst,
@@ -207,6 +204,9 @@ const buildPreferencesSyncPayload = (
     map_zoom_speed: preferencesState.mapZoomSpeed,
     map_pan_speed: preferencesState.mapPanSpeed,
     map_zone_opacity: preferencesState.mapZoneOpacity,
+    map_show_self_objectives: preferencesState.mapShowSelfObjectives,
+    map_show_pinned_objectives: preferencesState.mapShowPinnedObjectives,
+    map_show_team_objectives: preferencesState.mapShowTeamObjectives,
     pinned_task_ids: Array.isArray(preferencesState.pinnedTaskIds)
       ? preferencesState.pinnedTaskIds.filter(
           (taskId): taskId is string => typeof taskId === 'string' && taskId.length > 0

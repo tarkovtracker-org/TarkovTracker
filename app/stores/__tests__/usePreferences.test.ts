@@ -8,7 +8,6 @@ import {
   resetPreferencesStoreForSessionTransition,
   usePreferencesStore,
   type PreferencesState,
-  type TaskFilterPreset,
 } from '@/stores/usePreferences';
 import { DEFAULT_KEYBINDS } from '@/utils/keybinds';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
@@ -134,6 +133,9 @@ describe('usePreferencesStore', () => {
       expect(store.mapZoomSpeed).toBe(1);
       expect(store.mapPanSpeed).toBe(1);
       expect(store.pinnedTaskIds).toEqual([]);
+      expect(store.mapShowSelfObjectives).toBe(true);
+      expect(store.mapShowPinnedObjectives).toBe(true);
+      expect(store.mapShowTeamObjectives).toBe(true);
     });
     it('sanitizes keybinds assigned through store actions', () => {
       const store = usePreferencesStore();
@@ -161,7 +163,6 @@ describe('usePreferencesStore', () => {
         hideGlobalTasks: false,
         hideNonKappaTasks: false,
         hideCompletedMapObjectives: false,
-        itemsNeededHideNonFIR: false,
       });
     });
   });
@@ -280,10 +281,11 @@ describe('usePreferencesStore', () => {
       expect(migratedValue.data.neededItemsHideCollected).toBeUndefined();
     });
     it('should migrate untouched legacy map marker defaults', () => {
-      const legacyMapMarkerColors = {
+      const legacyMapMarkerColors: Record<string, string> = {
         ...MAP_MARKER_COLORS,
         SELF_OBJECTIVE: '#ef4444',
       };
+      delete legacyMapMarkerColors.PINNED_OBJECTIVE;
       const persistedState = {
         mapMarkerColors: legacyMapMarkerColors,
       };
@@ -777,12 +779,6 @@ describe('usePreferencesStore', () => {
       const store = usePreferencesStore();
       expect(store.getNeededItemsCardStyle).toBe('expanded');
     });
-    it('should return itemsHideNonFIR state for itemsNeededHideNonFIR', () => {
-      const store = usePreferencesStore();
-      expect(store.itemsNeededHideNonFIR).toBe(false);
-      store.itemsHideNonFIR = true;
-      expect(store.itemsNeededHideNonFIR).toBe(true);
-    });
   });
   describe('Getters - Hide Settings', () => {
     it('should return hideGlobalTasks state', () => {
@@ -803,15 +799,6 @@ describe('usePreferencesStore', () => {
       store.hideCompletedMapObjectives = true;
       expect(store.getHideCompletedMapObjectives).toBe(true);
     });
-    it('should return default "mediumCard" for null neededitemsStyle', () => {
-      const store = usePreferencesStore();
-      expect(store.getNeededItemsStyle).toBe('mediumCard');
-    });
-    it('should return set neededitemsStyle value', () => {
-      const store = usePreferencesStore();
-      store.neededitemsStyle = 'smallCard';
-      expect(store.getNeededItemsStyle).toBe('smallCard');
-    });
   });
   describe('Getters - Hideout', () => {
     it('should return default "available" for null hideoutPrimaryView', () => {
@@ -822,12 +809,6 @@ describe('usePreferencesStore', () => {
       const store = usePreferencesStore();
       store.hideoutPrimaryView = 'all';
       expect(store.getHideoutPrimaryView).toBe('all');
-    });
-    it('should return hideoutCollapseCompleted state', () => {
-      const store = usePreferencesStore();
-      expect(store.getHideoutCollapseCompleted).toBe(false);
-      store.hideoutCollapseCompleted = true;
-      expect(store.getHideoutCollapseCompleted).toBe(true);
     });
     it('should return hideoutSortReadyFirst state', () => {
       const store = usePreferencesStore();
@@ -961,19 +942,23 @@ describe('usePreferencesStore', () => {
       const store = usePreferencesStore();
       expect(store.getUseAutomaticLevelCalculation).toBe(false);
     });
-    it('should return dashboardNoticeDismissed state', () => {
-      const store = usePreferencesStore();
-      expect(store.getDashboardNoticeDismissed).toBe(false);
-    });
     it('should return pinnedTaskIds state', () => {
       const store = usePreferencesStore();
       expect(store.getPinnedTaskIds).toEqual([]);
       store.pinnedTaskIds = ['task-1', 'task-2'];
       expect(store.getPinnedTaskIds).toEqual(['task-1', 'task-2']);
     });
-    it('should return taskFilterPresets state', () => {
+    it('should return map objective visibility state with default true', () => {
       const store = usePreferencesStore();
-      expect(store.getTaskFilterPresets).toEqual([]);
+      expect(store.getMapShowSelfObjectives).toBe(true);
+      expect(store.getMapShowPinnedObjectives).toBe(true);
+      expect(store.getMapShowTeamObjectives).toBe(true);
+      store.mapShowSelfObjectives = false;
+      store.mapShowPinnedObjectives = false;
+      store.mapShowTeamObjectives = false;
+      expect(store.getMapShowSelfObjectives).toBe(false);
+      expect(store.getMapShowPinnedObjectives).toBe(false);
+      expect(store.getMapShowTeamObjectives).toBe(false);
     });
     it('should return skillSortMode state with default priority', () => {
       const store = usePreferencesStore();
@@ -1176,17 +1161,6 @@ describe('usePreferencesStore', () => {
       store.setNeededItemsCardStyle('compact');
       expect(store.neededItemsCardStyle).toBe('compact');
     });
-    it('should set items needed hide non-FIR with saving state', () => {
-      const store = usePreferencesStore();
-      store.setItemsNeededHideNonFIR(true);
-      expect(store.itemsHideNonFIR).toBe(true);
-      expect(store.saving?.itemsNeededHideNonFIR).toBe(true);
-    });
-    it('should set needed items style', () => {
-      const store = usePreferencesStore();
-      store.setNeededItemsStyle('smallCard');
-      expect(store.neededitemsStyle).toBe('smallCard');
-    });
   });
   describe('Actions - Hide Settings', () => {
     it('should set hide global tasks with saving state', () => {
@@ -1213,16 +1187,6 @@ describe('usePreferencesStore', () => {
       const store = usePreferencesStore();
       store.setHideoutPrimaryView('all');
       expect(store.hideoutPrimaryView).toBe('all');
-    });
-    it('should set hideout collapse completed', () => {
-      const store = usePreferencesStore();
-      store.setHideoutCollapseCompleted(true);
-      expect(store.hideoutCollapseCompleted).toBe(true);
-    });
-    it('should set hideout sort ready first', () => {
-      const store = usePreferencesStore();
-      store.setHideoutSortReadyFirst(true);
-      expect(store.hideoutSortReadyFirst).toBe(true);
     });
     it('should set hideout require station levels', () => {
       const store = usePreferencesStore();
@@ -1343,17 +1307,21 @@ describe('usePreferencesStore', () => {
       store.setShowFailedFilter(false);
       expect(store.showFailedFilter).toBe(false);
     });
+    it('should set map objective visibility filters', () => {
+      const store = usePreferencesStore();
+      store.setMapShowSelfObjectives(false);
+      expect(store.mapShowSelfObjectives).toBe(false);
+      store.setMapShowPinnedObjectives(false);
+      expect(store.mapShowPinnedObjectives).toBe(false);
+      store.setMapShowTeamObjectives(false);
+      expect(store.mapShowTeamObjectives).toBe(false);
+    });
   });
   describe('Actions - XP and Level', () => {
     it('should set use automatic level calculation', () => {
       const store = usePreferencesStore();
       store.setUseAutomaticLevelCalculation(true);
       expect(store.useAutomaticLevelCalculation).toBe(true);
-    });
-    it('should set dashboard notice dismissed', () => {
-      const store = usePreferencesStore();
-      store.setDashboardNoticeDismissed(true);
-      expect(store.dashboardNoticeDismissed).toBe(true);
     });
   });
   describe('Actions - Map Settings', () => {
@@ -1460,71 +1428,6 @@ describe('usePreferencesStore', () => {
       expect(store.pinnedTaskIds).toContain('task-1');
     });
   });
-  describe('Actions - Task Filter Presets', () => {
-    const mockPreset: TaskFilterPreset = {
-      id: 'preset-1',
-      name: 'My Preset',
-      settings: {
-        taskPrimaryView: 'maps',
-        taskMapView: 'customs',
-        taskTraderView: 'all',
-        taskSecondaryView: 'available',
-        taskUserView: 'self',
-        taskSortMode: 'impact',
-        taskSortDirection: 'desc',
-        taskSharedByAllOnly: false,
-        hideGlobalTasks: false,
-        hideNonKappaTasks: false,
-        showNonSpecialTasks: true,
-        showLightkeeperTasks: true,
-        onlyTasksWithRequiredKeys: false,
-        respectTaskFiltersForImpact: true,
-        showAllFilter: true,
-        showAvailableFilter: true,
-        showLockedFilter: true,
-        showCompletedFilter: true,
-        showFailedFilter: true,
-      },
-    };
-    it('should add new task filter preset', () => {
-      const store = usePreferencesStore();
-      store.addTaskFilterPreset(mockPreset);
-      expect(store.taskFilterPresets).toHaveLength(1);
-      expect(store.taskFilterPresets[0]).toEqual(mockPreset);
-    });
-    it('should update existing task filter preset', () => {
-      const store = usePreferencesStore();
-      store.addTaskFilterPreset(mockPreset);
-      const updatedPreset = { ...mockPreset, name: 'Updated Preset' };
-      store.addTaskFilterPreset(updatedPreset);
-      expect(store.taskFilterPresets).toHaveLength(1);
-      expect(store.taskFilterPresets[0]?.name).toBe('Updated Preset');
-    });
-    it('should remove task filter preset', () => {
-      const store = usePreferencesStore();
-      store.addTaskFilterPreset(mockPreset);
-      store.removeTaskFilterPreset('preset-1');
-      expect(store.taskFilterPresets).toHaveLength(0);
-    });
-    it('should handle removing non-existent preset', () => {
-      const store = usePreferencesStore();
-      store.addTaskFilterPreset(mockPreset);
-      store.removeTaskFilterPreset('non-existent');
-      expect(store.taskFilterPresets).toHaveLength(1);
-    });
-    it('should handle removing preset from undefined array', () => {
-      const store = usePreferencesStore();
-      store.$patch({ taskFilterPresets: undefined });
-      store.removeTaskFilterPreset('preset-1');
-      expect(store.taskFilterPresets).toBeUndefined();
-    });
-    it('should initialize taskFilterPresets if undefined when adding', () => {
-      const store = usePreferencesStore();
-      store.$patch({ taskFilterPresets: undefined });
-      store.addTaskFilterPreset(mockPreset);
-      expect(store.taskFilterPresets).toHaveLength(1);
-    });
-  });
   describe('Actions - Skills', () => {
     it('should set skill sort mode', () => {
       const store = usePreferencesStore();
@@ -1563,10 +1466,16 @@ describe('usePreferencesStore', () => {
       store.$patch({ pinnedTaskIds: undefined });
       expect(store.getPinnedTaskIds).toEqual([]);
     });
-    it('should handle nullish taskFilterPresets in getter', () => {
+    it('should handle nullish map objective visibility state in getters', () => {
       const store = usePreferencesStore();
-      store.$patch({ taskFilterPresets: undefined });
-      expect(store.getTaskFilterPresets).toEqual([]);
+      store.$patch({
+        mapShowSelfObjectives: undefined,
+        mapShowPinnedObjectives: undefined,
+        mapShowTeamObjectives: undefined,
+      });
+      expect(store.getMapShowSelfObjectives).toBe(true);
+      expect(store.getMapShowPinnedObjectives).toBe(true);
+      expect(store.getMapShowTeamObjectives).toBe(true);
     });
     it('should handle nullish mapMarkerColors in getter', () => {
       const store = usePreferencesStore();

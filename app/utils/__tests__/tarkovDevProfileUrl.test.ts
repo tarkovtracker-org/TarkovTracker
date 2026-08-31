@@ -9,6 +9,11 @@ describe('buildTarkovDevProfileUrl', () => {
   it('builds a pve profile URL for pve mode', () => {
     expect(buildTarkovDevProfileUrl(123456, 'pve')).toBe('https://tarkov.dev/players/pve/123456');
   });
+  it('builds a pvp-season profile URL for seasonal mode', () => {
+    expect(buildTarkovDevProfileUrl(123456, 'seasonal')).toBe(
+      'https://tarkov.dev/players/pvp-season/123456'
+    );
+  });
   it('returns undefined for missing or invalid uid values', () => {
     expect(buildTarkovDevProfileUrl(null, 'pvp')).toBeUndefined();
     expect(buildTarkovDevProfileUrl(-1, 'pve')).toBeUndefined();

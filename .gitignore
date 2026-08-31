@@ -1,3 +1,6 @@
+# Co-located git worktrees for parallel PR work (see AGENTS.md worktree policy)
+.wt/
+
 # Nuxt dev/build outputs
 .output
 .data
@@ -17,14 +20,13 @@ node_modules
 .fleet
 .idea
 .vscode/settings.json
+!.vscode/settings.json
 /logs/
 *.log
 .env
 .env.*
 !.env.example
 .dev.vars
-graphql.config.js
-schema.graphql
 .lighthouseci*
 
 # Local EFT log archives (can contain sensitive data)

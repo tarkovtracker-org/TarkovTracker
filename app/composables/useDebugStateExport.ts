@@ -1,6 +1,5 @@
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
-import { GAME_MODES } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import type { TaskCompletion, UserProgressData } from '@/types/progress';
 import type { Task } from '@/types/tarkov';
@@ -85,8 +84,7 @@ export function useDebugStateExport() {
   const metadataStore = useMetadataStore();
   const buildSnapshot = (): DebugStateSnapshot => {
     const currentMode = tarkovStore.getCurrentGameMode();
-    const modeData: UserProgressData =
-      currentMode === GAME_MODES.PVE ? tarkovStore.$state.pve : tarkovStore.$state.pvp;
+    const modeData: UserProgressData = tarkovStore.$state[currentMode];
     const tasks = metadataStore.tasks as Task[];
     const tasksById = new Map(tasks.map((t) => [t.id, t]));
     const { entries, sources } = buildTaskEntries(modeData, tasksById);

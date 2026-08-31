@@ -48,10 +48,7 @@
         :cycling="isCycling"
         trigger-class="bg-surface-700/80 text-surface-200 px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-white/5"
       />
-      <AppTooltip
-        v-if="displayDevUrl"
-        :text="t('page.tasks.questcard.view_on_tarkov_dev', 'View on Tarkov.dev')"
-      >
+      <AppTooltip v-if="displayDevUrl" :text="t('common.view_on_tarkov_dev', 'View on Tarkov.dev')">
         <a
           :href="displayDevUrl"
           target="_blank"
@@ -61,7 +58,7 @@
         >
           <img
             src="/img/logos/tarkovdevlogo.webp"
-            :alt="t('page.tasks.questcard.view_on_tarkov_dev', 'View on Tarkov.dev')"
+            :alt="t('common.view_on_tarkov_dev', 'View on Tarkov.dev')"
             class="h-4 w-4"
           />
         </a>

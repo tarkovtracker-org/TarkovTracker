@@ -3,7 +3,7 @@
     <template v-if="isCollapsed">
       <div class="text-center">
         <div class="text-surface-400 mb-1 text-[0.7em]">
-          {{ t('navigation_drawer.level') }}
+          {{ t('common.level') }}
         </div>
         <span class="text-center text-2xl leading-tight font-bold">
           {{ displayedLevel }}
@@ -42,17 +42,13 @@
             <div
               class="text-surface-400 mb-0.5 flex items-center justify-center gap-1 text-[0.6rem]"
             >
-              <span>{{ t('navigation_drawer.level') }}</span>
+              <span>{{ t('common.level') }}</span>
               <span class="text-surface-500 text-[0.5rem]">·</span>
               <span
                 class="text-[0.55rem]"
-                :class="useAutomaticLevel ? 'text-accent-400' : 'text-surface-500'"
+                :class="useAutomaticLevel ? 'text-accent-400' : 'text-surface-400'"
               >
-                {{
-                  useAutomaticLevel
-                    ? t('navigation_drawer.mode_auto')
-                    : t('navigation_drawer.mode_manual')
-                }}
+                {{ useAutomaticLevel ? t('navigation_drawer.mode_auto') : t('common.manual') }}
               </span>
             </div>
             <div class="flex h-8 items-center justify-center text-center">
@@ -107,22 +103,28 @@
             v-if="!useAutomaticLevel"
             class="flex shrink-0 flex-col overflow-hidden rounded-md border border-white/10 bg-white/5"
           >
-            <button
-              :class="[STEPPER_BUTTON_CLASS, 'border-b border-white/10']"
-              :disabled="displayedLevel >= maxPlayerLevel"
-              :aria-label="t('navigation_drawer.increment_level')"
-              @click="incrementLevel"
-            >
-              <UIcon name="i-heroicons-plus" class="h-3.5 w-3.5" />
-            </button>
-            <button
-              :class="STEPPER_BUTTON_CLASS"
-              :disabled="displayedLevel <= minPlayerLevel"
-              :aria-label="t('navigation_drawer.decrement_level')"
-              @click="decrementLevel"
-            >
-              <UIcon name="i-heroicons-minus" class="h-3.5 w-3.5" />
-            </button>
+            <AppTooltip :text="t('navigation_drawer.increment_level')">
+              <button
+                type="button"
+                :class="[STEPPER_BUTTON_CLASS, 'border-b border-white/10']"
+                :disabled="displayedLevel >= maxPlayerLevel"
+                :aria-label="t('navigation_drawer.increment_level')"
+                @click="incrementLevel"
+              >
+                <UIcon name="i-heroicons-plus" class="h-3.5 w-3.5" />
+              </button>
+            </AppTooltip>
+            <AppTooltip :text="t('navigation_drawer.decrement_level')">
+              <button
+                type="button"
+                :class="STEPPER_BUTTON_CLASS"
+                :disabled="displayedLevel <= minPlayerLevel"
+                :aria-label="t('navigation_drawer.decrement_level')"
+                @click="decrementLevel"
+              >
+                <UIcon name="i-heroicons-minus" class="h-3.5 w-3.5" />
+              </button>
+            </AppTooltip>
           </span>
         </div>
         <NuxtLink

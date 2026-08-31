@@ -16,7 +16,7 @@ const tarkovStore = {
   setTaskObjectiveComplete: vi.fn(),
   setTaskObjectiveUncomplete: vi.fn(),
   setTaskUncompleted: vi.fn(),
-  switchGameMode: vi.fn(async () => undefined),
+  switchGameMode: vi.fn(async (_mode: GameMode) => undefined),
 };
 const mockLogger = {
   debug: vi.fn(),
@@ -25,6 +25,7 @@ const mockLogger = {
   warn: vi.fn(),
 };
 const i18nMessages: Record<string, string> = {
+  'settings.data_management.seasonal_import_locked': 'Seasonal PvP imports are temporarily locked.',
   'settings.log_import.selected_files': 'Selected files',
   'settings.log_import.selected_files_count': '{count} selected files',
   'settings.log_import.errors.apply_import_failed':
@@ -116,6 +117,7 @@ describe('useEftLogsImport', () => {
     metadataStore.tasks = [{ id: '61604635c725987e815b1a46' }];
     tarkovStore.getCurrentGameMode.mockReturnValue('pvp');
     tarkovStore.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
+    tarkovStore.switchGameMode.mockImplementation(async () => undefined);
   });
   it('parses a single log file and exposes preview data', async () => {
     const composable = await loadComposable();
@@ -184,6 +186,36 @@ describe('useEftLogsImport', () => {
     expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith('61604635c725987e815b1a46');
     expect(tarkovStore.switchGameMode).toHaveBeenNthCalledWith(2, 'pvp');
     expect(composable.importState.value).toBe('success');
+  });
+  it('restores the original mode when switching into an import mode throws after mutation', async () => {
+    let currentMode: GameMode = 'pvp';
+    tarkovStore.getCurrentGameMode.mockImplementation(() => currentMode);
+    tarkovStore.switchGameMode.mockImplementation(async (mode: GameMode) => {
+      currentMode = mode;
+      if (mode === 'pve') throw new Error('switch persistence failed');
+    });
+    const composable = await loadComposable();
+    const file = new File([completionLog()], 'notifications.log', {
+      type: 'text/plain',
+    });
+    await composable.parseFile(file);
+    await composable.confirmImport('pve');
+    expect(tarkovStore.switchGameMode).toHaveBeenNthCalledWith(1, 'pve');
+    expect(tarkovStore.switchGameMode).toHaveBeenNthCalledWith(2, 'pvp');
+    expect(currentMode).toBe('pvp');
+    expect(composable.importState.value).toBe('error');
+  });
+  it('rejects seasonal imports before mutating task progress', async () => {
+    const composable = await loadComposable();
+    const file = new File([completionLog()], 'notifications.log', {
+      type: 'text/plain',
+    });
+    await composable.parseFile(file);
+    await (composable.confirmImport as (mode: string) => Promise<void>)('seasonal');
+    expect(composable.importState.value).toBe('error');
+    expect(composable.importError.value).toBe('Seasonal PvP imports are temporarily locked.');
+    expect(tarkovStore.switchGameMode).not.toHaveBeenCalled();
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
   });
   it('backfills required prerequisite tasks when importing a later completed task', async () => {
     const prerequisiteTaskId = '5ac2426c86f774138762edfe';

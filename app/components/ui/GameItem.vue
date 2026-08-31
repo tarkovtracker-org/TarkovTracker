@@ -79,7 +79,10 @@
         v-if="showActions && (props.devLink || props.wikiLink)"
         class="absolute inset-0 flex items-center justify-center gap-2 rounded bg-black/80 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
       >
-        <AppTooltip v-if="props.devLink" :text="t('page.tasks.questcard.view_on_tarkov_dev')">
+        <AppTooltip
+          v-if="props.devLink"
+          :text="t('common.view_on_tarkov_dev', 'View on Tarkov.dev')"
+        >
           <a
             :href="props.devLink"
             target="_blank"
@@ -97,7 +100,7 @@
             />
           </a>
         </AppTooltip>
-        <AppTooltip v-if="props.wikiLink" :text="t('page.tasks.questcard.view_on_wiki')">
+        <AppTooltip v-if="props.wikiLink" :text="t('common.view_on_wiki', 'View on Wiki')">
           <a
             :href="toWikiUrl(props.wikiLink)"
             target="_blank"
@@ -130,13 +133,13 @@
       </div>
     </div>
     <!-- Context Menu -->
-    <ContextMenu ref="contextMenu">
+    <ContextMenu v-if="contextMenuOpened" ref="contextMenu">
       <template #default="{ close }">
         <!-- Task Options -->
         <template v-if="props.taskWikiLink">
           <ContextMenuItem
             icon="/img/logos/wikilogo.webp"
-            :label="t('page.tasks.questcard.view_on_wiki')"
+            :label="t('common.view_on_wiki', 'View on Wiki')"
             @click="
               openTaskWiki();
               close();
@@ -151,7 +154,7 @@
         <ContextMenuItem
           v-if="props.itemName && props.wikiLink"
           icon="/img/logos/wikilogo.webp"
-          :label="t('page.tasks.questcard.view_on_wiki')"
+          :label="t('common.view_on_wiki', 'View on Wiki')"
           @click="
             openWikiLink();
             close();
@@ -160,7 +163,7 @@
         <ContextMenuItem
           v-if="props.itemName && props.devLink"
           icon="/img/logos/tarkovdevlogo.webp"
-          :label="t('page.tasks.questcard.view_on_tarkov_dev')"
+          :label="t('common.view_on_tarkov_dev', 'View on Tarkov.dev')"
           @click="
             openTarkovDevLink();
             close();
@@ -170,7 +173,7 @@
           <ContextMenuItem
             v-if="props.wikiLink"
             icon="/img/logos/wikilogo.webp"
-            :label="t('page.tasks.questcard.view_on_wiki')"
+            :label="t('common.view_on_wiki', 'View on Wiki')"
             @click="
               openWikiLink();
               close();
@@ -179,7 +182,7 @@
           <ContextMenuItem
             v-if="props.devLink"
             icon="/img/logos/tarkovdevlogo.webp"
-            :label="t('page.tasks.questcard.view_on_tarkov_dev')"
+            :label="t('common.view_on_tarkov_dev', 'View on Tarkov.dev')"
             @click="
               openTarkovDevLink();
               close();
@@ -205,13 +208,11 @@
 </template>
 <script setup lang="ts">
   import { useWikiLink } from '@/composables/useWikiLink';
+  import ItemCountControls from '@/features/neededitems/ItemCountControls.vue';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
   import { openExternalUrl } from '@/utils/redirect';
   import type ContextMenu from '@/components/ui/ContextMenu.vue';
-  const ItemCountControls = defineAsyncComponent(
-    () => import('@/features/neededitems/ItemCountControls.vue')
-  );
   interface Props {
     // Basic item identification
     itemId?: string;
@@ -298,6 +299,7 @@
   } as const;
   type BackgroundKey = keyof typeof BACKGROUND_CLASS_MAP;
   const contextMenu = ref<InstanceType<typeof ContextMenu>>();
+  const contextMenuOpened = ref(false);
   // Compute image source based on available props
   const computedImageSrc = computed(() => {
     if (props.src) return props.src;
@@ -404,9 +406,13 @@
     }
   };
   const handleContextMenu = (event: MouseEvent) => {
-    // Only show context menu if there are links available
     if (props.devLink || props.wikiLink || props.itemName || props.taskWikiLink) {
-      contextMenu.value?.open(event);
+      event.preventDefault();
+      event.stopPropagation();
+      contextMenuOpened.value = true;
+      nextTick(() => {
+        contextMenu.value?.open(event);
+      });
     }
   };
   const openTaskWiki = () => {

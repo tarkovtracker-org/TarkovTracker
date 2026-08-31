@@ -48,7 +48,7 @@
             v-if="props.objective.optional"
             class="text-warning-300 ml-1 text-[10px] font-semibold uppercase"
           >
-            ({{ t('page.tasks.questcard.objective_optional_badge') }})
+            ({{ t('common.optional') }})
           </span>
         </div>
         <ObjectiveRequiredItems
@@ -96,9 +96,7 @@
         />
         <AppTooltip
           v-else
-          :text="
-            isComplete ? t('page.tasks.questcard.uncomplete') : t('page.tasks.questcard.complete')
-          "
+          :text="isComplete ? t('page.tasks.questcard.uncomplete') : t('common.complete')"
         >
           <button
             type="button"
@@ -166,24 +164,22 @@
     return tarkovStore.isTaskObjectiveComplete(props.objective.id);
   });
   const objectiveLabel = computed(() => {
-    return props.objective.description || t('page.tasks.questcard.objective');
+    return props.objective.description || t('common.objective');
   });
   const toggleObjectiveLabel = computed(() => {
     const actionLabel = isComplete.value
       ? t('page.tasks.questcard.uncomplete')
-      : t('page.tasks.questcard.complete');
+      : t('common.complete');
     return `${actionLabel}: ${objectiveLabel.value}`;
   });
   const objectiveAriaLabel = computed(() => {
-    const optionalPrefix = props.objective.optional
-      ? `${t('page.tasks.questcard.objective_optional_badge')}. `
-      : '';
+    const optionalPrefix = props.objective.optional ? `${t('common.optional')}. ` : '';
     const status = isComplete.value
-      ? t('page.tasks.questcard.completed')
+      ? t('common.completed')
       : t('page.tasks.questcard.not_completed');
     const toggleAction = isComplete.value
       ? t('page.tasks.questcard.uncomplete')
-      : t('page.tasks.questcard.complete');
+      : t('common.complete');
     return `${optionalPrefix}${objectiveLabel.value}. ${status}. ${toggleAction}.`;
   });
   const fullObjective = computed(() => {
@@ -261,20 +257,26 @@
     metadataStore.getObjectiveModeCountDifference(props.objective.id)
   );
   const currentGameMode = computed(() => tarkovStore.getCurrentGameMode());
-  const currentModeBadgeLabel = computed(() =>
-    currentGameMode.value === GAME_MODES.PVE
-      ? t('settings.game_settings.pve')
-      : t('settings.game_settings.pvp')
-  );
-  const currentModeBadgeClass = computed(() =>
-    currentGameMode.value === GAME_MODES.PVE
-      ? 'border border-pve-500/30 bg-pve-700/25 text-pve-200'
-      : 'border border-pvp-500/30 bg-pvp-700/25 text-pvp-200'
-  );
+  const currentModeBadgeLabel = computed(() => {
+    if (currentGameMode.value === GAME_MODES.PVE) return t('common.pve', 'PvE');
+    if (currentGameMode.value === GAME_MODES.SEASONAL) {
+      return t('common.seasonal_pvp', 'Seasonal PvP');
+    }
+    return t('common.pvp', 'PvP');
+  });
+  const currentModeBadgeClass = computed(() => {
+    if (currentGameMode.value === GAME_MODES.PVE) {
+      return 'border border-pve-500/30 bg-pve-700/25 text-pve-200';
+    }
+    if (currentGameMode.value === GAME_MODES.SEASONAL) {
+      return 'border border-warning-500/30 bg-warning-700/20 text-warning-200';
+    }
+    return 'border border-pvp-500/30 bg-pvp-700/25 text-pvp-200';
+  });
   const objectiveModeCountDifferenceText = computed(() => {
     const difference = objectiveModeCountDifference.value;
     if (!difference) return '';
-    return `${t('settings.game_settings.pvp')} ${difference.pvp} • ${t('settings.game_settings.pve')} ${difference.pve}`;
+    return `${t('common.pvp')} ${difference.pvp} • ${t('common.pve')} ${difference.pve}`;
   });
   const neededCount = computed(() => fullObjective.value?.count ?? props.objective.count ?? 1);
   const hasMapLocation = computed(() => {

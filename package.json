@@ -4,13 +4,15 @@
     "@vueuse/core": "Previously pinned to 13.9.0 due to Nuxt/@nuxt/ui/reka-ui compatibility; updated to ^14.1.0 after upgrading Nuxt/@nuxt/ui.",
     "fast-xml-parser": "Pinned fast-xml-parser to the patched v5 line on 2026-02-18 to avoid potential v6 API regressions in @nuxtjs/sitemap dependency paths; remediation: remove this override after @nuxtjs/sitemap officially supports fast-xml-parser v6 and confirm sitemap generation in CI."
   },
-  "version": "1.59.4",
+  "version": "1.74.1",
   "dependencies": {
+    "@iconify-json/heroicons": "^1.2.3",
+    "@iconify-json/lucide": "^1.2.122",
     "@iconify-json/mdi": "^1.2.3",
     "@nuxt/image": "^2.0.0",
-    "@nuxt/ui": "^4.6.1",
-    "@nuxtjs/i18n": "^10.2.4",
-    "@nuxtjs/sitemap": "^8.0.12",
+    "@nuxt/ui": "^4.10.0",
+    "@nuxtjs/i18n": "^10.6.0",
+    "@nuxtjs/sitemap": "^8.3.2",
     "@pinia/nuxt": "^0.11.3",
     "@supabase/supabase-js": "^2.110.2",
     "@vue-flow/controls": "^1.1.3",
@@ -23,29 +25,28 @@
     "jsonpath-plus": "^10.4.0",
     "leaflet": "^1.9.4",
     "lru-cache": "^11.3.3",
-    "nuxt": "^4.4.2",
+    "nuxt": "^4.5.1",
     "ofetch": "^1.5.1",
     "pinia": "^3.0.4",
     "pinia-plugin-persistedstate": "^4.7.1",
     "stripe": "^22.3.1",
     "vue": "^3.5.32",
     "vue-i18n": "catalog:",
-    "vue-router": "^5.0.4"
+    "vue-router": "^5.2.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260409.1",
     "@codecov/nuxt-plugin": "^2.0.1",
     "@commitlint/cli": "^21.0.2",
-    "@commitlint/config-conventional": "^20.5.0",
-    "@google/design.md": "^0.3.0",
+    "@commitlint/config-conventional": "^21.1.0",
+    "@google/design.md": "^0.4.0",
     "@nuxt/eslint": "^1.15.2",
-    "@nuxt/test-utils": "^4.0.2",
+    "@nuxt/test-utils": "^4.1.0",
     "@semantic-release/changelog": "^6.0.3",
-    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/git": "^11.0.1",
     "@semantic-release/npm": "^13.1.5",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/leaflet": "^1.9.21",
-    "@types/node": "^25.5.2",
+    "@types/node": "^26.0.1",
     "@vitest/coverage-v8": "^4.1.4",
     "@vitest/ui": "^4.1.4",
     "@vue/test-utils": "^2.4.6",
@@ -54,11 +55,12 @@
     "eslint": "^10.2.0",
     "eslint-plugin-import-x": "^4.16.2",
     "fake-indexeddb": "^6.2.5",
+    "fallow": "3.17.0",
     "happy-dom": "^20.8.9",
     "husky": "^9.1.7",
     "knip": "^6.26.0",
     "lint-staged": "^17.0.7",
-    "postcss": "^8.5.9",
+    "postcss": "^8.5.18",
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "semantic-release": "^25.0.3",
@@ -66,14 +68,14 @@
     "tailwindcss": "^4.2.2",
     "taze": "^19.14.1",
     "tsx": "^4.22.4",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "vitest": "^4.1.4",
     "vue-tsc": "^3.2.7",
     "wait-on": "^9.0.4",
-    "wrangler": "^4.81.0"
+    "wrangler": "^4.126.0"
   },
   "engines": {
-    "node": ">=24.12.0",
+    "node": ">=24.19.0",
     "pnpm": ">=10.34.5 <12"
   },
   "name": "tarkovtracker-nuxt",
@@ -84,22 +86,29 @@
     "design:lint": "design.md lint DESIGN.md",
     "deps": "taze --r --I",
     "dev": "nuxt dev",
-    "format": "prettier --write \"app/**/*.{js,ts,tsx,vue,json,css,md}\" \"docs/**/*.{md,markdown}\" \"*.md\" \".github/**/*.md\" \"DESIGN.md\" \"nuxt.config.ts\" \"app/app.config.ts\" \"vitest.config.ts\" \"tests/test-setup.ts\" && NODE_ENV=development nuxt prepare && eslint app --fix",
-    "format:check": "prettier --check \"app/**/*.{js,ts,tsx,vue,json,css,md}\" \"docs/**/*.{md,markdown}\" \"*.md\" \".github/**/*.md\" \"DESIGN.md\" \"nuxt.config.ts\" \"app/app.config.ts\" \"vitest.config.ts\" \"tests/test-setup.ts\"",
+    "lint:fallow": "fallow audit --base origin/main --gate new-only --quiet",
+    "format": "pnpm run format:prettier && NODE_ENV=development nuxt prepare && eslint app --fix && pnpm run format:blank-lines",
+    "format:blank-lines": "node scripts/lint-blank-lines.mjs --fix",
+    "format:check": "pnpm run format:check:prettier && pnpm run lint:blank-lines",
+    "format:check:prettier": "node scripts/format-files.mjs --check",
+    "format:prettier": "node scripts/format-files.mjs --write",
     "generate": "nuxt generate",
     "i18n:check": "node scripts/lint-i18n.mjs",
     "i18n:translate": "node scripts/translate-i18n.mjs",
-    "lint": "pnpm run design:lint && NODE_ENV=development nuxt prepare && eslint app --max-warnings=0",
+    "lint": "pnpm run design:lint && NODE_ENV=development nuxt prepare && eslint app --max-warnings=0 && pnpm run lint:blank-lines",
+    "lint:blank-lines": "node scripts/lint-blank-lines.mjs",
     "typecheck": "NODE_ENV=development nuxt typecheck && tsc -p scripts/precompute",
-    "lint:fix": "NODE_ENV=development nuxt prepare && eslint app --fix",
+    "lint:fix": "NODE_ENV=development nuxt prepare && eslint app --fix && pnpm run format:blank-lines",
     "lint:unused": "knip --reporter compact",
     "postinstall": "nuxt prepare",
     "precompute:tarkov": "tsx --tsconfig scripts/precompute/tsconfig.json scripts/precompute/run.ts",
+    "prod-db:test": "vitest run scripts/prod-db.test.mjs",
     "prepare": "husky || true",
     "preview": "nuxt preview",
     "setup": "bash scripts/setup-dev-environment.sh",
     "supabase:check": "bash scripts/check-supabase-db.sh",
     "supabase:types": "supabase gen types typescript --linked > supabase/functions/_shared/database.types.ts",
+    "systems:check": "node scripts/check-systems-drift.mjs",
     "test": "vitest run --maxWorkers=2",
     "test:coverage": "vitest run --coverage --maxWorkers=2",
     "test:watch": "vitest --watch",
@@ -108,46 +117,102 @@
   },
   "type": "module",
   "lint-staged": {
-    "app/**/*.{js,ts,tsx,vue}": [
+    "app/**/*.{js,ts,tsx}": [
       "prettier --write",
-      "eslint --fix"
+      "eslint --fix",
+      "node scripts/lint-blank-lines.mjs --fix"
     ],
-    "app/**/*.{json,css,md}": [
-      "prettier --write"
+    "app/**/*.vue": [
+      "prettier --write",
+      "eslint --fix",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "app/**/*.{css,md}": [
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "app/locales/en.json": [
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
     ],
     "app/locales/*.json": [
       "node scripts/lint-i18n.mjs"
     ],
-    "docs/**/*.{md,markdown}": [
+    "**/*.{md,markdown}": [
       "prettier --write"
     ],
-    "*.md": [
-      "prettier --write"
-    ],
-    ".github/**/*.md": [
-      "prettier --write"
-    ],
-    "DESIGN.md": [
-      "prettier --write",
+    "./DESIGN.md": [
       "design.md lint"
     ],
-    "tests/test-setup.ts": [
-      "prettier --write"
-    ],
-    "nuxt.config.ts": [
+    "./nuxt.config.ts": [
       "prettier --write",
-      "eslint --fix"
+      "eslint --fix",
+      "node scripts/lint-blank-lines.mjs --fix"
     ],
     "app/app.config.ts": [
       "prettier --write",
-      "eslint --fix"
+      "eslint --fix",
+      "node scripts/lint-blank-lines.mjs --fix"
     ],
-    "vitest*.ts": [
+    "./vitest*.ts": [
       "prettier --write",
-      "eslint --fix"
+      "eslint --fix",
+      "node scripts/lint-blank-lines.mjs --fix"
     ],
-    "*.json": [
-      "prettier --write"
+    "./*.{js,mjs,cjs}": [
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "!(app)/**/*.{js,mjs,cjs}": [
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "tests/**/*.{ts,tsx}": [
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "./*.json": [
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "!(app|scripts|supabase|workers|.cubic)/**/*.json": [
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "app/**/!(*locales)/*.json": [
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "scripts/**/*.json": [
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "scripts/**/*.mjs": [
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "supabase/**/*.json": [
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "workers/**/*.json": [
+      "prettier --write",
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "scripts/**/*.{sh,ts,tsx}": [
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "supabase/**/*.{sh,ts,tsx}": [
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "workers/**/*.{sh,ts,tsx}": [
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    ".cubic/**/*.json": [
+      "node scripts/lint-blank-lines.mjs --fix"
+    ],
+    "**/*.{yaml,yml}": [
+      "node scripts/lint-blank-lines.mjs --fix"
     ]
   }
 }

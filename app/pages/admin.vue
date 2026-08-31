@@ -5,7 +5,7 @@
     middleware: ['admin'],
   });
   const { t } = useI18n({ useScope: 'global' });
-  const metaTitle = computed(() => t('admin.title'));
+  const metaTitle = computed(() => t('common.admin_panel'));
   useSeoMeta({
     title: metaTitle,
     robots: 'noindex, nofollow',
@@ -52,7 +52,7 @@
     />
   </div>
   <div v-else-if="systemStore.isAdmin" class="px-3 py-6 sm:px-6">
-    <div class="mx-auto max-w-[1400px] space-y-6">
+    <div class="mx-auto max-w-350 space-y-6">
       <UAlert
         icon="i-mdi-alert"
         color="warning"
@@ -62,13 +62,14 @@
         <template #description>
           {{
             t('admin.access_warning_description', {
-              user: $supabase.user?.email || $supabase.user?.displayName || t('admin.unknown_user'),
+              user: $supabase.user?.email || $supabase.user?.displayName || t('common.unknown'),
             })
           }}
         </template>
       </UAlert>
       <div class="grid gap-6 lg:grid-cols-2">
         <AdminSupporterAccessCard />
+        <AdminTwitchConfigCard />
         <AdminCacheCard />
         <AdminAuditLog />
       </div>

@@ -1,0 +1,541 @@
+# Tarkov Data and Progress Architecture
+
+## Document status
+
+- **Purpose:** durable architecture record and resumable implementation plan for the Tarkov data and progress system.
+- **Decision status:** target architecture agreed; Phase 0 deployment safeguards completed.
+- **Interim state:** direct Worker JSON fetching remains an interim compatibility path, not the intended end state.
+
+## Executive decision
+
+Build one overlay-corrected, mode-aware, versioned Tarkov data release. Publish immutable UI and progress-rules artifacts to Cloudflare KV. Use one framework-free TypeScript progress engine in both the browser and API Worker. Keep Supabase authoritative for mutable user progress and enforce writes through atomic RPCs.
+
+Platform responsibilities:
+
+| Component                       | Responsibility                                                               |
+| ------------------------------- | ---------------------------------------------------------------------------- |
+| GitHub Actions precompute       | Fetch, normalize, apply overlay, validate, compile, publish                  |
+| Cloudflare KV                   | Immutable globally distributed static data and compact progress rules        |
+| Pages Functions                 | Serve UI projections from the active KV release                              |
+| API Worker                      | Authentication, rate limiting, input validation, derived progress evaluation |
+| Supabase                        | Transactional user state, atomic merge/command RPCs, team/auth queries       |
+| Shared TypeScript domain module | All progression, branch, invalidation, and edition semantics                 |
+
+Do not make Supabase the primary runtime store for globally static game definitions. A release audit table is reasonable, but full static payloads should not be a required Postgres read on every request.
+
+---
+
+## Current data flow
+
+### Frontend metadata
+
+```text
+json.tarkov.dev
+  → app/server/utils/tarkov-json.ts
+  → complete canonical model
+  → app/server/utils/overlay.ts
+  → reduced endpoint projections
+  → edgeCache / precomputed TARKOV_DATA value
+  → browser metadata store
+```
+
+Relevant files:
+
+- `app/server/utils/tarkov-json.ts`
+- `app/server/utils/overlay.ts`
+- `app/server/utils/deepMerge.ts`
+- `app/server/utils/edgeCache.ts`
+- `app/server/utils/precomputedTarkov.ts`
+- `app/server/api/tarkov/*.get.ts`
+- `scripts/precompute/precompute.ts`
+- `scripts/precompute/kv.ts`
+- `scripts/precompute/run.ts`
+
+### Public API progress reads
+
+```text
+request
+  → Worker token lookup in Supabase
+  → Worker tier lookup in Supabase
+  → Durable Object daily/burst/IP rate limits
+  → user_progress fetch from Supabase
+  → display-name fetch when needed
+  → task/hideout metadata fetch
+  → Worker invalidation and hideout transforms
+  → API response
+```
+
+### Public API task writes
+
+```text
+request
+  → authenticate and rate limit
+  → fetch current user_progress JSONB
+  → mutate completion and dependent tasks in Worker
+  → merge_progress_data RPC
+```
+
+### Browser progress writes
+
+The browser directly upserts complete `user_progress` payloads. This is a second write authority and can race with public API commands despite the API's partial-merge RPC.
+
+---
+
+## Confirmed defects and architectural gaps
+
+### P0: production KV contains malformed overlay projections
+
+The live `tasks-core-json-v2-en-regular` value was inspected through Cloudflare API.
+
+- Envelope version: 1
+- Overlay version: 1.53
+- Task count: 512
+- Overlay task additions are present.
+
+For overlay-corrected tasks, `objectives` is an ID-keyed object instead of an array. Examples:
+
+- `66058cc5bb83da7ba474aba9`
+- `5ae449c386f7744bde357697`
+
+Root cause:
+
+1. `adaptTaskCore()` produces a reduced task without objectives.
+2. `applyOverlay()` runs after that projection.
+3. `deepMerge()` replaces the missing property with the overlay's ID-keyed patch object.
+
+The pipeline must apply the overlay to a complete canonical model before creating endpoint-specific projections.
+
+### P0: the API Worker and frontend do not use one rules implementation
+
+`app/utils/progressInvalidation.ts` and `workers/api-gateway/src/utils/invalidation.ts` differ.
+
+Examples:
+
+- Frontend skips recursive invalidation when a requirement accepts `failed`; Worker does not.
+- Alternative-branch behavior differs.
+- Worker still depends on `alternatives`, a field removed from upstream APIs.
+
+Adding a third SQL implementation would increase drift. Extract one shared pure TypeScript engine.
+
+### Resolved: interim Worker JSON migration was mode-insensitive
+
+The Worker service, callers, and caches now select distinct `regular` and `pve` JSON data. Shared-profile failure metadata also uses the requested mode and the runtime-configurable Tarkov JSON base URL.
+
+The remaining limitation is architectural rather than mode correctness: the Worker still fetches directly from the upstream JSON service instead of consuming an immutable validated release. Phase 4 removes that runtime upstream dependency.
+
+### P0: branch semantics depend on removed `alternatives`
+
+The upstream `alternatives` field no longer exists. Branch relationships are represented by `taskStatus` failure conditions. Compile explicit branch/failure edges from `failConditions` and remove runtime dependence on `alternatives`.
+
+### Resolved: API usage User-Agent migration deployed and constrained
+
+Migration `20260718120000_add_user_agent_to_api_usage_daily.sql` is deployed in production. The live seven-argument `record_api_usage` RPC accepts `p_user_agent`, trims it to 200 characters, and stores the latest normalized value per token/day. Follow-up migration `20260723120000_constrain_api_usage_user_agent.sql` constrains the storage column to `VARCHAR(200)` so direct writes cannot bypass the RPC's length bound.
+
+### P1: Worker has no durable source for patched metadata
+
+Its module cache is per-isolate and ephemeral. The current direct JSON fallback is unpatched and should not be the final source.
+
+### P1: active KV data expires automatically
+
+A scheduler or credential incident lasting seven days would remove the data. Active and previous validated releases should not expire automatically.
+
+### P1: API task writes use GET → mutate → merge
+
+The Worker reads current progress before generating dependent changes. Concurrent writers can make that read stale. Derived branch/invalidation state should not be persisted as ordinary explicit user state.
+
+### P1: browser and API writes use different persistence paths
+
+Browser full-row upserts and API partial merges can overwrite one another. Both must eventually use server-side merge/command contracts.
+
+### P1: API request path has avoidable Supabase round trips
+
+Token validation and tier lookup are separate database calls, followed by operation-specific reads. A combined auth-context RPC should return token state, permissions, mode, and tier before rate limiting.
+
+---
+
+## Target data model
+
+### Canonical source model
+
+The precompute process should create one complete, mode-specific canonical model before projection. It must include all fields needed by every consumer, including:
+
+- tasks and task additions
+- objective and failure-condition arrays
+- task requirements and accepted statuses
+- faction and level/edition/prestige restrictions
+- maps, traders, rewards, and items needed by UI projections
+- hideout stations, levels, requirements, and edition grants
+- overlay provenance
+
+### Compiled progress rules
+
+Publish one language-independent rules artifact per mode:
+
+```ts
+type ProgressRuleset = {
+  schemaVersion: number;
+  releaseId: string;
+  mode: 'regular' | 'pve';
+  source: {
+    generatedAt: string;
+    overlayVersion: string;
+    overlaySha256: string;
+  };
+  tasks: Record<
+    string,
+    {
+      faction?: string;
+      objectiveIds: string[];
+      requirements: Array<{
+        taskId: string;
+        acceptedStatuses: string[];
+      }>;
+      failureConditions: Array<{
+        taskId: string;
+        statuses: string[];
+      }>;
+    }
+  >;
+  dependentsByTaskId: Record<string, string[]>;
+  editionGrants: Record<
+    string,
+    {
+      moduleIds: string[];
+      requirementIds: string[];
+    }
+  >;
+};
+```
+
+Compile graph indexes during precompute to reduce request CPU further.
+
+### Explicit versus derived progress
+
+Persist explicit state:
+
+- task completion
+- manual or observed failure
+- objective completion/count
+- hideout progress
+- timestamps, progress epoch, and import provenance
+
+Derive from current rules:
+
+- invalid faction tasks
+- failed prerequisites
+- locked/unavailable tasks
+- branch failures caused by another completed task
+- edition/prestige availability
+- edition-granted hideout modules and requirements
+
+Return effective derived state in API responses, but avoid permanently storing values that can become stale when metadata changes.
+
+---
+
+## Target release format
+
+Recommended KV layout:
+
+```text
+tarkov/releases/{releaseId}/manifest
+tarkov/releases/{releaseId}/rules/regular
+tarkov/releases/{releaseId}/rules/pve
+tarkov/releases/{releaseId}/ui/{lang}/regular/tasks-core
+tarkov/releases/{releaseId}/ui/{lang}/regular/tasks-objectives
+tarkov/releases/{releaseId}/ui/{lang}/regular/tasks-rewards
+tarkov/releases/{releaseId}/ui/{lang}/regular/hideout
+...same projections for pve...
+tarkov/active-release
+tarkov/previous-release
+```
+
+Release ID should be content-derived or otherwise immutable and include a manifest containing:
+
+- schema version
+- release ID
+- generated timestamp
+- source endpoint versions/hashes where available
+- overlay version and SHA-256
+- available modes/languages/projections
+- per-artifact sizes and hashes
+- validation summary
+
+### Publish protocol
+
+1. Fetch all required inputs for regular and PVE.
+2. Normalize into complete canonical models.
+3. Apply shared and mode-specific overlays.
+4. Validate canonical models and all output projections.
+5. Write every immutable release artifact.
+6. Read back and verify required artifacts.
+7. Acquire a single-writer promotion claim with a unique fencing token and lease, and record the pre-promotion state `S0 = (previous-release = P, active-release = A)`. Before changing either pointer, require the storage layer to atomically verify both `S0` and the current fencing token/lease. Every pointer write and read-back verification below must carry that token and be rejected atomically after lease expiry or lock takeover; a process-side check followed by an unconditional write is insufficient.
+8. Under that fence, the only supported states are `S0`, the intermediate `S1 = (A, A)`, and the promoted state `S2 = (A, B)`. Conditionally change `S0 → S1`, verify `S1`, then conditionally change `S1 → S2` and verify `S2`. A rejected or ambiguous operation stops further writes and triggers a fenced read of both pointers: `S0` means not promoted; `S2` means promoted; `S1` may be reconciled to `S0` or `S2` only while the same fencing token remains valid. Treat `(B, B)`, `(P, B)`, and every other unknown pair as forbidden: do not repair it in this attempt, surface it for operator/new-attempt reconciliation. If the claim is lost, perform no repair writes; re-read state and start a new promotion attempt. The pointers must never both advance to `B`, or rollback would be ineffective.
+9. Run production canaries.
+10. Retain active and previous releases without expiration.
+11. Optionally archive older releases in R2.
+
+Do not fall back to raw tarkov.dev on a runtime miss. Use the previous validated release. If no validated release is available, reads may degrade explicitly, but progress writes should fail with 503 rather than accept unverifiable state.
+
+---
+
+## Target runtime flows
+
+### Metadata/UI request
+
+```text
+Pages Function
+  → read active release pointer
+  → read immutable mode/lang projection from KV
+  → return with release/hash headers
+```
+
+### API progress read
+
+```text
+Worker
+  → combined Supabase auth-context RPC
+  → Durable Object limits
+  → consolidated progress/team RPC
+  → load mode-specific rules from module memory or KV
+  → shared TypeScript rules engine
+  → return effective progress + releaseId
+```
+
+### API progress command
+
+```text
+Worker
+  → combined auth-context RPC
+  → Durable Object limits
+  → load rules and validate entity/command
+  → atomic Supabase command RPC for explicit state only
+  → evaluate effective state using shared rules
+  → return result + releaseId
+```
+
+### Browser sync
+
+```text
+Browser
+  → timestamp/epoch-aware merge RPC
+  → Supabase row lock and atomic merge
+  → realtime notification
+```
+
+After migration, revoke broad direct client full-row updates.
+
+---
+
+## Why not use Supabase for all static game data?
+
+Full normalized tables or JSON snapshots in Supabase are technically possible but are not the best primary serving path:
+
+- static global data would consume transactional database capacity
+- every Worker request would depend on a centralized origin
+- returning the rules snapshot repeatedly would transfer unnecessary data
+- implementing progression rules in SQL would duplicate browser TypeScript semantics
+- the frontend still needs globally cached UI payloads
+
+Appropriate Supabase additions:
+
+- optional release/audit manifest table
+- combined token+tier auth-context RPC
+- consolidated progress and team-read RPCs
+- atomic command and browser-merge RPCs
+- release ID in operational logs/audit records
+
+Inappropriate primary responsibility:
+
+- serving full static Tarkov definitions on every request
+- owning a second SQL implementation of progression rules
+
+---
+
+## Validation gates
+
+### Canonical model
+
+- Both `regular` and `pve` are present.
+- All tasks and objectives have stable IDs.
+- Requirements and task-status failure edges reference existing tasks.
+- Overlay additions do not collide with upstream IDs.
+- Disabled entities are absent from published projections.
+- Objectives and failure conditions are always arrays.
+- Edition grants reference existing hideout entities.
+- No unexpected projection field changes.
+
+### Release publication
+
+- All required keys written before pointer changes.
+- Artifact hashes match the manifest.
+- Read-back verification succeeds.
+- Previous release remains readable.
+- Rollback can switch the active pointer without rebuilding.
+
+### Shared rules engine
+
+- One fixture suite runs against browser and Worker imports.
+- Regular/PVE differences are covered.
+- Failed-only and accepted-failed requirements are covered.
+- Mutual branch failure conditions are covered.
+- Faction and completed-task behavior are covered.
+- Property tests check order independence and idempotency.
+
+### Worker rollout
+
+Compare before/after by endpoint:
+
+- CPU average/p95/p99
+- wall duration average/p95/p99
+- 5xx and CPU-limit errors
+- KV load failures
+- stale/previous release usage
+- Supabase operation count and latency
+- response release ID
+
+Use a canary before full rollout because current GET progress p95 CPU is already approximately 10 ms.
+
+---
+
+## Resumable implementation plan
+
+### Phase 0 — deployment safety
+
+- [x] Deploy `20260718120000_add_user_agent_to_api_usage_daily.sql` before User-Agent-aware usage recording and constrain the storage column with `20260723120000_constrain_api_usage_user_agent.sql`.
+- [x] Do not ship mode-insensitive direct JSON fetching as the final solution. Interim callers and caches are mode-aware; Phase 4 removes runtime upstream fetching.
+- [x] Add tests proving regular and PVE use distinct data.
+- [x] Add a regression test for overlay objective array shape.
+- [x] Document or remove the obsolete `alternatives` contract.
+
+### Phase 1 — canonical builder
+
+- [ ] Define canonical model and release manifest schemas.
+- [ ] Fetch all upstream inputs once per mode/language as needed.
+- [ ] Apply overlay before reduced projections.
+- [ ] Compile all current endpoint projections from the canonical model.
+- [ ] Compile regular/PVE progress rules.
+- [ ] Add invariant and cross-reference validation.
+
+### Phase 2 — immutable publication
+
+- [ ] Add versioned KV key builders.
+- [ ] Publish immutable artifacts.
+- [ ] Add read-back verification.
+- [ ] Add active/previous release pointers.
+- [ ] Remove expiration from active/previous releases.
+- [ ] Add manual refresh and rollback dispatch inputs.
+- [ ] Preserve scheduled failure issue behavior.
+
+### Phase 3 — shared rules engine
+
+- [ ] Extract one framework-free domain module.
+- [ ] Port frontend invalidation behavior.
+- [ ] Replace `alternatives` with failure-condition edges.
+- [ ] Replace frontend implementation.
+- [ ] Replace Worker implementation.
+- [ ] Reuse engine in shared-profile/streamer paths where applicable.
+
+### Phase 4 — Worker KV cutover
+
+- [ ] Add `TARKOV_DATA` binding to `workers/api-gateway/wrangler.toml` and generated Env types.
+- [ ] Load compact rules by requested game mode.
+- [ ] Keep module memory only as a secondary optimization.
+- [ ] Fall back to previous release, never raw upstream.
+- [ ] Remove runtime tarkov.dev task/hideout fetches.
+- [ ] Include release ID in logs and API metadata.
+- [ ] Canary and verify CPU/latency.
+
+### Phase 5 — Supabase request consolidation
+
+- [ ] Add combined token+tier auth-context RPC.
+- [ ] Add consolidated progress-read RPC.
+- [ ] Add consolidated team-progress RPC.
+- [ ] Add atomic task/objective command RPCs.
+- [ ] Stop persisting derived invalid/branch state.
+- [ ] Keep usage recording asynchronous and observable.
+
+### Phase 6 — browser write unification
+
+- [ ] Add server-side timestamp/epoch-aware sync RPC.
+- [ ] Move browser full-row upserts to the RPC.
+- [ ] Preserve offline-first conflict semantics.
+- [ ] Revoke direct broad client updates after migration.
+- [ ] Add concurrent browser/API writer tests.
+
+### Resume point
+
+When work resumes, verify that the completed **Phase 0** safeguards still hold, then start active implementation with **Phase 1** by designing the canonical schema and release manifest before changing storage bindings. Do not begin by adding Supabase game tables or by merely increasing the Worker memory TTL; both bypass the root consistency problems.
+
+---
+
+## Decision log
+
+### 2026-07-18 — GraphQL removal
+
+GraphQL was removed from active code because the Worker query referenced fields no longer present in the schema. Direct JSON fetching is an interim compatibility fix, not the target architecture.
+
+### 2026-07-18 — Supabase game-data proposal rejected as primary runtime path
+
+Supabase remains the mutable-state authority. Static globally read data belongs in versioned KV artifacts. This avoids centralized static-data reads and a second SQL progression engine.
+
+### 2026-07-18 — shared TypeScript rules engine selected
+
+The frontend must evaluate local/offline progress, so SQL cannot be the sole implementation. A single framework-free TypeScript engine prevents existing browser/Worker drift.
+
+### 2026-07-18 — live KV projection defect confirmed
+
+Cloudflare API inspection confirmed overlay objective patches are published as objects in tasks-core. Overlay-before-projection became a mandatory first-stage correction.
+
+### 2026-07-18 — GitHub Actions remains the release control plane
+
+The existing scheduled precompute workflow is healthy and appropriately keeps heavy work off the Free-plan Worker. It should be expanded into a validated release publisher rather than replaced by a scheduled Worker.
+
+### 2026-07-23 — User-Agent enforcement rollout accepted
+
+The 5–200 character `User-Agent` requirement shipped directly in API version 2.3.0 without the deprecation window proposed in issue #565. Enforcement is already live, documented in OpenAPI, and verified at the production boundary. The missed advance-warning period cannot be recreated retroactively, so the direct rollout is accepted as the final disposition rather than weakening enforcement after release. The database retains defense in depth through RPC normalization plus a `VARCHAR(200)` column constraint.
+
+---
+
+## Primary code references
+
+### Precompute and caching
+
+- `.github/workflows/precompute-tarkov-data.yml`
+- `scripts/precompute/precompute.ts`
+- `scripts/precompute/kv.ts`
+- `scripts/precompute/run.ts`
+- `app/server/utils/precomputedTarkov.ts`
+- `app/server/utils/edgeCache.ts`
+
+### Canonical data and overlay
+
+- `app/server/utils/tarkov-json.ts`
+- `app/server/utils/overlay.ts`
+- `app/server/utils/deepMerge.ts`
+- `app/server/utils/objectiveTypeInferrer.ts`
+
+### Frontend progression
+
+- `app/utils/progressInvalidation.ts`
+- `app/stores/useProgress.ts`
+- `app/stores/useTarkov.ts`
+- `app/stores/tarkov/hideoutPrereqs.ts`
+- `app/stores/tarkov/progressMerge.ts`
+
+### API gateway
+
+- `workers/api-gateway/src/services/tarkov.ts`
+- `workers/api-gateway/src/utils/memory-cache.ts`
+- `workers/api-gateway/src/utils/invalidation.ts`
+- `workers/api-gateway/src/utils/transform.ts`
+- `workers/api-gateway/src/handlers/progress.ts`
+- `workers/api-gateway/src/handlers/team.ts`
+- `workers/api-gateway/src/auth.ts`
+- `workers/api-gateway/wrangler.toml`
+
+### Supabase
+
+- `supabase/migrations/20260708140000_add_merge_progress_rpc.sql`
+- `supabase/migrations/20260718120000_add_user_agent_to_api_usage_daily.sql`
+- `supabase/migrations/20260723120000_constrain_api_usage_user_agent.sql`
+- `supabase/migrations/20260215160000_sanitize_user_progress_payload.sql`

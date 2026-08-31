@@ -11,9 +11,25 @@
       <UCard class="border-surface-700/80 bg-surface-900/95 border shadow-xl backdrop-blur">
         <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-center">
           <div class="space-y-3">
-            <p class="text-primary-300 text-xs font-semibold tracking-[0.25em] uppercase">
-              {{ t('analytics_consent.eyebrow') }}
-            </p>
+            <div
+              data-testid="analytics-consent-eyebrow-row"
+              class="flex flex-wrap items-center gap-2"
+            >
+              <p class="text-primary-300 text-xs font-semibold tracking-[0.25em] uppercase">
+                {{ t('analytics_consent.eyebrow') }}
+              </p>
+              <UBadge
+                data-testid="analytics-consent-status"
+                role="status"
+                aria-live="polite"
+                :color="isAccepted ? 'success' : 'neutral'"
+                variant="soft"
+                size="sm"
+                class="shrink-0"
+              >
+                {{ analyticsStatusLabel }}
+              </UBadge>
+            </div>
             <div class="space-y-1">
               <h2 :id="consentTitleId" class="text-lg font-semibold text-white">
                 {{ consentTitle }}
@@ -71,7 +87,7 @@
               class="mt-1 w-full justify-center"
               @click="closePreferences"
             >
-              {{ t('generic.close_button') }}
+              {{ t('common.close', 'Close') }}
             </UButton>
           </div>
         </div>
@@ -82,7 +98,7 @@
 <script setup lang="ts">
   import { shouldEnableAnalyticsIntegrations } from '@/utils/runtimeConfig';
   const { t } = useI18n({ useScope: 'global' });
-  const { accept, closePreferences, decline, hasAnswered, isPromptOpen, state } =
+  const { accept, closePreferences, decline, hasAnswered, isAccepted, isPromptOpen, state } =
     useAnalyticsConsent();
   const runtimeConfig = useRuntimeConfig();
   const consentDescriptionId = 'analytics-consent-description';
@@ -98,6 +114,11 @@
       runtimeConfig.public.microsoftClarityProjectId,
     ].some((value) => String(value || '').trim().length > 0);
   const isVisible = computed(() => analyticsConfigured && isPromptOpen.value);
+  const analyticsStatusLabel = computed(() =>
+    isAccepted.value
+      ? t('analytics_consent.status_enabled', 'Analytics Status: Enabled')
+      : t('analytics_consent.status_disabled', 'Analytics Status: Disabled')
+  );
   const consentTitle = computed(() => {
     if (state.value.status === 'unknown') {
       return t('analytics_consent.title');

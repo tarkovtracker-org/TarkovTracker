@@ -22,7 +22,7 @@ const mountSettingsDrawerItem = () => {
     props: {
       icon: 'i-mdi-cog-outline',
       isCollapsed: false,
-      localeKey: 'settings',
+      localeKey: 'common.settings',
       to: '/settings',
     },
     global: {
@@ -65,5 +65,9 @@ describe('DrawerItem', () => {
     expect(wrapper.getComponent({ name: 'DrawerItemIcon' }).props('colorClass')).toBe(
       'text-surface-300 group-hover:text-white'
     );
+  });
+  it('translates the full locale key passed by the caller', () => {
+    const wrapper = mountSettingsDrawerItem();
+    expect(wrapper.text()).toContain('common.settings');
   });
 });

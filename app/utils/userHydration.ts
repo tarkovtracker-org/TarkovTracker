@@ -1,3 +1,4 @@
+import { extractUserMetadataDisplayName, extractUserMetadataUsername } from '@/utils/userMetadata';
 import type { User } from '@supabase/supabase-js';
 /**
  * User object structure for hydration.
@@ -20,64 +21,6 @@ export interface HydratableUser {
   provider?: string | null;
   /** All linked OAuth providers for this account */
   providers?: string[] | null;
-}
-/**
- * Helper to safely extract a string value from user metadata
- */
-function getMetaString(metadata: Record<string, unknown>, key: string): string | null {
-  return typeof metadata[key] === 'string' ? (metadata[key] as string) : null;
-}
-/**
- * Extracts username from session user based on provider
- */
-function extractUsername(
-  userMetadata: Record<string, unknown>,
-  email: string | null,
-  provider: string | null
-): string | null {
-  if (provider === 'discord') {
-    // Discord user objects expose username + global_name (preferred display name).
-    const globalName = getMetaString(userMetadata, 'global_name');
-    const username = getMetaString(userMetadata, 'username');
-    const preferredUsername = getMetaString(userMetadata, 'preferred_username');
-    const fullName = getMetaString(userMetadata, 'full_name');
-    const legacyName = getMetaString(userMetadata, 'name');
-    return (
-      globalName ||
-      username ||
-      preferredUsername ||
-      fullName ||
-      legacyName?.split('#')[0] ||
-      email?.split('@')[0] ||
-      null
-    );
-  }
-  if (provider === 'twitch') {
-    return (
-      getMetaString(userMetadata, 'preferred_username') ||
-      getMetaString(userMetadata, 'name') ||
-      email?.split('@')[0] ||
-      null
-    );
-  }
-  return getMetaString(userMetadata, 'name') || email?.split('@')[0] || null;
-}
-/**
- * Extracts display name from session user based on provider
- */
-function extractDisplayName(
-  userMetadata: Record<string, unknown>,
-  provider: string | null,
-  username: string | null
-): string | null {
-  const fullName = getMetaString(userMetadata, 'full_name');
-  if (provider === 'discord') {
-    return username;
-  }
-  if (provider === 'twitch') {
-    return fullName || username;
-  }
-  return fullName || username;
 }
 /**
  * Hydrates a user object from a Supabase session user
@@ -129,8 +72,8 @@ export function hydrateUserFromSession(user: HydratableUser, sessionUser: User |
   let username: string | null;
   let displayName: string | null;
   try {
-    username = extractUsername(userMetadata, user.email, provider);
-    displayName = extractDisplayName(userMetadata, provider, username);
+    username = extractUserMetadataUsername(userMetadata, user.email, provider) || null;
+    displayName = extractUserMetadataDisplayName(userMetadata, provider, username) || null;
   } catch {
     username = null;
     displayName = null;

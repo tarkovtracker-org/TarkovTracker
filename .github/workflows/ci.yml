@@ -1,5 +1,4 @@
 name: CI
-
 on:
   push:
     branches: [main, develop, 'wip/**']
@@ -17,158 +16,187 @@ on:
       - 'app/locales/ru.json'
       - 'app/locales/uk.json'
       - 'app/locales/zh.json'
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
-
 permissions:
   contents: read
-
 jobs:
+  fallow:
+    name: Fallow audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+      - name: Install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.14.0 --activate
+      - name: Setup pnpm cache
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Resolve Fallow base
+        id: fallow-base
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          if [ "$BASE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            BASE="origin/main"
+          fi
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
+      - name: Audit changed files
+        run: pnpm exec fallow audit --base "${{ steps.fallow-base.outputs.base }}" --gate new-only --quiet
   lint-format:
     name: Lint & Format
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
-
       - name: Install pnpm
         run: |
           corepack enable
           corepack prepare pnpm@11.14.0 --activate
-
       - name: Setup pnpm cache
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
           cache: 'pnpm'
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
       - name: Lint
         run: pnpm run lint
-
       - name: Format check
         run: pnpm run format:check
-
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
-
       - name: Install pnpm
         run: |
           corepack enable
           corepack prepare pnpm@11.14.0 --activate
-
       - name: Setup pnpm cache
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
           cache: 'pnpm'
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
       - name: Type check
         run: pnpm run typecheck
-
   test:
-    name: Test
+    name: Test (shard ${{ matrix.shard }}/${{ matrix.total }})
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+        total: [4]
     env:
       CI: 'true'
+      VITEST_SHARD: ${{ matrix.shard }}/${{ matrix.total }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 2
-
+          persist-credentials: false
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
-
       - name: Install pnpm
         run: |
           corepack enable
           corepack prepare pnpm@11.14.0 --activate
-
       - name: Setup pnpm cache
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
           cache: 'pnpm'
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Test with coverage
-        run: pnpm run test:coverage
-
+      - name: Setup Deno
+        if: matrix.shard == 1
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
+        with:
+          deno-version: v2.9.4
+      - name: Run Deno tests
+        if: matrix.shard == 1
+        run: deno test supabase/functions/_shared/*.deno.test.ts
+      - name: Run shard ${{ matrix.shard }}/${{ matrix.total }}
+        run: pnpm exec vitest run --coverage --shard=${{ matrix.shard }}/${{ matrix.total }}
       - name: Upload coverage to Codecov
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
-        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           files: ./coverage/lcov.info
-          flags: unittests
+          flags: unittests-shard-${{ matrix.shard }}
           fail_ci_if_error: false
-
       - name: Upload test results to Codecov
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
-        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac
+        if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true) && !cancelled()
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           report_type: test_results
           files: ./test-report.junit.xml
-          flags: unittests
+          flags: unittests-shard-${{ matrix.shard }}
           fail_ci_if_error: false
-
   validate:
     name: Validate
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 2
-
+          persist-credentials: false
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
-
       - name: Install pnpm
         run: |
           corepack enable
           corepack prepare pnpm@11.14.0 --activate
-
       - name: Setup pnpm cache
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
           cache: 'pnpm'
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
       - name: Build
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
         run: pnpm run build
@@ -180,7 +208,6 @@ jobs:
           SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
       - name: Upload build artifacts
         if: github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -188,69 +215,76 @@ jobs:
           name: build-${{ github.sha }}
           path: dist
           retention-days: 7
-
   supabase-db:
     name: Supabase DB
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
-
       - name: Install pnpm
         run: |
           corepack enable
           corepack prepare pnpm@11.14.0 --activate
-
       - name: Setup pnpm cache
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
           cache: 'pnpm'
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
       - name: Validate Supabase migrations
         run: pnpm run supabase:check
-
+  systems-drift:
+    name: Systems drift check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+      - name: Systems drift check
+        run: node scripts/check-systems-drift.mjs
   workers:
     name: Workers
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
-
       - name: Install pnpm
         run: |
           corepack enable
           corepack prepare pnpm@11.14.0 --activate
-
       - name: Setup pnpm cache
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
           cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
-
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
-
       - name: Validate api-gateway
         if: hashFiles('workers/api-gateway/package.json') != ''
         run: |
+          pnpm --filter api-gateway run types:check
           pnpm --filter api-gateway run typecheck
           pnpm --filter api-gateway run validate:openapi
-
+          pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run
       - name: Test api-gateway
         if: hashFiles('workers/api-gateway/package.json') != ''
         run: pnpm run test:api-gateway

@@ -22,7 +22,7 @@
               variant="link"
               size="xs"
               icon="i-mdi-close-circle"
-              :aria-label="t('page.tasks.search.clear')"
+              :aria-label="t('common.clear_search')"
               @click="$emit('update:searchQuery', '')"
             />
           </template>
@@ -35,14 +35,14 @@
           size="sm"
           class="leading-none"
           :disabled="primaryView === 'all'"
-          :aria-label="t('page.tasks.primary_views.list')"
+          :aria-label="t('common.list')"
           :aria-pressed="primaryView === 'all'"
           :class="getPrimaryViewButtonClass(primaryView === 'all')"
           @click="setPrimaryView('all')"
         >
           <UIcon name="i-mdi-checkbox-multiple-marked" class="h-4 w-4 shrink-0 sm:mr-1.5" />
           <span class="hidden text-xs leading-none uppercase sm:inline">
-            {{ t('page.tasks.primary_views.list') }}
+            {{ t('common.list') }}
           </span>
         </UButton>
         <UButton
@@ -51,14 +51,14 @@
           size="sm"
           class="leading-none"
           :disabled="primaryView === 'traders'"
-          :aria-label="t('page.tasks.primary_views.traders')"
+          :aria-label="t('common.traders')"
           :aria-pressed="primaryView === 'traders'"
           :class="getPrimaryViewButtonClass(primaryView === 'traders')"
           @click="setPrimaryView('traders')"
         >
           <UIcon name="i-mdi-account-group" class="h-4 w-4 shrink-0 sm:mr-1.5" />
           <span class="hidden text-xs leading-none uppercase sm:inline">
-            {{ t('page.tasks.primary_views.traders') }}
+            {{ t('common.traders') }}
           </span>
         </UButton>
         <UButton
@@ -67,14 +67,14 @@
           size="sm"
           class="leading-none"
           :disabled="primaryView === 'maps'"
-          :aria-label="t('page.tasks.primary_views.maps')"
+          :aria-label="t('common.maps')"
           :aria-pressed="primaryView === 'maps'"
           :class="getPrimaryViewButtonClass(primaryView === 'maps')"
           @click="setPrimaryView('maps')"
         >
           <UIcon name="i-mdi-map" class="h-4 w-4 shrink-0 sm:mr-1.5" />
           <span class="hidden text-xs leading-none uppercase sm:inline">
-            {{ t('page.tasks.primary_views.maps') }}
+            {{ t('common.maps') }}
           </span>
         </UButton>
         <UButton
@@ -156,7 +156,7 @@
               class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block"
             />
             <span class="text-xs leading-none uppercase sm:text-sm">
-              {{ t('page.tasks.secondary_views.all', 'All') }}
+              {{ t('common.all', 'All') }}
             </span>
             <span
               class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
@@ -183,7 +183,7 @@
           >
             <UIcon name="i-mdi-clipboard-text" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
             <span class="text-xs leading-none uppercase sm:text-sm">
-              {{ t('page.tasks.secondary_views.available') }}
+              {{ t('common.available') }}
             </span>
             <span
               class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
@@ -205,7 +205,7 @@
           >
             <UIcon name="i-mdi-lock" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
             <span class="text-xs leading-none uppercase sm:text-sm">
-              {{ t('page.tasks.secondary_views.locked') }}
+              {{ t('common.locked') }}
             </span>
             <span
               class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
@@ -227,7 +227,7 @@
           >
             <UIcon name="i-mdi-check-circle" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
             <span class="text-xs leading-none uppercase sm:text-sm">
-              {{ t('page.tasks.secondary_views.completed') }}
+              {{ t('common.completed') }}
             </span>
             <span
               class="bg-success-500 ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
@@ -248,7 +248,7 @@
           >
             <UIcon name="i-mdi-close-circle" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
             <span class="text-xs leading-none uppercase sm:text-sm">
-              {{ t('page.tasks.secondary_views.failed') }}
+              {{ t('common.failed') }}
             </span>
             <span
               class="bg-error-500 ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
@@ -318,11 +318,11 @@
             :disabled="preferencesStore.getTaskUserView === 'all'"
             :aria-pressed="preferencesStore.getTaskUserView === 'all'"
             :class="getSegmentButtonClass(preferencesStore.getTaskUserView === 'all')"
-            @click="onUserViewSelect({ label: t('page.tasks.user_views.all'), value: 'all' })"
+            @click="onUserViewSelect({ label: t('common.all'), value: 'all' })"
           >
             <UIcon name="i-mdi-account-multiple" class="h-4 w-4 shrink-0 sm:mr-1" />
             <span class="text-xs leading-none uppercase sm:text-sm">
-              {{ t('page.tasks.user_views.all') }}
+              {{ t('common.all') }}
             </span>
           </UButton>
         </div>
@@ -541,9 +541,7 @@
     return preferencesStore.teamHide?.[teamId] === true;
   };
   const getTeammateVisibilityLabel = (teamId: string): string => {
-    const actionLabel = isTeammateHidden(teamId)
-      ? t('settings.account_data.action_show')
-      : t('settings.account_data.action_hide');
+    const actionLabel = isTeammateHidden(teamId) ? t('common.show') : t('common.hide');
     return `${actionLabel} ${getTeammateDisplayName(teamId)}`;
   };
   const toggleTeammateVisibility = (teamId: string) => {

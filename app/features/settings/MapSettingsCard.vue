@@ -4,62 +4,62 @@
     icon-color="success"
     highlight-color="success"
     :fill-height="false"
-    :title="$t('settings.interface.maps.title')"
+    :title="$t('common.maps')"
     title-classes="text-lg font-semibold"
   >
     <template #content>
       <div class="space-y-4 px-4 py-4">
-        <div class="grid gap-4 md:grid-cols-3">
-          <UCheckbox
-            v-model="showMapExtracts"
-            :label="$t('settings.interface.maps.show_extracts')"
-          />
+        <UCheckbox v-model="showMapExtracts" :label="$t('settings.interface.maps.show_extracts')" />
+        <div class="grid gap-4 sm:grid-cols-3">
           <div class="space-y-1">
             <div class="flex justify-between">
-              <span class="text-sm font-medium">
+              <label :for="mapZoomSliderId" class="text-sm font-medium">
                 {{ $t('settings.interface.maps.zoom_speed') }}
-              </span>
+              </label>
               <span class="text-surface-200 text-xs">{{ mapZoomSpeed }}x</span>
             </div>
             <input
+              :id="mapZoomSliderId"
               v-model.number="mapZoomSpeed"
               type="range"
               min="0.5"
               max="3"
               step="0.1"
-              class="bg-surface-700 accent-surface-200 h-2 w-full cursor-pointer appearance-none rounded-lg"
+              class="bg-surface-700 accent-surface-200 slider-thumb h-2 w-full cursor-pointer appearance-none rounded-lg"
             />
           </div>
           <div class="space-y-1">
             <div class="flex justify-between">
-              <span class="text-sm font-medium">
+              <label :for="mapPanSliderId" class="text-sm font-medium">
                 {{ $t('settings.interface.maps.pan_speed') }}
-              </span>
+              </label>
               <span class="text-surface-200 text-xs">{{ mapPanSpeed.toFixed(1) }}x</span>
             </div>
             <input
+              :id="mapPanSliderId"
               v-model.number="mapPanSpeed"
               type="range"
               min="0.5"
               max="3"
               step="0.1"
-              class="bg-surface-700 accent-surface-200 h-2 w-full cursor-pointer appearance-none rounded-lg"
+              class="bg-surface-700 accent-surface-200 slider-thumb h-2 w-full cursor-pointer appearance-none rounded-lg"
             />
           </div>
           <div class="space-y-1">
             <div class="flex justify-between">
-              <span class="text-sm font-medium">
+              <label :for="mapZoneOpacitySliderId" class="text-sm font-medium">
                 {{ $t('settings.interface.maps.zone_opacity') }}
-              </span>
+              </label>
               <span class="text-surface-200 text-xs">{{ Math.round(mapZoneOpacity * 100) }}%</span>
             </div>
             <input
+              :id="mapZoneOpacitySliderId"
               v-model.number="mapZoneOpacity"
               type="range"
               min="0.05"
               max="0.5"
               step="0.01"
-              class="bg-surface-700 accent-surface-200 h-2 w-full cursor-pointer appearance-none rounded-lg"
+              class="bg-surface-700 accent-surface-200 slider-thumb h-2 w-full cursor-pointer appearance-none rounded-lg"
             />
           </div>
         </div>
@@ -79,10 +79,10 @@
               variant="ghost"
               @click="preferencesStore.resetMapMarkerColors()"
             >
-              {{ $t('settings.interface.maps.colors.reset') }}
+              {{ $t('common.reset') }}
             </UButton>
           </div>
-          <div class="grid gap-2 md:grid-cols-2">
+          <div class="grid gap-2 sm:grid-cols-2">
             <label
               v-for="option in mapColorOptions"
               :key="option.key"
@@ -101,7 +101,7 @@
                 :aria-label="option.label"
                 :value="mapMarkerColors[option.key]"
                 type="color"
-                class="bg-surface-900 border-surface-700 h-8 w-11 cursor-pointer rounded border p-1"
+                class="bg-surface-900 border-surface-700 h-8 w-11 shrink-0 cursor-pointer rounded border p-1"
                 @input="onMapColorInput(option.key, $event)"
               />
             </label>
@@ -117,6 +117,9 @@
   import { getMapColorOptions, type MapMarkerColorKey } from '@/utils/theme-colors';
   const { t } = useI18n({ useScope: 'global' });
   const preferencesStore = usePreferencesStore();
+  const mapZoomSliderId = 'settings-map-zoom-speed-slider';
+  const mapPanSliderId = 'settings-map-pan-speed-slider';
+  const mapZoneOpacitySliderId = 'settings-map-zone-opacity-slider';
   const showMapExtracts = computed({
     get: () => preferencesStore.getShowMapExtracts,
     set: (val) => preferencesStore.setShowMapExtracts(val),

@@ -144,7 +144,6 @@ const setup = async (
       setTraderSortMode,
       setTraderSortDirection,
       dashboardNoticeDismissed: false,
-      setDashboardNoticeDismissed: vi.fn(),
       setTaskPrimaryView: vi.fn(),
       setTaskTraderView: vi.fn(),
     }),
@@ -159,6 +158,9 @@ const defaultGlobalStubs = {
   AppTooltip: { template: '<span><slot /></span>' },
   DashboardNextActions: {
     template: '<div data-testid="dashboard-focus-card"></div>',
+  },
+  DashboardMigrationBanner: {
+    template: '<div data-testid="dashboard-migration-banner"></div>',
   },
   DashboardProgressCard: {
     props: ['completed', 'total', 'percentage', 'label', 'icon', 'color'],
@@ -190,6 +192,13 @@ describe('dashboard page', () => {
       global: { stubs: defaultGlobalStubs },
     });
     expect(wrapper.find('[data-testid="dashboard-focus-card"]').exists()).toBe(true);
+  });
+  it('renders the migration guide banner', async () => {
+    const { DashboardPage } = await setup();
+    const wrapper = await mountSuspended(DashboardPage, {
+      global: { stubs: defaultGlobalStubs },
+    });
+    expect(wrapper.find('[data-testid="dashboard-migration-banner"]').exists()).toBe(true);
   });
   it('renders dashboard progress cards', async () => {
     const { DashboardPage } = await setup();

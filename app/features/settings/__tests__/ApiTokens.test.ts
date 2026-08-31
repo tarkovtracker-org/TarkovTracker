@@ -3,10 +3,15 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
-const { mockCreateToken, mockRevokeToken } = vi.hoisted(() => ({
-  mockCreateToken: vi.fn(),
-  mockRevokeToken: vi.fn(),
-}));
+const { mockCreateToken, mockEq, mockRevokeToken, mockUpdate, mockUpdateSingle } = vi.hoisted(
+  () => ({
+    mockCreateToken: vi.fn(),
+    mockEq: vi.fn(),
+    mockRevokeToken: vi.fn(),
+    mockUpdate: vi.fn(),
+    mockUpdateSingle: vi.fn(),
+  })
+);
 const mockSupabaseUser = reactive({
   loggedIn: true,
   id: 'user-a',
@@ -24,7 +29,7 @@ const pendingLoads = new Map<
   (value: {
     data: Array<{
       created_at: string;
-      game_mode: 'pvp' | 'pve';
+      game_mode: 'pvp' | 'pve' | 'seasonal';
       is_active: boolean;
       last_used_at: string | null;
       note: string;
@@ -43,14 +48,24 @@ const pendingCreates = new Map<
 const mockInsert = vi.fn();
 const mockInsertSingle = vi.fn();
 const mockFrom = vi.fn(() => {
+  let operation: 'insert' | 'select' | 'update' = 'select';
   let currentUserId = '';
   const table = {
     insert: vi.fn((payload: Record<string, unknown>) => {
+      operation = 'insert';
       mockInsert(payload);
       return table;
     }),
-    eq: vi.fn((_column: string, userId: string) => {
-      currentUserId = userId;
+    update: vi.fn((payload: Record<string, unknown>) => {
+      operation = 'update';
+      mockUpdate(payload);
+      return table;
+    }),
+    eq: vi.fn((column: string, value: string) => {
+      mockEq(column, value);
+      if (column === 'user_id') {
+        currentUserId = value;
+      }
       return table;
     }),
     order: vi.fn(
@@ -60,7 +75,7 @@ const mockFrom = vi.fn(() => {
         })
     ),
     select: vi.fn(() => table),
-    single: vi.fn(() => mockInsertSingle()),
+    single: vi.fn(() => (operation === 'update' ? mockUpdateSingle() : mockInsertSingle())),
   };
   return table;
 });
@@ -104,10 +119,10 @@ const createWrapper = async () => {
           template: '<span><slot /></span>',
         },
         UButton: {
-          props: ['disabled', 'loading'],
+          props: ['ariaLabel', 'disabled', 'loading', 'type'],
           emits: ['click'],
           template:
-            '<button :disabled="disabled" :data-loading="loading" @click="$emit(\'click\')"><slot /></button>',
+            '<button :type="type" :aria-label="ariaLabel" :disabled="disabled" :data-loading="loading" @click="$emit(\'click\')"><slot /></button>',
         },
         UCard: {
           template: '<div><slot /></div>',
@@ -123,10 +138,10 @@ const createWrapper = async () => {
         },
         UIcon: true,
         UInput: {
-          props: ['modelValue'],
+          props: ['ariaLabel', 'modelValue'],
           emits: ['update:modelValue'],
           template:
-            '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+            '<input :aria-label="ariaLabel" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
         },
         UModal: {
           props: ['open'],
@@ -155,7 +170,7 @@ const makeTokenRow = (
   note: string,
   overrides: Partial<{
     created_at: string;
-    game_mode: 'pvp' | 'pve';
+    game_mode: 'pvp' | 'pve' | 'seasonal';
     is_active: boolean;
     last_used_at: string | null;
     permissions: string[];
@@ -209,8 +224,11 @@ describe('ApiTokens', () => {
     mockSupabaseUser.loggedIn = true;
     mockSupabaseUser.id = 'user-a';
     mockCreateToken.mockReset();
+    mockEq.mockReset();
     mockInsert.mockReset();
     mockInsertSingle.mockReset();
+    mockUpdate.mockReset();
+    mockUpdateSingle.mockReset();
     mockCreateToken.mockImplementation(
       () =>
         new Promise((resolve) => {
@@ -284,6 +302,152 @@ describe('ApiTokens', () => {
         ([payload]) => payload.title === 'page.settings.card.apitokens.create_token_success'
       )
     ).toHaveLength(1);
+  });
+  it('renames a token inline and trims the saved name', async () => {
+    mockUpdateSingle.mockResolvedValueOnce({
+      data: { token_id: 'user-a-token' },
+      error: null,
+    });
+    const wrapper = await createWrapper();
+    await flushPromises();
+    resolveLoad('user-a', 'Existing Token');
+    await flushPromises();
+    const editButton = wrapper.find(
+      'button[aria-label="page.settings.card.apitokens.edit_name_aria"]'
+    );
+    expect(editButton.exists()).toBe(true);
+    await editButton.trigger('click');
+    const nameInput = wrapper.find('input[aria-label="page.settings.card.apitokens.edit_name"]');
+    expect((nameInput.element as HTMLInputElement).value).toBe('Existing Token');
+    const saveButton = wrapper.find('button[aria-label="page.settings.card.apitokens.save_name"]');
+    expect(saveButton.attributes('disabled')).toBeDefined();
+    await nameInput.setValue('  Renamed Token  ');
+    expect(saveButton.attributes('disabled')).toBeUndefined();
+    await wrapper.find('form').trigger('submit');
+    await flushPromises();
+    expect(mockUpdate).toHaveBeenCalledWith({ note: 'Renamed Token' });
+    expect(mockEq).toHaveBeenCalledWith('token_id', 'user-a-token');
+    expect(mockEq).toHaveBeenCalledWith('user_id', 'user-a');
+    expect(wrapper.text()).toContain('Renamed Token');
+    expect(wrapper.text()).not.toContain('Existing Token');
+    expect(mockToast.add).toHaveBeenCalledWith({
+      title: 'page.settings.card.apitokens.name_updated',
+      color: 'success',
+    });
+  });
+  it('allows clearing a token name back to the untitled fallback', async () => {
+    mockUpdateSingle.mockResolvedValueOnce({
+      data: { token_id: 'user-a-token' },
+      error: null,
+    });
+    const wrapper = await createWrapper();
+    await flushPromises();
+    resolveLoad('user-a', 'Existing Token');
+    await flushPromises();
+    await wrapper
+      .find('button[aria-label="page.settings.card.apitokens.edit_name_aria"]')
+      .trigger('click');
+    await wrapper.find('input[aria-label="page.settings.card.apitokens.edit_name"]').setValue(' ');
+    await wrapper.find('form').trigger('submit');
+    await flushPromises();
+    expect(mockUpdate).toHaveBeenCalledWith({ note: null });
+    expect(wrapper.text()).toContain('page.settings.card.apitokens.default_note');
+  });
+  it('keeps the name editor open when a rename fails', async () => {
+    mockUpdateSingle.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'Rename failed' },
+    });
+    const wrapper = await createWrapper();
+    await flushPromises();
+    resolveLoad('user-a', 'Existing Token');
+    await flushPromises();
+    await wrapper
+      .find('button[aria-label="page.settings.card.apitokens.edit_name_aria"]')
+      .trigger('click');
+    await wrapper
+      .find('input[aria-label="page.settings.card.apitokens.edit_name"]')
+      .setValue('Retry Token');
+    await wrapper.find('form').trigger('submit');
+    await flushPromises();
+    expect(
+      wrapper.find('input[aria-label="page.settings.card.apitokens.edit_name"]').exists()
+    ).toBe(true);
+    expect(mockToast.add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: 'Rename failed',
+        title: 'page.settings.card.apitokens.name_update_error',
+      })
+    );
+  });
+  it('ignores a token rename response after an account switch', async () => {
+    let resolveRename: ((value: { data: { token_id: string }; error: null }) => void) | undefined;
+    mockUpdateSingle.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRename = resolve;
+        })
+    );
+    const wrapper = await createWrapper();
+    await flushPromises();
+    resolveLoad('user-a', 'Token A');
+    await flushPromises();
+    await wrapper
+      .find('button[aria-label="page.settings.card.apitokens.edit_name_aria"]')
+      .trigger('click');
+    await wrapper
+      .find('input[aria-label="page.settings.card.apitokens.edit_name"]')
+      .setValue('Renamed Token A');
+    await wrapper.find('form').trigger('submit');
+    await flushPromises();
+    mockSupabaseUser.id = 'user-b';
+    await flushPromises();
+    resolveRename?.({ data: { token_id: 'user-a-token' }, error: null });
+    await flushPromises();
+    expect(
+      mockToast.add.mock.calls.filter(
+        ([payload]) => payload.title === 'page.settings.card.apitokens.name_updated'
+      )
+    ).toHaveLength(0);
+    expect(wrapper.text()).not.toContain('Renamed Token A');
+  });
+  it('applies a token rename to the current row after a concurrent list reload', async () => {
+    let resolveRename: ((value: { data: { token_id: string }; error: null }) => void) | undefined;
+    mockUpdateSingle.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRename = resolve;
+        })
+    );
+    mockRevokeToken.mockResolvedValueOnce(undefined);
+    const wrapper = await createWrapper();
+    await flushPromises();
+    resolveLoadMany('user-a', [
+      makeTokenRow('user-a', 'Existing Token', { token_id: 'user-a-token' }),
+      makeTokenRow('user-a', 'Other Token', { token_id: 'user-a-other-token' }),
+    ]);
+    await flushPromises();
+    await wrapper
+      .findAll('button[aria-label="page.settings.card.apitokens.edit_name_aria"]')[0]!
+      .trigger('click');
+    await wrapper
+      .find('input[aria-label="page.settings.card.apitokens.edit_name"]')
+      .setValue('Renamed Token');
+    await wrapper.find('form').trigger('submit');
+    await flushPromises();
+    const revokeButtons = wrapper
+      .findAll('button')
+      .filter((button) => button.text() === 'page.settings.card.apitokens.revoke_button');
+    await revokeButtons[1]!.trigger('click');
+    await flushPromises();
+    resolveLoadMany('user-a', [
+      makeTokenRow('user-a', 'Existing Token', { token_id: 'user-a-token' }),
+    ]);
+    await flushPromises();
+    resolveRename?.({ data: { token_id: 'user-a-token' }, error: null });
+    await flushPromises();
+    expect(wrapper.text()).toContain('Renamed Token');
+    expect(wrapper.text()).not.toContain('Existing Token');
   });
   it('shows an error instead of bypassing the function when token creation throws a statusless error', async () => {
     mockCreateToken.mockRejectedValueOnce(new Error('Internal server error'));
@@ -369,6 +533,34 @@ describe('ApiTokens', () => {
       )
     ).toHaveLength(1);
     expect(wrapper.text()).toContain('Fallback Token');
+  });
+  it('uses the SZN prefix for Seasonal token creation and direct fallback', async () => {
+    runtimeConfig.public.allowDirectTokenCreateFallback = true;
+    mockCreateToken.mockRejectedValueOnce({ status: 404, data: { message: 'Not found' } });
+    mockInsertSingle.mockResolvedValueOnce({
+      data: { token_id: 'user-a-seasonal-token' },
+      error: null,
+    });
+    const wrapper = await createWrapper();
+    await flushPromises();
+    await clickButton(wrapper, 'page.settings.card.apitokens.new_token_expand');
+    await wrapper.findAll('input[type="radio"]')[2]!.setValue();
+    await clickButton(wrapper, 'page.settings.card.apitokens.submit_new_token');
+    await flushPromises();
+    expect(mockCreateToken).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gameMode: 'seasonal',
+        tokenValue: expect.stringMatching(/^SZN_[0-9a-f]{18}$/),
+      })
+    );
+    const edgeTokenValue = mockCreateToken.mock.calls[0]?.[0].tokenValue;
+    expect(edgeTokenValue).toMatch(/^SZN_[0-9a-f]{18}$/);
+    expect(mockInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        game_mode: 'seasonal',
+        token_value: edgeTokenValue,
+      })
+    );
   });
   it('disables create and shows the token cap alert when the account has 3 active tokens', async () => {
     const wrapper = await createWrapper();
