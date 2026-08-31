@@ -246,52 +246,47 @@
           :id="`task-content-${task.id}`"
           class="border-surface-700/50 border-t"
         >
-          <div
-            class="hover:bg-surface-700/20 focus-visible:ring-primary-500/40 focus-visible:ring-offset-surface-900 flex cursor-pointer items-center justify-between rounded-sm transition-colors select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-            :class="compactClasses.objectivesToggle"
-            role="button"
-            tabindex="0"
-            :aria-expanded="objectivesVisible"
-            :aria-controls="`objectives-content-${task.id}`"
-            @click="toggleObjectivesVisibility"
-            @keydown.enter.prevent="toggleObjectivesVisibility"
-            @keydown.space.prevent="toggleObjectivesVisibility"
-          >
-            <div class="text-surface-400 text-[10px] font-bold tracking-wider uppercase">
-              {{ t('common.objectives', 'Objectives') }}
-            </div>
-            <div class="flex items-center gap-2">
-              <AppTooltip
-                v-if="taskItemObjectives.length > 0"
-                :text="resetItemCountsDisabledReason"
-                :disabled="!resetItemCountsDisabledReason"
-              >
-                <span class="inline-flex" @click.stop>
-                  <UButton
-                    size="xs"
-                    color="neutral"
-                    variant="soft"
-                    class="text-surface-300 hover:text-surface-100 cursor-pointer text-[10px] tracking-normal normal-case"
-                    :disabled="!canResetTaskItemCounts"
-                    :aria-label="t('page.tasks.questcard.reset_item_counts', 'Reset item counts')"
-                    @click.stop="confirmResetTaskItemCounts"
-                    @keydown.enter.stop
-                    @keydown.space.stop
-                  >
-                    <UIcon name="i-mdi-restore" aria-hidden="true" class="h-3.5 w-3.5" />
-                    <span class="hidden sm:inline">
-                      {{ t('page.tasks.questcard.reset_item_counts', 'Reset item counts') }}
-                    </span>
-                  </UButton>
-                </span>
-              </AppTooltip>
+          <div class="flex items-center justify-between rounded-sm transition-colors select-none">
+            <button
+              type="button"
+              class="hover:bg-surface-700/20 focus-visible:ring-primary-500/40 focus-visible:ring-offset-surface-900 flex min-w-0 flex-1 cursor-pointer items-center justify-between rounded-sm text-left transition-colors select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              :class="compactClasses.objectivesToggle"
+              :aria-expanded="objectivesVisible"
+              :aria-controls="`objectives-content-${task.id}`"
+              @click="toggleObjectivesVisibility"
+            >
+              <div class="text-surface-400 text-[10px] font-bold tracking-wider uppercase">
+                {{ t('common.objectives', 'Objectives') }}
+              </div>
               <UIcon
                 name="i-mdi-chevron-down"
                 aria-hidden="true"
                 class="pointer-events-none h-4 w-4 transition-transform duration-200"
                 :class="{ 'rotate-180': objectivesVisible }"
               />
-            </div>
+            </button>
+            <AppTooltip
+              v-if="taskItemObjectives.length > 0"
+              :text="resetItemCountsDisabledReason"
+              :disabled="!resetItemCountsDisabledReason"
+            >
+              <span class="inline-flex" @click.stop>
+                <UButton
+                  size="xs"
+                  color="neutral"
+                  variant="soft"
+                  class="text-surface-300 hover:text-surface-100 cursor-pointer text-[10px] tracking-normal normal-case"
+                  :disabled="!canResetTaskItemCounts"
+                  :aria-label="t('page.tasks.questcard.reset_item_counts', 'Reset item counts')"
+                  @click.stop="confirmResetTaskItemCounts"
+                >
+                  <UIcon name="i-mdi-restore" aria-hidden="true" class="h-3.5 w-3.5" />
+                  <span class="hidden sm:inline">
+                    {{ t('page.tasks.questcard.reset_item_counts', 'Reset item counts') }}
+                  </span>
+                </UButton>
+              </span>
+            </AppTooltip>
           </div>
           <Transition
             :css="false"

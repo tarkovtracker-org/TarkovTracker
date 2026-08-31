@@ -147,7 +147,7 @@ const AppTooltipStub = {
 const QuestObjectivesStub = {
   template: '<div data-testid="task-objectives" />',
 };
-const mountTaskCard = async () =>
+const mountTaskCard = async (taskOverrides: Partial<Task> = {}) =>
   mountSuspended(TaskCard, {
     props: {
       task: {
@@ -156,6 +156,7 @@ const mountTaskCard = async () =>
         factionName: 'Any',
         objectives: [],
         taskRequirements: [],
+        ...taskOverrides,
       },
     },
     global: {
@@ -237,5 +238,14 @@ describe('TaskCard expansion controls', () => {
     const wrapper = await mountTaskCard();
     expect(wrapper.find('#task-content-task-1').exists()).toBe(true);
     expect(wrapper.get('button[aria-label="Collapse task"]')).toBeDefined();
+  });
+  it('keeps the objectives disclosure and reset controls separate', async () => {
+    const wrapper = await mountTaskCard({
+      objectives: [{ id: 'objective-1', item: { id: 'item-1' } }],
+    });
+    const disclosure = wrapper.get('button[aria-controls="objectives-content-task-1"]');
+    const reset = wrapper.get('button[aria-label="Reset item counts"]');
+    expect(disclosure.element.contains(reset.element)).toBe(false);
+    expect(disclosure.find('button').exists()).toBe(false);
   });
 });
