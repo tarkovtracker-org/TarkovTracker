@@ -38,6 +38,7 @@ canonical agent contract and project conventions live in the root [`AGENTS.md`](
 - [`SYSTEMS.md`](./SYSTEMS.md) — plain-language spec of the non-obvious systems (Tarkov.dev integration, data fetching, multi-layer caching, overlay, precompute) with diagrams and invariants. Covers **what systems exist, what they own, and how they interact**. Point at this when asking "why does the app do X?".
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) — deeper technical structure: state model, sync, data flows, implementation decisions, tradeoffs, and the canonical environment-variable map. `SYSTEMS.md` is the entry point for system behavior; `ARCHITECTURE.md` is the deeper reference for how the app is built.
 - [`decisions/tarkov-data-architecture.md`](./decisions/tarkov-data-architecture.md) — durable architecture decision and resumable implementation plan for the Tarkov data and progress system (KV releases, shared rules engine, Supabase write consolidation).
+- [`eft-log-reference/`](./eft-log-reference/) — privacy-normalized reference for EFT (and Arena) local log events: what data the game writes, where, and in which builds. Historical evidence base for the EFT logs import feature.
 - [`API.md`](./API.md) — endpoint reference, caching, supported languages, game modes.
 - [`RATE_LIMITING.md`](./RATE_LIMITING.md) — ownership map for API, Edge, Pages, DB, and Auth rate-limit systems.
 - [`runbook.md`](./runbook.md) — required env vars, pre-deploy checks, incident triage and recovery.
