@@ -1,41 +1,41 @@
-import type { SeasonalModifier } from '@/types/season';
+import type { HardcoreModifier, SeasonalModifier } from '@/types/season';
+const createHardcoreModifier = (
+  id: string,
+  name: string,
+  description: string
+): HardcoreModifier => ({
+  id,
+  name,
+  type: 'hardcore',
+  description,
+});
 export const seasonalModifiers: SeasonalModifier[] = [
-  {
-    id: 'no_insurance',
-    name: 'No Insurance',
-    type: 'hardcore',
-    description: 'Cannot insure items before raid.',
-  },
-  {
-    id: 'black_division',
-    name: 'Black Division',
-    type: 'hardcore',
-    description: 'Black Division operatives can be encountered on specific locations.',
-  },
-  {
-    id: 'no_fir_hideout',
-    name: 'No FiR for Hideout',
-    type: 'hardcore',
-    description: "Hideout zones don't require the Found in Raid status.",
-  },
-  {
-    id: 'armor_shortage',
-    name: 'Armor Shortage',
-    type: 'hardcore',
-    description: 'Traders across Tarkov are experiencing an armor shortage.',
-  },
-  {
-    id: 'handyman',
-    name: 'Handyman',
-    type: 'hardcore',
-    description: 'Item crafting time is reduced by 50%. Crafting skill starts at level 51.',
-  },
-  {
-    id: 'seasoned_pmcs',
-    name: 'Seasoned PMCs',
-    type: 'hardcore',
-    description: 'Your character gains 25% more raid experience.',
-  },
+  createHardcoreModifier('no_insurance', 'No Insurance', 'Cannot insure items before raid.'),
+  createHardcoreModifier(
+    'black_division',
+    'Black Division',
+    'Black Division operatives can be encountered on specific locations.'
+  ),
+  createHardcoreModifier(
+    'no_fir_hideout',
+    'No FiR for Hideout',
+    "Hideout zones don't require the Found in Raid status."
+  ),
+  createHardcoreModifier(
+    'armor_shortage',
+    'Armor Shortage',
+    'Traders across Tarkov are experiencing an armor shortage.'
+  ),
+  createHardcoreModifier(
+    'handyman',
+    'Handyman',
+    'Item crafting time is reduced by 50%. Crafting skill starts at level 51.'
+  ),
+  createHardcoreModifier(
+    'seasoned_pmcs',
+    'Seasoned PMCs',
+    'Your character gains 25% more raid experience.'
+  ),
   {
     id: 'marathon_runner',
     name: 'Marathon Runner',
