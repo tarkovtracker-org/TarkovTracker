@@ -729,7 +729,13 @@
   const accentClasses = computed(() => {
     if (props.accentVariant === 'global') {
       const border = 'border-l-4 border-l-info-400';
-      if (isComplete.value || isFailed.value || isInvalid.value || isLocked.value) {
+      if (
+        isComplete.value ||
+        isFailed.value ||
+        isInvalid.value ||
+        isLocked.value ||
+        isActive.value
+      ) {
         return border;
       }
       return `${border} bg-info-500/5`;

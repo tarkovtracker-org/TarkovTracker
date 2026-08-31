@@ -989,7 +989,7 @@ describe('api-gateway', () => {
               taskCompletions: {
                 'task-1': { complete: true, failed: false, timestamp: 1 },
                 'task-2': { active: true, complete: false, failed: false, timestamp: 2 },
-                'task-3': { complete: true, failed: true, timestamp: 3 },
+                'task-3': { active: true, complete: true, failed: true, timestamp: 3 },
               },
               hideoutParts: { 'part-1': { complete: false, count: 0 } },
               hideoutModules: { 'module-1': { complete: false } },

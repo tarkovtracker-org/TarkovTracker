@@ -9,7 +9,7 @@ interface TaskNotificationReturn {
   taskStatus: Ref<string>;
   showUndoButton: Ref<boolean>;
   onTaskAction: (event: TaskActionPayload) => void;
-  undoLastAction: () => void;
+  undoLastAction: () => Promise<void>;
   closeNotification: () => void;
   cleanup: () => void;
 }
@@ -217,9 +217,7 @@ export function useTaskNotification(): TaskNotificationReturn {
       }
     });
   };
-  const undoLastAction = () => {
-    void actionHistoryStore.undoLastAction();
-  };
+  const undoLastAction = () => actionHistoryStore.undoLastAction();
   const cleanup = () => {
     if (notificationTimeout.value !== null) {
       clearTimeout(notificationTimeout.value);

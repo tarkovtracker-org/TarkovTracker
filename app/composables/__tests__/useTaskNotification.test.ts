@@ -55,7 +55,7 @@ describe('useTaskNotification', () => {
       taskName: task.name!,
       statusKey: 'page.tasks.questcard.status_active',
     });
-    notification.undoLastAction();
+    await notification.undoLastAction();
     expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith(task.id);
     stop();
   });
@@ -81,7 +81,7 @@ describe('useTaskNotification', () => {
       taskName: 'Main Task',
       statusKey: 'page.tasks.questcard.status_uncomplete',
     });
-    notification.undoLastAction();
+    await notification.undoLastAction();
     expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith('task-main');
     expect(tarkovStore.setTaskFailed).not.toHaveBeenCalledWith('task-alt-done');
     expect(tarkovStore.setTaskObjectiveUncomplete).not.toHaveBeenCalledWith('obj-alt-done');

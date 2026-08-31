@@ -62,8 +62,7 @@ const KAPPA_STATUS_RULES: Array<{
 const resolveKappaTaskStatus = (context: KappaTaskStatusContext): KappaTaskStatus =>
   KAPPA_STATUS_RULES.find(({ matches }) => matches(context))?.status ?? 'locked';
 const getTaskName = (task: Task | undefined, fallback: string | undefined): string | undefined => {
-  if (task && task.name !== undefined) return task.name;
-  return fallback;
+  return task?.name ?? fallback;
 };
 const findLockedBy = (
   task: Task,

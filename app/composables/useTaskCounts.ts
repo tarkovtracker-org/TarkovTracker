@@ -17,6 +17,16 @@ type TeamTaskStatus = {
 };
 type TaskCountResult = { status: TaskCountStatus | null };
 type TaskLifecycleStatus = 'active' | 'completed' | 'failed' | 'incomplete';
+type TaskCountFilterContext = {
+  showKappa: boolean;
+  showLightkeeper: boolean;
+  showNonSpecial: boolean;
+  hasTypeSelection: boolean;
+  onlyTasksWithRequiredKeys: boolean;
+  userPrestigeLevel: number;
+  prestigeTaskMap: Map<string, number>;
+  excludedTaskIds: Set<string>;
+};
 const TASK_STATUS_TO_COUNT_STATUS: Record<
   Exclude<TaskLifecycleStatus, 'incomplete'>,
   TaskCountStatus
@@ -31,6 +41,27 @@ const isAvailableTeamTask = ({
   isCompleted,
   isFailed,
 }: TeamTaskStatus): boolean => isUnlocked && !isActive && !isCompleted && !isFailed;
+const taskHasRequiredKeys = (task: Task): boolean => (task.requiredKeys?.length ?? 0) > 0;
+const isTaskTypeVisible = (task: Task, context: TaskCountFilterContext): boolean => {
+  if (!context.hasTypeSelection) return true;
+  const isKappaRequired = task.kappaRequired === true;
+  const isLightkeeperRequired = task.lightkeeperRequired === true;
+  const isNonSpecial = !isKappaRequired && !isLightkeeperRequired;
+  return (
+    (isKappaRequired && context.showKappa) ||
+    (isLightkeeperRequired && context.showLightkeeper) ||
+    (isNonSpecial && context.showNonSpecial)
+  );
+};
+const isTaskIncluded = (task: Task, context: TaskCountFilterContext): boolean => {
+  if (context.excludedTaskIds.has(task.id)) return false;
+  const taskPrestigeLevel = context.prestigeTaskMap.get(task.id);
+  if (taskPrestigeLevel !== undefined && taskPrestigeLevel !== context.userPrestigeLevel) {
+    return false;
+  }
+  if (!isTaskTypeVisible(task, context)) return false;
+  return !context.onlyTasksWithRequiredKeys || taskHasRequiredKeys(task);
+};
 const resolveUnstartedTaskStatus = (
   isUnlocked: boolean,
   isInvalid: boolean
@@ -73,7 +104,21 @@ export function useTaskCounts() {
   };
   const shouldApplyRequiredKeysFilter = (): boolean =>
     preferencesStore.getOnlyTasksWithRequiredKeys && metadataStore.tasksObjectivesHydrated;
-  const taskHasRequiredKeys = (task: Task): boolean => (task.requiredKeys?.length ?? 0) > 0;
+  const getTaskFilterContext = (): TaskCountFilterContext => {
+    const showKappa = !preferencesStore.getHideNonKappaTasks;
+    const showLightkeeper = preferencesStore.getShowLightkeeperTasks;
+    const showNonSpecial = preferencesStore.getShowNonSpecialTasks;
+    return {
+      showKappa,
+      showLightkeeper,
+      showNonSpecial,
+      hasTypeSelection: showKappa || showLightkeeper || showNonSpecial,
+      onlyTasksWithRequiredKeys: shouldApplyRequiredKeysFilter(),
+      userPrestigeLevel: tarkovStore.getPrestigeLevel(),
+      prestigeTaskMap: metadataStore.prestigeTaskMap || new Map<string, number>(),
+      excludedTaskIds: metadataStore.getExcludedTaskIdsForEdition(tarkovStore.getGameEdition()),
+    };
+  };
   const getTeamTaskStatus = (taskId: string, teamId: string): TeamTaskStatus => {
     const status = progressStore.getTaskStatus(teamId, taskId);
     return {
@@ -110,37 +155,11 @@ export function useTaskCounts() {
       userView,
     });
     const counts = { all: 0, active: 0, available: 0, locked: 0, completed: 0, failed: 0 };
-    const taskList = metadataStore.tasks;
-    const showKappa = !preferencesStore.getHideNonKappaTasks;
-    const showLightkeeper = preferencesStore.getShowLightkeeperTasks;
-    const showNonSpecial = preferencesStore.getShowNonSpecialTasks;
-    const hasTypeSelection = showKappa || showLightkeeper || showNonSpecial;
-    const onlyTasksWithRequiredKeys = shouldApplyRequiredKeysFilter();
-    const userPrestigeLevel = tarkovStore.getPrestigeLevel();
-    const prestigeTaskMap = metadataStore.prestigeTaskMap || new Map<string, number>();
-    const userEdition = tarkovStore.getGameEdition();
-    const excludedTaskIds = metadataStore.getExcludedTaskIdsForEdition(userEdition);
+    const taskFilterContext = getTaskFilterContext();
     const isAllUsers = isAllUsersView(userView);
     const visibleTeamIds = isAllUsers ? Object.keys(progressStore.visibleTeamStores || {}) : [];
-    for (const task of taskList) {
-      if (excludedTaskIds.has(task.id)) continue;
-      if (prestigeTaskMap.has(task.id)) {
-        const taskPrestigeLevel = prestigeTaskMap.get(task.id);
-        if (taskPrestigeLevel !== userPrestigeLevel) continue;
-      }
-      const isKappaRequired = task.kappaRequired === true;
-      const isLightkeeperRequired = task.lightkeeperRequired === true;
-      const isNonSpecial = !isKappaRequired && !isLightkeeperRequired;
-      if (hasTypeSelection) {
-        const matchesTaskType =
-          (isKappaRequired && showKappa) ||
-          (isLightkeeperRequired && showLightkeeper) ||
-          (isNonSpecial && showNonSpecial);
-        if (!matchesTaskType) continue;
-      }
-      if (onlyTasksWithRequiredKeys && !taskHasRequiredKeys(task)) {
-        continue;
-      }
+    for (const task of metadataStore.tasks) {
+      if (!isTaskIncluded(task, taskFilterContext)) continue;
       const result = isAllUsers
         ? getAllUsersTaskCount(task, visibleTeamIds)
         : getUserTaskCount(task, userView);
@@ -161,37 +180,11 @@ export function useTaskCounts() {
       secondaryView,
     });
     const counts: Record<string, number> = {};
-    const taskList = metadataStore.tasks;
-    const showKappa = !preferencesStore.getHideNonKappaTasks;
-    const showLightkeeper = preferencesStore.getShowLightkeeperTasks;
-    const showNonSpecial = preferencesStore.getShowNonSpecialTasks;
-    const hasTypeSelection = showKappa || showLightkeeper || showNonSpecial;
-    const onlyTasksWithRequiredKeys = shouldApplyRequiredKeysFilter();
-    const userPrestigeLevel = tarkovStore.getPrestigeLevel();
-    const prestigeTaskMap = metadataStore.prestigeTaskMap || new Map<string, number>();
-    const userEdition = tarkovStore.getGameEdition();
-    const excludedTaskIds = metadataStore.getExcludedTaskIdsForEdition(userEdition);
+    const taskFilterContext = getTaskFilterContext();
     const isAllUsers = isAllUsersView(userView);
     const visibleTeamIds = isAllUsers ? Object.keys(progressStore.visibleTeamStores || {}) : [];
-    for (const task of taskList) {
-      if (excludedTaskIds.has(task.id)) continue;
-      if (prestigeTaskMap.has(task.id)) {
-        const taskPrestigeLevel = prestigeTaskMap.get(task.id);
-        if (taskPrestigeLevel !== userPrestigeLevel) continue;
-      }
-      const isKappaRequired = task.kappaRequired === true;
-      const isLightkeeperRequired = task.lightkeeperRequired === true;
-      const isNonSpecial = !isKappaRequired && !isLightkeeperRequired;
-      if (hasTypeSelection) {
-        const matchesTaskType =
-          (isKappaRequired && showKappa) ||
-          (isLightkeeperRequired && showLightkeeper) ||
-          (isNonSpecial && showNonSpecial);
-        if (!matchesTaskType) continue;
-      }
-      if (onlyTasksWithRequiredKeys && !taskHasRequiredKeys(task)) {
-        continue;
-      }
+    for (const task of metadataStore.tasks) {
+      if (!isTaskIncluded(task, taskFilterContext)) continue;
       const traderId = task.trader?.id;
       if (!traderId) continue;
       if (!counts[traderId]) counts[traderId] = 0;
