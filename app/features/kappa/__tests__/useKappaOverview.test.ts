@@ -48,6 +48,7 @@ const tasks: Task[] = [
 ];
 let completionState: Record<string, boolean> = {};
 let failedState: Record<string, boolean> = {};
+let activeState: Record<string, boolean> = {};
 let unlockedState: Record<string, { self: boolean }> = {};
 let invalidState: Record<string, { self: boolean }> = {};
 vi.mock('@/stores/useMetadata', () => ({
@@ -62,6 +63,7 @@ vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
     isTaskComplete: (id: string) => completionState[id] === true,
     isTaskFailed: (id: string) => failedState[id] === true,
+    isTaskActive: (id: string) => activeState[id] === true,
     getPMCFaction: () => 'Any',
     getGameEdition: () => undefined,
     getPrestigeLevel: () => 0,
@@ -77,6 +79,7 @@ describe('useKappaOverview', () => {
   beforeEach(() => {
     completionState = {};
     failedState = {};
+    activeState = {};
     unlockedState = {};
     invalidState = {};
   });
@@ -115,6 +118,13 @@ describe('useKappaOverview', () => {
       't-therapist': 'available',
       't-no-trader': 'locked',
     });
+  });
+  it('classifies explicitly active tasks separately while counting them as available', () => {
+    activeState['t-therapist'] = true;
+    const { totals, tasksWithStatus } = useKappaOverview(() => 'kappa');
+    const active = tasksWithStatus.value.find((row) => row.task.id === 't-therapist');
+    expect(active?.status).toBe('active');
+    expect(totals.value.available).toBe(1);
   });
   it('excludes failed tasks from group totalCount and overview total', () => {
     completionState['t-prapor-low'] = true;
@@ -219,6 +229,7 @@ describe('useKappaOverview chain ordering', () => {
       useTarkovStore: () => ({
         isTaskComplete: () => false,
         isTaskFailed: () => false,
+        isTaskActive: () => false,
         getPMCFaction: () => 'Any',
         getGameEdition: () => undefined,
         getPrestigeLevel: () => 0,

@@ -3,7 +3,7 @@ import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { isTaskCounted, isTaskRelevant } from '@/utils/taskStatus';
 import type { Task, Trader } from '@/types/tarkov';
-export type KappaTaskStatus = 'available' | 'complete' | 'failed' | 'locked';
+export type KappaTaskStatus = 'available' | 'active' | 'complete' | 'failed' | 'locked';
 export type KappaTabKey = 'kappa' | 'lightkeeper';
 export type KappaRowEntry = {
   task: Task;
@@ -79,6 +79,8 @@ export function useKappaOverview(tab: () => KappaTabKey) {
         status = 'complete';
       } else if (isFailed) {
         status = 'failed';
+      } else if (tarkovStore.isTaskActive(task.id)) {
+        status = 'active';
       } else if (unlocked[task.id]?.self === true) {
         status = 'available';
       } else {
@@ -118,7 +120,7 @@ export function useKappaOverview(tab: () => KappaTabKey) {
       }
       if (row.status === 'complete') completed += 1;
       else if (row.status === 'failed') failed += 1;
-      else if (row.status === 'available') available += 1;
+      else if (row.status === 'available' || row.status === 'active') available += 1;
       else locked += 1;
     }
     return {

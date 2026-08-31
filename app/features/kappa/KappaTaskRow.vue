@@ -15,6 +15,11 @@
       >
         <UIcon v-if="row.status === 'complete'" name="i-mdi-check-bold" class="h-3 w-3" />
         <UIcon v-else-if="row.status === 'failed'" name="i-mdi-close-thick" class="h-3 w-3" />
+        <UIcon
+          v-else-if="row.status === 'active'"
+          name="i-mdi-play-circle-outline"
+          class="h-3 w-3"
+        />
         <UIcon v-else-if="row.status === 'locked'" name="i-mdi-lock" class="h-2.5 w-2.5" />
       </button>
       <NuxtLink
@@ -52,7 +57,7 @@
   const progressStore = useProgressStore();
   const playerLevel = computed(() => progressStore.getLevel('self'));
   const taskRef = computed(() => props.row.task);
-  const { markTaskComplete, markTaskUncomplete, markTaskAvailable } = useTaskActions(
+  const { markTaskActive, markTaskComplete, markTaskUncomplete } = useTaskActions(
     () => taskRef.value
   );
   const taskHref = computed(() => `/tasks?task=${props.row.task.id}`);
@@ -108,6 +113,8 @@
         return t('common.complete', 'Complete');
       case 'failed':
         return t('common.failed', 'Failed');
+      case 'active':
+        return t('common.active', 'Active');
       case 'locked':
         return t('common.locked', 'Locked');
       default:
@@ -141,6 +148,8 @@
         return 'border-success-500/30 bg-success-500/5 hover:bg-success-500/10';
       case 'failed':
         return 'border-error-500/30 bg-error-500/5 hover:bg-error-500/10';
+      case 'active':
+        return 'border-primary-500/30 bg-primary-500/5 hover:bg-primary-500/10';
       case 'locked':
         return 'border-white/5 bg-surface-900/30';
       default:
@@ -153,6 +162,8 @@
         return 'border-success-500/60 bg-success-500/20 text-success-200 hover:bg-success-500/30';
       case 'failed':
         return 'border-error-500/60 bg-error-500/20 text-error-200 hover:bg-error-500/30';
+      case 'active':
+        return 'border-primary-500/60 bg-primary-500/20 text-primary-200 hover:bg-primary-500/30';
       case 'locked':
         return 'border-white/10 bg-surface-900/40 text-surface-500 cursor-not-allowed';
       default:
@@ -166,6 +177,10 @@
         return t('page.kappa.row.action_uncomplete', 'Mark uncomplete') + `: ${name}`;
       case 'failed':
         return t('page.kappa.row.action_reset_failed', 'Reset failed') + `: ${name}`;
+      case 'active':
+        return t('common.mark_complete', 'Mark complete') + `: ${name}`;
+      case 'available':
+        return t('common.accept', 'Accept') + `: ${name}`;
       case 'locked':
         return t('common.locked', 'Locked') + `: ${name}`;
       default:
@@ -179,9 +194,9 @@
       return;
     }
     if (props.row.status === 'available') {
-      markTaskComplete();
+      markTaskActive();
       return;
     }
-    markTaskAvailable();
+    markTaskComplete();
   }
 </script>

@@ -245,7 +245,7 @@ const applyCompletedImports = (
 const shouldStartImportedTask = (
   alreadyCompleted: boolean,
   flags: ReturnType<typeof getCompletionFlags>
-) => !alreadyCompleted && (!flags.complete || flags.failed);
+) => !alreadyCompleted && !flags.complete && !flags.failed;
 const applyStartedImports = (
   store: ReturnType<typeof useTarkovStore>,
   completedTaskIds: Set<string>,

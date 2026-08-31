@@ -280,7 +280,7 @@ describe('useEftLogsImport', () => {
     expect(tarkovStore.setTaskActive).toHaveBeenCalledWith('61604635c725987e815b1a46');
     expect(composable.importState.value).toBe('success');
   });
-  it('restarts a previously failed task when a started event is imported', async () => {
+  it('preserves a previously failed task when a started event is imported', async () => {
     tarkovStore.getCurrentProgressData.mockReturnValue({
       taskCompletions: {
         '61604635c725987e815b1a46': { complete: true, failed: true, active: false },
@@ -292,7 +292,7 @@ describe('useEftLogsImport', () => {
     });
     await composable.parseFile(file);
     await composable.confirmImport('pvp');
-    expect(tarkovStore.setTaskActive).toHaveBeenCalledWith('61604635c725987e815b1a46');
+    expect(tarkovStore.setTaskActive).not.toHaveBeenCalled();
   });
   it.each([
     ['started before completed', startedLog() + completionLog()],
