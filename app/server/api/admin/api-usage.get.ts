@@ -1,5 +1,7 @@
-import { createError, defineEventHandler, getQuery } from 'h3';
+import { defineEventHandler, getQuery } from 'h3';
+import { createAdminError } from '@/server/utils/adminError';
 import { adminSupabaseFetch, getIsAdmin } from '@/server/utils/adminSupabase';
+import { ADMIN_ERROR_CODES } from '@/utils/adminErrors';
 interface UsageSummaryRow {
   user_id: string;
   token_id: string;
@@ -27,16 +29,28 @@ export default defineEventHandler(async (event): Promise<ApiUsageResponse> => {
   const supabaseUrl = ((config.supabaseUrl as string) || '').replace(/\/$/, '');
   const serviceKey = (config.supabaseServiceKey as string) || '';
   if (!supabaseUrl || !serviceKey) {
-    throw createError({ statusCode: 500, message: 'Supabase service config missing' });
+    throw createAdminError(
+      500,
+      ADMIN_ERROR_CODES.SERVICE_CONFIG_MISSING,
+      'Supabase service config missing'
+    );
   }
   const authUser = (event.context as { auth?: { user?: { id?: string } } }).auth?.user;
   const adminUserId = authUser?.id;
   if (!adminUserId) {
-    throw createError({ statusCode: 401, message: 'Authentication required' });
+    throw createAdminError(
+      401,
+      ADMIN_ERROR_CODES.AUTHENTICATION_REQUIRED,
+      'Authentication required'
+    );
   }
   const isAdmin = await getIsAdmin(supabaseUrl, serviceKey, adminUserId);
   if (!isAdmin) {
-    throw createError({ statusCode: 403, message: 'Admin privileges required' });
+    throw createAdminError(
+      403,
+      ADMIN_ERROR_CODES.ADMIN_PRIVILEGES_REQUIRED,
+      'Admin privileges required'
+    );
   }
   const limit = readLimit(getQuery(event).limit);
   // UTC-day buckets: covers today and yesterday (UTC), not a rolling 24 hours.

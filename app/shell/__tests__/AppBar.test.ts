@@ -501,12 +501,14 @@ describe('AppBar responsive layout', () => {
     expect(classAttr).toContain('w-9');
     wrapper.unmount();
   });
-  it('renders the Log In button with a filled primary background', async () => {
+  it('renders the Log In button with an accessible primary treatment', async () => {
     const wrapper = await mountAppBar();
     const loginLink = wrapper.find('a[aria-label="app_bar.login_aria"]');
     expect(loginLink.exists()).toBe(true);
     const classAttr = loginLink.attributes('class') || '';
-    expect(classAttr).toContain('bg-primary-600');
+    expect(classAttr).toContain('bg-primary-500');
+    expect(classAttr).toContain('hover:bg-primary-400');
+    expect(classAttr).toContain('text-surface-950');
     expect(classAttr).toContain('h-9');
     wrapper.unmount();
   });

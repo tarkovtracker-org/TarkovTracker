@@ -4,6 +4,20 @@
     "error_title": "Connection Error",
     "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
     "no_reference": "N/A",
+    "error": {
+      "admin_privileges_required": "You do not have permission to perform this action.",
+      "authentication_required": "Devi aver fatto il login per continuare.",
+      "invalid_channel": "Inserisci un nome valido del canale Twitch.",
+      "invalid_display_name": "Inserisci un username valido.",
+      "invalid_enabled_flag": "Il valore abilitato non è valido.",
+      "invalid_request_body": "Corpo della richiesta non valido.",
+      "invalid_target_user_id": "Inserisci un ID utente valido.",
+      "invalid_tier": "Seleziona un livello supporter valido.",
+      "service_config_missing": "Il servizio di amministrazione non è configurato.",
+      "supabase_request_failed": "Il servizio di amministrazione non può completare la richiesta.",
+      "supporter_update_failed": "Could not update supporter access.",
+      "twitch_config_update_failed": "Impossibile aggiornare la configurazione Twitch."
+    },
     "access_warning_title": "Admin Access",
     "access_warning_description": "Actions performed here affect all users. Logged in as {user}.",
     "cache_management_title": "Cache Management",
@@ -516,19 +530,6 @@
       "drag_to_resize": "Trascina per ridimensionare la mappa",
       "switch_floor": "Cambia piano (Ctrl + Rotella mouse)"
     },
-    "controls": {
-      "help": {
-        "pan": "o trascina per spostare la visuale",
-        "zoom": "per ingrandire",
-        "reset": "per resettare la vista",
-        "cycle_floors": "per ciclare i piani",
-        "floor_panel": "o utilizza il pannello dei piani",
-        "click_at_cursor": "per cliccare sul cursore",
-        "click_marker": "Fai clic su un marcatore per i dettagli",
-        "fullscreen": "Usa il pulsante a schermo intero nei controlli mappa",
-        "resize": "Trascina il bordo inferiore della mappa per ridimensionare"
-      }
-    },
     "help": {
       "title": "Controlli mappa",
       "groups": {
@@ -536,13 +537,21 @@
         "floors": "Piani",
         "interact": "Interagisci",
         "view": "Visualizza"
-      }
+      },
+      "pan": "{keys} o trascina per spostare",
+      "zoom": "{keys} per ingrandire",
+      "reset": "{key} per resettare la vista",
+      "cycle_floors": "{keys} per passare da un piano all'altro",
+      "floor_panel": "O usa il pannello dei Piani.",
+      "click_at_cursor": "{key} per cliccare in corrispondenza del cursore",
+      "click_marker": "Fai clic su un marcatore per i dettagli.",
+      "fullscreen": "Usa il pulsante a schermo intero nei controlli mappa.",
+      "resize": "Trascina il bordo inferiore della mappa per ridimensionare."
     },
     "hint": {
       "title": "Controlli rapidi mappa",
-      "drag_to_pan": "Trascina per spostare la visuale",
-      "shift_scroll_zoom": "Maiusc + Scorrimento per ingrandire",
-      "ctrl_scroll_floors": "Ctrl + Scorrimento per cambiare piani",
+      "summary": "Trascina per spostare la visuale · Shift + rotellina per zoomare",
+      "summary_multi_floor": "Trascina per spostare la visuale · Shift + rotellina per zoomare · Ctrl + rotellina per cambiare piano",
       "all_controls": "Tutti i controlli"
     },
     "aria": {
@@ -1200,6 +1209,51 @@
       "meta": {
         "description": "Collabora con i compagni sui progressi in Escape from Tarkov. Condividi completamenti di missioni, stato del rifugio e coordina la raccolta di oggetti."
       },
+      "page_title": "Squadra",
+      "page_description": "Invita compagni di squadra, scegli quale progresso di squadra vedi, e traccia insieme.",
+      "invite": {
+        "title": "Link di invito",
+        "subtitle": "Condividi la tua squadra con compagni di squadra affidabili.",
+        "link_label": "Url invito di squadra",
+        "helper": "Chiunque con questo link può unirsi alla tua squadra.",
+        "show": "Mostra link",
+        "hide": "Nascondi link",
+        "copy": "Copia link",
+        "copied": "Copiato!"
+      },
+      "members": {
+        "title": "Membri ({count})",
+        "no_members": "Ancora nessun membro in questa squadra. Condividi il tuo link di invito per aggiungere compagni di squadra.",
+        "alone": "Sei solo qui — condividi il tuo link di invito per aggiungere compagni di squadra.",
+        "copy_invite": "Copia link di invito",
+        "copied": "Copiato!"
+      },
+      "visibility": {
+        "title": "Impostazioni di visibilità",
+        "description": "Controlla i progressi dei tuoi compagni di squadra sul tuo tracker.",
+        "items_section": "Oggetti",
+        "show_tasks": "Mostra le attività dei membri del team",
+        "show_items": "Mostra gli elementi necessari dei membri del team",
+        "show_non_fir": "Mostra elementi necessari non FIR",
+        "show_hideout": "Mostra gli elementi necessari nascosti",
+        "show_maps": "Mostra gli obiettivi della mappa dei membri del team"
+      },
+      "danger_zone": {
+        "title": "Zona di pericolo",
+        "disband_description": "Lo smantellamento rimuove la squadra per tutti i membri. Questo non può essere annullato.",
+        "leave_description": "Lasciando ti rimuove da questa squadra. I tuoi progressi rimangono sul tuo account.",
+        "disband": "Sciogli team",
+        "leave": "Abbandona il team",
+        "confirm_disband_title": "Abbandonare il team?",
+        "confirm_disband_description": "Questo rimuove la squadra e i suoi membri per tutti. Questo non può essere annullato.",
+        "confirm_leave_title": "Abbandona la squadra?",
+        "confirm_leave_description": "Lascerai questo team e smetterai di condividere i progressi con i suoi membri.",
+        "confirm_disband": "Sì, disband team",
+        "confirm_leave": "Sì, lascia il team",
+        "disband_success": "Squadra sciolta con successo.",
+        "disband_error": "Impossibile disboscare il team.",
+        "action_error": "Impossibile aggiornare l'appartenenza al team."
+      },
       "card": {
         "manageteam": {
           "title": "Membri del team",
@@ -1209,7 +1263,12 @@
             "owner": "Proprietario",
             "taskscomplete": "{completed}/{total} missioni completate",
             "kick_success": "Compagno di team espulso con successo.",
-            "kick_error": "Errore nell'espellere il compagno di team."
+            "kick_error": "Errore nell'espellere il compagno di team.",
+            "level_badge_alt": "Livello {level} badge",
+            "hide_progress": "Nascondi i progressi di {name}da me",
+            "show_progress": "Mostra i progressi di {name}per me",
+            "enable_team_tasks": "Mostra i compiti dei membri del team prima di cambiare un singolo membro",
+            "remove_member": "Rimuovi {name} dal team"
           }
         },
         "teamoptions": {
@@ -2140,6 +2199,7 @@
       "xp_progress_value": "{percent}% verso il livello successivo"
     },
     "danger_zone": {
+      "confirm_instruction": "Digita {word} per confermare il ripristino di tutti i dati:",
       "confirm_word": "ELIMINA"
     },
     "log_import": {

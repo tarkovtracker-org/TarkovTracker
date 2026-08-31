@@ -1,6 +1,11 @@
 <script setup lang="ts">
   import { useSupporter } from '@/composables/useSupporter';
   import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
+  import {
+    ADMIN_ERROR_CODES,
+    ADMIN_ERROR_LOCALE_KEYS,
+    getAdminErrorCode,
+  } from '@/utils/adminErrors';
   import { refreshSupabaseSession } from '@/utils/supabaseAuth';
   const { $supabase } = useNuxtApp();
   const { t } = useI18n({ useScope: 'global' });
@@ -21,6 +26,12 @@
   const canSave = computed(() => {
     return systemStore.isAdmin && targetUserId.value.trim().length > 0 && !isSaving.value;
   });
+  const errorDescription = (error: unknown): string => {
+    const code = getAdminErrorCode(error);
+    return code
+      ? t(ADMIN_ERROR_LOCALE_KEYS[code], 'Could not update supporter access.')
+      : t('admin.supporter_override_failed_description');
+  };
   const applySupporterOverride = async () => {
     if (!canSave.value) return;
     isSaving.value = true;
@@ -32,7 +43,16 @@
         token = refreshed?.access_token ?? null;
       }
       if (!token) {
-        throw new Error(t('admin.supporter_override_login_required'));
+        toast.add({
+          title: t('common.update_failed', 'Update failed'),
+          description: t(
+            ADMIN_ERROR_LOCALE_KEYS[ADMIN_ERROR_CODES.AUTHENTICATION_REQUIRED],
+            'You must be signed in to continue.'
+          ),
+          color: 'error',
+          icon: 'i-mdi-alert-circle',
+        });
+        return;
       }
       await $fetch('/api/admin/supporter', {
         method: 'POST',
@@ -57,8 +77,7 @@
     } catch (error) {
       toast.add({
         title: t('common.update_failed', 'Update failed'),
-        description:
-          error instanceof Error ? error.message : t('admin.supporter_override_failed_description'),
+        description: errorDescription(error),
         color: 'error',
         icon: 'i-mdi-alert-circle',
       });
