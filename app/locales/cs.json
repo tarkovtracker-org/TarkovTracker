@@ -4,6 +4,20 @@
     "error_title": "Connection Error",
     "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
     "no_reference": "N/A",
+    "error": {
+      "admin_privileges_required": "Nemáte oprávnění k provedení této akce.",
+      "authentication_required": "Pro pokračování musíte být přihlášeni.",
+      "invalid_channel": "Zadejte platný název kanálu Twitch.",
+      "invalid_display_name": "Zadejte platné zobrazované jméno.",
+      "invalid_enabled_flag": "Povolená hodnota je neplatná.",
+      "invalid_request_body": "Tělo požadavku je neplatné.",
+      "invalid_target_user_id": "Zadejte platné ID uživatele.",
+      "invalid_tier": "Vyberte platnou vrstvu podporovatele.",
+      "service_config_missing": "Administrátorská služba není nakonfigurována.",
+      "supabase_request_failed": "Nelze dokončit požadavek administrátorem.",
+      "supporter_update_failed": "Nelze aktualizovat přístup podporovatele.",
+      "twitch_config_update_failed": "Nelze aktualizovat konfiguraci Twitch."
+    },
     "access_warning_title": "Admin Access",
     "access_warning_description": "Actions performed here affect all users. Logged in as {user}.",
     "cache_management_title": "Cache Management",
@@ -516,19 +530,6 @@
       "drag_to_resize": "Přetažením změníte velikost mapy",
       "switch_floor": "Přepínací podlaha (Ctrl + Scroll)"
     },
-    "controls": {
-      "help": {
-        "pan": "nebo přetáhněte k pánvi",
-        "zoom": "Zvětšit",
-        "reset": "pro obnovení zobrazení",
-        "cycle_floors": "K cyklování podlah",
-        "floor_panel": "nebo použijte podlahovou desku",
-        "click_at_cursor": "pro kliknutí na kurzor",
-        "click_marker": "Pro podrobnosti klikněte na značku",
-        "fullscreen": "Použít tlačítko na celou obrazovku v ovládacích prvcích mapy",
-        "resize": "Přetažením dolního okraje mapy změníte velikost"
-      }
-    },
     "help": {
       "title": "Ovládání mapy",
       "groups": {
@@ -536,13 +537,21 @@
         "floors": "Podlahy",
         "interact": "Interakce",
         "view": "Zobrazit"
-      }
+      },
+      "pan": "{keys} nebo přetáhněte k pánvi",
+      "zoom": "{keys} pro přiblížení",
+      "reset": "{key} pro obnovení zobrazení",
+      "cycle_floors": "{keys} k cyklování podlaží",
+      "floor_panel": "Nebo použijte podlahovou desku.",
+      "click_at_cursor": "{key} klikněte na kurzor",
+      "click_marker": "Pro podrobnosti klikněte na značku.",
+      "fullscreen": "Použijte tlačítko na celou obrazovku v ovládacích prvcích mapy.",
+      "resize": "Přetažením dolního okraje mapy změníte velikost."
     },
     "hint": {
       "title": "Ovládání rychlých map",
-      "drag_to_pan": "Přetáhněte k pánvi",
-      "shift_scroll_zoom": "Přesunout + posunout na přiblížení",
-      "ctrl_scroll_floors": "Ctrl + Posunutím změníte podlahy",
+      "summary": "Přetažením posouvat · Shift + posunutím přiblížit",
+      "summary_multi_floor": "Přetažením prstu · Shift + Posunutím přiblížíte · Ctrl + Posunutím změnit podlahu",
       "all_controls": "Všechny ovládací prvky"
     },
     "aria": {
@@ -1200,6 +1209,51 @@
       "meta": {
         "description": "Spolupracujte s týmovými spolupracovníky na útěku od Tarkovu. Sdílejte dokončení úkolů, skrývejte stav a koordinujte shromažďování položek."
       },
+      "page_title": "Tým",
+      "page_description": "Pozvěte týmové spoluhráče, zvolte, jaký tým postupuje a sledujte společně.",
+      "invite": {
+        "title": "Odkaz na pozvání",
+        "subtitle": "Sdílejte svůj tým s důvěryhodnými týmovými spolupracovníky.",
+        "link_label": "URL pozvánky týmu",
+        "helper": "Kdokoli s tímto odkazem se může připojit k vašemu týmu.",
+        "show": "Zobrazit odkaz",
+        "hide": "Skrýt odkaz",
+        "copy": "Kopírovat odkaz",
+        "copied": "Zkopírováno!"
+      },
+      "members": {
+        "title": "Členové ({count})",
+        "no_members": "Zatím žádní členové tohoto týmu. Sdílejte svůj odkaz pro přidání týmových spolupracovníků.",
+        "alone": "Jste zde sami — sdílejte svůj pozvánkový odkaz pro přidání týmových spolupracovníků.",
+        "copy_invite": "Kopírovat pozvánku",
+        "copied": "Zkopírováno!"
+      },
+      "visibility": {
+        "title": "Nastavení viditelnosti",
+        "description": "Kontrolujte průběh týmů na vašem trackeru.",
+        "items_section": "Položky",
+        "show_tasks": "Zobrazit úkoly členů týmu",
+        "show_items": "Zobrazit potřebné položky členů týmu",
+        "show_non_fir": "Zobrazit nevyžadované položky",
+        "show_hideout": "Zobrazit potřebné položky",
+        "show_maps": "Zobrazit mapové cíle členů týmu"
+      },
+      "danger_zone": {
+        "title": "Nebezpečná zóna",
+        "disband_description": "Zrušení odebere tým pro všechny členy. Tuto akci nelze vrátit zpět.",
+        "leave_description": "Necháte-li vás odebrat z tohoto týmu. Váš postup zůstává na vašem účtu.",
+        "disband": "Spárovat tým",
+        "leave": "Opustit tým",
+        "confirm_disband_title": "Zrušit tým?",
+        "confirm_disband_description": "Tím se odstraní tým a jeho členství pro všechny. Tuto akci nelze vrátit zpět.",
+        "confirm_leave_title": "Opustit týmu?",
+        "confirm_leave_description": "Opustíte tento tým a přestanete sdílet pokrok s jeho členy.",
+        "confirm_disband": "Ano, rozštěpovat tým",
+        "confirm_leave": "Ano, odejít z týmu",
+        "disband_success": "Tým úspěšně odstraněn.",
+        "disband_error": "Nepodařilo se rozptýlit tým.",
+        "action_error": "Nelze aktualizovat členství v týmu."
+      },
       "card": {
         "manageteam": {
           "title": "Členové týmu",
@@ -1209,7 +1263,12 @@
             "owner": "Vlastník",
             "taskscomplete": "{completed}/{total} úkoly dokončeny",
             "kick_success": "Teamy úspěšně vyhozeny.",
-            "kick_error": "Chyba při vybírání týmového partnera."
+            "kick_error": "Chyba při vybírání týmového partnera.",
+            "level_badge_alt": "Úroveň {level} odznak",
+            "hide_progress": "Skrýt postup {name}od mě",
+            "show_progress": "Zobrazit postup {name}pro mě",
+            "enable_team_tasks": "Zobrazit úkoly členů týmu před změnou jednotlivého člena",
+            "remove_member": "Odstranit {name} z týmu"
           }
         },
         "teamoptions": {
@@ -2140,6 +2199,7 @@
       "xp_progress_value": "{percent}% směrem k další úrovni"
     },
     "danger_zone": {
+      "confirm_instruction": "Zadejte {word} pro potvrzení resetování všech dat:",
       "confirm_word": "ODSTRANIT"
     },
     "log_import": {

@@ -4,6 +4,20 @@
     "error_title": "연결 오류",
     "load_error_description": "관리자 데이터를 불러오지 못했습니다. 새로고침하거나 고객지원에 문의해 주세요. 참조: {reference}",
     "no_reference": "N/A",
+    "error": {
+      "admin_privileges_required": "이 작업을 수행할 권한이 없습니다.",
+      "authentication_required": "You must be signed in to continue.",
+      "invalid_channel": "Enter a valid Twitch channel name.",
+      "invalid_display_name": "Enter a valid display name.",
+      "invalid_enabled_flag": "The enabled value is invalid.",
+      "invalid_request_body": "The request body is invalid.",
+      "invalid_target_user_id": "Enter a valid user ID.",
+      "invalid_tier": "Select a valid supporter tier.",
+      "service_config_missing": "The admin service is not configured.",
+      "supabase_request_failed": "The admin service could not complete the request.",
+      "supporter_update_failed": "Could not update supporter access.",
+      "twitch_config_update_failed": "Could not update Twitch config."
+    },
     "access_warning_title": "Admin Access",
     "access_warning_description": "Actions performed here affect all users. Logged in as {user}.",
     "cache_management_title": "캐시 관리",
@@ -516,19 +530,6 @@
       "drag_to_resize": "Drag to resize map",
       "switch_floor": "Switch floor (Ctrl + Scroll)"
     },
-    "controls": {
-      "help": {
-        "pan": "or drag to pan",
-        "zoom": "to zoom",
-        "reset": "to reset view",
-        "cycle_floors": "to cycle floors",
-        "floor_panel": "or use the floor panel",
-        "click_at_cursor": "to click at cursor",
-        "click_marker": "Click a marker for details",
-        "fullscreen": "Use the full screen button in the map controls",
-        "resize": "Drag the bottom edge of the map to resize"
-      }
-    },
     "help": {
       "title": "Map controls",
       "groups": {
@@ -536,13 +537,21 @@
         "floors": "Floors",
         "interact": "Interact",
         "view": "View"
-      }
+      },
+      "pan": "{keys} or drag to pan",
+      "zoom": "{keys} to zoom",
+      "reset": "{key} to reset view",
+      "cycle_floors": "{keys} to cycle floors",
+      "floor_panel": "Or use the floor panel.",
+      "click_at_cursor": "{key} to click at cursor",
+      "click_marker": "Click a marker for details.",
+      "fullscreen": "Use the full screen button in the map controls.",
+      "resize": "Drag the bottom edge of the map to resize."
     },
     "hint": {
       "title": "Quick map controls",
-      "drag_to_pan": "Drag to pan",
-      "shift_scroll_zoom": "Shift + Scroll to zoom",
-      "ctrl_scroll_floors": "Ctrl + Scroll to change floors",
+      "summary": "Drag to pan · Shift + Scroll to zoom",
+      "summary_multi_floor": "Drag to pan · Shift + Scroll to zoom · Ctrl + Scroll to change floors",
       "all_controls": "All controls"
     },
     "aria": {
@@ -1200,6 +1209,51 @@
       "meta": {
         "description": "Collaborate with teammates on Escape from Tarkov progress. Share quest completions, hideout status, and coordinate item gathering."
       },
+      "page_title": "Team",
+      "page_description": "Invite teammates, choose which team progress you see, and track together.",
+      "invite": {
+        "title": "Invite link",
+        "subtitle": "Share your team with trusted teammates.",
+        "link_label": "Team invite URL",
+        "helper": "Anyone with this link can join your team.",
+        "show": "Show link",
+        "hide": "Hide link",
+        "copy": "Copy link",
+        "copied": "Copied!"
+      },
+      "members": {
+        "title": "Members ({count})",
+        "no_members": "No members in this team yet. Share your invite link to add teammates.",
+        "alone": "You're alone here — share your invite link to add teammates.",
+        "copy_invite": "Copy invite link",
+        "copied": "Copied!"
+      },
+      "visibility": {
+        "title": "Visibility settings",
+        "description": "Control which teammates' progress appears on your tracker.",
+        "items_section": "Items",
+        "show_tasks": "Show team members' tasks",
+        "show_items": "Show team members' needed items",
+        "show_non_fir": "Show non-FIR needed items",
+        "show_hideout": "Show hideout needed items",
+        "show_maps": "Show team members' map objectives"
+      },
+      "danger_zone": {
+        "title": "Danger zone",
+        "disband_description": "Disbanding removes the team for all members. This cannot be undone.",
+        "leave_description": "Leaving removes you from this team. Your progress stays on your account.",
+        "disband": "Disband team",
+        "leave": "Leave team",
+        "confirm_disband_title": "Disband team?",
+        "confirm_disband_description": "This removes the team and its membership for everyone. This cannot be undone.",
+        "confirm_leave_title": "Leave team?",
+        "confirm_leave_description": "You will leave this team and stop sharing progress with its members.",
+        "confirm_disband": "Yes, disband team",
+        "confirm_leave": "Yes, leave team",
+        "disband_success": "Team disbanded successfully.",
+        "disband_error": "Failed to disband team.",
+        "action_error": "Unable to update team membership."
+      },
       "card": {
         "manageteam": {
           "title": "Team Members",
@@ -1209,7 +1263,12 @@
             "owner": "Owner",
             "taskscomplete": "{completed}/{total} tasks completed",
             "kick_success": "Teammate kicked successfully.",
-            "kick_error": "Error kicking teammate."
+            "kick_error": "Error kicking teammate.",
+            "level_badge_alt": "Level {level} badge",
+            "hide_progress": "Hide {name}'s progress from me",
+            "show_progress": "Show {name}'s progress to me",
+            "enable_team_tasks": "Show team members' tasks before changing an individual member",
+            "remove_member": "Remove {name} from team"
           }
         },
         "teamoptions": {
@@ -2140,6 +2199,7 @@
       "xp_progress_value": "{percent}% toward the next level"
     },
     "danger_zone": {
+      "confirm_instruction": "Type {word} to confirm resetting all data:",
       "confirm_word": "DELETE"
     },
     "log_import": {
