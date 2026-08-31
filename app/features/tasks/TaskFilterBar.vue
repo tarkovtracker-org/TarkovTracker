@@ -106,12 +106,6 @@
           <template #leading>
             <UIcon :name="currentSortIcon" class="h-4 w-4" />
           </template>
-          <template #item="{ item }">
-            <div class="flex items-center gap-2">
-              <UIcon :name="item.icon" class="h-4 w-4" />
-              <span>{{ item.label }}</span>
-            </div>
-          </template>
         </SelectMenuFixed>
         <UButton
           color="neutral"

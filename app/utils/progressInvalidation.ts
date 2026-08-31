@@ -1,5 +1,5 @@
 import type { Task } from '@/types/tarkov';
-export type TaskCompletion = { active?: boolean; complete?: boolean; failed?: boolean };
+export type TaskCompletion = { complete?: boolean; failed?: boolean };
 type InvalidationInput = {
   tasks: Task[];
   taskCompletions: Record<string, TaskCompletion>;
