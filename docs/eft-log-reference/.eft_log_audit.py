@@ -118,6 +118,7 @@ SIGNATURE_ANCHOR_RE = re.compile(
     b"|".join(re.escape(anchor) for anchor in sorted(ANCHOR_TO_SIGNATURES, key=len, reverse=True)),
     re.IGNORECASE,
 )
+HTTP_CRC_ENVELOPE_MARKERS = (b"---> request https", b"<--- response https")
 
 ENDPOINT_RE = re.compile(rb"(?:(?:https?|wss)://[^/\s\"']+)?((?:/v2)?/client/[A-Za-z0-9_./-]+|/router)(?:\?[^\s\"']*)?", re.I)
 NOTIFICATION_RE = re.compile(rb"Got notification\s*\|\s*([A-Za-z][A-Za-z0-9_]*)", re.I)
@@ -126,6 +127,54 @@ ARENA_EVENT_RE = re.compile(
     rb"\b(?:event|message|type|method|action|ApplicationState|MatchingProgressState|GameplayState)\b\s*[:=]\s*[\"']?([A-Za-z][A-Za-z0-9_.-]{2,80})",
     re.I,
 )
+SAFE_SHAPE_WORDS = frozenset(
+    {
+        "active",
+        "address",
+        "and",
+        "application",
+        "at",
+        "binding",
+        "code",
+        "connect",
+        "connecting",
+        "corpse",
+        "create",
+        "created",
+        "data",
+        "email",
+        "for",
+        "found",
+        "from",
+        "interface",
+        "is",
+        "item",
+        "loading",
+        "login",
+        "lost",
+        "message",
+        "ms",
+        "nickname",
+        "on",
+        "ping",
+        "profile",
+        "recorded",
+        "reported",
+        "saved",
+        "server",
+        "session",
+        "spawn",
+        "to",
+        "token",
+        "user",
+        "uuid",
+        "verified",
+    }
+)
+SHAPE_PLACEHOLDERS = frozenset(
+    {"email", "endpoint", "id", "nickname", "n", "path", "profile", "profile_id", "text", "token", "url"}
+)
+SHAPE_WORD_RE = re.compile(r"[^\W\d_][\w-]*", re.UNICODE)
 
 
 def sanitized_shape(raw: bytes) -> str:
@@ -154,6 +203,13 @@ def sanitized_shape(raw: bytes) -> str:
     text = re.sub(r"'(?:\\.|[^'\\])*'", "'<TEXT>'", text)
     text = re.sub(r"\b\d+(?:\.\d+)*(?:[eE][+-]?\d+)?\b", "<N>", text)
     text = re.sub(r"\s+", " ", text).strip()
+    text = SHAPE_WORD_RE.sub(
+        lambda match: match.group(0)
+        if match.group(0).casefold() in SAFE_SHAPE_WORDS
+        or match.group(0).casefold() in SHAPE_PLACEHOLDERS
+        else "<TEXT>",
+        text,
+    )
     return text[:500]
 
 
@@ -230,11 +286,13 @@ def main() -> None:
 
     roots = [("main", args.main_root), ("arena", args.arena_root)]
     files: list[tuple[str, Path]] = []
+    missing_roots: list[str] = []
     for game, root in roots:
         if root.is_dir():
             files.extend((game, path) for path in root.rglob("*.log"))
         else:
-            sys.stderr.write(f"Warning: root directory for '{game}' not found or not a directory: {root}\n")
+            missing_roots.append(game)
+            sys.stderr.write(f"Warning: root directory for '{game}' not found or not a directory\n")
 
     version_sessions: dict[tuple[str, str], set[Path]] = collections.defaultdict(set)
     channel_files: collections.Counter[tuple[str, str, str]] = collections.Counter()
@@ -298,15 +356,22 @@ def main() -> None:
                                 session_modes[session].add("P")
                         if b"gw-pve" in lower or b"wsn-pve" in lower:
                             session_modes[session].add("E")
-                        if b"pvp-season" in lower or b"pvp_season" in lower:
+                        is_seasonal = any(
+                            marker in lower for marker in (b"pvpseason", b"pvp season", b"pvp-season", b"pvp_season")
+                        )
+                        if is_seasonal:
                             session_modes[session].add("S")
-                        if (b"gw-pvp" in lower or b"wsn-pvp" in lower) and b"pvp-season" not in lower and b"pvp_season" not in lower:
+                        if (b"gw-pvp" in lower or b"wsn-pvp" in lower) and not is_seasonal:
                             session_modes[session].add("P")
 
                     if scan_signatures:
                         for match in SIGNATURE_ANCHOR_RE.finditer(clean):
                             anchor = match.group(0).lower()
                             for label, any_of, all_of in ANCHOR_TO_SIGNATURES[anchor]:
+                                if label == "http_crc" and not any(
+                                    marker in lower for marker in HTTP_CRC_ENVELOPE_MARKERS
+                                ):
+                                    continue
                                 if any(fragment in lower for fragment in any_of) and all(
                                     fragment in lower for fragment in all_of
                                 ):
@@ -389,6 +454,8 @@ def main() -> None:
             for game, _ in roots
         },
         "unreadable_files": dict(unreadable),
+        "corpus_status": "incomplete" if missing_roots or unreadable else "complete",
+        "missing_roots": sorted(missing_roots),
         "channels": [
             {
                 "game": game,
@@ -437,7 +504,7 @@ def main() -> None:
     }
     if args.section == "endpoints" and args.reference:
         if not args.reference.is_file():
-            raise SystemExit(f"Reference file not found: {args.reference}")
+            raise SystemExit("Reference file not found")
         reference_text = args.reference.read_text(encoding="utf-8")
         start_anchor = "#### Complete observed endpoint inventory"
         if start_anchor not in reference_text:
@@ -457,7 +524,7 @@ def main() -> None:
             "historical_not_current": sorted(documented_paths - current_paths),
         }
     section_keys = {
-        "corpus": ("corpus", "unreadable_files"),
+        "corpus": ("corpus", "corpus_status", "missing_roots", "unreadable_files"),
         "channels": ("channels",),
         "modes": ("mode_session_counts",),
         "signatures": ("signatures",),

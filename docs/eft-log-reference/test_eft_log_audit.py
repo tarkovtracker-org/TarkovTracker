@@ -3,10 +3,8 @@
 
 from __future__ import annotations
 
-import collections
 import importlib.util
 import json
-import os
 import sys
 import tempfile
 import unittest
@@ -95,6 +93,16 @@ class TestEftLogAuditHelpers(unittest.TestCase):
             'Message: "<TEXT>" reported',
         )
 
+    def test_sanitized_shape_masks_unlabelled_values(self):
+        shape = mod.sanitized_shape(
+            b"PlayerName Bob connected to node prod-eu-1.example.invalid /home/bob/private.log"
+        )
+        self.assertNotIn("PlayerName", shape)
+        self.assertNotIn("Bob", shape)
+        self.assertNotIn("prod-eu-1", shape)
+        self.assertNotIn("example.invalid", shape)
+        self.assertNotIn("/home/bob/private.log", shape)
+
     def test_normalize_endpoint(self):
         self.assertEqual(
             mod.normalize_endpoint(b"/client/game/profile/507f191e810c19729de860ea/items/moving"),
@@ -149,8 +157,9 @@ class TestEftLogAuditCLI(unittest.TestCase):
 
         backend_log = main_sess / "2026-08-29_12-00-00_1.1.0.1.46911_backend_0.log"
         backend_log.write_bytes(
-            b"2026-08-29 12:00:03.100 +00:00|1.1.0.1.46911|Info|backend|---> Request HTTPS, id [123]: URL: https://gw-pvp.escapefromtarkov.com/client/game/profile/list\n"
+            b"2026-08-29 12:00:03.100 +00:00|1.1.0.1.46911|Info|backend|---> Request HTTPS, id [123]: crc: 456 URL: https://gw-pvp.escapefromtarkov.com/client/game/profile/list\n"
             b"2026-08-29 12:00:04.100 +00:00|1.1.0.1.46911|Info|backend|<--- Response HTTPS, id [123]: URL: https://gw-pvp.escapefromtarkov.com/client/game/profile/list\n"
+            b"2026-08-29 12:00:04.200 +00:00|1.1.0.1.46911|Info|backend|Unrelated https crc: marker\n"
         )
 
         push_log = main_sess / "2026-08-29_12-00-00_1.1.0.1.46911_push-notifications_0.log"
@@ -164,6 +173,7 @@ class TestEftLogAuditCLI(unittest.TestCase):
         seasonal_backend = seasonal_sess / "2026-08-29_12-30-00_1.1.0.1.46911_backend_0.log"
         seasonal_backend.write_bytes(
             b"2026-08-29 12:30:03.100 +00:00|1.1.0.1.46911|Info|backend|---> Request HTTPS, id [124]: URL: https://gw-pvp_season.escapefromtarkov.com/client/match/group/status\n"
+            b"2026-08-29 12:30:04.100 +00:00|1.1.0.1.46911|Info|backend|gw-pvpseason matchmaking\n"
         )
 
         # Create mock Arena session
@@ -208,6 +218,7 @@ class TestEftLogAuditCLI(unittest.TestCase):
         sig_events = {item["event"] for item in data["signatures"]}
         self.assertNotIn("start_game", sig_events)
         self.assertIn("game_started", sig_events)
+        self.assertIn("http_crc", sig_events)
 
         # Confirm notifications captured
         notif_markers = {item["marker"] for item in data["notifications"]}
@@ -219,6 +230,7 @@ class TestEftLogAuditCLI(unittest.TestCase):
             for item in data["mode_session_counts"]
         }
         self.assertEqual(modes_by_session.get(("main", "1.1.0.1.46911", "S")), 1)
+        self.assertEqual(modes_by_session.get(("main", "1.1.0.1.46911", "P")), 1)
 
     def test_missing_root_warning(self):
         non_existent = Path(self.tmp_dir.name) / "NonExistent"
@@ -227,12 +239,17 @@ class TestEftLogAuditCLI(unittest.TestCase):
             "--main-root", str(self.main_root),
             "--arena-root", str(non_existent),
             "--section", "corpus",
+            "--out", str(Path(self.tmp_dir.name) / "missing_root_report.json"),
         ]
         stderr_capture = StringIO()
         with patch.object(sys, "argv", test_args), patch("sys.stderr", stderr_capture), patch("sys.stdout", StringIO()):
             mod.main()
 
         self.assertIn("Warning: root directory for 'arena' not found", stderr_capture.getvalue())
+        self.assertNotIn(str(non_existent), stderr_capture.getvalue())
+        data = json.loads((Path(self.tmp_dir.name) / "missing_root_report.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["corpus_status"], "incomplete")
+        self.assertEqual(data["missing_roots"], ["arena"])
 
     def test_unreadable_file_handling(self):
         unreadable_sess = self.main_root / "2026-08-29_14-00-00_1.1.0.1.46911"
@@ -260,6 +277,7 @@ class TestEftLogAuditCLI(unittest.TestCase):
         data = json.loads(out_file.read_text(encoding="utf-8"))
         self.assertIn("unreadable_files", data)
         self.assertEqual(data["unreadable_files"].get("PermissionError"), 1)
+        self.assertEqual(data["corpus_status"], "incomplete")
 
     def test_reference_validation(self):
         missing_ref = Path(self.tmp_dir.name) / "missing.md"

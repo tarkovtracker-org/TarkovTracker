@@ -49,6 +49,10 @@ python .eft_log_audit.py \
 If the diff shows new builds, endpoints, or event shapes, update the reference and dictionary and
 replace the dated signatures JSON with the new audit output.
 
+The JSON report includes `corpus_status` and `missing_roots`. Treat a report with
+`corpus_status: "incomplete"` as non-authoritative until the missing roots or unreadable files are
+resolved. Diagnostic warnings do not echo local filesystem paths.
+
 ## Provenance
 
 Originally produced 2026-08-09 (snapshot `H`: 124 session folders, 1,121 log files, 16 main-game
