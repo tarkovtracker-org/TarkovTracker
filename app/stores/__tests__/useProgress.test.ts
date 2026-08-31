@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { describe, expect, it, vi } from 'vitest';
 import { nextTick, ref } from 'vue';
-import { TASK_ID_REGISTRY } from '@/utils/constants';
+import { TASK_ID_REGISTRY, TASK_STATE } from '@/utils/constants';
 type TraderProgress = Record<string, { level?: number; reputation?: number }>;
 const createProgressData = (
   taskCompletions: Record<string, unknown>,
@@ -114,6 +114,22 @@ describe('useProgressStore', () => {
     const { useProgressStore } = await import('@/stores/useProgress');
     const store = useProgressStore();
     expect(store.tasksFailed['task-1']).toEqual({ self: true, 'teammate-1': false });
+  });
+  it('distinguishes explicitly active tasks from available legacy tasks', async () => {
+    setupMocks({
+      selfCompletions: {
+        'task-active': { active: true, complete: false, failed: false },
+        'task-legacy': { complete: false, failed: false },
+      },
+      tasks: [
+        { id: 'task-active', factionName: 'Any', name: 'Active Task' },
+        { id: 'task-legacy', factionName: 'Any', name: 'Legacy Task' },
+      ],
+    });
+    const { useProgressStore } = await import('@/stores/useProgress');
+    const store = useProgressStore();
+    expect(store.tasksState['task-active']).toBe(TASK_STATE.ACTIVE);
+    expect(store.tasksState['task-legacy']).toBe(TASK_STATE.AVAILABLE);
   });
   it('reacts when teammate stores are added after progress store initialization', async () => {
     const { teammateStore, teammateStores } = setupMocks({

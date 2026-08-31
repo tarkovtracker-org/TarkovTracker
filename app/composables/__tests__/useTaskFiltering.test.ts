@@ -122,7 +122,10 @@ const createProgressStore = () => ({
   } as Record<string, Record<string, boolean>>,
   playerFaction: { self: 'USEC' } as Record<string, string>,
   getDisplayName: (teamId: string) => teamId,
-  getTaskStatus: (teamId: string, taskId: string) => {
+  getTaskStatus: (
+    teamId: string,
+    taskId: string
+  ): 'active' | 'completed' | 'failed' | 'incomplete' => {
     const completions: Record<string, Record<string, boolean>> = {
       'task-map': { self: false },
       'task-trader': { self: true },
@@ -262,11 +265,29 @@ describe('useTaskFiltering', () => {
       'task-lightkeeper',
     ]);
   });
+  it('keeps active tasks out of available and includes them in active', async () => {
+    const { taskFiltering, tasks, progressStore } = await setup();
+    progressStore.getTaskStatus = (_teamId: string, taskId: string) =>
+      taskId === 'task-map' ? 'active' : 'incomplete';
+    expect(taskFiltering.filterTasksByStatus([tasks[0]!], 'available', 'self')).toEqual([]);
+    expect(taskFiltering.filterTasksByStatus([tasks[0]!], 'active', 'self')).toEqual([tasks[0]]);
+  });
+  it('keeps active tasks out of locked filters and trader counts', async () => {
+    const { taskFiltering, tasks, progressStore } = await setup();
+    const activeTask = tasks.find((task) => task.id === 'task-locked')!;
+    progressStore.getTaskStatus = (_teamId: string, taskId: string) =>
+      taskId === activeTask.id ? 'active' : 'incomplete';
+    expect(taskFiltering.filterTasksByStatus([activeTask], 'locked', 'self')).toEqual([]);
+    expect(taskFiltering.filterTasksByStatus([activeTask], 'locked', 'all')).toEqual([]);
+    expect(taskFiltering.calculateTraderCounts('self', 'locked')['trader-1']).toBe(0);
+    expect(taskFiltering.calculateTraderCounts('all', 'locked')['trader-1']).toBe(0);
+  });
   it('calculates status counts excluding invalid availability', async () => {
     const { taskFiltering } = await setup();
     const counts = taskFiltering.calculateStatusCounts('self');
     expect(counts).toEqual({
       all: 9,
+      active: 0,
       available: 5,
       locked: 1,
       completed: 1,
@@ -415,6 +436,7 @@ describe('useTaskFiltering', () => {
     const statusCounts = taskFiltering.calculateStatusCounts('self');
     expect(statusCounts).toEqual({
       all: 9,
+      active: 0,
       available: 5,
       locked: 1,
       completed: 1,
@@ -427,6 +449,7 @@ describe('useTaskFiltering', () => {
     const statusCounts = taskFiltering.calculateStatusCounts('self');
     expect(statusCounts).toEqual({
       all: 3,
+      active: 0,
       available: 2,
       locked: 1,
       completed: 0,
@@ -522,6 +545,42 @@ describe('useTaskFiltering', () => {
       'task-trader',
       'task-failed',
     ]);
+  });
+  it('does not rank active trader tasks as available', async () => {
+    const { taskFiltering, tasks, progressStore } = await setup();
+    const activeTask = tasks.find((task) => task.id === 'task-map')!;
+    const completedTask = tasks.find((task) => task.id === 'task-trader')!;
+    const failedTask = tasks.find((task) => task.id === 'task-failed')!;
+    completedTask.trader = { id: 'trader-1', name: 'Trader One' };
+    failedTask.trader = { id: 'trader-1', name: 'Trader One' };
+    progressStore.getTaskStatus = (_teamId: string, taskId: string) => {
+      if (taskId === activeTask.id) return 'active';
+      if (taskId === completedTask.id) return 'completed';
+      if (taskId === failedTask.id) return 'failed';
+      return 'incomplete';
+    };
+    for (const userView of ['self', 'all']) {
+      await taskFiltering.updateVisibleTasks(
+        {
+          primaryView: 'traders',
+          secondaryView: 'all',
+          userView,
+          mapView: 'all',
+          traderView: 'trader-1',
+          mergedMaps: [],
+          sortMode: 'alphabetical',
+          sortDirection: 'asc',
+        },
+        false
+      );
+      expect(taskFiltering.visibleTasks.value.map((task) => task.id)).toEqual([
+        'task-kappa',
+        'task-locked',
+        'task-map',
+        'task-trader',
+        'task-failed',
+      ]);
+    }
   });
   it('keeps pinned tasks first while preserving status rank within pinned and unpinned groups', async () => {
     const { taskFiltering, tasks, preferencesStore } = await setup();
@@ -792,6 +851,11 @@ describe('useTaskFiltering', () => {
       progressStore.tasksCompletions['task-map'] = { self: false, teammate: true };
       progressStore.tasksFailed['task-map'] = { self: false, teammate: false };
       progressStore.objectiveCompletions['obj-map'] = { self: true, teammate: false };
+      progressStore.getTaskStatus = (teamId, taskId) => {
+        if (progressStore.tasksFailed[taskId]?.[teamId]) return 'failed';
+        if (progressStore.tasksCompletions[taskId]?.[teamId]) return 'completed';
+        return 'incomplete';
+      };
       await taskFiltering.updateVisibleTasks(
         {
           primaryView: 'maps',

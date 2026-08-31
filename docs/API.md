@@ -394,6 +394,51 @@ The `returnUrl` host must match the configured app URL host. Mismatched hosts fa
 
 ---
 
+## Progress Task Lifecycle
+
+Task writes on `api.tarkovtracker.org` accept four states through both
+`POST /progress/task/{taskId}` and `POST /progress/tasks`:
+
+| State         | Stored `complete` | Stored `failed` | Stored `active` |
+| ------------- | ----------------- | --------------- | --------------- |
+| `active`      | `false`           | `false`         | `true`          |
+| `completed`   | `true`            | `false`         | `false`         |
+| `failed`      | `true`            | `true`          | `false`         |
+| `uncompleted` | `false`           | `false`         | `false`         |
+
+Use `active` when the player has accepted an ordinary task. When an unlocked successor has no
+stored progress, dependency processing materializes it as explicitly neutral and never marks it
+active. Existing successor progress is never overwritten by dependency propagation. Completing,
+failing, or uncompleting a task clears `active`.
+
+Single-task request:
+
+```json
+{ "state": "active" }
+```
+
+Batch request:
+
+```json
+[
+  { "id": "task-1", "state": "active" },
+  { "id": "task-2", "state": "completed" }
+]
+```
+
+The legacy direct object-map form remains supported for compatibility:
+
+```json
+{ "task-1": "active", "task-2": "completed" }
+```
+
+`GET /progress` may include `active: true` or `active: false` on each task progress object. The
+property is optional for backward compatibility: its absence on legacy data means the acceptance
+state is unknown, not false. Clients must not infer active from `complete: false` and
+`failed: false`. Existing clients can continue using `complete` and `failed` and ignore `active`.
+
+---
+
 ## Rate Limits (API Gateway)
 
 This section covers **external progress API quotas only** (Worker + Durable Object). App mutation

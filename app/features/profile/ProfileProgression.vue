@@ -214,6 +214,7 @@
           :counted-tasks="countedTasks"
           :is-task-successful="isTaskSuccessful"
           :is-task-failed="isTaskFailed"
+          :is-task-active="isProfileTaskActive"
           :is-task-locked="isTaskLocked"
           :objective-completions="objectiveCompletions"
         />
@@ -275,7 +276,7 @@
     toggleStoryChapterWithLinearObjectives,
   } from '@/utils/storylineObjectives';
   import { buildTarkovDevProfileUrl } from '@/utils/tarkovDevProfileUrl';
-  import { getCompletionFlags, type RawTaskCompletion } from '@/utils/taskStatus';
+  import { getCompletionFlags, isTaskActive, type RawTaskCompletion } from '@/utils/taskStatus';
   import { filterTasksByTypeSettings, type TaskTypeFilterOptions } from '@/utils/taskTypeFilters';
   import type {
     AchievementRow,
@@ -714,8 +715,13 @@
     const completion = taskCompletions.value[taskId] as RawTaskCompletion;
     return getCompletionFlags(completion).failed;
   };
+  const isProfileTaskActive = (taskId: string): boolean => {
+    return isTaskActive(taskCompletions.value[taskId] as RawTaskCompletion);
+  };
   const isTaskLocked = (taskId: string): boolean => {
-    if (isTaskSuccessful(taskId) || isTaskFailed(taskId)) return false;
+    if (isTaskSuccessful(taskId) || isTaskFailed(taskId) || isProfileTaskActive(taskId)) {
+      return false;
+    }
     if (isViewingCurrentMode.value) {
       return progressStore.unlockedTasks[taskId]?.self !== true;
     }
@@ -737,7 +743,13 @@
         );
         if (requiresComplete && reqFlags.complete) return true;
         if (requiresFailed && reqFlags.failed) return true;
-        if (requiresActive) return true;
+        if (
+          requiresActive &&
+          (reqFlags.complete ||
+            isTaskActive(taskCompletions.value[req.task.id] as RawTaskCompletion))
+        ) {
+          return true;
+        }
         return false;
       });
       if (!allMet) return true;

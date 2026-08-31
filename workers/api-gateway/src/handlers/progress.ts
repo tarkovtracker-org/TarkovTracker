@@ -26,6 +26,7 @@ import type {
   ApiUpdateMeta,
   GameMode,
   ProgressDataField,
+  TarkovTaskRequirement,
 } from '../types';
 const DISPLAY_NAME_CACHE_TTL_SECONDS = 86400;
 interface ProgressMergePayload {
@@ -114,9 +115,7 @@ async function fetchUserProgressMode(
 ): Promise<UserProgressModeRow | null> {
   const seasonNumber = await getGameModeSeasonNumber(env, gameMode);
   const legacyProgressField = getLegacyModeProgressField(gameMode);
-  const metadataSelect = ['user_id', 'game_edition', legacyProgressField]
-    .filter(Boolean)
-    .join(',');
+  const metadataSelect = ['user_id', 'game_edition', legacyProgressField].filter(Boolean).join(',');
   const modeUrl = `${env.SUPABASE_URL}/rest/v1/user_game_mode_progress?user_id=eq.${userId}&game_mode=eq.${gameMode}&season_number=eq.${seasonNumber}&select=user_id,progress_data&limit=1`;
   const metadataUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${userId}&select=${metadataSelect}&limit=1`;
   const [modeResponse, metadataResponse] = await Promise.all([
@@ -216,9 +215,10 @@ async function getUserDisplayName(env: Env, userId: string): Promise<string | nu
     return null;
   }
 }
-const toTaskState = (complete: boolean, failed: boolean): TaskState => {
+const toTaskState = (complete: boolean, failed: boolean, active?: boolean): TaskState => {
   if (failed) return 'failed';
   if (complete) return 'completed';
+  if (active === true) return 'active';
   return 'uncompleted';
 };
 const buildApiUpdateMeta = (updates: ApiTaskUpdate[], timestamp: number): ApiUpdateMeta => {
@@ -234,13 +234,18 @@ const setTaskCompletion = (
   taskId: string,
   complete: boolean,
   failed: boolean,
+  active: boolean,
   timestamp: number,
   updates?: Map<string, TaskState>
 ): void => {
   const previous = taskCompletions[taskId];
-  const prevState = toTaskState(previous?.complete === true, previous?.failed === true);
-  const nextState = toTaskState(complete, failed);
-  taskCompletions[taskId] = { complete, failed, timestamp };
+  const prevState = toTaskState(
+    previous?.complete === true,
+    previous?.failed === true,
+    previous?.active
+  );
+  const nextState = toTaskState(complete, failed, active);
+  taskCompletions[taskId] = { complete, failed, active, timestamp };
   if (updates && prevState !== nextState) {
     updates.set(taskId, nextState);
   }
@@ -261,7 +266,7 @@ const checkAllRequirementsMet = (
       if (requirementStatus.includes('failed') && newState === 'failed') return true;
       if (
         requirementStatus.includes('active') &&
-        (newState === 'uncompleted' || newState === 'completed')
+        (newState === 'active' || newState === 'completed')
       ) {
         return true;
       }
@@ -277,7 +282,7 @@ const checkAllRequirementsMet = (
     }
     if (
       requirementStatus.includes('active') &&
-      (otherTaskData?.complete === false ||
+      (otherTaskData?.active === true ||
         (otherTaskData?.complete === true && !otherTaskData?.failed))
     ) {
       return true;
@@ -287,6 +292,45 @@ const checkAllRequirementsMet = (
     }
     return false;
   });
+};
+const stateMeetsRequirement = (state: TaskState, statuses: string[]): boolean => {
+  if (statuses.includes('complete') && state === 'completed') return true;
+  if (statuses.includes('failed') && state === 'failed') return true;
+  return statuses.includes('active') && (state === 'active' || state === 'completed');
+};
+const findChangedRequirement = (
+  requirements: TarkovTask['taskRequirements'] | undefined,
+  changedTaskId: string
+): TarkovTaskRequirement | undefined =>
+  requirements?.find((requirement) => requirement?.task?.id === changedTaskId);
+const isTaskStateUpdateAllowed = (
+  dependentTask: TarkovTask,
+  changedTaskId: string,
+  newState: TaskState,
+  taskCompletions: Record<string, TaskCompletion>,
+  changedRequirement: TarkovTaskRequirement
+): boolean =>
+  [
+    stateMeetsRequirement(newState, changedRequirement.status ?? []),
+    checkAllRequirementsMet(dependentTask, changedTaskId, newState, taskCompletions),
+    !Object.hasOwn(taskCompletions, dependentTask.id),
+  ].every(Boolean);
+const canUpdateDependentTask = (
+  dependentTask: TarkovTask,
+  changedRequirement: TarkovTaskRequirement,
+  changedTaskId: string,
+  newState: TaskState,
+  taskCompletions: Record<string, TaskCompletion>,
+  protectedTaskIds?: Set<string>
+): boolean => {
+  if (protectedTaskIds?.has(dependentTask.id)) return false;
+  return isTaskStateUpdateAllowed(
+    dependentTask,
+    changedTaskId,
+    newState,
+    taskCompletions,
+    changedRequirement
+  );
 };
 const updateDependentTasks = (
   changedTaskId: string,
@@ -298,29 +342,24 @@ const updateDependentTasks = (
   protectedTaskIds?: Set<string>
 ): void => {
   for (const dependentTask of tasks) {
-    const requirements = dependentTask.taskRequirements ?? [];
-    if (!requirements.length) continue;
-    let shouldUnlock = false;
-    let shouldLock = false;
-    for (const requirement of requirements) {
-      if (requirement?.task?.id !== changedTaskId) continue;
-      const requirementStatus = requirement.status ?? [];
-      if (!requirementStatus.includes('complete')) continue;
-      if (newState === 'completed') {
-        shouldUnlock = checkAllRequirementsMet(
-          dependentTask,
-          changedTaskId,
-          newState,
-          taskCompletions
-        );
-      } else {
-        shouldLock = true;
-      }
+    const changedRequirement = findChangedRequirement(
+      dependentTask.taskRequirements,
+      changedTaskId
+    );
+    if (!changedRequirement) continue;
+    if (
+      !canUpdateDependentTask(
+        dependentTask,
+        changedRequirement,
+        changedTaskId,
+        newState,
+        taskCompletions,
+        protectedTaskIds
+      )
+    ) {
+      continue;
     }
-    if (shouldUnlock || shouldLock) {
-      if (protectedTaskIds?.has(dependentTask.id)) continue;
-      setTaskCompletion(taskCompletions, dependentTask.id, false, false, updateTime, updates);
-    }
+    setTaskCompletion(taskCompletions, dependentTask.id, false, false, false, updateTime, updates);
   }
 };
 /**
@@ -435,6 +474,7 @@ export async function handleUpdateTask(
     taskId,
     state === 'completed' || state === 'failed',
     state === 'failed',
+    state === 'active',
     updateTime,
     updateMap
   );
@@ -483,6 +523,7 @@ export async function handleUpdateTasks(
       update.id,
       update.state === 'completed' || update.state === 'failed',
       update.state === 'failed',
+      update.state === 'active',
       updateTime,
       updateMap
     );

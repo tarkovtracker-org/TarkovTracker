@@ -17,6 +17,7 @@ const createTarkovStore = (options: {
 }) => {
   const objectiveCounts = new Map<string, number>(Object.entries(options.objectiveCounts ?? {}));
   return {
+    setTaskActive: vi.fn(),
     setTaskComplete: vi.fn(),
     setTaskFailed: vi.fn(),
     setTaskUncompleted: vi.fn(),
@@ -120,6 +121,15 @@ const setup = async (
   };
 };
 describe('useTaskActions', () => {
+  it('accepts an available task as explicitly active', async () => {
+    const task: Task = { id: 'task-active', name: 'Task Active' };
+    const { actions, onAction, tarkovStore } = await setup(task, [task], {});
+    actions.markTaskActive();
+    expect(tarkovStore.setTaskActive).toHaveBeenCalledWith('task-active');
+    expect(onAction).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'active', taskId: 'task-active' })
+    );
+  });
   it('tracks each task action once with rich analytics metadata', async () => {
     const task: Task = {
       id: 'task-analytics',

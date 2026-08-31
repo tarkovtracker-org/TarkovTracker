@@ -1,7 +1,13 @@
 import { isTaskAvailableForEdition } from '@/utils/editionHelpers';
 import type { GameEdition, Task } from '@/types/tarkov';
 export type RawTaskCompletion =
-  | { complete?: boolean; failed?: boolean; timestamp?: number; manual?: boolean }
+  | {
+      complete?: boolean;
+      failed?: boolean;
+      active?: boolean;
+      timestamp?: number;
+      manual?: boolean;
+    }
   | boolean
   | null
   | undefined;
@@ -42,18 +48,16 @@ export function isTaskFailed(completion?: RawTaskCompletion): boolean {
   return getCompletionFlags(completion).failed;
 }
 /**
- * Checks if a task is actively in progress (started but not completed or failed).
- * Returns false for:
- * - undefined/null: No completion record exists (task not started)
- * - false: Task exists but explicitly not started
- * - Completed tasks (isTaskComplete returns true)
- * - Failed tasks (isTaskFailed returns true)
- * @see isTaskComplete for checking task completion
- * @see isTaskFailed for checking task failure
+ * Checks if a task is explicitly active (accepted but not completed or failed).
+ * Legacy records without `active` are unknown and never inferred as active.
  */
 export function isTaskActive(completion?: RawTaskCompletion): boolean {
-  if (!completion) return false;
-  return !isTaskComplete(completion) && !isTaskFailed(completion);
+  return (
+    typeof completion === 'object' &&
+    completion !== null &&
+    completion.active === true &&
+    getTaskStatusFromFlags(completion) === 'incomplete'
+  );
 }
 export function getTaskStatusFromFlags(completion?: RawTaskCompletion): TaskStatusResult {
   const flags = getCompletionFlags(completion);

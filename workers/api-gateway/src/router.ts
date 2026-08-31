@@ -23,7 +23,7 @@ import {
 import { INBOUND_USER_AGENT_MIN_LENGTH, normalizeInboundUserAgent } from './utils/userAgent';
 import type { BatchTaskUpdate, Env, Permission, TaskState } from './types';
 const LEGACY_API_DEPRECATION_DATE = '@1783296000';
-const TASK_STATES = new Set<TaskState>(['completed', 'uncompleted', 'failed']);
+const TASK_STATES = new Set<TaskState>(['active', 'completed', 'uncompleted', 'failed']);
 const API_HOST_PREFIXES = ['/api/v2', '/api', '/v2'] as const;
 type Action = 'progress-read' | 'progress-write' | 'token-info';
 type RouteContext = {
@@ -312,7 +312,7 @@ async function routeTask(context: RouteContext): Promise<Response | null> {
   if (!isTaskState(body.state)) {
     const value = typeof body.state === 'string' ? body.state : String(body.state ?? '');
     return errorResponse(
-      'Invalid state "' + value + '" (must be completed, uncompleted, or failed)',
+      'Invalid state "' + value + '" (must be active, completed, uncompleted, or failed)',
       400,
       context.origin,
       context.reqOrigin,

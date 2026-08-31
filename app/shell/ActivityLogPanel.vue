@@ -114,6 +114,7 @@
   };
   const getStateLabel = (state: ApiTaskUpdate['state']): string => {
     const icons: Record<ApiTaskUpdate['state'], string> = {
+      active: '●',
       completed: '✓',
       failed: '✗',
       uncompleted: '○',

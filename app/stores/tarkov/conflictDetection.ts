@@ -12,7 +12,13 @@ export function detectDataConflicts(
   for (const taskId of taskIds) {
     const localFlags = getCompletionFlags(localTasks[taskId] as RawTaskCompletion);
     const remoteFlags = getCompletionFlags(remoteTasks[taskId] as RawTaskCompletion);
-    if (localFlags.complete !== remoteFlags.complete || localFlags.failed !== remoteFlags.failed) {
+    const localActive = localTasks[taskId]?.active;
+    const remoteActive = remoteTasks[taskId]?.active;
+    if (
+      localFlags.complete !== remoteFlags.complete ||
+      localFlags.failed !== remoteFlags.failed ||
+      localActive !== remoteActive
+    ) {
       conflictCount++;
     }
   }

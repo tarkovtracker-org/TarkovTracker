@@ -116,11 +116,13 @@
     "api_synced": "API Progress Synced",
     "more_count": "+{count} more",
     "entry": {
+      "active": "Accepted Task: {name}",
       "completed": "Completed Task: {name}",
       "uncompleted": "Uncompleted Task: {name}",
       "failed": "Failed Task: {name}",
       "reset_failed": "Reset Failed Task: {name}",
       "available": "Unlocked Task: {name}",
+      "undo_active": "Undid Task Acceptance: {name}",
       "undo_completed": "Undid Task Completion: {name}",
       "undo_uncompleted": "Undid Task Uncompletion: {name}",
       "undo_reset_failed": "Undid Reset Failed Task: {name}",
@@ -173,6 +175,7 @@
         "plural": "Tasks updated"
       },
       "state": {
+        "active": "active",
         "completed": "completed",
         "failed": "failed",
         "uncompleted": "uncompleted"
@@ -223,6 +226,7 @@
     "refresh_button": "Try again",
     "opens_in_new_tab": "Opens in new tab",
     "available": "Available",
+    "active": "Active",
     "enabled": "Enabled",
     "disabled": "Disabled",
     "update_failed": "Update failed",
@@ -1010,7 +1014,9 @@
         "status_failed": "Marked {name} as failed",
         "status_reset_failed": "Reset failed status for {name}",
         "status_available": "Marked all prerequisites for {name} as complete",
+        "status_active": "Marked {name} as active",
         "undo": "Undo",
+        "undo_active": "Undid accepting {name}",
         "undo_complete": "Undid completion of {name}",
         "undo_uncomplete": "Undid uncompleting of {name}",
         "undo_failed": "Undid failing {name}",

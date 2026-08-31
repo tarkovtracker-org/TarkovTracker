@@ -15,9 +15,7 @@ const CULTIST_CIRCLE_STATION_ID = '667298e75ea6b4493c08f266';
 /**
  * Extract game mode specific data from user progress row
  */
-export function extractGameModeData(
-  row: UserProgressModeRow | null
-): UserProgressData | null {
+export function extractGameModeData(row: UserProgressModeRow | null): UserProgressData | null {
   if (!row) return null;
   return row.progress_data ?? null;
 }
@@ -87,19 +85,26 @@ export function transformProgress(
     pmcFaction,
   });
   // Transform tasks to array format
-  const tasksProgress: ProgressResponseTask[] = Object.entries(taskCompletions).map(([id, data]) => {
-    const entry: ProgressResponseTask = {
-      id,
-      complete: data.complete === true && data.failed !== true,
-    };
-    if (invalidTasks[id]) {
-      entry.invalid = true;
+  const tasksProgress: ProgressResponseTask[] = Object.entries(taskCompletions).map(
+    ([id, data]) => {
+      const entry: ProgressResponseTask = {
+        id,
+        complete: data.complete === true && data.failed !== true,
+      };
+      if (invalidTasks[id]) {
+        entry.invalid = true;
+      }
+      if (data.failed === true) {
+        entry.failed = true;
+      }
+      if (data.complete === true || data.failed === true) {
+        entry.active = false;
+      } else if (typeof data.active === 'boolean') {
+        entry.active = data.active;
+      }
+      return entry;
     }
-    if (data.failed === true) {
-      entry.failed = true;
-    }
-    return entry;
-  });
+  );
   // Transform objectives to array format
   const taskObjectivesProgress: ProgressResponseObjective[] = Object.entries(
     progressData?.taskObjectives ?? {}

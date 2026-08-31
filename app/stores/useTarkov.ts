@@ -738,7 +738,14 @@ const tarkovActions = {
     const shouldRemainFailed = (
       task: Task | undefined,
       completion:
-        { complete?: boolean; failed?: boolean; manual?: boolean; timestamp?: number } | undefined
+        | {
+            active?: boolean;
+            complete?: boolean;
+            failed?: boolean;
+            manual?: boolean;
+            timestamp?: number;
+          }
+        | undefined
     ) => {
       if (completion?.manual === true) return true;
       if (!task) return true;
@@ -829,6 +836,7 @@ const tarkovActions = {
     const now = Date.now();
     completions[taskId]!.complete = false;
     completions[taskId]!.failed = false;
+    completions[taskId]!.active = false;
     completions[taskId]!.manual = false;
     completions[taskId]!.timestamp = now;
     const task = tasksMap.get(taskId);
@@ -867,6 +875,7 @@ const tarkovActions = {
     }
     completions[taskId]!.complete = true;
     completions[taskId]!.failed = true;
+    completions[taskId]!.active = false;
     if (completions[taskId]!.manual !== true) {
       completions[taskId]!.manual = false;
     }
