@@ -22,16 +22,18 @@ export interface TaskNodeData {
   kappaRequired: boolean;
   lightkeeperRequired: boolean;
 }
+const TASK_NODE_STATUS_BY_STATE: Record<string, TaskNodeStatus> = {
+  [TASK_STATE.COMPLETE]: 'completed',
+  [TASK_STATE.FAILED]: 'failed',
+  [TASK_STATE.ACTIVE]: 'active',
+  [TASK_STATE.AVAILABLE]: 'available',
+};
 export const resolveTaskNodeStatus = (
   taskId: string,
   tasksState: Record<string, string>
 ): TaskNodeStatus => {
-  const state = tasksState[taskId];
-  if (state === TASK_STATE.COMPLETE) return 'completed';
-  if (state === TASK_STATE.FAILED) return 'failed';
-  if (state === TASK_STATE.ACTIVE) return 'active';
-  if (state === TASK_STATE.AVAILABLE) return 'available';
-  return 'locked';
+  const state = tasksState[taskId] ?? '';
+  return TASK_NODE_STATUS_BY_STATE[state] ?? 'locked';
 };
 const collectFocusChain = (focusedTaskId: string, tasksById: Map<string, Task>): Set<string> => {
   const chain = new Set<string>();

@@ -128,6 +128,14 @@
 </template>
 <script setup lang="ts">
   import type { Task } from '@/types/tarkov';
+  type ProfileTaskStatus = 'failed' | 'complete' | 'active' | 'locked' | 'default';
+  const TASK_STATUS_PRESENTATION: Record<ProfileTaskStatus, { icon: string; color: string }> = {
+    failed: { icon: 'i-mdi-close-circle', color: 'text-error-400' },
+    complete: { icon: 'i-mdi-check-circle', color: 'text-success-400' },
+    active: { icon: 'i-mdi-play-circle', color: 'text-primary-400' },
+    locked: { icon: 'i-mdi-lock', color: 'text-warning-400' },
+    default: { icon: 'i-mdi-circle-outline', color: 'text-info-400' },
+  };
   interface ObjectiveCompletion {
     complete?: boolean;
     count?: number;
@@ -222,20 +230,18 @@
       },
     ];
   });
-  const taskStatusIcon = (taskId: string): string => {
-    if (props.isTaskFailed(taskId)) return 'i-mdi-close-circle';
-    if (props.isTaskSuccessful(taskId)) return 'i-mdi-check-circle';
-    if (props.isTaskActive(taskId)) return 'i-mdi-play-circle';
-    if (props.isTaskLocked(taskId)) return 'i-mdi-lock';
-    return 'i-mdi-circle-outline';
+  const getTaskStatusPresentation = (taskId: string) => {
+    const checks: Array<{ status: ProfileTaskStatus; matches: () => boolean }> = [
+      { status: 'failed', matches: () => props.isTaskFailed(taskId) },
+      { status: 'complete', matches: () => props.isTaskSuccessful(taskId) },
+      { status: 'active', matches: () => props.isTaskActive(taskId) },
+      { status: 'locked', matches: () => props.isTaskLocked(taskId) },
+    ];
+    const status = checks.find(({ matches }) => matches())?.status ?? 'default';
+    return TASK_STATUS_PRESENTATION[status];
   };
-  const taskStatusColor = (taskId: string): string => {
-    if (props.isTaskFailed(taskId)) return 'text-error-400';
-    if (props.isTaskSuccessful(taskId)) return 'text-success-400';
-    if (props.isTaskActive(taskId)) return 'text-primary-400';
-    if (props.isTaskLocked(taskId)) return 'text-warning-400';
-    return 'text-info-400';
-  };
+  const taskStatusIcon = (taskId: string): string => getTaskStatusPresentation(taskId).icon;
+  const taskStatusColor = (taskId: string): string => getTaskStatusPresentation(taskId).color;
   const objectiveIcon = (objectiveId: string): string => {
     return props.objectiveCompletions[objectiveId]?.complete
       ? 'i-mdi-check-circle'

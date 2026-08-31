@@ -44,6 +44,42 @@ const taskFilterFor = (tab: KappaTabKey) =>
   tab === 'kappa'
     ? (task: Task) => task.kappaRequired === true
     : (task: Task) => task.lightkeeperRequired === true;
+type KappaTaskStatusContext = {
+  isComplete: boolean;
+  isFailed: boolean;
+  isActive: boolean;
+  isUnlocked: boolean;
+};
+const KAPPA_STATUS_RULES: Array<{
+  matches: (context: KappaTaskStatusContext) => boolean;
+  status: KappaTaskStatus;
+}> = [
+  { matches: ({ isFailed }) => isFailed, status: 'failed' },
+  { matches: ({ isComplete }) => isComplete, status: 'complete' },
+  { matches: ({ isActive }) => isActive, status: 'active' },
+  { matches: ({ isUnlocked }) => isUnlocked, status: 'available' },
+];
+const resolveKappaTaskStatus = (context: KappaTaskStatusContext): KappaTaskStatus =>
+  KAPPA_STATUS_RULES.find(({ matches }) => matches(context))?.status ?? 'locked';
+const getTaskName = (task: Task | undefined, fallback: string | undefined): string | undefined => {
+  if (task && task.name !== undefined) return task.name;
+  return fallback;
+};
+const findLockedBy = (
+  task: Task,
+  tasksById: Map<string, Task>,
+  isTaskComplete: (taskId: string) => boolean
+): KappaRowEntry['lockedBy'] => {
+  const requiredTask = (task.taskRequirements ?? [])
+    .map(({ task: requiredTask }) => requiredTask)
+    .find(({ id }) => id && !isTaskComplete(id));
+  if (!requiredTask) return undefined;
+  const required = tasksById.get(requiredTask.id);
+  return {
+    id: requiredTask.id,
+    name: getTaskName(required, requiredTask.name),
+  };
+};
 export function useKappaOverview(tab: () => KappaTabKey) {
   const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
@@ -70,36 +106,14 @@ export function useKappaOverview(tab: () => KappaTabKey) {
     const unlocked = progressStore.unlockedTasks;
     const tasksById = new Map(metadataStore.tasks.map((task) => [task.id, task]));
     return sourceTasks.value.map((task) => {
-      const isComplete = tarkovStore.isTaskComplete(task.id);
-      const isFailed = tarkovStore.isTaskFailed(task.id);
-      let status: KappaTaskStatus;
-      if (isComplete && isFailed) {
-        status = 'failed';
-      } else if (isComplete) {
-        status = 'complete';
-      } else if (isFailed) {
-        status = 'failed';
-      } else if (tarkovStore.isTaskActive(task.id)) {
-        status = 'active';
-      } else if (unlocked[task.id]?.self === true) {
-        status = 'available';
-      } else {
-        status = 'locked';
-      }
-      let lockedBy: KappaRowEntry['lockedBy'] | undefined;
-      if (status === 'locked') {
-        for (const requirement of task.taskRequirements ?? []) {
-          const requiredId = requirement?.task?.id;
-          if (!requiredId) continue;
-          if (tarkovStore.isTaskComplete(requiredId)) continue;
-          const required = tasksById.get(requiredId);
-          lockedBy = {
-            id: requiredId,
-            name: required?.name ?? requirement.task.name,
-          };
-          break;
-        }
-      }
+      const status = resolveKappaTaskStatus({
+        isComplete: tarkovStore.isTaskComplete(task.id),
+        isFailed: tarkovStore.isTaskFailed(task.id),
+        isActive: tarkovStore.isTaskActive(task.id),
+        isUnlocked: unlocked[task.id]?.self === true,
+      });
+      const lockedBy =
+        status === 'locked' ? findLockedBy(task, tasksById, tarkovStore.isTaskComplete) : undefined;
       const isInvalid = progressStore.invalidTasks?.[task.id]?.self === true;
       return { task, status, isInvalid, lockedBy };
     });

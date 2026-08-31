@@ -16,6 +16,7 @@ import {
   resolveModeProgressData,
 } from '@/utils/modeProgressFallback';
 import { sanitizeTeammateProgressData } from '@/utils/progressSanitizers';
+import { getCompletionFlags } from '@/utils/taskStatus';
 import type { MemberProfile, TeamGetters, TeamState } from '@/types/tarkov';
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 import type { Store } from 'pinia';
@@ -87,6 +88,12 @@ const logTeammateModeProgressHydrationFailure = (error: unknown, teammateId: str
     error,
     teammateId,
   });
+};
+const getExplicitActiveState = (
+  completion: TaskCompletionSnapshot[string] | undefined
+): boolean | undefined => {
+  if (typeof completion?.active === 'boolean') return completion.active;
+  return undefined;
 };
 const applyLegacyPersistentProgressResult = (
   result: { data: { pve_data?: unknown; pvp_data?: unknown } | null; error: unknown },
@@ -177,15 +184,13 @@ function cloneTaskCompletions(
 }
 export const createTaskCompletionBroadcast = (
   completion: TaskCompletionSnapshot[string] | undefined
-) => ({
-  complete: completion?.complete ?? false,
-  failed: completion?.failed ?? false,
-  ...(typeof completion?.active === 'boolean'
-    ? { active: completion.active }
-    : completion?.complete === true || completion?.failed === true
-      ? { active: false }
-      : {}),
-});
+) => {
+  const flags = getCompletionFlags(completion);
+  const active = getExplicitActiveState(completion);
+  if (active !== undefined) return { ...flags, active };
+  if (flags.complete || flags.failed) return { ...flags, active: false };
+  return flags;
+};
 export const mergeTaskCompletionBroadcast = (
   current: TaskCompletionSnapshot[string] | undefined,
   update: { active?: boolean; complete: boolean; failed: boolean }

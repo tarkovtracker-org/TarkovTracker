@@ -26,6 +26,7 @@ import type {
   ApiUpdateMeta,
   GameMode,
   ProgressDataField,
+  TarkovTaskRequirement,
 } from '../types';
 const DISPLAY_NAME_CACHE_TTL_SECONDS = 86400;
 interface ProgressMergePayload {
@@ -297,6 +298,40 @@ const stateMeetsRequirement = (state: TaskState, statuses: string[]): boolean =>
   if (statuses.includes('failed') && state === 'failed') return true;
   return statuses.includes('active') && (state === 'active' || state === 'completed');
 };
+const findChangedRequirement = (
+  requirements: TarkovTask['taskRequirements'] | undefined,
+  changedTaskId: string
+): TarkovTaskRequirement | undefined =>
+  requirements?.find((requirement) => requirement?.task?.id === changedTaskId);
+const isTaskStateUpdateAllowed = (
+  dependentTask: TarkovTask,
+  changedTaskId: string,
+  newState: TaskState,
+  taskCompletions: Record<string, TaskCompletion>,
+  changedRequirement: TarkovTaskRequirement
+): boolean =>
+  [
+    stateMeetsRequirement(newState, changedRequirement.status ?? []),
+    checkAllRequirementsMet(dependentTask, changedTaskId, newState, taskCompletions),
+    !Object.hasOwn(taskCompletions, dependentTask.id),
+  ].every(Boolean);
+const canUpdateDependentTask = (
+  dependentTask: TarkovTask,
+  changedRequirement: TarkovTaskRequirement,
+  changedTaskId: string,
+  newState: TaskState,
+  taskCompletions: Record<string, TaskCompletion>,
+  protectedTaskIds?: Set<string>
+): boolean => {
+  if (protectedTaskIds?.has(dependentTask.id)) return false;
+  return isTaskStateUpdateAllowed(
+    dependentTask,
+    changedTaskId,
+    newState,
+    taskCompletions,
+    changedRequirement
+  );
+};
 const updateDependentTasks = (
   changedTaskId: string,
   newState: TaskState,
@@ -307,17 +342,20 @@ const updateDependentTasks = (
   protectedTaskIds?: Set<string>
 ): void => {
   for (const dependentTask of tasks) {
-    const requirements = dependentTask.taskRequirements ?? [];
-    if (!requirements.length) continue;
-    const changedRequirement = requirements.find(
-      (requirement) => requirement?.task?.id === changedTaskId
+    const changedRequirement = findChangedRequirement(
+      dependentTask.taskRequirements,
+      changedTaskId
     );
-    if (!changedRequirement || protectedTaskIds?.has(dependentTask.id)) continue;
-    const requirementMet = stateMeetsRequirement(newState, changedRequirement.status ?? []);
+    if (!changedRequirement) continue;
     if (
-      !requirementMet ||
-      !checkAllRequirementsMet(dependentTask, changedTaskId, newState, taskCompletions) ||
-      Object.hasOwn(taskCompletions, dependentTask.id)
+      !canUpdateDependentTask(
+        dependentTask,
+        changedRequirement,
+        changedTaskId,
+        newState,
+        taskCompletions,
+        protectedTaskIds
+      )
     ) {
       continue;
     }

@@ -52,8 +52,12 @@ export function isTaskFailed(completion?: RawTaskCompletion): boolean {
  * Legacy records without `active` are unknown and never inferred as active.
  */
 export function isTaskActive(completion?: RawTaskCompletion): boolean {
-  if (!completion || typeof completion === 'boolean') return false;
-  return completion.active === true && !isTaskComplete(completion) && !isTaskFailed(completion);
+  return (
+    typeof completion === 'object' &&
+    completion !== null &&
+    completion.active === true &&
+    getTaskStatusFromFlags(completion) === 'incomplete'
+  );
 }
 export function getTaskStatusFromFlags(completion?: RawTaskCompletion): TaskStatusResult {
   const flags = getCompletionFlags(completion);

@@ -27,11 +27,11 @@ const requiresCompletedStatus = (statuses: string[]): boolean => {
   return statuses.includes('complete') || statuses.includes('completed');
 };
 const hasExplicitActiveState = (completion: RawTaskCompletion): boolean =>
-  typeof completion === 'object' &&
-  completion !== null &&
-  Object.prototype.hasOwnProperty.call(completion, 'active');
+  typeof completion === 'object' && completion !== null && Object.hasOwn(completion, 'active');
 const requiresActiveStatus = (statuses: string[]): boolean =>
   ['active', 'accept', 'accepted'].some((status) => statuses.includes(status));
+const hasAcceptedTaskState = (completion: RawTaskCompletion): boolean =>
+  isTaskActive(completion) || isTaskComplete(completion);
 const matchesRequiredActiveStatus = (
   statuses: string[],
   completion: RawTaskCompletion,
@@ -39,7 +39,7 @@ const matchesRequiredActiveStatus = (
   isUnlockable: (taskId: string) => boolean
 ): boolean => {
   if (!requiresActiveStatus(statuses)) return false;
-  if (isTaskActive(completion) || isTaskComplete(completion)) return true;
+  if (hasAcceptedTaskState(completion)) return true;
   if (hasExplicitActiveState(completion)) return false;
   return isUnlockable(taskId);
 };

@@ -52,6 +52,28 @@
   import { useTaskActions } from '@/composables/useTaskActions';
   import { useProgressStore } from '@/stores/useProgress';
   import type { KappaRowEntry } from '@/features/kappa/useKappaOverview';
+  type KappaTaskStatus = KappaRowEntry['status'];
+  const KAPPA_STATUS_LABELS: Record<KappaTaskStatus, { key: string; fallback: string }> = {
+    complete: { key: 'common.complete', fallback: 'Complete' },
+    failed: { key: 'common.failed', fallback: 'Failed' },
+    active: { key: 'common.active', fallback: 'Active' },
+    locked: { key: 'common.locked', fallback: 'Locked' },
+    available: { key: 'common.available', fallback: 'Available' },
+  };
+  const KAPPA_TILE_CLASSES: Record<KappaTaskStatus, string> = {
+    complete: 'border-success-500/30 bg-success-500/5 hover:bg-success-500/10',
+    failed: 'border-error-500/30 bg-error-500/5 hover:bg-error-500/10',
+    active: 'border-primary-500/30 bg-primary-500/5 hover:bg-primary-500/10',
+    locked: 'border-white/5 bg-surface-900/30',
+    available: 'border-white/10 bg-surface-900/40 hover:bg-surface-700/40',
+  };
+  const KAPPA_CHECKBOX_CLASSES: Record<KappaTaskStatus, string> = {
+    complete: 'border-success-500/60 bg-success-500/20 text-success-200 hover:bg-success-500/30',
+    failed: 'border-error-500/60 bg-error-500/20 text-error-200 hover:bg-error-500/30',
+    active: 'border-primary-500/60 bg-primary-500/20 text-primary-200 hover:bg-primary-500/30',
+    locked: 'border-white/10 bg-surface-900/40 text-surface-500 cursor-not-allowed',
+    available: 'border-white/20 bg-surface-900/40 text-surface-300 hover:bg-surface-700/50',
+  };
   const props = defineProps<{ row: KappaRowEntry }>();
   const { t } = useI18n({ useScope: 'global' });
   const progressStore = useProgressStore();
@@ -108,18 +130,8 @@
     );
   });
   const statusLabel = computed(() => {
-    switch (props.row.status) {
-      case 'complete':
-        return t('common.complete', 'Complete');
-      case 'failed':
-        return t('common.failed', 'Failed');
-      case 'active':
-        return t('common.active', 'Active');
-      case 'locked':
-        return t('common.locked', 'Locked');
-      default:
-        return t('common.available', 'Available');
-    }
+    const label = KAPPA_STATUS_LABELS[props.row.status];
+    return t(label.key, label.fallback);
   });
   const tooltipText = computed(() => {
     const parts: string[] = [props.row.task.name ?? props.row.task.id];
@@ -142,34 +154,8 @@
     }
     return parts.join(' · ');
   });
-  const tileClasses = computed(() => {
-    switch (props.row.status) {
-      case 'complete':
-        return 'border-success-500/30 bg-success-500/5 hover:bg-success-500/10';
-      case 'failed':
-        return 'border-error-500/30 bg-error-500/5 hover:bg-error-500/10';
-      case 'active':
-        return 'border-primary-500/30 bg-primary-500/5 hover:bg-primary-500/10';
-      case 'locked':
-        return 'border-white/5 bg-surface-900/30';
-      default:
-        return 'border-white/10 bg-surface-900/40 hover:bg-surface-700/40';
-    }
-  });
-  const checkboxClasses = computed(() => {
-    switch (props.row.status) {
-      case 'complete':
-        return 'border-success-500/60 bg-success-500/20 text-success-200 hover:bg-success-500/30';
-      case 'failed':
-        return 'border-error-500/60 bg-error-500/20 text-error-200 hover:bg-error-500/30';
-      case 'active':
-        return 'border-primary-500/60 bg-primary-500/20 text-primary-200 hover:bg-primary-500/30';
-      case 'locked':
-        return 'border-white/10 bg-surface-900/40 text-surface-500 cursor-not-allowed';
-      default:
-        return 'border-white/20 bg-surface-900/40 text-surface-300 hover:bg-surface-700/50';
-    }
-  });
+  const tileClasses = computed(() => KAPPA_TILE_CLASSES[props.row.status]);
+  const checkboxClasses = computed(() => KAPPA_CHECKBOX_CLASSES[props.row.status]);
   const checkboxLabel = computed(() => {
     const name = props.row.task.name ?? props.row.task.id;
     switch (props.row.status) {
