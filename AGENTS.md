@@ -49,7 +49,7 @@ can read it and an agent can verify any claim against the code. Each system sect
 ## Project Snapshot
 
 - **Stack:** Nuxt 4 SPA (`ssr: false`), Vue 3 Composition API, TypeScript strict, Pinia, Supabase, Tailwind CSS v4, Vitest, Cloudflare Pages/Workers.
-- **Runtime:** Node >=24.12.0, packageManager `pnpm@11.14.0` (engines allow `pnpm >=10.34.5 <12`).
+- **Runtime:** Node >=24.19.0, packageManager `pnpm@11.14.0` (engines allow `pnpm >=10.34.5 <12`).
 - **Backend:** Supabase (auth, database, realtime). API proxy via Nitro server routes.
 - **Deployment:** Cloudflare Pages/Workers for the frontend and `api-gateway`; the Supabase GitHub
   integration applies DB migrations and deploys Edge Functions. All three run automatically on merge
@@ -65,7 +65,8 @@ can read it and an agent can verify any claim against the code. Each system sect
 - `app/stores/` — Pinia stores. Core state: `useTarkovStore` with `useMetadataStore`, `useProgressStore`, `usePreferencesStore`.
 - `app/locales/` — JSON locale files. `en.json` is source; non-English files are Crowdin-owned.
 - `supabase/` — `config.toml`, `functions/` (Deno edge functions), `migrations/`.
-- `workers/` — Cloudflare Workers: `api-gateway`.
+- `workers/` — Cloudflare Workers. The `api-gateway` entrypoint delegates routing,
+  authentication, rate limiting, and response construction to focused modules in `src/`.
 - `scripts/precompute/` — standalone precompute of heavy tasks-core payloads into the `TARKOV_DATA` KV namespace, run by the scheduled GitHub Actions workflow `.github/workflows/precompute-tarkov-data.yml` (the account's Workers Free tier CPU limit rules out a scheduled Worker). Reuses the `app/server/utils` pipeline via tsx tsconfig paths; request handlers read the entries via `edgeCache`'s `precomputed` option and fall back to the per-colo Cache API when the binding or entry is absent.
 - `docs/` — Project documentation.
 - `public/` — Static assets.
@@ -75,7 +76,11 @@ can read it and an agent can verify any claim against the code. Each system sect
 
 Install: `pnpm install` | Worktree bootstrap: `bash scripts/setup-worktree.sh` | Dev: `pnpm run dev` (localhost:3000) | Build: `pnpm run build` | Preview: `pnpm run preview` | Static: `pnpm run generate`
 
-Test: `pnpm run test` | Watch: `pnpm run test:watch` | Coverage: `pnpm run test:coverage` | API gateway: `pnpm run test:api-gateway` | Production observer: `pnpm run prod-db:test` | Single file: `pnpm exec vitest run path/to/file.test.ts` | By name: `pnpm exec vitest run -t "pattern"`
+Test: `pnpm run test` | Watch: `pnpm run test:watch` | Coverage: `pnpm run test:coverage` | API gateway: `pnpm run test:api-gateway` | Supabase DB: `pnpm run supabase:check` (reset + pgTAP + lint) | Production observer: `pnpm run prod-db:test` | Single file: `pnpm exec vitest run path/to/file.test.ts` | By name: `pnpm exec vitest run -t "pattern"`
+
+API gateway bindings: `pnpm --filter api-gateway run types` regenerates the checked-in
+`workers/api-gateway/worker-configuration.d.ts`; `pnpm --filter api-gateway run types:check` detects
+configuration or dashboard-secret declaration drift.
 
 Lint: `pnpm run lint` (zero warnings) | Fallow audit: `pnpm run lint:fallow` (changed-file dead code, duplication, and complexity gate) | Blank-line lint: `pnpm run lint:blank-lines` | Fix: `pnpm run lint:fix` | Format: `pnpm run format` (Prettier + ESLint + blank-line fix) | Typecheck: `pnpm run typecheck`
 
@@ -88,11 +93,14 @@ Before finishing any agent task:
 - Run the smallest relevant validation (typecheck for TS changes, lint for code changes, i18n:check for locale changes).
 - `pnpm run lint:blank-lines` checks supported source and configuration files while preserving Markdown, generated files, and blank lines inside multiline strings/comments.
 - State what validation was run and what passed/failed.
+- API gateway changes also require `pnpm --filter api-gateway run types:check` and
+  `pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run`.
 - Do not run the full test suite unless you changed test logic or executable code that could break tests.
 - Respect existing lint warnings; do not introduce new ones.
 - Formatting is handled by the pre-commit hook. Do not run `pnpm run format` manually unless the hook is bypassed. CI `format:check` is the gate.
 - Coverage, bundle analysis, JUnit test results, and shard configuration are handled by CI — see
-  `docs/WORKFLOW_AUTOMATION.md`. Local `pnpm run test` / `pnpm run test:coverage` remain unsharded.
+  `docs/WORKFLOW_AUTOMATION.md`. CI shards report only imported files for merging; local
+  `pnpm run test:coverage` remains unsharded and measures the full app source denominator.
 - Lighthouse runs once per selected route per Lighthouse job on UI/performance PRs. Use repeated local or manual runs to investigate a borderline failure instead of increasing every job's collection count.
 
 ## Production Readiness Review
@@ -178,7 +186,7 @@ Naming:
 
 - Non-English files (`cs`, `de`, `es`, `fr`, `it`, `ko`, `pl`, `pt`, `ru`, `uk`, `zh`) are Crowdin-owned exports.
 - vue-i18n fallback locale is `en` (`app/i18n.config.ts`). Missing non-English keys render English automatically.
-- `pnpm run i18n:check` is fatal only for snake_case naming violations in `en.json`. Missing/orphaned keys in non-English files are informational.
+- `pnpm run i18n:check` is fatal only for snake_case naming violations in `en.json`. Missing/orphaned keys in non-English files are informational. It also emits non-fatal drift warnings comparing flattened parsed values (missing keys count as English fallback): an enabled locale with >90% of values identical to the English source, or a locale file <30% identical that is missing from `SUPPORTED_LOCALES`.
 - Locale keys must be snake_case. Provide fallback strings in `t('key', 'Fallback')` calls.
 - When adding user-facing copy: add key to `en.json` only, run `pnpm run i18n:check`. Crowdin handles propagation.
 - Crowdin-only PRs that change only non-English exports are excluded from repository-owned CI, PR metadata, security, and Dependabot workflows via their `paths-ignore` filters. Changes to source code or `en.json` still run normal checks.
@@ -191,7 +199,38 @@ Naming:
 
 - Pinia stores in `app/stores/`, auto-registered by Nuxt. Use `pinia-plugin-persistedstate` where applicable.
 - Supabase client: `app/plugins/supabase.client.ts`. Regenerate types: `pnpm run supabase:types`.
+- OAuth PKCE callback: the client treats a request as an OAuth callback only on the `/auth/callback`
+  route (`readOAuthCallbackCode()`); a `code` query param on any other route — e.g. a team invite
+  `/team?team=...&code=...` — is left for that feature to consume and never sent to
+  `exchangeCodeForSession`. `detectSessionInUrl` is disabled for every query `code` so Supabase cannot
+  auto-classify a feature-specific value as PKCE; the plugin exchanges it only on the callback route.
+  The PKCE exchange runs inside `$supabase.ready()` (deferred, exactly once), never in top-level plugin
+  `setup()`, so an expired/replayed/invalid code rejects `ready()` for `auth/callback.vue` to surface
+  and post `OAUTH_ERROR` to the login opener instead of aborting plugin initialization and stalling
+  the popup until its abandonment timeout. The single exchange attempt clears the in-memory callback
+  marker when it settles; a successful exchange also removes `code` and `sb_flow_id` from the callback
+  URL so later `ready()` calls refresh the current session normally.
 - API endpoints: `app/server/api/`. Use composables for shared data access patterns.
+- Admin Pages API routes return stable machine-readable error codes in `data.code`; keep the
+  English `statusMessage` as a client fallback and map known codes to localized UI copy.
+- The hideout Tarkov-data route caches the adapted base payload, then applies the current overlay
+  after `edgeCache()` and calls `setOverlayResponseHeaders()` before returning. Its browser
+  IndexedDB entry uses the matching `json-v4` version and a one-hour TTL. Warm requests serve a
+  stale overlay immediately while one Cloudflare-lifetime refresh runs in the background; failed
+  deferred refreshes back off for one minute. Other overlay-enabled Tarkov-data routes cache their
+  final corrected payload. Preserve this ordering so no cache layer pins stale hideout corrections.
+- Overlay data must be fetched over HTTPS on every server path. `OVERLAY_URL` must be HTTPS
+  (anything else falls back to the trusted `raw.githubusercontent.com` default), and no redirect may
+  downgrade to plaintext: `app/server/utils/overlay.ts` follows redirects manually with a per-hop
+  HTTPS check and a 3-hop cap, and the streamer Kappa editions fetch passes `redirect: 'error'`. New
+  server-side overlay consumers must do one or the other. See the Overlay corrections section of
+  `docs/SYSTEMS.md`.
+- Task adaptation and overlay patches carry trader requirements in the raw upstream shape (one
+  `traderRequirements` list discriminated by `requirementType`). The adapter and `applyOverlay`
+  split them into `traderLevelRequirements` (level gates) and reputation-only `traderRequirements`;
+  a task patch's `traderRequirements` replaces the whole requirement set, and the split runs for
+  patched tasks and `tasksAdd` entries alike. See the Overlay corrections section of
+  `docs/SYSTEMS.md`.
 - Internal game modes are `pvp`, `pve`, and `seasonal`; game-data requests map Seasonal to the
   upstream `pvp-season` slug. Active Seasonal progress is keyed by season number in
   `user_game_mode_progress`, while `user_progress` remains the account-metadata and rolling-deploy
@@ -206,9 +245,40 @@ Naming:
   triples: active `{complete:false, failed:false, active:true}`, completed/failed/neutral always set
   `active:false`. Missing `active` on legacy rows means unknown; never infer it from incomplete
   flags or mass-backfill ambiguous rows. Auto-unlocked successors are neutral, not active.
+- API gateway routes must call `authorize()` before validating or decoding request input (URL params
+  and body). Authentication and daily-quota enforcement come first so a malformed request from an
+  unauthenticated or over-quota client answers `401`/`429`, never `400`. Pass `auth.rlHeaders` into
+  the resulting `400` responses so validation errors carry the same `X-RateLimit-*` headers as
+  successful ones (empty on the fail-open path, where no quota decision exists).
+- The `token-create` Edge Function accepts `permissions` only as a non-empty array of supported
+  values (`GP`/`TP`/`WP`, matching the api-gateway `Permission` enum and the frontend
+  `API_PERMISSIONS` map); any other shape is rejected with `400` before token insertion.
 - API token renames update only `api_tokens.note` through authenticated owner-scoped RLS. They
   must never rotate or replace the token or change its ID, value or hash, permissions, game mode,
   or usage data.
+- Team owners disband through the authenticated `team-disband` Edge Function, which calls the
+  owner-scoped atomic `disband_team` RPC. The UI must require confirmation; regular `team-leave`
+  remains the non-owner leave path.
+- Account deletion requests consume their three-per-minute limit and record the allowed attempt in
+  one `consume_account_deletion_attempt` transaction. Both the initiating function and reconciler
+  must atomically claim work through `claim_account_deletion_job`; a fresh `in_progress` claim has a
+  15-minute lease before reconciliation can recover it. Completion and failure writes must match
+  the current claim's fencing token. Only a new user request can revive a dead-lettered job. Both
+  RPCs remain service-role-only.
+- The promoted Twitch stream supports a build-time fallback and an admin-managed override.
+  `NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED=true` directly enables the build-time fallback without an
+  admin write. `public.app_settings` is service-role-only; `/api/twitch/config` resolves the
+  admin-managed `promoted_twitch` override over that fallback, and `/api/admin/twitch-config` is the
+  only writer. `/api/twitch/config` is edge-cached with the `promoted-twitch-config` tag and is
+  invalidated by the `admin-cache-purge` edge function after a committed admin update. A successful
+  immediate tag purge (with purge-by-URL fallback) schedules the same purge six seconds later to
+  clear stale in-flight fills. Twitch-only purges use a distinct audit action so game-data cache
+  metadata never interprets them as Tarkov-data invalidations. Purge failures return the committed
+  config with an explicit warning flag so clients reconcile without repeating the write. Config responses carry the settings version
+  so stale browser cache entries cannot overwrite a newer admin save. Mounted embeds refresh the
+  config every five minutes while visible and on tab focus; those requests are served by the edge
+  cache between fills. The admin form disables browser caching when loading config so it cannot
+  submit stale settings. See the Promoted Twitch configuration section of `docs/SYSTEMS.md`.
 - Mock Supabase/network calls in tests. Keep tests deterministic.
 
 ## Error Handling

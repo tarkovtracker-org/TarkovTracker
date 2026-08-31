@@ -5,6 +5,7 @@ export type MutationRateLimitAction =
   | 'team-join'
   | 'team-leave'
   | 'team-kick'
+  | 'team-disband'
   | 'token-create'
   | 'token-revoke';
 type MutationRateLimitConfig = {
@@ -20,6 +21,7 @@ const MUTATION_RATE_LIMITS: Record<MutationRateLimitAction, MutationRateLimitCon
   'team-join': { limit: 30, windowSec: 600 },
   'team-leave': { limit: 30, windowSec: 3600 },
   'team-kick': { limit: 20, windowSec: 3600 },
+  'team-disband': { limit: 10, windowSec: 3600 },
   'token-create': { limit: 3, windowSec: 3600 },
   'token-revoke': { limit: 50, windowSec: 600 },
 };

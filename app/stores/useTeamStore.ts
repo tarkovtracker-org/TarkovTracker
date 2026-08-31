@@ -33,6 +33,8 @@ function getTeamIdFromSystemStore(
  */
 export const useTeamStore = defineStore<string, TeamState, TeamGetters>('team', {
   state: (): TeamState => ({
+    // fallow-ignore-next-line unused-store-member -- read directly by Team page consumers
+    id: null,
     owner: null,
     joinCode: null,
     members: [],

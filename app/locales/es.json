@@ -4,6 +4,20 @@
     "error_title": "Error de conexión",
     "load_error_description": "Error al cargar los datos del administrador. Por favor, actualice o póngase en contacto con soporte. Referencia: {reference}",
     "no_reference": "N/D",
+    "error": {
+      "admin_privileges_required": "No tienes permiso para realizar esta acción.",
+      "authentication_required": "Debes iniciar sesión para continuar.",
+      "invalid_channel": "Introduzca un nombre de canal válido de Twitch.",
+      "invalid_display_name": "Introduzca un nombre para mostrar válido.",
+      "invalid_enabled_flag": "El valor habilitado no es válido.",
+      "invalid_request_body": "El cuerpo de la solicitud no es válido.",
+      "invalid_target_user_id": "Introduzca un ID de usuario válido.",
+      "invalid_tier": "Seleccione un nivel de seguidor válido.",
+      "service_config_missing": "El servicio de administración no está configurado.",
+      "supabase_request_failed": "El servicio de administración no pudo completar la solicitud.",
+      "supporter_update_failed": "No se pudo actualizar el acceso del seguidor.",
+      "twitch_config_update_failed": "No se pudo actualizar la configuración de Twitch."
+    },
     "access_warning_title": "Acceso de administrador",
     "access_warning_description": "Las acciones realizadas aquí afectan a todos los usuarios. Iniciado sesión como {user}.",
     "cache_management_title": "Gestión de caché",
@@ -39,19 +53,30 @@
     "audit_log_fetch_failed": "Error al recuperar registros de auditoría",
     "no_actions_recorded": "No hay acciones de administración registradas aún",
     "audit_log_by": "por",
-    "supporter_override_title": "Supporter Access",
+    "supporter_override_title": "Acceso de soporte",
     "supporter_override_description": "Set a user's supporter state for production testing without creating a Stripe payment.",
-    "supporter_target_user_label": "User ID",
+    "supporter_target_user_label": "Id de usuario",
     "supporter_target_user_placeholder": "Supabase auth user UUID",
-    "supporter_tier_label": "Tier",
-    "supporter_enabled_label": "Enabled",
-    "supporter_disabled_label": "Disabled",
+    "supporter_tier_label": "Grado",
     "supporter_override_login_required": "You must be signed in to update supporter access.",
-    "supporter_override_saved_title": "Supporter access updated",
+    "supporter_override_saved_title": "Acceso de soporte actualizado",
     "supporter_override_enabled_description": "Enabled {tier} supporter access.",
     "supporter_override_disabled_description": "Disabled active supporter access.",
-    "supporter_override_failed_title": "Update failed",
-    "supporter_override_failed_description": "Could not update supporter access."
+    "supporter_override_failed_description": "Could not update supporter access.",
+    "twitch_config_title": "Flujo de Twitch",
+    "twitch_config_description": "Establece el canal de Twitch promocionado en la esquina del sitio. Los visitantes recogen el cambio en un par de minutos.",
+    "twitch_channel_label": "Canal",
+    "twitch_channel_placeholder": "Nombre del canal Twitch",
+    "twitch_display_name_label": "Nombre mostrado",
+    "twitch_display_name_placeholder": "Nombre para mostrar canal",
+    "twitch_config_saved_title": "Configuración de Twitch actualizada",
+    "twitch_config_saved_description": "La transmisión promocionada es ahora {channel}.",
+    "twitch_config_saved_with_warning_title": "Configuración de Twitch guardada",
+    "twitch_config_saved_with_warning_description": "La configuración fue guardada, pero los visitantes en caché pueden ver el valor anterior.",
+    "twitch_config_failed_description": "No se pudo actualizar la configuración de Twitch.",
+    "twitch_config_load_failed_title": "Configuración de Twitch no disponible",
+    "twitch_config_load_failed_description": "No se pudo cargar la configuración actual de Twitch.",
+    "twitch_config_login_required": "Debes iniciar sesión para actualizar la configuración de Twitch."
   },
   "alerts": {
     "no_map_data": "No hay datos de mapa disponibles para esta selección."
@@ -64,38 +89,38 @@
     "user_label": "Usuario",
     "user_avatar_alt": "Avatar de usuario",
     "supporter_badge_aria": "Manage your supporter subscription ({tier})",
-    "help_community_aria": "Help & community",
-    "community_section": "Community",
-    "keyboard_shortcuts": "Keyboard shortcuts",
-    "report_problem": "Report a problem",
-    "login_aria": "Log in to your account"
+    "help_community_aria": "Ayuda y comunidad",
+    "community_section": "Comunidad",
+    "keyboard_shortcuts": "Atajos de teclado",
+    "report_problem": "Informar de un problema",
+    "login_aria": "Inicia sesión en tu cuenta"
   },
   "omnibar": {
-    "title": "Search",
-    "description": "Search tasks, needed items, and hideout stations",
+    "title": "Buscar",
+    "description": "Buscar tareas, elementos necesarios y estaciones ocultas",
     "trigger_label": "Buscar...",
-    "open_aria": "Open global search",
-    "aria_label": "Global search",
+    "open_aria": "Abrir búsqueda global",
+    "aria_label": "Búsqueda global",
     "placeholder": "Search tasks, needed items, hideout...",
-    "hint_min_chars": "Type at least 2 characters to search...",
-    "no_results": "No results found for \"{query}\".",
-    "group_tasks": "Tasks / Quests",
+    "hint_min_chars": "Escribe al menos 2 caracteres para buscar...",
+    "no_results": "No se han encontrado resultados para \"{query}\".",
+    "group_tasks": "Tareas / Misiones",
     "group_hideout": "Hideout Stations"
   },
   "activity_log": {
-    "unread_indicator": "You have unread activity",
-    "mark_read": "Mark read",
-    "clear": "Clear",
-    "empty": "No activity recorded yet.",
+    "unread_indicator": "Tienes actividad sin leer",
+    "mark_read": "Marcar como leído",
+    "clear": "Limpiar",
+    "empty": "Ninguna actividad registrada aún.",
     "badge_api": "API Sync",
-    "api_synced": "API Progress Synced",
+    "api_synced": "Progreso de API sincronizado",
     "more_count": "+{count} más",
     "entry": {
-      "completed": "Completed Task: {name}",
-      "uncompleted": "Uncompleted Task: {name}",
-      "failed": "Failed Task: {name}",
-      "reset_failed": "Reset Failed Task: {name}",
-      "available": "Unlocked Task: {name}",
+      "completed": "Tarea completada: {name}",
+      "uncompleted": "Tarea incompleta: {name}",
+      "failed": "Tarea fallida: {name}",
+      "reset_failed": "Reiniciar tarea fallida: {name}",
+      "available": "Tarea desbloqueada: {name}",
       "undo_completed": "Undid Task Completion: {name}",
       "undo_uncompleted": "Undid Task Uncompletion: {name}",
       "undo_reset_failed": "Undid Reset Failed Task: {name}",
@@ -184,7 +209,7 @@
       "title": "Undid action: {description}"
     },
     "action_undo_failed": {
-      "title": "Failed to undo action: {description}"
+      "title": "Error al deshacer la acción: {description}"
     }
   },
   "common": {
@@ -198,6 +223,9 @@
     "refresh_button": "Intentar de nuevo",
     "opens_in_new_tab": "Abrir en una pestaña nueva",
     "available": "Disponible",
+    "enabled": "Activado",
+    "disabled": "Deshabilitado",
+    "update_failed": "Error al actualizar",
     "tasks": "Tareas",
     "level": "Nivel",
     "locked": "Bloqueado",
@@ -306,7 +334,8 @@
     "reset_all_data": "Restablecer todos los datos",
     "import_failed": "Error al importar",
     "delete_archived_run": "Eliminar Ejecuta Archivada",
-    "validation_error": "Error de validación"
+    "validation_error": "Error de validación",
+    "got_it": "Entendido"
   },
   "page_help": {
     "button": "Ayuda",
@@ -317,7 +346,7 @@
       "page_guide_unavailable": "Todavía no hay una guía para esta página. Usa el onboarding en su lugar.",
       "onboarding": "Onboarding para nuevos usuarios",
       "onboarding_description": "Empieza con las importaciones, termina lo básico y luego verifica las tareas.",
-      "keyboard_shortcuts_error": "Could not open keyboard shortcuts. Please try again."
+      "keyboard_shortcuts_error": "No se pudo abrir los atajos de teclado. Por favor, inténtelo de nuevo."
     },
     "onboarding": {
       "title": "Empezar la configuración",
@@ -486,20 +515,44 @@
       "pmc_spawns": "Spawns de PMC"
     },
     "legend": {
-      "your_objectives": "Tus objetivos",
-      "team_objectives": "Objetivos del equipo",
+      "regular": "Regular",
+      "pinned": "Fijado",
+      "team": "Equipo",
       "shared_extract": "Extracción compartida (cualquiera de las facciones)",
       "coop_extract": "Extracción cooperativa (PMC + Scav)"
     },
-    "controls": {
-      "keyboard": {
-        "pan": "para mover",
-        "zoom_keys": "para zoom",
-        "click": "para hacer clic en el cursor",
-        "reset": "para reiniciar vista",
-        "cycle_floors": "+ Desplazar para cambiar de piso",
-        "zoom": "+ Desplazar para hacer zoom"
-      }
+    "tooltips": {
+      "zoom_in": "Acercarse en",
+      "zoom_out": "Apagar",
+      "reset_view": "Restablecer vista",
+      "open_fullscreen": "Abrir pantalla completa del mapa",
+      "exit_fullscreen": "Salir de pantalla completa",
+      "drag_to_resize": "Arrastre para cambiar el tamaño del mapa",
+      "switch_floor": "Cambiar piso (Ctrl + desplazamiento)"
+    },
+    "help": {
+      "title": "Controles del mapa",
+      "groups": {
+        "navigate": "Navigate",
+        "floors": "Pisos",
+        "interact": "Interactuar",
+        "view": "Ver"
+      },
+      "pan": "{keys} o arrastre a una sartén",
+      "zoom": "{keys} para acercar",
+      "reset": "{key} para restablecer la vista",
+      "cycle_floors": "{keys} a los pisos de ciclo",
+      "floor_panel": "O utilice el panel del suelo.",
+      "click_at_cursor": "{key} para hacer clic en el cursor",
+      "click_marker": "Haga clic en un marcador para más detalles.",
+      "fullscreen": "Utilice el botón de pantalla completa en los controles de mapas.",
+      "resize": "Arrastre el borde inferior del mapa para cambiar el tamaño."
+    },
+    "hint": {
+      "title": "Controles rápidos del mapa",
+      "summary": "Arrastre al sartén · Mayúsculas + Desplazamiento para acercar",
+      "summary_multi_floor": "Arrastre al pan · Mayúsculas + Desplazarse para acercar · Ctrl + Desplazarse para cambiar de piso",
+      "all_controls": "Todos los controles"
     },
     "aria": {
       "tooltip_density": "Tooltip density"
@@ -653,9 +706,9 @@
         "rep_progress_label": "Nivel {level}",
         "scav_karma": "Karma de Scav",
         "unlock_required": "Se requiere desbloqueo:",
-        "locked_summary": "{count} traders locked",
+        "locked_summary": "{count} Comerciantes bloqueados",
         "sort": {
-          "aria_label": "Sort traders",
+          "aria_label": "Ordenar comerciantes",
           "direction_aria_label": "Toggle sort direction"
         }
       }
@@ -706,46 +759,46 @@
       "title": "Kappa & Lightkeeper Tracker",
       "subtitle": "Track your progress toward the Kappa container and Lightkeeper quests.",
       "row": {
-        "level_met_aria": "Required level {required}, you are level {current}",
-        "level_unmet_aria": "Requires level {required}, you are level {current}",
-        "level_title": "Required level {required} (you are {current})",
+        "level_met_aria": "Nivel requerido {required}, tú eres nivel {current}",
+        "level_unmet_aria": "Requiere nivel {required}, tú eres nivel {current}",
+        "level_title": "Nivel requerido {required} (eres {current})",
         "level_summary": "Lv {required} (you {current})",
         "trader_level": "{trader} Lv{level}",
-        "action_uncomplete": "Mark uncomplete",
-        "action_reset_failed": "Reset failed",
-        "locked_by": "Requires: {task}"
+        "action_uncomplete": "Marcar incompleto",
+        "action_reset_failed": "Error al restablecer",
+        "locked_by": "Requiere: {task}"
       },
-      "empty": "No tasks for this list yet.",
+      "empty": "Aún no hay tareas para esta lista.",
       "summary": {
         "complete": "completado",
         "final_goal": "Final Kappa Goal"
       },
       "trader_selector": {
-        "label": "Select Trader"
+        "label": "Seleccionar comerciante"
       },
       "trader": {
-        "other": "Other"
+        "other": "Otro"
       }
     },
     "supporter": {
-      "title": "Support TarkovTracker",
+      "title": "Apoya TarkovTracker",
       "subtitle": "Help keep the site running. Every contribution goes directly toward hosting, development, and keeping the lights on.",
-      "billing_monthly": "Monthly",
-      "billing_6month": "6 Months",
-      "billing_yearly": "Yearly",
-      "most_popular": "Most Popular",
-      "tier_cta": "Subscribe",
-      "tier_login_cta": "Log in to subscribe",
-      "tier_change_cta": "Change plan in billing portal",
-      "current_tier_badge": "Current tier",
+      "billing_monthly": "Mensual",
+      "billing_6month": "6 meses",
+      "billing_yearly": "Anual",
+      "most_popular": "Más popular",
+      "tier_cta": "Subscribir",
+      "tier_login_cta": "Inicia sesión para suscribirse",
+      "tier_change_cta": "Cambiar plan en el portal de facturación",
+      "current_tier_badge": "Plan actual",
       "tier_scav_name": "Escav",
       "tier_scav_tagline": "Just trying to get by",
       "tier_timmy_name": "Timmy",
       "tier_timmy_tagline": "Learning the ropes",
       "tier_chad_name": "Chad",
       "tier_chad_tagline": "True veteran supporter",
-      "perk_badge": "Supporter badge",
-      "perk_discord": "Supporter role in Discord",
+      "perk_badge": "Insignia de apoyo",
+      "perk_discord": "Rol de apoyo en Discord",
       "perk_tier_role": "{tier} Tier role in Discord (coming soon)",
       "perk_early_access": "Early access to new features",
       "perk_priority_support": "Priority support",
@@ -898,7 +951,9 @@
       "loading": "Cargando misiones",
       "map": {
         "resize_handle": "Ajustar altura del mapa",
-        "toggle_panel": "Mostrar u ocultar panel del mapa",
+        "show_map": "Mostrar mapa",
+        "hide_map": "Ocultar mapa",
+        "fullscreen_label": "Pantalla completa",
         "required_items_summary": "Objetos necesarios para tareas activas",
         "required_keys_summary": "Llaves necesarias para tareas activas",
         "time_period": {
@@ -911,7 +966,9 @@
         "map_complete_tasks_hidden": "{count} tareas completadas en este mapa están ocultas.",
         "map_complete_tasks_showing": "{count} tareas completadas en este mapa se están mostrando.",
         "map_complete_tasks_toggle_show": "Mostrar ocultas",
-        "map_complete_tasks_toggle_hide": "Ocultar completadas en mapa"
+        "map_complete_tasks_toggle_hide": "Ocultar completadas en mapa",
+        "map_hidden_hint": "Mapa oculto — haga clic para mostrar",
+        "raid_time_tooltip": "Tiempo actual de la banda del juego"
       },
       "pinned_tasks_section": "Tareas fijadas",
       "focused_task_section": "Tarea enfocada",
@@ -1152,6 +1209,51 @@
       "meta": {
         "description": "Colabora con tus compañeros en el progreso de Escape from Tarkov. Comparte misiones completadas, estado del escondite y coordina la recolección de objetos."
       },
+      "page_title": "Equipo",
+      "page_description": "Invita a tus compañeros, elige el progreso del equipo que ves y sigue juntos.",
+      "invite": {
+        "title": "Enlace de invitación",
+        "subtitle": "Comparte tu equipo con compañeros de equipo de confianza.",
+        "link_label": "URL de invitación al equipo",
+        "helper": "Cualquiera con este enlace puede unirse a su equipo.",
+        "show": "Mostrar enlace",
+        "hide": "Ocultar enlace",
+        "copy": "Copiar enlace",
+        "copied": "¡Copiado!"
+      },
+      "members": {
+        "title": "Miembros ({count})",
+        "no_members": "Aún no hay miembros en este equipo. Comparte tu enlace de invitación para añadir compañeros.",
+        "alone": "Estás solo aquí: comparte tu enlace de invitación para añadir compañeros.",
+        "copy_invite": "Copiar enlace de invitación",
+        "copied": "¡Copiado!"
+      },
+      "visibility": {
+        "title": "Ajustes de visibilidad",
+        "description": "Controla el progreso de tus compañeros de equipo que aparecen en tu rastreador.",
+        "items_section": "Items",
+        "show_tasks": "Mostrar tareas de los miembros del equipo",
+        "show_items": "Mostrar elementos necesarios de los miembros del equipo",
+        "show_non_fir": "Mostrar elementos que no son necesarios",
+        "show_hideout": "Mostrar elementos necesarios para ocultar",
+        "show_maps": "Mostrar los objetivos del mapa de los miembros del equipo"
+      },
+      "danger_zone": {
+        "title": "Zona de peligro",
+        "disband_description": "La disolución elimina el equipo para todos los miembros. Esto no se puede deshacer.",
+        "leave_description": "Dejar te elimina de este equipo. Tu progreso permanece en tu cuenta.",
+        "disband": "Disolver equipo",
+        "leave": "Dejar equipo",
+        "confirm_disband_title": "¿Disolver equipo?",
+        "confirm_disband_description": "Esto elimina el equipo y su membresía para todos. Esto no se puede deshacer.",
+        "confirm_leave_title": "¿Abandonar equipo?",
+        "confirm_leave_description": "Dejarás este equipo y dejarás de compartir el progreso con sus miembros.",
+        "confirm_disband": "Sí, equipo de disolver",
+        "confirm_leave": "Sí, dejar equipo",
+        "disband_success": "Equipo disuelto correctamente.",
+        "disband_error": "Error al disolver el equipo.",
+        "action_error": "No se puede actualizar la membresía del equipo."
+      },
       "card": {
         "manageteam": {
           "title": "Miembros del Equipo",
@@ -1161,7 +1263,12 @@
             "owner": "Dueño",
             "taskscomplete": "{completed}/{total} misiones completadas",
             "kick_success": "El compañero de equipo pateó con éxito.",
-            "kick_error": "Error al patear a un compañero."
+            "kick_error": "Error al patear a un compañero.",
+            "level_badge_alt": "Insignia {level} de nivel",
+            "hide_progress": "Hide {name}'s progress from me",
+            "show_progress": "Mostrar el progreso de {name}para mí",
+            "enable_team_tasks": "Mostrar tareas de los miembros del equipo antes de cambiar un miembro individual",
+            "remove_member": "Eliminar {name} del equipo"
           }
         },
         "teamoptions": {
@@ -1187,6 +1294,7 @@
           "url_copied": "URL copiada al portapapeles",
           "copy_url_failed": "Error al copiar la URL al portapapeles",
           "no_team": "Actualmente no estás en un equipo.",
+          "login_required": "Inicia sesión para crear un equipo o administrar el enlace de invitación de tu equipo.",
           "team_invite_url_label": "URL de Invitación al Equipo",
           "copy_link": "Copiar",
           "link_hidden_message": "Haga clic en \"Mostrar\" para revelar el enlace de invitación de su equipo.",
@@ -1561,6 +1669,7 @@
     "tarkovguru": "Tarkov Gurú",
     "tarkovmonitor": "Monitor Tarkov",
     "resources": "Resources",
+    "section_more": "Más",
     "profile": "Perfil",
     "section_navigation": "Navegación",
     "section_external": "Externo",
@@ -1696,13 +1805,17 @@
   },
   "settings": {
     "locale": "Idioma",
+    "page_description": "Administra tu cuenta, progreso del juego y preferencias de la aplicación.",
     "tabs": {
       "progression": "Progreso",
       "imports": "Importaciones"
     },
     "tab_groups": {
-      "game": "Juego",
-      "account_advanced": "Cuenta y avanzado"
+      "game_progress": "Progreso del juego",
+      "app": "App",
+      "data": "Datos",
+      "account": "Cuenta",
+      "tools_integrations": "Herramientas e integraciones"
     },
     "tab_seo": {
       "progression": {
@@ -1750,6 +1863,7 @@
       "copy_button": "Copy Debug State"
     },
     "general": {
+      "title": "Preferencias generales",
       "privacy_mode": "Modo streamer",
       "privacy_mode_hint": "Oculta información sensible mientras transmites."
     },
@@ -1761,7 +1875,10 @@
         "show_next": "Mostrar misiones siguientes",
         "show_prev": "Mostrar misiones anteriores",
         "density": "Densidad de tarjetas",
-        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
+        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
+        "flags_section": "Mostrar tarea",
+        "availability_section": "Disponibilidad de tareas",
+        "view_defaults_section": "Vistas por defecto"
       },
       "maps": {
         "show_extracts": "Mostrar extracciones por defecto",
@@ -1772,6 +1889,7 @@
           "title": "Colores del mapa",
           "description": "Ajusta los colores de los marcadores para mejorar legibilidad y accesibilidad.",
           "self_objective": "Tu objetivo",
+          "pinned_objective": "Tarea Anclada",
           "team_objective": "Objetivo del equipo",
           "selected": "Objetivo fijado",
           "shared_extract": "Extracción compartida",
@@ -1852,6 +1970,8 @@
       "export_error_title": "Error de exportación",
       "debug_export_error_title": "Error al exportar la depuración",
       "reset_title": "Restablecer progreso",
+      "danger_zone_title": "Zona de peligro",
+      "danger_zone_hint": "Restableciendo todo el progreso permanentemente borra sus datos para JcJ, JcJ y JcJ estacional. Esto no se puede deshacer.",
       "prestige_history_title": "Historial de prestigio",
       "prestige_history_loading": "Cargando historial de prestigio...",
       "prestige_history_empty": "Aún no hay runs de prestigio archivadas.",
@@ -2025,7 +2145,9 @@
       "saved_title": "Nombre para mostrar guardado",
       "saved_description": "Tu nombre para mostrar de {mode} se ha actualizado",
       "save_failed_title": "Error al guardar",
-      "save_failed_description": "No se pudo guardar el nombre para mostrar. Inténtalo de nuevo."
+      "save_failed_description": "No se pudo guardar el nombre para mostrar. Inténtalo de nuevo.",
+      "active_mode": "Activo",
+      "game_edition_hint": "Selecciona la edición del juego que tienes para que el seguimiento coincida con tu contenido disponible."
     },
     "skills": {
       "title": "Gestión de Habilidades",
@@ -2042,7 +2164,10 @@
       "valid_range": "Rango válido: 0-51",
       "sort": {
         "ingame": "En el juego"
-      }
+      },
+      "quest_tooltip": "Nivel de habilidad otorgado automáticamente por las recompensas de misión completadas.",
+      "offset_tooltip": "Ajuste manual sobre el nivel de recompensa de misión. Positivo significa que has entrenado la habilidad sobre las recompensas de misión.",
+      "collapsed_hint": "Showing {shown} of {total} skills. Show all to see every skill."
     },
     "keybinds": {
       "title": "Keyboard Shortcuts",
@@ -2052,6 +2177,7 @@
       "undo_description": "Press this shortcut to revert your most recent progress change.",
       "record_placeholder": "Click to record...",
       "recording": "Press key combination...",
+      "listening": "Escuchando...",
       "reset_aria": "Reset to default",
       "conflict_omnibar": "Shortcut conflicts with Undo keybind.",
       "conflict_undo": "Shortcut conflicts with Search keybind.",
@@ -2068,9 +2194,12 @@
       "manual_hint": "Ingrese su XP total real para ajustar la compensación automáticamente.",
       "xp_amount": "{amount} XP",
       "xp_to_next": "{amount} para el siguiente",
-      "reset_offset": "Restablecer compensación de XP"
+      "reset_offset": "Restablecer compensación de XP",
+      "xp_progress_aria": "Progreso de la experiencia hacia el siguiente nivel",
+      "xp_progress_value": "{percent}% hacia el siguiente nivel"
     },
     "danger_zone": {
+      "confirm_instruction": "Escriba {word} para confirmar el restablecimiento de todos los datos:",
       "confirm_word": "ELIMINAR"
     },
     "log_import": {

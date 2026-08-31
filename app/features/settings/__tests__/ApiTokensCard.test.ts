@@ -15,6 +15,9 @@ mockNuxtImport('useNuxtApp', () => () => ({
     },
   },
 }));
+mockNuxtImport('useI18n', () => () => ({
+  t: (key: string) => key,
+}));
 describe('ApiTokensCard', () => {
   beforeEach(() => {
     mockState.isLoggedIn = false;

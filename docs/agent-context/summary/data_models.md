@@ -165,7 +165,8 @@ Defined in `app/types/tarkov.ts`:
 
 - `SystemState` / `SystemGetters` — `user_id`, `tokens`, `team`, `pvp_team_id`, `pve_team_id`,
   `seasonal_team_id`, `is_admin`; getters `userTokens`, `userTeam`, `userTeamIsOwn`, `isAdmin`.
-- `TeamState` / `TeamGetters` — `owner`, `joinCode`, `members`, `memberProfiles`; getters
+- `TeamState` / `TeamGetters` — active team `id`, `owner`, `joinCode`, `members`,
+  `memberProfiles`; getters
   `teamOwner`, `isOwner`, `inviteCode`, `teamMembers`, `teammates`.
 - `MemberProfile` — `displayName`, `level`, `tasksCompleted`, `gameMode` (`'pvp'|'pve'|'seasonal'`).
 

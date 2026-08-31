@@ -4,7 +4,7 @@
     "@vueuse/core": "Previously pinned to 13.9.0 due to Nuxt/@nuxt/ui/reka-ui compatibility; updated to ^14.1.0 after upgrading Nuxt/@nuxt/ui.",
     "fast-xml-parser": "Pinned fast-xml-parser to the patched v5 line on 2026-02-18 to avoid potential v6 API regressions in @nuxtjs/sitemap dependency paths; remediation: remove this override after @nuxtjs/sitemap officially supports fast-xml-parser v6 and confirm sitemap generation in CI."
   },
-  "version": "1.69.3",
+  "version": "1.74.1",
   "dependencies": {
     "@iconify-json/heroicons": "^1.2.3",
     "@iconify-json/lucide": "^1.2.122",
@@ -35,7 +35,6 @@
     "vue-router": "^5.2.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260409.1",
     "@codecov/nuxt-plugin": "^2.0.1",
     "@commitlint/cli": "^21.0.2",
     "@commitlint/config-conventional": "^21.1.0",
@@ -43,7 +42,7 @@
     "@nuxt/eslint": "^1.15.2",
     "@nuxt/test-utils": "^4.1.0",
     "@semantic-release/changelog": "^6.0.3",
-    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/git": "^11.0.1",
     "@semantic-release/npm": "^13.1.5",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/leaflet": "^1.9.21",
@@ -56,7 +55,7 @@
     "eslint": "^10.2.0",
     "eslint-plugin-import-x": "^4.16.2",
     "fake-indexeddb": "^6.2.5",
-    "fallow": "3.14.0",
+    "fallow": "3.17.0",
     "happy-dom": "^20.8.9",
     "husky": "^9.1.7",
     "knip": "^6.26.0",
@@ -73,10 +72,10 @@
     "vitest": "^4.1.4",
     "vue-tsc": "^3.2.7",
     "wait-on": "^9.0.4",
-    "wrangler": "^4.81.0"
+    "wrangler": "^4.126.0"
   },
   "engines": {
-    "node": ">=24.12.0",
+    "node": ">=24.19.0",
     "pnpm": ">=10.34.5 <12"
   },
   "name": "tarkovtracker-nuxt",

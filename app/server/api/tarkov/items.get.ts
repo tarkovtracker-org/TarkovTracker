@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
   const baseFetcher = createTarkovJsonItemsFetcher({ gameMode, lang });
   const fetcher = async () => {
     const response = await baseFetcher();
-    return await applyOverlay(response, { bypassCache, gameMode });
+    return await applyOverlay(response, { bypassCache, gameMode, locale: lang });
   };
   return await edgeCache(event, cacheKey, fetcher, CACHE_TTL_EXTENDED, {
     cacheKeyPrefix: 'tarkov',

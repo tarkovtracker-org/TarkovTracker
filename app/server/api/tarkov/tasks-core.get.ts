@@ -16,7 +16,11 @@ export default defineEventHandler(async (event) => {
   const baseFetcher = createTarkovJsonTasksCoreFetcher({ gameMode, lang });
   const fetcherWithOverlay = async () => {
     try {
-      return await applyOverlay(await baseFetcher(), { bypassCache: bypassOverlayCache, gameMode });
+      return await applyOverlay(await baseFetcher(), {
+        bypassCache: bypassOverlayCache,
+        gameMode,
+        locale: lang,
+      });
     } catch (overlayError) {
       logger.error('Failed to apply overlay:', overlayError);
       throw overlayError;

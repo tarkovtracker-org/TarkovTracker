@@ -4,6 +4,20 @@
     "error_title": "Connection Error",
     "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
     "no_reference": "N/A",
+    "error": {
+      "admin_privileges_required": "Sie haben keine Berechtigung, um diese Aktion durchzuführen.",
+      "authentication_required": "Du musst angemeldet sein, um fortzufahren.",
+      "invalid_channel": "Geben Sie einen gültigen Twitch-Kanalnamen ein.",
+      "invalid_display_name": "Geben Sie einen gültigen Anzeigenamen ein.",
+      "invalid_enabled_flag": "Der aktivierte Wert ist ungültig.",
+      "invalid_request_body": "Der Anfragetext ist ungültig.",
+      "invalid_target_user_id": "Geben Sie eine gültige Benutzer-ID ein.",
+      "invalid_tier": "Wählen Sie eine gültige Unterstützerstufe.",
+      "service_config_missing": "Der Admin-Dienst ist nicht konfiguriert.",
+      "supabase_request_failed": "Der Admin-Dienst konnte die Anfrage nicht abschließen.",
+      "supporter_update_failed": "Konnte den Unterstützerzugriff nicht aktualisieren.",
+      "twitch_config_update_failed": "Twitch-Konfiguration konnte nicht aktualisiert werden."
+    },
     "access_warning_title": "Admin Access",
     "access_warning_description": "Actions performed here affect all users. Logged in as {user}.",
     "cache_management_title": "Cache Management",
@@ -44,14 +58,25 @@
     "supporter_target_user_label": "User ID",
     "supporter_target_user_placeholder": "Supabase auth user UUID",
     "supporter_tier_label": "Tier",
-    "supporter_enabled_label": "Enabled",
-    "supporter_disabled_label": "Disabled",
     "supporter_override_login_required": "You must be signed in to update supporter access.",
     "supporter_override_saved_title": "Supporter access updated",
     "supporter_override_enabled_description": "Enabled {tier} supporter access.",
     "supporter_override_disabled_description": "Disabled active supporter access.",
-    "supporter_override_failed_title": "Update failed",
-    "supporter_override_failed_description": "Could not update supporter access."
+    "supporter_override_failed_description": "Could not update supporter access.",
+    "twitch_config_title": "Twitch-Stream",
+    "twitch_config_description": "Legen Sie den Twitch-Kanal in der Ecke der Seite fest. Besucher nehmen die Änderung innerhalb weniger Minuten auf.",
+    "twitch_channel_label": "Kanal",
+    "twitch_channel_placeholder": "Twitch-Kanalname",
+    "twitch_display_name_label": "Anzeigename",
+    "twitch_display_name_placeholder": "Name der Kanalanzeige",
+    "twitch_config_saved_title": "Twitch-Konfiguration aktualisiert",
+    "twitch_config_saved_description": "Promoted Stream ist jetzt {channel}.",
+    "twitch_config_saved_with_warning_title": "Twitch-Konfiguration gespeichert",
+    "twitch_config_saved_with_warning_description": "Die Konfiguration wurde gespeichert, aber zwischengespeicherte Besucher sehen möglicherweise noch den vorherigen Wert.",
+    "twitch_config_failed_description": "Twitch-Konfiguration konnte nicht aktualisiert werden.",
+    "twitch_config_load_failed_title": "Twitch-Konfiguration nicht verfügbar",
+    "twitch_config_load_failed_description": "Konnte die aktuelle Twitch-Konfiguration nicht laden.",
+    "twitch_config_login_required": "Sie müssen angemeldet sein, um die Twitch-Konfiguration zu aktualisieren."
   },
   "alerts": {
     "no_map_data": "Für diese Auswahl sind keine Kartendaten verfügbar."
@@ -198,6 +223,9 @@
     "refresh_button": "Erneut versuchen",
     "opens_in_new_tab": "Öffnet in neuem Tab",
     "available": "Verfügbar",
+    "enabled": "Aktiviert",
+    "disabled": "Deaktiviert",
+    "update_failed": "Update fehlgeschlagen",
     "tasks": "Aufgaben",
     "level": "Level",
     "locked": "Gesperrt",
@@ -306,7 +334,8 @@
     "reset_all_data": "Alle Daten zurücksetzen",
     "import_failed": "Import fehlgeschlagen",
     "delete_archived_run": "Archivierten Lauf löschen",
-    "validation_error": "Validierungsfehler"
+    "validation_error": "Validierungsfehler",
+    "got_it": "Verstanden"
   },
   "page_help": {
     "button": "Hilfe",
@@ -486,20 +515,44 @@
       "pmc_spawns": "PMC-Spawns"
     },
     "legend": {
-      "your_objectives": "Deine Ziele",
-      "team_objectives": "Teamziele",
+      "regular": "Normal",
+      "pinned": "Angeheftet",
+      "team": "Team",
       "shared_extract": "Gemeinsamer Extrakt (beide Fraktionen)",
       "coop_extract": "Co-op-Extrakt (PMC + Scav)"
     },
-    "controls": {
-      "keyboard": {
-        "pan": "Zum Verschieben",
-        "zoom_keys": "Zum Zoomen",
-        "click": "Zum Klicken am Cursor",
-        "reset": "Ansicht zurücksetzen",
-        "cycle_floors": "+ Scrollen zum Ebenenwechsel",
-        "zoom": "+ Scrollen zum Zoomen"
-      }
+    "tooltips": {
+      "zoom_in": "Vergrößern",
+      "zoom_out": "Verkleinern",
+      "reset_view": "Ansicht zurücksetzen",
+      "open_fullscreen": "Karte im Vollbild öffnen",
+      "exit_fullscreen": "Vollbild beenden",
+      "drag_to_resize": "Ziehen, um Karte zu skalieren",
+      "switch_floor": "Boden wechseln (Strg + Scroll)"
+    },
+    "help": {
+      "title": "Kartensteuerung",
+      "groups": {
+        "navigate": "Navigate",
+        "floors": "Stockwerke",
+        "interact": "Interagieren",
+        "view": "Ansicht"
+      },
+      "pan": "{keys} oder ziehen in Pfanne",
+      "zoom": "{keys} um zu zoomen",
+      "reset": "{key} um die Ansicht zurückzusetzen",
+      "cycle_floors": "{keys} um Böden zu schliessen",
+      "floor_panel": "Oder verwenden Sie die Bodenplatte.",
+      "click_at_cursor": "{key} um am Cursor zu klicken",
+      "click_marker": "Klicken Sie auf einen Marker für Details.",
+      "fullscreen": "Benutzen Sie den Vollbild-Button in den Kartensteuerelementen.",
+      "resize": "Ziehen Sie die untere Kante der Karte, um sie zu vergrößern."
+    },
+    "hint": {
+      "title": "Schnellkarten-Steuerung",
+      "summary": "Ziehen in die Pan · Shift + Scrollen zum zoomen",
+      "summary_multi_floor": "Ziehen in die Pan · Umschalt+Scrollen zum Zoomen · Strg + Scrollen um Böden zu wechseln",
+      "all_controls": "Alle Steuerelemente"
     },
     "aria": {
       "tooltip_density": "Tooltip density"
@@ -898,7 +951,9 @@
       "loading": "Lade Aufgaben",
       "map": {
         "resize_handle": "Kartenhöhe anpassen",
-        "toggle_panel": "Kartenbereich ein-/ausblenden",
+        "show_map": "Karte anzeigen",
+        "hide_map": "Karte ausblenden",
+        "fullscreen_label": "Vollbild",
         "required_items_summary": "Benötigte Gegenstände für aktive Aufgaben",
         "required_keys_summary": "Benötigte Schlüssel für aktive Aufgaben",
         "time_period": {
@@ -911,7 +966,9 @@
         "map_complete_tasks_hidden": "{count} kartenziel-erledigte Aufgaben auf dieser Karte ausgeblendet.",
         "map_complete_tasks_showing": "{count} kartenziel-erledigte Aufgaben werden auf dieser Karte angezeigt.",
         "map_complete_tasks_toggle_show": "Ausgeblendete anzeigen",
-        "map_complete_tasks_toggle_hide": "Kartenziel-erledigte ausblenden"
+        "map_complete_tasks_toggle_hide": "Kartenziel-erledigte ausblenden",
+        "map_hidden_hint": "Karte versteckt — klicke zum Anzeigen",
+        "raid_time_tooltip": "Aktuelle Schlachtzugszeit im Spiel"
       },
       "pinned_tasks_section": "Angeheftete Aufgaben",
       "focused_task_section": "Fokussierte Aufgabe",
@@ -1152,6 +1209,51 @@
       "meta": {
         "description": "Arbeite mit Teamkameraden am Escape from Tarkov Fortschritt zusammen. Teile Quest-Abschlüsse, Versteck-Status und koordiniere das Sammeln von Gegenständen."
       },
+      "page_title": "Team",
+      "page_description": "Lade Teammitglieder ein, wähle aus, welchen Teamfortschritt du siehst und trage zusammen ein.",
+      "invite": {
+        "title": "Einladungslink",
+        "subtitle": "Teilen Sie Ihr Team mit vertrauenswürdigen Teammitgliedern.",
+        "link_label": "Team-Einladungs-URL",
+        "helper": "Jeder mit diesem Link kann Ihrem Team beitreten.",
+        "show": "Link anzeigen",
+        "hide": "Link ausblenden",
+        "copy": "Link kopieren",
+        "copied": "Kopiert!"
+      },
+      "members": {
+        "title": "Mitglieder ({count})",
+        "no_members": "Noch keine Mitglieder in diesem Team. Teile deinen Einladungslink, um Teammitglieder hinzuzufügen.",
+        "alone": "Sie sind hier allein – teilen Sie Ihren Einladungslink, um Teammitglieder hinzuzufügen.",
+        "copy_invite": "Einladungslink kopieren",
+        "copied": "Kopiert!"
+      },
+      "visibility": {
+        "title": "Sichtbarkeitseinstellungen",
+        "description": "Bestimme den Fortschritt der Teammitglieder auf deinem Tracker.",
+        "items_section": "Artikel",
+        "show_tasks": "Teammitglieder Aufgaben anzeigen",
+        "show_items": "Benötigte Elemente der Teammitglieder anzeigen",
+        "show_non_fir": "Nicht-FIR benötigte Elemente anzeigen",
+        "show_hideout": "Verstecke benötigte Elemente anzeigen",
+        "show_maps": "Kartenziele von Teammitgliedern anzeigen"
+      },
+      "danger_zone": {
+        "title": "Gefahrenzone",
+        "disband_description": "Das Auflösen entfernt das Team für alle Mitglieder. Dies kann nicht rückgängig gemacht werden.",
+        "leave_description": "Das Verlassen entfernt dich von diesem Team. Dein Fortschritt bleibt auf deinem Konto.",
+        "disband": "Team auflösen",
+        "leave": "Team verlassen",
+        "confirm_disband_title": "Team auflösen?",
+        "confirm_disband_description": "Dies entfernt das Team und seine Mitgliedschaft für alle. Dies kann nicht rückgängig gemacht werden.",
+        "confirm_leave_title": "Team verlassen?",
+        "confirm_leave_description": "Du wirst dieses Team verlassen und den Fortschritt mit seinen Mitgliedern beenden.",
+        "confirm_disband": "Ja, Team auflösen",
+        "confirm_leave": "Ja, Team verlassen",
+        "disband_success": "Team wurde erfolgreich aufgelöst.",
+        "disband_error": "Team konnte nicht aufgelöst werden.",
+        "action_error": "Teammitgliedschaft konnte nicht aktualisiert werden."
+      },
       "card": {
         "manageteam": {
           "title": "Teammitglieder",
@@ -1161,7 +1263,12 @@
             "owner": "Besitzer",
             "taskscomplete": "{completed}/{total} Aufgaben erledigt",
             "kick_success": "Teammitglied erfolgreich entfernt.",
-            "kick_error": "Fehler beim Entfernen des Teammitglieds."
+            "kick_error": "Fehler beim Entfernen des Teammitglieds.",
+            "level_badge_alt": "Level {level} Abzeichen",
+            "hide_progress": "Verstecke {name}Fortschritt von mir",
+            "show_progress": "{name}Fortschritt für mich anzeigen",
+            "enable_team_tasks": "Teammitglieder Aufgaben vor dem Ändern eines einzelnen Mitglieds anzeigen",
+            "remove_member": "Entferne {name} vom Team"
           }
         },
         "teamoptions": {
@@ -1187,6 +1294,7 @@
           "url_copied": "URL in Zwischenablage kopiert",
           "copy_url_failed": "Fehler beim Kopieren der URL in die Zwischenablage",
           "no_team": "Du bist derzeit in keinem Team.",
+          "login_required": "Melden Sie sich an, um ein Team zu erstellen oder verwalten Sie Ihren Team-Einladungs-Link.",
           "team_invite_url_label": "Team-Einladungs-URL",
           "copy_link": "Kopieren",
           "link_hidden_message": "Klicke auf 'Anzeigen', um deinen Team-Einladungslink anzuzeigen",
@@ -1561,6 +1669,7 @@
     "tarkovguru": "Tarkov Guru",
     "tarkovmonitor": "Tarkov-Monitor",
     "resources": "Resources",
+    "section_more": "Mehr",
     "profile": "Profil",
     "section_navigation": "Navigation",
     "section_external": "Extern",
@@ -1696,13 +1805,17 @@
   },
   "settings": {
     "locale": "Sprache",
+    "page_description": "Verwalten Sie Ihr Konto, Spielfortschritt und die Einstellungen Ihrer Anwendung.",
     "tabs": {
       "progression": "Fortschritt",
       "imports": "Importe"
     },
     "tab_groups": {
-      "game": "Spiel",
-      "account_advanced": "Konto & Erweitert"
+      "game_progress": "Spielfortschritt",
+      "app": "App",
+      "data": "Daten",
+      "account": "Konto",
+      "tools_integrations": "Werkzeuge & Integrationen"
     },
     "tab_seo": {
       "progression": {
@@ -1750,6 +1863,7 @@
       "copy_button": "Copy Debug State"
     },
     "general": {
+      "title": "Allgemeine Einstellungen",
       "privacy_mode": "Streamer-Modus",
       "privacy_mode_hint": "Verbirgt sensible Informationen während du streamst."
     },
@@ -1761,7 +1875,10 @@
         "show_next": "Nächste Aufgaben anzeigen",
         "show_prev": "Vorherige Aufgaben anzeigen",
         "density": "Kartendichte",
-        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
+        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
+        "flags_section": "Aufgabenanzeige",
+        "availability_section": "Aufgabenverfügbarkeit",
+        "view_defaults_section": "Standardaufrufe"
       },
       "maps": {
         "show_extracts": "Extraktionen standardmäßig anzeigen",
@@ -1772,6 +1889,7 @@
           "title": "Kartenfarben",
           "description": "Passe Markerfarben für bessere Lesbarkeit und Barrierefreiheit an.",
           "self_objective": "Dein Ziel",
+          "pinned_objective": "Angepinnte Aufgabe",
           "team_objective": "Teamziel",
           "selected": "Angeheftetes Ziel",
           "shared_extract": "Geteilte Extraktion",
@@ -1852,6 +1970,8 @@
       "export_error_title": "Export fehlgeschlagen",
       "debug_export_error_title": "Debug-Export fehlgeschlagen",
       "reset_title": "Fortschritt zurücksetzen",
+      "danger_zone_title": "Gefahrenzone",
+      "danger_zone_hint": "Beim Zurücksetzen aller Fortschritte werden deine Daten für PvP, PvE und PvP dauerhaft gelöscht. Dies kann nicht rückgängig gemacht werden.",
       "prestige_history_title": "Prestige-Verlauf",
       "prestige_history_loading": "Prestige-Verlauf wird geladen...",
       "prestige_history_empty": "Noch keine archivierten Prestige-Durchläufe.",
@@ -2025,7 +2145,9 @@
       "saved_title": "Anzeigename gespeichert",
       "saved_description": "Dein {mode}-Anzeigename wurde aktualisiert",
       "save_failed_title": "Speichern fehlgeschlagen",
-      "save_failed_description": "Anzeigename konnte nicht gespeichert werden. Bitte versuche es erneut."
+      "save_failed_description": "Anzeigename konnte nicht gespeichert werden. Bitte versuche es erneut.",
+      "active_mode": "Aktiv",
+      "game_edition_hint": "Wählen Sie die eigene Spielausgabe, so dass die Tracking zu Ihrem verfügbaren Inhalt passt."
     },
     "skills": {
       "title": "Fertigkeiten-Verwaltung",
@@ -2042,7 +2164,10 @@
       "valid_range": "Gültiger Bereich: 0-51",
       "sort": {
         "ingame": "Im Spiel"
-      }
+      },
+      "quest_tooltip": "Fertigkeitsstufe wird automatisch durch abgeschlossene Questbelohnungen gewährt.",
+      "offset_tooltip": "Manuelle Anpassung auf dem Level der Questbelohnung. Positiv bedeutet, dass du die Fertigkeit über den Questbelohnungen trainierst.",
+      "collapsed_hint": "{shown} von {total} Skills anzeigen. Zeigen Sie alle, um jeden Skill zu sehen."
     },
     "keybinds": {
       "title": "Keyboard Shortcuts",
@@ -2052,6 +2177,7 @@
       "undo_description": "Press this shortcut to revert your most recent progress change.",
       "record_placeholder": "Click to record...",
       "recording": "Press key combination...",
+      "listening": "Zuhören...",
       "reset_aria": "Reset to default",
       "conflict_omnibar": "Shortcut conflicts with Undo keybind.",
       "conflict_undo": "Shortcut conflicts with Search keybind.",
@@ -2068,9 +2194,12 @@
       "manual_hint": "Gib deine tatsächliche Gesamt-XP ein, um den Offset automatisch anzupassen.",
       "xp_amount": "{amount} XP",
       "xp_to_next": "{amount} bis zum nächsten",
-      "reset_offset": "XP-Offset zurücksetzen"
+      "reset_offset": "XP-Offset zurücksetzen",
+      "xp_progress_aria": "Erfahrungsfortschritt auf dem nächsten Level",
+      "xp_progress_value": "{percent}% zum nächsten Level"
     },
     "danger_zone": {
+      "confirm_instruction": "Geben Sie {word} ein, um das Zurücksetzen aller Daten zu bestätigen:",
       "confirm_word": "DELETE"
     },
     "log_import": {

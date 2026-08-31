@@ -14,7 +14,7 @@ check_prerequisites() {
     if [ -f .nvmrc ]; then
         required_version=$(tr -d 'v' < .nvmrc)
     else
-        required_version="24.12.0"
+        required_version="24.19.0"
     fi
     if ! printf '%s\n' "$required_version" "$node_version" | sort -V -C; then
         echo "WARNING: Node.js version $node_version found, but $required_version or higher is recommended"

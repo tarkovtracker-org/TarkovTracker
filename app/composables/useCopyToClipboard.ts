@@ -1,6 +1,10 @@
 import { logger } from '@/utils/logger';
 export interface UseCopyToClipboardReturn {
-  copyToClipboard: (text: string) => Promise<boolean>;
+  copyToClipboard: (text: string, options?: CopyToClipboardOptions) => Promise<boolean>;
+}
+export interface CopyToClipboardOptions {
+  revealValue?: boolean;
+  shouldNotify?: () => boolean;
 }
 async function writeToClipboard(text: string): Promise<boolean> {
   try {
@@ -28,21 +32,31 @@ async function writeToClipboard(text: string): Promise<boolean> {
 export function useCopyToClipboard(): UseCopyToClipboardReturn {
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
-  const copyToClipboard = async (text: string): Promise<boolean> => {
+  const notifyClipboardResult = (success: boolean, text: string, revealValue: boolean) => {
+    const message = success
+      ? {
+          color: 'success' as const,
+          descriptionKey: 'toast.clipboard_copied.description',
+          titleKey: 'toast.clipboard_copied.title',
+        }
+      : {
+          color: 'error' as const,
+          descriptionKey: 'toast.clipboard_error.description',
+          titleKey: 'toast.clipboard_error.title',
+        };
+    toast.add({
+      title: t(message.titleKey),
+      description: revealValue ? t(message.descriptionKey, { value: text }) : undefined,
+      color: message.color,
+    });
+  };
+  const copyToClipboard = async (
+    text: string,
+    { revealValue = true, shouldNotify = () => true }: CopyToClipboardOptions = {}
+  ): Promise<boolean> => {
     const success = await writeToClipboard(text);
-    if (success) {
-      toast.add({
-        title: t('toast.clipboard_copied.title'),
-        description: t('toast.clipboard_copied.description', { value: text }),
-        color: 'success',
-      });
-    } else {
-      toast.add({
-        title: t('toast.clipboard_error.title'),
-        description: t('toast.clipboard_error.description', { value: text }),
-        color: 'error',
-      });
-    }
+    if (!shouldNotify()) return success;
+    notifyClipboardResult(success, text, revealValue);
     return success;
   };
   return { copyToClipboard };

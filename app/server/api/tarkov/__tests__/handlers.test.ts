@@ -22,6 +22,8 @@ const {
   mockGetQuery,
   mockGetValidatedLanguage,
   mockSanitizeTaskRewards,
+  mockScheduleBackgroundTask,
+  mockSetOverlayResponseHeaders,
   mockSetResponseHeaders,
   mockShouldBypassCache,
   mockValidateGameMode,
@@ -40,6 +42,8 @@ const {
   mockGetQuery: vi.fn(),
   mockGetValidatedLanguage: vi.fn(),
   mockSanitizeTaskRewards: vi.fn(),
+  mockScheduleBackgroundTask: vi.fn(),
+  mockSetOverlayResponseHeaders: vi.fn(),
   mockSetResponseHeaders: vi.fn(),
   mockShouldBypassCache: vi.fn(),
   mockValidateGameMode: vi.fn(),
@@ -56,6 +60,9 @@ vi.mock('h3', async () => {
     setResponseHeaders: mockSetResponseHeaders,
   };
 });
+vi.mock('~/server/utils/backgroundTask', () => ({
+  scheduleBackgroundTask: mockScheduleBackgroundTask,
+}));
 vi.mock('~/server/utils/edgeCache', () => ({
   edgeCache: mockEdgeCache,
   shouldBypassCache: mockShouldBypassCache,
@@ -73,6 +80,9 @@ vi.mock('~/server/utils/logger', () => ({
 }));
 vi.mock('~/server/utils/overlay', () => ({
   applyOverlay: mockApplyOverlay,
+}));
+vi.mock('~/server/utils/overlayResponseHeaders', () => ({
+  setOverlayResponseHeaders: mockSetOverlayResponseHeaders,
 }));
 vi.mock('~/server/utils/tarkov-cache-config', () => ({
   CACHE_TTL_DEFAULT: 111,
@@ -150,14 +160,32 @@ describe('Tarkov API handlers', () => {
     expect(mockApplyOverlay).toHaveBeenCalledWith(expect.anything(), {
       bypassCache: false,
       gameMode: 'regular',
+      locale: 'en',
+      scheduleRefresh: expect.any(Function),
     });
+    const overlayOptions = mockApplyOverlay.mock.calls[0]?.[1] as {
+      scheduleRefresh: (task: Promise<unknown>) => void;
+    };
+    const refreshTask = Promise.resolve();
+    overlayOptions.scheduleRefresh(refreshTask);
+    expect(mockScheduleBackgroundTask).toHaveBeenCalledWith(event, refreshTask);
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
-      'hideout-json-v3-en-regular',
-      expect.any(Function),
+      'hideout-json-v4-en-regular',
+      baseFetcher,
       111,
       { cacheKeyPrefix: 'tarkov' }
     );
+    expect(mockSetOverlayResponseHeaders).toHaveBeenCalledWith(event, {
+      data: { tasks: [] },
+    });
+  });
+  it('rethrows hideout cache failures', async () => {
+    mockEdgeCache.mockRejectedValueOnce(new Error('hideout cache failed'));
+    const { default: handler } = await import('@/server/api/tarkov/hideout.get');
+    await expect(handler(event)).rejects.toThrow('hideout cache failed');
+    expect(mockApplyOverlay).not.toHaveBeenCalled();
+    expect(mockSetOverlayResponseHeaders).not.toHaveBeenCalled();
   });
   it('builds expected cache key for items-lite', async () => {
     const { default: handler } = await import('@/server/api/tarkov/items-lite.get');
@@ -169,6 +197,7 @@ describe('Tarkov API handlers', () => {
     expect(mockApplyOverlay).toHaveBeenCalledWith(expect.anything(), {
       bypassCache: false,
       gameMode: 'regular',
+      locale: 'en',
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
@@ -188,6 +217,7 @@ describe('Tarkov API handlers', () => {
     expect(mockApplyOverlay).toHaveBeenCalledWith(expect.anything(), {
       bypassCache: false,
       gameMode: 'regular',
+      locale: 'en',
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
@@ -253,6 +283,7 @@ describe('Tarkov API handlers', () => {
     expect(mockApplyOverlay).toHaveBeenCalledWith(expect.anything(), {
       bypassCache: false,
       gameMode: 'regular',
+      locale: 'en',
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
@@ -272,6 +303,7 @@ describe('Tarkov API handlers', () => {
     expect(mockApplyOverlay).toHaveBeenCalledWith(expect.anything(), {
       bypassCache: false,
       gameMode: 'regular',
+      locale: 'en',
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
@@ -292,6 +324,7 @@ describe('Tarkov API handlers', () => {
     expect(mockApplyOverlay).toHaveBeenCalledWith(expect.anything(), {
       bypassCache: false,
       gameMode: 'regular',
+      locale: 'en',
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,

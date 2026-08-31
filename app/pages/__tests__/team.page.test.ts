@@ -32,11 +32,13 @@ describe('team page', () => {
   it('renders team members when user has a team', async () => {
     const wrapper = mount(TeamPage, {
       global: {
+        mocks: { $t: (key: string) => key },
         stubs: {
           MyTeam: { template: '<div data-testid="my-team" />' },
           TeamInvite: { template: '<div data-testid="team-invite" />' },
           TeamMembers: { template: '<div data-testid="team-members" />' },
           TeamOptions: { template: '<div data-testid="team-options" />' },
+          TeamDangerZone: { template: '<div data-testid="team-danger-zone" />' },
         },
       },
     });
@@ -48,11 +50,13 @@ describe('team page', () => {
     hasTeamMock.mockReturnValue(false);
     const wrapper = mount(TeamPage, {
       global: {
+        mocks: { $t: (key: string) => key },
         stubs: {
           MyTeam: { template: '<div data-testid="my-team" />' },
           TeamInvite: { template: '<div data-testid="team-invite" />' },
           TeamMembers: { template: '<div data-testid="team-members" />' },
           TeamOptions: { template: '<div data-testid="team-options" />' },
+          TeamDangerZone: { template: '<div data-testid="team-danger-zone" />' },
         },
       },
     });

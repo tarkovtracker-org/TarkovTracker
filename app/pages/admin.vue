@@ -69,6 +69,7 @@
       </UAlert>
       <div class="grid gap-6 lg:grid-cols-2">
         <AdminSupporterAccessCard />
+        <AdminTwitchConfigCard />
         <AdminCacheCard />
         <AdminAuditLog />
       </div>

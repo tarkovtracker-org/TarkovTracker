@@ -1,17 +1,8 @@
-// Environment bindings
-export interface Env {
-  API_GATEWAY_LIMITER: DurableObjectNamespace;
-  // Native Workers rate limiting binding used as the pre-auth abuse gate.
-  // Optional so local dev and tests without the binding simply skip the gate.
-  API_ABUSE_LIMITER?: RateLimit;
-  SUPABASE_URL: string;
-  SUPABASE_ANON_KEY: string;
-  SUPABASE_SERVICE_ROLE_KEY: string;
-  ALLOWED_ORIGIN?: string;
-  API_HOST?: string;
-  LEGACY_API_REDIRECT?: string;
-  IP_HASH_SECRET?: string;
-}
+type RequiredEnv = Pick<
+  CloudflareEnv,
+  'API_GATEWAY_LIMITER' | 'SUPABASE_URL' | 'SUPABASE_ANON_KEY' | 'SUPABASE_SERVICE_ROLE_KEY'
+>;
+export type Env = RequiredEnv & Partial<Omit<CloudflareEnv, keyof RequiredEnv>>;
 // API Token from database
 export type GameMode = 'pvp' | 'pve' | 'seasonal';
 export type ProgressDataField = 'pvp_data' | 'pve_data' | 'seasonal_data';

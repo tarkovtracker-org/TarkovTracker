@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   const fetcher = async () => {
     try {
       const sanitizedResponse = sanitizeTaskRewards(await baseFetcher());
-      return await applyOverlay(sanitizedResponse, { bypassCache, gameMode });
+      return await applyOverlay(sanitizedResponse, { bypassCache, gameMode, locale: lang });
     } catch (error) {
       logger.error('Failed to build tasks rewards response:', error);
       throw error;

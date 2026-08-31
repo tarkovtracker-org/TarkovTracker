@@ -4,6 +4,20 @@
     "error_title": "Connection Error",
     "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
     "no_reference": "N/A",
+    "error": {
+      "admin_privileges_required": "Nemáte oprávnění k provedení této akce.",
+      "authentication_required": "Pro pokračování musíte být přihlášeni.",
+      "invalid_channel": "Zadejte platný název kanálu Twitch.",
+      "invalid_display_name": "Zadejte platné zobrazované jméno.",
+      "invalid_enabled_flag": "Povolená hodnota je neplatná.",
+      "invalid_request_body": "Tělo požadavku je neplatné.",
+      "invalid_target_user_id": "Zadejte platné ID uživatele.",
+      "invalid_tier": "Vyberte platnou vrstvu podporovatele.",
+      "service_config_missing": "Administrátorská služba není nakonfigurována.",
+      "supabase_request_failed": "Nelze dokončit požadavek administrátorem.",
+      "supporter_update_failed": "Nelze aktualizovat přístup podporovatele.",
+      "twitch_config_update_failed": "Nelze aktualizovat konfiguraci Twitch."
+    },
     "access_warning_title": "Admin Access",
     "access_warning_description": "Actions performed here affect all users. Logged in as {user}.",
     "cache_management_title": "Cache Management",
@@ -44,14 +58,25 @@
     "supporter_target_user_label": "User ID",
     "supporter_target_user_placeholder": "Supabase auth user UUID",
     "supporter_tier_label": "Tier",
-    "supporter_enabled_label": "Enabled",
-    "supporter_disabled_label": "Disabled",
     "supporter_override_login_required": "You must be signed in to update supporter access.",
     "supporter_override_saved_title": "Supporter access updated",
     "supporter_override_enabled_description": "Enabled {tier} supporter access.",
     "supporter_override_disabled_description": "Disabled active supporter access.",
-    "supporter_override_failed_title": "Update failed",
-    "supporter_override_failed_description": "Could not update supporter access."
+    "supporter_override_failed_description": "Could not update supporter access.",
+    "twitch_config_title": "Stream Twitch",
+    "twitch_config_description": "Nastavte kanál Twitch povýšený v rohu webu. Návštěvníci si tuto změnu vyzvednou během několika minut.",
+    "twitch_channel_label": "Kanál",
+    "twitch_channel_placeholder": "Název kanálu Twitch",
+    "twitch_display_name_label": "Zobrazovaný název",
+    "twitch_display_name_placeholder": "Název zobrazení kanálu",
+    "twitch_config_saved_title": "Nastavení Twitch aktualizováno",
+    "twitch_config_saved_description": "Propagovaný stream je nyní {channel}.",
+    "twitch_config_saved_with_warning_title": "Nastavení Twitch uloženo",
+    "twitch_config_saved_with_warning_description": "Konfigurace byla uložena, ale návštěvníci v mezipaměti mohou stále vidět předchozí hodnotu.",
+    "twitch_config_failed_description": "Nelze aktualizovat konfiguraci Twitch.",
+    "twitch_config_load_failed_title": "Nastavení Twitch není k dispozici",
+    "twitch_config_load_failed_description": "Nelze načíst aktuální konfiguraci Twitch.",
+    "twitch_config_login_required": "Pro aktualizaci konfigurace Twitch musíte být přihlášeni."
   },
   "alerts": {
     "no_map_data": "Pro tento výběr nejsou k dispozici žádná mapová data."
@@ -198,6 +223,9 @@
     "refresh_button": "Zkuste to znovu",
     "opens_in_new_tab": "Otevře se v nové kartě",
     "available": "Dostupné",
+    "enabled": "Povoleno",
+    "disabled": "Zakázáno",
+    "update_failed": "Aktualizace se nezdařila",
     "tasks": "Úkoly",
     "level": "Úrovně",
     "locked": "Uzamčeno",
@@ -306,7 +334,8 @@
     "reset_all_data": "Resetovat všechna data",
     "import_failed": "Import se nezdařil",
     "delete_archived_run": "Odstranit archivovaný běh",
-    "validation_error": "Chyba ověření"
+    "validation_error": "Chyba ověření",
+    "got_it": "Rozumím"
   },
   "page_help": {
     "button": "Nápověda",
@@ -486,20 +515,44 @@
       "pmc_spawns": "PMC Spawns"
     },
     "legend": {
-      "your_objectives": "Vaše cíle",
-      "team_objectives": "Cíle týmu",
+      "regular": "Běžný",
+      "pinned": "Připnuté",
+      "team": "Tým",
       "shared_extract": "Sdílený extrakt (frakce buď)",
       "coop_extract": "Koop extrakt (PMC + Scav)"
     },
-    "controls": {
-      "keyboard": {
-        "pan": "přivolat",
-        "zoom_keys": "Přiblížení",
-        "click": "pro kliknutí na kurzor",
-        "reset": "Resetovat zobrazení",
-        "cycle_floors": "+ Přejít na cyklus podlahy",
-        "zoom": "+ Přejít na přiblížení"
-      }
+    "tooltips": {
+      "zoom_in": "Přiblížit",
+      "zoom_out": "Oddálit",
+      "reset_view": "Obnovit zobrazení",
+      "open_fullscreen": "Otevřít mapu na celé obrazovce",
+      "exit_fullscreen": "Ukončit celou obrazovku",
+      "drag_to_resize": "Přetažením změníte velikost mapy",
+      "switch_floor": "Přepínací podlaha (Ctrl + Scroll)"
+    },
+    "help": {
+      "title": "Ovládání mapy",
+      "groups": {
+        "navigate": "Navigate",
+        "floors": "Podlahy",
+        "interact": "Interakce",
+        "view": "Zobrazit"
+      },
+      "pan": "{keys} nebo přetáhněte k pánvi",
+      "zoom": "{keys} pro přiblížení",
+      "reset": "{key} pro obnovení zobrazení",
+      "cycle_floors": "{keys} k cyklování podlaží",
+      "floor_panel": "Nebo použijte podlahovou desku.",
+      "click_at_cursor": "{key} klikněte na kurzor",
+      "click_marker": "Pro podrobnosti klikněte na značku.",
+      "fullscreen": "Použijte tlačítko na celou obrazovku v ovládacích prvcích mapy.",
+      "resize": "Přetažením dolního okraje mapy změníte velikost."
+    },
+    "hint": {
+      "title": "Ovládání rychlých map",
+      "summary": "Přetažením posouvat · Shift + posunutím přiblížit",
+      "summary_multi_floor": "Přetažením prstu · Shift + Posunutím přiblížíte · Ctrl + Posunutím změnit podlahu",
+      "all_controls": "Všechny ovládací prvky"
     },
     "aria": {
       "tooltip_density": "Tooltip density"
@@ -898,7 +951,9 @@
       "loading": "Načítání úkolů",
       "map": {
         "resize_handle": "Změnit velikost výšky mapy",
-        "toggle_panel": "Přepnout panel mapy",
+        "show_map": "Zobrazit mapu",
+        "hide_map": "Skrýt mapu",
+        "fullscreen_label": "Celá obrazovka",
         "required_items_summary": "Požadované položky pro aktivní úkoly",
         "required_keys_summary": "Požadované klíče pro aktivní úkoly",
         "time_period": {
@@ -911,7 +966,9 @@
         "map_complete_tasks_hidden": "{count} úkoly skryté na této mapě.",
         "map_complete_tasks_showing": "Úlohy úplné {count} na mapě zobrazené na této mapě.",
         "map_complete_tasks_toggle_show": "Zobrazit skryté",
-        "map_complete_tasks_toggle_hide": "Skrýt mapu kompletní"
+        "map_complete_tasks_toggle_hide": "Skrýt mapu kompletní",
+        "map_hidden_hint": "Mapa skrytá — klikněte pro zobrazení",
+        "raid_time_tooltip": "Aktuální čas nájezdu ve hře"
       },
       "pinned_tasks_section": "Připnuté úkoly",
       "focused_task_section": "Zaměřený úkol",
@@ -1152,6 +1209,51 @@
       "meta": {
         "description": "Spolupracujte s týmovými spolupracovníky na útěku od Tarkovu. Sdílejte dokončení úkolů, skrývejte stav a koordinujte shromažďování položek."
       },
+      "page_title": "Tým",
+      "page_description": "Pozvěte týmové spoluhráče, zvolte, jaký tým postupuje a sledujte společně.",
+      "invite": {
+        "title": "Odkaz na pozvání",
+        "subtitle": "Sdílejte svůj tým s důvěryhodnými týmovými spolupracovníky.",
+        "link_label": "URL pozvánky týmu",
+        "helper": "Kdokoli s tímto odkazem se může připojit k vašemu týmu.",
+        "show": "Zobrazit odkaz",
+        "hide": "Skrýt odkaz",
+        "copy": "Kopírovat odkaz",
+        "copied": "Zkopírováno!"
+      },
+      "members": {
+        "title": "Členové ({count})",
+        "no_members": "Zatím žádní členové tohoto týmu. Sdílejte svůj odkaz pro přidání týmových spolupracovníků.",
+        "alone": "Jste zde sami — sdílejte svůj pozvánkový odkaz pro přidání týmových spolupracovníků.",
+        "copy_invite": "Kopírovat pozvánku",
+        "copied": "Zkopírováno!"
+      },
+      "visibility": {
+        "title": "Nastavení viditelnosti",
+        "description": "Kontrolujte průběh týmů na vašem trackeru.",
+        "items_section": "Položky",
+        "show_tasks": "Zobrazit úkoly členů týmu",
+        "show_items": "Zobrazit potřebné položky členů týmu",
+        "show_non_fir": "Zobrazit nevyžadované položky",
+        "show_hideout": "Zobrazit potřebné položky",
+        "show_maps": "Zobrazit mapové cíle členů týmu"
+      },
+      "danger_zone": {
+        "title": "Nebezpečná zóna",
+        "disband_description": "Zrušení odebere tým pro všechny členy. Tuto akci nelze vrátit zpět.",
+        "leave_description": "Necháte-li vás odebrat z tohoto týmu. Váš postup zůstává na vašem účtu.",
+        "disband": "Spárovat tým",
+        "leave": "Opustit tým",
+        "confirm_disband_title": "Zrušit tým?",
+        "confirm_disband_description": "Tím se odstraní tým a jeho členství pro všechny. Tuto akci nelze vrátit zpět.",
+        "confirm_leave_title": "Opustit týmu?",
+        "confirm_leave_description": "Opustíte tento tým a přestanete sdílet pokrok s jeho členy.",
+        "confirm_disband": "Ano, rozštěpovat tým",
+        "confirm_leave": "Ano, odejít z týmu",
+        "disband_success": "Tým úspěšně odstraněn.",
+        "disband_error": "Nepodařilo se rozptýlit tým.",
+        "action_error": "Nelze aktualizovat členství v týmu."
+      },
       "card": {
         "manageteam": {
           "title": "Členové týmu",
@@ -1161,7 +1263,12 @@
             "owner": "Vlastník",
             "taskscomplete": "{completed}/{total} úkoly dokončeny",
             "kick_success": "Teamy úspěšně vyhozeny.",
-            "kick_error": "Chyba při vybírání týmového partnera."
+            "kick_error": "Chyba při vybírání týmového partnera.",
+            "level_badge_alt": "Úroveň {level} odznak",
+            "hide_progress": "Skrýt postup {name}od mě",
+            "show_progress": "Zobrazit postup {name}pro mě",
+            "enable_team_tasks": "Zobrazit úkoly členů týmu před změnou jednotlivého člena",
+            "remove_member": "Odstranit {name} z týmu"
           }
         },
         "teamoptions": {
@@ -1187,6 +1294,7 @@
           "url_copied": "URL zkopírováno do schránky",
           "copy_url_failed": "Kopírování URL do schránky se nezdařilo",
           "no_team": "V současné době nejste v týmu.",
+          "login_required": "Přihlaste se k vytvoření týmu nebo spravujte pozvánku vašeho týmu.",
           "team_invite_url_label": "URL pozvánky do týmu",
           "copy_link": "Kopírovat",
           "link_hidden_message": "Klepnutím na tlačítko 'Zobrazit' zobrazíte odkaz pozvánky vašeho týmu",
@@ -1561,6 +1669,7 @@
     "tarkovguru": "Tarkov Guru",
     "tarkovmonitor": "Tarkov Monitor",
     "resources": "Resources",
+    "section_more": "Více",
     "profile": "Profil",
     "section_navigation": "Navigation",
     "section_external": "Externí",
@@ -1696,13 +1805,17 @@
   },
   "settings": {
     "locale": "Jazyk",
+    "page_description": "Spravujte svůj účet, průběh hry a nastavení aplikací.",
     "tabs": {
       "progression": "Pokrok",
       "imports": "Dovoz"
     },
     "tab_groups": {
-      "game": "Hra",
-      "account_advanced": "Účet & Pokročilé"
+      "game_progress": "Průběh hry",
+      "app": "Aplikace",
+      "data": "Údaje",
+      "account": "Účet",
+      "tools_integrations": "Nástroje a integrace"
     },
     "tab_seo": {
       "progression": {
@@ -1750,6 +1863,7 @@
       "copy_button": "Copy Debug State"
     },
     "general": {
+      "title": "Obecné předvolby",
       "privacy_mode": "Streamovací režim",
       "privacy_mode_hint": "Skryje citlivé informace během vysílání."
     },
@@ -1761,7 +1875,10 @@
         "show_next": "Zobrazit další úkoly",
         "show_prev": "Zobrazit předchozí úkoly",
         "density": "Hustota karty",
-        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
+        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
+        "flags_section": "Zobrazení úloh",
+        "availability_section": "Dostupnost úkolu",
+        "view_defaults_section": "Výchozí zobrazení"
       },
       "maps": {
         "show_extracts": "Ve výchozím nastavení zobrazit extrakty",
@@ -1772,6 +1889,7 @@
           "title": "Barvy mapy",
           "description": "Nastavte barvy značky pro lepší čitelnost a dostupnost.",
           "self_objective": "Váš cíl",
+          "pinned_objective": "Připnutý úkol",
           "team_objective": "Týmový cíl",
           "selected": "Připnutý cíl",
           "shared_extract": "Sdílený extrakt",
@@ -1852,6 +1970,8 @@
       "export_error_title": "Export selhal",
       "debug_export_error_title": "Export ladění se nezdařil",
       "reset_title": "Obnovit průběh",
+      "danger_zone_title": "Nebezpečná zóna",
+      "danger_zone_hint": "Obnovení veškerého postupu trvale smaže vaše data pro PvP, PvE a Seasonal PvP. Tuto akci nelze vrátit zpět.",
       "prestige_history_title": "Prestige History",
       "prestige_history_loading": "Načítání historie prestiži...",
       "prestige_history_empty": "Zatím neběží žádná archivovaná prestiž.",
@@ -2025,7 +2145,9 @@
       "saved_title": "Zobrazované jméno uloženo",
       "saved_description": "Vaše {mode} zobrazované jméno bylo aktualizováno",
       "save_failed_title": "Uložení se nezdařilo",
-      "save_failed_description": "Nepodařilo se uložit zobrazované jméno. Zkuste to prosím znovu."
+      "save_failed_description": "Nepodařilo se uložit zobrazované jméno. Zkuste to prosím znovu.",
+      "active_mode": "Aktivní",
+      "game_edition_hint": "Vyberte verzi hry, kterou vlastníte, aby sledování odpovídalo vašemu dostupnému obsahu."
     },
     "skills": {
       "title": "Správa dovedností",
@@ -2042,7 +2164,10 @@
       "valid_range": "Valid range: 0-51",
       "sort": {
         "ingame": "Ve hře"
-      }
+      },
+      "quest_tooltip": "Úroveň dovedností udělená automaticky dokončenými odměnami.",
+      "offset_tooltip": "Ruční nastavení nad úrovní odměny. Pozitivní znamená, že jste vyškolili dovednost nad odměnu za hledání práce.",
+      "collapsed_hint": "Zobrazení {shown} dovedností {total} . Ukaž vše a uvidíš všechny dovednosti."
     },
     "keybinds": {
       "title": "Keyboard Shortcuts",
@@ -2052,6 +2177,7 @@
       "undo_description": "Press this shortcut to revert your most recent progress change.",
       "record_placeholder": "Click to record...",
       "recording": "Press key combination...",
+      "listening": "Poslouchám...",
       "reset_aria": "Reset to default",
       "conflict_omnibar": "Shortcut conflicts with Undo keybind.",
       "conflict_undo": "Shortcut conflicts with Search keybind.",
@@ -2068,9 +2194,12 @@
       "manual_hint": "Zadejte celkovou hodnotu XP pro automatickou úpravu posunu.",
       "xp_amount": "{amount} XP",
       "xp_to_next": "{amount} do dalšího",
-      "reset_offset": "Resetovat odsazení XP"
+      "reset_offset": "Resetovat odsazení XP",
+      "xp_progress_aria": "Zkus pokrok směrem k další úrovni",
+      "xp_progress_value": "{percent}% směrem k další úrovni"
     },
     "danger_zone": {
+      "confirm_instruction": "Zadejte {word} pro potvrzení resetování všech dat:",
       "confirm_word": "ODSTRANIT"
     },
     "log_import": {

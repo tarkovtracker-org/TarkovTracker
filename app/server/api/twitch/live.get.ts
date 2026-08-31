@@ -5,7 +5,10 @@ import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
 const logger = createLogger('twitch-live');
 const TWITCH_GQL_URL = 'https://gql.twitch.tv/gql';
 const CACHE_TTL_MS = 60_000;
-const LIVE_HEADERS = { 'cache-control': 'public, max-age=30, s-maxage=60' };
+const LIVE_HEADERS = {
+  'cache-control': 'public, max-age=30, s-maxage=60',
+  'cloudflare-cdn-cache-control': 'public, max-age=30',
+};
 let cachedResult: { channel: string; isLive: boolean; checkedAt: number } | null = null;
 export default defineEventHandler(async (event) => {
   const { twitchClientId } = useRuntimeConfig(event);

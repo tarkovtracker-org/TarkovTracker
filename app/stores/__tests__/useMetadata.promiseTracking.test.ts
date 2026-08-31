@@ -89,6 +89,15 @@ describe('useMetadataStore promise tracking', () => {
     expect(store.hideoutError).toBeNull();
     expect(store.loading).toBe(false);
     expect(store.hideoutLoading).toBe(false);
+    expect(store.prestigeLoading).toBe(false);
+    expect(store.prestigeError).toBeNull();
+    expect(cacheUtils.setCachedData).toHaveBeenCalledWith(
+      'hideout',
+      'json-v4-regular',
+      'en',
+      expect.anything(),
+      60 * 60 * 1000
+    );
   });
   it('keeps tasks-core hydration working when each action call sees a fresh `this` proxy (Pinia devtools wrapping)', async () => {
     const store = useMetadataStore();

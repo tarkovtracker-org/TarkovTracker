@@ -204,6 +204,9 @@ const buildPreferencesSyncPayload = (
     map_zoom_speed: preferencesState.mapZoomSpeed,
     map_pan_speed: preferencesState.mapPanSpeed,
     map_zone_opacity: preferencesState.mapZoneOpacity,
+    map_show_self_objectives: preferencesState.mapShowSelfObjectives,
+    map_show_pinned_objectives: preferencesState.mapShowPinnedObjectives,
+    map_show_team_objectives: preferencesState.mapShowTeamObjectives,
     pinned_task_ids: Array.isArray(preferencesState.pinnedTaskIds)
       ? preferencesState.pinnedTaskIds.filter(
           (taskId): taskId is string => typeof taskId === 'string' && taskId.length > 0

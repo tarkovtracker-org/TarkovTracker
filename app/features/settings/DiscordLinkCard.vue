@@ -66,19 +66,17 @@
         >
           {{ t('settings.discord_link.link_account', 'Link Discord account') }}
         </UButton>
-        <UButton
+        <LoginRequiredAlert
           v-else
-          color="primary"
-          icon="i-mdi-login"
-          to="/login?redirect=%2Fsettings%23account"
-        >
-          {{ t('settings.discord_link.login_to_link', 'Log in to link Discord') }}
-        </UButton>
+          :title="t('settings.discord_link.login_to_link', 'Log in to link Discord')"
+          redirect-path="/settings#account"
+        />
       </div>
     </template>
   </GenericCard>
 </template>
 <script setup lang="ts">
+  import LoginRequiredAlert from '@/components/ui/LoginRequiredAlert.vue';
   import { logger } from '@/utils/logger';
   interface DiscordAccountLink {
     discord_username: string;

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { defineAdminAccessTests } from './testUtils';
 import type { H3Event, H3EventContext } from 'h3';
 const runtimeConfig = {
   supabaseServiceKey: 'service-key',
@@ -48,15 +49,13 @@ describe('GET /api/admin/api-usage', () => {
     vi.resetModules();
     vi.unstubAllGlobals();
   });
-  it('requires authentication', async () => {
-    const { default: handler } = await import('@/server/api/admin/api-usage.get');
-    await expect(handler(makeEvent(null))).rejects.toMatchObject({ statusCode: 401 });
-  });
-  it('rejects non-admin users', async () => {
-    mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: false }]));
-    const { default: handler } = await import('@/server/api/admin/api-usage.get');
-    await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 403 });
-  });
+  defineAdminAccessTests(
+    runtimeConfig,
+    mockFetch,
+    makeEvent,
+    jsonResponse,
+    () => import('@/server/api/admin/api-usage.get')
+  );
   it('returns the top consumers from the SQL aggregation RPC', async () => {
     mockFetch.mockResolvedValueOnce(jsonResponse([{ is_admin: true }])).mockResolvedValueOnce(
       jsonResponse([

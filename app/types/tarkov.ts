@@ -91,11 +91,15 @@ export interface TraderRequirement {
   id: string;
   trader: { id: string; name: string };
   value: number;
+  requirementType?: 'level' | 'reputation';
+  compareMethod?: '>=' | '<' | '<=' | '>';
 }
 export interface TaskTraderLevelRequirement {
   id: string;
   trader: { id: string; name: string };
   level: number;
+  requirementType?: 'level' | 'reputation';
+  compareMethod?: '>=' | '<' | '<=' | '>';
 }
 export interface TraderLevelRequirementWithMet extends TaskTraderLevelRequirement {
   met: boolean;
@@ -528,6 +532,7 @@ export interface SystemGetters extends _GettersTree<SystemState> {
   isAdmin: (state: SystemState) => boolean;
 }
 export interface TeamState extends StateTree {
+  id?: string | null;
   owner?: string | null;
   joinCode?: string | null;
   members?: string[];

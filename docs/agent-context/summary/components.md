@@ -127,25 +127,29 @@ Each slice contains its Vue components and slice-local helpers/composables. High
 
 ## Supabase Edge Functions (`supabase/functions/`)
 
-| Function                                                                  | Responsibility                                                                      |
-| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `team-create` / `team-join` / `team-leave` / `team-kick` / `team-members` | Team lifecycle (per-user rate limited).                                             |
-| `token-create` / `token-revoke`                                           | API token issuance/revocation (hashed storage).                                     |
-| `account-delete` / `account-delete-reconcile`                             | Account deletion job + reconciliation.                                              |
-| `stripe-webhook`                                                          | Process Stripe events; grant/revoke supporter; sync Discord roles.                  |
-| `admin-cache-purge`                                                       | Purge Cloudflare + data caches (admin-gated).                                       |
-| `_shared/*`                                                               | `auth.ts`, `cors.ts`, `discord.ts`, `rate-limit.ts`, generated `database.types.ts`. |
+| Function                                                                                   | Responsibility                                                                      |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| `team-create` / `team-join` / `team-leave` / `team-kick` / `team-disband` / `team-members` | Team lifecycle (per-user rate limited).                                             |
+| `token-create` / `token-revoke`                                                            | API token issuance/revocation (hashed storage).                                     |
+| `account-delete` / `account-delete-reconcile`                                              | Account deletion job + reconciliation.                                              |
+| `stripe-webhook`                                                                           | Process Stripe events; grant/revoke supporter; sync Discord roles.                  |
+| `admin-cache-purge`                                                                        | Purge Cloudflare + data caches (admin-gated).                                       |
+| `_shared/*`                                                                                | `auth.ts`, `cors.ts`, `discord.ts`, `rate-limit.ts`, generated `database.types.ts`. |
 
 ## Cloudflare Worker (`workers/api-gateway/src/`)
 
-| Component                                     | Responsibility                                                 |
-| --------------------------------------------- | -------------------------------------------------------------- |
-| `index.ts`                                    | Worker entry, routing, `ApiGatewayRateLimiter` Durable Object. |
-| `auth.ts`                                     | Bearer token extraction, SHA-256 validation, usage tracking.   |
-| `handlers/progress.ts`                        | Get/update progress (tasks, objectives, level).                |
-| `handlers/team.ts`                            | Team progress aggregation.                                     |
-| `handlers/token.ts`                           | Token info endpoint.                                           |
-| `services/tarkov.ts`                          | Fetch tasks/hideout for transforms.                            |
-| `utils/transform.ts`                          | Progress transform + hideout auto-complete.                    |
-| `utils/{invalidation,memory-cache,logger}.ts` | Cache invalidation + in-memory cache.                          |
-| `openapi.ts`                                  | OpenAPI spec (validated in CI).                                |
+| Component                                     | Responsibility                                               |
+| --------------------------------------------- | ------------------------------------------------------------ |
+| `index.ts`                                    | Worker entry (thin adapter).                                 |
+| `router.ts`                                   | Routing, User-Agent gate, host/legacy redirect.              |
+| `authentication.ts`                           | Abuse gate, token auth, daily-quota enforcement.             |
+| `rateLimiter.ts`                              | `ApiGatewayRateLimiter` Durable Object + quota client.       |
+| `responses.ts`                                | CORS, envelopes, conditional response, ETag/compression.     |
+| `auth.ts`                                     | Bearer token extraction, SHA-256 validation, usage tracking. |
+| `handlers/progress.ts`                        | Get/update progress (tasks, objectives, level).              |
+| `handlers/team.ts`                            | Team progress aggregation.                                   |
+| `handlers/token.ts`                           | Token info endpoint.                                         |
+| `services/tarkov.ts`                          | Fetch tasks/hideout for transforms.                          |
+| `utils/transform.ts`                          | Progress transform + hideout auto-complete.                  |
+| `utils/{invalidation,memory-cache,logger}.ts` | Cache invalidation + in-memory cache.                        |
+| `openapi.ts`                                  | OpenAPI spec (validated in CI).                              |

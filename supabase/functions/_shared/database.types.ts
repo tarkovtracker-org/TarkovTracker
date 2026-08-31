@@ -61,6 +61,7 @@ export type Database = {
       account_deletion_jobs: {
         Row: {
           attempts: number
+          claim_token: string | null
           completed_at: string | null
           created_at: string | null
           dead_lettered_at: string | null
@@ -75,6 +76,7 @@ export type Database = {
         }
         Insert: {
           attempts?: number
+          claim_token?: string | null
           completed_at?: string | null
           created_at?: string | null
           dead_lettered_at?: string | null
@@ -89,6 +91,7 @@ export type Database = {
         }
         Update: {
           attempts?: number
+          claim_token?: string | null
           completed_at?: string | null
           created_at?: string | null
           dead_lettered_at?: string | null
@@ -514,6 +517,9 @@ export type Database = {
           locale_override: string | null
           map_marker_colors: Json
           map_pan_speed: number | null
+          map_show_pinned_objectives: boolean
+          map_show_self_objectives: boolean
+          map_show_team_objectives: boolean
           map_team_hide_all: boolean | null
           map_zone_opacity: number
           map_zoom_speed: number | null
@@ -590,6 +596,9 @@ export type Database = {
           locale_override?: string | null
           map_marker_colors?: Json
           map_pan_speed?: number | null
+          map_show_pinned_objectives?: boolean
+          map_show_self_objectives?: boolean
+          map_show_team_objectives?: boolean
           map_team_hide_all?: boolean | null
           map_zone_opacity?: number
           map_zoom_speed?: number | null
@@ -666,6 +675,9 @@ export type Database = {
           locale_override?: string | null
           map_marker_colors?: Json
           map_pan_speed?: number | null
+          map_show_pinned_objectives?: boolean
+          map_show_self_objectives?: boolean
+          map_show_team_objectives?: boolean
           map_team_hide_all?: boolean | null
           map_zone_opacity?: number
           map_zoom_speed?: number | null
@@ -923,11 +935,30 @@ export type Database = {
         }
         Returns: undefined
       }
+      claim_account_deletion_job: {
+        Args: { p_create_if_missing?: boolean; p_user_id: string }
+        Returns: {
+          claim_token: string | null
+          claimed: boolean
+          status: string
+        }[]
+      }
       cleanup_old_deletion_attempts: {
         Args: { retention_days?: number }
         Returns: {
           deleted_count: number
           oldest_remaining: string
+        }[]
+      }
+      consume_account_deletion_attempt: {
+        Args: {
+          p_ip_address: string
+          p_user_agent: string
+          p_user_id: string
+        }
+        Returns: {
+          allowed: boolean
+          retry_after_seconds: number
         }[]
       }
       consume_mutation_rate_limit: {
@@ -942,6 +973,10 @@ export type Database = {
           remaining: number
           reset_at: string
         }[]
+      }
+      disband_team: {
+        Args: { p_owner_id: string; p_team_id: string }
+        Returns: boolean
       }
       get_api_usage_summary: {
         Args: { p_limit?: number; p_since: string }

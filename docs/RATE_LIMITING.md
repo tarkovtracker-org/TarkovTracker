@@ -82,14 +82,14 @@ flowchart TB
 
 ### Ownership matrix
 
-| Traffic class               | Examples                                         | Primary enforcer                        | Secondary / hard stop                    | Storage / implementation                   |
-| --------------------------- | ------------------------------------------------ | --------------------------------------- | ---------------------------------------- | ------------------------------------------ |
-| External progress API       | `/api/v2/*` on `api.tarkovtracker.org`           | Worker DO daily quota + IP abuse gate   | Supporter tier resolution, token auth    | `ApiGatewayRateLimiter`, `api_usage_daily` |
-| Authenticated app mutations | team create/join/leave/kick, token create/revoke | Edge Function mutation limiter          | DB token cap (3 active), RLS             | `mutation_rate_limits` + RPC               |
-| Public / shared app reads   | shared profile, team members, tarkov-dev profile | Pages/Nitro shared limiter              | CDN/cache TTLs, Cloudflare WAF if needed | `sharedEdgeStore` (+ DO if bound)          |
-| Destructive account ops     | account delete                                   | Edge Function (dedicated table for now) | Deletion jobs queue                      | `account_deletion_attempts`                |
-| Auth platform               | signup, sign-in, refresh, OTP                    | Supabase Auth                           | Captcha (optional)                       | GoTrue `[auth.rate_limit]`                 |
-| Outbound third parties      | Discord API, Stripe                              | Provider `Retry-After` / SDK rules      | Circuit breakers, job retries            | not user quotas                            |
+| Traffic class               | Examples                                                 | Primary enforcer                        | Secondary / hard stop                    | Storage / implementation                   |
+| --------------------------- | -------------------------------------------------------- | --------------------------------------- | ---------------------------------------- | ------------------------------------------ |
+| External progress API       | `/api/v2/*` on `api.tarkovtracker.org`                   | Worker DO daily quota + IP abuse gate   | Supporter tier resolution, token auth    | `ApiGatewayRateLimiter`, `api_usage_daily` |
+| Authenticated app mutations | team create/join/leave/kick/disband, token create/revoke | Edge Function mutation limiter          | DB token cap (3 active), RLS             | `mutation_rate_limits` + RPC               |
+| Public / shared app reads   | shared profile, team members, tarkov-dev profile         | Pages/Nitro shared limiter              | CDN/cache TTLs, Cloudflare WAF if needed | `sharedEdgeStore` (+ DO if bound)          |
+| Destructive account ops     | account delete                                           | Edge Function (dedicated table for now) | Deletion jobs queue                      | `account_deletion_attempts`                |
+| Auth platform               | signup, sign-in, refresh, OTP                            | Supabase Auth                           | Captcha (optional)                       | GoTrue `[auth.rate_limit]`                 |
+| Outbound third parties      | Discord API, Stripe                                      | Provider `Retry-After` / SDK rules      | Circuit breakers, job retries            | not user quotas                            |
 
 ---
 
@@ -135,6 +135,7 @@ sequenceDiagram
 | `team-join`    | `team-join`    |    30 | 10 min |
 | `team-leave`   | `team-leave`   |    30 | 1 hour |
 | `team-kick`    | `team-kick`    |    20 | 1 hour |
+| `team-disband` | `team-disband` |    10 | 1 hour |
 | `token-create` | `token-create` |     3 | 1 hour |
 | `token-revoke` | `token-revoke` |    50 | 10 min |
 
@@ -217,7 +218,9 @@ Details and response headers: [`API.md`](./API.md#rate-limits-api-gateway)
 
 Implementation notes:
 
-- Enforcer class: `ApiGatewayRateLimiter` in `workers/api-gateway/src/index.ts`
+- Enforcer class: `ApiGatewayRateLimiter` in `workers/api-gateway/src/rateLimiter.ts`
+- Gateway routing, authentication, and HTTP responses are isolated in `router.ts`,
+  `authentication.ts`, and `responses.ts`; `index.ts` remains the Worker entrypoint
 - Keys are namespaced (`daily-read:<userId>`, `daily-write:<userId>`)
 - Daily quota uses a UTC-day fixed window; a quota unit is consumed when a valid authenticated
   request is admitted for processing (downstream failures do not trigger refunds)
@@ -277,12 +280,15 @@ Important:
 
 `account-delete` currently uses a **dedicated** path:
 
-1. Query recent rows in `account_deletion_attempts` for the user
-2. Allow max **3 attempts / 60s**
-3. Insert an attempt row, then enqueue deletion work
+1. Call `consume_account_deletion_attempt` to serialize each user's requests in Postgres
+2. Allow and record max **3 attempts / 60s** in the same transaction
+3. Atomically claim the deletion job through `claim_account_deletion_job`
 
-This is **not** wired through `consume_mutation_rate_limit` today. Functionally fine, but it is a
-second pattern for “sensitive mutation limiting.”
+This is **not** wired through `consume_mutation_rate_limit` today. It remains a second pattern for
+“sensitive mutation limiting” because the dedicated table also retains the deletion audit history.
+Both RPCs are service-role-only. A job claim holds a 15-minute lease; the reconciler can recover a
+stale `in_progress` job after that lease, but a fencing token prevents the stale worker from
+overwriting its replacement. Only an explicit user request can reset and revive dead-lettered work.
 
 Preferred future shape: add an `account-delete` scope to the shared mutation limiter and keep
 `account_deletion_attempts` only if audit history is still needed.
@@ -434,10 +440,13 @@ Treat these deliberately; do not “make everything fail open” without underst
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Mutation limit constants + Edge helper | `supabase/functions/_shared/rate-limit.ts`                                                                                                                          |
 | Mutation RPC + table                   | `supabase/migrations/20260404120000_add_mutation_rate_limit_rpc.sql`                                                                                                |
-| Edge consumers                         | `supabase/functions/{token-create,token-revoke,team-create,team-join,team-leave,team-kick}/`                                                                        |
+| Edge consumers                         | `supabase/functions/{token-create,token-revoke,team-create,team-join,team-leave,team-kick,team-disband}/`                                                           |
 | Frontend mutation callers              | `app/composables/api/useEdgeFunctions.ts`                                                                                                                           |
 | Worker tier constants                  | `workers/api-gateway/src/limits.ts`                                                                                                                                 |
-| Worker DO enforcer                     | `workers/api-gateway/src/index.ts` (`ApiGatewayRateLimiter`)                                                                                                        |
+| Worker entrypoint and routing          | `workers/api-gateway/src/index.ts`, `workers/api-gateway/src/router.ts`                                                                                             |
+| Worker authentication and quotas       | `workers/api-gateway/src/authentication.ts`                                                                                                                         |
+| Worker DO enforcer                     | `workers/api-gateway/src/rateLimiter.ts` (`ApiGatewayRateLimiter`)                                                                                                  |
+| Worker response and cache handling     | `workers/api-gateway/src/responses.ts`                                                                                                                              |
 | Pages shared limiter                   | `app/server/utils/sharedEdgeStore.ts`                                                                                                                               |
 | Pages consumers                        | `app/server/api/team/members.ts`, `app/server/api/profile/[userId]/[mode].get.ts`, `app/server/api/tarkov-dev/profile.get.ts`, `app/server/api/logs/client.post.ts` |
 | Account-delete limiter                 | `supabase/functions/account-delete/index.ts`                                                                                                                        |

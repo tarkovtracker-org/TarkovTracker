@@ -292,6 +292,20 @@ Authorization: Bearer <supabase_jwt_token>
 | 401    | Invalid token      | Invalid or expired JWT   |
 | 403    | Not a team member  | User not in team         |
 
+### Team mutation Edge Functions
+
+Team mutations are invoked with an authenticated Supabase JWT through the client composable. The
+`team-disband` operation is owner-only and removes the team, memberships, and team-owned records in
+one database transaction after confirmation in the UI.
+
+| Function       | Purpose                                |
+| -------------- | -------------------------------------- |
+| `team-create`  | Create a team and its owner membership |
+| `team-join`    | Join a team with an invite code        |
+| `team-leave`   | Leave a team as a non-owner            |
+| `team-kick`    | Remove a member as the owner           |
+| `team-disband` | Atomically remove an owned team        |
+
 ---
 
 ## Supporter / Stripe Endpoints
@@ -449,6 +463,12 @@ A pre-authentication IP-based abuse gate (Cloudflare Workers Rate Limiting bindi
 the token validation step from floods. It is deliberately coarse — infrastructure protection,
 not a customer quota — and is not advertised as a per-IP entitlement.
 
+Authentication and the daily-quota check run before request-input validation, so a malformed request
+from an unauthenticated or over-quota client returns `401`/`429` rather than `400`. Once a request is
+authorized, validation `400` responses (malformed URL params, invalid JSON body) carry the same
+`X-RateLimit-*` headers as successful responses — and, like them, omit those headers on the fail-open
+path when no quota decision is available.
+
 Responses for which the daily-quota service returns a quota decision include `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` (Unix seconds). When that decision denies the request, the gateway responds with `429` and `Retry-After`. Pre-authentication abuse-gate `429` responses include only `Retry-After`, and fail-open responses (daily-quota service temporarily unavailable) omit the `X-RateLimit-*` headers. When a free-tier user exhausts a daily quota, the `429` body includes an upgrade link. Admins can inspect the top consumers via `GET /api/admin/api-usage`; usage is bucketed by UTC day, so the report covers the current and previous UTC day (the `since` field gives the exact starting day).
 
 ### Conditional Requests & Polling
@@ -459,7 +479,7 @@ Polling integrators (TarkovMonitor, tarkov.dev, RatScanner) should poll read end
 
 ### Active Token Cap
 
-Each account may have at most **3 active API tokens**. This is enforced by a database trigger, so token rotation cannot bypass it. The `token-create` Edge Function returns `409` with `error: "Token limit reached (3 active)"` when the cap is reached. Revoke an existing token before creating a new one. Token creation is only allowed through the `token-create` Edge Function (authenticated clients cannot insert into `api_tokens` directly) and is rate-limited to 3 creates per hour per account.
+Each account may have at most **3 active API tokens**. This is enforced by a database trigger, so token rotation cannot bypass it. The `token-create` Edge Function returns `409` with `error: "Token limit reached (3 active)"` when the cap is reached. Revoke an existing token before creating a new one. Token creation is only allowed through the `token-create` Edge Function (authenticated clients cannot insert into `api_tokens` directly) and is rate-limited to 3 creates per hour per account. The `permissions` field must be a non-empty array of `GP`/`TP`/`WP`; any other shape or value is rejected with `400` before insertion.
 
 Token names can be changed from Settings → API Tokens without rotating the token. Renaming updates
 only the token's optional `note`: authenticated users receive column-level `UPDATE (note)` permission,
@@ -487,7 +507,7 @@ Legacy `tt_` tokens are no longer accepted; they fail with `401 Invalid token fo
 
 ## Error Responses
 
-All endpoints return errors in this format:
+Nuxt/Pages `/api/*` routes return errors in this format:
 
 ```json
 {
@@ -496,6 +516,19 @@ All endpoints return errors in this format:
   "statusMessage": "Internal Server Error"
 }
 ```
+
+Admin routes also include a stable machine-readable code in `data.code`. The English serialized
+`statusMessage` fallback remains for API clients that do not localize responses; the admin UI maps these codes to
+locale keys instead of rendering server text. Current admin codes are `admin_privileges_required`,
+`authentication_required`, `invalid_channel`, `invalid_display_name`, `invalid_enabled_flag`, `invalid_request_body`,
+`invalid_target_user_id`, `invalid_tier`, `service_config_missing`, `supabase_request_failed`,
+`supporter_update_failed`, and `twitch_config_update_failed`.
+
+The public API gateway (`api.tarkovtracker.org`) uses its own envelope,
+`{"success": false, "error": "..."}`. Unexpected gateway failures always return `500` with the fixed
+body `{"success": false, "error": "Internal server error"}`; the underlying exception is logged
+server-side only, so clients must not parse `500` bodies for diagnostic detail. Client-correctable
+problems keep their specific `4xx` messages in the same envelope.
 
 ---
 
@@ -558,13 +591,9 @@ This allowlist is a subset of what upstream serves. `json.tarkov.dev` additional
 
 **Enabled UI locales** (`SUPPORTED_LOCALES` in `app/utils/locales.ts`):
 
-`en` (English), `de` (German), `es` (Spanish), `fr` (French), `ko` (Korean), `ru` (Russian), `uk` (Ukrainian), `zh` (Chinese)
+`cs` (Czech), `de` (German), `en` (English), `es` (Spanish), `fr` (French), `it` (Italian), `ko` (Korean), `pl` (Polish), `pt` (Portuguese), `ru` (Russian), `uk` (Ukrainian), `zh` (Chinese)
 
 **UI locale with upstream fallback.** `uk` (Ukrainian) is an enabled UI locale but is **not supported by `json.tarkov.dev`**. It is mapped to `en` via `LOCALE_TO_API_MAPPING` in `app/utils/constants.ts`, so Ukrainian users see English game data while the rest of the UI remains in Ukrainian.
-
-**Locale JSON files that exist but are not currently enabled** (may be enabled in the future; Crowdin may still sync translations for these):
-
-`cs` (Czech), `it` (Italian), `pl` (Polish), `pt` (Portuguese)
 
 ---
 

@@ -283,6 +283,7 @@ describe('api-gateway', () => {
     const body = (await res.json()) as { openapi: string; info?: { title?: string } };
     expect(body.openapi).toBe('3.1.0');
     expect(body.info?.title).toBe('TarkovTracker API Gateway');
+    expect(res.headers.get('Vary')).toContain('Origin');
   });
   it('serves Scalar docs at api root', async () => {
     const res = await worker.fetch(buildRequest('/'), BASE_ENV);
@@ -889,6 +890,22 @@ describe('api-gateway', () => {
     );
     await expectErrorResponse(res, 400, 'Invalid JSON body');
   });
+  it.each([
+    ['empty array', '[]'],
+    ['empty object', '{}'],
+    ['whitespace-only task id', JSON.stringify([{ id: '   ', state: 'completed' }])],
+  ])('rejects POST /progress/tasks with %s', async (_name, body) => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(
+      buildRequest('/progress/tasks', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body,
+      }),
+      BASE_ENV
+    );
+    await expectErrorResponse(res, 400, 'Invalid request body');
+  });
   it('returns an error when the merge RPC matches no progress row', async () => {
     vi.stubGlobal(
       'fetch',
@@ -906,7 +923,7 @@ describe('api-gateway', () => {
       })
     );
     const res = await worker.fetch(postTaskRequest('task-main', { state: 'completed' }), BASE_ENV);
-    await expectErrorResponse(res, 500, 'Progress row not found for user');
+    await expectErrorResponse(res, 500, 'Internal server error');
   });
   it('does not lose unrelated keys when two writers merge concurrently', async () => {
     // Both writers read the same stale snapshot (GET always returns the
@@ -1082,6 +1099,9 @@ describe('api-gateway', () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
     const res = await worker.fetch(postTaskRequest('%E0%A4%A', { state: 'completed' }), BASE_ENV);
     await expectErrorResponse(res, 400, 'Invalid task ID in URL');
+    expect(res.headers.get('X-RateLimit-Limit')).toBe('100');
+    expect(res.headers.get('X-RateLimit-Remaining')).toBe('10');
+    expect(res.headers.get('X-RateLimit-Reset')).toMatch(/^\d+$/);
   });
   it('rejects POST /progress/task with malformed JSON body', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
@@ -1158,6 +1178,43 @@ describe('api-gateway', () => {
       BASE_ENV
     );
     await expectErrorResponse(res, 400, 'Invalid objective ID in URL');
+    expect(res.headers.get('X-RateLimit-Limit')).toBe('100');
+    expect(res.headers.get('X-RateLimit-Remaining')).toBe('10');
+    expect(res.headers.get('X-RateLimit-Reset')).toMatch(/^\d+$/);
+  });
+  it('authenticates before decoding malformed-URL task writes', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(
+      buildRequest('/progress/task/%E0%A4%A', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer tt_abc123', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'completed' }),
+      }),
+      BASE_ENV
+    );
+    await expectErrorResponse(res, 401, 'Invalid token format');
+  });
+  it('authenticates before decoding malformed-URL objective writes', async () => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(
+      buildRequest('/progress/task/objective/%E0%A4%A', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer tt_abc123', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'completed' }),
+      }),
+      BASE_ENV
+    );
+    await expectErrorResponse(res, 401, 'Invalid token format');
+  });
+  it('returns 429 (not 400) on malformed-URL writes when the daily quota is exceeded', async () => {
+    const env: Env = {
+      ...BASE_ENV,
+      API_GATEWAY_LIMITER: makeLimiter({ allowed: false, remaining: 0 }),
+    };
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(postTaskRequest('%E0%A4%A', { state: 'completed' }), env);
+    expect(res.status).toBe(429);
+    expect(res.headers.get('X-RateLimit-Remaining')).toBe('0');
   });
   it('rejects POST /progress/task/objective with malformed JSON body', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
@@ -1716,7 +1773,7 @@ describe('api-gateway', () => {
       expect(res.headers.get('Access-Control-Allow-Origin')).toBeTruthy();
       const body = (await res.json()) as { success: boolean; error: string };
       expect(body.success).toBe(false);
-      expect(body.error).toBe('digest unavailable');
+      expect(body.error).toBe('Internal server error');
     } finally {
       digest.mockRestore();
     }
@@ -1767,26 +1824,35 @@ describe('ApiGatewayRateLimiter storage cleanup', () => {
     );
   it('does not schedule a cleanup alarm when retain is set', async () => {
     const mock = createStorageMock();
-    const limiter = new ApiGatewayRateLimiter({
-      storage: mock.storage,
-    } as unknown as DurableObjectState);
+    const limiter = new ApiGatewayRateLimiter(
+      {
+        storage: mock.storage,
+      } as unknown as DurableObjectState,
+      {} as Env
+    );
     await callLimit(limiter, 5, 60, { retain: true });
     expect(mock.storage.setAlarm).not.toHaveBeenCalled();
   });
   it('schedules a cleanup alarm by default when retain is omitted', async () => {
     const mock = createStorageMock();
-    const limiter = new ApiGatewayRateLimiter({
-      storage: mock.storage,
-    } as unknown as DurableObjectState);
+    const limiter = new ApiGatewayRateLimiter(
+      {
+        storage: mock.storage,
+      } as unknown as DurableObjectState,
+      {} as Env
+    );
     const res = await callLimit(limiter);
     const body = (await res.json()) as { resetAt: number };
     expect(mock.storage.setAlarm).toHaveBeenCalledWith(body.resetAt + 1000);
   });
   it('wipes all storage when a cleanup alarm fires after expiry', async () => {
     const mock = createStorageMock();
-    const limiter = new ApiGatewayRateLimiter({
-      storage: mock.storage,
-    } as unknown as DurableObjectState);
+    const limiter = new ApiGatewayRateLimiter(
+      {
+        storage: mock.storage,
+      } as unknown as DurableObjectState,
+      {} as Env
+    );
     await callLimit(limiter, 5, 60);
     expect(mock.store.has('state')).toBe(true);
     const stored = mock.store.get('state') as { resetAt: number };
@@ -1798,9 +1864,12 @@ describe('ApiGatewayRateLimiter storage cleanup', () => {
   });
   it('retained active state is preserved by transitional alarm without rescheduling', async () => {
     const mock = createStorageMock();
-    const limiter = new ApiGatewayRateLimiter({
-      storage: mock.storage,
-    } as unknown as DurableObjectState);
+    const limiter = new ApiGatewayRateLimiter(
+      {
+        storage: mock.storage,
+      } as unknown as DurableObjectState,
+      {} as Env
+    );
     await callLimit(limiter, 5, 60, { retain: true });
     // Seed a legacy alarm over retained state (pre-deploy transitional drain).
     const stored = mock.store.get('state') as { resetAt: number };
@@ -1814,9 +1883,12 @@ describe('ApiGatewayRateLimiter storage cleanup', () => {
   });
   it('ephemeral active state is preserved and rescheduled by alarm', async () => {
     const mock = createStorageMock();
-    const limiter = new ApiGatewayRateLimiter({
-      storage: mock.storage,
-    } as unknown as DurableObjectState);
+    const limiter = new ApiGatewayRateLimiter(
+      {
+        storage: mock.storage,
+      } as unknown as DurableObjectState,
+      {} as Env
+    );
     await callLimit(limiter, 5, 60);
     const stored = mock.store.get('state') as { resetAt: number };
     mock.storage.setAlarm.mockClear();
@@ -1829,9 +1901,12 @@ describe('ApiGatewayRateLimiter storage cleanup', () => {
   });
   it('cleanup alarm wipes expired state without rescheduling', async () => {
     const mock = createStorageMock();
-    const limiter = new ApiGatewayRateLimiter({
-      storage: mock.storage,
-    } as unknown as DurableObjectState);
+    const limiter = new ApiGatewayRateLimiter(
+      {
+        storage: mock.storage,
+      } as unknown as DurableObjectState,
+      {} as Env
+    );
     await callLimit(limiter, 5, 60);
     const stored = mock.store.get('state') as { resetAt: number };
     mock.storage.setAlarm.mockClear();

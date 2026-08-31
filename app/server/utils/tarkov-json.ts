@@ -22,7 +22,9 @@ import type {
   TarkovTasksCoreQueryResult,
   Task,
   TaskObjective,
+  TaskTraderLevelRequirement,
   Trader,
+  TraderRequirement,
 } from '@/types/tarkov';
 const logger = createLogger('TarkovJson');
 const TARKOV_JSON_BASE_URL = 'https://json.tarkov.dev';
@@ -756,6 +758,54 @@ function adaptTraderRequirement(raw: unknown, context: AdapterContext) {
     trader: adaptTraderRef(raw.trader, context),
   });
 }
+const onlyIfPopulated = <T>(items: T[]): T[] | undefined => (items.length > 0 ? items : undefined);
+function readFiniteLevel(adapted: TraderRequirement & { level?: number }): number | undefined {
+  const level = adapted.level ?? adapted.value;
+  return typeof level === 'number' && Number.isFinite(level) ? level : undefined;
+}
+function pushTraderRequirement(
+  adapted: (TraderRequirement & { level?: number }) | undefined,
+  traderLevelRequirements: TaskTraderLevelRequirement[],
+  traderRequirements: TraderRequirement[]
+): void {
+  if (!adapted) return;
+  if (adapted.requirementType !== 'level') {
+    traderRequirements.push(adapted);
+    return;
+  }
+  const level = readFiniteLevel(adapted);
+  if (level === undefined) return;
+  traderLevelRequirements.push({
+    id: adapted.id,
+    trader: adapted.trader,
+    level,
+    requirementType: 'level',
+    compareMethod: adapted.compareMethod,
+  });
+}
+function adaptTraderRequirements(
+  raw: unknown,
+  context: AdapterContext
+): {
+  traderLevelRequirements?: TaskTraderLevelRequirement[];
+  traderRequirements?: TraderRequirement[];
+} {
+  if (!Array.isArray(raw)) return {};
+  const traderLevelRequirements: TaskTraderLevelRequirement[] = [];
+  const traderRequirements: TraderRequirement[] = [];
+  for (const requirement of raw) {
+    pushTraderRequirement(
+      adaptTraderRequirement(requirement, context) as
+        (TraderRequirement & { level?: number }) | undefined,
+      traderLevelRequirements,
+      traderRequirements
+    );
+  }
+  return {
+    traderLevelRequirements: onlyIfPopulated(traderLevelRequirements),
+    traderRequirements: onlyIfPopulated(traderRequirements),
+  };
+}
 // json.tarkov.dev may serialize requiredPrestige as a bare id string or as an object ref.
 // Accept both shapes.
 function adaptRequiredPrestigeRef(value: unknown): { id: string } | undefined {
@@ -781,9 +831,7 @@ function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
       : undefined,
     objectives: [],
     failConditions: [],
-    traderRequirements: Array.isArray(raw.traderRequirements)
-      ? raw.traderRequirements.map((requirement) => adaptTraderRequirement(requirement, context))
-      : undefined,
+    ...adaptTraderRequirements(raw.traderRequirements, context),
     factionName: typeof raw.factionName === 'string' ? raw.factionName : undefined,
   }) as Task;
 }

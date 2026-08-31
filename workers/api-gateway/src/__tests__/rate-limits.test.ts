@@ -127,8 +127,36 @@ describe('ApiGatewayRateLimiter durable object', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+  it.each([
+    ['malformed JSON', '{'],
+    ['null JSON', 'null'],
+    ['array JSON', '[]'],
+    ['non-positive limit', JSON.stringify({ limit: 0, windowSec: 60 })],
+    ['non-positive window', JSON.stringify({ limit: 1, windowSec: 0 })],
+    ['unsupported anchor', JSON.stringify({ limit: 1, windowSec: 60, anchor: 'sliding' })],
+    ['boolean limit', JSON.stringify({ limit: true, windowSec: 60 })],
+    ['string limit', JSON.stringify({ limit: '5', windowSec: 60 })],
+    ['single-element array limit', JSON.stringify({ limit: [5], windowSec: 60 })],
+  ])('rejects %s without touching storage', async (_name, body) => {
+    const state = makeState();
+    const getSpy = vi.spyOn(state.storage, 'get');
+    const limiter = new ApiGatewayRateLimiter(state, {} as Env);
+    const response = await limiter.fetch(
+      new Request('https://rate-limit', { method: 'POST', body })
+    );
+    expect(response.status).toBe(400);
+    expect(getSpy).not.toHaveBeenCalled();
+  });
+  it('rejects unsupported methods without touching storage', async () => {
+    const state = makeState();
+    const getSpy = vi.spyOn(state.storage, 'get');
+    const limiter = new ApiGatewayRateLimiter(state, {} as Env);
+    const response = await limiter.fetch(new Request('https://rate-limit'));
+    expect(response.status).toBe(405);
+    expect(getSpy).not.toHaveBeenCalled();
+  });
   it('anchors utc-day windows to the next UTC midnight', async () => {
-    const limiter = new ApiGatewayRateLimiter(makeState());
+    const limiter = new ApiGatewayRateLimiter(makeState(), {} as Env);
     const expectedReset = Math.floor(Date.now() / DAY_MS) * DAY_MS + DAY_MS;
     const first = await limiter.fetch(
       limiterRequest({ limit: 2, windowSec: 86400, anchor: 'utc-day' })
@@ -147,7 +175,7 @@ describe('ApiGatewayRateLimiter durable object', () => {
   it('resets utc-day counters after midnight', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-05T23:59:30Z'));
-    const limiter = new ApiGatewayRateLimiter(makeState());
+    const limiter = new ApiGatewayRateLimiter(makeState(), {} as Env);
     const payload = { limit: 1, windowSec: 86400, anchor: 'utc-day' };
     const first = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
       allowed: boolean;
@@ -166,7 +194,7 @@ describe('ApiGatewayRateLimiter durable object', () => {
     expect(afterMidnight.resetAt).toBe(Date.parse('2026-07-07T00:00:00Z'));
   });
   it('keeps legacy fixed-window behavior for payloads without mode or anchor', async () => {
-    const limiter = new ApiGatewayRateLimiter(makeState());
+    const limiter = new ApiGatewayRateLimiter(makeState(), {} as Env);
     const payload = { limit: 2, windowSec: 60 };
     const first = (await (await limiter.fetch(limiterRequest(payload))).json()) as {
       allowed: boolean;
@@ -191,7 +219,7 @@ describe('ApiGatewayRateLimiter durable object', () => {
         windowSec: 3600,
         anchor: 'utc-day',
       });
-      const limiter = new ApiGatewayRateLimiter(state);
+      const limiter = new ApiGatewayRateLimiter(state, {} as Env);
       const res = (await (
         await limiter.fetch(limiterRequest({ limit: 1, windowSec: 86400, anchor: 'utc-day' }))
       ).json()) as { allowed: boolean; remaining: number };
@@ -213,7 +241,7 @@ describe('ApiGatewayRateLimiter durable object', () => {
         mode: 'sliding',
         timestamps: [Date.parse('2026-07-05T10:59:00Z')],
       });
-      const limiter = new ApiGatewayRateLimiter(state);
+      const limiter = new ApiGatewayRateLimiter(state, {} as Env);
       const res = (await (
         await limiter.fetch(limiterRequest({ limit: 1, windowSec: 86400, anchor: 'utc-day' }))
       ).json()) as { allowed: boolean; resetAt: number };
@@ -226,7 +254,7 @@ describe('ApiGatewayRateLimiter durable object', () => {
   it('does not re-read storage on repeated calls within one object lifetime', async () => {
     const state = makeState();
     const getSpy = vi.spyOn(state.storage, 'get');
-    const limiter = new ApiGatewayRateLimiter(state);
+    const limiter = new ApiGatewayRateLimiter(state, {} as Env);
     await limiter.fetch(limiterRequest({ limit: 5, windowSec: 60 }));
     const firstCallCount = getSpy.mock.calls.length;
     await limiter.fetch(limiterRequest({ limit: 5, windowSec: 60 }));
@@ -235,7 +263,7 @@ describe('ApiGatewayRateLimiter durable object', () => {
   it('does not call setAlarm when retain is set', async () => {
     const state = makeState();
     const setAlarmSpy = vi.spyOn(state.storage, 'setAlarm');
-    const limiter = new ApiGatewayRateLimiter(state);
+    const limiter = new ApiGatewayRateLimiter(state, {} as Env);
     await limiter.fetch(
       limiterRequest({ limit: 5, windowSec: 60, anchor: 'utc-day', retain: true })
     );
@@ -248,7 +276,7 @@ describe('ApiGatewayRateLimiter durable object', () => {
       vi.setSystemTime(new Date('2026-07-05T12:00:00Z'));
       const state = makeState();
       const setAlarmSpy = vi.spyOn(state.storage, 'setAlarm');
-      const limiter = new ApiGatewayRateLimiter(state);
+      const limiter = new ApiGatewayRateLimiter(state, {} as Env);
       const res = await limiter.fetch(limiterRequest({ limit: 5, windowSec: 60 }));
       const body = (await res.json()) as { allowed: boolean; resetAt: number };
       expect(body.allowed).toBe(true);
@@ -271,7 +299,7 @@ describe('ApiGatewayRateLimiter durable object', () => {
         resetAt,
         windowSec: 60,
       });
-      const limiter = new ApiGatewayRateLimiter(state);
+      const limiter = new ApiGatewayRateLimiter(state, {} as Env);
       const res = await limiter.fetch(limiterRequest({ limit: 5, windowSec: 60 }));
       const body = (await res.json()) as { allowed: boolean; resetAt: number };
       expect(body.allowed).toBe(true);
@@ -297,7 +325,7 @@ describe('ApiGatewayRateLimiter durable object', () => {
       });
       await state.storage.setAlarm(resetAt + 1000);
       const setAlarmSpy = vi.spyOn(state.storage, 'setAlarm');
-      const limiter = new ApiGatewayRateLimiter(state);
+      const limiter = new ApiGatewayRateLimiter(state, {} as Env);
       await limiter.alarm();
       expect(setAlarmSpy).toHaveBeenCalledWith(resetAt + 1000);
       const stored = await state.storage.get<RateLimitState>('state');
@@ -321,7 +349,7 @@ describe('ApiGatewayRateLimiter durable object', () => {
       const deleteAlarmSpy = vi.spyOn(state.storage, 'deleteAlarm');
       const deleteAllSpy = vi.spyOn(state.storage, 'deleteAll');
       const setAlarmSpy = vi.spyOn(state.storage, 'setAlarm');
-      const limiter = new ApiGatewayRateLimiter(state);
+      const limiter = new ApiGatewayRateLimiter(state, {} as Env);
       await limiter.alarm();
       expect(deleteAlarmSpy).toHaveBeenCalledTimes(1);
       expect(deleteAllSpy).toHaveBeenCalledTimes(1);
@@ -349,7 +377,7 @@ describe('ApiGatewayRateLimiter durable object', () => {
       const setAlarmSpy = vi.spyOn(state.storage, 'setAlarm');
       const deleteAlarmSpy = vi.spyOn(state.storage, 'deleteAlarm');
       const deleteAllSpy = vi.spyOn(state.storage, 'deleteAll');
-      const limiter = new ApiGatewayRateLimiter(state);
+      const limiter = new ApiGatewayRateLimiter(state, {} as Env);
       await limiter.alarm();
       expect(setAlarmSpy).not.toHaveBeenCalled();
       expect(deleteAlarmSpy).not.toHaveBeenCalled();
@@ -371,7 +399,7 @@ describe('ApiGatewayRateLimiter durable object', () => {
       });
       const deleteAlarmSpy = vi.spyOn(state.storage, 'deleteAlarm');
       const deleteAllSpy = vi.spyOn(state.storage, 'deleteAll');
-      const limiter = new ApiGatewayRateLimiter(state);
+      const limiter = new ApiGatewayRateLimiter(state, {} as Env);
       await limiter.alarm();
       expect(deleteAlarmSpy).toHaveBeenCalledTimes(1);
       expect(deleteAllSpy).toHaveBeenCalledTimes(1);

@@ -46,58 +46,9 @@ Deno.serve(async (req) => {
     }
     // Check if user is the owner
     if (membership.role === 'owner') {
-      // Check if there are other members
-      const { data: otherMembers, error: membersError } = await supabase
-        .from('team_memberships')
-        .select('user_id')
-        .eq('team_id', teamId)
-        .neq('user_id', user.id);
-      if (membersError) {
-        console.error('Members check failed:', membersError);
-        return createErrorResponse('Failed to check team members', 500, req);
-      }
-      if (otherMembers && otherMembers.length > 0) {
-        return createErrorResponse(
-          'Team owner cannot leave while team has other members. Transfer ownership or kick all members first.',
-          400,
-          req
-        );
-      }
-      // If no other members, disband the team by:
-      // 1. Clear user_system team_id first (to avoid FK constraint)
-      const { error: systemError } = await supabase.from('user_system').upsert({
-        user_id: user.id,
-        [teamIdColumn]: null,
-        updated_at: new Date().toISOString(),
-      });
-      if (systemError) {
-        console.error('user_system upsert failed:', systemError);
-        if (systemError.code !== '42P01' && systemError.code !== '42703') {
-          return createErrorResponse('Failed to update user system state', 500, req);
-        }
-        console.warn('user_system table missing, continuing without system state update');
-      }
-      // 2. Delete all memberships (including owner's)
-      const { error: membershipDeleteError } = await supabase
-        .from('team_memberships')
-        .delete()
-        .eq('team_id', teamId);
-      if (membershipDeleteError) {
-        console.error('Membership deletion failed:', membershipDeleteError);
-        return createErrorResponse('Failed to delete team memberships', 500, req);
-      }
-      // 3. Finally delete the team
-      const { error: teamDeleteError } = await supabase.from('teams').delete().eq('id', teamId);
-      if (teamDeleteError) {
-        console.error('Team deletion failed:', teamDeleteError);
-        return createErrorResponse('Failed to delete team', 500, req);
-      }
-      return createSuccessResponse(
-        {
-          success: true,
-          message: 'Team deleted successfully (owner left empty team)',
-        },
-        200,
+      return createErrorResponse(
+        'Team owners must disband their team through the confirmed disband action.',
+        400,
         req
       );
     }

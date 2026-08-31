@@ -4,6 +4,20 @@
     "error_title": "Connection Error",
     "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
     "no_reference": "N/A",
+    "error": {
+      "admin_privileges_required": "Você não tem permissão para executar esta ação.",
+      "authentication_required": "Você precisa estar conectado para continuar.",
+      "invalid_channel": "Insira um nome de canal da Twitch válido.",
+      "invalid_display_name": "Informe um nome de exibição válido.",
+      "invalid_enabled_flag": "O valor habilitado é inválido",
+      "invalid_request_body": "O corpo da solicitação é inválido.",
+      "invalid_target_user_id": "Insira um ID de usuário válido.",
+      "invalid_tier": "Selecione um nível de su!supporter válido.",
+      "service_config_missing": "O serviço de administração não está configurado.",
+      "supabase_request_failed": "O serviço de administração não pôde completar a solicitação.",
+      "supporter_update_failed": "Não foi possível atualizar o acesso ao suporte.",
+      "twitch_config_update_failed": "Não foi possível atualizar as configurações da Twitch."
+    },
     "access_warning_title": "Admin Access",
     "access_warning_description": "Actions performed here affect all users. Logged in as {user}.",
     "cache_management_title": "Cache Management",
@@ -44,14 +58,25 @@
     "supporter_target_user_label": "User ID",
     "supporter_target_user_placeholder": "Supabase auth user UUID",
     "supporter_tier_label": "Tier",
-    "supporter_enabled_label": "Enabled",
-    "supporter_disabled_label": "Disabled",
     "supporter_override_login_required": "You must be signed in to update supporter access.",
     "supporter_override_saved_title": "Supporter access updated",
     "supporter_override_enabled_description": "Enabled {tier} supporter access.",
     "supporter_override_disabled_description": "Disabled active supporter access.",
-    "supporter_override_failed_title": "Update failed",
-    "supporter_override_failed_description": "Could not update supporter access."
+    "supporter_override_failed_description": "Could not update supporter access.",
+    "twitch_config_title": "Transmissão Twitch",
+    "twitch_config_description": "Defina o canal da Twitch promovido no canto do site. Os visitantes retomam a alteração em alguns minutos.",
+    "twitch_channel_label": "Canal",
+    "twitch_channel_placeholder": "Nome do canal Twitch",
+    "twitch_display_name_label": "Nome para exibição",
+    "twitch_display_name_placeholder": "Nome do canal",
+    "twitch_config_saved_title": "Configuração do Twitch atualizada",
+    "twitch_config_saved_description": "A transmissão promovida agora é {channel}.",
+    "twitch_config_saved_with_warning_title": "Configuração do Twitch salva",
+    "twitch_config_saved_with_warning_description": "A configuração foi salva, mas os visitantes podem ver o valor anterior em cache.",
+    "twitch_config_failed_description": "Não foi possível atualizar as configurações da Twitch.",
+    "twitch_config_load_failed_title": "Configuração do Twitch indisponível",
+    "twitch_config_load_failed_description": "Não foi possível carregar a configuração atual da Twitch",
+    "twitch_config_login_required": "Você deve estar logado para atualizar as configurações do Twitch."
   },
   "alerts": {
     "no_map_data": "No map data available for this selection."
@@ -198,6 +223,9 @@
     "refresh_button": "Try again",
     "opens_in_new_tab": "Opens in new tab",
     "available": "Disponível",
+    "enabled": "Ativado",
+    "disabled": "Desabilitado",
+    "update_failed": "Falha na atualização",
     "tasks": "Tarefas",
     "level": "Nível",
     "locked": "Trancado",
@@ -306,7 +334,8 @@
     "reset_all_data": "Redefinir todos os dados",
     "import_failed": "Importação Falhou",
     "delete_archived_run": "Excluir Corrida Arquivada",
-    "validation_error": "Erro de validação"
+    "validation_error": "Erro de validação",
+    "got_it": "Eu tenho que"
   },
   "page_help": {
     "button": "Help",
@@ -486,20 +515,44 @@
       "pmc_spawns": "PMC Spawns"
     },
     "legend": {
-      "your_objectives": "Your Objectives",
-      "team_objectives": "Team Objectives",
+      "regular": "Padrão",
+      "pinned": "Fixado",
+      "team": "Equipe",
       "shared_extract": "Shared Extract (Either Faction)",
       "coop_extract": "Co-op Extract (PMC + Scav)"
     },
-    "controls": {
-      "keyboard": {
-        "pan": "to Pan",
-        "zoom_keys": "to Zoom",
-        "click": "to Click at Cursor",
-        "reset": "to Reset View",
-        "cycle_floors": "+ Scroll to Cycle Floors",
-        "zoom": "+ Scroll to Zoom"
-      }
+    "tooltips": {
+      "zoom_in": "Aumentar zoom",
+      "zoom_out": "Diminuir zoom",
+      "reset_view": "Redefinir visão",
+      "open_fullscreen": "Abrir mapa em tela cheia",
+      "exit_fullscreen": "Sair da tela cheia",
+      "drag_to_resize": "Arraste para redimensionar o mapa",
+      "switch_floor": "Trocar chão (Ctrl + Scroll)"
+    },
+    "help": {
+      "title": "Controles do mapa",
+      "groups": {
+        "navigate": "Navigate",
+        "floors": "Andares",
+        "interact": "Interagir",
+        "view": "Visualizar"
+      },
+      "pan": "{keys} ou arraste para subir",
+      "zoom": "{keys} para ampliar",
+      "reset": "{key} para redefinir a visão",
+      "cycle_floors": "{keys} para ciclo de andares",
+      "floor_panel": "Ou use o painel do chão.",
+      "click_at_cursor": "{key} para clicar no cursor",
+      "click_marker": "Clique em um marcador para detalhes.",
+      "fullscreen": "Use o botão de tela cheia nos controles do mapa.",
+      "resize": "Arraste a borda inferior do mapa para redimensionar."
+    },
+    "hint": {
+      "title": "Controles rápidos de mapa",
+      "summary": "Arraste para pan · Shift + Rolar para ampliar",
+      "summary_multi_floor": "Arraste para pan · Shift + Role para ampliar · Ctrl + Role para alterar os andares",
+      "all_controls": "Todos os controles"
     },
     "aria": {
       "tooltip_density": "Tooltip density"
@@ -898,7 +951,9 @@
       "loading": "Loading tasks",
       "map": {
         "resize_handle": "Resize map height",
-        "toggle_panel": "Toggle map panel",
+        "show_map": "Mostrar mapa",
+        "hide_map": "Ocultar mapa",
+        "fullscreen_label": "Tela cheia",
         "required_items_summary": "Required items for active tasks",
         "required_keys_summary": "Required keys for active tasks",
         "time_period": {
@@ -911,7 +966,9 @@
         "map_complete_tasks_hidden": "{count} tasks hidden on this map.",
         "map_complete_tasks_showing": "{count} map-complete tasks shown on this map.",
         "map_complete_tasks_toggle_show": "Show hidden",
-        "map_complete_tasks_toggle_hide": "Hide map-complete"
+        "map_complete_tasks_toggle_hide": "Hide map-complete",
+        "map_hidden_hint": "Mapa oculto - clique para mostrar",
+        "raid_time_tooltip": "Tempo atual de incursão no jogo"
       },
       "pinned_tasks_section": "Pinned Tasks",
       "focused_task_section": "Focused Task",
@@ -1152,6 +1209,51 @@
       "meta": {
         "description": "Collaborate with teammates on Escape from Tarkov progress. Share quest completions, hideout status, and coordinate item gathering."
       },
+      "page_title": "Equipe",
+      "page_description": "Convide colegas, escolha o progresso da equipe que você vê e acompanhe juntos.",
+      "invite": {
+        "title": "Link de convite",
+        "subtitle": "Compartilhe sua equipe com seus companheiros de equipe.",
+        "link_label": "Convite para equipe URL",
+        "helper": "Qualquer um com este link pode se juntar à sua equipe.",
+        "show": "Mostrar link",
+        "hide": "Ocultar link",
+        "copy": "Link de cópia",
+        "copied": "Copiado!"
+      },
+      "members": {
+        "title": "Membros ({count})",
+        "no_members": "Nenhum membro desta equipe ainda. Compartilhe seu link de convite para adicionar colegas de equipe.",
+        "alone": "Você está sozinho - compartilhe seu link de convite para adicionar colegas.",
+        "copy_invite": "Copiar link do convite",
+        "copied": "Copiado!"
+      },
+      "visibility": {
+        "title": "Configurações de visibilidade",
+        "description": "Controle qual o progresso dos colegas de equipe aparece no seu rastreador.",
+        "items_section": "itens",
+        "show_tasks": "Mostrar tarefas dos membros da equipe",
+        "show_items": "Mostrar itens necessários dos membros da equipe",
+        "show_non_fir": "Mostrar itens não-FIR necessários",
+        "show_hideout": "Mostrar itens necessários para esconder",
+        "show_maps": "Mostrar objetivos do mapa dos membros da equipe"
+      },
+      "danger_zone": {
+        "title": "Zona de perigo",
+        "disband_description": "A dissolução remove a equipe para todos os membros. Esta ação não pode ser desfeita.",
+        "leave_description": "Deixar o remove desta equipe. Seu progresso permanece na sua conta.",
+        "disband": "Dissolver equipe",
+        "leave": "Leave team",
+        "confirm_disband_title": "Dissolver equipe?",
+        "confirm_disband_description": "Isso remove a equipe e sua filiação para todos. Isso não pode ser desfeito.",
+        "confirm_leave_title": "Sair da equipe?",
+        "confirm_leave_description": "Você deixará esta equipe e deixará de compartilhar o progresso com seus membros.",
+        "confirm_disband": "Sim, dissolver a equipe",
+        "confirm_leave": "Sim, sair da equipe",
+        "disband_success": "Equipe dissolvida com sucesso.",
+        "disband_error": "Falha ao dissolver equipe.",
+        "action_error": "Não foi possível atualizar a associação da equipe."
+      },
       "card": {
         "manageteam": {
           "title": "Team Members",
@@ -1161,7 +1263,12 @@
             "owner": "Owner",
             "taskscomplete": "{completed}/{total} tasks completed",
             "kick_success": "Teammate kicked successfully.",
-            "kick_error": "Error kicking teammate."
+            "kick_error": "Error kicking teammate.",
+            "level_badge_alt": "Emblema de nível {level}",
+            "hide_progress": "Ocultar meu progresso de {name}",
+            "show_progress": "Mostrar progresso de {name}para mim",
+            "enable_team_tasks": "Exibir tarefas dos membros da equipe antes de alterar um membro individual",
+            "remove_member": "Remover {name} da equipe"
           }
         },
         "teamoptions": {
@@ -1187,6 +1294,7 @@
           "url_copied": "URL copiado para área de transferência",
           "copy_url_failed": "Falha ao copiar URL para área de transferência",
           "no_team": "You are not currently in a team.",
+          "login_required": "Entre para criar uma equipe ou gerenciar o link de convite de sua equipe.",
           "team_invite_url_label": "Team Invite URL",
           "copy_link": "Copy",
           "link_hidden_message": "Click 'Show' to reveal your team invite link",
@@ -1561,6 +1669,7 @@
     "tarkovguru": "Tarkov Guru",
     "tarkovmonitor": "Tarkov Monitor",
     "resources": "Resources",
+    "section_more": "MAIS",
     "profile": "Profile",
     "section_navigation": "Navigation",
     "section_external": "External Tools",
@@ -1696,13 +1805,17 @@
   },
   "settings": {
     "locale": "Language",
+    "page_description": "Gerencie sua conta, progresso do jogo e preferências do aplicativo.",
     "tabs": {
       "progression": "Progression",
       "imports": "Imports"
     },
     "tab_groups": {
-      "game": "Game",
-      "account_advanced": "Account & Advanced"
+      "game_progress": "Progresso do Jogo",
+      "app": "Aplicativo",
+      "data": "Dado",
+      "account": "conta",
+      "tools_integrations": "Ferramentas e Integrações"
     },
     "tab_seo": {
       "progression": {
@@ -1750,7 +1863,8 @@
       "copy_button": "Copy Debug State"
     },
     "general": {
-      "privacy_mode": "Streamer Mode",
+      "title": "Preferências Gerais",
+      "privacy_mode": "Privacy Mode",
       "privacy_mode_hint": "Hides sensitive information while you're streaming."
     },
     "interface": {
@@ -1761,7 +1875,10 @@
         "show_next": "Show Next Quests",
         "show_prev": "Show Previous Quests",
         "density": "Card Density",
-        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability"
+        "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
+        "flags_section": "Exibição de tarefas",
+        "availability_section": "Disponibilidade de tarefas",
+        "view_defaults_section": "Visualizações padrão"
       },
       "maps": {
         "show_extracts": "Show Extracts by Default",
@@ -1772,6 +1889,7 @@
           "title": "Map Colors",
           "description": "Set marker colors for better readability and accessibility.",
           "self_objective": "Your Objective",
+          "pinned_objective": "Tarefa Fixada",
           "team_objective": "Team Objective",
           "selected": "Pinned Objective",
           "shared_extract": "Shared Extract",
@@ -1852,6 +1970,8 @@
       "export_error_title": "Export Failed",
       "debug_export_error_title": "Debug Export Failed",
       "reset_title": "Reset Progress",
+      "danger_zone_title": "Zona de Perigo",
+      "danger_zone_hint": "Redefinir todo o progresso exclui permanentemente seus dados para PvP, PvE e PvP sazonal. Isso não pode ser desfeito.",
       "prestige_history_title": "Prestige History",
       "prestige_history_loading": "Loading prestige history...",
       "prestige_history_empty": "No archived prestige runs yet.",
@@ -2016,7 +2136,7 @@
       "summary_description_manual": "{count} requirement(s) still need manual in-game verification."
     },
     "display_name": {
-      "explanation": "Your display name is shown to teammates and in the navigation. Each game mode (PVP/PVE) has a separate display name.",
+      "explanation": "Your display name is shown to teammates and in the navigation. Each game mode (PvP, PvE, Seasonal PvP) has a separate display name. The panel for your currently active mode is highlighted.",
       "label": "Display Name",
       "placeholder": "Enter your display name...",
       "save": "Save",
@@ -2025,7 +2145,9 @@
       "saved_title": "Display Name Saved",
       "saved_description": "Your {mode} display name has been updated",
       "save_failed_title": "Save Failed",
-      "save_failed_description": "Failed to save display name. Please try again."
+      "save_failed_description": "Failed to save display name. Please try again.",
+      "active_mode": "ativo",
+      "game_edition_hint": "Selecione a edição do jogo que você possui, então o rastreamento corresponde ao seu conteúdo disponível."
     },
     "skills": {
       "title": "Skills Management",
@@ -2042,7 +2164,10 @@
       "valid_range": "Valid range: 0-51",
       "sort": {
         "ingame": "In-Game"
-      }
+      },
+      "quest_tooltip": "Nível de habilidade concedido automaticamente por completar recompensas de missões.",
+      "offset_tooltip": "Ajuste manual em cima do nível de recompensa da missão. Positivo significa que você treinou a habilidade acima das recompensas da missão.",
+      "collapsed_hint": "Mostrando {shown} de {total} habilidades. Mostre todas para ver cada habilidade."
     },
     "keybinds": {
       "title": "Keyboard Shortcuts",
@@ -2052,6 +2177,7 @@
       "undo_description": "Press this shortcut to revert your most recent progress change.",
       "record_placeholder": "Click to record...",
       "recording": "Press key combination...",
+      "listening": "Escutando...",
       "reset_aria": "Reset to default",
       "conflict_omnibar": "Shortcut conflicts with Undo keybind.",
       "conflict_undo": "Shortcut conflicts with Search keybind.",
@@ -2068,9 +2194,12 @@
       "manual_hint": "Enter your actual total XP to adjust the offset automatically.",
       "xp_amount": "{amount} XP",
       "xp_to_next": "{amount} to next",
-      "reset_offset": "Reset XP Offset"
+      "reset_offset": "Reset XP Offset",
+      "xp_progress_aria": "Experiencie o progresso para o próximo nível",
+      "xp_progress_value": "{percent}% em direção ao próximo nível"
     },
     "danger_zone": {
+      "confirm_instruction": "Digite {word} para confirmar a redefinição de todos os dados:",
       "confirm_word": "DELETE"
     },
     "log_import": {

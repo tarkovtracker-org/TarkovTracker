@@ -151,7 +151,7 @@ jobs:
           deno-version: v2.9.4
       - name: Run Deno tests
         if: matrix.shard == 1
-        run: deno test supabase/functions/_shared/team-mode.deno.test.ts
+        run: deno test supabase/functions/_shared/*.deno.test.ts
       - name: Run shard ${{ matrix.shard }}/${{ matrix.total }}
         run: pnpm exec vitest run --coverage --shard=${{ matrix.shard }}/${{ matrix.total }}
       - name: Upload coverage to Codecov
@@ -281,8 +281,10 @@ jobs:
       - name: Validate api-gateway
         if: hashFiles('workers/api-gateway/package.json') != ''
         run: |
+          pnpm --filter api-gateway run types:check
           pnpm --filter api-gateway run typecheck
           pnpm --filter api-gateway run validate:openapi
+          pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run
       - name: Test api-gateway
         if: hashFiles('workers/api-gateway/package.json') != ''
         run: pnpm run test:api-gateway

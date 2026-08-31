@@ -63,7 +63,7 @@ TarkovTracker, visit **<https://tarkovtracker.org>** — no setup required.
 ### Local development
 
 ```bash
-corepack enable        # enables pnpm via Corepack (Node >=24.12.0)
+corepack enable        # enables pnpm via Corepack (Node >=24.19.0)
 pnpm install
 pnpm run dev           # http://localhost:3000
 ```

@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, writeFileSync, type Dirent } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveTrustProxySetting } from './app/utils/apiProtectionConfig';
+import { ENTRY_RECOVERY_SCRIPT } from './app/utils/entryRecoveryScript';
 import { SUPPORTED_LOCALES } from './app/utils/locales';
 import {
   assertCloudflarePagesOutput,
@@ -208,8 +209,7 @@ export default defineNuxtConfig({
       promotedTwitch: {
         channel: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_CHANNEL || 'honeyxxo',
         displayName: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_DISPLAY_NAME || 'honeyxxo',
-        enabled: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED !== 'false',
-        endsAt: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_ENDS_AT || '2026-06-09T00:00:00+00:00',
+        enabled: process.env.NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED === 'true',
       },
     },
   },
@@ -316,6 +316,9 @@ export default defineNuxtConfig({
         },
       ],
       script: [
+        {
+          innerHTML: ENTRY_RECOVERY_SCRIPT,
+        },
         {
           innerHTML: [
             'try{',

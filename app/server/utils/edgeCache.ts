@@ -9,6 +9,7 @@ import { useRuntimeConfig } from '#imports';
 import { buildEdgeCacheRequest } from '@/server/utils/edgeCacheKey';
 import { sanitizeErrorMessage } from '@/server/utils/edgeCacheSanitizers';
 import { createLogger } from '@/server/utils/logger';
+import { buildOverlayResponseHeaders } from '@/server/utils/overlayResponseHeaders';
 import { getPrecomputedStore, isPrecomputedEnvelope } from '@/server/utils/precomputedTarkov';
 import type { PrecomputedKvReader } from '@/server/utils/precomputedTarkov';
 import type { H3Event } from 'h3';
@@ -73,10 +74,7 @@ function setCacheResponseHeaders(
     'X-Cache-Status': status,
     'X-Cache-Key': fullCacheKey,
     'Cache-Control': cacheControl,
-    ...(overlayMeta?.status ? { 'X-Overlay-Status': overlayMeta.status } : {}),
-    ...(overlayMeta?.version ? { 'X-Overlay-Version': overlayMeta.version } : {}),
-    ...(overlayMeta?.generated ? { 'X-Overlay-Generated': overlayMeta.generated } : {}),
-    ...(overlayMeta?.sha256 ? { 'X-Overlay-Sha256': overlayMeta.sha256 } : {}),
+    ...buildOverlayResponseHeaders(overlayMeta),
   });
 }
 function getCloudflareCacheFromGlobal(): CacheLike | undefined {

@@ -10,15 +10,16 @@ import type { PostgrestError, RealtimeChannel } from '@supabase/supabase-js';
  * Now handles game-mode-specific team IDs (pvp_team_id, pve_team_id).
  * Falls back to legacy team/team_id for backwards compatibility.
  */
+const getLegacyTeamId = (state: SystemState): string | null =>
+  [state.team, state.team_id].find((teamId) => typeof teamId === 'string' && teamId.length > 0) ??
+  null;
 export function getTeamIdFromState(state: SystemState, gameMode?: GameMode): string | null {
   const mode = gameMode || getCurrentGameMode();
-  if (mode === 'seasonal') {
-    return state.seasonal_team_id ?? null;
-  }
-  if (mode === 'pve') {
-    return state.pve_team_id ?? state.team ?? state.team_id ?? null;
-  }
-  return state.pvp_team_id ?? state.team ?? state.team_id ?? null;
+  const modeSpecificTeamId = state[getTeamIdStateKey(mode)];
+  if (modeSpecificTeamId) return modeSpecificTeamId;
+  if (mode === 'seasonal') return null;
+  if ([state.pvp_team_id, state.pve_team_id].some(Boolean)) return null;
+  return getLegacyTeamId(state);
 }
 export function getTeamIdStateKey(
   gameMode: GameMode

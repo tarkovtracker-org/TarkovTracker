@@ -1,0 +1,4 @@
+ALTER TABLE public.user_preferences
+  ADD COLUMN IF NOT EXISTS map_show_self_objectives BOOLEAN DEFAULT TRUE NOT NULL,
+  ADD COLUMN IF NOT EXISTS map_show_pinned_objectives BOOLEAN DEFAULT TRUE NOT NULL,
+  ADD COLUMN IF NOT EXISTS map_show_team_objectives BOOLEAN DEFAULT TRUE NOT NULL;

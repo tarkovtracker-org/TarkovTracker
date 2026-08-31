@@ -123,6 +123,16 @@ export const CURRENCY_ITEM_IDS = [
   '5449016a4bdc2d6f028b456f', // Roubles (RUB)
   '569668774bdc2da2298b4568', // Euros (EUR)
 ] as const;
+export type CurrencyItemId = (typeof CURRENCY_ITEM_IDS)[number];
+export const CURRENCY_SYMBOLS = {
+  '5449016a4bdc2d6f028b456f': '₽',
+  '5696686a4bdc2da3298b456a': '$',
+  '569668774bdc2da2298b4568': '€',
+} as const satisfies Record<CurrencyItemId, string>;
+export const isCurrencyItemId = (itemId: string): itemId is CurrencyItemId =>
+  CURRENCY_ITEM_IDS.includes(itemId as CurrencyItemId);
+export const getCurrencySymbol = (itemId: string): string | null =>
+  isCurrencyItemId(itemId) ? CURRENCY_SYMBOLS[itemId] : null;
 // API Language Configuration
 export const API_SUPPORTED_LANGUAGES = [
   'cs', // Czech

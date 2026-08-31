@@ -4,6 +4,20 @@
     "error_title": "Erreur de Connexion",
     "load_error_description": "Impossible de charger les données admin. Veuillez actualiser ou contacter le support. Référence : {reference}",
     "no_reference": "N/A",
+    "error": {
+      "admin_privileges_required": "Vous n'avez pas la permission d'effectuer cette action.",
+      "authentication_required": "Vous devez être connecté pour continuer.",
+      "invalid_channel": "Entrez un nom de chaîne Twitch valide.",
+      "invalid_display_name": "Entrez un nom d'affichage valide.",
+      "invalid_enabled_flag": "La valeur activée est invalide.",
+      "invalid_request_body": "Le corps de la requête n'est pas valide.",
+      "invalid_target_user_id": "Entrez un identifiant d'utilisateur valide.",
+      "invalid_tier": "Sélectionnez un niveau de supporter valide.",
+      "service_config_missing": "Le service d'administration n'est pas configuré.",
+      "supabase_request_failed": "Le service d'administration n'a pas pu compléter la requête.",
+      "supporter_update_failed": "Impossible de mettre à jour l'accès du supporteur.",
+      "twitch_config_update_failed": "Impossible de mettre à jour la configuration de Twitch."
+    },
     "access_warning_title": "Accès admin",
     "access_warning_description": "Les actions effectuées ici affectent tous les utilisateurs. Connecté en tant que {user}.",
     "cache_management_title": "Gestion du cache",
@@ -44,14 +58,25 @@
     "supporter_target_user_label": "ID utilisateur",
     "supporter_target_user_placeholder": "UUID de l'utilisateur Supabase Auth",
     "supporter_tier_label": "Niveau",
-    "supporter_enabled_label": "Activé",
-    "supporter_disabled_label": "Désactivé",
     "supporter_override_login_required": "Vous devez être connecté pour mettre à jour l'accès Supporter.",
     "supporter_override_saved_title": "Accès Supporter mis à jour",
     "supporter_override_enabled_description": "Accès Supporter {tier} activé.",
     "supporter_override_disabled_description": "Accès du Supporter actif désactivé.",
-    "supporter_override_failed_title": "Echec de la mise à jour",
-    "supporter_override_failed_description": "Impossible de mettre à jour l'accès du supporteur."
+    "supporter_override_failed_description": "Impossible de mettre à jour l'accès du supporteur.",
+    "twitch_config_title": "Flux Twitch",
+    "twitch_config_description": "Définissez la chaîne Twitch promue dans le coin du site. Les visiteurs récupèrent le changement dans quelques minutes.",
+    "twitch_channel_label": "Chaîne",
+    "twitch_channel_placeholder": "Nom de la chaîne Twitch",
+    "twitch_display_name_label": "Nom affiché",
+    "twitch_display_name_placeholder": "Nom d'affichage du canal",
+    "twitch_config_saved_title": "Configuration Twitch mise à jour",
+    "twitch_config_saved_description": "Le flux promu est maintenant {channel}.",
+    "twitch_config_saved_with_warning_title": "Configuration Twitch enregistrée",
+    "twitch_config_saved_with_warning_description": "La configuration a été enregistrée, mais les visiteurs en cache peuvent toujours voir la valeur précédente.",
+    "twitch_config_failed_description": "Impossible de mettre à jour la configuration de Twitch.",
+    "twitch_config_load_failed_title": "Configuration Twitch indisponible",
+    "twitch_config_load_failed_description": "Impossible de charger la configuration actuelle de Twitch.",
+    "twitch_config_login_required": "Vous devez être connecté pour mettre à jour la configuration de Twitch."
   },
   "alerts": {
     "no_map_data": "Aucune donnée de carte disponible pour cette sélection."
@@ -198,6 +223,9 @@
     "refresh_button": "Actualiser",
     "opens_in_new_tab": "Ouvre dans un nouvel onglet",
     "available": "Disponible",
+    "enabled": "Activé",
+    "disabled": "Désactivé",
+    "update_failed": "La mise à jour a échoué",
     "tasks": "Tâches",
     "level": "Niveau",
     "locked": "Verrouillé",
@@ -306,7 +334,8 @@
     "reset_all_data": "Réinitialiser toutes les données",
     "import_failed": "Importation échouée",
     "delete_archived_run": "Supprimer la partie archivée",
-    "validation_error": "Erreur de validation"
+    "validation_error": "Erreur de validation",
+    "got_it": "Compris"
   },
   "page_help": {
     "button": "Aide",
@@ -486,20 +515,44 @@
       "pmc_spawns": "Spawns PMC"
     },
     "legend": {
-      "your_objectives": "Vos objectifs",
-      "team_objectives": "Objectifs de l'équipe",
+      "regular": "Régulièrement",
+      "pinned": "Épinglé",
+      "team": "Equipe",
       "shared_extract": "Extraction partagée (n'importe quelle faction)",
       "coop_extract": "Extraction coop (PMC + Scav)"
     },
-    "controls": {
-      "keyboard": {
-        "pan": "pour déplacer",
-        "zoom_keys": "pour zoomer",
-        "click": "pour cliquer au curseur",
-        "reset": "pour réinitialiser la vue",
-        "cycle_floors": "+ Faire défiler pour changer d'étage",
-        "zoom": "+ Faire défiler pour zoomer"
-      }
+    "tooltips": {
+      "zoom_in": "Zoom avant",
+      "zoom_out": "Zoom arrière",
+      "reset_view": "Réinitialiser la vue",
+      "open_fullscreen": "Ouvrir la carte en plein écran",
+      "exit_fullscreen": "Quitter le mode plein écran",
+      "drag_to_resize": "Glisser pour redimensionner la carte",
+      "switch_floor": "Commuter le plancher (Ctrl + défilement)"
+    },
+    "help": {
+      "title": "Contrôles de la carte",
+      "groups": {
+        "navigate": "Navigate",
+        "floors": "Étages",
+        "interact": "Interagir",
+        "view": "Voir"
+      },
+      "pan": "{keys} ou faites glisser vers la poêle",
+      "zoom": "{keys} pour zoomer",
+      "reset": "{key} pour réinitialiser la vue",
+      "cycle_floors": "{keys} to cycle floors",
+      "floor_panel": "Ou utilisez le panneau de plancher.",
+      "click_at_cursor": "{key} pour cliquer au curseur",
+      "click_marker": "Cliquez sur un marqueur pour plus de détails.",
+      "fullscreen": "Utilisez le bouton plein écran dans les commandes de la carte.",
+      "resize": "Faites glisser le bord inférieur de la carte pour redimensionner."
+    },
+    "hint": {
+      "title": "Contrôles de la carte rapide",
+      "summary": "Faites glisser vers le panoramique · Maj + Défilement pour zoomer",
+      "summary_multi_floor": "Faites glisser pour faire glisser vers la pan · Maj + Défilement pour zoomer · Ctrl + Défilement pour changer de plancher",
+      "all_controls": "Tous les contrôles"
     },
     "aria": {
       "tooltip_density": "Densité des infobulles"
@@ -898,7 +951,9 @@
       "loading": "Chargement des quêtes",
       "map": {
         "resize_handle": "Ajuster la hauteur de la carte",
-        "toggle_panel": "Afficher ou masquer le panneau de carte",
+        "show_map": "Afficher la carte",
+        "hide_map": "Cacher la carte",
+        "fullscreen_label": "Plein écran",
         "required_items_summary": "Objets requis pour les tâches actives",
         "required_keys_summary": "Clés requises pour les tâches actives",
         "time_period": {
@@ -911,7 +966,9 @@
         "map_complete_tasks_hidden": "{count} tâches terminées sur cette carte sont masquées.",
         "map_complete_tasks_showing": "{count} tâches terminées sur cette carte sont affichées.",
         "map_complete_tasks_toggle_show": "Afficher masquées",
-        "map_complete_tasks_toggle_hide": "Masquer terminées carte"
+        "map_complete_tasks_toggle_hide": "Masquer terminées carte",
+        "map_hidden_hint": "Carte masquée - cliquez pour afficher",
+        "raid_time_tooltip": "Temps de raid actuel en jeu"
       },
       "pinned_tasks_section": "Quêtes épinglées",
       "focused_task_section": "Quête ciblée",
@@ -1152,6 +1209,51 @@
       "meta": {
         "description": "Collaborez avec vos coéquipiers sur la progression d'Escape from Tarkov. Partagez les quêtes terminées, l'état du refuge et coordonnez la collecte d'objets."
       },
+      "page_title": "Equipe",
+      "page_description": "Invitez vos coéquipiers, choisissez la progression de l'équipe que vous voyez et suivez ensemble.",
+      "invite": {
+        "title": "Lien d'invitation",
+        "subtitle": "Partagez votre équipe avec des coéquipiers de confiance.",
+        "link_label": "URL d'invitation de l'équipe",
+        "helper": "N'importe qui avec ce lien peut rejoindre votre équipe.",
+        "show": "Afficher le lien",
+        "hide": "Cacher le lien",
+        "copy": "Copier le lien",
+        "copied": "Copié !"
+      },
+      "members": {
+        "title": "Membres ({count})",
+        "no_members": "Aucun membre de cette équipe pour l'instant. Partagez votre lien d'invitation pour ajouter des coéquipiers.",
+        "alone": "Vous êtes seul ici — partagez votre lien d'invitation pour ajouter des coéquipiers.",
+        "copy_invite": "Copier le lien d'invitation",
+        "copied": "Copié !"
+      },
+      "visibility": {
+        "title": "Paramètres de visibilité",
+        "description": "Contrôlez les progrès des coéquipiers qui apparaissent sur votre tracker.",
+        "items_section": "Objets",
+        "show_tasks": "Afficher les tâches des membres de l'équipe",
+        "show_items": "Afficher les éléments nécessaires aux membres de l'équipe",
+        "show_non_fir": "Afficher les éléments non-FIR nécessaires",
+        "show_hideout": "Afficher le masquage des éléments nécessaires",
+        "show_maps": "Afficher les objectifs de la carte des membres de l'équipe"
+      },
+      "danger_zone": {
+        "title": "Zone de danger",
+        "disband_description": "La dissolution supprime l'équipe pour tous les membres. Cela ne peut pas être annulé.",
+        "leave_description": "Quitter vous supprime de cette équipe. Votre progression reste sur votre compte.",
+        "disband": "Dissoudre l’équipe",
+        "leave": "Quitter l’équipe",
+        "confirm_disband_title": "Dissoudre l'équipe?",
+        "confirm_disband_description": "Cela supprime l'équipe et son adhésion pour tout le monde. Cela ne peut pas être annulé.",
+        "confirm_leave_title": "Quitter l'équipe?",
+        "confirm_leave_description": "Vous quitterez cette équipe et cesserez de partager les progrès avec ses membres.",
+        "confirm_disband": "Oui, dissoudre l'équipe",
+        "confirm_leave": "Oui, quitter l'équipe",
+        "disband_success": "Équipe dissoute avec succès.",
+        "disband_error": "Impossible de dissoudre l'équipe.",
+        "action_error": "Impossible de mettre à jour l'appartenance à l'équipe."
+      },
       "card": {
         "manageteam": {
           "title": "Membre de l’équipe",
@@ -1161,7 +1263,12 @@
             "owner": "Propriétaire",
             "taskscomplete": "{completed}/{total} quêtes terminées",
             "kick_success": "Un coéquipier a donné un coup de pied réussi.",
-            "kick_error": "Erreur lors du coup de pied d'un coéquipier."
+            "kick_error": "Erreur lors du coup de pied d'un coéquipier.",
+            "level_badge_alt": "Badge de niveau {level}",
+            "hide_progress": "Masquer les progrès de {name}pour moi",
+            "show_progress": "Afficher les progrès de {name}pour moi",
+            "enable_team_tasks": "Afficher les tâches des membres de l'équipe avant de changer de membre individuel",
+            "remove_member": "Retirer {name} de l'équipe"
           }
         },
         "teamoptions": {
@@ -1187,6 +1294,7 @@
           "url_copied": "URL copiée dans le presse-papiers",
           "copy_url_failed": "Impossible de copier l'URL dans le presse-papiers",
           "no_team": "Vous n'êtes actuellement dans aucune équipe.",
+          "login_required": "Connectez-vous pour créer une équipe ou gérer le lien d'invitation de votre équipe.",
           "team_invite_url_label": "URL d'invitation de l’équipe",
           "copy_link": "Copie",
           "link_hidden_message": "Cliquez sur \"Afficher\" pour révéler le lien d'invitation de votre équipe",
@@ -1561,6 +1669,7 @@
     "tarkovguru": "Gourou Tarkov",
     "tarkovmonitor": "Moniteur Tarkov",
     "resources": "Documentation",
+    "section_more": "En savoir plus",
     "profile": "Profil",
     "section_navigation": "Navigation",
     "section_external": "Externe",
@@ -1696,13 +1805,17 @@
   },
   "settings": {
     "locale": "Langue",
+    "page_description": "Gérez votre compte, votre progression de jeu et vos préférences d'application.",
     "tabs": {
       "progression": "Progression",
       "imports": "Imports"
     },
     "tab_groups": {
-      "game": "Jeu",
-      "account_advanced": "Compte et avancé"
+      "game_progress": "Progression de la partie",
+      "app": "Application",
+      "data": "Donnée",
+      "account": "Compte",
+      "tools_integrations": "Outils & Intégrations"
     },
     "tab_seo": {
       "progression": {
@@ -1750,6 +1863,7 @@
       "copy_button": "Copier l'état de débogage"
     },
     "general": {
+      "title": "Préférences Générales",
       "privacy_mode": "Mode streamer",
       "privacy_mode_hint": "Masque les informations sensibles pendant que vous diffusez."
     },
@@ -1761,7 +1875,10 @@
         "show_next": "Afficher les quêtes suivantes",
         "show_prev": "Afficher les quêtes précédentes",
         "density": "Densité des cartes",
-        "require_trader_levels": "Nécessite le niveau de fidélité du marchand et la réputation pour la disponibilité des tâches"
+        "require_trader_levels": "Nécessite le niveau de fidélité du marchand et la réputation pour la disponibilité des tâches",
+        "flags_section": "Affichage des Tâches",
+        "availability_section": "Disponibilité des tâches",
+        "view_defaults_section": "Vues par défaut"
       },
       "maps": {
         "show_extracts": "Afficher les extractions par défaut",
@@ -1772,6 +1889,7 @@
           "title": "Couleurs de carte",
           "description": "Ajustez les couleurs des marqueurs pour améliorer lisibilité et accessibilité.",
           "self_objective": "Votre objectif",
+          "pinned_objective": "Tâche épinglée",
           "team_objective": "Objectif d'équipe",
           "selected": "Objectif épinglé",
           "shared_extract": "Extraction partagée",
@@ -1852,6 +1970,8 @@
       "export_error_title": "Échec de l'exportation",
       "debug_export_error_title": "Échec de l’export de débogage",
       "reset_title": "Réinitialiser la progression",
+      "danger_zone_title": "Zone de danger",
+      "danger_zone_hint": "La réinitialisation de tous les progrès supprime définitivement vos données pour le JcJ, le JcE et le JcJ saisonnier. Cela ne peut pas être annulé.",
       "prestige_history_title": "Historique de prestige",
       "prestige_history_loading": "Chargement de l'historique de prestige...",
       "prestige_history_empty": "Aucune run de prestige archivée pour le moment.",
@@ -2025,7 +2145,9 @@
       "saved_title": "Nom d'affichage enregistré",
       "saved_description": "Votre nom d'affichage {mode} a été mis à jour",
       "save_failed_title": "Échec de l'enregistrement",
-      "save_failed_description": "Impossible d'enregistrer le nom d'affichage. Veuillez réessayer."
+      "save_failed_description": "Impossible d'enregistrer le nom d'affichage. Veuillez réessayer.",
+      "active_mode": "Actif",
+      "game_edition_hint": "Sélectionnez l'édition du jeu que vous possédez afin que le suivi corresponde à votre contenu disponible."
     },
     "skills": {
       "title": "Gestion des compétences",
@@ -2042,7 +2164,10 @@
       "valid_range": "Plage valide : 0-51",
       "sort": {
         "ingame": "En jeu"
-      }
+      },
+      "quest_tooltip": "Niveau de compétence octroyé automatiquement par les récompenses de quête.",
+      "offset_tooltip": "Ajustement manuel en plus du niveau de récompense de quête. Positif signifie que vous avez entraîné la compétence au-dessus des récompenses de quête.",
+      "collapsed_hint": "Afficher {shown} des compétences {total} . Montrez tout pour voir chaque compétence."
     },
     "keybinds": {
       "title": "Raccourcis clavier",
@@ -2052,6 +2177,7 @@
       "undo_description": "Appuyez sur ce raccourci pour annuler votre dernier changement de progression.",
       "record_placeholder": "Cliquez pour enregistrer...",
       "recording": "Appuyez sur la combinaison de touches ...",
+      "listening": "Écoute...",
       "reset_aria": "Restaurer les valeurs par défaut",
       "conflict_omnibar": "Le raccourci entre en conflit avec le raccourci clavier Undo.",
       "conflict_undo": "Le raccourci entre en conflit avec le lien de recherche.",
@@ -2068,9 +2194,12 @@
       "manual_hint": "Entrez votre XP total réel pour ajuster automatiquement le décalage.",
       "xp_amount": "+{amount} XP",
       "xp_to_next": "{amount} pour le suivant",
-      "reset_offset": "Réinitialiser le décalage XP"
+      "reset_offset": "Réinitialiser le décalage XP",
+      "xp_progress_aria": "Expérimentez les progrès vers le niveau suivant",
+      "xp_progress_value": "{percent}% vers le niveau suivant"
     },
     "danger_zone": {
+      "confirm_instruction": "Tapez {word} pour confirmer la réinitialisation de toutes les données :",
       "confirm_word": "SUPPRIMER"
     },
     "log_import": {

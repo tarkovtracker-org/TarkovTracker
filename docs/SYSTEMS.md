@@ -33,6 +33,10 @@ and have an agent verify the answer against the code.
    freshness gate, abuse controls
 9. [Production database observer](#9-production-database-observer) — bounded read-only telemetry,
    JSON normalization, and migration preflight
+10. [Promoted Twitch configuration](#10-promoted-twitch-configuration) — admin-managed stream
+    selection, public resolution, and client polling
+11. [Boot-time asset-failure recovery](#11-boot-time-asset-failure-recovery) — recovering from
+    stale-chunk load failures before and after the app boots
 
 ---
 
@@ -79,6 +83,12 @@ their upstream data does not currently need corrections.
 
 Only `tasks-core` is precomputed today (it is the largest, hottest, and most expensive payload).
 See [Precompute](#5-precompute-workflow).
+
+The hideout route is the cache-order exception: its `json-v4` edge entry stores the adapted base
+payload, then the handler applies the current module-cached overlay after every edge-cache read. Its
+browser IndexedDB entry also uses `json-v4`, with a one-hour TTL matching overlay freshness. This
+keeps the 12-hour edge cache and the browser cache from pinning an old overlay correction. The other
+overlay-enabled routes cache their final overlay-applied payload.
 
 ### Diagram
 
@@ -203,7 +213,8 @@ replaces the key with the translated string.
    the `TARKOV_DATA` KV binding populated by the scheduled precompute workflow. See
    [Precompute](#5-precompute-workflow).
 2. **Edge Cache API** (per-colo, Cloudflare `caches.default`) — the standard layer. Stores the
-   adapted + overlay-applied payload with `s-maxage = ttl + staleTtl`.
+   adapted + overlay-applied payload with `s-maxage = ttl + staleTtl`. The hideout route instead
+   stores its adapted base payload and applies the current overlay after the cache read.
 3. **Upstream fetch** — on a cold miss, run the full pipeline (fetch → adapt → overlay) and write
    the result back into the edge cache.
 4. **Dev fallback** — when running locally with no Cache API (`globalThis.caches` undefined), skip
@@ -290,6 +301,10 @@ flowchart TD
   catch block (502 on upstream failure) do not set it — the invariant covers the success
   paths only.
 - The cache key must include language and game mode so two locales or modes never share an entry.
+- Hideout edge-cache entries must contain the adapted base payload, not the overlay-applied response;
+  `hideout.get.ts` applies the overlay after `edgeCache()` and restores the overlay metadata headers.
+- The browser hideout cache version must match the server route version and its TTL must not exceed
+  the one-hour overlay TTL.
 - The precomputed envelope is only trusted if `isPrecomputedEnvelope()` returns true; a corrupt
   write falls through to the edge cache instead of serving `null`.
 
@@ -309,7 +324,7 @@ sequenceDiagram
     participant Handler
     participant Overlay as overlay.ts
     participant GitHub as raw.githubusercontent.com<br/>tarkov-data-overlay
-    Handler->>Overlay: applyOverlay(basePayload, { gameMode, bypassCache })
+    Handler->>Overlay: applyOverlay(basePayload, { gameMode, bypassCache, locale })
     Overlay->>Overlay: check module cache (1h TTL)
     alt cache fresh
         Overlay-->>Overlay: use cached overlay
@@ -327,17 +342,48 @@ sequenceDiagram
 
 - Module-level cache (`cachedOverlay`, `cacheTimestamp`) with a 1-hour TTL
   (`OVERLAY_CACHE_TTL = 3600000`).
+- The configured overlay URL must use HTTPS. Invalid URLs and non-HTTPS schemes fall back to the
+  trusted `raw.githubusercontent.com` source so corrections cannot be modified in transit.
+- Redirects are followed manually (`redirect: 'manual'`) for at most `MAX_OVERLAY_REDIRECTS = 3`
+  hops, and every hop must also be HTTPS. A redirect to a non-HTTPS target, a redirect without a
+  `location` header, or exceeding the hop limit aborts the fetch and leaves the previous overlay in
+  place.
+- Overlay task patches carry trader requirements in the raw upstream shape: one
+  `traderRequirements` list discriminated by `requirementType` (`level` gates
+  trader loyalty level, `reputation` gates standing). `applyOverlay` re-splits
+  a patched task's merged list into `traderLevelRequirements` and
+  `traderRequirements` (reputation-only) so availability and progress checks
+  evaluate the right metric; a patch's `traderRequirements` replaces the whole
+  requirement set.
 - On fetch failure, serves the last good overlay (stale) rather than failing the request.
 - Overlay supports mode-specific corrections under `modes[gameMode]` plus global corrections.
+- Per-locale corrections under `locales[locale]` patch `tasks`, `items`, and `traders`
+  (locale-sensitive fields such as name, wikiLink, and objective descriptions) and are applied last
+  so they take precedence over global and mode-specific corrections. The locale defaults to `en`
+  when a handler does not pass one.
 - `tasksAdd` lets the overlay inject entirely new tasks not present upstream.
 - Objective post-processing (`objectiveTypeInferrer.ts`) normalizes objective lists and infers
   `foundInRaid` flags so the client does not have to guess.
-- `bypassCache: true` (from `shouldBypassCache`) forces a fresh overlay fetch — used after publishing
-  a correction.
+- `bypassCache: true` (from `shouldBypassCache`) forces an awaited overlay refresh — used after
+  publishing a correction.
+- A hideout request with an expired module-cached overlay serves the stale correction immediately
+  and registers one coalesced refresh with the Cloudflare execution context. Background task
+  rejections are logged and contained. A failed deferred refresh backs off for one minute before
+  another hideout request may retry it. Cold requests still await the initial overlay fetch, whose
+  five-second timeout covers both response headers and body parsing.
+- Hideout applies the overlay after reading its versioned base-data edge entry, so its correction
+  freshness is bounded by the overlay module's one-hour cache and browser cache TTL rather than the
+  hideout edge TTL. Other
+  overlay-enabled routes cache their final corrected payload; publishing new overlay data requires
+  a Tarkov data cache purge so those entries and the browser cache-purge marker are invalidated.
 
 ### Files
 
-- `app/server/utils/overlay.ts` — fetch, cache, merge.
+- `app/server/utils/overlay.ts` — fetch, cache, merge, and deferred refresh coordination.
+- `app/server/utils/backgroundTask.ts` — keeps deferred refreshes alive through the Cloudflare
+  execution context.
+- `app/server/utils/overlayResponseHeaders.ts` — restores overlay metadata headers when corrections
+  are applied after an edge-cache read.
 - `app/server/utils/deepMerge.ts` — `deepMerge` + `isPlainObject`.
 - `app/server/utils/objectiveTypeInferrer.ts` — objective normalization.
 
@@ -347,8 +393,16 @@ sequenceDiagram
   `FETCH_TIMEOUT_MS = 5000`. On timeout, fall back to the cached overlay.
 - A missing or malformed overlay must never cause a 5xx; the base payload is returned with
   `X-Overlay-Status: missing`.
+- Overlay data must only be fetched over HTTPS on every server path. A non-HTTPS `OVERLAY_URL` must
+  resolve to the trusted default, and no redirect hop may downgrade the transport — the fetch must
+  fail rather than read a payload served over plaintext. `applyOverlay` follows HTTPS redirects
+  manually; the streamer Kappa editions fetch in
+  `app/server/api/streamer/[userId]/[mode]/kappa.get.ts` uses `redirect: 'error'` because its URL is
+  a hardcoded constant that never redirects. Any new server-side overlay consumer must do one or the
+  other.
 - Overlay metadata (`status`, `version`, `generated`, `sha256`) must be propagated to response
-  headers so we can debug which correction was applied.
+  headers so we can debug which correction was applied. Routes that apply an overlay after
+  `edgeCache()` must call `setOverlayResponseHeaders()` before returning.
 
 ---
 
@@ -461,7 +515,7 @@ sequenceDiagram
 
 ### Flow
 
-1. **Routing + User-Agent gate.** `workers/api-gateway/src/index.ts` normalizes the path, rejects
+1. **Routing + User-Agent gate.** `workers/api-gateway/src/router.ts` normalizes the path, rejects
    requests without a 5–200 character `User-Agent`, and (when enabled) 308-redirects legacy
    `/api/v2` hosts to the api subdomain.
 2. **Pre-auth abuse gate.** A Cloudflare Workers Rate Limiting binding (`API_ABUSE_LIMITER`) keys
@@ -487,7 +541,7 @@ sequenceDiagram
    `uncompleted`. They persist canonical `complete`/`failed`/`active` triples. Dependency processing
    materializes missing auto-unlocked successors as explicitly neutral, never active, and never
    overwrites existing successor progress.
-8. **Conditional response.** `conditionalReadResponse` in `workers/api-gateway/src/index.ts`
+8. **Conditional response.** `conditionalReadResponse` in `workers/api-gateway/src/responses.ts`
    serializes once, derives a weak `ETag` from the payload, answers `304` on a matching
    `If-None-Match`, and sets `Cache-Control: private, max-age=15` plus
    `Vary: Accept-Encoding, Authorization, Origin`. Bodies ≥1 KiB are gzipped when the client
@@ -498,7 +552,11 @@ sequenceDiagram
 
 ### Files
 
-- `workers/api-gateway/src/index.ts` — routing, rate limiting, conditional response layer
+- `workers/api-gateway/src/index.ts` — Worker entrypoint; delegates to the modules below
+- `workers/api-gateway/src/router.ts` — path normalization, User-Agent gate, host/legacy redirect, route dispatch
+- `workers/api-gateway/src/authentication.ts` — abuse gate, token auth, daily-quota enforcement
+- `workers/api-gateway/src/rateLimiter.ts` — `ApiGatewayRateLimiter` Durable Object + quota client
+- `workers/api-gateway/src/responses.ts` — CORS, envelopes, conditional response, ETag/compression
 - `workers/api-gateway/src/auth.ts` — token validation
 - `workers/api-gateway/src/handlers/progress.ts`, `workers/api-gateway/src/handlers/team.ts` —
   progress reads/writes
@@ -589,7 +647,9 @@ flowchart LR
    audit event together. `user_system` keeps legacy persistent PvP/PvE columns plus the active
    Seasonal team column. The team-members endpoint reads the `team_member_mode_summary` view, which
    derives display name, level, and completed-task count inside the database so teammate progress
-   blobs never cross the wire.
+   blobs never cross the wire. Owners disband through the authenticated `team-disband` function,
+   which calls an atomic service-role-only RPC; regular `team-leave` remains the non-owner leave
+   path.
 6. The active season definition carries its number, start date, and exact end timestamp. The UI
    counts down to that end timestamp. Advancing the number starts each account on a fresh empty row;
    historical rows remain retained and cannot be merged into the new season. Locally persisted
@@ -608,6 +668,9 @@ flowchart LR
 
 - `supabase/migrations/20260804043342_normalize_game_mode_progress_and_add_seasonal.sql` — schema,
   RLS, compatibility triggers, `team_member_mode_summary`, sync/sharing/prestige RPCs
+- `supabase/migrations/20260829120000_add_atomic_team_disband.sql` — owner-scoped atomic team
+  disband RPC and grants
+- `supabase/functions/team-disband/index.ts` — authenticated owner disband endpoint
 - `supabase/migrations/20260806120000_add_game_mode_progress_backfill_helper.sql` — retained,
   revoked helper for optional one-range-at-a-time operational maintenance. Correctness does not
   depend on running it; see the Database Migrations section of `docs/runbook.md`
@@ -617,6 +680,8 @@ flowchart LR
   `app/stores/useTarkov.ts` — load, merge, write, and realtime flow
 - `app/stores/useSystemStore.ts`, `app/stores/useTeamStore.ts` — mode-specific teams and teammate
   hydration
+- `app/features/team/TeamDangerZone.vue`, `app/features/team/useTeamInviteLink.ts` — resolved active
+  team actions and mode-scoped invite links
 - `app/composables/useDataBackup.ts` — season-aware native backups
 - `app/server/api/profile/[userId]/[mode].get.ts`,
   `app/server/api/streamer/[userId]/[mode]/kappa.get.ts`, `app/server/api/team/members.ts` —
@@ -627,6 +692,11 @@ flowchart LR
 ### Invariants
 
 - `pvp` and `pve` always use season `0`; `seasonal` always uses a positive season.
+- Legacy `user_system.team` / `team_id` values are used only when neither persistent mode-specific
+  team ID exists. They must never make a PvP team appear as the active PvE team or vice versa.
+- Team actions and invite links are unavailable until the active team row has loaded and its ID
+  matches the mode-specific system-store team ID; stale owner or join-code state is never combined
+  with another team's ID.
 - App `ACTIVE_SEASON` metadata must match the database's `private.active_season_*()` functions;
   the Worker resolves the active Seasonal number through the database instead of carrying a
   second runtime constant.
@@ -850,6 +920,190 @@ flowchart LR
 - Migration preflight is evidence-only and fails closed on unsupported or ambiguous syntax;
   production reports run sequentially, and migration execution remains in the reviewed merge and
   Supabase deployment workflow.
+
+## 10. Promoted Twitch configuration
+
+**Summary.** The promoted Twitch embed uses build-time public runtime config as a safe fallback, but
+an administrator can change the active channel, display name, and enabled state without a frontend
+redeploy. The override is stored in a service-role-only settings table. The public config route is
+cached at the edge with a bounded TTL and explicitly invalidated after an admin update; live status is
+also edge-cached per TTL, so mounted clients do not invoke the Pages Function for every poll.
+
+### Diagram
+
+```mermaid
+flowchart LR
+    Admin[Admin page] -->|Bearer token| Write[POST /api/admin/twitch-config]
+    Write --> Gate[Admin membership check]
+    Gate --> Settings[(public.app_settings)]
+    Write --> Audit[(admin_audit_log)]
+    Write -->|immediate + delayed purge| Purge[Cloudflare Purge API<br/>promoted-twitch-config]
+    Embed[PromotedTwitchEmbed] -->|mount, focus + every 5m| Read[GET /api/twitch/config]
+    Read --> Edge[Edge cache, 1h TTL]
+    Edge --> Settings
+    Edge --> Fallback[Public runtime config fallback]
+    Embed -->|every 60s while enabled| Live[GET /api/twitch/live]
+    Live --> LiveEdge[Edge cache, 30s TTL]
+```
+
+### Flow
+
+1. `AdminTwitchConfigCard` loads the effective public configuration with browser caching disabled,
+   so a previously cached response cannot make a later save revert newer settings. It obtains the
+   current Supabase access token before saving. After a successful save it also publishes the saved
+   config to the shared `usePromotedTwitch` client state, so the embed in the same tab adopts the
+   change immediately without waiting for a poll.
+2. `POST /api/admin/twitch-config` requires authenticated admin membership and validates the Twitch
+   channel, display name, and enabled flag. Validation and operational failures include a stable
+   `data.code` for clients; the English `statusMessage` remains a non-localized fallback. It calls
+   `update_promoted_twitch_config`, which updates the `promoted_twitch` JSON value, advances its
+   shared version, and writes the admin audit row in one database transaction. A failure rolls back
+   both writes.
+3. Only after the transaction commits does the route invoke the `admin-cache-purge` edge function
+   with `purgeType: 'twitch-config'`, which calls the Cloudflare Purge API with the
+   `promoted-twitch-config` cache tag. If the tag purge fails, the edge function falls back
+   to purging the `/api/twitch/config` URL (apex and `www` variants). After a successful immediate
+   purge, `EdgeRuntime.waitUntil()` schedules the same purge six seconds later. That delay exceeds
+   the config route's five-second Supabase timeout, so a request that read the previous version before
+   the commit cannot refill the cache after both purges. If the immediate tag and URL purges both
+   fail, the route returns the committed config with `cacheInvalidated: false`; the admin UI applies
+   the saved value locally and shows an explicit warning instead of encouraging a duplicate database
+   write. The edge function records Twitch-only invalidations as `twitch_config_cache_purge`, not the
+   `cache_purge` action consumed by Tarkov game-data cache metadata. A delayed purge failure is logged
+   without changing the already returned save result.
+4. `GET /api/twitch/config` combines the build-time fallback with a validated database override. A
+   missing table, missing row, malformed override, or unavailable database falls back safely instead
+   of breaking the embed. The route reads the database only when the Pages Function executes — i.e.
+   on cache fills. Its response carries `Cache-Tag: promoted-twitch-config` with a browser TTL of
+   five minutes (`max-age=300`) and a bounded Cloudflare edge TTL of one hour
+   (`s-maxage=3600` / `cloudflare-cdn-cache-control: public, max-age=3600`), so Cloudflare serves
+   cache hits without invoking the Function. The bounded TTL remains the final recovery path
+   if invalidation fails, while the delayed second purge prevents a successful invalidation from
+   being undone by an in-flight stale fill. When the database read fails, the fallback response is
+   sent with `no-store` so a transient outage never pins the env-default fallback at the edge.
+   Missing or invalid Supabase credentials are treated as the same uncacheable failure. Successful
+   responses include the settings version.
+5. `PromotedTwitchEmbed` fetches config on mount, every five minutes while visible, and again on tab
+   focus. Browser and edge caching absorb those refreshes between fills. It watches the shared client
+   state for immediate propagation of admin saves in the same tab and polls `/api/twitch/live` every
+   60 seconds while `enabled === true`, pausing both timers while the tab is hidden. It ignores
+   fetched configs older than the latest shared version, so a browser cache hit or overlapping focus
+   request cannot revert an admin save. Live responses are edge-cached for 30 seconds, so the CDN
+   absorbs the polling traffic instead of the Function.
+   Channel changes advance a request generation so stale live results cannot apply after a channel
+   cycles back. Channel changes replace the player URL and clear a stored dismissal, disabling hides
+   an active player, and an unavailable config endpoint keeps the build-time fallback working.
+
+### Files
+
+- `app/features/admin/AdminTwitchConfigCard.vue` — admin form, authenticated save flow, and shared
+  state publish.
+- `app/server/api/admin/twitch-config.post.ts` — validation, admin authorization, upsert, audit, and
+  post-commit cache purge.
+- `app/server/api/twitch/config.get.ts` — public fallback/override resolution and edge-cache
+  headers.
+- `app/server/api/twitch/live.get.ts` — live-status check with short edge caching.
+- `app/components/PromotedTwitchEmbed.vue` — bounded config refresh, live polling, and player state
+  updates.
+- `app/composables/usePromotedTwitch.ts` — shared client config state for cross-component
+  propagation.
+- `supabase/functions/admin-cache-purge/index.ts` — Cloudflare Purge API calls, including the
+  immediate and delayed `twitch-config` tag purges with purge-by-URL fallbacks.
+- `supabase/migrations/20260814120000_add_app_settings.sql` — service-role-only settings table and
+  transactional update/audit RPC.
+
+### Invariants
+
+- `public.app_settings` grants no table access to `PUBLIC`, `anon`, or `authenticated`; all reads and
+  writes go through server routes using the service role.
+- The admin write route must authenticate the user and verify `user_system.is_admin` before reading
+  the request body or changing settings.
+- Twitch channels are normalized to lowercase and limited to Twitch-compatible letters, digits, and
+  underscores with a maximum length of 25 characters. Display names are limited to 50 characters.
+- The settings update, version increment, and audit insert are one database transaction; none may
+  commit independently.
+- Invalid or unavailable database overrides never make the public route fail; build-time runtime
+  config remains the fallback.
+- The build-time fallback is opt-in: `NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED` must be exactly `true` to
+  promote a stream without a database override or admin write. The admin-managed override can change
+  the effective channel, display name, and enabled state. A missing or malformed build-time flag
+  resolves to disabled.
+- The config response must carry the `promoted-twitch-config` cache tag and a bounded edge TTL so
+  Cloudflare serves cache hits without executing the Pages Function; the route and its database read
+  run only on cache fills. A failed database read must not be cached (`no-store`), so a transient
+  outage cannot pin the env-default fallback at the edge.
+- The admin route must purge the `promoted-twitch-config` tag only after the database transaction
+  commits, then schedule a second purge after a delay longer than the config read timeout so an
+  in-flight stale fill cannot survive successful invalidation. If immediate invalidation fails, it
+  must return the committed config with an explicit warning flag; the client must apply that config
+  and visibly warn the admin without retrying the database write. The bounded TTL remains the final
+  recovery path when invalidation fails.
+- Mounted clients must refresh config every five minutes while visible and on mount/focus so remote
+  enable, disable, and channel changes reach continuously open tabs. Config refreshes and live-status
+  checks stop while the tab is hidden, and pending lifecycle work must not start timers after unmount.
+  Older config versions and stale live-request generations must never overwrite the latest shared
+  configuration or player state.
+- Twitch-only invalidations must use the `twitch_config_cache_purge` audit action. The `cache_purge`
+  action is reserved for `all` and `tarkov-data` purges because `/api/tarkov/cache-meta` treats its
+  latest successful row as a signal to clear browser game-data caches.
+
+## 11. Boot-time asset-failure recovery
+
+**Summary**: When a hashed chunk or the entry module fails to load — typically a stale
+`/_nuxt/*` request answered by the Cloudflare Pages SPA fallback (`HTTP 200`, `text/html`, cached 5
+hours) during a rolling deploy — the app recovers automatically. Recovery runs in two layers that
+share one retry budget: a pre-boot inline script for entry-module failures (the bundle never
+boots, so in-bundle code cannot run) and the in-app ChunkRecovery for lazy-chunk failures after
+boot.
+
+**Flow**
+
+```
+Page load
+  → inline recovery script registers in <head> (before the entry module)
+  → entry module fails? (error event on same-origin <script type="module">)
+      → cooldown budget available? → record attempt → reload once with ?_tt_retry=<ts>
+      → budget exhausted or storage write fails → stay on the broken page (manual refresh needed)
+  → app boots → lazy chunk fails? (ChunkLoadError / blocked network request)
+      → NuxtErrorBoundary / error handlers in app.vue → same budget check → hard reload once
+      → still failing → friendly localized error page (errors.chunk_load_blocked /
+        errors.network_access_denied)
+```
+
+**Step-by-step**
+
+1. `nuxt.config.ts` emits the inline recovery script from `app/utils/entryRecoveryScript.ts` via
+   `app.head.script`, so it lands in `<head>` before the entry module script in the built
+   `index.html`.
+2. The script registers a capture-phase `error` listener. It ignores classic scripts and
+   cross-origin scripts; for same-origin `type="module"` failures it checks the shared cooldown,
+   writes the attempt timestamp to sessionStorage, and reloads with a `_tt_retry` cache-buster so
+   the HTML request revalidates (`max-age=0, must-revalidate`) against the fresh deployment and
+   boots with the new chunk names.
+3. Once the app boots, `app/app.vue`'s ChunkRecovery handles lazy-chunk and network failures with
+   the same budget key, then surfaces localized error messages when recovery cannot succeed.
+
+### Files
+
+- `app/utils/entryRecoveryScript.ts` — the pre-boot inline script string.
+- `nuxt.config.ts` — `app.head.script` placement, before the entry module in `<head>`.
+- `app/app.vue` — ChunkRecovery: error patterns, cooldown check, hard reload, error page copy.
+- `app/locales/en.json` — `errors.chunk_load_blocked` / `errors.network_access_denied` keys.
+
+### Invariants
+
+- The inline script must not depend on the bundle and must execute before the entry module.
+- Recovery only triggers for `type="module"` script elements whose `src` parses (via the URL
+  constructor against the page) to exactly `window.location.origin`. No string-prefix checks —
+  they admit deceptive hosts such as `https://app.test.evil.example.com` and cross-host
+  protocol-relative URLs.
+- Both layers share the `tt:auto-reload-on-asset-error` sessionStorage key and the 120000 ms
+  cooldown: at most one recovery reload per 2 minutes per tab session, so a prolonged outage
+  cannot produce a reload loop.
+- A throwing sessionStorage write must abort the reload (return before `location.replace`),
+  otherwise storage breakage produces an unbounded reload loop.
+- The retry URL always carries `_tt_retry=<timestamp>` so the reload bypasses the browser's cached
+  HTML and revalidates against the current deployment.
 
 ## When this doc is wrong
 
