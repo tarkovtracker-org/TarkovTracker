@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { refreshSupabaseSession } from '@/utils/supabaseAuth';
+const mockLogger = vi.hoisted(() => ({ warn: vi.fn() }));
+vi.mock('@/utils/logger', () => ({ logger: mockLogger }));
 const createDeferred = <T>() => {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((promiseResolve) => {
@@ -19,5 +21,15 @@ describe('refreshSupabaseSession', () => {
     await expect(Promise.all([first, second])).resolves.toEqual([null, null]);
     await refreshSupabaseSession(client);
     expect(refreshSession).toHaveBeenCalledTimes(2);
+  });
+  it('logs and rethrows refresh failures', async () => {
+    const error = new Error('refresh failed');
+    const client = {
+      auth: {
+        refreshSession: vi.fn().mockRejectedValue(error),
+      },
+    };
+    await expect(refreshSupabaseSession(client)).rejects.toBe(error);
+    expect(mockLogger.warn).toHaveBeenCalledWith('[SupabaseAuth] Session refresh failed:', error);
   });
 });

@@ -245,14 +245,12 @@ export default defineNuxtPlugin({
       void ensureClientInitialized().catch(() => {});
     };
     const readReadySession = async (client: SupabaseClient): Promise<Session | null> => {
-      if (!readySessionPromise) {
-        readySessionPromise = (async () => {
-          const sessionResult = await client.auth.getSession();
-          const session = sessionResult.data?.session ?? null;
-          hydrateFromSession(session);
-          return session;
-        })();
-      }
+      readySessionPromise ??= (async () => {
+        const sessionResult = await client.auth.getSession();
+        const session = sessionResult.data?.session ?? null;
+        hydrateFromSession(session);
+        return session;
+      })();
       const sessionPromise = readySessionPromise;
       try {
         await sessionPromise;

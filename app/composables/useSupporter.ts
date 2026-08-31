@@ -19,6 +19,7 @@ const error = ref<string | null>(null);
 let channel: RealtimeChannel | null = null;
 let channelUserId: string | null = null;
 let statusRequestVersion = 0;
+let subscriptionRequestVersion = 0;
 export function useSupporter() {
   const { $supabase } = useNuxtApp();
   const isCurrentStatusRequest = (userId: string, requestVersion: number) => {
@@ -99,12 +100,15 @@ export function useSupporter() {
   async function subscribe(userId: string) {
     if (!$supabase || !userId) return;
     if (channel && channelUserId === userId) return;
+    const requestVersion = ++subscriptionRequestVersion;
     const previousChannel = channel;
     channel = null;
     channelUserId = null;
     await removeRealtimeChannel(previousChannel);
+    if (requestVersion !== subscriptionRequestVersion) return;
     if ($supabase.user?.loggedIn === false || $supabase.user?.id !== userId) return;
-    channel = $supabase.client
+    if (channel || channelUserId) return;
+    const nextChannel = $supabase.client
       .channel(`supporters:${userId}`)
       .on(
         'postgres_changes',
@@ -121,9 +125,11 @@ export function useSupporter() {
         }
       )
       .subscribe();
+    channel = nextChannel;
     channelUserId = userId;
   }
   function unsubscribe() {
+    subscriptionRequestVersion += 1;
     const channelToRemove = channel;
     channel = null;
     channelUserId = null;

@@ -85,6 +85,7 @@ AS $$
 DECLARE
   v_user_id UUID := (SELECT auth.uid());
   v_mode TEXT;
+  v_seasonal_mode CONSTANT TEXT := 'seasonal';
   v_progress JSONB;
   v_season_number SMALLINT;
   v_active_season SMALLINT := private.active_season_number();
@@ -95,7 +96,7 @@ BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
   END IF;
-  IF p_current_game_mode IS NULL OR p_current_game_mode NOT IN ('pvp', 'pve', 'seasonal') THEN
+  IF p_current_game_mode IS NULL OR p_current_game_mode NOT IN ('pvp', 'pve', v_seasonal_mode) THEN
     RAISE EXCEPTION 'Unsupported game mode';
   END IF;
   IF p_modes IS NULL OR jsonb_typeof(p_modes) <> 'object' THEN
@@ -163,18 +164,18 @@ BEGIN
     pve_data = EXCLUDED.pve_data;
 
   FOR v_mode, v_progress IN SELECT key, value FROM jsonb_each(p_modes) LOOP
-    IF v_mode NOT IN ('pvp', 'pve', 'seasonal') THEN
+    IF v_mode NOT IN ('pvp', 'pve', v_seasonal_mode) THEN
       RAISE EXCEPTION 'Unsupported game mode: %', v_mode;
     END IF;
     IF jsonb_typeof(v_progress) <> 'object' THEN
       RAISE EXCEPTION 'Progress for % must be a JSON object', v_mode;
     END IF;
-    IF v_mode = 'seasonal'
+    IF v_mode = v_seasonal_mode
       AND (p_seasonal_season_number IS NULL OR p_seasonal_season_number <> v_active_season) THEN
       CONTINUE;
     END IF;
     v_season_number := CASE
-      WHEN v_mode = 'seasonal' THEN v_active_season
+      WHEN v_mode = v_seasonal_mode THEN v_active_season
       ELSE 0
     END;
     INSERT INTO public.user_game_mode_progress (
@@ -183,7 +184,12 @@ BEGIN
       season_number,
       progress_data
     )
-    VALUES (v_user_id, v_mode, v_season_number, v_progress)
+    VALUES (
+      v_user_id,
+      v_mode,
+      v_season_number,
+      public.sanitize_user_progress_mode_data(v_progress)
+    )
     ON CONFLICT (user_id, game_mode, season_number) DO UPDATE
     SET progress_data = EXCLUDED.progress_data;
   END LOOP;
@@ -191,6 +197,6 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.sync_user_game_mode_progress(TEXT, INTEGER, BIGINT, JSONB, SMALLINT)
-  FROM PUBLIC, anon;
+  FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.sync_user_game_mode_progress(TEXT, INTEGER, BIGINT, JSONB, SMALLINT)
   TO authenticated;

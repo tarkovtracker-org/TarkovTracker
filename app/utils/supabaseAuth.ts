@@ -1,3 +1,4 @@
+import { logger } from '@/utils/logger';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 const pendingRefreshes = new WeakMap<object, Promise<Session | null>>();
 type SupabaseAuthClient = Pick<SupabaseClient['auth'], 'refreshSession'>;
@@ -8,9 +9,14 @@ export const refreshSupabaseSession = async (client: {
   const pending = pendingRefreshes.get(clientKey);
   if (pending) return pending;
   const refresh = (async () => {
-    const { data, error } = await client.auth.refreshSession();
-    if (error) throw error;
-    return data.session;
+    try {
+      const { data, error } = await client.auth.refreshSession();
+      if (error) throw error;
+      return data.session;
+    } catch (error) {
+      logger.warn('[SupabaseAuth] Session refresh failed:', error);
+      throw error;
+    }
   })();
   pendingRefreshes.set(clientKey, refresh);
   try {

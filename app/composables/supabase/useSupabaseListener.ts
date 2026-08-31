@@ -48,7 +48,11 @@ const runFilterWatch = (
   watchFilter: () => () => void
 ): (() => void) | undefined => (scope ? scope.run(watchFilter) : watchFilter());
 const registerComponentCleanup = (scope: ListenerScope | undefined, cleanup: () => void): void => {
-  if (getCurrentInstance() && !scope) {
+  if (scope) {
+    scope.run(() => onScopeDispose(cleanup));
+    return;
+  }
+  if (getCurrentInstance()) {
     onUnmounted(cleanup);
   }
 };

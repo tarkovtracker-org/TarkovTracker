@@ -79,6 +79,14 @@ const logTeammateModeProgressHydrationFailure = (error: unknown, teammateId: str
     teammateId,
   });
 };
+const TEAM_MEMBER_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const buildMemberProgressFilter = (members: string[] | null | undefined): string | undefined => {
+  const memberIds = Array.from(
+    new Set((members ?? []).filter((member) => TEAM_MEMBER_ID_PATTERN.test(member)))
+  );
+  return memberIds.length > 0 ? `user_id=in.(${memberIds.join(',')})` : undefined;
+};
 const applyLegacyPersistentProgressResult = (
   result: { data: unknown; error: unknown },
   appliedModes: Set<GameMode>,
@@ -162,6 +170,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   const { $supabase } = useNuxtApp();
   const listenerScope = effectScope(true);
   const teamChannel = ref<RealtimeChannel | null>(null);
+  let membershipSubscriptionVersion = 0;
   let lastMembersRefreshAt = 0;
   let refreshInFlight: Promise<void> | null = null;
   let refreshInFlightTeamId: string | null = null;
@@ -299,7 +308,8 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     const currentTeamId = getTeamIdFromSystemStore(systemStore);
     cleanupMembership();
     if (!currentTeamId) return;
-    teamChannel.value = $supabase.client
+    const memberProgressFilter = buildMemberProgressFilter(teamStore.members);
+    let nextChannel = $supabase.client
       .channel(`team:${currentTeamId}`, { config: { private: true } })
       .on(
         'postgres_changes',
@@ -310,13 +320,15 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
           filter: `team_id=eq.${currentTeamId}`,
         },
         () => {
-          void refreshMembers();
+          void refreshMembershipSubscription();
         }
-      )
-      .on(
+      );
+    if (memberProgressFilter) {
+      nextChannel = nextChannel.on(
         'postgres_changes',
         {
           event: '*',
+          filter: memberProgressFilter,
           schema: 'public',
           table: 'user_game_mode_progress',
         },
@@ -326,19 +338,20 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
           const userId = typeof data.user_id === 'string' ? data.user_id : null;
           const mode = data.game_mode;
           const expectedSeason = mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
+          const existingProfile = userId ? teamStore.memberProfiles?.[userId] : undefined;
           if (
             !userId ||
             userId === $supabase.user?.id ||
             !isGameMode(mode) ||
             data.season_number !== expectedSeason ||
             !teamStore.members?.includes(userId) ||
+            (existingProfile?.gameMode && existingProfile.gameMode !== mode) ||
             !hasMaterializedProgress(data.progress_data) ||
             typeof window === 'undefined'
           ) {
             return;
           }
           const summary = summarizeModeProgressData(data.progress_data);
-          const existingProfile = teamStore.memberProfiles?.[userId];
           teamStore.$patch((state) => {
             state.memberProfiles = {
               ...state.memberProfiles,
@@ -353,12 +366,20 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
           });
           window.dispatchEvent(new CustomEvent('teammate-mode-progress', { detail: data }));
         }
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          void refreshMembers();
-        }
-      });
+      );
+    }
+    teamChannel.value = nextChannel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        void refreshMembers();
+      }
+    });
+  };
+  const refreshMembershipSubscription = async (): Promise<void> => {
+    const requestVersion = ++membershipSubscriptionVersion;
+    cleanupMembership();
+    await refreshMembers(true);
+    if (requestVersion !== membershipSubscriptionVersion) return;
+    setupMembershipSubscription();
   };
   // Setup Supabase listener with custom onData handler
   // NOTE: Don't pass the store - we handle patching manually to preserve mapped fields
@@ -377,10 +398,8 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   listenerScope.run(() => {
     watch(
       teamFilter,
-      async () => {
-        cleanupMembership();
-        await refreshMembers(true);
-        setupMembershipSubscription();
+      () => {
+        void refreshMembershipSubscription();
       },
       { immediate: true }
     );
@@ -441,6 +460,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     teamStore,
     isSubscribed,
     cleanup: () => {
+      membershipSubscriptionVersion += 1;
       teamListenerCleanup();
       cleanupMembership();
       listenerScope.stop();
@@ -552,6 +572,7 @@ export function useTeammateStores() {
       ): GameMode | null => {
         const mode = row.game_mode;
         if (!isGameMode(mode)) return null;
+        if (!authoritative && appliedModes.has(mode)) return null;
         const expectedSeason = mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
         if (row.season_number !== expectedSeason) return null;
         applyProgressData(mode, row.progress_data, authoritative);
