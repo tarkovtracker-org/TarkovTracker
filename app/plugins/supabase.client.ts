@@ -231,6 +231,40 @@ export default defineNuxtPlugin({
         logger.warn('[Supabase] Failed to remove realtime channels after sign-out', error);
       }
     };
+    const handleAuthStateChange = (event: string, session: Session | null) => {
+      hydrateFromSession(session);
+      if (event !== 'SIGNED_OUT') return;
+      setTimeout(() => {
+        void removeAllRealtimeChannels();
+      }, 0);
+    };
+    const createSupabaseClient = async (): Promise<SupabaseClient> => {
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient(supabaseUrl, supabaseKey, {
+          auth: {
+            detectSessionInUrl: !hasCodeQueryParam,
+            flowType: 'pkce',
+          },
+        });
+        supabaseClient = client;
+        api.client = client;
+        client.auth.onAuthStateChange(handleAuthStateChange);
+        return client;
+      } catch (error) {
+        logger.error('[Supabase] Failed to initialize client', error);
+        throw error;
+      }
+    };
+    const hydrateInitialSession = async (client: SupabaseClient): Promise<void> => {
+      try {
+        const sessionResult = await client.auth.getSession();
+        hydrateFromSession(sessionResult.data?.session ?? null);
+      } catch (error) {
+        logger.error('[Supabase] Failed to read initial session', error);
+        throw error;
+      }
+    };
     const ensureClientInitialized = async (): Promise<'created' | 'waited' | 'existing'> => {
       if (initPromise) {
         await initPromise;
@@ -238,36 +272,8 @@ export default defineNuxtPlugin({
       }
       if (supabaseClient) return 'existing';
       initPromise = (async () => {
-        let client: SupabaseClient;
-        try {
-          const { createClient } = await import('@supabase/supabase-js');
-          client = createClient(supabaseUrl, supabaseKey, {
-            auth: {
-              detectSessionInUrl: !hasCodeQueryParam,
-              flowType: 'pkce',
-            },
-          });
-          supabaseClient = client;
-          api.client = client;
-          client.auth.onAuthStateChange((event, session) => {
-            hydrateFromSession(session);
-            if (event === 'SIGNED_OUT') {
-              setTimeout(() => {
-                void removeAllRealtimeChannels();
-              }, 0);
-            }
-          });
-        } catch (error) {
-          logger.error('[Supabase] Failed to initialize client', error);
-          throw error;
-        }
-        try {
-          const sessionResult = await client.auth.getSession();
-          hydrateFromSession(sessionResult.data?.session ?? null);
-        } catch (error) {
-          logger.error('[Supabase] Failed to read initial session', error);
-          throw error;
-        }
+        const client = await createSupabaseClient();
+        await hydrateInitialSession(client);
       })().finally(() => {
         initPromise = null;
       });

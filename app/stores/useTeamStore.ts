@@ -583,7 +583,28 @@ export function useTeammateStores() {
         applyProgressData(mode, row.progress_data, authoritative);
         return mode;
       };
+      const applyModeProgressRows = (rows: Array<Record<string, unknown>> | null | undefined) => {
+        rows?.forEach((row) => {
+          if (!isHydrationActive()) return;
+          if (isGameMode(row.game_mode) && appliedModes.has(row.game_mode)) return;
+          applyModeProgress(row);
+        });
+      };
       const legacyMode = resolveTeammateLegacyMode(memberProfile, getCurrentGameMode());
+      const applyLegacyModeProgress = (legacyRow: { data: unknown; error: unknown }) => {
+        if (!isHydrationActive()) return;
+        applyLegacyPersistentProgressResult(
+          legacyRow,
+          appliedModes,
+          teammateId,
+          legacyMode,
+          applyProgressData
+        );
+      };
+      const replayHydratedProgressMetadata = () => {
+        if (!isHydrationActive()) return;
+        replayProgressMetadataMigration();
+      };
       const hydrateModeProgress = async () => {
         try {
           const [modeRows, legacyRow] = await Promise.all([
@@ -598,21 +619,9 @@ export function useTeammateStores() {
             logTeammateModeProgressHydrationFailure(modeRows.error, teammateId);
             return;
           }
-          modeRows.data?.forEach((row) => {
-            if (!isHydrationActive()) return;
-            if (isGameMode(row.game_mode) && appliedModes.has(row.game_mode)) return;
-            applyModeProgress(row as Record<string, unknown>);
-          });
-          if (!isHydrationActive()) return;
-          applyLegacyPersistentProgressResult(
-            legacyRow,
-            appliedModes,
-            teammateId,
-            legacyMode,
-            applyProgressData
-          );
-          if (!isHydrationActive()) return;
-          replayProgressMetadataMigration();
+          applyModeProgressRows(modeRows.data);
+          applyLegacyModeProgress(legacyRow);
+          replayHydratedProgressMetadata();
         } catch (error) {
           logTeammateModeProgressHydrationFailure(error, teammateId);
         }
