@@ -82,6 +82,20 @@ describe('useTeamStore', () => {
         complete: true,
         failed: false,
       });
+      expect(
+        createTaskCompletionBroadcast({ active: true, complete: true, failed: false })
+      ).toEqual({
+        active: false,
+        complete: true,
+        failed: false,
+      });
+      expect(createTaskCompletionBroadcast({ active: true, complete: true, failed: true })).toEqual(
+        {
+          active: false,
+          complete: true,
+          failed: true,
+        }
+      );
     });
   });
   describe('Default State Initialization', () => {

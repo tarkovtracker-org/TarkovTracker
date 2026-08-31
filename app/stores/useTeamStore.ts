@@ -186,9 +186,9 @@ export const createTaskCompletionBroadcast = (
   completion: TaskCompletionSnapshot[string] | undefined
 ) => {
   const flags = getCompletionFlags(completion);
+  if (flags.complete || flags.failed) return { ...flags, active: false };
   const active = getExplicitActiveState(completion);
   if (active !== undefined) return { ...flags, active };
-  if (flags.complete || flags.failed) return { ...flags, active: false };
   return flags;
 };
 export const mergeTaskCompletionBroadcast = (
