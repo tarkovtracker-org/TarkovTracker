@@ -35,13 +35,24 @@ INSERT INTO client_progress_protected_tables (table_name)
 VALUES ('teams'), ('team_memberships'), ('user_progress'), ('user_game_mode_progress');
 
 CREATE TEMP TABLE client_progress_privilege_fixture (
+  authenticated_role TEXT NOT NULL,
+  anon_role TEXT NOT NULL,
   role_name TEXT NOT NULL,
-  execute_privilege TEXT NOT NULL
+  table_prefix TEXT NOT NULL,
+  execute_privilege TEXT NOT NULL,
+  request_claim_name TEXT NOT NULL
 );
-INSERT INTO client_progress_privilege_fixture (role_name, execute_privilege)
-VALUES ('service_role', 'EXECUTE');
+INSERT INTO client_progress_privilege_fixture (
+  authenticated_role,
+  anon_role,
+  role_name,
+  table_prefix,
+  execute_privilege,
+  request_claim_name
+)
+VALUES ('authenticated', 'anon', 'service_role', 'public.', 'EXECUTE', 'request.jwt.claim.sub');
 
-GRANT SELECT ON client_progress_fixture TO authenticated;
+GRANT SELECT ON client_progress_fixture, client_progress_privilege_fixture TO authenticated;
 
 UPDATE public.user_progress
 SET
@@ -50,37 +61,61 @@ SET
 WHERE user_id = (SELECT teammate_id FROM client_progress_fixture);
 
 SELECT ok(
-  (SELECT bool_and(NOT has_table_privilege('authenticated', 'public.' || table_name, 'INSERT'))
+  (SELECT bool_and(
+    NOT has_table_privilege(
+      (SELECT authenticated_role FROM client_progress_privilege_fixture),
+      (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name,
+      'INSERT'
+    )
+  )
    FROM client_progress_protected_tables),
   'authenticated clients cannot insert directly into protected tables'
 );
 SELECT ok(
-  (SELECT bool_and(NOT has_table_privilege('authenticated', 'public.' || table_name, 'UPDATE'))
+  (SELECT bool_and(
+    NOT has_table_privilege(
+      (SELECT authenticated_role FROM client_progress_privilege_fixture),
+      (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name,
+      'UPDATE'
+    )
+  )
    FROM client_progress_protected_tables),
   'authenticated clients cannot update directly protected tables'
 );
 SELECT ok(
-  (SELECT bool_and(NOT has_table_privilege('authenticated', 'public.' || table_name, 'DELETE'))
+  (SELECT bool_and(
+    NOT has_table_privilege(
+      (SELECT authenticated_role FROM client_progress_privilege_fixture),
+      (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name,
+      'DELETE'
+    )
+  )
    FROM client_progress_protected_tables),
   'authenticated clients cannot delete directly from protected tables'
 );
 SELECT ok(
-  (SELECT bool_and(has_table_privilege('authenticated', 'public.' || table_name, 'SELECT'))
+  (SELECT bool_and(
+    has_table_privilege(
+      (SELECT authenticated_role FROM client_progress_privilege_fixture),
+      (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name,
+      'SELECT'
+    )
+  )
    FROM client_progress_protected_tables),
   'authenticated clients retain required read access'
 );
 SELECT ok(
   (SELECT bool_and(
-    has_table_privilege((SELECT role_name FROM client_progress_privilege_fixture), 'public.' || table_name, 'SELECT')
-    AND has_table_privilege((SELECT role_name FROM client_progress_privilege_fixture), 'public.' || table_name, 'INSERT')
-    AND has_table_privilege((SELECT role_name FROM client_progress_privilege_fixture), 'public.' || table_name, 'UPDATE')
-    AND has_table_privilege((SELECT role_name FROM client_progress_privilege_fixture), 'public.' || table_name, 'DELETE')
+    has_table_privilege((SELECT role_name FROM client_progress_privilege_fixture), (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name, 'SELECT')
+    AND has_table_privilege((SELECT role_name FROM client_progress_privilege_fixture), (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name, 'INSERT')
+    AND has_table_privilege((SELECT role_name FROM client_progress_privilege_fixture), (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name, 'UPDATE')
+    AND has_table_privilege((SELECT role_name FROM client_progress_privilege_fixture), (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name, 'DELETE')
   ) FROM client_progress_protected_tables),
   'service-role workflows retain table access'
 );
 SELECT ok(
   has_function_privilege(
-    'authenticated',
+    (SELECT authenticated_role FROM client_progress_privilege_fixture),
     'public.get_teammate_legacy_progress(uuid,text)',
     (SELECT execute_privilege FROM client_progress_privilege_fixture)
   ),
@@ -88,15 +123,15 @@ SELECT ok(
 );
 SELECT ok(
   NOT has_function_privilege(
-    'anon',
+    (SELECT anon_role FROM client_progress_privilege_fixture),
     'public.get_teammate_legacy_progress(uuid,text)',
-    'EXECUTE'
+    (SELECT execute_privilege FROM client_progress_privilege_fixture)
   ),
   'anonymous clients cannot use the legacy progress RPC'
 );
 SELECT ok(
   has_function_privilege(
-    'authenticated',
+    (SELECT authenticated_role FROM client_progress_privilege_fixture),
     'public.sync_user_game_mode_progress(text,integer,bigint,jsonb,smallint)',
     (SELECT execute_privilege FROM client_progress_privilege_fixture)
   ),
@@ -104,9 +139,9 @@ SELECT ok(
 );
 SELECT ok(
   NOT has_function_privilege(
-    'anon',
+    (SELECT anon_role FROM client_progress_privilege_fixture),
     'public.sync_user_game_mode_progress(text,integer,bigint,jsonb,smallint)',
-    'EXECUTE'
+    (SELECT execute_privilege FROM client_progress_privilege_fixture)
   ),
   'anonymous clients cannot use the progress sync RPC'
 );
@@ -123,7 +158,7 @@ SELECT ok(
 
 SET LOCAL ROLE authenticated;
 SELECT set_config(
-  'request.jwt.claim.sub',
+  (SELECT request_claim_name FROM client_progress_privilege_fixture),
   (SELECT viewer_id::TEXT FROM client_progress_fixture),
   TRUE
 );
@@ -142,7 +177,7 @@ SELECT ok(
   'a teammate cannot read a legacy mode they do not share'
 );
 SELECT set_config(
-  'request.jwt.claim.sub',
+  (SELECT request_claim_name FROM client_progress_privilege_fixture),
   (SELECT outsider_id::TEXT FROM client_progress_fixture),
   TRUE
 );
@@ -155,7 +190,7 @@ SELECT is(
   'users outside the team cannot read teammate progress'
 );
 SELECT set_config(
-  'request.jwt.claim.sub',
+  (SELECT request_claim_name FROM client_progress_privilege_fixture),
   (SELECT viewer_id::TEXT FROM client_progress_fixture),
   TRUE
 );
