@@ -94,6 +94,13 @@ type BaseFetchMockOptions = {
   teamMembers?: string[];
   missingProgressUserIds?: string[];
 };
+const tasksWithRequirement = (status: string[]) => [
+  { id: 'task-main', taskRequirements: [] },
+  {
+    id: 'task-dependent',
+    taskRequirements: [{ task: 'task-main', status }],
+  },
+];
 const createBaseFetchMock = ({
   onMerge,
   mergeResult,
@@ -483,22 +490,7 @@ describe('api-gateway', () => {
       onMerge: (payload) => {
         mergePayload = payload;
       },
-      tasks: [
-        {
-          id: 'task-main',
-          name: 'Main Task',
-          factionName: 'Any',
-          objectives: [],
-          taskRequirements: [],
-        },
-        {
-          id: 'task-dependent',
-          name: 'Dependent Task',
-          factionName: 'Any',
-          objectives: [],
-          taskRequirements: [{ task: 'task-main', status: ['complete'] }],
-        },
-      ],
+      tasks: tasksWithRequirement(['complete']),
     });
     vi.stubGlobal('fetch', fetchMock);
     const res = await worker.fetch(
@@ -556,7 +548,9 @@ describe('api-gateway', () => {
       tasks: [{ id: 'task-main', state: 'active' }],
     });
   });
-  it('materializes active-only successors as neutral for a single update', async () => {
+  it.each(['active', 'failed'] as const)(
+    'materializes %s-only successors as neutral for a single update',
+    async (state) => {
     let mergePayload: MergeRpcPayload | null = null;
     vi.stubGlobal(
       'fetch',
@@ -564,16 +558,10 @@ describe('api-gateway', () => {
         onMerge: (payload) => {
           mergePayload = payload;
         },
-        tasks: [
-          { id: 'task-main', taskRequirements: [] },
-          {
-            id: 'task-dependent',
-            taskRequirements: [{ task: 'task-main', status: ['active'] }],
-          },
-        ],
+        tasks: tasksWithRequirement([state]),
       })
     );
-    const res = await worker.fetch(postTaskRequest('task-main', { state: 'active' }), BASE_ENV);
+    const res = await worker.fetch(postTaskRequest('task-main', { state }), BASE_ENV);
     expect(res.status).toBe(200);
     const payload = mergePayload as unknown as MergeRpcPayload;
     expect(payload.p_task_completions?.['task-dependent']).toMatchObject({
@@ -581,33 +569,8 @@ describe('api-gateway', () => {
       complete: false,
       failed: false,
     });
-  });
-  it('materializes failed-only successors as neutral for a single update', async () => {
-    let mergePayload: MergeRpcPayload | null = null;
-    vi.stubGlobal(
-      'fetch',
-      createBaseFetchMock({
-        onMerge: (payload) => {
-          mergePayload = payload;
-        },
-        tasks: [
-          { id: 'task-main', taskRequirements: [] },
-          {
-            id: 'task-dependent',
-            taskRequirements: [{ task: 'task-main', status: ['failed'] }],
-          },
-        ],
-      })
-    );
-    const res = await worker.fetch(postTaskRequest('task-main', { state: 'failed' }), BASE_ENV);
-    expect(res.status).toBe(200);
-    const payload = mergePayload as unknown as MergeRpcPayload;
-    expect(payload.p_task_completions?.['task-dependent']).toMatchObject({
-      active: false,
-      complete: false,
-      failed: false,
-    });
-  });
+    }
+  );
   it('materializes active-only successors as neutral in a batch update', async () => {
     let mergePayload: MergeRpcPayload | null = null;
     vi.stubGlobal(
@@ -616,13 +579,7 @@ describe('api-gateway', () => {
         onMerge: (payload) => {
           mergePayload = payload;
         },
-        tasks: [
-          { id: 'task-main', taskRequirements: [] },
-          {
-            id: 'task-dependent',
-            taskRequirements: [{ task: 'task-main', status: ['active'] }],
-          },
-        ],
+        tasks: tasksWithRequirement(['active']),
       })
     );
     const res = await worker.fetch(
@@ -652,13 +609,7 @@ describe('api-gateway', () => {
         onMerge: (payload) => {
           mergePayload = payload;
         },
-        tasks: [
-          { id: 'task-main', taskRequirements: [] },
-          {
-            id: 'task-dependent',
-            taskRequirements: [{ task: 'task-main', status: ['active'] }],
-          },
-        ],
+        tasks: tasksWithRequirement(['active']),
         userProgress: {
           user_id: 'user-1',
           game_edition: 1,
@@ -709,7 +660,7 @@ describe('api-gateway', () => {
             { id: 'task-main', taskRequirements: [] },
             {
               id: 'task-dependent',
-              taskRequirements: [{ task: 'task-main', status: ['active'] }],
+            taskRequirements: [{ task: 'task-main', status: ['active'] }],
             },
           ],
           userProgress: {
