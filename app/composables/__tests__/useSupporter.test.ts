@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import { createDeferred } from '@/utils/test-helpers';
 const userState = reactive({
@@ -14,9 +14,14 @@ const createdChannels: Array<{
   subscribe: ReturnType<typeof vi.fn>;
 }> = [];
 const mockChannel = vi.fn();
+const mockFetch = vi.fn();
 const mockRemoveChannel = vi.fn();
 const mockSupabase = {
   client: {
+    auth: {
+      getSession: vi.fn(),
+      refreshSession: vi.fn(),
+    },
     channel: mockChannel,
     from: vi.fn(() => ({
       select: vi.fn(() => ({
@@ -45,9 +50,13 @@ describe('useSupporter', () => {
     vi.resetModules();
     userState.id = 'user-1';
     userState.loggedIn = true;
+    vi.stubGlobal('$fetch', mockFetch);
     mockMaybeSingle.mockReset();
     mockChannel.mockReset();
+    mockFetch.mockReset();
     mockRemoveChannel.mockReset();
+    mockSupabase.client.auth.getSession.mockReset();
+    mockSupabase.client.auth.refreshSession.mockReset();
     mockSupabase.client.from.mockClear();
     createdChannels.length = 0;
     const { useSupporter } = await import('@/composables/useSupporter');
@@ -101,7 +110,9 @@ describe('useSupporter', () => {
       createdChannels.push(nextChannel);
       return nextChannel;
     });
-    mockRemoveChannel.mockImplementationOnce(() => removalDeferred.promise);
+    mockRemoveChannel
+      .mockImplementationOnce(() => removalDeferred.promise)
+      .mockRejectedValueOnce(new Error('remove failed'));
     const { useSupporter } = await import('@/composables/useSupporter');
     const supporter = useSupporter();
     userState.id = 'user-0';
@@ -120,9 +131,34 @@ describe('useSupporter', () => {
     await Promise.all([firstSubscription, secondSubscription]);
     supporter.unsubscribe();
     await Promise.resolve();
+    await Promise.resolve();
     expect(mockRemoveChannel).toHaveBeenCalledTimes(2);
     expect(new Set(mockRemoveChannel.mock.calls.map(([removedChannel]) => removedChannel))).toEqual(
       new Set(createdChannels)
     );
+  });
+  it('refreshes auth before creating a checkout session when no cached token exists', async () => {
+    mockFetch.mockResolvedValue({ url: 'https://checkout.test' });
+    mockSupabase.client.auth.getSession.mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
+    mockSupabase.client.auth.refreshSession.mockResolvedValue({
+      data: { session: { access_token: 'refreshed-token' } },
+      error: null,
+    });
+    const { useSupporter } = await import('@/composables/useSupporter');
+    const supporter = useSupporter();
+    await expect(supporter.createCheckout({ mode: 'payment' })).resolves.toBe(
+      'https://checkout.test'
+    );
+    expect(mockFetch).toHaveBeenCalledWith('/api/stripe/checkout', {
+      body: { mode: 'payment' },
+      headers: { Authorization: 'Bearer refreshed-token' },
+      method: 'POST',
+    });
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 });

@@ -7,9 +7,20 @@ import {
   mergeMemberProfileBroadcast,
   resolveTeammateIdentity,
   useTeamStore,
+  useTeamStoreWithSupabase,
 } from '@/stores/useTeamStore';
 import { GAME_MODES, type GameMode } from '@/utils/constants';
 import type { TeamState, MemberProfile } from '@/types/tarkov';
+const { mockGetTeamMembers, mockUseSupabaseListener } = vi.hoisted(() => ({
+  mockGetTeamMembers: vi.fn(),
+  mockUseSupabaseListener: vi.fn(),
+}));
+vi.mock('@/composables/api/useEdgeFunctions', () => ({
+  useEdgeFunctions: () => ({ getTeamMembers: mockGetTeamMembers }),
+}));
+vi.mock('@/composables/supabase/useSupabaseListener', () => ({
+  useSupabaseListener: mockUseSupabaseListener,
+}));
 type TeamPatch = Omit<Partial<TeamState>, 'members'> & {
   join_code?: string | null;
   members?: TeamState['members'] | null;
@@ -608,6 +619,108 @@ describe('Team Store Getter Logic', () => {
       patchTeamState(store, { members: ['user-1', 'user-3'] });
       expect(store.teammates).toEqual(['user-3']);
     });
+  });
+});
+describe('Team realtime resources', () => {
+  it('filters teammate progress and cleans up scoped subscriptions', async () => {
+    const currentUserId = '11111111-1111-4111-8111-111111111111';
+    const teammateId = '22222222-2222-4222-8222-222222222222';
+    const handlers: Array<{
+      config: { table?: string };
+      handler: (payload: { eventType: string; new: Record<string, unknown> }) => void;
+    }> = [];
+    const channel = {
+      on: vi.fn(
+        (
+          _event: string,
+          config: { table?: string },
+          handler: (payload: { eventType: string; new: Record<string, unknown> }) => void
+        ) => {
+          handlers.push({ config, handler });
+          return channel;
+        }
+      ),
+      subscribe: vi.fn((callback?: (status: string) => void) => {
+        callback?.('SUBSCRIBED');
+        return channel;
+      }),
+    };
+    const membershipQuery = {
+      eq: vi.fn().mockResolvedValue({
+        data: [{ game_mode: GAME_MODES.PVP, team_id: 'team-1' }],
+        error: null,
+      }),
+      select: vi.fn(),
+    };
+    membershipQuery.select.mockReturnValue(membershipQuery);
+    const client = {
+      channel: vi.fn(() => channel),
+      from: vi.fn(() => membershipQuery),
+      removeChannel: vi.fn().mockResolvedValue('ok'),
+    };
+    const nuxtApp = useNuxtApp() as unknown as {
+      $supabase: {
+        client: typeof client;
+        ready: () => Promise<null>;
+        user: { id: string; loggedIn: boolean };
+      };
+    };
+    nuxtApp.$supabase.client = client;
+    nuxtApp.$supabase.ready = vi.fn().mockResolvedValue(null);
+    nuxtApp.$supabase.user = { id: currentUserId, loggedIn: true };
+    mockGetTeamMembers.mockResolvedValue({
+      members: [currentUserId, teammateId],
+      profiles: {
+        [teammateId]: {
+          displayName: 'Teammate',
+          gameEdition: 4,
+          gameMode: GAME_MODES.PVP,
+          level: 10,
+          tasksCompleted: 2,
+        },
+      },
+    });
+    mockUseSupabaseListener.mockImplementation(() => ({
+      cleanup: vi.fn(),
+      fetchData: vi.fn(),
+      hasInitiallyLoaded: { value: false },
+      isSubscribed: { value: false },
+      loadError: { value: null },
+    }));
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(mockGetTeamMembers).toHaveBeenCalledWith('team-1', true));
+      const progressSubscription = handlers.find(
+        ({ config }) => config.table === 'user_game_mode_progress'
+      );
+      expect(progressSubscription?.config).toMatchObject({
+        filter: `user_id=in.(${currentUserId},${teammateId})`,
+      });
+      progressSubscription?.handler({
+        eventType: 'UPDATE',
+        new: {
+          game_mode: GAME_MODES.PVP,
+          progress_data: {
+            displayName: 'Updated Teammate',
+            level: 22,
+            taskCompletions: { task: { complete: true } },
+          },
+          season_number: 0,
+          user_id: teammateId,
+        },
+      });
+      expect(instance.teamStore.memberProfiles?.[teammateId]).toMatchObject({
+        displayName: 'Updated Teammate',
+        gameEdition: 4,
+        gameMode: GAME_MODES.PVP,
+        level: 22,
+        tasksCompleted: 1,
+      });
+    } finally {
+      instance.cleanup();
+    }
+    await Promise.resolve();
+    expect(client.removeChannel).toHaveBeenCalledWith(channel);
   });
 });
 describe('Teammate progress helpers', () => {

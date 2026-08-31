@@ -435,7 +435,7 @@ describe('supabase plugin', () => {
     );
   });
   it('preserves scoped local state after signOut', async () => {
-    const { removeAllChannels, signOut } = createClientMock('user-1');
+    const { getAuthStateChangeCallback, removeAllChannels, signOut } = createClientMock('user-1');
     const plugin = (await import('@/plugins/supabase.client')).default;
     const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
       SupabasePluginProvide | undefined;
@@ -446,6 +446,52 @@ describe('supabase plugin', () => {
     expect(removeAllChannels).toHaveBeenCalledTimes(1);
     expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe('progress-state');
     expect(localStorage.getItem(STORAGE_KEYS.preferences)).toBe('preferences-state');
+    getAuthStateChangeCallback()?.('SIGNED_OUT', null);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(removeAllChannels).toHaveBeenCalledTimes(2);
+  });
+  it('logs realtime cleanup failures after signOut without rejecting', async () => {
+    const cleanupError = new Error('realtime cleanup failed');
+    const { removeAllChannels, signOut } = createClientMock('user-1');
+    removeAllChannels.mockRejectedValue(cleanupError);
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    await flushPlugin();
+    await expect(result?.provide.supabase.signOut()).resolves.toBeUndefined();
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      '[Supabase] Failed to remove realtime channels after sign-out',
+      cleanupError
+    );
+    expect(removeAllChannels).toHaveBeenCalledTimes(1);
+    expect(signOut).toHaveBeenCalledTimes(1);
+  });
+  it('shares client initialization between concurrent ready and oauth calls', async () => {
+    localStorage.removeItem('sb-test-auth-token');
+    const sessionDeferred = createDeferred<{
+      data: { session: ReturnType<typeof createSession> };
+    }>();
+    const signInWithOAuth = vi.fn().mockResolvedValue({
+      data: { provider: 'github', url: null },
+      error: null,
+    });
+    mockAuthClient({
+      getSession: vi.fn(() => sessionDeferred.promise),
+      signInWithOAuth,
+    });
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    const readyPromise = result?.provide.supabase.ready();
+    const signInPromise = result?.provide.supabase.signInWithOAuth('github', {
+      skipBrowserRedirect: true,
+    });
+    await flushPlugin();
+    expect(mockCreateClient).toHaveBeenCalledTimes(1);
+    sessionDeferred.resolve({ data: { session: null } });
+    await expect(readyPromise).resolves.toBeUndefined();
+    await expect(signInPromise).resolves.toEqual({ provider: 'github', url: null });
+    expect(signInWithOAuth).toHaveBeenCalledTimes(1);
   });
   it('provides an offline stub when supabase config is missing', async () => {
     localStorage.removeItem('sb-test-auth-token');
