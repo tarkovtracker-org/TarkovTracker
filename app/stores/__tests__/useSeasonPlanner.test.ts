@@ -1,9 +1,32 @@
 import { createPinia, setActivePinia } from 'pinia';
-import { beforeEach, describe, expect, it } from 'vitest';
+import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createApp, nextTick } from 'vue';
 import { useSeasonPlannerStore } from '@/stores/useSeasonPlanner';
+import { STORAGE_KEYS } from '@/utils/storageKeys';
+import { serializeUserScopedStorage } from '@/utils/userScopedStorage';
+const { currentUserId } = vi.hoisted(() => ({
+  currentUserId: {
+    value: null as string | null,
+  },
+}));
+vi.mock('@/utils/userScopedStorage', async () => {
+  const actual = await vi.importActual<typeof import('@/utils/userScopedStorage')>(
+    '@/utils/userScopedStorage'
+  );
+  return {
+    ...actual,
+    getCurrentSupabaseUserId: () => currentUserId.value,
+  };
+});
 describe('useSeasonPlannerStore', () => {
   beforeEach(() => {
-    setActivePinia(createPinia());
+    currentUserId.value = null;
+    localStorage.clear();
+    const pinia = createPinia();
+    pinia.use(piniaPluginPersistedstate);
+    createApp({}).use(pinia);
+    setActivePinia(pinia);
   });
   describe('modifier data', () => {
     it('assigns the crafting bonuses to Handyman and the experience bonus to Seasoned PMCs', () => {
@@ -162,6 +185,60 @@ describe('useSeasonPlannerStore', () => {
       const store = useSeasonPlannerStore();
       store.normalizeSelection();
       expect(store.selectedModifiers).toEqual([]);
+    });
+  });
+  describe('persistence safety', () => {
+    it('ignores malformed persisted selections before getters run', () => {
+      currentUserId.value = 'user-1';
+      localStorage.setItem(
+        STORAGE_KEYS.seasonPlanner,
+        serializeUserScopedStorage(
+          { selectedModifiers: ['marathon_runner', { invalid: true }, 'no_insurance'] },
+          'user-1'
+        )
+      );
+      const store = useSeasonPlannerStore();
+      expect(store.selectedModifierIds).toEqual(['marathon_runner']);
+      expect(store.totalPoints).toBe(-3);
+      expect(store.isValid).toBe(false);
+      expect(() => store.normalizeSelection()).not.toThrow();
+    });
+    it("does not hydrate another user's selection", () => {
+      currentUserId.value = 'user-1';
+      const firstUserStore = useSeasonPlannerStore();
+      firstUserStore.toggleModifier('marathon_runner');
+      expect(firstUserStore.selectedModifierIds).toEqual(['marathon_runner']);
+      currentUserId.value = 'user-2';
+      const secondPinia = createPinia();
+      secondPinia.use(piniaPluginPersistedstate);
+      createApp({}).use(secondPinia);
+      setActivePinia(secondPinia);
+      const secondUserStore = useSeasonPlannerStore();
+      expect(secondUserStore.selectedModifierIds).toEqual([]);
+      expect(secondUserStore.totalPoints).toBe(0);
+    });
+    it('clears an in-memory selection when the current user changes', async () => {
+      currentUserId.value = 'user-1';
+      const store = useSeasonPlannerStore();
+      store.toggleModifier('marathon_runner');
+      currentUserId.value = 'user-2';
+      expect(store.selectedModifierIds).toEqual([]);
+      store.toggleModifier('no_flea_market');
+      expect(store.selectedModifierIds).toEqual(['no_flea_market']);
+      await nextTick();
+      expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.seasonPlanner) ?? '{}')).toMatchObject({
+        _userId: 'user-2',
+        data: { selectedModifiers: ['no_flea_market'] },
+      });
+    });
+    it('handles a malformed selection patched into the live store', () => {
+      const store = useSeasonPlannerStore();
+      store.$patch({ selectedModifiers: null as unknown as string[] });
+      expect(store.selectedModifierIds).toEqual([]);
+      expect(store.totalPoints).toBe(0);
+      expect(store.isSelected('marathon_runner')).toBe(false);
+      expect(() => store.toggleModifier('marathon_runner')).not.toThrow();
+      expect(store.selectedModifierIds).toEqual(['marathon_runner']);
     });
   });
   describe('reset', () => {

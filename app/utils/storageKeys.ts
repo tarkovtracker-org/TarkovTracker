@@ -14,6 +14,7 @@ export const STORAGE_KEYS = {
   activityLogManual: `${STORAGE_PREFIX}activity_log_manual`,
   activityLogLastRead: `${STORAGE_PREFIX}activity_log_last_read`,
   tasksMapPanelExpanded: `${STORAGE_PREFIX}tasks_map_panel_expanded`,
+  seasonPlanner: 'season-planner-v1',
 } as const;
 export const LEGACY_STORAGE_KEYS = {
   progress: 'progress',

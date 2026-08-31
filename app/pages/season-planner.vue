@@ -63,9 +63,11 @@
             variant="soft"
             :title="t('page.season_planner.invalid_total_title', 'Invalid Point Total')"
             :description="
-              t('page.season_planner.points_needed', {
-                points: Math.abs(plannerStore.totalPoints),
-              })
+              t(
+                'page.season_planner.points_needed',
+                { points: Math.abs(plannerStore.totalPoints) },
+                Math.abs(plannerStore.totalPoints)
+              )
             "
           />
         </div>
@@ -175,6 +177,6 @@
     if (plannerStore.isSelected(modifier.id)) {
       return false;
     }
-    return plannerStore.conflictsWithSelection(modifier.id, plannerStore.selectedModifiers);
+    return plannerStore.conflictsWithSelection(modifier.id, plannerStore.selectedModifierIds);
   };
 </script>

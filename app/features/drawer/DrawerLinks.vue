@@ -21,7 +21,7 @@
       ></DrawerItem>
       <DrawerItem
         icon="i-heroicons-sparkles"
-        locale-key="season_planner"
+        locale-key="navigation_drawer.season_planner"
         to="/season-planner"
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>

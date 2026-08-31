@@ -14,5 +14,6 @@ export interface HardcoreModifier {
 }
 export type SeasonalModifier = PersonalModifier | HardcoreModifier;
 export interface SeasonPlannerState {
+  ownerUserId: string | null;
   selectedModifiers: string[];
 }

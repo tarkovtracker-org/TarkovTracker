@@ -10,8 +10,13 @@ mockNuxtImport('useSeoMeta', () => seoMetaMock);
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({
-    t: (key: string, fallback?: string | Record<string, unknown>) =>
-      typeof fallback === 'string' ? fallback : key,
+    t: (key: string, values?: string | Record<string, unknown>, choice?: number) => {
+      if (key === 'page.season_planner.points_needed' && typeof values === 'object') {
+        const points = values.points;
+        return `Add ${points} more ${choice === 1 ? 'point' : 'points'} to make this plan valid.`;
+      }
+      return typeof values === 'string' ? values : key;
+    },
   }),
 }));
 describe('season planner page', () => {
@@ -69,6 +74,17 @@ describe('season planner page', () => {
     const alert = wrapper.find('[data-testid="u-alert"]');
     expect(alert.exists()).toBe(true);
     expect(alert.attributes('data-title')).toBe('Invalid Point Total');
+  });
+  it('uses the singular point label when one point is needed', async () => {
+    const wrapper = await mountSuspended(SeasonPlannerPage, {
+      global: globalConfig,
+    });
+    const store = useSeasonPlannerStore();
+    store.selectedModifiers = ['street_tax'];
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-testid="u-alert"]').text()).toContain(
+      'Add 1 more point to make this plan valid.'
+    );
   });
   it('disables incompatible modifiers when their counterpart is selected', async () => {
     const wrapper = await mountSuspended(SeasonPlannerPage, {

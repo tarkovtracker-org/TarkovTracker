@@ -1655,7 +1655,7 @@
       "total_points": "Total Points",
       "reset": "Reset Plan",
       "invalid_total_title": "Invalid Point Total",
-      "points_needed": "Add {points} more points to make this plan valid.",
+      "points_needed": "Add {points} more point to make this plan valid. | Add {points} more points to make this plan valid.",
       "conflict_title": "Modifier Conflict",
       "conflict_description": "Some selected modifiers cannot be used together. Remove one of the conflicting modifiers.",
       "modifiers": {
@@ -1834,6 +1834,7 @@
     "section_more": "More",
     "profile": "Profile",
     "section_navigation": "Navigation",
+    "season_planner": "Season Planner",
     "section_external": "External Tools",
     "account_menu": "Account menu",
     "edition_label": "Edition",
