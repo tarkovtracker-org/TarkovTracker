@@ -572,7 +572,6 @@ export function useTeammateStores() {
       ): GameMode | null => {
         const mode = row.game_mode;
         if (!isGameMode(mode)) return null;
-        if (!authoritative && appliedModes.has(mode)) return null;
         const expectedSeason = mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
         if (row.season_number !== expectedSeason) return null;
         applyProgressData(mode, row.progress_data, authoritative);
@@ -592,7 +591,10 @@ export function useTeammateStores() {
             logTeammateModeProgressHydrationFailure(modeRows.error, teammateId);
             return;
           }
-          modeRows.data?.forEach((row) => applyModeProgress(row as Record<string, unknown>));
+          modeRows.data?.forEach((row) => {
+            if (isGameMode(row.game_mode) && appliedModes.has(row.game_mode)) return;
+            applyModeProgress(row as Record<string, unknown>);
+          });
           applyLegacyPersistentProgressResult(
             legacyRow,
             appliedModes,
