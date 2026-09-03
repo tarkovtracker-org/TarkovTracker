@@ -954,8 +954,11 @@
         "show_map": "Afficher la carte",
         "hide_map": "Cacher la carte",
         "fullscreen_label": "Plein écran",
+        "required_items": "Objets requis",
+        "required_keys": "Clés requises",
         "required_items_summary": "Objets requis pour les tâches actives",
         "required_keys_summary": "Clés requises pour les tâches actives",
+        "active_tasks_group": "Tâches actives",
         "time_period": {
           "dawn": "Aube",
           "day": "Jour",
