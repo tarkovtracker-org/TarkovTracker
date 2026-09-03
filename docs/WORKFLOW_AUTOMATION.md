@@ -74,11 +74,17 @@ previous version until the next unrelated push to `main`. Letting Pages build th
 one extra deploy per release and keeps the displayed version honest.
 
 > [!WARNING]
-> Both providers match these markers **anywhere** in the commit message, not just as a prefix. Never
-> write a bracketed skip marker verbatim in a commit message or PR title — including when merely
+> Never write a bracketed skip marker verbatim in a commit message — including when merely
 > describing one — or you will silently skip CI, Release, and the deploy for that commit. Refer to
-> them unbracketed (`skip ci`, `skip actions`) in commit messages instead. Prose inside repository
-> files is safe; only commit messages and PR titles are scanned.
+> them unbracketed (`skip ci`, `skip actions`) instead.
+>
+> GitHub scans the commit message of a push and the HEAD commit of a pull request. It does **not**
+> scan PR titles. Cloudflare's docs describe its markers as a commit-message _prefix_, but observed
+> behaviour in this repository is broader — both `chore(release): 1.75.0 [skip ci]` (marker trailing
+> the subject) and a commit carrying `[skip ci]` only in its body produced no Pages deploy at all.
+> Assume any position matches.
+>
+> Prose inside repository files, such as this paragraph, is not scanned by either provider.
 
 **Commit Convention:**
 
