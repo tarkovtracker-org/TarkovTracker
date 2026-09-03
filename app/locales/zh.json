@@ -954,8 +954,11 @@
         "show_map": "显示地图",
         "hide_map": "隐藏地图",
         "fullscreen_label": "全屏",
+        "required_items": "必填项",
+        "required_keys": "必需的密钥",
         "required_items_summary": "活跃任务所需物品",
         "required_keys_summary": "活跃任务所需钥匙",
+        "active_tasks_group": "活动任务",
         "time_period": {
           "dawn": "黎明",
           "day": "白天",
