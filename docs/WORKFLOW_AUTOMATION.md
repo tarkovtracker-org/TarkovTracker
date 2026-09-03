@@ -56,6 +56,30 @@ Semantic versioning with automated releases:
 
 **Triggers:** Push to `main` (non-docs changes)
 
+**Version-bump commit:** `@semantic-release/git` commits the bumped `package.json` and `CHANGELOG.md`
+as `chore(release): <version> [skip actions]`. The marker is deliberately `[skip actions]` rather
+than `[skip ci]`:
+
+- GitHub Actions treats `[skip actions]` as a skip marker, so this workflow does not re-trigger
+  itself. ([Skipping workflow runs](https://docs.github.com/en/actions/managing-workflow-runs/skipping-workflow-runs))
+- Cloudflare Pages does **not** recognize `[skip actions]`. Its skip markers are `[CI Skip]`,
+  `[CI-Skip]`, `[Skip CI]`, `[Skip-CI]`, and `[CF-Pages-Skip]`.
+  ([GitHub integration](https://developers.cloudflare.com/pages/configuration/git-integration/github-integration/))
+
+That asymmetry is the point. The footer version comes from `packageJson.version` in
+`nuxt.config.ts`, which is baked into the bundle at build time and surfaced through
+`runtimeConfig.public.appVersion`. The merge commit is built _before_ semantic-release bumps
+`package.json`, so if Cloudflare also skipped the bump commit the deployed site would advertise the
+previous version until the next unrelated push to `main`. Letting Pages build the bump commit costs
+one extra deploy per release and keeps the displayed version honest.
+
+> [!WARNING]
+> Both providers match these markers **anywhere** in the commit message, not just as a prefix. Never
+> write a bracketed skip marker verbatim in a commit message or PR title — including when merely
+> describing one — or you will silently skip CI, Release, and the deploy for that commit. Refer to
+> them unbracketed (`skip ci`, `skip actions`) in commit messages instead. Prose inside repository
+> files is safe; only commit messages and PR titles are scanned.
+
 **Commit Convention:**
 
 - `feat:` → minor version bump
@@ -282,6 +306,11 @@ Push to `main` triggers:
 
 GitHub Actions itself deploys nothing; items 2-4 are separate Git integrations. See the Deployment
 section of [`runbook.md`](./runbook.md) for what to verify after each merge.
+
+A releasing merge deploys twice: once for the merge commit, then again for the
+`chore(release): <version> [skip actions]` commit that carries the bumped `package.json`. The second
+deploy is what makes the footer version match the release, so treat it as part of the merge rather
+than a stray build.
 
 ### Manual Deployment
 

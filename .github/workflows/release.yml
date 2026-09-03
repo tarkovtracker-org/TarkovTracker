@@ -13,10 +13,17 @@ jobs:
     name: Release
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    # GitHub natively skips push-triggered workflows for all five of these markers, so this guard is
+    # belt-and-braces. It is kept explicit because skip markers do not apply to every event type,
+    # and because semantic-release tags its own version-bump commit with '[skip actions]' to avoid
+    # re-triggering this workflow. See docs/WORKFLOW_AUTOMATION.md for why that marker, not
+    # '[skip ci]'.
     if: >-
       !contains(github.event.head_commit.message, '[skip ci]') &&
       !contains(github.event.head_commit.message, '[ci skip]') &&
-      !contains(github.event.head_commit.message, '[no ci]')
+      !contains(github.event.head_commit.message, '[no ci]') &&
+      !contains(github.event.head_commit.message, '[skip actions]') &&
+      !contains(github.event.head_commit.message, '[actions skip]')
     permissions:
       contents: write
       issues: write
