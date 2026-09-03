@@ -9,6 +9,10 @@ export const getObjectiveEquipmentItems = (
     objective.type &&
     ['plantItem', 'plantQuestItem', 'place', 'useItem', 'sellItem'].includes(objective.type);
   if (objective.markerItem?.id) items.push(objective.markerItem);
+  // Bring-mode callers (the map required-items summary) need the canonical singular `item`,
+  // which upstream populates for bring objectives that expose no `items` array. Task-card
+  // rendering ('all') keeps using the array fields so its chip set stays unchanged.
+  if (mode === 'bring' && isBringType && objective.item?.id) items.push(objective.item);
   if (objective.items?.length && (mode === 'all' || isBringType)) {
     const cap = objective.type === 'sellItem' ? MAX_RENDERED_OBJECTIVE_ITEMS : Infinity;
     items.push(...objective.items.slice(0, cap));

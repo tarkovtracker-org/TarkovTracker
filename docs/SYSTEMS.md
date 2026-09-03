@@ -37,6 +37,8 @@ and have an agent verify the answer against the code.
     selection, public resolution, and client polling
 11. [Boot-time asset-failure recovery](#11-boot-time-asset-failure-recovery) — recovering from
     stale-chunk load failures before and after the app boots
+12. [Map objective visibility and required items](#12-map-objective-visibility-and-required-items) —
+    map marker categories and split pinned/active requirements
 
 ---
 
@@ -1084,6 +1086,62 @@ Page load
   otherwise storage breakage produces an unbounded reload loop.
 - The retry URL always carries `_tt_retry=<timestamp>` so the reload bypasses the browser's cached
   HTML and revalidates against the current deployment.
+
+## 12. Map objective visibility and required items
+
+**Summary.** The Tasks map derives objective visibility once for map markers and the required-item
+summary. Objectives are categorized as pinned, self, or team, while the summary separately groups
+items and keys from pinned tasks and active tasks so pinned requirements remain distinguishable.
+
+### Flow
+
+1. `useMapObjectiveMarks` derives each objective's active users, completion state, and category.
+   Pinning is resolved from the enclosing task ID; pinned objectives take precedence over self and
+   team membership. The composable returns both map marks and an objective-visibility map, each
+   entry carrying the category plus `selfNeedsObjective` — whether the local player still needs
+   that objective themselves.
+2. `LeafletMap` applies the pinned, self, and team map preferences to marker colors and visibility.
+3. `MapRequiredItemsSummary` splits the selected task set using the persisted pinned task IDs, then
+   aggregates bring-mode equipment and alternative key groups independently for each group. It
+   filters objectives to the selected map and the shared objective-visibility state.
+4. The summary's pinned group follows the pinned-objective preference. Its active group follows the
+   self-objective preference. Objectives the player does not still need themselves are dropped, so
+   the Team chip never changes required-item summaries.
+
+### Files
+
+- `app/composables/useMapObjectiveMarks.ts` — objective users, categories, map marks, and shared
+  visibility state.
+- `app/features/maps/LeafletMap.vue` — marker category filtering and map rendering.
+- `app/features/maps/MapRequiredItemsSummary.vue` — pinned/active grouping and preference gates.
+- `app/features/maps/composables/useMapRequiredItems.ts` — selected-map item/key aggregation.
+- `app/features/tasks/task-objective-equipment.ts` — canonical bring-mode equipment extraction.
+- `app/pages/tasks.vue` — passes filtered tasks and shared visibility into the map components.
+
+### Invariants
+
+- Pinning is determined by `task.id`, never by an objective ID; a pinned task's objectives are
+  categorized as `pinned` before self or team membership is considered.
+- Map marker visibility is controlled independently by the pinned, self, and team preferences.
+- Required-item summaries use the selected map and shared objective visibility, exclude completed
+  objectives, and preserve equipment counts and alternative key groups after deduplication.
+- A summary lists only what the local player still needs, and enforces that through
+  `selfNeedsObjective` rather than through `category`. That covers objectives the player ticked
+  off, tasks they completed or failed, and tasks they have not unlocked — even when a teammate
+  still needs the objective. Gating on `category` alone would be wrong, because a pinned task
+  reports `category: 'pinned'` and would otherwise mask a teammate-only requirement.
+- Pinned and active task requirements are aggregated into separate groups whenever both contain
+  visible content; the pinned group uses the pinned marker accent.
+- The pinned summary group follows `mapShowPinnedObjectives`; the active summary group follows
+  `mapShowSelfObjectives`. `mapShowTeamObjectives` does not hide or alter the required-item
+  summary, preserving the product rule that the Team chip controls map markers only.
+- Bring-mode aggregation additionally includes the canonical `objective.item` field for bring-type
+  objectives, covering upstream objectives that expose no `items` array. Task-card rendering uses
+  `all` mode and is unaffected by that field, and neither mode reintroduces the removed task
+  `alternatives` runtime dependency.
+- A group given a title renders its section headings one level down (`h4`) and uses the short
+  `required_items` / `required_keys` labels; an untitled standalone group keeps the `h3` level and
+  the longer `*_summary` labels.
 
 ## When this doc is wrong
 
