@@ -221,6 +221,9 @@ export function useSupabaseListener<
         }
       )
       .subscribe((status: string, error?: Error) => {
+        // Cleanup can start while the join is still pending; a disposed channel
+        // must not flip `isSubscribed` back on or log for a listener that is gone.
+        if (subscriptionVersion !== cleanupVersion) return;
         isSubscribed.value = status === 'SUBSCRIBED';
         logChannelSubscribeFailure(storeIdForLogging, status, error, { table });
       });

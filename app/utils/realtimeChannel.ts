@@ -10,10 +10,10 @@ export type SupabaseRealtimeChannel = ReturnType<SupabaseClient['channel']>;
 /**
  * A Realtime channel paired with the client that created it.
  *
- * `$supabase.client` is replaced when the plugin finishes background
- * initialization and again after a sign-out/sign-in cycle. Resolving the client
- * lazily at teardown time can therefore hand the channel to a client that never
- * owned it, so the owner is captured when the channel is created.
+ * `$supabase.client` starts as an offline stub and is replaced once background
+ * initialization completes. Resolving the client lazily at teardown time can
+ * therefore hand the channel to a client that never owned it, so the owner is
+ * captured when the channel is created.
  */
 export type OwnedRealtimeChannel = {
   channel: SupabaseRealtimeChannel;
@@ -21,6 +21,36 @@ export type OwnedRealtimeChannel = {
   /** Topic the channel was created with; leaves are tracked per topic. */
   topic: string;
 };
+/**
+ * Tracks in-flight channel leaves so a topic is not rejoined before it is free.
+ *
+ * `RealtimeClient` keys channels by topic, so only a rejoin of a leaving topic
+ * has to wait; joining a different topic proceeds immediately. Leaves are tracked
+ * per topic because several can be in flight at once. A failed leave keeps its
+ * entry so later attempts still decline that topic instead of binding to one that
+ * is still occupied.
+ */
+export const createChannelReleaseLatch = () => {
+  const pending = new Map<string, Promise<boolean>>();
+  return {
+    hold: (owned: OwnedRealtimeChannel, removal: Promise<boolean>): void => {
+      pending.set(owned.topic, removal);
+    },
+    /** Synchronous check so callers can skip an await when nothing is leaving. */
+    isHolding: (topic: string): boolean => pending.has(topic),
+    /** @returns `true` when `topic` is free to join. */
+    release: async (topic: string): Promise<boolean> => {
+      const inFlight = pending.get(topic);
+      if (!inFlight) return true;
+      const leftCleanly = await inFlight;
+      if (leftCleanly && pending.get(topic) === inFlight) pending.delete(topic);
+      return leftCleanly;
+    },
+  };
+};
+/** The offline stub resolves with no status; treat that as a clean leave. */
+const isCleanLeave = (status: string | undefined): boolean =>
+  status === undefined || status === 'ok';
 /**
  * Leaves a Realtime channel and waits for the leave to complete.
  *
@@ -36,40 +66,6 @@ export type OwnedRealtimeChannel = {
  *   treating a rejoin as successful. `removeChannel` only tears the channel down
  *   on an `ok` leave, and an `error` reply never closes it.
  */
-/**
- * Tracks an in-flight channel leave so the same topic is not rejoined early.
- *
- * `RealtimeClient` keys channels by topic, so only a rejoin of the leaving topic
- * has to wait; joining a different topic proceeds immediately. A failed leave
- * keeps the latch so later attempts still decline that topic rather than binding
- * to one that is still occupied.
- */
-export const createChannelReleaseLatch = () => {
-  type PendingLeave = { topic: string; removal: Promise<boolean> };
-  let pending: PendingLeave | null = null;
-  const held = (topic: string): PendingLeave | null => (pending?.topic === topic ? pending : null);
-  const clearIfCurrent = (leave: PendingLeave): void => {
-    if (pending === leave) pending = null;
-  };
-  return {
-    hold: (owned: OwnedRealtimeChannel, removal: Promise<boolean>): void => {
-      pending = { removal, topic: owned.topic };
-    },
-    /** Synchronous check so callers can skip an await when nothing is leaving. */
-    isHolding: (topic: string): boolean => held(topic) !== null,
-    /** @returns `true` when `topic` is free to join. */
-    release: async (topic: string): Promise<boolean> => {
-      const inFlight = held(topic);
-      if (!inFlight) return true;
-      const leftCleanly = await inFlight.removal;
-      if (leftCleanly) clearIfCurrent(inFlight);
-      return leftCleanly;
-    },
-  };
-};
-/** The offline stub resolves with no status; treat that as a clean leave. */
-const isCleanLeave = (status: string | undefined): boolean =>
-  status === undefined || status === 'ok';
 export const removeOwnedChannel = async (
   owned: OwnedRealtimeChannel | null,
   label: string
