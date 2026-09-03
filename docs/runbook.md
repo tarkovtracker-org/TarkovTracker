@@ -131,9 +131,16 @@ The Supabase check keeps the name `Supabase Preview` on `main`, where it targets
 project rather than a preview branch. Per-PR preview deploys are intentionally disabled to avoid
 per-preview billing, which is why the same check reports `skipping` on pull requests.
 
-One prerequisite is not covered by any of the three integrations: private Realtime channels are only
-enforced when **Allow public access** is disabled under the project's Realtime settings in the
-Supabase dashboard. The `realtime.messages` policies shipped by
+Two things need operator attention beyond the automated integrations.
+
+First, ship the frontend and both Supabase migrations as one release. The migrations remove the
+client broadcast permission and the direct write grants that older bundles rely on, and deployment
+order across the three integrations is uncontrolled. After the release, reload or close stale tabs:
+a tab still running the previous bundle keeps a channel and write path that no longer exist and will
+stop receiving team updates until it reloads.
+
+Second, private Realtime channels are only enforced when **Allow public access** is disabled under
+the project's Realtime settings in the Supabase dashboard. The `realtime.messages` policies shipped by
 `20260830120000_secure_team_realtime_channels.sql` authorize the private `team:<id>` join, but with
 public access still enabled a client can join a same-named public topic. Row data stays protected by
 table RLS either way; disable the setting to close topic-level access. The migration deliberately

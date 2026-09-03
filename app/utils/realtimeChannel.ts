@@ -34,7 +34,16 @@ export const createChannelReleaseLatch = () => {
   const pending = new Map<string, Promise<boolean>>();
   return {
     hold: (owned: OwnedRealtimeChannel, removal: Promise<boolean>): void => {
-      pending.set(owned.topic, removal);
+      const { topic } = owned;
+      pending.set(topic, removal);
+      // Drop the entry once a clean leave settles, so topics that are never
+      // rejoined do not accumulate. Failed leaves are retained on purpose.
+      void removal.then(
+        (leftCleanly) => {
+          if (leftCleanly && pending.get(topic) === removal) pending.delete(topic);
+        },
+        () => undefined
+      );
     },
     /** Synchronous check so callers can skip an await when nothing is leaving. */
     isHolding: (topic: string): boolean => pending.has(topic),

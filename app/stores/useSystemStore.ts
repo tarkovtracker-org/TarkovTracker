@@ -2,6 +2,7 @@ import { defineStore, type Store } from 'pinia';
 import { useSupabaseListener } from '@/composables/supabase/useSupabaseListener';
 import { getCurrentGameMode } from '@/stores/utils/gameMode';
 import {
+  createChannelReleaseLatch,
   logChannelSubscribeFailure,
   removeOwnedChannel,
   type OwnedRealtimeChannel,
@@ -114,6 +115,7 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
   // `shallowRef`: a Realtime channel owns a socket, timers, and internal state
   // that must not be wrapped in a deep reactive proxy.
   const membershipChannel = shallowRef<OwnedRealtimeChannel | null>(null);
+  const channelRelease = createChannelReleaseLatch();
   let membershipRequestId = 0;
   let membershipSessionId = 0;
   const getAuthenticatedUserId = (): string | null =>
@@ -217,18 +219,40 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
   const cleanupMembershipChannel = async () => {
     const owned = membershipChannel.value;
     membershipChannel.value = null;
-    await removeOwnedChannel(owned, 'SystemStore');
+    if (!owned) return;
+    channelRelease.hold(owned, removeOwnedChannel(owned, 'SystemStore'));
+    await channelRelease.release(owned.topic);
+  };
+  const canJoinMembershipTopic = async (
+    topic: string,
+    sessionId: number,
+    userId: string
+  ): Promise<boolean> =>
+    (await channelRelease.release(topic)) && isCurrentMembershipSession(sessionId, userId);
+  /**
+   * Tears the previous channel down and resolves the user this setup owns.
+   *
+   * @returns The authenticated user id, or `null` when a newer session
+   *   superseded this one or nobody is signed in.
+   */
+  const resolveMembershipSession = async (sessionId: number): Promise<string | null> => {
+    await cleanupMembershipChannel();
+    if (!isCurrentMembershipSession(sessionId)) return null;
+    const userId = getAuthenticatedUserId();
+    if (!userId) return null;
+    await refreshTeamMemberships(userId, sessionId);
+    return isCurrentMembershipSession(sessionId, userId) ? userId : null;
   };
   const setupMembershipChannel = async () => {
     const sessionId = ++membershipSessionId;
-    await cleanupMembershipChannel();
-    if (!isCurrentMembershipSession(sessionId)) return;
-    const userId = getAuthenticatedUserId();
+    const userId = await resolveMembershipSession(sessionId);
     if (!userId) return;
-    await refreshTeamMemberships(userId, sessionId);
-    if (!isCurrentMembershipSession(sessionId, userId)) return;
     const client = $supabase.client;
     const topic = `system-team-memberships-${userId}`;
+    // The topic is per user, so signing out and back in reuses it. An unclean
+    // leave keeps it occupied and `subscribe()` would never rejoin, so decline
+    // this attempt and let the next auth change retry.
+    if (!(await canJoinMembershipTopic(topic, sessionId, userId))) return;
     const channel = client
       .channel(topic)
       .on(

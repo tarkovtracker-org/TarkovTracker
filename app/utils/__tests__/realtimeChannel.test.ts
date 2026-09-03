@@ -36,6 +36,29 @@ describe('createChannelReleaseLatch', () => {
     second.resolve(true);
     await expect(latch.release('topic-b')).resolves.toBe(true);
   });
+  it('keeps a newer hold for a topic whose earlier release is still in flight', async () => {
+    const latch = createChannelReleaseLatch();
+    const first = deferred();
+    const second = deferred();
+    latch.hold(owned('topic-a'), first.promise);
+    const inFlightRelease = latch.release('topic-a');
+    // A cleanup can re-hold the same topic while the previous release awaits.
+    latch.hold(owned('topic-a'), second.promise);
+    first.resolve(true);
+    await expect(inFlightRelease).resolves.toBe(true);
+    // The stale release must not discard the newer leave.
+    expect(latch.isHolding('topic-a')).toBe(true);
+    second.resolve(true);
+    await expect(latch.release('topic-a')).resolves.toBe(true);
+    expect(latch.isHolding('topic-a')).toBe(false);
+  });
+  it('forgets a clean leave that is never rejoined', async () => {
+    const latch = createChannelReleaseLatch();
+    latch.hold(owned('topic-a'), Promise.resolve(true));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(latch.isHolding('topic-a')).toBe(false);
+  });
   it('keeps declining a topic whose leave failed', async () => {
     const latch = createChannelReleaseLatch();
     latch.hold(owned('topic-a'), Promise.resolve(false));

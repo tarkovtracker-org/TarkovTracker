@@ -158,15 +158,6 @@ const shouldIgnoreLegacyMetadataUpdate = (
   }
   return true;
 };
-/**
- * Releases the previous `user_progress_<uid>` channel before it is rejoined.
- *
- * The topic is per user, so signing out and back in as the same user reuses it.
- * `RealtimeClient.channel()` hands back the still-leaving channel until
- * `phx_leave` settles and `subscribe()` only rejoins a closed channel, so the
- * previous leave has to finish first. An unclean leave keeps the topic occupied,
- * in which case rejoining would silently never join.
- */
 const isStillSignedInAs = (currentUserId: string): boolean => {
   const { $supabase } = useNuxtApp();
   return $supabase.user.loggedIn === true && $supabase.user.id === currentUserId;
@@ -192,13 +183,25 @@ const adoptProgressChannel = (owned: OwnedRealtimeChannel, generation: number): 
   }
   realtimeChannel = owned;
 };
-const prepareProgressTopic = async (
-  currentUserId: string,
-  generation: number
-): Promise<boolean> => {
+/**
+ * Releases the previous `user_progress_<uid>` channel before it is rejoined.
+ *
+ * The topic is per user, so signing out and back in as the same user reuses it.
+ * `RealtimeClient.channel()` hands back the still-leaving channel until
+ * `phx_leave` settles and `subscribe()` only rejoins a closed channel, so the
+ * previous leave has to finish first. An unclean leave keeps the topic occupied,
+ * in which case rejoining would silently never join.
+ *
+ * @returns The generation this setup owns, or `null` if it must not proceed. The
+ *   generation is taken after the internal cleanup, which bumps it too.
+ */
+const stillOwnsSetup = (currentUserId: string, generation: number): boolean =>
+  generation === listenerGeneration && isStillSignedInAs(currentUserId);
+const prepareProgressTopic = async (currentUserId: string): Promise<number | null> => {
   if (realtimeChannel) await cleanupRealtimeListener();
-  if (!(await channelRelease.release(progressTopic(currentUserId)))) return false;
-  return generation === listenerGeneration && isStillSignedInAs(currentUserId);
+  const generation = ++listenerGeneration;
+  if (!(await channelRelease.release(progressTopic(currentUserId)))) return null;
+  return stillOwnsSetup(currentUserId, generation) ? generation : null;
 };
 export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promise<void> {
   const { $supabase } = useNuxtApp();
@@ -206,8 +209,8 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
   const toastI18n = useToastI18n();
   const currentUserId = $supabase.user.id;
   if (!$supabase.user.loggedIn || !currentUserId) return;
-  const generation = ++listenerGeneration;
-  if (!(await prepareProgressTopic(currentUserId, generation))) return;
+  const generation = await prepareProgressTopic(currentUserId);
+  if (generation === null) return;
   const latestModeUpdateTimes = new Map<GameMode, number>();
   const acceptModeUpdate = (mode: GameMode, updateTime: number): boolean => {
     const latestUpdateTime = latestModeUpdateTimes.get(mode);

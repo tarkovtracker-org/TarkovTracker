@@ -71,6 +71,16 @@ describe('seasonal progress realtime synchronization', () => {
     resetSyncTimeline();
     vi.clearAllMocks();
   });
+  it('rebuilds the channel when setup runs again with one already active', async () => {
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    await setupRealtimeListener(store);
+    expect(supabaseContext.client.channel).toHaveBeenCalledTimes(1);
+    // The internal cleanup bumps the listener generation, so a naive generation
+    // check would abort here and leave the user without a progress listener.
+    await setupRealtimeListener(store);
+    expect(supabaseContext.client.channel).toHaveBeenCalledTimes(2);
+    expect(handlers.size).toBeGreaterThan(0);
+  });
   it('applies only the active Seasonal row without changing persistent modes', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     await setupRealtimeListener(store);
