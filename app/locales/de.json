@@ -954,8 +954,11 @@
         "show_map": "Karte anzeigen",
         "hide_map": "Karte ausblenden",
         "fullscreen_label": "Vollbild",
+        "required_items": "Benötigte Elemente",
+        "required_keys": "Erforderliche Schlüssel",
         "required_items_summary": "Benötigte Gegenstände für aktive Aufgaben",
         "required_keys_summary": "Benötigte Schlüssel für aktive Aufgaben",
+        "active_tasks_group": "Aktive Aufgaben",
         "time_period": {
           "dawn": "Morgendämmerung",
           "day": "Tag",
