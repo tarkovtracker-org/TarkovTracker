@@ -44,17 +44,20 @@
     if (category === 'pinned') return preferencesStore.getMapShowPinnedObjectives;
     return preferencesStore.getMapShowSelfObjectives;
   };
+  // A `team` category means only teammates still need the objective, so it carries no requirement
+  // for this player. The Team chip therefore never alters the summary.
+  const isPlayerRequirement = (visibility: MapObjectiveVisibility): boolean => {
+    if (!visibility.hasActiveObjective) return false;
+    if (visibility.category === 'team') return false;
+    return isCategoryEnabled(visibility.category);
+  };
   const isObjectiveVisible = (objective: TaskObjective, selfComplete: boolean): boolean => {
     // The summary is the local player's shopping list for this map, so an objective they have
     // already completed never contributes items, even when a teammate still needs it.
     if (selfComplete) return false;
     if (!props.objectiveVisibility) return true;
     const visibility = props.objectiveVisibility.get(objective.id);
-    if (!visibility) return false;
-    // A `team` category means only teammates still need the objective, so it carries no
-    // requirement for this player. The Team chip therefore never alters the summary.
-    if (visibility.category === 'team') return false;
-    return visibility.hasActiveObjective && isCategoryEnabled(visibility.category);
+    return visibility ? isPlayerRequirement(visibility) : false;
   };
   const {
     equipment: pinnedEquipment,
