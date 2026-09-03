@@ -40,7 +40,9 @@
   const pinnedIds = computed(() => new Set(preferencesStore.getPinnedTaskIds));
   const pinnedTasks = computed(() => props.tasks.filter((task) => pinnedIds.value.has(task.id)));
   const activeTasks = computed(() => props.tasks.filter((task) => !pinnedIds.value.has(task.id)));
-  const isCategoryEnabled = (category: MapObjectiveCategory): boolean => {
+  // `team` is excluded from the parameter type because it must never reach this gate: it has no
+  // corresponding summary preference, so falling through to either chip would be wrong.
+  const isCategoryEnabled = (category: Exclude<MapObjectiveCategory, 'team'>): boolean => {
     if (category === 'pinned') return preferencesStore.getMapShowPinnedObjectives;
     return preferencesStore.getMapShowSelfObjectives;
   };
