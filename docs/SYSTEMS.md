@@ -1097,14 +1097,16 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 
 1. `useMapObjectiveMarks` derives each objective's active users, completion state, and category.
    Pinning is resolved from the enclosing task ID; pinned objectives take precedence over self and
-   team membership. The composable returns both map marks and an objective-visibility map.
+   team membership. The composable returns both map marks and an objective-visibility map, each
+   entry carrying the category plus `selfNeedsObjective` — whether the local player still needs
+   that objective themselves.
 2. `LeafletMap` applies the pinned, self, and team map preferences to marker colors and visibility.
 3. `MapRequiredItemsSummary` splits the selected task set using the persisted pinned task IDs, then
    aggregates bring-mode equipment and alternative key groups independently for each group. It
    filters objectives to the selected map and the shared objective-visibility state.
 4. The summary's pinned group follows the pinned-objective preference. Its active group follows the
-   self-objective preference. Objectives the player has completed, and objectives only teammates
-   still need, are dropped, so the Team chip never changes required-item summaries.
+   self-objective preference. Objectives the player does not still need themselves are dropped, so
+   the Team chip never changes required-item summaries.
 
 ### Files
 
@@ -1123,9 +1125,11 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 - Map marker visibility is controlled independently by the pinned, self, and team preferences.
 - Required-item summaries use the selected map and shared objective visibility, exclude completed
   objectives, and preserve equipment counts and alternative key groups after deduplication.
-- A summary lists only what the local player still needs. Objectives categorized as `team` carry no
-  requirement for the player and are excluded, as is any objective the player has already
-  completed, even when a teammate still needs it.
+- A summary lists only what the local player still needs, and enforces that through
+  `selfNeedsObjective` rather than through `category`. That covers objectives the player ticked
+  off, tasks they completed or failed, and tasks they have not unlocked — even when a teammate
+  still needs the objective. Gating on `category` alone would be wrong, because a pinned task
+  reports `category: 'pinned'` and would otherwise mask a teammate-only requirement.
 - Pinned and active task requirements are aggregated into separate groups whenever both contain
   visible content; the pinned group uses the pinned marker accent.
 - The pinned summary group follows `mapShowPinnedObjectives`; the active summary group follows

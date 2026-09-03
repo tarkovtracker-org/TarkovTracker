@@ -46,10 +46,14 @@
     if (category === 'pinned') return preferencesStore.getMapShowPinnedObjectives;
     return preferencesStore.getMapShowSelfObjectives;
   };
-  // A `team` category means only teammates still need the objective, so it carries no requirement
-  // for this player. The Team chip therefore never alters the summary.
+  // Only the local player's own outstanding need puts an item on this list. `selfNeedsObjective`
+  // already excludes objectives they ticked off, tasks they completed or failed, and tasks they
+  // have not unlocked — including on a pinned task, where `category` alone would report `pinned`
+  // and so mask a requirement that is really only a teammate's.
   const isPlayerRequirement = (visibility: MapObjectiveVisibility): boolean => {
-    if (!visibility.hasActiveObjective) return false;
+    if (!visibility.selfNeedsObjective) return false;
+    // Unreachable while `selfNeedsObjective` holds, because that puts `self` among the objective's
+    // users and therefore yields `pinned` or `self`. Kept as an explicit gate rather than a cast.
     if (visibility.category === 'team') return false;
     return isCategoryEnabled(visibility.category);
   };

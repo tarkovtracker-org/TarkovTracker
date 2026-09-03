@@ -20,7 +20,11 @@ export type MapObjectiveMark = {
 export type MapObjectiveCategory = 'self' | 'pinned' | 'team';
 export type MapObjectiveVisibility = {
   category: MapObjectiveCategory;
-  hasActiveObjective: boolean;
+  // True only when the local player still needs this objective themselves: the task is unlocked,
+  // neither complete nor failed, and the objective is not ticked off. Consumers that build a
+  // player-facing requirement list must gate on this rather than on `category`, because a pinned
+  // task reports `category: 'pinned'` even when only a teammate still needs the objective.
+  selfNeedsObjective: boolean;
 };
 interface MapObjectiveMarksOptions {
   mapId: ComputedRef<string | null | undefined>;
@@ -102,7 +106,7 @@ const getObjectiveUsers = ({
   objectiveCompletions,
   tasksCompletions,
   tasksFailed,
-}: ObjectiveUsersOptions): { users: string[]; hasActiveObjective: boolean } => {
+}: ObjectiveUsersOptions): string[] => {
   const teammateUsers = getTeammateUsers({
     taskId,
     objectiveId,
@@ -115,20 +119,15 @@ const getObjectiveUsers = ({
   const users: string[] = [];
   if (selfNeedsObjective) users.push('self');
   users.push(...teammateUsers);
-  if (users.length > 0) {
-    return { users, hasActiveObjective: true };
-  }
-  return {
-    users: canShowCompletedObjective(
-      selfComplete,
-      selfTaskComplete,
-      selfTaskFailed,
-      shouldShowCompletedObjectives
-    )
-      ? ['self']
-      : [],
-    hasActiveObjective: false,
-  };
+  if (users.length > 0) return users;
+  return canShowCompletedObjective(
+    selfComplete,
+    selfTaskComplete,
+    selfTaskFailed,
+    shouldShowCompletedObjectives
+  )
+    ? ['self']
+    : [];
 };
 const getZoneLocation = (
   zone: ObjectiveZone,
@@ -270,7 +269,7 @@ export function useMapObjectiveMarks({
         const selfTaskUnlocked = unlockedTasks.value[task.id]?.self === true;
         const selfNeedsObjective =
           selfTaskUnlocked && !selfTaskComplete && !selfTaskFailed && !selfComplete;
-        const { users, hasActiveObjective } = getObjectiveUsers({
+        const users = getObjectiveUsers({
           taskId: task.id,
           objectiveId: obj.id,
           teammateIds,
@@ -288,7 +287,7 @@ export function useMapObjectiveMarks({
         const pinned = pinnedTaskIds.has(task.id);
         objectiveVisibility.set(obj.id, {
           category: mapObjectiveCategory(pinned, users),
-          hasActiveObjective,
+          selfNeedsObjective,
         });
         const { zones, possibleLocations } = getObjectiveLocations(
           obj,

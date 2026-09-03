@@ -119,9 +119,51 @@ describe('useMapObjectiveMarks', () => {
     expect(unpinnedMark?.pinned).toBe(false);
     expect(mapObjectiveVisibility.value.get('obj-pinned')).toEqual({
       category: 'pinned',
-      hasActiveObjective: true,
+      selfNeedsObjective: true,
     });
   });
+  // A pinned task keeps `category: 'pinned'` even when the local player has no stake in the
+  // objective, so the visibility record has to report that separately or the required-items
+  // summary cannot tell a real requirement from a teammate's.
+  it.each([
+    {
+      route: 'the player has not unlocked the task',
+      apply: () => {
+        unlockedTasks.value = { 'task-pinned': { 'teammate-a': true } };
+      },
+    },
+    {
+      route: 'the player failed the task',
+      apply: () => {
+        unlockedTasks.value = { 'task-pinned': { self: true, 'teammate-a': true } };
+        failedTaskIds.value = new Set(['task-pinned']);
+      },
+    },
+  ])(
+    'reports selfNeedsObjective:false on a pinned objective only a teammate needs when $route',
+    async ({ apply }) => {
+      const { useMapObjectiveMarks } = await setup();
+      visibleTeamStores.value = { self: {}, 'teammate-a': {} };
+      pinnedTaskIds.value = ['task-pinned'];
+      apply();
+      const tasks: Task[] = [
+        {
+          id: 'task-pinned',
+          name: 'Pinned Task',
+          objectives: [objectiveWithLocation('obj-pinned', 'customs')],
+        },
+      ];
+      const { mapObjectiveVisibility } = useMapObjectiveMarks({
+        mapId: computed(() => 'customs'),
+        shouldShowCompletedObjectives: computed(() => false),
+        tasks: computed(() => tasks),
+      });
+      expect(mapObjectiveVisibility.value.get('obj-pinned')).toEqual({
+        category: 'pinned',
+        selfNeedsObjective: false,
+      });
+    }
+  );
   it('determines pinned state from task.id, not obj.id', async () => {
     const { useMapObjectiveMarks } = await setup();
     // The objective id on task-1 deliberately collides with a pinned id string,
