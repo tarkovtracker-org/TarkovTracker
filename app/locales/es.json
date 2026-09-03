@@ -954,8 +954,11 @@
         "show_map": "Mostrar mapa",
         "hide_map": "Ocultar mapa",
         "fullscreen_label": "Pantalla completa",
+        "required_items": "Artículos requeridos",
+        "required_keys": "Claves requeridas",
         "required_items_summary": "Objetos necesarios para tareas activas",
         "required_keys_summary": "Llaves necesarias para tareas activas",
+        "active_tasks_group": "Tareas activas",
         "time_period": {
           "dawn": "Amanecer",
           "day": "Día",
