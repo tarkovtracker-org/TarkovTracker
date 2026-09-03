@@ -954,8 +954,11 @@
         "show_map": "Mostra mappa",
         "hide_map": "Nascondi mappa",
         "fullscreen_label": "Schermo intero",
+        "required_items": "Oggetti richiesti",
+        "required_keys": "Chiavi richieste",
         "required_items_summary": "Oggetti richiesti per le missioni attive",
         "required_keys_summary": "Chiavi richieste per le missioni attive",
+        "active_tasks_group": "Attività Attive",
         "time_period": {
           "dawn": "Alba",
           "day": "Giorno",
