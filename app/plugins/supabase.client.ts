@@ -254,6 +254,9 @@ export default defineNuxtPlugin({
     let readySessionPromise: Promise<Session | null> | null = null;
     let supabaseClient: SupabaseClient | null = null;
     let currentSession: Session | null = null;
+    // Bumped by `signOut()` so a slow initial-session read that resolves after
+    // sign-out cannot re-hydrate the pre-sign-out session and re-log-in the UI.
+    let authInvalidationToken = 0;
     let oauthCallbackCode = readOAuthCallbackCode();
     const hasCodeQueryParam = currentSearchParams().has('code');
     const hasStoredSession = () => {
@@ -327,8 +330,15 @@ export default defineNuxtPlugin({
       }
     };
     const hydrateInitialSession = async (client: SupabaseClient): Promise<void> => {
+      const tokenAtReadStart = authInvalidationToken;
       try {
         const sessionResult = await client.auth.getSession();
+        if (authInvalidationToken !== tokenAtReadStart) {
+          // A sign-out happened while this read was in flight. Hydrating its
+          // (pre-sign-out) result would revive the signed-out session.
+          logger.debug('[Supabase] Discarding initial session read invalidated by sign-out');
+          return;
+        }
         if (sessionResult.error) {
           // A failed read is not the same as "signed out"; hydrating null here
           // would sign a valid user out of the UI.
@@ -369,8 +379,15 @@ export default defineNuxtPlugin({
     };
     const readReadySession = async (client: SupabaseClient): Promise<Session | null> => {
       readySessionPromise ??= (async () => {
+        const tokenAtReadStart = authInvalidationToken;
         try {
           const sessionResult = await client.auth.getSession();
+          if (authInvalidationToken !== tokenAtReadStart) {
+            // A sign-out happened while this read was in flight. Return the
+            // current (signed-out) session instead of reviving the old one.
+            logger.debug('[Supabase] Discarding ready session read invalidated by sign-out');
+            return currentSession;
+          }
           if (sessionResult.error) {
             // A failed read is not the same as "signed out". Keep the last known
             // session instead of hydrating null and signing the user out.
@@ -462,6 +479,9 @@ export default defineNuxtPlugin({
         return;
       }
       signOutOwnsChannelTeardown = true;
+      // Invalidate any session read already in flight so a late resolution
+      // cannot re-hydrate the session we are signing out of.
+      authInvalidationToken += 1;
       try {
         const { error } = await supabaseClient.auth.signOut();
         if (error) throw error;

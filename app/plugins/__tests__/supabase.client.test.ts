@@ -192,6 +192,56 @@ describe('supabase plugin', () => {
       vi.useRealTimers();
     }
   });
+  it('does not re-hydrate the signed-out session when a slow initial read resolves late', async () => {
+    vi.useFakeTimers();
+    try {
+      const sessionDeferred = createDeferred<{
+        data: { session: ReturnType<typeof createSession> };
+        error: null;
+      }>();
+      const authStateChangeCallbacks: MockAuthStateChangeCallback[] = [];
+      const captureAuthStateChange = (callback: MockAuthStateChangeCallback) => {
+        authStateChangeCallbacks.push(callback);
+        return stubAuthSubscription();
+      };
+      const signOut = vi.fn().mockResolvedValue({ error: null });
+      const removeAllChannels = vi.fn().mockResolvedValue([]);
+      mockCreateClient.mockReturnValue({
+        removeAllChannels,
+        auth: {
+          getSession: vi.fn(() => sessionDeferred.promise),
+          onAuthStateChange: vi.fn(captureAuthStateChange),
+          signInWithOAuth: vi.fn(),
+          signOut,
+        },
+      });
+      const plugin = (await import('@/plugins/supabase.client')).default;
+      const setupPromise = plugin.setup?.(
+        {} as Parameters<NonNullable<typeof plugin.setup>>[0]
+      ) as Promise<SupabasePluginProvide | undefined>;
+      await flushPlugin();
+      // The stored-session path awaits readiness; let the boot budget elapse so
+      // setup resolves while the initial getSession() is still in flight.
+      await vi.advanceTimersByTimeAsync(8000);
+      const result = await setupPromise;
+      const supabase = result?.provide.supabase;
+      expect(supabase?.user.loggedIn).toBe(false);
+      // Sign out while the initial read is still pending. signOut awaits client
+      // init, which is still bounded by the boot budget, so advance past it.
+      const signOutPromise = supabase?.signOut();
+      await vi.advanceTimersByTimeAsync(8000);
+      await signOutPromise;
+      expect(signOut).toHaveBeenCalledTimes(1);
+      authStateChangeCallbacks.forEach((callback) => callback('SIGNED_OUT', null));
+      // The slow read now resolves with the pre-sign-out session.
+      sessionDeferred.resolve({ data: { session: createSession('user-1') }, error: null });
+      await flushPlugin();
+      expect(supabase?.user.loggedIn).toBe(false);
+      expect(supabase?.user.id).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('exchanges an oauth callback code when ready is called', async () => {
     localStorage.removeItem('sb-test-auth-token');
     window.history.replaceState(null, '', '/');
