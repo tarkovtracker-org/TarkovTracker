@@ -1674,9 +1674,9 @@ export async function initializeTarkovSync() {
     }
     // MULTI-DEVICE CONFLICT RESOLUTION
     // Setup realtime listener for remote changes from other devices. Awaited so
-    // the channel is created and bound before initialization resolves, and so a
-    // rejection cannot surface as an unhandled promise. The join itself is
-    // acknowledged asynchronously afterwards.
+    // initialization does not report success before the channel is acknowledged
+    // by Realtime; failed or stalled joins reject explicitly and are handled by
+    // the app initialization boundary.
     await setupRealtimeListener(tarkovStore);
   }
 }

@@ -746,6 +746,10 @@ flowchart LR
   the existing channel until its `phx_leave` settles and `subscribe()` only rejoins a closed channel,
   so rejoining early yields a channel that never joins and never reports an error. An unclean leave
   skips the rejoin rather than binding to an occupied topic.
+- Own-progress listener setup waits for the initial `SUBSCRIBED` acknowledgement, rejects on an
+  explicit channel failure, and times out a join that reports no status. A newer setup or teardown
+  invalidates older work at each asynchronous boundary; a different user's topic may proceed while
+  the previous user's topic is leaving, while a same-topic rejoin still waits for its leave.
 - The team channel records itself as bound only after `SUBSCRIBED`, so a silently failed join is never
   mistaken for a live one. Membership events rebuild it only when the topic or teammate-progress
   filter changed, and any non-subscribed status drops the binding so the next event rebuilds.

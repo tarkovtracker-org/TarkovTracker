@@ -21,6 +21,7 @@ export type OwnedRealtimeChannel = {
   /** Topic the channel was created with; leaves are tracked per topic. */
   topic: string;
 };
+export const REALTIME_SUBSCRIPTION_TIMEOUT_MS = 15_000;
 /**
  * Tracks in-flight channel leaves so a topic is not rejoined before it is free.
  *
@@ -106,9 +107,15 @@ export const logChannelSubscribeFailure = (
   label: string,
   status: string,
   error: Error | undefined,
-  context: Record<string, unknown>
+  context: Record<string, unknown>,
+  options?: { treatClosedAsFailure?: boolean }
 ): boolean => {
-  if (HEALTHY_CHANNEL_STATUSES.has(status)) return false;
+  if (
+    HEALTHY_CHANNEL_STATUSES.has(status) &&
+    !(status === 'CLOSED' && options?.treatClosedAsFailure)
+  ) {
+    return false;
+  }
   logger.warn(`[${label}] Realtime channel is not subscribed:`, {
     ...context,
     error: describeChannelError(error),
@@ -116,3 +123,60 @@ export const logChannelSubscribeFailure = (
   });
   return true;
 };
+/**
+ * Starts a channel subscription and waits for the initial join acknowledgement.
+ *
+ * `RealtimeChannel.subscribe()` is intentionally callback-based: returning from
+ * the method only starts the join. Waiting for `SUBSCRIBED` prevents callers from
+ * treating a channel as ready while the socket is still joining. A timeout turns
+ * a stalled socket into an explicit failure instead of leaving initialization
+ * pending forever.
+ *
+ * @param channel - The channel to subscribe.
+ * @param label - Log prefix identifying the caller.
+ * @param context - Diagnostic fields included in status logs.
+ * @param timeoutMs - Maximum time to wait for the initial join acknowledgement.
+ * @returns A promise that resolves after `SUBSCRIBED` or rejects on failure.
+ */
+export const subscribeAndWaitForRealtimeChannel = (
+  channel: SupabaseRealtimeChannel,
+  label: string,
+  context: Record<string, unknown>,
+  timeoutMs = REALTIME_SUBSCRIPTION_TIMEOUT_MS
+): Promise<void> =>
+  new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      const error = new Error(`Realtime subscription timed out after ${timeoutMs}ms for ${label}`);
+      logger.warn(`[${label}] Realtime subscription timed out:`, {
+        ...context,
+        timeoutMs,
+      });
+      settle(error);
+    }, timeoutMs);
+    const settle = (error?: Error): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (error) reject(error);
+      else resolve();
+    };
+    try {
+      channel.subscribe((status: string, error?: Error) => {
+        logger.debug(`[${label}] Realtime subscription status: ${status}`);
+        if (status === 'SUBSCRIBED') {
+          settle();
+          return;
+        }
+        if (
+          logChannelSubscribeFailure(label, status, error, context, {
+            treatClosedAsFailure: true,
+          })
+        ) {
+          settle(error ?? new Error(`Realtime subscription failed with status ${status}`));
+        }
+      });
+    } catch (error) {
+      settle(error instanceof Error ? error : new Error(String(error)));
+    }
+  });

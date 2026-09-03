@@ -19,8 +19,8 @@ import {
 } from '@/utils/progressSanitizers';
 import {
   createChannelReleaseLatch,
-  logChannelSubscribeFailure,
   removeOwnedChannel,
+  subscribeAndWaitForRealtimeChannel,
   type OwnedRealtimeChannel,
 } from '@/utils/realtimeChannel';
 import type { UserProgressData, UserState } from '@/stores/progressState';
@@ -48,17 +48,10 @@ type LegacyProgressMetadata = {
 let syncControllerGetter: SyncControllerGetter = () => null;
 let realtimeChannel: OwnedRealtimeChannel | null = null;
 const channelRelease = createChannelReleaseLatch();
-/** Tail of the serialized setup queue. */
-let setupQueue: Promise<void> = Promise.resolve();
 /**
- * Bumped by every public teardown. Captured when a setup is queued so a teardown
- * that happens while the setup waits in the queue cancels it, instead of the
- * setup starting afterwards and recreating the channel.
- */
-let teardownEpoch = 0;
-/**
- * Bumped by every setup and teardown so a setup suspended across an await cannot
- * create a channel after a later teardown or setup superseded it.
+ * Bumped synchronously by every setup and teardown. A newer request supersedes an
+ * older one before either request reaches its next await, so unrelated topics do
+ * not wait behind a slow leave from the previous user.
  */
 let listenerGeneration = 0;
 let syncResumeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -170,74 +163,67 @@ const isStillSignedInAs = (currentUserId: string): boolean => {
   const { $supabase } = useNuxtApp();
   return $supabase.user.loggedIn === true && $supabase.user.id === currentUserId;
 };
-/**
- * Releases the previous `user_progress_<uid>` channel before it is rejoined.
- *
- * The topic is per user, so signing out and back in as the same user reuses it.
- * `RealtimeClient.channel()` hands back the still-leaving channel until
- * `phx_leave` settles and `subscribe()` only rejoins a closed channel, so the
- * previous leave has to finish first. An unclean leave keeps the topic occupied,
- * in which case rejoining would silently never join.
- */
 const progressTopic = (userId: string) => `user_progress_${userId}`;
 /**
- * Keeps the channel only if no teardown or newer setup superseded this one while
- * it was building; otherwise leaves it again immediately.
- */
-const adoptProgressChannel = (owned: OwnedRealtimeChannel, generation: number): void => {
-  if (generation !== listenerGeneration) {
-    channelRelease.hold(owned, removeOwnedChannel(owned, 'TarkovStore'));
-    return;
-  }
-  realtimeChannel = owned;
-};
-/**
- * Releases the previous `user_progress_<uid>` channel before it is rejoined.
+ * Returns whether a setup still owns the current user and generation.
  *
- * The topic is per user, so signing out and back in as the same user reuses it.
- * `RealtimeClient.channel()` hands back the still-leaving channel until
- * `phx_leave` settles and `subscribe()` only rejoins a closed channel, so the
- * previous leave has to finish first. An unclean leave keeps the topic occupied,
- * in which case rejoining would silently never join.
- *
- * @returns The generation this setup owns, or `null` if it must not proceed. The
- *   generation is taken after the internal cleanup, which bumps it too.
+ * Setup and teardown increment the generation synchronously, before awaiting
+ * channel removal or subscription acknowledgement.
  */
 const stillOwnsSetup = (currentUserId: string, generation: number): boolean =>
   generation === listenerGeneration && isStillSignedInAs(currentUserId);
-const prepareProgressTopic = async (currentUserId: string): Promise<number | null> => {
-  if (realtimeChannel) await teardownProgressChannel();
-  const generation = ++listenerGeneration;
-  if (!(await channelRelease.release(progressTopic(currentUserId)))) return null;
-  return stillOwnsSetup(currentUserId, generation) ? generation : null;
+/**
+ * Releases a channel and records its leave until the topic is free to rejoin.
+ *
+ * `RealtimeClient.channel()` hands back the still-leaving channel until
+ * `phx_leave` settles and `subscribe()` only rejoins a closed channel, so the
+ * same-topic setup must wait for this promise. Different topics can continue
+ * independently.
+ */
+const releaseProgressChannel = (owned: OwnedRealtimeChannel): Promise<boolean> => {
+  if (realtimeChannel === owned) realtimeChannel = null;
+  const removal = removeOwnedChannel(owned, 'TarkovStore');
+  channelRelease.hold(owned, removal);
+  return channelRelease.release(owned.topic);
+};
+const prepareProgressTopic = async (
+  currentUserId: string,
+  generation: number
+): Promise<boolean> => {
+  const previousChannel = realtimeChannel;
+  if (previousChannel) {
+    realtimeChannel = null;
+    const leftCleanly = releaseProgressChannel(previousChannel);
+    // A different user's topic can proceed while the old topic leaves. Rejoining
+    // the same topic still waits for its leave to finish.
+    if (previousChannel.topic === progressTopic(currentUserId) && !(await leftCleanly)) {
+      return false;
+    }
+  }
+  if (!(await channelRelease.release(progressTopic(currentUserId)))) return false;
+  return stillOwnsSetup(currentUserId, generation);
 };
 /**
- * Serializes listener setup.
+ * Starts listener setup immediately and lets the newest request win.
  *
- * Setup suspends across a channel leave, so overlapping calls could otherwise
- * interleave and claim generations out of order, installing duplicate handlers or
- * rejecting the newest request. Queueing keeps exactly one setup in flight.
+ * A setup suspends across a channel leave and subscription acknowledgement. The
+ * generation check invalidates stale work at every asynchronous boundary while
+ * the release latch only blocks a rejoin of the same topic.
  */
 export function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promise<void> {
-  const queuedEpoch = teardownEpoch;
-  const run = setupQueue
-    .catch(() => undefined)
-    .then(() => {
-      // A teardown while this call waited in the queue cancels it.
-      if (queuedEpoch !== teardownEpoch) return;
-      return runSetupRealtimeListener(tarkovStore);
-    });
-  setupQueue = run.catch(() => undefined);
-  return run;
+  const generation = ++listenerGeneration;
+  return runSetupRealtimeListener(tarkovStore, generation);
 }
-async function runSetupRealtimeListener(tarkovStore: TarkovStoreLike): Promise<void> {
+async function runSetupRealtimeListener(
+  tarkovStore: TarkovStoreLike,
+  generation: number
+): Promise<void> {
   const { $supabase } = useNuxtApp();
   const metadataStore = useMetadataStore();
   const toastI18n = useToastI18n();
   const currentUserId = $supabase.user.id;
   if (!$supabase.user.loggedIn || !currentUserId) return;
-  const generation = await prepareProgressTopic(currentUserId);
-  if (generation === null) return;
+  if (!(await prepareProgressTopic(currentUserId, generation))) return;
   const latestModeUpdateTimes = new Map<GameMode, number>();
   const acceptModeUpdate = (mode: GameMode, updateTime: number): boolean => {
     const latestUpdateTime = latestModeUpdateTimes.get(mode);
@@ -346,21 +332,34 @@ async function runSetupRealtimeListener(tarkovStore: TarkovStoreLike): Promise<v
         filter: `user_id=eq.${currentUserId}`,
       },
       handleProgressChange
-    )
-    .subscribe((status: string, error?: Error) => {
-      logger.debug(`[TarkovStore] Realtime subscription status: ${status}`);
-      logChannelSubscribeFailure('TarkovStore', status, error, {
-        table: 'user_progress',
-      });
+    );
+  const owned = { channel, client, topic } satisfies OwnedRealtimeChannel;
+  if (!stillOwnsSetup(currentUserId, generation)) {
+    await releaseProgressChannel(owned);
+    return;
+  }
+  // Publish ownership before awaiting the join so a newer setup can tear down
+  // this channel instead of creating a duplicate subscription for the topic.
+  realtimeChannel = owned;
+  try {
+    await subscribeAndWaitForRealtimeChannel(channel, 'TarkovStore', {
+      table: 'user_progress',
     });
-  // A teardown or newer setup during the awaits above wins; drop this channel.
-  adoptProgressChannel({ channel, client, topic }, generation);
+  } catch (error) {
+    if (realtimeChannel === owned) await releaseProgressChannel(owned);
+    // A newer setup or teardown intentionally superseded this request. Its
+    // subscription failure is no longer actionable and must not reject the new
+    // request or surface as an initialization failure.
+    if (!stillOwnsSetup(currentUserId, generation)) return;
+    throw error;
+  }
+  if (!stillOwnsSetup(currentUserId, generation) || realtimeChannel !== owned) {
+    if (realtimeChannel === owned) await releaseProgressChannel(owned);
+  }
 }
 /**
- * Removes the channel and stops its timers without touching `teardownEpoch`.
- *
- * Setup uses this for its own replacement so it does not cancel other calls that
- * are legitimately queued behind it.
+ * Removes the channel and stops its timers. Bumping the generation invalidates
+ * setup work that is awaiting a leave or subscription acknowledgement.
  */
 async function teardownProgressChannel(): Promise<void> {
   listenerGeneration += 1;
@@ -369,8 +368,7 @@ async function teardownProgressChannel(): Promise<void> {
     // replaced once background initialization completes.
     const owned = realtimeChannel;
     realtimeChannel = null;
-    channelRelease.hold(owned, removeOwnedChannel(owned, 'TarkovStore'));
-    await channelRelease.release(owned.topic);
+    await releaseProgressChannel(owned);
     logger.debug('[TarkovStore] Cleaned up realtime listener');
   }
   if (syncResumeTimer) {
@@ -383,12 +381,11 @@ async function teardownProgressChannel(): Promise<void> {
   }
 }
 /**
- * Public teardown: removes the channel and cancels any setup still queued.
+ * Public teardown: removes the channel and cancels any setup still in flight.
  *
- * Without bumping the epoch, a setup queued before this call would start
- * afterwards and recreate the channel the caller just tore down.
+ * Bumping the generation before awaiting removal prevents a setup suspended
+ * across an asynchronous boundary from recreating the channel afterwards.
  */
 export async function cleanupRealtimeListener(): Promise<void> {
-  teardownEpoch += 1;
   await teardownProgressChannel();
 }

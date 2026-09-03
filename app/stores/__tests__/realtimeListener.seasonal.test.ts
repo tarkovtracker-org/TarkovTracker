@@ -7,13 +7,28 @@ const showProgressMerged = vi.fn();
 type FakeChannel = {
   topic: string;
   subscribed: boolean;
+  subscribeCallback?: (status: string, error?: Error) => void;
   on: ReturnType<typeof vi.fn>;
   subscribe: ReturnType<typeof vi.fn>;
 };
-const { createdChannels, handlers, openTopics, supabaseContext } = vi.hoisted(() => {
+const {
+  createdChannels,
+  handlers,
+  openTopics,
+  removalGate,
+  resolveRemovals,
+  subscribeGate,
+  supabaseContext,
+} = vi.hoisted(() => {
   const handlers = new Map<string, (payload: { new: unknown }) => void>();
   const createdChannels: FakeChannel[] = [];
   const openTopics = new Map<string, FakeChannel>();
+  const subscribeGate = { defer: false };
+  const removalGate = { defer: false, resolvers: [] as Array<() => void> };
+  const resolveRemovals = () => {
+    const resolvers = removalGate.resolvers.splice(0);
+    resolvers.forEach((resolve) => resolve());
+  };
   const makeChannel = (topic: string): FakeChannel => {
     const fake: FakeChannel = {
       on: vi.fn(),
@@ -27,13 +42,19 @@ const { createdChannels, handlers, openTopics, supabaseContext } = vi.hoisted(()
         return fake;
       }
     );
-    fake.subscribe = vi.fn(() => {
+    fake.subscribe = vi.fn((callback?: (status: string, error?: Error) => void) => {
+      fake.subscribeCallback = callback;
+      if (subscribeGate.defer) return fake;
       fake.subscribed = true;
+      callback?.('SUBSCRIBED');
       return fake;
     });
     return fake;
   };
   const removeChannel = vi.fn(async (target: unknown) => {
+    if (removalGate.defer) {
+      await new Promise<void>((resolve) => removalGate.resolvers.push(resolve));
+    }
     for (const [topic, fake] of openTopics) {
       if (fake === target) {
         fake.subscribed = false;
@@ -60,7 +81,15 @@ const { createdChannels, handlers, openTopics, supabaseContext } = vi.hoisted(()
       loggedIn: true,
     },
   };
-  return { createdChannels, handlers, openTopics, removeChannel, supabaseContext };
+  return {
+    createdChannels,
+    handlers,
+    openTopics,
+    removalGate,
+    resolveRemovals,
+    subscribeGate,
+    supabaseContext,
+  };
 });
 mockNuxtImport('useNuxtApp', () => () => ({
   $supabase: supabaseContext,
@@ -96,6 +125,9 @@ describe('seasonal progress realtime synchronization', () => {
     handlers.clear();
     createdChannels.length = 0;
     openTopics.clear();
+    removalGate.defer = false;
+    removalGate.resolvers.length = 0;
+    subscribeGate.defer = false;
     Object.assign(state, structuredClone(defaultState));
     supabaseContext.user.loggedIn = true;
   });
@@ -115,25 +147,59 @@ describe('seasonal progress realtime synchronization', () => {
     expect(supabaseContext.client.channel).toHaveBeenCalledTimes(2);
     expect(handlers.size).toBeGreaterThan(0);
   });
-  it('serializes overlapping setup calls into one live channel', async () => {
+  it('waits for the channel to report SUBSCRIBED before resolving setup', async () => {
+    subscribeGate.defer = true;
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    const setup = setupRealtimeListener(store);
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    const channel = createdChannels[0];
+    if (!channel) throw new Error('Expected a realtime channel to be created');
+    expect(channel.subscribe).toHaveBeenCalledOnce();
+    let settled = false;
+    void setup.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    channel.subscribed = true;
+    channel.subscribeCallback?.('SUBSCRIBED');
+    await setup;
+    expect(settled).toBe(true);
+  });
+  it('does not block a new user on a different topic leave', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     await setupRealtimeListener(store);
-    // Two concurrent setups must not interleave across the channel leave.
+    removalGate.defer = true;
+    supabaseContext.user.id = '22222222-2222-4222-8222-222222222222';
+    const setup = setupRealtimeListener(store);
+    await setup;
+    expect(createdChannels).toHaveLength(2);
+    expect(createdChannels[1]?.subscribed).toBe(true);
+    expect(openTopics.has('user_progress_22222222-2222-4222-8222-222222222222')).toBe(true);
+    removalGate.defer = false;
+    resolveRemovals();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  it('lets the newest overlapping setup replace the older request', async () => {
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    await setupRealtimeListener(store);
+    // Two concurrent setups must not leave duplicate live channels.
     await Promise.all([setupRealtimeListener(store), setupRealtimeListener(store)]);
-    expect(createdChannels).toHaveLength(3);
-    // Each replacement got its own channel and only the last one is joined.
-    expect(createdChannels.filter(({ subscribed }) => subscribed)).toEqual([createdChannels[2]]);
+    expect(createdChannels).toHaveLength(2);
+    // Only the newest request is allowed to join after the shared leave.
+    expect(createdChannels.filter(({ subscribed }) => subscribed)).toEqual([createdChannels[1]]);
     expect(openTopics.size).toBe(1);
     expect(handlers.size).toBeGreaterThan(0);
   });
-  it('cancels a queued setup when cleanup runs first', async () => {
+  it('cancels in-flight setup when cleanup runs first', async () => {
     const { cleanupRealtimeListener, setupRealtimeListener } =
       await import('@/stores/tarkov/realtimeListener');
     // Establish a live channel first so teardown has something to remove.
     await setupRealtimeListener(store);
     expect(openTopics.size).toBe(1);
     const queued = setupRealtimeListener(store);
-    // Teardown while the second setup is still queued must win.
+    // Teardown while the second setup is waiting for the old leave must win.
     const teardown = cleanupRealtimeListener();
     await Promise.all([queued, teardown]);
     expect(createdChannels.filter(({ subscribed }) => subscribed)).toEqual([]);
