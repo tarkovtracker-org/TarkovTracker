@@ -954,8 +954,11 @@
         "show_map": "Pokaż mapę",
         "hide_map": "Ukryj mapę",
         "fullscreen_label": "Pełny ekran",
+        "required_items": "Wymagane elementy",
+        "required_keys": "Wymagane klucze",
         "required_items_summary": "Required items for active tasks",
         "required_keys_summary": "Required keys for active tasks",
+        "active_tasks_group": "Aktywne zadania",
         "time_period": {
           "dawn": "Dawn",
           "day": "Day",
