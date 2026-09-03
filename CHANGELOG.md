@@ -1,3 +1,10 @@
+# [1.75.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.74.1...v1.75.0) (2026-09-03)
+
+
+### Features
+
+* **maps:** split map requirements strip into pinned and active groups ([#748](https://github.com/tarkovtracker-org/TarkovTracker/issues/748)) ([c4704b1](https://github.com/tarkovtracker-org/TarkovTracker/commit/c4704b18674400059db2cd9c48aa4805aa4c95ac))
+
 ## [1.74.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.74.0...v1.74.1) (2026-08-30)
 
 
