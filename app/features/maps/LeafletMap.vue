@@ -673,10 +673,6 @@
   } from '@/features/maps/composables/useLeafletMapControls';
   import LeafletObjectiveTooltip from '@/features/maps/LeafletObjectiveTooltip.vue';
   import { getMarksHash, type MapMark } from '@/features/maps/utils/marksHash';
-  import {
-    getObjectiveCategory,
-    type ObjectiveCategory,
-  } from '@/features/maps/utils/objectiveCategory';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { logger } from '@/utils/logger';
   import { clusterSpawns } from '@/utils/mapClustering';
