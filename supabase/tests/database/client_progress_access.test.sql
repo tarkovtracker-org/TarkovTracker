@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(17);
+SELECT plan(27);
 
 CREATE TEMP TABLE client_progress_fixture AS
 SELECT
@@ -204,7 +204,47 @@ SELECT lives_ok(
   )$$,
   'authenticated clients can sync through the bounded RPC'
 );
-SELECT throws_ok(
+SELECT lives_ok(
+  $$SELECT public.sync_user_game_mode_progress(
+    'pvp'::TEXT,
+    1::INTEGER,
+    NULL::BIGINT,
+    '{"pvp":{"level":12},"seasonal":{"level":99}}'::JSONB,
+    0::SMALLINT
+  )$$,
+  'a stale seasonal season number does not abort a multi-mode sync'
+);
+SELECT is(
+  (
+    SELECT pvp_data->>'level'
+    FROM public.user_progress
+    WHERE user_id = (SELECT viewer_id FROM client_progress_fixture)
+  ),
+  '12',
+  'legacy PvP progress still commits when Seasonal state is stale'
+);
+SELECT is(
+  (
+    SELECT progress_data->>'level'
+    FROM public.user_game_mode_progress
+    WHERE user_id = (SELECT viewer_id FROM client_progress_fixture)
+      AND game_mode = 'pvp'
+      AND season_number = 0
+  ),
+  '12',
+  'normalized PvP progress still commits when Seasonal state is stale'
+);
+SELECT is(
+  (
+    SELECT COUNT(*)::INTEGER
+    FROM public.user_game_mode_progress
+    WHERE user_id = (SELECT viewer_id FROM client_progress_fixture)
+      AND game_mode = 'seasonal'
+  ),
+  0,
+  'a stale seasonal season number never writes a seasonal row'
+);
+SELECT lives_ok(
   $$SELECT public.sync_user_game_mode_progress(
     'seasonal'::TEXT,
     1::INTEGER,
@@ -212,19 +252,56 @@ SELECT throws_ok(
     '{"seasonal":{"level":11}}'::JSONB,
     NULL::SMALLINT
   )$$,
-  'Invalid season number for seasonal progress',
-  'seasonal progress requires the active season number'
+  'a missing seasonal season number is skipped instead of raising'
+);
+SELECT is(
+  (
+    SELECT COUNT(*)::INTEGER
+    FROM public.user_game_mode_progress
+    WHERE user_id = (SELECT viewer_id FROM client_progress_fixture)
+      AND game_mode = 'seasonal'
+  ),
+  0,
+  'a missing seasonal season number never writes a seasonal row'
 );
 SELECT throws_ok(
+  format(
+    $$SELECT public.sync_user_game_mode_progress(
+      'pvp'::TEXT,
+      1::INTEGER,
+      NULL::BIGINT,
+      %L::JSONB,
+      0::SMALLINT
+    )$$,
+    jsonb_build_object('pvp', jsonb_build_object('displayName', repeat('x', 600000)))
+  ),
+  'p_modes exceeds the maximum payload size',
+  'the sync RPC rejects payloads over the 512 KiB cap'
+);
+RESET ROLE;
+-- Seed the bucket at the limit directly so this assertion does not depend on how
+-- many syncs the preceding tests performed.
+INSERT INTO public.mutation_rate_limits (scope, subject, count, reset_at)
+VALUES (
+  'progress-sync',
+  (SELECT viewer_id::TEXT FROM client_progress_fixture),
+  60,
+  NOW() + INTERVAL '1 minute'
+)
+ON CONFLICT (scope, subject) DO UPDATE
+SET count = 60,
+    reset_at = NOW() + INTERVAL '1 minute';
+SET LOCAL ROLE authenticated;
+SELECT throws_ok(
   $$SELECT public.sync_user_game_mode_progress(
-    'seasonal'::TEXT,
+    'pvp'::TEXT,
     1::INTEGER,
     NULL::BIGINT,
-    '{"seasonal":{"level":11}}'::JSONB,
+    '{"pvp":{"level":13}}'::JSONB,
     0::SMALLINT
   )$$,
-  'Invalid season number for seasonal progress',
-  'seasonal progress rejects stale season numbers'
+  'Progress sync rate limit exceeded',
+  'the sync RPC rejects a client that exhausted its per-minute budget'
 );
 RESET ROLE;
 SELECT is(
@@ -237,6 +314,67 @@ SELECT is(
   1,
   'the progress RPC records a per-user rate-limit bucket'
 );
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'realtime'
+      AND tablename = 'messages'
+      AND policyname = 'Team members can receive team broadcasts'
+      AND cmd = 'SELECT'
+      AND 'authenticated' = ANY (roles)
+  ),
+  'a realtime read policy authorizes joining the private team topic'
+);
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'realtime'
+      AND tablename = 'messages'
+      AND policyname = 'Team members can send team broadcasts'
+      AND cmd = 'INSERT'
+      AND 'authenticated' = ANY (roles)
+  ),
+  'a realtime write policy exists for the private team topic'
+);
+
+SET LOCAL ROLE authenticated;
+SELECT set_config(
+  (SELECT request_claim_name FROM client_progress_privilege_fixture),
+  (SELECT viewer_id::TEXT FROM client_progress_fixture),
+  TRUE
+);
+SELECT set_config(
+  'realtime.topic',
+  (SELECT concat('team:', team_id::TEXT) FROM client_progress_fixture),
+  TRUE
+);
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM public.team_memberships membership
+    WHERE membership.user_id = (SELECT auth.uid())
+      AND concat('team:', membership.team_id::text) = (SELECT realtime.topic())
+  ),
+  'a team member satisfies the realtime team topic predicate'
+);
+SELECT set_config(
+  (SELECT request_claim_name FROM client_progress_privilege_fixture),
+  (SELECT outsider_id::TEXT FROM client_progress_fixture),
+  TRUE
+);
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1
+    FROM public.team_memberships membership
+    WHERE membership.user_id = (SELECT auth.uid())
+      AND concat('team:', membership.team_id::text) = (SELECT realtime.topic())
+  ),
+  'a user outside the team fails the realtime team topic predicate'
+);
+RESET ROLE;
 
 SELECT * FROM finish();
 

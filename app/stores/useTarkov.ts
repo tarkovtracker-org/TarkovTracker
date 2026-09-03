@@ -1673,7 +1673,9 @@ export async function initializeTarkovSync() {
       pendingSyncWatchStop = stopWatch;
     }
     // MULTI-DEVICE CONFLICT RESOLUTION
-    // Setup realtime listener for remote changes from other devices
-    setupRealtimeListener(tarkovStore);
+    // Setup realtime listener for remote changes from other devices. Awaited so
+    // the subscription is live once initialization resolves and so a rejection
+    // cannot surface as an unhandled promise.
+    await setupRealtimeListener(tarkovStore);
   }
 }

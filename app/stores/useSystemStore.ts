@@ -1,10 +1,15 @@
 import { defineStore, type Store } from 'pinia';
 import { useSupabaseListener } from '@/composables/supabase/useSupabaseListener';
 import { getCurrentGameMode } from '@/stores/utils/gameMode';
+import {
+  logChannelSubscribeFailure,
+  removeOwnedChannel,
+  type OwnedRealtimeChannel,
+} from '@/utils/realtimeChannel';
 import { collectTeamMembershipIds } from '@/utils/teamMemberships';
 import type { SystemGetters, SystemState } from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
-import type { PostgrestError, RealtimeChannel } from '@supabase/supabase-js';
+import type { PostgrestError } from '@supabase/supabase-js';
 /**
  * Helper to extract team ID from system store state.
  * Now handles game-mode-specific team IDs (pvp_team_id, pve_team_id).
@@ -106,7 +111,9 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
   const systemStore = useSystemStore();
   const { $supabase } = useNuxtApp();
   const listenerScope = effectScope(true);
-  const membershipChannel = ref<RealtimeChannel | null>(null);
+  // `shallowRef`: a Realtime channel owns a socket, timers, and internal state
+  // that must not be wrapped in a deep reactive proxy.
+  const membershipChannel = shallowRef<OwnedRealtimeChannel | null>(null);
   let membershipRequestId = 0;
   let membershipSessionId = 0;
   const getAuthenticatedUserId = (): string | null =>
@@ -208,14 +215,9 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
   if (!listenerState) throw new Error('Failed to create system realtime listener');
   const { cleanup, isSubscribed, hasInitiallyLoaded, loadError } = listenerState;
   const cleanupMembershipChannel = async () => {
-    const channelToRemove = membershipChannel.value;
+    const owned = membershipChannel.value;
     membershipChannel.value = null;
-    if (!channelToRemove) return;
-    try {
-      await $supabase.client.removeChannel(channelToRemove as unknown as RealtimeChannel);
-    } catch (error) {
-      logger.warn('[SystemStore] Failed to remove membership realtime channel:', error);
-    }
+    await removeOwnedChannel(owned, 'SystemStore');
   };
   const setupMembershipChannel = async () => {
     const sessionId = ++membershipSessionId;
@@ -225,7 +227,8 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
     if (!userId) return;
     await refreshTeamMemberships(userId, sessionId);
     if (!isCurrentMembershipSession(sessionId, userId)) return;
-    membershipChannel.value = $supabase.client
+    const client = $supabase.client;
+    const channel = client
       .channel(`system-team-memberships-${userId}`)
       .on(
         'postgres_changes',
@@ -237,7 +240,12 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
         },
         () => void refreshTeamMemberships(userId, sessionId)
       )
-      .subscribe();
+      .subscribe((status, error) => {
+        logChannelSubscribeFailure('SystemStore', status, error, {
+          table: 'team_memberships',
+        });
+      });
+    membershipChannel.value = { channel, client };
   };
   listenerScope.run(() => {
     watch(

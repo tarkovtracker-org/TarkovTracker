@@ -172,7 +172,11 @@ BEGIN
     END IF;
     IF v_mode = v_seasonal_mode
       AND (p_seasonal_season_number IS NULL OR p_seasonal_season_number <> v_active_season) THEN
-      RAISE EXCEPTION 'Invalid season number for seasonal progress';
+      -- A client sync always carries every mode in one payload. Skip stale
+      -- Seasonal state instead of raising, which would roll back the valid
+      -- persistent-mode progress from the same request and take cloud sync
+      -- offline for every client whose bundled season number lags the database.
+      CONTINUE;
     END IF;
     v_season_number := CASE
       WHEN v_mode = v_seasonal_mode THEN v_active_season

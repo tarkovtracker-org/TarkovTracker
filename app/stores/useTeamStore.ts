@@ -12,8 +12,14 @@ import { getErrorStatus } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 import { hasMaterializedProgress, summarizeModeProgressData } from '@/utils/modeProgressFallback';
 import { sanitizeTeammateProgressData } from '@/utils/progressSanitizers';
+import {
+  logChannelSubscribeFailure,
+  removeOwnedChannel,
+  type OwnedRealtimeChannel,
+  type SupabaseRealtimeChannel,
+} from '@/utils/realtimeChannel';
 import type { MemberProfile, TeamGetters, TeamState } from '@/types/tarkov';
-import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Store } from 'pinia';
 /**
  * Helper to extract team ID from system store for the current game mode
@@ -135,28 +141,274 @@ export const resolveTeammateIdentity = (
   identity.gameEdition = profile.gameEdition ?? defaultState.gameEdition;
   return identity;
 };
-export type MemberProfileBroadcast = {
-  userId: string;
-  displayName?: string | null;
-  gameEdition?: number;
-  gameMode?: GameMode;
-  level?: number | null;
-  tasksCompleted?: number | null;
+/**
+ * Consecutive non-subscribed statuses tolerated before the built-in rejoin loop
+ * is stopped. Realtime backs off to one rejoin every 10s and never gives up,
+ * which would hammer the server indefinitely if the private-channel
+ * authorization policy rejects the join.
+ */
+const MAX_CHANNEL_ERRORS = 5;
+/** Delay before a single recovery attempt after the rejoin loop is stopped. */
+const CHANNEL_RETRY_DELAY_MS = 60_000;
+/** A teammate we currently track, and never the viewer's own row. */
+const isTrackedTeammate = (
+  members: string[] | undefined,
+  viewerId: string | null | undefined,
+  userId: string | null
+): userId is string => userId !== null && userId !== viewerId && members?.includes(userId) === true;
+/** Rejects events for a mode/season pair that is not the active one. */
+const isActiveSeasonProgressEvent = (data: Record<string, unknown>): boolean => {
+  const mode = data.game_mode;
+  if (!isGameMode(mode)) return false;
+  const expectedSeason = mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
+  return data.season_number === expectedSeason;
 };
-export const mergeMemberProfileBroadcast = (
-  profiles: Record<string, MemberProfile>,
-  data: MemberProfileBroadcast
-): Record<string, MemberProfile> => {
-  const existingProfile = profiles[data.userId];
-  const { displayName = null, level = null, tasksCompleted = null } = data;
+/**
+ * Keeps a profile pinned to the mode it was resolved for.
+ *
+ * A teammate is displayed in one game mode at a time, so an event for the other
+ * mode must not overwrite the mode currently shown.
+ */
+const teammateProfileAcceptsMode = (profile: MemberProfile | undefined, mode: GameMode): boolean =>
+  !profile?.gameMode || profile.gameMode === mode;
+const teammateProgressEventApplies = (
+  teamStore: ReturnType<typeof useTeamStore>,
+  viewerId: string | null | undefined,
+  data: Record<string, unknown>,
+  userId: string | null
+): userId is string => {
+  if (!isTrackedTeammate(teamStore.members, viewerId, userId)) return false;
+  if (!isActiveSeasonProgressEvent(data)) return false;
+  return hasMaterializedProgress(data.progress_data);
+};
+/**
+ * Applies a teammate's normalized progress event to the shared team profiles.
+ *
+ * Extracted from the channel binding so the filtering rules stay testable and
+ * the store factory stays within its size budget.
+ */
+/** No-op outside the browser: the app is SPA-only but stores are unit-tested in isolation. */
+const dispatchTeammateProgressEvent = (data: Record<string, unknown>): void => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('teammate-mode-progress', { detail: data }));
+};
+const readMemberProfile = (
+  teamStore: ReturnType<typeof useTeamStore>,
+  userId: string
+): MemberProfile | undefined => teamStore.memberProfiles?.[userId];
+export const applyTeammateProgressEvent = (
+  teamStore: ReturnType<typeof useTeamStore>,
+  viewerId: string | null | undefined,
+  data: Record<string, unknown>
+): void => {
+  const userId = typeof data.user_id === 'string' ? data.user_id : null;
+  if (!teammateProgressEventApplies(teamStore, viewerId, data, userId)) return;
+  const mode = data.game_mode as GameMode;
+  const existingProfile = readMemberProfile(teamStore, userId);
+  if (!teammateProfileAcceptsMode(existingProfile, mode)) return;
+  const summary = summarizeModeProgressData(data.progress_data);
+  teamStore.$patch((state) => {
+    state.memberProfiles = {
+      ...state.memberProfiles,
+      [userId]: {
+        displayName: summary.display_name,
+        gameEdition: existingProfile?.gameEdition ?? 1,
+        gameMode: mode,
+        level: summary.level,
+        tasksCompleted: summary.tasks_completed,
+      },
+    };
+  });
+  dispatchTeammateProgressEvent(data);
+};
+type TeamChannelDeps = {
+  /** Resolved per call: the plugin replaces the client during initialization. */
+  getClient: () => SupabaseClient;
+  getTeamId: () => string | null;
+  getMembers: () => string[] | undefined;
+  applyProgress: (data: Record<string, unknown>) => void;
+  refreshMembers: (force?: boolean) => Promise<void>;
+};
+type TeamChannelController = {
+  /** Leaves the channel and waits for the leave to settle. */
+  cleanup: () => Promise<void>;
+  /** Refreshes members, then rebuilds the channel only if its bindings changed. */
+  refresh: () => Promise<void>;
+  /** Permanently stops the controller: no further setup or retry can run. */
+  dispose: () => Promise<void>;
+};
+/**
+ * Owns the lifetime of the single private `team:<id>` Realtime channel.
+ *
+ * Kept outside the store factory so the channel state machine is isolated from
+ * store concerns and can be reasoned about on its own.
+ */
+const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelController => {
+  // `shallowRef`: a Realtime channel owns a socket, timers, and internal state
+  // that must not be wrapped in a deep reactive proxy. It also keeps the
+  // identity check in `handleStatus` meaningful.
+  const channel = shallowRef<OwnedRealtimeChannel | null>(null);
+  let version = 0;
+  /** Team/filter of the channel that reported `SUBSCRIBED`, not merely created. */
+  let joinedTeamId: string | null = null;
+  let joinedFilter: string | undefined;
+  let errorCount = 0;
+  let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+  /** Leave of the previous channel; awaited before the same topic is rejoined. */
+  let pendingRemoval: Promise<boolean> | null = null;
+  let disposed = false;
+  const clearRetry = () => {
+    if (retryTimeout === null) return;
+    clearTimeout(retryTimeout);
+    retryTimeout = null;
+  };
+  const cleanup = async (): Promise<void> => {
+    clearRetry();
+    const owned = channel.value;
+    channel.value = null;
+    joinedTeamId = null;
+    joinedFilter = undefined;
+    errorCount = 0;
+    if (!owned) return;
+    const removal = removeOwnedChannel(owned, 'TeamStore');
+    pendingRemoval = removal;
+    await removal;
+  };
+  const scheduleRecovery = () => {
+    const retryVersion = ++version;
+    void cleanup().then(() => {
+      if (disposed || retryVersion !== version) return;
+      retryTimeout = setTimeout(() => {
+        retryTimeout = null;
+        if (disposed || retryVersion !== version) return;
+        void refresh();
+      }, CHANNEL_RETRY_DELAY_MS);
+    });
+  };
+  const recordStatusFailure = (status: string, error?: Error) => {
+    const failed = logChannelSubscribeFailure('TeamStore', status, error, {
+      attempts: errorCount + 1,
+      teamId: joinedTeamId,
+    });
+    if (!failed) return;
+    errorCount += 1;
+    if (errorCount < MAX_CHANNEL_ERRORS) return;
+    scheduleRecovery();
+  };
+  /**
+   * Reacts to every subscribe status rather than only `SUBSCRIBED`.
+   *
+   * The channel is private, so a rejected `realtime.messages` authorization
+   * check surfaces here as `CHANNEL_ERROR`. Without this the failure is
+   * invisible while Realtime rejoins forever. The binding is recorded as joined
+   * only here, so a join that silently no-ops is never mistaken for a live one.
+   */
+  const handleStatus = (
+    owned: OwnedRealtimeChannel,
+    teamId: string,
+    filter: string | undefined,
+    status: string,
+    error?: Error
+  ) => {
+    if (channel.value !== owned) return;
+    if (status === 'SUBSCRIBED') {
+      joinedTeamId = teamId;
+      joinedFilter = filter;
+      errorCount = 0;
+      void deps.refreshMembers();
+      return;
+    }
+    // A closed channel is no longer joined, so drop the binding to let the next
+    // membership event rebuild it.
+    joinedTeamId = null;
+    joinedFilter = undefined;
+    recordStatusFailure(status, error);
+  };
+  const bindProgress = (source: SupabaseRealtimeChannel, filter: string): SupabaseRealtimeChannel =>
+    source.on(
+      'postgres_changes',
+      { event: '*', filter, schema: 'public', table: 'user_game_mode_progress' },
+      (payload) => {
+        if (payload.eventType === 'DELETE') return;
+        deps.applyProgress(payload.new as Record<string, unknown>);
+      }
+    );
+  const buildChannel = (teamId: string, progressFilter: string | undefined) => {
+    const client = deps.getClient();
+    let next = client.channel(`team:${teamId}`, { config: { private: true } }).on(
+      'postgres_changes',
+      {
+        event: '*',
+        filter: `team_id=eq.${teamId}`,
+        schema: 'public',
+        table: 'team_memberships',
+      },
+      () => void refresh()
+    );
+    if (progressFilter) next = bindProgress(next, progressFilter);
+    const owned: OwnedRealtimeChannel = { channel: next, client };
+    channel.value = owned;
+    next.subscribe((status, error) => handleStatus(owned, teamId, progressFilter, status, error));
+  };
+  /**
+   * Waits for the previous leave and reports whether the topic is free.
+   *
+   * `removeChannel` only tears the channel down on an `ok` leave, so an unclean
+   * leave keeps the topic occupied and any rejoin would silently never join.
+   */
+  const awaitTopicRelease = async (): Promise<boolean> => {
+    const removal = pendingRemoval;
+    if (!removal) return true;
+    pendingRemoval = null;
+    return await removal;
+  };
+  const canBuild = (setupVersion: number): boolean => !disposed && setupVersion === version;
+  const setup = async (setupVersion: number): Promise<void> => {
+    const teamId = deps.getTeamId();
+    await cleanup();
+    const released = await awaitTopicRelease();
+    if (!released || !teamId) return;
+    if (!canBuild(setupVersion)) return;
+    buildChannel(teamId, buildMemberProgressFilter(deps.getMembers()));
+  };
+  const isCurrentBinding = (teamId: string): boolean =>
+    channel.value !== null &&
+    joinedTeamId === teamId &&
+    joinedFilter === buildMemberProgressFilter(deps.getMembers());
+  /** Resolves the team to rebind to, tearing the channel down when there is none. */
+  const resolveTargetTeam = async (): Promise<string | null> => {
+    const teamId = deps.getTeamId();
+    if (teamId) return teamId;
+    await cleanup();
+    return null;
+  };
+  /**
+   * Membership events fire on every member's client. Rejoining a channel that
+   * already carries the right bindings would churn Realtime connections for no
+   * benefit, so only rebuild when the topic or progress filter changed.
+   */
+  const needsRebuild = (teamId: string | null): boolean =>
+    teamId !== null && !isCurrentBinding(teamId);
+  const isStale = (requestVersion: number): boolean => disposed || requestVersion !== version;
+  const shouldContinue = async (requestVersion: number): Promise<boolean> =>
+    !isStale(requestVersion) && (await resolveTargetTeam()) !== null;
+  const refresh = async (): Promise<void> => {
+    const requestVersion = ++version;
+    if (!(await shouldContinue(requestVersion))) return;
+    await deps.refreshMembers(true);
+    if (!(await shouldContinue(requestVersion))) return;
+    if (!needsRebuild(deps.getTeamId())) return;
+    await setup(requestVersion);
+  };
   return {
-    ...profiles,
-    [data.userId]: {
-      ...existingProfile,
-      displayName,
-      level,
-      tasksCompleted,
+    cleanup,
+    dispose: () => {
+      disposed = true;
+      version += 1;
+      clearRetry();
+      return cleanup();
     },
+    refresh,
   };
 };
 // Singleton instance to prevent multiple listener setups
@@ -171,8 +423,6 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   const teamStore = useTeamStore();
   const { $supabase } = useNuxtApp();
   const listenerScope = effectScope(true);
-  const teamChannel = ref<RealtimeChannel | null>(null);
-  let membershipSubscriptionVersion = 0;
   let lastMembersRefreshAt = 0;
   let refreshInFlight: Promise<void> | null = null;
   let refreshInFlightTeamId: string | null = null;
@@ -217,17 +467,6 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       });
     }
   };
-  const cleanupMembership = () => {
-    const channelToRemove = teamChannel.value;
-    teamChannel.value = null;
-    if (channelToRemove) {
-      void $supabase.client
-        .removeChannel(channelToRemove as unknown as RealtimeChannel)
-        .catch((error) => {
-          logger.warn('[TeamStore] Failed to remove team realtime channel:', error);
-        });
-    }
-  };
   const refreshMembers = async (force = false) => {
     if (!$supabase.user?.loggedIn || !$supabase.user?.id) {
       teamStore.$patch((state) => {
@@ -267,7 +506,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         state.members = [];
         state.memberProfiles = {};
       });
-      cleanupMembership();
+      await teamChannel.cleanup();
       return;
     }
     const requestVersion = ++latestMembersRequestVersion;
@@ -306,83 +545,13 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       }
     }
   };
-  const setupMembershipSubscription = () => {
-    const currentTeamId = getTeamIdFromSystemStore(systemStore);
-    cleanupMembership();
-    if (!currentTeamId) return;
-    const memberProgressFilter = buildMemberProgressFilter(teamStore.members);
-    let nextChannel = $supabase.client
-      .channel(`team:${currentTeamId}`, { config: { private: true } })
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'team_memberships',
-          filter: `team_id=eq.${currentTeamId}`,
-        },
-        () => {
-          void refreshMembershipSubscription();
-        }
-      );
-    if (memberProgressFilter) {
-      nextChannel = nextChannel.on(
-        'postgres_changes',
-        {
-          event: '*',
-          filter: memberProgressFilter,
-          schema: 'public',
-          table: 'user_game_mode_progress',
-        },
-        (payload) => {
-          if (payload.eventType === 'DELETE') return;
-          const data = payload.new as Record<string, unknown>;
-          const userId = typeof data.user_id === 'string' ? data.user_id : null;
-          const mode = data.game_mode;
-          const expectedSeason = mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
-          const existingProfile = userId ? teamStore.memberProfiles?.[userId] : undefined;
-          if (
-            !userId ||
-            userId === $supabase.user?.id ||
-            !isGameMode(mode) ||
-            data.season_number !== expectedSeason ||
-            !teamStore.members?.includes(userId) ||
-            (existingProfile?.gameMode && existingProfile.gameMode !== mode) ||
-            !hasMaterializedProgress(data.progress_data) ||
-            typeof window === 'undefined'
-          ) {
-            return;
-          }
-          const summary = summarizeModeProgressData(data.progress_data);
-          teamStore.$patch((state) => {
-            state.memberProfiles = {
-              ...state.memberProfiles,
-              [userId]: {
-                displayName: summary.display_name,
-                gameEdition: existingProfile?.gameEdition ?? 1,
-                gameMode: mode,
-                level: summary.level,
-                tasksCompleted: summary.tasks_completed,
-              },
-            };
-          });
-          window.dispatchEvent(new CustomEvent('teammate-mode-progress', { detail: data }));
-        }
-      );
-    }
-    teamChannel.value = nextChannel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        void refreshMembers();
-      }
-    });
-  };
-  const refreshMembershipSubscription = async (): Promise<void> => {
-    const requestVersion = ++membershipSubscriptionVersion;
-    cleanupMembership();
-    await refreshMembers(true);
-    if (requestVersion !== membershipSubscriptionVersion) return;
-    setupMembershipSubscription();
-  };
+  const teamChannel = createTeamChannelController({
+    applyProgress: (data) => applyTeammateProgressEvent(teamStore, $supabase.user?.id, data),
+    getClient: () => $supabase.client,
+    getMembers: () => teamStore.members,
+    getTeamId: () => getTeamIdFromSystemStore(systemStore),
+    refreshMembers,
+  });
   // Setup Supabase listener with custom onData handler
   // NOTE: Don't pass the store - we handle patching manually to preserve mapped fields
   const listenerState = listenerScope.run(() =>
@@ -401,7 +570,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     watch(
       teamFilter,
       () => {
-        void refreshMembershipSubscription();
+        void teamChannel.refresh();
       },
       { immediate: true }
     );
@@ -462,9 +631,8 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     teamStore,
     isSubscribed,
     cleanup: () => {
-      membershipSubscriptionVersion += 1;
       teamListenerCleanup();
-      cleanupMembership();
+      void teamChannel.dispose();
       listenerScope.stop();
       if (teamStoreInstance === instance) teamStoreInstance = null;
     },
@@ -658,6 +826,10 @@ export function useTeammateStores() {
     teammateUnsubscribes.value = {};
     teammateStores.value = {};
   };
+  // The only consumer (`useProgressStore`) destructures `teammateStores` alone,
+  // so bind teardown to the owning scope instead of relying on a caller to run
+  // it; otherwise the `teammate-mode-progress` listeners outlive the store.
+  onScopeDispose(cleanup);
   return {
     teammateStores,
     teammateUnsubscribes,

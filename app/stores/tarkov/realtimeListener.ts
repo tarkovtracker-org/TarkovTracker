@@ -17,6 +17,11 @@ import {
   sanitizeOwnedUserState,
   sanitizeTarkovUid,
 } from '@/utils/progressSanitizers';
+import {
+  logChannelSubscribeFailure,
+  removeOwnedChannel,
+  type OwnedRealtimeChannel,
+} from '@/utils/realtimeChannel';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 const SYNC_RESUME_DELAY_MS = 1000;
 export type SyncControllerHandle = {
@@ -40,7 +45,9 @@ type LegacyProgressMetadata = {
   updated_at?: string | null;
 };
 let syncControllerGetter: SyncControllerGetter = () => null;
-let realtimeChannel: unknown = null;
+let realtimeChannel: OwnedRealtimeChannel | null = null;
+/** Removal of the previous channel, awaited before rejoining the same topic. */
+let pendingChannelRemoval: Promise<boolean> | null = null;
 let syncResumeTimer: ReturnType<typeof setTimeout> | null = null;
 let pausedSyncController: SyncControllerHandle | null = null;
 export const registerSyncControllerGetter = (getter: SyncControllerGetter): void => {
@@ -146,15 +153,42 @@ const shouldIgnoreLegacyMetadataUpdate = (
   }
   return true;
 };
+/**
+ * Releases the previous `user_progress_<uid>` channel before it is rejoined.
+ *
+ * The topic is per user, so signing out and back in as the same user reuses it.
+ * `RealtimeClient.channel()` hands back the still-leaving channel until
+ * `phx_leave` settles and `subscribe()` only rejoins a closed channel, so the
+ * previous leave has to finish first. An unclean leave keeps the topic occupied,
+ * in which case rejoining would silently never join.
+ */
+const isStillSignedInAs = (currentUserId: string): boolean => {
+  const { $supabase } = useNuxtApp();
+  return $supabase.user.loggedIn === true && $supabase.user.id === currentUserId;
+};
+/**
+ * Releases the previous `user_progress_<uid>` channel before it is rejoined.
+ *
+ * The topic is per user, so signing out and back in as the same user reuses it.
+ * `RealtimeClient.channel()` hands back the still-leaving channel until
+ * `phx_leave` settles and `subscribe()` only rejoins a closed channel, so the
+ * previous leave has to finish first. An unclean leave keeps the topic occupied,
+ * in which case rejoining would silently never join.
+ */
+const prepareProgressTopic = async (currentUserId: string): Promise<boolean> => {
+  if (realtimeChannel) await cleanupRealtimeListener();
+  const removal = pendingChannelRemoval;
+  if (!removal) return true;
+  pendingChannelRemoval = null;
+  return (await removal) && isStillSignedInAs(currentUserId);
+};
 export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promise<void> {
   const { $supabase } = useNuxtApp();
   const metadataStore = useMetadataStore();
   const toastI18n = useToastI18n();
   const currentUserId = $supabase.user.id;
   if (!$supabase.user.loggedIn || !currentUserId) return;
-  if (realtimeChannel) {
-    await cleanupRealtimeListener();
-  }
+  if (!(await prepareProgressTopic(currentUserId))) return;
   const latestModeUpdateTimes = new Map<GameMode, number>();
   const acceptModeUpdate = (mode: GameMode, updateTime: number): boolean => {
     const latestUpdateTime = latestModeUpdateTimes.get(mode);
@@ -230,7 +264,8 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
     scheduleSyncResume();
     notifyModeConflict(conflicts, apiUpdateHandled, updateTime, toastI18n);
   };
-  realtimeChannel = $supabase.client
+  const client = $supabase.client;
+  const channel = client
     .channel(`user_progress_${currentUserId}`)
     .on(
       'postgres_changes' as const,
@@ -262,17 +297,22 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
       },
       handleProgressChange
     )
-    .subscribe((status: string) => {
+    .subscribe((status: string, error?: Error) => {
       logger.debug(`[TarkovStore] Realtime subscription status: ${status}`);
+      logChannelSubscribeFailure('TarkovStore', status, error, {
+        table: 'user_progress',
+      });
     });
+  realtimeChannel = { channel, client };
 }
 export async function cleanupRealtimeListener(): Promise<void> {
   if (realtimeChannel) {
-    const { $supabase } = useNuxtApp();
-    await $supabase.client.removeChannel(
-      realtimeChannel as Parameters<typeof $supabase.client.removeChannel>[0]
-    );
+    // Remove through the client that created the channel: `$supabase.client` is
+    // replaced once background initialization completes.
+    const removal = removeOwnedChannel(realtimeChannel, 'TarkovStore');
     realtimeChannel = null;
+    pendingChannelRemoval = removal;
+    await removal;
     logger.debug('[TarkovStore] Cleaned up realtime listener');
   }
   if (syncResumeTimer) {

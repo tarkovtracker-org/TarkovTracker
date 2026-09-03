@@ -1,7 +1,11 @@
 import { isSupporterActivityActive } from '@/features/supporter/supporterStatus';
 import { logger } from '@/utils/logger';
+import {
+  logChannelSubscribeFailure,
+  removeOwnedChannel,
+  type OwnedRealtimeChannel,
+} from '@/utils/realtimeChannel';
 import { refreshSupabaseSession } from '@/utils/supabaseAuth';
-import type { RealtimeChannel } from '@supabase/supabase-js';
 export interface SupporterStatus {
   tier: 'supporter' | 'scav' | 'timmy' | 'chad';
   status: 'active' | 'past_due' | 'expired' | 'cancelled';
@@ -16,7 +20,7 @@ export interface SupporterStatus {
 const supporterState = ref<SupporterStatus | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
-let channel: RealtimeChannel | null = null;
+let channel: OwnedRealtimeChannel | null = null;
 let channelUserId: string | null = null;
 let statusRequestVersion = 0;
 let subscriptionRequestVersion = 0;
@@ -89,13 +93,8 @@ export function useSupporter() {
       }
     }
   }
-  async function removeRealtimeChannel(channelToRemove: RealtimeChannel | null) {
-    if (!channelToRemove) return;
-    try {
-      await $supabase.client.removeChannel(channelToRemove);
-    } catch (err) {
-      logger.warn('Failed to remove supporter realtime channel', { err });
-    }
+  async function removeRealtimeChannel(channelToRemove: OwnedRealtimeChannel | null) {
+    await removeOwnedChannel(channelToRemove, 'Supporter');
   }
   async function subscribe(userId: string) {
     if (!$supabase || !userId) return;
@@ -108,7 +107,8 @@ export function useSupporter() {
     if (requestVersion !== subscriptionRequestVersion) return;
     if ($supabase.user?.loggedIn === false || $supabase.user?.id !== userId) return;
     if (channel || channelUserId) return;
-    const nextChannel = $supabase.client
+    const client = $supabase.client;
+    const nextChannel = client
       .channel(`supporters:${userId}`)
       .on(
         'postgres_changes',
@@ -124,8 +124,10 @@ export function useSupporter() {
           });
         }
       )
-      .subscribe();
-    channel = nextChannel;
+      .subscribe((status, err) => {
+        logChannelSubscribeFailure('Supporter', status, err, { userId });
+      });
+    channel = { channel: nextChannel, client };
     channelUserId = userId;
   }
   function unsubscribe() {

@@ -107,8 +107,10 @@ Prepare and deploy each rollover in two releases during the no-write gap between
    validation plus the Supabase DB and API gateway suites for both final states.
 2. After the previous season's announced cutoff, deploy only the database migration that replaces
    `private.active_season_number()`, `private.active_season_starts_on()`, and
-   `private.active_season_ends_at()`. Verify all three functions before continuing. Existing clients
-   fail closed on old-season writes during this gap instead of writing into the new season.
+   `private.active_season_ends_at()`. Verify all three functions before continuing. During this gap
+   `sync_user_game_mode_progress` skips the Seasonal entry of any client still bundling the previous
+   season number, so no old-season state reaches the new season while those clients keep syncing
+   their persistent PvP and PvE progress normally.
 3. Deploy the application release that updates `ACTIVE_SEASON` in `app/utils/constants.ts`. Verify
    the app countdown and `/progress` Seasonal row selection before announcing the new season open.
 4. Do not combine the database flip and application constants in one merge because their production
@@ -128,6 +130,13 @@ GitHub Actions — and each surfaces as a check on the merge commit:
 The Supabase check keeps the name `Supabase Preview` on `main`, where it targets the **production**
 project rather than a preview branch. Per-PR preview deploys are intentionally disabled to avoid
 per-preview billing, which is why the same check reports `skipping` on pull requests.
+
+One prerequisite is not covered by any of the three integrations: private Realtime channels are only
+enforced when **Allow public access** is disabled under the project's Realtime settings in the
+Supabase dashboard. The `realtime.messages` policies shipped by
+`20260830120000_secure_team_realtime_channels.sql` authorize the private `team:<id>` join, but with
+public access still enabled a client can join a same-named public topic. Row data stays protected by
+table RLS either way; disable the setting to close topic-level access.
 
 The steps below are therefore mostly verification. The manual commands are a fallback for when an
 integration fails or is unavailable, not the normal path.

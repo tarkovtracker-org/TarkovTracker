@@ -1,12 +1,13 @@
 // Framework imports
 // Library imports
 import { logger } from '@/utils/logger';
+import {
+  logChannelSubscribeFailure,
+  removeOwnedChannel,
+  type OwnedRealtimeChannel,
+} from '@/utils/realtimeChannel';
 import { clearStaleState, resetStore, safePatchStore } from '@/utils/storeHelpers';
-import type {
-  PostgrestError,
-  RealtimeChannel,
-  RealtimePostgresChangesPayload,
-} from '@supabase/supabase-js';
+import type { PostgrestError, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import type { StateTree, Store } from 'pinia';
 // Local imports
 export interface SupabaseListenerConfig<
@@ -88,7 +89,11 @@ export function useSupabaseListener<
   scope,
 }: SupabaseListenerConfig<TStoreState, TData>): SupabaseListenerReturn {
   const { $supabase } = useNuxtApp();
-  const channel = ref<RealtimeChannel | null>(null);
+  // `shallowRef`: a Realtime channel owns a socket, timers, and internal state
+  // that must not be wrapped in a deep reactive proxy.
+  const channel = shallowRef<OwnedRealtimeChannel | null>(null);
+  /** Removal of the previous channel, awaited before rejoining the same topic. */
+  let pendingChannelRemoval: Promise<boolean> | null = null;
   const isSubscribed = ref(false);
   const hasInitiallyLoaded = ref(false);
   const loadError = ref<PostgrestError | null>(null);
@@ -168,12 +173,28 @@ export function useSupabaseListener<
       }
     }
   };
-  const setupSubscription = () => {
+  /**
+   * Waits for a previous channel removal to settle.
+   *
+   * `RealtimeClient.channel()` returns the existing channel until its
+   * `phx_leave` settles, and `subscribe()` only rejoins a closed channel. Filter
+   * transitions such as A -> undefined -> A reuse the same topic, so the removal
+   * has to finish before rejoining.
+   */
+  const awaitPendingRemoval = async (): Promise<boolean> => {
+    const inFlightRemoval = pendingChannelRemoval;
+    if (!inFlightRemoval) return true;
+    const leftCleanly = await inFlightRemoval;
+    if (pendingChannelRemoval === inFlightRemoval) pendingChannelRemoval = null;
+    return leftCleanly;
+  };
+  const createSubscription = () => {
     const currentFilter = getFilterValue();
     if (channel.value) return;
     if (!currentFilter) return;
     const subscriptionVersion = cleanupVersion;
-    channel.value = $supabase.client
+    const client = $supabase.client;
+    const nextChannel = client
       .channel(`public:${table}:${currentFilter}`)
       .on(
         'postgres_changes',
@@ -213,9 +234,31 @@ export function useSupabaseListener<
           }
         }
       )
-      .subscribe((status: string) => {
+      .subscribe((status: string, error?: Error) => {
         isSubscribed.value = status === 'SUBSCRIBED';
+        logChannelSubscribeFailure(storeIdForLogging, status, error, { table });
       });
+    channel.value = { channel: nextChannel, client };
+  };
+  /**
+   * Subscribes immediately unless a previous channel is still leaving.
+   *
+   * Staying synchronous in the common case preserves the channel being available
+   * as soon as the listener is created; the deferred branch only runs when the
+   * same topic could still be occupied.
+   */
+  const setupSubscription = (): void => {
+    if (!pendingChannelRemoval) {
+      createSubscription();
+      return;
+    }
+    const setupVersion = cleanupVersion;
+    void awaitPendingRemoval().then((leftCleanly) => {
+      // A failed leave leaves the topic occupied, so rejoining it would return a
+      // channel that never joins. Skip and let the next filter change retry.
+      if (!leftCleanly || setupVersion !== cleanupVersion) return;
+      createSubscription();
+    });
   };
   const cleanup = () => {
     cleanupVersion += 1;
@@ -230,11 +273,7 @@ export function useSupabaseListener<
     const channelToRemove = channel.value;
     channel.value = null;
     if (channelToRemove) {
-      void $supabase.client
-        .removeChannel(channelToRemove as unknown as RealtimeChannel)
-        .catch((error) => {
-          logger.warn(`[${storeIdForLogging}] Failed to remove realtime channel:`, error);
-        });
+      pendingChannelRemoval = removeOwnedChannel(channelToRemove, storeIdForLogging);
       isSubscribed.value = false;
       // Note: Don't reset hasInitiallyLoaded here - it should persist as long as store has data
       // This prevents showing loading spinner when navigating back to a page

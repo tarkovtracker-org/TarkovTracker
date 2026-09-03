@@ -614,10 +614,11 @@ flowchart LR
    concurrent account-row updates, updates account metadata, mirrors persistent PvP/PvE for older
    clients, and upserts each normalized row. The caller passes the season number its bundle was
    built for; the function writes the Seasonal row only when that number equals the database's
-   active season, so a cached client from a previous season cannot upload stale Seasonal state.
-   Persistent PvP and PvE still sync in that case. The RPC rejects payloads larger than 512 KiB and
-   allows at most 60 direct client syncs per user per minute. API gateway reads resolve the active
-   Seasonal number through the database before selecting a row.
+   active season, so a cached client from a previous season cannot upload stale Seasonal state. A
+   client sync always carries every mode in one payload, so a stale Seasonal entry is skipped rather
+   than raising: persistent PvP and PvE from the same request still commit. The RPC rejects payloads
+   larger than 512 KiB and allows at most 60 direct client syncs per user per minute. API gateway
+   reads resolve the active Seasonal number through the database before selecting a row.
 3. Realtime listens to both the account row and normalized rows. A normalized event is applied only
    when its mode is supported and its season equals the active season. The long-lived system and team
    listeners run in detached scopes so route unmounts cannot orphan their channels. The team store
@@ -713,24 +714,43 @@ flowchart LR
 - Historical Seasonal rows are retained but never merged into the active season. Locally persisted
   Seasonal progress is stamped with its season number and reset to defaults when that stamp does not
   match the active season; absent stamps are treated as the active season. `sync_user_game_mode_progress`
-  independently rejects Seasonal writes whose caller-supplied season number is absent or does not
+  independently skips Seasonal writes whose caller-supplied season number is absent or does not
   match `private.active_season_number()`, so the fresh-season guarantee does not depend on client
-  code alone.
+  code alone. It skips rather than raises so a client whose bundled season number lags the database
+  cannot take persistent-mode cloud sync offline.
 - Teammate summaries normally come from `team_member_mode_summary`. When a persistent normalized row
   is missing or its summary has no level, `app/server/api/team/members.ts` loads that member's legacy
   progress server-side and returns only the derived display name, level, and completed-task count;
   progress blobs never reach the client in the team-members payload. That fallback is best-effort — a
   failed or timed-out legacy read is logged and the endpoint still returns the members it resolved.
+  It requires the service-role key: `user_progress` is owner-only, so a caller-JWT read returns at
+  most the caller's own row and never a teammate's. The route logs and skips the fallback when the key
+  is absent instead of issuing a request that cannot return teammate rows.
 - Authenticated users can write only their own progress through the bounded sync RPC; direct client
   mutations of team, membership, legacy progress, and normalized progress tables are revoked.
   Teammate reads require a shared team in the same game mode; cross-mode teammates and outsiders
   cannot read a row.
-- Team broadcast channels are private, and `realtime.messages` permits team members to send and
-  receive only the `team:<id>` topic for a team they belong to.
+- The team channel is private. Realtime authorizes a private join from `realtime.messages` RLS, so
+  the read policy scoped to `team:<id>` for members of that team is what gates the join; a write
+  policy is kept alongside it, but the client no longer sends broadcasts. Full enforcement also
+  requires 'Allow public access' to be disabled in the project's Realtime settings — a dashboard
+  setting no migration can apply.
 - The team channel carries teammate mode-progress changes for all authorized rows; the client does
   not create one Postgres Changes channel per teammate.
 - System and team singleton listeners own detached effect scopes and stop those scopes during explicit
   cleanup, so their channel lifetime is independent of the route that first created them.
+- Every channel is stored with the client that created it and removed through that client, because
+  `$supabase.client` starts as an offline stub and is replaced once background initialization
+  completes. Removal is awaited before the same topic is rejoined: `RealtimeClient.channel()` returns
+  the existing channel until its `phx_leave` settles and `subscribe()` only rejoins a closed channel,
+  so rejoining early yields a channel that never joins and never reports an error. An unclean leave
+  skips the rejoin rather than binding to an occupied topic.
+- The team channel records itself as bound only after `SUBSCRIBED`, so a silently failed join is never
+  mistaken for a live one. Membership events rebuild it only when the topic or teammate-progress
+  filter changed, and any non-subscribed status drops the binding so the next event rebuilds.
+- Subscribe callbacks log every status that is not `SUBSCRIBED` or `CLOSED`. Five consecutive failures
+  tear the team channel down and schedule one rebuild a minute later, replacing Realtime's unbounded
+  rejoin loop with a bounded retry cycle.
 - `user_system` is included in `supabase_realtime`, and sign-out tears down all client channels.
 - New clients read teammate progress from mode rows. When a persistent normalized row is missing or
   carries no `level`, `useTeamStore` calls `get_teammate_legacy_progress` for only the teammate's

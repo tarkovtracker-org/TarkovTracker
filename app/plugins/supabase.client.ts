@@ -19,6 +19,46 @@ type SupabaseUser = {
   providers: string[] | null; // All linked OAuth providers
 };
 type OAuthCallbackCode = { code: string; flowId?: string };
+/**
+ * How long app start-up waits for the initial session read before continuing.
+ * The read is not cancelled; it hydrates the session whenever it completes.
+ */
+const SESSION_BOOT_BUDGET_MS = 8000;
+/**
+ * Waits for the initial session read without letting it block app start-up.
+ *
+ * `ready()` resolves only after `getSession()` returns, so a hung request would
+ * otherwise stall the whole SPA inside the plugin's `setup()`. The read keeps
+ * running past the budget and still hydrates the session when it completes, so a
+ * slow network delays sign-in state instead of preventing the app from mounting.
+ */
+const sessionFromResult = (result: {
+  data?: { session?: Session | null } | null;
+}): Session | null => result.data?.session ?? null;
+const supportsChannelRemoval = (
+  client: SupabaseClient | null
+): client is SupabaseClient & { removeAllChannels: () => Promise<unknown> } =>
+  client !== null && typeof client.removeAllChannels === 'function';
+const awaitSessionWithinBudget = async (read: () => Promise<Session | null>): Promise<void> => {
+  const sessionRead = read().then(
+    () => undefined,
+    (error: unknown) => {
+      logger.error('[Supabase] Initial session read failed', error);
+    }
+  );
+  let budgetTimeout: ReturnType<typeof setTimeout> | undefined;
+  const budgetElapsed = new Promise<void>((resolve) => {
+    budgetTimeout = setTimeout(() => {
+      logger.warn('[Supabase] Initial session read exceeded the start-up budget; continuing');
+      resolve();
+    }, SESSION_BOOT_BUDGET_MS);
+  });
+  try {
+    await Promise.race([sessionRead, budgetElapsed]);
+  } finally {
+    if (budgetTimeout !== undefined) clearTimeout(budgetTimeout);
+  }
+};
 const createSupabaseUserState = () =>
   reactive<SupabaseUser>({
     id: null,
@@ -223,12 +263,28 @@ export default defineNuxtPlugin({
         logger.debug('[Supabase] Cleaned OAuth hash from URL');
       }
     };
+    let removeChannelsPromise: Promise<void> | null = null;
+    /**
+     * Removes every Realtime channel, coalescing concurrent callers.
+     *
+     * Explicit `signOut()` and the `SIGNED_OUT` auth event both reach this, so
+     * without coalescing a single sign-out tears channels down twice.
+     */
     const removeAllRealtimeChannels = async () => {
-      if (!supabaseClient || typeof supabaseClient.removeAllChannels !== 'function') return;
+      const client = supabaseClient;
+      if (!supportsChannelRemoval(client)) return;
+      removeChannelsPromise ??= (async () => {
+        try {
+          await client.removeAllChannels();
+        } catch (error) {
+          logger.warn('[Supabase] Failed to remove realtime channels after sign-out', error);
+        }
+      })();
+      const pendingRemoval = removeChannelsPromise;
       try {
-        await supabaseClient.removeAllChannels();
-      } catch (error) {
-        logger.warn('[Supabase] Failed to remove realtime channels after sign-out', error);
+        await pendingRemoval;
+      } finally {
+        if (removeChannelsPromise === pendingRemoval) removeChannelsPromise = null;
       }
     };
     const handleAuthStateChange = (event: string, session: Session | null) => {
@@ -259,7 +315,10 @@ export default defineNuxtPlugin({
     const hydrateInitialSession = async (client: SupabaseClient): Promise<void> => {
       try {
         const sessionResult = await client.auth.getSession();
-        hydrateFromSession(sessionResult.data?.session ?? null);
+        if (sessionResult.error) {
+          logger.warn('[Supabase] Initial session read returned an error', sessionResult.error);
+        }
+        hydrateFromSession(sessionFromResult(sessionResult));
       } catch (error) {
         logger.error('[Supabase] Failed to read initial session', error);
         throw error;
@@ -287,7 +346,12 @@ export default defineNuxtPlugin({
       readySessionPromise ??= (async () => {
         try {
           const sessionResult = await client.auth.getSession();
-          const session = sessionResult.data?.session ?? null;
+          if (sessionResult.error) {
+            // A failed read is not the same as "signed out"; log it so a broken
+            // refresh is not silently indistinguishable from a guest session.
+            logger.warn('[Supabase] Ready session read returned an error', sessionResult.error);
+          }
+          const session = sessionFromResult(sessionResult);
           hydrateFromSession(session);
           return session;
         } catch (error) {
@@ -380,7 +444,7 @@ export default defineNuxtPlugin({
     if (oauthCallbackCode) {
       initializeClientInBackground();
     } else if (hasOAuthCallbackParams() || hasStoredSession()) {
-      await ready();
+      await awaitSessionWithinBudget(ready);
     } else {
       initializeClientInBackground();
     }

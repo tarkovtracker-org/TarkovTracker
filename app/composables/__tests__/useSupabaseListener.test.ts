@@ -108,4 +108,50 @@ describe('useSupabaseListener cleanup', () => {
     expect(syncController.pause).not.toHaveBeenCalled();
     expect(onData).not.toHaveBeenCalled();
   });
+  it('waits for the previous channel to leave before rejoining the same topic', async () => {
+    const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
+    let resolveRemoval: ((status: string) => void) | undefined;
+    removeChannel.mockImplementationOnce(
+      () =>
+        new Promise<string>((resolve) => {
+          resolveRemoval = resolve;
+        })
+    );
+    const filter = ref<string | undefined>('id=eq.row-1');
+    const listener = useSupabaseListener({
+      filter,
+      patchStore: false,
+      store: createStore(),
+      table: 'test_table',
+    });
+    expect(client.channel).toHaveBeenCalledTimes(1);
+    // Same topic again: the rejoin must not happen while the leave is in flight.
+    filter.value = undefined;
+    await nextTick();
+    filter.value = 'id=eq.row-1';
+    await nextTick();
+    expect(client.channel).toHaveBeenCalledTimes(1);
+    resolveRemoval?.('ok');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(client.channel).toHaveBeenCalledTimes(2);
+    listener.cleanup();
+  });
+  it('logs a channel error instead of failing silently', async () => {
+    const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
+    channel.subscribe.mockImplementationOnce((callback: (s: string, e?: Error) => void) => {
+      callback('CHANNEL_ERROR', new Error('nope'));
+      return channel;
+    });
+    const listener = useSupabaseListener({
+      filter: 'id=eq.row-1',
+      patchStore: false,
+      store: createStore(),
+      table: 'test_table',
+    });
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      '[listener-test] Realtime channel is not subscribed:',
+      expect.objectContaining({ error: 'nope', status: 'CHANNEL_ERROR' })
+    );
+    listener.cleanup();
+  });
 });
