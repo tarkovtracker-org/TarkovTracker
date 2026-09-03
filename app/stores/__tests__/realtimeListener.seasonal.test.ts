@@ -94,6 +94,10 @@ const {
 mockNuxtImport('useNuxtApp', () => () => ({
   $supabase: supabaseContext,
 }));
+const releaseDeferredRemovals = (): void => {
+  removalGate.defer = false;
+  resolveRemovals();
+};
 vi.mock('@/composables/useToastI18n', () => ({
   useToastI18n: () => ({ showProgressMerged }),
 }));
@@ -125,13 +129,14 @@ describe('seasonal progress realtime synchronization', () => {
     handlers.clear();
     createdChannels.length = 0;
     openTopics.clear();
-    removalGate.defer = false;
+    releaseDeferredRemovals();
     removalGate.resolvers.length = 0;
     subscribeGate.defer = false;
     Object.assign(state, structuredClone(defaultState));
     supabaseContext.user.loggedIn = true;
   });
   afterEach(async () => {
+    releaseDeferredRemovals();
     const { cleanupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     await cleanupRealtimeListener();
     resetSyncTimeline();
@@ -167,19 +172,19 @@ describe('seasonal progress realtime synchronization', () => {
     expect(settled).toBe(true);
   });
   it('does not block a new user on a different topic leave', async () => {
-    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
-    await setupRealtimeListener(store);
-    removalGate.defer = true;
-    supabaseContext.user.id = '22222222-2222-4222-8222-222222222222';
-    const setup = setupRealtimeListener(store);
-    await setup;
-    expect(createdChannels).toHaveLength(2);
-    expect(createdChannels[1]?.subscribed).toBe(true);
-    expect(openTopics.has('user_progress_22222222-2222-4222-8222-222222222222')).toBe(true);
-    removalGate.defer = false;
-    resolveRemovals();
-    await Promise.resolve();
-    await Promise.resolve();
+    try {
+      const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+      await setupRealtimeListener(store);
+      removalGate.defer = true;
+      supabaseContext.user.id = '22222222-2222-4222-8222-222222222222';
+      const setup = setupRealtimeListener(store);
+      await setup;
+      expect(createdChannels).toHaveLength(2);
+      expect(createdChannels[1]?.subscribed).toBe(true);
+      expect(openTopics.has('user_progress_22222222-2222-4222-8222-222222222222')).toBe(true);
+    } finally {
+      releaseDeferredRemovals();
+    }
   });
   it('lets the newest overlapping setup replace the older request', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
