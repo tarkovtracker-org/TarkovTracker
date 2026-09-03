@@ -161,6 +161,37 @@ describe('supabase plugin', () => {
       })
     );
   });
+  it('bounds readiness and auth actions when the initial session read never settles', async () => {
+    vi.useFakeTimers();
+    try {
+      const getSession = vi.fn(
+        () => new Promise<{ data: { session: ReturnType<typeof createSession> } }>(() => {})
+      );
+      const signInWithOAuth = vi.fn().mockResolvedValue({
+        data: { provider: 'github', url: null },
+        error: null,
+      });
+      mockAuthClient({ getSession, signInWithOAuth });
+      const plugin = (await import('@/plugins/supabase.client')).default;
+      const setupPromise = plugin.setup?.(
+        {} as Parameters<NonNullable<typeof plugin.setup>>[0]
+      ) as Promise<SupabasePluginProvide | undefined>;
+      await flushPlugin();
+      await vi.advanceTimersByTimeAsync(8000);
+      const result = await setupPromise;
+      const readyPromise = result?.provide.supabase.ready();
+      const signInPromise = result?.provide.supabase.signInWithOAuth('github', {
+        skipBrowserRedirect: true,
+      });
+      await vi.advanceTimersByTimeAsync(8000);
+      await expect(readyPromise).resolves.toBeNull();
+      await expect(signInPromise).resolves.toEqual({ provider: 'github', url: null });
+      expect(getSession).toHaveBeenCalledTimes(2);
+      expect(signInWithOAuth).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('exchanges an oauth callback code when ready is called', async () => {
     localStorage.removeItem('sb-test-auth-token');
     window.history.replaceState(null, '', '/');

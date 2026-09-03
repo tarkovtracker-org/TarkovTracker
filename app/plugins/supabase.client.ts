@@ -27,10 +27,9 @@ const SESSION_BOOT_BUDGET_MS = 8000;
 /**
  * Waits for the initial session read without letting it block app start-up.
  *
- * `ready()` resolves only after `getSession()` returns, so a hung request would
- * otherwise stall the whole SPA inside the plugin's `setup()`. The read keeps
- * running past the budget and still hydrates the session when it completes, so a
- * slow network delays sign-in state instead of preventing the app from mounting.
+ * The read keeps running past the budget and still hydrates the session when it
+ * completes, so a slow network delays sign-in state instead of preventing the
+ * app from mounting. All callers that depend on readiness use the same budget.
  */
 const sessionFromResult = (result: {
   data?: { session?: Session | null } | null;
@@ -39,25 +38,35 @@ const supportsChannelRemoval = (
   client: SupabaseClient | null
 ): client is SupabaseClient & { removeAllChannels: () => Promise<unknown> } =>
   client !== null && typeof client.removeAllChannels === 'function';
-const awaitSessionWithinBudget = async (read: () => Promise<Session | null>): Promise<void> => {
-  const sessionRead = read().then(
-    () => undefined,
-    (error: unknown) => {
-      logger.error('[Supabase] Initial session read failed', error);
-    }
-  );
+const awaitWithSessionBudget = async <T>(
+  operation: () => Promise<T>,
+  fallback: () => T,
+  timeoutMessage: string
+): Promise<T> => {
+  const operationResult = Promise.resolve().then(operation);
   let budgetTimeout: ReturnType<typeof setTimeout> | undefined;
-  const budgetElapsed = new Promise<void>((resolve) => {
+  const budgetElapsed = new Promise<T>((resolve) => {
     budgetTimeout = setTimeout(() => {
-      logger.warn('[Supabase] Initial session read exceeded the start-up budget; continuing');
-      resolve();
+      logger.warn(timeoutMessage);
+      resolve(fallback());
     }, SESSION_BOOT_BUDGET_MS);
   });
   try {
-    await Promise.race([sessionRead, budgetElapsed]);
+    return await Promise.race([operationResult, budgetElapsed]);
   } finally {
     if (budgetTimeout !== undefined) clearTimeout(budgetTimeout);
   }
+};
+const awaitSessionWithinBudget = async (read: () => Promise<Session | null>): Promise<void> => {
+  await awaitWithSessionBudget(
+    () =>
+      read().catch((error: unknown) => {
+        logger.error('[Supabase] Initial session read failed', error);
+        return null;
+      }),
+    () => null,
+    '[Supabase] Initial session read exceeded the start-up budget; continuing'
+  );
 };
 const createSupabaseUserState = () =>
   reactive<SupabaseUser>({
@@ -334,7 +343,11 @@ export default defineNuxtPlugin({
     };
     const ensureClientInitialized = async (): Promise<'created' | 'waited' | 'existing'> => {
       if (initPromise) {
-        await initPromise;
+        await awaitWithSessionBudget(
+          () => initPromise as Promise<void>,
+          () => undefined,
+          '[Supabase] Client initialization exceeded the start-up budget; continuing'
+        );
         return 'waited';
       }
       if (supabaseClient) return 'existing';
@@ -344,7 +357,11 @@ export default defineNuxtPlugin({
       })().finally(() => {
         initPromise = null;
       });
-      await initPromise;
+      await awaitWithSessionBudget(
+        () => initPromise as Promise<void>,
+        () => undefined,
+        '[Supabase] Client initialization exceeded the start-up budget; continuing'
+      );
       return 'created';
     };
     const initializeClientInBackground = () => {
@@ -408,11 +425,17 @@ export default defineNuxtPlugin({
       return true;
     };
     const ready = async (): Promise<Session | null> => {
-      await ensureClientInitialized();
-      if (await consumeOAuthCallbackCode()) {
-        return currentSession;
-      }
-      return refreshFromStoredSession();
+      return await awaitWithSessionBudget(
+        async () => {
+          await ensureClientInitialized();
+          if (await consumeOAuthCallbackCode()) {
+            return currentSession;
+          }
+          return refreshFromStoredSession();
+        },
+        () => currentSession,
+        '[Supabase] Session readiness exceeded the start-up budget; continuing'
+      );
     };
     const signInWithOAuth = async (
       provider: OAuthProvider,
