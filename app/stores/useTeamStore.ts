@@ -222,7 +222,7 @@ export const applyTeammateProgressEvent = (
   });
   dispatchTeammateProgressEvent(data);
 };
-type TeamChannelDeps = {
+export type TeamChannelDeps = {
   /** Resolved per call: the plugin replaces the client during initialization. */
   getClient: () => SupabaseClient;
   getTeamId: () => string | null;
@@ -230,7 +230,7 @@ type TeamChannelDeps = {
   applyProgress: (data: Record<string, unknown>) => void;
   refreshMembers: (force?: boolean) => Promise<void>;
 };
-type TeamChannelController = {
+export type TeamChannelController = {
   /** Leaves the channel and waits for the leave to settle. */
   cleanup: () => Promise<void>;
   /** Refreshes members, then rebuilds the channel only if its bindings changed. */
@@ -244,7 +244,7 @@ type TeamChannelController = {
  * Kept outside the store factory so the channel state machine is isolated from
  * store concerns and can be reasoned about on its own.
  */
-const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelController => {
+export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelController => {
   // `shallowRef`: a Realtime channel owns a socket, timers, and internal state
   // that must not be wrapped in a deep reactive proxy. It also keeps the
   // identity check in `handleStatus` meaningful.

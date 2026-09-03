@@ -81,6 +81,15 @@ describe('seasonal progress realtime synchronization', () => {
     expect(supabaseContext.client.channel).toHaveBeenCalledTimes(2);
     expect(handlers.size).toBeGreaterThan(0);
   });
+  it('serializes overlapping setup calls into one live channel', async () => {
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    await setupRealtimeListener(store);
+    // Two concurrent setups must not interleave across the channel leave.
+    await Promise.all([setupRealtimeListener(store), setupRealtimeListener(store)]);
+    expect(supabaseContext.client.channel).toHaveBeenCalledTimes(3);
+    expect(supabaseContext.client.removeChannel).toHaveBeenCalledTimes(2);
+    expect(handlers.size).toBeGreaterThan(0);
+  });
   it('applies only the active Seasonal row without changing persistent modes', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     await setupRealtimeListener(store);

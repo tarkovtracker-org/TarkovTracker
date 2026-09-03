@@ -48,6 +48,8 @@ type LegacyProgressMetadata = {
 let syncControllerGetter: SyncControllerGetter = () => null;
 let realtimeChannel: OwnedRealtimeChannel | null = null;
 const channelRelease = createChannelReleaseLatch();
+/** Tail of the serialized setup queue. */
+let setupQueue: Promise<void> = Promise.resolve();
 /**
  * Bumped by every setup and teardown so a setup suspended across an await cannot
  * create a channel after a later teardown or setup superseded it.
@@ -203,7 +205,19 @@ const prepareProgressTopic = async (currentUserId: string): Promise<number | nul
   if (!(await channelRelease.release(progressTopic(currentUserId)))) return null;
   return stillOwnsSetup(currentUserId, generation) ? generation : null;
 };
-export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promise<void> {
+/**
+ * Serializes listener setup.
+ *
+ * Setup suspends across a channel leave, so overlapping calls could otherwise
+ * interleave and claim generations out of order, installing duplicate handlers or
+ * rejecting the newest request. Queueing keeps exactly one setup in flight.
+ */
+export function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promise<void> {
+  const run = setupQueue.catch(() => undefined).then(() => runSetupRealtimeListener(tarkovStore));
+  setupQueue = run.catch(() => undefined);
+  return run;
+}
+async function runSetupRealtimeListener(tarkovStore: TarkovStoreLike): Promise<void> {
   const { $supabase } = useNuxtApp();
   const metadataStore = useMetadataStore();
   const toastI18n = useToastI18n();
