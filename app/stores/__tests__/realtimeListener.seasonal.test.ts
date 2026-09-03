@@ -129,11 +129,13 @@ describe('seasonal progress realtime synchronization', () => {
   it('cancels a queued setup when cleanup runs first', async () => {
     const { cleanupRealtimeListener, setupRealtimeListener } =
       await import('@/stores/tarkov/realtimeListener');
-    const first = setupRealtimeListener(store);
+    // Establish a live channel first so teardown has something to remove.
+    await setupRealtimeListener(store);
+    expect(openTopics.size).toBe(1);
     const queued = setupRealtimeListener(store);
     // Teardown while the second setup is still queued must win.
     const teardown = cleanupRealtimeListener();
-    await Promise.all([first, queued, teardown]);
+    await Promise.all([queued, teardown]);
     expect(createdChannels.filter(({ subscribed }) => subscribed)).toEqual([]);
     expect(openTopics.size).toBe(0);
   });
