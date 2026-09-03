@@ -1103,7 +1103,8 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
    aggregates bring-mode equipment and alternative key groups independently for each group. It
    filters objectives to the selected map and the shared objective-visibility state.
 4. The summary's pinned group follows the pinned-objective preference. Its active group follows the
-   self-objective preference; the Team chip intentionally does not change required-item summaries.
+   self-objective preference. Objectives the player has completed, and objectives only teammates
+   still need, are dropped, so the Team chip never changes required-item summaries.
 
 ### Files
 
@@ -1122,13 +1123,21 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 - Map marker visibility is controlled independently by the pinned, self, and team preferences.
 - Required-item summaries use the selected map and shared objective visibility, exclude completed
   objectives, and preserve equipment counts and alternative key groups after deduplication.
+- A summary lists only what the local player still needs. Objectives categorized as `team` carry no
+  requirement for the player and are excluded, as is any objective the player has already
+  completed, even when a teammate still needs it.
 - Pinned and active task requirements are aggregated into separate groups whenever both contain
   visible content; the pinned group uses the pinned marker accent.
 - The pinned summary group follows `mapShowPinnedObjectives`; the active summary group follows
   `mapShowSelfObjectives`. `mapShowTeamObjectives` does not hide or alter the required-item
   summary, preserving the product rule that the Team chip controls map markers only.
-- Bring-mode aggregation includes the canonical `objective.item` field and any supported item
-  arrays, without reintroducing the removed task `alternatives` runtime dependency.
+- Bring-mode aggregation additionally includes the canonical `objective.item` field for bring-type
+  objectives, covering upstream objectives that expose no `items` array. Task-card rendering uses
+  `all` mode and is unaffected by that field, and neither mode reintroduces the removed task
+  `alternatives` runtime dependency.
+- A group given a title renders its section headings one level down (`h4`) and uses the short
+  `required_items` / `required_keys` labels; an untitled standalone group keeps the `h3` level and
+  the longer `*_summary` labels.
 
 ## When this doc is wrong
 

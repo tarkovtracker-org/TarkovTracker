@@ -9,7 +9,7 @@
           borderColor: `color-mix(in srgb, ${accent} 25%, transparent)`,
         }"
       >
-        <UIcon name="i-mdi-pin" class="h-4 w-4" :style="{ color: accent }" />
+        <UIcon :name="icon" class="h-4 w-4" :style="{ color: accent }" />
       </div>
       <h3 class="text-surface-100 truncate text-[15px] font-semibold">{{ title }}</h3>
     </div>
@@ -20,15 +20,14 @@
         >
           <UIcon name="i-mdi-briefcase-variant-outline" class="text-primary-300 h-4 w-4" />
         </div>
-        <h3 class="text-surface-100 truncate text-[15px] font-semibold">
+        <component
+          :is="sectionHeadingTag"
+          class="text-surface-100 truncate text-[15px] font-semibold"
+        >
           {{
-            $t(
-              scope === 'pinned'
-                ? 'page.tasks.map.required_items'
-                : 'page.tasks.map.required_items_summary'
-            )
+            $t(title ? 'page.tasks.map.required_items' : 'page.tasks.map.required_items_summary')
           }}
-        </h3>
+        </component>
       </div>
       <ObjectiveRequiredItems
         class="mt-0!"
@@ -44,15 +43,12 @@
         >
           <UIcon name="i-mdi-key-variant" class="text-primary-300 h-4 w-4" />
         </div>
-        <h3 class="text-surface-100 truncate text-[15px] font-semibold">
-          {{
-            $t(
-              scope === 'pinned'
-                ? 'page.tasks.map.required_keys'
-                : 'page.tasks.map.required_keys_summary'
-            )
-          }}
-        </h3>
+        <component
+          :is="sectionHeadingTag"
+          class="text-surface-100 truncate text-[15px] font-semibold"
+        >
+          {{ $t(title ? 'page.tasks.map.required_keys' : 'page.tasks.map.required_keys_summary') }}
+        </component>
       </div>
       <ObjectiveRequiredItems class="mt-0!" variant="keys" :required-keys="keyGroups" />
     </div>
@@ -61,12 +57,17 @@
 <script setup lang="ts">
   import ObjectiveRequiredItems from '@/features/tasks/ObjectiveRequiredItems.vue';
   import type { TarkovItem } from '@/types/tarkov';
-  defineProps<{
-    scope: 'active' | 'pinned';
-    title?: string;
-    accent?: string;
-    equipment: TarkovItem[];
-    equipmentCounts: Record<string, number>;
-    keyGroups: TarkovItem[][];
-  }>();
+  const props = withDefaults(
+    defineProps<{
+      title?: string;
+      accent?: string;
+      icon?: string;
+      equipment: TarkovItem[];
+      equipmentCounts: Record<string, number>;
+      keyGroups: TarkovItem[][];
+    }>(),
+    { title: undefined, accent: undefined, icon: 'i-mdi-pin' }
+  );
+  // A titled group is nested under that title, so its sections drop one heading level.
+  const sectionHeadingTag = computed(() => (props.title ? 'h4' : 'h3'));
 </script>

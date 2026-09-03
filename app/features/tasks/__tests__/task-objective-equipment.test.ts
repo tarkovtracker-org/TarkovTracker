@@ -92,6 +92,23 @@ describe('task-objective-equipment', () => {
     );
     expect(equipment).toEqual([shared]);
   });
+  it('excludes the canonical item in all mode so task-card chips stay unchanged', () => {
+    const item = createItem('canonical-item');
+    const weaponEquipment = getObjectiveEquipmentItems(
+      createObjective({
+        type: 'buildWeapon',
+        item,
+      })
+    );
+    expect(weaponEquipment).toEqual([]);
+    const bringEquipment = getObjectiveEquipmentItems(
+      createObjective({
+        type: 'plantItem',
+        item,
+      })
+    );
+    expect(bringEquipment).toEqual([]);
+  });
   it('includes items for bring-type objectives when mode is set to "bring"', () => {
     const item1 = createItem('item-1');
     const equipment = getObjectiveEquipmentItems(

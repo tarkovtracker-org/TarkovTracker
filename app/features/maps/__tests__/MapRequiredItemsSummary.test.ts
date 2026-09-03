@@ -170,12 +170,15 @@ describe('MapRequiredItemsSummary', () => {
     expect(equipmentIds(groups[1]!)).toEqual(['item-1']);
     expect(wrapper.text()).toContain('page.tasks.pinned_tasks_section');
     expect(wrapper.text()).toContain('page.tasks.map.active_tasks_group');
-    expect(wrapper.findAll('h3').map((heading) => heading.text())).toEqual(
-      expect.arrayContaining([
-        'page.tasks.map.required_items',
-        'page.tasks.map.required_items_summary',
-      ])
-    );
+    expect(wrapper.findAll('h3').map((heading) => heading.text())).toEqual([
+      'page.tasks.pinned_tasks_section',
+      'page.tasks.map.active_tasks_group',
+    ]);
+    expect(wrapper.findAll('h4').map((heading) => heading.text())).toEqual([
+      'page.tasks.map.required_items',
+      'page.tasks.map.required_items',
+    ]);
+    expect(wrapper.text()).not.toContain('page.tasks.map.required_items_summary');
   });
   it('applies the custom pinned marker colour as the group accent', () => {
     mockPreferencesStore.getPinnedTaskIds = ['task-pinned'];
@@ -218,29 +221,17 @@ describe('MapRequiredItemsSummary', () => {
     expect(wrapper.findAll('[data-variant]')).toHaveLength(0);
     expect(wrapper.text().trim()).toBe('');
   });
-  it('does not let the team chip change active required items', () => {
-    const teamTask: Task = {
-      id: 'team-task',
-      objectives: [
-        {
-          id: 'team-obj',
-          type: 'plantItem',
-          maps: [{ id: 'customs' }],
-          items: [{ id: 'item-team', name: 'Team Item', shortName: 'TI' }],
-        },
-      ] as TaskObjective[],
-    } as Task;
+  it('does not let the team chip change required items', () => {
     const objectiveVisibility = new Map<string, MapObjectiveVisibility>([
-      ['team-obj', { category: 'team', hasActiveObjective: true }],
+      ['obj-1', { category: 'self', hasActiveObjective: true }],
     ]);
-    const withTeam = mountSummary([teamTask], objectiveVisibility);
-    expect(equipmentIds(withTeam.get('[data-variant="equipment"]'))).toEqual(['item-team']);
+    const withTeam = mountSummary([task], objectiveVisibility);
+    expect(equipmentIds(withTeam.get('[data-variant="equipment"]'))).toEqual(['item-1']);
     mockPreferencesStore.getMapShowTeamObjectives = false;
-    const withoutTeam = mountSummary([teamTask], objectiveVisibility);
-    expect(equipmentIds(withoutTeam.get('[data-variant="equipment"]'))).toEqual(['item-team']);
+    const withoutTeam = mountSummary([task], objectiveVisibility);
+    expect(equipmentIds(withoutTeam.get('[data-variant="equipment"]'))).toEqual(['item-1']);
   });
-  it('retains a teammate objective when self already completed it', () => {
-    mockProgressStore.objectiveCompletions = { 'team-obj': { self: true } };
+  it('excludes objectives only teammates still need', () => {
     const teamTask: Task = {
       id: 'team-task',
       objectives: [
@@ -256,6 +247,96 @@ describe('MapRequiredItemsSummary', () => {
       ['team-obj', { category: 'team', hasActiveObjective: true }],
     ]);
     const wrapper = mountSummary([teamTask], objectiveVisibility);
-    expect(equipmentIds(wrapper.get('[data-variant="equipment"]'))).toEqual(['item-team']);
+    expect(wrapper.find('[data-variant="equipment"]').exists()).toBe(false);
+  });
+  it('excludes a completed objective even while a teammate still needs it', () => {
+    mockProgressStore.objectiveCompletions = { 'obj-1': { self: true } };
+    const objectiveVisibility = new Map<string, MapObjectiveVisibility>([
+      ['obj-1', { category: 'team', hasActiveObjective: true }],
+    ]);
+    const wrapper = mountSummary([task], objectiveVisibility);
+    expect(wrapper.find('[data-variant="equipment"]').exists()).toBe(false);
+  });
+  it('excludes a completed pinned objective a teammate still needs', () => {
+    mockPreferencesStore.getPinnedTaskIds = ['task-pinned'];
+    mockProgressStore.objectiveCompletions = { 'pinned-obj-1': { self: true } };
+    const objectiveVisibility = new Map<string, MapObjectiveVisibility>([
+      ['pinned-obj-1', { category: 'pinned', hasActiveObjective: true }],
+    ]);
+    const wrapper = mountSummary([pinnedTask], objectiveVisibility);
+    expect(wrapper.find('[data-variant="equipment"]').exists()).toBe(false);
+  });
+  it('splits pinned and active groups when visibility state is supplied', () => {
+    mockPreferencesStore.getPinnedTaskIds = ['task-pinned'];
+    const objectiveVisibility = new Map<string, MapObjectiveVisibility>([
+      ['obj-1', { category: 'self', hasActiveObjective: true }],
+      ['pinned-obj-1', { category: 'pinned', hasActiveObjective: true }],
+    ]);
+    const wrapper = mountSummary([task, pinnedTask], objectiveVisibility);
+    const groups = wrapper.findAll('[data-variant="equipment"]');
+    expect(groups).toHaveLength(2);
+    expect(equipmentIds(groups[0]!)).toEqual(['item-pinned']);
+    expect(equipmentIds(groups[1]!)).toEqual(['item-1']);
+  });
+  it('hides the pinned group by category gate when visibility state is supplied', () => {
+    mockPreferencesStore.getPinnedTaskIds = ['task-pinned'];
+    mockPreferencesStore.getMapShowPinnedObjectives = false;
+    const objectiveVisibility = new Map<string, MapObjectiveVisibility>([
+      ['obj-1', { category: 'self', hasActiveObjective: true }],
+      ['pinned-obj-1', { category: 'pinned', hasActiveObjective: true }],
+    ]);
+    const wrapper = mountSummary([task, pinnedTask], objectiveVisibility);
+    const groups = wrapper.findAll('[data-variant="equipment"]');
+    expect(groups).toHaveLength(1);
+    expect(equipmentIds(groups[0]!)).toEqual(['item-1']);
+  });
+  it('excludes objectives with no active user when visibility state is supplied', () => {
+    const objectiveVisibility = new Map<string, MapObjectiveVisibility>([
+      ['obj-1', { category: 'self', hasActiveObjective: false }],
+    ]);
+    const wrapper = mountSummary([task], objectiveVisibility);
+    expect(wrapper.find('[data-variant="equipment"]').exists()).toBe(false);
+  });
+  it('excludes objectives missing from the supplied visibility map', () => {
+    const wrapper = mountSummary([task], new Map<string, MapObjectiveVisibility>());
+    expect(wrapper.find('[data-variant="equipment"]').exists()).toBe(false);
+  });
+  it('splits key groups across the pinned and active groups', () => {
+    mockPreferencesStore.getPinnedTaskIds = ['keyed-pinned'];
+    const keyedPinned: Task = {
+      id: 'keyed-pinned',
+      objectives: [
+        {
+          id: 'keyed-pinned-obj',
+          type: 'mark',
+          maps: [{ id: 'customs' }],
+          requiredKeys: [[{ id: 'key-pinned', name: 'Pinned Key', shortName: 'PK' }]],
+        },
+      ] as TaskObjective[],
+    } as Task;
+    const keyedActive: Task = {
+      id: 'keyed-active',
+      objectives: [
+        {
+          id: 'keyed-active-obj',
+          type: 'mark',
+          maps: [{ id: 'customs' }],
+          requiredKeys: [[{ id: 'key-active', name: 'Active Key', shortName: 'AK' }]],
+        },
+      ] as TaskObjective[],
+    } as Task;
+    const objectiveVisibility = new Map<string, MapObjectiveVisibility>([
+      ['keyed-pinned-obj', { category: 'pinned', hasActiveObjective: true }],
+      ['keyed-active-obj', { category: 'self', hasActiveObjective: true }],
+    ]);
+    const wrapper = mountSummary([keyedPinned, keyedActive], objectiveVisibility);
+    const keyGroups = wrapper.findAll('[data-variant="keys"]');
+    expect(keyGroups).toHaveLength(2);
+    const idsFor = (element: { attributes: (key: string) => string | undefined }) =>
+      (
+        JSON.parse(element.attributes('data-required-keys') ?? '[]') as Array<Array<{ id: string }>>
+      ).flatMap((group) => group.map((key) => key.id));
+    expect(idsFor(keyGroups[0]!)).toEqual(['key-pinned']);
+    expect(idsFor(keyGroups[1]!)).toEqual(['key-active']);
   });
 });
