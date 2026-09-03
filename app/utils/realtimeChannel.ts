@@ -103,6 +103,7 @@ const describeChannelError = (error: Error | undefined): string | null => error?
  *
  * @returns `true` when the status indicates a failure.
  */
+// fallow-ignore-next-line complexity -- initial joins treat CLOSED as an explicit failure
 export const logChannelSubscribeFailure = (
   label: string,
   status: string,

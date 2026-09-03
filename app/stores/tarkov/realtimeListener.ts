@@ -186,6 +186,7 @@ const releaseProgressChannel = (owned: OwnedRealtimeChannel): Promise<boolean> =
   channelRelease.hold(owned, removal);
   return channelRelease.release(owned.topic);
 };
+// fallow-ignore-next-line complexity -- same-topic joins must await a clean leave
 const prepareProgressTopic = async (
   currentUserId: string,
   generation: number
@@ -214,6 +215,7 @@ export function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promise<voi
   const generation = ++listenerGeneration;
   return runSetupRealtimeListener(tarkovStore, generation);
 }
+// fallow-ignore-next-line complexity -- coordinates cancellation, topic release, and join readiness
 async function runSetupRealtimeListener(
   tarkovStore: TarkovStoreLike,
   generation: number
