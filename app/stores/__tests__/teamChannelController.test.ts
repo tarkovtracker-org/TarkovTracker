@@ -39,11 +39,14 @@ const createHarness = (options: { removeStatus?: string | Promise<string> } = {}
     });
     return fake;
   };
-  const removeChannel = vi.fn((target: unknown) => {
+  const removeChannel = vi.fn(async (target: unknown) => {
+    const status = await (options.removeStatus ?? 'ok');
+    // Mirrors `RealtimeClient.removeChannel`: only an `ok` leave frees the topic.
+    if (status !== 'ok') return status;
     for (const [topic, fake] of open) {
       if (fake === target) open.delete(topic);
     }
-    return Promise.resolve(options.removeStatus ?? 'ok');
+    return status;
   });
   const client = {
     // Mirrors `RealtimeClient.channel()`: an open topic returns the live channel.
@@ -70,7 +73,16 @@ const createHarness = (options: { removeStatus?: string | Promise<string> } = {}
     getTeamId: () => state.teamId,
     refreshMembers,
   };
-  return { applyProgress, channels, client, deps, refreshMembers, removeChannel, state };
+  return {
+    applyProgress,
+    channels,
+    client,
+    deps,
+    isTopicOpen: (topic: string) => open.has(topic),
+    refreshMembers,
+    removeChannel,
+    state,
+  };
 };
 describe('createTeamChannelController', () => {
   beforeEach(() => {
@@ -195,7 +207,11 @@ describe('createTeamChannelController', () => {
     await controller.refresh();
     harness.state.members = [MEMBER_A, MEMBER_B, MEMBER_C];
     await controller.refresh();
-    // The topic may still be occupied, so no replacement channel is created.
+    // The topic is still occupied, so no replacement channel is created and the
+    // failed leave keeps declining it on later attempts.
+    expect(harness.channels).toHaveLength(1);
+    expect(harness.isTopicOpen('team:team-1')).toBe(true);
+    await controller.refresh();
     expect(harness.channels).toHaveLength(1);
     expect(loggerMock.warn).toHaveBeenCalledWith(
       '[TeamStore] Realtime channel did not leave cleanly:',

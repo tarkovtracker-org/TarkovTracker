@@ -51,6 +51,12 @@ const channelRelease = createChannelReleaseLatch();
 /** Tail of the serialized setup queue. */
 let setupQueue: Promise<void> = Promise.resolve();
 /**
+ * Bumped by every public teardown. Captured when a setup is queued so a teardown
+ * that happens while the setup waits in the queue cancels it, instead of the
+ * setup starting afterwards and recreating the channel.
+ */
+let teardownEpoch = 0;
+/**
  * Bumped by every setup and teardown so a setup suspended across an await cannot
  * create a channel after a later teardown or setup superseded it.
  */
@@ -200,7 +206,7 @@ const adoptProgressChannel = (owned: OwnedRealtimeChannel, generation: number): 
 const stillOwnsSetup = (currentUserId: string, generation: number): boolean =>
   generation === listenerGeneration && isStillSignedInAs(currentUserId);
 const prepareProgressTopic = async (currentUserId: string): Promise<number | null> => {
-  if (realtimeChannel) await cleanupRealtimeListener();
+  if (realtimeChannel) await teardownProgressChannel();
   const generation = ++listenerGeneration;
   if (!(await channelRelease.release(progressTopic(currentUserId)))) return null;
   return stillOwnsSetup(currentUserId, generation) ? generation : null;
@@ -213,7 +219,14 @@ const prepareProgressTopic = async (currentUserId: string): Promise<number | nul
  * rejecting the newest request. Queueing keeps exactly one setup in flight.
  */
 export function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promise<void> {
-  const run = setupQueue.catch(() => undefined).then(() => runSetupRealtimeListener(tarkovStore));
+  const queuedEpoch = teardownEpoch;
+  const run = setupQueue
+    .catch(() => undefined)
+    .then(() => {
+      // A teardown while this call waited in the queue cancels it.
+      if (queuedEpoch !== teardownEpoch) return;
+      return runSetupRealtimeListener(tarkovStore);
+    });
   setupQueue = run.catch(() => undefined);
   return run;
 }
@@ -343,7 +356,13 @@ async function runSetupRealtimeListener(tarkovStore: TarkovStoreLike): Promise<v
   // A teardown or newer setup during the awaits above wins; drop this channel.
   adoptProgressChannel({ channel, client, topic }, generation);
 }
-export async function cleanupRealtimeListener(): Promise<void> {
+/**
+ * Removes the channel and stops its timers without touching `teardownEpoch`.
+ *
+ * Setup uses this for its own replacement so it does not cancel other calls that
+ * are legitimately queued behind it.
+ */
+async function teardownProgressChannel(): Promise<void> {
   listenerGeneration += 1;
   if (realtimeChannel) {
     // Remove through the client that created the channel: `$supabase.client` is
@@ -362,4 +381,14 @@ export async function cleanupRealtimeListener(): Promise<void> {
     pausedSyncController.resume();
     pausedSyncController = null;
   }
+}
+/**
+ * Public teardown: removes the channel and cancels any setup still queued.
+ *
+ * Without bumping the epoch, a setup queued before this call would start
+ * afterwards and recreate the channel the caller just tore down.
+ */
+export async function cleanupRealtimeListener(): Promise<void> {
+  teardownEpoch += 1;
+  await teardownProgressChannel();
 }

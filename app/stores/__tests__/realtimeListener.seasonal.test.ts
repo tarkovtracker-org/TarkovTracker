@@ -4,16 +4,55 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultState, type UserState } from '@/stores/progressState';
 import { recordLocalSyncTime, resetSyncTimeline } from '@/stores/tarkov/syncTimeline';
 const showProgressMerged = vi.fn();
-const { channel, handlers, supabaseContext } = vi.hoisted(() => {
+type FakeChannel = {
+  topic: string;
+  subscribed: boolean;
+  on: ReturnType<typeof vi.fn>;
+  subscribe: ReturnType<typeof vi.fn>;
+};
+const { createdChannels, handlers, openTopics, supabaseContext } = vi.hoisted(() => {
   const handlers = new Map<string, (payload: { new: unknown }) => void>();
-  const removeChannel = vi.fn(async () => undefined);
-  const channel = {
-    on: vi.fn(),
-    subscribe: vi.fn(),
+  const createdChannels: FakeChannel[] = [];
+  const openTopics = new Map<string, FakeChannel>();
+  const makeChannel = (topic: string): FakeChannel => {
+    const fake: FakeChannel = {
+      on: vi.fn(),
+      subscribe: vi.fn(),
+      subscribed: false,
+      topic,
+    };
+    fake.on = vi.fn(
+      (_event: string, config: { table: string }, handler: (payload: { new: unknown }) => void) => {
+        handlers.set(config.table, handler);
+        return fake;
+      }
+    );
+    fake.subscribe = vi.fn(() => {
+      fake.subscribed = true;
+      return fake;
+    });
+    return fake;
   };
+  const removeChannel = vi.fn(async (target: unknown) => {
+    for (const [topic, fake] of openTopics) {
+      if (fake === target) {
+        fake.subscribed = false;
+        openTopics.delete(topic);
+      }
+    }
+    return undefined;
+  });
   const supabaseContext = {
     client: {
-      channel: vi.fn(() => channel),
+      // Mirrors `RealtimeClient.channel()`: an open topic returns the live channel.
+      channel: vi.fn((topic: string) => {
+        const existing = openTopics.get(topic);
+        if (existing) return existing;
+        const fake = makeChannel(topic);
+        createdChannels.push(fake);
+        openTopics.set(topic, fake);
+        return fake;
+      }),
       removeChannel,
     },
     user: {
@@ -21,7 +60,7 @@ const { channel, handlers, supabaseContext } = vi.hoisted(() => {
       loggedIn: true,
     },
   };
-  return { channel, handlers, removeChannel, supabaseContext };
+  return { createdChannels, handlers, openTopics, removeChannel, supabaseContext };
 });
 mockNuxtImport('useNuxtApp', () => () => ({
   $supabase: supabaseContext,
@@ -55,14 +94,9 @@ describe('seasonal progress realtime synchronization', () => {
   };
   beforeEach(() => {
     handlers.clear();
+    createdChannels.length = 0;
+    openTopics.clear();
     Object.assign(state, structuredClone(defaultState));
-    channel.on.mockImplementation(
-      (_event: string, config: { table: string }, handler: (payload: { new: unknown }) => void) => {
-        handlers.set(config.table, handler);
-        return channel;
-      }
-    );
-    channel.subscribe.mockImplementation(() => channel);
     supabaseContext.user.loggedIn = true;
   });
   afterEach(async () => {
@@ -86,9 +120,22 @@ describe('seasonal progress realtime synchronization', () => {
     await setupRealtimeListener(store);
     // Two concurrent setups must not interleave across the channel leave.
     await Promise.all([setupRealtimeListener(store), setupRealtimeListener(store)]);
-    expect(supabaseContext.client.channel).toHaveBeenCalledTimes(3);
-    expect(supabaseContext.client.removeChannel).toHaveBeenCalledTimes(2);
+    expect(createdChannels).toHaveLength(3);
+    // Each replacement got its own channel and only the last one is joined.
+    expect(createdChannels.filter(({ subscribed }) => subscribed)).toEqual([createdChannels[2]]);
+    expect(openTopics.size).toBe(1);
     expect(handlers.size).toBeGreaterThan(0);
+  });
+  it('cancels a queued setup when cleanup runs first', async () => {
+    const { cleanupRealtimeListener, setupRealtimeListener } =
+      await import('@/stores/tarkov/realtimeListener');
+    const first = setupRealtimeListener(store);
+    const queued = setupRealtimeListener(store);
+    // Teardown while the second setup is still queued must win.
+    const teardown = cleanupRealtimeListener();
+    await Promise.all([first, queued, teardown]);
+    expect(createdChannels.filter(({ subscribed }) => subscribed)).toEqual([]);
+    expect(openTopics.size).toBe(0);
   });
   it('applies only the active Seasonal row without changing persistent modes', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
