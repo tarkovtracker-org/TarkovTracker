@@ -1,3 +1,10 @@
+## [1.75.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.75.0...v1.75.1) (2026-09-03)
+
+
+### Bug Fixes
+
+* **ci:** deploy the version-bump commit so the footer shows the real version ([#796](https://github.com/tarkovtracker-org/TarkovTracker/issues/796)) ([d35d533](https://github.com/tarkovtracker-org/TarkovTracker/commit/d35d5334b8bb704329152278e3928616252fa1f7))
+
 # [1.75.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.74.1...v1.75.0) (2026-09-03)
 
 
