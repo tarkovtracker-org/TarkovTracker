@@ -954,8 +954,11 @@
         "show_map": "Zobrazit mapu",
         "hide_map": "Skrýt mapu",
         "fullscreen_label": "Celá obrazovka",
+        "required_items": "Požadované položky",
+        "required_keys": "Požadované klíče",
         "required_items_summary": "Požadované položky pro aktivní úkoly",
         "required_keys_summary": "Požadované klíče pro aktivní úkoly",
+        "active_tasks_group": "Aktivní úkoly",
         "time_period": {
           "dawn": "Úsvit",
           "day": "Den",
