@@ -954,8 +954,11 @@
         "show_map": "Показать карту",
         "hide_map": "Скрыть карту",
         "fullscreen_label": "Полный экран",
+        "required_items": "Обязательные элементы",
+        "required_keys": "Требуемые ключи",
         "required_items_summary": "Необходимые предметы для активных заданий",
         "required_keys_summary": "Необходимые ключи для активных заданий",
+        "active_tasks_group": "Активные задачи",
         "time_period": {
           "dawn": "Рассвет",
           "day": "День",
