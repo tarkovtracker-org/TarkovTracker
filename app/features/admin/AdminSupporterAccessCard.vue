@@ -39,7 +39,9 @@
       const sessionResp = await $supabase.client.auth.getSession();
       let token = sessionResp.data.session?.access_token ?? null;
       if (!token) {
-        const refreshed = await refreshSupabaseSession($supabase.client);
+        // A failed refresh means no usable token. Fall through to the
+        // authentication-required message instead of the generic failure.
+        const refreshed = await refreshSupabaseSession($supabase.client).catch(() => null);
         token = refreshed?.access_token ?? null;
       }
       if (!token) {

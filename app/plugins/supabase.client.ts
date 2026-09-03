@@ -264,6 +264,8 @@ export default defineNuxtPlugin({
       }
     };
     let removeChannelsPromise: Promise<void> | null = null;
+    /** Set while `signOut()` is responsible for removing channels. */
+    let signOutOwnsChannelTeardown = false;
     /**
      * Removes every Realtime channel, coalescing concurrent callers.
      *
@@ -290,6 +292,9 @@ export default defineNuxtPlugin({
     const handleAuthStateChange = (event: string, session: Session | null) => {
       hydrateFromSession(session);
       if (event !== 'SIGNED_OUT') return;
+      // `signOut()` tears channels down itself. Scheduling a second removal here
+      // could tear down channels recreated right after sign-out, so skip it.
+      if (signOutOwnsChannelTeardown) return;
       setTimeout(() => {
         void removeAllRealtimeChannels();
       }, 0);
@@ -316,7 +321,10 @@ export default defineNuxtPlugin({
       try {
         const sessionResult = await client.auth.getSession();
         if (sessionResult.error) {
+          // A failed read is not the same as "signed out"; hydrating null here
+          // would sign a valid user out of the UI.
           logger.warn('[Supabase] Initial session read returned an error', sessionResult.error);
+          return;
         }
         hydrateFromSession(sessionFromResult(sessionResult));
       } catch (error) {
@@ -347,9 +355,10 @@ export default defineNuxtPlugin({
         try {
           const sessionResult = await client.auth.getSession();
           if (sessionResult.error) {
-            // A failed read is not the same as "signed out"; log it so a broken
-            // refresh is not silently indistinguishable from a guest session.
+            // A failed read is not the same as "signed out". Keep the last known
+            // session instead of hydrating null and signing the user out.
             logger.warn('[Supabase] Ready session read returned an error', sessionResult.error);
+            return currentSession;
           }
           const session = sessionFromResult(sessionResult);
           hydrateFromSession(session);
@@ -429,9 +438,14 @@ export default defineNuxtPlugin({
         logger.debug('[Supabase] signOut skipped because client is not initialized');
         return;
       }
-      const { error } = await supabaseClient.auth.signOut();
-      if (error) throw error;
-      await removeAllRealtimeChannels();
+      signOutOwnsChannelTeardown = true;
+      try {
+        const { error } = await supabaseClient.auth.signOut();
+        if (error) throw error;
+        await removeAllRealtimeChannels();
+      } finally {
+        signOutOwnsChannelTeardown = false;
+      }
     };
     const api = reactive({
       client: stub.client,

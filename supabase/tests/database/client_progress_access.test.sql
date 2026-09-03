@@ -338,7 +338,7 @@ SELECT is(
   (
     SELECT COUNT(*)::INTEGER
     FROM public.mutation_rate_limits
-    WHERE scope = 'progress-sync'
+    WHERE scope = (SELECT rate_limit_scope FROM client_progress_realtime_fixture)
       AND subject = (SELECT viewer_id::TEXT FROM client_progress_fixture)
   ),
   1,
@@ -358,16 +358,15 @@ SELECT ok(
   'a realtime read policy authorizes joining the private team topic'
 );
 SELECT ok(
-  EXISTS (
+  NOT EXISTS (
     SELECT 1
     FROM pg_policies
     WHERE schemaname = (SELECT policy_schema FROM client_progress_realtime_fixture)
       AND tablename = (SELECT policy_table FROM client_progress_realtime_fixture)
-      AND policyname = 'Team members can send team broadcasts'
       AND cmd = (SELECT write_command FROM client_progress_realtime_fixture)
       AND (SELECT authenticated_role FROM client_progress_privilege_fixture) = ANY (roles)
   ),
-  'a realtime write policy exists for the private team topic'
+  'clients cannot publish broadcasts on the private team topic'
 );
 
 SET LOCAL ROLE authenticated;

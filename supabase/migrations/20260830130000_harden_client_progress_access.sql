@@ -120,6 +120,18 @@ BEGIN
     RAISE EXCEPTION 'p_modes exceeds the maximum payload size';
   END IF;
 
+  -- Validate every mode before spending rate-limit budget: a later RAISE would
+  -- roll the whole transaction back, refunding the consumed slot and leaving
+  -- malformed requests effectively unthrottled.
+  FOR v_mode, v_progress IN SELECT key, value FROM jsonb_each(p_modes) LOOP
+    IF v_mode NOT IN (v_pvp_mode, v_pve_mode, v_seasonal_mode) THEN
+      RAISE EXCEPTION 'Unsupported game mode: %', v_mode;
+    END IF;
+    IF jsonb_typeof(v_progress) <> 'object' THEN
+      RAISE EXCEPTION 'Progress for % must be a JSON object', v_mode;
+    END IF;
+  END LOOP;
+
   SELECT allowed
   INTO v_rate_allowed
   FROM public.consume_mutation_rate_limit('progress-sync', v_user_id::TEXT, 60, 60);
@@ -178,12 +190,6 @@ BEGIN
     pve_data = EXCLUDED.pve_data;
 
   FOR v_mode, v_progress IN SELECT key, value FROM jsonb_each(p_modes) LOOP
-    IF v_mode NOT IN (v_pvp_mode, v_pve_mode, v_seasonal_mode) THEN
-      RAISE EXCEPTION 'Unsupported game mode: %', v_mode;
-    END IF;
-    IF jsonb_typeof(v_progress) <> 'object' THEN
-      RAISE EXCEPTION 'Progress for % must be a JSON object', v_mode;
-    END IF;
     IF v_mode = v_seasonal_mode
       AND (p_seasonal_season_number IS NULL OR p_seasonal_season_number <> v_active_season) THEN
       -- A client sync always carries every mode in one payload. Skip stale

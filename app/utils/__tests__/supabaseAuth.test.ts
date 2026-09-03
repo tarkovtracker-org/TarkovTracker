@@ -32,4 +32,31 @@ describe('refreshSupabaseSession', () => {
     await expect(refreshSupabaseSession(client)).rejects.toBe(error);
     expect(mockLogger.warn).toHaveBeenCalledWith('[SupabaseAuth] Session refresh failed:', error);
   });
+  it('clears the coalescing cache after a failure so the next call retries', async () => {
+    const error = new Error('refresh failed');
+    const refreshSession = vi.fn().mockRejectedValue(error);
+    const client = { auth: { refreshSession } };
+    await expect(refreshSupabaseSession(client)).rejects.toBe(error);
+    await expect(refreshSupabaseSession(client)).rejects.toBe(error);
+    expect(refreshSession).toHaveBeenCalledTimes(2);
+  });
+  it('reports no session when the client cannot refresh', async () => {
+    // The offline fallback client exposes no auth methods.
+    await expect(refreshSupabaseSession({ auth: {} })).resolves.toBeNull();
+    expect(mockLogger.warn).not.toHaveBeenCalled();
+  });
+  it('calls refreshSession with the auth object as receiver', async () => {
+    const auth = {
+      marker: 'auth-object',
+      refreshSession: vi.fn(function (this: { marker?: string }) {
+        return Promise.resolve({
+          data: { session: { marker: this?.marker } as never, user: null },
+          error: null,
+        });
+      }),
+    };
+    await expect(refreshSupabaseSession({ auth } as never)).resolves.toEqual({
+      marker: 'auth-object',
+    });
+  });
 });

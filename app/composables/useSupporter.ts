@@ -1,6 +1,7 @@
 import { isSupporterActivityActive } from '@/features/supporter/supporterStatus';
 import { logger } from '@/utils/logger';
 import {
+  createChannelReleaseLatch,
   logChannelSubscribeFailure,
   removeOwnedChannel,
   type OwnedRealtimeChannel,
@@ -21,6 +22,7 @@ const supporterState = ref<SupporterStatus | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
 let channel: OwnedRealtimeChannel | null = null;
+const channelRelease = createChannelReleaseLatch();
 let channelUserId: string | null = null;
 let statusRequestVersion = 0;
 let subscriptionRequestVersion = 0;
@@ -100,13 +102,19 @@ export function useSupporter() {
     const previousChannel = channel;
     channel = null;
     channelUserId = null;
-    await removeOwnedChannel(previousChannel, 'Supporter');
+    if (previousChannel) {
+      channelRelease.hold(previousChannel, removeOwnedChannel(previousChannel, 'Supporter'));
+    }
+    const topic = `supporters:${userId}`;
+    // Resubscribing to the same user reuses the topic, so its leave has to finish
+    // first; an unclean leave declines the topic entirely.
+    if (!(await channelRelease.release(topic))) return;
     if (requestVersion !== subscriptionRequestVersion) return;
     if ($supabase.user?.loggedIn === false || $supabase.user?.id !== userId) return;
     if (channel || channelUserId) return;
     const client = $supabase.client;
     const nextChannel = client
-      .channel(`supporters:${userId}`)
+      .channel(topic)
       .on(
         'postgres_changes',
         {
@@ -124,7 +132,7 @@ export function useSupporter() {
       .subscribe((status, err) => {
         logChannelSubscribeFailure('Supporter', status, err, { userId });
       });
-    channel = { channel: nextChannel, client };
+    channel = { channel: nextChannel, client, topic };
     channelUserId = userId;
   }
   function unsubscribe() {
@@ -132,7 +140,9 @@ export function useSupporter() {
     const channelToRemove = channel;
     channel = null;
     channelUserId = null;
-    void removeOwnedChannel(channelToRemove, 'Supporter');
+    if (channelToRemove) {
+      channelRelease.hold(channelToRemove, removeOwnedChannel(channelToRemove, 'Supporter'));
+    }
   }
   function reset() {
     statusRequestVersion += 1;
@@ -169,7 +179,9 @@ export function useSupporter() {
       const sessionResp = await $supabase.client.auth.getSession();
       token = sessionResp.data.session?.access_token ?? null;
       if (!token) {
-        const refreshed = await refreshSupabaseSession($supabase.client);
+        // A failed refresh means no usable token; fall through to the
+        // sign-in message rather than surfacing a raw Supabase error.
+        const refreshed = await refreshSupabaseSession($supabase.client).catch(() => null);
         token = refreshed?.access_token ?? null;
       }
       if (!token) {

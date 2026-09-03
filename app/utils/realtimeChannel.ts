@@ -18,6 +18,8 @@ export type SupabaseRealtimeChannel = ReturnType<SupabaseClient['channel']>;
 export type OwnedRealtimeChannel = {
   channel: SupabaseRealtimeChannel;
   client: Pick<SupabaseClient, 'removeChannel'>;
+  /** Topic the channel was created with; leaves are tracked per topic. */
+  topic: string;
 };
 /**
  * Leaves a Realtime channel and waits for the leave to complete.
@@ -34,6 +36,37 @@ export type OwnedRealtimeChannel = {
  *   treating a rejoin as successful. `removeChannel` only tears the channel down
  *   on an `ok` leave, and an `error` reply never closes it.
  */
+/**
+ * Tracks an in-flight channel leave so the same topic is not rejoined early.
+ *
+ * `RealtimeClient` keys channels by topic, so only a rejoin of the leaving topic
+ * has to wait; joining a different topic proceeds immediately. A failed leave
+ * keeps the latch so later attempts still decline that topic rather than binding
+ * to one that is still occupied.
+ */
+export const createChannelReleaseLatch = () => {
+  type PendingLeave = { topic: string; removal: Promise<boolean> };
+  let pending: PendingLeave | null = null;
+  const held = (topic: string): PendingLeave | null => (pending?.topic === topic ? pending : null);
+  const clearIfCurrent = (leave: PendingLeave): void => {
+    if (pending === leave) pending = null;
+  };
+  return {
+    hold: (owned: OwnedRealtimeChannel, removal: Promise<boolean>): void => {
+      pending = { removal, topic: owned.topic };
+    },
+    /** Synchronous check so callers can skip an await when nothing is leaving. */
+    isHolding: (topic: string): boolean => held(topic) !== null,
+    /** @returns `true` when `topic` is free to join. */
+    release: async (topic: string): Promise<boolean> => {
+      const inFlight = held(topic);
+      if (!inFlight) return true;
+      const leftCleanly = await inFlight.removal;
+      if (leftCleanly) clearIfCurrent(inFlight);
+      return leftCleanly;
+    },
+  };
+};
 /** The offline stub resolves with no status; treat that as a clean leave. */
 const isCleanLeave = (status: string | undefined): boolean =>
   status === undefined || status === 'ok';

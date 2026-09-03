@@ -136,7 +136,8 @@ enforced when **Allow public access** is disabled under the project's Realtime s
 Supabase dashboard. The `realtime.messages` policies shipped by
 `20260830120000_secure_team_realtime_channels.sql` authorize the private `team:<id>` join, but with
 public access still enabled a client can join a same-named public topic. Row data stays protected by
-table RLS either way; disable the setting to close topic-level access.
+table RLS either way; disable the setting to close topic-level access. The migration deliberately
+leaves no client INSERT policy on `realtime.messages`, so no team member can publish broadcasts.
 
 The steps below are therefore mostly verification. The manual commands are a fallback for when an
 integration fails or is unavailable, not the normal path.

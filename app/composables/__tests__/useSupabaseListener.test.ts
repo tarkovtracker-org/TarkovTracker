@@ -3,12 +3,13 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Store } from 'pinia';
 const { channel, client, loggerMock, removeChannel } = vi.hoisted(() => {
-  const handlers: Array<(payload: unknown) => void> = [];
   const realtimeChannel = {
-    on: vi.fn((_event: string, _config: unknown, handler: (payload: unknown) => void) => {
-      handlers.push(handler);
-      return realtimeChannel;
-    }),
+    // Tests read the handler back from `on.mock.calls`, so keep the parameters
+    // typed rather than collapsing them away.
+    on: vi.fn(
+      (_event: string, _config: Record<string, unknown>, _handler: (payload: unknown) => void) =>
+        realtimeChannel
+    ),
     subscribe: vi.fn((callback: (status: string) => void) => {
       callback('SUBSCRIBED');
       return realtimeChannel;

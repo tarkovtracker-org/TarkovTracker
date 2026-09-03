@@ -2,6 +2,7 @@
 // Library imports
 import { logger } from '@/utils/logger';
 import {
+  createChannelReleaseLatch,
   logChannelSubscribeFailure,
   removeOwnedChannel,
   type OwnedRealtimeChannel,
@@ -92,8 +93,7 @@ export function useSupabaseListener<
   // `shallowRef`: a Realtime channel owns a socket, timers, and internal state
   // that must not be wrapped in a deep reactive proxy.
   const channel = shallowRef<OwnedRealtimeChannel | null>(null);
-  /** Removal of the previous channel, awaited before rejoining the same topic. */
-  let pendingChannelRemoval: Promise<boolean> | null = null;
+  const channelRelease = createChannelReleaseLatch();
   const isSubscribed = ref(false);
   const hasInitiallyLoaded = ref(false);
   const loadError = ref<PostgrestError | null>(null);
@@ -173,21 +173,7 @@ export function useSupabaseListener<
       }
     }
   };
-  /**
-   * Waits for a previous channel removal to settle.
-   *
-   * `RealtimeClient.channel()` returns the existing channel until its
-   * `phx_leave` settles, and `subscribe()` only rejoins a closed channel. Filter
-   * transitions such as A -> undefined -> A reuse the same topic, so the removal
-   * has to finish before rejoining.
-   */
-  const awaitPendingRemoval = async (): Promise<boolean> => {
-    const inFlightRemoval = pendingChannelRemoval;
-    if (!inFlightRemoval) return true;
-    const leftCleanly = await inFlightRemoval;
-    if (pendingChannelRemoval === inFlightRemoval) pendingChannelRemoval = null;
-    return leftCleanly;
-  };
+  const listenerTopic = (currentFilter: string) => `public:${table}:${currentFilter}`;
   const createSubscription = () => {
     const currentFilter = getFilterValue();
     if (channel.value) return;
@@ -195,7 +181,7 @@ export function useSupabaseListener<
     const subscriptionVersion = cleanupVersion;
     const client = $supabase.client;
     const nextChannel = client
-      .channel(`public:${table}:${currentFilter}`)
+      .channel(listenerTopic(currentFilter))
       .on(
         'postgres_changes',
         {
@@ -238,7 +224,7 @@ export function useSupabaseListener<
         isSubscribed.value = status === 'SUBSCRIBED';
         logChannelSubscribeFailure(storeIdForLogging, status, error, { table });
       });
-    channel.value = { channel: nextChannel, client };
+    channel.value = { channel: nextChannel, client, topic: listenerTopic(currentFilter) };
   };
   /**
    * Subscribes immediately unless a previous channel is still leaving.
@@ -247,15 +233,29 @@ export function useSupabaseListener<
    * as soon as the listener is created; the deferred branch only runs when the
    * same topic could still be occupied.
    */
+  /**
+   * Subscribes immediately unless a previous channel is still leaving.
+   *
+   * `RealtimeClient.channel()` returns the existing channel until its
+   * `phx_leave` settles and `subscribe()` only rejoins a closed channel, so
+   * filter transitions such as A -> undefined -> A must wait. Staying
+   * synchronous otherwise keeps the channel available as soon as the listener is
+   * created.
+   */
   const setupSubscription = (): void => {
-    if (!pendingChannelRemoval) {
+    const currentFilter = getFilterValue();
+    if (!currentFilter) return;
+    const topic = listenerTopic(currentFilter);
+    // Subscribe immediately unless this exact topic is still leaving, so the
+    // channel is available as soon as the listener is created.
+    if (!channelRelease.isHolding(topic)) {
       createSubscription();
       return;
     }
     const setupVersion = cleanupVersion;
-    void awaitPendingRemoval().then((leftCleanly) => {
-      // A failed leave leaves the topic occupied, so rejoining it would return a
-      // channel that never joins. Skip and let the next filter change retry.
+    void channelRelease.release(topic).then((leftCleanly) => {
+      // An unclean leave keeps the topic occupied, so rejoining would return a
+      // channel that never joins. The latch is retained for the next attempt.
       if (!leftCleanly || setupVersion !== cleanupVersion) return;
       createSubscription();
     });
@@ -273,7 +273,7 @@ export function useSupabaseListener<
     const channelToRemove = channel.value;
     channel.value = null;
     if (channelToRemove) {
-      pendingChannelRemoval = removeOwnedChannel(channelToRemove, storeIdForLogging);
+      channelRelease.hold(channelToRemove, removeOwnedChannel(channelToRemove, storeIdForLogging));
       isSubscribed.value = false;
       // Note: Don't reset hasInitiallyLoaded here - it should persist as long as store has data
       // This prevents showing loading spinner when navigating back to a page

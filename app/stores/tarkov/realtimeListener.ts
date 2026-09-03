@@ -18,6 +18,7 @@ import {
   sanitizeTarkovUid,
 } from '@/utils/progressSanitizers';
 import {
+  createChannelReleaseLatch,
   logChannelSubscribeFailure,
   removeOwnedChannel,
   type OwnedRealtimeChannel,
@@ -46,8 +47,12 @@ type LegacyProgressMetadata = {
 };
 let syncControllerGetter: SyncControllerGetter = () => null;
 let realtimeChannel: OwnedRealtimeChannel | null = null;
-/** Removal of the previous channel, awaited before rejoining the same topic. */
-let pendingChannelRemoval: Promise<boolean> | null = null;
+const channelRelease = createChannelReleaseLatch();
+/**
+ * Bumped by every setup and teardown so a setup suspended across an await cannot
+ * create a channel after a later teardown or setup superseded it.
+ */
+let listenerGeneration = 0;
 let syncResumeTimer: ReturnType<typeof setTimeout> | null = null;
 let pausedSyncController: SyncControllerHandle | null = null;
 export const registerSyncControllerGetter = (getter: SyncControllerGetter): void => {
@@ -175,12 +180,25 @@ const isStillSignedInAs = (currentUserId: string): boolean => {
  * previous leave has to finish first. An unclean leave keeps the topic occupied,
  * in which case rejoining would silently never join.
  */
-const prepareProgressTopic = async (currentUserId: string): Promise<boolean> => {
+const progressTopic = (userId: string) => `user_progress_${userId}`;
+/**
+ * Keeps the channel only if no teardown or newer setup superseded this one while
+ * it was building; otherwise leaves it again immediately.
+ */
+const adoptProgressChannel = (owned: OwnedRealtimeChannel, generation: number): void => {
+  if (generation !== listenerGeneration) {
+    channelRelease.hold(owned, removeOwnedChannel(owned, 'TarkovStore'));
+    return;
+  }
+  realtimeChannel = owned;
+};
+const prepareProgressTopic = async (
+  currentUserId: string,
+  generation: number
+): Promise<boolean> => {
   if (realtimeChannel) await cleanupRealtimeListener();
-  const removal = pendingChannelRemoval;
-  if (!removal) return true;
-  pendingChannelRemoval = null;
-  return (await removal) && isStillSignedInAs(currentUserId);
+  if (!(await channelRelease.release(progressTopic(currentUserId)))) return false;
+  return generation === listenerGeneration && isStillSignedInAs(currentUserId);
 };
 export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promise<void> {
   const { $supabase } = useNuxtApp();
@@ -188,7 +206,8 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
   const toastI18n = useToastI18n();
   const currentUserId = $supabase.user.id;
   if (!$supabase.user.loggedIn || !currentUserId) return;
-  if (!(await prepareProgressTopic(currentUserId))) return;
+  const generation = ++listenerGeneration;
+  if (!(await prepareProgressTopic(currentUserId, generation))) return;
   const latestModeUpdateTimes = new Map<GameMode, number>();
   const acceptModeUpdate = (mode: GameMode, updateTime: number): boolean => {
     const latestUpdateTime = latestModeUpdateTimes.get(mode);
@@ -265,8 +284,9 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
     notifyModeConflict(conflicts, apiUpdateHandled, updateTime, toastI18n);
   };
   const client = $supabase.client;
+  const topic = progressTopic(currentUserId);
   const channel = client
-    .channel(`user_progress_${currentUserId}`)
+    .channel(topic)
     .on(
       'postgres_changes' as const,
       {
@@ -303,16 +323,18 @@ export async function setupRealtimeListener(tarkovStore: TarkovStoreLike): Promi
         table: 'user_progress',
       });
     });
-  realtimeChannel = { channel, client };
+  // A teardown or newer setup during the awaits above wins; drop this channel.
+  adoptProgressChannel({ channel, client, topic }, generation);
 }
 export async function cleanupRealtimeListener(): Promise<void> {
+  listenerGeneration += 1;
   if (realtimeChannel) {
     // Remove through the client that created the channel: `$supabase.client` is
     // replaced once background initialization completes.
-    const removal = removeOwnedChannel(realtimeChannel, 'TarkovStore');
+    const owned = realtimeChannel;
     realtimeChannel = null;
-    pendingChannelRemoval = removal;
-    await removal;
+    channelRelease.hold(owned, removeOwnedChannel(owned, 'TarkovStore'));
+    await channelRelease.release(owned.topic);
     logger.debug('[TarkovStore] Cleaned up realtime listener');
   }
   if (syncResumeTimer) {

@@ -228,8 +228,9 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
     await refreshTeamMemberships(userId, sessionId);
     if (!isCurrentMembershipSession(sessionId, userId)) return;
     const client = $supabase.client;
+    const topic = `system-team-memberships-${userId}`;
     const channel = client
-      .channel(`system-team-memberships-${userId}`)
+      .channel(topic)
       .on(
         'postgres_changes',
         {
@@ -245,7 +246,7 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
           table: 'team_memberships',
         });
       });
-    membershipChannel.value = { channel, client };
+    membershipChannel.value = { channel, client, topic };
   };
   listenerScope.run(() => {
     watch(

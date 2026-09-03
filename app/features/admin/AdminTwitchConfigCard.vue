@@ -57,7 +57,9 @@
     const sessionResp = await $supabase.client.auth.getSession();
     const token = sessionResp.data.session?.access_token;
     if (token) return token;
-    const refreshed = await refreshSupabaseSession($supabase.client);
+    // A failed refresh means no usable token; report that rather than throwing a
+    // generic error past the caller's authentication-required handling.
+    const refreshed = await refreshSupabaseSession($supabase.client).catch(() => null);
     return refreshed?.access_token;
   };
   const errorMessage = (error: unknown): string => {

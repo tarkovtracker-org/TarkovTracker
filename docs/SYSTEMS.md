@@ -730,10 +730,11 @@ flowchart LR
   mutations of team, membership, legacy progress, and normalized progress tables are revoked.
   Teammate reads require a shared team in the same game mode; cross-mode teammates and outsiders
   cannot read a row.
-- The team channel is private. Realtime authorizes a private join from `realtime.messages` RLS, so
-  the read policy scoped to `team:<id>` for members of that team is what gates the join; a write
-  policy is kept alongside it, but the client no longer sends broadcasts. Full enforcement also
-  requires 'Allow public access' to be disabled in the project's Realtime settings — a dashboard
+- The team channel is private. Realtime authorizes a private join from `realtime.messages` RLS, and a
+  read permission alone is enough to join, so the only policy is a read policy scoped to `team:<id>`
+  for members of that team. No client write policy exists: the channel carries authoritative Postgres
+  Changes, so `authenticated` must not be able to publish payloads to other members. Full enforcement
+  also requires 'Allow public access' to be disabled in the project's Realtime settings — a dashboard
   setting no migration can apply.
 - The team channel carries teammate mode-progress changes for all authorized rows; the client does
   not create one Postgres Changes channel per teammate.

@@ -13,6 +13,7 @@ import { logger } from '@/utils/logger';
 import { hasMaterializedProgress, summarizeModeProgressData } from '@/utils/modeProgressFallback';
 import { sanitizeTeammateProgressData } from '@/utils/progressSanitizers';
 import {
+  createChannelReleaseLatch,
   logChannelSubscribeFailure,
   removeOwnedChannel,
   type OwnedRealtimeChannel,
@@ -254,8 +255,7 @@ const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelControll
   let joinedFilter: string | undefined;
   let errorCount = 0;
   let retryTimeout: ReturnType<typeof setTimeout> | null = null;
-  /** Leave of the previous channel; awaited before the same topic is rejoined. */
-  let pendingRemoval: Promise<boolean> | null = null;
+  const release = createChannelReleaseLatch();
   let disposed = false;
   const clearRetry = () => {
     if (retryTimeout === null) return;
@@ -270,9 +270,8 @@ const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelControll
     joinedFilter = undefined;
     errorCount = 0;
     if (!owned) return;
-    const removal = removeOwnedChannel(owned, 'TeamStore');
-    pendingRemoval = removal;
-    await removal;
+    release.hold(owned, removeOwnedChannel(owned, 'TeamStore'));
+    await release.release(owned.topic);
   };
   const scheduleRecovery = () => {
     const retryVersion = ++version;
@@ -333,9 +332,11 @@ const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelControll
         deps.applyProgress(payload.new as Record<string, unknown>);
       }
     );
+  const teamTopic = (teamId: string) => `team:${teamId}`;
   const buildChannel = (teamId: string, progressFilter: string | undefined) => {
     const client = deps.getClient();
-    let next = client.channel(`team:${teamId}`, { config: { private: true } }).on(
+    const topic = teamTopic(teamId);
+    let next = client.channel(topic, { config: { private: true } }).on(
       'postgres_changes',
       {
         event: '*',
@@ -346,28 +347,19 @@ const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelControll
       () => void refresh()
     );
     if (progressFilter) next = bindProgress(next, progressFilter);
-    const owned: OwnedRealtimeChannel = { channel: next, client };
+    const owned: OwnedRealtimeChannel = { channel: next, client, topic };
     channel.value = owned;
     next.subscribe((status, error) => handleStatus(owned, teamId, progressFilter, status, error));
-  };
-  /**
-   * Waits for the previous leave and reports whether the topic is free.
-   *
-   * `removeChannel` only tears the channel down on an `ok` leave, so an unclean
-   * leave keeps the topic occupied and any rejoin would silently never join.
-   */
-  const awaitTopicRelease = async (): Promise<boolean> => {
-    const removal = pendingRemoval;
-    if (!removal) return true;
-    pendingRemoval = null;
-    return await removal;
   };
   const canBuild = (setupVersion: number): boolean => !disposed && setupVersion === version;
   const setup = async (setupVersion: number): Promise<void> => {
     const teamId = deps.getTeamId();
     await cleanup();
-    const released = await awaitTopicRelease();
-    if (!released || !teamId) return;
+    if (!teamId) return;
+    // `removeChannel` only tears the channel down on an `ok` leave, so an
+    // unclean leave keeps `team:<id>` occupied and any rejoin would never join.
+    // The latch is shared, so an overlapping setup waits on the same leave.
+    if (!(await release.release(teamTopic(teamId)))) return;
     if (!canBuild(setupVersion)) return;
     buildChannel(teamId, buildMemberProgressFilter(deps.getMembers()));
   };
