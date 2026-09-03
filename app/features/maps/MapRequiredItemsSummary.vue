@@ -42,7 +42,6 @@
   const activeTasks = computed(() => props.tasks.filter((task) => !pinnedIds.value.has(task.id)));
   const isCategoryEnabled = (category: MapObjectiveCategory): boolean => {
     if (category === 'pinned') return preferencesStore.getMapShowPinnedObjectives;
-    if (category === 'team') return preferencesStore.getMapShowTeamObjectives;
     return preferencesStore.getMapShowSelfObjectives;
   };
   const isObjectiveVisible = (objective: TaskObjective, selfComplete: boolean): boolean => {
@@ -67,9 +66,7 @@
     () => preferencesStore.getMapShowPinnedObjectives && pinnedHasContent.value
   );
   const showActiveGroup = computed(
-    () =>
-      (preferencesStore.getMapShowSelfObjectives || preferencesStore.getMapShowTeamObjectives) &&
-      activeHasContent.value
+    () => preferencesStore.getMapShowSelfObjectives && activeHasContent.value
   );
   const pinnedAccent = computed(() => preferencesStore.getMapMarkerColors.PINNED_OBJECTIVE);
 </script>

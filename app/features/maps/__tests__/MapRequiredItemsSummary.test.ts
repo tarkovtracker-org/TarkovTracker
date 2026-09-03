@@ -195,7 +195,7 @@ describe('MapRequiredItemsSummary', () => {
   it('hides the active group when the regular chip is off', () => {
     mockPreferencesStore.getPinnedTaskIds = ['task-pinned'];
     mockPreferencesStore.getMapShowSelfObjectives = false;
-    mockPreferencesStore.getMapShowTeamObjectives = false;
+    mockPreferencesStore.getMapShowTeamObjectives = true;
     const wrapper = mountSummary([task, pinnedTask]);
     const groups = wrapper.findAll('[data-variant="equipment"]');
     expect(groups).toHaveLength(1);
@@ -211,7 +211,7 @@ describe('MapRequiredItemsSummary', () => {
     expect(wrapper.findAll('[data-variant]')).toHaveLength(0);
     expect(wrapper.text().trim()).toBe('');
   });
-  it('respects the team chip for team-only objectives', () => {
+  it('does not let the team chip change active required items', () => {
     const teamTask: Task = {
       id: 'team-task',
       objectives: [
@@ -230,7 +230,7 @@ describe('MapRequiredItemsSummary', () => {
     expect(equipmentIds(withTeam.get('[data-variant="equipment"]'))).toEqual(['item-team']);
     mockPreferencesStore.getMapShowTeamObjectives = false;
     const withoutTeam = mountSummary([teamTask], objectiveVisibility);
-    expect(withoutTeam.find('[data-variant="equipment"]').exists()).toBe(false);
+    expect(equipmentIds(withoutTeam.get('[data-variant="equipment"]'))).toEqual(['item-team']);
   });
   it('retains a teammate objective when self already completed it', () => {
     mockProgressStore.objectiveCompletions = { 'team-obj': { self: true } };
