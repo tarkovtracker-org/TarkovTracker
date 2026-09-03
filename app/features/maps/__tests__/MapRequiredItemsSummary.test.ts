@@ -144,6 +144,7 @@ describe('MapRequiredItemsSummary', () => {
     const wrapper = mountSummary([keyTask]);
     const keysSummary = wrapper.find('[data-variant="keys"]');
     expect(keysSummary.exists()).toBe(true);
+    expect(keysSummary.classes()).toContain('mt-0!');
     const keyGroups = JSON.parse(keysSummary.attributes('data-required-keys') ?? '[]') as Array<
       Array<{ id: string }>
     >;
@@ -169,6 +170,12 @@ describe('MapRequiredItemsSummary', () => {
     expect(equipmentIds(groups[1]!)).toEqual(['item-1']);
     expect(wrapper.text()).toContain('page.tasks.pinned_tasks_section');
     expect(wrapper.text()).toContain('page.tasks.map.active_tasks_group');
+    expect(wrapper.findAll('h3').map((heading) => heading.text())).toEqual(
+      expect.arrayContaining([
+        'page.tasks.map.required_items',
+        'page.tasks.map.required_items_summary',
+      ])
+    );
   });
   it('applies the custom pinned marker colour as the group accent', () => {
     mockPreferencesStore.getPinnedTaskIds = ['task-pinned'];

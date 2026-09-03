@@ -5,6 +5,7 @@
   >
     <MapRequiredItemsGroup
       v-if="showPinnedGroup"
+      scope="pinned"
       :title="$t('page.tasks.pinned_tasks_section')"
       :accent="pinnedAccent"
       :equipment="pinnedEquipment"
@@ -13,6 +14,7 @@
     />
     <MapRequiredItemsGroup
       v-if="showActiveGroup"
+      scope="active"
       :class="{ 'mt-6': showPinnedGroup }"
       :title="showPinnedGroup ? $t('page.tasks.map.active_tasks_group') : undefined"
       :equipment="activeEquipment"

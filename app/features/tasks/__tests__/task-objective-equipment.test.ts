@@ -103,6 +103,28 @@ describe('task-objective-equipment', () => {
     );
     expect(equipment).toEqual([item1]);
   });
+  it('includes the canonical item for bring-type objectives when items is absent', () => {
+    const item = createItem('canonical-item');
+    const equipment = getObjectiveEquipmentItems(
+      createObjective({
+        type: 'plantItem',
+        item,
+      }),
+      'bring'
+    );
+    expect(equipment).toEqual([item]);
+  });
+  it('excludes the canonical item for non-bring objectives in bring mode', () => {
+    const item = createItem('non-bring-item');
+    const equipment = getObjectiveEquipmentItems(
+      createObjective({
+        type: 'giveItem',
+        item,
+      }),
+      'bring'
+    );
+    expect(equipment).toEqual([]);
+  });
   it('excludes items for non-bring objectives when mode is set to "bring"', () => {
     const item2 = createItem('item-2');
     const equipment = getObjectiveEquipmentItems(

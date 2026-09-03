@@ -21,7 +21,13 @@
           <UIcon name="i-mdi-briefcase-variant-outline" class="text-primary-300 h-4 w-4" />
         </div>
         <h3 class="text-surface-100 truncate text-[15px] font-semibold">
-          {{ $t('page.tasks.map.required_items_summary') }}
+          {{
+            $t(
+              scope === 'pinned'
+                ? 'page.tasks.map.required_items'
+                : 'page.tasks.map.required_items_summary'
+            )
+          }}
         </h3>
       </div>
       <ObjectiveRequiredItems
@@ -39,10 +45,16 @@
           <UIcon name="i-mdi-key-variant" class="text-primary-300 h-4 w-4" />
         </div>
         <h3 class="text-surface-100 truncate text-[15px] font-semibold">
-          {{ $t('page.tasks.map.required_keys_summary') }}
+          {{
+            $t(
+              scope === 'pinned'
+                ? 'page.tasks.map.required_keys'
+                : 'page.tasks.map.required_keys_summary'
+            )
+          }}
         </h3>
       </div>
-      <ObjectiveRequiredItems variant="keys" :required-keys="keyGroups" />
+      <ObjectiveRequiredItems class="mt-0!" variant="keys" :required-keys="keyGroups" />
     </div>
   </div>
 </template>
@@ -50,6 +62,7 @@
   import ObjectiveRequiredItems from '@/features/tasks/ObjectiveRequiredItems.vue';
   import type { TarkovItem } from '@/types/tarkov';
   defineProps<{
+    scope: 'active' | 'pinned';
     title?: string;
     accent?: string;
     equipment: TarkovItem[];

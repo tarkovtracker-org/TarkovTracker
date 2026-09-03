@@ -9,6 +9,7 @@ export const getObjectiveEquipmentItems = (
     objective.type &&
     ['plantItem', 'plantQuestItem', 'place', 'useItem', 'sellItem'].includes(objective.type);
   if (objective.markerItem?.id) items.push(objective.markerItem);
+  if (objective.item?.id && (mode === 'all' || isBringType)) items.push(objective.item);
   if (objective.items?.length && (mode === 'all' || isBringType)) {
     const cap = objective.type === 'sellItem' ? MAX_RENDERED_OBJECTIVE_ITEMS : Infinity;
     items.push(...objective.items.slice(0, cap));

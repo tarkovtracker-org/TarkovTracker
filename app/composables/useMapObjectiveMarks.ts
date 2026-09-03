@@ -48,7 +48,7 @@ interface ObjectiveUsersOptions {
   tasksCompletions: BooleanProgressMap;
   tasksFailed: BooleanProgressMap;
 }
-const mapObjectiveCategory = (pinned: boolean, users: string[]): MapObjectiveCategory => {
+export const mapObjectiveCategory = (pinned: boolean, users: string[]): MapObjectiveCategory => {
   if (pinned) return 'pinned';
   if (users.includes('self')) return 'self';
   return 'team';
