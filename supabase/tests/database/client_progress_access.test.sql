@@ -52,7 +52,45 @@ INSERT INTO client_progress_privilege_fixture (
 )
 VALUES ('authenticated', 'anon', 'service_role', 'public.', 'EXECUTE', 'request.jwt.claim.sub');
 
-GRANT SELECT ON client_progress_fixture, client_progress_privilege_fixture TO authenticated;
+CREATE TEMP TABLE client_progress_realtime_fixture (
+  policy_schema TEXT NOT NULL,
+  policy_table TEXT NOT NULL,
+  read_command TEXT NOT NULL,
+  write_command TEXT NOT NULL,
+  topic_prefix TEXT NOT NULL,
+  seasonal_mode TEXT NOT NULL,
+  topic_setting TEXT NOT NULL,
+  rate_limit_scope TEXT NOT NULL,
+  update_command TEXT NOT NULL,
+  delete_command TEXT NOT NULL
+);
+INSERT INTO client_progress_realtime_fixture (
+  policy_schema,
+  policy_table,
+  read_command,
+  write_command,
+  topic_prefix,
+  seasonal_mode,
+  topic_setting,
+  rate_limit_scope,
+  update_command,
+  delete_command
+)
+VALUES (
+  'realtime',
+  'messages',
+  'SELECT',
+  'INSERT',
+  'team:',
+  'seasonal',
+  'realtime.topic',
+  'progress-sync',
+  'UPDATE',
+  'DELETE'
+);
+
+GRANT SELECT ON client_progress_fixture, client_progress_privilege_fixture,
+  client_progress_realtime_fixture TO authenticated;
 
 UPDATE public.user_progress
 SET
@@ -64,9 +102,7 @@ SELECT ok(
   (SELECT bool_and(
     NOT has_table_privilege(
       (SELECT authenticated_role FROM client_progress_privilege_fixture),
-      (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name,
-      'INSERT'
-    )
+      (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name,(SELECT write_command FROM client_progress_realtime_fixture))
   )
    FROM client_progress_protected_tables),
   'authenticated clients cannot insert directly into protected tables'
@@ -75,9 +111,7 @@ SELECT ok(
   (SELECT bool_and(
     NOT has_table_privilege(
       (SELECT authenticated_role FROM client_progress_privilege_fixture),
-      (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name,
-      'UPDATE'
-    )
+      (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name,(SELECT update_command FROM client_progress_realtime_fixture))
   )
    FROM client_progress_protected_tables),
   'authenticated clients cannot update directly protected tables'
@@ -86,9 +120,7 @@ SELECT ok(
   (SELECT bool_and(
     NOT has_table_privilege(
       (SELECT authenticated_role FROM client_progress_privilege_fixture),
-      (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name,
-      'DELETE'
-    )
+      (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name,(SELECT delete_command FROM client_progress_realtime_fixture))
   )
    FROM client_progress_protected_tables),
   'authenticated clients cannot delete directly from protected tables'
@@ -97,19 +129,17 @@ SELECT ok(
   (SELECT bool_and(
     has_table_privilege(
       (SELECT authenticated_role FROM client_progress_privilege_fixture),
-      (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name,
-      'SELECT'
-    )
+      (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name,(SELECT read_command FROM client_progress_realtime_fixture))
   )
    FROM client_progress_protected_tables),
   'authenticated clients retain required read access'
 );
 SELECT ok(
   (SELECT bool_and(
-    has_table_privilege((SELECT role_name FROM client_progress_privilege_fixture), (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name, 'SELECT')
-    AND has_table_privilege((SELECT role_name FROM client_progress_privilege_fixture), (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name, 'INSERT')
-    AND has_table_privilege((SELECT role_name FROM client_progress_privilege_fixture), (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name, 'UPDATE')
-    AND has_table_privilege((SELECT role_name FROM client_progress_privilege_fixture), (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name, 'DELETE')
+    has_table_privilege((SELECT role_name FROM client_progress_privilege_fixture), (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name,(SELECT read_command FROM client_progress_realtime_fixture))
+    AND has_table_privilege((SELECT role_name FROM client_progress_privilege_fixture), (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name,(SELECT write_command FROM client_progress_realtime_fixture))
+    AND has_table_privilege((SELECT role_name FROM client_progress_privilege_fixture), (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name,(SELECT update_command FROM client_progress_realtime_fixture))
+    AND has_table_privilege((SELECT role_name FROM client_progress_privilege_fixture), (SELECT table_prefix FROM client_progress_privilege_fixture) || table_name,(SELECT delete_command FROM client_progress_realtime_fixture))
   ) FROM client_progress_protected_tables),
   'service-role workflows retain table access'
 );
@@ -239,7 +269,7 @@ SELECT is(
     SELECT COUNT(*)::INTEGER
     FROM public.user_game_mode_progress
     WHERE user_id = (SELECT viewer_id FROM client_progress_fixture)
-      AND game_mode = 'seasonal'
+      AND game_mode = (SELECT seasonal_mode FROM client_progress_realtime_fixture)
   ),
   0,
   'a stale seasonal season number never writes a seasonal row'
@@ -259,7 +289,7 @@ SELECT is(
     SELECT COUNT(*)::INTEGER
     FROM public.user_game_mode_progress
     WHERE user_id = (SELECT viewer_id FROM client_progress_fixture)
-      AND game_mode = 'seasonal'
+      AND game_mode = (SELECT seasonal_mode FROM client_progress_realtime_fixture)
   ),
   0,
   'a missing seasonal season number never writes a seasonal row'
@@ -283,7 +313,7 @@ RESET ROLE;
 -- many syncs the preceding tests performed.
 INSERT INTO public.mutation_rate_limits (scope, subject, count, reset_at)
 VALUES (
-  'progress-sync',
+  (SELECT rate_limit_scope FROM client_progress_realtime_fixture),
   (SELECT viewer_id::TEXT FROM client_progress_fixture),
   60,
   NOW() + INTERVAL '1 minute'
@@ -319,11 +349,11 @@ SELECT ok(
   EXISTS (
     SELECT 1
     FROM pg_policies
-    WHERE schemaname = 'realtime'
-      AND tablename = 'messages'
+    WHERE schemaname = (SELECT policy_schema FROM client_progress_realtime_fixture)
+      AND tablename = (SELECT policy_table FROM client_progress_realtime_fixture)
       AND policyname = 'Team members can receive team broadcasts'
-      AND cmd = 'SELECT'
-      AND 'authenticated' = ANY (roles)
+      AND cmd = (SELECT read_command FROM client_progress_realtime_fixture)
+      AND (SELECT authenticated_role FROM client_progress_privilege_fixture) = ANY (roles)
   ),
   'a realtime read policy authorizes joining the private team topic'
 );
@@ -331,11 +361,11 @@ SELECT ok(
   EXISTS (
     SELECT 1
     FROM pg_policies
-    WHERE schemaname = 'realtime'
-      AND tablename = 'messages'
+    WHERE schemaname = (SELECT policy_schema FROM client_progress_realtime_fixture)
+      AND tablename = (SELECT policy_table FROM client_progress_realtime_fixture)
       AND policyname = 'Team members can send team broadcasts'
-      AND cmd = 'INSERT'
-      AND 'authenticated' = ANY (roles)
+      AND cmd = (SELECT write_command FROM client_progress_realtime_fixture)
+      AND (SELECT authenticated_role FROM client_progress_privilege_fixture) = ANY (roles)
   ),
   'a realtime write policy exists for the private team topic'
 );
@@ -347,8 +377,12 @@ SELECT set_config(
   TRUE
 );
 SELECT set_config(
-  'realtime.topic',
-  (SELECT concat('team:', team_id::TEXT) FROM client_progress_fixture),
+  (SELECT topic_setting FROM client_progress_realtime_fixture),
+  (
+    SELECT concat(prefix.topic_prefix, fixture.team_id::TEXT)
+    FROM client_progress_fixture AS fixture
+    CROSS JOIN client_progress_realtime_fixture AS prefix
+  ),
   TRUE
 );
 SELECT ok(
@@ -356,7 +390,10 @@ SELECT ok(
     SELECT 1
     FROM public.team_memberships membership
     WHERE membership.user_id = (SELECT auth.uid())
-      AND concat('team:', membership.team_id::text) = (SELECT realtime.topic())
+      AND concat(
+        (SELECT topic_prefix FROM client_progress_realtime_fixture),
+        membership.team_id::text
+      ) = (SELECT realtime.topic())
   ),
   'a team member satisfies the realtime team topic predicate'
 );
@@ -370,7 +407,10 @@ SELECT ok(
     SELECT 1
     FROM public.team_memberships membership
     WHERE membership.user_id = (SELECT auth.uid())
-      AND concat('team:', membership.team_id::text) = (SELECT realtime.topic())
+      AND concat(
+        (SELECT topic_prefix FROM client_progress_realtime_fixture),
+        membership.team_id::text
+      ) = (SELECT realtime.topic())
   ),
   'a user outside the team fails the realtime team topic predicate'
 );

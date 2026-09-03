@@ -36,19 +36,27 @@ CREATE OR REPLACE FUNCTION public.get_teammate_legacy_progress(
   p_game_mode TEXT
 )
 RETURNS JSONB
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
+DECLARE
+  v_pvp_mode CONSTANT TEXT := 'pvp';
+  v_pve_mode CONSTANT TEXT := 'pve';
+  v_progress JSONB;
+BEGIN
+  -- Only the persistent legacy columns exist; Seasonal has no legacy blob.
+  IF p_game_mode IS NULL OR p_game_mode NOT IN (v_pvp_mode, v_pve_mode) THEN
+    RETURN NULL;
+  END IF;
   SELECT CASE p_game_mode
-    WHEN 'pvp' THEN progress.pvp_data
-    WHEN 'pve' THEN progress.pve_data
-    ELSE NULL
+    WHEN v_pvp_mode THEN progress.pvp_data
+    WHEN v_pve_mode THEN progress.pve_data
   END
+  INTO v_progress
   FROM public.user_progress AS progress
   WHERE progress.user_id = p_user_id
-    AND p_game_mode IN ('pvp', 'pve')
     AND (
       progress.user_id = (SELECT auth.uid())
       OR EXISTS (
@@ -63,6 +71,8 @@ AS $$
       )
     )
   LIMIT 1;
+  RETURN v_progress;
+END;
 $$;
 
 REVOKE ALL ON FUNCTION public.get_teammate_legacy_progress(UUID, TEXT)
@@ -85,18 +95,22 @@ AS $$
 DECLARE
   v_user_id UUID := (SELECT auth.uid());
   v_mode TEXT;
+  v_pvp_mode CONSTANT TEXT := 'pvp';
+  v_pve_mode CONSTANT TEXT := 'pve';
   v_seasonal_mode CONSTANT TEXT := 'seasonal';
+  v_empty_object CONSTANT JSONB := '{}'::jsonb;
   v_progress JSONB;
   v_season_number SMALLINT;
   v_active_season SMALLINT := private.active_season_number();
-  v_existing_pvp JSONB := '{}'::jsonb;
-  v_existing_pve JSONB := '{}'::jsonb;
+  v_existing_pvp JSONB := v_empty_object;
+  v_existing_pve JSONB := v_empty_object;
   v_rate_allowed BOOLEAN;
 BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
   END IF;
-  IF p_current_game_mode IS NULL OR p_current_game_mode NOT IN ('pvp', 'pve', v_seasonal_mode) THEN
+  IF p_current_game_mode IS NULL
+    OR p_current_game_mode NOT IN (v_pvp_mode, v_pve_mode, v_seasonal_mode) THEN
     RAISE EXCEPTION 'Unsupported game mode';
   END IF;
   IF p_modes IS NULL OR jsonb_typeof(p_modes) <> 'object' THEN
@@ -126,14 +140,14 @@ BEGIN
     p_current_game_mode,
     COALESCE(p_game_edition, 1),
     p_tarkov_uid,
-    public.sanitize_user_progress_mode_data(COALESCE(p_modes->'pvp', '{}'::jsonb)),
-    public.sanitize_user_progress_mode_data(COALESCE(p_modes->'pve', '{}'::jsonb))
+    public.sanitize_user_progress_mode_data(COALESCE(p_modes->v_pvp_mode, v_empty_object)),
+    public.sanitize_user_progress_mode_data(COALESCE(p_modes->v_pve_mode, v_empty_object))
   )
   ON CONFLICT (user_id) DO NOTHING;
 
   SELECT
-    COALESCE(pvp_data, '{}'::jsonb),
-    COALESCE(pve_data, '{}'::jsonb)
+    COALESCE(pvp_data, v_empty_object),
+    COALESCE(pve_data, v_empty_object)
   INTO v_existing_pvp, v_existing_pve
   FROM public.user_progress
   WHERE user_id = v_user_id
@@ -152,8 +166,8 @@ BEGIN
     p_current_game_mode,
     COALESCE(p_game_edition, 1),
     p_tarkov_uid,
-    public.sanitize_user_progress_mode_data(COALESCE(p_modes->'pvp', v_existing_pvp)),
-    public.sanitize_user_progress_mode_data(COALESCE(p_modes->'pve', v_existing_pve))
+    public.sanitize_user_progress_mode_data(COALESCE(p_modes->v_pvp_mode, v_existing_pvp)),
+    public.sanitize_user_progress_mode_data(COALESCE(p_modes->v_pve_mode, v_existing_pve))
   )
   ON CONFLICT (user_id) DO UPDATE
   SET
@@ -164,7 +178,7 @@ BEGIN
     pve_data = EXCLUDED.pve_data;
 
   FOR v_mode, v_progress IN SELECT key, value FROM jsonb_each(p_modes) LOOP
-    IF v_mode NOT IN ('pvp', 'pve', v_seasonal_mode) THEN
+    IF v_mode NOT IN (v_pvp_mode, v_pve_mode, v_seasonal_mode) THEN
       RAISE EXCEPTION 'Unsupported game mode: %', v_mode;
     END IF;
     IF jsonb_typeof(v_progress) <> 'object' THEN

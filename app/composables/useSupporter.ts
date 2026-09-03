@@ -93,9 +93,6 @@ export function useSupporter() {
       }
     }
   }
-  async function removeRealtimeChannel(channelToRemove: OwnedRealtimeChannel | null) {
-    await removeOwnedChannel(channelToRemove, 'Supporter');
-  }
   async function subscribe(userId: string) {
     if (!$supabase || !userId) return;
     if (channel && channelUserId === userId) return;
@@ -103,7 +100,7 @@ export function useSupporter() {
     const previousChannel = channel;
     channel = null;
     channelUserId = null;
-    await removeRealtimeChannel(previousChannel);
+    await removeOwnedChannel(previousChannel, 'Supporter');
     if (requestVersion !== subscriptionRequestVersion) return;
     if ($supabase.user?.loggedIn === false || $supabase.user?.id !== userId) return;
     if (channel || channelUserId) return;
@@ -135,7 +132,7 @@ export function useSupporter() {
     const channelToRemove = channel;
     channel = null;
     channelUserId = null;
-    void removeRealtimeChannel(channelToRemove);
+    void removeOwnedChannel(channelToRemove, 'Supporter');
   }
   function reset() {
     statusRequestVersion += 1;
