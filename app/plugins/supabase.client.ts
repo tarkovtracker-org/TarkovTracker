@@ -254,8 +254,8 @@ export default defineNuxtPlugin({
     let readySessionPromise: Promise<Session | null> | null = null;
     let supabaseClient: SupabaseClient | null = null;
     let currentSession: Session | null = null;
-    // Bumped by `signOut()` so a slow initial-session read that resolves after
-    // sign-out cannot re-hydrate the pre-sign-out session and re-log-in the UI.
+    // Bumped on every SIGNED_OUT event so a slow session read that resolves
+    // after sign-out cannot re-hydrate the pre-sign-out session.
     let authInvalidationToken = 0;
     let oauthCallbackCode = readOAuthCallbackCode();
     const hasCodeQueryParam = currentSearchParams().has('code');
@@ -302,6 +302,12 @@ export default defineNuxtPlugin({
       }
     };
     const handleAuthStateChange = (event: string, session: Session | null) => {
+      if (event === 'SIGNED_OUT') {
+        // Invalidate any session read already in flight so a late resolution
+        // cannot re-hydrate the signed-out session. Covers explicit sign-out and
+        // externally delivered events (expiry, other tabs, server revocation).
+        authInvalidationToken += 1;
+      }
       hydrateFromSession(session);
       if (event !== 'SIGNED_OUT') return;
       // `signOut()` tears channels down itself. Scheduling a second removal here
@@ -479,9 +485,6 @@ export default defineNuxtPlugin({
         return;
       }
       signOutOwnsChannelTeardown = true;
-      // Invalidate any session read already in flight so a late resolution
-      // cannot re-hydrate the session we are signing out of.
-      authInvalidationToken += 1;
       try {
         const { error } = await supabaseClient.auth.signOut();
         if (error) throw error;

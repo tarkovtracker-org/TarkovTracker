@@ -242,6 +242,48 @@ describe('supabase plugin', () => {
       vi.useRealTimers();
     }
   });
+  it('discards a late read after an externally delivered SIGNED_OUT event', async () => {
+    vi.useFakeTimers();
+    try {
+      const sessionDeferred = createDeferred<{
+        data: { session: ReturnType<typeof createSession> };
+        error: null;
+      }>();
+      const authStateChangeCallbacks: MockAuthStateChangeCallback[] = [];
+      const captureAuthStateChange = (callback: MockAuthStateChangeCallback) => {
+        authStateChangeCallbacks.push(callback);
+        return stubAuthSubscription();
+      };
+      const removeAllChannels = vi.fn().mockResolvedValue([]);
+      mockCreateClient.mockReturnValue({
+        removeAllChannels,
+        auth: {
+          getSession: vi.fn(() => sessionDeferred.promise),
+          onAuthStateChange: vi.fn(captureAuthStateChange),
+          signInWithOAuth: vi.fn(),
+          signOut: vi.fn().mockResolvedValue({ error: null }),
+        },
+      });
+      const plugin = (await import('@/plugins/supabase.client')).default;
+      const setupPromise = plugin.setup?.(
+        {} as Parameters<NonNullable<typeof plugin.setup>>[0]
+      ) as Promise<SupabasePluginProvide | undefined>;
+      await flushPlugin();
+      await vi.advanceTimersByTimeAsync(8000);
+      const result = await setupPromise;
+      const supabase = result?.provide.supabase;
+      expect(supabase?.user.loggedIn).toBe(false);
+      // An externally delivered sign-out (expiry, another tab, revocation)
+      // arrives while the initial read is still pending. signOut() is not called.
+      authStateChangeCallbacks.forEach((callback) => callback('SIGNED_OUT', null));
+      sessionDeferred.resolve({ data: { session: createSession('user-1') }, error: null });
+      await flushPlugin();
+      expect(supabase?.user.loggedIn).toBe(false);
+      expect(supabase?.user.id).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('exchanges an oauth callback code when ready is called', async () => {
     localStorage.removeItem('sb-test-auth-token');
     window.history.replaceState(null, '', '/');
