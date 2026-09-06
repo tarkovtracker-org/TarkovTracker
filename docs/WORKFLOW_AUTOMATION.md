@@ -49,16 +49,73 @@ Only substantial behavioral corrections or unresolved significant findings warra
 
 ### 1. CI Pipeline (`.github/workflows/ci.yml`)
 
-Runs on every push and PR:
+Runs on pushes to `main`, `develop`, and `wip/**`, and PRs targeting `main` or `develop`,
+including translation-only PRs. All eligible push runs retain full validation.
 
-**Jobs:**
+The lightweight `changes` job emits proposed and effective selections. **Shadow rollout is enabled**:
+the effective selection runs every existing CI job. `CI Result` always evaluates the job outcomes and
+fails on missing classifier data, selected failures/cancellations, or unexpected skips. Systems drift
+runs independently on every CI run. Existing check names, Dependabot expectations, fork restrictions,
+security checks, and Codecov statuses remain unchanged; the aggregate does not replace external gates.
 
-- `validate` - Lint, type checking, format check, tests, production build (sequential steps)
-- `workers` - Cloudflare Worker generated-type drift check, typecheck, OpenAPI validation,
-  deployment dry-run, and API gateway tests (Node unit tests plus a workerd smoke using the
-  production Wrangler configuration)
+The shared setup action uses `.nvmrc`, the full `packageManager` pin, pnpm caching, and a frozen
+installation. Each caller owns checkout history and credential settings. `Lint & Format` runs lint
+and Prettier once each (lint already includes blank-line validation), plus i18n and workflow fixtures.
+The four Vitest shards, dedicated Deno tests, Supabase validation, Worker validation, and production
+build retain their existing commands and environment behavior. Tests in `scripts/ci-tests/` use
+Node's built-in runner via `pnpm run test:workflow`; their filenames deliberately avoid Vitest discovery.
 
-**Triggers:** Push to `main`, `develop`, `wip/**` branches and all PRs
+#### Local validation selection
+
+```bash
+pnpm run validate:changes --base origin/main --explain
+pnpm run validate:changes --base origin/main
+pnpm run validate:changes --mode ci --base <base-sha> --head <head-sha> --explain
+pnpm run validate:changes --mode full --base origin/main
+```
+
+Local mode combines the merge-base diff with staged, unstaged, and untracked paths. Explicit CI
+mode reads only the revision diff; full mode forces full selection. Explanation mode executes no
+checks. Local mode runs lint, formatting, typecheck, workflow fixtures, unit tests, i18n, and systems
+drift for executable changes; apply path-specific `AGENTS.md` checks as well. CI/full execution adds
+Fallow, build, database and Worker checks, and Deno tests, requiring their usual runtimes and build
+environment. CI itself retains sharding, secrets/fork rules, and report uploads in workflow jobs.
+Link validation remains in the existing Link Check workflow for applicable documentation paths.
+
+The proposed reduced selection covers only root `.md` files, Markdown under `docs/` and `.github/`,
+and `app/locales/*.json`. `DESIGN.md`, generated code, scripts, dependencies, configuration, public
+assets, and unknown paths select full validation. Renames include both paths and deletions remain
+visible. Empty diffs, missing refs, malformed arguments, and Git errors conservatively select full
+validation. Non-English formatting exclusions and Crowdin ownership remain intact.
+
+#### CI rollout and measurements
+
+1. Merge policy/setup, then the shadow classifier and aggregate. Capture a successful and failing
+   executable PR, a documentation-only PR, a translation-only PR, and a mixed PR. Confirm the proposed
+   selections and aggregate conclusions, including the existing Dependabot and coverage behavior.
+2. Only after that evidence, remove `--shadow` from the classifier invocation in a follow-up change.
+   Retain `--full` for push events. Check required-check settings before enabling skips; do not change
+   those settings in this rollout. Roll back selection by restoring `--shadow`.
+3. Merge release deduplication separately only after successful and failing aggregate runs have been
+   demonstrated. Do not treat local fixtures as evidence of GitHub App or branch-protection behavior.
+
+The initial observations are recorded in [the baseline report](ci-turnaround-baseline.md).
+The read-only `scripts/workflow-metrics.mjs` collector samples the preceding 20 merged PRs and emits
+per-PR CI and release timings as JSON. Run it with authenticated `gh` and save stdout to a report:
+
+```bash
+node scripts/workflow-metrics.mjs --before <rollout-ISO-time>
+node scripts/workflow-metrics.mjs --after <rollout-ISO-time> --count 20
+```
+
+The follow-up selects the first 20 merges after the boundary; record the actual rollout timestamp.
+Compare categories separately (documentation, translations, mixed documentation/translations,
+executable). Runner minutes sum job durations across attempts, not billed rounding. Workflow duration
+uses completion metadata as a proxy. Historical PR association can be inferred from repository,
+branch, and PR lifetime when GitHub omits the association; the report labels that limitation.
+Correction-push counts, review-to-correction delay, and agent usage remain null without retained
+telemetry rather than being inferred from commit counts. A 30% reduction is a measured objective,
+not an acceptance gate. Test-project changes, finer subsystem selection, and code cleanup are deferred.
 
 #### Fallow changed-file gate
 
@@ -90,7 +147,7 @@ Weekly security audits:
 
 **Jobs:**
 
-- `security-scan` - pnpm audit (prod and all deps), outdated check, checksum-verified Gitleaks secret detection
+- `security-scan` - pnpm audit (prod and all deps), schedule-only informational outdated check, checksum-verified Gitleaks secret detection
 - `codeql` - CodeQL static analysis
 
 **Triggers:** Push to main/develop, all PRs, weekly (Sunday 00:00 UTC)

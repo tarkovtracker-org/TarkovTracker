@@ -7,10 +7,12 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 ### CI (`ci.yml`)
 
 **Trigger:** Push to main/develop/wip branches, PRs
-**Concurrency:** Outdated runs are automatically cancelled for the same PR or branch.
+**Concurrency:** Outdated PR/non-main runs are cancelled; active main runs finish to protect publication.
 **Jobs:**
 
-- `Lint & Format` — ESLint + Prettier checks
+- `Validation plan` — proposed scope plus full effective scope during shadow rollout
+- `CI Result` — strict aggregate of selected jobs; missing data or unexpected skips fail
+- `Lint & Format` — ESLint + Prettier, i18n, and Node workflow fixtures
 - `Fallow audit` — changed-file dead code, duplication, and complexity gate
 - `Type Check` — `vue-tsc` / Nuxt type checking
 - `Test (shard 1/4)` … `Test (shard 4/4)` — Vitest with coverage, sharded across 4 parallel jobs. The `github-actions` reporter annotates failed tests directly on the PR diff so the failing test name and assertion are visible without digging into logs. Shards report imported files only to avoid duplicate zero-filled entries, and Codecov merges the per-shard coverage. Unsharded local coverage retains the full `app/**/*.{ts,vue}` denominator.
@@ -20,7 +22,8 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 - `Workers` — Validate api-gateway (generated types, typecheck, OpenAPI, deployment dry-run, Node
   unit tests, and a workerd smoke using the production Wrangler configuration)
 
-All jobs run in parallel; the `Workers` job no longer waits for `Validate` to finish.
+Heavy jobs run in parallel after classification; systems drift runs independently.
+Lighthouse scope detection runs independently of PR metadata installation and commitlint.
 
 ### Crowdin Sync (`crowdin.yml`)
 
@@ -55,10 +58,10 @@ for this workflow: the upstream Action prints its environment in debug mode.
 
 ### Crowdin locale PRs
 
-PRs whose changes are limited to the non-English locale exports in `app/locales/` do not trigger
-`CI`, `PR Checks`, `Security`, or `Dependabot Auto Merge`. This prevents each burst of Crowdin
-synchronization commits from starting redundant repository-owned jobs. Changes to source code,
-workflow files, or `app/locales/en.json` still run the normal checks.
+`CI`, `PR Checks`, and `Security` report for translation-only PRs. During shadow rollout they retain
+full validation. The proposed classifier selects formatting, i18n, and systems drift for locales;
+only a verified follow-up change enables expensive-check skips. Non-English locale formatting
+exclusions remain intact. See the rollout checklist in `docs/WORKFLOW_AUTOMATION.md`.
 
 ### Security (`security.yml`)
 
@@ -73,7 +76,7 @@ workflow files, or `app/locales/en.json` still run the normal checks.
 ### PR Checks (`pr-checks.yml`)
 
 **Trigger:** PR opened/updated/reopened
-**Jobs:** `PR Meta` (labels, size, commit validation, Lighthouse gating), `Lighthouse` (conditional on UI file changes, Lighthouse configuration/workflow changes, or `ui`/`performance` labels)
+**Jobs:** `PR Meta` (labels, size, commit validation), `Lighthouse scope` (lightweight detection), `Lighthouse` (conditional on UI file changes, Lighthouse configuration/workflow changes, or `ui`/`performance` labels)
 **Lighthouse server:** Builds the Cloudflare Pages app and serves it with `wrangler pages dev`
 so `/api/*` routes are available during audits. The build sets
 `NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED=false` so audits measure the app itself rather than the
@@ -106,15 +109,11 @@ introduce a new pinned SHA.
 **Trigger:** Daily schedule
 **Jobs:** Mark inactive issues/PRs stale, then close stale items unless labeled `never-stale`
 
-## Check Count
+## Merge checks
 
-| Context       | Checks                                                                                                                                                           |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PR            | ~15 (Fallow audit, Lint & Format, Type Check, Test ×4 shards, Validate, Supabase DB, Systems drift check, Workers, PR Meta, Security Scan, CodeQL, Lighthouse\*) |
-| Dependabot PR | ~16 (standard PR checks plus Dependabot Auto Merge when allowlisted)                                                                                             |
-| Main push     | ~14 (Fallow audit, Lint & Format, Type Check, Test ×4 shards, Validate, Supabase DB, Systems drift check, Workers, Security Scan, CodeQL, Release)               |
-
-\*Lighthouse runs only when the PR touches UI paths or already carries `performance`/`ui`
+Existing check names and Dependabot's expected-check list are preserved. New classification and
+aggregate jobs supplement them. Keep branch protection and external Codecov/Security gates unchanged
+while shadow mode is validated; `CI Result` does not replace them.
 
 ## Secrets
 
