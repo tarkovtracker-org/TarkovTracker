@@ -28,8 +28,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          # workflow_run's default SHA can differ from the commit that passed CI.
-          ref: ${{ github.event.workflow_run.head_sha }}
+          # Load the gate from trusted default-branch code, not the event's candidate.
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: Check validated commit before setup
@@ -42,6 +42,14 @@ jobs:
             const result = await releaseEligibility({ github, context });
             core.info(result.reason);
             core.setOutput('release', String(result.release));
+            core.setOutput('sha', result.sha || '');
+      - name: Checkout validated release commit
+        if: steps.eligible.outputs.release == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ steps.eligible.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
       - name: Setup Node.js
         if: steps.eligible.outputs.release == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020

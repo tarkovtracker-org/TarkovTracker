@@ -32,7 +32,7 @@ describe('release eligibility', () => {
     const f = fixture();
     // Webhook payloads need not include the workflow path; verify it through the API.
     delete f.context.payload.workflow_run.path;
-    expect((await releaseEligibility(f)).release).toBe(true);
+    expect(await releaseEligibility(f)).toMatchObject({ release: true, sha: f.run.head_sha });
     expect(f.github.rest.actions.getWorkflowRun).toHaveBeenCalledWith({
       owner: 'owner',
       repo: 'repo',
@@ -65,6 +65,8 @@ describe('release eligibility', () => {
     Object.assign(f.run, changes);
     expect((await releaseEligibility(f)).release).toBe(false);
   });
+});
+describe('release freshness and failures', () => {
   it('skips a newer unvalidated main instead of checking it out', async () => {
     const f = fixture();
     f.main.object.sha = 'b'.repeat(40);

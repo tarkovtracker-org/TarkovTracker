@@ -86,7 +86,8 @@ semantic-release still decides whether the accumulated conventional commits warr
 `release-gate.mjs` re-reads the triggering run and `refs/heads/main` before dependency setup and
 again immediately before publishing. It verifies the CI workflow path, conclusion, SHA, and run
 attempt. Superseded commits skip; release never substitutes a newer, unvalidated checkout.
-`actions/checkout` pins the triggering CI SHA rather than the default SHA of `workflow_run`.
+The gate initially loads from the trusted default-branch SHA. Only after validation does a second
+checkout pin the triggering CI SHA for building and publishing; it never executes a fork candidate.
 
 Only release jobs share the non-cancelling `release-main` concurrency group. CI can cancel obsolete
 validation independently; an active publisher is not cancelled by a newer merge. A merge in the
