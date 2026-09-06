@@ -4,25 +4,41 @@ on:
     branches: [main, develop, 'wip/**']
   pull_request:
     branches: [main, develop]
-    paths-ignore:
-      - 'app/locales/cs.json'
-      - 'app/locales/de.json'
-      - 'app/locales/es.json'
-      - 'app/locales/fr.json'
-      - 'app/locales/it.json'
-      - 'app/locales/ko.json'
-      - 'app/locales/pl.json'
-      - 'app/locales/pt.json'
-      - 'app/locales/ru.json'
-      - 'app/locales/uk.json'
-      - 'app/locales/zh.json'
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
 jobs:
+  changes:
+    name: Validation plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      plan: ${{ steps.plan.outputs.plan }}
+      full: ${{ steps.plan.outputs.full }}
+      i18n: ${{ steps.plan.outputs.i18n }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+      - name: Classify changes (shadow rollout)
+        id: plan
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          args=(--mode ci --explain --base "$BASE_SHA" --head "$HEAD_SHA" --shadow)
+          if [ "$EVENT_NAME" != "pull_request" ]; then args+=(--full); fi
+          node scripts/validate-changes.mjs "${args[@]}"
   fallow:
+    needs: changes
+    if: needs.changes.outputs.full == 'true'
     name: Fallow audit
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -31,21 +47,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .nvmrc
-      - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.14.0 --activate
-      - name: Setup pnpm cache
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .nvmrc
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-project
       - name: Resolve Fallow base
         id: fallow-base
         run: |
@@ -61,6 +63,7 @@ jobs:
       - name: Audit changed files
         run: pnpm run lint:fallow --base "${{ steps.fallow-base.outputs.base }}"
   lint-format:
+    needs: changes
     name: Lint & Format
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -68,26 +71,28 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .nvmrc
-      - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.14.0 --activate
-      - name: Setup pnpm cache
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .nvmrc
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-project
       - name: Lint
+        if: needs.changes.outputs.full == 'true'
         run: pnpm run lint
       - name: Format check
-        run: pnpm run format:check
+        env:
+          FULL_VALIDATION: ${{ needs.changes.outputs.full }}
+        run: |
+          if [ "$FULL_VALIDATION" = "true" ]; then
+            pnpm run format:check:prettier
+          else
+            pnpm run format:check
+          fi
+      - name: Validate locales
+        if: needs.changes.outputs.i18n == 'true'
+        run: pnpm run i18n:check
+      - name: Test workflow tooling
+        if: needs.changes.outputs.full == 'true'
+        run: pnpm run test:workflow
   typecheck:
+    needs: changes
+    if: needs.changes.outputs.full == 'true'
     name: Type Check
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -95,24 +100,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .nvmrc
-      - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.14.0 --activate
-      - name: Setup pnpm cache
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .nvmrc
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-project
       - name: Type check
         run: pnpm run typecheck
   test:
+    needs: changes
+    if: needs.changes.outputs.full == 'true'
     name: Test (shard ${{ matrix.shard }}/${{ matrix.total }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -129,21 +122,7 @@ jobs:
         with:
           fetch-depth: 2
           persist-credentials: false
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .nvmrc
-      - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.14.0 --activate
-      - name: Setup pnpm cache
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .nvmrc
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-project
       - name: Setup Deno
         if: matrix.shard == 1
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
@@ -174,6 +153,8 @@ jobs:
           flags: unittests-shard-${{ matrix.shard }}
           fail_ci_if_error: false
   validate:
+    needs: changes
+    if: needs.changes.outputs.full == 'true'
     name: Validate
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -182,21 +163,7 @@ jobs:
         with:
           fetch-depth: 2
           persist-credentials: false
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .nvmrc
-      - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.14.0 --activate
-      - name: Setup pnpm cache
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .nvmrc
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-project
       - name: Build
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
         run: pnpm run build
@@ -216,6 +183,8 @@ jobs:
           path: dist
           retention-days: 7
   supabase-db:
+    needs: changes
+    if: needs.changes.outputs.full == 'true'
     name: Supabase DB
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -223,21 +192,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .nvmrc
-      - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.14.0 --activate
-      - name: Setup pnpm cache
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .nvmrc
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-project
       - name: Validate Supabase migrations
         run: pnpm run supabase:check
   systems-drift:
@@ -255,6 +210,8 @@ jobs:
       - name: Systems drift check
         run: node scripts/check-systems-drift.mjs
   workers:
+    needs: changes
+    if: needs.changes.outputs.full == 'true'
     name: Workers
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -262,22 +219,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .nvmrc
-      - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.14.0 --activate
-      - name: Setup pnpm cache
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .nvmrc
-          cache: 'pnpm'
-          cache-dependency-path: pnpm-lock.yaml
-      - name: Install workspace dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-project
       - name: Validate api-gateway
         if: hashFiles('workers/api-gateway/package.json') != ''
         run: |
@@ -288,3 +230,21 @@ jobs:
       - name: Test api-gateway
         if: hashFiles('workers/api-gateway/package.json') != ''
         run: pnpm run test:api-gateway
+  ci-result:
+    name: CI Result
+    if: always()
+    needs: [changes, fallow, lint-format, typecheck, test, validate, supabase-db, systems-drift, workers]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+      - name: Require all selected jobs to succeed
+        env:
+          VALIDATION_PLAN: ${{ needs.changes.outputs.plan }}
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: node scripts/check-ci-result.mjs

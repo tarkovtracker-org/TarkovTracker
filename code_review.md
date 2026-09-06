@@ -13,25 +13,14 @@ Its validation commands and risk areas override the skill's defaults.
 
 ## Validation Commands
 
-Run these in order. All must pass before a READY verdict.
+Use the validation requirements in `AGENTS.md` and the commands in `package.json`.
+Run focused checks while correcting the change, then the required checks once the diff stabilizes.
+A READY verdict requires applicable validation and independent review where the root policy requires it.
+Record the validated commit, dirty worktree state, commands, and results. Unavailable checks or reviews
+remain incomplete; they do not count as passing. Do not rerun checks for unchanged validated inputs.
 
-```bash
-pnpm run typecheck
-pnpm run lint
-pnpm run test
-pnpm run i18n:check
-pnpm run validate:openapi
-```
-
-If the change touches `workers/api-gateway`, also run:
-
-```bash
-pnpm run test:api-gateway
-```
-
-If the change touches `supabase/functions/`, note that edge functions run on
-Deno and are not covered by `pnpm run test`. Inspect them manually for Deno API
-compatibility.
+Supabase Edge Functions use Deno; preserve the dedicated Deno tests and database validation rather
+than assuming the root Vitest suite covers them. Applied migrations remain immutable.
 
 ## Mandatory Checks
 
@@ -68,9 +57,8 @@ Hard rules the reviewer must verify for every diff:
 
 - **Where:** `workers/api-gateway/src/rateLimiter.ts` (rate limiter DO), `workers/tarkov-precompute/`
 - **Check:** DO alarm lifecycle — no orphaned alarms, no double-fire without
-  idempotency, no alarm leaks on cleanup. The current branch (`fix-do-alarm-overhead`)
-  is specifically addressing alarm overhead — verify that lazy expiration does not
-  leave stale rate-limit state. DO storage transactions are single-writer; no
+  idempotency, no alarm leaks on cleanup. Verify that lazy expiration does not leave stale
+  rate-limit state. DO storage transactions are single-writer; no
   cross-DO atomicity assumptions. KV eventual consistency — reads after writes may
   be stale. CPU limits on Workers Free tier rule out scheduled Workers for
   precompute (hence the GitHub Actions workflow).

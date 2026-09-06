@@ -3,18 +3,6 @@ on:
   push:
     branches: [main, develop]
   pull_request:
-    paths-ignore:
-      - 'app/locales/cs.json'
-      - 'app/locales/de.json'
-      - 'app/locales/es.json'
-      - 'app/locales/fr.json'
-      - 'app/locales/it.json'
-      - 'app/locales/ko.json'
-      - 'app/locales/pl.json'
-      - 'app/locales/pt.json'
-      - 'app/locales/ru.json'
-      - 'app/locales/uk.json'
-      - 'app/locales/zh.json'
   schedule:
     - cron: '0 0 * * 0'
 concurrency:
@@ -31,21 +19,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .nvmrc
-      - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.14.0 --activate
-      - name: Setup pnpm cache
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .nvmrc
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-project
       - name: Prepare pnpm audit workspace
         id: prepare-audit
         run: |
@@ -60,6 +34,7 @@ jobs:
         working-directory: ${{ steps.prepare-audit.outputs.audit_dir }}
         run: pnpm audit --audit-level=high || true
       - name: Check for outdated dependencies
+        if: github.event_name == 'schedule'
         run: pnpm outdated || true
       - name: Install Gitleaks CLI
         shell: bash

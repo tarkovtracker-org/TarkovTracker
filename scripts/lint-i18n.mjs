@@ -189,11 +189,19 @@ function summarize(parts, targetCount) {
   }
   console.log(`All ${targetCount} locale(s) are in sync with ${SOURCE_LOCALE}${LOCALE_EXTENSION}`);
 }
+function assertSupportedLocales(locales, enabledLocales) {
+  const missing = [...(enabledLocales || [])].filter((code) => !Object.hasOwn(locales, code));
+  if (missing.length > 0) {
+    const filenames = missing.map((code) => `${code}.json`).join(', ');
+    throw new Error(`Missing supported locale file(s): ${filenames}`);
+  }
+}
 function main() {
   const { locales, targetCodes } = readLocaleFiles();
   const sourceKeys = new Set(Object.keys(locales[SOURCE_LOCALE]));
   const sourceValues = locales[SOURCE_LOCALE];
   const enabledLocales = loadEnabledLocales();
+  assertSupportedLocales(locales, enabledLocales);
   const caseViolationCount = reportCaseViolations([...sourceKeys]);
   if (caseViolationCount > 0) {
     console.log(

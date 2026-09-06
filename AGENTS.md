@@ -40,6 +40,25 @@ i18n: `pnpm run i18n:check` | OpenAPI: `pnpm run validate:openapi` | Dependencie
 Use the single-file Vitest command from `package.json` for focused tests. Do not run the full suite
 unless executable or test logic changes make it relevant.
 
+## Agent and review workflow
+
+- Load this contract and relevant system docs first. Search generated files, translations,
+  migration history, and reference archives only when relevant to the task.
+- Run focused checks during implementation, then required validation once the diff stabilizes.
+  Record the commit, dirty worktree state, commands, and results in the PR summary. Changes to
+  validated inputs invalidate the affected results; do not reuse results across those changes.
+- Batch substantiated review corrections; defer unrelated cleanup and optional style suggestions.
+- Documentation, translations, and mechanical formatting need self-review and deterministic checks.
+  Routine executable changes also receive Codex PR review, requested selectively until automatic
+  exclusions are verified. Substantial behavior changes also receive one best-effort local
+  CodeRabbit review of the complete branch diff after it stabilizes, alongside relevant checks.
+- Substantial means public contracts, persisted state, cross-module behavior, auth, billing,
+  migrations, or concurrency. The last four require independent review; another provider or human
+  substitutes if necessary. Record unavailable/rate-limited review as incomplete, without retries.
+  Rerun local review only for substantial behavioral corrections or unresolved significant findings.
+- Verify Codex review delivery before disabling duplicate automatic providers. See
+  `docs/WORKFLOW_AUTOMATION.md` for the staged rollout and external verification checklist.
+
 ## Required validation
 
 - Run the smallest relevant check before finishing and report what passed or failed.

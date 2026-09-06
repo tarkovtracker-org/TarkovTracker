@@ -41,6 +41,7 @@ and have an agent verify the answer against the code.
     map marker categories and split pinned/active requirements
 
 13. [Fallow audit snapshots](#13-fallow-audit-snapshots) — consistent generated context and local source attribution
+14. [CI validation selection](#14-ci-validation-selection) — conservative classification and strict aggregation
 
 ---
 
@@ -1263,3 +1264,23 @@ Collapse-by-default applies to list cards; map cards start expanded. Matching de
 their card. The dedicated chevron controls card expansion in both views. Hide-rewards applies
 to both list and map cards. Missing database columns use the existing preference-sync fallback,
 so new settings remain local until the compact-list preference migration is deployed.
+
+## 14. CI validation selection
+
+`scripts/validation-plan.mjs` classifies Git paths and validates aggregate outcomes;
+`scripts/validate-changes.mjs` exposes local execution and CI outputs;
+`scripts/check-ci-result.mjs` enforces outcomes in `.github/workflows/ci.yml`.
+
+The proposed selection reduces checks only for explicitly recognized documentation and locale paths.
+`DESIGN.md`, unknown inputs, and executable changes select full validation. Local input includes
+committed and dirty paths; CI input is the explicit revision diff. Renames contribute both paths.
+Shadow rollout forces every check while printing the proposed selection. See
+`docs/WORKFLOW_AUTOMATION.md` for rollout evidence and local/full execution profiles.
+
+**Invariants:**
+
+- Pushes retain full validation; shadow mode retains full validation on PRs too.
+- Missing classifier output or selected jobs that fail, cancel, or unexpectedly skip fail CI Result.
+- Only deliberately unselected jobs may report skipped; systems drift always runs.
+- Existing shard discovery, coverage enforcement, secret restrictions, and merge governance remain.
+- The aggregate covers repository CI jobs, not independently reported Security or Codecov statuses.

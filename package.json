@@ -113,7 +113,9 @@
     "test:coverage": "vitest run --coverage --maxWorkers=2",
     "test:watch": "vitest --watch",
     "test:api-gateway": "vitest --config workers/api-gateway/vitest.config.ts",
-    "validate:openapi": "pnpm --filter api-gateway run validate:openapi"
+    "validate:openapi": "pnpm --filter api-gateway run validate:openapi",
+    "validate:changes": "node scripts/validate-changes.mjs",
+    "test:workflow": "node --test scripts/ci-tests/*.mjs"
   },
   "type": "module",
   "lint-staged": {

@@ -10,7 +10,9 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 **Concurrency:** Outdated runs are automatically cancelled for the same PR or branch.
 **Jobs:**
 
-- `Lint & Format` — ESLint + Prettier checks
+- `Validation plan` — proposed scope plus full effective scope during shadow rollout
+- `CI Result` — strict aggregate of selected jobs; missing data or unexpected skips fail
+- `Lint & Format` — ESLint + Prettier, i18n, and Node workflow fixtures
 - `Fallow audit` — changed-file dead code, duplication, and complexity gate
 - `Type Check` — `vue-tsc` / Nuxt type checking
 - `Test (shard 1/4)` … `Test (shard 4/4)` — Vitest with coverage, sharded across 4 parallel jobs. The `github-actions` reporter annotates failed tests directly on the PR diff so the failing test name and assertion are visible without digging into logs. Shards report imported files only to avoid duplicate zero-filled entries, and Codecov merges the per-shard coverage. Unsharded local coverage retains the full `app/**/*.{ts,vue}` denominator.
@@ -20,7 +22,8 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 - `Workers` — Validate api-gateway (generated types, typecheck, OpenAPI, deployment dry-run, Node
   unit tests, and a workerd smoke using the production Wrangler configuration)
 
-All jobs run in parallel; the `Workers` job no longer waits for `Validate` to finish.
+Heavy jobs run in parallel after classification; systems drift runs independently.
+Lighthouse scope detection runs independently of PR metadata installation and commitlint.
 
 ### Crowdin Sync (`crowdin.yml`)
 
@@ -55,10 +58,15 @@ for this workflow: the upstream Action prints its environment in debug mode.
 
 ### Crowdin locale PRs
 
-PRs whose changes are limited to the non-English locale exports in `app/locales/` do not trigger
-`CI`, `PR Checks`, `Security`, or `Dependabot Auto Merge`. This prevents each burst of Crowdin
-synchronization commits from starting redundant repository-owned jobs. Changes to source code,
-workflow files, or `app/locales/en.json` still run the normal checks.
+`CI`, `PR Checks`, and `Security` report for translation-only PRs. During shadow rollout they retain
+full validation. The proposed classifier selects formatting, i18n, and systems drift for locales;
+only a verified follow-up change enables expensive-check skips. Non-English locale formatting
+exclusions remain intact. See the rollout checklist in `docs/WORKFLOW_AUTOMATION.md`.
+
+Crowdin Sync now creates PRs using `GITHUB_TOKEN`. GitHub creates their PR workflow runs in an
+approval-required state; a repository writer must approve them before they execute. Removing path
+exclusions does not bypass this platform requirement. See
+[GitHub token event behavior](https://docs.github.com/en/actions/concepts/security/github_token).
 
 ### Security (`security.yml`)
 
@@ -77,7 +85,7 @@ serialized without cancelling an active release. See `docs/WORKFLOW_AUTOMATION.m
 ### PR Checks (`pr-checks.yml`)
 
 **Trigger:** PR opened/updated/reopened
-**Jobs:** `PR Meta` (labels, size, commit validation, Lighthouse gating), `Lighthouse` (conditional on UI file changes, Lighthouse configuration/workflow changes, or `ui`/`performance` labels)
+**Jobs:** `PR Meta` (labels, size, commit validation), `Lighthouse scope` (lightweight detection), `Lighthouse` (conditional on UI file changes, Lighthouse configuration/workflow changes, or `ui`/`performance` labels)
 **Lighthouse server:** Builds the Cloudflare Pages app and serves it with `wrangler pages dev`
 so `/api/*` routes are available during audits. The build sets
 `NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED=false` so audits measure the app itself rather than the
@@ -110,17 +118,14 @@ introduce a new pinned SHA.
 **Trigger:** Daily schedule
 **Jobs:** Mark inactive issues/PRs stale, then close stale items unless labeled `never-stale`
 
-## Check Count
+## Merge checks
 
-| Context       | Checks                                                                                                                                                           |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PR            | ~15 (Fallow audit, Lint & Format, Type Check, Test ×4 shards, Validate, Supabase DB, Systems drift check, Workers, PR Meta, Security Scan, CodeQL, Lighthouse\*) |
-| Dependabot PR | ~16 (standard PR checks plus Dependabot Auto Merge when allowlisted)                                                                                             |
-| Main push     | ~13 (Fallow audit, Lint & Format, Type Check, Test ×4 shards, Validate, Supabase DB, Systems drift check, Workers, Security Scan, CodeQL)                        |
+Existing check names and Dependabot's expected-check list are preserved. New classification and
+aggregate jobs supplement them. Keep branch protection and external Codecov/Security gates unchanged
+while shadow mode is validated; `CI Result` does not replace them.
 
 Successful main CI completion separately triggers the gated `Release` workflow.
-
-\*Lighthouse runs only when the PR touches UI paths or already carries `performance`/`ui`
+Lighthouse runs only when the PR touches UI paths or already carries `performance`/`ui`.
 
 ## Secrets
 
@@ -128,16 +133,10 @@ Workflow-specific secrets are not required for the Gitleaks step anymore. The wo
 
 ## AI Review Bots
 
-Cubic is the primary automatic reviewer, with Greptile retained as a useful secondary reviewer.
-CodeRabbit remains enabled and skips PRs whose titles contain `Crowdin` via `.coderabbit.yaml`, but
-its frequent rate limits make it best-effort rather than a required review dependency. Kilo Code is
-disabled because its signal was low. CodeAnt is a removal candidate because its AI, quality,
-security, and coverage checks overlap with retained integrations; its locale exclusions live in
-`.codeant/configuration.json` while its activation remains dashboard-controlled. GitHub-managed
-Copilot review and the duplicate CodeQL workflow (`dynamic/github-code-scanning/codeql`) are also
-controlled outside this repository; the checked-in `Security` workflow already runs CodeQL for
-normal code PRs. Socket PR alerts are limited to dependency manifest changes by the root
-`socket.yml`; Snyk and Supabase preview behavior are controlled by their integration settings.
+Codex is the intended primary reviewer, with one best-effort local CodeRabbit pass for substantial
+behavior changes. Existing automatic provider settings remain unchanged until Codex delivery and
+exclusions are verified on representative PRs. See the reviewer transition checklist in
+`docs/WORKFLOW_AUTOMATION.md`; dashboard settings are not proven by checked-in configuration.
 
 ## Commands
 
