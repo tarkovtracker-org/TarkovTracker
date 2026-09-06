@@ -1,3 +1,10 @@
+## [1.76.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.0...v1.76.1) (2026-09-06)
+
+
+### Bug Fixes
+
+* **api:** safely describe invalid progress states ([#803](https://github.com/tarkovtracker-org/TarkovTracker/issues/803)) ([d00f723](https://github.com/tarkovtracker-org/TarkovTracker/commit/d00f72323580663483c0aea21595c73657b29834))
+
 # [1.76.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.75.4...v1.76.0) (2026-09-06)
 
 

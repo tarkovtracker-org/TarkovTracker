@@ -2,11 +2,11 @@
 
 ## PR scope
 
-The PR branch is `codex/agent-ci-shadow`, prepared on main revision `f66b1569`. It contains the agent
+The PR branch is `codex/agent-ci-shadow`, prepared on main revision `f66b1569` and synchronized with `c3f2ab27` after PR #805 merged. It contains the agent
 policy, manifest-pinned setup, conservative classifier, strict aggregate, baseline collector, and
 CodeRabbit's metrics-boundary correction from the original implementation.
 
-Release deduplication is handled separately in [PR #805](https://github.com/tarkovtracker-org/TarkovTracker/pull/805).
+Release deduplication was merged separately in [PR #805](https://github.com/tarkovtracker-org/TarkovTracker/pull/805).
 This PR leaves release behavior and main-run cancellation unchanged. It preserves the newly merged
 Crowdin Sync workflow and its configuration. The original complete implementation remains on local
 branch `codex/agent-ci-turnaround`; its alternative release implementation is not part of this PR.

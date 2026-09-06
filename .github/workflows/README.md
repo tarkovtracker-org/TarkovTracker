@@ -75,8 +75,12 @@ exclusions does not bypass this platform requirement. See
 
 ### Release (`release.yml`)
 
-**Trigger:** Push to main (excluding `**.md`, `docs/**`)
-**Jobs:** `Release` (build + semantic-release)
+**Trigger:** Successful completion of `CI` for a same-repository push to `main`.
+**Jobs:** `Release` (validate the CI run and current main SHA, build, recheck, semantic-release).
+The workflow reuses CI's test shards and database checks. It rejects stale commits and CI attempts,
+PR/fork events, and automation-skip directives before publishing. Documentation-only pushes can
+reach the gate; conventional commits determine whether a version is warranted. Publication is
+serialized without cancelling an active release. See `docs/WORKFLOW_AUTOMATION.md` for details.
 
 ### PR Checks (`pr-checks.yml`)
 
@@ -119,6 +123,9 @@ introduce a new pinned SHA.
 Existing check names and Dependabot's expected-check list are preserved. New classification and
 aggregate jobs supplement them. Keep branch protection and external Codecov/Security gates unchanged
 while shadow mode is validated; `CI Result` does not replace them.
+
+Successful main CI completion separately triggers the gated `Release` workflow.
+Lighthouse runs only when the PR touches UI paths or already carries `performance`/`ui`.
 
 ## Secrets
 

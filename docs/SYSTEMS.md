@@ -1225,6 +1225,26 @@ See [the workflow guide](WORKFLOW_AUTOMATION.md#fallow-changed-file-gate) for us
   removed in a `finally` block on success or failure.
 - Local Git exclusions apply to untracked candidates without dropping tracked source files.
 
+## 14. Release validation and publication
+
+Release starts after successful main-push CI, reusing its test shards and database validation.
+`scripts/release-gate.mjs` checks live workflow identity, repository, conclusion, attempt, and SHA
+against the triggering event and current main before setup and immediately before publishing.
+The checkout stays pinned to the validated SHA. The production build still runs in Release.
+
+### Invariants
+
+- PR, fork, unsuccessful, superseded, and stale CI-attempt events cannot authorize publication.
+- Never replace the validated checkout with a newer main commit to make publishing succeed.
+- CI cancellation must not cancel a publisher; only release jobs share `release-main` with
+  `cancel-in-progress: false`. Git non-fast-forward protection and semantic-release's upstream
+  check remain the final safeguards if main advances after the last eligibility check.
+- Release version commits retain the existing skip marker behavior and Cloudflare rebuild.
+- A green workflow run must continue to mean the test shards and Supabase validation passed;
+  making those jobs optional requires reconsidering this release gate.
+
+See `docs/WORKFLOW_AUTOMATION.md` for triggering, retry, and deployment behavior.
+
 ## When this doc is wrong
 
 If you read something here that does not match the code, the disagreement is a bug — either in the

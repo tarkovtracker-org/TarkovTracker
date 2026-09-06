@@ -164,14 +164,34 @@ Semantic versioning with automated releases:
 
 **Jobs:**
 
-- Runs tests and build
-- Resets and lints local Supabase migrations and runs pgTAP database regressions with
-  `pnpm run supabase:check`
+- Reuses the successful `CI` run for the exact `main` push commit, including all four test shards
+  and the Supabase reset, lint, and pgTAP checks
+- Runs the production build before publishing
 - Generates changelog from conventional commits
 - Creates GitHub releases
 - Updates version in package.json
 
-**Triggers:** Push to `main` (non-docs changes)
+**Triggers:** Completion of `CI` for a successful same-repository push to `main`. PR runs, failed
+or cancelled CI, and fork runs cannot publish. Successful CI reruns can retry release eligibility;
+there is no manual bypass of the CI gate. Documentation-only pushes may reach the gate, but
+semantic-release still decides whether the accumulated conventional commits warrant a version.
+
+`release-gate.mjs` re-reads the triggering run and `refs/heads/main` before dependency setup and
+again immediately before publishing. It verifies the CI workflow path, conclusion, SHA, and run
+attempt. Superseded commits skip; release never substitutes a newer, unvalidated checkout.
+The gate initially loads from the trusted default-branch SHA and is copied to `RUNNER_TEMP` so
+both checks use the same source even after checkout replacement. Only after validation does a
+second checkout pin the triggering CI SHA for building and publishing; it never executes a fork
+candidate.
+
+Only release jobs share the non-cancelling `release-main` concurrency group. CI can cancel obsolete
+validation independently; an active publisher is not cancelled by a newer merge. A merge in the
+small interval after the last check remains subject to semantic-release's upstream check and git's
+non-fast-forward push protection. No force push or rebase onto an unvalidated commit is permitted.
+
+This removes the duplicate full test suite and database reset from the serialized release path.
+The production build remains a release check. Cloudflare deployments continue independently;
+this workflow controls release/version publication, not when the initial deployment starts.
 
 **Version-bump commit:** `@semantic-release/git` commits the bumped `package.json` and `CHANGELOG.md`
 as `chore(release): <version> [skip actions]`. The marker is deliberately `[skip actions]` rather
