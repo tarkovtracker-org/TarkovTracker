@@ -91,7 +91,9 @@ The proposed reduced selection covers only root `.md` files, Markdown under `doc
 and `app/locales/*.json`. `DESIGN.md`, generated code, scripts, dependencies, configuration, public
 assets, and unknown paths select full validation. Renames include both paths and deletions remain
 visible. Empty diffs, missing refs, malformed arguments, and Git errors conservatively select full
-validation. Non-English formatting exclusions and Crowdin ownership remain intact.
+validation. The i18n check rejects missing supported locale files, including deletions and
+renames, while missing translation keys still use the non-fatal English fallback.
+Non-English formatting exclusions and Crowdin ownership remain intact.
 
 #### CI rollout and measurements
 
