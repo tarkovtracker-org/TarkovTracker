@@ -1189,13 +1189,6 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
   `required_items` / `required_keys` labels; an untitled standalone group keeps the `h3` level and
   the longer `*_summary` labels.
 
-## When this doc is wrong
-
-If you read something here that does not match the code, the disagreement is a bug — either in the
-code (fix the code) or in this doc (fix the doc in the same PR). `AGENTS.md`'s Maintenance Contract
-requires updating this file whenever one of these systems changes. When in doubt, the code is the
-source of truth and this doc is the explanation of it.
-
 ## 13. Fallow audit snapshots
 
 **Summary.** Local and CI `lint:fallow` commands use `scripts/fallow-audit.mjs` to create a
@@ -1217,3 +1210,10 @@ See [the workflow guide](WORKFLOW_AUTOMATION.md#fallow-changed-file-gate) for us
 - Invalid refs, missing setup, and analyzer errors fail explicitly; temporary snapshots are
   removed in a `finally` block on success or failure.
 - Local Git exclusions apply to untracked candidates without dropping tracked source files.
+
+## When this doc is wrong
+
+If you read something here that does not match the code, the disagreement is a bug — either in the
+code (fix the code) or in this doc (fix the doc in the same PR). `AGENTS.md`'s Maintenance Contract
+requires updating this file whenever one of these systems changes. When in doubt, the code is the
+source of truth and this doc is the explanation of it.

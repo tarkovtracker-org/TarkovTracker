@@ -54,18 +54,21 @@ const createHead = (source, destination, base, directory) => {
   );
   // A tracked file may now be a directory. Only its current children belong in
   // the empty snapshot index; replaying the old filename would fail Git staging.
-  const paths = candidates
-    .toString('utf8')
-    .split('\0')
-    .filter(Boolean)
-    .filter((path) => {
-      return !lstatSync(join(source, path), { throwIfNoEntry: false })?.isDirectory();
-    });
+  const paths = [];
+  const prefix = Buffer.from(`${source}/`);
+  let start = 0;
+  for (let end = candidates.indexOf(0); end !== -1; end = candidates.indexOf(0, start)) {
+    const path = candidates.subarray(start, end);
+    if (!lstatSync(Buffer.concat([prefix, path]), { throwIfNoEntry: false })?.isDirectory()) {
+      paths.push(candidates.subarray(start, end + 1));
+    }
+    start = end + 1;
+  }
   git([...location, 'read-tree', '--empty'], environment);
   git(
     [...location, 'update-index', '--add', '--remove', '-z', '--stdin'],
     environment,
-    paths.map((path) => `${path}\0`).join('')
+    Buffer.concat(paths)
   );
   git(['-C', destination, 'add', '--force', '--', '.nuxt'], environment);
   const tree = git([...location, 'write-tree'], environment);

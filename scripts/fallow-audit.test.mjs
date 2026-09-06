@@ -211,6 +211,18 @@ describe('Fallow audit context', () => {
     expect(result.attribution.dead_code_introduced).toBe(0);
     expect(result.attribution.complexity_introduced).toBe(0);
   });
+  it.skipIf(process.platform === 'win32')('preserves non-UTF-8 filename bytes', () => {
+    const path = Buffer.concat([
+      Buffer.from(`${repository}/app/`),
+      Buffer.from([255]),
+      Buffer.from('.ts'),
+    ]);
+    writeFileSync(path, 'export const byteNamedValue = 1;\n');
+    const result = report(run(), 1);
+    expect(result.dead_code.unused_files).toEqual(
+      expect.arrayContaining([expect.objectContaining({ introduced: true })])
+    );
+  });
   it('handles a tracked file replaced by a directory', () => {
     rmSync(join(repository, 'app/logic.ts'));
     write('app/logic.ts/index.ts', files['app/logic.ts']);
