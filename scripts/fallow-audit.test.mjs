@@ -211,13 +211,20 @@ describe('Fallow audit context', () => {
     expect(result.attribution.dead_code_introduced).toBe(0);
     expect(result.attribution.complexity_introduced).toBe(0);
   });
-  it.skipIf(process.platform === 'win32')('preserves non-UTF-8 filename bytes', () => {
+  it.skipIf(process.platform === 'win32')('preserves non-UTF-8 filename bytes', ({ skip }) => {
     const path = Buffer.concat([
       Buffer.from(`${repository}/app/`),
       Buffer.from([255]),
       Buffer.from('.ts'),
     ]);
-    writeFileSync(path, 'export const byteNamedValue = 1;\n');
+    try {
+      writeFileSync(path, 'export const byteNamedValue = 1;\n');
+    } catch (error) {
+      if (error.code === 'EINVAL' || error.code === 'EILSEQ') {
+        skip('The fixture filesystem requires valid UTF-8 filenames');
+      }
+      throw error;
+    }
     const result = report(run(), 1);
     expect(result.dead_code.unused_files).toEqual(
       expect.arrayContaining([expect.objectContaining({ introduced: true })])
