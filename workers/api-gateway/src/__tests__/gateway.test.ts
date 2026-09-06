@@ -889,6 +889,21 @@ describe('api-gateway', () => {
       'Invalid state "123" (must be completed, uncompleted, or failed)'
     );
   });
+  it.each([
+    { state: { toString: null }, display: '[object]' },
+    { state: [{ toString: null }], display: '[array]' },
+  ])('rejects an unstringifiable task state: $display', async ({ state, display }) => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(postTaskRequest('task-1', { state }), BASE_ENV);
+    await expectErrorResponse(
+      res,
+      400,
+      `Invalid state "${display}" (must be completed, uncompleted, or failed)`
+    );
+    expect(res.headers.get('X-RateLimit-Limit')).toBe('100');
+    expect(res.headers.get('X-RateLimit-Remaining')).toBe('10');
+    expect(res.headers.get('X-RateLimit-Reset')).toMatch(/^\d+$/);
+  });
   it('accepts POST /progress/task with URL-encoded valid task ID', async () => {
     let mergePayload: MergeRpcPayload | null = null;
     const fetchMock = createBaseFetchMock({
@@ -993,6 +1008,21 @@ describe('api-gateway', () => {
     vi.stubGlobal('fetch', createBaseFetchMock());
     const res = await worker.fetch(postObjectiveRequest('obj-1', { state: 123 }), BASE_ENV);
     await expectErrorResponse(res, 400, 'Invalid state "123" (must be completed or uncompleted)');
+  });
+  it.each([
+    { state: { toString: null }, display: '[object]' },
+    { state: [{ toString: null }], display: '[array]' },
+  ])('rejects an unstringifiable objective state: $display', async ({ state, display }) => {
+    vi.stubGlobal('fetch', createBaseFetchMock());
+    const res = await worker.fetch(postObjectiveRequest('obj-1', { state }), BASE_ENV);
+    await expectErrorResponse(
+      res,
+      400,
+      `Invalid state "${display}" (must be completed or uncompleted)`
+    );
+    expect(res.headers.get('X-RateLimit-Limit')).toBe('100');
+    expect(res.headers.get('X-RateLimit-Remaining')).toBe('10');
+    expect(res.headers.get('X-RateLimit-Reset')).toMatch(/^\d+$/);
   });
   it('rejects POST /progress/task/objective with negative count', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock());

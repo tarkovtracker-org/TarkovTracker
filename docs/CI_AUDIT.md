@@ -199,6 +199,16 @@ quality gates. It is the strongest full-removal candidate:
 
 ### SonarCloud
 
+The project uses automatic analysis with a rolling 30-day new-code period
+(`sonar.leak.period=30`, `sonar.leak.period.type=days`). Do not use `previous_version` unless
+analysis supplies a reliable release version. These settings live in SonarCloud project settings.
+
+The project overrides `sonar.plsql.file.suffixes` to `tab,pkb`, removing the inherited `sql`
+suffix: repository SQL is PostgreSQL, not Oracle PL/SQL. Database validation remains owned by
+`pnpm run supabase:check` and migration review; do not exclude Supabase TypeScript from analysis.
+Applied migrations are immutable. Review historical style findings individually and document
+accepted findings in SonarCloud rather than rewriting migration history or weakening the gate.
+
 Keep provisionally if it catches maintainability or correctness issues not enforced by ESLint and
 CodeQL. Remove it if a review of recent findings shows that it only repeats local lint rules.
 
