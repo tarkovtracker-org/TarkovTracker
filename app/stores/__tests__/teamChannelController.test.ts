@@ -114,12 +114,15 @@ describe('createTeamChannelController', () => {
     await controller.refresh();
     expect(harness.channels[0]?.bindings.map(({ table }) => table)).toEqual(['team_memberships']);
   });
-  it('refreshes members once the join is acknowledged', async () => {
+  it('refreshes members on rejoin without duplicating the initial refresh', async () => {
     const harness = createHarness();
     const controller = createTeamChannelController(harness.deps);
     await controller.refresh();
     harness.refreshMembers.mockClear();
     harness.channels[0]?.status?.('SUBSCRIBED');
+    expect(harness.refreshMembers).not.toHaveBeenCalled();
+    harness.channels[0]?.status?.('SUBSCRIBED');
+    await vi.advanceTimersByTimeAsync(0);
     expect(harness.refreshMembers).toHaveBeenCalledTimes(1);
   });
   it('does not rebuild while the topic and member filter are unchanged', async () => {

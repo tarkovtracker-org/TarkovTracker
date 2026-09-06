@@ -775,8 +775,8 @@ flowchart LR
   an outstanding disconnect before reconnecting once. Auth, local persistence, and outbound saves
   remain active. Rejoined consumers refresh authoritative snapshots; owner progress uses existing
   merge/epoch rules, and snapshot responses cannot overwrite newer live events or another session.
-  Pending profile fields (including explicit clears) survive reconnect reads and edits made during
-  those reads; a higher reset epoch still wins over pending fields from an older epoch.
+  Pending profile fields (including explicit clears) survive reconnect reads, incoming live events,
+  and edits made during those reads; a higher reset epoch still wins over an older epoch's edits.
 - Progress RPC upserts compare sanitized account/mode values before updating. Identical saves do not
   change progress timestamps or emit progress-row events. The legacy compatibility trigger remains;
   its normalized write makes the subsequent identical RPC upsert a no-op. Startup freshness uses

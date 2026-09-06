@@ -81,6 +81,8 @@ export const registerSyncControllerGetter = (getter: SyncControllerGetter): void
 };
 export const getRegisteredSyncController = (): SyncControllerHandle | null =>
   syncControllerGetter();
+const hasPendingLocalChanges = (): boolean =>
+  getRegisteredSyncController()?.hasPendingChanges?.() === true;
 const parseRealtimeUpdateTime = (value: unknown): number => {
   const parsed = typeof value === 'string' ? Date.parse(value) : Number.NaN;
   return Number.isNaN(parsed) ? Date.now() : parsed;
@@ -299,7 +301,10 @@ async function runSetupRealtimeListener(
     });
     scheduleSyncResume();
   };
-  const handleModeProgressChange = (payload: { new: unknown }, preserveLocal = false) => {
+  const handleModeProgressChange = (
+    payload: { new: unknown },
+    preserveLocal = hasPendingLocalChanges()
+  ) => {
     if (!isCurrentRealtimeUser()) return;
     const remote = acceptRealtimeModeProgress(payload.new);
     if (!remote) return;
@@ -361,7 +366,7 @@ async function runSetupRealtimeListener(
   const refreshSnapshot = async () => {
     const request = ++refreshGeneration;
     const stateBeforeRead = sanitizeOwnedUserState(tarkovStore.$state);
-    const pendingBeforeRead = getRegisteredSyncController()?.hasPendingChanges?.() ?? false;
+    const pendingBeforeRead = hasPendingLocalChanges();
     const metadataBeforeRead = buildLegacyMetadataState(
       {},
       sanitizeOwnedUserState(tarkovStore.$state)
@@ -389,7 +394,7 @@ async function runSetupRealtimeListener(
       if (
         metadata.data &&
         metadataUnchanged &&
-        !getRegisteredSyncController()?.hasPendingChanges?.() &&
+        !hasPendingLocalChanges() &&
         parseRealtimeUpdateTime(metadata.data.updated_at) >= getLastLocalSyncTime()
       ) {
         handleProgressChange({ new: metadata.data, old: null });
@@ -398,7 +403,7 @@ async function runSetupRealtimeListener(
         if (!isGameMode(row.game_mode)) continue;
         const preserveLocal =
           pendingBeforeRead ||
-          getRegisteredSyncController()?.hasPendingChanges?.() === true ||
+          hasPendingLocalChanges() ||
           !deepEqual(stateBeforeRead[row.game_mode], tarkovStore.$state[row.game_mode]) ||
           parseRealtimeUpdateTime(row.updated_at) < getLastLocalSyncTime();
         handleModeProgressChange({ new: row }, preserveLocal);

@@ -289,6 +289,7 @@ describe('seasonal progress realtime synchronization', () => {
     'saved-during-read',
     'remote-reset',
     'missing-metadata',
+    'live-event',
   ])('preserves reconnect edits while respecting reset epochs: %s', async (scenario) => {
     const { setupRealtimeListener, registerSyncControllerGetter } =
       await import('@/stores/tarkov/realtimeListener');
@@ -324,6 +325,20 @@ describe('seasonal progress realtime synchronization', () => {
       });
       pending = scenario !== 'saved-during-read';
       if (!pending) recordLocalSyncTime();
+      if (scenario === 'live-event') {
+        handlers.get('user_game_mode_progress')?.({
+          new: {
+            game_mode: 'pvp',
+            season_number: 0,
+            updated_at: '2026-09-06T12:01:00Z',
+            progress_data: {
+              ...structuredClone(defaultState.pvp),
+              displayName: 'live',
+              taskCompletions: { remoteTask: { complete: true, timestamp: 10 } },
+            },
+          },
+        });
+      }
       resolveModes({
         data: [
           {

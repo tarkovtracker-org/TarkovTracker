@@ -104,6 +104,26 @@ export function useSupabaseListener<
   let pendingSyncResumeTimeout: ReturnType<typeof setTimeout> | null = null;
   // Helper to get current filter value (supports both string and ref)
   const getFilterValue = (): string | undefined => unref(filter);
+  const parseFilter = (currentFilter = '') => {
+    const [column, value] = currentFilter.split('=eq.');
+    if (column && value) return { column, value };
+    if (currentFilter) {
+      logger.error(`[${storeIdForLogging}] Invalid filter format. Expected 'col=eq.val'`);
+    }
+    hasInitiallyLoaded.value = true;
+    return null;
+  };
+  const applyFetchedData = (data: TData | null) => {
+    if (patchStore) {
+      if (data) {
+        safePatchStore(store, data as Partial<TStoreState>);
+        clearStaleState(store, data);
+      } else {
+        resetStore(store);
+      }
+    }
+    onData?.(data);
+  };
   // Initial fetch
   // fallow-ignore-next-line complexity -- tested fetch cancellation and pending-save guards must share one response boundary
   const fetchData = async (reconnecting = false) => {
@@ -114,28 +134,13 @@ export function useSupabaseListener<
     const fetchController = new AbortController();
     activeFetchController = fetchController;
     loadError.value = null;
-    const currentFilter = getFilterValue();
-    if (!currentFilter) {
-      if (fetchVersion === latestFetchVersion) {
-        hasInitiallyLoaded.value = true;
-      }
-      return;
-    }
-    // Parse filter to get column and value
-    // Expecting format "column=eq.value"
-    const [column, rest] = currentFilter.split('=eq.');
-    if (!column || !rest) {
-      logger.error(`[${storeIdForLogging}] Invalid filter format. Expected 'col=eq.val'`);
-      if (fetchVersion === latestFetchVersion) {
-        hasInitiallyLoaded.value = true;
-      }
-      return;
-    }
+    const filterQuery = parseFilter(getFilterValue());
+    if (!filterQuery) return;
     try {
       const queryBuilder = $supabase.client
         .from(table)
         .select('*')
-        .eq(column, rest)
+        .eq(filterQuery.column, filterQuery.value)
         .single() as QueryBuilderWithAbortSignal<TData>;
       const result =
         typeof queryBuilder.abortSignal === 'function'
@@ -160,18 +165,7 @@ export function useSupabaseListener<
           stateBeforeRead !== JSON.stringify(store.$state))
       )
         return;
-      if (data) {
-        if (patchStore) {
-          safePatchStore(store, data as Partial<TStoreState>);
-          clearStaleState(store, data);
-        }
-        if (onData) onData(data);
-      } else {
-        if (patchStore) {
-          resetStore(store);
-        }
-        if (onData) onData(null);
-      }
+      applyFetchedData(data);
       hasInitiallyLoaded.value = true;
     } catch (error) {
       if (fetchController.signal.aborted || isAbortError(error)) {
