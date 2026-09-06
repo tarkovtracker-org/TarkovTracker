@@ -7,7 +7,7 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 ### CI (`ci.yml`)
 
 **Trigger:** Push to main/develop/wip branches, PRs
-**Concurrency:** Outdated PR/non-main runs are cancelled; active main runs finish to protect publication.
+**Concurrency:** Outdated runs are automatically cancelled for the same PR or branch.
 **Jobs:**
 
 - `Validation plan` — proposed scope plus full effective scope during shadow rollout
@@ -62,6 +62,11 @@ for this workflow: the upstream Action prints its environment in debug mode.
 full validation. The proposed classifier selects formatting, i18n, and systems drift for locales;
 only a verified follow-up change enables expensive-check skips. Non-English locale formatting
 exclusions remain intact. See the rollout checklist in `docs/WORKFLOW_AUTOMATION.md`.
+
+Crowdin Sync now creates PRs using `GITHUB_TOKEN`. GitHub creates their PR workflow runs in an
+approval-required state; a repository writer must approve them before they execute. Removing path
+exclusions does not bypass this platform requirement. See
+[GitHub token event behavior](https://docs.github.com/en/actions/concepts/security/github_token).
 
 ### Security (`security.yml`)
 

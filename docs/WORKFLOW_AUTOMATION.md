@@ -96,8 +96,9 @@ validation. Non-English formatting exclusions and Crowdin ownership remain intac
 2. Only after that evidence, remove `--shadow` from the classifier invocation in a follow-up change.
    Retain `--full` for push events. Check required-check settings before enabling skips; do not change
    those settings in this rollout. Roll back selection by restoring `--shadow`.
-3. Merge release deduplication separately only after successful and failing aggregate runs have been
-   demonstrated. Do not treat local fixtures as evidence of GitHub App or branch-protection behavior.
+3. Release deduplication is handled separately in [PR #805](https://github.com/tarkovtracker-org/TarkovTracker/pull/805).
+   This shadow rollout does not change release triggers, validation, or main-run cancellation.
+   Do not treat local fixtures as evidence of GitHub App or branch-protection behavior.
 
 The initial observations are recorded in [the baseline report](ci-turnaround-baseline.md).
 The read-only `scripts/workflow-metrics.mjs` collector samples the preceding 20 merged PRs and emits
