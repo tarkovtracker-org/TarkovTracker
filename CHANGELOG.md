@@ -1,3 +1,10 @@
+## [1.75.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.75.1...v1.75.2) (2026-09-06)
+
+
+### Bug Fixes
+
+* harden auth and realtime resource usage ([#786](https://github.com/tarkovtracker-org/TarkovTracker/issues/786)) ([74c4ec2](https://github.com/tarkovtracker-org/TarkovTracker/commit/74c4ec2c27c2a8cdf03aefa4cd73788733b7eb0a))
+
 ## [1.75.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.75.0...v1.75.1) (2026-09-03)
 
 
