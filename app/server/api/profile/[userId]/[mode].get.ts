@@ -641,7 +641,7 @@ export default defineEventHandler(async (event) => {
   let modeProgressResponse: Response;
   let preferencesResponse: Response;
   const legacyProgressField = getLegacyModeProgressField(mode);
-  const progressSelect = ['user_id', 'game_edition', legacyProgressField].filter(Boolean).join(',');
+  const progressSelect = 'user_id,game_edition';
   try {
     [progressResponse, modeProgressResponse, preferencesResponse] = await Promise.all([
       restFetch(`user_progress?select=${progressSelect}&user_id=eq.${userId}&limit=1`),
@@ -697,6 +697,15 @@ export default defineEventHandler(async (event) => {
   const isModePublic = modeProgressRow ? modeProgressRow.profile_public === true : legacyModePublic;
   if (!isOwner && !isModePublic) {
     throw createError({ statusCode: 403, statusMessage: 'Profile is private for this mode' });
+  }
+  if (legacyProgressField && !hasMaterializedProgress(modeProgressRow?.progress_data)) {
+    const response = await restFetch(
+      `user_progress?select=${legacyProgressField}&user_id=eq.${userId}&limit=1`
+    );
+    if (!response.ok)
+      throw createError({ statusCode: 502, statusMessage: 'Failed to load legacy profile data' });
+    const rows = (await response.json()) as ProgressRow[];
+    progressRow[legacyProgressField] = rows[0]?.[legacyProgressField];
   }
   const profileData = resolveModeProgressData(mode, modeProgressRow?.progress_data, progressRow);
   const hideDisplayName = !isOwner && preferencesRow?.streamer_mode === true;

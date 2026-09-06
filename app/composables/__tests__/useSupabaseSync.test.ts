@@ -65,6 +65,41 @@ describe('useSupabaseSync', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+  it('retains pending local edits across a remote reconciliation pause', async () => {
+    const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+    const state = { local: 1, remote: 0 };
+    const store = createMockStore(state);
+    const sync = useSupabaseSync({ store, table: 'user_progress', debounceMs: 5 });
+    store.notifySubscriber();
+    expect(sync.hasPendingChanges?.()).toBe(true);
+    sync.pause();
+    state.remote = 2;
+    store.notifySubscriber();
+    await flushSync(5);
+    expect(upsert).not.toHaveBeenCalled();
+    sync.resume();
+    await flushSync(5);
+    expect(upsert).toHaveBeenCalledWith({ local: 1, remote: 2, user_id: 'user-1' });
+    expect(sync.hasPendingChanges?.()).toBe(false);
+    sync.cleanup();
+  });
+  it('saves an edit first made during a pause even when its debounce expires while paused', async () => {
+    const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+    const state = { count: 0 };
+    const store = createMockStore(state);
+    const sync = useSupabaseSync({ store, table: 'user_progress', debounceMs: 5 });
+    sync.pause();
+    state.count = 3;
+    store.notifySubscriber();
+    await flushSync(5);
+    expect(upsert).not.toHaveBeenCalled();
+    expect(sync.hasPendingChanges?.()).toBe(true);
+    sync.resume();
+    await flushSync(5);
+    expect(upsert).toHaveBeenCalledWith({ count: 3, user_id: 'user-1' });
+    expect(sync.hasPendingChanges?.()).toBe(false);
+    sync.cleanup();
+  });
   it('syncs transformed data when store state contains non-cloneable references', async () => {
     const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
     const storeState = reactive({

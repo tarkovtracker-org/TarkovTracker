@@ -114,9 +114,7 @@ async function fetchUserProgressMode(
 ): Promise<UserProgressModeRow | null> {
   const seasonNumber = await getGameModeSeasonNumber(env, gameMode);
   const legacyProgressField = getLegacyModeProgressField(gameMode);
-  const metadataSelect = ['user_id', 'game_edition', legacyProgressField]
-    .filter(Boolean)
-    .join(',');
+  const metadataSelect = 'user_id,game_edition';
   const modeUrl = `${env.SUPABASE_URL}/rest/v1/user_game_mode_progress?user_id=eq.${userId}&game_mode=eq.${gameMode}&season_number=eq.${seasonNumber}&select=user_id,progress_data&limit=1`;
   const metadataUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${userId}&select=${metadataSelect}&limit=1`;
   const [modeResponse, metadataResponse] = await Promise.all([
@@ -138,10 +136,23 @@ async function fetchUserProgressMode(
   }>;
   const modeRow = modeRows[0];
   const metadataRow = metadataRows[0];
+  if (legacyProgressField && !hasMaterializedProgress(modeRow?.progress_data)) {
+    const legacy = await fetchLegacyProgressRow(env, userId, gameMode);
+    if (metadataRow)
+      metadataRow[legacyProgressField] = legacy?.[
+        legacyProgressField
+      ] as typeof metadataRow.pvp_data;
+    else if (legacy)
+      metadataRows.push({
+        ...legacy,
+        user_id: userId,
+        game_edition: null,
+      } as (typeof metadataRows)[number]);
+  }
   return {
     user_id: modeRow?.user_id ?? userId,
     game_edition: metadataRow?.game_edition ?? 1,
-    progress_data: resolveModeProgressData(gameMode, modeRow?.progress_data, metadataRow),
+    progress_data: resolveModeProgressData(gameMode, modeRow?.progress_data, metadataRows[0]),
   };
 }
 const asProgressRecord = (value: unknown): Record<string, unknown> =>

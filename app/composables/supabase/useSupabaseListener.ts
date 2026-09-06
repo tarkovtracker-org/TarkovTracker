@@ -179,6 +179,7 @@ export function useSupabaseListener<
     if (channel.value) return;
     if (!currentFilter) return;
     const subscriptionVersion = cleanupVersion;
+    let joined = false;
     const client = $supabase.client;
     const nextChannel = client
       .channel(listenerTopic(currentFilter))
@@ -192,6 +193,8 @@ export function useSupabaseListener<
         },
         (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
           if (subscriptionVersion !== cleanupVersion) return;
+          latestFetchVersion += 1;
+          activeFetchController?.abort();
           syncController?.pause();
           try {
             if (subscriptionVersion !== cleanupVersion) return;
@@ -209,6 +212,8 @@ export function useSupabaseListener<
               }
               if (onData) onData(newData);
             }
+            hasInitiallyLoaded.value = true;
+            loadError.value = null;
           } finally {
             if (subscriptionVersion === cleanupVersion) {
               if (pendingSyncResumeTimeout) clearTimeout(pendingSyncResumeTimeout);
@@ -225,6 +230,10 @@ export function useSupabaseListener<
         // must not flip `isSubscribed` back on or log for a listener that is gone.
         if (subscriptionVersion !== cleanupVersion) return;
         isSubscribed.value = status === 'SUBSCRIBED';
+        if (isSubscribed.value) {
+          if (joined) void fetchData();
+          joined = true;
+        }
         logChannelSubscribeFailure(storeIdForLogging, status, error, { table });
       });
     channel.value = { channel: nextChannel, client, topic: listenerTopic(currentFilter) };

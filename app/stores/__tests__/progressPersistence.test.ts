@@ -16,6 +16,32 @@ describe('progress persistence error handling', () => {
       expect.objectContaining({ p_seasonal_season_number: ACTIVE_SEASON_NUMBER })
     );
   });
+  it('uses only active mode timestamps when establishing startup freshness', async () => {
+    const query = Promise.resolve({
+      error: null,
+      data: [
+        {
+          game_mode: 'seasonal',
+          season_number: ACTIVE_SEASON_NUMBER,
+          progress_data: { level: 5 },
+          updated_at: '2026-09-06T12:00:00Z',
+        },
+        {
+          game_mode: 'seasonal',
+          season_number: ACTIVE_SEASON_NUMBER + 1,
+          progress_data: { level: 1 },
+          updated_at: '2026-09-07T12:00:00Z',
+        },
+        { game_mode: 'pvp', season_number: 0, progress_data: { level: 8 }, updated_at: 'invalid' },
+      ],
+    });
+    const client = {
+      from: () => ({ select: () => ({ eq: () => ({ in: () => ({ in: () => query }) }) }) }),
+    } as unknown as ModeProgressClient;
+    const result = await loadModeProgress(client, 'user-1');
+    expect(result.updatedAt).toBe(Date.parse('2026-09-06T12:00:00Z'));
+    expect(result.data.seasonal).toEqual({ level: 5 });
+  });
   it('normalizes rejected sync RPCs into the error result', async () => {
     const client: ProgressRpcClient = {
       rpc: vi.fn().mockRejectedValue(new Error('network unavailable')),

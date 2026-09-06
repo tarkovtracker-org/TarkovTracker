@@ -318,6 +318,13 @@ describe('Shared Profile API', () => {
       userId: '11111111-1111-4111-8111-111111111111',
       visibility: 'public',
     });
+    const restCalls = mockFetch.mock.calls
+      .map(([url]) => new URL(String(url)))
+      .filter((url) => url.pathname.includes('/rest/v1/'));
+    expect(restCalls).toHaveLength(3);
+    expect(
+      restCalls.find((url) => url.pathname.endsWith('/user_progress'))?.searchParams.get('select')
+    ).toBe('user_id,game_edition');
   });
   it('falls back to legacy persistent progress and visibility when the normalized row is missing', async () => {
     mockFetch
@@ -325,7 +332,11 @@ describe('Shared Profile API', () => {
         progressResponse(3, { pvp_data: { displayName: 'LegacyPlayer', level: 39 } })
       )
       .mockResolvedValueOnce({ ok: true, json: async () => [] })
-      .mockResolvedValueOnce(preferencesResponse(false, { pvp: true }));
+      .mockResolvedValueOnce(preferencesResponse(false, { pvp: true }))
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ pvp_data: { displayName: 'LegacyPlayer', level: 39 } }],
+      });
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
     const result = await handler(mockEvent as H3Event);
     expect(result).toMatchObject({
@@ -341,7 +352,11 @@ describe('Shared Profile API', () => {
         progressResponse(3, { pvp_data: { displayName: 'LegacyPlayer', level: 39 } })
       )
       .mockResolvedValueOnce(modeProgressResponse({ taskCompletions: {} }, true))
-      .mockResolvedValueOnce(preferencesResponse(false, { pvp: true }));
+      .mockResolvedValueOnce(preferencesResponse(false, { pvp: true }))
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ pvp_data: { displayName: 'LegacyPlayer', level: 39 } }],
+      });
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
     const result = await handler(mockEvent as H3Event);
     expect(result).toMatchObject({

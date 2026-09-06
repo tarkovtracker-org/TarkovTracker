@@ -770,6 +770,19 @@ flowchart LR
   tear the team channel down and schedule one rebuild a minute later, replacing Realtime's unbounded
   rejoin loop with a bounded retry cycle.
 - `user_system` is included in `supabase_realtime`, and sign-out tears down all client channels.
+- The shared browser Realtime transport disconnects after 60 seconds continuously hidden. Channel
+  ownership is retained, new connect attempts are gated while suspended, and a visible tab waits for
+  an outstanding disconnect before reconnecting once. Auth, local persistence, and outbound saves
+  remain active. Rejoined consumers refresh authoritative snapshots; owner progress uses existing
+  merge/epoch rules, and snapshot responses cannot overwrite newer live events or another session.
+- Progress RPC upserts compare sanitized account/mode values before updating. Identical saves do not
+  change progress timestamps or emit progress-row events. The legacy compatibility trigger remains;
+  its normalized write makes the subsequent identical RPC upsert a no-op. Startup freshness uses
+  the newest account or active-mode timestamp because Seasonal-only saves no longer touch the account.
+- Startup fetches metadata and normalized modes before requesting missing persistent legacy columns.
+  Shared-profile, gateway, and teammate reads request legacy progress only when their existing
+  fallback rules require it. Public visibility and team authorization still precede fallback use.
+  This reduces Supabase transfer; gateway response ETags alone do not avoid upstream reads.
 - New clients read teammate progress from mode rows. When a persistent normalized row is missing or
   carries no `level`, `useTeamStore` calls `get_teammate_legacy_progress` for only the teammate's
   authorized mode column; the raw `user_progress` teammate policy is not used. Account-wide metadata

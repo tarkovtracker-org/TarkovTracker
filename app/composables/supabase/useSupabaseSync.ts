@@ -28,6 +28,7 @@ export interface SupabaseSyncReturn<
   TState extends StateTree = StateTree,
   TPayload extends SupabaseSyncPayload = SupabaseSyncPayload,
 > {
+  hasPendingChanges?: () => boolean;
   isSyncing: Ref<boolean>;
   isPaused: Ref<boolean>;
   cleanup: () => void;
@@ -124,6 +125,8 @@ export function useSupabaseSync<
   const isSyncing = ref(false);
   const isPaused = ref(false);
   let lastSyncedHash: string | null = null;
+  let pendingLocalChanges = false;
+  let localVersion = 0;
   const syncToSupabase = async (state = store.$state as TState): Promise<TPayload | null> => {
     logger.debug('[Sync] syncToSupabase called', {
       loggedIn: $supabase.user.loggedIn,
@@ -137,6 +140,7 @@ export function useSupabaseSync<
       logger.debug('[Sync] Skipping - user not logged in');
       return null;
     }
+    const syncVersion = localVersion;
     isSyncing.value = true;
     try {
       const transformedState = transform ? transform(state) : (state as unknown as TPayload);
@@ -154,6 +158,7 @@ export function useSupabaseSync<
       // Skip sync if data hasn't changed (reduces egress significantly)
       const currentHash = hashState(dataToSave);
       if (currentHash === lastSyncedHash) {
+        if (syncVersion === localVersion) pendingLocalChanges = false;
         logger.debug('[Sync] Skipping - data unchanged');
         isSyncing.value = false;
         return null;
@@ -234,6 +239,7 @@ export function useSupabaseSync<
       }
       if (syncResult.synced) {
         lastSyncedHash = currentHash;
+        if (syncVersion === localVersion) pendingLocalChanges = false;
         logger.debug(`[Sync] ✅ Successfully synced to ${table}`);
         onSynced?.();
       }
@@ -247,6 +253,10 @@ export function useSupabaseSync<
   };
   const debouncedSync = debounce(syncToSupabase, debounceMs);
   const unsubscribe = store.$subscribe((_mutation, state) => {
+    // Pausing gates transmission, not change tracking: a user can edit while
+    // reconciliation is waiting to resume. The RPC suppresses unchanged writes.
+    localVersion += 1;
+    pendingLocalChanges = true;
     logger.debug(`[Sync] Store state changed for ${table}, triggering debounced sync`);
     void debouncedSync(state as TState).catch((error) => {
       if (isDebounceRejection(error)) return;
@@ -268,8 +278,14 @@ export function useSupabaseSync<
   const resume = () => {
     logger.debug(`[Sync] Resuming sync for ${table}`);
     isPaused.value = false;
+    if (pendingLocalChanges) {
+      void debouncedSync(store.$state as TState).catch((error) => {
+        if (!isDebounceRejection(error)) logger.error('[Sync] Resumed sync failed', error);
+      });
+    }
   };
   return {
+    hasPendingChanges: () => pendingLocalChanges,
     isSyncing,
     isPaused,
     cleanup,

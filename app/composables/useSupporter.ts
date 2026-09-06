@@ -130,6 +130,8 @@ export function useSupporter() {
         }
       )
       .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED' && requestVersion === subscriptionRequestVersion)
+          void fetchStatus(userId);
         logChannelSubscribeFailure('Supporter', status, err, { userId });
       });
     channel = { channel: nextChannel, client, topic };

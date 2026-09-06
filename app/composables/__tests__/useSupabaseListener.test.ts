@@ -64,6 +64,29 @@ describe('useSupabaseListener cleanup', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+  it.each(['UPDATE', 'DELETE'])(
+    'completes initialization when %s supersedes the initial fetch',
+    async (eventType) => {
+      const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
+      const onData = vi.fn();
+      const listener = useSupabaseListener({
+        filter: 'id=eq.row-1',
+        onData,
+        patchStore: false,
+        store: createStore(),
+        table: 'test_table',
+      });
+      expect(listener.hasInitiallyLoaded.value).toBe(false);
+      const payloadHandler = channel.on.mock.calls[0]?.[2];
+      payloadHandler?.({ eventType, new: { id: 'row-1' } });
+      expect(listener.hasInitiallyLoaded.value).toBe(true);
+      expect(listener.loadError.value).toBeNull();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(onData).toHaveBeenCalledOnce();
+      expect(onData).toHaveBeenCalledWith(eventType === 'DELETE' ? null : { id: 'row-1' });
+      listener.cleanup();
+    }
+  );
   it('does not resume sync after a delayed realtime update is cleaned up', async () => {
     const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
     const syncController = {

@@ -65,6 +65,7 @@ const {
   });
   const supabaseContext = {
     client: {
+      from: vi.fn(),
       // Mirrors `RealtimeClient.channel()`: an open topic returns the live channel.
       channel: vi.fn((topic: string) => {
         const existing = openTopics.get(topic);
@@ -235,6 +236,52 @@ describe('seasonal progress realtime synchronization', () => {
       releaseDeferredRemovals();
       await teardown;
     }
+  });
+  it('merges a reconnect snapshot without overwriting a newer live mode event', async () => {
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    let resolveModes!: (value: unknown) => void;
+    const modeResult = new Promise((resolve) => {
+      resolveModes = resolve;
+    });
+    supabaseContext.client.from.mockImplementation((table: string) => ({
+      select: () => ({
+        eq: () =>
+          table === 'user_progress'
+            ? {
+                single: async () => ({
+                  data: { current_game_mode: 'pvp', updated_at: '2026-09-06T12:00:00Z' },
+                  error: null,
+                }),
+              }
+            : modeResult,
+      }),
+    }));
+    await setupRealtimeListener(store);
+    const channel = createdChannels[0]!;
+    channel.subscribeCallback?.('SUBSCRIBED');
+    const handler = handlers.get('user_game_mode_progress');
+    handler?.({
+      new: {
+        game_mode: 'pvp',
+        season_number: 0,
+        progress_data: { level: 35 },
+        updated_at: '2026-09-06T12:01:00Z',
+      },
+    });
+    resolveModes({
+      data: [
+        {
+          game_mode: 'pvp',
+          season_number: 0,
+          progress_data: { level: 12 },
+          updated_at: '2026-09-06T12:00:00Z',
+        },
+      ],
+      error: null,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(state.pvp.level).toBe(35);
+    expect(createdChannels).toHaveLength(1);
   });
   it('applies only the active Seasonal row without changing persistent modes', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');

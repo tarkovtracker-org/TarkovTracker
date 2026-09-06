@@ -19,6 +19,7 @@ import {
   type OwnedRealtimeChannel,
   type SupabaseRealtimeChannel,
 } from '@/utils/realtimeChannel';
+import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
 import type { MemberProfile, TeamGetters, TeamState } from '@/types/tarkov';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Store } from 'pinia';
@@ -310,11 +311,14 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     error?: Error
   ) => {
     if (channel.value !== owned) return;
+    if (deps.getClient().realtime && isRealtimeSuspended(deps.getClient().realtime)) return;
     if (status === 'SUBSCRIBED') {
       joinedTeamId = teamId;
       joinedFilter = filter;
       errorCount = 0;
-      void deps.refreshMembers();
+      void deps.refreshMembers(true);
+      if (typeof window !== 'undefined')
+        window.dispatchEvent(new Event('teammate-progress-reconnected'));
       return;
     }
     // A closed channel is no longer joined, so drop the binding to let the next
@@ -765,16 +769,25 @@ export function useTeammateStores() {
         if (!isHydrationActive()) return;
         replayProgressMetadataMigration();
       };
+      let hydrationRequest = 0;
       const hydrateModeProgress = async () => {
+        const request = ++hydrationRequest;
+        appliedModes.clear();
         try {
-          const [modeRows, legacyRow] = await Promise.all([
-            $supabase.client
-              .from('user_game_mode_progress')
-              .select('game_mode,season_number,progress_data')
-              .eq('user_id', teammateId),
-            fetchLegacyTeammateProgress($supabase.client, teammateId, legacyMode),
-          ]);
-          if (!isHydrationActive()) return;
+          const modeRows = await $supabase.client
+            .from('user_game_mode_progress')
+            .select('game_mode,season_number,progress_data')
+            .eq('user_id', teammateId);
+          const needsLegacy = !(modeRows.data ?? []).some(
+            (row) =>
+              row.game_mode === legacyMode &&
+              row.season_number === 0 &&
+              hasMaterializedProgress(row.progress_data)
+          );
+          const legacyRow = needsLegacy
+            ? await fetchLegacyTeammateProgress($supabase.client, teammateId, legacyMode)
+            : { data: null, error: null };
+          if (!isHydrationActive() || request !== hydrationRequest) return;
           if (modeRows.error) {
             logTeammateModeProgressHydrationFailure(modeRows.error, teammateId);
             return;
@@ -793,11 +806,13 @@ export function useTeammateStores() {
       };
       if (typeof window !== 'undefined') {
         window.addEventListener('teammate-mode-progress', handleModeProgress);
+        window.addEventListener('teammate-progress-reconnected', hydrateModeProgress);
       }
       teammateUnsubscribes.value[teammateId] = () => {
         hydrationActive = false;
         if (typeof window !== 'undefined') {
           window.removeEventListener('teammate-mode-progress', handleModeProgress);
+          window.removeEventListener('teammate-progress-reconnected', hydrateModeProgress);
         }
       };
       void hydrateModeProgress();

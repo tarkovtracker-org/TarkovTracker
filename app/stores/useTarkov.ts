@@ -1353,7 +1353,7 @@ export async function initializeTarkovSync() {
         }
         const result = await $supabase.client
           .from('user_progress')
-          .select('*')
+          .select('user_id,current_game_mode,game_edition,tarkov_uid,updated_at')
           .eq('user_id', $supabase.user.id)
           .single();
         data = result.data as UserProgressRow | null;
@@ -1395,6 +1395,21 @@ export async function initializeTarkovSync() {
         );
         return { hadRemoteData, needsRemoteCleanup, ok: false };
       }
+      const missingLegacyFields = (['pvp', 'pve'] as const)
+        .filter((mode) => modeProgressResult.data[mode] == null)
+        .map((mode) => `${mode}_data`);
+      if (data && missingLegacyFields.length > 0) {
+        const legacy = await $supabase.client
+          .from('user_progress')
+          .select(missingLegacyFields.join(','))
+          .eq('user_id', currentUserId)
+          .single();
+        if (legacy.error) return { hadRemoteData, needsRemoteCleanup, ok: false };
+        data = {
+          ...data,
+          ...(legacy.data as unknown as Partial<UserProgressRow>),
+        } as UserProgressRow;
+      }
       // Normalize Supabase data with defaults for safety
       const hasNormalizedProgress = Object.keys(modeProgressResult.data).length > 0;
       const normalizedRemote =
@@ -1411,7 +1426,13 @@ export async function initializeTarkovSync() {
       const remoteScore = normalizedRemote ? progressScore(normalizedRemote) : 0;
       const localScore = progressScore(localState);
       if (normalizedRemote) {
-        const remoteUpdatedAt = data?.updated_at ? Date.parse(data.updated_at) : null;
+        const accountUpdatedAt = data?.updated_at ? Date.parse(data.updated_at) : 0;
+        // Seasonal-only saves no longer touch the legacy account row.
+        const remoteUpdatedAt =
+          Math.max(
+            Number.isFinite(accountUpdatedAt) ? accountUpdatedAt : 0,
+            modeProgressResult.updatedAt ?? 0
+          ) || null;
         const localOwnedByUser = storedUserId === currentUserId;
         const remoteHadDeprecatedProgressData = hasDeprecatedTarkovDevProfileData({
           pvp: modeProgressResult.data.pvp ?? data?.pvp_data,

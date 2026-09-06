@@ -22,10 +22,13 @@ import {
   removeOwnedChannel,
   subscribeAndWaitForRealtimeChannel,
   type OwnedRealtimeChannel,
+  REALTIME_SUBSCRIPTION_TIMEOUT_MS,
 } from '@/utils/realtimeChannel';
+import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 const SYNC_RESUME_DELAY_MS = 1000;
 export type SyncControllerHandle = {
+  hasPendingChanges?: () => boolean;
   pause: () => void;
   resume: () => void;
 };
@@ -252,7 +255,9 @@ async function runSetupRealtimeListener(
     latestLegacyMetadataUpdateTime = updateTime;
     return true;
   };
-  const isCurrentRealtimeUser = () => stillOwnsSetup(currentUserId, generation);
+  const isCurrentRealtimeUser = () =>
+    stillOwnsSetup(currentUserId, generation) &&
+    !($supabase.client.realtime && isRealtimeSuspended($supabase.client.realtime));
   logger.debug('[TarkovStore] Setting up realtime listener for multi-device sync');
   const handleProgressChange = (payload: { new: unknown; old: unknown }) => {
     if (!isCurrentRealtimeUser()) return;
@@ -334,6 +339,45 @@ async function runSetupRealtimeListener(
       },
       handleProgressChange
     );
+  let refreshGeneration = 0;
+  const refreshSnapshot = async () => {
+    const request = ++refreshGeneration;
+    const metadataBeforeRead = buildLegacyMetadataState(
+      {},
+      sanitizeOwnedUserState(tarkovStore.$state)
+    );
+    try {
+      const [metadata, modes] = await Promise.all([
+        client
+          .from('user_progress')
+          .select('current_game_mode,game_edition,tarkov_uid,updated_at')
+          .eq('user_id', currentUserId)
+          .single(),
+        client
+          .from('user_game_mode_progress')
+          .select('game_mode,season_number,progress_data,updated_at')
+          .eq('user_id', currentUserId),
+      ]);
+      if (!isCurrentRealtimeUser() || request !== refreshGeneration) return;
+      if (metadata.error || modes.error) throw metadata.error ?? modes.error;
+      const currentState = tarkovStore.$state;
+      const metadataUnchanged =
+        currentState.currentGameMode === metadataBeforeRead.currentGameMode &&
+        currentState.gameEdition === metadataBeforeRead.gameEdition &&
+        currentState.tarkovUid === metadataBeforeRead.tarkovUid;
+      if (
+        metadata.data &&
+        metadataUnchanged &&
+        !getRegisteredSyncController()?.hasPendingChanges?.() &&
+        parseRealtimeUpdateTime(metadata.data.updated_at) >= getLastLocalSyncTime()
+      ) {
+        handleProgressChange({ new: metadata.data, old: null });
+      }
+      for (const row of modes.data ?? []) handleModeProgressChange({ new: row });
+    } catch (error) {
+      logger.warn('[TarkovStore] Reconnect snapshot failed', error);
+    }
+  };
   const owned = { channel, client, topic } satisfies OwnedRealtimeChannel;
   if (!stillOwnsSetup(currentUserId, generation)) {
     await releaseProgressChannel(owned);
@@ -343,9 +387,17 @@ async function runSetupRealtimeListener(
   // this channel instead of creating a duplicate subscription for the topic.
   realtimeChannel = owned;
   try {
-    await subscribeAndWaitForRealtimeChannel(channel, 'TarkovStore', {
-      table: 'user_progress',
-    });
+    await subscribeAndWaitForRealtimeChannel(
+      channel,
+      'TarkovStore',
+      {
+        table: 'user_progress',
+      },
+      REALTIME_SUBSCRIPTION_TIMEOUT_MS,
+      () => {
+        void refreshSnapshot();
+      }
+    );
   } catch (error) {
     if (realtimeChannel === owned) await releaseProgressChannel(owned);
     // A newer setup or teardown intentionally superseded this request. Its

@@ -2,6 +2,7 @@
 import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
 import { hasSupabaseAuthSessionHint } from '@/utils/clientStorage';
 import { logger } from '@/utils/logger';
+import { installRealtimeVisibility } from '@/utils/realtimeVisibility';
 import { shouldUseOfflineSupabaseFallback } from '@/utils/runtimeConfig';
 import { hydrateUserFromSession } from '@/utils/userHydration';
 type OAuthProvider = 'twitch' | 'discord' | 'google' | 'github';
@@ -326,6 +327,10 @@ export default defineNuxtPlugin({
             flowType: 'pkce',
           },
         });
+        if (client.realtime) {
+          const disposeVisibility = installRealtimeVisibility(client.realtime);
+          if (import.meta.hot) import.meta.hot.dispose(disposeVisibility);
+        }
         supabaseClient = client;
         api.client = client;
         client.auth.onAuthStateChange(handleAuthStateChange);

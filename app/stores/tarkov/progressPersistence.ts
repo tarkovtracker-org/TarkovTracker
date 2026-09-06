@@ -20,6 +20,7 @@ type ModeProgressRow = {
   game_mode: string;
   progress_data: unknown;
   season_number: number;
+  updated_at?: string;
 };
 type ModeProgressQuery = PromiseLike<{
   data: ModeProgressRow[] | null;
@@ -92,12 +93,13 @@ export const loadModeProgress = async (
   userId: string
 ): Promise<{
   data: Partial<Record<GameMode, UserProgressData>>;
+  updatedAt?: number;
   error: SupabaseError | null;
 }> => {
   try {
     const { data: rows, error } = await client
       .from('user_game_mode_progress')
-      .select('game_mode,season_number,progress_data')
+      .select('game_mode,season_number,progress_data,updated_at')
       .eq('user_id', userId)
       .in('game_mode', GAME_MODE_VALUES)
       .in('season_number', [0, ACTIVE_SEASON_NUMBER]);
@@ -107,7 +109,15 @@ export const loadModeProgress = async (
       return activeProgress ? [[activeProgress.mode, activeProgress.progress] as const] : [];
     });
     const data = Object.fromEntries(entries) as Partial<Record<GameMode, UserProgressData>>;
-    return { data, error: null };
+    const timestamps = (rows ?? [])
+      .filter((row) => getActiveModeProgress(row) !== null)
+      .map((row) => Date.parse(row.updated_at ?? ''))
+      .filter(Number.isFinite);
+    return {
+      data,
+      error: null,
+      updatedAt: timestamps.length > 0 ? Math.max(...timestamps) : undefined,
+    };
   } catch (error) {
     const normalizedError = normalizePersistenceError(error);
     logger.error(
