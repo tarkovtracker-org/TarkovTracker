@@ -5,6 +5,9 @@
     "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
     "no_reference": "N/A",
     "error": {
+      "cache_purge_failed": "Не удалось очистить кэш. Пожалуйста, попробуйте еще раз.",
+      "invalid_purge_type": "Выберите правильный тип очистки кэша.",
+      "method_not_allowed": "Этот метод запроса не поддерживается.",
       "admin_privileges_required": "У вас нет разрешения на выполнение этого действия.",
       "authentication_required": "Вы должны войти для продолжения.",
       "invalid_channel": "Введите правильное имя канала Twitch.",
