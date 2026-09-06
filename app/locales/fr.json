@@ -924,7 +924,9 @@
           "experience_rewards": "Récompenses d'expérience",
           "next_tasks": "Tâches suivantes",
           "previous_tasks": "Tâches précédentes",
-          "collapse_completed_objectives": "Réduire les objectifs sur les tâches terminées"
+          "collapse_completed_objectives": "Réduire les objectifs sur les tâches terminées",
+          "collapse_by_default": "Réduire les quêtes par défaut",
+          "hide_rewards": "Cacher les récompenses"
         },
         "filter_bar": {
           "hint": "Afficher ou masquer les filtres d'état.",
@@ -1008,6 +1010,8 @@
         "available_button": "Disponible",
         "uncomplete_button": "Annuler",
         "reset_item_counts": "Réinitialiser les compteurs d'objets",
+        "collapse_task": "Réduire la tâche",
+        "expand_task": "Développer la tâche",
         "reset_item_counts_disabled_complete": "Décochez cette quête pour réinitialiser les compteurs",
         "reset_item_counts_disabled_failed": "Marquez cette quête comme disponible pour réinitialiser les compteurs",
         "reset_item_counts_disabled_nothing_to_reset": "Aucun compteur d'objets à réinitialiser",
@@ -1880,7 +1884,8 @@
         "show_xp": "Afficher les récompenses d'XP",
         "show_next": "Afficher les quêtes suivantes",
         "show_prev": "Afficher les quêtes précédentes",
-        "density": "Densité des cartes",
+        "collapse_by_default": "Réduire les quêtes par défaut",
+        "hide_rewards": "Cacher les récompenses",
         "require_trader_levels": "Nécessite le niveau de fidélité du marchand et la réputation pour la disponibilité des tâches",
         "flags_section": "Affichage des Tâches",
         "availability_section": "Disponibilité des tâches",
