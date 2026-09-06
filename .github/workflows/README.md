@@ -45,7 +45,7 @@ Before enabling this workflow on `main`:
 3. Review and merge or close any existing `locales` PR authored by a personal account. The Action
    reuses open PRs and cannot change their author. Keep the branch when disposing of the old PR.
 4. Ensure Actions may create PRs and the repository's selected-action policy permits
-   `crowdin/github-action@v3` and `actions/checkout@v7`.
+   the pinned `crowdin/github-action` v3 commit and `actions/checkout@v7`.
 
 After merging, inspect the first sync run and the next translation PR: verify its author, base,
 and that its diff contains only expected non-English locale exports. The Action creates a PR

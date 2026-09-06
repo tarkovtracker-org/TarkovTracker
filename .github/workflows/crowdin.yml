@@ -30,7 +30,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Synchronize Crowdin translations
-        uses: crowdin/github-action@v3
+        uses: crowdin/github-action@0d5670f539973aea2f01abce61a8989934df0025 # v3
         with:
           upload_sources: true
           upload_translations: false
