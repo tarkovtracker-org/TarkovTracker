@@ -3,6 +3,7 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultState, type UserState } from '@/stores/progressState';
 import { recordLocalSyncTime, resetSyncTimeline } from '@/stores/tarkov/syncTimeline';
+import { logger } from '@/utils/logger';
 import { installRealtimeVisibility } from '@/utils/realtimeVisibility';
 const showProgressMerged = vi.fn();
 type FakeChannel = {
@@ -282,6 +283,8 @@ describe('seasonal progress realtime synchronization', () => {
     await setupRealtimeListener(store);
     createdChannels[0]?.subscribeCallback?.('SUBSCRIBED');
     await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(supabaseContext.client.from).toHaveBeenCalledWith('user_game_mode_progress');
+    expect(logger.warn).toHaveBeenCalledWith('[TarkovStore] Reconnect snapshot failed', failure);
     expect(state.pvp.level).toBe(25);
     expect(createdChannels).toHaveLength(1);
   });

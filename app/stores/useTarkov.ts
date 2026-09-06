@@ -1437,12 +1437,9 @@ export async function initializeTarkovSync() {
       const localScore = progressScore(localState);
       if (normalizedRemote) {
         const accountUpdatedAt = data?.updated_at ? Date.parse(data.updated_at) : 0;
-        // Seasonal-only saves no longer touch the legacy account row.
-        const remoteUpdatedAt =
-          Math.max(
-            Number.isFinite(accountUpdatedAt) ? accountUpdatedAt : 0,
-            modeProgressResult.updatedAt ?? 0
-          ) || null;
+        // Account metadata and each mode have independent freshness. Visibility
+        // changes must never lend their timestamps to progress in another mode.
+        const remoteUpdatedAt = Number.isFinite(accountUpdatedAt) ? accountUpdatedAt || null : null;
         const localOwnedByUser = storedUserId === currentUserId;
         const remoteHadDeprecatedProgressData = hasDeprecatedTarkovDevProfileData({
           pvp: modeProgressResult.data.pvp ?? data?.pvp_data,
@@ -1460,7 +1457,8 @@ export async function initializeTarkovSync() {
             remoteUpdatedAt,
             localScore,
             remoteScore,
-            (modeProgressResult.updatedAt ?? 0) > (accountUpdatedAt || 0)
+            (modeProgressResult.updatedAt ?? 0) > (accountUpdatedAt || 0),
+            modeProgressResult.updatedAtByMode
           );
           const remoteMatchesResolved = deepEqual(resolvedState, normalizedRemote);
           if (!remoteMatchesResolved) {

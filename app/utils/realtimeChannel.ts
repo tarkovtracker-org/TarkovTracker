@@ -150,8 +150,8 @@ export const subscribeAndWaitForRealtimeChannel = (
   new Promise<void>((resolve, reject) => {
     let settled = false;
     let joined = false;
-    let needsRefresh = false;
     const suspended = () => channel.socket && isRealtimeSuspended(channel.socket);
+    let needsRefresh = Boolean(suspended());
     const timeoutJoin = () => {
       if (suspended()) {
         timeout = setTimeout(timeoutJoin, timeoutMs);

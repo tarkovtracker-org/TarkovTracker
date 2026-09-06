@@ -87,7 +87,10 @@ describe('performReset seasonal', () => {
       remote.taskObjectives.noCounts = { complete: true, timestamp: 2 };
       local.hideoutParts.olderCount = { count: 4, timestamp: 1 };
       remote.hideoutParts.olderCount = { complete: true, timestamp: 2 };
+      local.taskObjectives.decreased = { count: 4, timestamp: 1 };
+      remote.taskObjectives.decreased = { count: 2, timestamp: 2 };
       const result = mergeProgressData(local, remote, preferNewerCount);
+      expect(result.taskObjectives.decreased?.count).toBe(preferNewerCount ? 2 : 4);
       expect(result.taskObjectives.noCounts?.count).toBe(0);
       expect(result.hideoutParts.olderCount?.count).toBe(4);
     }

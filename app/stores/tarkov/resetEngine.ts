@@ -53,7 +53,8 @@ export const resolveInitialSyncState = (
   remoteUpdatedAt: number | null,
   localScore: number,
   remoteScore: number,
-  mergeModeSnapshots = false
+  mergeModeSnapshots = false,
+  modeUpdatedAt?: Partial<Record<GameMode, number>>
 ): UserState => {
   const preferLocalMetadata = shouldPreferLocalStartupMetadata(
     localTimestamp,
@@ -64,18 +65,25 @@ export const resolveInitialSyncState = (
   // fallow-ignore-next-line complexity -- startup merge/reset precedence is covered in resetEngine.seasonalReset.test.ts
   const resolveModeData = (
     localModeData: UserProgressData,
-    remoteModeData: UserProgressData
+    remoteModeData: UserProgressData,
+    mode: GameMode
   ): UserProgressData => {
     const localEpoch = toProgressEpoch(localModeData);
     const remoteEpoch = toProgressEpoch(remoteModeData);
     if (localEpoch !== remoteEpoch) {
       return mergeProgressData(localModeData, remoteModeData);
     }
-    const preferredModeData = preferLocalMetadata ? localModeData : remoteModeData;
-    // Mode updated_at also changes for visibility. It cannot establish that an
-    // entire progress snapshot supersedes local timestamped edits.
+    const preferLocalMode = shouldPreferLocalStartupMetadata(
+      localTimestamp,
+      modeUpdatedAt?.[mode] ?? remoteUpdatedAt,
+      localScore,
+      remoteScore
+    );
+    const preferredModeData = preferLocalMode ? localModeData : remoteModeData;
+    // Seasonal writes can advance independently of account metadata. Keep entry
+    // timestamps and reset epochs while using this mode's own progress freshness.
     if (mergeModeSnapshots) {
-      const merged = preferLocalMetadata
+      const merged = preferLocalMode
         ? mergeProgressData(remoteModeData, localModeData, true)
         : mergeProgressData(localModeData, remoteModeData, true);
       return {
@@ -102,9 +110,9 @@ export const resolveInitialSyncState = (
     tarkovUid: preferLocalMetadata
       ? (localState.tarkovUid ?? null)
       : (remoteState.tarkovUid ?? null),
-    pvp: resolveModeData(localState.pvp, remoteState.pvp),
-    pve: resolveModeData(localState.pve, remoteState.pve),
-    seasonal: resolveModeData(localState.seasonal, remoteState.seasonal),
+    pvp: resolveModeData(localState.pvp, remoteState.pvp, GAME_MODES.PVP),
+    pve: resolveModeData(localState.pve, remoteState.pve, GAME_MODES.PVE),
+    seasonal: resolveModeData(localState.seasonal, remoteState.seasonal, GAME_MODES.SEASONAL),
     seasonalSeasonNumber: ACTIVE_SEASON_NUMBER,
   };
 };

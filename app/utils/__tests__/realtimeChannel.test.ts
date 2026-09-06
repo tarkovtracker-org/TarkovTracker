@@ -102,6 +102,21 @@ describe('subscribeAndWaitForRealtimeChannel', () => {
     await expect(ready).resolves.toBeUndefined();
     expect(settled).toBe(true);
   });
+  it('refreshes on the first join when subscription began while suspended', async () => {
+    const { channel, emit } = createChannel();
+    Object.assign(channel, { socket: {} });
+    const refresh = vi.fn();
+    suspension.active = true;
+    try {
+      const ready = subscribeAndWaitForRealtimeChannel(channel, 'test', {}, 10, refresh);
+      suspension.active = false;
+      emit('SUBSCRIBED');
+      await ready;
+      expect(refresh).toHaveBeenCalledOnce();
+    } finally {
+      suspension.active = false;
+    }
+  });
   it('retains a pending join through a suspended CLOSED transition', async () => {
     vi.useFakeTimers();
     const { channel, emit } = createChannel();

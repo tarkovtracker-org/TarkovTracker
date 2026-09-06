@@ -24,20 +24,26 @@ describe('progress persistence error handling', () => {
           game_mode: 'seasonal',
           season_number: ACTIVE_SEASON_NUMBER,
           progress_data: { level: 5 },
-          updated_at: '2026-09-06T12:00:00Z',
+          progress_updated_at: '2026-09-06T12:00:00Z',
+          updated_at: '2026-09-09T12:00:00Z',
         },
         {
           game_mode: 'seasonal',
           season_number: ACTIVE_SEASON_NUMBER + 1,
           progress_data: { level: 1 },
-          updated_at: '2026-09-07T12:00:00Z',
+          progress_updated_at: '2026-09-07T12:00:00Z',
         },
-        { game_mode: 'pvp', season_number: 0, progress_data: { level: 8 }, updated_at: 'invalid' },
+        {
+          game_mode: 'pvp',
+          season_number: 0,
+          progress_data: { level: 8 },
+          progress_updated_at: 'invalid',
+        },
         {
           game_mode: 'pve',
           season_number: 0,
           progress_data: {},
-          updated_at: '2026-09-08T12:00:00Z',
+          progress_updated_at: '2026-09-08T12:00:00Z',
         },
       ],
     });
@@ -46,6 +52,7 @@ describe('progress persistence error handling', () => {
     } as unknown as ModeProgressClient;
     const result = await loadModeProgress(client, 'user-1');
     expect(result.updatedAt).toBe(Date.parse('2026-09-06T12:00:00Z'));
+    expect(result.updatedAtByMode).toEqual({ seasonal: Date.parse('2026-09-06T12:00:00Z') });
     expect(result.data.seasonal).toEqual({ level: 5 });
     expect(result.data.pve).toBeUndefined();
   });

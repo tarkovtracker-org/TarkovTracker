@@ -782,10 +782,14 @@ flowchart LR
   and edits made during those reads; a higher reset epoch still wins over an older epoch's edits.
 - Progress RPC upserts compare sanitized account/mode values before updating. Identical saves do not
   change progress timestamps or emit progress-row events. The legacy compatibility trigger remains;
-  its normalized write makes the subsequent identical RPC upsert a no-op. Startup freshness uses
-  the newest account or active-mode timestamp because Seasonal-only saves no longer touch the account.
-  When only a mode row is newer, startup merges progress by entry timestamps and reset epochs;
+  its normalized write makes the subsequent identical RPC upsert a no-op. Startup account metadata
+  uses the account timestamp; each mode independently uses `progress_updated_at`, which changes only
+  with sanitized progress. Visibility-only writes never advance it. Historical rows retain null until
+  progress changes and use the account timestamp as the legacy fallback, never visibility freshness.
+  When a mode is newer than account metadata, startup merges progress by entry timestamps and reset epochs;
   clearable profile fields use the preferred snapshot verbatim, including null names and empty offsets.
+  Startup skill-offset maps are atomic: absent keys represent deletions, and historical snapshots
+  have no per-offset timestamps or deletion markers to safely union concurrent edits.
   Visibility changes also update mode timestamps and cannot justify replacing whole mode snapshots.
   Team rejoin refreshes membership and rebuilds changed filters before hydrating teammates; initial
   joins do not trigger an additional hydration. Only the winning membership refresh may trigger
@@ -797,7 +801,8 @@ flowchart LR
   Save acknowledgements advance only their changed paths, preserving unrelated remote values
   accepted while the save was queued or in flight.
   Supporter status refreshes after the first join as well as subsequent joins to close the
-  initial read/join gap. Initialization delegates the initial status read to the subscription, with a
+  initial read/join gap. A progress subscription begun while suspended also reconciles on its first
+  eventual join. Initialization delegates the initial status read to the subscription, with a
   single fallback read if the initial join fails.
   Skipped saves do not run payload transforms. Actual RPC writes temporarily mark the self-origin
   timeline before awaiting the response; failure removes that marker, success retains it, and

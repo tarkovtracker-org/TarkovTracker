@@ -21,7 +21,7 @@ type ModeProgressRow = {
   game_mode: string;
   progress_data: unknown;
   season_number: number;
-  updated_at?: string;
+  progress_updated_at?: string | null;
 };
 type ModeProgressQuery = PromiseLike<{
   data: ModeProgressRow[] | null;
@@ -97,12 +97,13 @@ export const loadModeProgress = async (
 ): Promise<{
   data: Partial<Record<GameMode, UserProgressData>>;
   updatedAt?: number;
+  updatedAtByMode?: Partial<Record<GameMode, number>>;
   error: SupabaseError | null;
 }> => {
   try {
     const { data: rows, error } = await client
       .from('user_game_mode_progress')
-      .select('game_mode,season_number,progress_data,updated_at')
+      .select('game_mode,season_number,progress_data,progress_updated_at')
       .eq('user_id', userId)
       .in('game_mode', GAME_MODE_VALUES)
       .in('season_number', [0, ACTIVE_SEASON_NUMBER]);
@@ -112,13 +113,18 @@ export const loadModeProgress = async (
       return activeProgress ? [[activeProgress.mode, activeProgress.progress] as const] : [];
     });
     const data = Object.fromEntries(entries) as Partial<Record<GameMode, UserProgressData>>;
-    const timestamps = (rows ?? [])
-      .filter((row) => getActiveModeProgress(row) !== null)
-      .map((row) => Date.parse(row.updated_at ?? ''))
-      .filter(Number.isFinite);
+    const updatedAtByMode = Object.fromEntries(
+      (rows ?? []).flatMap((row) => {
+        const active = getActiveModeProgress(row);
+        const timestamp = Date.parse(row.progress_updated_at ?? '');
+        return active && Number.isFinite(timestamp) ? [[active.mode, timestamp]] : [];
+      })
+    ) as Partial<Record<GameMode, number>>;
+    const timestamps = Object.values(updatedAtByMode);
     return {
       data,
       error: null,
+      updatedAtByMode,
       updatedAt: timestamps.length > 0 ? Math.max(...timestamps) : undefined,
     };
   } catch (error) {

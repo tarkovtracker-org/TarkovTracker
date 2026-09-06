@@ -116,7 +116,13 @@ const {
     error: null,
   }));
   const modeProgressResult: {
-    data: Array<{ game_mode: string; progress_data: unknown; season_number: number }>;
+    data: Array<{
+      game_mode: string;
+      progress_data: unknown;
+      season_number: number;
+      updated_at?: string;
+      progress_updated_at?: string;
+    }>;
     error: SupabaseErrorLike;
     errorSequence?: SupabaseErrorLike[];
   } = { data: [], error: null };
@@ -409,6 +415,7 @@ describe('useTarkov sync integration', () => {
     });
   });
   afterEach(() => {
+    vi.restoreAllMocks();
     resetTarkovSync('test teardown');
     localStorage.clear();
   });
@@ -432,6 +439,54 @@ describe('useTarkov sync integration', () => {
       expect(useTarkovStore().pvp.level).toBe(7);
     }
   );
+  it('keeps mode freshness independent of other modes and visibility-only timestamps', async () => {
+    const now = Date.now();
+    const local = structuredClone(defaultState);
+    local.pvp.level = 7;
+    local.pvp.taskObjectives.objective = { count: 0 };
+    local.pvp.hideoutParts.part = { count: 0 };
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({
+        _timestamp: now - 1000,
+        _userId: 'user-1',
+        data: local,
+      })
+    );
+    single.mockResolvedValue({
+      data: createRemoteRow({ updated_at: new Date(now - 5000).toISOString() }),
+      error: null,
+    });
+    modeProgressResult.data = [
+      {
+        game_mode: 'pvp',
+        season_number: 0,
+        progress_updated_at: new Date(now - 2000).toISOString(),
+        progress_data: {
+          ...local.pvp,
+          taskObjectives: { objective: { count: 5 } },
+          hideoutParts: { part: { count: 5 } },
+        },
+      },
+      {
+        game_mode: 'pve',
+        season_number: 0,
+        updated_at: new Date(now + 2000).toISOString(),
+        progress_updated_at: new Date(now - 2000).toISOString(),
+        progress_data: local.pve,
+      },
+      {
+        game_mode: 'seasonal',
+        season_number: ACTIVE_SEASON_NUMBER,
+        progress_updated_at: new Date(now).toISOString(),
+        progress_data: { ...local.seasonal, level: 55 },
+      },
+    ];
+    await initializeTarkovSync();
+    expect(useTarkovStore().pvp.taskObjectives.objective?.count).toBe(0);
+    expect(useTarkovStore().pvp.hideoutParts.part?.count).toBe(0);
+    expect(useTarkovStore().seasonal.level).toBe(55);
+  });
   it('stops initialization after deferred legacy reads exhaust their retries', async () => {
     single
       .mockResolvedValueOnce({ data: createRemoteRow(), error: null })
@@ -446,7 +501,6 @@ describe('useTarkov sync integration', () => {
     vi.spyOn(Date, 'now').mockReturnValue(123456789);
     options.onSynced();
     expect(getLastLocalSyncTime()).toBe(123456789);
-    vi.restoreAllMocks();
   });
   it.each(['success', 'error', 'throw', 'session-reset'])(
     'tracks an in-flight RPC and removes failed or stale markers: %s',
