@@ -924,7 +924,9 @@
           "experience_rewards": "Recompensas de experiencia",
           "next_tasks": "Próximas tareas",
           "previous_tasks": "Tareas anteriores",
-          "collapse_completed_objectives": "Contraer objetivos en tareas completadas"
+          "collapse_completed_objectives": "Contraer objetivos en tareas completadas",
+          "collapse_by_default": "Colapsar misiones por defecto",
+          "hide_rewards": "Ocultar recompensas"
         },
         "filter_bar": {
           "hint": "Mostrar u ocultar filtros de estado.",
@@ -1008,6 +1010,8 @@
         "available_button": "Marcar como disponible",
         "uncomplete_button": "Marcar como no completado",
         "reset_item_counts": "Restablecer conteos de objetos",
+        "collapse_task": "Colapsar tarea",
+        "expand_task": "Expandir tarea",
         "reset_item_counts_disabled_complete": "Marca esta misión como incompleta para restablecer conteos",
         "reset_item_counts_disabled_failed": "Marca esta misión como disponible para restablecer conteos",
         "reset_item_counts_disabled_nothing_to_reset": "No hay conteos de objetos que restablecer",
@@ -1880,7 +1884,8 @@
         "show_xp": "Mostrar recompensas de XP",
         "show_next": "Mostrar misiones siguientes",
         "show_prev": "Mostrar misiones anteriores",
-        "density": "Densidad de tarjetas",
+        "collapse_by_default": "Colapsar misiones por defecto",
+        "hide_rewards": "Ocultar recompensas",
         "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
         "flags_section": "Mostrar tarea",
         "availability_section": "Disponibilidad de tareas",
