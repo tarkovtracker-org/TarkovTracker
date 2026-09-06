@@ -5,6 +5,9 @@
     "load_error_description": "Impossible de charger les données admin. Veuillez actualiser ou contacter le support. Référence : {reference}",
     "no_reference": "N/A",
     "error": {
+      "cache_purge_failed": "Impossible de purger le cache. Veuillez réessayer.",
+      "invalid_purge_type": "Sélectionnez un type de purge de cache valide.",
+      "method_not_allowed": "Cette méthode de requête n'est pas prise en charge.",
       "admin_privileges_required": "Vous n'avez pas la permission d'effectuer cette action.",
       "authentication_required": "Vous devez être connecté pour continuer.",
       "invalid_channel": "Entrez un nom de chaîne Twitch valide.",
