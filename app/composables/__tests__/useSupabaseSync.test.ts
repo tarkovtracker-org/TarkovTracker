@@ -97,6 +97,11 @@ describe('useSupabaseSync', () => {
     const result = reconcile(remote);
     expect(result).toEqual({ pvp: { name: 'remote', count: 0 }, pve: { name: 'other device' } });
     Object.assign(store.$state, result);
+    // The saved zero remains acknowledged after the stale snapshot: a later
+    // remote change must not be mistaken for a conflict with a pending edit.
+    expect(sync.captureRemoteMerge!()({ pvp: { name: 'remote', count: 3 } })).toEqual({
+      pvp: { name: 'remote', count: 3 },
+    });
     // Applying one remote value must not make it a permanent local override.
     expect(sync.captureRemoteMerge!()({ pve: { name: 'newer remote' } })).toEqual({
       pve: { name: 'newer remote' },

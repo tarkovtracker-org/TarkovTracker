@@ -53,10 +53,10 @@ export const createPendingStateTracker = (getState: () => unknown) => {
             ? preservePendingPaths(beforeRead[key], current[key], merged[key])
             : merged[key];
           // A domain merge may intentionally keep a fallback instead of the
-          // raw remote value. Only advance clean paths to what was accepted;
-          // locally changed paths retain their prior baseline until saved.
+          // raw remote value. Preserve acknowledgements that advanced since
+          // this read started, rather than restoring its pre-save baseline.
           acknowledged[key] = preserveChanges
-            ? preservePendingPaths(current[key], beforeRead[key], merged[key])
+            ? preservePendingPaths(beforeRead[key], baseline[key], merged[key])
             : merged[key];
         }
         baseline = snapshotSyncState(acknowledged);
