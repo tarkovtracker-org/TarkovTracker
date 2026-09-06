@@ -5,6 +5,9 @@
     "load_error_description": "관리자 데이터를 불러오지 못했습니다. 새로고침하거나 고객지원에 문의해 주세요. 참조: {reference}",
     "no_reference": "N/A",
     "error": {
+      "cache_purge_failed": "Could not purge the cache. Please try again.",
+      "invalid_purge_type": "Select a valid cache purge type.",
+      "method_not_allowed": "This request method is not supported.",
       "admin_privileges_required": "이 작업을 수행할 권한이 없습니다.",
       "authentication_required": "You must be signed in to continue.",
       "invalid_channel": "Enter a valid Twitch channel name.",
