@@ -81,6 +81,12 @@ export function useInfiniteScroll(
       logDebug('skip', { reason: 'missing-window', scrollTriggered });
       return;
     }
+    // Suspense can mount the list in a detached tree. Its zero bounding rect is
+    // not evidence that the sentinel is near the viewport; wait for real layout.
+    if (!sentinelRef.value.isConnected || sentinelRef.value.getClientRects().length === 0) {
+      logDebug('skip', { reason: 'sentinel-without-layout', scrollTriggered });
+      return;
+    }
     if (autoFill && resetAutoLoadCycle) {
       resetAutoLoadState('manual-check');
     }
