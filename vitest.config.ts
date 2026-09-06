@@ -54,10 +54,42 @@ export default defineVitestConfig({
         ? {}
         : {
             thresholds: {
-              branches: 15,
-              functions: 20,
-              lines: 20,
-              statements: 20,
+              branches: 50,
+              functions: 60,
+              lines: 65,
+              statements: 63,
+              'app/stores/utils/gameMode.ts': { 100: true },
+              'app/composables/useTaskState.ts': { 100: true },
+              'app/utils/storeHelpers.ts': {
+                lines: 85,
+                statements: 85,
+                functions: 100,
+                branches: 85,
+              },
+              'app/composables/useTaskRepair.ts': {
+                lines: 90,
+                statements: 90,
+                functions: 85,
+                branches: 75,
+              },
+              'app/composables/useAppInitialization.ts': {
+                lines: 95,
+                statements: 85,
+                functions: 100,
+                branches: 80,
+              },
+              'app/server/api/changelog.get.ts': {
+                lines: 90,
+                statements: 85,
+                functions: 95,
+                branches: 70,
+              },
+              'app/utils/changelog.ts': {
+                lines: 100,
+                statements: 100,
+                functions: 100,
+                branches: 90,
+              },
             },
           }),
     },
