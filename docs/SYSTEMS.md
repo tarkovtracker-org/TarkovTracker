@@ -1269,6 +1269,8 @@ skeleton/reward reflow and an initial list filtered without edition eligibility.
 request is scoped to the tasks page; other routes retain the store's idle scheduling. Edition
 responses, errors, and cleanup apply only to the current promise; superseded cache reads and
 network requests cannot overwrite current eligibility, cache payloads, or loading state.
+Normalize edition and chapter network payloads before applying either, preserving existing
+data if normalization fails.
 
 Core-task replacements advance `tasksCoreRevision`, including cache hits that never raise
 `loading`; detail/item merges do not advance it. Readiness watches this revision so cached

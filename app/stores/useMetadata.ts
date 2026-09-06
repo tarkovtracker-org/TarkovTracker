@@ -168,6 +168,30 @@ const deriveStaticMapKey = (mapName: string, normalizedName?: string): string =>
   const lower = mapName.toLowerCase();
   return MAP_NAME_MAPPING[lower] ?? lower.replace(/[\s+-]/g, '');
 };
+type CachedEditions = { editions?: GameEdition[]; storyChapters?: StoryChapter[] };
+const readCachedEditions = async (): Promise<CachedEditions> => {
+  if (typeof window === 'undefined') return {};
+  try {
+    return (await getCachedData<CachedEditions>('editions' as CacheType, 'all', 'en')) ?? {};
+  } catch (error) {
+    logger.warn('[MetadataStore] Editions cache read failed:', error);
+    return {};
+  }
+};
+const applyCachedEditions = async (
+  state: Pick<MetadataState, 'editions' | 'storyChapters'>,
+  isCurrent: () => boolean
+): Promise<boolean> => {
+  const { editions, storyChapters = [] } = await readCachedEditions();
+  if (!isCurrent() || !editions) return false;
+  state.editions = markRaw(editions);
+  if (!storyChapters.length) return false;
+  state.storyChapters = markRaw(
+    storyChapters.map((chapter) => normalizeStoryChapter(chapter)).sort((a, b) => a.order - b.order)
+  );
+  logger.debug('[MetadataStore] Editions loaded from cache');
+  return true;
+};
 export const useMetadataStore = defineStore('metadata', {
   state: (): MetadataState => ({
     initialized: false,
@@ -961,8 +985,6 @@ export const useMetadataStore = defineStore('metadata', {
         throwOnError: true,
       });
     },
-    // Fallow cannot follow this method through the typed composable boundary.
-    // fallow-ignore-next-line unused-store-member -- accessed through typed composable boundary
     async fetchMapSpawnsData(forceRefresh = false) {
       if (this.mapSpawnsLoaded && !forceRefresh) return;
       const requestLanguage = this.languageCode;
@@ -1364,36 +1386,23 @@ export const useMetadataStore = defineStore('metadata', {
         return existingPromise;
       }
       // Register the promise before requests can settle or throw synchronously.
+      // fallow-ignore-next-line complexity -- CRAP assumes zero coverage; measured coverage and reduced complexity are documented in docs/task-performance-validation.md
       const promise = Promise.resolve().then(async () => {
         this.editionsError = null;
-        const existingEditions = this.editions;
-        const existingStoryChapters = this.storyChapters;
-        if (!forceRefresh && typeof window !== 'undefined') {
-          try {
-            const cached = await getCachedData<{
-              editions: GameEdition[];
-              storyChapters?: StoryChapter[];
-            }>('editions' as CacheType, 'all', 'en');
-            if (promiseStore.editionsPromise !== promise) return;
-            if (cached?.editions) {
-              this.editions = markRaw(cached.editions);
-            }
-            if (cached?.editions && cached.storyChapters && cached.storyChapters.length > 0) {
-              logger.debug('[MetadataStore] Editions loaded from cache');
-              const sorted = cached.storyChapters
-                .map((chapter) => normalizeStoryChapter(chapter))
-                .sort((a, b) => a.order - b.order);
-              this.storyChapters = markRaw(sorted);
-              void this.fetchEditionsData(true).catch((err) =>
-                logger.warn('[MetadataStore] Background editions revalidation failed:', err)
-              );
-              return;
-            }
-          } catch (cacheErr) {
-            logger.warn('[MetadataStore] Editions cache read failed:', cacheErr);
-          }
+        const isCurrent = () => promiseStore.editionsPromise === promise;
+        if (
+          !forceRefresh &&
+          (await applyCachedEditions(this, isCurrent).catch((error) => {
+            logger.warn('[MetadataStore] Editions cache read failed:', error);
+            return false;
+          }))
+        ) {
+          void this.fetchEditionsData(true).catch((error) =>
+            logger.warn('[MetadataStore] Background editions revalidation failed:', error)
+          );
+          return;
         }
-        if (promiseStore.editionsPromise !== promise) return;
+        if (!isCurrent()) return;
         this.editionsLoading = true;
         try {
           const OVERLAY_URL =
@@ -1405,21 +1414,15 @@ export const useMetadataStore = defineStore('metadata', {
             parseResponse: JSON.parse,
           });
           if (promiseStore.editionsPromise !== promise) return;
-          if (overlay?.editions) {
-            this.editions = markRaw(Object.values(overlay.editions));
-          } else {
+          // Normalize both before assigning so malformed chapters cannot partially replace eligibility.
+          const editions = Object.values(overlay?.editions ?? {});
+          const chapters = Object.values(overlay?.storyChapters ?? {})
+            .map((chapter) => normalizeStoryChapter(chapter))
+            .sort((a, b) => a.order - b.order);
+          if (!overlay?.editions)
             logger.warn('[MetadataStore] No editions found in overlay response');
-            this.editions = markRaw([]);
-          }
-          if (overlay?.storyChapters) {
-            const chaptersArray = Object.values(overlay.storyChapters).map((chapter) =>
-              normalizeStoryChapter(chapter)
-            );
-            chaptersArray.sort((a, b) => a.order - b.order);
-            this.storyChapters = markRaw(chaptersArray);
-          } else {
-            this.storyChapters = markRaw([]);
-          }
+          this.editions = markRaw(editions);
+          this.storyChapters = markRaw(chapters);
           if (typeof window !== 'undefined') {
             setCachedData(
               'editions' as CacheType,
@@ -1433,15 +1436,6 @@ export const useMetadataStore = defineStore('metadata', {
           if (promiseStore.editionsPromise !== promise) return;
           logger.error('[MetadataStore] Error fetching editions data:', err);
           this.editionsError = err as Error;
-          if (!this.editions.length && existingEditions.length) {
-            this.editions = markRaw(existingEditions);
-          }
-          if (!this.storyChapters.length && existingStoryChapters.length) {
-            this.storyChapters = markRaw(existingStoryChapters);
-          }
-          if (!this.editions.length) {
-            this.editions = markRaw([]);
-          }
         }
       });
       promiseStore.editionsPromise = promise;

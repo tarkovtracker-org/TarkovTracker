@@ -130,6 +130,36 @@ describe('useMetadataStore fetchEditionsData', () => {
     expect(store.editions).toEqual([latest]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+  it('keeps cached eligibility when malformed chapters and the network both fail', async () => {
+    const store = useMetadataStore();
+    const cached = createEdition('cached', 1, 'Cached');
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue({
+      editions: [cached],
+      storyChapters: [null],
+    });
+    vi.stubGlobal('$fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    await store.fetchEditionsData();
+    expect(store.editions).toEqual([cached]);
+    expect(store.editionsError).toBeInstanceOf(Error);
+  });
+  it('preserves eligibility and chapters when the response cannot be normalized', async () => {
+    const store = useMetadataStore();
+    const existing = createEdition('existing', 1, 'Existing');
+    const chapter = createStoryChapter('existing', 1, 'Existing');
+    store.editions = [existing];
+    store.storyChapters = [chapter];
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn().mockResolvedValue({
+        editions: { replacement: createEdition('replacement', 2, 'Replacement') },
+        storyChapters: { invalid: null },
+      })
+    );
+    await store.fetchEditionsData(true);
+    expect(store.editions).toEqual([existing]);
+    expect(store.storyChapters).toEqual([chapter]);
+    expect(store.editionsError).toBeInstanceOf(TypeError);
+  });
   it('records synchronous network failures after request registration', async () => {
     const store = useMetadataStore();
     const error = new Error('synchronous failure');

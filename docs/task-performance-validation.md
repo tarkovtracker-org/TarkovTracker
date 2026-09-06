@@ -337,3 +337,30 @@ Final extended Lighthouse runs were score **0.40 / 0.42 / 0.41**, TBT **1009 / 9
 CLS **0.0020 / 0.0020 / 0.0020**, FCP **5043 / 5043 / 5045 ms**, and LCP
 **23357 / 23281 / 23360 ms**. Median TBT is about 12% below main; the layout and timing budgets
 still pass. The reported LCP tradeoff remains and is not described as an improvement.
+
+### Loader complexity and coverage
+
+The final loader cleanup separates cache reading/application from request control and normalizes
+both network payloads before changing state. A malformed response preserves existing eligibility
+and chapters; malformed cached chapters still fall back to the network while preserving cached
+eligibility. These paths have dedicated regression coverage.
+
+The edition request callback drops from cyclomatic **25 to 14** and cognitive **29 to 11**.
+Fallow classifies the refactored inherited callback as new and estimates zero coverage, producing
+CRAP 210. A focused V8 coverage diagnostic instead measured **30/33 statements** and **17/18
+branches** covered inside this callback across ten edition tests. Using statement coverage in
+Fallow's documented CRAP formula puts it below 15, under the default 30 threshold. The narrowly
+scoped Fallow annotation documents this mismatch; no repository threshold or CI gate is changed.
+Sonar's cognitive-complexity rule remains enabled.
+
+The diagnostic command was `pnpm run test app/stores/__tests__/useMetadata.fetchEditionsData.test.ts
+--coverage --coverage.reporter=json`. Its ten tests passed; the command exits nonzero because a
+single-file run cannot meet the configured whole-application coverage floors. This diagnostic is
+not reported as a passing full coverage run.
+
+After the loader cleanup, all **160 tests across 12 focused files** passed, along with lint,
+typecheck, systems drift, and Fallow. The broader repeated measurements above precede this
+loader-only cleanup; no readiness timing policy, filters, or card rendering code changed in it.
+The rebuilt loader also passed cached-core, empty-recovery, edition/count/item delay, and
+deep-link browser probes. Its final mobile cold/warm smoke trace retained eight cards, no
+empty-state frames, and shift sums **0.0020 / 0** (first complete cards **3018 / 1815 ms**).
