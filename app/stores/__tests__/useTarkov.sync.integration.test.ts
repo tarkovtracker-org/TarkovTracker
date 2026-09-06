@@ -175,7 +175,10 @@ const {
       realtimeState.callback = callback;
       return channel;
     }),
-    subscribe: vi.fn(() => channel),
+    subscribe: vi.fn((callback?: (status: string, error?: Error) => void) => {
+      callback?.('SUBSCRIBED');
+      return channel;
+    }),
   };
   const i18nTranslate = vi.fn((key: string, params?: Record<string, unknown>) => {
     if (key === 'toast.api_updated.label.single') return 'Task updated';
@@ -395,7 +398,10 @@ describe('useTarkov sync integration', () => {
       }
       return channel;
     });
-    channel.subscribe.mockImplementation(() => channel);
+    channel.subscribe.mockImplementation((callback?: (status: string, error?: Error) => void) => {
+      callback?.('SUBSCRIBED');
+      return channel;
+    });
     useSupabaseSyncMock.mockReturnValue({
       cleanup: cleanupSync,
       pause: pauseSync,

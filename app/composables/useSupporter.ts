@@ -1,6 +1,12 @@
 import { isSupporterActivityActive } from '@/features/supporter/supporterStatus';
 import { logger } from '@/utils/logger';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import {
+  createChannelReleaseLatch,
+  logChannelSubscribeFailure,
+  removeOwnedChannel,
+  type OwnedRealtimeChannel,
+} from '@/utils/realtimeChannel';
+import { refreshSupabaseSession } from '@/utils/supabaseAuth';
 export interface SupporterStatus {
   tier: 'supporter' | 'scav' | 'timmy' | 'chad';
   status: 'active' | 'past_due' | 'expired' | 'cancelled';
@@ -15,9 +21,11 @@ export interface SupporterStatus {
 const supporterState = ref<SupporterStatus | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
-let channel: RealtimeChannel | null = null;
+let channel: OwnedRealtimeChannel | null = null;
+const channelRelease = createChannelReleaseLatch();
 let channelUserId: string | null = null;
 let statusRequestVersion = 0;
+let subscriptionRequestVersion = 0;
 export function useSupporter() {
   const { $supabase } = useNuxtApp();
   const isCurrentStatusRequest = (userId: string, requestVersion: number) => {
@@ -87,16 +95,26 @@ export function useSupporter() {
       }
     }
   }
-  function subscribe(userId: string) {
+  async function subscribe(userId: string) {
     if (!$supabase || !userId) return;
     if (channel && channelUserId === userId) return;
-    if (channel) {
-      channel.unsubscribe();
-      channel = null;
-      channelUserId = null;
+    const requestVersion = ++subscriptionRequestVersion;
+    const previousChannel = channel;
+    channel = null;
+    channelUserId = null;
+    if (previousChannel) {
+      channelRelease.hold(previousChannel, removeOwnedChannel(previousChannel, 'Supporter'));
     }
-    channel = $supabase.client
-      .channel(`supporters:${userId}`)
+    const topic = `supporters:${userId}`;
+    // Resubscribing to the same user reuses the topic, so its leave has to finish
+    // first; an unclean leave declines the topic entirely.
+    if (!(await channelRelease.release(topic))) return;
+    if (requestVersion !== subscriptionRequestVersion) return;
+    if ($supabase.user?.loggedIn === false || $supabase.user?.id !== userId) return;
+    if (channel || channelUserId) return;
+    const client = $supabase.client;
+    const nextChannel = client
+      .channel(topic)
       .on(
         'postgres_changes',
         {
@@ -111,14 +129,19 @@ export function useSupporter() {
           });
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        logChannelSubscribeFailure('Supporter', status, err, { userId });
+      });
+    channel = { channel: nextChannel, client, topic };
     channelUserId = userId;
   }
   function unsubscribe() {
-    if (channel) {
-      channel.unsubscribe();
-      channel = null;
-      channelUserId = null;
+    subscriptionRequestVersion += 1;
+    const channelToRemove = channel;
+    channel = null;
+    channelUserId = null;
+    if (channelToRemove) {
+      channelRelease.hold(channelToRemove, removeOwnedChannel(channelToRemove, 'Supporter'));
     }
   }
   function reset() {
@@ -156,8 +179,10 @@ export function useSupporter() {
       const sessionResp = await $supabase.client.auth.getSession();
       token = sessionResp.data.session?.access_token ?? null;
       if (!token) {
-        const refreshed = await $supabase.client.auth.refreshSession();
-        token = refreshed.data.session?.access_token ?? null;
+        // A failed refresh means no usable token; fall through to the
+        // sign-in message rather than surfacing a raw Supabase error.
+        const refreshed = await refreshSupabaseSession($supabase.client).catch(() => null);
+        token = refreshed?.access_token ?? null;
       }
       if (!token) {
         const message = 'You must be signed in to support TarkovTracker.';

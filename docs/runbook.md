@@ -107,8 +107,10 @@ Prepare and deploy each rollover in two releases during the no-write gap between
    validation plus the Supabase DB and API gateway suites for both final states.
 2. After the previous season's announced cutoff, deploy only the database migration that replaces
    `private.active_season_number()`, `private.active_season_starts_on()`, and
-   `private.active_season_ends_at()`. Verify all three functions before continuing. Existing clients
-   fail closed on old-season writes during this gap instead of writing into the new season.
+   `private.active_season_ends_at()`. Verify all three functions before continuing. During this gap
+   `sync_user_game_mode_progress` skips the Seasonal entry of any client still bundling the previous
+   season number, so no old-season state reaches the new season while those clients keep syncing
+   their persistent PvP and PvE progress normally.
 3. Deploy the application release that updates `ACTIVE_SEASON` in `app/utils/constants.ts`. Verify
    the app countdown and `/progress` Seasonal row selection before announcing the new season open.
 4. Do not combine the database flip and application constants in one merge because their production
@@ -128,6 +130,21 @@ GitHub Actions — and each surfaces as a check on the merge commit:
 The Supabase check keeps the name `Supabase Preview` on `main`, where it targets the **production**
 project rather than a preview branch. Per-PR preview deploys are intentionally disabled to avoid
 per-preview billing, which is why the same check reports `skipping` on pull requests.
+
+Two things need operator attention beyond the automated integrations.
+
+First, ship the frontend and both Supabase migrations as one release. The migrations remove the
+client broadcast permission and the direct write grants that older bundles rely on, and deployment
+order across the three integrations is uncontrolled. After the release, reload or close stale tabs:
+a tab still running the previous bundle keeps a channel and write path that no longer exist and will
+stop receiving team updates until it reloads.
+
+Second, private Realtime channels are only enforced when **Allow public access** is disabled under
+the project's Realtime settings in the Supabase dashboard. The `realtime.messages` policies shipped by
+`20260830120000_secure_team_realtime_channels.sql` authorize the private `team:<id>` join, but with
+public access still enabled a client can join a same-named public topic. Row data stays protected by
+table RLS either way; disable the setting to close topic-level access. The migration deliberately
+leaves no client INSERT policy on `realtime.messages`, so no team member can publish broadcasts.
 
 The steps below are therefore mostly verification. The manual commands are a fallback for when an
 integration fails or is unavailable, not the normal path.
@@ -235,9 +252,10 @@ These show up in Supabase logs / query performance and are expected. Do not trea
    - Health checks: replication slots are `active`/`streaming` with `0 GB` lag, and the
      `supabase_realtime` publication is explicitly scoped to a named table list (not
      `FOR ALL TABLES`). This is the desired configuration. The current list is
-     `public.user_progress` (added by `20251205120619`), `public.supporters` (added by
-     `20260714065213`), and `public.user_game_mode_progress` plus `public.team_memberships` (both
-     added by `20260804043342`). Verify with
+     `public.user_progress` (added by `20251205120619`), `public.user_system` (added by
+     `20260830120000`), `public.supporters` (added by `20260714065213`), and
+     `public.user_game_mode_progress` plus `public.team_memberships` (both added by
+     `20260804043342`). Verify with
      `SELECT tablename FROM pg_publication_tables WHERE pubname = 'supabase_realtime';` and update
      this list whenever a migration adds or removes a table.
    - Watch for: occasional high max-time correlates with an inactive/lagging replication slot.

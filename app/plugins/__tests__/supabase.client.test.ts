@@ -84,7 +84,9 @@ const createClientMock = (initialUserId: string) => {
     error: null,
   });
   const signOut = vi.fn().mockResolvedValue({ error: null });
+  const removeAllChannels = vi.fn().mockResolvedValue([]);
   mockCreateClient.mockReturnValue({
+    removeAllChannels,
     auth: {
       getSession: vi.fn().mockResolvedValue({
         data: {
@@ -101,6 +103,7 @@ const createClientMock = (initialUserId: string) => {
   });
   return {
     getAuthStateChangeCallback: () => authStateChangeCallback,
+    removeAllChannels,
     signInWithOAuth,
     signOut,
   };
@@ -157,6 +160,129 @@ describe('supabase plugin', () => {
         },
       })
     );
+  });
+  it('bounds readiness and auth actions when the initial session read never settles', async () => {
+    vi.useFakeTimers();
+    try {
+      const getSession = vi.fn(
+        () => new Promise<{ data: { session: ReturnType<typeof createSession> } }>(() => {})
+      );
+      const signInWithOAuth = vi.fn().mockResolvedValue({
+        data: { provider: 'github', url: null },
+        error: null,
+      });
+      mockAuthClient({ getSession, signInWithOAuth });
+      const plugin = (await import('@/plugins/supabase.client')).default;
+      const setupPromise = plugin.setup?.(
+        {} as Parameters<NonNullable<typeof plugin.setup>>[0]
+      ) as Promise<SupabasePluginProvide | undefined>;
+      await flushPlugin();
+      await vi.advanceTimersByTimeAsync(8000);
+      const result = await setupPromise;
+      const readyPromise = result?.provide.supabase.ready();
+      const signInPromise = result?.provide.supabase.signInWithOAuth('github', {
+        skipBrowserRedirect: true,
+      });
+      await vi.advanceTimersByTimeAsync(8000);
+      await expect(readyPromise).resolves.toBeNull();
+      await expect(signInPromise).resolves.toEqual({ provider: 'github', url: null });
+      expect(getSession).toHaveBeenCalledTimes(2);
+      expect(signInWithOAuth).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('does not re-hydrate the signed-out session when a slow initial read resolves late', async () => {
+    vi.useFakeTimers();
+    try {
+      const sessionDeferred = createDeferred<{
+        data: { session: ReturnType<typeof createSession> };
+        error: null;
+      }>();
+      const authStateChangeCallbacks: MockAuthStateChangeCallback[] = [];
+      const captureAuthStateChange = (callback: MockAuthStateChangeCallback) => {
+        authStateChangeCallbacks.push(callback);
+        return stubAuthSubscription();
+      };
+      const signOut = vi.fn().mockResolvedValue({ error: null });
+      const removeAllChannels = vi.fn().mockResolvedValue([]);
+      mockCreateClient.mockReturnValue({
+        removeAllChannels,
+        auth: {
+          getSession: vi.fn(() => sessionDeferred.promise),
+          onAuthStateChange: vi.fn(captureAuthStateChange),
+          signInWithOAuth: vi.fn(),
+          signOut,
+        },
+      });
+      const plugin = (await import('@/plugins/supabase.client')).default;
+      const setupPromise = plugin.setup?.(
+        {} as Parameters<NonNullable<typeof plugin.setup>>[0]
+      ) as Promise<SupabasePluginProvide | undefined>;
+      await flushPlugin();
+      // The stored-session path awaits readiness; let the boot budget elapse so
+      // setup resolves while the initial getSession() is still in flight.
+      await vi.advanceTimersByTimeAsync(8000);
+      const result = await setupPromise;
+      const supabase = result?.provide.supabase;
+      expect(supabase?.user.loggedIn).toBe(false);
+      // Sign out while the initial read is still pending. signOut awaits client
+      // init, which is still bounded by the boot budget, so advance past it.
+      const signOutPromise = supabase?.signOut();
+      await vi.advanceTimersByTimeAsync(8000);
+      await signOutPromise;
+      expect(signOut).toHaveBeenCalledTimes(1);
+      authStateChangeCallbacks.forEach((callback) => callback('SIGNED_OUT', null));
+      // The slow read now resolves with the pre-sign-out session.
+      sessionDeferred.resolve({ data: { session: createSession('user-1') }, error: null });
+      await flushPlugin();
+      expect(supabase?.user.loggedIn).toBe(false);
+      expect(supabase?.user.id).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('discards a late read after an externally delivered SIGNED_OUT event', async () => {
+    vi.useFakeTimers();
+    try {
+      const sessionDeferred = createDeferred<{
+        data: { session: ReturnType<typeof createSession> };
+        error: null;
+      }>();
+      const authStateChangeCallbacks: MockAuthStateChangeCallback[] = [];
+      const captureAuthStateChange = (callback: MockAuthStateChangeCallback) => {
+        authStateChangeCallbacks.push(callback);
+        return stubAuthSubscription();
+      };
+      const removeAllChannels = vi.fn().mockResolvedValue([]);
+      mockCreateClient.mockReturnValue({
+        removeAllChannels,
+        auth: {
+          getSession: vi.fn(() => sessionDeferred.promise),
+          onAuthStateChange: vi.fn(captureAuthStateChange),
+          signInWithOAuth: vi.fn(),
+          signOut: vi.fn().mockResolvedValue({ error: null }),
+        },
+      });
+      const plugin = (await import('@/plugins/supabase.client')).default;
+      const setupPromise = plugin.setup?.(
+        {} as Parameters<NonNullable<typeof plugin.setup>>[0]
+      ) as Promise<SupabasePluginProvide | undefined>;
+      await flushPlugin();
+      await vi.advanceTimersByTimeAsync(8000);
+      const result = await setupPromise;
+      const supabase = result?.provide.supabase;
+      expect(supabase?.user.loggedIn).toBe(false);
+      // An externally delivered sign-out (expiry, another tab, revocation)
+      // arrives while the initial read is still pending. signOut() is not called.
+      authStateChangeCallbacks.forEach((callback) => callback('SIGNED_OUT', null));
+      sessionDeferred.resolve({ data: { session: createSession('user-1') }, error: null });
+      await flushPlugin();
+      expect(supabase?.user.loggedIn).toBe(false);
+      expect(supabase?.user.id).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it('exchanges an oauth callback code when ready is called', async () => {
     localStorage.removeItem('sb-test-auth-token');
@@ -253,7 +379,9 @@ describe('supabase plugin', () => {
       await expect(result?.provide.supabase.ready()).rejects.toThrow('invalid_grant');
       expect(window.location.search).toBe('?code=expired-code');
       expect(result?.provide.supabase.user.loggedIn).toBe(false);
-      await expect(result?.provide.supabase.ready()).resolves.toBeUndefined();
+      await expect(result?.provide.supabase.ready()).resolves.toMatchObject({
+        user: { id: 'user-after-retry' },
+      });
       expect(getSession).toHaveBeenCalledTimes(2);
       expect(result?.provide.supabase.user.id).toBe('user-after-retry');
     } finally {
@@ -376,13 +504,64 @@ describe('supabase plugin', () => {
       SupabasePluginProvide | undefined;
     await flushPlugin();
     expect(result?.provide.supabase.user.loggedIn).toBe(false);
-    await result?.provide.supabase.ready();
+    const session = await result?.provide.supabase.ready();
     expect(getSession).toHaveBeenCalledTimes(2);
+    expect(session?.user.id).toBe('user-3');
     expect(result?.provide.supabase.user.id).toBe('user-3');
     expect(result?.provide.supabase.user.loggedIn).toBe(true);
   });
+  it('deduplicates concurrent ready session reads and logs failures', async () => {
+    localStorage.removeItem('sb-test-auth-token');
+    const sessionDeferred = createDeferred<{
+      data: { session: ReturnType<typeof createSession> };
+    }>();
+    const getSession = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: {
+          session: createSession('user-1'),
+        },
+      })
+      .mockReturnValue(sessionDeferred.promise);
+    mockCreateClient.mockReturnValue({
+      auth: {
+        getSession,
+        onAuthStateChange: vi.fn(() => ({
+          data: {
+            subscription: {
+              unsubscribe: vi.fn(),
+            },
+          },
+        })),
+        signInWithOAuth: vi.fn(),
+        signOut: vi.fn(),
+      },
+    });
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    await flushPlugin();
+    const firstReady = result?.provide.supabase.ready();
+    const secondReady = result?.provide.supabase.ready();
+    await flushPlugin();
+    expect(getSession).toHaveBeenCalledTimes(2);
+    sessionDeferred.resolve({
+      data: {
+        session: createSession('user-1'),
+      },
+    });
+    await Promise.all([firstReady, secondReady]);
+    expect(result?.provide.supabase.user.id).toBe('user-1');
+    const readyError = new Error('ready session failed');
+    getSession.mockRejectedValueOnce(readyError);
+    await expect(result?.provide.supabase.ready()).rejects.toBe(readyError);
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      '[Supabase] Failed to read ready session',
+      readyError
+    );
+  });
   it('preserves scoped local state after signOut', async () => {
-    const { signOut } = createClientMock('user-1');
+    const { getAuthStateChangeCallback, removeAllChannels, signOut } = createClientMock('user-1');
     const plugin = (await import('@/plugins/supabase.client')).default;
     const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
       SupabasePluginProvide | undefined;
@@ -390,8 +569,55 @@ describe('supabase plugin', () => {
     await result?.provide.supabase.ready();
     await result?.provide.supabase.signOut();
     expect(signOut).toHaveBeenCalledTimes(1);
+    expect(removeAllChannels).toHaveBeenCalledTimes(1);
     expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe('progress-state');
     expect(localStorage.getItem(STORAGE_KEYS.preferences)).toBe('preferences-state');
+    getAuthStateChangeCallback()?.('SIGNED_OUT', null);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(removeAllChannels).toHaveBeenCalledTimes(2);
+  });
+  it('logs realtime cleanup failures after signOut without rejecting', async () => {
+    const cleanupError = new Error('realtime cleanup failed');
+    const { removeAllChannels, signOut } = createClientMock('user-1');
+    removeAllChannels.mockRejectedValue(cleanupError);
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    await flushPlugin();
+    await expect(result?.provide.supabase.signOut()).resolves.toBeUndefined();
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      '[Supabase] Failed to remove realtime channels after sign-out',
+      cleanupError
+    );
+    expect(removeAllChannels).toHaveBeenCalledTimes(1);
+    expect(signOut).toHaveBeenCalledTimes(1);
+  });
+  it('shares client initialization between concurrent ready and oauth calls', async () => {
+    localStorage.removeItem('sb-test-auth-token');
+    const sessionDeferred = createDeferred<{
+      data: { session: ReturnType<typeof createSession> };
+    }>();
+    const signInWithOAuth = vi.fn().mockResolvedValue({
+      data: { provider: 'github', url: null },
+      error: null,
+    });
+    mockAuthClient({
+      getSession: vi.fn(() => sessionDeferred.promise),
+      signInWithOAuth,
+    });
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    const readyPromise = result?.provide.supabase.ready();
+    const signInPromise = result?.provide.supabase.signInWithOAuth('github', {
+      skipBrowserRedirect: true,
+    });
+    await flushPlugin();
+    expect(mockCreateClient).toHaveBeenCalledTimes(1);
+    sessionDeferred.resolve({ data: { session: null } });
+    await expect(readyPromise).resolves.toBeNull();
+    await expect(signInPromise).resolves.toEqual({ provider: 'github', url: null });
+    expect(signInWithOAuth).toHaveBeenCalledTimes(1);
   });
   it('provides an offline stub when supabase config is missing', async () => {
     localStorage.removeItem('sb-test-auth-token');
@@ -435,7 +661,7 @@ describe('supabase plugin', () => {
     await expect(fullClient.functions.invoke('noop')).resolves.toEqual({ data: null, error: null });
     await expect(fullClient.auth.signOut()).resolves.toEqual({ error: null });
     expect(fullClient.auth.onAuthStateChange()).toBeDefined();
-    await expect(supabase?.ready()).resolves.toBeUndefined();
+    await expect(supabase?.ready()).resolves.toBeNull();
     await expect(supabase?.signOut()).resolves.toBeUndefined();
     await expect(supabase?.signInWithOAuth('github')).rejects.toThrow(
       'Supabase not configured - login unavailable in offline mode'
@@ -548,6 +774,21 @@ describe('supabase plugin', () => {
     expect(loggerMock.error).toHaveBeenCalledWith(
       '[Supabase] Failed to initialize client',
       initError
+    );
+  });
+  it('logs and rejects initial session read failures', async () => {
+    const sessionError = new Error('initial session read failed');
+    localStorage.removeItem('sb-test-auth-token');
+    mockAuthClient({
+      getSession: vi.fn().mockRejectedValue(sessionError),
+    });
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    await expect(result?.provide.supabase.ready()).rejects.toBe(sessionError);
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      '[Supabase] Failed to read initial session',
+      sessionError
     );
   });
 });

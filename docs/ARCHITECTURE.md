@@ -311,8 +311,11 @@ sequenceDiagram
 
 1. User authenticates via Supabase (OAuth/email)
 2. JWT stored in session
-3. Protected routes validate token
-4. Team API validates membership
+3. Client initialization and session reads are single-flight per browser client.
+4. Protected requests reuse the current access token; concurrent refreshes share one
+   `refreshSession()` request per client.
+5. Protected routes validate token
+6. Team API validates membership
 
 ## API Architecture
 

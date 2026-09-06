@@ -1,5 +1,5 @@
 // eslint-disable-next-line import-x/order
-import type { SupabaseClient, User } from '@supabase/supabase-js';
+import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
 import { hasSupabaseAuthSessionHint } from '@/utils/clientStorage';
 import { logger } from '@/utils/logger';
 import { shouldUseOfflineSupabaseFallback } from '@/utils/runtimeConfig';
@@ -19,6 +19,55 @@ type SupabaseUser = {
   providers: string[] | null; // All linked OAuth providers
 };
 type OAuthCallbackCode = { code: string; flowId?: string };
+/**
+ * How long app start-up waits for the initial session read before continuing.
+ * The read is not cancelled; it hydrates the session whenever it completes.
+ */
+const SESSION_BOOT_BUDGET_MS = 8000;
+/**
+ * Waits for the initial session read without letting it block app start-up.
+ *
+ * The read keeps running past the budget and still hydrates the session when it
+ * completes, so a slow network delays sign-in state instead of preventing the
+ * app from mounting. All callers that depend on readiness use the same budget.
+ */
+const sessionFromResult = (result: {
+  data?: { session?: Session | null } | null;
+}): Session | null => result.data?.session ?? null;
+const supportsChannelRemoval = (
+  client: SupabaseClient | null
+): client is SupabaseClient & { removeAllChannels: () => Promise<unknown> } =>
+  client !== null && typeof client.removeAllChannels === 'function';
+const awaitWithSessionBudget = async <T>(
+  operation: () => Promise<T>,
+  fallback: () => T,
+  timeoutMessage: string
+): Promise<T> => {
+  const operationResult = Promise.resolve().then(operation);
+  let budgetTimeout: ReturnType<typeof setTimeout> | undefined;
+  const budgetElapsed = new Promise<T>((resolve) => {
+    budgetTimeout = setTimeout(() => {
+      logger.warn(timeoutMessage);
+      resolve(fallback());
+    }, SESSION_BOOT_BUDGET_MS);
+  });
+  try {
+    return await Promise.race([operationResult, budgetElapsed]);
+  } finally {
+    if (budgetTimeout !== undefined) clearTimeout(budgetTimeout);
+  }
+};
+const awaitSessionWithinBudget = async (read: () => Promise<Session | null>): Promise<void> => {
+  await awaitWithSessionBudget(
+    () =>
+      read().catch((error: unknown) => {
+        logger.error('[Supabase] Initial session read failed', error);
+        return null;
+      }),
+    () => null,
+    '[Supabase] Initial session read exceeded the start-up budget; continuing'
+  );
+};
 const createSupabaseUserState = () =>
   reactive<SupabaseUser>({
     id: null,
@@ -172,7 +221,7 @@ const buildStub = () => {
       throw new Error('Supabase not configured - login unavailable in offline mode');
     },
     signOut: async () => {},
-    ready: async () => {},
+    ready: async (): Promise<Session | null> => null,
   };
 };
 export default defineNuxtPlugin({
@@ -202,7 +251,12 @@ export default defineNuxtPlugin({
     const user = createSupabaseUserState();
     const stub = buildStub();
     let initPromise: Promise<void> | null = null;
+    let readySessionPromise: Promise<Session | null> | null = null;
     let supabaseClient: SupabaseClient | null = null;
+    let currentSession: Session | null = null;
+    // Bumped on every SIGNED_OUT event so a slow session read that resolves
+    // after sign-out cannot re-hydrate the pre-sign-out session.
+    let authInvalidationToken = 0;
     let oauthCallbackCode = readOAuthCallbackCode();
     const hasCodeQueryParam = currentSearchParams().has('code');
     const hasStoredSession = () => {
@@ -214,43 +268,153 @@ export default defineNuxtPlugin({
       return false;
     };
     const hydrateFromSession = (session: { user?: User } | null) => {
+      currentSession = session as Session | null;
       hydrateUserFromSession(user, session?.user ?? null);
       if (session && window.location.hash.includes('access_token')) {
         window.history.replaceState(null, '', window.location.pathname + window.location.search);
         logger.debug('[Supabase] Cleaned OAuth hash from URL');
       }
     };
-    const ensureClientInitialized = async () => {
-      if (supabaseClient) return;
-      if (!initPromise) {
-        initPromise = (async () => {
-          const { createClient } = await import('@supabase/supabase-js');
-          const client = createClient(supabaseUrl, supabaseKey, {
-            auth: {
-              detectSessionInUrl: !hasCodeQueryParam,
-              flowType: 'pkce',
-            },
-          });
-          supabaseClient = client;
-          api.client = client;
-          client.auth.onAuthStateChange((_event, session) => {
-            hydrateFromSession(session);
-          });
-          const sessionResult = await client.auth.getSession();
-          hydrateFromSession(sessionResult.data?.session ?? null);
-        })()
-          .catch((error) => {
-            logger.error('[Supabase] Failed to initialize client', error);
-            throw error;
-          })
-          .finally(() => {
-            initPromise = null;
-          });
+    let removeChannelsPromise: Promise<void> | null = null;
+    /** Set while `signOut()` is responsible for removing channels. */
+    let signOutOwnsChannelTeardown = false;
+    /**
+     * Removes every Realtime channel, coalescing concurrent callers.
+     *
+     * Explicit `signOut()` and the `SIGNED_OUT` auth event both reach this, so
+     * without coalescing a single sign-out tears channels down twice.
+     */
+    const removeAllRealtimeChannels = async () => {
+      const client = supabaseClient;
+      if (!supportsChannelRemoval(client)) return;
+      removeChannelsPromise ??= (async () => {
+        try {
+          await client.removeAllChannels();
+        } catch (error) {
+          logger.warn('[Supabase] Failed to remove realtime channels after sign-out', error);
+        }
+      })();
+      const pendingRemoval = removeChannelsPromise;
+      try {
+        await pendingRemoval;
+      } finally {
+        if (removeChannelsPromise === pendingRemoval) removeChannelsPromise = null;
       }
-      await initPromise;
+    };
+    const handleAuthStateChange = (event: string, session: Session | null) => {
+      if (event === 'SIGNED_OUT') {
+        // Invalidate any session read already in flight so a late resolution
+        // cannot re-hydrate the signed-out session. Covers explicit sign-out and
+        // externally delivered events (expiry, other tabs, server revocation).
+        authInvalidationToken += 1;
+      }
+      hydrateFromSession(session);
+      if (event !== 'SIGNED_OUT') return;
+      // `signOut()` tears channels down itself. Scheduling a second removal here
+      // could tear down channels recreated right after sign-out, so skip it.
+      if (signOutOwnsChannelTeardown) return;
+      setTimeout(() => {
+        void removeAllRealtimeChannels();
+      }, 0);
+    };
+    const createSupabaseClient = async (): Promise<SupabaseClient> => {
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient(supabaseUrl, supabaseKey, {
+          auth: {
+            detectSessionInUrl: !hasCodeQueryParam,
+            flowType: 'pkce',
+          },
+        });
+        supabaseClient = client;
+        api.client = client;
+        client.auth.onAuthStateChange(handleAuthStateChange);
+        return client;
+      } catch (error) {
+        logger.error('[Supabase] Failed to initialize client', error);
+        throw error;
+      }
+    };
+    const hydrateInitialSession = async (client: SupabaseClient): Promise<void> => {
+      const tokenAtReadStart = authInvalidationToken;
+      try {
+        const sessionResult = await client.auth.getSession();
+        if (authInvalidationToken !== tokenAtReadStart) {
+          // A sign-out happened while this read was in flight. Hydrating its
+          // (pre-sign-out) result would revive the signed-out session.
+          logger.debug('[Supabase] Discarding initial session read invalidated by sign-out');
+          return;
+        }
+        if (sessionResult.error) {
+          // A failed read is not the same as "signed out"; hydrating null here
+          // would sign a valid user out of the UI.
+          logger.warn('[Supabase] Initial session read returned an error', sessionResult.error);
+          return;
+        }
+        hydrateFromSession(sessionFromResult(sessionResult));
+      } catch (error) {
+        logger.error('[Supabase] Failed to read initial session', error);
+        throw error;
+      }
+    };
+    const ensureClientInitialized = async (): Promise<'created' | 'waited' | 'existing'> => {
+      if (initPromise) {
+        await awaitWithSessionBudget(
+          () => initPromise as Promise<void>,
+          () => undefined,
+          '[Supabase] Client initialization exceeded the start-up budget; continuing'
+        );
+        return 'waited';
+      }
+      if (supabaseClient) return 'existing';
+      initPromise = (async () => {
+        const client = await createSupabaseClient();
+        await hydrateInitialSession(client);
+      })().finally(() => {
+        initPromise = null;
+      });
+      await awaitWithSessionBudget(
+        () => initPromise as Promise<void>,
+        () => undefined,
+        '[Supabase] Client initialization exceeded the start-up budget; continuing'
+      );
+      return 'created';
     };
     const initializeClientInBackground = () => {
       void ensureClientInitialized().catch(() => {});
+    };
+    const readReadySession = async (client: SupabaseClient): Promise<Session | null> => {
+      readySessionPromise ??= (async () => {
+        const tokenAtReadStart = authInvalidationToken;
+        try {
+          const sessionResult = await client.auth.getSession();
+          if (authInvalidationToken !== tokenAtReadStart) {
+            // A sign-out happened while this read was in flight. Return the
+            // current (signed-out) session instead of reviving the old one.
+            logger.debug('[Supabase] Discarding ready session read invalidated by sign-out');
+            return currentSession;
+          }
+          if (sessionResult.error) {
+            // A failed read is not the same as "signed out". Keep the last known
+            // session instead of hydrating null and signing the user out.
+            logger.warn('[Supabase] Ready session read returned an error', sessionResult.error);
+            return currentSession;
+          }
+          const session = sessionFromResult(sessionResult);
+          hydrateFromSession(session);
+          return session;
+        } catch (error) {
+          logger.error('[Supabase] Failed to read ready session', error);
+          throw error;
+        }
+      })();
+      const sessionPromise = readySessionPromise;
+      try {
+        await sessionPromise;
+      } finally {
+        if (readySessionPromise === sessionPromise) readySessionPromise = null;
+      }
+      return currentSession;
     };
     let oauthExchangePromise: Promise<void> | null = null;
     const exchangeOAuthCode = async ({ code, flowId }: OAuthCallbackCode) => {
@@ -267,14 +431,13 @@ export default defineNuxtPlugin({
       hydrateFromSession(result.data.session);
       clearOAuthCallbackCode();
     };
-    const refreshFromStoredSession = async () => {
+    const refreshFromStoredSession = async (): Promise<Session | null> => {
       if (!supabaseClient) {
-        return;
+        return null;
       }
-      const sessionResult = await supabaseClient.auth.getSession();
-      hydrateFromSession(sessionResult.data?.session ?? null);
+      return readReadySession(supabaseClient);
     };
-    const consumeOAuthCallbackCode = async () => {
+    const consumeOAuthCallbackCode = async (): Promise<boolean> => {
       if (!oauthCallbackCode) {
         return false;
       }
@@ -284,12 +447,18 @@ export default defineNuxtPlugin({
       await oauthExchangePromise;
       return true;
     };
-    const ready = async () => {
-      await ensureClientInitialized();
-      if (await consumeOAuthCallbackCode()) {
-        return;
-      }
-      await refreshFromStoredSession();
+    const ready = async (): Promise<Session | null> => {
+      return await awaitWithSessionBudget(
+        async () => {
+          await ensureClientInitialized();
+          if (await consumeOAuthCallbackCode()) {
+            return currentSession;
+          }
+          return refreshFromStoredSession();
+        },
+        () => currentSession,
+        '[Supabase] Session readiness exceeded the start-up budget; continuing'
+      );
     };
     const signInWithOAuth = async (
       provider: OAuthProvider,
@@ -315,8 +484,14 @@ export default defineNuxtPlugin({
         logger.debug('[Supabase] signOut skipped because client is not initialized');
         return;
       }
-      const { error } = await supabaseClient.auth.signOut();
-      if (error) throw error;
+      signOutOwnsChannelTeardown = true;
+      try {
+        const { error } = await supabaseClient.auth.signOut();
+        if (error) throw error;
+        await removeAllRealtimeChannels();
+      } finally {
+        signOutOwnsChannelTeardown = false;
+      }
     };
     const api = reactive({
       client: stub.client,
@@ -329,7 +504,7 @@ export default defineNuxtPlugin({
     if (oauthCallbackCode) {
       initializeClientInBackground();
     } else if (hasOAuthCallbackParams() || hasStoredSession()) {
-      await ready();
+      await awaitSessionWithinBudget(ready);
     } else {
       initializeClientInBackground();
     }
