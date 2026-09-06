@@ -906,7 +906,11 @@
   const route = useRoute();
   useTaskRouteSync({ maps, traders: sortedTraders });
   const canRefreshVisibleTasks = computed(
-    () => metadataStore.hasInitialized && !tasksLoading.value && taskDetailsReady.value
+    () =>
+      metadataStore.hasInitialized &&
+      !tasksLoading.value &&
+      !metadataStore.tasksCoreRefreshing &&
+      taskDetailsReady.value
   );
   // Metadata readiness can precede the first debounced filter refresh.
   const hasRefreshedVisibleTasks = ref(false);

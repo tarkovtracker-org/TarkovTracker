@@ -364,3 +364,33 @@ loader-only cleanup; no readiness timing policy, filters, or card rendering code
 The rebuilt loader also passed cached-core, empty-recovery, edition/count/item delay, and
 deep-link browser probes. Its final mobile cold/warm smoke trace retained eight cards, no
 empty-state frames, and shift sums **0.0020 / 0** (first complete cards **3018 / 1815 ms**).
+
+### Bootstrap phase and deferred-load ownership
+
+Final review reproduced two coordination gaps: cached details could settle before a requested
+locale's bootstrap/core phase, and an edition load queued behind slow prestige could run after
+an eager load had completed. `tasksCoreRefreshing` now covers bootstrap through core settlement;
+a per-store token protects overlapping refreshes, and failures clear the phase. Initialization
+also starts this phase before locale/mode updates and cache reads. It does not
+extend the phase across optional metadata requests. Edition request versions let a later eager
+request consume the queued load, including when the caller joins an existing request.
+
+Nine store ownership tests and a composable regression cover these boundaries. The queued
+load still runs on routes without an eager owner. Both issues also reproduced in the previous
+production build: a delayed-prestige probe counted two overlay downloads, and a delayed
+bootstrap probe exposed eight old cards before core settlement. The updated focused suite
+passes **170 tests across 13 files**, with lint, typecheck, systems drift, and Fallow passing.
+
+The rebuilt production probes now count one overlay download and zero old cards during pending
+bootstrap. Cached-core, empty-recovery, delayed edition/count/item, deep-link, fallback, task
+controls, shared routes, mode switching, and team controls all passed again.
+
+Three fresh mobile profiles recorded cold shift sums **0.0020 / 0.0020 / 0.0020** and warm sums
+**0 / 0 / 0**, with eight cards and no empty-state frames. First complete cards appeared at
+**3094 / 3185 / 3094 ms** cold and **1839 / 1961 / 1871 ms** warm. The team smoke repeat recorded
+shift sums **0.0020 / 0** and first complete cards **3467 / 2202 ms** cold/warm.
+
+Extended Lighthouse repeats recorded scores **0.41 / 0.42 / 0.39**, TBT **942 / 908 / 1077 ms**,
+CLS **0.0020 / 0.0020 / 0.0020**, FCP **5043 / 5040 / 5040 ms**, and LCP
+**23358 / 23353 / 25229 ms**. Median TBT remains about 12% below the baseline's 1077 ms;
+the stated layout and complete-card timing budgets pass. The LCP tradeoff remains explicit.

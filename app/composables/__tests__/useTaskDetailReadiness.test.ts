@@ -4,6 +4,7 @@ import { useTaskDetailReadiness } from '@/composables/useTaskDetailReadiness';
 const metadata = reactive({
   hasInitialized: true,
   loading: false,
+  tasksCoreRefreshing: false,
   languageCode: 'en',
   mode: 'regular',
   tasks: [{ id: 'task' }],
@@ -39,6 +40,7 @@ describe('useTaskDetailReadiness', () => {
     scope = effectScope();
     metadata.hasInitialized = true;
     metadata.loading = false;
+    metadata.tasksCoreRefreshing = false;
     metadata.languageCode = 'en';
     metadata.mode = 'regular';
     metadata.tasks = [{ id: 'task' }];
@@ -83,11 +85,28 @@ describe('useTaskDetailReadiness', () => {
     expect(ready.value).toBe(true);
   });
   it('does not retry handled objective count failures', async () => {
+    // Handled failures resolve undefined and leave hydration false; neither permits a retry.
     metadata.objectiveModeCountDifferencesHydrated = false;
+    metadata.fetchObjectiveModeCountDifferences.mockResolvedValueOnce(undefined);
     const ready = start();
     await flush();
     expect(ready.value).toBe(true);
     expect(metadata.fetchObjectiveModeCountDifferences).toHaveBeenCalledTimes(1);
+  });
+  it('keeps cached locale details hidden while bootstrap and core refresh are pending', async () => {
+    const ready = start();
+    await flush();
+    expect(ready.value).toBe(true);
+    metadata.fetchTaskRewardsData.mockClear();
+    metadata.tasksCoreRefreshing = true;
+    metadata.languageCode = 'fr';
+    await flush();
+    expect(ready.value).toBe(false);
+    expect(metadata.fetchTaskRewardsData).not.toHaveBeenCalled();
+    metadata.tasksCoreRefreshing = false;
+    metadata.tasksCoreRevision += 1;
+    await flush();
+    expect(ready.value).toBe(true);
   });
   it('waits for core metadata before requesting details', async () => {
     metadata.hasInitialized = false;

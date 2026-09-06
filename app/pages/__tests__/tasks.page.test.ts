@@ -73,6 +73,7 @@ const metadataStoreMock = reactive({
   hasInitialized: true,
   languageCode: 'en',
   tasksCoreRevision: 0,
+  tasksCoreRefreshing: false,
   editionsLoading: false,
   objectiveModeCountDifferencesHydrated: true,
   getApiGameMode: () => 'regular',

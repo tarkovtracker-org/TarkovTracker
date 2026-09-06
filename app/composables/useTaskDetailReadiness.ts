@@ -10,7 +10,10 @@ export const useTaskDetailReadiness = () => {
   const ready = ref(false);
   watch(
     [
-      () => metadataStore.hasInitialized && !metadataStore.loading,
+      () =>
+        metadataStore.hasInitialized &&
+        !metadataStore.loading &&
+        !metadataStore.tasksCoreRefreshing,
       () => metadataStore.languageCode,
       () => metadataStore.getApiGameMode(),
       () => metadataStore.tasksCoreRevision,

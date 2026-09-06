@@ -103,6 +103,7 @@ interface MetadataState {
   loading: boolean;
   // Only core replacement advances this token; detail and item merges leave it unchanged.
   tasksCoreRevision: number;
+  tasksCoreRefreshing: boolean;
   // Indicates objectives still need to be fetched (set when tasks exist but objectives not yet loaded)
   tasksObjectivesPending: boolean;
   tasksObjectivesHydrated: boolean;
@@ -168,6 +169,21 @@ const deriveStaticMapKey = (mapName: string, normalizedName?: string): string =>
   const lower = mapName.toLowerCase();
   return MAP_NAME_MAPPING[lower] ?? lower.replace(/[\s+-]/g, '');
 };
+const beginTaskCoreRefresh = (state: Pick<MetadataState, 'tasksCoreRefreshing'>): symbol => {
+  const token = Symbol('taskCoreRefresh');
+  getPromiseStore(state).taskCoreRefreshId = token;
+  state.tasksCoreRefreshing = true;
+  return token;
+};
+const finishTaskCoreRefresh = (
+  state: Pick<MetadataState, 'tasksCoreRefreshing'>,
+  token: symbol
+) => {
+  const promises = getPromiseStore(state);
+  if (promises.taskCoreRefreshId !== token) return;
+  state.tasksCoreRefreshing = false;
+  promises.taskCoreRefreshId = null;
+};
 type CachedEditions = { editions?: GameEdition[]; storyChapters?: StoryChapter[] };
 const readCachedEditions = async (): Promise<CachedEditions> => {
   if (typeof window === 'undefined') return {};
@@ -198,6 +214,7 @@ export const useMetadataStore = defineStore('metadata', {
     initializationFailed: false,
     loading: false,
     tasksCoreRevision: 0,
+    tasksCoreRefreshing: false,
     tasksObjectivesPending: false,
     tasksObjectivesHydrated: false,
     hideoutLoading: false,
@@ -407,6 +424,7 @@ export const useMetadataStore = defineStore('metadata', {
       }
       promiseStore.isInitializing = true;
       promiseStore.initPromise = (async () => {
+        const taskCoreRefreshId = beginTaskCoreRefresh(this);
         try {
           this.updateLanguageAndGameMode(undefined, options?.gameMode);
           await this.loadStaticMapData();
@@ -429,6 +447,7 @@ export const useMetadataStore = defineStore('metadata', {
           // Rethrow to allow caller (e.g. metadata plugin) to handle retries or critical failure
           throw err;
         } finally {
+          finishTaskCoreRefresh(this, taskCoreRefreshId);
           promiseStore.isInitializing = false;
           promiseStore.initPromise = null;
           perfEnd(perfTimer, {
@@ -860,45 +879,53 @@ export const useMetadataStore = defineStore('metadata', {
           logger.error('[MetadataStore] Error during cache cleanup:', err)
         );
       }
-      if (cachedData && !forceRefresh) {
-        this.applyCriticalCachedData(cachedData);
-      }
-      await this.fetchBootstrapData(forceRefresh);
-      // Use pre-loaded cache data if available, otherwise fetch
+      const promiseStore = getPromiseStore(this);
+      const taskCoreRefreshId = beginTaskCoreRefresh(this);
       let hideoutPromise: Promise<void>;
       let prestigePromise: Promise<void> = Promise.resolve();
       let editionsPromise: Promise<void> = Promise.resolve();
       let tasksCorePromise: Promise<void>;
-      if (cachedData && !forceRefresh) {
-        hideoutPromise = Promise.resolve();
-        if (!this.storyChapters.length) {
-          editionsPromise = this.fetchEditionsData(false);
+      try {
+        if (cachedData && !forceRefresh) {
+          this.applyCriticalCachedData(cachedData);
         }
-        tasksCorePromise = Promise.resolve();
-      } else {
-        hideoutPromise = this.fetchHideoutData(forceRefresh);
-        if (deferHeavy) {
-          queueIdleTask(
-            () =>
-              this.fetchPrestigeData(forceRefresh).catch((err) =>
-                logger.error('[MetadataStore] Error fetching deferred prestige data:', err)
-              ),
-            { timeout: 3000, minTime: 8, priority: 'normal' }
-          );
-          queueIdleTask(
-            () =>
-              this.fetchEditionsData(forceRefresh).catch((err) =>
-                logger.error('[MetadataStore] Error fetching deferred editions data:', err)
-              ),
-            { timeout: 3500, minTime: 8, priority: 'normal' }
-          );
+        await this.fetchBootstrapData(forceRefresh);
+        if (cachedData && !forceRefresh) {
+          hideoutPromise = Promise.resolve();
+          if (!this.storyChapters.length) {
+            editionsPromise = this.fetchEditionsData(false);
+          }
+          tasksCorePromise = Promise.resolve();
         } else {
-          prestigePromise = this.fetchPrestigeData(forceRefresh);
-          editionsPromise = this.fetchEditionsData(forceRefresh);
+          hideoutPromise = this.fetchHideoutData(forceRefresh);
+          if (deferHeavy) {
+            queueIdleTask(
+              () =>
+                this.fetchPrestigeData(forceRefresh).catch((err) =>
+                  logger.error('[MetadataStore] Error fetching deferred prestige data:', err)
+                ),
+              { timeout: 3000, minTime: 8, priority: 'normal' }
+            );
+            const editionsRequestVersion = promiseStore.editionsRequestVersion;
+            queueIdleTask(
+              () => {
+                if (promiseStore.editionsRequestVersion !== editionsRequestVersion) return;
+                return this.fetchEditionsData(forceRefresh).catch((err) =>
+                  logger.error('[MetadataStore] Error fetching deferred editions data:', err)
+                );
+              },
+              { timeout: 3500, minTime: 8, priority: 'normal' }
+            );
+          } else {
+            prestigePromise = this.fetchPrestigeData(forceRefresh);
+            editionsPromise = this.fetchEditionsData(forceRefresh);
+          }
+          tasksCorePromise = this.fetchTasksCoreData(forceRefresh);
         }
-        tasksCorePromise = this.fetchTasksCoreData(forceRefresh);
+        await tasksCorePromise;
+      } finally {
+        finishTaskCoreRefresh(this, taskCoreRefreshId);
       }
-      await tasksCorePromise;
       // Fetch critical data directly (not deferred) - needed for UI to render
       const itemsLitePromise = this.fetchItemsLiteData(forceRefresh);
       let taskObjectivesPromise: Promise<void> = Promise.resolve();
@@ -1381,6 +1408,7 @@ export const useMetadataStore = defineStore('metadata', {
      */
     async fetchEditionsData(forceRefresh = false) {
       const promiseStore = getPromiseStore(this);
+      promiseStore.editionsRequestVersion += 1;
       const existingPromise = promiseStore.editionsPromise;
       if (existingPromise && !forceRefresh) {
         return existingPromise;

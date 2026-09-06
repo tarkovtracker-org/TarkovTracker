@@ -1272,6 +1272,16 @@ network requests cannot overwrite current eligibility, cache payloads, or loadin
 Normalize edition and chapter network payloads before applying either, preserving existing
 data if normalization fails.
 
+Initialization marks `tasksCoreRefreshing` before updating locale/mode and reading caches.
+`fetchAllData` takes ownership of this phase before bootstrap and clears it after core settlement,
+including failures. A per-store token prevents an older refresh from clearing a newer phase.
+Task readiness stays false during this phase, so locale changes cannot reveal old core data
+while bootstrap is pending. Optional requests remain outside this phase and keep their timeout.
+
+Deferred edition callbacks capture a request version. A later edition request, including a
+deduplicated join, consumes that queued load; the callback skips its redundant revalidation.
+Routes without an eager request retain idle edition loading.
+
 Core-task replacements advance `tasksCoreRevision`, including cache hits that never raise
 `loading`; detail/item merges do not advance it. Readiness watches this revision so cached
 locale replacements and empty-to-populated core recovery start a new wait. After objectives
