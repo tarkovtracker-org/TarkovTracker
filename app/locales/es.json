@@ -5,6 +5,9 @@
     "load_error_description": "Error al cargar los datos del administrador. Por favor, actualice o póngase en contacto con soporte. Referencia: {reference}",
     "no_reference": "N/D",
     "error": {
+      "cache_purge_failed": "No se pudo purgar la caché. Por favor, inténtelo de nuevo.",
+      "invalid_purge_type": "Seleccione un tipo de purga de caché válido.",
+      "method_not_allowed": "Este método de solicitud no es compatible.",
       "admin_privileges_required": "No tienes permiso para realizar esta acción.",
       "authentication_required": "Debes iniciar sesión para continuar.",
       "invalid_channel": "Introduzca un nombre de canal válido de Twitch.",
