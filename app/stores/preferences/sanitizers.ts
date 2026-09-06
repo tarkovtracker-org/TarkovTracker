@@ -23,7 +23,9 @@ export const requiresLegacyPreferencesMigration = (
   persistedState: PersistedPreferencesStateWithLegacy
 ): boolean => {
   return (
-    'neededItemsHideCollected' in persistedState || 'onlyTasksWithSuggestedKeys' in persistedState
+    'taskCardDensity' in persistedState ||
+    'neededItemsHideCollected' in persistedState ||
+    'onlyTasksWithSuggestedKeys' in persistedState
   );
 };
 const isPlainObject = (value: unknown): value is Record<string, unknown> => {

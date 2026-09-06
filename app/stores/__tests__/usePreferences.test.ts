@@ -273,6 +273,30 @@ describe('usePreferencesStore', () => {
       const store = usePreferencesStore();
       expect(store.neededItemsHideOwned).toBe(false);
     });
+    it.each(['compact', 'comfortable'])(
+      'persists removal of legacy %s density on hydration',
+      (density) => {
+        localStorageMock.setItem(
+          STORAGE_KEYS.preferences,
+          serializeUserScopedStorage(
+            { taskCardDensity: density, showNextQuests: false },
+            'user-1',
+            1234
+          )
+        );
+        currentUserId.value = 'user-1';
+        const store = usePreferencesStore();
+        const migratedValue = JSON.parse(
+          localStorageMock.getItem(STORAGE_KEYS.preferences) || '{}'
+        );
+        expect(store.$state).not.toHaveProperty('taskCardDensity');
+        expect(migratedValue).toEqual({
+          _timestamp: 1234,
+          _userId: 'user-1',
+          data: { showNextQuests: false },
+        });
+      }
+    );
     it('persists scoped migration for neededItemsHideCollected', () => {
       localStorageMock.setItem(
         STORAGE_KEYS.preferences,
