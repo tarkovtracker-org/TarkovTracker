@@ -5,6 +5,9 @@
     "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
     "no_reference": "N/A",
     "error": {
+      "cache_purge_failed": "无法清除缓存。请重试。",
+      "invalid_purge_type": "选择有效的缓存清除类型。",
+      "method_not_allowed": "不支持此请求方法。",
       "admin_privileges_required": "您没有权限执行此操作。",
       "authentication_required": "您必须登录才能继续。",
       "invalid_channel": "输入一个有效的Twitch频道名称。",
