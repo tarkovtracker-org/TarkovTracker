@@ -1,3 +1,10 @@
+## [1.76.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.1...v1.76.2) (2026-09-06)
+
+
+### Bug Fixes
+
+* **ci:** reuse validated main CI for releases ([#805](https://github.com/tarkovtracker-org/TarkovTracker/issues/805)) ([c3f2ab2](https://github.com/tarkovtracker-org/TarkovTracker/commit/c3f2ab271dfabb0332fb449314116c6c502d5b8b))
+
 ## [1.76.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.0...v1.76.1) (2026-09-06)
 
 
