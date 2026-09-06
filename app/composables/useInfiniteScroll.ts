@@ -19,6 +19,11 @@ export interface UseInfiniteScrollReturn {
   start: () => void;
   checkAndLoadMore: (scrollTriggered?: boolean) => Promise<void>;
 }
+/**
+ * Load bounded batches when a rendered sentinel approaches the viewport.
+ * Detached or hidden sentinels wait for an observer, scroll, or explicit check
+ * after layout becomes available, without consuming the auto-load budget.
+ */
 export function useInfiniteScroll(
   sentinelRef: Ref<HTMLElement | null> | ComputedRef<HTMLElement | null>,
   onLoadMore: () => void | Promise<void>,

@@ -113,3 +113,14 @@ why the broader CLS work in #444 remains open despite the low Lighthouse CLS.
   collapse/expand, pin/unpin, search/clear, task deep links, and completion/undo.
 - Authenticated team synchronization was not exercised in the offline preview. Existing team
   filtering and teammate map-marker regressions are covered by the focused tests.
+
+Additional browser checks passed for Hideout scrolling (14 → 20 stations), Needed Items
+scrolling (36 → 60 entries), graph and map routes, and PvP → PvE → Seasonal → PvP transitions.
+Paired real-time mobile traces reproduced the same cold layout-shift values on both revisions
+(0.2204 and 0.2586, in different run order); warm layout-shift sum remained 0.1075. The fixed
+mobile runs rendered eight initial cards rather than the baseline's 72, without empty-state
+flashes. These checks produced no uncaught browser exceptions.
+
+The Cloudflare build/deployment also passed. Its hosted preview requires Cloudflare Access;
+the interaction checks above used the local production build, not an authenticated hosted
+preview session.

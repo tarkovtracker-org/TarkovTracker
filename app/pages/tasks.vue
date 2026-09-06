@@ -906,6 +906,7 @@
   useTaskRouteSync({ maps, traders: sortedTraders });
   // Metadata readiness can precede the first debounced filter refresh.
   const hasRefreshedVisibleTasks = ref(false);
+  /** Refresh filters before allowing initial results to replace the loading state. */
   const refreshVisibleTasks = async () => {
     try {
       await updateVisibleTasks(mapTaskVisibilityFilterOptions.value, tasksLoading.value);
