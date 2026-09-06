@@ -924,7 +924,9 @@
           "experience_rewards": "经验奖励",
           "next_tasks": "后续任务",
           "previous_tasks": "前置任务",
-          "collapse_completed_objectives": "折叠已完成任务的目标"
+          "collapse_completed_objectives": "折叠已完成任务的目标",
+          "collapse_by_default": "默认情况下收起任务",
+          "hide_rewards": "隐藏奖励"
         },
         "filter_bar": {
           "hint": "显示或隐藏状态筛选",
@@ -1008,6 +1010,8 @@
         "available_button": "标记为可接取",
         "uncomplete_button": "标记为未完成",
         "reset_item_counts": "重置物品计数",
+        "collapse_task": "折叠任务",
+        "expand_task": "展开任务",
         "reset_item_counts_disabled_complete": "将此任务标记为未完成以重置物品计数",
         "reset_item_counts_disabled_failed": "将此任务标记为可用以重置物品计数",
         "reset_item_counts_disabled_nothing_to_reset": "没有可重置的物品计数",
@@ -1880,7 +1884,8 @@
         "show_xp": "显示经验奖励",
         "show_next": "显示后续任务",
         "show_prev": "显示前置任务",
-        "density": "卡片密度",
+        "collapse_by_default": "默认情况下收起任务",
+        "hide_rewards": "隐藏奖励",
         "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
         "flags_section": "任务显示",
         "availability_section": "任务可用性",
