@@ -22,6 +22,37 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 
 All jobs run in parallel; the `Workers` job no longer waits for `Validate` to finish.
 
+### Crowdin Sync (`crowdin.yml`)
+
+**Triggers:** English source, Crowdin config, or sync workflow changes on `main`; every six hours
+at minute 17 UTC; manual dispatch on `main`. Runs are serialized without cancelling an active sync.
+The workflow uploads `app/locales/en.json` to the Crowdin `main` branch and downloads translations
+to `app/locales/%two_letters_code%.json`, preserving the directory hierarchy. It never uploads
+local translations. The existing `locales` branch supplies translation PRs targeting `main`.
+
+Repository secrets `CROWDIN_PROJECT_ID` and `CROWDIN_PERSONAL_TOKEN` authenticate to Crowdin only.
+GitHub writes use the automatic `secrets.GITHUB_TOKEN`, with only `contents: write` and
+`pull-requests: write`, so newly created PRs are authored by `github-actions[bot]`.
+
+Before enabling this workflow on `main`:
+
+1. Confirm the existing Crowdin source is under the Crowdin branch `main` at
+   `app/locales/en.json`. Crowdin branches are separate from GitHub branches; if the source lives
+   at the Crowdin project root, omit `crowdin_branch_name` before the first run.
+2. Disable the native Crowdin GitHub integration's synchronization for this repository so both
+   integrations cannot write concurrently. Preserve the Crowdin project, translations, and GitHub
+   `locales` branch.
+3. Review and merge or close any existing `locales` PR authored by a personal account. The Action
+   reuses open PRs and cannot change their author. Keep the branch when disposing of the old PR.
+4. Ensure Actions may create PRs and the repository's selected-action policy permits
+   the pinned `crowdin/github-action` v3 commit and `actions/checkout@v7`.
+
+After merging, inspect the first sync run and the next translation PR: verify its author, base,
+and that its diff contains only expected non-English locale exports. The Action creates a PR
+when it commits changed translations; a no-change run may create no PR. If necessary, dispatch
+`Crowdin Sync` on `main` after new translations are available. Do not enable runner debug logging
+for this workflow: the upstream Action prints its environment in debug mode.
+
 ### Crowdin locale PRs
 
 PRs whose changes are limited to the non-English locale exports in `app/locales/` do not trigger
