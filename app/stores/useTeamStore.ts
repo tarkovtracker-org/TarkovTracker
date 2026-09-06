@@ -260,17 +260,16 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
   let disposed = false;
   const previouslyJoined = new WeakSet<OwnedRealtimeChannel>();
   let hydrationTeam: string | null = null;
-  const dispatchHydration = (teamId: string) => {
-    if (hydrationTeam !== teamId) return;
+  const dispatchHydration = (teamId: string | null) => {
+    if (!teamId || hydrationTeam !== teamId) return;
     hydrationTeam = null;
     if (typeof window !== 'undefined')
       window.dispatchEvent(new Event('teammate-progress-reconnected'));
   };
-  const reconcileRejoin = async (owned: OwnedRealtimeChannel, teamId: string) => {
+  const reconcileRejoin = async (teamId: string) => {
     hydrationTeam = teamId;
     try {
       await refresh();
-      if (channel.value === owned) dispatchHydration(teamId);
     } catch (error) {
       logger.warn('[TeamStore] Reconnect member refresh failed', error);
     }
@@ -334,7 +333,7 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
       joinedTeamId = teamId;
       joinedFilter = filter;
       errorCount = 0;
-      if (previouslyJoined.has(owned)) void reconcileRejoin(owned, teamId);
+      if (previouslyJoined.has(owned)) void reconcileRejoin(teamId);
       else {
         previouslyJoined.add(owned);
         dispatchHydration(teamId);
@@ -413,7 +412,12 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     if (!(await shouldContinue(requestVersion))) return;
     await deps.refreshMembers(true);
     if (!(await shouldContinue(requestVersion))) return;
-    if (!needsRebuild(deps.getTeamId())) return;
+    if (!needsRebuild(deps.getTeamId())) {
+      // Only the winning refresh can hydrate an unchanged binding. An older
+      // reconnect request may have been superseded by a membership event.
+      dispatchHydration(joinedTeamId);
+      return;
+    }
     await setup(requestVersion);
   };
   return {

@@ -784,7 +784,8 @@ flowchart LR
   When only a mode row is newer, startup merges progress by entry timestamps and reset epochs;
   visibility changes also update mode timestamps and cannot justify replacing whole mode snapshots.
   Team rejoin refreshes membership and rebuilds changed filters before hydrating teammates; initial
-  joins do not trigger an additional hydration. Optional missing account metadata never blocks
+  joins do not trigger an additional hydration. Only the winning membership refresh may trigger
+  hydration; a superseded reconnect request cannot race ahead of a newer filter rebuild. Optional missing account metadata never blocks
   normalized reconnect progress. Deferred legacy reads retain startup retries and API error mapping.
   Unmaterialized normalized rows are absent for startup fallback and freshness. Outbound writes are
   serialized with captured payloads and versions; resumed saves cannot overtake an in-flight save.

@@ -1361,7 +1361,7 @@ describe('useTarkov sync integration', () => {
     modeProgressResult.data = [{ game_mode: 'pvp', season_number: 0, progress_data: {} }];
     const row = createRemoteRow({ pvp_data: progressWithTaskState('legacy-task', true) });
     single
-      .mockResolvedValueOnce({ data: row, error: null })
+      .mockResolvedValueOnce({ data: { ...row, pvp_data: null, pve_data: null }, error: null })
       .mockResolvedValueOnce({ data: null, error: { message: 'temporary' } })
       .mockResolvedValue({ data: row, error: null });
     await initializeTarkovSync();

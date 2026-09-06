@@ -125,6 +125,48 @@ describe('createTeamChannelController', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(harness.refreshMembers).toHaveBeenCalledTimes(1);
   });
+  it('lets a newer membership refresh finish before reconnect hydration', async () => {
+    const harness = createHarness();
+    const controller = createTeamChannelController(harness.deps);
+    const hydrated = vi.fn();
+    window.addEventListener('teammate-progress-reconnected', hydrated);
+    try {
+      await controller.refresh();
+      harness.channels[0]?.status?.('SUBSCRIBED');
+      let finishOld!: () => void;
+      let finishNew!: () => void;
+      harness.refreshMembers
+        .mockImplementationOnce(
+          () =>
+            new Promise<undefined>((resolve) => {
+              finishOld = () => resolve(undefined);
+            })
+        )
+        .mockImplementationOnce(
+          () =>
+            new Promise<undefined>((resolve) => {
+              finishNew = () => resolve(undefined);
+            })
+        );
+      harness.channels[0]?.status?.('SUBSCRIBED');
+      await vi.advanceTimersByTimeAsync(0);
+      const newer = controller.refresh();
+      await vi.advanceTimersByTimeAsync(0);
+      finishOld();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(hydrated).not.toHaveBeenCalled();
+      harness.state.members = [MEMBER_A, MEMBER_B, MEMBER_C];
+      finishNew();
+      await newer;
+      expect(hydrated).not.toHaveBeenCalled();
+      expect(harness.channels).toHaveLength(2);
+      harness.channels[1]?.status?.('SUBSCRIBED');
+      expect(hydrated).toHaveBeenCalledOnce();
+    } finally {
+      window.removeEventListener('teammate-progress-reconnected', hydrated);
+      await controller.dispose();
+    }
+  });
   it('does not rebuild while the topic and member filter are unchanged', async () => {
     const harness = createHarness();
     const controller = createTeamChannelController(harness.deps);
