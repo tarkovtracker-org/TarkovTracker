@@ -924,7 +924,9 @@
           "experience_rewards": "Erleben Sie Belohnungen",
           "next_tasks": "Nächste Aufgaben",
           "previous_tasks": "Vorherige Aufgaben",
-          "collapse_completed_objectives": "Reduzieren Sie Ziele für abgeschlossene Aufgaben"
+          "collapse_completed_objectives": "Reduzieren Sie Ziele für abgeschlossene Aufgaben",
+          "collapse_by_default": "Quests standardmäßig einklappen",
+          "hide_rewards": "Verstecke Belohnungen"
         },
         "filter_bar": {
           "hint": "Statusfilter ein- oder ausblenden.",
@@ -1008,6 +1010,8 @@
         "available_button": "Als verfügbar markieren",
         "uncomplete_button": "Als unvollständig markieren",
         "reset_item_counts": "Gegenstandszähler zurücksetzen",
+        "collapse_task": "Aufgabe einklappen",
+        "expand_task": "Aufgabe erweitern",
         "reset_item_counts_disabled_complete": "Markiere diese Aufgabe als unvollständig, um Zähler zurückzusetzen",
         "reset_item_counts_disabled_failed": "Markiere diese Aufgabe als verfügbar, um Zähler zurückzusetzen",
         "reset_item_counts_disabled_nothing_to_reset": "Keine Gegenstandszähler zum Zurücksetzen vorhanden",
@@ -1880,7 +1884,8 @@
         "show_xp": "XP-Belohnungen anzeigen",
         "show_next": "Nächste Aufgaben anzeigen",
         "show_prev": "Vorherige Aufgaben anzeigen",
-        "density": "Kartendichte",
+        "collapse_by_default": "Quests standardmäßig einklappen",
+        "hide_rewards": "Verstecke Belohnungen",
         "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
         "flags_section": "Aufgabenanzeige",
         "availability_section": "Aufgabenverfügbarkeit",
