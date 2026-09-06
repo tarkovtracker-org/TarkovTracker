@@ -1,4 +1,5 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime';
+import { flushPromises } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, inject, isRef, nextTick, ref } from 'vue';
 import { jumpToMapObjectiveKey } from '@/features/tasks/task-context';
@@ -71,10 +72,14 @@ const metadataStoreMock = reactive({
   loading: false,
   hasInitialized: true,
   languageCode: 'en',
+  tasksCoreRevision: 0,
+  editionsLoading: false,
+  objectiveModeCountDifferencesHydrated: true,
   getApiGameMode: () => 'regular',
   fetchTaskObjectivesData: vi.fn(() => Promise.resolve()),
   fetchTaskRewardsData: vi.fn(() => Promise.resolve()),
   fetchEditionsData: vi.fn(() => Promise.resolve()),
+  fetchObjectiveModeCountDifferences: vi.fn(() => Promise.resolve()),
   mapsWithSvg: [] as Array<{ id: string; name: string }>,
   objectives: [],
   sortedTraders: [],
@@ -379,27 +384,31 @@ describe('tasks page', () => {
   afterEach(() => {
     wrapper?.unmount();
   });
-  it('filters merged details before revealing the first cards', async () => {
-    wrapper.unmount();
-    updateVisibleTasksMock.mockClear();
-    let finishRewards: () => void = () => {};
-    metadataStoreMock.fetchTaskRewardsData.mockImplementationOnce(
-      () =>
-        new Promise<void>((resolve) => {
-          finishRewards = resolve;
-        })
-    );
-    wrapper = await mountSuspended(TasksPage, {
-      global: { stubs: defaultGlobalStubs },
-    });
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    expect(wrapper.find('task-loading-state-stub').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="task-card"]').exists()).toBe(false);
-    expect(updateVisibleTasksMock).not.toHaveBeenCalled();
-    finishRewards();
-    await vi.waitFor(() => expect(wrapper.find('[data-testid="task-card"]').exists()).toBe(true));
-    expect(updateVisibleTasksMock).toHaveBeenCalled();
-  });
+  it.each(['fetchTaskObjectivesData', 'fetchTaskRewardsData', 'fetchEditionsData'] as const)(
+    'filters merged details before revealing the first cards (%s)',
+    async (action) => {
+      wrapper.unmount();
+      updateVisibleTasksMock.mockClear();
+      let finishRewards: () => void = () => {};
+      metadataStoreMock[action].mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finishRewards = resolve;
+          })
+      );
+      wrapper = await mountSuspended(TasksPage, {
+        global: { stubs: defaultGlobalStubs },
+      });
+      await flushPromises();
+      expect(metadataStoreMock[action]).toHaveBeenCalled();
+      expect(wrapper.find('task-loading-state-stub').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="task-card"]').exists()).toBe(false);
+      expect(updateVisibleTasksMock).not.toHaveBeenCalled();
+      finishRewards();
+      await vi.waitFor(() => expect(wrapper.find('[data-testid="task-card"]').exists()).toBe(true));
+      expect(updateVisibleTasksMock).toHaveBeenCalled();
+    }
+  );
   it.each([true, false])(
     'keeps the loading state until the initial filter refresh finishes (has tasks: %s)',
     async (hasTasks) => {

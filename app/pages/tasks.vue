@@ -905,6 +905,9 @@
   };
   const route = useRoute();
   useTaskRouteSync({ maps, traders: sortedTraders });
+  const canRefreshVisibleTasks = computed(
+    () => metadataStore.hasInitialized && !tasksLoading.value && taskDetailsReady.value
+  );
   // Metadata readiness can precede the first debounced filter refresh.
   const hasRefreshedVisibleTasks = ref(false);
   let visibleTaskRefreshGeneration = 0;
@@ -917,8 +920,7 @@
       logger.error('[Tasks] Failed to refresh tasks:', error);
     } finally {
       if (generation === visibleTaskRefreshGeneration) {
-        hasRefreshedVisibleTasks.value =
-          metadataStore.hasInitialized && !tasksLoading.value && taskDetailsReady.value;
+        hasRefreshedVisibleTasks.value = canRefreshVisibleTasks.value;
       }
     }
   };
@@ -978,7 +980,7 @@
       editions,
     ],
     () => {
-      if (!metadataStore.hasInitialized || tasksLoading.value || !taskDetailsReady.value) {
+      if (!canRefreshVisibleTasks.value) {
         visibleTaskRefreshGeneration += 1;
         hasRefreshedVisibleTasks.value = false;
         debouncedRefreshVisibleTasks.cancel();
@@ -992,11 +994,7 @@
     { immediate: true, flush: 'post' }
   );
   const isLoading = computed(
-    () =>
-      !metadataStore.hasInitialized ||
-      tasksLoading.value ||
-      !taskDetailsReady.value ||
-      !hasRefreshedVisibleTasks.value
+    () => !canRefreshVisibleTasks.value || !hasRefreshedVisibleTasks.value
   );
   const {
     activeSearchCount,

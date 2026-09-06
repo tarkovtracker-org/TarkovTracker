@@ -62,6 +62,23 @@ describe('useMetadataStore fetchEditionsData', () => {
     expect(store.editions).toEqual([existingEdition]);
     expect(store.editionsError).toBeInstanceOf(Error);
   });
+  it('keeps loading until the latest forced request settles', async () => {
+    const store = useMetadataStore();
+    const older = createDeferred<object>();
+    const current = createDeferred<object>();
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn().mockReturnValueOnce(older.promise).mockReturnValueOnce(current.promise)
+    );
+    const first = store.fetchEditionsData(true);
+    const second = store.fetchEditionsData(true);
+    older.resolve({});
+    await first;
+    expect(store.editionsLoading).toBe(true);
+    current.resolve({});
+    await second;
+    expect(store.editionsLoading).toBe(false);
+  });
   it('reuses the in-flight background editions revalidation while serving cached data', async () => {
     const store = useMetadataStore();
     const cachedEdition = createEdition('cached-edition', 1, 'Cached Edition');
@@ -79,9 +96,16 @@ describe('useMetadataStore fetchEditionsData', () => {
     const fetchMock = vi.fn().mockImplementation(() => overlayResponse.promise);
     vi.stubGlobal('$fetch', fetchMock);
     const firstRequest = store.fetchEditionsData(false);
+    await firstRequest;
+    expect(store.editionsLoading).toBe(true);
+    let secondSettled = false;
     const secondRequest = store.fetchEditionsData(false);
+    void secondRequest.then(() => {
+      secondSettled = true;
+    });
     await flushPromises();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(secondSettled).toBe(false);
     overlayResponse.resolve({
       editions: {
         [refreshedEdition.id]: refreshedEdition,

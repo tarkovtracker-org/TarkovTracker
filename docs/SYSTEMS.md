@@ -1262,12 +1262,20 @@ the list becomes visible; configured scroll fallback and explicit checks use the
 
 The tasks page requests objectives, rewards, and edition eligibility together through the
 existing cached/deduplicated store actions (`useTaskDetailReadiness`). Keep its loading state
-until these requests settle and the first visible-task refresh settles. This prevents objective
+until these requests, background edition revalidation, objective mode-count metadata, and the
+first visible-task refresh settle. This prevents objective
 skeleton/reward reflow and an initial list filtered without edition eligibility. This eager
-request is scoped to the tasks page; other routes retain the store's idle scheduling.
+request is scoped to the tasks page; other routes retain the store's idle scheduling. Edition
+request cleanup clears loading and deduplication only for the current promise.
 
-Optional detail requests can hold the page for at most three seconds after core readiness;
-then show the existing progressive UI while late requests continue. Failed requests also release
+Core-task replacements advance `tasksCoreRevision`, including cache hits that never raise
+`loading`; detail/item merges do not advance it. Readiness watches this revision so cached
+locale replacements and empty-to-populated core recovery start a new wait. After objectives
+and rewards settle, await objective mode-count metadata; retry once if an already-running
+request was discarded during task replacement. The existing gate timer still bounds this wait.
+
+Optional detail requests use a three-second gate timer after core readiness; on expiry,
+resume filtering/rendering while late requests continue. Failed requests also release
 the gate. Mode/locale changes, core reloads, and scope disposal invalidate earlier waits and clear
 their timers. An empty task dataset does not wait for optional requests.
 

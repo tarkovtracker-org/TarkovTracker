@@ -7,10 +7,14 @@ const metadata = reactive({
   languageCode: 'en',
   mode: 'regular',
   tasks: [{ id: 'task' }],
+  tasksCoreRevision: 0,
+  editionsLoading: false,
+  objectiveModeCountDifferencesHydrated: true,
   getApiGameMode: () => metadata.mode,
   fetchTaskObjectivesData: vi.fn<() => Promise<void>>(),
   fetchTaskRewardsData: vi.fn<() => Promise<void>>(),
   fetchEditionsData: vi.fn<() => Promise<void>>(),
+  fetchObjectiveModeCountDifferences: vi.fn<() => Promise<void>>(),
 });
 vi.mock('@/stores/useMetadata', () => ({ useMetadataStore: () => metadata }));
 const deferred = () => {
@@ -25,8 +29,7 @@ const deferred = () => {
 let scope: ReturnType<typeof effectScope>;
 const start = () => scope.run(() => useTaskDetailReadiness())!;
 const flush = async () => {
-  await Promise.resolve();
-  await Promise.resolve();
+  await vi.advanceTimersByTimeAsync(0);
   await nextTick();
 };
 describe('useTaskDetailReadiness', () => {
@@ -38,9 +41,13 @@ describe('useTaskDetailReadiness', () => {
     metadata.languageCode = 'en';
     metadata.mode = 'regular';
     metadata.tasks = [{ id: 'task' }];
+    metadata.tasksCoreRevision = 0;
+    metadata.editionsLoading = false;
+    metadata.objectiveModeCountDifferencesHydrated = true;
     metadata.fetchTaskObjectivesData.mockReset().mockResolvedValue();
     metadata.fetchTaskRewardsData.mockReset().mockResolvedValue();
     metadata.fetchEditionsData.mockReset().mockResolvedValue();
+    metadata.fetchObjectiveModeCountDifferences.mockReset().mockResolvedValue();
   });
   afterEach(() => {
     scope.stop();
@@ -87,6 +94,66 @@ describe('useTaskDetailReadiness', () => {
     metadata.tasks = [];
     expect(start().value).toBe(true);
     expect(metadata.fetchTaskRewardsData).not.toHaveBeenCalled();
+  });
+  it.each([true, false])(
+    're-arms cached core replacement without loading (previous tasks: %s)',
+    async (hadTasks) => {
+      if (!hadTasks) metadata.tasks = [];
+      const ready = start();
+      await flush();
+      expect(ready.value).toBe(true);
+      const replacement = deferred();
+      metadata.fetchTaskObjectivesData.mockReturnValueOnce(replacement.promise);
+      metadata.tasks = [{ id: 'localized-task' }];
+      metadata.tasksCoreRevision += 1;
+      await nextTick();
+      expect(ready.value).toBe(false);
+      replacement.resolve();
+      await flush();
+      expect(ready.value).toBe(true);
+    }
+  );
+  it('waits for background edition revalidation after the cache read settles', async () => {
+    metadata.editionsLoading = true;
+    const ready = start();
+    await flush();
+    expect(ready.value).toBe(false);
+    metadata.editionsLoading = false;
+    await nextTick();
+    expect(ready.value).toBe(true);
+  });
+  it('waits for objective count differences after the objectives merge', async () => {
+    const differences = deferred();
+    metadata.fetchObjectiveModeCountDifferences.mockReturnValue(differences.promise);
+    const ready = start();
+    await flush();
+    expect(ready.value).toBe(false);
+    differences.resolve();
+    await flush();
+    expect(ready.value).toBe(true);
+  });
+  it('retries a discarded count request once after detail hydration', async () => {
+    metadata.objectiveModeCountDifferencesHydrated = false;
+    const replacement = deferred();
+    metadata.fetchObjectiveModeCountDifferences
+      .mockResolvedValueOnce()
+      .mockReturnValueOnce(replacement.promise);
+    const ready = start();
+    await flush();
+    expect(metadata.fetchObjectiveModeCountDifferences).toHaveBeenCalledTimes(2);
+    expect(ready.value).toBe(false);
+    replacement.resolve();
+    await flush();
+    expect(ready.value).toBe(true);
+    expect(metadata.fetchObjectiveModeCountDifferences).toHaveBeenCalledTimes(2);
+  });
+  it('does not let stalled edition revalidation hold the page indefinitely', async () => {
+    metadata.editionsLoading = true;
+    const ready = start();
+    await flush();
+    expect(ready.value).toBe(false);
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(ready.value).toBe(true);
   });
   it('releases the page on request failure', async () => {
     metadata.fetchTaskObjectivesData.mockRejectedValue(new Error('offline'));

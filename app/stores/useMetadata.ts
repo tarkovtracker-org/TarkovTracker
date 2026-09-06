@@ -101,6 +101,8 @@ interface MetadataState {
   initialized: boolean;
   initializationFailed: boolean;
   loading: boolean;
+  // Only core replacement advances this token; detail and item merges leave it unchanged.
+  tasksCoreRevision: number;
   // Indicates objectives still need to be fetched (set when tasks exist but objectives not yet loaded)
   tasksObjectivesPending: boolean;
   tasksObjectivesHydrated: boolean;
@@ -171,6 +173,7 @@ export const useMetadataStore = defineStore('metadata', {
     initialized: false,
     initializationFailed: false,
     loading: false,
+    tasksCoreRevision: 0,
     tasksObjectivesPending: false,
     tasksObjectivesHydrated: false,
     hideoutLoading: false,
@@ -1434,15 +1437,16 @@ export const useMetadataStore = defineStore('metadata', {
           if (!this.editions.length) {
             this.editions = markRaw([]);
           }
-        } finally {
-          this.editionsLoading = false;
         }
       })();
       promiseStore.editionsPromise = promise;
       try {
         await promise;
       } finally {
-        promiseStore.editionsPromise = null;
+        if (promiseStore.editionsPromise === promise) {
+          this.editionsLoading = false;
+          promiseStore.editionsPromise = null;
+        }
       }
     },
     applyCriticalCachedData(cachedData: {
@@ -1511,6 +1515,7 @@ export const useMetadataStore = defineStore('metadata', {
         maps: data.maps || [],
         traders: data.traders || [],
       });
+      this.tasksCoreRevision += 1;
       perfEnd(perfTimer, { tasks: this.tasks.length });
     },
     mergeMapSpawns(data: TarkovMapSpawnsQueryResult) {

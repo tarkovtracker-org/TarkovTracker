@@ -130,8 +130,11 @@ preview session.
 ## Follow-up: complete initial task cards
 
 The follow-up compares main `8f0c63896ffa8df08d40df241474dcc0e21701c2` (the merged #808
-implementation) with this revision. The same production-build method and public API response
-replay described above are used. The subsequent main release commit changes the version only.
+implementation) with implementation commit `fa6f422b092a3b2546b6bf595304d1e71c7a5917`.
+The measurements below identify the initial implementation; the review corrections and their
+validation are recorded separately below. The same production-build method and public API
+response replay described above are used. The subsequent main release commit changes the
+version only.
 
 ### Cause and behavior
 
@@ -141,15 +144,17 @@ trace of the intermediate follow-up showed Shooting Cans replaced by Shady Contr
 edition data arrived. Waiting for objectives/rewards alone therefore did not fix cold CLS.
 
 `useTaskDetailReadiness` requests objectives, rewards, and editions concurrently once core
-metadata is ready. The tasks page filters after those requests settle and presents complete
-cards together. It uses the existing cache, deduplication, and response-context guards; other
+metadata is ready. It also waits for background edition revalidation and objective mode-count
+metadata, including one retry if hydration discarded an in-flight count request. The tasks page
+filters after these settle and presents complete cards together. It uses the existing cache, deduplication, and response-context guards; other
 routes retain deferred loading. No card expansion defaults, task eligibility rules, batch sizes,
 progress persistence, or remote data contracts change.
 
 The wait is bounded at **three seconds after core readiness**. Failures release the page;
 stalled requests continue in the background after the bound. This intentionally favors usable
 navigation over stable layout during an outage. A mode/locale change or core reload invalidates
-an earlier wait; unmount clears timers. Filter refresh generations prevent an older async
+an earlier wait, including cached core replacements tracked by `tasksCoreRevision`; unmount
+clears timers. Filter refresh generations prevent an older async
 completion from releasing a newer loading cycle. Its regression test failed before the guard.
 
 ### Measurement policy for closing #444
@@ -250,8 +255,8 @@ and settled-card budgets without changing the selected progress or task filters.
 
 ### Follow-up functional validation
 
-Production build, lint, typecheck, systems drift check, and eight focused Vitest files
-(123 tests) passed. Coverage includes readiness settlement, failures, the three-second timer,
+The initial implementation passed production build, lint, typecheck, systems drift check, and
+eight focused Vitest files (123 tests). Coverage includes readiness settlement, failures, the three-second timer,
 mode/locale changes, core reloads, unmount cleanup, and stale filter refreshes, plus existing
 filtering, actions, deep-link, infinite-scroll, and objective visibility regressions.
 
@@ -263,3 +268,46 @@ promptly. Both retained interactive cards. Teammate selection and hide/show were
 a synthetic identity on the offline client; no authenticated network access was involved.
 Desktop/mobile screenshots were inspected. Local CodeRabbit review raised one stale-refresh
 finding, which the generation guard and failing-then-passing regression test address.
+
+### Review corrections and repeated validation
+
+Review identified three additional initial-render races: cached core replacements without a
+loading transition, background edition revalidation after a cache hit, and deferred objective
+mode-count badges. Core revisions now re-arm readiness, and the gate includes edition
+revalidation and count metadata. Edition promise/loading cleanup is identity-guarded so an
+older request cannot clear the current request's tracking. Empty-to-populated core recovery is
+covered as well. The three-second availability timer still bounds all optional waits.
+
+The corrected production build was measured again on September 6 using the same response
+replay, viewports, throttling, and three independent profiles per scenario. These are separate
+from the initial implementation samples above. All runs displayed eight initial cards and no
+transient empty state.
+
+| Scenario         | Cold shift sums          | Warm shift sums          | Median settled cards, cold / warm (ms) |
+| ---------------- | ------------------------ | ------------------------ | -------------------------------------- |
+| Guest desktop    | 0.0009 / 0.0009 / 0.0009 | 0.0002 / 0.0002 / 0.0002 | 3266 / 2109                            |
+| Guest mobile     | 0.0020 / 0.0020 / 0.0020 | 0 / 0 / 0                | 3330 / 1924                            |
+| Persisted mobile | 0.0020 / 0.0020 / 0.0020 | 0 / 0 / 0                | 3560 / 1960                            |
+| Team mobile      | 0.0020 / 0.0020 / 0.0020 | 0 / 0 / 0                | 3479 / 2120                            |
+
+All layout and settled-card timing budgets still pass against main. The corrected build's
+median complete-card appearance is 10–26% earlier than main across these scenarios. This
+retains the tradeoff above: first incomplete cards previously appeared sooner.
+
+The corrected build's extended mobile Lighthouse runs were score **0.41 / 0.40 / 0.41**,
+TBT **987 / 1034 / 978 ms**, CLS **0.0020 / 0.0020 / 0.0020**, FCP
+**4972 / 5042 / 5046 ms**, and LCP **23357 / 23356 / 23363 ms**. Median TBT is about 8%
+below main's 1077 ms and passes the budget. The LCP candidate/tradeoff remains unchanged.
+
+The review corrections passed 11 focused Vitest files (145 tests), typecheck, and production
+build. Cached-core, edition-revalidation, count-metadata, and edition-deduplication
+regressions failed before their corresponding fixes. Page tests now independently delay
+objectives, rewards, and editions. Local CodeRabbit's second review
+identified the edition loading cleanup race, now covered by a concurrent-request test.
+
+Browser checks repeated successfully on the corrected build: all task controls and shared
+routes listed above, mode switching, and teammate selection/hide/show. Deterministic delayed
+actions in the production browser also verified cached core replacement, empty-core recovery,
+edition revalidation, and count metadata: cards stayed hidden until settlement, then eight
+appeared. Stalled requests released usable cards about 3.2 seconds after core readiness;
+rejections released them promptly. No uncaught browser exceptions were observed.

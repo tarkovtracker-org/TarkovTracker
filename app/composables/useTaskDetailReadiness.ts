@@ -13,6 +13,7 @@ export const useTaskDetailReadiness = () => {
       () => metadataStore.hasInitialized && !metadataStore.loading,
       () => metadataStore.languageCode,
       () => metadataStore.getApiGameMode(),
+      () => metadataStore.tasksCoreRevision,
     ],
     ([coreReady], _previous, onCleanup) => {
       ready.value = false;
@@ -22,22 +23,38 @@ export const useTaskDetailReadiness = () => {
         return;
       }
       let active = true;
+      let requestsSettled = false;
       const timeout = setTimeout(() => {
         if (active) ready.value = true;
       }, TASK_DETAIL_WAIT_MS);
+      const finishWhenSettled = () => {
+        if (!active || !requestsSettled || metadataStore.editionsLoading) return;
+        clearTimeout(timeout);
+        ready.value = true;
+      };
+      // A cache hit can return while edition eligibility is still being revalidated.
+      const stopEditionsWatch = watch(() => metadataStore.editionsLoading, finishWhenSettled);
       onCleanup(() => {
         active = false;
         clearTimeout(timeout);
+        stopEditionsWatch();
       });
+      const settleCountDifferences = async () => {
+        await metadataStore.fetchObjectiveModeCountDifferences();
+        // A joined request may be discarded when reward/item hydration replaces tasks.
+        if (active && !metadataStore.objectiveModeCountDifferencesHydrated) {
+          await metadataStore.fetchObjectiveModeCountDifferences();
+        }
+      };
       // These actions retain the store's cache, request deduplication, and stale-response guards.
       void Promise.allSettled([
         metadataStore.fetchTaskObjectivesData(),
         metadataStore.fetchTaskRewardsData(),
         metadataStore.fetchEditionsData(),
-      ]).then(() => {
-        if (!active) return;
-        clearTimeout(timeout);
-        ready.value = true;
+      ]).then(async () => {
+        if (active) await Promise.allSettled([settleCountDifferences()]);
+        requestsSettled = true;
+        finishWhenSettled();
       });
     },
     { immediate: true }
