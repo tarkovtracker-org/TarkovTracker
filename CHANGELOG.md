@@ -1,3 +1,10 @@
+## [1.75.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.75.2...v1.75.3) (2026-09-06)
+
+
+### Bug Fixes
+
+* **ci:** preserve Nuxt context in Fallow audits ([#800](https://github.com/tarkovtracker-org/TarkovTracker/issues/800)) ([0befdd7](https://github.com/tarkovtracker-org/TarkovTracker/commit/0befdd748150e7152f21944b8f357a5c4a77e2e6))
+
 ## [1.75.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.75.1...v1.75.2) (2026-09-06)
 
 
