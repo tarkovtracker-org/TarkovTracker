@@ -78,7 +78,6 @@ jobs:
     name: Lighthouse scope
     runs-on: ubuntu-latest
     permissions:
-      contents: read
       pull-requests: read
     outputs:
       run_lighthouse: ${{ steps.lighthouse-gate.outputs.run_lighthouse }}

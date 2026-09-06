@@ -2,6 +2,7 @@
 import { appendFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { classifyPaths, collectChanges } from './validation-plan.mjs';
+import { pnpmEntry } from './validation-tools.mjs';
 const args = process.argv.slice(2);
 const options = { mode: 'local', explain: false, full: false, shadow: false };
 let malformed = false;
@@ -40,6 +41,7 @@ if (process.env.GITHUB_OUTPUT) {
   );
 }
 if (options.explain) process.exit(0);
+const packageManagerEntry = pnpmEntry();
 const commands = plan.full
   ? [
       ['run', 'lint'],
@@ -79,13 +81,19 @@ if (plan.full && options.mode !== 'local') {
 }
 for (const command of commands) {
   console.log(`> pnpm ${command.join(' ')}`);
-  const result = spawnSync('pnpm', command, { stdio: 'inherit' });
+  const result = spawnSync(process.execPath, [packageManagerEntry, ...command], {
+    stdio: 'inherit',
+  });
   if (result.error || result.status !== 0) process.exit(result.status || 1);
 }
 if (plan.full && options.mode !== 'local') {
-  const result = spawnSync('bash', ['-c', 'deno test supabase/functions/_shared/*.deno.test.ts'], {
-    stdio: 'inherit',
-  });
+  const result = spawnSync(
+    '/bin/bash',
+    ['-c', 'deno test supabase/functions/_shared/*.deno.test.ts'],
+    {
+      stdio: 'inherit',
+    }
+  );
   if (result.error || result.status !== 0) process.exit(result.status || 1);
 }
 if (options.mode === 'local')

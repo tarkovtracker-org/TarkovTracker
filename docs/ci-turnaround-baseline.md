@@ -40,7 +40,7 @@ This is the pre-rollout baseline; record the actual rollout timestamp before col
 
 - First-pass success refers only to the earliest CI run’s first attempt, not every external PR check.
 - GitHub omitted historical PR associations. CI runs are inferred from matching head repository, branch, and PR lifetime; branch reuse can make this imperfect.
-- CI durations use workflow start and update timestamps as a completion proxy. Runner minutes sum executed job durations across attempts; they are not rounded billing minutes.
+- CI durations use the latest attempt’s start and update timestamps as a completion proxy. The three rerun samples were checked against attempt-specific metadata; their recorded durations were unchanged. Runner minutes sum executed job durations across attempts; they are not rounded billing minutes.
 - No translation CI runs were observed under the former path exclusions. Do not treat this as a successful first pass or compare it directly with the new always-reporting shadow rollout.
 - Correction pushes, review-to-correction delay, and agent usage are unavailable from this collection. Commit counts are not used as substitutes.
 - No API collection failures occurred. Missing release samples may reflect documentation exclusions or commits without a release run.

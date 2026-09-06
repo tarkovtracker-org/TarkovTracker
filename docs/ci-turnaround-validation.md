@@ -19,13 +19,14 @@ settings, required checks, application APIs, database schema, or deployment inte
 
 The original code was validated against `fb919ca0` and reviewed by CodeRabbit CLI 0.7.5 at `ebe4b2f9`.
 The only finding was an empty metrics `--after` argument silently selecting the baseline; it was fixed
-and regression-tested. Removing the alternative release implementation leaves 11 focused workflow
-tests on this PR branch. The production-readiness pass found no must-fix defects in this scope.
+and regression-tested. The PR feedback pass adds rerun-timing and absolute-tool-path regression coverage, bringing the
+focused workflow suite to 16 tests. It also requires complete integrity pins for matching pnpm
+installations and removes the unused Lighthouse contents permission.
 
 Required checks are recorded against the final PR revision in its description:
 
 - `pnpm run test:workflow`: temporary-repository and mocked pnpm/Corepack tests for classification,
-  dirty Git state, aggregation, expected check names, shard/Deno/fork preservation, and metrics input.
+  dirty Git state, aggregation, expected check names, shard/Deno/fork preservation, metrics input and rerun timing, and absolute tool paths.
 - `pnpm run lint`, `pnpm run typecheck`, and `pnpm run format:check`.
 - `pnpm run lint:fallow --base origin/main`, `pnpm run i18n:check`, and `pnpm run systems:check`.
 - actionlint 1.7.12, shell syntax validation, and `git diff --check`.

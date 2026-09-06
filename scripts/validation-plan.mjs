@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { gitExecutable } from './validation-tools.mjs';
 export const fullJobs = [
   'fallow',
   'lint-format',
@@ -14,9 +15,12 @@ function knownPathCategory(path) {
   if (/^app\/locales\/[^/]+\.json$/.test(path)) return 'locales';
   return /^(?:[^/]+\.md|(?:docs|\.github)\/.+\.(?:md|markdown))$/.test(path) ? 'docs' : 'full';
 }
+function unsafePath(path) {
+  return path.startsWith('/') || path === 'DESIGN.md' || path.split('/').includes('..');
+}
 function pathCategory(path) {
   if (typeof path !== 'string') return 'full';
-  if (/^(?:\/|DESIGN\.md$)|(?:^|\/)\.\.(?:\/|$)/.test(path)) return 'full';
+  if (unsafePath(path)) return 'full';
   return knownPathCategory(path);
 }
 function requiresFullValidation(paths, categories, forceFull) {
@@ -64,7 +68,11 @@ export function collectChanges({
   cwd = process.cwd(),
 } = {}) {
   const git = (...args) =>
-    execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    execFileSync(gitExecutable(), args, {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
   try {
     // Resolve refs first so user-supplied revision arguments cannot become Git options.
     const baseSha = git('rev-parse', '--verify', '--end-of-options', `${base}^{commit}`).trim();
@@ -74,11 +82,9 @@ export function collectChanges({
       git('diff', '--name-status', '-z', '--find-renames', mergeBase, headSha, '--')
     );
     if (local) {
-      paths.push(...parseNameStatus(git('diff', '--name-status', '-z', '--find-renames', '--')));
       paths.push(
-        ...parseNameStatus(git('diff', '--cached', '--name-status', '-z', '--find-renames', '--'))
-      );
-      paths.push(
+        ...parseNameStatus(git('diff', '--name-status', '-z', '--find-renames', '--')),
+        ...parseNameStatus(git('diff', '--cached', '--name-status', '-z', '--find-renames', '--')),
         ...git('ls-files', '--others', '--exclude-standard', '-z').split('\0').filter(Boolean)
       );
     }

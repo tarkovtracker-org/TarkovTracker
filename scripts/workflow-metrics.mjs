@@ -2,6 +2,7 @@
 // Read-only GitHub baseline collector. Requires authenticated gh; emits JSON on stdout.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { duration, measuredRun } from './workflow-metrics-timing.mjs';
 import { classifyPaths } from './validation-plan.mjs';
 const exec = promisify(execFile);
 const args = process.argv.slice(2);
@@ -83,31 +84,11 @@ for (let page = 1; ; page++) {
 // Baseline: preceding N; follow-up: first N merged after the rollout boundary.
 if (options.after) candidates.reverse();
 const selected = candidates.slice(0, options.count);
-const duration = (start, end) =>
-  start && end ? (Date.parse(end) - Date.parse(start)) / 60000 : null;
 const unavailable = [];
-async function measuredRun(run) {
-  const attempts = [];
-  for (let attempt = 1; attempt <= run.run_attempt; attempt++) {
-    const jobs = await pages(`actions/runs/${run.id}/attempts/${attempt}/jobs`, 'jobs');
-    const executed = jobs.filter(
-      (job) => job.started_at && job.completed_at && job.conclusion !== 'skipped'
-    );
-    attempts.push({
-      attempt,
-      runner_minutes: executed.reduce(
-        (sum, job) => sum + duration(job.started_at, job.completed_at),
-        0
-      ),
-    });
-  }
-  return {
-    id: run.id,
-    sha: run.head_sha,
-    conclusion: run.conclusion,
-    attempts,
-    duration_minutes: duration(run.run_started_at, run.updated_at),
-  };
+function planCategory(plan) {
+  if (plan.full) return 'executable';
+  if (plan.docs) return plan.locales ? 'documentation-and-translations' : 'documentation';
+  return 'translations';
 }
 const records = [];
 for (const pr of selected) {
@@ -118,13 +99,7 @@ for (const pr of selected) {
     ...(file.previous_filename ? [file.previous_filename] : []),
   ]);
   const plan = classifyPaths(paths);
-  const category = plan.full
-    ? 'executable'
-    : plan.docs && plan.locales
-      ? 'documentation-and-translations'
-      : plan.locales
-        ? 'translations'
-        : 'documentation';
+  const category = planCategory(plan);
   const record = {
     number: pr.number,
     merged_at: pr.merged_at,
@@ -135,8 +110,9 @@ for (const pr of selected) {
     agent_usage: null,
   };
   try {
+    const createdRange = encodeURIComponent([pr.created_at, pr.merged_at].join('..'));
     const runs = await pages(
-      `actions/workflows/ci.yml/runs?event=pull_request&branch=${encodeURIComponent(pr.head.ref)}&created=${encodeURIComponent(`${pr.created_at}..${pr.merged_at}`)}`,
+      `actions/workflows/ci.yml/runs?event=pull_request&branch=${encodeURIComponent(pr.head.ref)}&created=${createdRange}`,
       'workflow_runs'
     );
     const related = runs.filter((run) => isPrRun(run, pr));
@@ -144,7 +120,7 @@ for (const pr of selected) {
       'PR number when present; otherwise matching head repository and branch within PR lifetime (inferred)';
     related.sort((a, b) => a.id - b.id);
     record.ci_runs = [];
-    for (const run of related) record.ci_runs.push(await measuredRun(run));
+    for (const run of related) record.ci_runs.push(await measuredRun(run, { pages, api }));
     const first = related[0];
     record.first_ci_pass = first
       ? (await api(`actions/runs/${first.id}/attempts/1`)).conclusion === 'success'
@@ -154,7 +130,7 @@ for (const pr of selected) {
       'workflow_runs'
     );
     record.release_runs = [];
-    for (const run of releaseRuns) record.release_runs.push(await measuredRun(run));
+    for (const run of releaseRuns) record.release_runs.push(await measuredRun(run, { pages, api }));
     // After reusable-release rollout, publication jobs are nested inside CI.
     if (!releaseRuns.length) {
       const mainRuns = await pages(

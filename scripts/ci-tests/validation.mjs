@@ -11,6 +11,7 @@ import {
   aggregateResults,
   fullJobs,
 } from '../validation-plan.mjs';
+import { gitExecutable } from '../validation-tools.mjs';
 const cli = resolve('scripts/validate-changes.mjs');
 test('only explicit documentation and translation paths receive reduced validation', () => {
   for (const paths of [
@@ -79,7 +80,7 @@ test('aggregate fails closed on selected failures, cancellations, unexpected ski
 test('local classifier includes committed, staged, unstaged and untracked paths; CI ignores dirt', (t) => {
   const cwd = mkdtempSync(join(tmpdir(), 'validation-git-'));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
-  const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+  const git = (...args) => execFileSync(gitExecutable(), args, { cwd, encoding: 'utf8' }).trim();
   git('init', '-q');
   git('config', 'user.email', 'test@example.invalid');
   git('config', 'user.name', 'Test');

@@ -20,7 +20,7 @@ Complete workflow automation setup for TarkovTracker with CI/CD pipelines, quali
 `package.json` defines commands; `AGENTS.md` defines required validation and review.
 `code_review.md` supplements that contract with risk areas, without requiring the full suite for
 unrelated changes. Worktree setup and the shared CI setup action use `scripts/ensure-pnpm.sh` to
-verify pnpm against `packageManager`, activating its complete integrity-qualified pin when needed.
+verify pnpm against `packageManager`, preparing its complete integrity-qualified pin even when the installed version matches.
 
 Run focused checks while implementing, then required checks after the diff stabilizes. Record the
 commit, dirty worktree state, commands, and results in the PR summary. Invalidate affected results
@@ -73,6 +73,11 @@ pnpm run validate:changes --base origin/main
 pnpm run validate:changes --mode ci --base <base-sha> --head <head-sha> --explain
 pnpm run validate:changes --mode full --base origin/main
 ```
+
+Execution reuses the absolute package-manager entry from `pnpm run`; direct Node invocation is
+only supported for `--explain`. Git defaults to `/usr/bin/git` (the standard Git for Windows
+location on Windows); set `GIT_EXECUTABLE` to an absolute trusted path for a nonstandard install.
+The full profile requires Bash at `/bin/bash` for the existing Deno test command.
 
 Local mode combines the merge-base diff with staged, unstaged, and untracked paths. Explicit CI
 mode reads only the revision diff; full mode forces full selection. Explanation mode executes no
