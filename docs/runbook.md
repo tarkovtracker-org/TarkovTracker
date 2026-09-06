@@ -296,8 +296,10 @@ These show up in Supabase logs / query performance and are expected. Do not trea
   pnpm exec supabase db push --linked --dry-run
   ```
 
-  Confirm the project ref in `projects list` matches the linked ref from `supabase/config.toml` and
-  every evidence record names it, so output cannot be mistaken for another project's history.
+  Confirm the remote project ref in `projects list` matches the linked ref stored in the gitignored
+  `supabase/.temp/project-ref` (written by `supabase link`), and every evidence record names it, so
+  output cannot be mistaken for another project's history. `project_id` in `supabase/config.toml` is
+  a local host-level identifier, not the remote project ref.
 
   A local-only version is pending; a remote-only version is missing from the checkout. Stop on
   unexpected versions or ordering differences and reconcile against deployment records before any
