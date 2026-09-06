@@ -22,8 +22,8 @@ type ProgressRow = {
 };
 type EditionRow = {
   game_edition: number | null;
-  pve_data: UserProgressModeRow['progress_data'];
-  pvp_data: UserProgressModeRow['progress_data'];
+  pve_data?: UserProgressModeRow['progress_data'];
+  pvp_data?: UserProgressModeRow['progress_data'];
   user_id: string;
 };
 // Team progress response format (matching RatScanner expectations)
@@ -56,11 +56,12 @@ const loadMissingLegacyProgress = async (
     { headers: getServiceHeaders(env) }
   );
   if (!response.ok) throw new Error('Failed to fetch legacy team progress');
-  const rows = (await response.json()) as EditionRow[];
+  const rows = (await response.json()) as Omit<EditionRow, 'game_edition'>[];
   for (const row of rows) {
     const metadata = editionRows.find((entry) => entry.user_id === row.user_id);
     if (metadata) metadata[field] = row[field];
-    else editionRows.push(row);
+    // An account can appear between the metadata and fallback requests.
+    else editionRows.push({ ...row, game_edition: null });
   }
 };
 const buildProgressResponse = (

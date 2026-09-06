@@ -65,6 +65,33 @@ describe('useSupabaseSync', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+  it('queues resumed saves behind an in-flight write', async () => {
+    const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+    let finishFirst!: (result: { error: null }) => void;
+    upsert.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishFirst = resolve;
+        })
+    );
+    const store = createMockStore({ value: 1 });
+    const sync = useSupabaseSync({ store, table: 'test_table', debounceMs: 10 });
+    const first = sync.syncToSupabase();
+    store.$state.value = 2;
+    store.notifySubscriber();
+    sync.pause();
+    sync.resume();
+    await flushSync(10);
+    expect(upsert).toHaveBeenCalledTimes(1);
+    expect(upsert.mock.calls[0]?.[0]).toMatchObject({ value: 1 });
+    finishFirst({ error: null });
+    await first;
+    await flushSync(0);
+    expect(upsert).toHaveBeenCalledTimes(2);
+    expect(upsert.mock.calls[1]?.[0]).toMatchObject({ value: 2 });
+    expect(sync.hasPendingChanges?.()).toBe(false);
+    sync.cleanup();
+  });
   it('retains pending local edits across a remote reconciliation pause', async () => {
     const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
     const state = { local: 1, remote: 0 };

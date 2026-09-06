@@ -8,6 +8,7 @@ import {
   type GameMode,
 } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import { hasMaterializedProgress } from '@/utils/modeProgressFallback';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 type SupabaseError = { code?: string; message: string };
 export type ProgressRpcClient = {
@@ -54,6 +55,7 @@ const getActiveModeProgress = (
 ): { mode: GameMode; progress: UserProgressData } | null => {
   if (!isGameMode(row.game_mode)) return null;
   if (row.season_number !== getGameModeSeasonNumber(row.game_mode)) return null;
+  if (!hasMaterializedProgress(row.progress_data)) return null;
   return { mode: row.game_mode, progress: row.progress_data as UserProgressData };
 };
 const normalizePersistenceError = (error: unknown): SupabaseError => ({

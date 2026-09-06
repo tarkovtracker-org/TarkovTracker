@@ -786,6 +786,9 @@ flowchart LR
   Team rejoin refreshes membership and rebuilds changed filters before hydrating teammates; initial
   joins do not trigger an additional hydration. Optional missing account metadata never blocks
   normalized reconnect progress. Deferred legacy reads retain startup retries and API error mapping.
+  Unmaterialized normalized rows are absent for startup fallback and freshness. Outbound writes are
+  serialized with captured payloads and versions; resumed saves cannot overtake an in-flight save.
+  Supporter status refreshes on subsequent joins without duplicating the initial status load.
 - Startup fetches metadata and normalized modes before requesting missing persistent legacy columns.
   Shared-profile, gateway, and teammate reads request legacy progress only when their existing
   fallback rules require it. Public visibility and team authorization still precede fallback use.

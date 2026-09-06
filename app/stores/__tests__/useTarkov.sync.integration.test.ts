@@ -1357,7 +1357,8 @@ describe('useTarkov sync integration', () => {
     await expect(initializeTarkovSync()).rejects.toThrow('Supabase initial load failed');
     expect(showLocalIgnored).toHaveBeenCalledTimes(1);
   });
-  it('retries a transient deferred legacy progress read', async () => {
+  it('retries a transient deferred legacy read for an empty normalized placeholder', async () => {
+    modeProgressResult.data = [{ game_mode: 'pvp', season_number: 0, progress_data: {} }];
     const row = createRemoteRow({ pvp_data: progressWithTaskState('legacy-task', true) });
     single
       .mockResolvedValueOnce({ data: row, error: null })

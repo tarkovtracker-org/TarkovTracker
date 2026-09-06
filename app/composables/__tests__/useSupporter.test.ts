@@ -62,6 +62,24 @@ describe('useSupporter', () => {
     const { useSupporter } = await import('@/composables/useSupporter');
     useSupporter().reset();
   });
+  it('refreshes status on rejoin without duplicating the initial fetch', async () => {
+    const nextChannel = { on: vi.fn(), subscribe: vi.fn() };
+    nextChannel.on.mockReturnValue(nextChannel);
+    nextChannel.subscribe.mockReturnValue(nextChannel);
+    mockChannel.mockReturnValue(nextChannel);
+    mockMaybeSingle.mockResolvedValue({ data: null, error: null });
+    const { useSupporter } = await import('@/composables/useSupporter');
+    const supporter = useSupporter();
+    await supporter.fetchStatus('user-1');
+    await supporter.subscribe('user-1');
+    mockMaybeSingle.mockClear();
+    const status = nextChannel.subscribe.mock.calls[0]?.[0];
+    status('SUBSCRIBED');
+    expect(mockMaybeSingle).not.toHaveBeenCalled();
+    status('SUBSCRIBED');
+    expect(mockMaybeSingle).toHaveBeenCalledOnce();
+    supporter.unsubscribe();
+  });
   it('does not apply a stale status response after reset', async () => {
     const deferred = createDeferred<{
       data: {

@@ -127,6 +127,7 @@ describe('seasonal progress realtime synchronization', () => {
     $patch: (mutator: (target: UserState) => void) => mutator(state),
   };
   beforeEach(() => {
+    supabaseContext.client.from.mockReset();
     handlers.clear();
     createdChannels.length = 0;
     openTopics.clear();

@@ -33,6 +33,12 @@ describe('progress persistence error handling', () => {
           updated_at: '2026-09-07T12:00:00Z',
         },
         { game_mode: 'pvp', season_number: 0, progress_data: { level: 8 }, updated_at: 'invalid' },
+        {
+          game_mode: 'pve',
+          season_number: 0,
+          progress_data: {},
+          updated_at: '2026-09-08T12:00:00Z',
+        },
       ],
     });
     const client = {
@@ -41,6 +47,7 @@ describe('progress persistence error handling', () => {
     const result = await loadModeProgress(client, 'user-1');
     expect(result.updatedAt).toBe(Date.parse('2026-09-06T12:00:00Z'));
     expect(result.data.seasonal).toEqual({ level: 5 });
+    expect(result.data.pve).toBeUndefined();
   });
   it('normalizes rejected sync RPCs into the error result', async () => {
     const client: ProgressRpcClient = {

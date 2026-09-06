@@ -127,7 +127,12 @@ export function useSupabaseSync<
   let lastSyncedHash: string | null = null;
   let pendingLocalChanges = false;
   let localVersion = 0;
-  const syncToSupabase = async (state = store.$state as TState): Promise<TPayload | null> => {
+  let disposed = false;
+  let syncQueue: Promise<TPayload | null> | null = null;
+  const syncToSupabase = async (
+    transformedState: TPayload | null,
+    syncVersion: number
+  ): Promise<TPayload | null> => {
     logger.debug('[Sync] syncToSupabase called', {
       loggedIn: $supabase.user.loggedIn,
       isPaused: isPaused.value,
@@ -140,10 +145,9 @@ export function useSupabaseSync<
       logger.debug('[Sync] Skipping - user not logged in');
       return null;
     }
-    const syncVersion = localVersion;
+    const ownerId = $supabase.user.id;
     isSyncing.value = true;
     try {
-      const transformedState = transform ? transform(state) : (state as unknown as TPayload);
       // Skip if transform returned null (e.g., during initial load)
       if (!transformedState) {
         logger.debug('[Sync] Skipping - transform returned null');
@@ -218,7 +222,12 @@ export function useSupabaseSync<
         !isPaused.value
       ) {
         await delay(ABORT_RETRY_DELAY_MS);
-        if (!isPaused.value && $supabase.user.loggedIn && $supabase.user.id) {
+        if (
+          !isPaused.value &&
+          $supabase.user.loggedIn &&
+          $supabase.user.id === ownerId &&
+          !disposed
+        ) {
           syncResult = await upsertWithFallback(dataToSave);
         }
       }
@@ -237,7 +246,7 @@ export function useSupabaseSync<
           logger.error(`[Sync] Error syncing to ${table}:`, formatSupabaseError(syncResult.error));
         }
       }
-      if (syncResult.synced) {
+      if (syncResult.synced && !disposed && $supabase.user.id === ownerId) {
         lastSyncedHash = currentHash;
         if (syncVersion === localVersion) pendingLocalChanges = false;
         logger.debug(`[Sync] ✅ Successfully synced to ${table}`);
@@ -251,7 +260,33 @@ export function useSupabaseSync<
       isSyncing.value = false;
     }
   };
-  const debouncedSync = debounce(syncToSupabase, debounceMs);
+  const capturePayload = (state: TState): TPayload | null => {
+    try {
+      const payload = transform ? transform(state) : (state as unknown as TPayload);
+      return payload ? (JSON.parse(JSON.stringify(payload)) as TPayload) : null;
+    } catch (error) {
+      logger.error('[Sync] Unexpected error:', error);
+      return null;
+    }
+  };
+  const enqueueSync = (state = store.$state as TState): Promise<TPayload | null> => {
+    // Capture each request before queuing: later mutations must not change an
+    // earlier payload, and resumed writes must not overtake an in-flight save.
+    const version = localVersion;
+    const snapshot = capturePayload(state);
+    const ownerId = $supabase.user.id;
+    const run = () => {
+      if (disposed || $supabase.user.id !== ownerId) return Promise.resolve(null);
+      return syncToSupabase(snapshot, version);
+    };
+    const result = syncQueue ? syncQueue.then(run, run) : run();
+    syncQueue = result;
+    void result.finally(() => {
+      if (syncQueue === result) syncQueue = null;
+    });
+    return result;
+  };
+  const debouncedSync = debounce(enqueueSync, debounceMs);
   const unsubscribe = store.$subscribe((_mutation, state) => {
     // Pausing gates transmission, not change tracking: a user can edit while
     // reconciliation is waiting to resume. The RPC suppresses unchanged writes.
@@ -264,6 +299,7 @@ export function useSupabaseSync<
     });
   });
   const cleanup = () => {
+    disposed = true;
     debouncedSync.cancel();
     unsubscribe();
   };
@@ -291,6 +327,6 @@ export function useSupabaseSync<
     cleanup,
     pause,
     resume,
-    syncToSupabase,
+    syncToSupabase: enqueueSync,
   };
 }
