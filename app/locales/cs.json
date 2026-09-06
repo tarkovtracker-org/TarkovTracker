@@ -924,7 +924,9 @@
           "experience_rewards": "Zkušenosti odměn",
           "next_tasks": "Další úkoly",
           "previous_tasks": "Předchozí úkoly",
-          "collapse_completed_objectives": "Sbalit cíle při dokončených úkolech"
+          "collapse_completed_objectives": "Sbalit cíle při dokončených úkolech",
+          "collapse_by_default": "Sbalit úkoly ve výchozím nastavení",
+          "hide_rewards": "Skrýt odměny"
         },
         "filter_bar": {
           "hint": "Zvolte, zda zobrazit nebo schovat stavové filtry.",
@@ -1008,6 +1010,8 @@
         "available_button": "Označit k dispozici",
         "uncomplete_button": "Označit jako nedokončené",
         "reset_item_counts": "Resetovat počet položek",
+        "collapse_task": "Sbalit úkol",
+        "expand_task": "Rozbalit úkol",
         "reset_item_counts_disabled_complete": "Nedokončete tento úkol pro resetování počtu položek",
         "reset_item_counts_disabled_failed": "Označit tento úkol jako dostupný pro obnovení počtu položek",
         "reset_item_counts_disabled_nothing_to_reset": "Neexistují žádné počty položek k obnovení",
@@ -1880,7 +1884,8 @@
         "show_xp": "Zobrazit XP odměny",
         "show_next": "Zobrazit další úkoly",
         "show_prev": "Zobrazit předchozí úkoly",
-        "density": "Hustota karty",
+        "collapse_by_default": "Sbalit úkoly ve výchozím nastavení",
+        "hide_rewards": "Skrýt odměny",
         "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
         "flags_section": "Zobrazení úloh",
         "availability_section": "Dostupnost úkolu",
