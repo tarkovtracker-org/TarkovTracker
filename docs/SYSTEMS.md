@@ -1252,6 +1252,25 @@ code (fix the code) or in this doc (fix the doc in the same PR). `AGENTS.md`'s M
 requires updating this file whenever one of these systems changes. When in doubt, the code is the
 source of truth and this doc is the explanation of it.
 
+### Task list loading
+
+`app/composables/useInfiniteScroll.ts` loads another batch only when the sentinel is connected
+to the document and has a layout box. Nuxt Suspense can mount a warm-cache task list in a
+detached tree; its zero bounding rectangle must not trigger auto-fill. Hidden or detached
+sentinels consume no auto-load budget. The existing intersection observer checks again when
+the list becomes visible; configured scroll fallback and explicit checks use the same guard.
+
+The tasks page retains its loading state until metadata is ready and the first visible-task
+refresh settles. Reset that readiness when metadata starts loading again. Metadata readiness
+alone must not expose the empty state during the debounced filter refresh; a completed refresh
+with no matching tasks still shows the normal empty state. Subsequent filter changes retain
+the existing debounce and task actions still request an immediate refresh.
+
+Keep the tasks page's eight-card batches, preload margin, and auto-load caps. Do not defer
+critical metadata or change task filters, progress state, or card expansion to mask mounting
+cost. Performance validation and the issue #444 baseline are documented in
+`docs/task-performance-validation.md`.
+
 ### Task card layout and legacy density preferences
 
 Task cards always use compact spacing. There is no density selector or persisted density

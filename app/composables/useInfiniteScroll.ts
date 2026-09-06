@@ -19,6 +19,11 @@ export interface UseInfiniteScrollReturn {
   start: () => void;
   checkAndLoadMore: (scrollTriggered?: boolean) => Promise<void>;
 }
+/**
+ * Load bounded batches when a rendered sentinel approaches the viewport.
+ * Detached or hidden sentinels wait for an observer, scroll, or explicit check
+ * after layout becomes available, without consuming the auto-load budget.
+ */
 export function useInfiniteScroll(
   sentinelRef: Ref<HTMLElement | null> | ComputedRef<HTMLElement | null>,
   onLoadMore: () => void | Promise<void>,
@@ -79,6 +84,12 @@ export function useInfiniteScroll(
     }
     if (typeof window === 'undefined') {
       logDebug('skip', { reason: 'missing-window', scrollTriggered });
+      return;
+    }
+    // Suspense can mount the list in a detached tree. Its zero bounding rect is
+    // not evidence that the sentinel is near the viewport; wait for real layout.
+    if (!sentinelRef.value.isConnected || sentinelRef.value.getClientRects().length === 0) {
+      logDebug('skip', { reason: 'sentinel-without-layout', scrollTriggered });
       return;
     }
     if (autoFill && resetAutoLoadCycle) {

@@ -18,9 +18,14 @@ class MockIntersectionObserver {
   takeRecords: IntersectionObserver['takeRecords'] = vi.fn(() => []);
   unobserve: IntersectionObserver['unobserve'] = vi.fn();
 }
+const createClientRects = (rects: DOMRect[]): DOMRectList =>
+  Object.assign(rects, { item: (index: number) => rects[index] ?? null });
+const sentinels: HTMLElement[] = [];
 const createSentinelElement = () => {
   const sentinel = document.createElement('div');
+  sentinels.push(sentinel);
   sentinel.getBoundingClientRect = () => new DOMRect(0, 100, 100, 20);
+  sentinel.getClientRects = () => createClientRects([sentinel.getBoundingClientRect()]);
   return sentinel;
 };
 const flushMicrotasks = async (cycles = 8) => {
@@ -33,7 +38,9 @@ const mountHarness = async (
   onLoadMore: () => void | Promise<void>,
   options: UseInfiniteScrollOptions
 ) => {
-  const sentinelRef = ref<HTMLElement | null>(createSentinelElement());
+  const sentinel = createSentinelElement();
+  document.body.append(sentinel);
+  const sentinelRef = ref<HTMLElement | null>(sentinel);
   let result: ReturnType<typeof useInfiniteScroll> | undefined;
   const wrapper = mount(
     defineComponent({
@@ -47,7 +54,7 @@ const mountHarness = async (
   if (!result) {
     throw new Error('Failed to initialize useInfiniteScroll harness');
   }
-  return { result, wrapper };
+  return { result, wrapper, sentinel };
 };
 describe('useInfiniteScroll', () => {
   beforeEach(() => {
@@ -56,6 +63,55 @@ describe('useInfiniteScroll', () => {
   });
   afterEach(() => {
     vi.unstubAllGlobals();
+    for (const sentinel of sentinels.splice(0)) sentinel.remove();
+  });
+  it.each(['detached', 'hidden'] as const)(
+    'waits for a %s sentinel to have layout before consuming the auto-load budget',
+    async (state) => {
+      const onLoadMore = vi.fn();
+      const { result, wrapper, sentinel } = await mountHarness(onLoadMore, {
+        autoLoadOnReady: false,
+        maxAutoLoads: 1,
+      });
+      const getClientRects = sentinel.getClientRects;
+      if (state === 'detached') sentinel.remove();
+      else sentinel.getClientRects = () => createClientRects([]);
+      await result.checkAndLoadMore();
+      await flushMicrotasks();
+      expect(onLoadMore).not.toHaveBeenCalled();
+      expect(logger.warn).not.toHaveBeenCalled();
+      document.body.append(sentinel);
+      sentinel.getClientRects = getClientRects;
+      await result.checkAndLoadMore(true);
+      await flushMicrotasks();
+      expect(onLoadMore).toHaveBeenCalledTimes(1);
+      wrapper.unmount();
+    }
+  );
+  it('stops queued auto-fill when the sentinel loses its layout box', async () => {
+    const onLoadMore = vi.fn(() => {
+      sentinel.getClientRects = () => createClientRects([]);
+    });
+    const { result, wrapper, sentinel } = await mountHarness(onLoadMore, {
+      autoLoadOnReady: false,
+      maxAutoLoads: 8,
+    });
+    await result.checkAndLoadMore();
+    await flushMicrotasks(12);
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+    expect(logger.warn).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('does not load when a rendered sentinel is outside the preload range', async () => {
+    const onLoadMore = vi.fn();
+    const { result, wrapper, sentinel } = await mountHarness(onLoadMore, {
+      autoLoadOnReady: false,
+      rootMargin: '700px',
+    });
+    sentinel.getBoundingClientRect = () => new DOMRect(0, window.innerHeight + 701, 100, 20);
+    await result.checkAndLoadMore();
+    expect(onLoadMore).not.toHaveBeenCalled();
+    wrapper.unmount();
   });
   it('starts a fresh auto-load cycle on external checks', async () => {
     const onLoadMore = vi.fn();

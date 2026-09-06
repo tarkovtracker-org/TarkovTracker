@@ -904,21 +904,24 @@
   };
   const route = useRoute();
   useTaskRouteSync({ maps, traders: sortedTraders });
-  const refreshVisibleTasks = () => {
+  // Metadata readiness can precede the first debounced filter refresh.
+  const hasRefreshedVisibleTasks = ref(false);
+  /** Refresh filters before allowing initial results to replace the loading state. */
+  const refreshVisibleTasks = async () => {
     try {
-      updateVisibleTasks(mapTaskVisibilityFilterOptions.value, tasksLoading.value);
+      await updateVisibleTasks(mapTaskVisibilityFilterOptions.value, tasksLoading.value);
     } catch (error) {
       logger.error('[Tasks] Failed to refresh tasks:', error);
+    } finally {
+      hasRefreshedVisibleTasks.value = metadataStore.hasInitialized && !tasksLoading.value;
     }
   };
-  const debouncedRefreshVisibleTasks = debounce(() => {
-    refreshVisibleTasks();
-  }, 50);
+  const debouncedRefreshVisibleTasks = debounce(refreshVisibleTasks, 50);
   const handleTaskAction = (payload: TaskActionPayload) => {
     onTaskAction(payload);
     trackFocusedTaskAction(payload);
     void nextTick(() => {
-      refreshVisibleTasks();
+      void refreshVisibleTasks();
       debouncedRefreshVisibleTasks.cancel();
     });
   };
@@ -956,6 +959,7 @@
       getHideGlobalTasks,
       getHideCompletedMapObjectives,
       getPinnedTaskIds,
+      () => metadataStore.hasInitialized,
       tasksLoading,
       tasks,
       maps,
@@ -967,6 +971,11 @@
       editions,
     ],
     () => {
+      if (!metadataStore.hasInitialized || tasksLoading.value) {
+        hasRefreshedVisibleTasks.value = false;
+        debouncedRefreshVisibleTasks.cancel();
+        return;
+      }
       void debouncedRefreshVisibleTasks().catch((error) => {
         if (isDebounceRejection(error)) return;
         logger.error('[Tasks] Debounced refresh failed:', error);
@@ -974,7 +983,9 @@
     },
     { immediate: true, flush: 'post' }
   );
-  const isLoading = computed(() => !metadataStore.hasInitialized || tasksLoading.value);
+  const isLoading = computed(
+    () => !metadataStore.hasInitialized || tasksLoading.value || !hasRefreshedVisibleTasks.value
+  );
   const {
     activeSearchCount,
     cleanup: cleanupTaskFilters,
