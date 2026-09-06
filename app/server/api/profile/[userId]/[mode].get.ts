@@ -699,13 +699,25 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: 'Profile is private for this mode' });
   }
   if (legacyProgressField && !hasMaterializedProgress(modeProgressRow?.progress_data)) {
-    const response = await restFetch(
-      `user_progress?select=${legacyProgressField}&user_id=eq.${userId}&limit=1`
-    );
-    if (!response.ok)
+    try {
+      const response = await restFetch(
+        `user_progress?select=${legacyProgressField}&user_id=eq.${userId}&limit=1`
+      );
+      if (!response.ok)
+        throw createError({ statusCode: 502, statusMessage: 'Failed to load legacy profile data' });
+      const rows = (await response.json()) as ProgressRow[];
+      progressRow[legacyProgressField] = rows[0]?.[legacyProgressField];
+    } catch (error) {
+      resourcesController.abort();
+      if (Object(error).statusCode === 504 || isAbortError(error)) {
+        throw createError({
+          statusCode: 504,
+          statusMessage: 'Timed out while loading shared profile data',
+        });
+      }
+      logger.error('Failed to load legacy profile resources', { error, userId });
       throw createError({ statusCode: 502, statusMessage: 'Failed to load legacy profile data' });
-    const rows = (await response.json()) as ProgressRow[];
-    progressRow[legacyProgressField] = rows[0]?.[legacyProgressField];
+    }
   }
   const profileData = resolveModeProgressData(mode, modeProgressRow?.progress_data, progressRow);
   const hideDisplayName = !isOwner && preferencesRow?.streamer_mode === true;

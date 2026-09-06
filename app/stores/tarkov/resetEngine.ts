@@ -52,7 +52,8 @@ export const resolveInitialSyncState = (
   localTimestamp: number | null,
   remoteUpdatedAt: number | null,
   localScore: number,
-  remoteScore: number
+  remoteScore: number,
+  mergeModeSnapshots = false
 ): UserState => {
   const preferLocalMetadata = shouldPreferLocalStartupMetadata(
     localTimestamp,
@@ -60,6 +61,7 @@ export const resolveInitialSyncState = (
     localScore,
     remoteScore
   );
+  // fallow-ignore-next-line complexity -- startup merge/reset precedence is covered in resetEngine.seasonalReset.test.ts
   const resolveModeData = (
     localModeData: UserProgressData,
     remoteModeData: UserProgressData
@@ -70,6 +72,13 @@ export const resolveInitialSyncState = (
       return mergeProgressData(localModeData, remoteModeData);
     }
     const preferredModeData = preferLocalMetadata ? localModeData : remoteModeData;
+    // Mode updated_at also changes for visibility. It cannot establish that an
+    // entire progress snapshot supersedes local timestamped edits.
+    if (mergeModeSnapshots) {
+      return preferLocalMetadata
+        ? mergeProgressData(remoteModeData, localModeData)
+        : mergeProgressData(localModeData, remoteModeData);
+    }
     return {
       ...preferredModeData,
       storyChapters: mergeStoryChapterProgress(

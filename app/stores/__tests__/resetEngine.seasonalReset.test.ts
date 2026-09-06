@@ -2,7 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultState, type UserState } from '@/stores/progressState';
-import { performReset } from '@/stores/tarkov/resetEngine';
+import { performReset, resolveInitialSyncState } from '@/stores/tarkov/resetEngine';
 import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 const { clearProgressStorageMock, supabaseContext, syncProgressStateMock } = vi.hoisted(() => ({
   clearProgressStorageMock: vi.fn(),
@@ -43,6 +43,21 @@ describe('performReset seasonal', () => {
     supabaseContext.user.loggedIn = true;
     supabaseContext.user.id = 'user-1';
     syncProgressStateMock.mockResolvedValue({ error: null });
+  });
+  it('merges timestamped progress when a visibility-only mode timestamp is newer', () => {
+    const local = structuredClone(defaultState);
+    const remote = structuredClone(defaultState);
+    local.pvp.taskCompletions.localTask = { complete: true, timestamp: 20 };
+    local.pvp.hideoutModules.module = { complete: true, timestamp: 20 };
+    remote.pvp.taskCompletions.remoteTask = { complete: true, timestamp: 10 };
+    const result = resolveInitialSyncState(local, remote, 20, 30, 2, 1, true);
+    expect(result.pvp.taskCompletions.localTask?.complete).toBe(true);
+    expect(result.pvp.taskCompletions.remoteTask?.complete).toBe(true);
+    expect(result.pvp.hideoutModules.module?.complete).toBe(true);
+    remote.pvp.progressEpoch = 1;
+    expect(
+      resolveInitialSyncState(local, remote, 20, 30, 2, 1, true).pvp.taskCompletions.localTask
+    ).toBeUndefined();
   });
   it('resets only the seasonal mode and leaves persistent progress untouched', async () => {
     const store = createStore();

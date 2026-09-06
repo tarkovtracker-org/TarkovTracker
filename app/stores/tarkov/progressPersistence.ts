@@ -88,6 +88,7 @@ export const syncProgressState = async (
     return { error: normalizedError };
   }
 };
+// fallow-ignore-next-line complexity -- active-mode timestamp and legacy fallback branches are covered in progressPersistence.test.ts
 export const loadModeProgress = async (
   client: ModeProgressClient,
   userId: string

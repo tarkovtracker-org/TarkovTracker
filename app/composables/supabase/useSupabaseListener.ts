@@ -23,7 +23,7 @@ export interface SupabaseListenerConfig<
   onData?: (data: TData | null) => void;
   patchStore?: boolean;
   /** Optional sync controller to pause during remote updates */
-  syncController?: { pause: () => void; resume: () => void };
+  syncController?: { pause: () => void; resume: () => void; hasPendingChanges?: () => boolean };
   scope?: ListenerScope;
 }
 interface SupabaseListenerReturn {
@@ -105,7 +105,10 @@ export function useSupabaseListener<
   // Helper to get current filter value (supports both string and ref)
   const getFilterValue = (): string | undefined => unref(filter);
   // Initial fetch
-  const fetchData = async () => {
+  // fallow-ignore-next-line complexity -- tested fetch cancellation and pending-save guards must share one response boundary
+  const fetchData = async (reconnecting = false) => {
+    const pendingBeforeRead = syncController?.hasPendingChanges?.() === true;
+    const stateBeforeRead = reconnecting ? JSON.stringify(store.$state) : null;
     const fetchVersion = ++latestFetchVersion;
     activeFetchController?.abort();
     const fetchController = new AbortController();
@@ -148,6 +151,15 @@ export function useSupabaseListener<
         hasInitiallyLoaded.value = true;
         return;
       }
+      // A reconnect must not replace state that still belongs to an outbound
+      // save, including edits that were saved while this request was in flight.
+      if (
+        reconnecting &&
+        (pendingBeforeRead ||
+          syncController?.hasPendingChanges?.() ||
+          stateBeforeRead !== JSON.stringify(store.$state))
+      )
+        return;
       if (data) {
         if (patchStore) {
           safePatchStore(store, data as Partial<TStoreState>);
@@ -231,7 +243,7 @@ export function useSupabaseListener<
         if (subscriptionVersion !== cleanupVersion) return;
         isSubscribed.value = status === 'SUBSCRIBED';
         if (isSubscribed.value) {
-          if (joined) void fetchData();
+          if (joined) void fetchData(true);
           joined = true;
         }
         logChannelSubscribeFailure(storeIdForLogging, status, error, { table });

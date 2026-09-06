@@ -827,6 +827,33 @@ describe('Team realtime resources', () => {
     // assertion does not depend on `$supabase.client` still being this mock.
     expect(client.removeChannel).toHaveBeenCalledWith(firstTeamRecord(teamRecords).channel);
   });
+  it('hydrates only on rejoin and rebuilds changed member filters before hydration', async () => {
+    const { teamRecords, currentUserId, teammateId } = buildRealtimeHarness();
+    const hydrated = vi.fn();
+    window.addEventListener('teammate-progress-reconnected', hydrated);
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      expect(hydrated).not.toHaveBeenCalled();
+      mockGetTeamMembers.mockResolvedValue({
+        members: [currentUserId, teammateId, '44444444-4444-4444-8444-444444444444'],
+        profiles: {},
+      });
+      firstTeamRecord(teamRecords).statusCallbacks[0]?.('SUBSCRIBED');
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(2));
+      expect(hydrated).toHaveBeenCalledOnce();
+      expect(
+        teamRecords()[1]?.handlers.some(
+          ({ config }) =>
+            config.table === 'user_game_mode_progress' &&
+            JSON.stringify(config).includes('44444444')
+        )
+      ).toBe(true);
+    } finally {
+      window.removeEventListener('teammate-progress-reconnected', hydrated);
+      instance.cleanup();
+    }
+  });
   it('does not rejoin the team channel when the member set is unchanged', async () => {
     const { client, teamRecords } = buildRealtimeHarness();
     const instance = useTeamStoreWithSupabase();

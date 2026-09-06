@@ -258,6 +258,23 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
   let retryTimeout: ReturnType<typeof setTimeout> | null = null;
   const release = createChannelReleaseLatch();
   let disposed = false;
+  const previouslyJoined = new WeakSet<OwnedRealtimeChannel>();
+  let hydrationTeam: string | null = null;
+  const dispatchHydration = (teamId: string) => {
+    if (hydrationTeam !== teamId) return;
+    hydrationTeam = null;
+    if (typeof window !== 'undefined')
+      window.dispatchEvent(new Event('teammate-progress-reconnected'));
+  };
+  const reconcileRejoin = async (owned: OwnedRealtimeChannel, teamId: string) => {
+    hydrationTeam = teamId;
+    try {
+      await refresh();
+      if (channel.value === owned) dispatchHydration(teamId);
+    } catch (error) {
+      logger.warn('[TeamStore] Reconnect member refresh failed', error);
+    }
+  };
   const clearRetry = () => {
     if (retryTimeout === null) return;
     clearTimeout(retryTimeout);
@@ -303,6 +320,7 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
    * invisible while Realtime rejoins forever. The binding is recorded as joined
    * only here, so a join that silently no-ops is never mistaken for a live one.
    */
+  // fallow-ignore-next-line complexity -- tested subscription ownership and recovery state machine; inferred coverage misses callback calls
   const handleStatus = (
     owned: OwnedRealtimeChannel,
     teamId: string,
@@ -316,9 +334,11 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
       joinedTeamId = teamId;
       joinedFilter = filter;
       errorCount = 0;
-      void deps.refreshMembers(true);
-      if (typeof window !== 'undefined')
-        window.dispatchEvent(new Event('teammate-progress-reconnected'));
+      if (previouslyJoined.has(owned)) void reconcileRejoin(owned, teamId);
+      else {
+        previouslyJoined.add(owned);
+        dispatchHydration(teamId);
+      }
       return;
     }
     // A closed channel is no longer joined, so drop the binding to let the next
@@ -770,6 +790,7 @@ export function useTeammateStores() {
         replayProgressMetadataMigration();
       };
       let hydrationRequest = 0;
+      // fallow-ignore-next-line complexity -- hydration ordering and stale-event guards are covered in useTeamStore.test.ts
       const hydrateModeProgress = async () => {
         const request = ++hydrationRequest;
         appliedModes.clear();

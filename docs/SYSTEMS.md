@@ -775,10 +775,17 @@ flowchart LR
   an outstanding disconnect before reconnecting once. Auth, local persistence, and outbound saves
   remain active. Rejoined consumers refresh authoritative snapshots; owner progress uses existing
   merge/epoch rules, and snapshot responses cannot overwrite newer live events or another session.
+  Pending profile fields (including explicit clears) survive reconnect reads and edits made during
+  those reads; a higher reset epoch still wins over pending fields from an older epoch.
 - Progress RPC upserts compare sanitized account/mode values before updating. Identical saves do not
   change progress timestamps or emit progress-row events. The legacy compatibility trigger remains;
   its normalized write makes the subsequent identical RPC upsert a no-op. Startup freshness uses
   the newest account or active-mode timestamp because Seasonal-only saves no longer touch the account.
+  When only a mode row is newer, startup merges progress by entry timestamps and reset epochs;
+  visibility changes also update mode timestamps and cannot justify replacing whole mode snapshots.
+  Team rejoin refreshes membership and rebuilds changed filters before hydrating teammates; initial
+  joins do not trigger an additional hydration. Optional missing account metadata never blocks
+  normalized reconnect progress. Deferred legacy reads retain startup retries and API error mapping.
 - Startup fetches metadata and normalized modes before requesting missing persistent legacy columns.
   Shared-profile, gateway, and teammate reads request legacy progress only when their existing
   fallback rules require it. Public visibility and team authorization still precede fallback use.

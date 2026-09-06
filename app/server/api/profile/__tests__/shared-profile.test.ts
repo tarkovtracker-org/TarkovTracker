@@ -326,6 +326,22 @@ describe('Shared Profile API', () => {
       restCalls.find((url) => url.pathname.endsWith('/user_progress'))?.searchParams.get('select')
     ).toBe('user_id,game_edition');
   });
+  it.each(['network', 'json'])('normalizes deferred legacy %s failures to 502', async (failure) => {
+    mockFetch
+      .mockResolvedValueOnce(progressResponse(3))
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
+      .mockResolvedValueOnce(preferencesResponse(false, { pvp: true }));
+    if (failure === 'network') mockFetch.mockRejectedValueOnce(new Error('offline'));
+    else
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => {
+          throw new Error('invalid json');
+        },
+      });
+    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({ statusCode: 502 });
+  });
   it('falls back to legacy persistent progress and visibility when the normalized row is missing', async () => {
     mockFetch
       .mockResolvedValueOnce(

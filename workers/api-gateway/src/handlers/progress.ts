@@ -107,6 +107,7 @@ const getServiceHeaders = (env: Env) => ({
   Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
   apikey: env.SUPABASE_SERVICE_ROLE_KEY,
 });
+// fallow-ignore-next-line complexity -- normalized/legacy fallback branches are exercised by gateway.test.ts; inferred coverage misses indirect route calls
 async function fetchUserProgressMode(
   env: Env,
   userId: string,

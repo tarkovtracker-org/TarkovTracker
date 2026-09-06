@@ -173,6 +173,7 @@ export const subscribeAndWaitForRealtimeChannel = (
       else resolve();
     };
     try {
+      // fallow-ignore-next-line complexity -- tested join/rejoin state machine; inferred coverage misses the SDK callback
       channel.subscribe((status: string, error?: Error) => {
         logger.debug(`[${label}] Realtime subscription status: ${status}`);
         if (status === 'SUBSCRIBED') {

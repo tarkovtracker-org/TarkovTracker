@@ -44,6 +44,7 @@ export const installRealtimeVisibility = (
     if (!suspendedTransports.has(transport)) return;
     void Promise.resolve(leaving)
       .catch(() => undefined)
+      // fallow-ignore-next-line complexity -- disconnect/visibility races covered with the real SDK in realtimeVisibility.test.ts
       .then(() => {
         if (disposed || version !== generation || page.visibilityState === 'hidden') return;
         leaving = null;

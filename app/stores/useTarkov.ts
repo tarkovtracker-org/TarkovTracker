@@ -1399,11 +1399,17 @@ export async function initializeTarkovSync() {
         .filter((mode) => modeProgressResult.data[mode] == null)
         .map((mode) => `${mode}_data`);
       if (data && missingLegacyFields.length > 0) {
-        const legacy = await $supabase.client
-          .from('user_progress')
-          .select(missingLegacyFields.join(','))
-          .eq('user_id', currentUserId)
-          .single();
+        const readLegacy = () =>
+          $supabase.client
+            .from('user_progress')
+            .select(missingLegacyFields.join(','))
+            .eq('user_id', currentUserId)
+            .single();
+        let legacy = await readLegacy();
+        for (let attempt = 1; attempt < LOAD_RETRY_COUNT && legacy.error; attempt++) {
+          await delay(LOAD_RETRY_DELAY_MS);
+          legacy = await readLegacy();
+        }
         if (legacy.error) return { hadRemoteData, needsRemoteCleanup, ok: false };
         data = {
           ...data,
@@ -1449,7 +1455,8 @@ export async function initializeTarkovSync() {
             localTimestamp,
             remoteUpdatedAt,
             localScore,
-            remoteScore
+            remoteScore,
+            (modeProgressResult.updatedAt ?? 0) > (accountUpdatedAt || 0)
           );
           const remoteMatchesResolved = deepEqual(resolvedState, normalizedRemote);
           if (!remoteMatchesResolved) {

@@ -1357,6 +1357,16 @@ describe('useTarkov sync integration', () => {
     await expect(initializeTarkovSync()).rejects.toThrow('Supabase initial load failed');
     expect(showLocalIgnored).toHaveBeenCalledTimes(1);
   });
+  it('retries a transient deferred legacy progress read', async () => {
+    const row = createRemoteRow({ pvp_data: progressWithTaskState('legacy-task', true) });
+    single
+      .mockResolvedValueOnce({ data: row, error: null })
+      .mockResolvedValueOnce({ data: null, error: { message: 'temporary' } })
+      .mockResolvedValue({ data: row, error: null });
+    await initializeTarkovSync();
+    expect(single.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(useTarkovStore().pvp.taskCompletions['legacy-task']?.complete).toBe(true);
+  });
   it('deduplicates repeated API update toast payloads by update id', async () => {
     const now = Date.now();
     single.mockResolvedValue({

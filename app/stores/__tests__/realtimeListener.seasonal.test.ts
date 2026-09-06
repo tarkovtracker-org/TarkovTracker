@@ -283,6 +283,80 @@ describe('seasonal progress realtime synchronization', () => {
     expect(state.pvp.level).toBe(35);
     expect(createdChannels).toHaveLength(1);
   });
+  it.each([
+    'pending',
+    'edited-during-read',
+    'saved-during-read',
+    'remote-reset',
+    'missing-metadata',
+  ])('preserves reconnect edits while respecting reset epochs: %s', async (scenario) => {
+    const { setupRealtimeListener, registerSyncControllerGetter } =
+      await import('@/stores/tarkov/realtimeListener');
+    let pending = scenario !== 'edited-during-read';
+    const controller = { pause: vi.fn(), resume: vi.fn(), hasPendingChanges: () => pending };
+    registerSyncControllerGetter(() => controller);
+    let resolveModes!: (result: unknown) => void;
+    const modeResult = new Promise((resolve) => {
+      resolveModes = resolve;
+    });
+    supabaseContext.client.from.mockImplementation((table: string) => ({
+      select: () => ({
+        eq: () =>
+          table === 'user_progress'
+            ? {
+                single: async () => ({
+                  data: null,
+                  error: scenario === 'missing-metadata' ? { code: 'PGRST116' } : null,
+                }),
+              }
+            : modeResult,
+      }),
+    }));
+    try {
+      state.pvp.displayName = 'before';
+      await setupRealtimeListener(store);
+      createdChannels[0]!.subscribeCallback?.('SUBSCRIBED');
+      Object.assign(state.pvp, {
+        displayName: null,
+        pmcFaction: 'BEAR',
+        xpOffset: 123,
+        skillOffsets: { Endurance: 4 },
+      });
+      pending = scenario !== 'saved-during-read';
+      if (!pending) recordLocalSyncTime();
+      resolveModes({
+        data: [
+          {
+            game_mode: 'pvp',
+            season_number: 0,
+            updated_at: '2026-09-06T12:00:00Z',
+            progress_data: {
+              ...structuredClone(defaultState.pvp),
+              displayName: 'remote',
+              progressEpoch: scenario === 'remote-reset' ? 1 : 0,
+              taskCompletions: { remoteTask: { complete: true, timestamp: 10 } },
+            },
+          },
+        ],
+        error: null,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(state.pvp.taskCompletions.remoteTask?.complete).toBe(true);
+      if (scenario === 'remote-reset') {
+        expect(state.pvp.displayName).toBe('remote');
+        expect(state.pvp.progressEpoch).toBe(1);
+      } else {
+        expect(state.pvp).toMatchObject({
+          displayName: null,
+          pmcFaction: 'BEAR',
+          xpOffset: 123,
+          skillOffsets: { Endurance: 4 },
+        });
+      }
+    } finally {
+      registerSyncControllerGetter(() => null);
+    }
+  });
   it('applies only the active Seasonal row without changing persistent modes', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     await setupRealtimeListener(store);

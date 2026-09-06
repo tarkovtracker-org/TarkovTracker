@@ -64,6 +64,27 @@ describe('useSupabaseListener cleanup', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+  it('does not replace pending local state on reconnect', async () => {
+    const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
+    const onData = vi.fn();
+    let pending = false;
+    const listener = useSupabaseListener({
+      filter: 'id=eq.row-1',
+      store: createStore(),
+      table: 'test_table',
+      onData,
+      patchStore: false,
+      syncController: { pause: vi.fn(), resume: vi.fn(), hasPendingChanges: () => pending },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    onData.mockClear();
+    pending = true;
+    channel.subscribe.mock.calls[0]?.[0]('SUBSCRIBED');
+    pending = false;
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onData).not.toHaveBeenCalled();
+    listener.cleanup();
+  });
   it.each(['UPDATE', 'DELETE'])(
     'completes initialization when %s supersedes the initial fetch',
     async (eventType) => {
