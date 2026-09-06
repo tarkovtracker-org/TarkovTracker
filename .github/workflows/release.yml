@@ -38,7 +38,10 @@ jobs:
         with:
           script: |
             const { pathToFileURL } = require('node:url');
-            const { releaseEligibility } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/release-gate.mjs`));
+            const { copyFile } = require('node:fs/promises');
+            const gatePath = `${process.env.RUNNER_TEMP}/release-gate.mjs`;
+            await copyFile(`${process.env.GITHUB_WORKSPACE}/scripts/release-gate.mjs`, gatePath);
+            const { releaseEligibility } = await import(pathToFileURL(gatePath));
             const result = await releaseEligibility({ github, context });
             core.info(result.reason);
             core.setOutput('release', String(result.release));
@@ -86,7 +89,7 @@ jobs:
         with:
           script: |
             const { pathToFileURL } = require('node:url');
-            const { releaseEligibility } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/release-gate.mjs`));
+            const { releaseEligibility } = await import(pathToFileURL(`${process.env.RUNNER_TEMP}/release-gate.mjs`));
             const result = await releaseEligibility({ github, context });
             core.info(result.reason);
             core.setOutput('release', String(result.release));
