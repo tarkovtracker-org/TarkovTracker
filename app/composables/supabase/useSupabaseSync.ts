@@ -129,6 +129,93 @@ export function useSupabaseSync<
   let localVersion = 0;
   let disposed = false;
   let syncQueue: Promise<TPayload | null> | null = null;
+  // fallow-ignore-next-line complexity -- development-only diagnostics exercised through sync tests; inferred coverage misses indirect calls
+  const logPayload = (dataToSave: TPayload) => {
+    // Log detailed info about what we're syncing (dev only)
+    if (import.meta.env.DEV) {
+      if (table === 'user_progress') {
+        const userData = dataToSave as SupabaseUserData;
+        const pvpTasks = Object.keys(userData.pvp_data?.taskCompletions || {}).length;
+        const pveTasks = Object.keys(userData.pve_data?.taskCompletions || {}).length;
+        logger.debug(`[Sync] About to upsert to ${table}:`, {
+          gameMode: userData.current_game_mode,
+          pvpLevel: userData.pvp_data?.level,
+          pvpTasksCompleted: pvpTasks,
+          pveLevel: userData.pve_data?.level,
+          pveTasksCompleted: pveTasks,
+        });
+      } else {
+        logger.debug('[Sync] About to upsert to', table);
+      }
+    }
+  };
+  const upsert = async (payload: Record<string, unknown>) =>
+    sync ? sync(payload as TPayload) : $supabase.client.from(table).upsert(payload);
+  const upsertWithFallback = async (payload: Record<string, unknown>) => {
+    let payloadToSync: Record<string, unknown> | null = payload;
+    let error: SupabaseErrorLike | null = null;
+    let synced = false;
+    const removedMissingColumns = new Set<string>();
+    while (payloadToSync) {
+      const { error: syncError } = await upsert(payloadToSync);
+      if (!syncError) {
+        synced = true;
+        break;
+      }
+      error = syncError;
+      if (!isMissingColumnError(syncError)) {
+        break;
+      }
+      const missingColumn = getMissingColumnName(syncError);
+      if (!missingColumn || removedMissingColumns.has(missingColumn)) {
+        break;
+      }
+      const fallbackPayload = getFallbackPayload(payloadToSync, missingColumn);
+      if (!fallbackPayload) {
+        break;
+      }
+      removedMissingColumns.add(missingColumn);
+      payloadToSync = fallbackPayload;
+    }
+    return { synced, error, removedMissingColumns };
+  };
+  // fallow-ignore-next-line complexity -- retry/fallback outcomes are covered by sync integration tests; keep error reporting with the write result
+  const writePayload = async (dataToSave: TPayload, ownerId: string): Promise<boolean> => {
+    let syncResult = await upsertWithFallback(dataToSave);
+    if (
+      !syncResult.synced &&
+      syncResult.error &&
+      isAbortRequestError(syncResult.error) &&
+      !isPaused.value
+    ) {
+      await delay(ABORT_RETRY_DELAY_MS);
+      if (
+        !isPaused.value &&
+        $supabase.user.loggedIn &&
+        $supabase.user.id === ownerId &&
+        !disposed
+      ) {
+        syncResult = await upsertWithFallback(dataToSave);
+      }
+    }
+    if (syncResult.synced && syncResult.removedMissingColumns.size) {
+      logger.warn(
+        `[Sync] ${table} fallback sync succeeded after removing missing columns: ${Array.from(syncResult.removedMissingColumns).join(', ')}`
+      );
+    }
+    if (!syncResult.synced && syncResult.error) {
+      if (isAbortRequestError(syncResult.error)) {
+        logger.warn(`[Sync] Sync to ${table} was aborted; retry did not succeed yet`, {
+          ...formatSupabaseError(syncResult.error),
+          retryDelayMs: ABORT_RETRY_DELAY_MS,
+        });
+      } else {
+        logger.error(`[Sync] Error syncing to ${table}:`, formatSupabaseError(syncResult.error));
+      }
+    }
+    return syncResult.synced;
+  };
+  // fallow-ignore-next-line complexity -- serialized save/cleanup/version guards are covered in useSupabaseSync.test.ts and sync integration tests
   const syncToSupabase = async (
     transformedState: TPayload | null,
     syncVersion: number
@@ -167,86 +254,9 @@ export function useSupabaseSync<
         isSyncing.value = false;
         return null;
       }
-      // Log detailed info about what we're syncing (dev only)
-      if (import.meta.env.DEV) {
-        if (table === 'user_progress') {
-          const userData = dataToSave as SupabaseUserData;
-          const pvpTasks = Object.keys(userData.pvp_data?.taskCompletions || {}).length;
-          const pveTasks = Object.keys(userData.pve_data?.taskCompletions || {}).length;
-          logger.debug(`[Sync] About to upsert to ${table}:`, {
-            gameMode: userData.current_game_mode,
-            pvpLevel: userData.pvp_data?.level,
-            pvpTasksCompleted: pvpTasks,
-            pveLevel: userData.pve_data?.level,
-            pveTasksCompleted: pveTasks,
-          });
-        } else {
-          logger.debug('[Sync] About to upsert to', table);
-        }
-      }
-      const upsert = async (payload: Record<string, unknown>) =>
-        sync ? sync(payload as TPayload) : $supabase.client.from(table).upsert(payload);
-      const upsertWithFallback = async (payload: Record<string, unknown>) => {
-        let payloadToSync: Record<string, unknown> | null = payload;
-        let error: SupabaseErrorLike | null = null;
-        let synced = false;
-        const removedMissingColumns = new Set<string>();
-        while (payloadToSync) {
-          const { error: syncError } = await upsert(payloadToSync);
-          if (!syncError) {
-            synced = true;
-            break;
-          }
-          error = syncError;
-          if (!isMissingColumnError(syncError)) {
-            break;
-          }
-          const missingColumn = getMissingColumnName(syncError);
-          if (!missingColumn || removedMissingColumns.has(missingColumn)) {
-            break;
-          }
-          const fallbackPayload = getFallbackPayload(payloadToSync, missingColumn);
-          if (!fallbackPayload) {
-            break;
-          }
-          removedMissingColumns.add(missingColumn);
-          payloadToSync = fallbackPayload;
-        }
-        return { synced, error, removedMissingColumns };
-      };
-      let syncResult = await upsertWithFallback(dataToSave);
-      if (
-        !syncResult.synced &&
-        syncResult.error &&
-        isAbortRequestError(syncResult.error) &&
-        !isPaused.value
-      ) {
-        await delay(ABORT_RETRY_DELAY_MS);
-        if (
-          !isPaused.value &&
-          $supabase.user.loggedIn &&
-          $supabase.user.id === ownerId &&
-          !disposed
-        ) {
-          syncResult = await upsertWithFallback(dataToSave);
-        }
-      }
-      if (syncResult.synced && syncResult.removedMissingColumns.size) {
-        logger.warn(
-          `[Sync] ${table} fallback sync succeeded after removing missing columns: ${Array.from(syncResult.removedMissingColumns).join(', ')}`
-        );
-      }
-      if (!syncResult.synced && syncResult.error) {
-        if (isAbortRequestError(syncResult.error)) {
-          logger.warn(`[Sync] Sync to ${table} was aborted; retry did not succeed yet`, {
-            ...formatSupabaseError(syncResult.error),
-            retryDelayMs: ABORT_RETRY_DELAY_MS,
-          });
-        } else {
-          logger.error(`[Sync] Error syncing to ${table}:`, formatSupabaseError(syncResult.error));
-        }
-      }
-      if (syncResult.synced && !disposed && $supabase.user.id === ownerId) {
+      logPayload(dataToSave);
+      const synced = await writePayload(dataToSave, ownerId);
+      if (synced && !disposed && $supabase.user.id === ownerId) {
         lastSyncedHash = currentHash;
         if (syncVersion === localVersion) pendingLocalChanges = false;
         logger.debug(`[Sync] ✅ Successfully synced to ${table}`);
@@ -263,7 +273,10 @@ export function useSupabaseSync<
   const capturePayload = (state: TState): TPayload | null => {
     try {
       const payload = transform ? transform(state) : (state as unknown as TPayload);
-      return payload ? (JSON.parse(JSON.stringify(payload)) as TPayload) : null;
+      if (!payload) return null;
+      // Capture the JSON wire representation, not a clone of reactive references.
+      const serializedPayload = JSON.stringify(payload);
+      return JSON.parse(serializedPayload) as TPayload;
     } catch (error) {
       logger.error('[Sync] Unexpected error:', error);
       return null;
