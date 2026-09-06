@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { flushPromises, mount } from '@vue/test-utils';
-import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
+import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, reactive, ref } from 'vue';
 import { useAppInitialization } from '@/composables/useAppInitialization';
 const localeRef = ref('en');
@@ -28,7 +28,10 @@ const mockSupabaseUser = reactive({
 });
 const mockSupabase = {
   user: mockSupabaseUser,
+  client: { auth: { getSession: vi.fn() } },
 };
+const mockSupporter = { fetchStatus: vi.fn(), subscribe: vi.fn(), reset: vi.fn() };
+vi.mock('@/composables/useSupporter', () => ({ useSupporter: () => mockSupporter }));
 const mockInitializeTarkovSync = vi.fn(async () => {});
 const mockResetTarkovStoreForSessionTransition = vi.fn();
 const mockMigrateDataIfNeeded = vi.fn(async () => {});
@@ -85,7 +88,12 @@ const mountWithComposable = async () => {
   return mount(Component);
 };
 describe('useAppInitialization locale setup', () => {
+  afterEach(() => vi.unstubAllGlobals());
   beforeEach(async () => {
+    mockSupabase.client.auth.getSession.mockReset().mockResolvedValue({ data: { session: null } });
+    mockSupporter.fetchStatus.mockReset().mockResolvedValue(undefined);
+    mockSupporter.subscribe.mockReset().mockResolvedValue(undefined);
+    mockSupporter.reset.mockReset();
     localeRef.value = 'en';
     setLocale.mockClear();
     setLocale.mockImplementation(async (value: string) => {
@@ -211,5 +219,89 @@ describe('useAppInitialization locale setup', () => {
     expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
     expect(mockMigrateDataIfNeeded).toHaveBeenCalledTimes(1);
     wrapper.unmount();
+  });
+  it('does not refetch metadata before initialization', async () => {
+    mockMetadataStore.hasInitialized = false;
+    await mountWithComposable();
+    await flushPromises();
+    expect(mockMetadataStore.languageCode).toBe('de');
+    expect(mockMetadataStore.fetchAllData).not.toHaveBeenCalled();
+  });
+  it('reports metadata refresh failures after a locale change', async () => {
+    mockMetadataStore.fetchAllData.mockRejectedValueOnce(new Error('offline'));
+    await mountWithComposable();
+    await flushPromises();
+    expect(mockShowLoadFailed).toHaveBeenCalledTimes(1);
+    expect(localeRef.value).toBe('de');
+  });
+  it.each(['sync', 'migration'])(
+    'reports %s failure and retries on the next login',
+    async (step) => {
+      const operation = step === 'sync' ? mockInitializeTarkovSync : mockMigrateDataIfNeeded;
+      operation.mockRejectedValueOnce(new Error('offline'));
+      mockSupabaseUser.loggedIn = true;
+      mockSupabaseUser.id = 'user-1';
+      await mountWithComposable();
+      await flushPromises();
+      expect(mockShowLoadFailed).toHaveBeenCalledTimes(1);
+      mockSupabaseUser.loggedIn = false;
+      await flushPromises();
+      mockSupabaseUser.loggedIn = true;
+      await flushPromises();
+      expect(operation).toHaveBeenCalledTimes(2);
+    }
+  );
+  it('does not continue an old account initialization after a newer account is active', async () => {
+    const pending = Promise.withResolvers<undefined>();
+    mockInitializeTarkovSync.mockReturnValueOnce(pending.promise);
+    mockSupabaseUser.loggedIn = true;
+    mockSupabaseUser.id = 'user-1';
+    await mountWithComposable();
+    await flushPromises();
+    mockSupabaseUser.id = 'user-2';
+    await flushPromises();
+    pending.resolve(undefined);
+    await flushPromises();
+    expect(mockMigrateDataIfNeeded).toHaveBeenCalledTimes(1);
+    expect(mockSupporter.fetchStatus).toHaveBeenCalledExactlyOnceWith('user-2');
+  });
+  it('does not subscribe to a former account when its supporter lookup finishes late', async () => {
+    const pending = Promise.withResolvers<undefined>();
+    mockSupporter.fetchStatus.mockReturnValueOnce(pending.promise);
+    mockSupabaseUser.loggedIn = true;
+    mockSupabaseUser.id = 'user-1';
+    await mountWithComposable();
+    await flushPromises();
+    mockSupabaseUser.id = 'user-2';
+    await flushPromises();
+    pending.resolve(undefined);
+    await flushPromises();
+    expect(mockSupporter.subscribe).toHaveBeenCalledExactlyOnceWith('user-2');
+  });
+  it('records account activity with the session token after initialization', async () => {
+    const fetch = vi.fn().mockResolvedValue({ recorded: true });
+    vi.stubGlobal('$fetch', fetch);
+    mockSupabase.client.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'fixture-token' } },
+    });
+    mockSupabaseUser.loggedIn = true;
+    mockSupabaseUser.id = 'user-1';
+    await mountWithComposable();
+    await flushPromises();
+    expect(fetch).toHaveBeenCalledExactlyOnceWith('/api/account/activity', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer fixture-token' },
+    });
+  });
+  it('keeps sync usable when optional supporter and activity requests fail', async () => {
+    mockSupporter.fetchStatus.mockRejectedValue(new Error('supporter offline'));
+    mockSupabase.client.auth.getSession.mockRejectedValue(new Error('session unavailable'));
+    mockSupabaseUser.loggedIn = true;
+    mockSupabaseUser.id = 'user-1';
+    await mountWithComposable();
+    await flushPromises();
+    expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
+    expect(mockMigrateDataIfNeeded).toHaveBeenCalledTimes(1);
+    expect(mockShowLoadFailed).not.toHaveBeenCalled();
   });
 });

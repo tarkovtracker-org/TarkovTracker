@@ -1,76 +1,191 @@
-import { describe, it, expect } from 'vitest';
-/**
- * Pure logic tests for teammate filtering.
- *
- * The actual useTeammateStores composable has complex dependencies on:
- * - Nuxt runtime (useNuxtApp, $supabase)
- * - Pinia singletons with Supabase listeners
- * - Dynamic imports for store creation
- *
- * Testing the full integration requires @nuxt/test-utils with a real Nuxt
- * runtime environment. These unit tests verify the core filtering logic
- * that determines which members should get teammate stores.
- */
-/**
- * Filter function that mirrors the logic in useTeammateStores.
- * Given a list of team members and the current user ID, returns
- * the list of teammates (excluding self).
- */
-function filterTeammates(members: string[], currentUserId: string | undefined): string[] {
-  if (!currentUserId) return members;
-  return members.filter((member) => member !== currentUserId);
-}
-describe('Teammate Filtering Logic', () => {
-  it('should filter out the current user from members list', () => {
-    const members = ['user-1', 'user-2', 'user-3'];
-    const currentUserId = 'user-1';
-    const teammates = filterTeammates(members, currentUserId);
-    expect(teammates).toEqual(['user-2', 'user-3']);
+// @vitest-environment happy-dom
+import { mockNuxtImport } from '@nuxt/test-utils/runtime';
+import { flushPromises } from '@vue/test-utils';
+import { createPinia, setActivePinia } from 'pinia';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { effectScope } from 'vue';
+import { useTeamStoreWithSupabase, useTeammateStores } from '@/stores/useTeamStore';
+import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
+const mocks = vi.hoisted(() => ({
+  eq: vi.fn(),
+  rpc: vi.fn(),
+  replay: vi.fn(),
+  cleanup: vi.fn(),
+  user: { id: 'self', loggedIn: false },
+}));
+vi.mock('@/stores/useSystemStore', () => ({
+  getTeamIdFromState: () => null,
+  useSystemStoreWithSupabase: () => ({ systemStore: { $state: {} } }),
+}));
+vi.mock('@/stores/useTarkov', () => ({
+  useTarkovStore: () => ({
+    getCurrentGameMode: () => 'pvp',
+    $state: { currentGameMode: 'pvp', pvp: {} },
+  }),
+}));
+vi.mock('@/composables/supabase/useSupabaseListener', () => ({
+  useSupabaseListener: () => ({ cleanup: mocks.cleanup, isSubscribed: { value: false } }),
+}));
+vi.mock('@/composables/useSafeToast', () => ({ useSafeToast: () => ({ add: vi.fn() }) }));
+vi.mock('@/stores/tarkov/metadataStoreBridge', () => ({
+  replayProgressMetadataMigration: mocks.replay,
+}));
+mockNuxtImport('useNuxtApp', () => () => ({
+  $supabase: {
+    user: mocks.user,
+    client: { from: () => ({ select: () => ({ eq: mocks.eq }) }), rpc: mocks.rpc },
+  },
+}));
+const row = (level: number, mode = 'pvp', season = 0) => ({
+  game_mode: mode,
+  season_number: season,
+  progress_data: { level },
+});
+const emitProgress = (data: Record<string, unknown>) =>
+  window.dispatchEvent(
+    new CustomEvent('teammate-mode-progress', { detail: { user_id: 'other', ...data } })
+  );
+let scope: ReturnType<typeof effectScope>;
+let instance: ReturnType<typeof useTeamStoreWithSupabase>;
+let flow: ReturnType<typeof useTeammateStores>;
+const addMember = async (mode: 'pvp' | 'pve' | 'seasonal' = 'pvp') => {
+  instance.teamStore.members = ['self', 'other'];
+  instance.teamStore.memberProfiles = {
+    other: {
+      gameMode: mode,
+      gameEdition: 4,
+      displayName: 'Teammate',
+      level: 10,
+      tasksCompleted: 0,
+    },
+  };
+  await flushPromises();
+};
+describe('teammate store hydration and lifetime', () => {
+  beforeEach(async () => {
+    setActivePinia(createPinia());
+    mocks.eq.mockReset().mockResolvedValue({ data: [], error: null });
+    mocks.rpc.mockReset().mockResolvedValue({ data: null, error: null });
+    instance = useTeamStoreWithSupabase();
+    await flushPromises();
+    scope = effectScope();
+    flow = scope.run(() => useTeammateStores())!;
+    await flushPromises();
   });
-  it('should return all members if current user is not in list', () => {
-    const members = ['user-2', 'user-3'];
-    const currentUserId = 'user-1';
-    const teammates = filterTeammates(members, currentUserId);
-    expect(teammates).toEqual(['user-2', 'user-3']);
+  afterEach(() => {
+    scope.stop();
+    instance.cleanup();
   });
-  it('should return all members if current user ID is undefined', () => {
-    const members = ['user-1', 'user-2'];
-    const currentUserId = undefined;
-    const teammates = filterTeammates(members, currentUserId);
-    expect(teammates).toEqual(['user-1', 'user-2']);
+  it('hydrates actual teammate stores, excludes self and preserves mode identity', async () => {
+    mocks.eq.mockResolvedValue({
+      data: [row(21), row(32, 'pve'), row(43, 'seasonal', ACTIVE_SEASON_NUMBER)],
+      error: null,
+    });
+    await addMember('pve');
+    expect(Object.keys(flow.teammateStores.value)).toEqual(['other']);
+    expect(flow.teammateStores.value.other?.$state).toMatchObject({
+      currentGameMode: 'pve',
+      gameEdition: 4,
+      pvp: { level: 21 },
+      pve: { level: 32 },
+      seasonal: { level: 43 },
+    });
+    expect(mocks.replay).toHaveBeenCalled();
   });
-  it('should return empty array for empty members list', () => {
-    const members: string[] = [];
-    const currentUserId = 'user-1';
-    const teammates = filterTeammates(members, currentUserId);
-    expect(teammates).toEqual([]);
+  it('uses persistent legacy progress only when normalized data is missing', async () => {
+    mocks.rpc.mockResolvedValue({ data: { level: 37 }, error: null });
+    await addMember('pve');
+    expect(flow.teammateStores.value.other?.$state.pve.level).toBe(37);
+    expect(mocks.rpc).toHaveBeenCalledWith('get_teammate_legacy_progress', {
+      p_user_id: 'other',
+      p_game_mode: 'pve',
+    });
   });
-  it('should handle single member who is self', () => {
-    const members = ['user-1'];
-    const currentUserId = 'user-1';
-    const teammates = filterTeammates(members, currentUserId);
-    expect(teammates).toEqual([]);
+  it('does not overwrite materialized normalized progress with legacy data', async () => {
+    mocks.eq.mockResolvedValue({ data: [row(25)], error: null });
+    mocks.rpc.mockResolvedValue({ data: { level: 50 }, error: null });
+    await addMember();
+    expect(flow.teammateStores.value.other?.$state.pvp.level).toBe(25);
   });
-  it('should handle member additions correctly', () => {
-    const currentUserId = 'user-1';
-    // Initial state
-    let members = ['user-1', 'user-2'];
-    let teammates = filterTeammates(members, currentUserId);
-    expect(teammates).toEqual(['user-2']);
-    // Add new member
-    members = ['user-1', 'user-2', 'user-3'];
-    teammates = filterTeammates(members, currentUserId);
-    expect(teammates).toEqual(['user-2', 'user-3']);
+  it('never uses persistent legacy fallback for a Seasonal teammate', async () => {
+    mocks.eq.mockResolvedValue({
+      data: [row(20, 'seasonal', ACTIVE_SEASON_NUMBER - 1)],
+      error: null,
+    });
+    await addMember('seasonal');
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(flow.teammateStores.value.other?.$state.seasonal.level).toBe(1);
   });
-  it('should handle member removals correctly', () => {
-    const currentUserId = 'user-1';
-    // Initial state
-    let members = ['user-1', 'user-2', 'user-3'];
-    let teammates = filterTeammates(members, currentUserId);
-    expect(teammates).toEqual(['user-2', 'user-3']);
-    // Remove user-2
-    members = ['user-1', 'user-3'];
-    teammates = filterTeammates(members, currentUserId);
-    expect(teammates).toEqual(['user-3']);
+  it('ignores events for a different user, invalid mode, or wrong season', async () => {
+    await addMember();
+    emitProgress({ ...row(50), user_id: 'outsider' });
+    emitProgress(row(50, 'arena'));
+    emitProgress(row(50, 'seasonal', ACTIVE_SEASON_NUMBER - 1));
+    emitProgress(row(50, 'pvp', 1));
+    expect(flow.teammateStores.value.other?.$state.pvp.level).toBe(1);
+    expect(flow.teammateStores.value.other?.$state.seasonal.level).toBe(1);
+    emitProgress(row(24, 'seasonal', ACTIVE_SEASON_NUMBER));
+    expect(flow.teammateStores.value.other?.$state.seasonal.level).toBe(24);
   });
+  it('keeps authoritative realtime progress when an older hydration request completes', async () => {
+    const pending = Promise.withResolvers<{ data: ReturnType<typeof row>[]; error: null }>();
+    mocks.eq.mockReturnValue(pending.promise);
+    await addMember();
+    emitProgress(row(40));
+    pending.resolve({ data: [row(10)], error: null });
+    await flushPromises();
+    expect(flow.teammateStores.value.other?.$state.pvp.level).toBe(40);
+  });
+  it('removes departed teammates and ignores their delayed hydration', async () => {
+    const pending = Promise.withResolvers<{ data: ReturnType<typeof row>[]; error: null }>();
+    mocks.eq.mockReturnValue(pending.promise);
+    await addMember();
+    const departed = flow.teammateStores.value.other!;
+    instance.teamStore.members = ['self'];
+    await flushPromises();
+    pending.resolve({ data: [row(50)], error: null });
+    emitProgress(row(60));
+    await flushPromises();
+    expect(flow.teammateStores.value).toEqual({});
+    expect(departed.$state.pvp.level).toBe(1);
+  });
+  it('updates identity from refreshed profiles without re-fetching progress', async () => {
+    await addMember();
+    instance.teamStore.memberProfiles = {
+      other: {
+        displayName: 'Teammate',
+        level: 1,
+        tasksCompleted: 0,
+        gameMode: 'pve',
+        gameEdition: 2,
+      },
+    };
+    await flushPromises();
+    expect(flow.teammateStores.value.other?.$state).toMatchObject({
+      currentGameMode: 'pve',
+      gameEdition: 2,
+    });
+    expect(mocks.eq).toHaveBeenCalledTimes(1);
+  });
+  it('detaches event listeners when the owning scope is disposed', async () => {
+    await addMember();
+    const previous = flow.teammateStores.value.other!;
+    scope.stop();
+    emitProgress(row(50));
+    expect(flow.teammateStores.value).toEqual({});
+    expect(flow.teammateUnsubscribes.value).toEqual({});
+    expect(previous.$state.pvp.level).toBe(1);
+  });
+  it.each(['response', 'rejection'])(
+    'handles hydration %s errors without applying legacy state',
+    async (kind) => {
+      if (kind === 'response')
+        mocks.eq.mockResolvedValue({ data: null, error: { message: 'offline' } });
+      else mocks.eq.mockRejectedValue(new Error('offline'));
+      mocks.rpc.mockResolvedValue({ data: { level: 50 }, error: null });
+      await addMember();
+      expect(flow.teammateStores.value.other?.$state.pvp.level).toBe(1);
+      expect(mocks.replay).not.toHaveBeenCalled();
+    }
+  );
 });
