@@ -5,6 +5,7 @@ import {
   getRouterParam,
   setResponseHeader,
 } from 'h3';
+import { normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
 import { fetchWithTimeout, isAbortError } from '@/server/utils/fetchWithTimeout';
 import { createLogger } from '@/server/utils/logger';
 import { getProxyAwareClientIdentifier } from '@/server/utils/requestIdentity';
@@ -545,7 +546,8 @@ export default defineEventHandler(async (event) => {
   }
   const typedConfig = useRuntimeConfig(event) as ReturnType<typeof useRuntimeConfig> &
     ApiProtectionConfig;
-  const { supabaseAnonKey, supabaseUrl } = typedConfig;
+  const { supabaseAnonKey } = typedConfig;
+  const supabaseUrl = normalizeSupabaseUrl(typedConfig.supabaseUrl);
   const supabaseServiceKey =
     typeof typedConfig.supabaseServiceKey === 'string' ? typedConfig.supabaseServiceKey : '';
   if (

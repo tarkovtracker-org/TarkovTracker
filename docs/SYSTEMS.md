@@ -637,6 +637,8 @@ flowchart LR
    A missing normalized row is treated as private rather than missing.
    Shared-profile REST reads use `fetchWithTimeout` with an eight-second deadline covering headers
    and the complete response body. A failed read cancels the sibling reads; timeouts return 504.
+   The configured Supabase URL is normalized before auth and REST paths are appended, removing
+   query strings, fragments, and the trailing slash; invalid or non-HTTPS URLs fail closed.
 5. Team identity comes from `team_memberships` for all modes. Team joins use a database transaction
    that locks the team while checking capacity and persists membership, user-system state, and the
    audit event together. `user_system` keeps legacy persistent PvP/PvE columns plus the active

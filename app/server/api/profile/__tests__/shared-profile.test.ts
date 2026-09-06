@@ -143,6 +143,39 @@ describe('Shared Profile API', () => {
       statusMessage: 'Missing Supabase configuration for shared profiles',
     });
   });
+  it.each(['not-a-url', 'ftp://test.supabase.co', '   '])(
+    'rejects invalid Supabase URL %s before fetching',
+    async (url) => {
+      runtimeConfig.supabaseUrl = url;
+      const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+      await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({ statusCode: 500 });
+      expect(mockFetch).not.toHaveBeenCalled();
+    }
+  );
+  it('normalizes the Supabase URL for authentication and all profile reads', async () => {
+    runtimeConfig.supabaseUrl = ' https://test.supabase.co/?source=config#fragment ';
+    mockGetRequestHeader.mockReturnValue('Bearer user-token');
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.endsWith('/auth/v1/user')) {
+        return new Response(JSON.stringify({ id: '11111111-1111-4111-8111-111111111111' }));
+      }
+      if (url.includes('/rest/v1/user_game_mode_progress?'))
+        return modeProgressResponse({ level: 24 });
+      if (url.includes('/rest/v1/user_preferences?')) return preferencesResponse();
+      return progressResponse();
+    });
+    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+    await handler(mockEvent as H3Event);
+    const urls = mockFetch.mock.calls.map(([url]) => url as string);
+    expect(urls).toContain('https://test.supabase.co/auth/v1/user');
+    const restUrls = urls.filter((url) => url.includes('/rest/v1/'));
+    expect(restUrls).toHaveLength(3);
+    for (const url of urls) {
+      expect(url).not.toContain('source=config');
+      expect(url).not.toContain('#fragment');
+      expect(url).toMatch(/^https:\/\/test\.supabase\.co\/(auth|rest)\/v1\//);
+    }
+  });
   it('serves shared profiles in production mode', async () => {
     const originalNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
