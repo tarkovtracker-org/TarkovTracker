@@ -57,7 +57,8 @@ Hard rules the reviewer must verify for every diff:
 
 - **Where:** `workers/api-gateway/src/rateLimiter.ts` (rate limiter DO), `workers/tarkov-precompute/`
 - **Check:** DO alarm lifecycle — no orphaned alarms, no double-fire without
-  idempotency, no alarm leaks on cleanup. Verify that lazy expiration does not leave stale rate-limit state. DO storage transactions are single-writer; no
+  idempotency, no alarm leaks on cleanup. Verify that lazy expiration does not leave stale
+  rate-limit state. DO storage transactions are single-writer; no
   cross-DO atomicity assumptions. KV eventual consistency — reads after writes may
   be stale. CPU limits on Workers Free tier rule out scheduled Workers for
   precompute (hence the GitHub Actions workflow).

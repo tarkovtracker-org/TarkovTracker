@@ -75,8 +75,8 @@ pnpm run validate:changes --mode full --base origin/main
 ```
 
 Execution reuses the absolute package-manager entry from `pnpm run`; direct Node invocation is
-only supported for `--explain`. Git defaults to `/usr/bin/git` (the standard Git for Windows
-location on Windows); set `GIT_EXECUTABLE` to an absolute trusted path for a nonstandard install.
+only supported for `--explain`. Git defaults to `/usr/bin/git` on Unix and
+`C:/Program Files/Git/cmd/git.exe` on Windows; set `GIT_EXECUTABLE` to an absolute trusted path for a nonstandard install.
 The full profile requires Bash at `/bin/bash` for the existing Deno test command.
 
 Local mode combines the merge-base diff with staged, unstaged, and untracked paths. Explicit CI

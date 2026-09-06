@@ -15,13 +15,20 @@ export async function measuredRun(run, { pages, api }) {
       ),
     });
   }
-  const latest =
-    run.run_attempt > 1 ? await api(`actions/runs/${run.id}/attempts/${run.run_attempt}`) : run;
   return {
     id: run.id,
     sha: run.head_sha,
     conclusion: run.conclusion,
     attempts,
-    duration_minutes: duration(latest.run_started_at, latest.updated_at),
+    ...(await measuredDuration(run, api)),
   };
+}
+async function measuredDuration(run, api) {
+  try {
+    const latest =
+      run.run_attempt > 1 ? await api(`actions/runs/${run.id}/attempts/${run.run_attempt}`) : run;
+    return { duration_minutes: duration(latest.run_started_at, latest.updated_at) };
+  } catch (error) {
+    return { duration_minutes: null, duration_unavailable: error.message.split('\n')[0] };
+  }
 }

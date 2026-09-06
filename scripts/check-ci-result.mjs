@@ -2,8 +2,8 @@
 import { aggregateResults } from './validation-plan.mjs';
 try {
   const errors = aggregateResults(
-    JSON.parse(process.env.VALIDATION_PLAN),
-    JSON.parse(process.env.CI_NEEDS)
+    JSON.parse(process.env.VALIDATION_PLAN || 'null'),
+    JSON.parse(process.env.CI_NEEDS || '{}')
   );
   if (errors.length) throw new Error(errors.join('\n'));
   console.log('All selected CI jobs passed.');

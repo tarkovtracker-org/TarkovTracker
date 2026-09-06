@@ -29,6 +29,8 @@ if (
   (Object.hasOwn(options, 'after') && !Number.isFinite(Date.parse(options.after)))
 )
   throw new Error('Invalid metrics options');
+if (Object.hasOwn(options, 'after') && Date.parse(options.after) >= Date.parse(options.before))
+  throw new Error('Invalid metrics options: after must precede before');
 const api = async (path) =>
   JSON.parse(
     (await exec('gh', ['api', `repos/${options.repo}/${path}`], { maxBuffer: 16 * 1024 * 1024 }))

@@ -20,7 +20,7 @@ settings, required checks, application APIs, database schema, or deployment inte
 The original code was validated against `fb919ca0` and reviewed by CodeRabbit CLI 0.7.5 at `ebe4b2f9`.
 The only finding was an empty metrics `--after` argument silently selecting the baseline; it was fixed
 and regression-tested. The PR feedback pass adds rerun-timing and absolute-tool-path regression coverage, bringing the
-focused workflow suite to 16 tests. It also requires complete integrity pins for matching pnpm
+focused workflow suite to 19 tests. It also requires complete integrity pins for matching pnpm
 installations and removes the unused Lighthouse contents permission.
 
 Required checks are recorded against the final PR revision in its description:
@@ -45,8 +45,8 @@ same setup action; its schedule, permissions, command, and environment remain un
   approval under [GitHub's token event behavior](https://docs.github.com/en/actions/concepts/security/github_token).
   Removing translation path exclusions does not remove that platform approval requirement.
 - Establish Codex delivery and reliable exclusions before disabling duplicate automatic reviewers.
-  Historical application PR #781 and translation PR #748 did not establish Codex delivery or usage
-  exclusions. Existing provider settings remain unchanged.
+  Historical PRs #781 and #748 did not establish Codex delivery or usage exclusions.
+  Both fall in the executable baseline category. Existing provider settings remain unchanged.
 - Read-only inspection returned no classic main-branch protection and only deletion/non-fast-forward
   applied rules. Existing governance is preserved; `CI Result` does not become required automatically.
 - Record the actual rollout timestamp, then collect the first 20 subsequent merges. See

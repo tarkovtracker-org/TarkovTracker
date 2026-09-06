@@ -23,6 +23,7 @@ test('only explicit documentation and translation paths receive reduced validati
     ['README.md', 'app/locales/cs.json'],
   ]) {
     assert.equal(classifyPaths(paths).full, false, paths.join());
+    assert.deepEqual(classifyPaths(paths).jobs, ['lint-format', 'systems-drift']);
   }
   for (const path of [
     'DESIGN.md',
@@ -41,6 +42,16 @@ test('only explicit documentation and translation paths receive reduced validati
     'docs/script.sh',
   ]) {
     assert.equal(classifyPaths([path]).full, true, path);
+    assert.deepEqual(classifyPaths([path]).jobs, [
+      'fallow',
+      'lint-format',
+      'typecheck',
+      'test',
+      'validate',
+      'supabase-db',
+      'systems-drift',
+      'workers',
+    ]);
   }
   assert.equal(classifyPaths([]).full, true);
   assert.equal(classifyPaths(['README.md', 'app/a.ts']).full, true);
@@ -57,6 +68,16 @@ test('name-status parser includes both rename paths and deletions without splitt
   for (const bad of ['M\0', 'R100\0one\0', 'M\0truncated', 'invalid\0path\0'])
     assert.throws(() => parseNameStatus(bad));
 });
+function assertSelectedJobFailures(plan, needs) {
+  for (const result of ['failure', 'cancelled', 'skipped', undefined]) {
+    for (const job of plan.jobs) {
+      assert.ok(
+        aggregateResults(plan, { ...needs, [job]: { result } }).length,
+        `${job}: ${result}`
+      );
+    }
+  }
+}
 test('aggregate fails closed on selected failures, cancellations, unexpected skips and missing data', () => {
   for (const paths of [['app/a.ts'], ['README.md']]) {
     const plan = classifyPaths(paths);
@@ -67,9 +88,7 @@ test('aggregate fails closed on selected failures, cancellations, unexpected ski
       ),
     };
     assert.deepEqual(aggregateResults(plan, needs), []);
-    for (const result of ['failure', 'cancelled', 'skipped', undefined]) {
-      assert.ok(aggregateResults(plan, { ...needs, 'lint-format': { result } }).length);
-    }
+    assertSelectedJobFailures(plan, needs);
     assert.ok(aggregateResults(plan, { ...needs, changes: { result: 'failure' } }).length);
     assert.ok(aggregateResults(undefined, needs).length);
     assert.ok(aggregateResults({ ...plan, jobs: [] }, needs).length);

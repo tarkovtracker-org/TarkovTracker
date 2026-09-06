@@ -46,17 +46,21 @@ test('rerun duration uses the latest attempt while runner minutes include all at
     'actions/runs/42/attempts/2/jobs',
   ]);
 });
-test('unavailable latest attempt metadata is not replaced with misleading run duration', async () => {
-  await assert.rejects(
-    measuredRun(
-      { ...run, run_attempt: 2 },
-      {
-        pages: async () => jobs,
-        api: async () => {
-          throw new Error('API unavailable');
-        },
-      }
-    ),
-    /API unavailable/
+test('unavailable latest attempt duration preserves runner minutes and identifies missing data', async () => {
+  const result = await measuredRun(
+    { ...run, run_attempt: 2 },
+    {
+      pages: async () => jobs,
+      api: async () => {
+        throw new Error('API unavailable');
+      },
+    }
   );
+  assert.equal(result.duration_minutes, null);
+  assert.equal(result.duration_unavailable, 'API unavailable');
+  assert.equal(result.conclusion, 'success');
+  assert.deepEqual(result.attempts, [
+    { attempt: 1, runner_minutes: 2 },
+    { attempt: 2, runner_minutes: 2 },
+  ]);
 });
