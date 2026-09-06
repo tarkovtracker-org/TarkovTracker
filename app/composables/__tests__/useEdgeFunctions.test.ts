@@ -352,3 +352,27 @@ describe('useEdgeFunctions.createToken', () => {
     expect(deleteEq).toHaveBeenCalledWith('token_id', 'token-1');
   });
 });
+describe('useEdgeFunctions.purgeCache', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.resetAllMocks();
+    mockSupabaseReady.mockResolvedValue({ access_token: 'token-1' });
+  });
+  it('preserves cache purge error codes for localized admin messages', async () => {
+    mockSupabaseClient.functions.invoke.mockResolvedValueOnce({
+      data: null,
+      error: {
+        context: new Response(
+          JSON.stringify({ error: 'cache_purge_failed', code: 'cache_purge_failed' }),
+          { status: 502 }
+        ),
+        message: 'Edge Function returned a non-2xx status code',
+      },
+    });
+    const { useEdgeFunctions } = await import('@/composables/api/useEdgeFunctions');
+    await expect(useEdgeFunctions().purgeCache('tarkov-data')).rejects.toMatchObject({
+      status: 502,
+      data: { code: 'cache_purge_failed' },
+    });
+  });
+});
