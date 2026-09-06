@@ -290,6 +290,26 @@ describe('seasonal progress realtime synchronization', () => {
     expect(state.pvp.taskObjectives.staleOnly).toBeUndefined();
     expect(createdChannels).toHaveLength(1);
   });
+  it('retains an acknowledged newer count clear in a full realtime snapshot', async () => {
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    state.pvp.taskObjectives.objective = { count: 0, timestamp: 20 };
+    state.pvp.hideoutParts.part = { count: 0, timestamp: 20 };
+    await setupRealtimeListener(store);
+    handlers.get('user_game_mode_progress')?.({
+      new: {
+        game_mode: 'pvp',
+        season_number: 0,
+        updated_at: new Date().toISOString(),
+        progress_data: {
+          ...structuredClone(defaultState.pvp),
+          taskObjectives: { objective: { count: 5, timestamp: 10 } },
+          hideoutParts: { part: { count: 3, timestamp: 10 } },
+        },
+      },
+    });
+    expect(state.pvp.taskObjectives.objective?.count).toBe(0);
+    expect(state.pvp.hideoutParts.part?.count).toBe(0);
+  });
   it('does not turn a skipped remote clear into a pending local name edit', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     state.pvp.displayName = 'existing';

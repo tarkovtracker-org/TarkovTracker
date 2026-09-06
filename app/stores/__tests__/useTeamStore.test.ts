@@ -827,6 +827,23 @@ describe('Team realtime resources', () => {
     // assertion does not depend on `$supabase.client` still being this mock.
     expect(client.removeChannel).toHaveBeenCalledWith(firstTeamRecord(teamRecords).channel);
   });
+  it('does not hydrate or rebuild after a rejected member refresh', async () => {
+    const { teamRecords } = buildRealtimeHarness();
+    const hydrated = vi.fn();
+    window.addEventListener('teammate-progress-reconnected', hydrated);
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      mockGetTeamMembers.mockRejectedValueOnce(new Error('members unavailable'));
+      firstTeamRecord(teamRecords).statusCallbacks[0]?.('SUBSCRIBED');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(hydrated).not.toHaveBeenCalled();
+      expect(teamRecords()).toHaveLength(1);
+    } finally {
+      window.removeEventListener('teammate-progress-reconnected', hydrated);
+      instance.cleanup();
+    }
+  });
   it('hydrates only on rejoin and rebuilds changed member filters before hydration', async () => {
     const { teamRecords, currentUserId, teammateId } = buildRealtimeHarness();
     const hydrated = vi.fn();

@@ -777,7 +777,8 @@ flowchart LR
   merge/epoch rules, and snapshot responses cannot overwrite newer live events or another session.
   A three-way merge compares each field with its acknowledged baseline, retaining only locally
   changed paths while accepting unrelated remote changes, including changes in other modes.
-  Pending fields (including explicit clears) survive reconnect reads, incoming live events,
+  Live mode rows and startup snapshots resolve counts by entry timestamp rather than maximum,
+  so an acknowledged count clear is not resurrected. Pending fields (including explicit clears) survive reconnect reads, incoming live events,
   and edits made during those reads; a higher reset epoch still wins over an older epoch's edits.
 - Progress RPC upserts compare sanitized account/mode values before updating. Identical saves do not
   change progress timestamps or emit progress-row events. The legacy compatibility trigger remains;
@@ -787,7 +788,8 @@ flowchart LR
   visibility changes also update mode timestamps and cannot justify replacing whole mode snapshots.
   Team rejoin refreshes membership and rebuilds changed filters before hydrating teammates; initial
   joins do not trigger an additional hydration. Only the winning membership refresh may trigger
-  hydration; a superseded reconnect request cannot race ahead of a newer filter rebuild. Optional missing account metadata never blocks
+  hydration after a successful membership read; a failed read neither hydrates nor rebuilds.
+  A superseded reconnect request cannot race ahead of a newer filter rebuild. Optional missing account metadata never blocks
   normalized reconnect progress. Deferred legacy reads retain startup retries and API error mapping.
   Unmaterialized normalized rows are absent for startup fallback and freshness. Outbound writes are
   serialized with captured payloads and versions; resumed saves cannot overtake an in-flight save.

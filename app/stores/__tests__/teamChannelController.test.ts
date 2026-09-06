@@ -65,7 +65,7 @@ const createHarness = (options: { removeStatus?: string | Promise<string> } = {}
     teamId: 'team-1' as string | null,
   };
   const applyProgress = vi.fn();
-  const refreshMembers = vi.fn(async () => undefined);
+  const refreshMembers = vi.fn(async () => true);
   const deps: TeamChannelDeps = {
     applyProgress,
     getClient: () => client,
@@ -138,14 +138,14 @@ describe('createTeamChannelController', () => {
       harness.refreshMembers
         .mockImplementationOnce(
           () =>
-            new Promise<undefined>((resolve) => {
-              finishOld = () => resolve(undefined);
+            new Promise<boolean>((resolve) => {
+              finishOld = () => resolve(true);
             })
         )
         .mockImplementationOnce(
           () =>
-            new Promise<undefined>((resolve) => {
-              finishNew = () => resolve(undefined);
+            new Promise<boolean>((resolve) => {
+              finishNew = () => resolve(true);
             })
         );
       harness.channels[0]?.status?.('SUBSCRIBED');

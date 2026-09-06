@@ -229,7 +229,7 @@ export type TeamChannelDeps = {
   getTeamId: () => string | null;
   getMembers: () => string[] | undefined;
   applyProgress: (data: Record<string, unknown>) => void;
-  refreshMembers: (force?: boolean) => Promise<void>;
+  refreshMembers: (force?: boolean) => Promise<boolean>;
 };
 export type TeamChannelController = {
   /** Leaves the channel and waits for the leave to settle. */
@@ -407,10 +407,11 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
   const isStale = (requestVersion: number): boolean => disposed || requestVersion !== version;
   const shouldContinue = async (requestVersion: number): Promise<boolean> =>
     !isStale(requestVersion) && (await resolveTargetTeam()) !== null;
+  // fallow-ignore-next-line complexity -- refresh success and generation fences are covered in teamChannelController.test.ts and useTeamStore.test.ts
   const refresh = async (): Promise<void> => {
     const requestVersion = ++version;
     if (!(await shouldContinue(requestVersion))) return;
-    await deps.refreshMembers(true);
+    if (!(await deps.refreshMembers(true))) return;
     if (!(await shouldContinue(requestVersion))) return;
     if (!needsRebuild(deps.getTeamId())) {
       // Only the winning refresh can hydrate an unchanged binding. An older
@@ -444,7 +445,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   const { $supabase } = useNuxtApp();
   const listenerScope = effectScope(true);
   let lastMembersRefreshAt = 0;
-  let refreshInFlight: Promise<void> | null = null;
+  let refreshInFlight: Promise<boolean> | null = null;
   let refreshInFlightTeamId: string | null = null;
   let latestMembersRequestVersion = 0;
   // Computed reference to the team document based on system store
@@ -493,7 +494,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         state.members = [];
         state.memberProfiles = {};
       });
-      return;
+      return false;
     }
     if (refreshInFlight) {
       const currentTeamId = getTeamIdFromSystemStore(systemStore);
@@ -502,23 +503,23 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         refreshInFlightTeamId = null;
       } else {
         try {
-          await refreshInFlight;
+          return await refreshInFlight;
         } catch (error) {
           const status = getErrorStatus(error);
           if (status === 401 || status === 403) {
             logger.debug('[TeamStore] Skipping team member refresh due auth/membership status:', {
               status,
             });
-            return;
+            return false;
           }
           logger.warn('[TeamStore] Failed to load team members:', error);
         }
-        return;
+        return false;
       }
     }
     const now = Date.now();
     if (!force && now - lastMembersRefreshAt < 2000) {
-      return;
+      return false;
     }
     const currentTeamId = getTeamIdFromSystemStore(systemStore);
     if (!currentTeamId) {
@@ -527,36 +528,38 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         state.memberProfiles = {};
       });
       await teamChannel.cleanup();
-      return;
+      return false;
     }
     const requestVersion = ++latestMembersRequestVersion;
     const inFlightRequest = (async () => {
       const { getTeamMembers } = useEdgeFunctions();
       const result = await getTeamMembers(currentTeamId, force);
       if (requestVersion !== latestMembersRequestVersion) {
-        return;
+        return false;
       }
       if (getTeamIdFromSystemStore(systemStore) !== currentTeamId) {
-        return;
+        return false;
       }
       teamStore.$patch((state) => {
         state.members = result?.members || [];
         state.memberProfiles = result?.profiles || {};
       });
+      return true;
     })();
     refreshInFlight = inFlightRequest;
     refreshInFlightTeamId = currentTeamId;
     try {
-      await inFlightRequest;
+      return await inFlightRequest;
     } catch (error) {
       const status = getErrorStatus(error);
       if (status === 401 || status === 403) {
         logger.debug('[TeamStore] Skipping team member refresh due auth/membership status:', {
           status,
         });
-        return;
+        return false;
       }
       logger.warn('[TeamStore] Failed to load team members:', error);
+      return false;
     } finally {
       if (refreshInFlight === inFlightRequest) {
         lastMembersRefreshAt = Date.now();

@@ -305,7 +305,7 @@ async function runSetupRealtimeListener(
     if (!remote) return;
     const { mode, progress: remoteProgress, updateTime } = remote;
     const localState = sanitizeOwnedUserState(tarkovStore.$state);
-    const merged = mergeProgressData(localState[mode], remoteProgress);
+    const merged = mergeProgressData(localState[mode], remoteProgress, true);
     const nextProgress = reconcile(
       { [mode]: remoteProgress },
       { [mode]: merged },
