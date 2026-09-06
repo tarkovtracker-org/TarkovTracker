@@ -4,9 +4,11 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = 'public'
 AS $$
+DECLARE
+  v_seasonal_mode CONSTANT TEXT := 'seasonal';
 BEGIN
   IF TG_OP = 'INSERT' THEN
-    IF NEW.game_mode = 'seasonal' THEN
+    IF NEW.game_mode = v_seasonal_mode THEN
       UPDATE public.user_system
       SET seasonal_team_id = NEW.team_id, updated_at = now()
       WHERE user_id = NEW.user_id;
@@ -23,7 +25,7 @@ BEGIN
   END IF;
 
   IF TG_OP = 'DELETE' THEN
-    IF OLD.game_mode = 'seasonal' THEN
+    IF OLD.game_mode = v_seasonal_mode THEN
       UPDATE public.user_system
       SET seasonal_team_id = NULL, updated_at = now()
       WHERE user_id = OLD.user_id AND seasonal_team_id = OLD.team_id;
@@ -48,14 +50,14 @@ BEGIN
       UPDATE public.user_system
       SET pvp_team_id = NULL, updated_at = now()
       WHERE user_id = OLD.user_id AND pvp_team_id = OLD.team_id;
-    ELSIF OLD.game_mode = 'seasonal' THEN
+    ELSIF OLD.game_mode = v_seasonal_mode THEN
       UPDATE public.user_system
       SET seasonal_team_id = NULL, updated_at = now()
       WHERE user_id = OLD.user_id AND seasonal_team_id = OLD.team_id;
     END IF;
   END IF;
 
-  IF NEW.game_mode = 'seasonal' THEN
+  IF NEW.game_mode = v_seasonal_mode THEN
     UPDATE public.user_system
     SET seasonal_team_id = NEW.team_id, updated_at = now()
     WHERE user_id = NEW.user_id;
