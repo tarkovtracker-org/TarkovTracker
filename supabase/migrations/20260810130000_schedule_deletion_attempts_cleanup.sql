@@ -18,16 +18,15 @@
 CREATE EXTENSION IF NOT EXISTS pg_cron SCHEMA extensions;
 
 DO $$
-DECLARE
-  v_job_name CONSTANT TEXT := 'account-deletion-attempts-cleanup';
 BEGIN
-  IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = v_job_name) THEN
-    PERFORM cron.unschedule(v_job_name);
+  IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'account-deletion-attempts-cleanup') THEN
+    PERFORM cron.unschedule('account-deletion-attempts-cleanup');
   END IF;
-  PERFORM cron.schedule(
-    v_job_name,
-    '45 3 * * *',
-    'SELECT public.cleanup_old_deletion_attempts(89)'
-  );
 END;
 $$;
+
+SELECT cron.schedule(
+  'account-deletion-attempts-cleanup',
+  '45 3 * * *',
+  $$SELECT public.cleanup_old_deletion_attempts(89)$$
+);

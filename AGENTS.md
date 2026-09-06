@@ -66,6 +66,13 @@ unless executable or test logic changes make it relevant.
   and `authenticated`, granting `service_role` explicitly where required.
 - Never put bulk data rewrites in migrations. Ship schema separately and make reads tolerate missing
   rows. Production database inspection uses the read-only `scripts/prod-db` observer workflow.
+- Applied/shared migrations are immutable: do not edit, rename, delete, or squash them, even for
+  formatting or static-analysis findings. Treat migrations on `main` as applied unless proven otherwise.
+  Use a new forward migration for behavior changes; disposition historical lint findings individually.
+- Before migration work, compare the PR migration diff with `origin/main` and obtain operator evidence
+  of remote history and pending migrations. Matching timestamps do not prove matching SQL or schema.
+  Consolidate only unmerged migrations proven unapplied to every shared environment. Never run remote
+  history repair, reset, or squash as routine cleanup. Follow `docs/runbook.md#database-migrations`.
 - Overlay consumers enforce HTTPS and preserve the cache/adaptation/overlay ordering documented in
   `docs/SYSTEMS.md`. Task patches keep the raw upstream trader requirement shape before adaptation.
 - API token renames update only the owner-scoped note; team owners disband through the confirmed

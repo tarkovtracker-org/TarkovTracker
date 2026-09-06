@@ -270,6 +270,77 @@ These show up in Supabase logs / query performance and are expected. Do not trea
 
 ## Database Migrations
 
+### Immutable history and remote synchronization
+
+- **Applied/shared migration files are immutable**, including comments, formatting, filenames, and
+  timestamps. Treat every migration on `main` as applied unless an operator proves otherwise. Never
+  rewrite history merely to satisfy SonarCloud, reduce file count, or make a fresh reset pass.
+- A real schema, permission, or function change after deployment requires a new forward migration.
+  For an intentional historical maintainability finding, record an issue-specific disposition in the
+  analysis service with evidence; do not weaken the global gate or change old SQL. A genuine security
+  defect still requires remediation, not automatic acceptance because its migration is historical.
+- Before a migration PR, fetch `origin/main` and inspect
+  `git diff --name-status origin/main...HEAD -- supabase/migrations`. Existing-file modifications,
+  deletions, and renames are a stop condition unless part of an explicitly approved recovery or
+  baseline project. Restoring an accidentally edited file to its deployed Git revision is not a new
+  schema change; verify the resulting PR has no historical SQL diff.
+- An authorized operator verifies the linked project identity and records the target project, Git SHA,
+  time, and sanitized output of these commands before deployment and again after the integration:
+
+  ```bash
+  pnpm exec supabase migration list --linked
+  pnpm exec supabase db push --linked --dry-run
+  ```
+
+  A local-only version is pending; a remote-only version is missing from the checkout. Stop on
+  unexpected versions or ordering differences and reconcile against deployment records before any
+  push. After deployment, expect no pending migrations for the deployed revision. A branch with new
+  migrations legitimately has pending versions before deployment; record that exact expected set.
+  Do not give Pi migration/admin credentials for these checks: use operator-provided evidence and the
+  approved read-only observer for supported catalog inspection. If evidence is unavailable, report
+  remote synchronization as unverified rather than assuming it from green CI.
+
+- `migration list` compares **timestamps only**. Matching rows do not detect edited SQL or schema
+  drift. Preserve the deployed Git revision, compare historical file contents against it, replay
+  locally with `pnpm run supabase:check`, and verify affected remote objects, grants, RLS, triggers,
+  and job configuration through approved inspection. Deployment success alone is not catalog proof.
+- `migration repair` changes history records, not schema. Never mark unapplied SQL as applied or
+  applied SQL as reverted simply to make the lists match. `db pull` can also update remote history;
+  neither is a routine read-only sync operation. Remote repair, reset, or squash requires explicit
+  operator approval and a recorded recovery plan. The named legacy reconciliation exception below
+  is not blanket authorization to repair other versions.
+
+### Minimize churn, not the audit trail
+
+The default is to keep deployed history and reduce unnecessary migrations **before deployment**:
+
+- Iterate on one cohesive migration for an unmerged change instead of appending a migration for each
+  review correction, but only after proving those versions have never run in any shared environment.
+  A disposable local database can be reset and replayed; a shared preview/staging database counts as
+  deployed history. If application status is uncertain, preserve the version and use a forward fix.
+- Keep independent deployment phases separate when required for rolling compatibility, lock budgets,
+  or operational safety. Never combine schema changes with bulk backfills just to save files.
+- Do not create migrations for documentation, static-analysis-only cleanup, or changes that leave the
+  deployed database unchanged. Do not delete old migrations because newer ones supersede their objects.
+- File count alone is not a reason to squash. Measure local/CI replay time before proposing a baseline.
+  Baseline replacement is a separate operator-approved maintenance project, not an agent cleanup task.
+
+An approved baseline project must freeze migration delivery, inventory every shared environment,
+archive the original Git history and migration records with a recovery plan, and prove both fresh
+bootstrap and existing-environment continuation on disposable databases. Compare schema, owners,
+grants, RLS, functions, triggers, publications, required reference data, cron jobs, and storage setup.
+The Supabase squash command produces a schema-only result and omits data changes, including cron jobs,
+storage buckets, and Vault entries. Reconstruct required non-schema state explicitly without exporting
+secrets into Git or replaying obsolete backfills. An operator must coordinate the history cutover for
+all environments so existing databases do not execute a fresh-install baseline over live objects.
+Until that project is separately approved and verified, keep all applied migration files in place.
+
+References: [migration history](https://supabase.com/docs/reference/cli/supabase-migration-list),
+[squash limitations](https://supabase.com/docs/reference/cli/supabase-migration-squash), and
+[history repair](https://supabase.com/docs/reference/cli/supabase-migration-repair).
+
+### Execution and deployment safety
+
 - **Never put a bulk data rewrite in a migration.** Migrations run in a transaction, so a
   statement that exceeds `statement_timeout` rolls the whole file back — schema included — while the
   Cloudflare Pages deploy from the same merge still succeeds. That is what took production down on
