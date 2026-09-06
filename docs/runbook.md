@@ -285,12 +285,19 @@ These show up in Supabase logs / query performance and are expected. Do not trea
   baseline project. Restoring an accidentally edited file to its deployed Git revision is not a new
   schema change; verify the resulting PR has no historical SQL diff.
 - An authorized operator verifies the linked project identity and records the target project, Git SHA,
-  time, and sanitized output of these commands before deployment and again after the integration:
+  CLI version, time, and sanitized output of these read-only commands before deployment and again
+  after the integration:
 
   ```bash
+  git rev-parse HEAD
+  pnpm exec supabase --version
+  pnpm exec supabase projects list
   pnpm exec supabase migration list --linked
   pnpm exec supabase db push --linked --dry-run
   ```
+
+  Confirm the project ref in `projects list` matches the linked ref from `supabase/config.toml` and
+  every evidence record names it, so output cannot be mistaken for another project's history.
 
   A local-only version is pending; a remote-only version is missing from the checkout. Stop on
   unexpected versions or ordering differences and reconcile against deployment records before any
