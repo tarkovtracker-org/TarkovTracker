@@ -119,10 +119,8 @@ beforeAll(() => {
   symlinkSync(join(root, 'node_modules'), join(repository, 'node_modules'), 'junction');
 });
 beforeEach(() => {
-  for (const [path, content] of Object.entries(files)) write(path, content);
-  rmSync(join(repository, 'app/new.ts'), { force: true });
-  rmSync(join(repository, 'app/renamed.ts'), { force: true });
-  git('read-tree', 'HEAD');
+  git('reset', '--hard', 'HEAD');
+  git('clean', '-fd');
 });
 afterAll(() => rmSync(directory, { recursive: true, force: true }));
 describe('Fallow audit context', () => {
@@ -213,6 +211,15 @@ describe('Fallow audit context', () => {
     expect(result.attribution.dead_code_introduced).toBe(0);
     expect(result.attribution.complexity_introduced).toBe(0);
   });
+  it('handles a tracked file replaced by a directory', () => {
+    rmSync(join(repository, 'app/logic.ts'));
+    write('app/logic.ts/index.ts', files['app/logic.ts']);
+    write('index.ts', files['index.ts'].replace('@/logic', '@/logic.ts/index'));
+    const result = run();
+    expect(result.status, result.stderr).not.toBe(2);
+    expect(JSON.parse(result.stdout).attribution).toBeDefined();
+    expect(readdirSync(scratch)).toEqual([]);
+  });
   it('keeps a genuinely new warning-only cycle nonblocking', () => {
     write(
       'fresh/b.ts',
@@ -242,11 +249,55 @@ describe('Fallow audit context', () => {
     expect(readFileSync(join(repository, '.git/index'))).toEqual(index);
     expect(git('status', '--porcelain')).toBe(status);
   });
+  it('respects local excludes while retaining force-tracked ignored files', () => {
+    const exclude = join(repository, '.git/info/exclude');
+    const original = readFileSync(exclude);
+    writeFileSync(exclude, 'app/local.ts\napp/tracked.ts\n');
+    write('app/local.ts', 'export const localValue = 1;\n');
+    write('app/tracked.ts', 'export const trackedValue = 2;\n');
+    git('add', '--force', 'app/tracked.ts');
+    try {
+      const result = report(run(), 1);
+      const paths = result.dead_code.unused_files.map((finding) => finding.path);
+      expect(paths).not.toContain('app/local.ts');
+      expect(paths).toContain('app/tracked.ts');
+    } finally {
+      writeFileSync(exclude, original);
+    }
+  });
+  it('reports missing dependencies before resolving the analyzer', () => {
+    const isolatedScript = join(repository, 'fallow-audit.mjs');
+    writeFileSync(isolatedScript, readFileSync(script));
+    rmSync(join(repository, 'node_modules'));
+    try {
+      const result = spawnSync(process.execPath, [isolatedScript, '--base', 'HEAD'], {
+        cwd: repository,
+        encoding: 'utf8',
+      });
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain('Missing node_modules');
+      expect(result.stderr).not.toContain('ERR_MODULE_NOT_FOUND');
+    } finally {
+      symlinkSync(join(root, 'node_modules'), join(repository, 'node_modules'), 'junction');
+    }
+  });
   it('rejects invalid refs instead of passing an empty audit', () => {
     const result = run(['--base', 'missing-ref']);
     expect(result.status).toBe(2);
     expect(result.stderr).toContain('[fallow audit]');
     expect(readdirSync(scratch)).toEqual([]);
+  });
+  it.each(['--help', '-c alias.audit=!touch injected', 'HEAD;touch injected', '$(touch injected)'])(
+    'rejects hostile base input %s without executing it',
+    (base) => {
+      const result = run(['--base', base]);
+      expect(result.status).toBe(2);
+      expect(readdirSync(repository)).not.toContain('injected');
+      expect(readdirSync(scratch)).toEqual([]);
+    }
+  );
+  it.each(['HEAD^{commit}', 'HEAD@{0}'])('preserves valid commit-ish base %s', (base) => {
+    report(run(['--base', base]), 0);
   });
   it('ignores inherited Git location and index overrides', () => {
     write('app/logic.ts', `\n${files['app/logic.ts']}`);

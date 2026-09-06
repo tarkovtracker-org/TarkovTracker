@@ -34,7 +34,8 @@ Runs on every push and PR:
 
 Run `pnpm run lint:fallow` locally; CI uses the same command with `--base <event-base-sha>`.
 The default base is `origin/main`. The command resolves the merge base with the current HEAD,
-includes staged, unstaged, and non-ignored untracked files, and keeps Fallow's native
+includes staged, unstaged, and non-ignored untracked files (respecting the source checkout's
+local and configured Git exclusions, while retaining force-tracked files), and keeps Fallow's native
 `--gate new-only` behavior and configured severities. New error findings fail; inherited findings
 and warning-only findings do not. No persistent finding baseline is maintained.
 

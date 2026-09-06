@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import {
   cpSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   realpathSync,
@@ -12,11 +13,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-const fallow = fileURLToPath(import.meta.resolve('fallow/bin/fallow'));
 const gitEnvironment = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
 );
-const git = (args, environment = gitEnvironment, input) =>
+const git = (args, environment = gitEnvironment, input = undefined) =>
   execFileSync(
     'git',
     [
@@ -44,13 +44,29 @@ const materializeContext = (source, destination) => {
 const createHead = (source, destination, base, directory) => {
   const environment = { ...gitEnvironment, GIT_INDEX_FILE: join(directory, 'head.index') };
   const location = ['--git-dir', join(destination, '.git'), '--work-tree', source];
-  const tracked = execFileSync('git', ['-C', source, 'ls-files', '--cached', '-z'], {
-    env: gitEnvironment,
-    maxBuffer: 16 * 1024 * 1024,
-  });
+  const candidates = execFileSync(
+    'git',
+    ['-C', source, 'ls-files', '--cached', '--others', '--exclude-standard', '-z'],
+    {
+      env: gitEnvironment,
+      maxBuffer: 16 * 1024 * 1024,
+    }
+  );
+  // A tracked file may now be a directory. Only its current children belong in
+  // the empty snapshot index; replaying the old filename would fail Git staging.
+  const paths = candidates
+    .toString('utf8')
+    .split('\0')
+    .filter(Boolean)
+    .filter((path) => {
+      return !lstatSync(join(source, path), { throwIfNoEntry: false })?.isDirectory();
+    });
   git([...location, 'read-tree', '--empty'], environment);
-  git([...location, 'add', '--all'], environment);
-  git([...location, 'update-index', '--add', '--remove', '-z', '--stdin'], environment, tracked);
+  git(
+    [...location, 'update-index', '--add', '--remove', '-z', '--stdin'],
+    environment,
+    paths.map((path) => `${path}\0`).join('')
+  );
   git(['-C', destination, 'add', '--force', '--', '.nuxt'], environment);
   const tree = git([...location, 'write-tree'], environment);
   return git(
@@ -59,6 +75,7 @@ const createHead = (source, destination, base, directory) => {
   );
 };
 const runFallow = (destination, base, format) => {
+  const fallow = fileURLToPath(import.meta.resolve('fallow/bin/fallow'));
   const result = spawnSync(
     process.execPath,
     [
@@ -79,7 +96,7 @@ const runFallow = (destination, base, format) => {
   );
   if (result.error) throw result.error;
   if (!Number.isInteger(result.status)) {
-    throw new Error('Fallow did not complete');
+    throw new TypeError('Fallow did not complete');
   }
   return result.status;
 };
@@ -106,6 +123,8 @@ const validateContext = (source) => {
 const audit = () => {
   const values = readOptions();
   const source = git(['rev-parse', '--show-toplevel']);
+  // Keep the option terminator: caller-supplied commit-ish expressions are data,
+  // and only Git-verified commit IDs reach subsequent commands.
   const requestedBase = git([
     'rev-parse',
     '--verify',

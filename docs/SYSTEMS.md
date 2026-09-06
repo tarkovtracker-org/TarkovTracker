@@ -40,6 +40,8 @@ and have an agent verify the answer against the code.
 12. [Map objective visibility and required items](#12-map-objective-visibility-and-required-items) —
     map marker categories and split pinned/active requirements
 
+13. [Fallow audit snapshots](#13-fallow-audit-snapshots) — consistent generated context and local source attribution
+
 ---
 
 ## 1. Tarkov.dev data integration
@@ -1193,3 +1195,25 @@ If you read something here that does not match the code, the disagreement is a b
 code (fix the code) or in this doc (fix the doc in the same PR). `AGENTS.md`'s Maintenance Contract
 requires updating this file whenever one of these systems changes. When in doubt, the code is the
 source of truth and this doc is the explanation of it.
+
+## 13. Fallow audit snapshots
+
+**Summary.** Local and CI `lint:fallow` commands use `scripts/fallow-audit.mjs` to create a
+disposable clone with two analysis commits. The merge-base source and current working source
+both receive physical copies of the same generated `.nuxt` context, so relative aliases resolve
+consistently in Fallow's base snapshot. Installed dependencies are linked into the clone.
+
+Candidate source files come from the original checkout's Git index and non-ignored untracked
+file list. This retains staged and unstaged source content, honors repository-local and configured
+exclusions, and includes force-tracked ignored files. A separate temporary index constructs the
+analysis head. Native new-only attribution and configured severities determine the exit status.
+See [the workflow guide](WORKFLOW_AUTOMATION.md#fallow-changed-file-gate) for usage and report IDs.
+
+**Invariants**
+
+- Source files, the source index, branches, and worktree registrations remain unchanged.
+- Both analysis commits contain the same physical generated context; no persistent finding
+  baseline or suppression changes the gate.
+- Invalid refs, missing setup, and analyzer errors fail explicitly; temporary snapshots are
+  removed on success and handled failure.
+- Local Git exclusions apply to untracked candidates without dropping tracked source files.
