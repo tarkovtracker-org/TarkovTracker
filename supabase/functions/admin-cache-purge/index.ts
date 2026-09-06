@@ -2,10 +2,18 @@ import {
   authenticateUser,
   handleCorsPreflight,
   validateMethod,
-  createErrorResponse,
   createSuccessResponse,
   type AuthSuccess,
 } from 'shared/auth';
+type CachePurgeErrorCode =
+  | 'authentication_required'
+  | 'admin_privileges_required'
+  | 'invalid_purge_type'
+  | 'method_not_allowed'
+  | 'service_config_missing'
+  | 'cache_purge_failed';
+const createPurgeError = (code: CachePurgeErrorCode, status: number, req: Request): Response =>
+  createSuccessResponse({ error: code, code }, status, req);
 // Cloudflare API configuration
 const CLOUDFLARE_API_URL = 'https://api.cloudflare.com/client/v4';
 const EDGE_CACHE_PATH = '/__edge-cache/tarkov';
@@ -327,17 +335,17 @@ Deno.serve(async (req) => {
   try {
     // Validate HTTP method
     const methodError = validateMethod(req, ['POST']);
-    if (methodError) return methodError;
+    if (methodError) return createPurgeError('method_not_allowed', 405, req);
     // Authenticate user
     const authResult = await authenticateUser(req);
     if ('error' in authResult) {
-      return createErrorResponse(authResult.error, authResult.status, req);
+      return createPurgeError('authentication_required', authResult.status, req);
     }
     const { user, supabase } = authResult as AuthSuccess;
     // Verify admin status
     const isAdmin = await verifyAdminStatus(supabase, user.id);
     if (!isAdmin) {
-      return createErrorResponse('Admin access required', 403, req);
+      return createPurgeError('admin_privileges_required', 403, req);
     }
     // Parse request body
     const rawBody = await req.text();
@@ -363,24 +371,20 @@ Deno.serve(async (req) => {
     const purgeType = body.purgeType!;
     // Validate purge type
     if (!['all', 'tarkov-data', 'twitch-config'].includes(purgeType)) {
-      return createErrorResponse(
-        "Invalid purgeType. Must be 'all', 'tarkov-data', or 'twitch-config'",
-        400,
-        req
-      );
+      return createPurgeError('invalid_purge_type', 400, req);
     }
     // Get Cloudflare credentials
     const zoneId = Deno.env.get('CLOUDFLARE_ZONE_ID');
     const apiToken = Deno.env.get('CLOUDFLARE_API_TOKEN');
     if (!zoneId || !apiToken) {
       console.error('[admin-cache-purge] Missing Cloudflare credentials');
-      return createErrorResponse('Cloudflare credentials not configured', 500, req);
+      return createPurgeError('service_config_missing', 500, req);
     }
     const baseUrl = Deno.env.get('APP_URL')?.trim() ?? '';
     if (purgeType === 'tarkov-data') {
       if (!baseUrl) {
         console.error('[admin-cache-purge] Missing APP_URL');
-        return createErrorResponse('Application URL not configured', 500, req);
+        return createPurgeError('service_config_missing', 500, req);
       }
       try {
         const protocol = new URL(baseUrl).protocol;
@@ -389,7 +393,7 @@ Deno.serve(async (req) => {
         }
       } catch {
         console.error('[admin-cache-purge] Invalid APP_URL');
-        return createErrorResponse('Application URL invalid', 500, req);
+        return createPurgeError('service_config_missing', 500, req);
       }
     }
     // Execute cache purge
@@ -425,7 +429,7 @@ Deno.serve(async (req) => {
           ? errors.map((e) => e.message).join(', ')
           : 'Unknown error (no details provided by Cloudflare)';
       console.error('[admin-cache-purge] Cloudflare purge failed:', errorMessages);
-      return createErrorResponse(`Cache purge failed: ${errorMessages}`, 502, req);
+      return createPurgeError('cache_purge_failed', 502, req);
     }
     return createSuccessResponse(
       {
@@ -440,6 +444,6 @@ Deno.serve(async (req) => {
     );
   } catch (error) {
     console.error('[admin-cache-purge] Error:', error);
-    return createErrorResponse('Internal server error', 500, req);
+    return createPurgeError('cache_purge_failed', 500, req);
   }
 });

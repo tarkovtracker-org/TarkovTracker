@@ -1,11 +1,27 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  mergeMemberProfileBroadcast,
+  applyLegacyPersistentProgressResult,
+  applyTeammateProgressEvent,
+  buildMemberProgressFilter,
+  fetchLegacyTeammateProgress,
   resolveTeammateIdentity,
   useTeamStore,
+  useTeamStoreWithSupabase,
 } from '@/stores/useTeamStore';
+import { GAME_MODES, type GameMode } from '@/utils/constants';
+import { logger } from '@/utils/logger';
 import type { TeamState, MemberProfile } from '@/types/tarkov';
+const { mockGetTeamMembers, mockUseSupabaseListener } = vi.hoisted(() => ({
+  mockGetTeamMembers: vi.fn(),
+  mockUseSupabaseListener: vi.fn(),
+}));
+vi.mock('@/composables/api/useEdgeFunctions', () => ({
+  useEdgeFunctions: () => ({ getTeamMembers: mockGetTeamMembers }),
+}));
+vi.mock('@/composables/supabase/useSupabaseListener', () => ({
+  useSupabaseListener: mockUseSupabaseListener,
+}));
 type TeamPatch = Omit<Partial<TeamState>, 'members'> & {
   join_code?: string | null;
   members?: TeamState['members'] | null;
@@ -495,35 +511,6 @@ describe('useTeamStore', () => {
       expect(initial).toEqual({ currentGameMode: 'pvp', gameEdition: 1 });
       expect(refreshed).toEqual({ currentGameMode: 'seasonal', gameEdition: 4 });
     });
-    it('should handle progress broadcast update pattern', () => {
-      const store = useTeamStore();
-      const initialProfile: MemberProfile = {
-        displayName: 'Player',
-        gameEdition: 4,
-        gameMode: 'seasonal',
-        level: 10,
-        tasksCompleted: 5,
-      };
-      patchTeamState(store, { memberProfiles: { 'user-1': initialProfile } });
-      const broadcastData = {
-        userId: 'user-1',
-        displayName: 'UpdatedPlayer',
-        gameEdition: 99,
-        gameMode: 'pve' as const,
-        level: 15,
-        tasksCompleted: 10,
-      };
-      store.$patch((state) => {
-        state.memberProfiles = mergeMemberProfileBroadcast(
-          state.memberProfiles || {},
-          broadcastData
-        );
-      });
-      expect(store.memberProfiles?.['user-1']?.level).toBe(15);
-      expect(store.memberProfiles?.['user-1']?.tasksCompleted).toBe(10);
-      expect(store.memberProfiles?.['user-1']?.gameEdition).toBe(4);
-      expect(store.memberProfiles?.['user-1']?.gameMode).toBe('seasonal');
-    });
   });
 });
 describe('Team Store Getter Logic', () => {
@@ -604,5 +591,361 @@ describe('Team Store Getter Logic', () => {
       patchTeamState(store, { members: ['user-1', 'user-3'] });
       expect(store.teammates).toEqual(['user-3']);
     });
+  });
+});
+describe('applyTeammateProgressEvent', () => {
+  const viewerId = '11111111-1111-4111-8111-111111111111';
+  const teammateId = '22222222-2222-4222-8222-222222222222';
+  const outsiderId = '33333333-3333-4333-8333-333333333333';
+  const progressData = {
+    displayName: 'Teammate',
+    level: 30,
+    taskCompletions: { taskA: { complete: true } },
+  };
+  const event = (overrides: Record<string, unknown> = {}) => ({
+    game_mode: GAME_MODES.PVP,
+    progress_data: progressData,
+    season_number: 0,
+    user_id: teammateId,
+    ...overrides,
+  });
+  const seed = (profiles: Record<string, MemberProfile> = {}) => {
+    setActivePinia(createPinia());
+    const store = useTeamStore();
+    patchTeamState(store, { memberProfiles: profiles, members: [viewerId, teammateId] });
+    return store;
+  };
+  it('applies an active-season event for a tracked teammate', () => {
+    const store = seed();
+    applyTeammateProgressEvent(store, viewerId, event());
+    expect(store.memberProfiles?.[teammateId]).toMatchObject({
+      displayName: 'Teammate',
+      gameMode: GAME_MODES.PVP,
+      level: 30,
+      tasksCompleted: 1,
+    });
+  });
+  it("ignores the viewer's own row", () => {
+    const store = seed();
+    applyTeammateProgressEvent(store, viewerId, event({ user_id: viewerId }));
+    expect(store.memberProfiles?.[viewerId]).toBeUndefined();
+  });
+  it('ignores a user who is not a team member', () => {
+    const store = seed();
+    applyTeammateProgressEvent(store, viewerId, event({ user_id: outsiderId }));
+    expect(store.memberProfiles?.[outsiderId]).toBeUndefined();
+  });
+  it('ignores a non-active season row', () => {
+    const store = seed();
+    applyTeammateProgressEvent(store, viewerId, event({ season_number: 1 }));
+    expect(store.memberProfiles?.[teammateId]).toBeUndefined();
+  });
+  it('ignores an unsupported game mode', () => {
+    const store = seed();
+    applyTeammateProgressEvent(store, viewerId, event({ game_mode: 'arena' }));
+    expect(store.memberProfiles?.[teammateId]).toBeUndefined();
+  });
+  it('ignores an event for a mode the profile is not pinned to', () => {
+    const store = seed({
+      [teammateId]: {
+        displayName: 'Teammate',
+        gameEdition: 4,
+        gameMode: GAME_MODES.PVE,
+        level: 5,
+        tasksCompleted: 0,
+      },
+    });
+    applyTeammateProgressEvent(store, viewerId, event());
+    expect(store.memberProfiles?.[teammateId]?.level).toBe(5);
+  });
+  it('ignores an unmaterialized progress blob', () => {
+    const store = seed();
+    applyTeammateProgressEvent(store, viewerId, event({ progress_data: {} }));
+    expect(store.memberProfiles?.[teammateId]).toBeUndefined();
+  });
+  it('preserves the existing game edition', () => {
+    const store = seed({
+      [teammateId]: {
+        displayName: 'Teammate',
+        gameEdition: 4,
+        gameMode: GAME_MODES.PVP,
+        level: 5,
+        tasksCompleted: 0,
+      },
+    });
+    applyTeammateProgressEvent(store, viewerId, event());
+    expect(store.memberProfiles?.[teammateId]?.gameEdition).toBe(4);
+  });
+});
+describe('Team realtime resources', () => {
+  type ChannelRecord = {
+    topic: string;
+    config?: unknown;
+    channel: { on: ReturnType<typeof vi.fn>; subscribe: ReturnType<typeof vi.fn> };
+    statusCallbacks: Array<(status: string, error?: Error) => void>;
+    handlers: Array<{
+      config: { table?: string };
+      handler: (payload: { eventType: string; new: Record<string, unknown> }) => void;
+    }>;
+  };
+  const buildRealtimeHarness = () => {
+    const currentUserId = '11111111-1111-4111-8111-111111111111';
+    const teammateId = '22222222-2222-4222-8222-222222222222';
+    const records: ChannelRecord[] = [];
+    const createRecord = (topic: string, config?: unknown): ChannelRecord => {
+      const record: ChannelRecord = {
+        channel: { on: vi.fn(), subscribe: vi.fn() },
+        config,
+        handlers: [],
+        statusCallbacks: [],
+        topic,
+      };
+      record.channel.on = vi.fn(
+        (
+          _event: string,
+          handlerConfig: { table?: string },
+          handler: (payload: { eventType: string; new: Record<string, unknown> }) => void
+        ) => {
+          record.handlers.push({ config: handlerConfig, handler });
+          return record.channel;
+        }
+      );
+      record.channel.subscribe = vi.fn((callback?: (status: string, error?: Error) => void) => {
+        if (callback) record.statusCallbacks.push(callback);
+        callback?.('SUBSCRIBED');
+        return record.channel;
+      });
+      return record;
+    };
+    const membershipQuery = {
+      eq: vi.fn().mockResolvedValue({
+        data: [{ game_mode: GAME_MODES.PVP, team_id: 'team-1' }],
+        error: null,
+      }),
+      select: vi.fn(),
+    };
+    membershipQuery.select.mockReturnValue(membershipQuery);
+    // Mirrors `RealtimeClient.channel()`: an open topic returns the existing
+    // channel, so a premature rejoin is observable instead of silently working.
+    const openTopics = new Map<string, ChannelRecord>();
+    const client = {
+      // `useTeamStoreWithSupabase` also initializes the system store, so this
+      // mock serves both the `system-team-memberships-*` channel and the
+      // `team:*` channel. Records are keyed by topic to keep them apart.
+      channel: vi.fn((topic: string, config?: unknown) => {
+        const existing = openTopics.get(topic);
+        if (existing) return existing.channel;
+        const record = createRecord(topic, config);
+        records.push(record);
+        openTopics.set(topic, record);
+        return record.channel;
+      }),
+      from: vi.fn(() => membershipQuery),
+      removeChannel: vi.fn((target: unknown) => {
+        for (const [topic, record] of openTopics) {
+          if (record.channel === target) openTopics.delete(topic);
+        }
+        return Promise.resolve('ok');
+      }),
+    };
+    const nuxtApp = useNuxtApp() as unknown as {
+      $supabase: {
+        client: typeof client;
+        ready: () => Promise<null>;
+        user: { id: string; loggedIn: boolean };
+      };
+    };
+    nuxtApp.$supabase.client = client;
+    nuxtApp.$supabase.ready = vi.fn().mockResolvedValue(null);
+    nuxtApp.$supabase.user = { id: currentUserId, loggedIn: true };
+    mockGetTeamMembers.mockResolvedValue({
+      members: [currentUserId, teammateId],
+      profiles: {
+        [teammateId]: {
+          displayName: 'Teammate',
+          gameEdition: 4,
+          gameMode: GAME_MODES.PVP,
+          level: 10,
+          tasksCompleted: 2,
+        },
+      },
+    });
+    mockUseSupabaseListener.mockImplementation(() => ({
+      cleanup: vi.fn(),
+      fetchData: vi.fn(),
+      hasInitiallyLoaded: { value: false },
+      isSubscribed: { value: false },
+      loadError: { value: null },
+    }));
+    const teamRecords = () => records.filter((record) => record.topic.startsWith('team:'));
+    return { client, currentUserId, teamRecords, teammateId };
+  };
+  const firstTeamRecord = (teamRecords: () => ChannelRecord[]): ChannelRecord => {
+    const record = teamRecords()[0];
+    if (!record) throw new Error('team channel was never created');
+    return record;
+  };
+  it('filters teammate progress and cleans up scoped subscriptions', async () => {
+    const { client, currentUserId, teamRecords, teammateId } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      const teamRecord = firstTeamRecord(teamRecords);
+      expect(teamRecord.topic).toBe('team:team-1');
+      expect(teamRecord.config).toEqual({ config: { private: true } });
+      const progressSubscription = teamRecord.handlers.find(
+        ({ config }) => config.table === 'user_game_mode_progress'
+      );
+      expect(progressSubscription?.config).toMatchObject({
+        filter: `user_id=in.(${currentUserId},${teammateId})`,
+      });
+      progressSubscription?.handler({
+        eventType: 'UPDATE',
+        new: {
+          game_mode: GAME_MODES.PVP,
+          progress_data: {
+            displayName: 'Updated Teammate',
+            level: 22,
+            taskCompletions: { task: { complete: true } },
+          },
+          season_number: 0,
+          user_id: teammateId,
+        },
+      });
+      expect(instance.teamStore.memberProfiles?.[teammateId]).toMatchObject({
+        displayName: 'Updated Teammate',
+        gameEdition: 4,
+        gameMode: GAME_MODES.PVP,
+        level: 22,
+        tasksCompleted: 1,
+      });
+    } finally {
+      instance.cleanup();
+    }
+    await Promise.resolve();
+    // Teardown must go through the client that created the channel, so this
+    // assertion does not depend on `$supabase.client` still being this mock.
+    expect(client.removeChannel).toHaveBeenCalledWith(firstTeamRecord(teamRecords).channel);
+  });
+  it('does not rejoin the team channel when the member set is unchanged', async () => {
+    const { client, teamRecords } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      const membershipSubscription = firstTeamRecord(teamRecords).handlers.find(
+        ({ config }) => config.table === 'team_memberships'
+      );
+      expect(membershipSubscription).toBeDefined();
+      const callsBefore = mockGetTeamMembers.mock.calls.length;
+      membershipSubscription?.handler({ eventType: 'UPDATE', new: {} });
+      await vi.waitFor(() =>
+        expect(mockGetTeamMembers.mock.calls.length).toBeGreaterThan(callsBefore)
+      );
+      expect(teamRecords()).toHaveLength(1);
+      expect(client.removeChannel).not.toHaveBeenCalled();
+    } finally {
+      instance.cleanup();
+    }
+  });
+  it('rebuilds the team channel on a new topic after the previous one left', async () => {
+    const { client, currentUserId, teamRecords, teammateId } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      const first = firstTeamRecord(teamRecords);
+      // A genuinely different member set changes the progress filter, which is
+      // what makes a rebuild necessary.
+      mockGetTeamMembers.mockResolvedValue({
+        members: [currentUserId, teammateId, '44444444-4444-4444-8444-444444444444'],
+        profiles: {},
+      });
+      const membershipSubscription = first.handlers.find(
+        ({ config }) => config.table === 'team_memberships'
+      );
+      membershipSubscription?.handler({ eventType: 'UPDATE', new: {} });
+      await vi.waitFor(() => expect(client.removeChannel).toHaveBeenCalled());
+      // The mock returns the live channel for an open topic, so a second record
+      // proves the rejoin happened only after the previous leave completed.
+      await vi.waitFor(() => expect(teamRecords().length).toBeGreaterThan(1));
+      expect(teamRecords()[1]).not.toBe(first);
+    } finally {
+      instance.cleanup();
+    }
+  });
+  it('reports a failed private channel subscription instead of failing silently', async () => {
+    const { teamRecords } = buildRealtimeHarness();
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      firstTeamRecord(teamRecords).statusCallbacks[0]?.(
+        'CHANNEL_ERROR',
+        new Error('Unauthorized topic')
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[TeamStore] Realtime channel is not subscribed:',
+        expect.objectContaining({ error: 'Unauthorized topic', status: 'CHANNEL_ERROR' })
+      );
+    } finally {
+      instance.cleanup();
+      warnSpy.mockRestore();
+    }
+  });
+});
+describe('Teammate progress helpers', () => {
+  it('builds a filtered membership expression from valid unique IDs', () => {
+    const firstMember = '11111111-1111-4111-8111-111111111111';
+    const secondMember = '22222222-2222-4222-8222-222222222222';
+    expect(buildMemberProgressFilter([firstMember, 'not-a-uuid', firstMember, secondMember])).toBe(
+      `user_id=in.(${firstMember},${secondMember})`
+    );
+  });
+  it('omits the progress filter when no valid members are present', () => {
+    expect(buildMemberProgressFilter(null)).toBeUndefined();
+    expect(buildMemberProgressFilter(['not-a-uuid'])).toBeUndefined();
+  });
+  it('applies a legacy progress result only when it is usable', () => {
+    const applyProgress = vi.fn();
+    const appliedModes = new Set<GameMode>();
+    applyLegacyPersistentProgressResult(
+      { data: { level: 12 }, error: null },
+      appliedModes,
+      'teammate-1',
+      GAME_MODES.PVP,
+      applyProgress
+    );
+    expect(applyProgress).toHaveBeenCalledWith(GAME_MODES.PVP, { level: 12 });
+    appliedModes.add(GAME_MODES.PVE);
+    applyLegacyPersistentProgressResult(
+      { data: { level: 20 }, error: null },
+      appliedModes,
+      'teammate-1',
+      GAME_MODES.PVE,
+      applyProgress
+    );
+    expect(applyProgress).toHaveBeenCalledTimes(1);
+    applyLegacyPersistentProgressResult(
+      { data: null, error: new Error('denied') },
+      appliedModes,
+      'teammate-1',
+      GAME_MODES.PVP,
+      applyProgress
+    );
+    expect(applyProgress).toHaveBeenCalledTimes(1);
+  });
+  it('uses the teammate RPC for persistent modes and skips Seasonal', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { level: 12 }, error: null });
+    const client = { rpc };
+    await expect(
+      fetchLegacyTeammateProgress(client, 'teammate-1', GAME_MODES.PVP)
+    ).resolves.toEqual({ data: { level: 12 }, error: null });
+    expect(rpc).toHaveBeenCalledWith('get_teammate_legacy_progress', {
+      p_game_mode: GAME_MODES.PVP,
+      p_user_id: 'teammate-1',
+    });
+    await expect(
+      fetchLegacyTeammateProgress(client, 'teammate-1', GAME_MODES.SEASONAL)
+    ).resolves.toEqual({ data: null, error: null });
+    expect(rpc).toHaveBeenCalledTimes(1);
   });
 });

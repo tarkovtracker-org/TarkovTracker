@@ -1,20 +1,23 @@
 <template>
-  <div class="px-3 py-6 sm:px-6">
-    <div class="mx-auto max-w-350 space-y-6">
-      <div v-if="route?.query?.team && route?.query?.code" class="mx-auto max-w-6xl">
+  <div class="font-ui px-4 py-6 sm:px-6 lg:px-8">
+    <div class="mx-auto w-full max-w-7xl space-y-8">
+      <header class="space-y-2">
+        <h1 class="text-surface-100 text-2xl font-bold sm:text-3xl">
+          {{ $t('page.team.page_title') }}
+        </h1>
+        <p class="text-surface-400 max-w-2xl text-sm leading-6 sm:text-base">
+          {{ $t('page.team.page_description') }}
+        </p>
+      </header>
+      <div v-if="route?.query?.team && route?.query?.code">
         <TeamInvite />
       </div>
-      <div class="relative mx-auto max-w-6xl">
-        <div class="space-y-6">
-          <div class="grid gap-4 lg:grid-cols-3">
-            <div class="lg:col-span-2">
-              <MyTeam />
-            </div>
-            <TeamOptions />
-          </div>
-          <TeamMembers v-if="userHasTeam" />
-        </div>
+      <div class="grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <MyTeam />
+        <TeamOptions />
       </div>
+      <TeamMembers v-if="userHasTeam" />
+      <TeamDangerZone v-if="userHasTeam" />
     </div>
   </div>
 </template>
@@ -39,6 +42,7 @@
   const TeamOptions = defineAsyncComponent(() => import('@/features/team/TeamOptions.vue'));
   const MyTeam = defineAsyncComponent(() => import('@/features/team/MyTeam.vue'));
   const TeamInvite = defineAsyncComponent(() => import('@/features/team/TeamInvite.vue'));
+  const TeamDangerZone = defineAsyncComponent(() => import('@/features/team/TeamDangerZone.vue'));
   const { hasTeam } = useSystemStoreWithSupabase();
   const userHasTeam = computed(() => hasTeam());
 </script>

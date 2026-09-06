@@ -127,14 +127,14 @@ Each slice contains its Vue components and slice-local helpers/composables. High
 
 ## Supabase Edge Functions (`supabase/functions/`)
 
-| Function                                                                  | Responsibility                                                                      |
-| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `team-create` / `team-join` / `team-leave` / `team-kick` / `team-members` | Team lifecycle (per-user rate limited).                                             |
-| `token-create` / `token-revoke`                                           | API token issuance/revocation (hashed storage).                                     |
-| `account-delete` / `account-delete-reconcile`                             | Account deletion job + reconciliation.                                              |
-| `stripe-webhook`                                                          | Process Stripe events; grant/revoke supporter; sync Discord roles.                  |
-| `admin-cache-purge`                                                       | Purge Cloudflare + data caches (admin-gated).                                       |
-| `_shared/*`                                                               | `auth.ts`, `cors.ts`, `discord.ts`, `rate-limit.ts`, generated `database.types.ts`. |
+| Function                                                                                   | Responsibility                                                                      |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| `team-create` / `team-join` / `team-leave` / `team-kick` / `team-disband` / `team-members` | Team lifecycle (per-user rate limited).                                             |
+| `token-create` / `token-revoke`                                                            | API token issuance/revocation (hashed storage).                                     |
+| `account-delete` / `account-delete-reconcile`                                              | Account deletion job + reconciliation.                                              |
+| `stripe-webhook`                                                                           | Process Stripe events; grant/revoke supporter; sync Discord roles.                  |
+| `admin-cache-purge`                                                                        | Purge Cloudflare + data caches (admin-gated).                                       |
+| `_shared/*`                                                                                | `auth.ts`, `cors.ts`, `discord.ts`, `rate-limit.ts`, generated `database.types.ts`. |
 
 ## Cloudflare Worker (`workers/api-gateway/src/`)
 

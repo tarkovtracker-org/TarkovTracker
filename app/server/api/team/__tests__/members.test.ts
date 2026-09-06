@@ -53,6 +53,9 @@ describe('Team Members API', () => {
   };
   beforeEach(() => {
     vi.clearAllMocks();
+    // `clearAllMocks` keeps `mockResolvedValueOnce` queues, so unconsumed
+    // responses would leak into the next test and mask real failures.
+    mockFetch.mockReset();
     // Reset runtime config to default state
     runtimeConfig.apiProtection.trustProxy = false;
     runtimeConfig.supabaseUrl = 'https://test.supabase.co';
@@ -397,6 +400,42 @@ describe('Team Members API', () => {
         level: 21,
         tasksCompleted: 1,
       });
+    });
+    it('skips the legacy fallback instead of querying user_progress without a service key', async () => {
+      // `user_progress` is owner-only, so a caller-JWT read would always be
+      // empty. The route must not issue it.
+      runtimeConfig.supabaseServiceKey = '';
+      mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
+      mockGetRequestHeader.mockImplementation((_, header: string) =>
+        header === 'authorization' ? 'Bearer valid-token' : undefined
+      );
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ game_mode: 'pvp', user_id: '11111111-1111-4111-8111-111111111111' }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [
+            {
+              display_name: null,
+              level: null,
+              tasks_completed: 0,
+              user_id: '11111111-1111-4111-8111-111111111111',
+            },
+          ],
+        });
+      const { default: handler } = await import('@/server/api/team/members');
+      const result = await handler(mockEvent as H3Event);
+      expect(result.members).toEqual(['11111111-1111-4111-8111-111111111111']);
+      const legacyCalls = mockFetch.mock.calls.filter(([url]) =>
+        String(url).includes('user_progress')
+      );
+      expect(legacyCalls).toEqual([]);
     });
     it('summarizes legacy persistent progress when normalized team rows are missing', async () => {
       mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });

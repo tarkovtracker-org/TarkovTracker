@@ -141,7 +141,7 @@
               </UDropdownMenu>
             </AppTooltip>
           </span>
-          <AppTooltip :text="t('navigation_drawer.account_menu')">
+          <AppTooltip :text="userDisplayName">
             <UDropdownMenu
               v-if="isLoggedIn"
               :items="accountMenuItems"
@@ -149,7 +149,7 @@
             >
               <button
                 type="button"
-                class="bg-surface-800/50 border-surface-600 hover:bg-surface-800 flex h-9 items-center gap-2 rounded-md border px-2 py-1.5 transition-colors sm:max-w-40"
+                class="bg-surface-800/50 border-surface-600 hover:bg-surface-800 flex h-9 min-w-0 items-center gap-2 rounded-md border px-2 py-1.5 transition-colors sm:max-w-56"
                 :aria-label="t('navigation_drawer.account_menu')"
               >
                 <img
@@ -160,7 +160,9 @@
                   @error="handleAvatarError"
                 />
                 <span
-                  class="text-surface-200 hidden min-w-0 flex-1 truncate text-[13px] leading-none font-medium sm:inline"
+                  class="text-surface-200 hidden min-w-0 flex-1 truncate text-[13px] leading-none font-medium whitespace-nowrap sm:inline"
+                  :data-long-name="userDisplayName.length > 24"
+                  :title="userDisplayName"
                 >
                   {{ userDisplayName }}
                 </span>
@@ -171,7 +173,7 @@
           <AppTooltip v-if="!isLoggedIn" :text="t('app_bar.login_aria', 'Log in to your account')">
             <NuxtLink
               to="/login"
-              class="bg-primary-600 hover:bg-primary-500 border-primary-500 flex h-9 items-center gap-1.5 rounded-md border px-3.5 text-[13px] leading-none font-semibold text-white transition-colors"
+              class="bg-primary-500 hover:bg-primary-400 border-primary-500 text-surface-950 flex h-9 items-center gap-1.5 rounded-md border px-3.5 text-[13px] leading-none font-semibold transition-colors"
               :aria-label="t('app_bar.login_aria', 'Log in to your account')"
             >
               <UIcon name="i-mdi-account-outline" class="h-4 w-4 shrink-0" />

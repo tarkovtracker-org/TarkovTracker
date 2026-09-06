@@ -4,6 +4,20 @@
     "error_title": "连接错误",
     "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
     "no_reference": "N/A",
+    "error": {
+      "admin_privileges_required": "您没有权限执行此操作。",
+      "authentication_required": "您必须登录才能继续。",
+      "invalid_channel": "输入一个有效的Twitch频道名称。",
+      "invalid_display_name": "输入一个有效的显示名称。",
+      "invalid_enabled_flag": "启用的值无效。",
+      "invalid_request_body": "请求正文无效。",
+      "invalid_target_user_id": "输入一个有效的用户 ID。",
+      "invalid_tier": "选择一个有效的支持者。",
+      "service_config_missing": "管理服务未配置。",
+      "supabase_request_failed": "管理服务无法完成请求。",
+      "supporter_update_failed": "无法更新支持者访问权限。",
+      "twitch_config_update_failed": "无法更新 Twitch 配置。"
+    },
     "access_warning_title": "管理员访问权限",
     "access_warning_description": "Actions performed here affect all users. Logged in as {user}.",
     "cache_management_title": "Cache Management",
@@ -516,19 +530,6 @@
       "drag_to_resize": "拖动以调整地图大小",
       "switch_floor": "切换底部(Ctrl + 滚动)"
     },
-    "controls": {
-      "help": {
-        "pan": "或拖动以pan",
-        "zoom": "缩放",
-        "reset": "重置视图",
-        "cycle_floors": "循环楼层",
-        "floor_panel": "或使用地板面板",
-        "click_at_cursor": "点击光标",
-        "click_marker": "点击标记查看详细信息",
-        "fullscreen": "使用地图控制中的全屏按钮",
-        "resize": "拖动地图的底部边缘以调整大小"
-      }
-    },
     "help": {
       "title": "地图控制",
       "groups": {
@@ -536,13 +537,21 @@
         "floors": "楼层",
         "interact": "交互功能",
         "view": "查看"
-      }
+      },
+      "pan": "{keys} or drag to pan",
+      "zoom": "{keys} to zoom",
+      "reset": "{key} to reset view",
+      "cycle_floors": "{keys} to cycle floors",
+      "floor_panel": "或使用地面板。",
+      "click_at_cursor": "{key} to click at cursor",
+      "click_marker": "点击标记查看详细信息。",
+      "fullscreen": "在地图控制中使用全屏按钮。",
+      "resize": "拖动地图的底部边缘来调整大小。"
     },
     "hint": {
       "title": "快速地图控制",
-      "drag_to_pan": "拖动以pan",
-      "shift_scroll_zoom": "Shift + 滚动以缩放",
-      "ctrl_scroll_floors": "Ctrl + 滚动以更改楼层",
+      "summary": "拖动以平移 · Shift + 滚动以缩放",
+      "summary_multi_floor": "拖动以平移 · Shift + 卷轴来缩放 · Ctrl + 卷轴来更改楼层。",
       "all_controls": "所有控制"
     },
     "aria": {
@@ -1200,6 +1209,51 @@
       "meta": {
         "description": "与队友协作推进《逃离塔科夫》进度。分享任务完成情况、藏身处状态，并协调物品收集。"
       },
+      "page_title": "团队",
+      "page_description": "邀请团队成员，选择您看到的团队进度，并一起跟踪。",
+      "invite": {
+        "title": "邀请链接",
+        "subtitle": "与信任的队友分享您的团队。",
+        "link_label": "团队邀请 URL",
+        "helper": "任何具有此链接的人都可以加入您的团队。",
+        "show": "显示链接",
+        "hide": "隐藏链接",
+        "copy": "复制链接",
+        "copied": "已复制！"
+      },
+      "members": {
+        "title": "Members ({count})",
+        "no_members": "此团队中还没有成员。分享您的邀请链接以添加队友。",
+        "alone": "只有您在这里 — — 分享您的邀请链接以添加队友。",
+        "copy_invite": "复制邀请链接",
+        "copied": "已复制！"
+      },
+      "visibility": {
+        "title": "可见性设置",
+        "description": "控制哪些团队成员的进度出现在您的跟踪上。",
+        "items_section": "项目",
+        "show_tasks": "显示团队成员的任务",
+        "show_items": "显示团队成员所需项目",
+        "show_non_fir": "显示非飞行情报区所需物品",
+        "show_hideout": "显示隐藏所需项目",
+        "show_maps": "显示团队成员的地图目标"
+      },
+      "danger_zone": {
+        "title": "危险区域",
+        "disband_description": "解散将移除所有成员的团队。此操作无法撤消。",
+        "leave_description": "离开将您从这个团队中移除。您的进度保持在您的帐户上。",
+        "disband": "解散队伍",
+        "leave": "退出队伍",
+        "confirm_disband_title": "解散团队吗？",
+        "confirm_disband_description": "这就取消了团队及其每个人的成员资格。这不能撤消。",
+        "confirm_leave_title": "离开团队吗？",
+        "confirm_leave_description": "您将离开这个团队，停止与其成员分享进度。",
+        "confirm_disband": "是的，解散团队",
+        "confirm_leave": "是的，离开团队",
+        "disband_success": "团队已成功解散。",
+        "disband_error": "解散团队失败。",
+        "action_error": "无法更新团队成员资格。"
+      },
       "card": {
         "manageteam": {
           "title": "队伍成员",
@@ -1209,7 +1263,12 @@
             "owner": "队长",
             "taskscomplete": "任务完成情况 {completed}/{total}",
             "kick_success": "已成功移出队友",
-            "kick_error": "移出队友失败"
+            "kick_error": "移出队友失败",
+            "level_badge_alt": "Level {level} badge",
+            "hide_progress": "Hide {name}'s progress from me",
+            "show_progress": "Show {name}'s progress to me",
+            "enable_team_tasks": "在更改单个成员之前显示团队成员的任务",
+            "remove_member": "Remove {name} from team"
           }
         },
         "teamoptions": {
@@ -2140,6 +2199,7 @@
       "xp_progress_value": "{percent}% toward the next level"
     },
     "danger_zone": {
+      "confirm_instruction": "Type {word} to confirm resetting all data:",
       "confirm_word": "删除账户"
     },
     "log_import": {

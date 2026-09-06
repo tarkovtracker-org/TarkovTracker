@@ -37,6 +37,10 @@ and have an agent verify the answer against the code.
     selection, public resolution, and client polling
 11. [Boot-time asset-failure recovery](#11-boot-time-asset-failure-recovery) — recovering from
     stale-chunk load failures before and after the app boots
+12. [Map objective visibility and required items](#12-map-objective-visibility-and-required-items) —
+    map marker categories and split pinned/active requirements
+
+13. [Fallow audit snapshots](#13-fallow-audit-snapshots) — consistent generated context and local source attribution
 
 ---
 
@@ -614,23 +618,35 @@ flowchart LR
    concurrent account-row updates, updates account metadata, mirrors persistent PvP/PvE for older
    clients, and upserts each normalized row. The caller passes the season number its bundle was
    built for; the function writes the Seasonal row only when that number equals the database's
-   active season, so a cached client from a previous season cannot upload stale Seasonal state.
-   Persistent PvP and PvE still sync in that case. API gateway reads resolve the active Seasonal
-   number through the database before selecting a row.
+   active season, so a cached client from a previous season cannot upload stale Seasonal state. A
+   client sync always carries every mode in one payload, so a stale Seasonal entry is skipped rather
+   than raising: persistent PvP and PvE from the same request still commit. The RPC rejects payloads
+   larger than 512 KiB and allows at most 60 direct client syncs per user per minute. API gateway
+   reads resolve the active Seasonal number through the database before selecting a row.
 3. Realtime listens to both the account row and normalized rows. A normalized event is applied only
-   when its mode is supported and its season equals the active season.
+   when its mode is supported and its season equals the active season. The long-lived system and team
+   listeners run in detached scopes so route unmounts cannot orphan their channels. The team store
+   uses one private `team:<id>` channel for membership changes and multiplexed normalized progress
+   events; teammate stores consume those events locally instead of opening one channel per teammate
+   or trusting client-supplied broadcast state. Signing out removes all remaining Realtime channels.
 4. Profile sharing is stored per normalized row in `profile_public`. Public profile and streamer
    routes select the exact mode and season; teammates receive same-mode progress through RLS. The
    sharing RPC also mirrors persistent PvP/PvE visibility back to the legacy
    `user_preferences.profile_share_*` columns, and a trigger mirrors legacy writes forward into
    `profile_public`, so a cached older client can still turn sharing off during a rolling deploy.
    A missing normalized row is treated as private rather than missing.
+   Shared-profile REST reads use `fetchWithTimeout` with an eight-second deadline covering headers
+   and the complete response body. A failed read cancels the sibling reads; timeouts return 504.
+   The configured Supabase URL is normalized before auth and REST paths are appended, removing
+   query strings, fragments, and the trailing slash; invalid or non-HTTPS URLs fail closed.
 5. Team identity comes from `team_memberships` for all modes. Team joins use a database transaction
    that locks the team while checking capacity and persists membership, user-system state, and the
    audit event together. `user_system` keeps legacy persistent PvP/PvE columns plus the active
    Seasonal team column. The team-members endpoint reads the `team_member_mode_summary` view, which
    derives display name, level, and completed-task count inside the database so teammate progress
-   blobs never cross the wire.
+   blobs never cross the wire. Owners disband through the authenticated `team-disband` function,
+   which calls an atomic service-role-only RPC; regular `team-leave` remains the non-owner leave
+   path.
 6. The active season definition carries its number, start date, and exact end timestamp. The UI
    counts down to that end timestamp. Advancing the number starts each account on a fresh empty row;
    historical rows remain retained and cannot be merged into the new season. Locally persisted
@@ -649,6 +665,13 @@ flowchart LR
 
 - `supabase/migrations/20260804043342_normalize_game_mode_progress_and_add_seasonal.sql` — schema,
   RLS, compatibility triggers, `team_member_mode_summary`, sync/sharing/prestige RPCs
+- `supabase/migrations/20260830120000_secure_team_realtime_channels.sql` — private team broadcast
+  authorization and `user_system` Realtime publication
+- `supabase/migrations/20260830130000_harden_client_progress_access.sql` — authenticated progress
+  sync limits, client mutation revocation, and mode-scoped legacy teammate progress RPC
+- `supabase/migrations/20260829120000_add_atomic_team_disband.sql` — owner-scoped atomic team
+  disband RPC and grants
+- `supabase/functions/team-disband/index.ts` — authenticated owner disband endpoint
 - `supabase/migrations/20260806120000_add_game_mode_progress_backfill_helper.sql` — retained,
   revoked helper for optional one-range-at-a-time operational maintenance. Correctness does not
   depend on running it; see the Database Migrations section of `docs/runbook.md`
@@ -658,6 +681,8 @@ flowchart LR
   `app/stores/useTarkov.ts` — load, merge, write, and realtime flow
 - `app/stores/useSystemStore.ts`, `app/stores/useTeamStore.ts` — mode-specific teams and teammate
   hydration
+- `app/features/team/TeamDangerZone.vue`, `app/features/team/useTeamInviteLink.ts` — resolved active
+  team actions and mode-scoped invite links
 - `app/composables/useDataBackup.ts` — season-aware native backups
 - `app/server/api/profile/[userId]/[mode].get.ts`,
   `app/server/api/streamer/[userId]/[mode]/kappa.get.ts`, `app/server/api/team/members.ts` —
@@ -668,6 +693,11 @@ flowchart LR
 ### Invariants
 
 - `pvp` and `pve` always use season `0`; `seasonal` always uses a positive season.
+- Legacy `user_system.team` / `team_id` values are used only when neither persistent mode-specific
+  team ID exists. They must never make a PvP team appear as the active PvE team or vice versa.
+- Team actions and invite links are unavailable until the active team row has loaded and its ID
+  matches the mode-specific system-store team ID; stale owner or join-code state is never combined
+  with another team's ID.
 - App `ACTIVE_SEASON` metadata must match the database's `private.active_season_*()` functions;
   the Worker resolves the active Seasonal number through the database instead of carrying a
   second runtime constant.
@@ -692,19 +722,53 @@ flowchart LR
 - Historical Seasonal rows are retained but never merged into the active season. Locally persisted
   Seasonal progress is stamped with its season number and reset to defaults when that stamp does not
   match the active season; absent stamps are treated as the active season. `sync_user_game_mode_progress`
-  independently rejects Seasonal writes whose caller-supplied season number is absent or does not
+  independently skips Seasonal writes whose caller-supplied season number is absent or does not
   match `private.active_season_number()`, so the fresh-season guarantee does not depend on client
-  code alone.
+  code alone. It skips rather than raises so a client whose bundled season number lags the database
+  cannot take persistent-mode cloud sync offline.
 - Teammate summaries normally come from `team_member_mode_summary`. When a persistent normalized row
   is missing or its summary has no level, `app/server/api/team/members.ts` loads that member's legacy
   progress server-side and returns only the derived display name, level, and completed-task count;
   progress blobs never reach the client in the team-members payload. That fallback is best-effort — a
   failed or timed-out legacy read is logged and the endpoint still returns the members it resolved.
-- Authenticated users can write only their own progress. Teammate reads require a shared team in
-  the same game mode; cross-mode teammates and outsiders cannot read a row.
-- New clients read teammate progress from mode rows. The teammate policy on `user_progress` is a
-  permanent dependency, not a rolling-deploy leftover: `useTeamStore` reads a teammate's legacy
-  persistent column when their normalized row is missing or carries no `level`. Account-wide metadata
+  It requires the service-role key: `user_progress` is owner-only, so a caller-JWT read returns at
+  most the caller's own row and never a teammate's. The route logs and skips the fallback when the key
+  is absent instead of issuing a request that cannot return teammate rows.
+- Authenticated users can write only their own progress through the bounded sync RPC; direct client
+  mutations of team, membership, legacy progress, and normalized progress tables are revoked.
+  Teammate reads require a shared team in the same game mode; cross-mode teammates and outsiders
+  cannot read a row.
+- The team channel is private. Realtime authorizes a private join from `realtime.messages` RLS, and a
+  read permission alone is enough to join, so the only policy is a read policy scoped to `team:<id>`
+  for members of that team. No client write policy exists: the channel carries authoritative Postgres
+  Changes, so `authenticated` must not be able to publish payloads to other members. Full enforcement
+  also requires 'Allow public access' to be disabled in the project's Realtime settings — a dashboard
+  setting no migration can apply.
+- The team channel carries teammate mode-progress changes for all authorized rows; the client does
+  not create one Postgres Changes channel per teammate.
+- System and team singleton listeners own detached effect scopes and stop those scopes during explicit
+  cleanup, so their channel lifetime is independent of the route that first created them.
+- Every channel is stored with the client that created it and removed through that client, because
+  `$supabase.client` starts as an offline stub and is replaced once background initialization
+  completes. Removal is awaited before the same topic is rejoined: `RealtimeClient.channel()` returns
+  the existing channel until its `phx_leave` settles and `subscribe()` only rejoins a closed channel,
+  so rejoining early yields a channel that never joins and never reports an error. An unclean leave
+  skips the rejoin rather than binding to an occupied topic.
+- Own-progress listener setup waits for the initial `SUBSCRIBED` acknowledgement, rejects on an
+  explicit channel failure, and times out a join that reports no status. A newer setup or teardown
+  invalidates older work at each asynchronous boundary and rejects progress and metadata callbacks
+  from the superseded listener, including while its channel is leaving. A different user's topic may
+  proceed while the previous user's topic is leaving, while a same-topic rejoin still waits for its leave.
+- The team channel records itself as bound only after `SUBSCRIBED`, so a silently failed join is never
+  mistaken for a live one. Membership events rebuild it only when the topic or teammate-progress
+  filter changed, and any non-subscribed status drops the binding so the next event rebuilds.
+- Subscribe callbacks log every status that is not `SUBSCRIBED` or `CLOSED`. Five consecutive failures
+  tear the team channel down and schedule one rebuild a minute later, replacing Realtime's unbounded
+  rejoin loop with a bounded retry cycle.
+- `user_system` is included in `supabase_realtime`, and sign-out tears down all client channels.
+- New clients read teammate progress from mode rows. When a persistent normalized row is missing or
+  carries no `level`, `useTeamStore` calls `get_teammate_legacy_progress` for only the teammate's
+  authorized mode column; the raw `user_progress` teammate policy is not used. Account-wide metadata
   for new clients is exposed through the authenticated team-members endpoint after explicit
   membership validation.
 - The public API, profile sharing, teams, backups, and streamer tools use the exact mode and active
@@ -1015,6 +1079,12 @@ flowchart LR
   action is reserved for `all` and `tarkov-data` purges because `/api/tarkov/cache-meta` treats its
   latest successful row as a signal to clear browser game-data caches.
 
+The `admin-cache-purge` Edge Function returns `{ error: code, code }` for failures while retaining
+HTTP status and CORS headers. Authentication, authorization, method, purge-type, configuration, and
+upstream failures have stable codes. `useEdgeFunctions` preserves the response envelope in error
+`data`; `AdminCacheCard` maps recognized codes through `admin.error.*` and uses a generic localized
+fallback for older or unknown errors. Upstream purge details remain in server logs.
+
 ## 11. Boot-time asset-failure recovery
 
 **Summary**: When a hashed chunk or the entry module fails to load — typically a stale
@@ -1072,6 +1142,84 @@ Page load
   otherwise storage breakage produces an unbounded reload loop.
 - The retry URL always carries `_tt_retry=<timestamp>` so the reload bypasses the browser's cached
   HTML and revalidates against the current deployment.
+
+## 12. Map objective visibility and required items
+
+**Summary.** The Tasks map derives objective visibility once for map markers and the required-item
+summary. Objectives are categorized as pinned, self, or team, while the summary separately groups
+items and keys from pinned tasks and active tasks so pinned requirements remain distinguishable.
+
+### Flow
+
+1. `useMapObjectiveMarks` derives each objective's active users, completion state, and category.
+   Pinning is resolved from the enclosing task ID; pinned objectives take precedence over self and
+   team membership. The composable returns both map marks and an objective-visibility map, each
+   entry carrying the category plus `selfNeedsObjective` — whether the local player still needs
+   that objective themselves.
+2. `LeafletMap` applies the pinned, self, and team map preferences to marker colors and visibility.
+3. `MapRequiredItemsSummary` splits the selected task set using the persisted pinned task IDs, then
+   aggregates bring-mode equipment and alternative key groups independently for each group. It
+   filters objectives to the selected map and the shared objective-visibility state.
+4. The summary's pinned group follows the pinned-objective preference. Its active group follows the
+   self-objective preference. Objectives the player does not still need themselves are dropped, so
+   the Team chip never changes required-item summaries.
+
+### Files
+
+- `app/composables/useMapObjectiveMarks.ts` — objective users, categories, map marks, and shared
+  visibility state.
+- `app/features/maps/LeafletMap.vue` — marker category filtering and map rendering.
+- `app/features/maps/MapRequiredItemsSummary.vue` — pinned/active grouping and preference gates.
+- `app/features/maps/composables/useMapRequiredItems.ts` — selected-map item/key aggregation.
+- `app/features/tasks/task-objective-equipment.ts` — canonical bring-mode equipment extraction.
+- `app/pages/tasks.vue` — passes filtered tasks and shared visibility into the map components.
+
+### Invariants
+
+- Pinning is determined by `task.id`, never by an objective ID; a pinned task's objectives are
+  categorized as `pinned` before self or team membership is considered.
+- Map marker visibility is controlled independently by the pinned, self, and team preferences.
+- Required-item summaries use the selected map and shared objective visibility, exclude completed
+  objectives, and preserve equipment counts and alternative key groups after deduplication.
+- A summary lists only what the local player still needs, and enforces that through
+  `selfNeedsObjective` rather than through `category`. That covers objectives the player ticked
+  off, tasks they completed or failed, and tasks they have not unlocked — even when a teammate
+  still needs the objective. Gating on `category` alone would be wrong, because a pinned task
+  reports `category: 'pinned'` and would otherwise mask a teammate-only requirement.
+- Pinned and active task requirements are aggregated into separate groups whenever both contain
+  visible content; the pinned group uses the pinned marker accent.
+- The pinned summary group follows `mapShowPinnedObjectives`; the active summary group follows
+  `mapShowSelfObjectives`. `mapShowTeamObjectives` does not hide or alter the required-item
+  summary, preserving the product rule that the Team chip controls map markers only.
+- Bring-mode aggregation additionally includes the canonical `objective.item` field for bring-type
+  objectives, covering upstream objectives that expose no `items` array. Task-card rendering uses
+  `all` mode and is unaffected by that field, and neither mode reintroduces the removed task
+  `alternatives` runtime dependency.
+- A group given a title renders its section headings one level down (`h4`) and uses the short
+  `required_items` / `required_keys` labels; an untitled standalone group keeps the `h3` level and
+  the longer `*_summary` labels.
+
+## 13. Fallow audit snapshots
+
+**Summary.** Local and CI `lint:fallow` commands use `scripts/fallow-audit.mjs` to create a
+disposable clone with two analysis commits. The merge-base source and current working source
+both receive physical copies of the same generated `.nuxt` context, so relative aliases resolve
+consistently in Fallow's base snapshot. Installed dependencies are linked into the clone.
+
+Candidate source files come from the original checkout's Git index and non-ignored untracked
+file list. This retains staged and unstaged source content, honors repository-local and configured
+exclusions, and includes force-tracked ignored files. A separate temporary index constructs the
+analysis head. Native new-only attribution and configured severities determine the exit status.
+See [the workflow guide](WORKFLOW_AUTOMATION.md#fallow-changed-file-gate) for usage and report IDs.
+
+**Invariants**
+
+- Source files, the source index, branches, and worktree registrations remain unchanged.
+- Both analysis commits contain the same physical generated context; no persistent finding
+  baseline or suppression changes the gate.
+- Invalid refs, missing setup, and analyzer errors fail explicitly; temporary snapshots are
+  removed in a `finally` block on success or failure.
+- Local Git exclusions apply to untracked candidates without dropping tracked source files.
 
 ## When this doc is wrong
 

@@ -155,6 +155,7 @@
                     <MapRequiredItemsSummary
                       v-if="selectedMapData"
                       :map-id="selectedMapData.id"
+                      :objective-visibility="mapObjectiveVisibility"
                       :tasks="filteredTasks"
                     />
                   </div>
@@ -680,7 +681,7 @@
   const sourceMapTasks = computed(() =>
     isSearchActive.value ? filteredTasks.value : visibleTasks.value
   );
-  const { mapObjectiveMarks } = useMapObjectiveMarks({
+  const { mapObjectiveMarks, mapObjectiveVisibility } = useMapObjectiveMarks({
     mapId: selectedMapId,
     shouldShowCompletedObjectives,
     tasks: sourceMapTasks,

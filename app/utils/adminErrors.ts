@@ -1,4 +1,7 @@
 export const ADMIN_ERROR_CODES = {
+  CACHE_PURGE_FAILED: 'cache_purge_failed',
+  INVALID_PURGE_TYPE: 'invalid_purge_type',
+  METHOD_NOT_ALLOWED: 'method_not_allowed',
   ADMIN_PRIVILEGES_REQUIRED: 'admin_privileges_required',
   AUTHENTICATION_REQUIRED: 'authentication_required',
   INVALID_CHANNEL: 'invalid_channel',
@@ -14,6 +17,9 @@ export const ADMIN_ERROR_CODES = {
 } as const;
 export type AdminErrorCode = (typeof ADMIN_ERROR_CODES)[keyof typeof ADMIN_ERROR_CODES];
 export const ADMIN_ERROR_LOCALE_KEYS: Record<AdminErrorCode, string> = {
+  [ADMIN_ERROR_CODES.CACHE_PURGE_FAILED]: 'admin.error.cache_purge_failed',
+  [ADMIN_ERROR_CODES.INVALID_PURGE_TYPE]: 'admin.error.invalid_purge_type',
+  [ADMIN_ERROR_CODES.METHOD_NOT_ALLOWED]: 'admin.error.method_not_allowed',
   [ADMIN_ERROR_CODES.ADMIN_PRIVILEGES_REQUIRED]: 'admin.error.admin_privileges_required',
   [ADMIN_ERROR_CODES.AUTHENTICATION_REQUIRED]: 'admin.error.authentication_required',
   [ADMIN_ERROR_CODES.INVALID_CHANNEL]: 'admin.error.invalid_channel',

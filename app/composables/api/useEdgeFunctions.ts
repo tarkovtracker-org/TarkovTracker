@@ -4,11 +4,13 @@
  */
 import { getErrorStatus } from '@/utils/errors';
 import { logger } from '@/utils/logger';
+import { refreshSupabaseSession } from '@/utils/supabaseAuth';
 import { shouldFallbackForUnavailableTokenFunction } from '@/utils/tokenFunctionFallback';
 import type { PurgeCacheResponse } from '@/types/edge';
 import type { MemberProfile } from '@/types/tarkov';
 import type {
   CreateTeamResponse,
+  DisbandTeamResponse,
   JoinTeamResponse,
   KickMemberResponse,
   LeaveTeamResponse,
@@ -71,16 +73,19 @@ const normalizeFunctionError = async <TError>(
 export const useEdgeFunctions = () => {
   const { $supabase } = useNuxtApp();
   const getAuthToken = async () => {
-    await $supabase.ready();
-    const { data, error } = await $supabase.client.auth.getSession();
-    if (error) throw error;
-    const token = data.session?.access_token;
+    const readySession = await $supabase.ready();
+    const token = readySession?.access_token;
     if (token) {
       return token;
     }
-    const { data: refreshData, error: refreshError } = await $supabase.client.auth.refreshSession();
-    if (refreshError) throw refreshError;
-    const refreshedToken = refreshData.session?.access_token;
+    const { data, error } = await $supabase.client.auth.getSession();
+    if (error) throw error;
+    const sessionToken = data.session?.access_token;
+    if (sessionToken) {
+      return sessionToken;
+    }
+    const refreshedSession = await refreshSupabaseSession($supabase.client);
+    const refreshedToken = refreshedSession?.access_token;
     if (refreshedToken) {
       return refreshedToken;
     }
@@ -101,9 +106,8 @@ export const useEdgeFunctions = () => {
     }
     if (getErrorStatus(error) === 401) {
       try {
-        const { data: refreshData, error: refreshError } =
-          await $supabase.client.auth.refreshSession();
-        if (!refreshError && refreshData.session?.access_token) {
+        const refreshedSession = await refreshSupabaseSession($supabase.client);
+        if (refreshedSession?.access_token) {
           ({ data, error } = await $supabase.client.functions.invoke<T>(fnName, {
             body,
             method,
@@ -156,9 +160,9 @@ export const useEdgeFunctions = () => {
       let status = getErrorStatus(latestError);
       if (status === 401) {
         try {
-          const { data, error: refreshError } = await $supabase.client.auth.refreshSession();
-          const refreshedToken = data?.session?.access_token;
-          if (!refreshError && refreshedToken) {
+          const refreshedSession = await refreshSupabaseSession($supabase.client);
+          const refreshedToken = refreshedSession?.access_token;
+          if (refreshedToken) {
             try {
               return await callTeamMembersApi(refreshedToken);
             } catch (retryError) {
@@ -234,6 +238,10 @@ export const useEdgeFunctions = () => {
     assertValidTeamId(teamId);
     return await callSupabaseFunction<LeaveTeamResponse>('team-leave', { teamId });
   };
+  const disbandTeam = async (teamId: string): Promise<DisbandTeamResponse> => {
+    assertValidTeamId(teamId);
+    return await callSupabaseFunction<DisbandTeamResponse>('team-disband', { teamId });
+  };
   /**
    * Kick a member from a team (owner only)
    * @param teamId The ID of the team
@@ -305,6 +313,7 @@ export const useEdgeFunctions = () => {
     createTeam,
     joinTeam,
     leaveTeam,
+    disbandTeam,
     kickTeamMember,
     getTeamMembers,
     // API token management

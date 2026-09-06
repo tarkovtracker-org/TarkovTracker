@@ -1,12 +1,14 @@
 // Framework imports
 // Library imports
 import { logger } from '@/utils/logger';
+import {
+  createChannelReleaseLatch,
+  logChannelSubscribeFailure,
+  removeOwnedChannel,
+  type OwnedRealtimeChannel,
+} from '@/utils/realtimeChannel';
 import { clearStaleState, resetStore, safePatchStore } from '@/utils/storeHelpers';
-import type {
-  PostgrestError,
-  RealtimeChannel,
-  RealtimePostgresChangesPayload,
-} from '@supabase/supabase-js';
+import type { PostgrestError, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import type { StateTree, Store } from 'pinia';
 // Local imports
 export interface SupabaseListenerConfig<
@@ -22,6 +24,7 @@ export interface SupabaseListenerConfig<
   patchStore?: boolean;
   /** Optional sync controller to pause during remote updates */
   syncController?: { pause: () => void; resume: () => void };
+  scope?: ListenerScope;
 }
 interface SupabaseListenerReturn {
   isSubscribed: Ref<boolean>;
@@ -30,6 +33,7 @@ interface SupabaseListenerReturn {
   cleanup: () => void;
   fetchData: () => Promise<void>;
 }
+type ListenerScope = { run<T>(fn: () => T): T | undefined };
 interface QueryBuilderWithAbortSignal<TData extends Record<string, unknown>> {
   abortSignal?: (signal: AbortSignal) => PromiseLike<{
     data: TData | null;
@@ -41,6 +45,19 @@ interface QueryBuilderWithAbortSignal<TData extends Record<string, unknown>> {
   }>['then'];
 }
 const VUE_REACTIVITY_SETTLE_MS = 100;
+const runFilterWatch = (
+  scope: ListenerScope | undefined,
+  watchFilter: () => () => void
+): (() => void) | undefined => (scope ? scope.run(watchFilter) : watchFilter());
+const registerComponentCleanup = (scope: ListenerScope | undefined, cleanup: () => void): void => {
+  if (scope) {
+    scope.run(() => onScopeDispose(cleanup));
+    return;
+  }
+  if (getCurrentInstance()) {
+    onUnmounted(cleanup);
+  }
+};
 const isAbortError = (error: unknown): boolean => {
   if (error instanceof Error && error.name === 'AbortError') {
     return true;
@@ -70,15 +87,21 @@ export function useSupabaseListener<
   onData,
   patchStore = true,
   syncController,
+  scope,
 }: SupabaseListenerConfig<TStoreState, TData>): SupabaseListenerReturn {
   const { $supabase } = useNuxtApp();
-  const channel = ref<RealtimeChannel | null>(null);
+  // `shallowRef`: a Realtime channel owns a socket, timers, and internal state
+  // that must not be wrapped in a deep reactive proxy.
+  const channel = shallowRef<OwnedRealtimeChannel | null>(null);
+  const channelRelease = createChannelReleaseLatch();
   const isSubscribed = ref(false);
   const hasInitiallyLoaded = ref(false);
   const loadError = ref<PostgrestError | null>(null);
   const storeIdForLogging = storeId || store.$id;
   let activeFetchController: AbortController | null = null;
   let latestFetchVersion = 0;
+  let cleanupVersion = 0;
+  let pendingSyncResumeTimeout: ReturnType<typeof setTimeout> | null = null;
   // Helper to get current filter value (supports both string and ref)
   const getFilterValue = (): string | undefined => unref(filter);
   // Initial fetch
@@ -150,12 +173,15 @@ export function useSupabaseListener<
       }
     }
   };
-  const setupSubscription = () => {
+  const listenerTopic = (currentFilter: string) => `public:${table}:${currentFilter}`;
+  const createSubscription = () => {
     const currentFilter = getFilterValue();
     if (channel.value) return;
     if (!currentFilter) return;
-    channel.value = $supabase.client
-      .channel(`public:${table}:${currentFilter}`)
+    const subscriptionVersion = cleanupVersion;
+    const client = $supabase.client;
+    const nextChannel = client
+      .channel(listenerTopic(currentFilter))
       .on(
         'postgres_changes',
         {
@@ -165,9 +191,10 @@ export function useSupabaseListener<
           filter: currentFilter,
         },
         (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-          // Pause sync to prevent bounce loop
+          if (subscriptionVersion !== cleanupVersion) return;
           syncController?.pause();
           try {
+            if (subscriptionVersion !== cleanupVersion) return;
             if (payload.eventType === 'DELETE') {
               if (patchStore) {
                 resetStore(store);
@@ -183,23 +210,73 @@ export function useSupabaseListener<
               if (onData) onData(newData);
             }
           } finally {
-            // Resume sync after a small delay to let Vue reactivity settle
-            setTimeout(() => syncController?.resume(), VUE_REACTIVITY_SETTLE_MS);
+            if (subscriptionVersion === cleanupVersion) {
+              if (pendingSyncResumeTimeout) clearTimeout(pendingSyncResumeTimeout);
+              pendingSyncResumeTimeout = setTimeout(() => {
+                pendingSyncResumeTimeout = null;
+                if (subscriptionVersion === cleanupVersion) syncController?.resume();
+              }, VUE_REACTIVITY_SETTLE_MS);
+            }
           }
         }
       )
-      .subscribe((status: string) => {
+      .subscribe((status: string, error?: Error) => {
+        // Cleanup can start while the join is still pending; a disposed channel
+        // must not flip `isSubscribed` back on or log for a listener that is gone.
+        if (subscriptionVersion !== cleanupVersion) return;
         isSubscribed.value = status === 'SUBSCRIBED';
+        logChannelSubscribeFailure(storeIdForLogging, status, error, { table });
       });
+    channel.value = { channel: nextChannel, client, topic: listenerTopic(currentFilter) };
+  };
+  /**
+   * Subscribes immediately unless a previous channel is still leaving.
+   *
+   * Staying synchronous in the common case preserves the channel being available
+   * as soon as the listener is created; the deferred branch only runs when the
+   * same topic could still be occupied.
+   */
+  /**
+   * Subscribes immediately unless a previous channel is still leaving.
+   *
+   * `RealtimeClient.channel()` returns the existing channel until its
+   * `phx_leave` settles and `subscribe()` only rejoins a closed channel, so
+   * filter transitions such as A -> undefined -> A must wait. Staying
+   * synchronous otherwise keeps the channel available as soon as the listener is
+   * created.
+   */
+  const setupSubscription = (): void => {
+    const currentFilter = getFilterValue();
+    if (!currentFilter) return;
+    const topic = listenerTopic(currentFilter);
+    // Subscribe immediately unless this exact topic is still leaving, so the
+    // channel is available as soon as the listener is created.
+    if (!channelRelease.isHolding(topic)) {
+      createSubscription();
+      return;
+    }
+    const setupVersion = cleanupVersion;
+    void channelRelease.release(topic).then((leftCleanly) => {
+      // An unclean leave keeps the topic occupied, so rejoining would return a
+      // channel that never joins. The latch is retained for the next attempt.
+      if (!leftCleanly || setupVersion !== cleanupVersion) return;
+      createSubscription();
+    });
   };
   const cleanup = () => {
+    cleanupVersion += 1;
+    if (pendingSyncResumeTimeout) {
+      clearTimeout(pendingSyncResumeTimeout);
+      pendingSyncResumeTimeout = null;
+    }
+    syncController?.resume();
     latestFetchVersion += 1;
     activeFetchController?.abort();
     activeFetchController = null;
-    if (channel.value) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      $supabase.client.removeChannel(channel.value as any);
-      channel.value = null;
+    const channelToRemove = channel.value;
+    channel.value = null;
+    if (channelToRemove) {
+      channelRelease.hold(channelToRemove, removeOwnedChannel(channelToRemove, storeIdForLogging));
       isSubscribed.value = false;
       // Note: Don't reset hasInitiallyLoaded here - it should persist as long as store has data
       // This prevents showing loading spinner when navigating back to a page
@@ -207,35 +284,36 @@ export function useSupabaseListener<
   };
   // Watch for filter changes - supports both static strings and reactive refs
   const filterSource = isRef(filter) ? filter : () => filter;
-  watch(
-    filterSource,
-    (newFilter) => {
-      cleanup();
-      if (!newFilter) {
-        if (patchStore) {
-          resetStore(store);
+  const watchFilter = () =>
+    watch(
+      filterSource,
+      (newFilter) => {
+        cleanup();
+        if (!newFilter) {
+          if (patchStore) {
+            resetStore(store);
+          }
+          if (onData) onData(null);
+          hasInitiallyLoaded.value = true;
+          return;
         }
-        if (onData) onData(null);
-        hasInitiallyLoaded.value = true;
-        return;
-      }
-      hasInitiallyLoaded.value = false;
-      fetchData();
-      setupSubscription();
-    },
-    { immediate: true }
-  );
+        hasInitiallyLoaded.value = false;
+        fetchData();
+        setupSubscription();
+      },
+      { immediate: true }
+    );
+  const stopFilterWatch = runFilterWatch(scope, watchFilter);
   // If used inside a component, clean up on unmount; otherwise caller must clean up manually.
-  if (getCurrentInstance()) {
-    onUnmounted(() => {
-      cleanup();
-    });
-  }
+  registerComponentCleanup(scope, cleanup);
   return {
     isSubscribed,
     hasInitiallyLoaded,
     loadError,
-    cleanup,
+    cleanup: () => {
+      stopFilterWatch?.();
+      cleanup();
+    },
     fetchData,
   };
 }

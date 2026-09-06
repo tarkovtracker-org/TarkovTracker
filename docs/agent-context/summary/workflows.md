@@ -124,8 +124,8 @@ sequenceDiagram
     TeamStore->>UI: teammate progress
 ```
 
-Functions: `team-create`, `team-join`, `team-leave`, `team-kick`, `team-members`. Owner transfer and
-membership sync are handled by migrations/RPCs.
+Functions: `team-create`, `team-join`, `team-leave`, `team-kick`, `team-disband`, `team-members`.
+Owner transfer and membership sync are handled by migrations/RPCs.
 
 ## 6. Progress Import (tarkov.dev profile / EFT logs)
 

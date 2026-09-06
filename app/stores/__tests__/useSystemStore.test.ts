@@ -100,6 +100,16 @@ describe('useSystemStore', () => {
         expect(getTeamIdFromState(state, GAME_MODES.PVP)).toBe('legacy-team-id-999');
         expect(getTeamIdFromState(state, GAME_MODES.PVE)).toBe('legacy-team-id-999');
       });
+      it('should not reuse a mode-specific team through legacy aliases in another mode', () => {
+        const state: SystemState = {
+          pvp_team_id: 'pvp-team-123',
+          pve_team_id: null,
+          team: 'pvp-team-123',
+          team_id: 'pvp-team-123',
+        };
+        expect(getTeamIdFromState(state, GAME_MODES.PVP)).toBe('pvp-team-123');
+        expect(getTeamIdFromState(state, GAME_MODES.PVE)).toBeNull();
+      });
       it('should return null if no team ID is found', () => {
         const state: SystemState = {};
         expect(getTeamIdFromState(state, GAME_MODES.PVP)).toBeNull();

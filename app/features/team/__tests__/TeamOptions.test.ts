@@ -33,21 +33,19 @@ const mockPreferencesStore = {
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => mockPreferencesStore,
 }));
-const USwitchStub = {
-  props: ['modelValue', 'disabled'],
+const TeamVisibilitySwitchStub = {
+  props: ['id', 'modelValue', 'disabled'],
   emits: ['update:modelValue'],
   template:
-    '<button :data-state="modelValue ? \'on\' : \'off\'" :disabled="disabled" @click="$emit(\'update:modelValue\', !modelValue)"></button>',
+    '<button :id="id" :data-state="modelValue ? \'on\' : \'off\'" :disabled="disabled" @click="$emit(\'update:modelValue\', !modelValue)"></button>',
 };
 const mountTeamOptions = async () => {
   const { default: TeamOptions } = await import('@/features/team/TeamOptions.vue');
   const wrapper = mount(TeamOptions, {
     global: {
       stubs: {
-        GenericCard: {
-          template: '<div><slot name="title" /><slot name="content" /><slot name="footer" /></div>',
-        },
-        USwitch: USwitchStub,
+        TeamCard: { template: '<div><slot name="icon" /><slot /></div>' },
+        TeamVisibilitySwitch: TeamVisibilitySwitchStub,
         USeparator: { template: '<hr />' },
       },
       mocks: {
@@ -68,6 +66,21 @@ describe('TeamOptions preferences', () => {
     vi.clearAllMocks();
   });
   describe('taskHideAll switch', () => {
+    it('toggles when the row text is clicked without duplicating switch events', async () => {
+      const wrapper = await mountTeamOptions();
+      const row = wrapper.find('[data-testid="task-row"]');
+      const taskToggle = wrapper.find('[data-testid="task-toggle"]');
+      const taskSwitch = wrapper.find('[data-testid="task-switch"]');
+      await taskToggle.trigger('click');
+      expect(mockPreferencesStore.setQuestTeamHideAll).toHaveBeenCalledTimes(1);
+      expect(mockPreferencesStore.setQuestTeamHideAll).toHaveBeenLastCalledWith(true);
+      vi.clearAllMocks();
+      await taskSwitch.trigger('click');
+      expect(mockPreferencesStore.setQuestTeamHideAll).toHaveBeenCalledTimes(1);
+      expect(row.element.tagName).toBe('DIV');
+      expect(taskToggle.element.tagName).toBe('BUTTON');
+      wrapper.unmount();
+    });
     it('calls setQuestTeamHideAll when toggled on', async () => {
       const wrapper = await mountTeamOptions();
       const taskSwitch = wrapper.find('[data-testid="task-switch"]');
@@ -104,6 +117,12 @@ describe('TeamOptions preferences', () => {
       expect(mockPreferencesStore.setItemsTeamHideAll).toHaveBeenCalledWith(false);
       wrapper.unmount();
     });
+    it('toggles item visibility when the row text is clicked', async () => {
+      const wrapper = await mountTeamOptions();
+      await wrapper.find('[data-testid="items-row"] button').trigger('click');
+      expect(mockPreferencesStore.setItemsTeamHideAll).toHaveBeenCalledWith(true);
+      wrapper.unmount();
+    });
   });
   describe('dependent toggles', () => {
     it('disables item switches when itemsTeamAllHidden is true', async () => {
@@ -128,20 +147,56 @@ describe('TeamOptions preferences', () => {
       expect(hideoutSwitch.disabled).toBe(false);
       wrapper.unmount();
     });
+    it('toggles non-FIR visibility from the row text', async () => {
+      const wrapper = await mountTeamOptions();
+      await wrapper.find('[data-testid="nonfir-row"] button').trigger('click');
+      expect(mockPreferencesStore.setItemsTeamHideNonFIR).toHaveBeenCalledWith(true);
+      wrapper.unmount();
+    });
+    it('does not toggle non-FIR visibility while all items are hidden', async () => {
+      mockPreferencesState.itemsTeamAllHidden = true;
+      const wrapper = await mountTeamOptions();
+      await wrapper.find('[data-testid="nonfir-row"] button').trigger('click');
+      expect(mockPreferencesStore.setItemsTeamHideNonFIR).not.toHaveBeenCalled();
+      wrapper.unmount();
+    });
+    it('renders the non-FIR switch as checked when non-FIR items are visible', async () => {
+      const wrapper = await mountTeamOptions();
+      expect(wrapper.find('[data-testid="nonfir-switch"]').attributes('data-state')).toBe('on');
+      wrapper.unmount();
+    });
+    it('toggles hideout visibility from the row text', async () => {
+      const wrapper = await mountTeamOptions();
+      await wrapper.find('[data-testid="hideout-row"] button').trigger('click');
+      expect(mockPreferencesStore.setItemsTeamHideHideout).toHaveBeenCalledWith(true);
+      wrapper.unmount();
+    });
+    it('does not toggle hideout visibility while all items are hidden', async () => {
+      mockPreferencesState.itemsTeamAllHidden = true;
+      const wrapper = await mountTeamOptions();
+      await wrapper.find('[data-testid="hideout-row"] button').trigger('click');
+      expect(mockPreferencesStore.setItemsTeamHideHideout).not.toHaveBeenCalled();
+      wrapper.unmount();
+    });
+    it('renders the hideout switch as checked when hideout items are visible', async () => {
+      const wrapper = await mountTeamOptions();
+      expect(wrapper.find('[data-testid="hideout-switch"]').attributes('data-state')).toBe('on');
+      wrapper.unmount();
+    });
   });
   describe('label computation', () => {
     it('renders static label regardless of preference state', async () => {
       mockPreferencesState.taskTeamAllHidden = true;
       const wrapper = await mountTeamOptions();
       const taskToggle = wrapper.find('[data-testid="task-toggle"]');
-      expect(taskToggle.text()).toContain('page.team.card.teamoptions.toggle_tasks');
+      expect(taskToggle.text()).toContain('page.team.visibility.show_tasks');
       wrapper.unmount();
     });
     it('renders same static label when preference is false', async () => {
       mockPreferencesState.taskTeamAllHidden = false;
       const wrapper = await mountTeamOptions();
       const taskToggle = wrapper.find('[data-testid="task-toggle"]');
-      expect(taskToggle.text()).toContain('page.team.card.teamoptions.toggle_tasks');
+      expect(taskToggle.text()).toContain('page.team.visibility.show_tasks');
       wrapper.unmount();
     });
   });
@@ -151,6 +206,12 @@ describe('TeamOptions preferences', () => {
       const wrapper = await mountTeamOptions();
       const mapSwitch = wrapper.find('[data-testid="map-switch"]');
       await mapSwitch.trigger('click');
+      expect(mockPreferencesStore.setMapTeamHideAll).toHaveBeenCalledWith(true);
+      wrapper.unmount();
+    });
+    it('toggles map team visibility when the row text is clicked', async () => {
+      const wrapper = await mountTeamOptions();
+      await wrapper.find('[data-testid="map-row"] button').trigger('click');
       expect(mockPreferencesStore.setMapTeamHideAll).toHaveBeenCalledWith(true);
       wrapper.unmount();
     });

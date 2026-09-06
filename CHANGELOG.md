@@ -1,3 +1,80 @@
+## [1.75.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.75.3...v1.75.4) (2026-09-06)
+
+
+### Bug Fixes
+
+* **api:** bound profile reads and localize cache purge errors ([#802](https://github.com/tarkovtracker-org/TarkovTracker/issues/802)) ([0844256](https://github.com/tarkovtracker-org/TarkovTracker/commit/0844256ec4c9baf06e0bf2a5cb3124163afc83ab))
+
+## [1.75.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.75.2...v1.75.3) (2026-09-06)
+
+
+### Bug Fixes
+
+* **ci:** preserve Nuxt context in Fallow audits ([#800](https://github.com/tarkovtracker-org/TarkovTracker/issues/800)) ([0befdd7](https://github.com/tarkovtracker-org/TarkovTracker/commit/0befdd748150e7152f21944b8f357a5c4a77e2e6))
+
+## [1.75.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.75.1...v1.75.2) (2026-09-06)
+
+
+### Bug Fixes
+
+* harden auth and realtime resource usage ([#786](https://github.com/tarkovtracker-org/TarkovTracker/issues/786)) ([74c4ec2](https://github.com/tarkovtracker-org/TarkovTracker/commit/74c4ec2c27c2a8cdf03aefa4cd73788733b7eb0a))
+
+## [1.75.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.75.0...v1.75.1) (2026-09-03)
+
+
+### Bug Fixes
+
+* **ci:** deploy the version-bump commit so the footer shows the real version ([#796](https://github.com/tarkovtracker-org/TarkovTracker/issues/796)) ([d35d533](https://github.com/tarkovtracker-org/TarkovTracker/commit/d35d5334b8bb704329152278e3928616252fa1f7))
+
+# [1.75.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.74.1...v1.75.0) (2026-09-03)
+
+
+### Features
+
+* **maps:** split map requirements strip into pinned and active groups ([#748](https://github.com/tarkovtracker-org/TarkovTracker/issues/748)) ([c4704b1](https://github.com/tarkovtracker-org/TarkovTracker/commit/c4704b18674400059db2cd9c48aa4805aa4c95ac))
+
+## [1.74.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.74.0...v1.74.1) (2026-08-30)
+
+
+### Bug Fixes
+
+* **supabase:** align migration history filename ([7c9f3ec](https://github.com/tarkovtracker-org/TarkovTracker/commit/7c9f3ece57b0e9a509f65ed91187e789c0301e96))
+
+# [1.74.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.12...v1.74.0) (2026-08-30)
+
+
+### Bug Fixes
+
+* **team:** address PR review findings ([45f942c](https://github.com/tarkovtracker-org/TarkovTracker/commit/45f942c6bb9bc60b3f14177dbac637fb2d16edd1))
+* **team:** align visibility row interaction states ([6b0f19a](https://github.com/tarkovtracker-org/TarkovTracker/commit/6b0f19a3aa6b8cee69260797ff788f7f41314af5))
+* **team:** guard delayed membership cleanup ([03669a7](https://github.com/tarkovtracker-org/TarkovTracker/commit/03669a7cefe9e3c20ddf8764471e06f43b912281))
+* **team:** harden collaboration page interactions ([3b2abbd](https://github.com/tarkovtracker-org/TarkovTracker/commit/3b2abbda8f0fea514e7ba2111a2f6a09d42f6463))
+* **team:** ignore stale invite copy results ([37cc754](https://github.com/tarkovtracker-org/TarkovTracker/commit/37cc7540f45c4ca8430cae2dd94a4c1c8c0321a6))
+* **team:** keep clipboard helper within audit limits ([26d2d7a](https://github.com/tarkovtracker-org/TarkovTracker/commit/26d2d7a3ad7e609bc90150ea020f095d3ba55053))
+
+
+### Features
+
+* **ui:** modernize Team collaboration page ([13db1d8](https://github.com/tarkovtracker-org/TarkovTracker/commit/13db1d8ecd06e708adc587908449802cadf5fd39))
+
+## [1.73.12](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.11...v1.73.12) (2026-08-30)
+
+
+### Bug Fixes
+
+* **ui:** resolve shell contrast failures ([#780](https://github.com/tarkovtracker-org/TarkovTracker/issues/780)) ([9ad8d12](https://github.com/tarkovtracker-org/TarkovTracker/commit/9ad8d127077297ee36b5871eab77e778bab424d3))
+
+## [1.73.11](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.10...v1.73.11) (2026-08-30)
+
+
+### Bug Fixes
+
+* **app:** clear exchanged OAuth callback code ([d6f7f92](https://github.com/tarkovtracker-org/TarkovTracker/commit/d6f7f9244a8cbc0a3bf092eec0251b12779121c5))
+* **app:** make OAuth PKCE callback exchange explicit ([a936466](https://github.com/tarkovtracker-org/TarkovTracker/commit/a93646692e4ee91bf350b430e240dbefc52a3e4a))
+* **app:** reset OAuth callback state after exchange ([21f9aaf](https://github.com/tarkovtracker-org/TarkovTracker/commit/21f9aaf38299a61f8277b0f2b561fb8e330ba04c))
+* **app:** scope OAuth PKCE exchange to callback route and defer to ready ([521ddef](https://github.com/tarkovtracker-org/TarkovTracker/commit/521ddefec9aa226bd1046d17df710f6dfc6514b0))
+* **app:** share the pending OAuth exchange across ready callers ([3c58493](https://github.com/tarkovtracker-org/TarkovTracker/commit/3c58493326dc5a8d6d461c96443203b26c5c8bd8))
+
 ## [1.73.10](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.73.9...v1.73.10) (2026-08-29)
 
 

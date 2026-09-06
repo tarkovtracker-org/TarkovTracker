@@ -30,6 +30,7 @@ const excludedFiles = new Set([
   '.coderabbit.yaml',
   'pnpm-lock.yaml',
   'supabase/functions/_shared/database.types.ts',
+  'workers/api-gateway/worker-configuration.d.ts',
 ]);
 const excludedLocalePattern = /^app\/locales\/(?!en\.json$)[^/]+\.json$/;
 const excludedDirectories = ['.git/', '.nuxt/', 'coverage/', 'dist/', 'node_modules/'];

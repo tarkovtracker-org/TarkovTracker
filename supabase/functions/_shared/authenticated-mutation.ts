@@ -6,7 +6,7 @@ import {
   validateMethod,
 } from './auth.ts';
 import { enforceUserMutationRateLimit, type MutationRateLimitAction } from './rate-limit.ts';
-type AuthenticatedMutation = {
+export type AuthenticatedMutation = {
   response: null;
   supabase: SupabaseClient;
   user: { email?: string; id: string };
@@ -29,7 +29,7 @@ const getEarlyMutationResponse = (req: Request): Response | null =>
   handleCorsPreflight(req) ?? validateMethod(req, ['POST']);
 const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
   Object.prototype.toString.call(value) === '[object Object]';
-const readJsonObject = async (req: Request): Promise<Record<string, unknown>> => {
+export const readJsonObject = async (req: Request): Promise<Record<string, unknown>> => {
   try {
     const parsed = await req.json();
     return isObjectRecord(parsed) ? parsed : {};
