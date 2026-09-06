@@ -1260,8 +1260,18 @@ detached tree; its zero bounding rectangle must not trigger auto-fill. Hidden or
 sentinels consume no auto-load budget. The existing intersection observer checks again when
 the list becomes visible; configured scroll fallback and explicit checks use the same guard.
 
-The tasks page retains its loading state until metadata is ready and the first visible-task
-refresh settles. Reset that readiness when metadata starts loading again. Metadata readiness
+The tasks page requests objectives, rewards, and edition eligibility together through the
+existing cached/deduplicated store actions (`useTaskDetailReadiness`). Keep its loading state
+until these requests settle and the first visible-task refresh settles. This prevents objective
+skeleton/reward reflow and an initial list filtered without edition eligibility. This eager
+request is scoped to the tasks page; other routes retain the store's idle scheduling.
+
+Optional detail requests can hold the page for at most three seconds after core readiness;
+then show the existing progressive UI while late requests continue. Failed requests also release
+the gate. Mode/locale changes, core reloads, and scope disposal invalidate earlier waits and clear
+their timers. An empty task dataset does not wait for optional requests.
+
+Reset filter readiness when metadata or task-detail readiness resets. Metadata readiness
 alone must not expose the empty state during the debounced filter refresh; a completed refresh
 with no matching tasks still shows the normal empty state. Subsequent filter changes retain
 the existing debounce and task actions still request an immediate refresh.

@@ -1,6 +1,8 @@
 # Task performance validation (#444)
 
-## Scope
+This records the #808 baseline and the [follow-up validation and closure policy](#follow-up-complete-initial-task-cards).
+
+## #808: warm-cache startup fix
 
 This change fixes two task-page startup races. Nuxt Suspense mounts the
 list in a detached tree. The sentinel's bounding rectangle is then zero, which previously
@@ -41,7 +43,7 @@ Reverting the composable change restores the previous behavior.
 Useful response fingerprints (SHA-256 prefixes): tasks-core `6d8940f89f17`, items-lite
 `625c4c63ec7e`, regular objectives `c925244c5d21`, rewards `84fc091370f6`.
 
-## Acceptance policy
+## #808 acceptance policy
 
 For this fix, a warm-cache page must not spend its auto-load budget on a detached or hidden
 sentinel, or flash an empty result before the first filter refresh settles. At the desktop test viewport with default expanded cards, initial rendering must
@@ -54,12 +56,12 @@ comparison budget, not a new universal performance floor. Keep the existing warn
 0.20 performance floor and single-run collection in PR CI; dedicated investigations use
 repeated runs. The historical 0.55 threshold is not a closure test for this patch.
 
-Issue #444 should remain open for cold-load investigation: expanded desktop cards still shift
-as deferred objectives/rewards arrive. A complete resolution needs those shifts addressed,
-representative persisted/team progress measurements, and a broader performance budget. Passing
-CI or this warm-cache regression check does not prove those remaining goals are complete.
+At the merge of #808, issue #444 remained open: expanded desktop cards still shifted as deferred
+objectives/rewards arrived. The follow-up below addresses those shifts, edition eligibility,
+representative persisted/team rendering, and the broader measurement policy. The #808 checks
+alone were not a closure claim.
 
-## Measured results
+## #808 measured results
 
 Three independent warm-cache desktop profiles per revision:
 
@@ -100,9 +102,9 @@ Median Lighthouse TBT fell from 709 to 582 ms; LCP was effectively unchanged. Th
 comparison budgets above. The real-time 4× CPU traces still show deferred-content movement:
 final cold desktop layout-shift sums were 0.1010, 0.1319, and 0.1010; the final mobile probe
 was 0.2586 cold and 0.1075 warm. None of the final probes flashed the empty state. These are
-why the broader CLS work in #444 remains open despite the low Lighthouse CLS.
+why #808 did not close the broader CLS work in #444 despite its low Lighthouse CLS.
 
-## Functional validation
+## #808 functional validation
 
 - Production build, repository lint, typecheck, and systems drift check passed.
 - Nine focused Vitest files passed (129 tests), covering infinite scroll, tasks/Hideout/Needed
@@ -124,3 +126,140 @@ flashes. These checks produced no uncaught browser exceptions.
 The Cloudflare build/deployment also passed. Its hosted preview requires Cloudflare Access;
 the interaction checks above used the local production build, not an authenticated hosted
 preview session.
+
+## Follow-up: complete initial task cards
+
+The follow-up compares main `8f0c63896ffa8df08d40df241474dcc0e21701c2` (the merged #808
+implementation) with this revision. The same production-build method and public API response
+replay described above are used. The subsequent main release commit changes the version only.
+
+### Cause and behavior
+
+Three asynchronous changes affected the first visible list: objective skeleton replacement,
+reward-summary insertion, and edition eligibility arriving after filtering. A frame-by-frame
+trace of the intermediate follow-up showed Shooting Cans replaced by Shady Contractor once
+edition data arrived. Waiting for objectives/rewards alone therefore did not fix cold CLS.
+
+`useTaskDetailReadiness` requests objectives, rewards, and editions concurrently once core
+metadata is ready. The tasks page filters after those requests settle and presents complete
+cards together. It uses the existing cache, deduplication, and response-context guards; other
+routes retain deferred loading. No card expansion defaults, task eligibility rules, batch sizes,
+progress persistence, or remote data contracts change.
+
+The wait is bounded at **three seconds after core readiness**. Failures release the page;
+stalled requests continue in the background after the bound. This intentionally favors usable
+navigation over stable layout during an outage. A mode/locale change or core reload invalidates
+an earlier wait; unmount clears timers. Filter refresh generations prevent an older async
+completion from releasing a newer loading cycle. Its regression test failed before the guard.
+
+### Measurement policy for closing #444
+
+Keep the existing warning-only 0.20 CI score floor, single collection, and standard simulated
+mobile throttling. Shared-runner scores are a smoke signal, not an application readiness test;
+the historical 0.55 gate is deliberately not restored. For task performance changes:
+
+- Use three independent profiles per comparison scenario, with identical public API responses,
+  viewport, CPU settings, and build configuration. Include guest, persisted progress, and team
+  rendering; include cold and warm caches. Do not run builds/tests alongside measurements.
+- Collect Lighthouse with `pauseAfterFcpMs: 5000` and `pauseAfterLoadMs: 5000` for both revisions.
+  Verify that objectives, rewards, and edition eligibility were included before interpreting
+  the score. Extend collection if the specific environment has not reached that state.
+- Require observed layout-shift sums below **0.1** in successful-load desktop/mobile probes,
+  through 15 seconds after cards appear. Summing all shifts is at least as strict as the CLS
+  session-window maximum. Failure/stall fallbacks are availability tests, not CLS claims.
+- Require median full-window mobile Lighthouse TBT no more than the baseline plus the greater
+  of **100 ms or 10%**. Compare first **settled complete cards** in the real-time traces with
+  the same tolerance. Also report first incomplete cards, FCP, LCP, and its candidate so a
+  loading-state change cannot masquerade as faster useful content.
+- Keep task filtering, paging, progress actions, deep links, game modes, and graph/map routes
+  functional. Exercise delayed/failed detail requests and obsolete refresh completion.
+
+This replaces #808's narrow cold-navigation comparison budget for issue closure. It does not
+claim that the application has reached ideal mobile performance or that arbitrary slow-network
+loads will have no shifts after the availability fallback.
+
+### Why default Lighthouse was misleading
+
+The original default collection on #808 ended before objectives/rewards requests. Its LCP node
+was the header search text. A fresh follow-up default collection includes task content and
+reports a lower score (0.40 versus #808's 0.48 median) and higher LCP. Extending both collection
+windows exposes main's deferred CLS and CPU work:
+
+| Extended mobile Lighthouse | Main runs                | Follow-up runs           |
+| -------------------------- | ------------------------ | ------------------------ |
+| Performance score          | 0.26 / 0.27 / 0.28       | 0.41 / 0.41 / 0.40       |
+| TBT (ms)                   | 1150 / 1077 / 923        | 969 / 945 / 1024         |
+| CLS                        | 0.2565 / 0.2565 / 0.2565 | 0.0020 / 0.0020 / 0.0020 |
+| FCP (ms)                   | 4973 / 5050 / 5048       | 5042 / 5042 / 5045       |
+| LCP (ms)                   | 9277 / 9288 / 9285       | 23359 / 23359 / 23284    |
+
+Median full-window TBT improves about 10%; FCP is effectively unchanged. **LCP is higher**:
+main's candidate remains header search text, while the follow-up candidate is a visible task
+objective. Do not describe this as an LCP improvement. The new readiness boundary delays the
+first incomplete cards in exchange for a stable, complete list; compare the actual settled-card
+timings below. Large game-data downloads and long main-thread tasks remain optimization
+opportunities even after these startup defects are fixed.
+
+### Representative rendering fixtures
+
+The persisted fixture uses a guest-owned localStorage envelope, level 40, and 120 completed
+low-level task IDs selected from the production task dataset. The team fixture adds three
+synthetic teammates at levels 25/30/35 with 50/70/90 completed tasks, using the application's
+teammate progress event and real stores, with the All users filter. Browser assertions verify
+these stores and progress values. Fixtures use no private user data or production credentials.
+This validates team rendering/filtering cost, not authenticated Supabase transport; those
+contracts are unchanged and remain covered by their existing tests.
+
+### Guest traces
+
+Three follow-up profiles per viewport, with eight complete initial cards in every run:
+
+| Real-time trace | Main shift sums          | Follow-up shift sums     | Main median first / settled cards (ms) | Follow-up median first complete cards (ms) |
+| --------------- | ------------------------ | ------------------------ | -------------------------------------- | ------------------------------------------ |
+| Desktop cold    | 0.1010 / 0.1319 / 0.1010 | 0.0009 / 0.0009 / 0.0009 | 2318 / 3740                            | 3324                                       |
+| Desktop warm    | 0.0361 / 0.0361 / 0.0361 | 0.0002 / 0.0002 / 0.0002 | 1170 / 2524                            | 2008                                       |
+| Mobile cold     | 0.2586 / 0.2204 / 0.2204 | 0.0020 / 0.0020 / 0.0020 | 2345 / 3693                            | 3155                                       |
+| Mobile warm     | 0.1075 / 0.1075 / 0.1075 | 0 / 0 / 0                | 1130 / 2507                            | 1969                                       |
+
+The main guest traces retain the #808 final-build samples (identical executable behavior to
+its squash merge), plus a fresh paired mobile profile; all fixture and follow-up samples were
+collected anew. “Settled” is the final card/height frame in the no-input settling window.
+The follow-up has one such frame: no skeleton replacement, reward insertion, or edition-driven
+card replacement after first display. Complete cards appear 11–21% earlier at the median,
+although the first incomplete cards previously appeared sooner.
+
+Warm desktop observed blocking portions were 1065 / 1346 / 1107 ms, compared with
+1061 / 1044 / 1128 ms on main (median about 4% higher). The grouped initial render can produce
+longer individual tasks; this change fixes layout/readiness, not every source of main-thread
+work. Full-window Lighthouse TBT and the complete-card timing pass the stated comparison
+budgets. No transient empty-state frames were observed.
+
+### Persisted/team mobile traces
+
+Three fresh profiles per fixture and revision:
+
+| Fixture        | Main shift sums          | Follow-up shift sums     | Median settled cards (ms) |
+| -------------- | ------------------------ | ------------------------ | ------------------------- |
+| Persisted cold | 0.1818 / 0.1524 / 0.1524 | 0.0020 / 0.0020 / 0.0020 | 4036 → 3414               |
+| Persisted warm | 0.0699 / 0.0699 / 0.0699 | 0.0000 / 0.0000 / 0.0000 | 2640 → 2029               |
+| Team cold      | 0.0540 / 0.0540 / 0.0540 | 0.0020 / 0.0020 / 0.0020 | 4007 → 3327               |
+| Team warm      | 0.0519 / 0.0519 / 0.0519 | 0.0000 / 0.0000 / 0.0000 | 2742 → 2081               |
+
+All fixture values were checked against the live store snapshots. These runs pass the layout
+and settled-card budgets without changing the selected progress or task filters.
+
+### Follow-up functional validation
+
+Production build, lint, typecheck, systems drift check, and eight focused Vitest files
+(123 tests) passed. Coverage includes readiness settlement, failures, the three-second timer,
+mode/locale changes, core reloads, unmount cleanup, and stale filter refreshes, plus existing
+filtering, actions, deep-link, infinite-scroll, and objective visibility regressions.
+
+Real-browser checks passed for paging, collapse/expand, pin/unpin, search/clear, task deep
+links, completion/undo, Hideout/Needed Items scrolling, graph/map routes, and PvP/PvE/Seasonal
+switching. A stalled detail request released the gate after its three-second timer (about
+3.2 seconds including filtering/rendering on the test machine); rejected requests released it
+promptly. Both retained interactive cards. Teammate selection and hide/show were checked with
+a synthetic identity on the offline client; no authenticated network access was involved.
+Desktop/mobile screenshots were inspected. Local CodeRabbit review raised one stale-refresh
+finding, which the generation guard and failing-then-passing regression test address.
