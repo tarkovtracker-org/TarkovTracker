@@ -28,6 +28,22 @@ vi.mock('@/utils/userScopedStorage', async () => {
     getCurrentSupabaseUserId: () => currentUserId.value,
   };
 });
+describe('retired task card density', () => {
+  it.each(['comfortable', 'compact'])(
+    'discards legacy %s density and preserves other preferences',
+    (density) => {
+      const store = usePreferencesStore();
+      store.replacePersistedState({
+        taskCardDensity: density,
+        taskCollapseDefault: true,
+        hideTaskRewards: true,
+      } as Parameters<typeof store.replacePersistedState>[0]);
+      expect(store.$state).not.toHaveProperty('taskCardDensity');
+      expect(store.getTaskCollapseDefault).toBe(true);
+      expect(store.getHideTaskRewards).toBe(true);
+    }
+  );
+});
 describe('usePreferencesStore', () => {
   let pinia: ReturnType<typeof createPinia>;
   const createLocalStorageMock = () => {
@@ -114,7 +130,6 @@ describe('usePreferencesStore', () => {
       expect(store.showExperienceRewards).toBe(true);
       expect(store.showNextQuests).toBe(true);
       expect(store.showPreviousQuests).toBe(true);
-      expect(store.taskCardDensity).toBe('comfortable');
       expect(store.taskCollapseDefault).toBe(false);
       expect(store.hideTaskRewards).toBe(false);
       expect(store.enableManualTaskFail).toBe(false);
@@ -898,10 +913,6 @@ describe('usePreferencesStore', () => {
       const store = usePreferencesStore();
       expect(store.getShowPreviousQuests).toBe(true);
     });
-    it('should return taskCardDensity state with default comfortable', () => {
-      const store = usePreferencesStore();
-      expect(store.getTaskCardDensity).toBe('comfortable');
-    });
     it('should return taskCollapseDefault state with default false', () => {
       const store = usePreferencesStore();
       expect(store.getTaskCollapseDefault).toBe(false);
@@ -1275,11 +1286,6 @@ describe('usePreferencesStore', () => {
       store.setShowPreviousQuests(false);
       expect(store.showPreviousQuests).toBe(false);
     });
-    it('should set task card density', () => {
-      const store = usePreferencesStore();
-      store.setTaskCardDensity('compact');
-      expect(store.taskCardDensity).toBe('compact');
-    });
     it('should set task collapse default', () => {
       const store = usePreferencesStore();
       store.setTaskCollapseDefault(true);
@@ -1538,7 +1544,6 @@ describe('usePreferencesStore', () => {
       expect(preferencesDefaultState.streamerMode).toBe(false);
       expect(preferencesDefaultState.taskTeamHideAll).toBe(false);
       expect(preferencesDefaultState.showNonSpecialTasks).toBe(true);
-      expect(preferencesDefaultState.taskCardDensity).toBe('comfortable');
       expect(preferencesDefaultState.taskCollapseDefault).toBe(false);
       expect(preferencesDefaultState.hideTaskRewards).toBe(false);
     });

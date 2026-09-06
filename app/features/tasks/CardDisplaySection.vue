@@ -50,28 +50,26 @@
           {{ t('page.tasks.settings.appearance.collapse_completed_objectives') }}
         </span>
       </label>
-      <template v-if="isCompact">
-        <label
-          for="task-settings-collapse-default"
-          class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
-        >
-          <UCheckbox id="task-settings-collapse-default" v-model="taskCollapseDefaultModel" />
-          <span class="text-surface-200 text-sm">
-            {{
-              t('page.tasks.settings.appearance.collapse_by_default', 'Collapse Quests by Default')
-            }}
-          </span>
-        </label>
-        <label
-          for="task-settings-hide-rewards"
-          class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
-        >
-          <UCheckbox id="task-settings-hide-rewards" v-model="hideTaskRewardsModel" />
-          <span class="text-surface-200 text-sm">
-            {{ t('page.tasks.settings.appearance.hide_rewards', 'Hide Rewards') }}
-          </span>
-        </label>
-      </template>
+      <label
+        for="task-settings-collapse-default"
+        class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
+      >
+        <UCheckbox id="task-settings-collapse-default" v-model="taskCollapseDefaultModel" />
+        <span class="text-surface-200 text-sm">
+          {{
+            t('page.tasks.settings.appearance.collapse_by_default', 'Collapse Quests by Default')
+          }}
+        </span>
+      </label>
+      <label
+        for="task-settings-hide-rewards"
+        class="hover:bg-surface-700/50 flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 transition-colors"
+      >
+        <UCheckbox id="task-settings-hide-rewards" v-model="hideTaskRewardsModel" />
+        <span class="text-surface-200 text-sm">
+          {{ t('page.tasks.settings.appearance.hide_rewards', 'Hide Rewards') }}
+        </span>
+      </label>
     </div>
   </section>
 </template>
@@ -84,7 +82,6 @@
     hideCompletedTaskObjectives: boolean;
     taskCollapseDefault: boolean;
     hideTaskRewards: boolean;
-    isCompact: boolean;
   }>();
   const emit = defineEmits<{
     'update:showRequiredLabels': [value: boolean];

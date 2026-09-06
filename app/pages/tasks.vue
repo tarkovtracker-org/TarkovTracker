@@ -592,9 +592,8 @@
   const showMapDisplay = computed(() => {
     return getTaskPrimaryView.value === 'maps' && getTaskMapView.value !== 'all';
   });
-  const isCompactTaskCards = computed(() => preferencesStore.getTaskCardDensity === 'compact');
-  const taskCardGapClass = computed(() => (isCompactTaskCards.value ? 'pb-2' : 'pb-4'));
-  const taskSectionGapClass = computed(() => (isCompactTaskCards.value ? 'mb-4' : 'mb-6'));
+  const taskCardGapClass = 'pb-2';
+  const taskSectionGapClass = 'mb-4';
   const showGraphView = computed(() => {
     return getTaskPrimaryView.value === 'graph';
   });

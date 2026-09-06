@@ -21,7 +21,6 @@ const defaultProps = {
   hideCompletedTaskObjectives: true,
   taskCollapseDefault: false,
   hideTaskRewards: false,
-  isCompact: false,
 };
 const createWrapper = (props: Partial<typeof defaultProps> = {}) =>
   mount(CardDisplaySection, {
@@ -34,27 +33,22 @@ const createWrapper = (props: Partial<typeof defaultProps> = {}) =>
     },
   });
 describe('CardDisplaySection', () => {
-  it('hides compact-only options when density is comfortable', () => {
+  it('always shows collapse and reward options', () => {
     const wrapper = createWrapper();
-    expect(wrapper.find('#task-settings-collapse-default').exists()).toBe(false);
-    expect(wrapper.find('#task-settings-hide-rewards').exists()).toBe(false);
-  });
-  it('shows compact-only options when density is compact', () => {
-    const wrapper = createWrapper({ isCompact: true });
     expect(wrapper.find('#task-settings-collapse-default').exists()).toBe(true);
     expect(wrapper.find('#task-settings-hide-rewards').exists()).toBe(true);
     expect(wrapper.text()).toContain('page.tasks.settings.appearance.collapse_by_default');
     expect(wrapper.text()).toContain('page.tasks.settings.appearance.hide_rewards');
   });
   it('associates compact option labels with their checkboxes', () => {
-    const wrapper = createWrapper({ isCompact: true });
+    const wrapper = createWrapper();
     const collapseLabel = wrapper.find('label[for="task-settings-collapse-default"]');
     const rewardsLabel = wrapper.find('label[for="task-settings-hide-rewards"]');
     expect(collapseLabel.exists()).toBe(true);
     expect(rewardsLabel.exists()).toBe(true);
   });
   it('emits updates when compact options are toggled', async () => {
-    const wrapper = createWrapper({ isCompact: true });
+    const wrapper = createWrapper();
     await wrapper.find('#task-settings-collapse-default').trigger('click');
     expect(wrapper.emitted('update:taskCollapseDefault')).toEqual([[true]]);
     await wrapper.find('#task-settings-hide-rewards').trigger('click');

@@ -15,6 +15,7 @@ import type { NeededItemsFilterType } from '@/features/neededitems/neededitems-c
 import type { PreferencesState } from '@/stores/usePreferences';
 export type PersistedPreferencesState = Partial<Omit<PreferencesState, 'saving'>>;
 export type PersistedPreferencesStateWithLegacy = PersistedPreferencesState & {
+  taskCardDensity?: unknown;
   neededItemsHideCollected?: boolean;
   onlyTasksWithSuggestedKeys?: boolean;
 };
@@ -167,6 +168,7 @@ export const sanitizePersistedPreferencesState = (
   const sanitizedState = clonePreferencesSnapshot(
     persistedState
   ) as PersistedPreferencesStateWithLegacy;
+  delete sanitizedState.taskCardDensity;
   const legacyHideCollected = sanitizedState.neededItemsHideCollected;
   if (
     typeof sanitizedState.neededItemsHideOwned !== 'boolean' &&

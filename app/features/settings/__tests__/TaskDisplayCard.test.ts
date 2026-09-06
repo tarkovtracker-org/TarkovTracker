@@ -3,12 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import TaskDisplayCard from '@/features/settings/TaskDisplayCard.vue';
 const { mockState, setters } = vi.hoisted(() => ({
   mockState: {
-    taskCardDensity: 'comfortable' as 'comfortable' | 'compact',
     taskCollapseDefault: false,
     hideTaskRewards: false,
   },
   setters: {
-    setTaskCardDensity: vi.fn(),
     setTaskCollapseDefault: vi.fn(),
     setHideTaskRewards: vi.fn(),
   },
@@ -30,9 +28,6 @@ vi.mock('@/stores/usePreferences', () => ({
     get getTasksRequireTraderLevels() {
       return true;
     },
-    get getTaskCardDensity() {
-      return mockState.taskCardDensity;
-    },
     get getTaskCollapseDefault() {
       return mockState.taskCollapseDefault;
     },
@@ -45,7 +40,6 @@ vi.mock('@/stores/usePreferences', () => ({
     get getHideoutPrimaryView() {
       return 'available';
     },
-    setTaskCardDensity: setters.setTaskCardDensity,
     setTaskCollapseDefault: setters.setTaskCollapseDefault,
     setHideTaskRewards: setters.setHideTaskRewards,
     setShowRequiredLabels: vi.fn(),
@@ -85,22 +79,16 @@ const createWrapper = () =>
   });
 describe('TaskDisplayCard compact options', () => {
   beforeEach(() => {
-    mockState.taskCardDensity = 'comfortable';
     mockState.taskCollapseDefault = false;
     mockState.hideTaskRewards = false;
     vi.clearAllMocks();
   });
-  it('hides compact-only checkboxes in comfortable density', () => {
+  it('removes the density selector while keeping default views', () => {
     const wrapper = createWrapper();
-    expect(
-      wrapper.find('[aria-label="settings.interface.tasks.collapse_by_default"]').exists()
-    ).toBe(false);
-    expect(wrapper.find('[aria-label="settings.interface.tasks.hide_rewards"]').exists()).toBe(
-      false
-    );
+    expect(wrapper.text()).not.toContain('settings.interface.tasks.density');
+    expect(wrapper.findAll('select-menu-fixed-stub')).toHaveLength(2);
   });
-  it('shows compact-only checkboxes in compact density and persists toggles', async () => {
-    mockState.taskCardDensity = 'compact';
+  it('always shows collapse and reward controls and persists toggles', async () => {
     const wrapper = createWrapper();
     const collapseToggle = wrapper.find(
       '[aria-label="settings.interface.tasks.collapse_by_default"]'

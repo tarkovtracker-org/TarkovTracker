@@ -8,7 +8,6 @@ const taskState = reactive({
   failed: false,
 });
 const preferencesState = reactive({
-  density: 'comfortable' as 'comfortable' | 'compact',
   collapseDefault: false,
   hideRewards: false,
   primaryView: 'all',
@@ -72,7 +71,6 @@ vi.mock('@/stores/usePreferences', () => ({
     getPinnedTaskIds: preferencesState.pinnedTaskIds,
     getRespectTaskFiltersForImpact: false,
     getShowRequiredLabels: true,
-    getTaskCardDensity: preferencesState.density,
     getTaskCollapseDefault: preferencesState.collapseDefault,
     getTaskMapView: 'all',
     getTaskPrimaryView: preferencesState.primaryView,
@@ -182,7 +180,6 @@ describe('TaskCard expansion controls', () => {
   beforeEach(() => {
     taskState.complete = false;
     taskState.failed = false;
-    preferencesState.density = 'comfortable';
     preferencesState.collapseDefault = false;
     preferencesState.hideRewards = false;
     preferencesState.primaryView = 'all';
@@ -194,7 +191,6 @@ describe('TaskCard expansion controls', () => {
     vi.clearAllMocks();
   });
   it('renders a dedicated toggle button in compact mode without making the header interactive', async () => {
-    preferencesState.density = 'compact';
     const wrapper = await mountTaskCard();
     const header = wrapper.get('[data-testid="task-card-header"]');
     const toggle = wrapper.get('[aria-label="Collapse task"]');
@@ -204,7 +200,6 @@ describe('TaskCard expansion controls', () => {
     expect(toggle.attributes('aria-controls')).toBe('task-content-task-1');
   });
   it('collapses compact content and expands it again from the dedicated toggle', async () => {
-    preferencesState.density = 'compact';
     const wrapper = await mountTaskCard();
     const toggle = wrapper.get('button[aria-label="Collapse task"]');
     expect(wrapper.find('#task-content-task-1').exists()).toBe(true);
@@ -216,7 +211,6 @@ describe('TaskCard expansion controls', () => {
     expect(wrapper.find('#task-content-task-1').exists()).toBe(true);
   });
   it('starts compact cards collapsed when the preference is enabled', async () => {
-    preferencesState.density = 'compact';
     preferencesState.collapseDefault = true;
     const wrapper = await mountTaskCard();
     expect(wrapper.find('#task-content-task-1').exists()).toBe(false);
@@ -225,7 +219,6 @@ describe('TaskCard expansion controls', () => {
     );
   });
   it('hides rewards only when compact cards are expanded and the preference is enabled', async () => {
-    preferencesState.density = 'compact';
     preferencesState.hideRewards = true;
     const wrapper = await mountTaskCard();
     expect(wrapper.find('[data-testid="task-card-rewards"]').exists()).toBe(false);

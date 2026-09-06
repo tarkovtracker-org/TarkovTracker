@@ -2,21 +2,18 @@ import type { ComputedRef } from '#imports';
 type ComputedRefLike<T> = Readonly<{ value: T }>;
 type TaskCardExpansionInputs = {
   taskId: () => string;
-  isCompact: ComputedRefLike<boolean>;
   onMapView: ComputedRefLike<boolean>;
   collapseByDefault: () => boolean;
   hideTaskRewards: () => boolean;
   routeTaskId: () => string | undefined;
 };
 export type UseTaskCardExpansionReturn = {
-  isCollapsible: ComputedRef<boolean>;
   rewardsHidden: ComputedRef<boolean>;
   taskExpanded: ComputedRef<boolean>;
   toggleTaskVisibility: () => void;
 };
 export function useTaskCardExpansion({
   taskId,
-  isCompact,
   onMapView,
   collapseByDefault,
   hideTaskRewards,
@@ -24,10 +21,9 @@ export function useTaskCardExpansion({
 }: TaskCardExpansionInputs): UseTaskCardExpansionReturn {
   const taskToggle = ref(true);
   const isDeepLinkedTask = computed(() => routeTaskId() === taskId());
-  const isCollapsible = computed(() => onMapView.value || isCompact.value);
-  const rewardsHidden = computed(() => isCompact.value && hideTaskRewards());
+  const rewardsHidden = computed(() => hideTaskRewards());
   watch(
-    () => isCompact.value && !onMapView.value && collapseByDefault(),
+    () => !onMapView.value && collapseByDefault(),
     (collapse) => {
       taskToggle.value = !(collapse && !isDeepLinkedTask.value);
     },
@@ -37,11 +33,10 @@ export function useTaskCardExpansion({
     if (linked) taskToggle.value = true;
   });
   const taskExpanded = computed(() => {
-    return !isCollapsible.value || taskToggle.value;
+    return taskToggle.value;
   });
   const toggleTaskVisibility = () => {
-    if (!isCollapsible.value) return;
     taskToggle.value = !taskToggle.value;
   };
-  return { isCollapsible, rewardsHidden, taskExpanded, toggleTaskVisibility };
+  return { rewardsHidden, taskExpanded, toggleTaskVisibility };
 }

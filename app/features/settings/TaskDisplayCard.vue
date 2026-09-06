@@ -27,18 +27,16 @@
               v-model="showPreviousQuests"
               :label="$t('settings.interface.tasks.show_prev')"
             />
-            <template v-if="isCompactDensity">
-              <UCheckbox
-                v-model="taskCollapseDefault"
-                :label="
-                  $t('settings.interface.tasks.collapse_by_default', 'Collapse Quests by Default')
-                "
-              />
-              <UCheckbox
-                v-model="hideTaskRewards"
-                :label="$t('settings.interface.tasks.hide_rewards', 'Hide Rewards')"
-              />
-            </template>
+            <UCheckbox
+              v-model="taskCollapseDefault"
+              :label="
+                $t('settings.interface.tasks.collapse_by_default', 'Collapse Quests by Default')
+              "
+            />
+            <UCheckbox
+              v-model="hideTaskRewards"
+              :label="$t('settings.interface.tasks.hide_rewards', 'Hide Rewards')"
+            />
           </div>
         </section>
         <USeparator />
@@ -58,18 +56,7 @@
           <p :id="taskViewDefaultsLabelId" class="text-surface-400 text-xs font-semibold uppercase">
             {{ $t('settings.interface.tasks.view_defaults_section', 'Default Views') }}
           </p>
-          <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <div class="space-y-2">
-              <p class="text-surface-200 text-sm font-semibold">
-                {{ $t('settings.interface.tasks.density') }}
-              </p>
-              <SelectMenuFixed
-                v-model="taskCardDensity"
-                :items="densityOptions"
-                value-key="value"
-                label-key="label"
-              />
-            </div>
+          <div class="grid gap-4 md:grid-cols-2">
             <div class="space-y-2">
               <p class="text-surface-200 text-sm font-semibold">
                 {{ $t('common.tasks') }}
@@ -126,11 +113,6 @@
     get: () => preferencesStore.getTasksRequireTraderLevels,
     set: (val) => preferencesStore.setTasksRequireTraderLevels(val),
   });
-  const taskCardDensity = computed({
-    get: () => preferencesStore.getTaskCardDensity,
-    set: (val) => preferencesStore.setTaskCardDensity(val),
-  });
-  const isCompactDensity = computed(() => preferencesStore.getTaskCardDensity === 'compact');
   const taskCollapseDefault = computed({
     get: () => preferencesStore.getTaskCollapseDefault,
     set: (val) => preferencesStore.setTaskCollapseDefault(val),
@@ -139,10 +121,6 @@
     get: () => preferencesStore.getHideTaskRewards,
     set: (val) => preferencesStore.setHideTaskRewards(val),
   });
-  const densityOptions = computed(() => [
-    { label: t('common.compact'), value: 'compact' },
-    { label: t('settings.density.comfortable'), value: 'comfortable' },
-  ]);
   const taskDefaultView = computed({
     get: () => preferencesStore.getTaskPrimaryView,
     set: (val) => preferencesStore.setTaskPrimaryView(val),

@@ -69,7 +69,6 @@
               </template>
             </TaskCardBadges>
             <button
-              v-if="isCollapsible"
               type="button"
               class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 flex h-7 w-7 shrink-0 items-center justify-center rounded transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
               :aria-label="
@@ -299,7 +298,7 @@
             <div
               v-if="objectivesVisible"
               :id="`objectives-content-${task.id}`"
-              :class="[isCompact ? 'space-y-1.5' : 'space-y-3', compactClasses.objectivesBody]"
+              :class="['space-y-1.5', compactClasses.objectivesBody]"
             >
               <QuestObjectivesSkeleton
                 v-if="showObjectivesSkeleton"
@@ -322,7 +321,6 @@
     <template #footer>
       <TaskCardRewards
         v-if="taskExpanded && !rewardsHidden"
-        :is-compact="isCompact"
         :trader-standing-rewards="traderStandingRewards"
         :skill-rewards="skillRewards"
         :trader-unlock-reward="traderUnlockReward"
@@ -701,11 +699,10 @@
     }
     return '';
   });
-  const isCompact = computed(() => preferencesStore.getTaskCardDensity === 'compact');
   const compactClasses = computed(() => ({
-    header: isCompact.value ? 'gap-2 px-3 py-2' : 'gap-3 px-4 py-3',
-    objectivesToggle: isCompact.value ? 'px-3 py-1.5' : 'px-4 py-3',
-    objectivesBody: isCompact.value ? 'px-3 pt-1 pb-2' : 'px-4 py-4',
+    header: 'gap-2 px-3 py-2',
+    objectivesToggle: 'px-3 py-1.5',
+    objectivesBody: 'px-3 pt-1 pb-2',
   }));
   const neededBy = computed(() => props.task.neededBy ?? []);
   const showNeededBy = computed(
@@ -921,16 +918,13 @@
     return 'available';
   });
   const onMapView = computed(() => preferencesStore.getTaskPrimaryView === 'maps');
-  const { isCollapsible, rewardsHidden, taskExpanded, toggleTaskVisibility } = useTaskCardExpansion(
-    {
-      taskId: () => props.task.id,
-      isCompact,
-      onMapView,
-      collapseByDefault: () => preferencesStore.getTaskCollapseDefault,
-      hideTaskRewards: () => preferencesStore.getHideTaskRewards,
-      routeTaskId: () => getQueryString(route.query.task),
-    }
-  );
+  const { rewardsHidden, taskExpanded, toggleTaskVisibility } = useTaskCardExpansion({
+    taskId: () => props.task.id,
+    onMapView,
+    collapseByDefault: () => preferencesStore.getTaskCollapseDefault,
+    hideTaskRewards: () => preferencesStore.getHideTaskRewards,
+    routeTaskId: () => getQueryString(route.query.task),
+  });
   const selectedMapIds = computed(() => {
     return resolveSelectedMapIds(
       preferencesStore.getTaskMapView,

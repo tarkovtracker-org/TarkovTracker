@@ -133,7 +133,6 @@ export interface PreferencesState {
   showExperienceRewards: boolean;
   showNextQuests: boolean;
   showPreviousQuests: boolean;
-  taskCardDensity: 'comfortable' | 'compact';
   taskCollapseDefault: boolean;
   hideTaskRewards: boolean;
   enableManualTaskFail: boolean;
@@ -224,7 +223,6 @@ export const preferencesDefaultState: PreferencesState = {
   showExperienceRewards: true,
   showNextQuests: true,
   showPreviousQuests: true,
-  taskCardDensity: 'comfortable',
   taskCollapseDefault: false,
   hideTaskRewards: false,
   enableManualTaskFail: false,
@@ -599,9 +597,6 @@ export const usePreferencesStore = defineStore('preferences', {
     getShowPreviousQuests: (state) => {
       return state.showPreviousQuests ?? true;
     },
-    getTaskCardDensity: (state) => {
-      return state.taskCardDensity ?? 'comfortable';
-    },
     getTaskCollapseDefault: (state) => {
       return state.taskCollapseDefault ?? false;
     },
@@ -873,9 +868,6 @@ export const usePreferencesStore = defineStore('preferences', {
     setShowPreviousQuests(show: boolean) {
       this.showPreviousQuests = show;
     },
-    setTaskCardDensity(density: 'comfortable' | 'compact') {
-      this.taskCardDensity = density;
-    },
     setTaskCollapseDefault(collapse: boolean) {
       this.taskCollapseDefault = collapse;
     },
@@ -1021,7 +1013,6 @@ export const usePreferencesStore = defineStore('preferences', {
       'showExperienceRewards',
       'showNextQuests',
       'showPreviousQuests',
-      'taskCardDensity',
       'taskCollapseDefault',
       'hideTaskRewards',
       'enableManualTaskFail',

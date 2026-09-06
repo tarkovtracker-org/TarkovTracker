@@ -54,7 +54,6 @@
         :hide-completed-task-objectives="hideCompletedTaskObjectives"
         :task-collapse-default="taskCollapseDefault"
         :hide-task-rewards="hideTaskRewards"
-        :is-compact="isCompactTaskCards"
         @update:show-required-labels="showRequiredLabels = $event"
         @update:show-experience-rewards="showExperienceRewards = $event"
         @update:show-next-quests="showNextQuests = $event"
@@ -231,7 +230,6 @@
     get: () => preferencesStore.getHideTaskRewards,
     set: (value) => preferencesStore.setHideTaskRewards(value),
   });
-  const isCompactTaskCards = computed(() => preferencesStore.getTaskCardDensity === 'compact');
   const showAllFilter = computed({
     get: () => preferencesStore.getShowAllFilter,
     set: (value) => preferencesStore.setShowAllFilter(value),
