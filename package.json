@@ -86,7 +86,7 @@
     "design:lint": "design.md lint DESIGN.md",
     "deps": "taze --r --I",
     "dev": "nuxt dev",
-    "lint:fallow": "fallow audit --base origin/main --gate new-only --quiet",
+    "lint:fallow": "node scripts/fallow-audit.mjs",
     "format": "pnpm run format:prettier && NODE_ENV=development nuxt prepare && eslint app --fix && pnpm run format:blank-lines",
     "format:blank-lines": "node scripts/lint-blank-lines.mjs --fix",
     "format:check": "pnpm run format:check:prettier && pnpm run lint:blank-lines",
