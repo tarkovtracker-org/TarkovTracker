@@ -1,3 +1,10 @@
+## [1.75.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.75.3...v1.75.4) (2026-09-06)
+
+
+### Bug Fixes
+
+* **api:** bound profile reads and localize cache purge errors ([#802](https://github.com/tarkovtracker-org/TarkovTracker/issues/802)) ([0844256](https://github.com/tarkovtracker-org/TarkovTracker/commit/0844256ec4c9baf06e0bf2a5cb3124163afc83ab))
+
 ## [1.75.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.75.2...v1.75.3) (2026-09-06)
 
 
