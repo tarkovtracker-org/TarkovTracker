@@ -122,16 +122,10 @@ Workflow-specific secrets are not required for the Gitleaks step anymore. The wo
 
 ## AI Review Bots
 
-Cubic is the primary automatic reviewer, with Greptile retained as a useful secondary reviewer.
-CodeRabbit remains enabled and skips PRs whose titles contain `Crowdin` via `.coderabbit.yaml`, but
-its frequent rate limits make it best-effort rather than a required review dependency. Kilo Code is
-disabled because its signal was low. CodeAnt is a removal candidate because its AI, quality,
-security, and coverage checks overlap with retained integrations; its locale exclusions live in
-`.codeant/configuration.json` while its activation remains dashboard-controlled. GitHub-managed
-Copilot review and the duplicate CodeQL workflow (`dynamic/github-code-scanning/codeql`) are also
-controlled outside this repository; the checked-in `Security` workflow already runs CodeQL for
-normal code PRs. Socket PR alerts are limited to dependency manifest changes by the root
-`socket.yml`; Snyk and Supabase preview behavior are controlled by their integration settings.
+Codex is the intended primary reviewer, with one best-effort local CodeRabbit pass for substantial
+behavior changes. Existing automatic provider settings remain unchanged until Codex delivery and
+exclusions are verified on representative PRs. See the reviewer transition checklist in
+`docs/WORKFLOW_AUTOMATION.md`; dashboard settings are not proven by checked-in configuration.
 
 ## Commands
 

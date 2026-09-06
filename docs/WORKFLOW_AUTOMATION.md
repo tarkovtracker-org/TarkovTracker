@@ -13,7 +13,37 @@ Complete workflow automation setup for TarkovTracker with CI/CD pipelines, quali
 - Pre-commit hooks for code quality
 - Dependency update automation via Dependabot
 - Conservative auto-merge for low-risk Dependabot updates
-- AI review integrations are configured in their GitHub App dashboards. Cubic is currently the most consistent automatic reviewer; Greptile is a useful secondary reviewer. CodeRabbit remains useful when available but is frequently rate-limited. Kilo Code is disabled because its signal was low.
+- Codex is the intended primary PR reviewer. GitHub App delivery and exclusions must be verified before disabling existing automatic providers; dashboard state is not inferred from repository configuration.
+
+## Agent validation and review
+
+`package.json` defines commands; `AGENTS.md` defines required validation and review.
+`code_review.md` supplements that contract with risk areas, without requiring the full suite for
+unrelated changes. Worktree setup and the shared CI setup action use `scripts/ensure-pnpm.sh` to
+verify pnpm against `packageManager`, activating its complete integrity-qualified pin when needed.
+
+Run focused checks while implementing, then required checks after the diff stabilizes. Record the
+commit, dirty worktree state, commands, and results in the PR summary. Invalidate affected results
+when their inputs change. Batch substantiated corrections; defer unrelated cleanup.
+
+Documentation, translation, and mechanical formatting changes need deterministic checks and
+self-review. Routine executable changes also receive Codex PR review. Substantial behavior changes
+(public contracts, persisted state, cross-module behavior, auth, billing, migrations, concurrency)
+also receive one best-effort local CodeRabbit review of the complete branch diff after it stabilizes.
+Auth, billing, migration, and concurrency changes require independent review; another provider or
+human substitutes if needed. Record missing/rate-limited review as incomplete without retry loops.
+Only substantial behavioral corrections or unresolved significant findings warrant a local rerun.
+
+### Reviewer transition: external verification pending
+
+1. Verify Codex delivers a review on a representative application PR.
+2. Verify a translation-only PR consumes no automatic review, and a mixed translation/code PR is
+   still reviewed. Use selective review requests until exclusions are demonstrated.
+3. After delivery is established, disable duplicate automatic CodeRabbit, Cubic, and Greptile
+   reviews in their repository/dashboard settings; retain manual access. Record the PR links and
+   observed settings here. Existing settings remain unchanged until that evidence exists.
+4. Check an existing-review revision and unavailable/quota-exhausted behavior: preserve completed
+   review evidence by revision and never report an unavailable review as successful.
 
 ## GitHub Actions Workflows
 

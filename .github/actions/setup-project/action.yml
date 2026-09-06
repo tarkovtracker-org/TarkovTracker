@@ -1,0 +1,19 @@
+name: Setup project
+description: Activate the pinned runtime and pnpm, cache packages, and install the frozen workspace.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      with:
+        node-version-file: .nvmrc
+    - name: Activate packageManager
+      shell: bash
+      run: bash scripts/ensure-pnpm.sh
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      with:
+        node-version-file: .nvmrc
+        cache: pnpm
+        cache-dependency-path: pnpm-lock.yaml
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile
