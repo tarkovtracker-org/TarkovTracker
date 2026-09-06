@@ -68,14 +68,16 @@ test('empty classifier output produces the missing-plan diagnostic and fails CI'
 test('CI job-level full gates match the classifier manifest', () => {
   const jobs = [
     ...read('.github/workflows/ci.yml').matchAll(
-      /^  ([a-z-]+):\n([\s\S]*?)(?=^  [a-z-]+:|$(?![\s\S]))/gm
+      /^ {2}([a-z-]+):\n([\s\S]*?)(?=^ {2}[a-z-]+:|$(?![\s\S]))/gm
     ),
   ];
   const gated = jobs
-    .filter((match) => /^    if: needs.changes.outputs.full == 'true'$/m.test(match[2]))
+    .filter((match) => /^ {4}if: needs.changes.outputs.full == 'true'$/m.test(match[2]))
     .map((match) => match[1]);
   const reduced = classifyPaths(['README.md']).jobs;
-  assert.deepEqual(gated.sort(), fullJobs.filter((job) => !reduced.includes(job)).sort());
+  const alphabetical = (left, right) => left.localeCompare(right);
+  const expected = fullJobs.filter((job) => !reduced.includes(job)).toSorted(alphabetical);
+  assert.deepEqual(gated.toSorted(alphabetical), expected);
   for (const job of fullJobs)
     assert.ok(
       jobs.some((match) => match[1] === job),
