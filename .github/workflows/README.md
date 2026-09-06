@@ -67,8 +67,12 @@ workflow files, or `app/locales/en.json` still run the normal checks.
 
 ### Release (`release.yml`)
 
-**Trigger:** Push to main (excluding `**.md`, `docs/**`)
-**Jobs:** `Release` (build + semantic-release)
+**Trigger:** Successful completion of `CI` for a same-repository push to `main`.
+**Jobs:** `Release` (validate the CI run and current main SHA, build, recheck, semantic-release).
+The workflow reuses CI's test shards and database checks. It rejects stale commits and CI attempts,
+PR/fork events, and automation-skip directives before publishing. Documentation-only pushes can
+reach the gate; conventional commits determine whether a version is warranted. Publication is
+serialized without cancelling an active release. See `docs/WORKFLOW_AUTOMATION.md` for details.
 
 ### PR Checks (`pr-checks.yml`)
 
@@ -112,7 +116,9 @@ introduce a new pinned SHA.
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | PR            | ~15 (Fallow audit, Lint & Format, Type Check, Test ×4 shards, Validate, Supabase DB, Systems drift check, Workers, PR Meta, Security Scan, CodeQL, Lighthouse\*) |
 | Dependabot PR | ~16 (standard PR checks plus Dependabot Auto Merge when allowlisted)                                                                                             |
-| Main push     | ~14 (Fallow audit, Lint & Format, Type Check, Test ×4 shards, Validate, Supabase DB, Systems drift check, Workers, Security Scan, CodeQL, Release)               |
+| Main push     | ~13 (Fallow audit, Lint & Format, Type Check, Test ×4 shards, Validate, Supabase DB, Systems drift check, Workers, Security Scan, CodeQL)                        |
+
+Successful main CI completion separately triggers the gated `Release` workflow.
 
 \*Lighthouse runs only when the PR touches UI paths or already carries `performance`/`ui`
 
