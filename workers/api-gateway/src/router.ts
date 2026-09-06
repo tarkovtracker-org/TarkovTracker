@@ -43,7 +43,9 @@ function normalizePath(pathname: string): string {
   return '/' + pathname.split('/').filter(Boolean).join('/');
 }
 function stripApiPrefix(path: string, prefixes: readonly string[]): string | null {
-  const prefix = prefixes.find((candidate) => path === candidate || path.startsWith(candidate + '/'));
+  const prefix = prefixes.find(
+    (candidate) => path === candidate || path.startsWith(candidate + '/')
+  );
   return prefix ? path.slice(prefix.length) || '/' : null;
 }
 function resolveApiPath(path: string, isApiHost: boolean): string | null {
@@ -76,11 +78,7 @@ function robotsResponse(origin?: string, reqOrigin?: string): Response {
     },
   });
 }
-function apiHostPublicResponse(
-  path: string,
-  origin?: string,
-  reqOrigin?: string
-): Response | null {
+function apiHostPublicResponse(path: string, origin?: string, reqOrigin?: string): Response | null {
   if (path === '/' || path === '/docs') return docsResponse(origin, reqOrigin);
   if (path === '/openapi.json') return openApiResponse(origin, reqOrigin);
   return path === '/robots.txt' ? robotsResponse(origin, reqOrigin) : null;
@@ -161,18 +159,25 @@ function normalizeTaskUpdates(body: unknown): BatchTaskUpdate[] | null {
   if (!body || typeof body !== 'object') return null;
   return normalizeBatchObject(body as Record<string, unknown>);
 }
+function formatInvalidState(state: unknown): string {
+  if (typeof state === 'string') return state;
+  if (state === null || state === undefined) return '';
+  if (typeof state === 'number' || typeof state === 'boolean') return String(state);
+  // JSON objects can shadow toString; never invoke their coercion hooks for an error message.
+  return Array.isArray(state) ? '[array]' : '[object]';
+}
 function objectiveStateError(state: unknown): string | null {
-  if (state === undefined || (typeof state === 'string' && ['completed', 'uncompleted'].includes(state))) {
+  if (
+    state === undefined ||
+    (typeof state === 'string' && ['completed', 'uncompleted'].includes(state))
+  ) {
     return null;
   }
-  const value = typeof state === 'string' ? state : String(state ?? '');
+  const value = formatInvalidState(state);
   return 'Invalid state "' + value + '" (must be completed or uncompleted)';
 }
 function objectiveCountError(count: unknown): string | null {
-  if (
-    count === undefined ||
-    (typeof count === 'number' && Number.isFinite(count) && count >= 0)
-  ) {
+  if (count === undefined || (typeof count === 'number' && Number.isFinite(count) && count >= 0)) {
     return null;
   }
   return 'Invalid count (must be a non-negative number)';
@@ -310,7 +315,7 @@ async function routeTask(context: RouteContext): Promise<Response | null> {
   );
   if (body instanceof Response) return body;
   if (!isTaskState(body.state)) {
-    const value = typeof body.state === 'string' ? body.state : String(body.state ?? '');
+    const value = formatInvalidState(body.state);
     return errorResponse(
       'Invalid state "' + value + '" (must be completed, uncompleted, or failed)',
       400,
@@ -392,7 +397,8 @@ export async function handleGatewayRequest(
   const response = publicResponse(request, path, isApiHost, origin, reqOrigin);
   if (response) return response;
   const apiPath = resolveApiPath(path, isApiHost);
-  if (!apiPath) return new Response('Not Found', { status: 404, headers: corsHeaders(origin, reqOrigin) });
+  if (!apiPath)
+    return new Response('Not Found', { status: 404, headers: corsHeaders(origin, reqOrigin) });
   const inboundUserAgent = normalizeInboundUserAgent(request.headers.get('User-Agent'));
   if (!inboundUserAgent || inboundUserAgent.length < INBOUND_USER_AGENT_MIN_LENGTH) {
     return errorResponse(

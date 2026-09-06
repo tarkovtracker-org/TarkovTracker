@@ -572,6 +572,9 @@ sequenceDiagram
   throttle in `api_usage_daily`.
 - The daily quota counts admitted requests, not successful responses. A Supabase 500 after
   admission consumes one slot — no refund system exists or is needed.
+- Invalid task/objective states return 400 with rate-limit headers after authentication and quota
+  checks. Error messages preserve scalar values but label arrays and objects without invoking
+  client-controlled string coercion, which could otherwise turn malformed input into a 500.
 - Progress reads select one exact `(user_id, game_mode, season_number)` row and account metadata;
   they never read another mode's progress or use `select=*`.
 - Read responses derive the `ETag` from the serialized payload (not `updated_at`), so a `304` can
