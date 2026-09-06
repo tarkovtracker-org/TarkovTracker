@@ -59,7 +59,7 @@ jobs:
           fi
           echo "base=$BASE" >> "$GITHUB_OUTPUT"
       - name: Audit changed files
-        run: pnpm exec fallow audit --base "${{ steps.fallow-base.outputs.base }}" --gate new-only --quiet
+        run: pnpm run lint:fallow --base "${{ steps.fallow-base.outputs.base }}"
   lint-format:
     name: Lint & Format
     runs-on: ubuntu-latest

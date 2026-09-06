@@ -30,6 +30,29 @@ Runs on every push and PR:
 
 **Triggers:** Push to `main`, `develop`, `wip/**` branches and all PRs
 
+#### Fallow changed-file gate
+
+Run `pnpm run lint:fallow` locally; CI uses the same command with `--base <event-base-sha>`.
+The default base is `origin/main`. The command resolves the merge base with the current HEAD,
+includes staged, unstaged, and non-ignored untracked files, and keeps Fallow's native
+`--gate new-only` behavior and configured severities. New error findings fail; inherited findings
+and warning-only findings do not. No persistent finding baseline is maintained.
+
+`scripts/fallow-audit.mjs` creates a temporary local clone and two analysis commits. Both contain
+a physical copy of the current generated `.nuxt` context; the second contains the current source
+tree. This prevents Fallow's internal base snapshot from symlinking the generated tsconfig and
+resolving its relative `@/` aliases against the wrong directory. Dependencies are linked from the
+installed checkout. Neither the source index, source files, branches, nor Git worktree registrations
+are modified, and the temporary clone is removed after success or failure. Run `pnpm install`
+first, as usual, to prepare dependencies and Nuxt types.
+
+Use `--format json` for structured findings. Each run uses fresh analysis without reusable caches.
+The report's Git IDs belong to the temporary analysis commits; the original source base and HEAD
+are printed on stderr. Invalid refs and setup/analyzer failures exit nonzero instead of skipping the gate.
+
+Regression checks live in `scripts/fallow-audit.test.mjs` and run with the regular test suite or
+`pnpm exec vitest run scripts/fallow-audit.test.mjs`.
+
 ### 2. Security Scanning (`.github/workflows/security.yml`)
 
 Weekly security audits:

@@ -31,6 +31,10 @@ Test: `pnpm run test` | API gateway: `pnpm run test:api-gateway` | Supabase: `pn
 
 Lint: `pnpm run lint` | Blank lines: `pnpm run lint:blank-lines` | Typecheck: `pnpm run typecheck`
 
+Fallow: `pnpm run lint:fallow` (optional `--base <ref>` and `--format json`). Use this command
+locally and in CI so generated Nuxt context is materialized consistently in both audit snapshots.
+It preserves Fallow's native new-only gate; see `docs/WORKFLOW_AUTOMATION.md`.
+
 i18n: `pnpm run i18n:check` | OpenAPI: `pnpm run validate:openapi` | Dependencies: `pnpm run deps`
 
 Use the single-file Vitest command from `package.json` for focused tests. Do not run the full suite
