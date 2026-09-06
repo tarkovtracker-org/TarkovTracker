@@ -1,3 +1,10 @@
+# [1.76.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.75.4...v1.76.0) (2026-09-06)
+
+
+### Features
+
+* **tasks:** use compact cards with optional collapse and hidden rewards ([#781](https://github.com/tarkovtracker-org/TarkovTracker/issues/781)) ([63b0926](https://github.com/tarkovtracker-org/TarkovTracker/commit/63b09261aab6d50c846c01536ec02dae80899a0e))
+
 ## [1.75.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.75.3...v1.75.4) (2026-09-06)
 
 
