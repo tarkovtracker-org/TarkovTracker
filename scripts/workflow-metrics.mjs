@@ -25,7 +25,7 @@ if (
   options.count < 1 ||
   options.count > 100 ||
   !Number.isFinite(Date.parse(options.before)) ||
-  (options.after && !Number.isFinite(Date.parse(options.after)))
+  (Object.hasOwn(options, 'after') && !Number.isFinite(Date.parse(options.after)))
 )
   throw new Error('Invalid metrics options');
 const api = async (path) =>

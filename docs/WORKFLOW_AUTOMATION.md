@@ -549,7 +549,7 @@ pnpm run lint:fix
 - Keep PRs focused (prefer size/S or size/M)
 - Update tests for new features
 - Run format/lint before pushing
-- Wait for CI before requesting review
+- Start local review alongside relevant checks after the diff stabilizes; request PR review selectively under the root review policy
 
 ### Dependencies
 

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 const read = (path) => readFileSync(path, 'utf8');
 test('Dependabot expected check names remain supplied by repository workflows', () => {
   const gate = read('.github/workflows/dependabot-auto-merge.yml');
@@ -32,4 +33,12 @@ test('shadow rollout and fork restrictions retain existing CI coverage and Deno 
   assert.match(ci, /ci-result:[\s\S]*if: always\(\)/);
   for (const name of ['ci', 'pr-checks', 'security'])
     assert.ok(!read(`.github/workflows/${name}.yml`).includes('paths-ignore:'));
+});
+test('metrics rejects an explicitly empty follow-up boundary before contacting GitHub', () => {
+  const result = spawnSync(process.execPath, ['scripts/workflow-metrics.mjs', '--after', ''], {
+    encoding: 'utf8',
+    env: { ...process.env, PATH: '' },
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Invalid metrics options/);
 });
