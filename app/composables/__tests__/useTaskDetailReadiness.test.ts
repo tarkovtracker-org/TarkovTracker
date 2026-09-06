@@ -13,15 +13,16 @@ const metadata = reactive({
   getApiGameMode: () => metadata.mode,
   fetchTaskObjectivesData: vi.fn<() => Promise<void>>(),
   fetchTaskRewardsData: vi.fn<() => Promise<void>>(),
+  fetchItemsLiteData: vi.fn<() => Promise<void>>(),
   fetchEditionsData: vi.fn<() => Promise<void>>(),
-  fetchObjectiveModeCountDifferences: vi.fn<() => Promise<void>>(),
+  fetchObjectiveModeCountDifferences: vi.fn<() => Promise<'stale' | undefined>>(),
 });
 vi.mock('@/stores/useMetadata', () => ({ useMetadataStore: () => metadata }));
 const deferred = () => {
   let resolve!: () => void;
   let reject!: (error: Error) => void;
-  const promise = new Promise<void>((done, fail) => {
-    resolve = done;
+  const promise = new Promise<undefined>((done, fail) => {
+    resolve = () => done(undefined);
     reject = fail;
   });
   return { promise, resolve, reject };
@@ -46,8 +47,9 @@ describe('useTaskDetailReadiness', () => {
     metadata.objectiveModeCountDifferencesHydrated = true;
     metadata.fetchTaskObjectivesData.mockReset().mockResolvedValue();
     metadata.fetchTaskRewardsData.mockReset().mockResolvedValue();
+    metadata.fetchItemsLiteData.mockReset().mockResolvedValue();
     metadata.fetchEditionsData.mockReset().mockResolvedValue();
-    metadata.fetchObjectiveModeCountDifferences.mockReset().mockResolvedValue();
+    metadata.fetchObjectiveModeCountDifferences.mockReset().mockResolvedValue(undefined);
   });
   afterEach(() => {
     scope.stop();
@@ -69,6 +71,23 @@ describe('useTaskDetailReadiness', () => {
     await flush();
     expect(ready.value).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
+  });
+  it('waits for item-lite hydration before revealing localized cards', async () => {
+    const items = deferred();
+    metadata.fetchItemsLiteData.mockReturnValue(items.promise);
+    const ready = start();
+    await flush();
+    expect(ready.value).toBe(false);
+    items.resolve();
+    await flush();
+    expect(ready.value).toBe(true);
+  });
+  it('does not retry handled objective count failures', async () => {
+    metadata.objectiveModeCountDifferencesHydrated = false;
+    const ready = start();
+    await flush();
+    expect(ready.value).toBe(true);
+    expect(metadata.fetchObjectiveModeCountDifferences).toHaveBeenCalledTimes(1);
   });
   it('waits for core metadata before requesting details', async () => {
     metadata.hasInitialized = false;
@@ -136,7 +155,7 @@ describe('useTaskDetailReadiness', () => {
     metadata.objectiveModeCountDifferencesHydrated = false;
     const replacement = deferred();
     metadata.fetchObjectiveModeCountDifferences
-      .mockResolvedValueOnce()
+      .mockResolvedValueOnce('stale')
       .mockReturnValueOnce(replacement.promise);
     const ready = start();
     await flush();

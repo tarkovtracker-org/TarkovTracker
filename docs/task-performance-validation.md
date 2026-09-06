@@ -278,7 +278,8 @@ revalidation and count metadata. Edition promise/loading cleanup is identity-gua
 older request cannot clear the current request's tracking. Empty-to-populated core recovery is
 covered as well. The three-second availability timer still bounds all optional waits.
 
-The corrected production build was measured again on September 6 using the same response
+The corrected production build at `98991762f91d0b46e1998f264eeb4ac0a51e0a22` was measured
+again on September 6 using the same response
 replay, viewports, throttling, and three independent profiles per scenario. These are separate
 from the initial implementation samples above. All runs displayed eight initial cards and no
 transient empty state.
@@ -311,3 +312,28 @@ actions in the production browser also verified cached core replacement, empty-c
 edition revalidation, and count metadata: cards stayed hidden until settlement, then eight
 appeared. Stalled requests released usable cards about 3.2 seconds after core readiness;
 rejections released them promptly. No uncaught browser exceptions were observed.
+
+### Final review edge cases
+
+Subsequent review added item-lite hydration to the readiness wait and connected deep-link
+handling to the combined page loading state. Count metadata now explicitly returns `stale`
+when discarded, so the single retry does not repeat handled network failures. Obsolete edition
+cache reads, responses, and errors are ignored before they can change eligibility or cached
+payloads. Request registration precedes execution, including synchronous network failures.
+
+The final corrections passed 12 focused Vitest files (158 tests), lint, typecheck, and Fallow.
+Regression tests reproduced the item wait, premature deep-link handling, failure retry, and
+obsolete edition response/error problems before their fixes. Reverse-order response tests also
+verify that newer edition state and its cache write survive an older request's completion.
+
+The final production browser checks also passed, including a deep link activated during a
+1.5-second cached-detail delay. All task/shared-route controls were repeated. Three fresh
+mobile profiles recorded cold shift sums **0.0020 / 0.0020 / 0.0020** and warm sums **0 / 0 / 0**;
+complete cards appeared at **3250 / 3210 / 3058 ms** cold and **1966 / 1998 / 1902 ms** warm.
+A final team cold/warm smoke repeat also retained eight cards and shift sums of **0.0020 / 0**.
+The broader desktop/persisted/team comparison remains the explicitly identified revision above.
+
+Final extended Lighthouse runs were score **0.40 / 0.42 / 0.41**, TBT **1009 / 910 / 946 ms**,
+CLS **0.0020 / 0.0020 / 0.0020**, FCP **5043 / 5043 / 5045 ms**, and LCP
+**23357 / 23281 / 23360 ms**. Median TBT is about 12% below main; the layout and timing budgets
+still pass. The reported LCP tradeoff remains and is not described as an improvement.

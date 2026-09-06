@@ -71,12 +71,76 @@ describe('useMetadataStore fetchEditionsData', () => {
       vi.fn().mockReturnValueOnce(older.promise).mockReturnValueOnce(current.promise)
     );
     const first = store.fetchEditionsData(true);
+    await flushPromises();
     const second = store.fetchEditionsData(true);
     older.resolve({});
     await first;
     expect(store.editionsLoading).toBe(true);
     current.resolve({});
     await second;
+    expect(store.editionsLoading).toBe(false);
+  });
+  it.each(['resolve', 'reject'] as const)(
+    'ignores obsolete forced responses (%s)',
+    async (outcome) => {
+      const store = useMetadataStore();
+      const older = createDeferred<object>();
+      const current = createDeferred<object>();
+      const latestEdition = createEdition('latest', 3, 'Latest');
+      const latestChapter = createStoryChapter('latest-chapter', 3, 'Latest Chapter');
+      const cacheWrite = vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+      vi.stubGlobal(
+        '$fetch',
+        vi.fn().mockReturnValueOnce(older.promise).mockReturnValueOnce(current.promise)
+      );
+      const first = store.fetchEditionsData(true);
+      await flushPromises();
+      const second = store.fetchEditionsData(true);
+      current.resolve({
+        editions: { latest: latestEdition },
+        storyChapters: { latest: latestChapter },
+      });
+      await second;
+      if (outcome === 'resolve') older.resolve({ editions: {}, storyChapters: {} });
+      else older.reject(new Error('obsolete failure'));
+      await first;
+      expect(store.editions).toEqual([latestEdition]);
+      expect(store.storyChapters).toEqual([latestChapter]);
+      expect(store.editionsError).toBeNull();
+      expect(store.editionsLoading).toBe(false);
+      expect(cacheWrite).toHaveBeenCalledTimes(1);
+    }
+  );
+  it('ignores a cache read superseded by a forced refresh', async () => {
+    const store = useMetadataStore();
+    const cache = createDeferred<{ editions: GameEdition[]; storyChapters: StoryChapter[] }>();
+    const latest = createEdition('latest', 3, 'Latest');
+    vi.spyOn(cacheUtils, 'getCachedData').mockReturnValue(cache.promise);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    const fetchMock = vi.fn().mockResolvedValue({ editions: { latest } });
+    vi.stubGlobal('$fetch', fetchMock);
+    const older = store.fetchEditionsData();
+    await flushPromises();
+    await store.fetchEditionsData(true);
+    cache.resolve({
+      editions: [createEdition('old', 1, 'Old')],
+      storyChapters: [createStoryChapter('old', 1, 'Old')],
+    });
+    await older;
+    expect(store.editions).toEqual([latest]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('records synchronous network failures after request registration', async () => {
+    const store = useMetadataStore();
+    const error = new Error('synchronous failure');
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn(() => {
+        throw error;
+      })
+    );
+    await store.fetchEditionsData(true);
+    expect(store.editionsError).toBe(error);
     expect(store.editionsLoading).toBe(false);
   });
   it('reuses the in-flight background editions revalidation while serving cached data', async () => {

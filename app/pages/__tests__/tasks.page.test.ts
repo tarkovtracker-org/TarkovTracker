@@ -78,6 +78,7 @@ const metadataStoreMock = reactive({
   getApiGameMode: () => 'regular',
   fetchTaskObjectivesData: vi.fn(() => Promise.resolve()),
   fetchTaskRewardsData: vi.fn(() => Promise.resolve()),
+  fetchItemsLiteData: vi.fn(() => Promise.resolve()),
   fetchEditionsData: vi.fn(() => Promise.resolve()),
   fetchObjectiveModeCountDifferences: vi.fn(() => Promise.resolve()),
   mapsWithSvg: [] as Array<{ id: string; name: string }>,
@@ -384,31 +385,50 @@ describe('tasks page', () => {
   afterEach(() => {
     wrapper?.unmount();
   });
-  it.each(['fetchTaskObjectivesData', 'fetchTaskRewardsData', 'fetchEditionsData'] as const)(
-    'filters merged details before revealing the first cards (%s)',
-    async (action) => {
-      wrapper.unmount();
-      updateVisibleTasksMock.mockClear();
-      let finishRewards: () => void = () => {};
-      metadataStoreMock[action].mockImplementationOnce(
-        () =>
-          new Promise<void>((resolve) => {
-            finishRewards = resolve;
-          })
-      );
-      wrapper = await mountSuspended(TasksPage, {
-        global: { stubs: defaultGlobalStubs },
-      });
-      await flushPromises();
-      expect(metadataStoreMock[action]).toHaveBeenCalled();
-      expect(wrapper.find('task-loading-state-stub').exists()).toBe(true);
-      expect(wrapper.find('[data-testid="task-card"]').exists()).toBe(false);
-      expect(updateVisibleTasksMock).not.toHaveBeenCalled();
-      finishRewards();
-      await vi.waitFor(() => expect(wrapper.find('[data-testid="task-card"]').exists()).toBe(true));
-      expect(updateVisibleTasksMock).toHaveBeenCalled();
-    }
-  );
+  it('defers deep links until cached detail readiness clears with unchanged task IDs', async () => {
+    let release!: () => void;
+    metadataStoreMock.fetchTaskRewardsData.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        })
+    );
+    metadataStoreMock.tasksCoreRevision += 1;
+    await nextTick();
+    handleTaskQueryParamMock.mockClear();
+    await wrapper.vm.$router.replace({ query: { task: defaultTask.id } });
+    await nextTick();
+    expect(handleTaskQueryParamMock).not.toHaveBeenCalled();
+    release();
+    await vi.waitFor(() => expect(handleTaskQueryParamMock).toHaveBeenCalled());
+  });
+  it.each([
+    'fetchTaskObjectivesData',
+    'fetchTaskRewardsData',
+    'fetchEditionsData',
+    'fetchItemsLiteData',
+  ] as const)('filters merged details before revealing the first cards (%s)', async (action) => {
+    wrapper.unmount();
+    updateVisibleTasksMock.mockClear();
+    let finishRewards: () => void = () => {};
+    metadataStoreMock[action].mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishRewards = resolve;
+        })
+    );
+    wrapper = await mountSuspended(TasksPage, {
+      global: { stubs: defaultGlobalStubs },
+    });
+    await flushPromises();
+    expect(metadataStoreMock[action]).toHaveBeenCalled();
+    expect(wrapper.find('task-loading-state-stub').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="task-card"]').exists()).toBe(false);
+    expect(updateVisibleTasksMock).not.toHaveBeenCalled();
+    finishRewards();
+    await vi.waitFor(() => expect(wrapper.find('[data-testid="task-card"]').exists()).toBe(true));
+    expect(updateVisibleTasksMock).toHaveBeenCalled();
+  });
   it.each([true, false])(
     'keeps the loading state until the initial filter refresh finishes (has tasks: %s)',
     async (hasTasks) => {

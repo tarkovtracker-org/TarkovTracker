@@ -1106,7 +1106,7 @@
     selectedMapData,
     showMapDisplay,
     stopResize,
-    tasksLoading,
+    tasksLoading: isLoading,
     visibleTaskCount,
   });
   onBeforeUnmount(() => {

@@ -40,9 +40,9 @@ export const useTaskDetailReadiness = () => {
         stopEditionsWatch();
       });
       const settleCountDifferences = async () => {
-        await metadataStore.fetchObjectiveModeCountDifferences();
+        const result = await metadataStore.fetchObjectiveModeCountDifferences();
         // A joined request may be discarded when reward/item hydration replaces tasks.
-        if (active && !metadataStore.objectiveModeCountDifferencesHydrated) {
+        if (active && result === 'stale') {
           await metadataStore.fetchObjectiveModeCountDifferences();
         }
       };
@@ -50,6 +50,7 @@ export const useTaskDetailReadiness = () => {
       void Promise.allSettled([
         metadataStore.fetchTaskObjectivesData(),
         metadataStore.fetchTaskRewardsData(),
+        metadataStore.fetchItemsLiteData(),
         metadataStore.fetchEditionsData(),
       ]).then(async () => {
         if (active) await Promise.allSettled([settleCountDifferences()]);

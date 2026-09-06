@@ -5,7 +5,7 @@ export interface PromiseStore {
   readonly itemsFullPromise: Promise<void> | null;
   readonly itemsLitePromise: Promise<void> | null;
   readonly mapSpawnsPromise: Promise<void> | null;
-  readonly objectiveModeCountDifferencesPromise: Promise<void> | null;
+  readonly objectiveModeCountDifferencesPromise: Promise<'stale' | undefined> | null;
   readonly taskObjectivesPromise: Promise<void> | null;
   readonly taskRewardsPromise: Promise<void> | null;
   readonly prestigePromise: Promise<void> | null;

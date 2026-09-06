@@ -1083,7 +1083,7 @@ export const useMetadataStore = defineStore('metadata', {
             this.languageCode !== requestLanguageCode ||
             this.tasks !== requestTasks
           ) {
-            return;
+            return 'stale' as const;
           }
           const otherModeTasks = (response.data.tasks || []).map((task) => ({
             id: task.id,
@@ -1116,7 +1116,7 @@ export const useMetadataStore = defineStore('metadata', {
             this.languageCode !== requestLanguageCode ||
             this.tasks !== requestTasks
           ) {
-            return;
+            return 'stale' as const;
           }
           this.objectiveModeCountDifferences = markRaw(differences);
           this.objectiveModeCountDifferencesHydrated = true;
@@ -1126,7 +1126,7 @@ export const useMetadataStore = defineStore('metadata', {
             this.languageCode !== requestLanguageCode ||
             this.tasks !== requestTasks
           ) {
-            return;
+            return 'stale' as const;
           }
           this.objectiveModeCountDifferences = markRaw({});
           this.objectiveModeCountDifferencesHydrated = false;
@@ -1135,7 +1135,7 @@ export const useMetadataStore = defineStore('metadata', {
       })();
       promiseStore.objectiveModeCountDifferencesPromise = promise;
       try {
-        await promise;
+        return await promise;
       } finally {
         promiseStore.objectiveModeCountDifferencesPromise = null;
       }
@@ -1363,7 +1363,8 @@ export const useMetadataStore = defineStore('metadata', {
       if (existingPromise && !forceRefresh) {
         return existingPromise;
       }
-      const promise = (async () => {
+      // Register the promise before requests can settle or throw synchronously.
+      const promise = Promise.resolve().then(async () => {
         this.editionsError = null;
         const existingEditions = this.editions;
         const existingStoryChapters = this.storyChapters;
@@ -1373,6 +1374,7 @@ export const useMetadataStore = defineStore('metadata', {
               editions: GameEdition[];
               storyChapters?: StoryChapter[];
             }>('editions' as CacheType, 'all', 'en');
+            if (promiseStore.editionsPromise !== promise) return;
             if (cached?.editions) {
               this.editions = markRaw(cached.editions);
             }
@@ -1391,6 +1393,7 @@ export const useMetadataStore = defineStore('metadata', {
             logger.warn('[MetadataStore] Editions cache read failed:', cacheErr);
           }
         }
+        if (promiseStore.editionsPromise !== promise) return;
         this.editionsLoading = true;
         try {
           const OVERLAY_URL =
@@ -1401,6 +1404,7 @@ export const useMetadataStore = defineStore('metadata', {
           }>(OVERLAY_URL, {
             parseResponse: JSON.parse,
           });
+          if (promiseStore.editionsPromise !== promise) return;
           if (overlay?.editions) {
             this.editions = markRaw(Object.values(overlay.editions));
           } else {
@@ -1426,6 +1430,7 @@ export const useMetadataStore = defineStore('metadata', {
             ).catch((err) => logger.error('[MetadataStore] Error caching editions:', err));
           }
         } catch (err) {
+          if (promiseStore.editionsPromise !== promise) return;
           logger.error('[MetadataStore] Error fetching editions data:', err);
           this.editionsError = err as Error;
           if (!this.editions.length && existingEditions.length) {
@@ -1438,7 +1443,7 @@ export const useMetadataStore = defineStore('metadata', {
             this.editions = markRaw([]);
           }
         }
-      })();
+      });
       promiseStore.editionsPromise = promise;
       try {
         await promise;

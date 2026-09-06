@@ -1260,19 +1260,21 @@ detached tree; its zero bounding rectangle must not trigger auto-fill. Hidden or
 sentinels consume no auto-load budget. The existing intersection observer checks again when
 the list becomes visible; configured scroll fallback and explicit checks use the same guard.
 
-The tasks page requests objectives, rewards, and edition eligibility together through the
-existing cached/deduplicated store actions (`useTaskDetailReadiness`). Keep its loading state
+The tasks page requests objectives, rewards, item-lite hydration, and edition eligibility through the
+readiness composable `useTaskDetailReadiness`, which invokes the existing cached/deduplicated
+metadata store actions. Keep its loading state
 until these requests, background edition revalidation, objective mode-count metadata, and the
 first visible-task refresh settle. This prevents objective
 skeleton/reward reflow and an initial list filtered without edition eligibility. This eager
 request is scoped to the tasks page; other routes retain the store's idle scheduling. Edition
-request cleanup clears loading and deduplication only for the current promise.
+responses, errors, and cleanup apply only to the current promise; superseded cache reads and
+network requests cannot overwrite current eligibility, cache payloads, or loading state.
 
 Core-task replacements advance `tasksCoreRevision`, including cache hits that never raise
 `loading`; detail/item merges do not advance it. Readiness watches this revision so cached
 locale replacements and empty-to-populated core recovery start a new wait. After objectives
-and rewards settle, await objective mode-count metadata; retry once if an already-running
-request was discarded during task replacement. The existing gate timer still bounds this wait.
+and rewards/items settle, await objective mode-count metadata; retry once only when the store
+returns `stale` for a response discarded during task replacement. Handled failures are not retried. The existing gate timer still bounds this wait.
 
 Optional detail requests use a three-second gate timer after core readiness; on expiry,
 resume filtering/rendering while late requests continue. Failed requests also release
@@ -1282,7 +1284,9 @@ their timers. An empty task dataset does not wait for optional requests.
 Reset filter readiness when metadata or task-detail readiness resets. Metadata readiness
 alone must not expose the empty state during the debounced filter refresh; a completed refresh
 with no matching tasks still shows the normal empty state. Subsequent filter changes retain
-the existing debounce and task actions still request an immediate refresh.
+the existing debounce and task actions still request an immediate refresh. Deep-link effects
+use this combined loading state so queries wait for mounted cards and retry after readiness
+clears even when the filtered task IDs have not changed.
 
 Keep the tasks page's eight-card batches, preload margin, and auto-load caps. Do not defer
 critical metadata or change task filters, progress state, or card expansion to mask mounting
