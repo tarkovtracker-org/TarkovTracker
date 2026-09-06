@@ -572,8 +572,6 @@ export default defineNuxtConfig({
       exclude: ['better-sqlite3'],
       include: [
         '@supabase/supabase-js',
-        '@vue/devtools-core',
-        '@vue/devtools-kit',
         '@vueuse/core',
         'fflate',
         'leaflet',

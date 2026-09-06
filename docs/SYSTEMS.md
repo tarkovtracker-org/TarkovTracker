@@ -1227,3 +1227,16 @@ If you read something here that does not match the code, the disagreement is a b
 code (fix the code) or in this doc (fix the doc in the same PR). `AGENTS.md`'s Maintenance Contract
 requires updating this file whenever one of these systems changes. When in doubt, the code is the
 source of truth and this doc is the explanation of it.
+
+### Task card layout and legacy density preferences
+
+Task cards always use compact spacing. There is no density selector or persisted density
+preference. Hydration discards legacy `taskCardDensity` values, including comfortable; remote
+`task_card_density` values are ignored and new preference writes omit that column. Keep the
+database column for older clients; this UI change requires no column removal or data rewrite.
+
+Collapse-by-default and hide-rewards remain independent preferences, both off by default.
+Collapse-by-default applies to list cards; map cards start expanded. Matching deep links expand
+their card. The dedicated chevron controls card expansion in both views. Hide-rewards applies
+to both list and map cards. Missing database columns use the existing preference-sync fallback,
+so new settings remain local until the compact-list preference migration is deployed.

@@ -6,10 +6,7 @@
   >
     <div
       class="text-surface-400 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 group flex w-full flex-wrap items-center gap-1.5 text-xs transition-colors select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:gap-2"
-      :class="[
-        hasExpandableDetails ? 'hover:bg-surface-700/20 cursor-pointer' : '',
-        isCompact ? 'px-3 py-1.5' : 'px-4 py-2',
-      ]"
+      :class="[hasExpandableDetails ? 'hover:bg-surface-700/20 cursor-pointer' : '', 'px-3 py-1.5']"
       :role="hasExpandableDetails ? 'button' : undefined"
       :tabindex="hasExpandableDetails ? 0 : undefined"
       :aria-expanded="hasExpandableDetails ? showDetails : undefined"
@@ -155,8 +152,7 @@
     >
       <div
         v-if="showDetails && hasExpandableDetails"
-        class="border-surface-700/30 bg-surface-900/30 border-t p-4"
-        :class="{ 'p-3': isCompact }"
+        class="border-surface-700/30 bg-surface-900/30 border-t p-3"
       >
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           <div v-if="showPreviousTasks" class="space-y-2">
@@ -308,7 +304,6 @@
     parentTasks: Task[];
     childTasks: Task[];
     experience?: number;
-    isCompact?: boolean;
     unlocksNextCount?: number;
     impactCount?: number;
   }>();
