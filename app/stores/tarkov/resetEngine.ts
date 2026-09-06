@@ -75,9 +75,16 @@ export const resolveInitialSyncState = (
     // Mode updated_at also changes for visibility. It cannot establish that an
     // entire progress snapshot supersedes local timestamped edits.
     if (mergeModeSnapshots) {
-      return preferLocalMetadata
+      const merged = preferLocalMetadata
         ? mergeProgressData(remoteModeData, localModeData, true)
         : mergeProgressData(localModeData, remoteModeData, true);
+      return {
+        ...merged,
+        displayName: preferredModeData.displayName,
+        pmcFaction: preferredModeData.pmcFaction,
+        xpOffset: preferredModeData.xpOffset,
+        skillOffsets: preferredModeData.skillOffsets,
+      };
     }
     return {
       ...preferredModeData,

@@ -1,5 +1,6 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useSystemStore, useSystemStoreWithSupabase } from '@/stores/useSystemStore';
 import {
   applyLegacyPersistentProgressResult,
   applyTeammateProgressEvent,
@@ -691,6 +692,23 @@ describe('Team realtime resources', () => {
   const buildRealtimeHarness = () => {
     const currentUserId = '11111111-1111-4111-8111-111111111111';
     const teammateId = '22222222-2222-4222-8222-222222222222';
+    useSystemStore().$reset();
+    useSystemStore().$patch((state) => {
+      state.pvp_team_id = 'team-1';
+    });
+    useTeamStore().$reset();
+    useTeamStore().$patch((state) => {
+      state.members = [currentUserId, teammateId];
+      state.memberProfiles = {
+        [teammateId]: {
+          displayName: 'Teammate',
+          gameEdition: 4,
+          gameMode: GAME_MODES.PVP,
+          level: 10,
+          tasksCompleted: 2,
+        },
+      };
+    });
     const records: ChannelRecord[] = [];
     const createRecord = (topic: string, config?: unknown): ChannelRecord => {
       const record: ChannelRecord = {
@@ -758,6 +776,7 @@ describe('Team realtime resources', () => {
     nuxtApp.$supabase.client = client;
     nuxtApp.$supabase.ready = vi.fn().mockResolvedValue(null);
     nuxtApp.$supabase.user = { id: currentUserId, loggedIn: true };
+    mockGetTeamMembers.mockReset();
     mockGetTeamMembers.mockResolvedValue({
       members: [currentUserId, teammateId],
       profiles: {
@@ -777,6 +796,7 @@ describe('Team realtime resources', () => {
       isSubscribed: { value: false },
       loadError: { value: null },
     }));
+    useSystemStoreWithSupabase().cleanup();
     const teamRecords = () => records.filter((record) => record.topic.startsWith('team:'));
     return { client, currentUserId, teamRecords, teammateId };
   };
@@ -785,6 +805,108 @@ describe('Team realtime resources', () => {
     if (!record) throw new Error('team channel was never created');
     return record;
   };
+  const deliverTeamSnapshot = () => {
+    const options = mockUseSupabaseListener.mock.calls.find(
+      ([config]) => config.table === 'teams'
+    )?.[0];
+    if (!options) throw new Error('Missing team listener');
+    options.onData({ id: 'team-1' });
+  };
+  it('ignores snapshot refreshes when logged out, throttled, or no longer in a team', async () => {
+    const { teamRecords } = buildRealtimeHarness();
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      const calls = mockGetTeamMembers.mock.calls.length;
+      deliverTeamSnapshot();
+      await Promise.resolve();
+      expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls);
+      const app = useNuxtApp();
+      app.$supabase.user.loggedIn = false;
+      deliverTeamSnapshot();
+      expect(instance.teamStore.members).toEqual([]);
+      app.$supabase.user.loggedIn = true;
+      useSystemStore().$patch((state) => {
+        state.pvp_team_id = null;
+      });
+      // Make the explicit refresh eligible despite the recent successful read.
+      vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 3000);
+      deliverTeamSnapshot();
+      await Promise.resolve();
+      expect(instance.teamStore.memberProfiles).toEqual({});
+      expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls);
+    } finally {
+      vi.restoreAllMocks();
+      instance.cleanup();
+    }
+  });
+  it.each(['success', 'forbidden', 'unavailable'])(
+    'coalesces member reads and handles %s for every waiter',
+    async (outcome) => {
+      const { teamRecords, currentUserId } = buildRealtimeHarness();
+      const instance = useTeamStoreWithSupabase();
+      let resolve!: (value: unknown) => void;
+      let reject!: (error: unknown) => void;
+      try {
+        await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        mockGetTeamMembers.mockReturnValueOnce(
+          new Promise((yes, no) => {
+            resolve = yes;
+            reject = no;
+          })
+        );
+        const calls = mockGetTeamMembers.mock.calls.length;
+        firstTeamRecord(teamRecords).statusCallbacks[0]?.('SUBSCRIBED');
+        await vi.waitFor(() => expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls + 1));
+        deliverTeamSnapshot();
+        if (outcome === 'success') resolve({ members: [currentUserId], profiles: {} });
+        else reject({ statusCode: outcome === 'forbidden' ? 403 : 500 });
+        await new Promise((finish) => setTimeout(finish, 0));
+        expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls + 1);
+        if (outcome === 'success') expect(instance.teamStore.members).toEqual([currentUserId]);
+        else expect(instance.teamStore.members).toHaveLength(2);
+      } finally {
+        instance.cleanup();
+      }
+    }
+  );
+  it.each(['switch', 'leave'])(
+    'does not apply a completed member read after a team %s',
+    async (change) => {
+      const { teamRecords, currentUserId } = buildRealtimeHarness();
+      const instance = useTeamStoreWithSupabase();
+      let finish!: (value: unknown) => void;
+      try {
+        await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        mockGetTeamMembers.mockReturnValueOnce(
+          new Promise((resolve) => {
+            finish = resolve;
+          })
+        );
+        const calls = mockGetTeamMembers.mock.calls.length;
+        firstTeamRecord(teamRecords).statusCallbacks[0]?.('SUBSCRIBED');
+        await vi.waitFor(() => expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls + 1));
+        mockGetTeamMembers.mockResolvedValue({ members: [currentUserId], profiles: {} });
+        useSystemStore().$patch((state) => {
+          state.pvp_team_id = change === 'switch' ? 'team-2' : null;
+          state.team = null;
+          state.team_id = null;
+        });
+        if (change === 'switch') {
+          await vi.waitFor(() =>
+            expect(mockGetTeamMembers).toHaveBeenLastCalledWith('team-2', true)
+          );
+        }
+        finish({ members: ['stale-member'], profiles: {} });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(instance.teamStore.members).not.toContain('stale-member');
+      } finally {
+        instance.cleanup();
+      }
+    }
+  );
   it('filters teammate progress and cleans up scoped subscriptions', async () => {
     const { client, currentUserId, teamRecords, teammateId } = buildRealtimeHarness();
     const instance = useTeamStoreWithSupabase();

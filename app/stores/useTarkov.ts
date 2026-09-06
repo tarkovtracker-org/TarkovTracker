@@ -65,7 +65,11 @@ import {
   performReset,
   resolveInitialSyncState,
 } from '@/stores/tarkov/resetEngine';
-import { recordLocalSyncTime, resetSyncTimeline } from '@/stores/tarkov/syncTimeline';
+import {
+  beginLocalSync,
+  recordLocalSyncTime,
+  resetSyncTimeline,
+} from '@/stores/tarkov/syncTimeline';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { delay } from '@/utils/async';
 import {
@@ -1669,18 +1673,27 @@ export async function initializeTarkovSync() {
             seasonal_data: sanitizedUserState.seasonal,
           };
         },
-        sync: async (payload: UserProgressSyncPayload) =>
-          await $supabase.client.rpc('sync_user_game_mode_progress', {
-            p_current_game_mode: payload.current_game_mode,
-            p_game_edition: payload.game_edition,
-            p_seasonal_season_number: ACTIVE_SEASON_NUMBER,
-            p_tarkov_uid: payload.tarkov_uid,
-            p_modes: {
-              [GAME_MODES.PVP]: payload.pvp_data,
-              [GAME_MODES.PVE]: payload.pve_data,
-              [GAME_MODES.SEASONAL]: payload.seasonal_data,
-            },
-          }),
+        sync: async (payload: UserProgressSyncPayload) => {
+          const finish = beginLocalSync();
+          try {
+            const result = await $supabase.client.rpc('sync_user_game_mode_progress', {
+              p_current_game_mode: payload.current_game_mode,
+              p_game_edition: payload.game_edition,
+              p_seasonal_season_number: ACTIVE_SEASON_NUMBER,
+              p_tarkov_uid: payload.tarkov_uid,
+              p_modes: {
+                [GAME_MODES.PVP]: payload.pvp_data,
+                [GAME_MODES.PVE]: payload.pve_data,
+                [GAME_MODES.SEASONAL]: payload.seasonal_data,
+              },
+            });
+            finish(!result.error);
+            return result;
+          } catch (error) {
+            finish(false);
+            throw error;
+          }
+        },
       });
     };
     const shouldStartSyncNow = loadResult.hadRemoteData || hasProgress(tarkovStore.$state);

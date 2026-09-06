@@ -263,11 +263,12 @@ describe('useAppInitialization locale setup', () => {
     pending.resolve(undefined);
     await flushPromises();
     expect(mockMigrateDataIfNeeded).toHaveBeenCalledTimes(1);
-    expect(mockSupporter.fetchStatus).toHaveBeenCalledExactlyOnceWith('user-2');
+    expect(mockSupporter.subscribe).toHaveBeenCalledExactlyOnceWith('user-2');
+    expect(mockSupporter.fetchStatus).not.toHaveBeenCalled();
   });
-  it('does not subscribe to a former account when its supporter lookup finishes late', async () => {
+  it('does not resubscribe to a former account when its subscription finishes late', async () => {
     const pending = Promise.withResolvers<undefined>();
-    mockSupporter.fetchStatus.mockReturnValueOnce(pending.promise);
+    mockSupporter.subscribe.mockReturnValueOnce(pending.promise);
     mockSupabaseUser.loggedIn = true;
     mockSupabaseUser.id = 'user-1';
     await mountWithComposable();
@@ -276,7 +277,10 @@ describe('useAppInitialization locale setup', () => {
     await flushPromises();
     pending.resolve(undefined);
     await flushPromises();
-    expect(mockSupporter.subscribe).toHaveBeenCalledExactlyOnceWith('user-2');
+    expect(mockSupporter.subscribe.mock.calls.map(([userId]) => userId)).toEqual([
+      'user-1',
+      'user-2',
+    ]);
   });
   it('records account activity with the session token after initialization', async () => {
     const fetch = vi.fn().mockResolvedValue({ recorded: true });
@@ -294,7 +298,7 @@ describe('useAppInitialization locale setup', () => {
     });
   });
   it('keeps sync usable when optional supporter and activity requests fail', async () => {
-    mockSupporter.fetchStatus.mockRejectedValue(new Error('supporter offline'));
+    mockSupporter.subscribe.mockRejectedValue(new Error('supporter offline'));
     mockSupabase.client.auth.getSession.mockRejectedValue(new Error('session unavailable'));
     mockSupabaseUser.loggedIn = true;
     mockSupabaseUser.id = 'user-1';

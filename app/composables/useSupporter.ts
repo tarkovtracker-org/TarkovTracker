@@ -113,6 +113,7 @@ export function useSupporter() {
     if ($supabase.user?.loggedIn === false || $supabase.user?.id !== userId) return;
     if (channel || channelUserId) return;
     const client = $supabase.client;
+    let initialReadStarted = false;
     const nextChannel = client
       .channel(topic)
       .on(
@@ -124,16 +125,19 @@ export function useSupporter() {
           filter: `user_id=eq.${userId}`,
         },
         () => {
+          if (requestVersion !== subscriptionRequestVersion) return;
           fetchStatus(userId).catch((err) => {
             logger.error('Realtime supporter status refresh failed', { userId, err });
           });
         }
       )
       .subscribe((status, err) => {
-        if (status === 'SUBSCRIBED' && requestVersion === subscriptionRequestVersion) {
-          void fetchStatus(userId);
-        }
+        if (requestVersion !== subscriptionRequestVersion) return;
         logChannelSubscribeFailure('Supporter', status, err, { userId });
+        // Subscribe reports either a join or a failure. Read once even if the initial join fails.
+        if (status !== 'SUBSCRIBED' && initialReadStarted) return;
+        initialReadStarted = true;
+        void fetchStatus(userId);
       });
     channel = { channel: nextChannel, client, topic };
     channelUserId = userId;

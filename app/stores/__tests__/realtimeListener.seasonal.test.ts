@@ -238,6 +238,24 @@ describe('seasonal progress realtime synchronization', () => {
       await teardown;
     }
   });
+  it('retains local progress when a reconnect snapshot fails', async () => {
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    const failure = { message: 'snapshot unavailable' };
+    supabaseContext.client.from.mockImplementation((table: string) => ({
+      select: () => ({
+        eq: () =>
+          table === 'user_progress'
+            ? { single: async () => ({ data: null, error: null }) }
+            : Promise.resolve({ data: null, error: failure }),
+      }),
+    }));
+    state.pvp.level = 25;
+    await setupRealtimeListener(store);
+    createdChannels[0]?.subscribeCallback?.('SUBSCRIBED');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(state.pvp.level).toBe(25);
+    expect(createdChannels).toHaveLength(1);
+  });
   it('merges a reconnect snapshot without overwriting a newer live mode event', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     let resolveModes!: (value: unknown) => void;
@@ -290,7 +308,7 @@ describe('seasonal progress realtime synchronization', () => {
     expect(state.pvp.taskObjectives.staleOnly).toBeUndefined();
     expect(createdChannels).toHaveLength(1);
   });
-  it('retains an acknowledged newer count clear in a full realtime snapshot', async () => {
+  it('uses entry timestamps for counts already clean when the listener starts', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     state.pvp.taskObjectives.objective = { count: 0, timestamp: 20 };
     state.pvp.hideoutParts.part = { count: 0, timestamp: 20 };

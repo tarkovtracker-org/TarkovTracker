@@ -38,6 +38,27 @@ describe('Realtime background transport', () => {
     expect(connect).toHaveBeenCalledTimes(1);
     dispose();
   });
+  it('recovers visibility after a failed disconnect without leaving an unhandled rejection', async () => {
+    vi.useFakeTimers();
+    const { transport, connect, dispose, visibility } = setup();
+    let rejectLeave!: (reason: Error) => void;
+    transport.disconnect.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          rejectLeave = reject;
+        })
+    );
+    visibility('hidden');
+    await vi.advanceTimersByTimeAsync(60_000);
+    visibility('visible');
+    rejectLeave(new Error('socket close failed'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(connect).toHaveBeenCalledOnce();
+    expect(
+      isRealtimeSuspended(transport as unknown as Parameters<typeof isRealtimeSuspended>[0])
+    ).toBe(false);
+    dispose();
+  });
   it('cancels brief hides and does not open a socket with no channels', async () => {
     vi.useFakeTimers();
     const { transport, connect, dispose, visibility } = setup();

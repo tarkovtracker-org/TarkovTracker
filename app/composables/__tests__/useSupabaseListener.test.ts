@@ -112,23 +112,39 @@ describe('useSupabaseListener cleanup', () => {
     expect(onData).toHaveBeenCalledWith({ name: 'remote', count: 0 });
     listener.cleanup();
   });
-  it('applies reconnect data when unrelated store fields changed during the read', async () => {
+  it('applies a reconnect row while preserving unrelated fields changed during the read', async () => {
     const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
     const store = createStore();
-    const onData = vi.fn();
+    store.$state = { teamName: 'old', memberProfiles: {} };
+    const tracker = createPendingStateTracker(() => store.$state);
+    let finish!: (value: unknown) => void;
+    const pending = new Promise((resolve) => {
+      finish = resolve;
+    });
+    const queryFor = (result: Promise<unknown>) => {
+      const query = { select: () => query, eq: () => query, single: () => result };
+      return query;
+    };
+    client.from
+      .mockReturnValueOnce(
+        queryFor(Promise.resolve({ data: { teamName: 'old' }, error: null })) as never
+      )
+      .mockReturnValueOnce(queryFor(pending) as never);
+    const onData = vi.fn((data) => Object.assign(store.$state, data));
     const listener = useSupabaseListener({
       filter: 'id=eq.row-1',
       store,
       table: 'test_table',
       patchStore: false,
       onData,
+      syncController: { pause: vi.fn(), resume: vi.fn(), captureRemoteMerge: tracker.capture },
     });
     await vi.advanceTimersByTimeAsync(0);
-    onData.mockClear();
     channel.subscribe.mock.calls[0]?.[0]('SUBSCRIBED');
     store.$state.memberProfiles = { teammate: 'new' };
+    finish({ data: { teamName: 'remote name' }, error: null });
     await vi.advanceTimersByTimeAsync(0);
-    expect(onData).toHaveBeenCalledOnce();
+    expect(store.$state).toEqual({ teamName: 'remote name', memberProfiles: { teammate: 'new' } });
     listener.cleanup();
   });
   it.each(['UPDATE', 'DELETE'])(

@@ -74,9 +74,6 @@ export function useAppInitialization() {
     if (!authenticatedUserId) return;
     if (supporterLoadedForUserId === authenticatedUserId) return;
     try {
-      await supporter.fetchStatus(authenticatedUserId);
-      if (expectedUserId && getAuthenticatedUserId() !== expectedUserId) return;
-      if (expectedToken !== undefined && expectedToken !== authChangeToken) return;
       await supporter.subscribe(authenticatedUserId);
       if (expectedUserId && getAuthenticatedUserId() !== expectedUserId) return;
       if (expectedToken !== undefined && expectedToken !== authChangeToken) return;

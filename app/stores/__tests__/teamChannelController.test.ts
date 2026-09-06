@@ -125,6 +125,24 @@ describe('createTeamChannelController', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(harness.refreshMembers).toHaveBeenCalledTimes(1);
   });
+  it('reports a rejected reconnect refresh without dispatching hydration', async () => {
+    const harness = createHarness();
+    const controller = createTeamChannelController(harness.deps);
+    const hydrated = vi.fn();
+    window.addEventListener('teammate-progress-reconnected', hydrated);
+    try {
+      await controller.refresh();
+      harness.channels[0]?.status?.('SUBSCRIBED');
+      harness.refreshMembers.mockRejectedValueOnce(new Error('network unavailable'));
+      harness.channels[0]?.status?.('SUBSCRIBED');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(hydrated).not.toHaveBeenCalled();
+      expect(harness.channels).toHaveLength(1);
+    } finally {
+      window.removeEventListener('teammate-progress-reconnected', hydrated);
+      await controller.dispose();
+    }
+  });
   it('lets a newer membership refresh finish before reconnect hydration', async () => {
     const harness = createHarness();
     const controller = createTeamChannelController(harness.deps);

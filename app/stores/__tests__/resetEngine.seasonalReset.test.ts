@@ -2,6 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultState, type UserState } from '@/stores/progressState';
+import { mergeProgressData } from '@/stores/tarkov/progressMerge';
 import { performReset, resolveInitialSyncState } from '@/stores/tarkov/resetEngine';
 import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 const { clearProgressStorageMock, supabaseContext, syncProgressStateMock } = vi.hoisted(() => ({
@@ -75,6 +76,40 @@ describe('performReset seasonal', () => {
       expect(result.pvp.taskObjectives.objective?.count).toBe(0);
       expect(result.pvp.taskObjectives.objective?.complete).toBe(false);
       expect(result.pvp.hideoutParts.part?.count).toBe(2);
+    }
+  );
+  it.each([false, true])(
+    'handles count entries without numeric counts (timestamp preference: %s)',
+    (preferNewerCount) => {
+      const local = structuredClone(defaultState.pvp);
+      const remote = structuredClone(defaultState.pvp);
+      local.taskObjectives.noCounts = { complete: false, timestamp: 1 };
+      remote.taskObjectives.noCounts = { complete: true, timestamp: 2 };
+      local.hideoutParts.olderCount = { count: 4, timestamp: 1 };
+      remote.hideoutParts.olderCount = { complete: true, timestamp: 2 };
+      const result = mergeProgressData(local, remote, preferNewerCount);
+      expect(result.taskObjectives.noCounts?.count).toBe(0);
+      expect(result.hideoutParts.olderCount?.count).toBe(4);
+    }
+  );
+  it.each([true, false])(
+    'preserves preferred profile clears at startup (local: %s)',
+    (localWins) => {
+      const local = structuredClone(defaultState);
+      const remote = structuredClone(defaultState);
+      const preferred = localWins ? local : remote;
+      const older = localWins ? remote : local;
+      preferred.pvp.displayName = null;
+      preferred.pvp.skillOffsets = {};
+      preferred.pvp.xpOffset = 0;
+      older.pvp.displayName = 'old name';
+      older.pvp.skillOffsets = { Endurance: 4 };
+      older.pvp.xpOffset = 100;
+      older.pvp.taskCompletions.remoteTask = { complete: true, timestamp: 10 };
+      const result = resolveInitialSyncState(local, remote, localWins ? 30 : 10, 20, 1, 1, true);
+      expect(result.pvp).toMatchObject({ displayName: null, skillOffsets: {}, xpOffset: 0 });
+      expect(result.pvp.skillOffsets).toEqual({});
+      expect(result.pvp.taskCompletions.remoteTask?.complete).toBe(true);
     }
   );
   it('resets only the seasonal mode and leaves persistent progress untouched', async () => {

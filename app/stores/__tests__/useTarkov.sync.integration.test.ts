@@ -253,7 +253,7 @@ mockNuxtImport('useNuxtApp', () => () => ({
   $supabase: supabaseContext,
 }));
 vi.mock('@/composables/supabase/useSupabaseSync', () => ({
-  useSupabaseSync: () => useSupabaseSyncMock(),
+  useSupabaseSync: (options: unknown) => useSupabaseSyncMock(options),
 }));
 vi.mock('@/composables/useToastI18n', () => ({
   useToastI18n: () => ({
@@ -412,6 +412,73 @@ describe('useTarkov sync integration', () => {
     resetTarkovSync('test teardown');
     localStorage.clear();
   });
+  it.each(['', 'invalid-date'])(
+    'restores owned progress when server timestamps are unusable: %s',
+    async (updatedAt) => {
+      localStorage.setItem(
+        STORAGE_KEYS.progress,
+        JSON.stringify({
+          _timestamp: Date.now(),
+          _userId: 'user-1',
+          data: { ...structuredClone(defaultState), pvp: progressWithLevel(7) },
+        })
+      );
+      single.mockResolvedValue({ data: createRemoteRow({ updated_at: updatedAt }), error: null });
+      modeProgressResult.data = [
+        { game_mode: 'pvp', season_number: 0, progress_data: progressWithLevel(5) },
+        { game_mode: 'pve', season_number: 0, progress_data: progressWithLevel(1) },
+      ];
+      await initializeTarkovSync();
+      expect(useTarkovStore().pvp.level).toBe(7);
+    }
+  );
+  it('stops initialization after deferred legacy reads exhaust their retries', async () => {
+    single
+      .mockResolvedValueOnce({ data: createRemoteRow(), error: null })
+      .mockResolvedValue({ data: null, error: { message: 'legacy unavailable' } });
+    await expect(initializeTarkovSync()).rejects.toThrow('Supabase initial load failed');
+    expect(useSupabaseSyncMock).not.toHaveBeenCalled();
+  });
+  it('records the local sync timestamp only when the save callback succeeds', async () => {
+    await initializeTarkovSync();
+    const { getLastLocalSyncTime } = await import('@/stores/tarkov/syncTimeline');
+    const options = useSupabaseSyncMock.mock.calls.at(-1)?.[0] as { onSynced: () => void };
+    vi.spyOn(Date, 'now').mockReturnValue(123456789);
+    options.onSynced();
+    expect(getLastLocalSyncTime()).toBe(123456789);
+    vi.restoreAllMocks();
+  });
+  it.each(['success', 'error', 'throw', 'session-reset'])(
+    'tracks an in-flight RPC and removes failed or stale markers: %s',
+    async (outcome) => {
+      await initializeTarkovSync();
+      const timeline = await import('@/stores/tarkov/syncTimeline');
+      const options = useSupabaseSyncMock.mock.calls.at(-1)?.[0] as {
+        sync: (payload: Record<string, unknown>) => Promise<unknown>;
+      };
+      let resolve!: (value: { error: null | { message: string } }) => void;
+      let reject!: (error: Error) => void;
+      rpc.mockReturnValueOnce(
+        new Promise((res, rej) => {
+          resolve = res;
+          reject = rej;
+        })
+      );
+      const startedAt = Date.now();
+      const saving = options.sync({});
+      expect(timeline.isLikelySelfOriginUpdate(startedAt)).toBe(true);
+      expect(timeline.getLastLocalSyncTime()).toBe(0);
+      if (outcome === 'session-reset') timeline.resetSyncTimeline();
+      if (outcome === 'throw') {
+        reject(new Error('offline'));
+        await expect(saving).rejects.toThrow('offline');
+      } else {
+        resolve({ error: outcome === 'error' ? { message: 'denied' } : null });
+        await saving;
+      }
+      expect(timeline.isLikelySelfOriginUpdate(startedAt)).toBe(outcome === 'success');
+    }
+  );
   it('skips reinitialization when sync already exists for same user', async () => {
     await initializeTarkovSync();
     expect(useSupabaseSyncMock).toHaveBeenCalledTimes(1);

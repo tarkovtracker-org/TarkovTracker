@@ -785,7 +785,8 @@ flowchart LR
   its normalized write makes the subsequent identical RPC upsert a no-op. Startup freshness uses
   the newest account or active-mode timestamp because Seasonal-only saves no longer touch the account.
   When only a mode row is newer, startup merges progress by entry timestamps and reset epochs;
-  visibility changes also update mode timestamps and cannot justify replacing whole mode snapshots.
+  clearable profile fields use the preferred snapshot verbatim, including null names and empty offsets.
+  Visibility changes also update mode timestamps and cannot justify replacing whole mode snapshots.
   Team rejoin refreshes membership and rebuilds changed filters before hydrating teammates; initial
   joins do not trigger an additional hydration. Only the winning membership refresh may trigger
   hydration after a successful membership read; a failed read neither hydrates nor rebuilds.
@@ -794,8 +795,11 @@ flowchart LR
   Unmaterialized normalized rows are absent for startup fallback and freshness. Outbound writes are
   serialized with captured payloads and versions; resumed saves cannot overtake an in-flight save.
   Supporter status refreshes after the first join as well as subsequent joins to close the
-  initial read/join gap and recover an unsuccessful initial read. Skipped saves do not run
-  payload transforms; the self-origin timestamp advances only after a successful write.
+  initial read/join gap. Initialization delegates the initial status read to the subscription, with a
+  single fallback read if the initial join fails.
+  Skipped saves do not run payload transforms. Actual RPC writes temporarily mark the self-origin
+  timeline before awaiting the response; failure removes that marker, success retains it, and
+  session reset invalidates outstanding markers.
 - Startup fetches metadata and normalized modes before requesting missing persistent legacy columns.
   Shared-profile, gateway, and teammate reads request legacy progress only when their existing
   fallback rules require it. Public visibility and team authorization still precede fallback use.
