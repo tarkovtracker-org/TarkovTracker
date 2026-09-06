@@ -924,7 +924,9 @@
           "experience_rewards": "Ricompense esperienza",
           "next_tasks": "Prossime missioni",
           "previous_tasks": "Missioni precedenti",
-          "collapse_completed_objectives": "Comprimi gli obiettivi nelle missioni completate"
+          "collapse_completed_objectives": "Comprimi gli obiettivi nelle missioni completate",
+          "collapse_by_default": "Comprimi le missioni di default",
+          "hide_rewards": "Nascondi Ricompense"
         },
         "filter_bar": {
           "hint": "Mostra o nascondi i filtri di stato.",
@@ -1008,6 +1010,8 @@
         "available_button": "Disponibile",
         "uncomplete_button": "Non completata",
         "reset_item_counts": "Resetta conteggio oggetti",
+        "collapse_task": "Comprimi attività",
+        "expand_task": "Espandi attività",
         "reset_item_counts_disabled_complete": "Segna questa missione come non completata per resettare il conteggio degli oggetti",
         "reset_item_counts_disabled_failed": "Contrassegna questa missione come disponibile per azzerare il conteggio degli oggetti",
         "reset_item_counts_disabled_nothing_to_reset": "Non ci sono oggetti da resettare",
@@ -1880,7 +1884,8 @@
         "show_xp": "Mostra ricompense XP",
         "show_next": "Mostra missioni successive",
         "show_prev": "Mostra missioni precedenti",
-        "density": "Densità pannello",
+        "collapse_by_default": "Comprimi le missioni di default",
+        "hide_rewards": "Nascondi Ricompense",
         "require_trader_levels": "Richiede livello di fedeltà trader e reputazione per la disponibilità della missione",
         "flags_section": "Schermata Missioni",
         "availability_section": "Disponibilità Missioni",
