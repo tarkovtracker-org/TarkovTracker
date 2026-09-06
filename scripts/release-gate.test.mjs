@@ -86,6 +86,19 @@ describe('release freshness and failures', () => {
       expect((await releaseEligibility(f)).release).toBe(false);
     }
   );
+  it.each(['skip-checks: true', 'skip-checks:true', 'skip-checks: true\r'])(
+    'rejects a rerun with trailer %s',
+    async (trailer) => {
+      const f = fixture();
+      f.run.head_commit.message = `chore: update metadata\n\n\n${trailer}`;
+      expect((await releaseEligibility(f)).release).toBe(false);
+    }
+  );
+  it('does not treat a false trailer or an inline mention as a skip directive', async () => {
+    const f = fixture();
+    f.run.head_commit.message = 'fix: explain skip-checks: true usage\n\n\nskip-checks: false';
+    expect((await releaseEligibility(f)).release).toBe(true);
+  });
   it('fails closed on API errors', async () => {
     const f = fixture();
     f.github.rest.git.getRef.mockRejectedValue(new Error('GitHub unavailable'));

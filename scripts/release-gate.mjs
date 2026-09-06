@@ -18,7 +18,10 @@ function matchesEvent(run, eventRun, repositoryId) {
 }
 function explicitlySkipsAutomation(run) {
   const message = run.head_commit?.message ?? '';
-  return /\[(skip ci|ci skip|no ci|skip actions|actions skip)\]/i.test(message);
+  return (
+    /\[(skip ci|ci skip|no ci|skip actions|actions skip)\]/i.test(message) ||
+    /^skip-checks:[ \t]*true[ \t]*\r?$/im.test(message)
+  );
 }
 function eligibleEvidence(run, eventRun, repositoryId) {
   return matchesEvent(run, eventRun, repositoryId) && !explicitlySkipsAutomation(run);
