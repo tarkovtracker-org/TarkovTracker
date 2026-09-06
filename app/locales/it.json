@@ -5,6 +5,9 @@
     "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
     "no_reference": "N/A",
     "error": {
+      "cache_purge_failed": "Impossibile eliminare la cache. Per favore riprova.",
+      "invalid_purge_type": "Seleziona un tipo di eliminazione cache valido.",
+      "method_not_allowed": "Questo metodo di richiesta non è supportato.",
       "admin_privileges_required": "You do not have permission to perform this action.",
       "authentication_required": "Devi aver fatto il login per continuare.",
       "invalid_channel": "Inserisci un nome valido del canale Twitch.",
