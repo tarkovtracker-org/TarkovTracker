@@ -283,6 +283,23 @@ describe('useEdgeFunctions.createToken', () => {
     expect(mockSupabaseClient.auth.refreshSession).toHaveBeenCalledTimes(1);
     expect(mockSupabaseClient.functions.invoke).toHaveBeenCalledTimes(2);
   });
+  it('preserves cache purge error codes for localized admin messages', async () => {
+    mockSupabaseClient.functions.invoke.mockResolvedValueOnce({
+      data: null,
+      error: {
+        context: new Response(
+          JSON.stringify({ error: 'cache_purge_failed', code: 'cache_purge_failed' }),
+          { status: 502 }
+        ),
+        message: 'Edge Function returned a non-2xx status code',
+      },
+    });
+    const { useEdgeFunctions } = await import('@/composables/api/useEdgeFunctions');
+    await expect(useEdgeFunctions().purgeCache('tarkov-data')).rejects.toMatchObject({
+      status: 502,
+      data: { code: 'cache_purge_failed' },
+    });
+  });
   it('normalizes Supabase function HTTP errors with response details', async () => {
     const rateLimitError = {
       context: new Response(JSON.stringify({ message: 'Too many requests' }), {

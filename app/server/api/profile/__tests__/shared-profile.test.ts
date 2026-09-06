@@ -195,6 +195,40 @@ describe('Shared Profile API', () => {
       statusMessage: 'Timed out while loading shared profile data',
     });
   });
+  it.each(['user_progress?', 'user_game_mode_progress?', 'user_preferences?'])(
+    'returns 504 when the %s response body stalls after headers',
+    async (stalledPath) => {
+      vi.useFakeTimers();
+      const signals: AbortSignal[] = [];
+      mockFetch.mockImplementation(async (url: string, init: RequestInit) => {
+        const signal = init.signal!;
+        signals.push(signal);
+        if (url.includes(stalledPath)) {
+          return {
+            ok: true,
+            arrayBuffer: () =>
+              new Promise((_, reject) => {
+                signal.addEventListener('abort', () => reject(createAbortError()), { once: true });
+              }),
+            json: () => new Promise(() => {}),
+          };
+        }
+        if (url.includes('user_game_mode_progress?')) return modeProgressResponse({ level: 24 });
+        if (url.includes('user_preferences?')) return preferencesResponse();
+        return progressResponse();
+      });
+      const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+      const expectation = expect(handler(mockEvent as H3Event)).rejects.toMatchObject({
+        statusCode: 504,
+        statusMessage: 'Timed out while loading shared profile data',
+      });
+      await vi.advanceTimersByTimeAsync(8000);
+      await expectation;
+      expect(signals).toHaveLength(3);
+      expect(signals.every((signal) => signal.aborted)).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+    }
+  );
   it('returns 502 when shared profile resources cannot be loaded', async () => {
     mockFetch.mockRejectedValueOnce(new Error('upstream failure'));
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');

@@ -635,6 +635,8 @@ flowchart LR
    `user_preferences.profile_share_*` columns, and a trigger mirrors legacy writes forward into
    `profile_public`, so a cached older client can still turn sharing off during a rolling deploy.
    A missing normalized row is treated as private rather than missing.
+   Shared-profile REST reads use `fetchWithTimeout` with an eight-second deadline covering headers
+   and the complete response body. A failed read cancels the sibling reads; timeouts return 504.
 5. Team identity comes from `team_memberships` for all modes. Team joins use a database transaction
    that locks the team while checking capacity and persists membership, user-system state, and the
    audit event together. `user_system` keeps legacy persistent PvP/PvE columns plus the active
@@ -1074,6 +1076,12 @@ flowchart LR
 - Twitch-only invalidations must use the `twitch_config_cache_purge` audit action. The `cache_purge`
   action is reserved for `all` and `tarkov-data` purges because `/api/tarkov/cache-meta` treats its
   latest successful row as a signal to clear browser game-data caches.
+
+The `admin-cache-purge` Edge Function returns `{ error: code, code }` for failures while retaining
+HTTP status and CORS headers. Authentication, authorization, method, purge-type, configuration, and
+upstream failures have stable codes. `useEdgeFunctions` preserves the response envelope in error
+`data`; `AdminCacheCard` maps recognized codes through `admin.error.*` and uses a generic localized
+fallback for older or unknown errors. Upstream purge details remain in server logs.
 
 ## 11. Boot-time asset-failure recovery
 
