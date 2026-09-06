@@ -1215,5 +1215,5 @@ See [the workflow guide](WORKFLOW_AUTOMATION.md#fallow-changed-file-gate) for us
 - Both analysis commits contain the same physical generated context; no persistent finding
   baseline or suppression changes the gate.
 - Invalid refs, missing setup, and analyzer errors fail explicitly; temporary snapshots are
-  removed on success and handled failure.
+  removed in a `finally` block on success or failure.
 - Local Git exclusions apply to untracked candidates without dropping tracked source files.
