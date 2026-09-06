@@ -5,6 +5,9 @@
     "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
     "no_reference": "N/A",
     "error": {
+      "cache_purge_failed": "Nie można wyczyścić pamięci podręcznej. Spróbuj ponownie.",
+      "invalid_purge_type": "Wybierz prawidłowy typ czyszczenia pamięci podręcznej.",
+      "method_not_allowed": "Ta metoda żądania nie jest obsługiwana.",
       "admin_privileges_required": "Nie masz uprawnień do wykonania tej czynności.",
       "authentication_required": "Musisz się zalogować, aby kontynuować.",
       "invalid_channel": "Wprowadź poprawną nazwę kanału Twitch.",
@@ -921,7 +924,9 @@
           "experience_rewards": "Experience Rewards",
           "next_tasks": "Next Tasks",
           "previous_tasks": "Previous Tasks",
-          "collapse_completed_objectives": "Collapse Objectives on Completed Tasks"
+          "collapse_completed_objectives": "Collapse Objectives on Completed Tasks",
+          "collapse_by_default": "Zwiń zadania domyślnie",
+          "hide_rewards": "Ukryj nagrody"
         },
         "filter_bar": {
           "hint": "Toggle task status filters on or off to control which tasks are visible.",
@@ -954,8 +959,11 @@
         "show_map": "Pokaż mapę",
         "hide_map": "Ukryj mapę",
         "fullscreen_label": "Pełny ekran",
+        "required_items": "Wymagane elementy",
+        "required_keys": "Wymagane klucze",
         "required_items_summary": "Required items for active tasks",
         "required_keys_summary": "Required keys for active tasks",
+        "active_tasks_group": "Aktywne zadania",
         "time_period": {
           "dawn": "Dawn",
           "day": "Day",
@@ -1002,6 +1010,8 @@
         "available_button": "Mark Available",
         "uncomplete_button": "Mark Uncompleted",
         "reset_item_counts": "Reset item counts",
+        "collapse_task": "Zwiń zadanie",
+        "expand_task": "Rozwiń zadanie",
         "reset_item_counts_disabled_complete": "Uncomplete this task to reset item counts",
         "reset_item_counts_disabled_failed": "Mark this task as available to reset item counts",
         "reset_item_counts_disabled_nothing_to_reset": "There are no item counts to reset",
@@ -1874,7 +1884,8 @@
         "show_xp": "Show XP Rewards",
         "show_next": "Show Next Quests",
         "show_prev": "Show Previous Quests",
-        "density": "Card Density",
+        "collapse_by_default": "Zwiń zadania domyślnie",
+        "hide_rewards": "Ukryj nagrody",
         "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
         "flags_section": "Wyświetlanie zadań",
         "availability_section": "Dostępność zadania",

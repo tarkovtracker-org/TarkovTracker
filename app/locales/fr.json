@@ -5,6 +5,9 @@
     "load_error_description": "Impossible de charger les données admin. Veuillez actualiser ou contacter le support. Référence : {reference}",
     "no_reference": "N/A",
     "error": {
+      "cache_purge_failed": "Impossible de purger le cache. Veuillez réessayer.",
+      "invalid_purge_type": "Sélectionnez un type de purge de cache valide.",
+      "method_not_allowed": "Cette méthode de requête n'est pas prise en charge.",
       "admin_privileges_required": "Vous n'avez pas la permission d'effectuer cette action.",
       "authentication_required": "Vous devez être connecté pour continuer.",
       "invalid_channel": "Entrez un nom de chaîne Twitch valide.",
@@ -921,7 +924,9 @@
           "experience_rewards": "Récompenses d'expérience",
           "next_tasks": "Tâches suivantes",
           "previous_tasks": "Tâches précédentes",
-          "collapse_completed_objectives": "Réduire les objectifs sur les tâches terminées"
+          "collapse_completed_objectives": "Réduire les objectifs sur les tâches terminées",
+          "collapse_by_default": "Réduire les quêtes par défaut",
+          "hide_rewards": "Cacher les récompenses"
         },
         "filter_bar": {
           "hint": "Afficher ou masquer les filtres d'état.",
@@ -954,8 +959,11 @@
         "show_map": "Afficher la carte",
         "hide_map": "Cacher la carte",
         "fullscreen_label": "Plein écran",
+        "required_items": "Objets requis",
+        "required_keys": "Clés requises",
         "required_items_summary": "Objets requis pour les tâches actives",
         "required_keys_summary": "Clés requises pour les tâches actives",
+        "active_tasks_group": "Tâches actives",
         "time_period": {
           "dawn": "Aube",
           "day": "Jour",
@@ -1002,6 +1010,8 @@
         "available_button": "Disponible",
         "uncomplete_button": "Annuler",
         "reset_item_counts": "Réinitialiser les compteurs d'objets",
+        "collapse_task": "Réduire la tâche",
+        "expand_task": "Développer la tâche",
         "reset_item_counts_disabled_complete": "Décochez cette quête pour réinitialiser les compteurs",
         "reset_item_counts_disabled_failed": "Marquez cette quête comme disponible pour réinitialiser les compteurs",
         "reset_item_counts_disabled_nothing_to_reset": "Aucun compteur d'objets à réinitialiser",
@@ -1874,7 +1884,8 @@
         "show_xp": "Afficher les récompenses d'XP",
         "show_next": "Afficher les quêtes suivantes",
         "show_prev": "Afficher les quêtes précédentes",
-        "density": "Densité des cartes",
+        "collapse_by_default": "Réduire les quêtes par défaut",
+        "hide_rewards": "Cacher les récompenses",
         "require_trader_levels": "Nécessite le niveau de fidélité du marchand et la réputation pour la disponibilité des tâches",
         "flags_section": "Affichage des Tâches",
         "availability_section": "Disponibilité des tâches",

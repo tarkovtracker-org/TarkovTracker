@@ -5,6 +5,9 @@
     "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
     "no_reference": "N/A",
     "error": {
+      "cache_purge_failed": "无法清除缓存。请重试。",
+      "invalid_purge_type": "选择有效的缓存清除类型。",
+      "method_not_allowed": "不支持此请求方法。",
       "admin_privileges_required": "您没有权限执行此操作。",
       "authentication_required": "您必须登录才能继续。",
       "invalid_channel": "输入一个有效的Twitch频道名称。",
@@ -921,7 +924,9 @@
           "experience_rewards": "经验奖励",
           "next_tasks": "后续任务",
           "previous_tasks": "前置任务",
-          "collapse_completed_objectives": "折叠已完成任务的目标"
+          "collapse_completed_objectives": "折叠已完成任务的目标",
+          "collapse_by_default": "默认情况下收起任务",
+          "hide_rewards": "隐藏奖励"
         },
         "filter_bar": {
           "hint": "显示或隐藏状态筛选",
@@ -954,8 +959,11 @@
         "show_map": "显示地图",
         "hide_map": "隐藏地图",
         "fullscreen_label": "全屏",
+        "required_items": "必填项",
+        "required_keys": "必需的密钥",
         "required_items_summary": "活跃任务所需物品",
         "required_keys_summary": "活跃任务所需钥匙",
+        "active_tasks_group": "活动任务",
         "time_period": {
           "dawn": "黎明",
           "day": "白天",
@@ -1002,6 +1010,8 @@
         "available_button": "标记为可接取",
         "uncomplete_button": "标记为未完成",
         "reset_item_counts": "重置物品计数",
+        "collapse_task": "折叠任务",
+        "expand_task": "展开任务",
         "reset_item_counts_disabled_complete": "将此任务标记为未完成以重置物品计数",
         "reset_item_counts_disabled_failed": "将此任务标记为可用以重置物品计数",
         "reset_item_counts_disabled_nothing_to_reset": "没有可重置的物品计数",
@@ -1874,7 +1884,8 @@
         "show_xp": "显示经验奖励",
         "show_next": "显示后续任务",
         "show_prev": "显示前置任务",
-        "density": "卡片密度",
+        "collapse_by_default": "默认情况下收起任务",
+        "hide_rewards": "隐藏奖励",
         "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
         "flags_section": "任务显示",
         "availability_section": "任务可用性",

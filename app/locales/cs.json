@@ -5,6 +5,9 @@
     "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
     "no_reference": "N/A",
     "error": {
+      "cache_purge_failed": "Nelze odstranit mezipaměť. Zkuste to prosím znovu.",
+      "invalid_purge_type": "Vyberte platný typ čištění mezipaměti.",
+      "method_not_allowed": "Tato metoda požadavku není podporována.",
       "admin_privileges_required": "Nemáte oprávnění k provedení této akce.",
       "authentication_required": "Pro pokračování musíte být přihlášeni.",
       "invalid_channel": "Zadejte platný název kanálu Twitch.",
@@ -921,7 +924,9 @@
           "experience_rewards": "Zkušenosti odměn",
           "next_tasks": "Další úkoly",
           "previous_tasks": "Předchozí úkoly",
-          "collapse_completed_objectives": "Sbalit cíle při dokončených úkolech"
+          "collapse_completed_objectives": "Sbalit cíle při dokončených úkolech",
+          "collapse_by_default": "Sbalit úkoly ve výchozím nastavení",
+          "hide_rewards": "Skrýt odměny"
         },
         "filter_bar": {
           "hint": "Zvolte, zda zobrazit nebo schovat stavové filtry.",
@@ -954,8 +959,11 @@
         "show_map": "Zobrazit mapu",
         "hide_map": "Skrýt mapu",
         "fullscreen_label": "Celá obrazovka",
+        "required_items": "Požadované položky",
+        "required_keys": "Požadované klíče",
         "required_items_summary": "Požadované položky pro aktivní úkoly",
         "required_keys_summary": "Požadované klíče pro aktivní úkoly",
+        "active_tasks_group": "Aktivní úkoly",
         "time_period": {
           "dawn": "Úsvit",
           "day": "Den",
@@ -1002,6 +1010,8 @@
         "available_button": "Označit k dispozici",
         "uncomplete_button": "Označit jako nedokončené",
         "reset_item_counts": "Resetovat počet položek",
+        "collapse_task": "Sbalit úkol",
+        "expand_task": "Rozbalit úkol",
         "reset_item_counts_disabled_complete": "Nedokončete tento úkol pro resetování počtu položek",
         "reset_item_counts_disabled_failed": "Označit tento úkol jako dostupný pro obnovení počtu položek",
         "reset_item_counts_disabled_nothing_to_reset": "Neexistují žádné počty položek k obnovení",
@@ -1874,7 +1884,8 @@
         "show_xp": "Zobrazit XP odměny",
         "show_next": "Zobrazit další úkoly",
         "show_prev": "Zobrazit předchozí úkoly",
-        "density": "Hustota karty",
+        "collapse_by_default": "Sbalit úkoly ve výchozím nastavení",
+        "hide_rewards": "Skrýt odměny",
         "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
         "flags_section": "Zobrazení úloh",
         "availability_section": "Dostupnost úkolu",

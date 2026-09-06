@@ -5,6 +5,9 @@
     "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
     "no_reference": "N/A",
     "error": {
+      "cache_purge_failed": "Не удалось очистить кэш. Пожалуйста, попробуйте еще раз.",
+      "invalid_purge_type": "Выберите правильный тип очистки кэша.",
+      "method_not_allowed": "Этот метод запроса не поддерживается.",
       "admin_privileges_required": "У вас нет разрешения на выполнение этого действия.",
       "authentication_required": "Вы должны войти для продолжения.",
       "invalid_channel": "Введите правильное имя канала Twitch.",
@@ -921,7 +924,9 @@
           "experience_rewards": "Получаемый опыт",
           "next_tasks": "Следующие задания",
           "previous_tasks": "Предыдущие задания",
-          "collapse_completed_objectives": "Свернуть цели выполненных заданий"
+          "collapse_completed_objectives": "Свернуть цели выполненных заданий",
+          "collapse_by_default": "Свернуть задания по умолчанию",
+          "hide_rewards": "Скрыть награды"
         },
         "filter_bar": {
           "hint": "Показать или скрыть фильтры статуса.",
@@ -954,8 +959,11 @@
         "show_map": "Показать карту",
         "hide_map": "Скрыть карту",
         "fullscreen_label": "Полный экран",
+        "required_items": "Обязательные элементы",
+        "required_keys": "Требуемые ключи",
         "required_items_summary": "Необходимые предметы для активных заданий",
         "required_keys_summary": "Необходимые ключи для активных заданий",
+        "active_tasks_group": "Активные задачи",
         "time_period": {
           "dawn": "Рассвет",
           "day": "День",
@@ -1002,6 +1010,8 @@
         "available_button": "Отметить Доступным",
         "uncomplete_button": "Отметить Незавершённым",
         "reset_item_counts": "Сбросить счётчики предметов",
+        "collapse_task": "Свернуть задачу",
+        "expand_task": "Развернуть задачу",
         "reset_item_counts_disabled_complete": "Отметьте задание незавершённым, чтобы сбросить счётчики",
         "reset_item_counts_disabled_failed": "Отметьте задание доступным, чтобы сбросить счётчики",
         "reset_item_counts_disabled_nothing_to_reset": "Нет счётчиков предметов для сброса",
@@ -1874,7 +1884,8 @@
         "show_xp": "Показывать награды опыта",
         "show_next": "Показывать следующие задания",
         "show_prev": "Показывать предыдущие задания",
-        "density": "Плотность карточек",
+        "collapse_by_default": "Свернуть задания по умолчанию",
+        "hide_rewards": "Скрыть награды",
         "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
         "flags_section": "Отображение задач",
         "availability_section": "Доступность задачи",

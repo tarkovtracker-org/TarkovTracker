@@ -5,6 +5,9 @@
     "load_error_description": "Error al cargar los datos del administrador. Por favor, actualice o póngase en contacto con soporte. Referencia: {reference}",
     "no_reference": "N/D",
     "error": {
+      "cache_purge_failed": "No se pudo purgar la caché. Por favor, inténtelo de nuevo.",
+      "invalid_purge_type": "Seleccione un tipo de purga de caché válido.",
+      "method_not_allowed": "Este método de solicitud no es compatible.",
       "admin_privileges_required": "No tienes permiso para realizar esta acción.",
       "authentication_required": "Debes iniciar sesión para continuar.",
       "invalid_channel": "Introduzca un nombre de canal válido de Twitch.",
@@ -921,7 +924,9 @@
           "experience_rewards": "Recompensas de experiencia",
           "next_tasks": "Próximas tareas",
           "previous_tasks": "Tareas anteriores",
-          "collapse_completed_objectives": "Contraer objetivos en tareas completadas"
+          "collapse_completed_objectives": "Contraer objetivos en tareas completadas",
+          "collapse_by_default": "Colapsar misiones por defecto",
+          "hide_rewards": "Ocultar recompensas"
         },
         "filter_bar": {
           "hint": "Mostrar u ocultar filtros de estado.",
@@ -954,8 +959,11 @@
         "show_map": "Mostrar mapa",
         "hide_map": "Ocultar mapa",
         "fullscreen_label": "Pantalla completa",
+        "required_items": "Artículos requeridos",
+        "required_keys": "Claves requeridas",
         "required_items_summary": "Objetos necesarios para tareas activas",
         "required_keys_summary": "Llaves necesarias para tareas activas",
+        "active_tasks_group": "Tareas activas",
         "time_period": {
           "dawn": "Amanecer",
           "day": "Día",
@@ -1002,6 +1010,8 @@
         "available_button": "Marcar como disponible",
         "uncomplete_button": "Marcar como no completado",
         "reset_item_counts": "Restablecer conteos de objetos",
+        "collapse_task": "Colapsar tarea",
+        "expand_task": "Expandir tarea",
         "reset_item_counts_disabled_complete": "Marca esta misión como incompleta para restablecer conteos",
         "reset_item_counts_disabled_failed": "Marca esta misión como disponible para restablecer conteos",
         "reset_item_counts_disabled_nothing_to_reset": "No hay conteos de objetos que restablecer",
@@ -1874,7 +1884,8 @@
         "show_xp": "Mostrar recompensas de XP",
         "show_next": "Mostrar misiones siguientes",
         "show_prev": "Mostrar misiones anteriores",
-        "density": "Densidad de tarjetas",
+        "collapse_by_default": "Colapsar misiones por defecto",
+        "hide_rewards": "Ocultar recompensas",
         "require_trader_levels": "Require Trader Loyalty Level and Reputation for Task Availability",
         "flags_section": "Mostrar tarea",
         "availability_section": "Disponibilidad de tareas",
