@@ -105,7 +105,7 @@ describe('useSupabaseListener cleanup', () => {
     });
     await vi.advanceTimersByTimeAsync(0);
     store.$state = { name: 'old', count: 5 };
-    tracker.acknowledge({ ...store.$state });
+    tracker.captureAcknowledgement({ ...store.$state })();
     store.$state.count = 0;
     onData.mockClear();
     channel.on.mock.calls[0]?.[2]({ eventType: 'UPDATE', new: { name: 'remote', count: 5 } });

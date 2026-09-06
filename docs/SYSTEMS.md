@@ -794,6 +794,8 @@ flowchart LR
   normalized reconnect progress. Deferred legacy reads retain startup retries and API error mapping.
   Unmaterialized normalized rows are absent for startup fallback and freshness. Outbound writes are
   serialized with captured payloads and versions; resumed saves cannot overtake an in-flight save.
+  Save acknowledgements advance only their changed paths, preserving unrelated remote values
+  accepted while the save was queued or in flight.
   Supporter status refreshes after the first join as well as subsequent joins to close the
   initial read/join gap. Initialization delegates the initial status read to the subscription, with a
   single fallback read if the initial join fails.

@@ -3,6 +3,7 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultState, type UserState } from '@/stores/progressState';
 import { recordLocalSyncTime, resetSyncTimeline } from '@/stores/tarkov/syncTimeline';
+import { installRealtimeVisibility } from '@/utils/realtimeVisibility';
 const showProgressMerged = vi.fn();
 type FakeChannel = {
   topic: string;
@@ -65,6 +66,11 @@ const {
   });
   const supabaseContext = {
     client: {
+      realtime: {
+        connect: vi.fn(),
+        disconnect: vi.fn().mockResolvedValue(undefined),
+        getChannels: vi.fn(() => []),
+      },
       from: vi.fn(),
       // Mirrors `RealtimeClient.channel()`: an open topic returns the live channel.
       channel: vi.fn((topic: string) => {
@@ -143,6 +149,29 @@ describe('seasonal progress realtime synchronization', () => {
     await cleanupRealtimeListener();
     resetSyncTimeline();
     vi.clearAllMocks();
+  });
+  it('ignores late progress events while the shared transport is suspended', async () => {
+    vi.useFakeTimers();
+    const page = Object.assign(new EventTarget(), { visibilityState: 'hidden' as const });
+    const disposeVisibility = installRealtimeVisibility(supabaseContext.client.realtime, page);
+    try {
+      const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+      await setupRealtimeListener(store);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(supabaseContext.client.realtime.disconnect).toHaveBeenCalled();
+      handlers.get('user_game_mode_progress')?.({
+        new: {
+          game_mode: 'pvp',
+          season_number: 0,
+          progress_data: { ...state.pvp, level: 55 },
+          updated_at: new Date().toISOString(),
+        },
+      });
+      expect(state.pvp.level).toBe(defaultState.pvp.level);
+    } finally {
+      disposeVisibility();
+      vi.useRealTimers();
+    }
   });
   it('rebuilds the channel when setup runs again with one already active', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');

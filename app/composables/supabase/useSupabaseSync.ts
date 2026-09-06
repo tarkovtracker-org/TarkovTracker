@@ -226,7 +226,7 @@ export function useSupabaseSync<
   const syncToSupabase = async (
     transformedState: TPayload | null,
     syncVersion: number,
-    savedState: Record<string, unknown>
+    acknowledge: () => void
   ): Promise<TPayload | null> => {
     logger.debug('[Sync] syncToSupabase called', {
       loggedIn: $supabase.user.loggedIn,
@@ -257,7 +257,7 @@ export function useSupabaseSync<
       // Skip sync if data hasn't changed (reduces egress significantly)
       const currentHash = hashState(dataToSave);
       if (currentHash === lastSyncedHash) {
-        pendingState.acknowledge(savedState);
+        acknowledge();
         if (syncVersion === localVersion) pendingLocalChanges = false;
         logger.debug('[Sync] Skipping - data unchanged');
         isSyncing.value = false;
@@ -266,7 +266,7 @@ export function useSupabaseSync<
       logPayload(dataToSave);
       const synced = await writePayload(dataToSave, ownerId);
       if (synced && !disposed && $supabase.user.id === ownerId) {
-        pendingState.acknowledge(savedState);
+        acknowledge();
         lastSyncedHash = currentHash;
         if (syncVersion === localVersion) pendingLocalChanges = false;
         logger.debug(`[Sync] ✅ Successfully synced to ${table}`);
@@ -299,12 +299,12 @@ export function useSupabaseSync<
     if (disposed || isPaused.value || !$supabase.user.loggedIn || !$supabase.user.id)
       return Promise.resolve(null);
     const version = localVersion;
-    const savedState = snapshotSyncState(state);
+    const acknowledge = pendingState.captureAcknowledgement(snapshotSyncState(state));
     const snapshot = capturePayload(state);
     const ownerId = $supabase.user.id;
     const run = () => {
       if (disposed || $supabase.user.id !== ownerId) return Promise.resolve(null);
-      return syncToSupabase(snapshot, version, savedState);
+      return syncToSupabase(snapshot, version, acknowledge);
     };
     const result = syncQueue ? syncQueue.then(run, run) : run();
     syncQueue = result;

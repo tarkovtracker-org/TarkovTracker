@@ -108,6 +108,29 @@ describe('useSupabaseSync', () => {
     });
     sync.cleanup();
   });
+  it('does not regress remote fields when a prior save finishes after reconciliation', async () => {
+    const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+    let finish!: (result: { error: null }) => void;
+    upsert.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
+    const store = createMockStore({ pvp: { count: 5, name: 'old' } });
+    const sync = useSupabaseSync({ store, table: 'test_table' });
+    store.$state.pvp.count = 0;
+    store.notifySubscriber();
+    const saving = sync.syncToSupabase();
+    expect(upsert).toHaveBeenCalledOnce();
+    Object.assign(store.$state, sync.captureRemoteMerge!()({ pvp: { count: 5, name: 'remote' } }));
+    expect(store.$state.pvp).toEqual({ count: 0, name: 'remote' });
+    finish({ error: null });
+    await saving;
+    const newer = sync.captureRemoteMerge!()({ pvp: { count: 3, name: 'newer remote' } });
+    expect(newer).toEqual({ pvp: { count: 3, name: 'newer remote' } });
+    sync.cleanup();
+  });
   it('queues resumed saves behind an in-flight write', async () => {
     const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
     let finishFirst!: (result: { error: null }) => void;

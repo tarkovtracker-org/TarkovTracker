@@ -39,8 +39,13 @@ export const preservePendingPaths = (base: unknown, local: unknown, remote: unkn
 export const createPendingStateTracker = (getState: () => unknown) => {
   let baseline = snapshotSyncState(getState());
   return {
-    acknowledge: (state: Snapshot) => {
-      baseline = state;
+    captureAcknowledgement: (state: Snapshot): (() => void) => {
+      const beforeWrite = baseline;
+      return () => {
+        // A save acknowledges its changed paths, not unrelated remote values
+        // accepted while that save was queued or in flight.
+        baseline = snapshotSyncState(preservePendingPaths(beforeWrite, state, baseline));
+      };
     },
     capture: (): RemoteStateMerge => {
       const beforeRead = baseline;
