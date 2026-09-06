@@ -5,6 +5,9 @@
     "load_error_description": "Failed to load admin data. Please refresh or contact support. Reference: {reference}",
     "no_reference": "N/A",
     "error": {
+      "cache_purge_failed": "Nelze odstranit mezipaměť. Zkuste to prosím znovu.",
+      "invalid_purge_type": "Vyberte platný typ čištění mezipaměti.",
+      "method_not_allowed": "Tato metoda požadavku není podporována.",
       "admin_privileges_required": "Nemáte oprávnění k provedení této akce.",
       "authentication_required": "Pro pokračování musíte být přihlášeni.",
       "invalid_channel": "Zadejte platný název kanálu Twitch.",
