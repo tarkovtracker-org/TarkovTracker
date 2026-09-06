@@ -1260,11 +1260,51 @@ detached tree; its zero bounding rectangle must not trigger auto-fill. Hidden or
 sentinels consume no auto-load budget. The existing intersection observer checks again when
 the list becomes visible; configured scroll fallback and explicit checks use the same guard.
 
-The tasks page retains its loading state until metadata is ready and the first visible-task
-refresh settles. Reset that readiness when metadata starts loading again. Metadata readiness
+The tasks page requests objectives, rewards, item-lite hydration, and edition eligibility through the
+readiness composable `useTaskDetailReadiness`, which invokes the existing cached/deduplicated
+metadata store actions. Keep its loading state
+until these requests, background edition revalidation, objective mode-count metadata, and the
+first visible-task refresh settle. This prevents objective
+skeleton/reward reflow and an initial list filtered without edition eligibility. This eager
+request is scoped to the tasks page; other routes retain the store's idle scheduling. Edition
+responses, errors, and cleanup apply only to the current promise; superseded cache reads and
+network requests cannot overwrite current eligibility, cache payloads, or loading state.
+Normalize edition and chapter network payloads before applying either, preserving existing
+data if normalization fails. Empty cached editions do not replace loaded eligibility.
+
+Task readiness uses `ensureEditionsData` to join or reuse the session's universal edition request,
+including a request settled during bootstrap/core loading. Explicit `fetchEditionsData` calls keep
+their cache revalidation behavior. Queued reward work, like editions, is consumed by a later eager
+request; other routes retain their idle load when no caller takes ownership.
+
+Initialization marks `tasksCoreRefreshing` before updating locale/mode and reading caches.
+`fetchAllData` registers its phase synchronously before bootstrap; initialization then releases
+its setup phase. A per-store set retains every active phase until core settlement, including
+failures, so either completion order keeps readiness pending while another core refresh can run.
+Task readiness stays false during this phase, so locale changes cannot reveal old core data
+while bootstrap is pending. Optional requests remain outside this phase and keep their timeout.
+
+Deferred edition callbacks capture a request version. A later edition request, including a
+deduplicated join, consumes that queued load; the callback skips its redundant revalidation.
+Routes without an eager request retain idle edition loading.
+
+Core-task replacements advance `tasksCoreRevision`, including cache hits that never raise
+`loading`; detail/item merges do not advance it. Readiness watches this revision so cached
+locale replacements and empty-to-populated core recovery start a new wait. After objectives
+and rewards/items settle, await objective mode-count metadata; retry once only when the store
+returns `stale` for a response discarded during task replacement. Handled failures are not retried. The existing gate timer still bounds this wait.
+
+Optional detail requests use a three-second gate timer after core readiness; on expiry,
+resume filtering/rendering while late requests continue. Failed requests also release
+the gate. Mode/locale changes, core reloads, and scope disposal invalidate earlier waits and clear
+their timers. An empty task dataset does not wait for optional requests.
+
+Reset filter readiness when metadata or task-detail readiness resets. Metadata readiness
 alone must not expose the empty state during the debounced filter refresh; a completed refresh
 with no matching tasks still shows the normal empty state. Subsequent filter changes retain
-the existing debounce and task actions still request an immediate refresh.
+the existing debounce and task actions still request an immediate refresh. Deep-link effects
+use this combined loading state so queries wait for mounted cards and retry after readiness
+clears even when the filtered task IDs have not changed.
 
 Keep the tasks page's eight-card batches, preload margin, and auto-load caps. Do not defer
 critical metadata or change task filters, progress state, or card expansion to mask mounting
