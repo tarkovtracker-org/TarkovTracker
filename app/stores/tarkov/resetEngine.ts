@@ -76,8 +76,8 @@ export const resolveInitialSyncState = (
     // entire progress snapshot supersedes local timestamped edits.
     if (mergeModeSnapshots) {
       return preferLocalMetadata
-        ? mergeProgressData(remoteModeData, localModeData)
-        : mergeProgressData(localModeData, remoteModeData);
+        ? mergeProgressData(remoteModeData, localModeData, true)
+        : mergeProgressData(localModeData, remoteModeData, true);
     }
     return {
       ...preferredModeData,

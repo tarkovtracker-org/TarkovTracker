@@ -59,6 +59,24 @@ describe('performReset seasonal', () => {
       resolveInitialSyncState(local, remote, 20, 30, 2, 1, true).pvp.taskCompletions.localTask
     ).toBeUndefined();
   });
+  it.each([true, false])(
+    'preserves newer count decrements and explicit clears (local preferred: %s)',
+    (preferLocal) => {
+      const local = structuredClone(defaultState);
+      const remote = structuredClone(defaultState);
+      const preferred = preferLocal ? local : remote;
+      const older = preferLocal ? remote : local;
+      preferred.pvp.taskObjectives.objective = { count: 0, complete: false };
+      older.pvp.taskObjectives.objective = { count: 5, complete: true };
+      // Per-entry timestamps override the overall snapshot preference.
+      preferred.pvp.hideoutParts.part = { count: 8, timestamp: 10 };
+      older.pvp.hideoutParts.part = { count: 2, timestamp: 20 };
+      const result = resolveInitialSyncState(local, remote, preferLocal ? 30 : 10, 20, 1, 1, true);
+      expect(result.pvp.taskObjectives.objective?.count).toBe(0);
+      expect(result.pvp.taskObjectives.objective?.complete).toBe(false);
+      expect(result.pvp.hideoutParts.part?.count).toBe(2);
+    }
+  );
   it('resets only the seasonal mode and leaves persistent progress untouched', async () => {
     const store = createStore();
     await performReset('seasonal', store);

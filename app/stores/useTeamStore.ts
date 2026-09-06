@@ -803,6 +803,11 @@ export function useTeammateStores() {
             .from('user_game_mode_progress')
             .select('game_mode,season_number,progress_data')
             .eq('user_id', teammateId);
+          if (!isHydrationActive() || request !== hydrationRequest) return;
+          if (modeRows.error) {
+            logTeammateModeProgressHydrationFailure(modeRows.error, teammateId);
+            return;
+          }
           const needsLegacy = !(modeRows.data ?? []).some(
             (row) =>
               row.game_mode === legacyMode &&
@@ -813,10 +818,6 @@ export function useTeammateStores() {
             ? await fetchLegacyTeammateProgress($supabase.client, teammateId, legacyMode)
             : { data: null, error: null };
           if (!isHydrationActive() || request !== hydrationRequest) return;
-          if (modeRows.error) {
-            logTeammateModeProgressHydrationFailure(modeRows.error, teammateId);
-            return;
-          }
           applyModeProgressRows(modeRows.data);
           applyLegacyModeProgress(legacyRow);
           replayHydratedProgressMetadata();

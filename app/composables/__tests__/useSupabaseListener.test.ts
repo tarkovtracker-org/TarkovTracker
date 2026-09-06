@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createPendingStateTracker } from '@/utils/pendingState';
 import type { Store } from 'pinia';
 const { channel, client, loggerMock, removeChannel } = vi.hoisted(() => {
   const realtimeChannel = {
@@ -83,6 +84,51 @@ describe('useSupabaseListener cleanup', () => {
     pending = false;
     await vi.advanceTimersByTimeAsync(0);
     expect(onData).not.toHaveBeenCalled();
+    expect(listener.hasInitiallyLoaded.value).toBe(true);
+    listener.cleanup();
+  });
+  it('preserves a pending live edit while applying unrelated remote fields', async () => {
+    const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
+    const store = createStore();
+    store.$state = { name: 'old', count: 5 };
+    const tracker = createPendingStateTracker(() => store.$state);
+    const onData = vi.fn((data) => {
+      store.$state = data ?? {};
+    });
+    const listener = useSupabaseListener({
+      filter: 'id=eq.row-1',
+      store,
+      table: 'test_table',
+      patchStore: false,
+      onData,
+      syncController: { pause: vi.fn(), resume: vi.fn(), captureRemoteMerge: tracker.capture },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    store.$state = { name: 'old', count: 5 };
+    tracker.acknowledge({ ...store.$state });
+    store.$state.count = 0;
+    onData.mockClear();
+    channel.on.mock.calls[0]?.[2]({ eventType: 'UPDATE', new: { name: 'remote', count: 5 } });
+    expect(onData).toHaveBeenCalledWith({ name: 'remote', count: 0 });
+    listener.cleanup();
+  });
+  it('applies reconnect data when unrelated store fields changed during the read', async () => {
+    const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
+    const store = createStore();
+    const onData = vi.fn();
+    const listener = useSupabaseListener({
+      filter: 'id=eq.row-1',
+      store,
+      table: 'test_table',
+      patchStore: false,
+      onData,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    onData.mockClear();
+    channel.subscribe.mock.calls[0]?.[0]('SUBSCRIBED');
+    store.$state.memberProfiles = { teammate: 'new' };
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onData).toHaveBeenCalledOnce();
     listener.cleanup();
   });
   it.each(['UPDATE', 'DELETE'])(

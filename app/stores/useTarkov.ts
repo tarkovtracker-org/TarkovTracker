@@ -1635,6 +1635,7 @@ export async function initializeTarkovSync() {
         table: 'user_progress',
         debounceMs: SYNC_DEBOUNCE_MS,
         onSynced: () => {
+          recordLocalSyncTime();
           if (typeof BroadcastChannel !== 'undefined') {
             const bc = new BroadcastChannel(`tarkov-progress:${$supabase.user.id}`);
             bc.postMessage('updated');
@@ -1655,8 +1656,6 @@ export async function initializeTarkovSync() {
             );
             return null; // Returning null prevents the sync
           }
-          // Track sync time for self-origin filtering in realtime listener
-          recordLocalSyncTime();
           const sanitizedUserState = sanitizeOwnedUserState(userState);
           return {
             current_game_mode: sanitizedUserState.currentGameMode || GAME_MODES.PVP,

@@ -1,6 +1,11 @@
 import { delay } from '@/utils/async';
 import { debounce, isDebounceRejection } from '@/utils/debounce';
 import { logger } from '@/utils/logger';
+import {
+  createPendingStateTracker,
+  snapshotSyncState,
+  type RemoteStateMerge,
+} from '@/utils/pendingState';
 import type { StateTree, Store } from 'pinia';
 import type { UserProgressData } from '~/stores/progressState';
 type SupabaseErrorLike = {
@@ -29,6 +34,7 @@ export interface SupabaseSyncReturn<
   TPayload extends SupabaseSyncPayload = SupabaseSyncPayload,
 > {
   hasPendingChanges?: () => boolean;
+  captureRemoteMerge?: () => RemoteStateMerge;
   isSyncing: Ref<boolean>;
   isPaused: Ref<boolean>;
   cleanup: () => void;
@@ -127,6 +133,7 @@ export function useSupabaseSync<
   let lastSyncedHash: string | null = null;
   let pendingLocalChanges = false;
   let localVersion = 0;
+  const pendingState = createPendingStateTracker(() => store.$state);
   let disposed = false;
   let syncQueue: Promise<TPayload | null> | null = null;
   // fallow-ignore-next-line complexity -- development-only diagnostics exercised through sync tests; inferred coverage misses indirect calls
@@ -218,7 +225,8 @@ export function useSupabaseSync<
   // fallow-ignore-next-line complexity -- serialized save/cleanup/version guards are covered in useSupabaseSync.test.ts and sync integration tests
   const syncToSupabase = async (
     transformedState: TPayload | null,
-    syncVersion: number
+    syncVersion: number,
+    savedState: Record<string, unknown>
   ): Promise<TPayload | null> => {
     logger.debug('[Sync] syncToSupabase called', {
       loggedIn: $supabase.user.loggedIn,
@@ -249,6 +257,7 @@ export function useSupabaseSync<
       // Skip sync if data hasn't changed (reduces egress significantly)
       const currentHash = hashState(dataToSave);
       if (currentHash === lastSyncedHash) {
+        pendingState.acknowledge(savedState);
         if (syncVersion === localVersion) pendingLocalChanges = false;
         logger.debug('[Sync] Skipping - data unchanged');
         isSyncing.value = false;
@@ -257,6 +266,7 @@ export function useSupabaseSync<
       logPayload(dataToSave);
       const synced = await writePayload(dataToSave, ownerId);
       if (synced && !disposed && $supabase.user.id === ownerId) {
+        pendingState.acknowledge(savedState);
         lastSyncedHash = currentHash;
         if (syncVersion === localVersion) pendingLocalChanges = false;
         logger.debug(`[Sync] ✅ Successfully synced to ${table}`);
@@ -282,15 +292,19 @@ export function useSupabaseSync<
       return null;
     }
   };
+  // fallow-ignore-next-line complexity -- save gates and serialization are exercised through the public method in useSupabaseSync.test.ts
   const enqueueSync = (state = store.$state as TState): Promise<TPayload | null> => {
     // Capture each request before queuing: later mutations must not change an
     // earlier payload, and resumed writes must not overtake an in-flight save.
+    if (disposed || isPaused.value || !$supabase.user.loggedIn || !$supabase.user.id)
+      return Promise.resolve(null);
     const version = localVersion;
+    const savedState = snapshotSyncState(state);
     const snapshot = capturePayload(state);
     const ownerId = $supabase.user.id;
     const run = () => {
       if (disposed || $supabase.user.id !== ownerId) return Promise.resolve(null);
-      return syncToSupabase(snapshot, version);
+      return syncToSupabase(snapshot, version, savedState);
     };
     const result = syncQueue ? syncQueue.then(run, run) : run();
     syncQueue = result;
@@ -335,6 +349,7 @@ export function useSupabaseSync<
   };
   return {
     hasPendingChanges: () => pendingLocalChanges,
+    captureRemoteMerge: pendingState.capture,
     isSyncing,
     isPaused,
     cleanup,

@@ -65,6 +65,44 @@ describe('useSupabaseSync', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+  it.each(['paused', 'signed-out', 'disposed'])(
+    'does not transform a gated %s save',
+    async (gate) => {
+      const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+      const transform = vi.fn((state) => state);
+      const sync = useSupabaseSync({
+        store: createMockStore({ value: 1 }),
+        table: 'test_table',
+        transform,
+      });
+      if (gate === 'paused') sync.pause();
+      if (gate === 'signed-out') supabaseContext.user.loggedIn = false;
+      if (gate === 'disposed') sync.cleanup();
+      await sync.syncToSupabase();
+      expect(transform).not.toHaveBeenCalled();
+      expect(upsert).not.toHaveBeenCalled();
+      sync.cleanup();
+    }
+  );
+  it('merges only pending paths and protects edits saved during a snapshot read', async () => {
+    const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+    const store = createMockStore({ pvp: { name: 'old', count: 5 }, pve: { name: 'old' } });
+    const sync = useSupabaseSync({ store, table: 'test_table' });
+    store.$state.pvp.count = 0;
+    store.notifySubscriber();
+    const reconcile = sync.captureRemoteMerge!();
+    await sync.syncToSupabase();
+    expect(sync.hasPendingChanges!()).toBe(false);
+    const remote = { pvp: { name: 'remote', count: 5 }, pve: { name: 'other device' } };
+    const result = reconcile(remote);
+    expect(result).toEqual({ pvp: { name: 'remote', count: 0 }, pve: { name: 'other device' } });
+    Object.assign(store.$state, result);
+    // Applying one remote value must not make it a permanent local override.
+    expect(sync.captureRemoteMerge!()({ pve: { name: 'newer remote' } })).toEqual({
+      pve: { name: 'newer remote' },
+    });
+    sync.cleanup();
+  });
   it('queues resumed saves behind an in-flight write', async () => {
     const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
     let finishFirst!: (result: { error: null }) => void;

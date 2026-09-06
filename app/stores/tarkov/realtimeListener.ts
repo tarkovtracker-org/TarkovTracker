@@ -11,6 +11,7 @@ import {
 import { useMetadataStore } from '@/stores/useMetadata';
 import { getGameModeSeasonNumber, isGameMode, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import { createPendingStateTracker, type RemoteStateMerge } from '@/utils/pendingState';
 import {
   sanitizeGameEdition,
   sanitizeOwnedProgressData,
@@ -27,25 +28,9 @@ import {
 import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 const SYNC_RESUME_DELAY_MS = 1000;
-const mergeSnapshotProgress = (
-  local: UserProgressData,
-  remote: UserProgressData,
-  preserveLocal: boolean
-): UserProgressData => {
-  const merged = mergeProgressData(local, remote);
-  if (!preserveLocal || toProgressEpoch(local) !== toProgressEpoch(remote)) return merged;
-  // These fields have no per-field timestamps. A reconnect read cannot replace
-  // unsaved edits, including explicit clears; reset epochs still take precedence.
-  return {
-    ...merged,
-    displayName: local.displayName,
-    pmcFaction: local.pmcFaction,
-    xpOffset: local.xpOffset,
-    skillOffsets: local.skillOffsets,
-  };
-};
 export type SyncControllerHandle = {
   hasPendingChanges?: () => boolean;
+  captureRemoteMerge?: () => RemoteStateMerge;
   pause: () => void;
   resume: () => void;
 };
@@ -81,8 +66,6 @@ export const registerSyncControllerGetter = (getter: SyncControllerGetter): void
 };
 export const getRegisteredSyncController = (): SyncControllerHandle | null =>
   syncControllerGetter();
-const hasPendingLocalChanges = (): boolean =>
-  getRegisteredSyncController()?.hasPendingChanges?.() === true;
 const parseRealtimeUpdateTime = (value: unknown): number => {
   const parsed = typeof value === 'string' ? Date.parse(value) : Number.NaN;
   return Number.isNaN(parsed) ? Date.now() : parsed;
@@ -248,6 +231,9 @@ async function runSetupRealtimeListener(
   const currentUserId = $supabase.user.id;
   if (!$supabase.user.loggedIn || !currentUserId) return;
   if (!(await prepareProgressTopic(currentUserId, generation))) return;
+  const fallbackTracker = createPendingStateTracker(() => tarkovStore.$state);
+  const captureRemoteMerge = () =>
+    getRegisteredSyncController()?.captureRemoteMerge?.() ?? fallbackTracker.capture();
   const latestModeUpdateTimes = new Map<GameMode, number>();
   const acceptModeUpdate = (mode: GameMode, updateTime: number): boolean => {
     const latestUpdateTime = latestModeUpdateTimes.get(mode);
@@ -278,13 +264,22 @@ async function runSetupRealtimeListener(
     stillOwnsSetup(currentUserId, generation) &&
     !($supabase.client.realtime && isRealtimeSuspended($supabase.client.realtime));
   logger.debug('[TarkovStore] Setting up realtime listener for multi-device sync');
-  const handleProgressChange = (payload: { new: unknown; old: unknown }) => {
+  const handleProgressChange = (
+    payload: { new: unknown; old: unknown },
+    reconcile = captureRemoteMerge()
+  ) => {
     if (!isCurrentRealtimeUser()) return;
     const remoteData = payload.new as LegacyProgressMetadata;
     const updateTime = parseRealtimeUpdateTime(remoteData.updated_at);
     if (!acceptLegacyMetadataUpdate(updateTime)) return;
     const localState = sanitizeOwnedUserState(tarkovStore.$state);
-    const nextState = buildLegacyMetadataState(remoteData, localState);
+    const remoteState = buildLegacyMetadataState(remoteData, localState);
+    const metadata = reconcile({
+      currentGameMode: remoteState.currentGameMode,
+      gameEdition: remoteState.gameEdition,
+      tarkovUid: remoteState.tarkovUid,
+    });
+    const nextState = { ...localState, ...metadata } as UserState;
     if (shouldIgnoreLegacyMetadataUpdate(updateTime, nextState, localState)) return;
     const isLikelySelfOrigin = isLikelySelfOriginUpdate(updateTime);
     logger.debug('[TarkovStore] Remote metadata update detected, applying changes', {
@@ -303,14 +298,19 @@ async function runSetupRealtimeListener(
   };
   const handleModeProgressChange = (
     payload: { new: unknown },
-    preserveLocal = hasPendingLocalChanges()
+    reconcile = captureRemoteMerge()
   ) => {
     if (!isCurrentRealtimeUser()) return;
     const remote = acceptRealtimeModeProgress(payload.new);
     if (!remote) return;
     const { mode, progress: remoteProgress, updateTime } = remote;
     const localState = sanitizeOwnedUserState(tarkovStore.$state);
-    const nextProgress = mergeSnapshotProgress(localState[mode], remoteProgress, preserveLocal);
+    const merged = mergeProgressData(localState[mode], remoteProgress);
+    const nextProgress = reconcile(
+      { [mode]: remoteProgress },
+      { [mode]: merged },
+      toProgressEpoch(localState[mode]) === toProgressEpoch(remoteProgress)
+    )[mode] as UserProgressData;
     if (shouldIgnoreModeProgressUpdate(mode, updateTime, nextProgress, localState[mode])) return;
     const conflicts = detectDataConflicts(localState[mode], remoteProgress);
     const apiUpdateHandled = maybeNotifyApiUpdate(
@@ -365,12 +365,7 @@ async function runSetupRealtimeListener(
   // fallow-ignore-next-line complexity -- snapshot/event/edit races are covered in realtimeListener.seasonal.test.ts; keep generation checks together
   const refreshSnapshot = async () => {
     const request = ++refreshGeneration;
-    const stateBeforeRead = sanitizeOwnedUserState(tarkovStore.$state);
-    const pendingBeforeRead = hasPendingLocalChanges();
-    const metadataBeforeRead = buildLegacyMetadataState(
-      {},
-      sanitizeOwnedUserState(tarkovStore.$state)
-    );
+    const reconcile = captureRemoteMerge();
     try {
       const [metadata, modes] = await Promise.all([
         client
@@ -386,27 +381,12 @@ async function runSetupRealtimeListener(
       if (!isCurrentRealtimeUser() || request !== refreshGeneration) return;
       if (modes.error) throw modes.error;
       if (metadata.error && metadata.error.code !== 'PGRST116') throw metadata.error;
-      const currentState = sanitizeOwnedUserState(tarkovStore.$state);
-      const metadataUnchanged =
-        currentState.currentGameMode === metadataBeforeRead.currentGameMode &&
-        currentState.gameEdition === metadataBeforeRead.gameEdition &&
-        currentState.tarkovUid === metadataBeforeRead.tarkovUid;
-      if (
-        metadata.data &&
-        metadataUnchanged &&
-        !hasPendingLocalChanges() &&
-        parseRealtimeUpdateTime(metadata.data.updated_at) >= getLastLocalSyncTime()
-      ) {
-        handleProgressChange({ new: metadata.data, old: null });
+      if (metadata.data) {
+        handleProgressChange({ new: metadata.data, old: null }, reconcile);
       }
       for (const row of modes.data ?? []) {
         if (!isGameMode(row.game_mode)) continue;
-        const preserveLocal =
-          pendingBeforeRead ||
-          hasPendingLocalChanges() ||
-          !deepEqual(stateBeforeRead[row.game_mode], tarkovStore.$state[row.game_mode]) ||
-          parseRealtimeUpdateTime(row.updated_at) < getLastLocalSyncTime();
-        handleModeProgressChange({ new: row }, preserveLocal);
+        handleModeProgressChange({ new: row }, reconcile);
       }
     } catch (error) {
       logger.warn('[TarkovStore] Reconnect snapshot failed', error);

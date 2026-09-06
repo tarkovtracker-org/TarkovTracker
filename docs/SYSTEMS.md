@@ -775,7 +775,9 @@ flowchart LR
   an outstanding disconnect before reconnecting once. Auth, local persistence, and outbound saves
   remain active. Rejoined consumers refresh authoritative snapshots; owner progress uses existing
   merge/epoch rules, and snapshot responses cannot overwrite newer live events or another session.
-  Pending profile fields (including explicit clears) survive reconnect reads, incoming live events,
+  A three-way merge compares each field with its acknowledged baseline, retaining only locally
+  changed paths while accepting unrelated remote changes, including changes in other modes.
+  Pending fields (including explicit clears) survive reconnect reads, incoming live events,
   and edits made during those reads; a higher reset epoch still wins over an older epoch's edits.
 - Progress RPC upserts compare sanitized account/mode values before updating. Identical saves do not
   change progress timestamps or emit progress-row events. The legacy compatibility trigger remains;
@@ -789,7 +791,9 @@ flowchart LR
   normalized reconnect progress. Deferred legacy reads retain startup retries and API error mapping.
   Unmaterialized normalized rows are absent for startup fallback and freshness. Outbound writes are
   serialized with captured payloads and versions; resumed saves cannot overtake an in-flight save.
-  Supporter status refreshes on subsequent joins without duplicating the initial status load.
+  Supporter status refreshes after the first join as well as subsequent joins to close the
+  initial read/join gap and recover an unsuccessful initial read. Skipped saves do not run
+  payload transforms; the self-origin timestamp advances only after a successful write.
 - Startup fetches metadata and normalized modes before requesting missing persistent legacy columns.
   Shared-profile, gateway, and teammate reads request legacy progress only when their existing
   fallback rules require it. Public visibility and team authorization still precede fallback use.

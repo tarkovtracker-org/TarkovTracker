@@ -265,7 +265,7 @@ describe('seasonal progress realtime synchronization', () => {
       new: {
         game_mode: 'pvp',
         season_number: 0,
-        progress_data: { level: 35 },
+        progress_data: { level: 35, displayName: 'live' },
         updated_at: '2026-09-06T12:01:00Z',
       },
     });
@@ -274,7 +274,11 @@ describe('seasonal progress realtime synchronization', () => {
         {
           game_mode: 'pvp',
           season_number: 0,
-          progress_data: { level: 12 },
+          progress_data: {
+            level: 12,
+            displayName: 'older',
+            taskObjectives: { staleOnly: { count: 9 } },
+          },
           updated_at: '2026-09-06T12:00:00Z',
         },
       ],
@@ -282,7 +286,51 @@ describe('seasonal progress realtime synchronization', () => {
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(state.pvp.level).toBe(35);
+    expect(state.pvp.displayName).toBe('live');
+    expect(state.pvp.taskObjectives.staleOnly).toBeUndefined();
     expect(createdChannels).toHaveLength(1);
+  });
+  it('preserves local clears while accepting unrelated mode and field updates', async () => {
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    state.pvp.taskObjectives.objective = { count: 5 };
+    state.pvp.hideoutParts.part = { count: 3 };
+    state.pvp.storyChapters.chapter = { complete: true };
+    await setupRealtimeListener(store);
+    state.pvp.taskObjectives.objective = { count: 0 };
+    delete state.pvp.hideoutParts.part;
+    state.pvp.storyChapters.chapter = { complete: false };
+    const handler = handlers.get('user_game_mode_progress');
+    handler?.({
+      new: {
+        game_mode: 'pvp',
+        season_number: 0,
+        updated_at: new Date().toISOString(),
+        progress_data: {
+          ...structuredClone(defaultState.pvp),
+          displayName: 'remote name',
+          taskObjectives: { objective: { count: 5 }, other: { count: 2 } },
+          hideoutParts: { part: { count: 3 } },
+          storyChapters: { chapter: { complete: true } },
+        },
+      },
+    });
+    handler?.({
+      new: {
+        game_mode: 'pve',
+        season_number: 0,
+        updated_at: new Date().toISOString(),
+        progress_data: {
+          ...structuredClone(defaultState.pve),
+          displayName: 'other mode',
+        },
+      },
+    });
+    expect(state.pvp.displayName).toBe('remote name');
+    expect(state.pve.displayName).toBe('other mode');
+    expect(state.pvp.taskObjectives.objective?.count).toBe(0);
+    expect(state.pvp.taskObjectives.other?.count).toBe(2);
+    expect(state.pvp.hideoutParts.part).toBeUndefined();
+    expect(state.pvp.storyChapters.chapter?.complete).toBe(false);
   });
   it.each([
     'pending',

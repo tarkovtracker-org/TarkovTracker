@@ -113,7 +113,6 @@ export function useSupporter() {
     if ($supabase.user?.loggedIn === false || $supabase.user?.id !== userId) return;
     if (channel || channelUserId) return;
     const client = $supabase.client;
-    let joined = false;
     const nextChannel = client
       .channel(topic)
       .on(
@@ -132,8 +131,7 @@ export function useSupporter() {
       )
       .subscribe((status, err) => {
         if (status === 'SUBSCRIBED' && requestVersion === subscriptionRequestVersion) {
-          if (joined) void fetchStatus(userId);
-          joined = true;
+          void fetchStatus(userId);
         }
         logChannelSubscribeFailure('Supporter', status, err, { userId });
       });

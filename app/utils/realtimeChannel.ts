@@ -184,7 +184,7 @@ export const subscribeAndWaitForRealtimeChannel = (
           return;
         }
         needsRefresh = true;
-        if (suspended() && status !== 'CLOSED') return;
+        if (suspended()) return;
         if (
           logChannelSubscribeFailure(label, status, error, context, {
             treatClosedAsFailure: true,

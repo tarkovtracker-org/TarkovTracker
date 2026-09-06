@@ -8,6 +8,7 @@ import {
   type OwnedRealtimeChannel,
 } from '@/utils/realtimeChannel';
 import { clearStaleState, resetStore, safePatchStore } from '@/utils/storeHelpers';
+import type { RemoteStateMerge } from '@/utils/pendingState';
 import type { PostgrestError, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import type { StateTree, Store } from 'pinia';
 // Local imports
@@ -23,7 +24,12 @@ export interface SupabaseListenerConfig<
   onData?: (data: TData | null) => void;
   patchStore?: boolean;
   /** Optional sync controller to pause during remote updates */
-  syncController?: { pause: () => void; resume: () => void; hasPendingChanges?: () => boolean };
+  syncController?: {
+    pause: () => void;
+    resume: () => void;
+    hasPendingChanges?: () => boolean;
+    captureRemoteMerge?: () => RemoteStateMerge;
+  };
   scope?: ListenerScope;
 }
 interface SupabaseListenerReturn {
@@ -124,11 +130,20 @@ export function useSupabaseListener<
     }
     onData?.(data);
   };
+  const reconcileData = (data: TData | null, reconcile?: RemoteStateMerge): TData | null => {
+    if (!reconcile) return data;
+    if (data) return reconcile(data) as TData;
+    // A deleted/missing row clears acknowledged fields, but must not erase
+    // local edits that are still waiting for upload.
+    const cleared = Object.fromEntries(Object.keys(store.$state).map((key) => [key, undefined]));
+    const merged = reconcile(cleared);
+    return Object.values(merged).some((value) => value !== undefined) ? (merged as TData) : null;
+  };
   // Initial fetch
   // fallow-ignore-next-line complexity -- tested fetch cancellation and pending-save guards must share one response boundary
   const fetchData = async (reconnecting = false) => {
     const pendingBeforeRead = syncController?.hasPendingChanges?.() === true;
-    const stateBeforeRead = reconnecting ? JSON.stringify(store.$state) : null;
+    const reconcile = syncController?.captureRemoteMerge?.();
     const fetchVersion = ++latestFetchVersion;
     activeFetchController?.abort();
     const fetchController = new AbortController();
@@ -160,12 +175,13 @@ export function useSupabaseListener<
       // save, including edits that were saved while this request was in flight.
       if (
         reconnecting &&
-        (pendingBeforeRead ||
-          syncController?.hasPendingChanges?.() ||
-          stateBeforeRead !== JSON.stringify(store.$state))
-      )
+        !reconcile &&
+        (pendingBeforeRead || syncController?.hasPendingChanges?.())
+      ) {
+        hasInitiallyLoaded.value = true;
         return;
-      applyFetchedData(data);
+      }
+      applyFetchedData(reconcileData(data, reconcile));
       hasInitiallyLoaded.value = true;
     } catch (error) {
       if (fetchController.signal.aborted || isAbortError(error)) {
@@ -204,20 +220,13 @@ export function useSupabaseListener<
           syncController?.pause();
           try {
             if (subscriptionVersion !== cleanupVersion) return;
-            if (payload.eventType === 'DELETE') {
-              if (patchStore) {
-                resetStore(store);
-              }
-              if (onData) onData(null);
-            } else {
-              // INSERT or UPDATE
-              const newData = payload.new as TData;
-              if (patchStore) {
-                safePatchStore(store, newData as Partial<TStoreState>);
-                clearStaleState(store, newData);
-              }
-              if (onData) onData(newData);
+            const reconcile = syncController?.captureRemoteMerge?.();
+            if (!reconcile && syncController?.hasPendingChanges?.()) {
+              hasInitiallyLoaded.value = true;
+              return;
             }
+            const data = payload.eventType === 'DELETE' ? null : (payload.new as TData);
+            applyFetchedData(reconcileData(data, reconcile));
             hasInitiallyLoaded.value = true;
             loadError.value = null;
           } finally {

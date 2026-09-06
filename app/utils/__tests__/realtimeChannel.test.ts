@@ -9,6 +9,8 @@ import {
 vi.mock('@/utils/logger', () => ({
   logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn() },
 }));
+const { suspension } = vi.hoisted(() => ({ suspension: { active: false } }));
+vi.mock('@/utils/realtimeVisibility', () => ({ isRealtimeSuspended: () => suspension.active }));
 const owned = (topic: string) => ({ topic }) as OwnedRealtimeChannel;
 const deferred = () => {
   let resolve!: (value: boolean) => void;
@@ -99,6 +101,24 @@ describe('subscribeAndWaitForRealtimeChannel', () => {
     emit('SUBSCRIBED');
     await expect(ready).resolves.toBeUndefined();
     expect(settled).toBe(true);
+  });
+  it('retains a pending join through a suspended CLOSED transition', async () => {
+    vi.useFakeTimers();
+    const { channel, emit } = createChannel();
+    Object.assign(channel, { socket: {} });
+    const refresh = vi.fn();
+    const ready = subscribeAndWaitForRealtimeChannel(channel, 'test', {}, 10, refresh);
+    suspension.active = true;
+    try {
+      emit('CLOSED');
+      await vi.advanceTimersByTimeAsync(20);
+      suspension.active = false;
+      emit('SUBSCRIBED');
+      await expect(ready).resolves.toBeUndefined();
+      expect(refresh).toHaveBeenCalledOnce();
+    } finally {
+      suspension.active = false;
+    }
   });
   it('rejects on an explicit subscription failure', async () => {
     const { channel, emit } = createChannel();
