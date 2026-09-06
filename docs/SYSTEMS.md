@@ -748,8 +748,9 @@ flowchart LR
   skips the rejoin rather than binding to an occupied topic.
 - Own-progress listener setup waits for the initial `SUBSCRIBED` acknowledgement, rejects on an
   explicit channel failure, and times out a join that reports no status. A newer setup or teardown
-  invalidates older work at each asynchronous boundary; a different user's topic may proceed while
-  the previous user's topic is leaving, while a same-topic rejoin still waits for its leave.
+  invalidates older work at each asynchronous boundary and rejects progress and metadata callbacks
+  from the superseded listener, including while its channel is leaving. A different user's topic may
+  proceed while the previous user's topic is leaving, while a same-topic rejoin still waits for its leave.
 - The team channel records itself as bound only after `SUBSCRIBED`, so a silently failed join is never
   mistaken for a live one. Membership events rebuild it only when the topic or teammate-progress
   filter changed, and any non-subscribed status drops the binding so the next event rebuilds.

@@ -210,6 +210,32 @@ describe('seasonal progress realtime synchronization', () => {
     expect(createdChannels.filter(({ subscribed }) => subscribed)).toEqual([]);
     expect(openTopics.size).toBe(0);
   });
+  it('ignores progress and metadata from a listener after teardown starts', async () => {
+    const { cleanupRealtimeListener, setupRealtimeListener } =
+      await import('@/stores/tarkov/realtimeListener');
+    await setupRealtimeListener(store);
+    const progressHandler = handlers.get('user_game_mode_progress');
+    const metadataHandler = handlers.get('user_progress');
+    removalGate.defer = true;
+    const teardown = cleanupRealtimeListener();
+    try {
+      progressHandler?.({
+        new: {
+          game_mode: 'seasonal',
+          progress_data: { level: 44 },
+          season_number: 1,
+          updated_at: new Date().toISOString(),
+        },
+      });
+      metadataHandler?.({
+        new: { current_game_mode: 'pve', game_edition: 2 },
+      });
+      expect(state).toEqual(defaultState);
+    } finally {
+      releaseDeferredRemovals();
+      await teardown;
+    }
+  });
   it('applies only the active Seasonal row without changing persistent modes', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     await setupRealtimeListener(store);

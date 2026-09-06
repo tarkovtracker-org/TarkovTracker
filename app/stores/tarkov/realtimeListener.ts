@@ -252,8 +252,7 @@ async function runSetupRealtimeListener(
     latestLegacyMetadataUpdateTime = updateTime;
     return true;
   };
-  const isCurrentRealtimeUser = () =>
-    $supabase.user.loggedIn && $supabase.user.id === currentUserId;
+  const isCurrentRealtimeUser = () => stillOwnsSetup(currentUserId, generation);
   logger.debug('[TarkovStore] Setting up realtime listener for multi-device sync');
   const handleProgressChange = (payload: { new: unknown; old: unknown }) => {
     if (!isCurrentRealtimeUser()) return;
