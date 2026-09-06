@@ -62,6 +62,16 @@ describe('useMetadataStore fetchEditionsData', () => {
     expect(store.editions).toEqual([existingEdition]);
     expect(store.editionsError).toBeInstanceOf(Error);
   });
+  it('preserves loaded eligibility when an empty cached fallback and the network fail', async () => {
+    const store = useMetadataStore();
+    const existing = createEdition('existing', 2, 'Existing');
+    store.editions = [existing];
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue({ editions: [] });
+    vi.stubGlobal('$fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    await store.fetchEditionsData();
+    expect(store.editions).toEqual([existing]);
+    expect(store.editionsError).toBeInstanceOf(Error);
+  });
   it('keeps loading until the latest forced request settles', async () => {
     const store = useMetadataStore();
     const older = createDeferred<object>();

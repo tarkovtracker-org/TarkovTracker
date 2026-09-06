@@ -1270,11 +1270,12 @@ request is scoped to the tasks page; other routes retain the store's idle schedu
 responses, errors, and cleanup apply only to the current promise; superseded cache reads and
 network requests cannot overwrite current eligibility, cache payloads, or loading state.
 Normalize edition and chapter network payloads before applying either, preserving existing
-data if normalization fails.
+data if normalization fails. Empty cached editions do not replace loaded eligibility.
 
 Initialization marks `tasksCoreRefreshing` before updating locale/mode and reading caches.
-`fetchAllData` takes ownership of this phase before bootstrap and clears it after core settlement,
-including failures. A per-store token prevents an older refresh from clearing a newer phase.
+`fetchAllData` registers its phase synchronously before bootstrap; initialization then releases
+its setup phase. A per-store set retains every active phase until core settlement, including
+failures, so either completion order keeps readiness pending while another core refresh can run.
 Task readiness stays false during this phase, so locale changes cannot reveal old core data
 while bootstrap is pending. Optional requests remain outside this phase and keep their timeout.
 

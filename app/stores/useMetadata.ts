@@ -171,7 +171,7 @@ const deriveStaticMapKey = (mapName: string, normalizedName?: string): string =>
 };
 const beginTaskCoreRefresh = (state: Pick<MetadataState, 'tasksCoreRefreshing'>): symbol => {
   const token = Symbol('taskCoreRefresh');
-  getPromiseStore(state).taskCoreRefreshId = token;
+  getPromiseStore(state).taskCoreRefreshes.add(token);
   state.tasksCoreRefreshing = true;
   return token;
 };
@@ -180,9 +180,8 @@ const finishTaskCoreRefresh = (
   token: symbol
 ) => {
   const promises = getPromiseStore(state);
-  if (promises.taskCoreRefreshId !== token) return;
-  state.tasksCoreRefreshing = false;
-  promises.taskCoreRefreshId = null;
+  promises.taskCoreRefreshes.delete(token);
+  state.tasksCoreRefreshing = promises.taskCoreRefreshes.size > 0;
 };
 type CachedEditions = { editions?: GameEdition[]; storyChapters?: StoryChapter[] };
 const readCachedEditions = async (): Promise<CachedEditions> => {
@@ -198,8 +197,8 @@ const applyCachedEditions = async (
   state: Pick<MetadataState, 'editions' | 'storyChapters'>,
   isCurrent: () => boolean
 ): Promise<boolean> => {
-  const { editions, storyChapters = [] } = await readCachedEditions();
-  if (!isCurrent() || !editions) return false;
+  const { editions = [], storyChapters = [] } = await readCachedEditions();
+  if (!isCurrent() || !editions.length) return false;
   state.editions = markRaw(editions);
   if (!storyChapters.length) return false;
   state.storyChapters = markRaw(
@@ -436,7 +435,13 @@ export const useMetadataStore = defineStore('metadata', {
               logger.debug('[MetadataStore] Critical cache exists, skipping loading screen');
             }
           }
-          await this.fetchAllData(forceRefresh, { deferHeavy: !forceRefresh, cachedData });
+          const dataRefresh = this.fetchAllData(forceRefresh, {
+            deferHeavy: !forceRefresh,
+            cachedData,
+          });
+          // fetchAllData registers its core phase synchronously; release setup ownership now.
+          finishTaskCoreRefresh(this, taskCoreRefreshId);
+          await dataRefresh;
           this.assertCriticalMetadataReady();
           this.initialized = true;
           this.initializationFailed = false;

@@ -94,6 +94,28 @@ describe('metadata task readiness ownership', () => {
     await second;
     expect(store.tasksCoreRefreshing).toBe(false);
   });
+  it('keeps readiness pending when the newer core refresh finishes before older bootstrap', async () => {
+    const older = createDeferred<undefined>();
+    vi.mocked(store.fetchBootstrapData).mockReturnValueOnce(older.promise);
+    const first = store.fetchAllData(false, { deferHeavy: true });
+    await store.fetchAllData(false, { deferHeavy: true });
+    expect(store.tasksCoreRefreshing).toBe(true);
+    older.resolve(undefined);
+    await first;
+    expect(store.tasksCoreRefreshing).toBe(false);
+  });
+  it('ends the initialization core phase before optional metadata settles', async () => {
+    const optional = createDeferred<undefined>();
+    vi.spyOn(store, 'updateLanguageAndGameMode').mockImplementation(() => undefined);
+    vi.spyOn(store, 'loadStaticMapData').mockResolvedValue();
+    vi.spyOn(store, 'loadCriticalCacheData').mockResolvedValue(null);
+    vi.mocked(store.fetchItemsLiteData).mockReturnValueOnce(optional.promise);
+    const initialization = store.initialize();
+    await flushPromises();
+    expect(store.tasksCoreRefreshing).toBe(false);
+    optional.resolve(undefined);
+    await initialization;
+  });
   it('clears the pending phase when core fetching fails', async () => {
     vi.mocked(store.fetchTasksCoreData).mockRejectedValueOnce(new Error('core offline'));
     await expect(store.fetchAllData(false, { deferHeavy: true })).rejects.toThrow('core offline');

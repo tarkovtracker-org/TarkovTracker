@@ -11,7 +11,7 @@ export interface PromiseStore {
   readonly prestigePromise: Promise<void> | null;
   readonly editionsPromise: Promise<void> | null;
   readonly editionsRequestVersion: number;
-  readonly taskCoreRefreshId: symbol | null;
+  readonly taskCoreRefreshes: Set<symbol>;
   readonly initPromise: Promise<void> | null;
   readonly isInitializing: boolean;
 }
@@ -55,7 +55,7 @@ export function getPromiseStore(storeInstance: object): MutablePromiseStore {
       prestigePromise: null,
       editionsPromise: null,
       editionsRequestVersion: 0,
-      taskCoreRefreshId: null,
+      taskCoreRefreshes: new Set(),
       initPromise: null,
       isInitializing: false,
     });

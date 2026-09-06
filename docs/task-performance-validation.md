@@ -394,3 +394,19 @@ Extended Lighthouse repeats recorded scores **0.41 / 0.42 / 0.39**, TBT **942 / 
 CLS **0.0020 / 0.0020 / 0.0020**, FCP **5043 / 5040 / 5040 ms**, and LCP
 **23358 / 23353 / 25229 ms**. Median TBT remains about 12% below the baseline's 1077 ms;
 the stated layout and complete-card timing budgets pass. The LCP tradeoff remains explicit.
+
+### Final fallback and overlapping-refresh regressions
+
+An empty edition cache followed by network failure now preserves loaded eligibility. Core
+readiness tracks all active setup/bootstrap/core phases, so a newer refresh completing before
+an older bootstrap cannot reveal cards early. Initialization hands off its setup phase before
+awaiting optional metadata, preserving the existing bounded detail wait. Both reported failures
+were reproduced by tests before the fixes; an additional test checks the optional-data boundary.
+
+All **173 tests across 13 focused files**, lint, typecheck, systems drift, Fallow, and the production
+build passed. The overlapping-bootstrap browser probe failed with eight prematurely visible
+cards before the correction and now passes with none until both core phases finish. Repeated
+race, deep-link, fallback, task/shared-route, mode, and team controls passed. A final mobile
+cold/warm smoke retained eight cards and shift sums **0.0020 / 0**, with first complete cards
+**3201 / 2005 ms**. The three-profile Lighthouse comparison above precedes these final fallback
+and overlap corrections; no rendering, throttle, or readiness timeout policy changed.
