@@ -1,3 +1,10 @@
+## [1.76.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.2...v1.76.3) (2026-09-06)
+
+
+### Performance Improvements
+
+* **tasks:** avoid premature rendering during startup ([#808](https://github.com/tarkovtracker-org/TarkovTracker/issues/808)) ([8f0c638](https://github.com/tarkovtracker-org/TarkovTracker/commit/8f0c63896ffa8df08d40df241474dcc0e21701c2)), closes [#444](https://github.com/tarkovtracker-org/TarkovTracker/issues/444)
+
 ## [1.76.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.1...v1.76.2) (2026-09-06)
 
 
