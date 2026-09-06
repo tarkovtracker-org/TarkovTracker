@@ -136,11 +136,33 @@ describe('metadata task readiness ownership', () => {
     const first = store.fetchEditionsData();
     await flushPromises();
     await store.fetchAllData(false, { deferHeavy: true });
-    const joined = store.fetchEditionsData();
+    const joined = store.ensureEditionsData();
     response.resolve({ editions: {}, storyChapters: {} });
     await Promise.all([first, joined]);
     await deferredEdition()();
     expect($fetch).toHaveBeenCalledTimes(1);
+  });
+  it('consumes deferred rewards after an eager request has settled', async () => {
+    vi.mocked(store.fetchTaskRewardsData).mockRestore();
+    vi.spyOn(store, 'fetchWithCache').mockResolvedValue();
+    await store.fetchAllData(false, { deferHeavy: true });
+    await store.fetchTaskRewardsData();
+    const queued = vi
+      .mocked(queueIdleTask)
+      .mock.calls.find(([, options]) => options?.timeout === 4000);
+    expect(queued).toBeDefined();
+    await queued![0]();
+    expect(store.fetchWithCache).toHaveBeenCalledTimes(1);
+  });
+  it('retains deferred rewards without an eager owner', async () => {
+    vi.mocked(store.fetchTaskRewardsData).mockRestore();
+    vi.spyOn(store, 'fetchWithCache').mockResolvedValue();
+    await store.fetchAllData(false, { deferHeavy: true });
+    const queued = vi
+      .mocked(queueIdleTask)
+      .mock.calls.find(([, options]) => options?.timeout === 4000);
+    await queued![0]();
+    expect(store.fetchWithCache).toHaveBeenCalledTimes(1);
   });
   it('retains deferred editions when no eager request takes ownership', async () => {
     await store.fetchAllData(false, { deferHeavy: true });

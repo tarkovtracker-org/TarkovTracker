@@ -54,7 +54,7 @@ export const useTaskDetailReadiness = () => {
         metadataStore.fetchTaskObjectivesData(),
         metadataStore.fetchTaskRewardsData(),
         metadataStore.fetchItemsLiteData(),
-        metadataStore.fetchEditionsData(),
+        metadataStore.ensureEditionsData(),
       ]).then(async () => {
         if (active) await Promise.allSettled([settleCountDifferences()]);
         requestsSettled = true;

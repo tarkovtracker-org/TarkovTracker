@@ -410,3 +410,27 @@ race, deep-link, fallback, task/shared-route, mode, and team controls passed. A 
 cold/warm smoke retained eight cards and shift sums **0.0020 / 0**, with first complete cards
 **3201 / 2005 ms**. The three-profile Lighthouse comparison above precedes these final fallback
 and overlap corrections; no rendering, throttle, or readiness timeout policy changed.
+
+### Avoid redundant settled requests
+
+Readiness now joins or reuses the universal edition request already started by the current
+session, including one completed while core data was pending. Explicit refreshes still revalidate.
+Queued rewards use request versions to avoid repeating an eager fetch and task merge after cards
+are visible. Regression tests reproduced both duplicate-load paths before these corrections;
+controls cover idle-only loading, in-flight reuse, handled failures, and explicit refreshes.
+
+All **178 tests across 13 focused files**, lint, typecheck, systems drift, Fallow, and production
+build passed. Production probes reproduced one extra reward merge and two overlay downloads
+before the fixes; the rebuilt probes record zero extra reward merges and one overlay download.
+All overlap/readiness, deep-link, fallback, shared-route, mode, and team controls passed again.
+One Puppeteer protocol error interrupted the race harness; its isolated rerun passed unchanged.
+
+Three final mobile profiles record cold shift sums **0.0020 / 0.0020 / 0.0020**, warm sums
+**0 / 0 / 0**, and eight cards without empty-state frames. Complete cards appeared at
+**3111 / 3260 / 3025 ms** cold and **1992 / 1986 / 1942 ms** warm. The team cold/warm smoke
+records shifts **0.0020 / 0** and first complete cards **2896 / 2035 ms**.
+
+Final extended Lighthouse scores are **0.41 / 0.43 / 0.41**, TBT **980 / 834 / 938 ms**,
+CLS **0.0020 / 0.0020 / 0.0020**, FCP **5043 / 4975 / 5044 ms**, and LCP
+**23357 / 23284 / 23280 ms**. Median TBT improves about 13% versus the baseline's 1077 ms.
+The documented complete-card and layout budgets pass; the stated LCP tradeoff remains.

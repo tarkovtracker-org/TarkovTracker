@@ -947,11 +947,14 @@ export const useMetadataStore = defineStore('metadata', {
       }
       // Only defer non-critical task rewards
       if (this.tasks.length && deferHeavy) {
+        const rewardsRequestVersion = promiseStore.taskRewardsRequestVersion;
         queueIdleTask(
-          () =>
-            this.fetchTaskRewardsData(forceRefresh).catch((err) =>
+          () => {
+            if (promiseStore.taskRewardsRequestVersion !== rewardsRequestVersion) return;
+            return this.fetchTaskRewardsData(forceRefresh).catch((err) =>
               logger.error('[MetadataStore] Error fetching deferred data:', err)
-            ),
+            );
+          },
           { timeout: 4000, minTime: 8, priority: 'normal' }
         );
       } else if (this.tasks.length) {
@@ -1198,6 +1201,7 @@ export const useMetadataStore = defineStore('metadata', {
      * Fetch task rewards data
      */
     async fetchTaskRewardsData(forceRefresh = false) {
+      getPromiseStore(this).taskRewardsRequestVersion += 1;
       const requestLanguage = this.languageCode;
       const requestGameMode = this.getApiGameMode();
       const requestKey = `${requestLanguage}-${requestGameMode}`;
@@ -1405,6 +1409,15 @@ export const useMetadataStore = defineStore('metadata', {
         promiseKey: 'prestigePromise',
         promiseRequestKey: requestLanguage,
       });
+    },
+    /** Join or reuse universal edition data for task readiness. */
+    async ensureEditionsData() {
+      const promises = getPromiseStore(this);
+      if (!promises.editionsRequestVersion) return this.fetchEditionsData();
+      // Universal editions already requested this session: join or reuse their settlement.
+      // This caller also consumes a queued idle load, even when joining another request.
+      promises.editionsRequestVersion += 1;
+      return promises.editionsPromise;
     },
     /**
      * Fetch game editions data directly from GitHub overlay.

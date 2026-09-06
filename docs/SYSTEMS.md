@@ -1272,6 +1272,11 @@ network requests cannot overwrite current eligibility, cache payloads, or loadin
 Normalize edition and chapter network payloads before applying either, preserving existing
 data if normalization fails. Empty cached editions do not replace loaded eligibility.
 
+Task readiness uses `ensureEditionsData` to join or reuse the session's universal edition request,
+including a request settled during bootstrap/core loading. Explicit `fetchEditionsData` calls keep
+their cache revalidation behavior. Queued reward work, like editions, is consumed by a later eager
+request; other routes retain their idle load when no caller takes ownership.
+
 Initialization marks `tasksCoreRefreshing` before updating locale/mode and reading caches.
 `fetchAllData` registers its phase synchronously before bootstrap; initialization then releases
 its setup phase. A per-store set retains every active phase until core settlement, including

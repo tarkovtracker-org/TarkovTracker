@@ -80,7 +80,7 @@ const metadataStoreMock = reactive({
   fetchTaskObjectivesData: vi.fn(() => Promise.resolve()),
   fetchTaskRewardsData: vi.fn(() => Promise.resolve()),
   fetchItemsLiteData: vi.fn(() => Promise.resolve()),
-  fetchEditionsData: vi.fn(() => Promise.resolve()),
+  ensureEditionsData: vi.fn(() => Promise.resolve()),
   fetchObjectiveModeCountDifferences: vi.fn(() => Promise.resolve()),
   mapsWithSvg: [] as Array<{ id: string; name: string }>,
   objectives: [],
@@ -406,7 +406,7 @@ describe('tasks page', () => {
   it.each([
     'fetchTaskObjectivesData',
     'fetchTaskRewardsData',
-    'fetchEditionsData',
+    'ensureEditionsData',
     'fetchItemsLiteData',
   ] as const)('filters merged details before revealing the first cards (%s)', async (action) => {
     wrapper.unmount();

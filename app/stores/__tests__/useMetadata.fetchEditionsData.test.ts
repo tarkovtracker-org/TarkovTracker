@@ -72,6 +72,33 @@ describe('useMetadataStore fetchEditionsData', () => {
     expect(store.editions).toEqual([existing]);
     expect(store.editionsError).toBeInstanceOf(Error);
   });
+  it('reuses settled editions for readiness after an active core refresh loaded them', async () => {
+    const store = useMetadataStore();
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    vi.stubGlobal('$fetch', vi.fn().mockResolvedValue({ editions: {}, storyChapters: {} }));
+    await store.fetchEditionsData();
+    await store.ensureEditionsData();
+    expect($fetch).toHaveBeenCalledTimes(1);
+  });
+  it('starts editions for readiness when no route has requested them', async () => {
+    const store = useMetadataStore();
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    vi.stubGlobal('$fetch', vi.fn().mockResolvedValue({ editions: {}, storyChapters: {} }));
+    await store.ensureEditionsData();
+    expect($fetch).toHaveBeenCalledTimes(1);
+  });
+  it('does not retry a settled failure for readiness but retains explicit refreshes', async () => {
+    const store = useMetadataStore();
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.stubGlobal('$fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    await store.fetchEditionsData();
+    await store.ensureEditionsData();
+    expect($fetch).toHaveBeenCalledTimes(1);
+    await store.fetchEditionsData(true);
+    expect($fetch).toHaveBeenCalledTimes(2);
+  });
   it('keeps loading until the latest forced request settles', async () => {
     const store = useMetadataStore();
     const older = createDeferred<object>();
@@ -203,7 +230,7 @@ describe('useMetadataStore fetchEditionsData', () => {
     await firstRequest;
     expect(store.editionsLoading).toBe(true);
     let secondSettled = false;
-    const secondRequest = store.fetchEditionsData(false);
+    const secondRequest = store.ensureEditionsData();
     void secondRequest.then(() => {
       secondSettled = true;
     });

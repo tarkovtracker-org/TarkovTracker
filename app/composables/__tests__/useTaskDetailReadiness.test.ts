@@ -15,7 +15,7 @@ const metadata = reactive({
   fetchTaskObjectivesData: vi.fn<() => Promise<void>>(),
   fetchTaskRewardsData: vi.fn<() => Promise<void>>(),
   fetchItemsLiteData: vi.fn<() => Promise<void>>(),
-  fetchEditionsData: vi.fn<() => Promise<void>>(),
+  ensureEditionsData: vi.fn<() => Promise<void>>(),
   fetchObjectiveModeCountDifferences: vi.fn<() => Promise<'stale' | undefined>>(),
 });
 vi.mock('@/stores/useMetadata', () => ({ useMetadataStore: () => metadata }));
@@ -50,7 +50,7 @@ describe('useTaskDetailReadiness', () => {
     metadata.fetchTaskObjectivesData.mockReset().mockResolvedValue();
     metadata.fetchTaskRewardsData.mockReset().mockResolvedValue();
     metadata.fetchItemsLiteData.mockReset().mockResolvedValue();
-    metadata.fetchEditionsData.mockReset().mockResolvedValue();
+    metadata.ensureEditionsData.mockReset().mockResolvedValue();
     metadata.fetchObjectiveModeCountDifferences.mockReset().mockResolvedValue(undefined);
   });
   afterEach(() => {
@@ -120,7 +120,7 @@ describe('useTaskDetailReadiness', () => {
   });
   it('waits for edition eligibility so the first cards use the final filters', async () => {
     const editions = deferred();
-    metadata.fetchEditionsData.mockReturnValue(editions.promise);
+    metadata.ensureEditionsData.mockReturnValue(editions.promise);
     const ready = start();
     await flush();
     expect(ready.value).toBe(false);
