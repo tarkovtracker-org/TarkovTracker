@@ -617,9 +617,9 @@ Pi access. Do not make production role provisioning or the canary an automatic m
    - Full ownership map (Worker DO vs Edge mutation limits vs Pages vs Auth): [`RATE_LIMITING.md`](./RATE_LIMITING.md).
 3. If API protection blocks valid traffic, update `API_ALLOWED_HOSTS` and redeploy.
 
-### Task cache contract rollout (v2 to v3)
+### Task cache contract rollout (v3 to v4)
 
-For the `tasks-core-json-v2-*` to `tasks-core-json-v3-*` transition, an authorized operator must dispatch
+For the `tasks-core-json-v3-*` to `tasks-core-json-v4-*` transition, an authorized operator must dispatch
 `.github/workflows/precompute-tarkov-data.yml` from the approved change revision before merging
 or promoting the app. Leave both workflow inputs, `lang` and `gameMode`, empty to include all
 48 combinations across `regular`, `pve`, and `pvp-season`. Require `succeeded: 48` and `failed: 0`,
