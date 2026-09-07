@@ -101,8 +101,8 @@
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
                   <AcceptedItemsPopover
-                    v-if="(obj.acceptedItems?.length ?? 0) > 1"
-                    :items="obj.acceptedItems ?? []"
+                    v-if="acceptedItemsFor(obj).length > 1"
+                    :items="acceptedItemsFor(obj)"
                     trigger-class="bg-surface-700/60 text-surface-200 px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-white/10"
                   />
                   <span
@@ -237,6 +237,7 @@
     GroupedItemInfo,
     NeededItemHideoutModule,
     NeededItemTaskObjective,
+    TarkovItem,
   } from '@/types/tarkov';
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
@@ -289,6 +290,8 @@
     const task = taskLookup.value[obj.taskId];
     return task?.kappaRequired === true;
   };
+  const acceptedItemsFor = (obj: NeededItemTaskObjective): TarkovItem[] =>
+    obj.acceptedItems?.length ? obj.acceptedItems : [];
   const getObjectiveCount = (obj: NeededItemTaskObjective) =>
     tarkovStore.getObjectiveCount(obj.id) ?? 0;
   const getHideoutCount = (mod: NeededItemHideoutModule) =>

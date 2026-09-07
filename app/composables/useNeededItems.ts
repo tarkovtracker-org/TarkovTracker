@@ -540,6 +540,20 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   });
   type GroupedNeededItemAccumulator = Omit<GroupedNeededItem, 'total' | 'currentCount'>;
   type GroupTarget = { id: string; data: TarkovItem; name: string };
+  const canGroupItem = (item: TarkovItem | undefined): item is TarkovItem & { name: string } =>
+    Boolean(item?.id && item?.name);
+  /**
+   * Returns the group target for the search-matched accepted item of a pooled
+   * "any of these" objective, or null when the search did not match one of its
+   * accepted items or the matched item cannot serve as a group entry.
+   */
+  const findAcceptedGroupTarget = (need: NeededItemTaskObjective): GroupTarget | null => {
+    const matchIndex = findAcceptedItemMatchIndex(need.acceptedItems, search.value);
+    const matchedItem = matchIndex >= 0 ? need.acceptedItems?.[matchIndex] : undefined;
+    if (!canGroupItem(matchedItem)) return null;
+    const { id, name } = matchedItem;
+    return { id, data: matchedItem, name };
+  };
   /**
    * Resolves the item a need is grouped and registered under in the grouped
    * view. When searching, a pooled "any of these" objective that matched an
@@ -550,17 +564,10 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   const resolveGroupTarget = (
     need: NeededItemTaskObjective | NeededItemHideoutModule
   ): GroupTarget | null => {
+    const acceptedTarget = need.needType === 'taskObjective' ? findAcceptedGroupTarget(need) : null;
+    if (acceptedTarget) return acceptedTarget;
     const primaryData = getNeededItemData(need);
-    if (!primaryData?.id) return null;
-    if (need.needType === 'taskObjective' && search.value) {
-      const matchIndex = findAcceptedItemMatchIndex(need.acceptedItems, search.value);
-      const matchedItem = matchIndex >= 0 ? need.acceptedItems?.[matchIndex] : undefined;
-      if (matchedItem?.id && matchedItem.name) {
-        const { id, name } = matchedItem;
-        return { id, data: matchedItem, name };
-      }
-    }
-    if (!primaryData.name) return null;
+    if (!canGroupItem(primaryData)) return null;
     return { id: primaryData.id, data: primaryData, name: primaryData.name };
   };
   const groupedItems = computed((): GroupedNeededItem[] => {

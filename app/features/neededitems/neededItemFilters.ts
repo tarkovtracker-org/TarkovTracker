@@ -37,6 +37,15 @@ export const getNeededItemData = (
   }
   return isNeededItemTaskObjective(need) ? need.markerItem : undefined;
 };
+const fuzzyMatchesQuery = (
+  name: string | undefined,
+  shortName: string | undefined,
+  query: string
+): boolean => fuzzyMatch(name ?? '', query) || fuzzyMatch(shortName ?? '', query);
+const acceptedItemMatchesQuery = (item: TarkovItem | undefined, query: string): boolean => {
+  if (!item) return false;
+  return fuzzyMatchesQuery(item.name, item.shortName, query);
+};
 /**
  * Returns the index of the first accepted item whose name or short name fuzzy
  * matches the query, or -1 when the query is empty or nothing matches.
@@ -50,11 +59,7 @@ export const findAcceptedItemMatchIndex = (
 ): number => {
   const normalizedQuery = query.trim();
   if (!normalizedQuery || !items?.length) return -1;
-  return items.findIndex(
-    (entry) =>
-      fuzzyMatch(entry?.name ?? '', normalizedQuery) ||
-      fuzzyMatch(entry?.shortName ?? '', normalizedQuery)
-  );
+  return items.findIndex((entry) => acceptedItemMatchesQuery(entry, normalizedQuery));
 };
 const isSpecialEquipmentText = (value: string): boolean => {
   const lower = value.toLowerCase();

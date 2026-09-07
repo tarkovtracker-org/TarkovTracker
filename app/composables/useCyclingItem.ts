@@ -34,23 +34,23 @@ export interface UseCyclingItemReturn {
  * Display-only: this never mutates progress or counts. When there is one item
  * or fewer, or cycling is disabled, it simply returns the primary (first) item.
  */
+const normalizePinnedIndex = (index: number): number =>
+  Number.isFinite(index) && index >= 0 ? index : -1;
 export function useCyclingItem(
   items: MaybeRefOrGetter<TarkovItem[] | undefined>,
   primaryItem: MaybeRefOrGetter<TarkovItem | null>,
   options: UseCyclingItemOptions = {}
 ): UseCyclingItemReturn {
   const { intervalMs = DEFAULT_CYCLE_INTERVAL_MS, enabled = true, preferredIndex = -1 } = options;
-  const pinnedIndex = computed(() => {
-    const resolved = Math.floor(toValue(preferredIndex));
-    return Number.isFinite(resolved) && resolved >= 0 ? resolved : -1;
-  });
   const itemList = computed(() => {
     const resolved = toValue(items);
     return Array.isArray(resolved) ? resolved.filter((entry): entry is TarkovItem => !!entry) : [];
   });
+  const primary = computed(() => toValue(primaryItem) ?? null);
   const total = computed(() => itemList.value.length);
   const hasAlternatives = computed(() => total.value > 1);
   const reducedMotion = usePreferredReducedMotion();
+  const pinnedIndex = computed(() => normalizePinnedIndex(Math.floor(toValue(preferredIndex))));
   const isCycling = computed(
     () =>
       Boolean(toValue(enabled)) &&
@@ -84,13 +84,10 @@ export function useCyclingItem(
     },
     { immediate: true }
   );
+  const itemAtIndex = (index: number): TarkovItem | null => itemList.value[index] ?? primary.value;
   const currentItem = computed(() => {
-    const fallback = toValue(primaryItem) ?? null;
-    if (pinnedIndex.value >= 0) {
-      return itemList.value[pinnedIndex.value] ?? fallback;
-    }
-    if (!isCycling.value) return fallback;
-    return itemList.value[currentIndex.value] ?? fallback;
+    if (pinnedIndex.value >= 0) return itemAtIndex(pinnedIndex.value);
+    return isCycling.value ? itemAtIndex(currentIndex.value) : primary.value;
   });
   return {
     currentItem,
