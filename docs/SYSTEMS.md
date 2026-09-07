@@ -498,7 +498,8 @@ consumer contract, precompute the new versioned keys from the reviewed consumer 
 promoting that app revision; old app revisions keep reading their old keys. Missing new keys still
 have the existing live fallback, but that is not proof of production readiness for cold colos.
 
-Run `pnpm run verify:overlay --origin https://tarkovtracker.org` after promotion. The command writes
+Run `pnpm run verify:overlay` after promotion. It targets the fixed production origin and prints the path to a report in a
+new private temporary directory. The command writes
 an artifact comparing the published SHA, last complete precompute and served tasks-core for all
 48 language/mode combinations. Missing evidence is `unverified`; a mismatch is `propagating` for
 at most 14 hours from the producer generation timestamp (12-hour schedule plus a 2-hour operational

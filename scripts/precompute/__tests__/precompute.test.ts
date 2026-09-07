@@ -5,8 +5,8 @@ import {
 } from '@/server/utils/precomputedTarkov';
 import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
 import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
-import { PRECOMPUTED_TTL_SECONDS, runPrecompute, validatePrecomputeFilter } from '../precompute';
-import type { KvWriter } from '../precompute';
+import { PRECOMPUTED_TTL_SECONDS, runPrecompute, validatePrecomputeFilter } from '@@/scripts/precompute/precompute';
+import type { KvWriter } from '@@/scripts/precompute/precompute';
 const { applyOverlayMock, createFetcherMock, fetcherMock } = vi.hoisted(() => {
   const hoistedFetcherMock = vi.fn();
   return {

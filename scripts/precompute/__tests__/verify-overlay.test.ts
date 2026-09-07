@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
 import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
-import { compareOverlayFleet } from '../verify-overlay';
+import { compareOverlayFleet } from '@@/scripts/precompute/verify-overlay';
 const now = Date.parse('2026-09-07T12:00:00Z');
 const entries = API_SUPPORTED_LANGUAGES.flatMap(lang => VALID_GAME_MODES.map(gameMode => ({ lang, gameMode, overlay: { sha256: 'published' } })));
 describe('overlay fleet verification', () => {

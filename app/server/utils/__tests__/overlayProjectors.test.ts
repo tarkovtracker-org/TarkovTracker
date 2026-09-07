@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { addFallbackCrafts, addFallbackItems } from '../overlayAdditions';
+import { addFallbackCrafts, addFallbackItems } from '@/server/utils/overlayAdditions';
 import {
   projectEditions,
   projectRawPrestige,
   projectSeasonalPerks,
   projectStoryChapters,
-} from '../overlayProjectors';
-import { unknownOverlaySections, validateOverlayData } from '../overlayValidation';
-import { adaptPrestigeResponse } from '../tarkov-json';
-import type { OverlayData } from '../overlayTypes';
+} from '@/server/utils/overlayProjectors';
+import { unknownOverlaySections, validateOverlayData } from '@/server/utils/overlayValidation';
+import { adaptPrestigeResponse } from '@/server/utils/tarkov-json';
+import type { OverlayData } from '@/server/utils/overlayTypes';
 import type { HideoutStation, TarkovItem } from '@/types/tarkov';
 const overlay: OverlayData = {
   $meta: { version: 'test', generated: '2026-09-07', sha256: 'test-sha' },

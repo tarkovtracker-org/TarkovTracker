@@ -149,9 +149,9 @@ const unknownSectionNames = (value: object, prefix: string, allowed: Set<string>
     .filter((key) => !allowed.has(key))
     .map((key) => `${prefix}${key}`);
 const scopedUnknownSections = (
-  container: Record<string, object> = {},
   prefix: string,
-  allowed: Set<string>
+  allowed: Set<string>,
+  container: Record<string, object> = {}
 ): string[] =>
   Object.entries(container).flatMap(([scope, sections]) =>
     unknownSectionNames(sections, `${prefix}.${scope}.`, allowed)
@@ -161,7 +161,7 @@ export const unknownOverlaySections = (overlay: OverlayData): string[] => {
   const localeNames = new Set(['tasks', 'items', 'traders', 'maps', 'prestige', 'storyChapters']);
   return [
     ...unknownSectionNames(overlay, '', rootNames),
-    ...scopedUnknownSections(overlay.modes, 'modes', sectionNames),
-    ...scopedUnknownSections(overlay.locales, 'locales', localeNames),
+    ...scopedUnknownSections('modes', sectionNames, overlay.modes),
+    ...scopedUnknownSections('locales', localeNames, overlay.locales),
   ];
 };
