@@ -790,6 +790,11 @@ flowchart LR
   epochs still reconcile progress. With both mode clocks unknown, remote scalar fields win;
   progress scores from unrelated modes cannot choose them. Only progress actually read from a
   legacy row uses that row's clock.
+  During the additive freshness-column rollout, startup and reconnect reads retry once without
+  `progress_updated_at` only when PostgreSQL/PostgREST reports that column missing. Those rows
+  retain unknown mode freshness; account timestamps never substitute for it. Other errors and
+  failed fallback reads remain failures. Each read probes the column again so completed migrations
+  take effect without a reload.
   When a mode is newer than account metadata, startup merges progress by entry timestamps and reset epochs;
   clearable profile fields use the preferred snapshot verbatim, including null names and empty offsets.
   Startup skill-offset maps are atomic: absent keys represent deletions, and historical snapshots
@@ -811,6 +816,9 @@ flowchart LR
   connection failure also hydrates after successful membership refresh and the replacement join.
   Only the winning membership refresh may trigger
   hydration after a successful membership read; a failed read neither hydrates nor rebuilds.
+  Pending hydration follows the winning replacement team when a team switch retains teammate
+  stores during reconnect; it fires only after the replacement joins. Leaving all teams or disposing
+  the controller clears that intent.
   A superseded reconnect request cannot race ahead of a newer filter rebuild. Optional missing account metadata never blocks
   normalized reconnect progress. Deferred legacy reads retain startup retries and API error mapping.
   Unmaterialized normalized rows are absent for startup fallback and freshness. Outbound writes are

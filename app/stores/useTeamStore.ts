@@ -266,6 +266,11 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     if (typeof window !== 'undefined')
       window.dispatchEvent(new Event('teammate-progress-reconnected'));
   };
+  const transferHydration = (teamId: string) => {
+    // Retained teammate stores need the missed snapshot even if the winning
+    // membership refresh moved us to another team while reconnect was pending.
+    if (hydrationTeam !== null) hydrationTeam = teamId;
+  };
   const reconcileRejoin = async (teamId: string) => {
     hydrationTeam = teamId;
     try {
@@ -391,6 +396,7 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     // The latch is shared, so an overlapping setup waits on the same leave.
     if (!(await release.release(teamTopic(teamId)))) return;
     if (!canBuild(setupVersion)) return;
+    transferHydration(teamId);
     buildChannel(teamId, buildMemberProgressFilter(deps.getMembers()));
   };
   const isCurrentBinding = (teamId: string): boolean =>
@@ -401,6 +407,7 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
   const resolveTargetTeam = async (): Promise<string | null> => {
     const teamId = deps.getTeamId();
     if (teamId) return teamId;
+    hydrationTeam = null;
     await cleanup();
     return null;
   };
@@ -432,6 +439,7 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     cleanup,
     dispose: () => {
       disposed = true;
+      hydrationTeam = null;
       version += 1;
       clearRetry();
       return cleanup();

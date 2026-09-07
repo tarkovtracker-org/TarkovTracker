@@ -228,6 +228,42 @@ describe('createTeamChannelController', () => {
       await controller.dispose();
     }
   });
+  it.each([true, false])(
+    'transfers reconnect hydration to a replacement team (old refresh finishes first: %s)',
+    async (oldFinishesFirst) => {
+      const harness = createHarness();
+      const controller = createTeamChannelController(harness.deps);
+      const hydrated = vi.fn();
+      window.addEventListener('teammate-progress-reconnected', hydrated);
+      try {
+        await controller.refresh();
+        harness.channels[0]?.status?.('SUBSCRIBED');
+        let finishOld!: (success: boolean) => void;
+        harness.refreshMembers.mockImplementationOnce(
+          () =>
+            new Promise<boolean>((resolve) => {
+              finishOld = resolve;
+            })
+        );
+        harness.channels[0]?.status?.('SUBSCRIBED');
+        await vi.advanceTimersByTimeAsync(0);
+        // The same teammate store survives the team change and needs a snapshot.
+        harness.state.teamId = 'team-2';
+        const replacement = controller.refresh();
+        if (oldFinishesFirst) finishOld(true);
+        await replacement;
+        expect(hydrated).not.toHaveBeenCalled();
+        harness.channels[1]?.status?.('SUBSCRIBED');
+        expect(hydrated).toHaveBeenCalledOnce();
+        if (!oldFinishesFirst) finishOld(true);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(hydrated).toHaveBeenCalledOnce();
+      } finally {
+        window.removeEventListener('teammate-progress-reconnected', hydrated);
+        await controller.dispose();
+      }
+    }
+  );
   it('does not rebuild while the topic and member filter are unchanged', async () => {
     const harness = createHarness();
     const controller = createTeamChannelController(harness.deps);

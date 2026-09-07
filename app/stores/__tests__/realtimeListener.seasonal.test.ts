@@ -430,6 +430,56 @@ describe('seasonal progress realtime synchronization', () => {
       await teardown;
     }
   });
+  it('reconciles before the freshness migration without inventing a mode clock', async () => {
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    const { progressStorageSerializer } = await import('@/stores/tarkov/localStorage');
+    const { parseUserScopedStorage } = await import('@/utils/userScopedStorage');
+    progressStorageSerializer.reset();
+    const selects: string[] = [];
+    supabaseContext.client.from.mockImplementation((table: string) => ({
+      select: (columns: string) => ({
+        eq: () => {
+          if (table === 'user_progress')
+            return { single: async () => ({ data: null, error: null }) };
+          selects.push(columns);
+          return Promise.resolve(
+            columns.includes('progress_updated_at')
+              ? {
+                  data: null,
+                  error: {
+                    code: '42703',
+                    message: 'column user_game_mode_progress.progress_updated_at does not exist',
+                  },
+                }
+              : {
+                  data: [
+                    {
+                      game_mode: 'pvp',
+                      season_number: 0,
+                      progress_data: { ...structuredClone(defaultState.pvp), level: 25 },
+                      updated_at: '2026-09-06T12:00:00Z',
+                    },
+                  ],
+                  error: null,
+                }
+          );
+        },
+      }),
+    }));
+    await setupRealtimeListener(store);
+    createdChannels[0]?.subscribeCallback?.('SUBSCRIBED');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(state.pvp.level).toBe(25);
+    expect(selects).toEqual([
+      'game_mode,season_number,progress_data,updated_at,progress_updated_at',
+      'game_mode,season_number,progress_data,updated_at',
+    ]);
+    const persisted = parseUserScopedStorage(
+      progressStorageSerializer.serialize(state, supabaseContext.user.id, Date.now())
+    );
+    expect(persisted?._modeTimestamps?.pvp).toBe(0);
+    progressStorageSerializer.reset();
+  });
   it('retains local progress when a reconnect snapshot fails', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     const failure = { message: 'snapshot unavailable' };

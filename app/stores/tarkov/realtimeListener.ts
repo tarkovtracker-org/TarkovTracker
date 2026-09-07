@@ -4,6 +4,7 @@ import { detectDataConflicts } from '@/stores/tarkov/conflictDetection';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
 import { progressStorageSerializer } from '@/stores/tarkov/localStorage';
 import { coerceGameMode, mergeProgressData, toProgressEpoch } from '@/stores/tarkov/progressMerge';
+import { readWithProgressFreshness } from '@/stores/tarkov/progressPersistence';
 import {
   getLastLocalSyncTime,
   isLikelySelfOriginUpdate,
@@ -405,10 +406,16 @@ async function runSetupRealtimeListener(
           .select('current_game_mode,game_edition,tarkov_uid,updated_at')
           .eq('user_id', currentUserId)
           .single(),
-        client
-          .from('user_game_mode_progress')
-          .select('game_mode,season_number,progress_data,updated_at,progress_updated_at')
-          .eq('user_id', currentUserId),
+        readWithProgressFreshness((includeFreshness) => {
+          const query = client.from('user_game_mode_progress');
+          return includeFreshness
+            ? query
+                .select('game_mode,season_number,progress_data,updated_at,progress_updated_at')
+                .eq('user_id', currentUserId)
+            : query
+                .select('game_mode,season_number,progress_data,updated_at')
+                .eq('user_id', currentUserId);
+        }),
       ]);
       if (!isCurrentRealtimeUser() || request !== refreshGeneration) return;
       if (modes.error) throw modes.error;

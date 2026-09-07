@@ -407,6 +407,27 @@ References: [migration history](https://supabase.com/docs/reference/cli/supabase
 - Platform-managed extensions (`pg_graphql`, `pg_net`) differ between the local stack and prod;
   migrations do not control these and the difference is expected.
 
+### Progress transfer and freshness rollout
+
+For `20260906174817_suppress_unchanged_progress_writes.sql` and
+`20260906234500_track_mode_progress_freshness.sql`, verify linked history, exact pending SQL,
+and production observer preflight before approving the migration rollout. Apply schema before
+frontend when possible; Cloudflare and Supabase integrations run independently.
+
+The frontend tolerates the freshness column being absent during deployment: startup and reconnect
+retry only a missing `progress_updated_at` column without that field and retain unknown mode
+freshness. This prevents an ordering race from aborting progress initialization; it does not prove
+the migrations succeeded. Confirm both history entries and deployed column/function definitions
+using the database migration procedure above. Without the migrations, write suppression and
+independent server mode clocks are not fully enabled. Do not backfill historical clocks from
+account or visibility timestamps.
+
+Before release sign-off, use two authenticated browser sessions to check progress edits and clears,
+a tab hidden longer than 60 seconds, edits while disconnected, reconnect, team changes during
+reconnect, and reload. Verify no saved progress is lost or resurrected, retained teammates refresh,
+and resumed saves succeed. Frontend rollback remains compatible with these additive migrations;
+preserve applied migrations.
+
 ### Reconcile migration `20260630075121_reconcile_prod_schema_drift`
 
 - Captures schema changes that were previously made directly in the dashboard (teams
