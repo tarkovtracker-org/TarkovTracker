@@ -555,6 +555,87 @@ describe('useNeededItems', () => {
       expect(counts).toEqual(sortedCounts);
     });
   });
+  describe('pooled accepted item objectives', () => {
+    const createPooledObjective = (): NeededItemTaskObjective => {
+      const primary = createItem('item-cms', 'CMS Kit');
+      const augmentin = createItem('item-augmentin', 'Augmentin');
+      const analgin = createItem('item-analgin', 'Analgin');
+      return {
+        id: 'obj-pool',
+        needType: 'taskObjective',
+        taskId: 'task-1',
+        type: 'giveItem',
+        item: primary,
+        count: 5,
+        foundInRaid: true,
+        acceptedItems: [primary, augmentin, analgin],
+      };
+    };
+    it('matches pooled objectives by any accepted item name', async () => {
+      const { neededItems, search } = await setup({
+        metadataStore: { neededItemTaskObjectives: [createPooledObjective()] },
+      });
+      search.value = 'augmentin';
+      const ids = neededItems.filteredItems.value.map((item) => item.id);
+      expect(ids).toContain('obj-pool');
+      expect(ids).not.toContain('hideout-1');
+    });
+    it('matches pooled objectives by accepted item short name', async () => {
+      const { neededItems, search } = await setup({
+        metadataStore: { neededItemTaskObjectives: [createPooledObjective()] },
+      });
+      search.value = 'anal';
+      const ids = neededItems.filteredItems.value.map((item) => item.id);
+      expect(ids).toContain('obj-pool');
+    });
+    it('excludes pooled objectives when no accepted item matches', async () => {
+      const { neededItems, search } = await setup({
+        metadataStore: { neededItemTaskObjectives: [createPooledObjective()] },
+      });
+      search.value = 'wrench';
+      const ids = neededItems.filteredItems.value.map((item) => item.id);
+      expect(ids).not.toContain('obj-pool');
+    });
+    it('groups pooled objectives under the matched accepted item while searching', async () => {
+      const { neededItems, search } = await setup({
+        metadataStore: { neededItemTaskObjectives: [createPooledObjective()] },
+      });
+      search.value = 'augmentin';
+      const groupIds = neededItems.groupedItems.value.map((group) => group.item.id);
+      expect(groupIds).toContain('item-augmentin');
+      expect(groupIds).not.toContain('item-cms');
+      const registered = neededItems.objectivesByItemId.value.get('item-augmentin');
+      expect(registered?.taskObjectives.map((objective) => objective.id)).toEqual(['obj-pool']);
+    });
+    it('groups pooled objectives under an accepted item matched only by short name', async () => {
+      const primary = createItem('item-cms', 'CMS Kit');
+      const shortNameOnly = { ...createItem('item-analgin', 'Analgin Tablets'), shortName: 'AT-3' };
+      const pooled: NeededItemTaskObjective = {
+        ...createPooledObjective(),
+        item: primary,
+        acceptedItems: [primary, shortNameOnly],
+      };
+      const { neededItems, search } = await setup({
+        metadataStore: { neededItemTaskObjectives: [pooled] },
+      });
+      search.value = 'at-3';
+      const groupIds = neededItems.groupedItems.value.map((group) => group.item.id);
+      expect(groupIds).toContain('item-analgin');
+      expect(groupIds).not.toContain('item-cms');
+    });
+    it('keeps the primary item as the group key when no accepted item matches', async () => {
+      const { neededItems, search } = await setup({
+        metadataStore: { neededItemTaskObjectives: [createPooledObjective()] },
+      });
+      // Searching the task name includes the objective without matching any of
+      // its accepted items, exercising the primary-item group fallback.
+      search.value = 'task one';
+      const groupIds = neededItems.groupedItems.value.map((group) => group.item.id);
+      expect(groupIds).toContain('item-cms');
+      const registered = neededItems.objectivesByItemId.value.get('item-cms');
+      expect(registered?.taskObjectives.map((objective) => objective.id)).toEqual(['obj-pool']);
+    });
+  });
   describe('loading state', () => {
     it('reports items ready when loaded', async () => {
       const { neededItems } = await setup();

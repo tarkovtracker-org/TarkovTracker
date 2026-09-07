@@ -7,11 +7,22 @@ export interface UseCyclingItemOptions {
   intervalMs?: number;
   /** When false (or 0/1 items) cycling pauses and the primary item is shown. */
   enabled?: MaybeRefOrGetter<boolean>;
+  /**
+   * When a valid list index is provided, the display pins to that item and
+   * rotation pauses (e.g. a search matched one of the accepted items). Use -1
+   * (the default) to keep normal rotation behavior. `currentIndex` keeps
+   * tracking the rotation, not the pin.
+   */
+  preferredIndex?: MaybeRefOrGetter<number>;
 }
 export interface UseCyclingItemReturn {
-  /** The item currently being displayed (primary item when not cycling). */
+  /** The item currently being displayed (pinned item, primary item when not cycling). */
   currentItem: ComputedRef<TarkovItem | null>;
-  /** Zero-based index of the current item within the provided list. */
+  /**
+   * Zero-based rotation index within the provided list. It advances while
+   * cycling and resets when cycling pauses or the display is pinned; while
+   * pinned, the displayed item is the one at `preferredIndex` instead.
+   */
   currentIndex: Ref<number>;
   /** Total number of items available to cycle through. */
   total: ComputedRef<number>;
@@ -28,21 +39,29 @@ export interface UseCyclingItemReturn {
  * Display-only: this never mutates progress or counts. When there is one item
  * or fewer, or cycling is disabled, it simply returns the primary (first) item.
  */
+const normalizePinnedIndex = (index: number): number =>
+  Number.isFinite(index) && index >= 0 ? index : -1;
 export function useCyclingItem(
   items: MaybeRefOrGetter<TarkovItem[] | undefined>,
   primaryItem: MaybeRefOrGetter<TarkovItem | null>,
   options: UseCyclingItemOptions = {}
 ): UseCyclingItemReturn {
-  const { intervalMs = DEFAULT_CYCLE_INTERVAL_MS, enabled = true } = options;
+  const { intervalMs = DEFAULT_CYCLE_INTERVAL_MS, enabled = true, preferredIndex = -1 } = options;
   const itemList = computed(() => {
     const resolved = toValue(items);
     return Array.isArray(resolved) ? resolved.filter((entry): entry is TarkovItem => !!entry) : [];
   });
+  const primary = computed(() => toValue(primaryItem) ?? null);
   const total = computed(() => itemList.value.length);
   const hasAlternatives = computed(() => total.value > 1);
   const reducedMotion = usePreferredReducedMotion();
+  const pinnedIndex = computed(() => normalizePinnedIndex(Math.floor(toValue(preferredIndex))));
   const isCycling = computed(
-    () => Boolean(toValue(enabled)) && reducedMotion.value !== 'reduce' && hasAlternatives.value
+    () =>
+      Boolean(toValue(enabled)) &&
+      reducedMotion.value !== 'reduce' &&
+      hasAlternatives.value &&
+      pinnedIndex.value < 0
   );
   const currentIndex = ref(0);
   // Keep the index within bounds if the list changes (e.g. filters/locale).
@@ -70,10 +89,10 @@ export function useCyclingItem(
     },
     { immediate: true }
   );
+  const itemAtIndex = (index: number): TarkovItem | null => itemList.value[index] ?? primary.value;
   const currentItem = computed(() => {
-    const fallback = toValue(primaryItem) ?? null;
-    if (!isCycling.value) return fallback;
-    return itemList.value[currentIndex.value] ?? fallback;
+    if (pinnedIndex.value >= 0) return itemAtIndex(pinnedIndex.value);
+    return isCycling.value ? itemAtIndex(currentIndex.value) : primary.value;
   });
   return {
     currentItem,

@@ -1,8 +1,10 @@
 import { useNeededItemsSorting } from '@/composables/useNeededItemsSorting';
 import {
+  findAcceptedItemMatchIndex,
   getNeededItemData,
   getNeededItemId,
   isNonFirSpecialEquipment,
+  itemMatchesQuery,
 } from '@/features/neededitems/neededItemFilters';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
@@ -23,6 +25,7 @@ import type {
   GroupedNeededItem,
   NeededItemHideoutModule,
   NeededItemTaskObjective,
+  TarkovItem,
 } from '@/types/tarkov';
 const DEFAULT_FULL_LOAD_TIMEOUT_MS = 5000;
 const DEFAULT_FULL_LOAD_MIN_TIME_MS = 16;
@@ -467,39 +470,38 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   ): boolean => {
     return !hideTeamItems.value || passesTeamFilter(item);
   };
+  /**
+   * Task objectives match their task's name, and pooled "any of these"
+   * objectives also match any valid turn-in item, not just the primary/cycled
+   * one, so searching e.g. "Augmentin" surfaces the quest.
+   */
+  const taskMatchesSearch = (taskObjective: NeededItemTaskObjective): boolean => {
+    if (findAcceptedItemMatchIndex(taskObjective.acceptedItems, search.value) !== -1) {
+      return true;
+    }
+    const task = metadataStore.getTaskById(taskObjective.taskId);
+    return Boolean(task?.name && fuzzyMatch(task.name, search.value));
+  };
+  const stationLevelMatchesSearch = (stationName: string, level: number): boolean => {
+    const stationWithLevel = `${stationName} ${level}`;
+    const stationWithLevelText = `${stationName} level ${level}`;
+    return (
+      fuzzyMatch(stationWithLevel, search.value) || fuzzyMatch(stationWithLevelText, search.value)
+    );
+  };
+  const stationMatchesSearch = (need: NeededItemHideoutModule): boolean => {
+    const station = metadataStore.getStationById(need.hideoutModule.stationId);
+    const stationName = station?.name;
+    if (!stationName) return false;
+    if (fuzzyMatch(stationName, search.value)) return true;
+    return stationLevelMatchesSearch(stationName, need.hideoutModule.level);
+  };
+  // An empty search matches every item (fuzzyMatch treats an empty query as a
+  // wildcard), so the item-name check doubles as the empty-search early-out.
   const passesSearchFilter = (item: NeededItemTaskObjective | NeededItemHideoutModule): boolean => {
-    if (!search.value) {
-      return true;
-    }
-    const itemObj = getNeededItemData(item);
-    const itemName = itemObj?.name ?? '';
-    const itemShortName = itemObj?.shortName ?? '';
-    if (fuzzyMatch(itemName, search.value) || fuzzyMatch(itemShortName, search.value)) {
-      return true;
-    }
-    if (item.needType === 'taskObjective') {
-      const task = metadataStore.getTaskById((item as NeededItemTaskObjective).taskId);
-      if (task?.name && fuzzyMatch(task.name, search.value)) {
-        return true;
-      }
-    }
-    if (item.needType === 'hideoutModule') {
-      const hideoutModule = (item as NeededItemHideoutModule).hideoutModule;
-      const station = metadataStore.getStationById(hideoutModule.stationId);
-      if (station?.name) {
-        if (fuzzyMatch(station.name, search.value)) {
-          return true;
-        }
-        const stationWithLevel = `${station.name} ${hideoutModule.level}`;
-        const stationWithLevelText = `${station.name} level ${hideoutModule.level}`;
-        if (
-          fuzzyMatch(stationWithLevel, search.value) ||
-          fuzzyMatch(stationWithLevelText, search.value)
-        ) {
-          return true;
-        }
-      }
-    }
+    if (itemMatchesQuery(getNeededItemData(item), search.value)) return true;
+    if (item.needType === 'taskObjective') return taskMatchesSearch(item);
+    if (item.needType === 'hideoutModule') return stationMatchesSearch(item);
     return false;
   };
   const filteredItems = computed(() => {
@@ -531,20 +533,60 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     return sorted;
   });
   type GroupedNeededItemAccumulator = Omit<GroupedNeededItem, 'total' | 'currentCount'>;
+  type GroupTarget = { id: string; data: TarkovItem; name: string };
+  const canGroupItem = (item: TarkovItem | undefined): item is TarkovItem & { name: string } =>
+    Boolean(item?.id && item?.name);
+  const groupEntryName = (item: TarkovItem | undefined): string | undefined => {
+    if (!item) return undefined;
+    return item.name || item.shortName;
+  };
+  const toGroupTarget = (item: TarkovItem | undefined): GroupTarget | null => {
+    const name = groupEntryName(item);
+    if (!item?.id || !name) return null;
+    return { id: item.id, data: item, name };
+  };
+  /**
+   * Returns the search-matched accepted item of a pooled "any of these"
+   * objective, or undefined when the search did not match one of its accepted
+   * items. Uses the same name-or-short-name matching as the search filter and
+   * the display pin so all three stay consistent.
+   */
+  const findAcceptedGroupMatch = (need: NeededItemTaskObjective): TarkovItem | undefined => {
+    const matchIndex = findAcceptedItemMatchIndex(need.acceptedItems, search.value);
+    if (matchIndex < 0) return undefined;
+    return need.acceptedItems?.[matchIndex];
+  };
+  /**
+   * Resolves the item a need is grouped and registered under in the grouped
+   * view. When searching, a pooled "any of these" objective that matched an
+   * accepted item is grouped under that matched turn-in item (identified by
+   * name or short name, mirroring the search match) so it is the visible
+   * entry; without an accepted match the primary item stays canonical under
+   * the grouped-view rule that nameless items are not grouped.
+   */
+  const resolveGroupTarget = (
+    need: NeededItemTaskObjective | NeededItemHideoutModule
+  ): GroupTarget | null => {
+    const acceptedTarget =
+      need.needType === 'taskObjective' ? toGroupTarget(findAcceptedGroupMatch(need)) : null;
+    if (acceptedTarget) return acceptedTarget;
+    const primaryData = getNeededItemData(need);
+    if (!canGroupItem(primaryData)) return null;
+    return { id: primaryData.id, data: primaryData, name: primaryData.name };
+  };
   const groupedItems = computed((): GroupedNeededItem[] => {
     const startedAt = perfDebug.value ? perfNow() : 0;
     const groups = new Map<string, GroupedNeededItemAccumulator>();
     for (const need of filteredItems.value) {
-      const itemId = getNeededItemId(need);
-      if (!itemId) continue;
-      const itemData = getNeededItemData(need);
-      if (!itemData || !itemData.name) continue;
+      const target = resolveGroupTarget(need);
+      if (!target) continue;
+      const { id: itemId, data: itemData, name: itemName } = target;
       const existingGroup = groups.get(itemId);
       if (!existingGroup) {
         groups.set(itemId, {
           item: {
             id: itemData.id,
-            name: itemData.name,
+            name: itemName,
             iconLink: itemData.iconLink,
             image512pxLink: itemData.image512pxLink,
             wikiLink: itemData.wikiLink,
@@ -614,8 +656,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
       }
     >();
     for (const need of filteredItems.value) {
-      const itemData = getNeededItemData(need);
-      const itemId = itemData?.id;
+      const itemId = resolveGroupTarget(need)?.id;
       if (!itemId) continue;
       if (!map.has(itemId)) {
         map.set(itemId, { taskObjectives: [], hideoutModules: [] });
