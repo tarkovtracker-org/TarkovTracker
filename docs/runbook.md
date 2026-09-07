@@ -621,7 +621,9 @@ Pi access. Do not make production role provisioning or the canary an automatic m
 
 When a change introduces a new `tasks-core-json-*` key, an authorized operator must dispatch
 `.github/workflows/precompute-tarkov-data.yml` from the approved change revision before merging
-or promoting the app. Leave language and mode filters empty; verify all 48 language/mode entries
-were written successfully under the new prefix and attach the run and revision to the release.
-The old-key fleet remains available to the previous app. The cold fetch/adapt/overlay fallback
+or promoting the app. Leave both workflow inputs, `lang` and `gameMode`, empty to include all
+48 combinations across `regular`, `pve`, and `pvp-season`. Require `succeeded: 48` and `failed: 0`,
+verify every `tasks-core-json-v3-*` entry was written, and attach the run and approved revision
+to the release. Before relying on the previous app for rollback, confirm its existing
+`tasks-core-json-v2-*` entries remain within their seven-day TTL. The cold fetch/adapt/overlay fallback
 can exceed the free-tier CPU budget and is not a safe bridge during a cache-key rollout.

@@ -23,7 +23,7 @@ on:
         required: false
         type: string
       gameMode:
-        description: 'Restrict to one game mode (regular or pve). Empty runs both.'
+        description: 'Restrict to one game mode (regular, pve, or pvp-season). Empty runs all.'
         required: false
         type: string
 concurrency:
