@@ -830,6 +830,8 @@ flowchart LR
   save acknowledgements for that mode; a newer local reset stays pending until its save succeeds.
   Owner and teammate reconnect/live mode hydration ignore unmaterialized placeholder rows.
   Teammates retain previously hydrated progress if the legacy fallback read fails.
+  Realtime SDK callbacks forward only their payload to reconciliation handlers; transport message
+  references must never be interpreted as snapshot reconciliation functions.
   Reconnect reads wait for in-flight saves and hold new outbound writes until snapshot application
   completes. Local changes remain tracked and are saved afterward; read failures also release this barrier.
   Supporter status refreshes after the first join as well as subsequent joins to close the

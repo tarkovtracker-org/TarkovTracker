@@ -373,7 +373,7 @@ async function runSetupRealtimeListener(
         table: 'user_progress',
         filter: `user_id=eq.${currentUserId}`,
       },
-      handleProgressChange
+      (payload) => handleProgressChange(payload)
     )
     .on(
       'postgres_changes' as const,
@@ -383,7 +383,7 @@ async function runSetupRealtimeListener(
         table: 'user_game_mode_progress',
         filter: `user_id=eq.${currentUserId}`,
       },
-      handleModeProgressChange
+      (payload) => handleModeProgressChange(payload)
     )
     .on(
       'postgres_changes' as const,
@@ -393,7 +393,7 @@ async function runSetupRealtimeListener(
         table: 'user_progress',
         filter: `user_id=eq.${currentUserId}`,
       },
-      handleProgressChange
+      (payload) => handleProgressChange(payload)
     );
   let refreshGeneration = 0;
   // fallow-ignore-next-line complexity -- snapshot/event/edit races are covered in realtimeListener.seasonal.test.ts; keep generation checks together

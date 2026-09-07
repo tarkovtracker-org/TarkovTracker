@@ -152,6 +152,25 @@ describe('seasonal progress realtime synchronization', () => {
     resetSyncTimeline();
     vi.clearAllMocks();
   });
+  it('accepts the SDK message reference without treating it as a snapshot reconciler', async () => {
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    await setupRealtimeListener(store);
+    const channel = createdChannels[0]!;
+    for (const [, config, callback] of channel.on.mock.calls) {
+      const row =
+        config.table === 'user_game_mode_progress'
+          ? {
+              game_mode: 'pvp',
+              season_number: 0,
+              progress_data: { level: 12 },
+              updated_at: new Date().toISOString(),
+            }
+          : { game_edition: 2, current_game_mode: 'pvp', updated_at: new Date().toISOString() };
+      expect(() => callback({ new: row, old: {} }, 'sdk-message-ref')).not.toThrow();
+    }
+    expect(state.pvp.level).toBe(12);
+    expect(state.gameEdition).toBe(2);
+  });
   it('keeps historical progress freshness unknown after a newer mode event with a null clock', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     const { progressStorageSerializer } = await import('@/stores/tarkov/localStorage');
