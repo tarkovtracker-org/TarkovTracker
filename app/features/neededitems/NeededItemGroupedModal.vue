@@ -100,6 +100,11 @@
                   </UBadge>
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
+                  <AcceptedItemsPopover
+                    v-if="(obj.acceptedItems?.length ?? 0) > 1"
+                    :items="obj.acceptedItems ?? []"
+                    trigger-class="bg-surface-700/60 text-surface-200 px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-white/10"
+                  />
                   <span
                     class="text-xs"
                     :class="obj.foundInRaid ? 'text-warning-400' : 'text-surface-400'"

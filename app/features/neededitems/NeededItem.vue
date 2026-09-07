@@ -27,6 +27,7 @@
   import { useCraftableItem } from '@/composables/useCraftableItem';
   import { useCyclingItem } from '@/composables/useCyclingItem';
   import { neededItemKey, type NeededItemTeamNeed } from '@/features/neededitems/neededitem-keys';
+  import { findAcceptedItemMatchIndex } from '@/features/neededitems/neededItemFilters';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
@@ -38,11 +39,14 @@
       itemStyle?: 'card' | 'row';
       initiallyVisible?: boolean;
       cardStyle?: 'compact' | 'expanded';
+      /** Active search term; pins pooled objectives to the matched accepted item. */
+      search?: string;
     }>(),
     {
       itemStyle: 'card',
       initiallyVisible: false,
       cardStyle: 'expanded',
+      search: '',
     }
   );
   const progressStore = useProgressStore();
@@ -254,10 +258,19 @@
     cyclingPaused.value = paused;
   };
   const hasAlternativeItems = computed(() => acceptedItems.value.length > 1);
+  // When a search matches one of the accepted items, pin the display to that
+  // item (instead of rotating) so users see exactly what matched, with the
+  // "Any of N" badge making clear the pool accepts alternatives.
+  const pinnedAcceptedIndex = computed(() =>
+    findAcceptedItemMatchIndex(acceptedItems.value, props.search)
+  );
   const { currentItem: cyclingItem, isCycling: isCyclingItems } = useCyclingItem(
     acceptedItems,
     primaryItem,
-    { enabled: () => !selfCompletedNeed.value && !cyclingPaused.value }
+    {
+      enabled: () => !selfCompletedNeed.value && !cyclingPaused.value,
+      preferredIndex: pinnedAcceptedIndex,
+    }
   );
   const relatedStation = computed(() => {
     const need = props.need;

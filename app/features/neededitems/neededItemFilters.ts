@@ -1,3 +1,4 @@
+import { fuzzyMatch } from '@/utils/fuzzySearch';
 import type { NeededItemHideoutModule, NeededItemTaskObjective, TarkovItem } from '@/types/tarkov';
 /**
  * Type guard to check if a needed item has needType === 'taskObjective'.
@@ -35,6 +36,25 @@ export const getNeededItemData = (
     return need.item;
   }
   return isNeededItemTaskObjective(need) ? need.markerItem : undefined;
+};
+/**
+ * Returns the index of the first accepted item whose name or short name fuzzy
+ * matches the query, or -1 when the query is empty or nothing matches.
+ *
+ * Used so pooled "any of these" objectives surface when searching for any
+ * valid turn-in item, and so the matched item can be pinned for display.
+ */
+export const findAcceptedItemMatchIndex = (
+  items: readonly (TarkovItem | undefined)[] | undefined,
+  query: string
+): number => {
+  const normalizedQuery = query.trim();
+  if (!normalizedQuery || !items?.length) return -1;
+  return items.findIndex(
+    (entry) =>
+      fuzzyMatch(entry?.name ?? '', normalizedQuery) ||
+      fuzzyMatch(entry?.shortName ?? '', normalizedQuery)
+  );
 };
 const isSpecialEquipmentText = (value: string): boolean => {
   const lower = value.toLowerCase();

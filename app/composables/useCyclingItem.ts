@@ -7,6 +7,12 @@ export interface UseCyclingItemOptions {
   intervalMs?: number;
   /** When false (or 0/1 items) cycling pauses and the primary item is shown. */
   enabled?: MaybeRefOrGetter<boolean>;
+  /**
+   * When a valid list index is provided, the display pins to that item and
+   * rotation pauses (e.g. a search matched one of the accepted items). Use -1
+   * (the default) to keep normal rotation behavior.
+   */
+  preferredIndex?: MaybeRefOrGetter<number>;
 }
 export interface UseCyclingItemReturn {
   /** The item currently being displayed (primary item when not cycling). */
@@ -33,7 +39,11 @@ export function useCyclingItem(
   primaryItem: MaybeRefOrGetter<TarkovItem | null>,
   options: UseCyclingItemOptions = {}
 ): UseCyclingItemReturn {
-  const { intervalMs = DEFAULT_CYCLE_INTERVAL_MS, enabled = true } = options;
+  const { intervalMs = DEFAULT_CYCLE_INTERVAL_MS, enabled = true, preferredIndex = -1 } = options;
+  const pinnedIndex = computed(() => {
+    const resolved = Math.floor(toValue(preferredIndex));
+    return Number.isFinite(resolved) && resolved >= 0 ? resolved : -1;
+  });
   const itemList = computed(() => {
     const resolved = toValue(items);
     return Array.isArray(resolved) ? resolved.filter((entry): entry is TarkovItem => !!entry) : [];
@@ -42,7 +52,11 @@ export function useCyclingItem(
   const hasAlternatives = computed(() => total.value > 1);
   const reducedMotion = usePreferredReducedMotion();
   const isCycling = computed(
-    () => Boolean(toValue(enabled)) && reducedMotion.value !== 'reduce' && hasAlternatives.value
+    () =>
+      Boolean(toValue(enabled)) &&
+      reducedMotion.value !== 'reduce' &&
+      hasAlternatives.value &&
+      pinnedIndex.value < 0
   );
   const currentIndex = ref(0);
   // Keep the index within bounds if the list changes (e.g. filters/locale).
@@ -72,6 +86,9 @@ export function useCyclingItem(
   );
   const currentItem = computed(() => {
     const fallback = toValue(primaryItem) ?? null;
+    if (pinnedIndex.value >= 0) {
+      return itemList.value[pinnedIndex.value] ?? fallback;
+    }
     if (!isCycling.value) return fallback;
     return itemList.value[currentIndex.value] ?? fallback;
   });

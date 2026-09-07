@@ -1,5 +1,6 @@
 import { useNeededItemsSorting } from '@/composables/useNeededItemsSorting';
 import {
+  findAcceptedItemMatchIndex,
   getNeededItemData,
   getNeededItemId,
   isNonFirSpecialEquipment,
@@ -23,6 +24,7 @@ import type {
   GroupedNeededItem,
   NeededItemHideoutModule,
   NeededItemTaskObjective,
+  TarkovItem,
 } from '@/types/tarkov';
 const DEFAULT_FULL_LOAD_TIMEOUT_MS = 5000;
 const DEFAULT_FULL_LOAD_MIN_TIME_MS = 16;
@@ -478,7 +480,13 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
       return true;
     }
     if (item.needType === 'taskObjective') {
-      const task = metadataStore.getTaskById((item as NeededItemTaskObjective).taskId);
+      const taskObjective = item as NeededItemTaskObjective;
+      // Pooled "any of these" objectives match any valid turn-in item, not just
+      // the primary/cycled one, so searching e.g. "Augmentin" surfaces the quest.
+      if (findAcceptedItemMatchIndex(taskObjective.acceptedItems, search.value) !== -1) {
+        return true;
+      }
+      const task = metadataStore.getTaskById(taskObjective.taskId);
       if (task?.name && fuzzyMatch(task.name, search.value)) {
         return true;
       }
@@ -531,20 +539,43 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     return sorted;
   });
   type GroupedNeededItemAccumulator = Omit<GroupedNeededItem, 'total' | 'currentCount'>;
+  type GroupTarget = { id: string; data: TarkovItem; name: string };
+  /**
+   * Resolves the item a need is grouped and registered under in the grouped
+   * view. When searching, a pooled "any of these" objective that matched an
+   * accepted item is grouped under that matched turn-in item so it is the
+   * visible entry; without an accepted match the primary item stays canonical.
+   * `name` mirrors the grouped-item rule that nameless items are not grouped.
+   */
+  const resolveGroupTarget = (
+    need: NeededItemTaskObjective | NeededItemHideoutModule
+  ): GroupTarget | null => {
+    const primaryData = getNeededItemData(need);
+    if (!primaryData?.id) return null;
+    if (need.needType === 'taskObjective' && search.value) {
+      const matchIndex = findAcceptedItemMatchIndex(need.acceptedItems, search.value);
+      const matchedItem = matchIndex >= 0 ? need.acceptedItems?.[matchIndex] : undefined;
+      if (matchedItem?.id && matchedItem.name) {
+        const { id, name } = matchedItem;
+        return { id, data: matchedItem, name };
+      }
+    }
+    if (!primaryData.name) return null;
+    return { id: primaryData.id, data: primaryData, name: primaryData.name };
+  };
   const groupedItems = computed((): GroupedNeededItem[] => {
     const startedAt = perfDebug.value ? perfNow() : 0;
     const groups = new Map<string, GroupedNeededItemAccumulator>();
     for (const need of filteredItems.value) {
-      const itemId = getNeededItemId(need);
-      if (!itemId) continue;
-      const itemData = getNeededItemData(need);
-      if (!itemData || !itemData.name) continue;
+      const target = resolveGroupTarget(need);
+      if (!target) continue;
+      const { id: itemId, data: itemData, name: itemName } = target;
       const existingGroup = groups.get(itemId);
       if (!existingGroup) {
         groups.set(itemId, {
           item: {
             id: itemData.id,
-            name: itemData.name,
+            name: itemName,
             iconLink: itemData.iconLink,
             image512pxLink: itemData.image512pxLink,
             wikiLink: itemData.wikiLink,
@@ -614,8 +645,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
       }
     >();
     for (const need of filteredItems.value) {
-      const itemData = getNeededItemData(need);
-      const itemId = itemData?.id;
+      const itemId = resolveGroupTarget(need)?.id;
       if (!itemId) continue;
       if (!map.has(itemId)) {
         map.set(itemId, { taskObjectives: [], hideoutModules: [] });
