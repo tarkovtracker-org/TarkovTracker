@@ -152,7 +152,7 @@ describe('seasonal progress realtime synchronization', () => {
     resetSyncTimeline();
     vi.clearAllMocks();
   });
-  it('keeps historical progress freshness unknown after a newer account event', async () => {
+  it('keeps historical progress freshness unknown after a newer mode event with a null clock', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     const { progressStorageSerializer } = await import('@/stores/tarkov/localStorage');
     const { parseUserScopedStorage } = await import('@/utils/userScopedStorage');
@@ -182,6 +182,48 @@ describe('seasonal progress realtime synchronization', () => {
     expect(persisted?._modeTimestamps?.pvp).toBe(0);
     progressStorageSerializer.reset();
   });
+  it.each(['live', 'reconnect'])(
+    'ignores visibility-created placeholders during %s updates',
+    async (source) => {
+      const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+      state.pvp.pmcFaction = 'BEAR';
+      state.pvp.xpOffset = 450;
+      state.pvp.skillOffsets = { Endurance: 3 };
+      const before = structuredClone(state.pvp);
+      const placeholder = {
+        game_mode: 'pvp',
+        season_number: 0,
+        progress_data: {},
+        profile_public: true,
+        updated_at: '2026-09-06T12:00:00Z',
+      };
+      supabaseContext.client.from.mockImplementation((table: string) => ({
+        select: () => ({
+          eq: () =>
+            table === 'user_progress'
+              ? { single: async () => ({ data: null, error: null }) }
+              : Promise.resolve({ data: [placeholder], error: null }),
+        }),
+      }));
+      await setupRealtimeListener(store);
+      if (source === 'live') handlers.get('user_game_mode_progress')?.({ new: placeholder });
+      else {
+        createdChannels[0]!.subscribeCallback?.('SUBSCRIBED');
+        await vi.waitFor(() => expect(supabaseContext.client.from).toHaveBeenCalledTimes(2));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      expect(state.pvp).toEqual(before);
+      // Ignoring the placeholder must not advance ordering past real progress.
+      handlers.get('user_game_mode_progress')?.({
+        new: {
+          ...placeholder,
+          updated_at: '2026-09-06T11:00:00Z',
+          progress_data: { ...before, level: 8 },
+        },
+      });
+      expect(state.pvp.level).toBe(8);
+    }
+  );
   it('waits for the sync controller before starting a reconnect read', async () => {
     const { setupRealtimeListener, registerSyncControllerGetter } =
       await import('@/stores/tarkov/realtimeListener');

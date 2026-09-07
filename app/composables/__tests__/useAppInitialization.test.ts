@@ -267,7 +267,7 @@ describe('useAppInitialization locale setup', () => {
     expect(mockSupporter.fetchStatus).not.toHaveBeenCalled();
   });
   it('does not resubscribe to a former account when its subscription finishes late', async () => {
-    const pending = Promise.withResolvers<undefined>();
+    const pending = Promise.withResolvers<boolean>();
     mockSupporter.subscribe.mockReturnValueOnce(pending.promise);
     mockSupabaseUser.loggedIn = true;
     mockSupabaseUser.id = 'user-1';
@@ -275,12 +275,33 @@ describe('useAppInitialization locale setup', () => {
     await flushPromises();
     mockSupabaseUser.id = 'user-2';
     await flushPromises();
-    pending.resolve(undefined);
+    pending.resolve(false);
     await flushPromises();
     expect(mockSupporter.subscribe.mock.calls.map(([userId]) => userId)).toEqual([
       'user-1',
       'user-2',
     ]);
+    expect(mockSupporter.fetchStatus).not.toHaveBeenCalled();
+  });
+  it('loads supporter status when a same-user relogin cannot recreate its channel', async () => {
+    mockSupporter.subscribe.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    mockSupporter.fetchStatus.mockResolvedValue(true);
+    mockSupabaseUser.loggedIn = true;
+    mockSupabaseUser.id = 'user-1';
+    const wrapper = await mountWithComposable();
+    await flushPromises();
+    expect(mockSupporter.fetchStatus).not.toHaveBeenCalled();
+    mockSupabaseUser.loggedIn = false;
+    await flushPromises();
+    mockSupabaseUser.loggedIn = true;
+    await flushPromises();
+    expect(mockSupporter.subscribe.mock.calls.map(([userId]) => userId)).toEqual([
+      'user-1',
+      'user-1',
+    ]);
+    expect(mockSupporter.fetchStatus).toHaveBeenCalledExactlyOnceWith('user-1');
+    expect(mockShowLoadFailed).not.toHaveBeenCalled();
+    wrapper.unmount();
   });
   it('records account activity with the session token after initialization', async () => {
     const fetch = vi.fn().mockResolvedValue({ recorded: true });

@@ -690,7 +690,7 @@ describe('useTarkov sync integration', () => {
     expect(cleanupSync).toHaveBeenCalledTimes(1);
     expect(useSupabaseSyncMock).toHaveBeenCalledTimes(1);
   });
-  it('shows other_account toast and clears mismatched local data', async () => {
+  it('shows other_account toast and replaces mismatched data with current-user progress', async () => {
     localStorage.setItem(
       STORAGE_KEYS.progress,
       JSON.stringify({

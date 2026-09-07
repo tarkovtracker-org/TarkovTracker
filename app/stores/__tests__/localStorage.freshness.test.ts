@@ -99,6 +99,43 @@ describe('local mode freshness', () => {
     expect(resolved.pvp.displayName).toBe('newer server edit');
     expect(resolved.gameEdition).toBe(3);
   });
+  it('does not let a stale tab acknowledgement replace newer same-user storage', () => {
+    const local = structuredClone(defaultState);
+    let stored = {
+      state: structuredClone(local),
+      storedUserId: 'user-1',
+      timestamp: 10,
+      metadataTimestamp: 10,
+      modeTimestamps: { pvp: 10, pve: 10, seasonal: 10 },
+      hadDeprecatedProgressData: false,
+    };
+    const persist = vi.fn();
+    const serializer = createProgressStorageSerializer(() => structuredClone(stored), persist);
+    serializer.serialize(local, 'user-1', 10);
+    stored.state.pvp.displayName = 'another tab pending edit';
+    stored.modeTimestamps.pvp = 30;
+    serializer.acceptRemote({
+      state: local,
+      userId: 'user-1',
+      remote: { gameEdition: local.gameEdition },
+      next: { gameEdition: local.gameEdition },
+      updatedAtByMode: {},
+      metadataTimestamp: 20,
+    });
+    expect(persist).not.toHaveBeenCalled();
+    expect(stored.state.pvp.displayName).toBe('another tab pending edit');
+    // Even equal data can carry an independently newer edit clock.
+    stored = { ...stored, state: structuredClone(local) };
+    serializer.acceptRemote({
+      state: local,
+      userId: 'user-1',
+      remote: { gameEdition: local.gameEdition },
+      next: { gameEdition: local.gameEdition },
+      updatedAtByMode: {},
+      metadataTimestamp: 25,
+    });
+    expect(persist).not.toHaveBeenCalled();
+  });
   it('preserves local edit freshness when remote hydration keeps pending fields', () => {
     const local = structuredClone(defaultState);
     const serializer = createProgressStorageSerializer(() => null);

@@ -787,7 +787,9 @@ flowchart LR
   with sanitized progress. Visibility-only writes never advance it. Historical rows retain null until
   progress changes; unknown normalized mode freshness stays unknown instead of borrowing metadata
   freshness. Known local mode clocks preserve offline scalar edits while entry timestamps and reset
-  epochs still reconcile progress. Only progress actually read from a legacy row uses that row's clock.
+  epochs still reconcile progress. With both mode clocks unknown, remote scalar fields win;
+  progress scores from unrelated modes cannot choose them. Only progress actually read from a
+  legacy row uses that row's clock.
   When a mode is newer than account metadata, startup merges progress by entry timestamps and reset epochs;
   clearable profile fields use the preferred snapshot verbatim, including null names and empty offsets.
   Startup skill-offset maps are atomic: absent keys represent deletions, and historical snapshots
@@ -797,7 +799,9 @@ flowchart LR
   within a mode advance its local clock; account hydration keeps the server metadata clock, and switching modes or editing another mode does not. Legacy
   envelopes seed unchanged modes from their original timestamp (unknown history stays zero).
   Startup and Realtime hydration retain remote progress freshness, rather than download time.
-  Accepted envelopes are persisted even when a matching acknowledgement needs no Pinia patch;
+  Accepted envelopes are persisted even when a matching acknowledgement needs no Pinia patch,
+  provided shared storage still matches the tab's prior data and clocks. Divergence skips that
+  acknowledgement write so another tab's unsaved edits remain stored;
   merged snapshots that retain local fields use at least one millisecond beyond the incoming
   snapshot clock, so reload cannot discard pending edits on a timestamp tie. Each tab compares
   with its own prior snapshot so another tab's storage write cannot make stale fields look edited.
@@ -816,12 +820,13 @@ flowchart LR
   changes separately from local acknowledgements, so older live events cannot override newer snapshots.
   Domain merges do not acknowledge unsaved local fields. A newer remote reset invalidates older
   save acknowledgements for that mode; a newer local reset stays pending until its save succeeds.
+  Reconnect and live mode hydration ignore unmaterialized placeholder rows, preserving legacy progress.
   Reconnect reads wait for in-flight saves and hold new outbound writes until snapshot application
   completes. Local changes remain tracked and are saved afterward; read failures also release this barrier.
   Supporter status refreshes after the first join as well as subsequent joins to close the
   initial read/join gap. An owner or generic subscription whose first join is delayed by suspension reconciles on its first
   eventual join. Initialization delegates the initial status read to the subscription, with a
-  single fallback read if the initial join fails. Initialization marks status loaded only after a
+  fallback status read if the subscription declines or the initial join fails. Initialization marks status loaded only after a
   successful read; initial callers share the latest request's result even when a refresh supersedes
   the initial query. Session reset releases waiters, and failed reads can retry on the existing channel.
   Skipped saves do not run payload transforms. Actual RPC writes temporarily mark the self-origin

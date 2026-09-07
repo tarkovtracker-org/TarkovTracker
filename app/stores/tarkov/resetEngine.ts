@@ -82,14 +82,14 @@ export const resolveInitialSyncState = (
     // callers using the legacy account-clock contract. Account-only changes
     // cannot establish whether an unknown mode is newer than an offline edit.
     const unknownModeClock = modeUpdatedAt !== undefined && modeUpdatedAt[mode] === undefined;
-    const preferLocalMode =
-      (unknownModeClock && Boolean(localModeTimestamp)) ||
-      shouldPreferLocalStartupMetadata(
-        localModeTimestamp,
-        unknownModeClock ? null : (modeUpdatedAt?.[mode] ?? remoteUpdatedAt),
-        localScore,
-        remoteScore
-      );
+    const preferLocalMode = unknownModeClock
+      ? (localModeTimestamp ?? 0) > 0
+      : shouldPreferLocalStartupMetadata(
+          localModeTimestamp,
+          modeUpdatedAt?.[mode] ?? remoteUpdatedAt,
+          localScore,
+          remoteScore
+        );
     const preferredModeData = preferLocalMode ? localModeData : remoteModeData;
     // Seasonal writes can advance independently of account metadata. Keep entry
     // timestamps and reset epochs while using this mode's own progress freshness.

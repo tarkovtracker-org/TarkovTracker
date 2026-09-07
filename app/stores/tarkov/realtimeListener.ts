@@ -12,6 +12,7 @@ import {
 import { useMetadataStore } from '@/stores/useMetadata';
 import { getGameModeSeasonNumber, isGameMode, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import { hasMaterializedProgress } from '@/utils/modeProgressFallback';
 import {
   createPendingStateTracker,
   type RemoteStateMerge,
@@ -77,10 +78,12 @@ const parseRealtimeUpdateTime = (value: unknown): number => {
   const parsed = typeof value === 'string' ? Date.parse(value) : Number.NaN;
   return Number.isNaN(parsed) ? Date.now() : parsed;
 };
-const isActiveRealtimeModeRow = (
+const isMaterializedActiveModeRow = (
   row: Record<string, unknown>
 ): row is Record<string, unknown> & { game_mode: GameMode } =>
-  isGameMode(row.game_mode) && row.season_number === getGameModeSeasonNumber(row.game_mode);
+  isGameMode(row.game_mode) &&
+  row.season_number === getGameModeSeasonNumber(row.game_mode) &&
+  hasMaterializedProgress(row.progress_data);
 const parseProgressTime = (value: unknown): number => {
   const parsed = typeof value === 'string' ? Date.parse(value) : Number.NaN;
   return Number.isFinite(parsed) ? parsed : 0;
@@ -88,7 +91,7 @@ const parseProgressTime = (value: unknown): number => {
 const parseRealtimeModeProgress = (value: unknown): RealtimeModeProgress | null => {
   if (!value || typeof value !== 'object') return null;
   const row = value as Record<string, unknown>;
-  if (!isActiveRealtimeModeRow(row)) return null;
+  if (!isMaterializedActiveModeRow(row)) return null;
   return {
     mode: row.game_mode,
     progress: sanitizeOwnedProgressData(row.progress_data),

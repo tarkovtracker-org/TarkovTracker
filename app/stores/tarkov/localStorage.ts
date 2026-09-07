@@ -41,6 +41,16 @@ const nextModeTimestamp = (
 };
 const retainedMetadataTimestamp = (previous: PersistedProgressSnapshot): number =>
   previous.metadataTimestamp ?? previous.timestamp ?? 0;
+const matchesPersistedSnapshot = (
+  current: PersistedProgressSnapshot | null,
+  expected: PersistedProgressSnapshot
+): boolean =>
+  !current ||
+  (deepEqual(current.state, expected.state) &&
+    retainedMetadataTimestamp(current) === retainedMetadataTimestamp(expected) &&
+    GAME_MODE_VALUES.every(
+      (mode) => retainedModeTimestamp(current, mode) === retainedModeTimestamp(expected, mode)
+    ));
 const nextMetadataTimestamp = (
   previous: PersistedProgressSnapshot | null,
   state: UserState,
@@ -123,11 +133,16 @@ export const createProgressStorageSerializer = (
       // would incorrectly timestamp downloaded progress as a new local edit.
       serialize(snapshot.state, snapshot.userId, Date.now());
       const accepted = previous!;
+      const canPersist = matchesPersistedSnapshot(readPrevious(snapshot.userId), accepted);
       acceptRemoteMetadata(accepted, snapshot);
       GAME_MODE_VALUES.forEach((mode) => acceptRemoteMode(accepted, snapshot, mode));
       // Matching echoes may require no Pinia patch. Persist the accepted clocks
       // now so a reload cannot restore an obsolete client-side edit timestamp.
-      persistAccepted?.(serialize(accepted.state, snapshot.userId, accepted.timestamp ?? 0));
+      // Another tab may have persisted an unsaved edit since our last write.
+      // A clock-only acknowledgement must not overwrite that shared envelope.
+      if (canPersist) {
+        persistAccepted?.(serialize(accepted.state, snapshot.userId, accepted.timestamp ?? 0));
+      }
     },
   };
 };
