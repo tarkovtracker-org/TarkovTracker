@@ -28,10 +28,11 @@ const optionalChapters = (overlay: { data: { storyChapters: StoryChapter[] } }):
 };
 const validProfilePrestigeLevel = (level: number): boolean =>
   Number.isInteger(level) && level >= 0 && level <= 6;
+const isProfileConditionRecord = (condition: unknown): boolean =>
+  condition !== null && typeof condition === 'object' && !Array.isArray(condition);
 const validProfilePrestigeConditions = (conditions: PrestigeLevel['conditions']): boolean =>
   conditions === undefined ||
-  (Array.isArray(conditions) &&
-    conditions.every((condition) => condition && typeof condition === 'object'));
+  (Array.isArray(conditions) && conditions.every(isProfileConditionRecord));
 const validProfilePrestige = (entry: PrestigeLevel): boolean => {
   if (!entry) return false;
   return [
