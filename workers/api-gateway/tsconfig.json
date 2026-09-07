@@ -5,7 +5,8 @@
     "moduleResolution": "bundler",
     "paths": {
       "@/*": ["./src/*"],
-      "~/*": ["./src/*"]
+      "~/*": ["./src/*"],
+      "@shared/*": ["../../shared/*"]
     },
     "lib": ["ES2022"],
     "types": ["node"],

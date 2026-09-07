@@ -562,10 +562,14 @@ sequenceDiagram
 - `workers/api-gateway/src/services/supporter.ts`, `workers/api-gateway/src/services/usage.ts`,
   `workers/api-gateway/src/services/tarkov.ts`
 - `workers/api-gateway/src/utils/transform.ts`, `workers/api-gateway/src/utils/invalidation.ts`
+- `shared/utils/userMetadata.ts` — runtime-independent provider metadata parsing, shared with app
+  user hydration through the `@shared` alias in Nuxt and the Worker build/test configuration
 - `docs/RATE_LIMITING.md`, `docs/API.md` — ownership map and client-facing docs
 
 ### Invariants
 
+- App user hydration and API progress responses share provider metadata fallback ordering. Shared
+  utilities must not import Nuxt or Worker runtime modules.
 - A request makes at most one Durable Object call (the daily quota). There is no burst bucket, no
   IP backstop bucket, and no refund reconciliation; reintroducing any of those is a regression.
 - The daily quota fails open on DO unavailability (logs `daily_quota_unavailable`); the pre-auth

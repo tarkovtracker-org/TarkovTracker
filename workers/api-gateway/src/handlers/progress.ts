@@ -1,7 +1,7 @@
 import {
   extractUserMetadataDisplayName,
   extractUserMetadataUsername,
-} from '../../../../app/utils/userMetadata';
+} from '@shared/utils/userMetadata';
 import {
   getLegacyModeProgressField,
   hasMaterializedProgress,

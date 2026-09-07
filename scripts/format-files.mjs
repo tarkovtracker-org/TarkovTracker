@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 const patterns = [
   'app/**/*.{js,ts,tsx,vue,css,md}',
+  'shared/**/*.{js,ts,tsx}',
   'app/**/!(*locales)/*.json',
   'app/locales/en.json',
   'docs/**/*.{md,markdown}',

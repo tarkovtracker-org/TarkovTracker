@@ -380,6 +380,7 @@ export default defineNuxtConfig({
   css: ['~/assets/css/tailwind.css'],
   alias: {
     '@': appDir,
+    '@shared': fileURLToPath(new URL('./shared', import.meta.url)),
     '#tests': testsDir,
     '~': appDir,
   },
