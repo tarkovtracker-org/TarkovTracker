@@ -125,7 +125,7 @@ describe('local mode freshness', () => {
     expect(persist).not.toHaveBeenCalled();
     expect(stored.state.pvp.displayName).toBe('another tab pending edit');
     // Even equal data can carry an independently newer edit clock.
-    stored = { ...stored, state: structuredClone(local) };
+    stored = { ...stored, state: structuredClone(local), metadataTimestamp: 20 };
     serializer.acceptRemote({
       state: local,
       userId: 'user-1',

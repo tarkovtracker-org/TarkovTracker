@@ -7,7 +7,7 @@ import { replayProgressMetadataMigration } from '@/stores/tarkov/metadataStoreBr
 import { getTeamIdFromState, useSystemStoreWithSupabase } from '@/stores/useSystemStore';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { getCurrentGameMode } from '@/stores/utils/gameMode';
-import { ACTIVE_SEASON_NUMBER, GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
+import { GAME_MODES, getGameModeSeasonNumber, isGameMode, type GameMode } from '@/utils/constants';
 import { getErrorStatus } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 import { hasMaterializedProgress, summarizeModeProgressData } from '@/utils/modeProgressFallback';
@@ -162,7 +162,7 @@ const isTrackedTeammate = (
 const isActiveSeasonProgressEvent = (data: Record<string, unknown>): boolean => {
   const mode = data.game_mode;
   if (!isGameMode(mode)) return false;
-  const expectedSeason = mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
+  const expectedSeason = getGameModeSeasonNumber(mode);
   return data.season_number === expectedSeason;
 };
 /**
@@ -776,8 +776,11 @@ export function useTeammateStores() {
       ): GameMode | null => {
         const mode = row.game_mode;
         if (!isGameMode(mode)) return null;
-        const expectedSeason = mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
+        const expectedSeason = getGameModeSeasonNumber(mode);
         if (row.season_number !== expectedSeason) return null;
+        // Visibility can create a row without progress. Keep the last usable
+        // snapshot and let legacy hydration recover, even after a live event.
+        if (!hasMaterializedProgress(row.progress_data)) return null;
         applyProgressData(mode, row.progress_data, authoritative);
         return mode;
       };

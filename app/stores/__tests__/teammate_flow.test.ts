@@ -107,6 +107,41 @@ describe('teammate store hydration and lifetime', () => {
     await addMember();
     expect(flow.teammateStores.value.other?.$state.pvp.level).toBe(25);
   });
+  it('retains hydrated progress when a reconnect placeholder has a failed legacy fallback', async () => {
+    mocks.eq.mockResolvedValue({
+      data: [{ ...row(25), progress_data: { level: 25, pmcFaction: 'BEAR', xpOffset: 450 } }],
+      error: null,
+    });
+    await addMember();
+    const teammate = flow.teammateStores.value.other!;
+    const previous = JSON.parse(JSON.stringify(teammate.$state.pvp));
+    const placeholder = { ...row(1), progress_data: {} };
+    mocks.eq.mockResolvedValue({ data: [placeholder], error: null });
+    mocks.rpc.mockResolvedValue({ data: null, error: { message: 'temporarily unavailable' } });
+    window.dispatchEvent(new Event('teammate-progress-reconnected'));
+    await flushPromises();
+    expect(mocks.rpc).toHaveBeenCalledWith('get_teammate_legacy_progress', {
+      p_user_id: 'other',
+      p_game_mode: 'pvp',
+    });
+    expect(teammate.$state.pvp).toEqual(previous);
+    emitProgress(placeholder);
+    expect(teammate.$state.pvp).toEqual(previous);
+    mocks.rpc.mockResolvedValue({ data: { level: 31, pmcFaction: 'BEAR' }, error: null });
+    window.dispatchEvent(new Event('teammate-progress-reconnected'));
+    await flushPromises();
+    expect(teammate.$state.pvp.level).toBe(31);
+  });
+  it('does not let a live placeholder suppress an outstanding usable legacy read', async () => {
+    const legacy = Promise.withResolvers<{ data: { level: number }; error: null }>();
+    mocks.eq.mockResolvedValue({ data: [{ ...row(1), progress_data: {} }], error: null });
+    mocks.rpc.mockReturnValue(legacy.promise);
+    await addMember();
+    emitProgress({ ...row(1), progress_data: {} });
+    legacy.resolve({ data: { level: 37 }, error: null });
+    await flushPromises();
+    expect(flow.teammateStores.value.other?.$state.pvp.level).toBe(37);
+  });
   it('never uses persistent legacy fallback for a Seasonal teammate', async () => {
     mocks.eq.mockResolvedValue({
       data: [row(20, 'seasonal', ACTIVE_SEASON_NUMBER - 1)],

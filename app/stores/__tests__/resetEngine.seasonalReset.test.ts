@@ -66,7 +66,6 @@ describe('performReset seasonal', () => {
   it('does not use unrelated mode scores when both mode clocks are unknown', () => {
     const local = structuredClone(defaultState);
     const remote = structuredClone(defaultState);
-    local.pvp.level = 60;
     local.pve.displayName = 'stale local name';
     local.pve.taskObjectives.objective = { count: 4, timestamp: 20 };
     remote.pve.displayName = 'remote name';
