@@ -2276,7 +2276,19 @@
         "no_quest_events_found": "No se encontraron eventos de inicio/finalización de misiones en los registros seleccionados.",
         "parse_failed": "No se pudieron analizar los registros de EFT.",
         "selected_logs_too_large": "Los registros seleccionados contienen demasiado contenido (máx. {max_mb} MB).",
-        "task_metadata_not_loaded": "Los metadatos de misiones aún no se cargaron. Actualiza e inténtalo de nuevo."
+        "task_metadata_not_loaded": "Los metadatos de misiones aún no se cargaron. Actualiza e inténtalo de nuevo.",
+        "invalid_mode": "Selecciona un modo de juego de destino válido.",
+        "outside_active_season": "Estos registros contienen eventos fuera de la temporada activa o sin una fecha utilizable. Seleccione sesiones de la temporada activa antes de importar en JcJ estacional."
+      },
+      "failed_tasks": "Tareas fallidas encontradas: {count}",
+      "unknown_failed_events": "Tareas fallidas (Modo desconocido)",
+      "skipped_malformed": {
+        "single": "Se omitió {count} notificación mal formada.",
+        "plural": "Se omitieron {count} notificaciones mal formadas."
+      },
+      "skipped_seasonal": {
+        "single": "Evento estacional omitido {count} fuera de la temporada activa o sin fecha válida.",
+        "plural": "Eventos estacionales omitidos {count} fuera de la temporada activa o sin fechas válidas."
       }
     },
     "tarkov_dev_import": {

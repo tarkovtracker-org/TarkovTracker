@@ -2276,7 +2276,19 @@
         "no_quest_events_found": "Aucun événement de début/fin de quête n'a été trouvé dans les journaux sélectionnés.",
         "parse_failed": "Impossible d'analyser les journaux EFT.",
         "selected_logs_too_large": "Les journaux sélectionnés contiennent trop de données (max {max_mb} Mo).",
-        "task_metadata_not_loaded": "Les métadonnées des tâches ne sont pas encore chargées. Actualisez puis réessayez."
+        "task_metadata_not_loaded": "Les métadonnées des tâches ne sont pas encore chargées. Actualisez puis réessayez.",
+        "invalid_mode": "Sélectionnez un mode de jeu de destination valide.",
+        "outside_active_season": "Ces logs contiennent des événements en dehors de la saison active ou sans date d'utilisation. Sélectionnez les sessions de la saison active avant d'importer dans le JcJ saisonnier."
+      },
+      "failed_tasks": "Tâches correspondantes échouées : {count}",
+      "unknown_failed_events": "Tâches échouées (Mode inconnu)",
+      "skipped_malformed": {
+        "single": "Notification malformée {count} ignorée.",
+        "plural": "Les notifications malformées {count} ont été ignorées."
+      },
+      "skipped_seasonal": {
+        "single": "Événement de saison {count} ignoré en dehors de la saison active ou sans date valide.",
+        "plural": "Événements de saison {count} ignorés en dehors de la saison active ou sans dates valides."
       }
     },
     "tarkov_dev_import": {
