@@ -13,6 +13,7 @@ import {
 } from '../_shared/authenticated-mutation.ts';
 import { isTeamGameMode, type TeamGameMode } from '../_shared/team-mode.ts';
 import { rejectExistingTeamMembership } from '../_shared/team-membership.ts';
+import { isMembershipConflict } from '../_shared/team-create-error.ts';
 const DEFAULT_MAX_TEAM_MEMBERS = 5;
 type TeamRow = {
   created_at: string;
@@ -101,18 +102,6 @@ const prepareCreate = async (req: Request): Promise<MutationStep<CreateContext>>
   const auth = await authenticateMutation(req, 'team-create');
   if (auth.response) return rejectMutationStep(auth.response);
   return parseCreateInput(req, auth.supabase, auth.user.id);
-};
-const isMembershipConflict = (
-  error: {
-    code?: string;
-    details?: string | null;
-    message?: string;
-  } | null
-): boolean => {
-  if (error?.code !== '23505') return false;
-  return [error.message, error.details].some((value) =>
-    value?.includes('team_memberships_user_mode_unique')
-  );
 };
 const createTeamInsertError = (
   req: Request,
