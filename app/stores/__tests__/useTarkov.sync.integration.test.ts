@@ -123,7 +123,7 @@ const {
       progress_data: unknown;
       season_number: number;
       updated_at?: string;
-      progress_updated_at?: string;
+      progress_updated_at?: string | null;
     }>;
     error: SupabaseErrorLike;
     errorSequence?: SupabaseErrorLike[];
@@ -421,6 +421,60 @@ describe('useTarkov sync integration', () => {
     resetTarkovSync('test teardown');
     localStorage.clear();
   });
+  it('keeps offline Seasonal edits when historical mode freshness is unknown and metadata is newer', async () => {
+    const base = Date.parse('2026-09-06T12:00:00Z');
+    const local = structuredClone(defaultState);
+    local.currentGameMode = 'seasonal';
+    local.seasonal.displayName = 'offline edit';
+    local.seasonal.level = 12;
+    local.seasonal.taskObjectives['objective-1'] = {
+      complete: false,
+      count: 4,
+      timestamp: base + 20_000,
+    };
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({
+        _userId: 'user-1',
+        _timestamp: base + 20_000,
+        _metadataTimestamp: base + 10_000,
+        _modeTimestamps: { pvp: base + 10_000, pve: base + 10_000, seasonal: base + 20_000 },
+        data: local,
+      })
+    );
+    single.mockResolvedValue({
+      data: createRemoteRow({
+        current_game_mode: 'pve',
+        game_edition: 3,
+        updated_at: new Date(base + 30_000).toISOString(),
+      }),
+      error: null,
+    });
+    modeProgressResult.data = [
+      {
+        game_mode: 'seasonal',
+        season_number: ACTIVE_SEASON_NUMBER,
+        progress_data: {
+          ...progressWithLevel(2),
+          displayName: 'historical',
+          taskObjectives: { 'objective-1': { complete: false, count: 1 } },
+        },
+        progress_updated_at: null,
+      },
+    ];
+    await initializeTarkovSync();
+    const store = useTarkovStore();
+    expect(store.currentGameMode).toBe('pve');
+    expect(store.gameEdition).toBe(3);
+    expect(store.seasonal.displayName).toBe('offline edit');
+    expect(store.seasonal.level).toBe(12);
+    expect(store.seasonal.taskObjectives['objective-1']?.count).toBe(4);
+    expect(getLastSyncPayload()?.p_modes).toEqual(
+      expect.objectContaining({
+        seasonal: expect.objectContaining({ displayName: 'offline edit', level: 12 }),
+      })
+    );
+  });
   it('persists remote freshness through the real Pinia persistence plugin', async () => {
     const base = Date.parse('2026-09-06T12:00:00Z');
     vi.spyOn(Date, 'now').mockReturnValue(base + 40_000);
@@ -479,6 +533,28 @@ describe('useTarkov sync integration', () => {
     expect(read()._modeTimestamps.pve).toBe(base + 40_000);
     expect(read()._modeTimestamps.pvp).toBe(base + 30_000);
     expect(read()._metadataTimestamp).toBe(base + 20_000);
+    // A matching echo needs no Pinia patch, but must persist its server clock.
+    getModeProgressCallback()?.({
+      old: null,
+      new: {
+        game_mode: 'pve',
+        season_number: 0,
+        progress_data: progressWithLevel(4),
+        updated_at: new Date(base + 35_000).toISOString(),
+        progress_updated_at: new Date(base + 35_000).toISOString(),
+      },
+    });
+    await nextTick();
+    expect(read()._modeTimestamps.pve).toBe(base + 35_000);
+    useTarkovStore().$patch({ gameEdition: 3 });
+    await nextTick();
+    expect(read()._metadataTimestamp).toBe(base + 40_000);
+    getRealtimeCallback()?.({
+      old: null,
+      new: createRemoteRow({ game_edition: 3, updated_at: new Date(base + 36_000).toISOString() }),
+    });
+    await nextTick();
+    expect(read()._metadataTimestamp).toBe(base + 36_000);
   });
   it.each(['', 'invalid-date'])(
     'restores owned progress when server timestamps are unusable: %s',
@@ -620,12 +696,15 @@ describe('useTarkov sync integration', () => {
       JSON.stringify({
         _timestamp: Date.now(),
         _userId: 'other-user',
-        data: useTarkovStore().$state,
+        data: { ...structuredClone(defaultState), pvp: progressWithLevel(47) },
       })
     );
     await initializeTarkovSync();
     expect(showLocalIgnored).toHaveBeenCalledWith('other_account');
-    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBeNull();
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!)).toMatchObject({
+      _userId: 'user-1',
+      data: { pvp: { level: 1 } },
+    });
   });
   it('keeps scoped local progress hidden until the matching user session is hydrated', async () => {
     supabaseContext.user.loggedIn = false;
@@ -1630,6 +1709,7 @@ describe('useTarkov sync integration', () => {
     callback?.({
       new: {
         ...payload,
+        progress_data: { ...payload.progress_data, level: 2 },
         updated_at: new Date(now + 2000).toISOString(),
       },
       old: {},

@@ -57,6 +57,48 @@ describe('local mode freshness', () => {
     });
     expect(resolved.pvp.displayName).toBe('newer at 30');
   });
+  it('persists no-op acknowledgements before reload without another state mutation', () => {
+    const local = structuredClone(defaultState);
+    local.pvp.displayName = 'acknowledged';
+    local.gameEdition = 2;
+    let stored: string;
+    const serializer = createProgressStorageSerializer(
+      () => null,
+      (value) => {
+        stored = value;
+      }
+    );
+    stored = serializer.serialize(local, 'user-1', 100);
+    serializer.acceptRemote({
+      state: local,
+      userId: 'user-1',
+      remote: local,
+      next: local,
+      updatedAtByMode: { pvp: 20, pve: 20, seasonal: 20 },
+      metadataTimestamp: 20,
+    });
+    const persisted = parseUserScopedStorage<typeof local>(stored)!;
+    expect(persisted._modeTimestamps?.pvp).toBe(20);
+    expect(persisted._metadataTimestamp).toBe(20);
+    const newer = structuredClone(local);
+    newer.pvp.displayName = 'newer server edit';
+    newer.gameEdition = 3;
+    const resolved = resolveInitialSyncState(
+      persisted.data,
+      newer,
+      persisted._metadataTimestamp!,
+      30,
+      1,
+      1,
+      {
+        mergeModeSnapshots: true,
+        localModeTimestamps: persisted._modeTimestamps,
+        modeUpdatedAt: { pvp: 30, pve: 20, seasonal: 20 },
+      }
+    );
+    expect(resolved.pvp.displayName).toBe('newer server edit');
+    expect(resolved.gameEdition).toBe(3);
+  });
   it('preserves local edit freshness when remote hydration keeps pending fields', () => {
     const local = structuredClone(defaultState);
     const serializer = createProgressStorageSerializer(() => null);

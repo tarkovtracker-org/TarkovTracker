@@ -81,6 +81,7 @@ import {
   type GameMode,
 } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import { hasMaterializedProgress } from '@/utils/modeProgressFallback';
 import {
   hasDeprecatedTarkovDevProfileData,
   sanitizeGameEdition,
@@ -1441,6 +1442,20 @@ export async function initializeTarkovSync() {
         // Account metadata and each mode have independent freshness. Visibility
         // changes must never lend their timestamps to progress in another mode.
         const remoteUpdatedAt = Number.isFinite(accountUpdatedAt) ? accountUpdatedAt || null : null;
+        const remoteModeUpdatedAt = { ...modeProgressResult.updatedAtByMode };
+        // Only a payload actually read from the legacy account row inherits
+        // that row's clock. A historical normalized row still has unknown
+        // progress freshness, even when account metadata changed recently.
+        if (remoteUpdatedAt !== null) {
+          for (const mode of ['pvp', 'pve'] as const) {
+            if (
+              modeProgressResult.data[mode] == null &&
+              hasMaterializedProgress(data?.[`${mode}_data`])
+            ) {
+              remoteModeUpdatedAt[mode] = remoteUpdatedAt;
+            }
+          }
+        }
         const localOwnedByUser = storedUserId === currentUserId;
         const remoteHadDeprecatedProgressData = hasDeprecatedTarkovDevProfileData({
           pvp: modeProgressResult.data.pvp ?? data?.pvp_data,
@@ -1460,7 +1475,7 @@ export async function initializeTarkovSync() {
             remoteScore,
             {
               mergeModeSnapshots: (modeProgressResult.updatedAt ?? 0) > (accountUpdatedAt || 0),
-              modeUpdatedAt: modeProgressResult.updatedAtByMode,
+              modeUpdatedAt: remoteModeUpdatedAt,
               localModeTimestamps: Object.fromEntries(
                 GAME_MODE_VALUES.map((mode) => [
                   mode,
@@ -1503,10 +1518,7 @@ export async function initializeTarkovSync() {
             metadataTimestamp: remoteUpdatedAt ?? 0,
             next: resolvedState,
             updatedAtByMode: Object.fromEntries(
-              GAME_MODE_VALUES.map((mode) => [
-                mode,
-                modeProgressResult.updatedAtByMode?.[mode] ?? remoteUpdatedAt ?? 0,
-              ])
+              GAME_MODE_VALUES.map((mode) => [mode, remoteModeUpdatedAt[mode] ?? 0])
             ),
           });
           if (!deepEqual(resolvedState, localState)) {
@@ -1530,10 +1542,7 @@ export async function initializeTarkovSync() {
             metadataTimestamp: remoteUpdatedAt ?? 0,
             next: normalizedRemote,
             updatedAtByMode: Object.fromEntries(
-              GAME_MODE_VALUES.map((mode) => [
-                mode,
-                modeProgressResult.updatedAtByMode?.[mode] ?? remoteUpdatedAt ?? 0,
-              ])
+              GAME_MODE_VALUES.map((mode) => [mode, remoteModeUpdatedAt[mode] ?? 0])
             ),
           });
           tarkovStore.$patch((state) => {

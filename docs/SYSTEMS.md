@@ -785,7 +785,9 @@ flowchart LR
   its normalized write makes the subsequent identical RPC upsert a no-op. Startup account metadata
   uses the account timestamp; each mode independently uses `progress_updated_at`, which changes only
   with sanitized progress. Visibility-only writes never advance it. Historical rows retain null until
-  progress changes and use the account timestamp as the legacy fallback, never visibility freshness.
+  progress changes; unknown normalized mode freshness stays unknown instead of borrowing metadata
+  freshness. Known local mode clocks preserve offline scalar edits while entry timestamps and reset
+  epochs still reconcile progress. Only progress actually read from a legacy row uses that row's clock.
   When a mode is newer than account metadata, startup merges progress by entry timestamps and reset epochs;
   clearable profile fields use the preferred snapshot verbatim, including null names and empty offsets.
   Startup skill-offset maps are atomic: absent keys represent deletions, and historical snapshots
@@ -794,7 +796,8 @@ flowchart LR
   account settings plus independent `_modeTimestamps` for progress. Only changes
   within a mode advance its local clock; account hydration keeps the server metadata clock, and switching modes or editing another mode does not. Legacy
   envelopes seed unchanged modes from their original timestamp (unknown history stays zero).
-  Startup and Realtime hydration retain remote progress freshness, rather than download time;
+  Startup and Realtime hydration retain remote progress freshness, rather than download time.
+  Accepted envelopes are persisted even when a matching acknowledgement needs no Pinia patch;
   merged snapshots that retain local fields use at least one millisecond beyond the incoming
   snapshot clock, so reload cannot discard pending edits on a timestamp tie. Each tab compares
   with its own prior snapshot so another tab's storage write cannot make stale fields look edited.

@@ -152,6 +152,36 @@ describe('seasonal progress realtime synchronization', () => {
     resetSyncTimeline();
     vi.clearAllMocks();
   });
+  it('keeps historical progress freshness unknown after a newer account event', async () => {
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    const { progressStorageSerializer } = await import('@/stores/tarkov/localStorage');
+    const { parseUserScopedStorage } = await import('@/utils/userScopedStorage');
+    progressStorageSerializer.reset();
+    await setupRealtimeListener(store);
+    handlers.get('user_progress')?.({
+      new: {
+        current_game_mode: 'pvp',
+        game_edition: 4,
+        tarkov_uid: null,
+        updated_at: '2026-09-06T12:00:00Z',
+      },
+    });
+    handlers.get('user_game_mode_progress')?.({
+      new: {
+        game_mode: 'pvp',
+        season_number: 0,
+        progress_data: structuredClone(defaultState.pvp),
+        progress_updated_at: null,
+        updated_at: '2026-09-06T12:01:00Z',
+      },
+    });
+    const persisted = parseUserScopedStorage(
+      progressStorageSerializer.serialize(state, supabaseContext.user.id, Date.now())
+    );
+    expect(persisted?._metadataTimestamp).toBe(Date.parse('2026-09-06T12:00:00Z'));
+    expect(persisted?._modeTimestamps?.pvp).toBe(0);
+    progressStorageSerializer.reset();
+  });
   it('waits for the sync controller before starting a reconnect read', async () => {
     const { setupRealtimeListener, registerSyncControllerGetter } =
       await import('@/stores/tarkov/realtimeListener');

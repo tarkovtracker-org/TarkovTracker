@@ -86,7 +86,8 @@ const acceptRemoteMode = (
   accepted.state[mode] = cloneStateSnapshot(next);
 };
 export const createProgressStorageSerializer = (
-  readPrevious: (userId: string | null) => PersistedProgressSnapshot | null
+  readPrevious: (userId: string | null) => PersistedProgressSnapshot | null,
+  persistAccepted?: (value: string) => void
 ) => {
   let previous: PersistedProgressSnapshot | null = null;
   const serialize = (state: UserState, userId: string | null, timestamp: number): string => {
@@ -124,6 +125,9 @@ export const createProgressStorageSerializer = (
       const accepted = previous!;
       acceptRemoteMetadata(accepted, snapshot);
       GAME_MODE_VALUES.forEach((mode) => acceptRemoteMode(accepted, snapshot, mode));
+      // Matching echoes may require no Pinia patch. Persist the accepted clocks
+      // now so a reload cannot restore an obsolete client-side edit timestamp.
+      persistAccepted?.(serialize(accepted.state, snapshot.userId, accepted.timestamp ?? 0));
     },
   };
 };
@@ -248,5 +252,8 @@ export const patchStoreState = (
   });
 };
 export const progressStorageSerializer = createProgressStorageSerializer(
-  readPersistedProgressState
+  readPersistedProgressState,
+  (value) => {
+    safeSetItem(STORAGE_KEYS.progress, value);
+  }
 );

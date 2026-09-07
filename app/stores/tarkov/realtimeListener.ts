@@ -49,7 +49,7 @@ type RealtimeModeProgress = {
   mode: GameMode;
   progress: UserProgressData;
   updateTime: number;
-  progressTime: number | null;
+  progressTime: number;
 };
 type LegacyProgressMetadata = {
   current_game_mode?: string;
@@ -81,12 +81,10 @@ const isActiveRealtimeModeRow = (
   row: Record<string, unknown>
 ): row is Record<string, unknown> & { game_mode: GameMode } =>
   isGameMode(row.game_mode) && row.season_number === getGameModeSeasonNumber(row.game_mode);
-const parseProgressTime = (value: unknown): number | null => {
+const parseProgressTime = (value: unknown): number => {
   const parsed = typeof value === 'string' ? Date.parse(value) : Number.NaN;
-  return Number.isFinite(parsed) ? parsed : null;
+  return Number.isFinite(parsed) ? parsed : 0;
 };
-const resolveProgressClock = (progressTime: number | null, metadataTime: number | undefined) =>
-  progressTime ?? metadataTime ?? 0;
 const parseRealtimeModeProgress = (value: unknown): RealtimeModeProgress | null => {
   if (!value || typeof value !== 'object') return null;
   const row = value as Record<string, unknown>;
@@ -340,7 +338,7 @@ async function runSetupRealtimeListener(
       remote: { [mode]: remoteProgress },
       next: { [mode]: nextProgress },
       updatedAtByMode: {
-        [mode]: resolveProgressClock(remote.progressTime, latestLegacyMetadataUpdateTime),
+        [mode]: remote.progressTime,
       },
     });
     if (shouldIgnoreModeProgressUpdate(mode, updateTime, nextProgress, localState[mode])) return;

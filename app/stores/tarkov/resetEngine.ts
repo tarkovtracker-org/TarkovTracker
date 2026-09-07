@@ -77,16 +77,23 @@ export const resolveInitialSyncState = (
     if (localEpoch !== remoteEpoch) {
       return mergeProgressData(localModeData, remoteModeData);
     }
-    const preferLocalMode = shouldPreferLocalStartupMetadata(
-      options.localModeTimestamps?.[mode] ?? localTimestamp,
-      modeUpdatedAt?.[mode] ?? remoteUpdatedAt,
-      localScore,
-      remoteScore
-    );
+    const localModeTimestamp = options.localModeTimestamps?.[mode] ?? localTimestamp;
+    // An explicit clock map distinguishes historical unknown progress from
+    // callers using the legacy account-clock contract. Account-only changes
+    // cannot establish whether an unknown mode is newer than an offline edit.
+    const unknownModeClock = modeUpdatedAt !== undefined && modeUpdatedAt[mode] === undefined;
+    const preferLocalMode =
+      (unknownModeClock && Boolean(localModeTimestamp)) ||
+      shouldPreferLocalStartupMetadata(
+        localModeTimestamp,
+        unknownModeClock ? null : (modeUpdatedAt?.[mode] ?? remoteUpdatedAt),
+        localScore,
+        remoteScore
+      );
     const preferredModeData = preferLocalMode ? localModeData : remoteModeData;
     // Seasonal writes can advance independently of account metadata. Keep entry
     // timestamps and reset epochs while using this mode's own progress freshness.
-    if (mergeModeSnapshots) {
+    if (mergeModeSnapshots || unknownModeClock) {
       const merged = preferLocalMode
         ? mergeProgressData(remoteModeData, localModeData, true)
         : mergeProgressData(localModeData, remoteModeData, true);

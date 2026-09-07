@@ -63,6 +63,39 @@ describe('performReset seasonal', () => {
         .taskCompletions.localTask
     ).toBeUndefined();
   });
+  it.each(['pvp', 'pve', 'seasonal'] as const)(
+    'does not lend account metadata freshness to unknown %s progress',
+    (mode) => {
+      const local = structuredClone(defaultState);
+      const remote = structuredClone(defaultState);
+      local[mode].displayName = null;
+      local[mode].xpOffset = 0;
+      local[mode].skillOffsets = {};
+      local[mode].taskObjectives.objective = { count: 0, timestamp: 20 };
+      remote[mode].displayName = 'older name';
+      remote[mode].xpOffset = 100;
+      remote[mode].skillOffsets = { Endurance: 4 };
+      remote[mode].taskObjectives.objective = { count: 5, timestamp: 10 };
+      remote[mode].taskCompletions.remoteTask = { complete: true, timestamp: 10 };
+      remote.gameEdition = 4;
+      const result = resolveInitialSyncState(local, remote, 10, 30, 1, 99, {
+        localModeTimestamps: { [mode]: 20 },
+        modeUpdatedAt: {},
+      });
+      expect(result.gameEdition).toBe(4);
+      expect(result[mode]).toMatchObject({ displayName: null, xpOffset: 0, skillOffsets: {} });
+      expect(result[mode].skillOffsets).toEqual({});
+      expect(result[mode].taskObjectives.objective?.count).toBe(0);
+      expect(result[mode].taskCompletions.remoteTask?.complete).toBe(true);
+      remote[mode].progressEpoch = 1;
+      const reset = resolveInitialSyncState(local, remote, 10, 30, 1, 99, {
+        localModeTimestamps: { [mode]: 20 },
+        modeUpdatedAt: {},
+      });
+      expect(reset[mode].progressEpoch).toBe(1);
+      expect(reset[mode].displayName).toBe('older name');
+    }
+  );
   it.each([true, false])(
     'preserves newer count decrements and explicit clears (local preferred: %s)',
     (preferLocal) => {
