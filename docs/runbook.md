@@ -348,6 +348,82 @@ References: [migration history](https://supabase.com/docs/reference/cli/supabase
 [squash limitations](https://supabase.com/docs/reference/cli/supabase-migration-squash), and
 [history repair](https://supabase.com/docs/reference/cli/supabase-migration-repair).
 
+### Seasonal-team index recovery (#646)
+
+The applied migration `20260804043344_add_seasonal_team_index_concurrently.sql` uses
+`CREATE INDEX CONCURRENTLY IF NOT EXISTS`. A cancelled/failed concurrent build can leave an
+invalid index, and rerunning that statement skips the existing name without repairing it. Do not
+edit the historical migration or rebuild a healthy index just because this failure is possible.
+
+An authorized operator first records the project identity, deployed revision, PostgreSQL version,
+and migration-history/pending-version evidence described above. Obtain the following catalog
+results through the operator's approved database access; the Pi observer does not accept arbitrary
+SQL. Do not supply operator credentials to an agent.
+
+```sql
+SELECT c.oid::regclass AS index_name,
+       c.relkind,
+       i.indrelid::regclass AS table_name,
+       i.indisvalid,
+       i.indisready,
+       i.indislive,
+       CASE WHEN i.indexrelid IS NOT NULL
+            THEN pg_catalog.pg_get_indexdef(i.indexrelid) END AS definition
+FROM pg_catalog.pg_class AS c
+LEFT JOIN pg_catalog.pg_index AS i ON i.indexrelid = c.oid
+WHERE c.oid = pg_catalog.to_regclass('public.idx_user_system_seasonal_team_id');
+
+SELECT pid, command, phase
+FROM pg_catalog.pg_stat_progress_create_index
+WHERE relid = pg_catalog.to_regclass('public.user_system');
+```
+
+Expected definition: a nonunique B-tree index on `public.user_system(seasonal_team_id)`, with no
+predicate, expression, or extra columns. Catalog inspection must use a role with visibility into
+all relevant operations. Review current lock/activity reports too; an empty progress view alone
+is not a concurrency guarantee. Coordinate the maintenance window so no migration or other index
+maintenance starts between inspection and recovery.
+
+| Observed state                                                         | Action                                                                                                                      |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Expected definition; valid, ready, and live                            | Record the evidence and leave the index in place.                                                                           |
+| Expected definition; invalid but live; no active build/maintenance     | Review and authorize the concurrent rebuild below.                                                                          |
+| Missing index, wrong definition, unexpected relation kind, or not live | Stop this recovery path. Investigate schema drift and prepare a separately reviewed forward schema change or recovery plan. |
+| Active build or conflicting maintenance                                | Let the operator investigate the operation; do not cancel it or start another rebuild automatically.                        |
+
+For the confirmed invalid, otherwise expected index, PostgreSQL supports rebuilding that exact
+index without changing its definition:
+
+```sql
+REINDEX INDEX CONCURRENTLY public.idx_user_system_seasonal_team_id;
+```
+
+Run it as a **single statement in a verified autocommit operator session**, outside `BEGIN`,
+a function, or a `DO` block. Set bounded session lock/statement timeouts appropriate to the
+observed table size and maintenance window. Concurrent rebuilding permits ordinary writes but
+still consumes I/O, needs space for another index, and can wait for existing transactions.
+Do not route this command through the migration runner: this repository has observed that
+`supabase:disable-transaction` did not disable its transaction wrapper. Rebuilding the existing
+expected index is an explicitly reviewed operational repair; it does not justify editing or
+repairing migration history. A changed index definition still requires a forward schema change.
+
+Afterward, rerun both catalog queries and record that the expected definition is unchanged and
+`indisvalid`, `indisready`, and `indislive` are all true. If interrupted again, stop and inspect the
+result before retrying. Concurrent reindexing can leave temporary `_ccnew` or `_ccold` indexes;
+follow PostgreSQL's failure-state guidance after verifying their identity and dependencies rather
+than deleting objects by suffix alone. Attach before/after evidence and the operation result to
+#646 (or its deployment record). Until that evidence exists, production index validity is
+**unverified**, even when repository CI is green.
+
+The failure and repair were reproduced in an isolated PostgreSQL 17 database: cancel a concurrent
+build while it waits for an open writer, observe invalid/not-ready flags, verify `IF NOT EXISTS`
+leaves those flags unchanged, then run the single-statement concurrent reindex and verify the
+original definition is valid/ready/live. This validates the procedure, not the deployed index.
+
+References: [CREATE INDEX](https://www.postgresql.org/docs/17/sql-createindex.html),
+[REINDEX and interrupted-build recovery](https://www.postgresql.org/docs/17/sql-reindex.html), and
+[pg_index validity flags](https://www.postgresql.org/docs/17/catalog-pg-index.html).
+
 ### Execution and deployment safety
 
 - **Never put a bulk data rewrite in a migration.** Migrations run in a transaction, so a
