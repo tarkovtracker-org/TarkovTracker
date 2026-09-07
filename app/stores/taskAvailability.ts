@@ -129,6 +129,7 @@ const missingPrestige = (task: Task): TaskBlocker[] =>
   task.requiredPrestige ? [{ type: 'unknown', reason: 'prestige_reference' }] : [];
 const traderNameFor = (task: Task) =>
   task.trader?.normalizedName || task.trader?.name?.toLowerCase();
+const traderDisplayName = (task: Task, fallback: string) => task.trader?.name || fallback;
 const storyChapterIds = (task: Task) => (task.storyUnlocks ?? []).map((chapter) => chapter.id);
 const traderUnlocked = (ids: string[], data: TaskAvailabilityTeamData) =>
   !ids.length || ids.some((id) => isTaskComplete(data.completions[id]));
@@ -226,7 +227,7 @@ const createTeamEvaluator = (
       {
         type: 'trader_unlock',
         taskId: ids[0],
-        trader: { id: task.trader!.id, name: traderName },
+        trader: { id: task.trader!.id, name: traderDisplayName(task, traderName) },
       },
     ];
   };

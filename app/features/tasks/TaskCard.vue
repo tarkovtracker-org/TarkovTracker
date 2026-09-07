@@ -422,6 +422,7 @@
     resolveTaskObjectives,
   } from '@/features/tasks/taskCardHelpers';
   import TaskCardRewards from '@/features/tasks/TaskCardRewards.vue';
+  import { hasStoryUnlockProgress } from '@/stores/taskAvailability';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
@@ -826,6 +827,11 @@
     isFailed.value ? failureSources.value : blockedSources.value
   );
   const pendingParentTasks = computed<PendingParentTask[]>(() => {
+    const modeProgress = tarkovStore.getModeProgressData(tarkovStore.getCurrentGameMode());
+    if (
+      props.task.storyUnlocks?.some((chapter) => hasStoryUnlockProgress(chapter.id, modeProgress))
+    )
+      return [];
     return parentTasks.value
       .map((parent) => {
         const completion = taskCompletions.value[parent.id];

@@ -332,13 +332,18 @@ const progressionRank = (evaluation?: TaskAvailabilityResult): [number, number] 
   if (!evaluation) return [6, 0];
   return evaluation.available ? [0, 0] : blockedRank(evaluation.blockers);
 };
+const compareProgressionRanks = (a: [number, number], b: [number, number]) =>
+  a[0] - b[0] || a[1] - b[1];
 const bestProgressionRank = (
   taskId: string,
   evaluations: TaskEvaluationMap | undefined,
   teamIds: string[]
 ): [number, number] => {
   const ranks = teamIds.map((id) => progressionRank(evaluations?.[taskId]?.[id]));
-  return ranks.toSorted((a, b) => a[0] - b[0] || a[1] - b[1])[0] ?? [6, 0];
+  return ranks.reduce<[number, number]>(
+    (best, rank) => (compareProgressionRanks(rank, best) < 0 ? rank : best),
+    [6, 0]
+  );
 };
 const compareProgression = (
   a: string,
@@ -349,7 +354,7 @@ const compareProgression = (
 ): number => {
   const left = bestProgressionRank(a, evaluations, teamIds);
   const right = bestProgressionRank(b, evaluations, teamIds);
-  return (left[0] - right[0] || left[1] - right[1]) * factor;
+  return compareProgressionRanks(left, right) * factor;
 };
 export const sortTasksByProgression = (
   tasks: Task[],

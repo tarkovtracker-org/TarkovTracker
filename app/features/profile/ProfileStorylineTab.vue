@@ -45,7 +45,9 @@
     type StorylineNormalizedChapterView,
   } from '@/composables/useStorylineChapters';
   import ChapterCard from '@/features/storyline/components/ChapterCard.vue';
+  import type { StoryChapter } from '@/types/tarkov';
   interface Props {
+    chapters: StoryChapter[];
     storyChapterCompletionState: Record<string, boolean>;
     storyObjectiveCompletionState: Record<string, Record<string, boolean>>;
     readOnly?: boolean;
@@ -57,6 +59,7 @@
   }>();
   const { t } = useI18n({ useScope: 'global' });
   const { normalizedChapters } = useStorylineChapters({
+    chapters: () => props.chapters,
     isChapterComplete: (chapterId: string) => props.storyChapterCompletionState[chapterId] === true,
     isObjectiveComplete: (chapterId: string, objectiveId: string) =>
       props.storyObjectiveCompletionState[chapterId]?.[objectiveId] === true,

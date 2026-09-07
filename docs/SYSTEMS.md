@@ -1512,14 +1512,18 @@ The result carries availability and blockers for levels, loyalty, reputation, qu
 failed branches, faction, trader unlocks, prestige and unsupported data. `useProgress.taskEvaluations`
 is the source for explanations and sorting; `unlockedTasks` is its boolean projection. The task
 card and dashboard use `useTaskBlockerText` for the same explanations. Shared/non-current profile
-views call the same evaluator with their own mode progress. Completed and failed tasks are terminal.
+views call the same evaluator with their own mode progress. Profile task/objective, prestige and
+story catalogs load for the selected mode without mutating the active metadata store; obsolete
+mode/language responses are ignored. Completed and failed tasks are terminal.
 The existing acceptance-unknown interpretation is retained; this does not introduce #715's
 explicit Accept workflow.
 
 Shared story chapters followed by matching mode corrections produce `Task.storyUnlocks` from
 `questUnlocks`. Availability requires all independent gates AND (all quest requirements OR any
 wired chapter with recorded completion/objective progress). Chapter ordering is never an unlock
-condition. `complete|failed` accepts either terminal outcome. A story route cannot bypass trader,
+condition. Client chapters merge the same mode patches (including partial objectives), and
+edition/chapter caches and in-flight requests are mode-scoped. A satisfied story route also
+suppresses the task card's otherwise-unmet quest prerequisite strip. `complete|failed` accepts either terminal outcome. A story route cannot bypass trader,
 faction or prestige gates. Required prestige uses the existing authoritative prestige task map;
 unresolved references remain blocked until metadata is available.
 

@@ -1,6 +1,7 @@
 <template>
   <div class="min-h-[calc(100vh-250px)] px-3 py-6 sm:px-6">
     <div class="mx-auto max-w-350 space-y-4 sm:space-y-6">
+      <UAlert v-if="profileMetadataError" color="error" :title="t('app_bar.error_loading')" />
       <section
         class="bg-surface-900 relative overflow-hidden rounded-xl border border-white/10 p-4 shadow-md sm:p-6"
       >
@@ -223,6 +224,7 @@
         />
         <ProfileStorylineTab
           v-else-if="selectedTabIndex === 3"
+          :chapters="profileChapters"
           :story-chapter-completion-state="storyChapterCompletionState"
           :story-objective-completion-state="storyObjectiveCompletionState"
           :read-only="isViewingSharedProfile || !isViewingCurrentMode"
@@ -234,6 +236,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useProfileTaskMetadata } from '@/composables/useProfileTaskMetadata';
   import {
     computeConfidence,
     computeCriticalPathFloor,
@@ -264,6 +267,7 @@
   import { isTaskAvailableForEdition as checkTaskEdition } from '@/utils/editionHelpers';
   import { calculatePercentageNum, useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
+  import { buildPrestigeTaskMap } from '@/utils/prestige';
   import {
     createProfileVisibility,
     fetchProfileVisibilityRows,
@@ -425,6 +429,19 @@
     normalizeMode(route.params.mode) ??
       normalizeMode(route.query.mode) ??
       tarkovStore.getCurrentGameMode()
+  );
+  const {
+    tasks: profileTasks,
+    chapters: profileChapters,
+    prestige: profilePrestige,
+    error: profileMetadataError,
+    loading: profileMetadataLoading,
+  } = useProfileTaskMetadata(
+    selectedMode,
+    computed(() => metadataStore.languageCode)
+  );
+  const profilePrestigeTaskMap = computed(() =>
+    buildPrestigeTaskMap(profileTasks.value, profilePrestige.value)
   );
   const profileVisibility = reactive(createProfileVisibility());
   let profileVisibilityLoadId = 0;
@@ -666,7 +683,7 @@
   });
   const relevantTasks = computed<Task[]>(() => {
     const faction = modeFaction.value;
-    const factionFiltered = (metadataStore.tasks ?? []).filter((task) => {
+    const factionFiltered = profileTasks.value.filter((task) => {
       if (!task?.id) {
         return false;
       }
@@ -681,14 +698,14 @@
       showLightkeeper: true,
       showNonSpecial: true,
       userPrestigeLevel: modeData.value.prestigeLevel ?? 0,
-      prestigeTaskMap: metadataStore.prestigeTaskMap,
+      prestigeTaskMap: profilePrestigeTaskMap.value,
       excludedTaskIds: new Set(),
     };
     return filterTasksByTypeSettings(factionFiltered, options);
   });
   const allTasksById = computed(() => {
     const lookup = new Map<string, Task>();
-    for (const task of metadataStore.tasks ?? []) {
+    for (const task of profileTasks.value) {
       if (task?.id) {
         lookup.set(task.id, task);
       }
@@ -717,7 +734,7 @@
   };
   const profileTaskEvaluations = computed(() =>
     buildTaskEvaluations(
-      metadataStore.tasks ?? [],
+      profileTasks.value,
       new Map([
         [
           'profile',
@@ -734,7 +751,7 @@
       ]),
       {
         requireTraderLevels: preferencesStore.getTasksRequireTraderLevels,
-        prestigeTaskMap: metadataStore.prestigeTaskMap,
+        prestigeTaskMap: profilePrestigeTaskMap.value,
       }
     )
   );
@@ -757,7 +774,7 @@
   });
   const invalidProgress = computed(() =>
     computeInvalidProgress({
-      tasks: metadataStore.tasks ?? [],
+      tasks: profileTasks.value,
       taskCompletions: normalizedTaskCompletions.value,
       pmcFaction: modeFaction.value,
     })
@@ -855,7 +872,7 @@
   const storyChapterCompletionState = computed<Record<string, boolean>>(() => {
     const storyProgress = modeData.value.storyChapters ?? {};
     const state: Record<string, boolean> = {};
-    for (const chapter of metadataStore.storyChapters ?? []) {
+    for (const chapter of profileChapters.value) {
       state[chapter.id] = storyProgress[chapter.id]?.complete === true;
     }
     return state;
@@ -863,7 +880,7 @@
   const storyObjectiveCompletionState = computed<Record<string, Record<string, boolean>>>(() => {
     const storyProgress = modeData.value.storyChapters ?? {};
     const state: Record<string, Record<string, boolean>> = {};
-    for (const chapter of metadataStore.storyChapters ?? []) {
+    for (const chapter of profileChapters.value) {
       const chapterProgress = storyProgress[chapter.id];
       const objState: Record<string, boolean> = {};
       for (const obj of orderedStoryObjectives(chapter.objectives)) {
@@ -877,7 +894,7 @@
     if (isViewingSharedProfile.value || !isViewingCurrentMode.value) {
       return;
     }
-    const chapter = metadataStore.storyChapters.find((value) => value.id === chapterId);
+    const chapter = profileChapters.value.find((value) => value.id === chapterId);
     toggleStoryChapterWithLinearObjectives({
       chapterId,
       isChapterComplete: storyChapterCompletionState.value[chapterId] === true,
@@ -901,7 +918,7 @@
       tarkovStore.setStoryObjectiveUncomplete(chapterId, objectiveId);
       return;
     }
-    const chapter = metadataStore.storyChapters.find((value) => value.id === chapterId);
+    const chapter = profileChapters.value.find((value) => value.id === chapterId);
     if (chapter) {
       const objective = orderedStoryObjectives(chapter.objectives).find(
         (value) => value.id === objectiveId
@@ -915,7 +932,7 @@
     }
     tarkovStore.setStoryObjectiveComplete(chapterId, objectiveId);
   };
-  const totalStoryChapters = computed(() => metadataStore.storyChapters?.length ?? 0);
+  const totalStoryChapters = computed(() => profileChapters.value.length);
   const completedStoryChapters = computed(() => {
     let count = 0;
     for (const chapterId of Object.keys(storyChapterCompletionState.value)) {
@@ -927,7 +944,7 @@
   });
   const totalStoryMainObjectives = computed(() => {
     let count = 0;
-    for (const chapter of metadataStore.storyChapters ?? []) {
+    for (const chapter of profileChapters.value) {
       count += orderedStoryObjectives(chapter.objectives).filter(
         (objective) => objective.type === 'main'
       ).length;
@@ -937,7 +954,7 @@
   const completedStoryMainObjectives = computed(() => {
     const storyProgress = modeData.value.storyChapters ?? {};
     let count = 0;
-    for (const chapter of metadataStore.storyChapters ?? []) {
+    for (const chapter of profileChapters.value) {
       const chapterProgress = storyProgress[chapter.id];
       for (const obj of orderedStoryObjectives(chapter.objectives).filter(
         (o) => o.type === 'main'
@@ -1554,7 +1571,7 @@
     },
   ]);
   const showMetadataHint = computed(
-    () => canRenderProfileContent.value && metadataStore.loading && metadataStore.tasks.length === 0
+    () => canRenderProfileContent.value && profileMetadataLoading.value
   );
   const selectedTabIndex = ref(0);
   const profileTabItems = computed(() => [

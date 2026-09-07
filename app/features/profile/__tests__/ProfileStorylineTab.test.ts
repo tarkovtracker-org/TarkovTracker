@@ -173,6 +173,7 @@ const createWrapper = async (readOnly: boolean) => {
     await import('@/features/profile/ProfileStorylineTab.vue');
   return mount(ProfileStorylineTab, {
     props: {
+      chapters: [],
       storyChapterCompletionState: { 'chapter-1': false },
       storyObjectiveCompletionState: {
         'chapter-1': {

@@ -249,4 +249,61 @@ describe('useMetadataStore fetchEditionsData', () => {
     expect(store.editions).toEqual([refreshedEdition]);
     expect(store.storyChapters).toEqual([refreshedChapter]);
   });
+  it('merges mode-only chapters and preserves fields of shared objective patches', async () => {
+    const store = useMetadataStore();
+    store.currentGameMode = 'pve';
+    const cacheWrite = vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn().mockResolvedValue({
+        editions: {},
+        storyChapters: {
+          shared: {
+            ...createStoryChapter('shared', 1, 'Shared'),
+            objectives: { obj: { id: 'obj', description: 'Base', type: 'optional', order: 4 } },
+          },
+        },
+        modes: {
+          pve: {
+            storyChapters: {
+              shared: { objectives: { obj: { description: 'PvE' } } },
+              added: createStoryChapter('added', 2, 'Mode only'),
+            },
+          },
+        },
+      })
+    );
+    await store.fetchEditionsData(true);
+    expect(store.storyChapters.map((chapter) => chapter.id)).toEqual(['shared', 'added']);
+    expect(store.storyChapters[0]?.objectives?.obj).toMatchObject({
+      description: 'PvE',
+      type: 'optional',
+      order: 4,
+    });
+    expect(cacheWrite).toHaveBeenCalledWith(
+      'editions',
+      'mode-v1-pve',
+      'en',
+      expect.any(Object),
+      expect.any(Number)
+    );
+  });
+  it('retries a mode whose obsolete request settled after switching away', async () => {
+    const store = useMetadataStore();
+    const pending = createDeferred<object>();
+    const fetch = vi
+      .fn()
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValue({ editions: {}, storyChapters: {} });
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.stubGlobal('$fetch', fetch);
+    const request = store.fetchEditionsData(true);
+    await flushPromises();
+    store.currentGameMode = 'pve';
+    pending.resolve({ editions: {}, storyChapters: {} });
+    await request;
+    store.currentGameMode = 'pvp';
+    await store.ensureEditionsData();
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
 });
