@@ -536,29 +536,39 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   type GroupTarget = { id: string; data: TarkovItem; name: string };
   const canGroupItem = (item: TarkovItem | undefined): item is TarkovItem & { name: string } =>
     Boolean(item?.id && item?.name);
+  const groupEntryName = (item: TarkovItem | undefined): string | undefined => {
+    if (!item) return undefined;
+    return item.name || item.shortName;
+  };
+  const toGroupTarget = (item: TarkovItem | undefined): GroupTarget | null => {
+    const name = groupEntryName(item);
+    if (!item?.id || !name) return null;
+    return { id: item.id, data: item, name };
+  };
   /**
-   * Returns the group target for the search-matched accepted item of a pooled
-   * "any of these" objective, or null when the search did not match one of its
-   * accepted items or the matched item cannot serve as a group entry.
+   * Returns the search-matched accepted item of a pooled "any of these"
+   * objective, or undefined when the search did not match one of its accepted
+   * items. Uses the same name-or-short-name matching as the search filter and
+   * the display pin so all three stay consistent.
    */
-  const findAcceptedGroupTarget = (need: NeededItemTaskObjective): GroupTarget | null => {
+  const findAcceptedGroupMatch = (need: NeededItemTaskObjective): TarkovItem | undefined => {
     const matchIndex = findAcceptedItemMatchIndex(need.acceptedItems, search.value);
-    const matchedItem = matchIndex >= 0 ? need.acceptedItems?.[matchIndex] : undefined;
-    if (!canGroupItem(matchedItem)) return null;
-    const { id, name } = matchedItem;
-    return { id, data: matchedItem, name };
+    if (matchIndex < 0) return undefined;
+    return need.acceptedItems?.[matchIndex];
   };
   /**
    * Resolves the item a need is grouped and registered under in the grouped
    * view. When searching, a pooled "any of these" objective that matched an
-   * accepted item is grouped under that matched turn-in item so it is the
-   * visible entry; without an accepted match the primary item stays canonical.
-   * `name` mirrors the grouped-item rule that nameless items are not grouped.
+   * accepted item is grouped under that matched turn-in item (identified by
+   * name or short name, mirroring the search match) so it is the visible
+   * entry; without an accepted match the primary item stays canonical under
+   * the grouped-view rule that nameless items are not grouped.
    */
   const resolveGroupTarget = (
     need: NeededItemTaskObjective | NeededItemHideoutModule
   ): GroupTarget | null => {
-    const acceptedTarget = need.needType === 'taskObjective' ? findAcceptedGroupTarget(need) : null;
+    const acceptedTarget =
+      need.needType === 'taskObjective' ? toGroupTarget(findAcceptedGroupMatch(need)) : null;
     if (acceptedTarget) return acceptedTarget;
     const primaryData = getNeededItemData(need);
     if (!canGroupItem(primaryData)) return null;

@@ -10,14 +10,19 @@ export interface UseCyclingItemOptions {
   /**
    * When a valid list index is provided, the display pins to that item and
    * rotation pauses (e.g. a search matched one of the accepted items). Use -1
-   * (the default) to keep normal rotation behavior.
+   * (the default) to keep normal rotation behavior. `currentIndex` keeps
+   * tracking the rotation, not the pin.
    */
   preferredIndex?: MaybeRefOrGetter<number>;
 }
 export interface UseCyclingItemReturn {
-  /** The item currently being displayed (primary item when not cycling). */
+  /** The item currently being displayed (pinned item, primary item when not cycling). */
   currentItem: ComputedRef<TarkovItem | null>;
-  /** Zero-based index of the current item within the provided list. */
+  /**
+   * Zero-based rotation index within the provided list. It advances while
+   * cycling and resets when cycling pauses or the display is pinned; while
+   * pinned, the displayed item is the one at `preferredIndex` instead.
+   */
   currentIndex: Ref<number>;
   /** Total number of items available to cycle through. */
   total: ComputedRef<number>;

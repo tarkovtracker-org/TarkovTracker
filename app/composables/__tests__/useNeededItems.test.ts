@@ -607,13 +607,33 @@ describe('useNeededItems', () => {
       const registered = neededItems.objectivesByItemId.value.get('item-augmentin');
       expect(registered?.taskObjectives.map((objective) => objective.id)).toEqual(['obj-pool']);
     });
+    it('groups pooled objectives under an accepted item matched only by short name', async () => {
+      const primary = createItem('item-cms', 'CMS Kit');
+      const shortNameOnly = { ...createItem('item-analgin', 'Analgin Tablets'), shortName: 'AT-3' };
+      const pooled: NeededItemTaskObjective = {
+        ...createPooledObjective(),
+        item: primary,
+        acceptedItems: [primary, shortNameOnly],
+      };
+      const { neededItems, search } = await setup({
+        metadataStore: { neededItemTaskObjectives: [pooled] },
+      });
+      search.value = 'at-3';
+      const groupIds = neededItems.groupedItems.value.map((group) => group.item.id);
+      expect(groupIds).toContain('item-analgin');
+      expect(groupIds).not.toContain('item-cms');
+    });
     it('keeps the primary item as the group key when no accepted item matches', async () => {
       const { neededItems, search } = await setup({
         metadataStore: { neededItemTaskObjectives: [createPooledObjective()] },
       });
-      search.value = 'cms';
+      // Searching the task name includes the objective without matching any of
+      // its accepted items, exercising the primary-item group fallback.
+      search.value = 'task one';
       const groupIds = neededItems.groupedItems.value.map((group) => group.item.id);
       expect(groupIds).toContain('item-cms');
+      const registered = neededItems.objectivesByItemId.value.get('item-cms');
+      expect(registered?.taskObjectives.map((objective) => objective.id)).toEqual(['obj-pool']);
     });
   });
   describe('loading state', () => {

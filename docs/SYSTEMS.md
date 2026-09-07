@@ -1442,6 +1442,29 @@ their card. The dedicated chevron controls card expansion in both views. Hide-re
 to both list and map cards. Missing database columns use the existing preference-sync fallback,
 so new settings remain local until the compact-list preference migration is deployed.
 
+### Needed Items pooled objective search and grouping
+
+Pooled "any of these" task objectives (`NeededItemTaskObjective.acceptedItems` with more than one
+entry) have two identities on the Needed Items page, and they must not be conflated. Progress and
+counts are always keyed to the objective itself (`id` for `getObjectiveCount`, the primary item for
+legacy grouping); the visible item identity is display-only. The list and grid views rotate or pin
+the displayed item, the "Any of N" popover marks pool membership, and the combined view aggregates
+counts per displayed item.
+
+Search must match any accepted item's name or short name, not just the primary item, so a valid
+turn-in item like Augmentin surfaces quests such as Pets Won't Need It. While such a match is
+active, the combined view re-keys the pooled objective under the matched accepted item (identified
+by name or short name) and registers it in `objectivesByItemId` under the same key; list and grid
+views pin the display to the matched item. Without an accepted match, the primary item stays
+canonical under the grouped-view rule that nameless items are not grouped. A pooled objective
+always contributes to exactly one group, so search-time re-keying never double-counts; progress
+writes stay bound to the objective ID regardless of which item identity is displayed.
+
+Keep `findAcceptedItemMatchIndex` (search filter and display pin) and the grouped-view accepted
+match aligned: if one matches by name-or-short-name and the other does not, the grouped view shows
+a pooled objective under a different item than the list pins, which contradicts the searched
+identity.
+
 ## 14. CI validation selection
 
 `scripts/validation-plan.mjs` classifies Git paths and validates aggregate outcomes;
