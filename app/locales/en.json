@@ -605,6 +605,7 @@
           "filter_hidden_other": "Your current filters hide {count} available tasks.",
           "blocked_level_one": "{task} is your closest unlock, but you still need 1 more level.",
           "blocked_level_other": "{task} is your closest unlock, but you still need {count} more levels.",
+          "blocked_requirement": "{task} is blocked by its requirements.",
           "blocked_prerequisite": "{task} is close, but it is still gated by prerequisite tasks.",
           "blocked_fence": "{task} is waiting on Fence reputation.",
           "blocked_trader_unlock": "{task} is locked behind another trader unlock task.",

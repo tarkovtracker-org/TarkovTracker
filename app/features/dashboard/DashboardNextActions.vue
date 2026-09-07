@@ -371,7 +371,7 @@
           { count: recommendation.hiddenAvailableCount ?? 0 }
         );
       case 'blocked-requirement':
-        return t('page.dashboard.focus.summary.blocked_prerequisite', { task });
+        return t('page.dashboard.focus.summary.blocked_requirement', { task });
       case 'complete':
         return t('page.dashboard.focus.summary.complete');
       default:
