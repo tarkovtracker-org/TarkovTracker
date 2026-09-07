@@ -160,7 +160,8 @@ const applyTraderMinimum = (
   requirement: KnownTraderRequirement
 ) => {
   if (requirement.requirementType === 'level') return applyLoyaltyMinimum(store, requirement);
-  // A strict standing bound proves the threshold, not an invented next increment.
+  // Standing has no declared increment; do not invent a value above a strict bound.
+  if (requirement.compareMethod === '>') return;
   if (store.getTraderReputation(requirement.trader.id) < requirement.value)
     store.setTraderReputation(requirement.trader.id, requirement.value);
 };

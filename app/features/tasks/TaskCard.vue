@@ -22,7 +22,7 @@
         class="text-surface-300 px-3 pt-2 text-xs"
         data-testid="task-blockers"
       >
-        <li v-for="text in taskBlockerTexts" :key="text">{{ text }}</li>
+        <li v-for="(text, index) in taskBlockerTexts" :key="`${index}-${text}`">{{ text }}</li>
       </ul>
       <!-- 1) Identity + Header (Padded) -->
       <div data-testid="task-card-header" class="flex flex-col" :class="compactClasses.header">

@@ -251,6 +251,7 @@ const applyCompletedImports = (
     if (task) {
       applyTaskAvailabilityRequirements({
         getCompletion: (id) => store.getCurrentProgressData().taskCompletions?.[id],
+        // A completion log does not identify which OR route the player used.
         skipTaskRequirements: Boolean(task.storyUnlocks?.length),
         onCompleteRequirement: completeTask,
         onFailRequirement: failTask,

@@ -504,7 +504,7 @@ describe('canonical progression overlay projection', () => {
               requirementType: 'reputation',
               value: -2,
               compareMethod: '<=',
-              trader: { id: 'fence', name: 'Fence' },
+              trader: 'fence',
             },
           ],
         },

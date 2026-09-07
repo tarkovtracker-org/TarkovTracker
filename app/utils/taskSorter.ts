@@ -310,9 +310,17 @@ const finalRanks = new Map<string, number>([
   ['unknown', 6],
   ['cycle', 6],
 ]);
-const blockerDistance = (blocker: NonNullable<TaskAvailabilityResult>['blockers'][number]) =>
-  Math.abs((blocker.required ?? 0) - (blocker.current ?? 0)) /
-  Math.max(1, Math.abs(blocker.required ?? 0));
+const distanceTarget = (blocker: TaskAvailabilityResult['blockers'][number]) => {
+  const required = blocker.required ?? 0;
+  return blocker.type === 'trader_level' && blocker.compareMethod === '>' ? required + 1 : required;
+};
+const blockerDistance = (blocker: TaskAvailabilityResult['blockers'][number]) => {
+  const target = distanceTarget(blocker);
+  return (
+    Math.max(Number.EPSILON, Math.abs(target - (blocker.current ?? 0))) /
+    Math.max(1, Math.abs(target))
+  );
+};
 const singleBlockerRank = (
   blocker: TaskAvailabilityResult['blockers'][number]
 ): [number, number] => {

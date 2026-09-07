@@ -323,6 +323,24 @@ describe('useEftLogsImport', () => {
     expect(tarkovStore.setObjectiveCount).toHaveBeenCalledWith('obj-prerequisite', 2);
     expect(composable.importState.value).toBe('success');
   });
+  it('does not infer a quest route from missing story progress', async () => {
+    const prerequisiteTaskId = '5ac2426c86f774138762edfe';
+    const completedTaskId = '61604635c725987e815b1a46';
+    metadataStore.tasks = [
+      { id: prerequisiteTaskId },
+      {
+        id: completedTaskId,
+        storyUnlocks: [{ id: 'chapter', name: 'Story route' }],
+        taskRequirements: [{ task: { id: prerequisiteTaskId }, status: ['Complete'] }],
+      },
+    ];
+    const composable = await loadComposable();
+    await composable.parseFile(
+      new File([completionLog(completedTaskId)], 'notifications.log', { type: 'text/plain' })
+    );
+    await composable.confirmImport('pvp');
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledExactlyOnceWith(completedTaskId);
+  });
   it('applies failed-only prerequisite requirements when importing completed tasks', async () => {
     const failedPrerequisiteTaskId = '593aa4be86f77457f56379f8';
     const completedTaskId = '61604635c725987e815b1a46';

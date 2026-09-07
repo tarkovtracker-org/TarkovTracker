@@ -180,4 +180,23 @@ describe('task progress requirements', () => {
     expect(isFailedOnlyRequirement(['Failed'])).toBe(true);
     expect(isFailedOnlyRequirement(['Failed', 'Completed'])).toBe(false);
   });
+  it('does not invent a standing increment for strict reputation requirements', () => {
+    const store = createStore();
+    applyTaskTraderRequirements({
+      store,
+      task: {
+        id: 'strict',
+        normalizedTraderRequirements: [
+          {
+            id: 'rep',
+            requirementType: 'reputation',
+            compareMethod: '>',
+            value: 0.5,
+            trader: { id: 'prapor', name: 'Prapor' },
+          },
+        ],
+      },
+    });
+    expect(store.setTraderReputation).not.toHaveBeenCalled();
+  });
 });

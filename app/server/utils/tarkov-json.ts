@@ -4,7 +4,7 @@ import { useRuntimeConfig } from '#imports';
 import { createLogger } from '@/server/utils/logger';
 import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
 import { buildSkillImageUrl } from '@/utils/tarkovUrls';
-import { normalizeTraderRequirements } from '@/utils/taskRequirements';
+import { isValidTraderLevel, normalizeTraderRequirements } from '@/utils/taskRequirements';
 import type { ValidGameMode } from '@/server/utils/tarkov-cache-config';
 import type {
   FinishRewards,
@@ -762,7 +762,7 @@ function adaptTraderRequirement(raw: unknown, context: AdapterContext) {
 const onlyIfPopulated = <T>(items: T[]): T[] | undefined => (items.length > 0 ? items : undefined);
 function readFiniteLevel(adapted: TraderRequirement & { level?: number }): number | undefined {
   const level = adapted.level ?? adapted.value;
-  return typeof level === 'number' && Number.isFinite(level) ? level : undefined;
+  return typeof level === 'number' && isValidTraderLevel(level) ? level : undefined;
 }
 function pushTraderRequirement(
   adapted: (TraderRequirement & { level?: number }) | undefined,

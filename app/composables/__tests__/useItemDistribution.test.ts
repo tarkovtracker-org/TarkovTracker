@@ -9,7 +9,10 @@ const mockStoreState = {
   patchedState: null as unknown,
 };
 vi.mock('@/stores/useProgress', () => ({
-  useProgressStore: () => ({ taskEvaluations: mockStoreState.taskEvaluations }),
+  useProgressStore: () => ({
+    taskEvaluations: mockStoreState.taskEvaluations,
+    getTeamIndex: (id: string) => id,
+  }),
 }));
 vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => ({
@@ -167,6 +170,29 @@ describe('useItemDistribution', () => {
       expect(first.taskId).toBe('task-low');
       expect(second.taskId).toBe('task-mid');
       expect(third.taskId).toBe('task-high');
+    });
+    it('ranks teammate objectives using their own task readiness', async () => {
+      mockStoreState.tasks.set('a', {});
+      mockStoreState.tasks.set('b', {});
+      const ready = { available: true, blockers: [] };
+      const locked = {
+        available: false,
+        blockers: [{ type: 'player_level' as const, current: 1, required: 20 }],
+      };
+      mockStoreState.taskEvaluations = {
+        a: { self: ready, teammate: locked },
+        b: { self: locked, teammate: ready },
+      };
+      const { useItemDistribution } = await import('@/composables/useItemDistribution');
+      const objectives = ['a', 'b'].map((id) => ({
+        ...createTaskObjective(id, id),
+        teamId: 'teammate',
+      }));
+      expect(
+        useItemDistribution()
+          .sortTaskObjectives(objectives)
+          .map((o) => o.taskId)
+      ).toEqual(['b', 'a']);
     });
     it('handles missing task metadata gracefully', async () => {
       const { useItemDistribution } = await import('@/composables/useItemDistribution');

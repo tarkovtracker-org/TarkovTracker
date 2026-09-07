@@ -19,13 +19,18 @@ export const compareRequirement = (
   if (![current, required].every(Number.isFinite)) return false;
   return comparators[method]?.(current, required) ?? false;
 };
+export const normalizeTraderReference = (trader: unknown): unknown =>
+  typeof trader === 'string' ? { id: trader, name: trader } : trader;
 const isValidTrader = (trader: unknown): trader is { id: string; name?: string } => {
   if (!isRecord(trader)) return false;
   return typeof trader.id === 'string' && trader.id.trim().length > 0;
 };
+export const MAX_TRADER_LEVEL = 4;
+export const isValidTraderLevel = (value: number): boolean =>
+  Number.isInteger(value) && value >= 1 && value <= MAX_TRADER_LEVEL;
 const isValidValue = (value: unknown, type: string): value is number => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return false;
-  return type !== 'level' || [1, 2, 3, 4].includes(value);
+  return type !== 'level' || isValidTraderLevel(value);
 };
 type UnknownReason = Extract<NormalizedTraderRequirement, { requirementType: 'unknown' }>['reason'];
 const comparisonMethod = (raw: Record<string, unknown>) => raw.compareMethod ?? '>=';
@@ -55,12 +60,13 @@ export const normalizeTraderRequirement = (
 ): NormalizedTraderRequirement => {
   const id = requirementId(raw, index);
   if (!isRecord(raw)) return { id, requirementType: 'unknown', reason: 'shape' };
-  const reason = invalidRequirementReason(raw);
+  const adapted: Record<string, unknown> = { ...raw, trader: normalizeTraderReference(raw.trader) };
+  const reason = invalidRequirementReason(adapted);
   if (reason) return { id, requirementType: 'unknown', reason };
-  const value = requirementValue(raw);
-  if (!isValidValue(value, String(raw.requirementType)))
+  const value = requirementValue(adapted);
+  if (!isValidValue(value, String(adapted.requirementType)))
     return { id, requirementType: 'unknown', reason: 'value' };
-  const trader = raw.trader as { id: string; name?: unknown };
+  const trader = adapted.trader as { id: string; name?: unknown };
   return {
     id,
     requirementType: raw.requirementType as 'level' | 'reputation',

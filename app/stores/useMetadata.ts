@@ -73,7 +73,7 @@ import type {
   Trader,
 } from '@/types/tarkov';
 const BOOTSTRAP_CACHE_VERSION = 'json-v1';
-const TASKS_CORE_CACHE_VERSION = 'json-v2';
+const TASKS_CORE_CACHE_VERSION = 'json-v3';
 const MAP_SPAWNS_CACHE_VERSION = 'json-v1';
 const ITEMS_CACHE_VERSION = 'json-v1';
 const TASK_OBJECTIVES_CACHE_VERSION = 'json-v3';

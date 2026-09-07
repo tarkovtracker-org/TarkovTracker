@@ -164,15 +164,15 @@ export function useKappaOverview(tab: () => KappaTabKey) {
         completedCount: row.status === 'complete' ? 1 : 0,
       });
     }
+    const taskOrderIndex = new Map<string, number>();
+    sortTasksByProgression(metadataStore.tasks, 'asc', progressStore.taskEvaluations).forEach(
+      (task, index) => {
+        taskOrderIndex.set(task.id, index);
+      }
+    );
     // Order chain groups by the best player-relative progression rank, keeping parts adjacent.
     type SortMeta = { anchorLevel: number; isChain: number; anchorIndex: number; part: number };
     const sortGroupRows = (rows: KappaRowEntry[]): KappaRowEntry[] => {
-      const taskOrderIndex = new Map<string, number>();
-      sortTasksByProgression(metadataStore.tasks, 'asc', progressStore.taskEvaluations).forEach(
-        (task, index) => {
-          taskOrderIndex.set(task.id, index);
-        }
-      );
       const chainAnchors = new Map<string, { level: number; index: number }>();
       for (const row of rows) {
         const chainKey = parseChainKey(row.task.name);

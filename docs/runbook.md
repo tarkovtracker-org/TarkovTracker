@@ -616,3 +616,12 @@ Pi access. Do not make production role provisioning or the canary an automatic m
    - Cache API-backed shared rate limits are best-effort under concurrent bursts; use Cloudflare or Durable Objects for hard enforcement.
    - Full ownership map (Worker DO vs Edge mutation limits vs Pages vs Auth): [`RATE_LIMITING.md`](./RATE_LIMITING.md).
 3. If API protection blocks valid traffic, update `API_ALLOWED_HOSTS` and redeploy.
+
+### Task cache contract rollout
+
+When a change introduces a new `tasks-core-json-*` key, an authorized operator must dispatch
+`.github/workflows/precompute-tarkov-data.yml` from the approved change revision before merging
+or promoting the app. Leave language and mode filters empty; verify all 48 language/mode entries
+were written successfully under the new prefix and attach the run and revision to the release.
+The old-key fleet remains available to the previous app. The cold fetch/adapt/overlay fallback
+can exceed the free-tier CPU budget and is not a safe bridge during a cache-key rollout.

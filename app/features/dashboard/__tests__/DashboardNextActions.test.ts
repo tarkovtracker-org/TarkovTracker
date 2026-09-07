@@ -150,7 +150,8 @@ describe('DashboardNextActions', () => {
           {
             count: 2,
             required: 15,
-            type: 'level',
+            type: 'requirement',
+            description: 'Reach level 15 (2 more levels to go).',
           },
         ],
         progress: {
@@ -158,7 +159,7 @@ describe('DashboardNextActions', () => {
           remaining: 1,
           total: 1,
         },
-        reason: 'blocked-level',
+        reason: 'blocked-requirement',
         score: -8,
         taskName: 'Wet Job - Part 1',
         tone: 'warning',
@@ -166,7 +167,7 @@ describe('DashboardNextActions', () => {
       'blocked'
     );
     expect(wrapper.text()).toContain('Why it won');
-    expect(wrapper.text()).toContain('Closest unlock: only 2 levels away.');
+    expect(wrapper.text()).toContain('Reach level 15 (2 more levels to go).');
     expect(wrapper.text()).toContain('Closest unlock: Wet Job - Part 1');
   });
   it('tracks primary recommendation clicks', async () => {
@@ -200,19 +201,13 @@ describe('DashboardNextActions', () => {
     const primarySurfaceLink = wrapper.get('a[data-task="task-impact"]');
     expect(primarySurfaceLink.text()).toContain('Impact Task');
   });
-  it('uses blocker priority instead of insertion order for blocked cards', async () => {
+  it('renders canonical blocker detail once with a separate summary and status', async () => {
     const wrapper = await mountWithRecommendation(
       createRecommendation({
         blockers: [
           {
-            count: 2,
-            required: 15,
-            type: 'level',
-          },
-          {
-            taskName: 'Getting Acquainted',
-            traderName: 'Lightkeeper',
-            type: 'trader-unlock',
+            type: 'requirement',
+            description: 'Complete Getting Acquainted to unlock Lightkeeper.',
           },
         ],
         progress: {
@@ -220,16 +215,15 @@ describe('DashboardNextActions', () => {
           remaining: 1,
           total: 1,
         },
-        reason: 'blocked-trader-unlock',
+        reason: 'blocked-requirement',
         score: -12,
         taskName: 'Top Secret',
         tone: 'warning',
       }),
       'blocked'
     );
-    expect(wrapper.text()).toContain('Top Secret is blocked until a trader unlock is complete.');
-    expect(wrapper.text()).toContain(
-      'Closest unlock: finish Getting Acquainted to unlock Lightkeeper.'
+    expect(wrapper.text().split('Complete Getting Acquainted to unlock Lightkeeper.')).toHaveLength(
+      2
     );
     expect(wrapper.text()).toContain('Complete Getting Acquainted to unlock Lightkeeper.');
     expect(wrapper.text()).not.toContain('only 2 levels away');

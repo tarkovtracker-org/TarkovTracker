@@ -24,6 +24,15 @@ describe('progression sorting', () => {
       ids.toReversed()
     );
   });
+  it.each([1, 2])('ranks strict loyalty using the next attainable level from LL%s', (current) => {
+    const evaluations: TaskEvaluationMap = {
+      a: { self: blocked({ type: 'trader_level', current, required: 3, compareMethod: '>=' }) },
+      z: { self: blocked({ type: 'trader_level', current, required: 2, compareMethod: '>' }) },
+    };
+    expect(
+      sortTasksByProgression([task('z'), task('a')], 'asc', evaluations).map((t) => t.id)
+    ).toEqual(['a', 'z']);
+  });
   it('uses only selected team members and the best visible readiness', () => {
     const data = { ...evaluations, far: { self: evaluations.far!.self!, teammate: available } };
     const tasks = [task('near'), task('far')];

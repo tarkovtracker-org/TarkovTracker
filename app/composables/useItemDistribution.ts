@@ -46,15 +46,21 @@ export function useItemDistribution(): UseItemDistributionReturn {
     return tarkovStore.getHideoutPartCount(objective.id) ?? 0;
   }
   function sortTaskObjectives(objectives: NeededItemTaskObjective[]): NeededItemTaskObjective[] {
-    const tasks = [...new Set(objectives.map((objective) => objective.taskId))].flatMap((id) => {
-      const task = metadataStore.getTaskById(id);
+    const taskKey = (objective: NeededItemTaskObjective) =>
+      `${objective.taskId}:${objective.teamId ?? 'self'}`;
+    const evaluations: import('@/stores/taskAvailability').TaskEvaluationMap = {};
+    const objectiveTeamIndex = (objective: NeededItemTaskObjective) =>
+      objective.teamId ? progressStore.getTeamIndex(objective.teamId) : 'self';
+    const tasks = objectives.flatMap((objective) => {
+      const task = metadataStore.getTaskById(objective.taskId);
+      const id = taskKey(objective);
+      const teamIndex = objectiveTeamIndex(objective);
+      const evaluation = progressStore.taskEvaluations[objective.taskId]?.[teamIndex];
+      if (evaluation) evaluations[id] = { self: evaluation };
       return task ? [{ ...task, id }] : [];
     });
     const order = new Map(
-      sortTasksByProgression(tasks, 'asc', progressStore.taskEvaluations).map((task, index) => [
-        task.id,
-        index,
-      ])
+      sortTasksByProgression(tasks, 'asc', evaluations).map((task, index) => [task.id, index])
     );
     return [...objectives].sort((a, b) => {
       const taskA = metadataStore.getTaskById(a.taskId);
@@ -63,8 +69,8 @@ export function useItemDistribution(): UseItemDistributionReturn {
       const kappaB = taskB?.kappaRequired ? 0 : 1;
       if (kappaA !== kappaB) return kappaA - kappaB;
       return (
-        (order.get(a.taskId) ?? Number.MAX_SAFE_INTEGER) -
-          (order.get(b.taskId) ?? Number.MAX_SAFE_INTEGER) || a.id.localeCompare(b.id)
+        (order.get(taskKey(a)) ?? Number.MAX_SAFE_INTEGER) -
+          (order.get(taskKey(b)) ?? Number.MAX_SAFE_INTEGER) || a.id.localeCompare(b.id)
       );
     });
   }

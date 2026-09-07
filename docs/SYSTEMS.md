@@ -1539,11 +1539,12 @@ Genuine level badges, graph levels and XP/level projections remain player-level 
 
 Completion/availability actions and EFT completion imports share `taskProgress.ts` implications:
 raise known loyalty/reputation lower bounds without reducing earned values. Integer strict loyalty
-bounds advance to the next level; strict reputation bounds imply only the known threshold, not an
-invented increment, and may remain unmet until the user records the actual value. Upper bounds and
-`!=` do not infer a new minimum. Existing terminal prerequisite outcomes are preserved. EFT
-completion of a task with a story alternative does not prove which quest path was taken, so it
-does not backfill that path. Imports still load and mutate only their selected destination mode;
+bounds advance to the next level; strict reputation bounds remain unchanged because no exact
+standing increment is known. Upper bounds and `!=` do not infer a new minimum. Existing terminal
+prerequisite outcomes are preserved. EFT completion logs do not identify which OR route was used,
+so tasks with wired story alternatives do not imply completion or failure of legacy prerequisites.
+Explicit prerequisite events still apply. Missing recorded story progress is not proof of the quest
+route. Imports load and mutate only their selected destination mode;
 Seasonal log eligibility and restoration guards are unchanged. Tarkov.dev profile import does
 not import quest completions and therefore has no trader/task backfill path.
 
@@ -1555,4 +1556,7 @@ not import quest completions and therefore has no trader/task backfill path.
 - PvP, PvE and Seasonal evaluate only their own progress and mode-specific task metadata.
 - `tasks-core-json-v3` keys invalidate incompatible edge/precompute payloads together. Browser
   IndexedDB schema 8 clears the old task contract. Missing new KV entries fall back to the normal
-  fetch/adapt/overlay pipeline, allowing deployment before the next precompute run.
+  fetch/adapt/overlay pipeline, which exceeds the free-tier CPU budget on a cold request. Before
+  merging or promoting the app, an authorized operator must run the precompute workflow from the
+  approved branch revision with no language/mode filters, verify all 48 new-key writes succeeded,
+  and record that evidence. Do not rely on cold fallback to bridge this cache-contract rollout.

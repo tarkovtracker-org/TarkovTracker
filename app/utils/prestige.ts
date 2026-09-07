@@ -44,7 +44,7 @@ const addPrestigeConditions = (
   prestige: PrestigeLevel,
   knownTaskIds: Set<string>
 ) => {
-  const level = prestige.prestigeLevel ?? 0;
+  const level = levelForPrestige(prestige) ?? 0;
   if (level <= 0) return;
   (prestige.conditions ?? []).forEach((condition) => {
     const task = condition.task;

@@ -294,11 +294,6 @@
   ) => {
     return count === 1 ? t(oneKey, values) : t(otherKey, values);
   };
-  const formatNumericValue = (value?: number) => {
-    if (typeof value !== 'number' || Number.isNaN(value)) return '';
-    if (Number.isInteger(value)) return String(value);
-    return value.toFixed(2);
-  };
   const getPrimaryBlocker = (
     recommendation: DashboardRecommendation
   ): DashboardRecommendationBlocker =>
@@ -354,8 +349,6 @@
   };
   const getPrimarySummary = (recommendation: DashboardRecommendation) => {
     const task = recommendation.taskName || '';
-    const blocker = getPrimaryBlocker(recommendation);
-    if (blocker.description) return blocker.description;
     switch (recommendation.reason) {
       case 'unlock-trader':
         return t('page.dashboard.focus.summary.unlock_trader', {
@@ -377,19 +370,8 @@
           'page.dashboard.focus.summary.filter_hidden_other',
           { count: recommendation.hiddenAvailableCount ?? 0 }
         );
-      case 'blocked-level':
-        return getCountLabel(
-          blocker.count ?? 0,
-          'page.dashboard.focus.summary.blocked_level_one',
-          'page.dashboard.focus.summary.blocked_level_other',
-          { count: blocker.count ?? 0, task }
-        );
-      case 'blocked-prerequisite':
+      case 'blocked-requirement':
         return t('page.dashboard.focus.summary.blocked_prerequisite', { task });
-      case 'blocked-fence':
-        return t('page.dashboard.focus.summary.blocked_fence', { task });
-      case 'blocked-trader-unlock':
-        return t('page.dashboard.focus.summary.blocked_trader_unlock', { task });
       case 'complete':
         return t('page.dashboard.focus.summary.complete');
       default:
@@ -420,20 +402,22 @@
     }
     return t('page.dashboard.focus.reason.default');
   };
-  const getProofText = (recommendation: DashboardRecommendation) => {
-    const blocker = getPrimaryBlocker(recommendation);
-    if (blocker.description) return blocker.description;
+  const getScopeProof = (recommendation: DashboardRecommendation) => {
+    const count = recommendation.hiddenAvailableCount ?? 0;
     if (recommendation.kind === 'filters') {
       return getCountLabel(
-        recommendation.hiddenAvailableCount ?? 0,
+        count,
         'page.dashboard.focus.proof.filters_one',
         'page.dashboard.focus.proof.filters_other',
-        { count: recommendation.hiddenAvailableCount ?? 0 }
+        { count }
       );
     }
     if (recommendation.reason === 'complete') {
       return t('page.dashboard.focus.proof.complete');
     }
+    return undefined;
+  };
+  const getPayoffProof = (recommendation: DashboardRecommendation) => {
     if (recommendation.unlockTraderName) {
       return getCountLabel(
         recommendation.progress.remaining,
@@ -453,33 +437,9 @@
         { count: recommendation.impact }
       );
     }
-    if (blocker.type === 'level') {
-      return getCountLabel(
-        blocker.count ?? 0,
-        'page.dashboard.focus.proof.blocked_level_one',
-        'page.dashboard.focus.proof.blocked_level_other',
-        { count: blocker.count ?? 0 }
-      );
-    }
-    if (blocker.type === 'prerequisite') {
-      return getCountLabel(
-        blocker.count ?? 0,
-        'page.dashboard.focus.proof.blocked_prerequisite_one',
-        'page.dashboard.focus.proof.blocked_prerequisite_other',
-        { count: blocker.count ?? 0 }
-      );
-    }
-    if (blocker.type === 'fence') {
-      return t('page.dashboard.focus.proof.blocked_fence', {
-        count: formatNumericValue(blocker.count),
-      });
-    }
-    if (blocker.type === 'trader-unlock') {
-      return t('page.dashboard.focus.proof.blocked_trader_unlock', {
-        task: blocker.taskName,
-        trader: blocker.traderName,
-      });
-    }
+    return undefined;
+  };
+  const getGoalProof = (recommendation: DashboardRecommendation) => {
     if (recommendation.isLightkeeper) {
       return getCountLabel(
         recommendation.progress.remaining,
@@ -504,6 +464,9 @@
         { count: recommendation.progress.remaining }
       );
     }
+    return undefined;
+  };
+  const getRemainingProof = (recommendation: DashboardRecommendation) => {
     if (recommendation.progress.remaining <= 0) {
       return t('page.dashboard.focus.proof.ready_zero');
     }
@@ -514,9 +477,16 @@
       { count: recommendation.progress.remaining }
     );
   };
+  const getActionProof = (recommendation: DashboardRecommendation) =>
+    getPayoffProof(recommendation) ??
+    getGoalProof(recommendation) ??
+    getRemainingProof(recommendation);
+  const getProofText = (recommendation: DashboardRecommendation) =>
+    getPrimaryBlocker(recommendation).description ??
+    getScopeProof(recommendation) ??
+    getActionProof(recommendation);
   const getStatusText = (recommendation: DashboardRecommendation) => {
     const blocker = getPrimaryBlocker(recommendation);
-    if (blocker.description) return blocker.description;
     switch (blocker.type) {
       case 'ready':
         if (recommendation.progress.remaining <= 0) {
@@ -530,28 +500,8 @@
         );
       case 'filters':
         return t('page.dashboard.focus.status.filters');
-      case 'level':
-        return getCountLabel(
-          blocker.count ?? 0,
-          'page.dashboard.focus.status.level_one',
-          'page.dashboard.focus.status.level_other',
-          { count: blocker.count ?? 0, required: blocker.required ?? 0 }
-        );
-      case 'prerequisite':
-        return t('page.dashboard.focus.status.prerequisite', {
-          tasks: (blocker.taskNames ?? []).join(', '),
-        });
-      case 'fence':
-        return t(
-          'common.meet_the_fence_reputation_requirement_required',
-          { required: formatNumericValue(blocker.required) },
-          'Meet the Fence reputation requirement ({required}).'
-        );
-      case 'trader-unlock':
-        return t('page.dashboard.focus.status.trader_unlock', {
-          task: blocker.taskName,
-          trader: blocker.traderName,
-        });
+      case 'requirement':
+        return t('page.dashboard.focus.title.blocked');
       case 'complete':
         return t('page.dashboard.focus.status.complete');
       default:

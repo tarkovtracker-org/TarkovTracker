@@ -200,7 +200,7 @@ export function useDashboardRecommendations(): {
   };
   const blockerText = useTaskBlockerText();
   const numericBlockerCount = (blocker: import('@/stores/taskAvailability').TaskBlocker) =>
-    Math.abs((blocker.required ?? 1) - (blocker.current ?? 0));
+    Math.max(1, Math.abs((blocker.required ?? 1) - (blocker.current ?? 0)));
   const taskEvaluation = (id: string) => progressStore.taskEvaluations?.[id]?.self;
   const blockerCount = (blocker: import('@/stores/taskAvailability').TaskBlocker) =>
     blocker.requirements?.length ?? numericBlockerCount(blocker);

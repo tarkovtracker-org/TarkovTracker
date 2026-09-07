@@ -536,6 +536,8 @@ export function useTaskFiltering() {
     });
     return [...pinned, ...mapSpecific, ...global];
   };
+  const shouldFilterImpact = (sortMode: TaskSortMode) =>
+    sortMode === 'impact' && preferencesStore.getRespectTaskFiltersForImpact;
   const sortTasks = (
     taskList: Task[],
     userView: string,
@@ -553,7 +555,7 @@ export function useTaskFiltering() {
         unpinnedTasks.push(task);
       }
     }
-    const impactEligibleTaskIds = preferencesStore.getRespectTaskFiltersForImpact
+    const impactEligibleTaskIds = shouldFilterImpact(sortMode)
       ? new Set(
           filterTasksByRequiredKeysSetting(filterTasksByTypeSettings(metadataStore.tasks)).map(
             (task) => task.id

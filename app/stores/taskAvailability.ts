@@ -98,9 +98,16 @@ const traderCurrentValue = (
   const trader = data.traders[requirement.trader.id] ?? {};
   return traderMetric(requirement.requirementType, trader);
 };
-const failedBranchBlockers = (task: Task, data: TaskAvailabilityTeamData): TaskBlocker[] =>
+const failedBranchBlockers = (
+  task: Task,
+  data: TaskAvailabilityTeamData,
+  tasksById: Map<string, Task>
+): TaskBlocker[] =>
   (task.failedRequirements ?? []).flatMap<TaskBlocker>((requirement) => {
-    if (!requirement?.task?.id) return [{ type: 'unknown', reason: 'failed_requirement' }];
+    if (!isValidRequirement(requirement))
+      return [{ type: 'unknown', reason: 'failed_requirement' }];
+    if (!tasksById.has(requirement.task.id))
+      return [{ type: 'unknown', taskId: requirement.task.id, reason: 'failed_requirement' }];
     return isTaskFailed(data.completions[requirement.task.id])
       ? [{ type: 'failed_branch', taskId: requirement.task.id }]
       : [];
@@ -156,9 +163,9 @@ const createTeamEvaluator = (
     const taskId = requirement.task.id;
     const completion = data.completions[taskId];
     const statuses = normalizeStatuses(requirement);
-    if (terminalStatusMet(statuses, completion)) return result([]);
     if (!tasksById.has(taskId))
       return result([{ type: 'unknown', taskId, reason: 'task_reference' }]);
+    if (terminalStatusMet(statuses, completion)) return result([]);
     return acceptsActive(statuses)
       ? activeRequirementResult(taskId, completion)
       : result([{ type: 'prerequisite' }]);
@@ -211,9 +218,17 @@ const createTeamEvaluator = (
     const diagnostics = unmet
       .flatMap((entry) => entry.result.blockers)
       .filter((blocker) => ['cycle', 'unknown'].includes(blocker.type));
-    if (diagnostics.length) return diagnostics;
+    const ordinary = unmet.filter((entry) =>
+      entry.result.blockers.every((blocker) => !['cycle', 'unknown'].includes(blocker.type))
+    );
+    if (!ordinary.length) return diagnostics;
     return [
-      { type: 'prerequisite', requirements: unmet.map((entry) => entry.requirement), chapterIds },
+      ...diagnostics,
+      {
+        type: 'prerequisite',
+        requirements: ordinary.map((entry) => entry.requirement),
+        chapterIds,
+      },
     ];
   };
   const unlockBlockers = (task: Task): TaskBlocker[] => {
@@ -254,7 +269,7 @@ const createTeamEvaluator = (
     blockers.push(
       ...playerLevelBlockers(task, data),
       ...factionBlockers(task, data),
-      ...failedBranchBlockers(task, data),
+      ...failedBranchBlockers(task, data, tasksById),
       ...traderBlockers(task),
       ...prestigeBlockers(task),
       ...prerequisiteBlockers(task),

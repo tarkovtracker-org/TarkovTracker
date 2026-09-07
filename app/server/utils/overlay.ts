@@ -1,4 +1,8 @@
-import { normalizeTraderRequirements } from '@/utils/taskRequirements';
+import {
+  isValidTraderLevel,
+  normalizeTraderReference,
+  normalizeTraderRequirements,
+} from '@/utils/taskRequirements';
 /**
  * Overlay utility for applying tarkov-data-overlay corrections to tarkov.dev API data.
  *
@@ -489,17 +493,22 @@ const isLevelRequirement = (requirement: unknown): requirement is Record<string,
   isPlainObject(requirement) && requirement.requirementType === 'level';
 const hasFiniteLevelThreshold = (requirement: Record<string, unknown>): boolean => {
   const level = requirement.level ?? requirement.value;
-  return typeof level === 'number' && Number.isFinite(level);
+  return typeof level === 'number' && isValidTraderLevel(level);
 };
 function applyTraderRequirementSplit(task: Record<string, unknown>): void {
   const raw = task.traderRequirements;
   task.normalizedTraderRequirements = normalizeTraderRequirements(raw);
   if (!Array.isArray(raw)) return;
-  const traderLevelRequirements = raw
+  const adapted = raw.map((requirement) =>
+    isPlainObject(requirement)
+      ? { ...requirement, trader: normalizeTraderReference(requirement.trader) }
+      : requirement
+  );
+  const traderLevelRequirements = adapted
     .filter(isLevelRequirement)
     .filter(hasFiniteLevelThreshold)
     .map((requirement) => ({ ...requirement, level: requirement.level ?? requirement.value }));
-  const traderRequirements = raw.filter(
+  const traderRequirements = adapted.filter(
     (requirement) => isPlainObject(requirement) && requirement.requirementType !== 'level'
   );
   task.traderLevelRequirements =

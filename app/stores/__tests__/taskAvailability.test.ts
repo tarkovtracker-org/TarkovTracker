@@ -193,7 +193,7 @@ describe('canonical task availability', () => {
       traders: { prapor: { level: 3 } },
       completions: { chemical: { failed: true } },
     });
-    expect(evaluate(task, quest).available).toBe(true);
+    expect(evaluate(task, quest, [{ id: 'chemical' }]).available).toBe(true);
     expect(
       evaluate(task, data({ traders: { prapor: { level: 3 } } }), [{ id: 'chemical' }]).blockers[0]
     ).toMatchObject({
@@ -213,5 +213,33 @@ describe('canonical task availability', () => {
     expect(results.target?.pvp?.available).toBe(true);
     expect(results.target?.pve?.available).toBe(false);
     expect(results.target?.seasonal?.available).toBe(false);
+  });
+  it('keeps ordinary prerequisites alongside missing-reference diagnostics', () => {
+    const task: Task = {
+      id: 'target',
+      taskRequirements: [
+        { task: { id: 'missing' }, status: ['complete'] },
+        { task: { id: 'known' }, status: ['complete'] },
+      ],
+    };
+    const result = evaluate(task, data({ completions: { missing: { complete: true } } }), [
+      { id: 'known' },
+    ]);
+    expect(result.blockers).toEqual([
+      { type: 'unknown', taskId: 'missing', reason: 'task_reference' },
+      { type: 'prerequisite', requirements: [task.taskRequirements![1]], chapterIds: [] },
+    ]);
+  });
+  it('does not infer safety for an absent failed-branch reference', () => {
+    const task: Task = {
+      id: 'target',
+      failConditions: [],
+      failedRequirements: [{ task: { id: 'missing' } }],
+    };
+    expect(evaluate(task).blockers).toContainEqual({
+      type: 'unknown',
+      taskId: 'missing',
+      reason: 'failed_requirement',
+    });
   });
 });
