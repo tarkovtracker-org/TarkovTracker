@@ -694,7 +694,9 @@ flowchart LR
    are preserved. Catalogs share metadata hydration's task-qualified duplicate-objective IDs.
    All destination task/objective catalogs are
    loaded before mutations, without changing the active metadata store. Destination catalogs
-   determine task eligibility and objective counts, and the original progress mode is restored.
+   determine task eligibility and objective counts, and the original progress mode is restored. Application is not transactional across modes:
+   failures explicitly warn that some progress may remain applied. Users can select the same logs
+   to retry; state-setting operations preserve successful completions.
    Seasonal events outside the active season are skipped; assigning unresolved out-of-season
    events to Seasonal is blocked. Preview counts exclude those events and the shared confirmation
    guard shows the date warning and disables confirmation immediately for an invalid selection.

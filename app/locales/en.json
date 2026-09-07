@@ -2263,7 +2263,7 @@
       "cleared_logs_toast_title": "Old logs were likely cleared",
       "cleared_logs_toast_description": "Log import can only read quest history still in your Logs folder. Deleted sessions cannot be recovered.",
       "errors": {
-        "apply_import_failed": "Failed to apply imported task completion data.",
+        "apply_import_failed": "Import could not finish. Some progress may already have been imported. Select the same logs again to retry; completed progress is preserved.",
         "archive_log_file_too_large": "Log file is too large in archive: {path}",
         "archive_logs_too_large": "Archive contains too much log content (max {max_mb} MB).",
         "import_file_too_large": "Import file is too large (max {max_mb} MB).",

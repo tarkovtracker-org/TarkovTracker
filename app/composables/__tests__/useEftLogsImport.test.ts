@@ -30,7 +30,7 @@ const i18nMessages: Record<string, string> = {
   'settings.log_import.selected_files': 'Selected files',
   'settings.log_import.selected_files_count': '{count} selected files',
   'settings.log_import.errors.apply_import_failed':
-    'Failed to apply imported task completion data.',
+    'Import could not finish. Some progress may already have been imported. Select the same logs again to retry; completed progress is preserved.',
   'settings.log_import.errors.archive_log_file_too_large':
     'Log file is too large in archive: {path}',
   'settings.log_import.errors.archive_logs_too_large':
@@ -235,6 +235,48 @@ describe('useEftLogsImport', () => {
     expect(tarkovStore.switchGameMode).toHaveBeenNthCalledWith(2, 'pvp');
     expect(currentMode).toBe('pvp');
     expect(composable.importState.value).toBe('error');
+  });
+  it('reports partial progress when the second mode fails and permits reimporting the same logs', async () => {
+    let currentMode: GameMode = 'pvp';
+    const completed = new Set<GameMode>();
+    tarkovStore.getCurrentGameMode.mockImplementation(() => currentMode);
+    tarkovStore.setTaskComplete.mockImplementation(() => {
+      completed.add(currentMode);
+    });
+    tarkovStore.switchGameMode.mockImplementation(async (mode: GameMode) => {
+      currentMode = mode;
+      if (mode === 'pve') throw new Error('second mode failed');
+    });
+    const files = [
+      new File(
+        [backendLog('prod-01.escapefromtarkov.com'), '\n', completionLog()],
+        'pvp/notifications.log'
+      ),
+      new File(
+        [
+          backendLog('gw-pve-01.escapefromtarkov.com'),
+          '\n',
+          completionLog().replace('event-1', 'event-2').replace('msg-1', 'msg-2'),
+        ],
+        'pve/notifications.log'
+      ),
+    ];
+    const importer = await loadComposable();
+    await importer.parseFiles(files);
+    await importer.confirmImport('pvp');
+    expect(importer.importState.value).toBe('error');
+    expect(importer.importError.value).toContain('Some progress may already have been imported');
+    expect([...completed]).toEqual(['pvp']);
+    expect(currentMode).toBe('pvp');
+    tarkovStore.switchGameMode.mockImplementation(async (mode: GameMode) => {
+      currentMode = mode;
+    });
+    await importer.parseFiles(files);
+    await importer.confirmImport('pvp');
+    expect(importer.importState.value).toBe('success');
+    expect([...completed]).toEqual(['pvp', 'pve']);
+    expect(currentMode).toBe('pvp');
+    tarkovStore.setTaskComplete.mockReset();
   });
   it('rejects out-of-season unknown events before mutating Seasonal progress', async () => {
     const composable = await loadComposable();
