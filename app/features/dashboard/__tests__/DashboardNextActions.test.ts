@@ -42,6 +42,7 @@ const translations: Record<string, string> = {
   'page.dashboard.focus.status.level_other': 'Reach level {required} ({count} more levels to go).',
   'page.dashboard.focus.status.ready_other': 'Ready now. {count} objectives left.',
   'page.dashboard.focus.status.trader_unlock': 'Complete {task} to unlock {trader}.',
+  'page.dashboard.focus.summary.blocked_requirement': '{task} is blocked by its requirements.',
   'page.dashboard.focus.summary.blocked_trader_unlock':
     '{task} is blocked until a trader unlock is complete.',
   'page.dashboard.focus.summary.blocked_level_other':
@@ -168,6 +169,7 @@ describe('DashboardNextActions', () => {
     );
     expect(wrapper.text()).toContain('Why it won');
     expect(wrapper.text()).toContain('Reach level 15 (2 more levels to go).');
+    expect(wrapper.text()).toContain('Wet Job - Part 1 is blocked by its requirements.');
     expect(wrapper.text()).toContain('Closest unlock: Wet Job - Part 1');
   });
   it('tracks primary recommendation clicks', async () => {
