@@ -36,7 +36,9 @@ Crawl and discovery directives live at `/robots.txt` and `/sitemap.xml`; see tho
 - [Items Lite](https://tarkovtracker.org/api/tarkov/items-lite): Lightweight item index. Accepts `lang`, `gameMode`.
 - [Items Full](https://tarkovtracker.org/api/tarkov/items): Full item data. Accepts `lang`, `gameMode`.
 - [Map Spawns](https://tarkovtracker.org/api/tarkov/map-spawns): Spawn/location data. Accepts `lang`, `gameMode`.
-- [Prestige](https://tarkovtracker.org/api/tarkov/prestige): Prestige requirement data. Accepts `lang`.
+- [Prestige](https://tarkovtracker.org/api/tarkov/prestige): Prestige requirement data. Accepts `lang`, `gameMode`.
+- [Editions and Story Catalog](https://tarkovtracker.org/api/tarkov/editions): Game editions, story chapters, and seasonal perks. Accepts `lang`, `gameMode`.
+- [Overlay Status](https://tarkovtracker.org/api/tarkov/overlay-status): Precompute fleet manifest with per-entry overlay identities.
 - [Cache Metadata](https://tarkovtracker.org/api/tarkov/cache-meta): Cache purge timestamp metadata.
 - [Contributors](https://tarkovtracker.org/api/contributors): Contributor listing.
 - [Changelog API](https://tarkovtracker.org/api/changelog): Changelog data feed. Accepts `limit` (1-50, default 10) and `releases` (1-10, default 3).

@@ -109,7 +109,7 @@ export const getAutoCompletableObjectiveIds = (objectives: StoryObjectiveInput):
 export interface ToggleStoryChapterWithLinearObjectivesOptions {
   chapterId: string;
   isChapterComplete: boolean;
-  objectives?: StoryObjectiveInput;
+  objectives?: Exclude<StoryObjectiveInput, undefined>;
   isObjectiveComplete: (objectiveId: string) => boolean;
   setChapterComplete: (chapterId: string) => void;
   setChapterUncomplete: (chapterId: string) => void;
