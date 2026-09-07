@@ -53,13 +53,14 @@ const result = (blockers: TaskBlocker[]): TaskAvailabilityResult => ({
   blockers,
 });
 const KNOWN_STATUSES = new Set(['complete', 'completed', 'failed', 'active', 'accept', 'accepted']);
+const requirementStatuses = (requirement: TaskRequirement): unknown[] => {
+  if (Array.isArray(requirement.status)) return requirement.status;
+  return requirement.status === undefined ? [] : ['unknown'];
+};
 const normalizeStatuses = (requirement: TaskRequirement): string[] =>
-  (Array.isArray(requirement.status)
-    ? requirement.status
-    : requirement.status === undefined
-      ? []
-      : ['unknown']
-  ).map((status) => (typeof status === 'string' ? status.toLowerCase() : 'unknown'));
+  requirementStatuses(requirement).map((status) =>
+    typeof status === 'string' ? status.toLowerCase() : 'unknown'
+  );
 const isValidRequirement = (
   requirement: TaskRequirement | null | undefined
 ): requirement is TaskRequirement =>
@@ -252,9 +253,7 @@ const createTeamEvaluator = (
     blockers.push(
       ...playerLevelBlockers(task, data),
       ...factionBlockers(task, data),
-      ...failedBranchBlockers(task, data)
-    );
-    blockers.push(
+      ...failedBranchBlockers(task, data),
       ...traderBlockers(task),
       ...prestigeBlockers(task),
       ...prerequisiteBlockers(task),

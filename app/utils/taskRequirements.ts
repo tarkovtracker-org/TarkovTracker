@@ -1,5 +1,5 @@
 import type { NormalizedTraderRequirement, RequirementComparison, Task } from '@/types/tarkov';
-const comparisons: readonly string[] = ['>=', '>', '<=', '<', '=', '==', '!='];
+const comparisons = new Set(['>=', '>', '<=', '<', '=', '==', '!=']);
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 const comparators: Record<RequirementComparison, (current: number, required: number) => boolean> = {
@@ -33,9 +33,13 @@ const normalizeTraderName = (trader: { id: string; name?: unknown }) => ({
   id: trader.id,
   name: typeof trader.name === 'string' ? trader.name : trader.id,
 });
+const validComparisonMethod = (raw: Record<string, unknown>) => {
+  const method = comparisonMethod(raw);
+  return typeof method === 'string' && comparisons.has(method);
+};
 const invalidRequirementReason = (raw: Record<string, unknown>): UnknownReason | undefined => {
   if (!['level', 'reputation'].includes(String(raw.requirementType))) return 'type';
-  if (!comparisons.includes(String(comparisonMethod(raw)))) return 'comparison';
+  if (!validComparisonMethod(raw)) return 'comparison';
   if (!isValidTrader(raw.trader)) return 'trader';
   return undefined;
 };
@@ -68,7 +72,7 @@ export const normalizeTraderRequirement = (
 export const normalizeTraderRequirements = (raw: unknown): NormalizedTraderRequirement[] => {
   if (raw === undefined) return [];
   return Array.isArray(raw)
-    ? raw.map(normalizeTraderRequirement)
+    ? raw.map((value, index) => normalizeTraderRequirement(value, index))
     : [normalizeTraderRequirement(raw, 0)];
 };
 export const getTaskTraderRequirements = (task: Task): NormalizedTraderRequirement[] => {
@@ -79,5 +83,5 @@ export const getTaskTraderRequirements = (task: Task): NormalizedTraderRequireme
       requirementType: req.requirementType ?? 'level',
     })),
     ...(task.traderRequirements ?? []),
-  ].map(normalizeTraderRequirement);
+  ].map((value, index) => normalizeTraderRequirement(value, index));
 };

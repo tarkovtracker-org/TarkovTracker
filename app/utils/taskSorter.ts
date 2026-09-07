@@ -338,7 +338,7 @@ const bestProgressionRank = (
   teamIds: string[]
 ): [number, number] => {
   const ranks = teamIds.map((id) => progressionRank(evaluations?.[taskId]?.[id]));
-  return ranks.sort((a, b) => a[0] - b[0] || a[1] - b[1])[0] ?? [6, 0];
+  return ranks.toSorted((a, b) => a[0] - b[0] || a[1] - b[1])[0] ?? [6, 0];
 };
 const compareProgression = (
   a: string,
