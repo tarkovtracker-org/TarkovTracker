@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { testOverlayEditions } from '@/server/utils/__tests__/overlayFixtures';
 const stubOverlayFetch = (overlay: unknown) => {
   const fetchMock = vi.fn(async () => {
     return new Response(JSON.stringify(overlay), {
@@ -24,6 +25,7 @@ describe('overlay URL validation', () => {
   ])('falls back to the trusted HTTPS overlay for %s', async (overlayUrl) => {
     vi.stubEnv('OVERLAY_URL', overlayUrl);
     const fetchMock = stubOverlayFetch({
+      editions: testOverlayEditions,
       $meta: { version: 'url-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
     });
     const { applyOverlay } = await import('@/server/utils/overlay');
@@ -36,6 +38,7 @@ describe('overlay URL validation', () => {
   it('uses a configured HTTPS overlay URL', async () => {
     vi.stubEnv('OVERLAY_URL', 'https://overlay.example.com/custom.json');
     const fetchMock = stubOverlayFetch({
+      editions: testOverlayEditions,
       $meta: { version: 'url-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
     });
     const { applyOverlay } = await import('@/server/utils/overlay');
@@ -84,6 +87,7 @@ describe('overlay redirect handling', () => {
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
+            editions: testOverlayEditions,
             $meta: { version: 'redirect-v1', generated: '2026-09-07', sha256: 'test-sha' },
           }),
           { status: 200 }
@@ -122,6 +126,7 @@ describe('overlay redirect handling', () => {
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
+            editions: testOverlayEditions,
             $meta: { version: 'redirect-v2', generated: '2026-09-07', sha256: 'test-sha' },
           }),
           { status: 200 }
@@ -136,6 +141,7 @@ describe('overlay redirect handling', () => {
 describe('applyOverlay locale integration', () => {
   it('applies the selected locale after global and mode corrections', async () => {
     const fetchMock = stubOverlayFetch({
+      editions: testOverlayEditions,
       $meta: {
         generated: '2026-08-14T12:00:00.000Z',
         sha256: 'overlay-sha',
@@ -224,7 +230,10 @@ describe('applyOverlay locale integration', () => {
       .fn()
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({ $meta: { version: 'v1', generated: '2026-09-07', sha256: 'test-sha' } }),
+          JSON.stringify({
+            editions: testOverlayEditions,
+            $meta: { version: 'v1', generated: '2026-09-07', sha256: 'test-sha' },
+          }),
           { status: 200 }
         )
       )
@@ -250,7 +259,10 @@ describe('applyOverlay locale integration', () => {
     expect(backgroundTasks).toHaveLength(1);
     resolveRefresh(
       new Response(
-        JSON.stringify({ $meta: { version: 'v2', generated: '2026-09-07', sha256: 'test-sha' } }),
+        JSON.stringify({
+          editions: testOverlayEditions,
+          $meta: { version: 'v2', generated: '2026-09-07', sha256: 'test-sha' },
+        }),
         { status: 200 }
       )
     );
@@ -290,7 +302,10 @@ describe('applyOverlay locale integration', () => {
       .fn()
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({ $meta: { version: 'v1', generated: '2026-09-07', sha256: 'test-sha' } }),
+          JSON.stringify({
+            editions: testOverlayEditions,
+            $meta: { version: 'v1', generated: '2026-09-07', sha256: 'test-sha' },
+          }),
           { status: 200 }
         )
       )
@@ -311,6 +326,7 @@ describe('applyOverlay locale integration', () => {
   });
   it('leaves unsupported locales unchanged by locale corrections', async () => {
     stubOverlayFetch({
+      editions: testOverlayEditions,
       $meta: { version: 'locale-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
       locales: {
         en: { tasks: { 'task-1': { name: 'English Task' } } },
@@ -328,6 +344,7 @@ describe('applyOverlay locale integration', () => {
     ['locale patch', { en: { tasks: { 'task-1': 'garbage' } } }],
   ])('handles a malformed %s without changing base data', async (_label, locales) => {
     stubOverlayFetch({
+      editions: testOverlayEditions,
       $meta: { version: 'locale-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
       locales,
     });
@@ -345,6 +362,7 @@ describe('story overlay validation', () => {
     { storyChapters: [] },
   ])('retains the last good payload for malformed chapter records: %j', async (invalid) => {
     const fetchMock = stubOverlayFetch({
+      editions: testOverlayEditions,
       $meta: { version: 'good', generated: '2026-09-07', sha256: 'test-sha' },
       storyChapters: { chapter: { name: 'Chapter', questUnlocks: [{ id: 'task' }] } },
     });
@@ -355,6 +373,7 @@ describe('story overlay validation', () => {
       async () =>
         new Response(
           JSON.stringify({
+            editions: testOverlayEditions,
             $meta: { version: 'invalid', generated: '2026-09-07', sha256: 'test-sha' },
             ...invalid,
           })
@@ -370,6 +389,7 @@ describe('story overlay validation', () => {
 describe('overlay semantic fallback and diagnostics', () => {
   it('retains a last-good overlay when a prestige story reference is invalid', async () => {
     const good = {
+      editions: testOverlayEditions,
       $meta: { version: 'good', generated: '2026-09-07', sha256: 'good-sha' },
       tasks: { task: { name: 'Corrected' } },
     };
@@ -380,6 +400,7 @@ describe('overlay semantic fallback and diagnostics', () => {
       new Response(
         JSON.stringify({
           ...good,
+          editions: testOverlayEditions,
           $meta: { version: 'bad', generated: '2026-09-07', sha256: 'test-sha' },
           prestige: {
             p: {
@@ -401,6 +422,7 @@ describe('overlay semantic fallback and diagnostics', () => {
   });
   it('keeps unknown-section diagnostics on cached responses', async () => {
     const fetch = stubOverlayFetch({
+      editions: testOverlayEditions,
       $meta: { version: '1', generated: '2026-09-07', sha256: 'test-sha' },
       future: {},
     });
@@ -411,10 +433,15 @@ describe('overlay semantic fallback and diagnostics', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 });
-it.each([{ version: 'truncated' }, { version: 'truncated', generated: '2026-09-07', sha256: '' }])(
-  'keeps the last-good catalog when provenance is malformed %j',
+it.each([
+  { version: 'truncated' },
+  { version: 'truncated', generated: '2026-09-07', sha256: '' },
+  { version: 'truncated', generated: '2026-09-07', sha256: 'complete-but-no-catalog' },
+])(
+  'keeps the last-good catalog when provenance or required catalogs are missing %j',
   async ($meta) => {
     const good = {
+      editions: testOverlayEditions,
       $meta: { version: 'good', generated: '2026-09-07', sha256: 'good-sha' },
       tasks: { task: { name: 'Corrected' } },
     };

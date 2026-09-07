@@ -295,3 +295,6 @@ it('gives chapters with missing or nonfinite order an explicit stable fallback',
     ['ordered', 2],
   ]);
 });
+it.each([undefined, {}])('rejects a missing or empty required editions catalog: %j', (editions) => {
+  expect(validateOverlayData({ ...overlay, editions })).toBe(false);
+});

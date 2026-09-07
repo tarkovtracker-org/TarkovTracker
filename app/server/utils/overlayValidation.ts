@@ -136,6 +136,7 @@ export const validateOverlayData = (value: unknown): value is OverlayData => {
   if (
     ![
       hasOverlayMeta(value),
+      isPlainObject(value.editions) && Object.keys(value.editions).length > 0,
       validCollections(value),
       validContainer(value.modes),
       validContainer(value.locales),

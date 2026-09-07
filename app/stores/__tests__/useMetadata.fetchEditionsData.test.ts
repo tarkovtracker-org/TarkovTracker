@@ -271,7 +271,7 @@ describe('useMetadataStore fetchEditionsData', () => {
     await store.fetchEditionsData(true);
     expect(store.storyChapters).toEqual([chapter]);
     expect(fetch).toHaveBeenCalledWith('/api/tarkov/editions', {
-      query: { lang: 'de', gameMode: 'pve' },
+      query: { lang: 'de', gameMode: 'pve', cacheBust: '1' },
     });
     expect(cacheWrite).toHaveBeenCalledWith(
       'editions',

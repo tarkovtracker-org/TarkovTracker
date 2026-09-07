@@ -1494,7 +1494,11 @@ export const useMetadataStore = defineStore('metadata', {
         this.editionsLoading = true;
         try {
           const response = await $fetch<{ data: CachedEditions }>('/api/tarkov/editions', {
-            query: { lang: requestLanguage, gameMode: requestMode },
+            query: {
+              lang: requestLanguage,
+              gameMode: requestMode,
+              ...(forceRefresh ? { cacheBust: '1' } : {}),
+            },
           });
           const overlay = response.data;
           if (

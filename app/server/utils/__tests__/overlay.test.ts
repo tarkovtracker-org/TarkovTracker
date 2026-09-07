@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
+import { testOverlayEditions } from '@/server/utils/__tests__/overlayFixtures';
 import { deepMerge } from '@/server/utils/deepMerge';
 import {
   applyLocaleOverlay,
@@ -6,9 +7,10 @@ import {
   expandObjectiveAdditions,
   getObjectiveItemIds,
 } from '@/server/utils/overlay';
-const stubOverlayFetch = (overlay: unknown) => {
+const stubOverlayFetch = (overlay: Record<string, unknown>) => {
+  const payload = { editions: testOverlayEditions, ...overlay };
   const fetchMock = vi.fn(async () => {
-    return new Response(JSON.stringify(overlay), {
+    return new Response(JSON.stringify(payload), {
       headers: { 'Content-Type': 'application/json' },
       status: 200,
     });
@@ -82,6 +84,7 @@ describe('mergeModeCorrections (via applyOverlay integration)', () => {
   });
   it('splits overlaid trader requirements into level and reputation fields', async () => {
     const fetchMock = stubOverlayFetch({
+      editions: testOverlayEditions,
       $meta: { version: 'split-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
       modes: {
         pve: {
@@ -146,6 +149,7 @@ describe('mergeModeCorrections (via applyOverlay integration)', () => {
   });
   it('splits trader requirements on tasksAdd entries', async () => {
     const fetchMock = stubOverlayFetch({
+      editions: testOverlayEditions,
       $meta: { version: 'tasksadd-split-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
       tasksAdd: {
         'new-task': {
@@ -200,6 +204,7 @@ describe('mergeModeCorrections (via applyOverlay integration)', () => {
   });
   it('drops malformed trader requirement entries during the split', async () => {
     const fetchMock = stubOverlayFetch({
+      editions: testOverlayEditions,
       $meta: { version: 'malformed-split-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
       modes: {
         pve: {
@@ -495,6 +500,7 @@ describe('canonical progression overlay projection', () => {
   it('replaces trader requirements and keeps story routes scoped to the selected mode', async () => {
     vi.resetModules();
     stubOverlayFetch({
+      editions: testOverlayEditions,
       $meta: { version: 'test', generated: '2026-09-07', sha256: 'test-sha' },
       tasks: {
         target: {
