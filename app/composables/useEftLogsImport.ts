@@ -1,5 +1,6 @@
 import { strFromU8, unzipSync } from 'fflate';
 import { useMetadataStore } from '@/stores/useMetadata';
+import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { GAME_MODE_VALUES, isGameMode, type GameMode } from '@/utils/constants';
 import { loadEftImportTaskCatalog } from '@/utils/eftLogImportCatalog';
@@ -218,23 +219,29 @@ const buildImportTaskSets = (
   }
   return { completed: sets.completed, started: sets.started, failed: sets.failed };
 };
+const applyImportedTaskRequirements = (
+  store: ReturnType<typeof useTarkovStore>,
+  task: Task | undefined,
+  requireTraders: boolean
+) => {
+  if (!task) return;
+  ensureTaskMinPlayerLevel(store, task);
+  if (requireTraders) applyTaskTraderRequirements({ store, task });
+};
 /** Applies completion requirements without overriding explicit imported states or existing completions. */
 const applyCompletedImports = (
   store: ReturnType<typeof useTarkovStore>,
   tasksMap: Map<string, Task>,
   completedTaskIds: Set<string>,
-  explicitOtherStates: Set<string>
+  explicitOtherStates: Set<string>,
+  requireTraders: boolean
 ) => {
   const processedCompleted = new Set<string>();
   const processedFailed = new Set<string>();
   const completeTask = (taskId: string) => {
     if (processedCompleted.has(taskId) || explicitOtherStates.has(taskId)) return;
     completeTaskForProgress({ store, taskId, tasksMap });
-    const task = tasksMap.get(taskId);
-    if (task) {
-      ensureTaskMinPlayerLevel(store, task);
-      applyTaskTraderRequirements({ store, task });
-    }
+    applyImportedTaskRequirements(store, tasksMap.get(taskId), requireTraders);
     processedCompleted.add(taskId);
   };
   const failTask = (taskId: string) => {
@@ -297,7 +304,8 @@ const applyModeImports = async (
   mode: GameMode,
   activeMode: GameMode,
   taskSets: ImportTaskSets,
-  onModeSwitched: (mode: GameMode) => void
+  onModeSwitched: (mode: GameMode) => void,
+  requireTraders: boolean
 ): Promise<GameMode> => {
   const tasksMap = new Map((catalogs.get(mode) ?? []).map((task) => [task.id, task]));
   const filter = (ids: Set<string>) => new Set([...ids].filter((id) => tasksMap.has(id)));
@@ -309,7 +317,13 @@ const applyModeImports = async (
     onModeSwitched(mode);
     await store.switchGameMode(mode);
   }
-  applyCompletedImports(store, tasksMap, completed, new Set([...started, ...failed]));
+  applyCompletedImports(
+    store,
+    tasksMap,
+    completed,
+    new Set([...started, ...failed]),
+    requireTraders
+  );
   applyFailedImports(store, tasksMap, failed);
   applyStartedImports(store, completed, started);
   return mode;
@@ -335,7 +349,8 @@ const applyAllModeImports = async (
   store: ReturnType<typeof useTarkovStore>,
   catalogs: Map<GameMode, Task[]>,
   originalMode: GameMode,
-  taskSets: ImportTaskSets
+  taskSets: ImportTaskSets,
+  requireTraders: boolean
 ): Promise<{ activeMode: GameMode; error: unknown }> => {
   let activeMode = originalMode;
   const trackMode = (mode: GameMode) => {
@@ -343,7 +358,15 @@ const applyAllModeImports = async (
   };
   try {
     for (const mode of GAME_MODE_VALUES) {
-      activeMode = await applyModeImports(store, catalogs, mode, activeMode, taskSets, trackMode);
+      activeMode = await applyModeImports(
+        store,
+        catalogs,
+        mode,
+        activeMode,
+        taskSets,
+        trackMode,
+        requireTraders
+      );
     }
     return { activeMode, error: null };
   } catch (error) {
@@ -355,6 +378,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   const { t } = useI18n({ useScope: 'global' });
   const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
+  const preferencesStore = usePreferencesStore();
   const isImporting = ref(false);
   const importState = ref<EftLogsImportState>('idle');
   const previewData = ref<EftLogsImportPreviewData | null>(null);
@@ -552,7 +576,14 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     if (!taskSets) return;
     const originalMode = tarkovStore.getCurrentGameMode();
     isImporting.value = true;
-    const applied = await applyAllModeImports(tarkovStore, catalogs, originalMode, taskSets);
+    const requireTraders = preferencesStore.getTasksRequireTraderLevels;
+    const applied = await applyAllModeImports(
+      tarkovStore,
+      catalogs,
+      originalMode,
+      taskSets,
+      requireTraders
+    );
     const importFailure = await restoreImportMode(
       tarkovStore,
       applied.activeMode,
