@@ -1572,7 +1572,10 @@ is the source for explanations and sorting; `unlockedTasks` is its boolean proje
 card and dashboard use `useTaskBlockerText` for the same explanations. Shared/non-current profile
 views call the same evaluator with their own mode progress. Profile task/objective, prestige and
 story catalogs load for the selected mode without mutating the active metadata store; obsolete
-mode/language responses are ignored. Completed and failed tasks are terminal.
+mode/language requests are aborted on scope change or unmount and late responses are ignored.
+Requests time out after 15 seconds. Independent story/prestige failures retain successful task
+and objective data with an error indicator; missing core/objective catalogs remain fatal.
+Completed and failed tasks are terminal.
 The existing acceptance-unknown interpretation is retained; this does not introduce #715's
 explicit Accept workflow.
 

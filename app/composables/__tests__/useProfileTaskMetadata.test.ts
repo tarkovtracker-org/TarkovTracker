@@ -5,12 +5,15 @@ import { effectScope, ref } from 'vue';
 import { useProfileTaskMetadata } from '@/composables/useProfileTaskMetadata';
 import { createDeferred } from '@/utils/test-helpers';
 import type { GameMode } from '@/utils/constants';
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 describe('profile mode metadata', () => {
   it('requests the selected mode and ignores responses from an obsolete mode', async () => {
     const old = createDeferred<object>();
     const mode = ref<GameMode>('pvp');
-    const fetch = vi.fn((url: string) => {
+    const fetch = vi.fn((url: string, _options: { signal: AbortSignal }) => {
       if (mode.value === 'pvp') return old.promise;
       if (url.includes('tasks-core'))
         return Promise.resolve({
@@ -26,17 +29,69 @@ describe('profile mode metadata', () => {
     vi.stubGlobal('$fetch', fetch);
     const scope = effectScope();
     const result = scope.run(() => useProfileTaskMetadata(mode, ref('de')))!;
+    const firstSignal = fetch.mock.calls[0]![1].signal;
     mode.value = 'pve';
     await flushPromises();
-    expect(fetch).toHaveBeenCalledWith('/api/tarkov/tasks-objectives', {
-      query: { gameMode: 'pve', lang: 'de' },
-    });
+    expect(firstSignal.aborted).toBe(true);
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/tarkov/tasks-objectives',
+      expect.objectContaining({
+        query: { gameMode: 'pve', lang: 'de' },
+      })
+    );
     expect(result.tasks.value).toEqual([
       expect.objectContaining({ id: 'pve', objectives: [{ id: 'pve-objective' }] }),
     ]);
     old.resolve({ data: { tasks: [{ id: 'pvp' }] } });
     await flushPromises();
     expect(result.tasks.value[0]?.id).toBe('pve');
+    scope.stop();
+  });
+  it('retains task metadata when independent prestige and overlay resources fail', async () => {
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn((url: string) => {
+        if (url.includes('tasks-core'))
+          return Promise.resolve({ data: { tasks: [{ id: 'task' }] } });
+        if (url.includes('tasks-objectives'))
+          return Promise.resolve({
+            data: { tasks: [{ id: 'task', objectives: [{ id: 'objective' }] }] },
+          });
+        return Promise.reject(new Error('Optional metadata unavailable'));
+      })
+    );
+    const scope = effectScope();
+    const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pve'), ref('en')))!;
+    await flushPromises();
+    expect(result.tasks.value[0]?.objectives).toEqual([{ id: 'objective' }]);
+    expect(result.chapters.value).toEqual([]);
+    expect(result.prestige.value).toEqual([]);
+    expect(result.error.value?.message).toBe('Optional metadata unavailable');
+    expect(result.loading.value).toBe(false);
+    scope.stop();
+  });
+  it('aborts hanging optional requests after 15 seconds and exposes completed tasks', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn((url: string, options: { signal: AbortSignal }) => {
+        if (url.includes('tasks-core'))
+          return Promise.resolve({ data: { tasks: [{ id: 'task' }] } });
+        if (url.includes('tasks-objectives')) return Promise.resolve({ data: { tasks: [] } });
+        return new Promise((_, reject) =>
+          options.signal.addEventListener('abort', () => reject(options.signal.reason), {
+            once: true,
+          })
+        );
+      })
+    );
+    const scope = effectScope();
+    const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pve'), ref('en')))!;
+    await vi.advanceTimersByTimeAsync(15000);
+    expect(result.tasks.value).toEqual([{ id: 'task' }]);
+    expect(result.error.value?.message).toBe('Profile metadata request timed out');
+    expect(result.loading.value).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
     scope.stop();
   });
 });
