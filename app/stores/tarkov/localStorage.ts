@@ -90,7 +90,7 @@ export const createProgressStorageSerializer = (
 ) => {
   let previous: PersistedProgressSnapshot | null = null;
   const serialize = (state: UserState, userId: string | null, timestamp: number): string => {
-    if (!previous || previous.storedUserId !== userId) previous = readPrevious(userId);
+    if (previous?.storedUserId !== userId) previous = readPrevious(userId);
     const modeTimestamps = Object.fromEntries(
       GAME_MODE_VALUES.map((mode) => [mode, nextModeTimestamp(previous, state, mode, timestamp)])
     );

@@ -188,6 +188,26 @@ describe('seasonal progress realtime synchronization', () => {
       registerSyncControllerGetter(() => null);
     }
   });
+  it('reports a rejected snapshot barrier without an unhandled rejection', async () => {
+    const { registerSyncControllerGetter, setupRealtimeListener } =
+      await import('@/stores/tarkov/realtimeListener');
+    const failure = new Error('barrier failed');
+    const withSnapshot: WithRemoteSnapshot = async () => {
+      throw failure;
+    };
+    registerSyncControllerGetter(() => ({ pause: vi.fn(), resume: vi.fn(), withSnapshot }));
+    try {
+      await setupRealtimeListener(store);
+      createdChannels[0]?.subscribeCallback?.('SUBSCRIBED');
+      await Promise.resolve();
+      expect(logger.warn).toHaveBeenCalledWith(
+        '[TarkovStore] Reconnect snapshot barrier failed',
+        failure
+      );
+    } finally {
+      registerSyncControllerGetter(() => null);
+    }
+  });
   it('ignores late progress events while the shared transport is suspended', async () => {
     vi.useFakeTimers();
     const page = Object.assign(new EventTarget(), { visibilityState: 'hidden' as const });

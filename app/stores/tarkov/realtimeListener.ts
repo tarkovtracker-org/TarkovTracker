@@ -443,9 +443,12 @@ async function runSetupRealtimeListener(
         const request = ++refreshGeneration;
         const read = (reconcile: RemoteStateMerge) => refreshSnapshot(reconcile, request);
         const controller = getRegisteredSyncController();
-        void (controller?.withSnapshot
+        const refreshing = controller?.withSnapshot
           ? controller.withSnapshot(read)
-          : read(captureRemoteMerge()));
+          : read(captureRemoteMerge());
+        refreshing.catch((error: unknown) => {
+          logger.warn('[TarkovStore] Reconnect snapshot barrier failed', error);
+        });
       }
     );
   } catch (error) {
