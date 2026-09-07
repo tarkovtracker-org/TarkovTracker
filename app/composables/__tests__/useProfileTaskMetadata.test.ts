@@ -167,6 +167,7 @@ it.each([
     { id: 'p', level: 7 },
     { id: 'p', level: 1, prestigeLevel: 7 },
     { id: 'p', level: 1, conditions: [null] },
+    { id: 'p', level: 1, conditions: [[]] },
   ].map((entry) => ({ data: { prestige: [entry] } })),
 ])('keeps task catalogs when optional prestige is malformed: %j', async (payload) => {
   vi.stubGlobal(
