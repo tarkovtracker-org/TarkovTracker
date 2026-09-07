@@ -5,6 +5,7 @@ import {
   createPendingStateTracker,
   snapshotSyncState,
   type RemoteStateMerge,
+  type WithRemoteSnapshot,
 } from '@/utils/pendingState';
 import type { StateTree, Store } from 'pinia';
 import type { UserProgressData } from '~/stores/progressState';
@@ -35,6 +36,7 @@ export interface SupabaseSyncReturn<
 > {
   hasPendingChanges?: () => boolean;
   captureRemoteMerge?: () => RemoteStateMerge;
+  withSnapshot?: WithRemoteSnapshot;
   isSyncing: Ref<boolean>;
   isPaused: Ref<boolean>;
   cleanup: () => void;
@@ -130,6 +132,7 @@ export function useSupabaseSync<
   const { $supabase } = useNuxtApp();
   const isSyncing = ref(false);
   const isPaused = ref(false);
+  let snapshotDepth = 0;
   let lastSyncedHash: string | null = null;
   let pendingLocalChanges = false;
   let localVersion = 0;
@@ -232,7 +235,7 @@ export function useSupabaseSync<
       loggedIn: $supabase.user.loggedIn,
       isPaused: isPaused.value,
     });
-    if (isPaused.value) {
+    if (isPaused.value || snapshotDepth > 0) {
       logger.debug('[Sync] Skipping - sync is paused');
       return null;
     }
@@ -296,7 +299,13 @@ export function useSupabaseSync<
   const enqueueSync = (state = store.$state as TState): Promise<TPayload | null> => {
     // Capture each request before queuing: later mutations must not change an
     // earlier payload, and resumed writes must not overtake an in-flight save.
-    if (disposed || isPaused.value || !$supabase.user.loggedIn || !$supabase.user.id)
+    if (
+      disposed ||
+      isPaused.value ||
+      snapshotDepth > 0 ||
+      !$supabase.user.loggedIn ||
+      !$supabase.user.id
+    )
       return Promise.resolve(null);
     const version = localVersion;
     const acknowledge = pendingState.captureAcknowledgement(snapshotSyncState(state));
@@ -338,18 +347,32 @@ export function useSupabaseSync<
     isPaused.value = true;
     debouncedSync.cancel();
   };
-  const resume = () => {
-    logger.debug(`[Sync] Resuming sync for ${table}`);
-    isPaused.value = false;
-    if (pendingLocalChanges) {
+  const schedulePendingSync = () => {
+    if (!disposed && pendingLocalChanges) {
       void debouncedSync(store.$state as TState).catch((error) => {
         if (!isDebounceRejection(error)) logger.error('[Sync] Resumed sync failed', error);
       });
     }
   };
+  const resume = () => {
+    logger.debug(`[Sync] Resuming sync for ${table}`);
+    isPaused.value = false;
+    schedulePendingSync();
+  };
+  const withSnapshot: WithRemoteSnapshot = async (read) => {
+    snapshotDepth += 1;
+    try {
+      await syncQueue;
+      return await read(pendingState.capture());
+    } finally {
+      snapshotDepth -= 1;
+      schedulePendingSync();
+    }
+  };
   return {
     hasPendingChanges: () => pendingLocalChanges,
     captureRemoteMerge: pendingState.capture,
+    withSnapshot,
     isSyncing,
     isPaused,
     cleanup,

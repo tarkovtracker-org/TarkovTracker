@@ -8,7 +8,7 @@ import {
   type OwnedRealtimeChannel,
 } from '@/utils/realtimeChannel';
 import { clearStaleState, resetStore, safePatchStore } from '@/utils/storeHelpers';
-import type { RemoteStateMerge } from '@/utils/pendingState';
+import type { RemoteStateMerge, WithRemoteSnapshot } from '@/utils/pendingState';
 import type { PostgrestError, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import type { StateTree, Store } from 'pinia';
 // Local imports
@@ -29,6 +29,7 @@ export interface SupabaseListenerConfig<
     resume: () => void;
     hasPendingChanges?: () => boolean;
     captureRemoteMerge?: () => RemoteStateMerge;
+    withSnapshot?: WithRemoteSnapshot;
   };
   scope?: ListenerScope;
 }
@@ -141,9 +142,11 @@ export function useSupabaseListener<
   };
   // Initial fetch
   // fallow-ignore-next-line complexity -- tested fetch cancellation and pending-save guards must share one response boundary
-  const fetchData = async (reconnecting = false) => {
+  const fetchData = async (
+    reconnecting = false,
+    reconcile = syncController?.captureRemoteMerge?.()
+  ) => {
     const pendingBeforeRead = syncController?.hasPendingChanges?.() === true;
-    const reconcile = syncController?.captureRemoteMerge?.();
     const fetchVersion = ++latestFetchVersion;
     activeFetchController?.abort();
     const fetchController = new AbortController();
@@ -194,6 +197,12 @@ export function useSupabaseListener<
         activeFetchController = null;
       }
     }
+  };
+  const readData = (reconnecting = false) => {
+    const version = cleanupVersion;
+    const read = (reconcile = syncController?.captureRemoteMerge?.()) =>
+      version === cleanupVersion ? fetchData(reconnecting, reconcile) : Promise.resolve();
+    return syncController?.withSnapshot ? syncController.withSnapshot(read) : read();
   };
   const listenerTopic = (currentFilter: string) => `public:${table}:${currentFilter}`;
   const createSubscription = () => {
@@ -246,7 +255,7 @@ export function useSupabaseListener<
         if (subscriptionVersion !== cleanupVersion) return;
         isSubscribed.value = status === 'SUBSCRIBED';
         if (isSubscribed.value) {
-          if (joined) void fetchData(true);
+          if (joined) void readData(true);
           joined = true;
         }
         logChannelSubscribeFailure(storeIdForLogging, status, error, { table });
@@ -322,7 +331,7 @@ export function useSupabaseListener<
           return;
         }
         hasInitiallyLoaded.value = false;
-        fetchData();
+        readData();
         setupSubscription();
       },
       { immediate: true }
@@ -338,6 +347,6 @@ export function useSupabaseListener<
       stopFilterWatch?.();
       cleanup();
     },
-    fetchData,
+    fetchData: readData,
   };
 }

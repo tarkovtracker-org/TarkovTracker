@@ -131,6 +131,61 @@ describe('useSupabaseSync', () => {
     expect(newer).toEqual({ pvp: { count: 3, name: 'newer remote' } });
     sync.cleanup();
   });
+  it('reads snapshots after saves and holds newer edits until reconciliation finishes', async () => {
+    const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+    let finishSave!: (result: { error: null }) => void;
+    let finishRead!: () => void;
+    upsert.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishSave = resolve;
+        })
+    );
+    const store = createMockStore({ count: 5, name: 'old' });
+    const sync = useSupabaseSync({ store, table: 'test_table', debounceMs: 10 });
+    store.$state.count = 0;
+    store.notifySubscriber();
+    const saving = sync.syncToSupabase();
+    const read = vi.fn(async (reconcile) => {
+      await new Promise<void>((resolve) => {
+        finishRead = resolve;
+      });
+      Object.assign(store.$state, reconcile({ count: 3, name: 'old' }));
+    });
+    const snapshot = sync.withSnapshot!(read);
+    await flushSync(0);
+    expect(read).not.toHaveBeenCalled();
+    finishSave({ error: null });
+    await saving;
+    await flushSync(0);
+    expect(read).toHaveBeenCalledOnce();
+    store.$state.name = 'pending local';
+    store.notifySubscriber();
+    sync.resume(); // A live-event resume cannot release the snapshot barrier.
+    await flushSync(10);
+    expect(upsert).toHaveBeenCalledOnce();
+    finishRead();
+    await snapshot;
+    expect(store.$state).toEqual({ count: 3, name: 'pending local' });
+    await flushSync(10);
+    expect(upsert).toHaveBeenLastCalledWith({ count: 3, name: 'pending local', user_id: 'user-1' });
+    sync.cleanup();
+  });
+  it('releases the snapshot barrier after a failed read', async () => {
+    const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+    const store = createMockStore({ count: 0 });
+    const sync = useSupabaseSync({ store, table: 'test_table', debounceMs: 10 });
+    await expect(
+      sync.withSnapshot!(async () => {
+        throw new Error('read failed');
+      })
+    ).rejects.toThrow('read failed');
+    store.$state.count = 1;
+    store.notifySubscriber();
+    await flushSync(10);
+    expect(upsert).toHaveBeenCalledWith({ count: 1, user_id: 'user-1' });
+    sync.cleanup();
+  });
   it('queues resumed saves behind an in-flight write', async () => {
     const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
     let finishFirst!: (result: { error: null }) => void;

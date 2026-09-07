@@ -5,6 +5,7 @@ import { defaultState, type UserState } from '@/stores/progressState';
 import { recordLocalSyncTime, resetSyncTimeline } from '@/stores/tarkov/syncTimeline';
 import { logger } from '@/utils/logger';
 import { installRealtimeVisibility } from '@/utils/realtimeVisibility';
+import type { WithRemoteSnapshot } from '@/utils/pendingState';
 const showProgressMerged = vi.fn();
 type FakeChannel = {
   topic: string;
@@ -150,6 +151,42 @@ describe('seasonal progress realtime synchronization', () => {
     await cleanupRealtimeListener();
     resetSyncTimeline();
     vi.clearAllMocks();
+  });
+  it('waits for the sync controller before starting a reconnect read', async () => {
+    const { setupRealtimeListener, registerSyncControllerGetter } =
+      await import('@/stores/tarkov/realtimeListener');
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const withSnapshot: WithRemoteSnapshot = async (read) => {
+      await gate;
+      return read((remote) => remote);
+    };
+    registerSyncControllerGetter(() => ({ pause: vi.fn(), resume: vi.fn(), withSnapshot }));
+    supabaseContext.client.from.mockImplementation((table: string) => ({
+      select: () => ({
+        eq: () =>
+          table === 'user_progress'
+            ? { single: async () => ({ data: null, error: null }) }
+            : Promise.resolve({
+                data: [{ game_mode: 'pvp', season_number: 0, progress_data: { level: 8 } }],
+                error: null,
+              }),
+      }),
+    }));
+    try {
+      await setupRealtimeListener(store);
+      createdChannels[0]?.subscribeCallback?.('SUBSCRIBED');
+      await Promise.resolve();
+      expect(supabaseContext.client.from).not.toHaveBeenCalled();
+      release();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(supabaseContext.client.from).toHaveBeenCalledWith('user_game_mode_progress');
+      expect(state.pvp.level).toBe(8);
+    } finally {
+      registerSyncControllerGetter(() => null);
+    }
   });
   it('ignores late progress events while the shared transport is suspended', async () => {
     vi.useFakeTimers();

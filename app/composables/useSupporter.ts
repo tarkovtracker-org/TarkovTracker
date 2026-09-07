@@ -27,7 +27,11 @@ let channelUserId: string | null = null;
 let statusRequestVersion = 0;
 let subscriptionRequestVersion = 0;
 let statusLoadedForUserId: string | null = null;
-let initialRead: { promise: Promise<boolean>; resolve: (success: boolean) => void } | null = null;
+let initialRead: {
+  userId: string;
+  promise: Promise<boolean>;
+  resolve: (success: boolean) => void;
+} | null = null;
 export function useSupporter() {
   const { $supabase } = useNuxtApp();
   const isCurrentStatusRequest = (userId: string, requestVersion: number) => {
@@ -56,6 +60,13 @@ export function useSupporter() {
     if (tier === 'supporter') return 'Supporter';
     return tier.charAt(0).toUpperCase() + tier.slice(1);
   });
+  const finishStatusRequest = (userId: string, requestVersion: number) => {
+    if (!isCurrentStatusRequest(userId, requestVersion)) return;
+    loading.value = false;
+    if (initialRead?.userId !== userId) return;
+    initialRead.resolve(error.value === null);
+    initialRead = null;
+  };
   async function fetchStatus(userId: string): Promise<boolean> {
     if (!$supabase || !userId) return false;
     const requestVersion = ++statusRequestVersion;
@@ -95,9 +106,7 @@ export function useSupporter() {
       supporterState.value = null;
       return false;
     } finally {
-      if (isCurrentStatusRequest(userId, requestVersion)) {
-        loading.value = false;
-      }
+      finishStatusRequest(userId, requestVersion);
     }
   }
   async function subscribe(userId: string): Promise<boolean> {
@@ -129,7 +138,7 @@ export function useSupporter() {
     const promise = new Promise<boolean>((resolve) => {
       resolveInitial = resolve;
     });
-    const pending = { promise, resolve: resolveInitial };
+    const pending = { userId, promise, resolve: resolveInitial };
     initialRead = pending;
     const nextChannel = client
       .channel(topic)
@@ -154,10 +163,7 @@ export function useSupporter() {
         // Subscribe reports either a join or a failure. Read once even if the initial join fails.
         if (status !== 'SUBSCRIBED' && initialReadStarted) return;
         initialReadStarted = true;
-        void fetchStatus(userId).then((success) => {
-          pending.resolve(success);
-          if (initialRead === pending) initialRead = null;
-        });
+        void fetchStatus(userId);
       });
     channel = { channel: nextChannel, client, topic };
     channelUserId = userId;

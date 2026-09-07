@@ -56,6 +56,7 @@ export const resolveInitialSyncState = (
   options: {
     mergeModeSnapshots?: boolean;
     modeUpdatedAt?: Partial<Record<GameMode, number>>;
+    localModeTimestamps?: Partial<Record<GameMode, number>>;
   } = {}
 ): UserState => {
   const { mergeModeSnapshots = false, modeUpdatedAt } = options;
@@ -77,7 +78,7 @@ export const resolveInitialSyncState = (
       return mergeProgressData(localModeData, remoteModeData);
     }
     const preferLocalMode = shouldPreferLocalStartupMetadata(
-      localTimestamp,
+      options.localModeTimestamps?.[mode] ?? localTimestamp,
       modeUpdatedAt?.[mode] ?? remoteUpdatedAt,
       localScore,
       remoteScore

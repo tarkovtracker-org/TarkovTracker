@@ -225,6 +225,36 @@ describe('createTeamChannelController', () => {
     await controller.refresh();
     expect(harness.channels).toHaveLength(2);
   });
+  it.each(['CLOSED', 'CHANNEL_ERROR'])(
+    'hydrates missed teammate progress after replacing a joined channel on %s',
+    async (status) => {
+      const harness = createHarness();
+      const controller = createTeamChannelController(harness.deps);
+      const hydrated = vi.fn();
+      window.addEventListener('teammate-progress-reconnected', hydrated);
+      try {
+        await controller.refresh();
+        harness.channels[0]?.status?.('SUBSCRIBED');
+        expect(hydrated).not.toHaveBeenCalled();
+        if (status === 'CHANNEL_ERROR') {
+          for (let attempt = 0; attempt < 5; attempt += 1) {
+            harness.channels[0]?.status?.(status, new Error('connection lost'));
+          }
+          await vi.advanceTimersByTimeAsync(60_000);
+        } else {
+          harness.channels[0]?.status?.(status);
+          await controller.refresh();
+        }
+        expect(harness.channels).toHaveLength(2);
+        expect(hydrated).not.toHaveBeenCalled();
+        harness.channels[1]?.status?.('SUBSCRIBED');
+        expect(hydrated).toHaveBeenCalledOnce();
+      } finally {
+        window.removeEventListener('teammate-progress-reconnected', hydrated);
+        await controller.dispose();
+      }
+    }
+  );
   it('tears the channel down when the team disappears', async () => {
     const harness = createHarness();
     const controller = createTeamChannelController(harness.deps);

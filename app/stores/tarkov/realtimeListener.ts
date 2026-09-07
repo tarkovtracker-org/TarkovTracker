@@ -2,6 +2,7 @@ import { useToastI18n } from '@/composables/useToastI18n';
 import { maybeNotifyApiUpdate } from '@/stores/tarkov/apiUpdateNotifier';
 import { detectDataConflicts } from '@/stores/tarkov/conflictDetection';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
+import { progressStorageSerializer } from '@/stores/tarkov/localStorage';
 import { coerceGameMode, mergeProgressData, toProgressEpoch } from '@/stores/tarkov/progressMerge';
 import {
   getLastLocalSyncTime,
@@ -11,7 +12,11 @@ import {
 import { useMetadataStore } from '@/stores/useMetadata';
 import { getGameModeSeasonNumber, isGameMode, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
-import { createPendingStateTracker, type RemoteStateMerge } from '@/utils/pendingState';
+import {
+  createPendingStateTracker,
+  type RemoteStateMerge,
+  type WithRemoteSnapshot,
+} from '@/utils/pendingState';
 import {
   sanitizeGameEdition,
   sanitizeOwnedProgressData,
@@ -31,6 +36,7 @@ const SYNC_RESUME_DELAY_MS = 1000;
 export type SyncControllerHandle = {
   hasPendingChanges?: () => boolean;
   captureRemoteMerge?: () => RemoteStateMerge;
+  withSnapshot?: WithRemoteSnapshot;
   pause: () => void;
   resume: () => void;
 };
@@ -43,6 +49,7 @@ type RealtimeModeProgress = {
   mode: GameMode;
   progress: UserProgressData;
   updateTime: number;
+  progressTime: number | null;
 };
 type LegacyProgressMetadata = {
   current_game_mode?: string;
@@ -74,6 +81,12 @@ const isActiveRealtimeModeRow = (
   row: Record<string, unknown>
 ): row is Record<string, unknown> & { game_mode: GameMode } =>
   isGameMode(row.game_mode) && row.season_number === getGameModeSeasonNumber(row.game_mode);
+const parseProgressTime = (value: unknown): number | null => {
+  const parsed = typeof value === 'string' ? Date.parse(value) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : null;
+};
+const resolveProgressClock = (progressTime: number | null, metadataTime: number | undefined) =>
+  progressTime ?? metadataTime ?? 0;
 const parseRealtimeModeProgress = (value: unknown): RealtimeModeProgress | null => {
   if (!value || typeof value !== 'object') return null;
   const row = value as Record<string, unknown>;
@@ -82,6 +95,7 @@ const parseRealtimeModeProgress = (value: unknown): RealtimeModeProgress | null 
     mode: row.game_mode,
     progress: sanitizeOwnedProgressData(row.progress_data),
     updateTime: parseRealtimeUpdateTime(row.updated_at),
+    progressTime: parseProgressTime(row.progress_updated_at),
   };
 };
 const buildLegacyMetadataState = (
@@ -274,12 +288,21 @@ async function runSetupRealtimeListener(
     if (!acceptLegacyMetadataUpdate(updateTime)) return;
     const localState = sanitizeOwnedUserState(tarkovStore.$state);
     const remoteState = buildLegacyMetadataState(remoteData, localState);
-    const metadata = reconcile({
+    const remoteMetadata = {
       currentGameMode: remoteState.currentGameMode,
       gameEdition: remoteState.gameEdition,
       tarkovUid: remoteState.tarkovUid,
-    });
+    };
+    const metadata = reconcile(remoteMetadata);
     const nextState = { ...localState, ...metadata } as UserState;
+    progressStorageSerializer.acceptRemote({
+      state: localState,
+      userId: currentUserId,
+      remote: remoteMetadata,
+      next: nextState,
+      updatedAtByMode: {},
+      metadataTimestamp: updateTime,
+    });
     if (shouldIgnoreLegacyMetadataUpdate(updateTime, nextState, localState)) return;
     const isLikelySelfOrigin = isLikelySelfOriginUpdate(updateTime);
     logger.debug('[TarkovStore] Remote metadata update detected, applying changes', {
@@ -311,6 +334,15 @@ async function runSetupRealtimeListener(
       { [mode]: merged },
       toProgressEpoch(localState[mode]) === toProgressEpoch(remoteProgress)
     )[mode] as UserProgressData;
+    progressStorageSerializer.acceptRemote({
+      state: localState,
+      userId: currentUserId,
+      remote: { [mode]: remoteProgress },
+      next: { [mode]: nextProgress },
+      updatedAtByMode: {
+        [mode]: resolveProgressClock(remote.progressTime, latestLegacyMetadataUpdateTime),
+      },
+    });
     if (shouldIgnoreModeProgressUpdate(mode, updateTime, nextProgress, localState[mode])) return;
     const conflicts = detectDataConflicts(localState[mode], remoteProgress);
     const apiUpdateHandled = maybeNotifyApiUpdate(
@@ -363,9 +395,8 @@ async function runSetupRealtimeListener(
     );
   let refreshGeneration = 0;
   // fallow-ignore-next-line complexity -- snapshot/event/edit races are covered in realtimeListener.seasonal.test.ts; keep generation checks together
-  const refreshSnapshot = async () => {
-    const request = ++refreshGeneration;
-    const reconcile = captureRemoteMerge();
+  const refreshSnapshot = async (reconcile: RemoteStateMerge, request: number) => {
+    if (!isCurrentRealtimeUser() || request !== refreshGeneration) return;
     try {
       const [metadata, modes] = await Promise.all([
         client
@@ -375,7 +406,7 @@ async function runSetupRealtimeListener(
           .single(),
         client
           .from('user_game_mode_progress')
-          .select('game_mode,season_number,progress_data,updated_at')
+          .select('game_mode,season_number,progress_data,updated_at,progress_updated_at')
           .eq('user_id', currentUserId),
       ]);
       if (!isCurrentRealtimeUser() || request !== refreshGeneration) return;
@@ -409,7 +440,12 @@ async function runSetupRealtimeListener(
       },
       REALTIME_SUBSCRIPTION_TIMEOUT_MS,
       () => {
-        void refreshSnapshot();
+        const request = ++refreshGeneration;
+        const read = (reconcile: RemoteStateMerge) => refreshSnapshot(reconcile, request);
+        const controller = getRegisteredSyncController();
+        void (controller?.withSnapshot
+          ? controller.withSnapshot(read)
+          : read(captureRemoteMerge()));
       }
     );
   } catch (error) {

@@ -328,7 +328,10 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     error?: Error
   ) => {
     if (channel.value !== owned) return;
-    if (deps.getClient().realtime && isRealtimeSuspended(deps.getClient().realtime)) return;
+    if (deps.getClient().realtime && isRealtimeSuspended(deps.getClient().realtime)) {
+      previouslyJoined.add(owned);
+      return;
+    }
     if (status === 'SUBSCRIBED') {
       joinedTeamId = teamId;
       joinedFilter = filter;
@@ -342,6 +345,9 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     }
     // A closed channel is no longer joined, so drop the binding to let the next
     // membership event rebuild it.
+    // Recovery can replace the owned channel before it rejoins. Carry the
+    // missed-progress refresh across that replacement, too.
+    if (previouslyJoined.has(owned)) hydrationTeam = teamId;
     joinedTeamId = null;
     joinedFilter = undefined;
     recordStatusFailure(status, error);
@@ -372,6 +378,7 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     if (progressFilter) next = bindProgress(next, progressFilter);
     const owned: OwnedRealtimeChannel = { channel: next, client, topic };
     channel.value = owned;
+    if (client.realtime && isRealtimeSuspended(client.realtime)) previouslyJoined.add(owned);
     next.subscribe((status, error) => handleStatus(owned, teamId, progressFilter, status, error));
   };
   const canBuild = (setupVersion: number): boolean => !disposed && setupVersion === version;

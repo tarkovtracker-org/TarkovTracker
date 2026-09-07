@@ -21,6 +21,7 @@ import {
   clearActiveProgressStorage,
   clearProgressStorageSafely,
   cloneStateSnapshot,
+  progressStorageSerializer,
   getPreservedProgressStorageValue,
   patchStoreState,
   readPersistedProgressState,
@@ -75,6 +76,7 @@ import { delay } from '@/utils/async';
 import {
   ACTIVE_SEASON_NUMBER,
   GAME_MODES,
+  GAME_MODE_VALUES,
   MANUAL_FAIL_TASK_IDS,
   type GameMode,
 } from '@/utils/constants';
@@ -86,11 +88,7 @@ import {
   sanitizeTarkovUid,
 } from '@/utils/progressSanitizers';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
-import {
-  getCurrentSupabaseUserId,
-  parseUserScopedStorage,
-  serializeUserScopedStorage,
-} from '@/utils/userScopedStorage';
+import { getCurrentSupabaseUserId, parseUserScopedStorage } from '@/utils/userScopedStorage';
 import type { Task } from '@/types/tarkov';
 export type { PrestigeRunRecord } from '@/stores/tarkov/prestige';
 // ============================================================================
@@ -958,7 +956,7 @@ export const useTarkovStore = defineStore('swapTarkov', {
         const now = Date.now();
         const currentUserId = getCurrentSupabaseUserId();
         const sanitizedState = sanitizeOwnedUserState(state as UserState);
-        const serialized = serializeUserScopedStorage(
+        const serialized = progressStorageSerializer.serialize(
           cloneStateSnapshot(sanitizedState),
           currentUserId,
           now
@@ -1028,6 +1026,7 @@ export const useTarkovStore = defineStore('swapTarkov', {
         return serialized;
       },
       deserialize: (value: string) => {
+        progressStorageSerializer.reset();
         try {
           const wrapped = parseUserScopedStorage<UserState>(value);
           const currentUserId = getCurrentSupabaseUserId();
@@ -1162,6 +1161,7 @@ export function resetTarkovSync(
   syncUserId = null;
   shownLocalIgnoreReasons.clear();
   resetSyncTimeline();
+  progressStorageSerializer.reset();
   resetApiUpdateState();
 }
 export function resetTarkovStoreForSessionTransition(
@@ -1214,22 +1214,21 @@ export async function initializeTarkovSync() {
         return {
           storedUserId: preservedLocalSnapshot.storedUserId,
           timestamp: preservedLocalSnapshot.timestamp,
+          metadataTimestamp: preservedLocalSnapshot.metadataTimestamp,
+          modeTimestamps: preservedLocalSnapshot.modeTimestamps,
         };
       }
       if (typeof window === 'undefined') return null;
       const raw = safeGetItem(STORAGE_KEYS.progress);
       if (!raw) return null;
       try {
-        const parsed = JSON.parse(raw) as
-          | { _userId?: string | null; _timestamp?: number; data?: unknown }
-          | Record<string, unknown>;
-        if (parsed && typeof parsed === 'object' && 'data' in parsed) {
+        const parsed = parseUserScopedStorage<UserState>(raw);
+        if (parsed) {
           return {
-            storedUserId: (parsed as { _userId?: string | null })._userId ?? null,
-            timestamp:
-              typeof (parsed as { _timestamp?: number })._timestamp === 'number'
-                ? (parsed as { _timestamp?: number })._timestamp
-                : null,
+            storedUserId: parsed._userId,
+            timestamp: parsed._timestamp ?? null,
+            metadataTimestamp: parsed._metadataTimestamp,
+            modeTimestamps: parsed._modeTimestamps,
           };
         }
         return { storedUserId: null, timestamp: null };
@@ -1256,7 +1255,7 @@ export async function initializeTarkovSync() {
       if (
         !safeSetItem(
           STORAGE_KEYS.progress,
-          serializeUserScopedStorage(
+          progressStorageSerializer.serialize(
             cloneStateSnapshot(sanitizedState),
             userId,
             timestamp ?? Date.now()
@@ -1302,6 +1301,7 @@ export async function initializeTarkovSync() {
         patchStoreState(tarkovStore, localState);
       }
       if (preservedLocalSnapshot) {
+        progressStorageSerializer.reset(preservedLocalSnapshot);
         shouldPersistSanitizedLocalState ||= preservedLocalSnapshot.hadDeprecatedProgressData;
         localState = sanitizeOwnedUserState(preservedLocalSnapshot.state);
         hasLocalProgress = hasProgress(localState);
@@ -1313,6 +1313,7 @@ export async function initializeTarkovSync() {
           readPersistedProgressState(currentUserId) ??
           (storedUserId !== currentUserId ? readPersistedProgressState(storedUserId) : null);
         if (persistedLocalState) {
+          progressStorageSerializer.reset(persistedLocalState);
           shouldPersistSanitizedLocalState ||= persistedLocalState.hadDeprecatedProgressData;
           localState = persistedLocalState.state;
           hasLocalProgress = hasProgress(localState);
@@ -1453,13 +1454,19 @@ export async function initializeTarkovSync() {
           const resolvedState = resolveInitialSyncState(
             localState,
             normalizedRemote!,
-            localTimestamp,
+            localMeta?.metadataTimestamp ?? localTimestamp,
             remoteUpdatedAt,
             localScore,
             remoteScore,
             {
               mergeModeSnapshots: (modeProgressResult.updatedAt ?? 0) > (accountUpdatedAt || 0),
               modeUpdatedAt: modeProgressResult.updatedAtByMode,
+              localModeTimestamps: Object.fromEntries(
+                GAME_MODE_VALUES.map((mode) => [
+                  mode,
+                  localMeta?.modeTimestamps?.[mode] ?? localTimestamp ?? 0,
+                ])
+              ),
             }
           );
           const remoteMatchesResolved = deepEqual(resolvedState, normalizedRemote);
@@ -1489,6 +1496,19 @@ export async function initializeTarkovSync() {
             logger.debug('[TarkovStore] Startup sync resolved to existing remote state');
             needsRemoteCleanup = remoteHadDeprecatedProgressData;
           }
+          progressStorageSerializer.acceptRemote({
+            state: localState,
+            userId: currentUserId,
+            remote: normalizedRemote,
+            metadataTimestamp: remoteUpdatedAt ?? 0,
+            next: resolvedState,
+            updatedAtByMode: Object.fromEntries(
+              GAME_MODE_VALUES.map((mode) => [
+                mode,
+                modeProgressResult.updatedAtByMode?.[mode] ?? remoteUpdatedAt ?? 0,
+              ])
+            ),
+          });
           if (!deepEqual(resolvedState, localState)) {
             tarkovStore.$patch((state) => {
               state.currentGameMode = resolvedState.currentGameMode;
@@ -1503,6 +1523,19 @@ export async function initializeTarkovSync() {
         } else {
           needsRemoteCleanup = remoteHadDeprecatedProgressData;
           logger.debug('[TarkovStore] Loading data from Supabase (user exists in DB)');
+          progressStorageSerializer.acceptRemote({
+            state: tarkovStore.$state,
+            userId: currentUserId,
+            remote: normalizedRemote,
+            metadataTimestamp: remoteUpdatedAt ?? 0,
+            next: normalizedRemote,
+            updatedAtByMode: Object.fromEntries(
+              GAME_MODE_VALUES.map((mode) => [
+                mode,
+                modeProgressResult.updatedAtByMode?.[mode] ?? remoteUpdatedAt ?? 0,
+              ])
+            ),
+          });
           tarkovStore.$patch((state) => {
             state.currentGameMode = normalizedRemote?.currentGameMode ?? state.currentGameMode;
             state.gameEdition = normalizedRemote?.gameEdition ?? state.gameEdition;

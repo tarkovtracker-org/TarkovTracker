@@ -790,12 +790,18 @@ flowchart LR
   clearable profile fields use the preferred snapshot verbatim, including null names and empty offsets.
   Startup skill-offset maps are atomic: absent keys represent deletions, and historical snapshots
   have no per-offset timestamps or deletion markers to safely union concurrent edits.
-  Local envelopes still carry one whole-state timestamp, as before this optimization; unrelated local
-  mode edits can affect startup preference for untimestamped fields. Per-mode local edit provenance
-  requires a separate persisted-format change, including remote hydration and legacy-envelope handling.
+  Local envelopes retain `_timestamp` for envelope compatibility and add `_metadataTimestamp` for
+  account settings plus independent `_modeTimestamps` for progress. Only changes
+  within a mode advance its local clock; account hydration keeps the server metadata clock, and switching modes or editing another mode does not. Legacy
+  envelopes seed unchanged modes from their original timestamp (unknown history stays zero).
+  Startup and Realtime hydration retain remote progress freshness, rather than download time;
+  merged snapshots that retain local fields also retain their local edit clock. Each tab compares
+  with its own prior snapshot so another tab's storage write cannot make stale fields look edited.
   Visibility changes update `updated_at`, never `progress_updated_at`, and cannot justify replacing whole mode snapshots.
   Team rejoin refreshes membership and rebuilds changed filters before hydrating teammates; initial
-  joins do not trigger an additional hydration. Only the winning membership refresh may trigger
+  joins do not trigger an additional hydration. Replacement of a previously joined channel after
+  connection failure also hydrates after successful membership refresh and the replacement join.
+  Only the winning membership refresh may trigger
   hydration after a successful membership read; a failed read neither hydrates nor rebuilds.
   A superseded reconnect request cannot race ahead of a newer filter rebuild. Optional missing account metadata never blocks
   normalized reconnect progress. Deferred legacy reads retain startup retries and API error mapping.
@@ -804,12 +810,14 @@ flowchart LR
   Save acknowledgements advance only their changed paths, preserving unrelated remote values
   accepted while the save was queued or in flight. Pending captures track intervening accepted remote
   changes separately from local acknowledgements, so older live events cannot override newer snapshots.
+  Reconnect reads wait for in-flight saves and hold new outbound writes until snapshot application
+  completes. Local changes remain tracked and are saved afterward; read failures also release this barrier.
   Supporter status refreshes after the first join as well as subsequent joins to close the
   initial read/join gap. A progress subscription begun while suspended also reconciles on its first
   eventual join. Initialization delegates the initial status read to the subscription, with a
   single fallback read if the initial join fails. Initialization marks status loaded only after a
-  successful read; initial callers share its result, session reset releases waiters, and failed reads
-  can retry on the existing channel.
+  successful read; initial callers share the latest request's result even when a refresh supersedes
+  the initial query. Session reset releases waiters, and failed reads can retry on the existing channel.
   Skipped saves do not run payload transforms. Actual RPC writes temporarily mark the self-origin
   timeline before awaiting the response; failure removes that marker, success retains it, and
   session reset invalidates outstanding markers.

@@ -91,6 +91,27 @@ describe('useSupporter', () => {
     expect(mockMaybeSingle).toHaveBeenCalledTimes(2);
     supporter.unsubscribe();
   });
+  it.each([true, false])(
+    'settles initialization from a superseding refresh (success: %s)',
+    async (success) => {
+      const { supporter, subscribing, status, nextChannel } = await startInitialSubscription();
+      const initial = createDeferred<{ data: null; error: null }>();
+      const replacement = createDeferred<{ data: null; error: { message: string } | null }>();
+      mockMaybeSingle.mockReturnValueOnce(initial.promise).mockReturnValueOnce(replacement.promise);
+      const settled = vi.fn();
+      void subscribing.then(settled);
+      status('SUBSCRIBED');
+      nextChannel.on.mock.calls[0]?.[2]();
+      initial.resolve({ data: null, error: null });
+      await initial.promise;
+      await Promise.resolve();
+      expect(settled).not.toHaveBeenCalled();
+      replacement.resolve({ data: null, error: success ? null : { message: 'offline' } });
+      await expect(subscribing).resolves.toBe(success);
+      expect(mockMaybeSingle).toHaveBeenCalledTimes(2);
+      supporter.unsubscribe();
+    }
+  );
   it('loads once when the initial join fails and ignores disposed channel callbacks', async () => {
     const { supporter, subscribing, nextChannel, status } = await startInitialSubscription();
     status('CHANNEL_ERROR');

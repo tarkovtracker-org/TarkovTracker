@@ -2,6 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPendingStateTracker } from '@/utils/pendingState';
+import type { WithRemoteSnapshot } from '@/utils/pendingState';
 import type { Store } from 'pinia';
 const { channel, client, loggerMock, removeChannel } = vi.hoisted(() => {
   const realtimeChannel = {
@@ -65,6 +66,34 @@ describe('useSupabaseListener cleanup', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+  it.each([false, true])(
+    'waits for the snapshot barrier and respects cleanup while waiting: %s',
+    async (disposed) => {
+      const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const withSnapshot: WithRemoteSnapshot = async (read) => {
+        await gate;
+        return read((remote) => remote);
+      };
+      const listener = useSupabaseListener({
+        filter: 'id=eq.row-1',
+        store: createStore(),
+        table: 'test_table',
+        patchStore: false,
+        syncController: { pause: vi.fn(), resume: vi.fn(), withSnapshot },
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(client.from).not.toHaveBeenCalled();
+      if (disposed) listener.cleanup();
+      release();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(client.from).toHaveBeenCalledTimes(disposed ? 0 : 1);
+      listener.cleanup();
+    }
+  );
   it('does not replace pending local state on reconnect', async () => {
     const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
     const onData = vi.fn();

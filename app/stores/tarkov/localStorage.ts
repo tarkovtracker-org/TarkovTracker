@@ -1,5 +1,7 @@
 import { migrateToGameModeStructure, type UserState } from '@/stores/progressState';
+import { deepEqual } from '@/stores/tarkov/deepEqual';
 import { clearProgressStorage } from '@/utils/clientStorage';
+import { GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import {
   hasDeprecatedTarkovDevProfileData,
@@ -12,6 +14,118 @@ export type PersistedProgressSnapshot = {
   state: UserState;
   storedUserId: string | null;
   timestamp: number | null;
+  metadataTimestamp?: number;
+  modeTimestamps?: Partial<Record<GameMode, number>>;
+};
+const metadataKeys = ['currentGameMode', 'gameEdition', 'tarkovUid'] as const;
+const sameMetadata = (left: Partial<UserState>, right: Partial<UserState>) =>
+  metadataKeys.every((key) => deepEqual(left[key], right[key]));
+type RemoteProgressSnapshot = {
+  state: UserState;
+  userId: string;
+  remote: Partial<UserState>;
+  next: Partial<UserState>;
+  updatedAtByMode: Partial<Record<GameMode, number>>;
+  metadataTimestamp?: number;
+};
+const retainedModeTimestamp = (previous: PersistedProgressSnapshot, mode: GameMode): number =>
+  previous.modeTimestamps?.[mode] ?? previous.timestamp ?? 0;
+const nextModeTimestamp = (
+  previous: PersistedProgressSnapshot | null,
+  state: UserState,
+  mode: GameMode,
+  timestamp: number
+): number => {
+  if (!previous || !deepEqual(previous.state[mode], state[mode])) return timestamp;
+  return retainedModeTimestamp(previous, mode);
+};
+const retainedMetadataTimestamp = (previous: PersistedProgressSnapshot): number =>
+  previous.metadataTimestamp ?? previous.timestamp ?? 0;
+const nextMetadataTimestamp = (
+  previous: PersistedProgressSnapshot | null,
+  state: UserState,
+  timestamp: number
+): number => {
+  if (!previous || !sameMetadata(previous.state, state)) return timestamp;
+  return retainedMetadataTimestamp(previous);
+};
+const acceptedRemoteTimestamp = (
+  matchesRemote: boolean,
+  localTimestamp = 0,
+  remoteTimestamp = 0
+): number => Math.max(matchesRemote ? 0 : localTimestamp, remoteTimestamp);
+const acceptRemoteMetadata = (
+  accepted: PersistedProgressSnapshot,
+  snapshot: RemoteProgressSnapshot
+): void => {
+  if (snapshot.metadataTimestamp === undefined) return;
+  accepted.metadataTimestamp = acceptedRemoteTimestamp(
+    sameMetadata(snapshot.next, snapshot.remote),
+    accepted.metadataTimestamp,
+    snapshot.metadataTimestamp
+  );
+  const presentKeys = metadataKeys.filter((key) => Object.hasOwn(snapshot.next, key));
+  Object.assign(
+    accepted.state,
+    Object.fromEntries(presentKeys.map((key) => [key, snapshot.next[key]]))
+  );
+};
+const acceptRemoteMode = (
+  accepted: PersistedProgressSnapshot,
+  snapshot: RemoteProgressSnapshot,
+  mode: GameMode
+): void => {
+  const next = snapshot.next[mode];
+  const remote = snapshot.remote[mode];
+  if (!next || !remote) return;
+  accepted.modeTimestamps![mode] = acceptedRemoteTimestamp(
+    deepEqual(next, remote),
+    accepted.modeTimestamps![mode],
+    snapshot.updatedAtByMode[mode]
+  );
+  accepted.state[mode] = cloneStateSnapshot(next);
+};
+export const createProgressStorageSerializer = (
+  readPrevious: (userId: string | null) => PersistedProgressSnapshot | null
+) => {
+  let previous: PersistedProgressSnapshot | null = null;
+  const serialize = (state: UserState, userId: string | null, timestamp: number): string => {
+    if (!previous || previous.storedUserId !== userId) previous = readPrevious(userId);
+    const modeTimestamps = Object.fromEntries(
+      GAME_MODE_VALUES.map((mode) => [mode, nextModeTimestamp(previous, state, mode, timestamp)])
+    );
+    const metadataTimestamp = nextMetadataTimestamp(previous, state, timestamp);
+    previous = {
+      metadataTimestamp,
+      state: cloneStateSnapshot(state),
+      storedUserId: userId,
+      timestamp,
+      modeTimestamps,
+      hadDeprecatedProgressData: false,
+    };
+    return JSON.stringify({
+      _timestamp: timestamp,
+      _metadataTimestamp: metadataTimestamp,
+      _modeTimestamps: modeTimestamps,
+      _userId: userId,
+      data: state,
+    });
+  };
+  return {
+    reset: (snapshot: PersistedProgressSnapshot | null = null) => {
+      previous = snapshot ? cloneStateSnapshot(snapshot) : null;
+    },
+    serialize,
+    acceptRemote: (snapshot: RemoteProgressSnapshot) => {
+      // Capture any local edits before replacing the baseline. Pinia persistence
+      // can run after a synchronous remote patch, so comparing only in serialize
+      // would incorrectly timestamp downloaded progress as a new local edit.
+      serialize(snapshot.state, snapshot.userId, Date.now());
+      const accepted = previous!;
+      acceptRemoteMetadata(accepted, snapshot);
+      GAME_MODE_VALUES.forEach((mode) => acceptRemoteMode(accepted, snapshot, mode));
+    },
+  };
 };
 export const cloneStateSnapshot = <T>(value: T): T => {
   const rawValue = value !== null && typeof value === 'object' ? toRaw(value) : value;
@@ -88,6 +202,8 @@ const parsePersistedProgressState = (
       state: sanitizeOwnedUserState(migrateToGameModeStructure(wrapped.data)),
       storedUserId: wrapped._userId,
       timestamp: wrapped._timestamp ?? null,
+      metadataTimestamp: wrapped._metadataTimestamp,
+      modeTimestamps: wrapped._modeTimestamps,
     };
   }
   try {
@@ -131,3 +247,6 @@ export const patchStoreState = (
     state.seasonal = sanitizedSnapshot.seasonal;
   });
 };
+export const progressStorageSerializer = createProgressStorageSerializer(
+  readPersistedProgressState
+);

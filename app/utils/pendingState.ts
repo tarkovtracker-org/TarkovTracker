@@ -1,5 +1,8 @@
 import { deepEqual } from '@/stores/tarkov/deepEqual';
 type Snapshot = Record<string, unknown>;
+export type WithRemoteSnapshot = <T>(
+  read: (reconcile: RemoteStateMerge) => Promise<T>
+) => Promise<T>;
 type RemoteAdvance = { before: Snapshot; after: Snapshot; next?: RemoteAdvance };
 export type RemoteStateMerge = (
   remote: Snapshot,
