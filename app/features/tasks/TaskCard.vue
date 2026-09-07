@@ -827,7 +827,7 @@
     isFailed.value ? failureSources.value : blockedSources.value
   );
   const pendingParentTasks = computed<PendingParentTask[]>(() => {
-    const modeProgress = tarkovStore.getModeProgressData(tarkovStore.getCurrentGameMode());
+    const modeProgress = tarkovStore.getCurrentProgressData();
     if (
       props.task.storyUnlocks?.some((chapter) => hasStoryUnlockProgress(chapter.id, modeProgress))
     )

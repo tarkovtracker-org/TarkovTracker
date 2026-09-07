@@ -3,6 +3,7 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ref } from 'vue';
 const setStoryChapterCompleteMock = vi.fn();
 const setStoryChapterUncompleteMock = vi.fn();
 const setStoryObjectiveCompleteMock = vi.fn();
@@ -77,9 +78,18 @@ vi.mock('@/stores/useTarkov', () => ({
     getTarkovUid: () => null,
   }),
 }));
+vi.mock('@/composables/useProfileTaskMetadata', () => ({
+  useProfileTaskMetadata: () => ({
+    tasks: ref([]),
+    chapters: ref(storyChaptersMetadata),
+    prestige: ref([]),
+    error: ref(null),
+    loading: ref(false),
+  }),
+}));
 vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => ({
-    storyChapters: storyChaptersMetadata,
+    storyChapters: [],
     tasks: [],
     hideoutStations: [],
     loading: false,

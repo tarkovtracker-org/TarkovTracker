@@ -185,7 +185,7 @@
         </section>
         <UTabs
           :items="profileTabItems"
-          :model-value="selectedTabIndex"
+          :model-value="String(selectedTabIndex)"
           class="w-full"
           @update:model-value="onTabChange"
         />
