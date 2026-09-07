@@ -9,14 +9,41 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { H3Event, H3EventContext } from 'h3';
-type SiteConfigStackEntry = Record<string, unknown>;
+import { BASE_SITE_CONTEXT, createRouterStub } from '@/server/utils/__tests__/eventStubs';
+import type { H3Event } from 'h3';
 const VALID_TEAM_ID = 'a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5';
+const VALID_USER_ID = '11111111-1111-4111-8111-111111111111';
 const { mockGetQuery, mockGetRequestHeader, mockFetch } = vi.hoisted(() => ({
   mockGetQuery: vi.fn(),
   mockGetRequestHeader: vi.fn(),
   mockFetch: vi.fn(),
 }));
+// Reused supabase response stubs; each handler call consumes one link in order.
+const membershipResponse = (gameMode: 'pvp' | 'seasonal') => ({
+  ok: true,
+  json: async () => [{ game_mode: gameMode, user_id: VALID_USER_ID }],
+});
+const memberIdsResponse = () => ({
+  ok: true,
+  json: async () => [{ user_id: VALID_USER_ID }],
+});
+const emptySummaryResponse = () => ({ ok: true, json: async () => [] });
+const editionResponse = (gameEdition: number) => ({
+  ok: true,
+  json: async () => [{ game_edition: gameEdition, user_id: VALID_USER_ID }],
+});
+const activeSeasonResponse = (season: number) => ({ ok: true, json: async () => season });
+const seasonalSummaryResponse = (tasksCompleted: number | null) => ({
+  ok: true,
+  json: async () => [
+    {
+      user_id: VALID_USER_ID,
+      display_name: 'Seasonal Player',
+      level: 12,
+      tasks_completed: tasksCompleted,
+    },
+  ],
+});
 const runtimeConfig = {
   apiProtection: {
     trustProxy: false,
@@ -35,22 +62,9 @@ vi.mock('h3', async () => {
 });
 global.fetch = mockFetch as typeof fetch;
 mockNuxtImport('useRuntimeConfig', () => () => runtimeConfig);
-mockNuxtImport('useRouter', () => () => ({
-  beforeEach: vi.fn(),
-  beforeResolve: vi.fn(),
-  onError: vi.fn(),
-  afterEach: vi.fn(),
-}));
+mockNuxtImport('useRouter', () => () => createRouterStub());
 describe('Team Members API', () => {
   let mockEvent: Partial<H3Event>;
-  const BASE_SITE_CONTEXT: Pick<H3EventContext, 'siteConfig' | 'siteConfigNitroOrigin'> = {
-    siteConfig: {
-      stack: [] as Partial<SiteConfigStackEntry>[],
-      push: vi.fn(() => () => {}),
-      get: vi.fn(() => ({})),
-    },
-    siteConfigNitroOrigin: '',
-  };
   beforeEach(() => {
     vi.clearAllMocks();
     // `clearAllMocks` keeps `mockResolvedValueOnce` queues, so unconsumed
@@ -333,19 +347,10 @@ describe('Team Members API', () => {
     it('returns a partial team response when the legacy fallback fetch throws', async () => {
       mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [{ game_mode: 'pvp', user_id: '11111111-1111-4111-8111-111111111111' }],
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
-        })
-        .mockResolvedValueOnce({ ok: true, json: async () => [] })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [{ game_edition: 3, user_id: '11111111-1111-4111-8111-111111111111' }],
-        })
+        .mockResolvedValueOnce(membershipResponse('pvp'))
+        .mockResolvedValueOnce(memberIdsResponse())
+        .mockResolvedValueOnce(emptySummaryResponse())
+        .mockResolvedValueOnce(editionResponse(3))
         .mockRejectedValueOnce(new Error('Timed out while loading team metadata'));
       const { default: handler } = await import('@/server/api/team/members');
       const result = await handler(mockEvent as H3Event);
@@ -440,19 +445,10 @@ describe('Team Members API', () => {
     it('summarizes legacy persistent progress when normalized team rows are missing', async () => {
       mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [{ game_mode: 'pvp', user_id: '11111111-1111-4111-8111-111111111111' }],
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
-        })
-        .mockResolvedValueOnce({ ok: true, json: async () => [] })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [{ game_edition: 3, user_id: '11111111-1111-4111-8111-111111111111' }],
-        })
+        .mockResolvedValueOnce(membershipResponse('pvp'))
+        .mockResolvedValueOnce(memberIdsResponse())
+        .mockResolvedValueOnce(emptySummaryResponse())
+        .mockResolvedValueOnce(editionResponse(3))
         .mockResolvedValueOnce({
           ok: true,
           json: async () => [
@@ -483,32 +479,11 @@ describe('Team Members API', () => {
     it('reads the season-aware summary view instead of progress blobs', async () => {
       mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
       mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [
-            { game_mode: 'seasonal', user_id: '11111111-1111-4111-8111-111111111111' },
-          ],
-        })
-        .mockResolvedValueOnce({ ok: true, json: async () => 2 })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [
-            {
-              user_id: '11111111-1111-4111-8111-111111111111',
-              display_name: 'Seasonal Player',
-              level: 12,
-              tasks_completed: 3,
-            },
-          ],
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [{ game_edition: 1, user_id: '11111111-1111-4111-8111-111111111111' }],
-        });
+        .mockResolvedValueOnce(membershipResponse('seasonal'))
+        .mockResolvedValueOnce(activeSeasonResponse(2))
+        .mockResolvedValueOnce(memberIdsResponse())
+        .mockResolvedValueOnce(seasonalSummaryResponse(3))
+        .mockResolvedValueOnce(editionResponse(1));
       const { default: handler } = await import('@/server/api/team/members');
       await handler(mockEvent as H3Event);
       const profileUrl = String(mockFetch.mock.calls[3]?.[0] ?? '');
@@ -524,28 +499,10 @@ describe('Team Members API', () => {
       try {
         mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
         mockFetch
-          .mockResolvedValueOnce({
-            ok: true,
-            json: async () => [
-              { game_mode: 'seasonal', user_id: '11111111-1111-4111-8111-111111111111' },
-            ],
-          })
-          .mockResolvedValueOnce({ ok: true, json: async () => 2 })
-          .mockResolvedValueOnce({
-            ok: true,
-            json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
-          })
-          .mockResolvedValueOnce({
-            ok: true,
-            json: async () => [
-              {
-                user_id: '11111111-1111-4111-8111-111111111111',
-                display_name: 'Seasonal Player',
-                level: 12,
-                tasks_completed: null,
-              },
-            ],
-          })
+          .mockResolvedValueOnce(membershipResponse('seasonal'))
+          .mockResolvedValueOnce(activeSeasonResponse(2))
+          .mockResolvedValueOnce(memberIdsResponse())
+          .mockResolvedValueOnce(seasonalSummaryResponse(null))
           .mockResolvedValueOnce({ ok: false, status: 503 });
         const { default: handler } = await import('@/server/api/team/members');
         const result = await handler(mockEvent as H3Event);
@@ -625,6 +582,90 @@ describe('Team Members API', () => {
         );
       } finally {
         errorSpy.mockRestore();
+      }
+    });
+  });
+  describe('Team members caching', () => {
+    it('serves the season-scoped cached payload without re-reading team data', async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      try {
+        process.env.NODE_ENV = 'development';
+        vi.resetModules();
+        const entries = new Map<string, string>();
+        vi.stubGlobal('caches', {
+          default: {
+            match: async (request: Request) => {
+              const payload = entries.get(request.url);
+              return payload ? new Response(payload) : undefined;
+            },
+            put: async (request: Request, response: Response) => {
+              entries.set(request.url, await response.clone().text());
+            },
+          },
+        });
+        mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
+        mockFetch.mockImplementation(async (url: string | URL) => {
+          const target = String(url);
+          if (target.includes('team_memberships?')) {
+            return membershipResponse('pvp');
+          }
+          if (target.includes('team_member_mode_summary?')) {
+            return {
+              ok: true,
+              json: async () => [
+                {
+                  user_id: VALID_USER_ID,
+                  display_name: 'Cached Player',
+                  level: 9,
+                  tasks_completed: 4,
+                },
+              ],
+            };
+          }
+          if (target.includes('user_progress?')) {
+            return {
+              ok: true,
+              json: async () => [{ user_id: VALID_USER_ID, game_edition: 2 }],
+            };
+          }
+          throw new Error(`Unexpected test request: ${target}`);
+        });
+        const { default: handler } = await import('@/server/api/team/members');
+        const fresh = await handler(mockEvent as H3Event);
+        expect(fresh).toEqual({
+          members: [VALID_USER_ID],
+          profiles: {
+            [VALID_USER_ID]: {
+              displayName: 'Cached Player',
+              gameEdition: 2,
+              gameMode: 'pvp',
+              level: 9,
+              tasksCompleted: 4,
+            },
+          },
+        });
+        const cacheKeys = [...entries.keys()].filter((url) =>
+          url.includes('/__edge-cache/team-members/')
+        );
+        expect(cacheKeys).toHaveLength(1);
+        expect(cacheKeys[0]).toContain(
+          `/__edge-cache/team-members/${encodeURIComponent(`${VALID_TEAM_ID}:${VALID_USER_ID}:0`)}`
+        );
+        const summaryCallsBefore = mockFetch.mock.calls.filter((call) =>
+          String(call[0]).includes('team_member_mode_summary')
+        ).length;
+        const cached = await handler(mockEvent as H3Event);
+        expect(cached).toEqual(fresh);
+        expect(
+          mockFetch.mock.calls.filter((call) =>
+            String(call[0]).includes('team_member_mode_summary')
+          ).length
+        ).toBe(summaryCallsBefore);
+      } finally {
+        if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+        else process.env.NODE_ENV = originalNodeEnv;
+        vi.unstubAllGlobals();
+        vi.resetModules();
       }
     });
   });
