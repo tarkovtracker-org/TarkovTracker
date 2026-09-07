@@ -11,7 +11,7 @@ export function resolveSeasonalPerks(perks: SeasonalPerk[], items: TarkovItem[])
     for (const category of itemCategories(item)) categoryById.set(category.id, category);
   }
   const resolve = <T>(ids: string[], byId: Map<string, T>) =>
-    ids.map((id) => ({ id, value: byId.get(id) ?? null }));
+    (Array.isArray(ids) ? ids : []).map((id) => ({ id, value: byId.get(id) ?? null }));
   return perks.map((perk) => ({
     ...perk,
     effects: (Array.isArray(perk.effects) ? perk.effects : []).map((effect) => ({

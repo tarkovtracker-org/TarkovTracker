@@ -47,3 +47,29 @@ it.each([undefined, null, {}])(
     expect(result[0]).toMatchObject({ id: 'broken', effects: [] });
   }
 );
+it.each([undefined, null, {}, 'bad'])(
+  'keeps malformed cached item filters from breaking perk consumers: %j',
+  (ids) => {
+    const perk = {
+      id: 'cached',
+      effects: [
+        {
+          effectId: 'filter',
+          itemFilter: {
+            allowedItems: ids,
+            excludedItems: ids,
+            allowedCategories: ids,
+            excludedCategories: ids,
+          },
+        },
+      ],
+    } as unknown as SeasonalPerk;
+    const result = resolveSeasonalPerks([perk], []);
+    expect(result[0]?.effects[0]?.resolvedItemFilter).toEqual({
+      allowedItems: [],
+      excludedItems: [],
+      allowedCategories: [],
+      excludedCategories: [],
+    });
+  }
+);

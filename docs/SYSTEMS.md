@@ -492,7 +492,7 @@ A run pins the first validated overlay SHA, or `EXPECTED_OVERLAY_SHA` supplied b
 Missing provenance, a different SHA, invalid task payloads or unconsumed sections fail that
 combination before its KV write. Previous entries survive failed combinations. Each successful
 entry records language, mode, storage time and overlay identity; envelope validation requires its
-identity to agree with `payload.dataOverlay`. Writes remain per-key, not atomic across the fleet.
+identity to agree with `payload.dataOverlay`. Writes remain per-key, not atomic across the fleet. A verifier exit code of zero can include `propagating` rows within the 14-hour window; post-deployment confirmation requires all 48 rows to be `current`, while pre-deployment approval requires the complete matching precompute manifest.
 Only a complete, unfiltered, failure-free run updates `overlay-precompute-manifest-json-v4`.
 The workflow uploads `precompute-manifest.json` even for partial failures, so operators can see
 which entries changed. `/api/tarkov/overlay-status` returns the last complete manifest without caching.
