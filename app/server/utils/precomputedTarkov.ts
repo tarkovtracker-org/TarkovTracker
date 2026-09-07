@@ -12,10 +12,11 @@
  * Both sides import this module so key format and envelope shape stay in sync.
  */
 export const PRECOMPUTED_KV_BINDING = 'TARKOV_DATA';
-export const PRECOMPUTED_ENVELOPE_VERSION = 1;
-export const TASKS_CORE_PRECOMPUTED_VERSION = 'json-v3';
+export const PRECOMPUTED_ENVELOPE_VERSION = 2;
+export const TASKS_CORE_PRECOMPUTED_VERSION = 'json-v4';
 export type PrecomputedEnvelope<T> = {
   payload: T;
+  overlay: { version: string; sha256: string } | null;
   storedAt: number;
   version: typeof PRECOMPUTED_ENVELOPE_VERSION;
 };
@@ -25,9 +26,20 @@ export type PrecomputedKvReader = {
 export function buildTasksCorePrecomputedKey(lang: string, gameMode: string): string {
   return `tasks-core-${TASKS_CORE_PRECOMPUTED_VERSION}-${lang}-${gameMode}`;
 }
+const overlayMeta = (payload: unknown) =>
+  (payload as { dataOverlay?: { version?: unknown; sha256?: unknown } })?.dataOverlay;
+export function precomputedOverlayIdentity(
+  payload: unknown
+): { version: string; sha256: string } | null {
+  const meta = overlayMeta(payload);
+  if (!meta) return null;
+  if (typeof meta.version !== 'string' || typeof meta.sha256 !== 'string') return null;
+  return { version: meta.version, sha256: meta.sha256 };
+}
 export function buildPrecomputedEnvelope<T>(payload: T): PrecomputedEnvelope<T> {
   return {
     payload,
+    overlay: precomputedOverlayIdentity(payload),
     storedAt: Date.now(),
     version: PRECOMPUTED_ENVELOPE_VERSION,
   };
@@ -35,7 +47,14 @@ export function buildPrecomputedEnvelope<T>(payload: T): PrecomputedEnvelope<T> 
 export function isPrecomputedEnvelope<T>(value: unknown): value is PrecomputedEnvelope<T> {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<PrecomputedEnvelope<T>>;
+  const identity = precomputedOverlayIdentity(candidate.payload);
+  const matchesIdentity =
+    identity === null
+      ? candidate.overlay === null
+      : candidate.overlay?.version === identity.version &&
+        candidate.overlay?.sha256 === identity.sha256;
   return (
+    matchesIdentity &&
     candidate.version === PRECOMPUTED_ENVELOPE_VERSION &&
     typeof candidate.storedAt === 'number' &&
     Number.isFinite(candidate.storedAt) &&

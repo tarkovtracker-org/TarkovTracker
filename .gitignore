@@ -42,3 +42,5 @@ Logs - Copy.zip
 # Python cache
 __pycache__/
 *.py[cod]
+
+/precompute-manifest.json

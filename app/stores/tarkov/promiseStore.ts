@@ -12,6 +12,7 @@ export interface PromiseStore {
   readonly editionsPromise: Promise<void> | null;
   readonly editionsRequestVersion: number;
   readonly editionsScope: string;
+  readonly editionsSettledScope: string;
   readonly taskRewardsRequestVersion: number;
   readonly taskCoreRefreshes: Set<symbol>;
   readonly initPromise: Promise<void> | null;
@@ -58,6 +59,7 @@ export function getPromiseStore(storeInstance: object): MutablePromiseStore {
       editionsPromise: null,
       editionsRequestVersion: 0,
       editionsScope: '',
+      editionsSettledScope: '',
       taskRewardsRequestVersion: 0,
       taskCoreRefreshes: new Set(),
       initPromise: null,

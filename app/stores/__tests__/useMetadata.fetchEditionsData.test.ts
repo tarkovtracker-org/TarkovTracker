@@ -76,7 +76,10 @@ describe('useMetadataStore fetchEditionsData', () => {
     const store = useMetadataStore();
     vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
     vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
-    vi.stubGlobal('$fetch', vi.fn().mockResolvedValue({ editions: {}, storyChapters: {} }));
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn().mockResolvedValue({ data: { editions: [], storyChapters: [] } })
+    );
     await store.fetchEditionsData();
     await store.ensureEditionsData();
     expect($fetch).toHaveBeenCalledTimes(1);
@@ -85,7 +88,10 @@ describe('useMetadataStore fetchEditionsData', () => {
     const store = useMetadataStore();
     vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
     vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
-    vi.stubGlobal('$fetch', vi.fn().mockResolvedValue({ editions: {}, storyChapters: {} }));
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn().mockResolvedValue({ data: { editions: [], storyChapters: [] } })
+    );
     await store.ensureEditionsData();
     expect($fetch).toHaveBeenCalledTimes(1);
   });
@@ -133,12 +139,9 @@ describe('useMetadataStore fetchEditionsData', () => {
       const first = store.fetchEditionsData(true);
       await flushPromises();
       const second = store.fetchEditionsData(true);
-      current.resolve({
-        editions: { latest: latestEdition },
-        storyChapters: { latest: latestChapter },
-      });
+      current.resolve({ data: { editions: [latestEdition], storyChapters: [latestChapter] } });
       await second;
-      if (outcome === 'resolve') older.resolve({ editions: {}, storyChapters: {} });
+      if (outcome === 'resolve') older.resolve({ data: { editions: [], storyChapters: [] } });
       else older.reject(new Error('obsolete failure'));
       await first;
       expect(store.editions).toEqual([latestEdition]);
@@ -154,7 +157,9 @@ describe('useMetadataStore fetchEditionsData', () => {
     const latest = createEdition('latest', 3, 'Latest');
     vi.spyOn(cacheUtils, 'getCachedData').mockReturnValue(cache.promise);
     vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
-    const fetchMock = vi.fn().mockResolvedValue({ editions: { latest } });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ data: { editions: [latest], storyChapters: [] } });
     vi.stubGlobal('$fetch', fetchMock);
     const older = store.fetchEditionsData();
     await flushPromises();
@@ -188,8 +193,7 @@ describe('useMetadataStore fetchEditionsData', () => {
     vi.stubGlobal(
       '$fetch',
       vi.fn().mockResolvedValue({
-        editions: { replacement: createEdition('replacement', 2, 'Replacement') },
-        storyChapters: { invalid: null },
+        data: { editions: [createEdition('replacement', 2, 'Replacement')], storyChapters: [null] },
       })
     );
     await store.fetchEditionsData(true);
@@ -217,8 +221,7 @@ describe('useMetadataStore fetchEditionsData', () => {
     const refreshedEdition = createEdition('refreshed-edition', 2, 'Refreshed Edition');
     const refreshedChapter = createStoryChapter('refreshed-chapter', 2, 'Refreshed Chapter');
     const overlayResponse = createDeferred<{
-      editions: Record<string, GameEdition>;
-      storyChapters: Record<string, StoryChapter>;
+      data: { editions: GameEdition[]; storyChapters: StoryChapter[] };
     }>();
     vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue({
       editions: [cachedEdition],
@@ -238,52 +241,29 @@ describe('useMetadataStore fetchEditionsData', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(secondSettled).toBe(false);
     overlayResponse.resolve({
-      editions: {
-        [refreshedEdition.id]: refreshedEdition,
-      },
-      storyChapters: {
-        [refreshedChapter.id]: refreshedChapter,
-      },
+      data: { editions: [refreshedEdition], storyChapters: [refreshedChapter] },
     });
     await Promise.all([firstRequest, secondRequest]);
     expect(store.editions).toEqual([refreshedEdition]);
     expect(store.storyChapters).toEqual([refreshedChapter]);
   });
-  it('merges mode-only chapters and preserves fields of shared objective patches', async () => {
+  it('requests and caches the current mode/language catalog', async () => {
     const store = useMetadataStore();
     store.currentGameMode = 'pve';
+    store.languageCode = 'de';
     const cacheWrite = vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
-    vi.stubGlobal(
-      '$fetch',
-      vi.fn().mockResolvedValue({
-        editions: {},
-        storyChapters: {
-          shared: {
-            ...createStoryChapter('shared', 1, 'Shared'),
-            objectives: { obj: { id: 'obj', description: 'Base', type: 'optional', order: 4 } },
-          },
-        },
-        modes: {
-          pve: {
-            storyChapters: {
-              shared: { objectives: { obj: { description: 'PvE' } } },
-              added: createStoryChapter('added', 2, 'Mode only'),
-            },
-          },
-        },
-      })
-    );
+    const chapter = createStoryChapter('mode-only', 1, 'PvE chapter');
+    const fetch = vi.fn().mockResolvedValue({ data: { editions: [], storyChapters: [chapter] } });
+    vi.stubGlobal('$fetch', fetch);
     await store.fetchEditionsData(true);
-    expect(store.storyChapters.map((chapter) => chapter.id)).toEqual(['shared', 'added']);
-    expect(store.storyChapters[0]?.objectives?.obj).toMatchObject({
-      description: 'PvE',
-      type: 'optional',
-      order: 4,
+    expect(store.storyChapters).toEqual([chapter]);
+    expect(fetch).toHaveBeenCalledWith('/api/tarkov/editions', {
+      query: { lang: 'de', gameMode: 'pve' },
     });
     expect(cacheWrite).toHaveBeenCalledWith(
       'editions',
-      'mode-v1-pve',
-      'en',
+      'overlay-v2-pve',
+      'de',
       expect.any(Object),
       expect.any(Number)
     );
@@ -294,16 +274,41 @@ describe('useMetadataStore fetchEditionsData', () => {
     const fetch = vi
       .fn()
       .mockReturnValueOnce(pending.promise)
-      .mockResolvedValue({ editions: {}, storyChapters: {} });
+      .mockResolvedValue({ data: { editions: [], storyChapters: [] } });
     vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
     vi.stubGlobal('$fetch', fetch);
     const request = store.fetchEditionsData(true);
     await flushPromises();
     store.currentGameMode = 'pve';
-    pending.resolve({ editions: {}, storyChapters: {} });
+    pending.resolve({ data: { editions: [], storyChapters: [] } });
     await request;
     store.currentGameMode = 'pvp';
     await store.ensureEditionsData();
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  it('reloads A after switching from loaded A to pending B and back to A', async () => {
+    const store = useMetadataStore();
+    const pending = createDeferred<object>();
+    const edition = createEdition('a', 1, 'A');
+    const response = { data: { editions: [edition], storyChapters: [] } };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(response)
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValue(response);
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    vi.stubGlobal('$fetch', fetch);
+    await store.fetchEditionsData(true);
+    store.currentGameMode = 'pve';
+    const other = store.fetchEditionsData(true);
+    await flushPromises();
+    store.currentGameMode = 'pvp';
+    await store.ensureEditionsData();
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(store.editions).toEqual([edition]);
+    pending.resolve({ data: { editions: [], storyChapters: [] } });
+    await other;
+    expect(store.editions).toEqual([edition]);
   });
 });

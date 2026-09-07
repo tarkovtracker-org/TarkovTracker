@@ -43,7 +43,7 @@ describe('runPrecompute', () => {
   beforeEach(() => {
     fetcherMock.mockReset().mockResolvedValue({ raw: true });
     createFetcherMock.mockClear();
-    applyOverlayMock.mockReset().mockResolvedValue({ data: { tasks: [{ id: 'task-1' }] } });
+    applyOverlayMock.mockReset().mockResolvedValue({ data: { tasks: [{ id: 'task-1' }] }, dataOverlay: { version: '1', sha256: 'release-sha' } });
   });
   it('writes a valid envelope per combination with the 7-day TTL', async () => {
     const kv = createKvMock();
@@ -52,20 +52,20 @@ describe('runPrecompute', () => {
     expect(result.successes).toHaveLength(3);
     expect(result.successes).toEqual(
       expect.arrayContaining([
-        'tasks-core-json-v3-en-regular',
-        'tasks-core-json-v3-en-pve',
-        'tasks-core-json-v3-en-pvp-season',
+        'tasks-core-json-v4-en-regular',
+        'tasks-core-json-v4-en-pve',
+        'tasks-core-json-v4-en-pvp-season',
       ])
     );
     expect(kv.put).toHaveBeenCalledTimes(3);
-    const putCall = kv.put.mock.calls.find(([key]) => key === 'tasks-core-json-v3-en-regular');
+    const putCall = kv.put.mock.calls.find(([key]) => key === 'tasks-core-json-v4-en-regular');
     expect(putCall).toBeDefined();
     const [, value, options] = putCall!;
     expect(options).toEqual({ expirationTtl: PRECOMPUTED_TTL_SECONDS });
     expect(PRECOMPUTED_TTL_SECONDS).toBe(604800);
     const envelope = JSON.parse(value as string);
     expect(isPrecomputedEnvelope(envelope)).toBe(true);
-    expect(envelope.payload).toEqual({ data: { tasks: [{ id: 'task-1' }] } });
+    expect(envelope.payload).toEqual({ data: { tasks: [{ id: 'task-1' }] }, dataOverlay: { version: '1', sha256: 'release-sha' } });
   });
   it('passes lang and gameMode through to the pipeline', async () => {
     const kv = createKvMock();
@@ -83,20 +83,20 @@ describe('runPrecompute', () => {
     expect(result.failures).toEqual([]);
     expect(result.successes).toHaveLength(expectedKeys.length);
     expect(result.successes).toEqual(expect.arrayContaining(expectedKeys));
-    expect(kv.put).toHaveBeenCalledTimes(expectedKeys.length);
+    expect(kv.put).toHaveBeenCalledTimes(expectedKeys.length + 1);
   });
   it('records a pipeline failure and continues with remaining combinations', async () => {
     applyOverlayMock
       .mockRejectedValueOnce(new Error('upstream 502'))
-      .mockResolvedValue({ data: { tasks: [{ id: 'task-1' }] } });
+      .mockResolvedValue({ data: { tasks: [{ id: 'task-1' }] }, dataOverlay: { version: '1', sha256: 'release-sha' } });
     const kv = createKvMock();
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toEqual([
-      { error: 'upstream 502', key: 'tasks-core-json-v3-en-regular' },
+      { error: 'upstream 502', key: 'tasks-core-json-v4-en-regular' },
     ]);
     expect(result.successes).toEqual([
-      'tasks-core-json-v3-en-pve',
-      'tasks-core-json-v3-en-pvp-season',
+      'tasks-core-json-v4-en-pve',
+      'tasks-core-json-v4-en-pvp-season',
     ]);
     expect(kv.put).toHaveBeenCalledTimes(2);
   });
@@ -105,46 +105,46 @@ describe('runPrecompute', () => {
     kv.put.mockRejectedValueOnce(new Error('KV write failed')).mockResolvedValue(undefined);
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toEqual([
-      { error: 'KV write failed', key: 'tasks-core-json-v3-en-regular' },
+      { error: 'KV write failed', key: 'tasks-core-json-v4-en-regular' },
     ]);
     expect(result.successes).toEqual([
-      'tasks-core-json-v3-en-pve',
-      'tasks-core-json-v3-en-pvp-season',
+      'tasks-core-json-v4-en-pve',
+      'tasks-core-json-v4-en-pvp-season',
     ]);
   });
   it('refuses to write a structurally empty payload to KV', async () => {
     applyOverlayMock
       .mockResolvedValueOnce({ data: { tasks: [] } })
-      .mockResolvedValue({ data: { tasks: [{ id: 'task-1' }] } });
+      .mockResolvedValue({ data: { tasks: [{ id: 'task-1' }] }, dataOverlay: { version: '1', sha256: 'release-sha' } });
     const kv = createKvMock();
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toEqual([
       {
         error: 'Sanity check failed: payload has no tasks; refusing to write to KV',
-        key: 'tasks-core-json-v3-en-regular',
+        key: 'tasks-core-json-v4-en-regular',
       },
     ]);
     expect(result.successes).toEqual([
-      'tasks-core-json-v3-en-pve',
-      'tasks-core-json-v3-en-pvp-season',
+      'tasks-core-json-v4-en-pve',
+      'tasks-core-json-v4-en-pvp-season',
     ]);
     expect(kv.put).toHaveBeenCalledTimes(2);
   });
   it('refuses to publish malformed task entries', async () => {
     applyOverlayMock
       .mockResolvedValueOnce({ data: { tasks: [null, { id: 'task-good', objectives: [] }] } })
-      .mockResolvedValue({ data: { tasks: [{ id: 'task-good', objectives: [] }] } });
+      .mockResolvedValue({ data: { tasks: [{ id: 'task-good', objectives: [] }] }, dataOverlay: { version: '1', sha256: 'release-sha' } });
     const kv = createKvMock();
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toEqual([
       {
         error: 'Sanity check failed: payload contains a malformed task; refusing to write to KV',
-        key: 'tasks-core-json-v3-en-regular',
+        key: 'tasks-core-json-v4-en-regular',
       },
     ]);
     expect(result.successes).toEqual([
-      'tasks-core-json-v3-en-pve',
-      'tasks-core-json-v3-en-pvp-season',
+      'tasks-core-json-v4-en-pve',
+      'tasks-core-json-v4-en-pvp-season',
     ]);
     expect(kv.put).toHaveBeenCalledTimes(2);
   });
@@ -153,20 +153,38 @@ describe('runPrecompute', () => {
       .mockResolvedValueOnce({
         data: { tasks: [{ id: 'task-bad', objectives: { objective: { count: 2 } } }] },
       })
-      .mockResolvedValue({ data: { tasks: [{ id: 'task-good', objectives: [] }] } });
+      .mockResolvedValue({ data: { tasks: [{ id: 'task-good', objectives: [] }] }, dataOverlay: { version: '1', sha256: 'release-sha' } });
     const kv = createKvMock();
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toEqual([
       {
         error:
           'Sanity check failed: task "task-bad" has malformed objective arrays; refusing to write to KV',
-        key: 'tasks-core-json-v3-en-regular',
+        key: 'tasks-core-json-v4-en-regular',
       },
     ]);
     expect(result.successes).toEqual([
-      'tasks-core-json-v3-en-pve',
-      'tasks-core-json-v3-en-pvp-season',
+      'tasks-core-json-v4-en-pve',
+      'tasks-core-json-v4-en-pvp-season',
     ]);
     expect(kv.put).toHaveBeenCalledTimes(2);
+  });
+});
+describe('overlay provenance gate', () => {
+  it('retains old entries when a release changes midway through the run', async () => {
+    const payload = (sha256: string) => ({ data: { tasks: [{ id: 'task' }] }, dataOverlay: { version: '1', sha256 } });
+    applyOverlayMock.mockReset().mockResolvedValueOnce(payload('first')).mockResolvedValue(payload('second'));
+    const kv = createKvMock();
+    const result = await runPrecompute(kv, { lang: 'en' });
+    expect(result.successes).toHaveLength(1);
+    expect(result.failures).toHaveLength(2);
+    expect(kv.put).toHaveBeenCalledTimes(1);
+  });
+  it('refuses unknown sections and missing provenance', async () => {
+    applyOverlayMock.mockReset().mockResolvedValueOnce({ data: { tasks: [{ id: 'task' }] }, dataOverlay: { version: '1', sha256: 'sha', unconsumedSections: ['future'] } }).mockResolvedValue({ data: { tasks: [{ id: 'task' }] } });
+    const kv = createKvMock();
+    const result = await runPrecompute(kv, { lang: 'en' });
+    expect(result.failures).toHaveLength(3);
+    expect(kv.put).not.toHaveBeenCalled();
   });
 });

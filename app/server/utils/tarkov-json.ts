@@ -80,7 +80,9 @@ type TarkovJsonOptions = {
   timeoutMs?: number;
   deps?: TarkovJsonDependencies;
 };
-type TarkovJsonPrestigeOptions = Omit<TarkovJsonOptions, 'gameMode'>;
+type TarkovJsonPrestigeOptions = TarkovJsonOptions & {
+  project?: (payload: JsonTasksPayload) => JsonTasksPayload;
+};
 type JsonPathResult = {
   parent?: unknown;
   parentProperty?: string | number;
@@ -1237,7 +1239,10 @@ export function createTarkovJsonHideoutFetcher(options: TarkovJsonOptions) {
   };
 }
 export function createTarkovJsonPrestigeFetcher(options: TarkovJsonPrestigeOptions) {
-  const regularOptions: TarkovJsonOptions = { ...options, gameMode: PRESTIGE_SOURCE_GAME_MODE };
+  const regularOptions: TarkovJsonOptions = {
+    ...options,
+    gameMode: options.gameMode ?? PRESTIGE_SOURCE_GAME_MODE,
+  };
   return async () => {
     try {
       const [tasksPayload, hideoutPayload, tradersPayload] = await Promise.all([
@@ -1245,7 +1250,10 @@ export function createTarkovJsonPrestigeFetcher(options: TarkovJsonPrestigeOptio
         fetchTarkovJsonEndpoint<unknown>('hideout', regularOptions),
         fetchTarkovJsonEndpoint<unknown>('traders', regularOptions),
       ]);
-      return adaptPrestigeResponse(tasksPayload, { hideoutPayload, tradersPayload });
+      return adaptPrestigeResponse(options.project ? options.project(tasksPayload) : tasksPayload, {
+        hideoutPayload,
+        tradersPayload,
+      });
     } catch (error) {
       logger.error('Failed to build prestige payload from tasks, hideout, and traders', {
         error,

@@ -163,8 +163,8 @@ describe('buildPrestigeRequirementRows', () => {
       status: 'manual',
       tracked: false,
     });
-    expect(rows.find((row) => row.name === 'Tour')).toBeTruthy();
-    expect(rows.find((row) => row.name === 'They Are Already Here')).toBeTruthy();
+    expect(rows.find((row) => row.name === 'Tour')).toBeUndefined();
+    expect(rows.filter((row) => row.kind === 'storyChapter')).toEqual([]);
   });
   it('uses the prestige 6 story chapter rule and marks ready state from tracked rows only', () => {
     const pvpProgress = createProgressData();
@@ -211,6 +211,14 @@ describe('buildPrestigeRequirementRows', () => {
           playerLevel: 47,
         },
       ]),
+    ];
+    prestigeLevels[0]!.storyRequirements = [
+      {
+        type: 'storyChapterStatus',
+        storyChapter: 'the-ticket',
+        name: 'The Ticket',
+        status: ['complete'],
+      },
     ];
     const rows = buildPrestigeRequirementRows({
       currentPrestigeLevel: 5,

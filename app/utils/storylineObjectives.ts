@@ -142,22 +142,3 @@ export const normalizeStoryChapter = (chapter: StoryChapter): StoryChapter => {
     objectives: normalizeStoryObjectives(chapter.objectives),
   };
 };
-/** Mode patches preserve shared objective fields before normalizing the catalog. */
-const storyObjectivePatches = (patch: StoryChapter) => Object.entries(patch.objectives ?? {});
-export function mergeStoryChapters(
-  shared: Record<string, StoryChapter> = {},
-  patches: Record<string, StoryChapter> = {}
-): StoryChapter[] {
-  const merged = { ...shared };
-  for (const [id, patch] of Object.entries(patches)) {
-    const base = shared[id];
-    const objectives = { ...base?.objectives };
-    for (const [objectiveId, objective] of storyObjectivePatches(patch)) {
-      objectives[objectiveId] = { ...objectives[objectiveId], ...objective };
-    }
-    merged[id] = { ...base, ...patch, id, objectives };
-  }
-  return Object.values(merged)
-    .map(normalizeStoryChapter)
-    .sort((a, b) => a.order - b.order);
-}

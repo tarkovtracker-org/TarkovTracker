@@ -1,12 +1,7 @@
 import { API_GAME_MODES } from '@/utils/constants';
 import { logger } from '@/utils/logger';
-import { mergeStoryChapters } from '@/utils/storylineObjectives';
 import type { Task, TarkovTasksCoreQueryResult, StoryChapter, PrestigeLevel } from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
-const modeChapters = (
-  overlay: { modes?: Record<string, { storyChapters?: Record<string, StoryChapter> }> },
-  mode: string
-) => overlay.modes?.[mode]?.storyChapters;
 const profileMetadataError = (cause: unknown): Error =>
   cause instanceof Error ? cause : new Error(String(cause));
 /** Read another profile mode without changing the application's active metadata. */
@@ -33,13 +28,7 @@ export function useProfileTaskMetadata(mode: Ref<GameMode>, language: Ref<string
         const [core, objectives, overlay, prestige] = await Promise.all([
           $fetch<{ data: TarkovTasksCoreQueryResult }>('/api/tarkov/tasks-core', { query }),
           $fetch<{ data: { tasks: Task[] } }>('/api/tarkov/tasks-objectives', { query }),
-          $fetch<{
-            storyChapters?: Record<string, StoryChapter>;
-            modes?: Record<string, { storyChapters?: Record<string, StoryChapter> }>;
-          }>(
-            'https://raw.githubusercontent.com/tarkovtracker-org/tarkov-data-overlay/main/dist/overlay.json',
-            { parseResponse: JSON.parse }
-          ),
+          $fetch<{ data: { storyChapters: StoryChapter[] } }>('/api/tarkov/editions', { query }),
           $fetch<{ data: { prestige: PrestigeLevel[] } }>('/api/tarkov/prestige', { query }),
         ]);
         const byId = new Map(objectives.data.tasks.map((task) => [task.id, task]));
@@ -47,10 +36,7 @@ export function useProfileTaskMetadata(mode: Ref<GameMode>, language: Ref<string
           snapshot.value = {
             scope: requestScope,
             tasks: core.data.tasks.map((task) => ({ ...task, ...byId.get(task.id) })),
-            chapters: mergeStoryChapters(
-              overlay.storyChapters,
-              modeChapters(overlay, query.gameMode)
-            ),
+            chapters: overlay.data.storyChapters,
             prestige: prestige.data.prestige,
           };
       } catch (cause) {

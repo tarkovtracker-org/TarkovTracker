@@ -69,29 +69,31 @@ before returning it.
 
 ### Endpoints
 
-| Endpoint                       | Purpose              | Cache TTL | Precomputed? | Overlay? |
-| ------------------------------ | -------------------- | --------- | ------------ | -------- |
-| `/api/tarkov/bootstrap`        | Player levels        | 12h       | no           | no       |
-| `/api/tarkov/tasks-core`       | Tasks, maps, traders | 12h       | **yes**      | yes      |
-| `/api/tarkov/tasks-objectives` | Task objectives      | 12h       | no           | yes      |
-| `/api/tarkov/tasks-rewards`    | Task rewards         | 12h       | no           | yes      |
-| `/api/tarkov/hideout`          | Hideout stations     | 12h       | no           | yes      |
-| `/api/tarkov/items-lite`       | Items (minimal)      | 24h       | no           | yes      |
-| `/api/tarkov/items`            | Items (full)         | 24h       | no           | yes      |
-| `/api/tarkov/prestige`         | Prestige levels      | 24h       | no           | no       |
-| `/api/tarkov/map-spawns`       | Map spawn points     | 12h       | no           | no       |
-| `/api/tarkov/cache-meta`       | Cache purge status   | 5m edge   | no           | no       |
+| Endpoint                       | Purpose                      | Cache TTL  | Precomputed? | Overlay? |
+| ------------------------------ | ---------------------------- | ---------- | ------------ | -------- |
+| `/api/tarkov/bootstrap`        | Player levels                | 12h        | no           | no       |
+| `/api/tarkov/tasks-core`       | Tasks, maps, traders         | 12h        | **yes**      | yes      |
+| `/api/tarkov/tasks-objectives` | Task objectives              | 12h        | no           | yes      |
+| `/api/tarkov/tasks-rewards`    | Task rewards                 | 12h        | no           | yes      |
+| `/api/tarkov/hideout`          | Hideout stations             | 12h        | no           | yes      |
+| `/api/tarkov/items-lite`       | Items (minimal)              | 24h        | no           | yes      |
+| `/api/tarkov/items`            | Items (full)                 | 24h        | no           | yes      |
+| `/api/tarkov/prestige`         | Prestige levels              | 24h        | no           | yes      |
+| `/api/tarkov/editions`         | Editions, chapters, perks    | 1h overlay | no           | yes      |
+| `/api/tarkov/overlay-status`   | Last complete fleet manifest | no-store   | no           | metadata |
+| `/api/tarkov/map-spawns`       | Map spawn points             | 12h        | no           | no       |
+| `/api/tarkov/cache-meta`       | Cache purge status           | 5m edge    | no           | no       |
 
-Overlay is applied by the six task/hideout/item endpoints. `bootstrap`, `prestige`,
-`map-spawns`, and `cache-meta` fetch directly into `edgeCache` without the overlay step —
-their upstream data does not currently need corrections.
+Task, hideout, item and prestige endpoints consume overlays. The editions endpoint projects
+editions, story chapters and Seasonal perks from the same validated loader. Bootstrap and
+map-spawns remain upstream-only; cache-meta and overlay-status expose operational metadata.
 
 Only `tasks-core` is precomputed today (it is the largest, hottest, and most expensive payload).
 See [Precompute](#5-precompute-workflow).
 
-The hideout route is the cache-order exception: its `json-v4` edge entry stores the adapted base
+The hideout route is the cache-order exception: its `json-v5` edge entry stores the adapted base
 payload, then the handler applies the current module-cached overlay after every edge-cache read. Its
-browser IndexedDB entry also uses `json-v4`, with a one-hour TTL matching overlay freshness. This
+browser IndexedDB entry also uses `json-v5`, with a one-hour TTL matching overlay freshness. This
 keeps the 12-hour edge cache and the browser cache from pinning an old overlay correction. The other
 overlay-enabled routes cache their final overlay-applied payload.
 
@@ -362,7 +364,7 @@ sequenceDiagram
   (section 15). A patch's `traderRequirements` replaces the whole requirement set.
 - On fetch failure, serves the last good overlay (stale) rather than failing the request.
 - Overlay supports mode-specific corrections under `modes[gameMode]` plus global corrections.
-- Per-locale corrections under `locales[locale]` patch `tasks`, `items`, and `traders`
+- Per-locale corrections under `locales[locale]` patch `tasks`, `items`, `traders` and `maps`
   (locale-sensitive fields such as name, wikiLink, and objective descriptions) and are applied last
   so they take precedence over global and mode-specific corrections. The locale defaults to `en`
   when a handler does not pass one.
@@ -382,6 +384,31 @@ sequenceDiagram
   overlay-enabled routes cache their final corrected payload; publishing new overlay data requires
   a Tarkov data cache purge so those entries and the browser cache-purge marker are invalidated.
 
+### Endpoint ownership and precedence
+
+Every collection merges shared records by ID, then the matching upstream mode (`regular`, `pve`,
+`pvp-season`), then supported locale patches. `overlayValidation.ts` validates known collection
+shapes, perk filters, craft additions and prestige chapter/objective references before replacing
+the last-good overlay. Unsupported story statuses/types fail validation. Unknown root, mode or
+locale sections are logged and retained in `dataOverlay.unconsumedSections`, including cache hits;
+precompute refuses to publish payloads with unconsumed sections.
+
+| Sections                               | Consumer and identity rules                                                                                                                                                                                                                                      |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tasks`, `tasksAdd`, `traders`, `maps` | Task routes; existing task IDs win over synthetic additions; maps support locale patches.                                                                                                                                                                        |
+| `items`, `itemsAdd`                    | Both item routes; adapt additions only when an ID is absent upstream, then apply explicit patches and locales.                                                                                                                                                   |
+| `hideout`, `craftsAdd`                 | Hideout; attach adapted crafts to station ID/level and deduplicate craft IDs globally. Null/absent task unlocks stay `unlockState: unknown`.                                                                                                                     |
+| `prestige`                             | Prestige route; patch/append raw conditions by ID before adaptation resolves tasks from upstream plus missing, enabled `tasksAdd` IDs. Array condition patches replace arrays. Locale task/prestige corrections apply before resolution.                         |
+| `storyChapters`                        | Editions route and task story unlock projection share chapter identities. Chapter/objective locales supply prestige story requirement names. Stored story progress is evaluated from explicit requirements, never chapter order or hardcoded chapter-name lists. |
+| `editions`                             | Editions route and metadata store own the mode-scoped edition catalog.                                                                                                                                                                                           |
+| `seasonalPerks`                        | Editions route exposes metadata only for `pvp-season`; the store's `resolvedSeasonalPerks` hydrates item/category references as items load, retaining missing IDs with null values. No perk selection/progress persistence is introduced.                        |
+
+Prestige fetches the requested upstream mode; regular corrections cannot leak into PvE or Seasonal.
+An empty upstream prestige collection stays empty. Client prestige and edition catalogs are keyed
+by mode and language (`json-v3` and `overlay-v2`), and stale responses cannot replace another scope.
+The item contract advances to `json-v2`, hideout to `json-v5`, tasks-core to `json-v4`, and IndexedDB
+schema 9 clears incompatible browser payloads.
+
 ### Files
 
 - `app/server/utils/overlay.ts` — fetch, cache, merge, and deferred refresh coordination.
@@ -396,8 +423,10 @@ sequenceDiagram
 
 - The overlay must never block the request path on a fresh fetch for more than
   `FETCH_TIMEOUT_MS = 5000`. On timeout, fall back to the cached overlay.
-- A missing or malformed overlay must never cause a 5xx; the base payload is returned with
-  `X-Overlay-Status: missing`.
+- Generic task/item/hideout consumers return the base payload with `X-Overlay-Status: missing`
+  when no valid overlay is available. Prestige and edition/story/perk catalogs require an overlay
+  and fail when no last-good overlay exists, preserving client caches rather than publishing
+  incomplete authoritative eligibility data.
 - Overlay data must only be fetched over HTTPS on every server path. A non-HTTPS `OVERLAY_URL` must
   resolve to the trusted default, and no redirect hop may downgrade the transport — the fetch must
   fail rather than read a payload served over plaintext. `applyOverlay` follows HTTPS redirects
@@ -442,14 +471,41 @@ flowchart LR
 ### Key contract
 
 - The KV binding name is `TARKOV_DATA` (`PRECOMPUTED_KV_BINDING`).
-- The envelope shape is `{ payload, storedAt, version }` with
-  `PRECOMPUTED_ENVELOPE_VERSION = 1`.
+- The envelope shape is `{ payload, overlay: { version, sha256 }, storedAt, version }` with
+  `PRECOMPUTED_ENVELOPE_VERSION = 2`.
 - The cache key for `tasks-core` is built by `buildTasksCorePrecomputedKey(lang, gameMode)` and is
-  `tasks-core-json-v3-<lang>-<gameMode>`. Both the precompute script and the request handler import
+  `tasks-core-json-v4-<lang>-<gameMode>`. Both the precompute script and the request handler import
   this function from `precomputedTarkov.ts`, so the keys can never drift.
 - Writes go through the Cloudflare REST API (one PUT per key) because the bulk endpoint's request
   size ceiling cannot hold all ~4.2MB envelopes in one call, and per-key writes isolate failures per
   `(lang, gameMode)` combo.
+
+### Release verification
+
+A run pins the first validated overlay SHA, or `EXPECTED_OVERLAY_SHA` supplied by a manual dispatch.
+Missing provenance, a different SHA, invalid task payloads or unconsumed sections fail that
+combination before its KV write. Previous entries survive failed combinations. Each successful
+entry records language, mode, storage time and overlay identity; envelope validation requires its
+identity to agree with `payload.dataOverlay`. Writes remain per-key, not atomic across the fleet.
+Only a complete, unfiltered, failure-free run updates `overlay-precompute-manifest-json-v4`.
+The workflow uploads `precompute-manifest.json` even for partial failures, so operators can see
+which entries changed. `/api/tarkov/overlay-status` returns the last complete manifest without caching.
+
+Release order: publish the overlay, dispatch precompute with its expected SHA for all 48 supported
+language/mode combinations, check the manifest, then advance the existing browser cache-purge marker
+and purge corrected edge entries through the established operator workflow. When changing the
+consumer contract, precompute the new versioned keys from the reviewed consumer revision before
+promoting that app revision; old app revisions keep reading their old keys. Missing new keys still
+have the existing live fallback, but that is not proof of production readiness for cold colos.
+
+Run `pnpm run verify:overlay --origin https://tarkovtracker.org` after promotion. The command writes
+an artifact comparing the published SHA, last complete precompute and served tasks-core for all
+48 language/mode combinations. Missing evidence is `unverified`; a mismatch is `propagating` for
+at most 14 hours from the producer generation timestamp (12-hour schedule plus a 2-hour operational
+target), then `drift`. Drift/unverified exits nonzero. This is a detection target, not a guarantee
+that caches expire within 14 hours. Browser IndexedDB has a separate maximum 24-hour TTL and must
+be invalidated through the purge marker for prompt client convergence. Retained seven-day KV
+fallbacks are intentionally reported as drift after a failed release, never as a current fleet.
 
 ### Files
 
@@ -1402,8 +1458,10 @@ network requests cannot overwrite current eligibility, cache payloads, or loadin
 Normalize edition and chapter network payloads before applying either, preserving existing
 data if normalization fails. Empty cached editions do not replace loaded eligibility.
 
-Task readiness uses `ensureEditionsData` to join or reuse the session's universal edition request,
-including a request settled during bootstrap/core loading. Explicit `fetchEditionsData` calls keep
+Task readiness uses `ensureEditionsData` to join or reuse the current mode/language edition request,
+including a request settled during bootstrap/core loading. Settled failures are also reused to avoid
+repeated readiness requests; they retain the error, and explicit fetch/refresh calls retry. Scope
+changes invalidate that settlement and clear the visible catalog. Explicit `fetchEditionsData` calls keep
 their cache revalidation behavior. Queued reward work, like editions, is consumed by a later eager
 request; other routes retain their idle load when no caller takes ownership.
 
@@ -1554,8 +1612,8 @@ not import quest completions and therefore has no trader/task backfill path.
   recommendations; no new dependency on the removed upstream task `alternatives` is introduced.
 - Known trader gates may be disabled by preference; unknown data never silently unlocks a task.
 - PvP, PvE and Seasonal evaluate only their own progress and mode-specific task metadata.
-- `tasks-core-json-v3` keys invalidate incompatible edge/precompute payloads together. Browser
-  IndexedDB schema 8 clears the old task contract. Missing new KV entries fall back to the normal
+- `tasks-core-json-v4` keys invalidate incompatible edge/precompute payloads together. Browser
+  IndexedDB schema 9 clears the old task contract. Missing new KV entries fall back to the normal
   fetch/adapt/overlay pipeline, which exceeds the free-tier CPU budget on a cold request. Before
   merging or promoting the app, an authorized operator must run the precompute workflow from the
   approved branch revision with no language/mode filters, verify all 48 new-key writes succeeded,

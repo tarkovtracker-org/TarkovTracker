@@ -21,7 +21,7 @@ describe('profile mode metadata', () => {
           data: { tasks: [{ id: 'pve', objectives: [{ id: 'pve-objective' }] }] },
         });
       if (url.includes('prestige')) return Promise.resolve({ data: { prestige: [] } });
-      return Promise.resolve({ storyChapters: {} });
+      return Promise.resolve({ data: { storyChapters: [] } });
     });
     vi.stubGlobal('$fetch', fetch);
     const scope = effectScope();

@@ -309,8 +309,8 @@ describe('applyOverlay locale integration', () => {
     const { applyOverlay } = await import('@/server/utils/overlay');
     const payload = { data: { tasks: [{ id: 'task-1', name: 'Base Task' }] } };
     const result = await applyOverlay(payload);
-    expect(result.data).toEqual({ tasks: [{ ...payload.data.tasks[0], storyUnlocks: [] }] });
-    expect(result.dataOverlay.status).toBe('fresh');
+    expect(result.data).toEqual(payload.data);
+    expect(result.dataOverlay.status).toBe('missing');
   });
 });
 describe('story overlay validation', () => {
@@ -334,5 +334,46 @@ describe('story overlay validation', () => {
     expect(result.data.tasks[0]).toMatchObject({
       storyUnlocks: [{ id: 'chapter', name: 'Chapter' }],
     });
+  });
+});
+describe('overlay semantic fallback and diagnostics', () => {
+  it('retains a last-good overlay when a prestige story reference is invalid', async () => {
+    const good = {
+      $meta: { version: 'good', sha256: 'good-sha' },
+      tasks: { task: { name: 'Corrected' } },
+    };
+    const fetch = stubOverlayFetch(good);
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    await applyOverlay({ data: { tasks: [{ id: 'task' }] } });
+    fetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          ...good,
+          $meta: { version: 'bad' },
+          prestige: {
+            p: {
+              storyRequirements: [
+                { type: 'storyChapterStatus', storyChapter: 'missing', status: ['complete'] },
+              ],
+            },
+          },
+        })
+      )
+    );
+    const result = await applyOverlay({ data: { tasks: [{ id: 'task' }] } }, { bypassCache: true });
+    expect(result.data.tasks[0]).toMatchObject({ name: 'Corrected' });
+    expect(result.dataOverlay).toMatchObject({
+      version: 'good',
+      status: 'stale',
+      error: 'validation_failed',
+    });
+  });
+  it('keeps unknown-section diagnostics on cached responses', async () => {
+    const fetch = stubOverlayFetch({ $meta: { version: '1' }, future: {} });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    await applyOverlay({ data: { tasks: [] } });
+    const cached = await applyOverlay({ data: { tasks: [] } });
+    expect(cached.dataOverlay.unconsumedSections).toEqual(['future']);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

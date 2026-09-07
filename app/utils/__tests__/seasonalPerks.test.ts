@@ -1,0 +1,42 @@
+import { describe, expect, it } from 'vitest';
+import { resolveSeasonalPerks } from '@/utils/seasonalPerks';
+import type { SeasonalPerk, TarkovItem } from '@/types/tarkov';
+describe('Seasonal perk reference hydration', () => {
+  it('resolves item/category metadata while retaining missing IDs explicitly', () => {
+    const perk: SeasonalPerk = {
+      id: 'perk',
+      name: 'Perk',
+      type: 'common',
+      points: null,
+      description: '',
+      mutuallyExclusiveSeasonalPerkIds: [],
+      effects: [
+        {
+          effectId: 'filter',
+          itemFilter: {
+            allowedItems: ['known', 'unknown'],
+            excludedItems: [],
+            allowedCategories: ['category'],
+            excludedCategories: ['missing-category'],
+          },
+        },
+      ],
+    };
+    const item = {
+      id: 'known',
+      name: 'Known',
+      categories: [{ id: 'category', name: 'Category' }],
+    } as TarkovItem;
+    const result = resolveSeasonalPerks([perk], [item]);
+    expect(result[0]?.effects[0]?.resolvedItemFilter).toEqual({
+      allowedItems: [
+        { id: 'known', value: item },
+        { id: 'unknown', value: null },
+      ],
+      excludedItems: [],
+      allowedCategories: [{ id: 'category', value: item.categories![0] }],
+      excludedCategories: [{ id: 'missing-category', value: null }],
+    });
+    expect(perk.effects[0]).not.toHaveProperty('resolvedItemFilter');
+  });
+});

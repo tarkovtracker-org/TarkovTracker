@@ -16,6 +16,7 @@ import { applyOverlay } from '@/server/utils/overlay';
 import {
   buildPrecomputedEnvelope,
   buildTasksCorePrecomputedKey,
+  precomputedOverlayIdentity,
 } from '@/server/utils/precomputedTarkov';
 import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
 import { createTarkovJsonTasksCoreFetcher } from '@/server/utils/tarkov-json';
@@ -37,6 +38,7 @@ export type PrecomputeResult = {
   durationMs: number;
   failures: { error: string; key: string }[];
   successes: string[];
+  manifest: Array<{ key: string; lang: string; gameMode: string; overlay: { version: string; sha256: string }; storedAt: number }>;
 };
 /**
  * Returns an error message when a filter value matches no supported
@@ -67,7 +69,9 @@ export async function runPrecompute(
   const gameModes = VALID_GAME_MODES.filter(
     (gameMode) => !filter.gameMode || gameMode === filter.gameMode
   );
+  let expectedSha = process.env.EXPECTED_OVERLAY_SHA || undefined;
   const successes: string[] = [];
+  const manifest: PrecomputeResult['manifest'] = [];
   const failures: { error: string; key: string }[] = [];
   // Sequential on purpose: each combination materializes several multi-MB JSON
   // documents, and sequential runs keep memory flat and upstream load polite.
@@ -79,10 +83,14 @@ export async function runPrecompute(
       const key = buildTasksCorePrecomputedKey(lang, gameMode);
       try {
         const payload = await precomputeTasksCore(lang, gameMode);
-        await kv.put(key, JSON.stringify(buildPrecomputedEnvelope(payload)), {
+        const overlay = requiredOverlayIdentity(payload, expectedSha);
+        expectedSha ??= overlay.sha256;
+        const envelope = buildPrecomputedEnvelope(payload);
+        await kv.put(key, JSON.stringify(envelope), {
           expirationTtl: PRECOMPUTED_TTL_SECONDS,
         });
         successes.push(key);
+        manifest.push({ key, lang, gameMode, overlay, storedAt: envelope.storedAt });
       } catch (error) {
         failures.push({
           error: error instanceof Error ? error.message : String(error),
@@ -91,16 +99,29 @@ export async function runPrecompute(
       }
     }
   }
+  if (isCompleteFleet(filter, failures)) {
+    await kv.put('overlay-precompute-manifest-json-v4', JSON.stringify({ completedAt: Date.now(), entries: manifest }), { expirationTtl: PRECOMPUTED_TTL_SECONDS });
+  }
   return {
+    manifest,
     durationMs: Date.now() - startedAt,
     failures,
     successes,
   };
 }
+const isCompleteFleet = (filter: PrecomputeFilter, failures: unknown[]) => !failures.length && !filter.lang && !filter.gameMode;
+const requiredOverlayIdentity = (payload: unknown, expectedSha: string | undefined) => {
+  const overlay = precomputedOverlayIdentity(payload);
+  if (!overlay) throw new Error('Overlay provenance missing; retaining the previous KV entry');
+  if (expectedSha && overlay.sha256 !== expectedSha) throw new Error('Overlay SHA differs from the requested release');
+  return overlay;
+};
 async function precomputeTasksCore(lang: string, gameMode: ValidGameMode): Promise<unknown> {
   const baseFetcher = createTarkovJsonTasksCoreFetcher({ gameMode, lang });
   const payload = await applyOverlay(await baseFetcher(), { gameMode, locale: lang });
   assertLooksLikeTasksCore(payload);
+  const unknown = (payload as { dataOverlay?: { unconsumedSections?: string[] } }).dataOverlay?.unconsumedSections;
+  if (unknown?.length) throw new Error(`Unconsumed overlay sections: ${unknown.join(', ')}`);
   return payload;
 }
 // A KV entry is served globally by every colo until the next successful run,

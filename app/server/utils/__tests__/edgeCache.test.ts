@@ -156,7 +156,8 @@ describe('edgeCache', () => {
       get: vi.fn(async () => ({
         payload: { data: { tasks: [{ id: 'precomputed' }] } },
         storedAt: Date.now(),
-        version: 1,
+        version: 2,
+        overlay: null,
       })),
     };
     const fetcher = vi.fn(async () => ({ data: { tasks: [{ id: 'fresh' }] } }));
@@ -188,7 +189,8 @@ describe('edgeCache', () => {
     const kvGet = vi.fn(async () => ({
       payload: { data: { tasks: [{ id: 'from-binding' }] } },
       storedAt: Date.now(),
-      version: 1,
+      version: 2,
+      overlay: null,
     }));
     const fetcher = vi.fn(async () => ({ data: { tasks: [{ id: 'fresh' }] } }));
     const event = createEvent();

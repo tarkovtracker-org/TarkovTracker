@@ -116,6 +116,8 @@ export interface TaskTraderLevelRequirement {
   compareMethod?: RequirementComparison;
 }
 export interface Craft {
+  taskUnlock?: { id: string; name?: string } | null;
+  unlockState?: 'unknown' | 'task';
   id: string;
   duration: number;
   requiredItems: ItemRequirement[];
@@ -358,8 +360,35 @@ export interface PlayerLevel {
   exp: number; // Cumulative XP required to reach this level (transformed from API)
   levelBadgeImageLink: string;
 }
+export interface SeasonalPerk {
+  id: string;
+  type: string;
+  name: string;
+  description: string;
+  points: number | null;
+  mutuallyExclusiveSeasonalPerkIds: string[];
+  effects: Array<{
+    effectId: string;
+    itemFilter?: {
+      allowedItems: string[];
+      excludedItems: string[];
+      allowedCategories: string[];
+      excludedCategories: string[];
+    };
+    [key: string]: unknown;
+  }>;
+}
+export interface PrestigeStoryRequirement {
+  type: 'storyChapterStatus' | 'storyObjectiveStatus';
+  storyChapter: string;
+  objective?: string;
+  name: string;
+  status: string[];
+  unresolved?: boolean;
+}
 // Prestige System Types
 export interface PrestigeLevel {
+  storyRequirements?: PrestigeStoryRequirement[];
   id: string;
   level: number; // 0-6
   name?: string;
