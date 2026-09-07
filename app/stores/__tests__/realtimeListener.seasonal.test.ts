@@ -288,58 +288,61 @@ describe('seasonal progress realtime synchronization', () => {
     expect(state.pvp.level).toBe(25);
     expect(createdChannels).toHaveLength(1);
   });
-  it('merges a reconnect snapshot without overwriting a newer live mode event', async () => {
-    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
-    let resolveModes!: (value: unknown) => void;
-    const modeResult = new Promise((resolve) => {
-      resolveModes = resolve;
-    });
-    supabaseContext.client.from.mockImplementation((table: string) => ({
-      select: () => ({
-        eq: () =>
-          table === 'user_progress'
-            ? {
-                single: async () => ({
-                  data: { current_game_mode: 'pvp', updated_at: '2026-09-06T12:00:00Z' },
-                  error: null,
-                }),
-              }
-            : modeResult,
-      }),
-    }));
-    await setupRealtimeListener(store);
-    const channel = createdChannels[0]!;
-    channel.subscribeCallback?.('SUBSCRIBED');
-    const handler = handlers.get('user_game_mode_progress');
-    handler?.({
-      new: {
-        game_mode: 'pvp',
-        season_number: 0,
-        progress_data: { level: 35, displayName: 'live' },
-        updated_at: '2026-09-06T12:01:00Z',
-      },
-    });
-    resolveModes({
-      data: [
-        {
+  it.each([false, true])(
+    'uses the newer mode row when a live event arrives during a snapshot (snapshot wins: %s)',
+    async (snapshotWins) => {
+      const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+      let resolveModes!: (value: unknown) => void;
+      const modeResult = new Promise((resolve) => {
+        resolveModes = resolve;
+      });
+      supabaseContext.client.from.mockImplementation((table: string) => ({
+        select: () => ({
+          eq: () =>
+            table === 'user_progress'
+              ? {
+                  single: async () => ({
+                    data: { current_game_mode: 'pvp', updated_at: '2026-09-06T12:00:00Z' },
+                    error: null,
+                  }),
+                }
+              : modeResult,
+        }),
+      }));
+      await setupRealtimeListener(store);
+      const channel = createdChannels[0]!;
+      channel.subscribeCallback?.('SUBSCRIBED');
+      const handler = handlers.get('user_game_mode_progress');
+      handler?.({
+        new: {
           game_mode: 'pvp',
           season_number: 0,
-          progress_data: {
-            level: 12,
-            displayName: 'older',
-            taskObjectives: { staleOnly: { count: 9 } },
-          },
-          updated_at: '2026-09-06T12:00:00Z',
+          progress_data: { level: 35, displayName: 'live' },
+          updated_at: '2026-09-06T12:01:00Z',
         },
-      ],
-      error: null,
-    });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(state.pvp.level).toBe(35);
-    expect(state.pvp.displayName).toBe('live');
-    expect(state.pvp.taskObjectives.staleOnly).toBeUndefined();
-    expect(createdChannels).toHaveLength(1);
-  });
+      });
+      resolveModes({
+        data: [
+          {
+            game_mode: 'pvp',
+            season_number: 0,
+            progress_data: {
+              level: 45,
+              displayName: 'snapshot',
+              taskObjectives: { staleOnly: { count: 9 } },
+            },
+            updated_at: snapshotWins ? '2026-09-06T12:02:00Z' : '2026-09-06T12:00:00Z',
+          },
+        ],
+        error: null,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(state.pvp.level).toBe(snapshotWins ? 45 : 35);
+      expect(state.pvp.displayName).toBe(snapshotWins ? 'snapshot' : 'live');
+      expect(state.pvp.taskObjectives.staleOnly?.count).toBe(snapshotWins ? 9 : undefined);
+      expect(createdChannels).toHaveLength(1);
+    }
+  );
   it('uses entry timestamps for counts already clean when the listener starts', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     state.pvp.taskObjectives.objective = { count: 0, timestamp: 20 };

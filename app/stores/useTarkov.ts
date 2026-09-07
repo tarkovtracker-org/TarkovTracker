@@ -1457,8 +1457,10 @@ export async function initializeTarkovSync() {
             remoteUpdatedAt,
             localScore,
             remoteScore,
-            (modeProgressResult.updatedAt ?? 0) > (accountUpdatedAt || 0),
-            modeProgressResult.updatedAtByMode
+            {
+              mergeModeSnapshots: (modeProgressResult.updatedAt ?? 0) > (accountUpdatedAt || 0),
+              modeUpdatedAt: modeProgressResult.updatedAtByMode,
+            }
           );
           const remoteMatchesResolved = deepEqual(resolvedState, normalizedRemote);
           if (!remoteMatchesResolved) {

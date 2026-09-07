@@ -92,7 +92,7 @@ describe('useAppInitialization locale setup', () => {
   beforeEach(async () => {
     mockSupabase.client.auth.getSession.mockReset().mockResolvedValue({ data: { session: null } });
     mockSupporter.fetchStatus.mockReset().mockResolvedValue(undefined);
-    mockSupporter.subscribe.mockReset().mockResolvedValue(undefined);
+    mockSupporter.subscribe.mockReset().mockResolvedValue(true);
     mockSupporter.reset.mockReset();
     localeRef.value = 'en';
     setLocale.mockClear();
@@ -297,15 +297,20 @@ describe('useAppInitialization locale setup', () => {
       headers: { Authorization: 'Bearer fixture-token' },
     });
   });
-  it('keeps sync usable when optional supporter and activity requests fail', async () => {
-    mockSupporter.subscribe.mockRejectedValue(new Error('supporter offline'));
-    mockSupabase.client.auth.getSession.mockRejectedValue(new Error('session unavailable'));
-    mockSupabaseUser.loggedIn = true;
-    mockSupabaseUser.id = 'user-1';
-    await mountWithComposable();
-    await flushPromises();
-    expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
-    expect(mockMigrateDataIfNeeded).toHaveBeenCalledTimes(1);
-    expect(mockShowLoadFailed).not.toHaveBeenCalled();
-  });
+  it.each(['throw', 'failed read'])(
+    'keeps sync usable when optional supporter status fails: %s',
+    async (outcome) => {
+      if (outcome === 'throw')
+        mockSupporter.subscribe.mockRejectedValue(new Error('supporter offline'));
+      else mockSupporter.subscribe.mockResolvedValue(false);
+      mockSupabase.client.auth.getSession.mockRejectedValue(new Error('session unavailable'));
+      mockSupabaseUser.loggedIn = true;
+      mockSupabaseUser.id = 'user-1';
+      await mountWithComposable();
+      await flushPromises();
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
+      expect(mockMigrateDataIfNeeded).toHaveBeenCalledTimes(1);
+      expect(mockShowLoadFailed).not.toHaveBeenCalled();
+    }
+  );
 });

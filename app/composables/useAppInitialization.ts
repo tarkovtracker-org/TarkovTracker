@@ -74,10 +74,10 @@ export function useAppInitialization() {
     if (!authenticatedUserId) return;
     if (supporterLoadedForUserId === authenticatedUserId) return;
     try {
-      await supporter.subscribe(authenticatedUserId);
+      const loaded = await supporter.subscribe(authenticatedUserId);
       if (expectedUserId && getAuthenticatedUserId() !== expectedUserId) return;
       if (expectedToken !== undefined && expectedToken !== authChangeToken) return;
-      supporterLoadedForUserId = authenticatedUserId;
+      if (loaded) supporterLoadedForUserId = authenticatedUserId;
     } catch (error) {
       logger.error('[useAppInitialization] Failed to load supporter status:', error);
     }

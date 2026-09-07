@@ -1,5 +1,6 @@
 import { deepEqual } from '@/stores/tarkov/deepEqual';
 type Snapshot = Record<string, unknown>;
+type RemoteAdvance = { before: Snapshot; after: Snapshot; next?: RemoteAdvance };
 export type RemoteStateMerge = (
   remote: Snapshot,
   merged?: Snapshot,
@@ -36,8 +37,19 @@ export const preservePendingPaths = (base: unknown, local: unknown, remote: unkn
   }
   return result;
 };
+const advanceReadBaseline = (cursor: { next?: RemoteAdvance }, baseline: Snapshot) => {
+  while (cursor.next) {
+    const advance = cursor.next;
+    baseline = preservePendingPaths(advance.before, advance.after, baseline) as Snapshot;
+    cursor = advance;
+  }
+  return { cursor, baseline };
+};
 export const createPendingStateTracker = (getState: () => unknown) => {
   let baseline = snapshotSyncState(getState());
+  // Only in-flight captures retain earlier links. The tracker holds the tail,
+  // so completed reads do not leave an ever-growing event history.
+  let remoteCursor: { next?: RemoteAdvance } = {};
   return {
     captureAcknowledgement: (state: Snapshot): (() => void) => {
       const beforeWrite = baseline;
@@ -48,8 +60,12 @@ export const createPendingStateTracker = (getState: () => unknown) => {
       };
     },
     capture: (): RemoteStateMerge => {
-      const beforeRead = baseline;
+      let beforeRead = baseline;
+      let cursor = remoteCursor;
       return (remote, merged = remote, preserveChanges = true) => {
+        const advanced = advanceReadBaseline(cursor, beforeRead);
+        beforeRead = advanced.baseline;
+        cursor = advanced.cursor;
         const current = snapshotSyncState(getState());
         const result = { ...merged };
         const acknowledged = { ...baseline };
@@ -64,7 +80,10 @@ export const createPendingStateTracker = (getState: () => unknown) => {
             ? preservePendingPaths(beforeRead[key], baseline[key], merged[key])
             : merged[key];
         }
-        baseline = snapshotSyncState(acknowledged);
+        const advance: RemoteAdvance = { before: baseline, after: snapshotSyncState(acknowledged) };
+        remoteCursor.next = advance;
+        remoteCursor = advance;
+        baseline = advance.after;
         return result;
       };
     },

@@ -70,10 +70,14 @@ describe('useSupporter', () => {
     mockMaybeSingle.mockResolvedValue({ data: null, error: null });
     const { useSupporter } = await import('@/composables/useSupporter');
     const supporter = useSupporter();
-    await supporter.subscribe('user-1');
+    const subscribing = supporter.subscribe('user-1');
+    await vi.waitFor(() => expect(nextChannel.subscribe).toHaveBeenCalled());
     expect(mockMaybeSingle).not.toHaveBeenCalled();
+    const concurrent = supporter.subscribe('user-1');
     const status = nextChannel.subscribe.mock.calls[0]?.[0];
     status('SUBSCRIBED');
+    await expect(concurrent).resolves.toBe(true);
+    await expect(subscribing).resolves.toBe(true);
     expect(mockMaybeSingle).toHaveBeenCalledOnce();
     status('SUBSCRIBED');
     expect(mockMaybeSingle).toHaveBeenCalledTimes(2);
@@ -87,9 +91,11 @@ describe('useSupporter', () => {
     mockMaybeSingle.mockResolvedValue({ data: null, error: null });
     const { useSupporter } = await import('@/composables/useSupporter');
     const supporter = useSupporter();
-    await supporter.subscribe('user-1');
+    const subscribing = supporter.subscribe('user-1');
+    await vi.waitFor(() => expect(nextChannel.subscribe).toHaveBeenCalled());
     const status = nextChannel.subscribe.mock.calls[0]?.[0];
     status('CHANNEL_ERROR');
+    await expect(subscribing).resolves.toBe(true);
     status('TIMED_OUT');
     expect(mockMaybeSingle).toHaveBeenCalledOnce();
     status('SUBSCRIBED');
@@ -98,6 +104,39 @@ describe('useSupporter', () => {
     status('SUBSCRIBED');
     nextChannel.on.mock.calls[0]?.[2]();
     expect(mockMaybeSingle).toHaveBeenCalledTimes(2);
+  });
+  it('settles an initial read waiter when its session is reset before joining', async () => {
+    const nextChannel = { on: vi.fn(), subscribe: vi.fn() };
+    nextChannel.on.mockReturnValue(nextChannel);
+    nextChannel.subscribe.mockReturnValue(nextChannel);
+    mockChannel.mockReturnValue(nextChannel);
+    const { useSupporter } = await import('@/composables/useSupporter');
+    const supporter = useSupporter();
+    const subscribing = supporter.subscribe('user-1');
+    await vi.waitFor(() => expect(nextChannel.subscribe).toHaveBeenCalled());
+    supporter.reset();
+    await expect(subscribing).resolves.toBe(false);
+    expect(mockMaybeSingle).not.toHaveBeenCalled();
+  });
+  it('reports a failed initial read and retries on the same channel', async () => {
+    const nextChannel = { on: vi.fn(), subscribe: vi.fn() };
+    nextChannel.on.mockReturnValue(nextChannel);
+    nextChannel.subscribe.mockImplementation((callback) => {
+      callback('SUBSCRIBED');
+      return nextChannel;
+    });
+    mockChannel.mockReturnValue(nextChannel);
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: null, error: { message: 'offline' } })
+      .mockResolvedValue({ data: null, error: null });
+    const { useSupporter } = await import('@/composables/useSupporter');
+    const supporter = useSupporter();
+    await expect(supporter.subscribe('user-1')).resolves.toBe(false);
+    await expect(supporter.subscribe('user-1')).resolves.toBe(true);
+    await expect(supporter.subscribe('user-1')).resolves.toBe(true);
+    expect(mockMaybeSingle).toHaveBeenCalledTimes(2);
+    expect(mockChannel).toHaveBeenCalledOnce();
+    supporter.unsubscribe();
   });
   it('does not apply a stale status response after reset', async () => {
     const deferred = createDeferred<{
@@ -143,7 +182,10 @@ describe('useSupporter', () => {
         subscribe: vi.fn(),
       };
       nextChannel.on.mockReturnValue(nextChannel);
-      nextChannel.subscribe.mockReturnValue(nextChannel);
+      nextChannel.subscribe.mockImplementation((callback) => {
+        callback?.('SUBSCRIBED');
+        return nextChannel;
+      });
       createdChannels.push(nextChannel);
       return nextChannel;
     });

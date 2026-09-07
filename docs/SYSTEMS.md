@@ -790,7 +790,10 @@ flowchart LR
   clearable profile fields use the preferred snapshot verbatim, including null names and empty offsets.
   Startup skill-offset maps are atomic: absent keys represent deletions, and historical snapshots
   have no per-offset timestamps or deletion markers to safely union concurrent edits.
-  Visibility changes also update mode timestamps and cannot justify replacing whole mode snapshots.
+  Local envelopes still carry one whole-state timestamp, as before this optimization; unrelated local
+  mode edits can affect startup preference for untimestamped fields. Per-mode local edit provenance
+  requires a separate persisted-format change, including remote hydration and legacy-envelope handling.
+  Visibility changes update `updated_at`, never `progress_updated_at`, and cannot justify replacing whole mode snapshots.
   Team rejoin refreshes membership and rebuilds changed filters before hydrating teammates; initial
   joins do not trigger an additional hydration. Only the winning membership refresh may trigger
   hydration after a successful membership read; a failed read neither hydrates nor rebuilds.
@@ -799,11 +802,14 @@ flowchart LR
   Unmaterialized normalized rows are absent for startup fallback and freshness. Outbound writes are
   serialized with captured payloads and versions; resumed saves cannot overtake an in-flight save.
   Save acknowledgements advance only their changed paths, preserving unrelated remote values
-  accepted while the save was queued or in flight.
+  accepted while the save was queued or in flight. Pending captures track intervening accepted remote
+  changes separately from local acknowledgements, so older live events cannot override newer snapshots.
   Supporter status refreshes after the first join as well as subsequent joins to close the
   initial read/join gap. A progress subscription begun while suspended also reconciles on its first
   eventual join. Initialization delegates the initial status read to the subscription, with a
-  single fallback read if the initial join fails.
+  single fallback read if the initial join fails. Initialization marks status loaded only after a
+  successful read; initial callers share its result, session reset releases waiters, and failed reads
+  can retry on the existing channel.
   Skipped saves do not run payload transforms. Actual RPC writes temporarily mark the self-origin
   timeline before awaiting the response; failure removes that marker, success retains it, and
   session reset invalidates outstanding markers.

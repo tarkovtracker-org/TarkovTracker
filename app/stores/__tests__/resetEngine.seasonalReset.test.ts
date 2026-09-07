@@ -51,13 +51,16 @@ describe('performReset seasonal', () => {
     local.pvp.taskCompletions.localTask = { complete: true, timestamp: 20 };
     local.pvp.hideoutModules.module = { complete: true, timestamp: 20 };
     remote.pvp.taskCompletions.remoteTask = { complete: true, timestamp: 10 };
-    const result = resolveInitialSyncState(local, remote, 20, 30, 2, 1, true);
+    const result = resolveInitialSyncState(local, remote, 20, 30, 2, 1, {
+      mergeModeSnapshots: true,
+    });
     expect(result.pvp.taskCompletions.localTask?.complete).toBe(true);
     expect(result.pvp.taskCompletions.remoteTask?.complete).toBe(true);
     expect(result.pvp.hideoutModules.module?.complete).toBe(true);
     remote.pvp.progressEpoch = 1;
     expect(
-      resolveInitialSyncState(local, remote, 20, 30, 2, 1, true).pvp.taskCompletions.localTask
+      resolveInitialSyncState(local, remote, 20, 30, 2, 1, { mergeModeSnapshots: true }).pvp
+        .taskCompletions.localTask
     ).toBeUndefined();
   });
   it.each([true, false])(
@@ -72,7 +75,9 @@ describe('performReset seasonal', () => {
       // Per-entry timestamps override the overall snapshot preference.
       preferred.pvp.hideoutParts.part = { count: 8, timestamp: 10 };
       older.pvp.hideoutParts.part = { count: 2, timestamp: 20 };
-      const result = resolveInitialSyncState(local, remote, preferLocal ? 30 : 10, 20, 1, 1, true);
+      const result = resolveInitialSyncState(local, remote, preferLocal ? 30 : 10, 20, 1, 1, {
+        mergeModeSnapshots: true,
+      });
       expect(result.pvp.taskObjectives.objective?.count).toBe(0);
       expect(result.pvp.taskObjectives.objective?.complete).toBe(false);
       expect(result.pvp.hideoutParts.part?.count).toBe(2);
@@ -109,7 +114,9 @@ describe('performReset seasonal', () => {
       older.pvp.skillOffsets = { Endurance: 4 };
       older.pvp.xpOffset = 100;
       older.pvp.taskCompletions.remoteTask = { complete: true, timestamp: 10 };
-      const result = resolveInitialSyncState(local, remote, localWins ? 30 : 10, 20, 1, 1, true);
+      const result = resolveInitialSyncState(local, remote, localWins ? 30 : 10, 20, 1, 1, {
+        mergeModeSnapshots: true,
+      });
       expect(result.pvp).toMatchObject({ displayName: null, skillOffsets: {}, xpOffset: 0 });
       expect(result.pvp.skillOffsets).toEqual({});
       expect(result.pvp.taskCompletions.remoteTask?.complete).toBe(true);
