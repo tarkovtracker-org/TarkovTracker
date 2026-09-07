@@ -62,7 +62,7 @@ describe('useSupporter', () => {
     const { useSupporter } = await import('@/composables/useSupporter');
     useSupporter().reset();
   });
-  it('refreshes status after the first join and each rejoin to close the read/join gap', async () => {
+  const startInitialSubscription = async () => {
     const nextChannel = { on: vi.fn(), subscribe: vi.fn() };
     nextChannel.on.mockReturnValue(nextChannel);
     nextChannel.subscribe.mockReturnValue(nextChannel);
@@ -72,9 +72,17 @@ describe('useSupporter', () => {
     const supporter = useSupporter();
     const subscribing = supporter.subscribe('user-1');
     await vi.waitFor(() => expect(nextChannel.subscribe).toHaveBeenCalled());
+    return {
+      supporter,
+      subscribing,
+      nextChannel,
+      status: nextChannel.subscribe.mock.calls[0]?.[0],
+    };
+  };
+  it('refreshes status after the first join and each rejoin to close the read/join gap', async () => {
+    const { supporter, subscribing, status } = await startInitialSubscription();
     expect(mockMaybeSingle).not.toHaveBeenCalled();
     const concurrent = supporter.subscribe('user-1');
-    const status = nextChannel.subscribe.mock.calls[0]?.[0];
     status('SUBSCRIBED');
     await expect(concurrent).resolves.toBe(true);
     await expect(subscribing).resolves.toBe(true);
@@ -84,16 +92,7 @@ describe('useSupporter', () => {
     supporter.unsubscribe();
   });
   it('loads once when the initial join fails and ignores disposed channel callbacks', async () => {
-    const nextChannel = { on: vi.fn(), subscribe: vi.fn() };
-    nextChannel.on.mockReturnValue(nextChannel);
-    nextChannel.subscribe.mockReturnValue(nextChannel);
-    mockChannel.mockReturnValue(nextChannel);
-    mockMaybeSingle.mockResolvedValue({ data: null, error: null });
-    const { useSupporter } = await import('@/composables/useSupporter');
-    const supporter = useSupporter();
-    const subscribing = supporter.subscribe('user-1');
-    await vi.waitFor(() => expect(nextChannel.subscribe).toHaveBeenCalled());
-    const status = nextChannel.subscribe.mock.calls[0]?.[0];
+    const { supporter, subscribing, nextChannel, status } = await startInitialSubscription();
     status('CHANNEL_ERROR');
     await expect(subscribing).resolves.toBe(true);
     status('TIMED_OUT');
@@ -106,14 +105,7 @@ describe('useSupporter', () => {
     expect(mockMaybeSingle).toHaveBeenCalledTimes(2);
   });
   it('settles an initial read waiter when its session is reset before joining', async () => {
-    const nextChannel = { on: vi.fn(), subscribe: vi.fn() };
-    nextChannel.on.mockReturnValue(nextChannel);
-    nextChannel.subscribe.mockReturnValue(nextChannel);
-    mockChannel.mockReturnValue(nextChannel);
-    const { useSupporter } = await import('@/composables/useSupporter');
-    const supporter = useSupporter();
-    const subscribing = supporter.subscribe('user-1');
-    await vi.waitFor(() => expect(nextChannel.subscribe).toHaveBeenCalled());
+    const { supporter, subscribing } = await startInitialSubscription();
     supporter.reset();
     await expect(subscribing).resolves.toBe(false);
     expect(mockMaybeSingle).not.toHaveBeenCalled();
