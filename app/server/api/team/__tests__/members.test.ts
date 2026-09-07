@@ -590,77 +590,83 @@ describe('Team Members API', () => {
     });
   });
   describe('Team members caching', () => {
-    it('serves the season-scoped cached payload without re-reading team data', async () => {
-      const originalNodeEnv = process.env.NODE_ENV;
-      try {
-        process.env.NODE_ENV = 'development';
-        vi.resetModules();
-        const entries = stubEdgeCache();
-        mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
-        mockFetch.mockImplementation(async (url: string | URL) => {
-          const target = String(url);
-          if (target.includes('team_memberships?')) {
-            return membershipResponse('pvp');
-          }
-          if (target.includes('team_member_mode_summary?')) {
-            return {
-              ok: true,
-              json: async () => [
-                {
-                  user_id: VALID_USER_ID,
-                  display_name: 'Cached Player',
-                  level: 9,
-                  tasks_completed: 4,
-                },
-              ],
-            };
-          }
-          if (target.includes('user_progress?')) {
-            return {
-              ok: true,
-              json: async () => [{ user_id: VALID_USER_ID, game_edition: 2 }],
-            };
-          }
-          throw new Error(`Unexpected test request: ${target}`);
-        });
-        const { default: handler } = await import('@/server/api/team/members');
-        const fresh = await handler(mockEvent as H3Event);
-        expect(fresh).toEqual({
-          members: [VALID_USER_ID],
-          profiles: {
-            [VALID_USER_ID]: {
-              displayName: 'Cached Player',
-              gameEdition: 2,
-              gameMode: 'pvp',
-              level: 9,
-              tasksCompleted: 4,
+    it.each(['pvp', 'seasonal'] as const)(
+      'serves the %s cache using the database-resolved season',
+      async (gameMode) => {
+        const originalNodeEnv = process.env.NODE_ENV;
+        try {
+          process.env.NODE_ENV = 'development';
+          vi.resetModules();
+          const entries = stubEdgeCache();
+          mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
+          const season = gameMode === 'seasonal' ? 2 : 0;
+          mockFetch.mockImplementation(async (url: string | URL) => {
+            const target = String(url);
+            if (target.includes('/rpc/get_active_season_number'))
+              return activeSeasonResponse(season);
+            if (target.includes('team_memberships?')) {
+              return membershipResponse(gameMode);
+            }
+            if (target.includes('team_member_mode_summary?')) {
+              return {
+                ok: true,
+                json: async () => [
+                  {
+                    user_id: VALID_USER_ID,
+                    display_name: 'Cached Player',
+                    level: 9,
+                    tasks_completed: 4,
+                  },
+                ],
+              };
+            }
+            if (target.includes('user_progress?')) {
+              return {
+                ok: true,
+                json: async () => [{ user_id: VALID_USER_ID, game_edition: 2 }],
+              };
+            }
+            throw new Error(`Unexpected test request: ${target}`);
+          });
+          const { default: handler } = await import('@/server/api/team/members');
+          const fresh = await handler(mockEvent as H3Event);
+          expect(fresh).toEqual({
+            members: [VALID_USER_ID],
+            profiles: {
+              [VALID_USER_ID]: {
+                displayName: 'Cached Player',
+                gameEdition: 2,
+                gameMode,
+                level: 9,
+                tasksCompleted: 4,
+              },
             },
-          },
-        });
-        const cacheKeys = [...entries.keys()].filter((url) =>
-          url.includes('/__edge-cache/team-members/')
-        );
-        expect(cacheKeys).toHaveLength(1);
-        expect(cacheKeys[0]).toContain(
-          `/__edge-cache/team-members/${encodeURIComponent(`${VALID_TEAM_ID}:${VALID_USER_ID}:0`)}`
-        );
-        const summaryCallsBefore = mockFetch.mock.calls.filter((call) =>
-          String(call[0]).includes('team_member_mode_summary')
-        ).length;
-        const cached = await handler(mockEvent as H3Event);
-        expect(cached).toEqual(fresh);
-        expect(
-          mockFetch.mock.calls.filter((call) =>
+          });
+          const cacheKeys = [...entries.keys()].filter((url) =>
+            url.includes('/__edge-cache/team-members/')
+          );
+          expect(cacheKeys).toHaveLength(1);
+          expect(cacheKeys[0]).toContain(
+            `/__edge-cache/team-members/${encodeURIComponent(`${VALID_TEAM_ID}:${VALID_USER_ID}:${season}`)}`
+          );
+          const summaryCallsBefore = mockFetch.mock.calls.filter((call) =>
             String(call[0]).includes('team_member_mode_summary')
-          ).length
-        ).toBe(summaryCallsBefore);
-      } finally {
-        if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
-        else process.env.NODE_ENV = originalNodeEnv;
-        vi.unstubAllGlobals();
-        vi.resetModules();
+          ).length;
+          const cached = await handler(mockEvent as H3Event);
+          expect(cached).toEqual(fresh);
+          expect(
+            mockFetch.mock.calls.filter((call) =>
+              String(call[0]).includes('team_member_mode_summary')
+            ).length
+          ).toBe(summaryCallsBefore);
+        } finally {
+          if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+          else process.env.NODE_ENV = originalNodeEnv;
+          vi.unstubAllGlobals();
+          vi.resetModules();
+        }
       }
-    });
+    );
   });
   describe('Authentication fallback', () => {
     it('should reject malformed auth context user id', async () => {
