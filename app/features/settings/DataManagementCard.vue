@@ -445,8 +445,9 @@
                   :key="version"
                   :model-value="eftLogsIncludedVersions.includes(version)"
                   :disabled="
-                    eftLogsIncludedVersions.length === 1 &&
-                    eftLogsIncludedVersions.includes(version)
+                    eftLogsIsImporting ||
+                    (eftLogsIncludedVersions.length === 1 &&
+                      eftLogsIncludedVersions.includes(version))
                   "
                   :label="formatEftLogsVersionLabel(version)"
                   @update:model-value="

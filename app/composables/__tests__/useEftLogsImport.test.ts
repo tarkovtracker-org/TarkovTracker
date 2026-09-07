@@ -136,6 +136,7 @@ describe('useEftLogsImport', () => {
       Object.defineProperty(file, 'size', { value: 32 * 1024 * 1024 });
       return file;
     });
+    const lastRawRead = vi.spyOn(rawFiles[7]!, 'text');
     const archive = new File(
       [new Uint8Array(zipSync({ 'notifications.log': strToU8(completionLog()) }))],
       'Logs.zip'
@@ -146,6 +147,7 @@ describe('useEftLogsImport', () => {
     expect(composable.importError.value).toBe(
       'Selected logs contain too much content (max 256 MB).'
     );
+    expect(lastRawRead).not.toHaveBeenCalled();
     expect(tarkovStore.switchGameMode).not.toHaveBeenCalled();
   });
   it('parses a single log file and exposes preview data', async () => {

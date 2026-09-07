@@ -672,7 +672,8 @@ flowchart LR
    The importer accepts legacy/rotated notification and backend filenames, and application/output
    context, in folders, individual files, and ZIPs. Inputs are limited to 512 MiB per selected file,
    32 MiB per log, and 256 MiB of combined log bytes across raw files and ZIPs. Readers count
-   bytes before decoding; preview assembly reuses those totals without re-encoding log text.
+   bytes against the remaining combined budget before decoding raw files or decompressing ZIP
+   entries; preview assembly reuses those totals without re-encoding log text.
    Arena is excluded. Multiline JSON is bounded
    by log records so a truncated event cannot consume the next notification.
    Mode routing uses preceding explicit session declarations or gateway/WebSocket connections;

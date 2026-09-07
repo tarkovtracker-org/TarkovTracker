@@ -118,7 +118,8 @@ function ensureTotalLogBytes(bytes: number): void {
 }
 /** Reads supported raw logs, preserving paths and counting source bytes before decoding. */
 async function readRawImportLogFiles(
-  files: File[]
+  files: File[],
+  previousLogBytes: number
 ): Promise<{ files: EftLogInputFile[]; scanned: number; bytes: number }> {
   let totalLogBytes = 0;
   const extracted: EftLogInputFile[] = [];
@@ -137,6 +138,7 @@ async function readRawImportLogFiles(
         max_mb: 256,
       });
     }
+    ensureTotalLogBytes(previousLogBytes + totalLogBytes);
     extracted.push({
       name: filePath,
       text: await file.text(),
@@ -150,7 +152,8 @@ async function readRawImportLogFiles(
 }
 /** Filters supported archive entries and enforces declared log sizes before decompression. */
 async function readZipLogs(
-  file: File
+  file: File,
+  previousLogBytes: number
 ): Promise<{ files: EftLogInputFile[]; scanned: number; bytes: number }> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   let scannedEntries = 0;
@@ -174,6 +177,7 @@ async function readZipLogs(
           max_mb: 256,
         });
       }
+      ensureTotalLogBytes(previousLogBytes + totalLogBytes);
       return true;
     },
   });
@@ -418,7 +422,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
       for (const file of files) {
         ensureImportFileSize(file);
         if (isZipFile(file)) {
-          const zipSource = await readZipLogs(file);
+          const zipSource = await readZipLogs(file, totalLogBytes);
           if (!isActiveRequest()) return;
           scannedEntries += zipSource.scanned;
           totalLogBytes += zipSource.bytes;
@@ -429,7 +433,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
         rawLogFiles.push(file);
       }
       if (rawLogFiles.length > 0) {
-        const rawSource = await readRawImportLogFiles(rawLogFiles);
+        const rawSource = await readRawImportLogFiles(rawLogFiles, totalLogBytes);
         if (!isActiveRequest()) return;
         scannedEntries += rawSource.scanned;
         totalLogBytes += rawSource.bytes;
