@@ -112,6 +112,21 @@ describe('useSupporter', () => {
       supporter.unsubscribe();
     }
   );
+  it('reports a successful initial status read despite an unrelated checkout failure', async () => {
+    const { supporter, subscribing, status } = await startInitialSubscription();
+    const initial = createDeferred<{ data: null; error: null }>();
+    mockMaybeSingle.mockReturnValueOnce(initial.promise);
+    mockSupabase.client.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'test-token' } },
+    });
+    mockFetch.mockRejectedValueOnce(new Error('checkout failed'));
+    status('SUBSCRIBED');
+    await expect(supporter.createCheckout({ mode: 'payment' })).resolves.toBeNull();
+    expect(supporter.error.value).toBe('checkout failed');
+    initial.resolve({ data: null, error: null });
+    await expect(subscribing).resolves.toBe(true);
+    supporter.unsubscribe();
+  });
   it('loads once when the initial join fails and ignores disposed channel callbacks', async () => {
     const { supporter, subscribing, nextChannel, status } = await startInitialSubscription();
     status('CHANNEL_ERROR');

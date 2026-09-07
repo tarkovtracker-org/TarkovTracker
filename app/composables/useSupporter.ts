@@ -60,11 +60,11 @@ export function useSupporter() {
     if (tier === 'supporter') return 'Supporter';
     return tier.charAt(0).toUpperCase() + tier.slice(1);
   });
-  const finishStatusRequest = (userId: string, requestVersion: number) => {
+  const finishStatusRequest = (userId: string, requestVersion: number, success: boolean) => {
     if (!isCurrentStatusRequest(userId, requestVersion)) return;
     loading.value = false;
     if (initialRead?.userId !== userId) return;
-    initialRead.resolve(error.value === null);
+    initialRead.resolve(success);
     initialRead = null;
   };
   async function fetchStatus(userId: string): Promise<boolean> {
@@ -72,6 +72,7 @@ export function useSupporter() {
     const requestVersion = ++statusRequestVersion;
     loading.value = true;
     error.value = null;
+    let success = false;
     try {
       const { data, error: err } = await $supabase.client
         .from('supporters')
@@ -98,6 +99,7 @@ export function useSupporter() {
         supporterState.value = null;
       }
       statusLoadedForUserId = userId;
+      success = true;
       return true;
     } catch (e: unknown) {
       logger.error('fetchStatus threw', { userId, err: e });
@@ -106,7 +108,7 @@ export function useSupporter() {
       supporterState.value = null;
       return false;
     } finally {
-      finishStatusRequest(userId, requestVersion);
+      finishStatusRequest(userId, requestVersion, success);
     }
   }
   async function subscribe(userId: string): Promise<boolean> {
