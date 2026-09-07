@@ -7,6 +7,7 @@ export default defineConfig({
   resolve: {
     alias: {
       'cloudflare:workers': workerShim,
+      '@shared': fileURLToPath(new URL('../../shared', import.meta.url)),
     },
   },
   test: {
