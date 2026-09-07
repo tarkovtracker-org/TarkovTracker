@@ -4,6 +4,7 @@ import {
   getNeededItemData,
   getNeededItemId,
   isNonFirSpecialEquipment,
+  itemMatchesQuery,
 } from '@/features/neededitems/neededItemFilters';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
@@ -469,45 +470,38 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   ): boolean => {
     return !hideTeamItems.value || passesTeamFilter(item);
   };
+  /**
+   * Task objectives match their task's name, and pooled "any of these"
+   * objectives also match any valid turn-in item, not just the primary/cycled
+   * one, so searching e.g. "Augmentin" surfaces the quest.
+   */
+  const taskMatchesSearch = (taskObjective: NeededItemTaskObjective): boolean => {
+    if (findAcceptedItemMatchIndex(taskObjective.acceptedItems, search.value) !== -1) {
+      return true;
+    }
+    const task = metadataStore.getTaskById(taskObjective.taskId);
+    return Boolean(task?.name && fuzzyMatch(task.name, search.value));
+  };
+  const stationLevelMatchesSearch = (stationName: string, level: number): boolean => {
+    const stationWithLevel = `${stationName} ${level}`;
+    const stationWithLevelText = `${stationName} level ${level}`;
+    return (
+      fuzzyMatch(stationWithLevel, search.value) || fuzzyMatch(stationWithLevelText, search.value)
+    );
+  };
+  const stationMatchesSearch = (need: NeededItemHideoutModule): boolean => {
+    const station = metadataStore.getStationById(need.hideoutModule.stationId);
+    const stationName = station?.name;
+    if (!stationName) return false;
+    if (fuzzyMatch(stationName, search.value)) return true;
+    return stationLevelMatchesSearch(stationName, need.hideoutModule.level);
+  };
+  // An empty search matches every item (fuzzyMatch treats an empty query as a
+  // wildcard), so the item-name check doubles as the empty-search early-out.
   const passesSearchFilter = (item: NeededItemTaskObjective | NeededItemHideoutModule): boolean => {
-    if (!search.value) {
-      return true;
-    }
-    const itemObj = getNeededItemData(item);
-    const itemName = itemObj?.name ?? '';
-    const itemShortName = itemObj?.shortName ?? '';
-    if (fuzzyMatch(itemName, search.value) || fuzzyMatch(itemShortName, search.value)) {
-      return true;
-    }
-    if (item.needType === 'taskObjective') {
-      const taskObjective = item as NeededItemTaskObjective;
-      // Pooled "any of these" objectives match any valid turn-in item, not just
-      // the primary/cycled one, so searching e.g. "Augmentin" surfaces the quest.
-      if (findAcceptedItemMatchIndex(taskObjective.acceptedItems, search.value) !== -1) {
-        return true;
-      }
-      const task = metadataStore.getTaskById(taskObjective.taskId);
-      if (task?.name && fuzzyMatch(task.name, search.value)) {
-        return true;
-      }
-    }
-    if (item.needType === 'hideoutModule') {
-      const hideoutModule = (item as NeededItemHideoutModule).hideoutModule;
-      const station = metadataStore.getStationById(hideoutModule.stationId);
-      if (station?.name) {
-        if (fuzzyMatch(station.name, search.value)) {
-          return true;
-        }
-        const stationWithLevel = `${station.name} ${hideoutModule.level}`;
-        const stationWithLevelText = `${station.name} level ${hideoutModule.level}`;
-        if (
-          fuzzyMatch(stationWithLevel, search.value) ||
-          fuzzyMatch(stationWithLevelText, search.value)
-        ) {
-          return true;
-        }
-      }
-    }
+    if (itemMatchesQuery(getNeededItemData(item), search.value)) return true;
+    if (item.needType === 'taskObjective') return taskMatchesSearch(item);
+    if (item.needType === 'hideoutModule') return stationMatchesSearch(item);
     return false;
   };
   const filteredItems = computed(() => {

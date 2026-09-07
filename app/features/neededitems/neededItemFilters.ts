@@ -42,7 +42,11 @@ const fuzzyMatchesQuery = (
   shortName: string | undefined,
   query: string
 ): boolean => fuzzyMatch(name ?? '', query) || fuzzyMatch(shortName ?? '', query);
-const acceptedItemMatchesQuery = (item: TarkovItem | undefined, query: string): boolean => {
+/**
+ * Returns whether an item's name or short name fuzzy matches the query.
+ * Shared by the Needed Items search filter and accepted-item pool matching.
+ */
+export const itemMatchesQuery = (item: TarkovItem | undefined, query: string): boolean => {
   if (!item) return false;
   return fuzzyMatchesQuery(item.name, item.shortName, query);
 };
@@ -59,7 +63,7 @@ export const findAcceptedItemMatchIndex = (
 ): number => {
   const normalizedQuery = query.trim();
   if (!normalizedQuery || !items?.length) return -1;
-  return items.findIndex((entry) => acceptedItemMatchesQuery(entry, normalizedQuery));
+  return items.findIndex((entry) => itemMatchesQuery(entry, normalizedQuery));
 };
 const isSpecialEquipmentText = (value: string): boolean => {
   const lower = value.toLowerCase();
