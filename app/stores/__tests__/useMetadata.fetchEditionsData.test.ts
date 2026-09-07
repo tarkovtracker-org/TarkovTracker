@@ -52,6 +52,19 @@ describe('useMetadataStore fetchEditionsData', () => {
     expect(store.storyChapters).toEqual([]);
     expect(store.editionsError).toBeInstanceOf(Error);
   });
+  it('preserves the last-good catalog on malformed edition records', async () => {
+    const store = useMetadataStore();
+    const existing = createEdition('existing', 1, 'Existing');
+    store.editions = [existing];
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn().mockResolvedValue({ data: { editions: [{ id: 'broken' }], storyChapters: [] } })
+    );
+    await store.fetchEditionsData(true);
+    expect(store.editions).toEqual([existing]);
+    expect(store.editionsError).toBeInstanceOf(Error);
+  });
   it('preserves already-loaded editions when overlay fetch fails', async () => {
     const store = useMetadataStore();
     const existingEdition = createEdition('existing-edition', 2, 'Existing Edition');

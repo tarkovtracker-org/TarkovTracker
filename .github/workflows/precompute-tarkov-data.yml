@@ -64,6 +64,7 @@ jobs:
           name: overlay-precompute-manifest
           path: precompute-manifest.json
           if-no-files-found: ignore
+          retention-days: 7
       - name: Open or update failure issue
         if: failure() && github.event_name == 'schedule'
         continue-on-error: true

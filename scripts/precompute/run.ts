@@ -43,7 +43,18 @@ const kv = createKvRestWriter({
 });
 try {
   const result = await runPrecompute(kv, filter);
-  await writeFile('precompute-manifest.json', JSON.stringify({ completedAt: Date.now(), entries: result.manifest, failures: result.failures }, null, 2));
+  try {
+    await writeFile(
+      'precompute-manifest.json',
+      JSON.stringify(
+        { completedAt: Date.now(), entries: result.manifest, failures: result.failures },
+        null,
+        2
+      )
+    );
+  } catch (error) {
+    console.warn('[precompute] Could not write local diagnostic manifest:', error);
+  }
   console.log(
     JSON.stringify(
       {

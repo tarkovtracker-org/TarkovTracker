@@ -16,6 +16,8 @@ export interface PromiseStore {
   readonly taskRewardsRequestVersion: number;
   readonly taskCoreRefreshes: Set<symbol>;
   readonly initPromise: Promise<void> | null;
+  readonly initScope: string;
+  readonly initVersion: number;
   readonly isInitializing: boolean;
 }
 export type PromiseKey = {
@@ -63,6 +65,8 @@ export function getPromiseStore(storeInstance: object): MutablePromiseStore {
       taskRewardsRequestVersion: 0,
       taskCoreRefreshes: new Set(),
       initPromise: null,
+      initScope: '',
+      initVersion: 0,
       isInitializing: false,
     });
   }

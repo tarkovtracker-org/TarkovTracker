@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { logger } from '@/server/utils/logger';
 import { addFallbackCrafts, addFallbackItems } from '@/server/utils/overlayAdditions';
 import {
   projectEditions,
@@ -19,7 +20,15 @@ const overlay: OverlayData = {
       objectives: { ticket: { id: 'ticket', description: 'Retrieve ticket' } },
     },
   },
-  editions: { standard: { title: 'Standard', value: 1 } },
+  editions: {
+    standard: {
+      title: 'Standard',
+      value: 1,
+      defaultStashLevel: 1,
+      defaultCultistCircleLevel: 0,
+      traderRepBonus: {},
+    },
+  },
   tasksAdd: { synthetic: { name: 'New Beginning', disabled: false } },
   seasonalPerks: { perk: { name: 'Perk', effects: [], mutuallyExclusiveSeasonalPerkIds: [] } },
   modes: {
@@ -214,4 +223,63 @@ describe('endpoint overlay projectors', () => {
     );
     expect(unknownOverlaySections({ ...overlay, future: {} } as OverlayData)).toEqual(['future']);
   });
+});
+it.each([
+  { version: 'test' },
+  { version: '', generated: '2026-09-07', sha256: 'sha' },
+  { version: 'test', generated: '', sha256: 'sha' },
+  { version: 'test', generated: '2026-09-07', sha256: '  ' },
+])('rejects incomplete overlay provenance %j', (meta) => {
+  expect(validateOverlayData({ ...overlay, $meta: meta })).toBe(false);
+});
+it('rejects malformed effective edition records', () => {
+  expect(validateOverlayData({ ...overlay, editions: { broken: { title: 'Broken' } } })).toBe(
+    false
+  );
+  expect(
+    validateOverlayData({
+      ...overlay,
+      modes: { pve: { editions: { standard: { value: 'bad' } } } },
+    })
+  ).toBe(false);
+});
+it('removes tasks disabled by mode or locale corrections from prestige references', () => {
+  const projected = projectRawPrestige(
+    { tasks: [{ id: 'mode' }, { id: 'locale' }, { id: 'keep' }], prestige: [] },
+    {
+      tasks: { mode: { disabled: true } },
+      locales: { de: { tasks: { locale: { disabled: true } } } },
+    },
+    'regular',
+    'de'
+  );
+  expect(projected.tasks.map((task) => task.id)).toEqual(['keep']);
+});
+it('leaves malformed upstream story requirements unexpanded', () => {
+  const projected = projectRawPrestige(
+    { tasks: [], prestige: [{ id: 'p', storyRequirements: [null, 'bad'] }] },
+    {},
+    'regular',
+    'en'
+  );
+  expect(projected.prestige[0]?.storyRequirements).toEqual([null, 'bad']);
+});
+it('reports craft additions whose destination level is absent', () => {
+  const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+  try {
+    const stations = [
+      { id: 'station', levels: [{ level: 1, crafts: [] }] },
+    ] as unknown as HideoutStation[];
+    const result = addFallbackCrafts(
+      stations,
+      {
+        craftsAdd: { orphan: { station: 'station', level: 2, requiredItems: [], productItem: {} } },
+      },
+      'regular'
+    );
+    expect(result[0]?.levels[0]?.crafts).toEqual([]);
+    expect(warn).toHaveBeenCalledWith('Unconsumed craft additions:', ['orphan']);
+  } finally {
+    warn.mockRestore();
+  }
 });

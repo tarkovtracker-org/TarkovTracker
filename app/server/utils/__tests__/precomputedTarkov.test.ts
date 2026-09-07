@@ -81,3 +81,8 @@ describe('precomputedTarkov', () => {
     });
   });
 });
+it.each(['', '   '])('rejects empty overlay identity fields %j', async (empty) => {
+  const { precomputedOverlayIdentity } = await import('@/server/utils/precomputedTarkov');
+  expect(precomputedOverlayIdentity({ dataOverlay: { version: empty, sha256: 'sha' } })).toBeNull();
+  expect(precomputedOverlayIdentity({ dataOverlay: { version: 'v1', sha256: empty } })).toBeNull();
+});

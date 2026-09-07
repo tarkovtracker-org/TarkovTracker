@@ -1,4 +1,3 @@
-import { scheduleBackgroundTask } from '~/server/utils/backgroundTask';
 import { edgeCache, shouldBypassCache } from '~/server/utils/edgeCache';
 import { getValidatedLanguage } from '~/server/utils/language-helpers';
 import { fetchOverlay } from '~/server/utils/overlay';
@@ -11,9 +10,7 @@ export default defineEventHandler(async (event) => {
   const lang = getValidatedLanguage(query);
   const gameMode = validateGameMode(query.gameMode);
   const fetcher = async () => {
-    const { overlay, meta } = await fetchOverlay(shouldBypassCache(event), (task) =>
-      scheduleBackgroundTask(event, task)
-    );
+    const { overlay, meta } = await fetchOverlay(shouldBypassCache(event));
     if (!overlay)
       throw createError({ statusCode: 503, statusMessage: 'Prestige corrections unavailable' });
     const baseFetcher = createTarkovJsonPrestigeFetcher({

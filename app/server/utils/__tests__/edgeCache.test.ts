@@ -338,6 +338,26 @@ describe('edgeCache', () => {
     expect(cacheSpy.match).not.toHaveBeenCalled();
     expect(cacheSpy.put).not.toHaveBeenCalled();
   });
+  it('preserves correction-unavailable status through the cache wrapper', async () => {
+    const { edgeCache } = await import('@/server/utils/edgeCache');
+    const unavailable = Object.assign(
+      new Error('Prestige corrections unavailable https://secret.example.com/private.sql'),
+      { statusCode: 503 }
+    );
+    await expect(
+      edgeCache(
+        createEvent(),
+        'prestige',
+        async () => {
+          throw unavailable;
+        },
+        60,
+        {
+          deps: { createErrorFn, setResponseHeadersFn: setHeaders },
+        }
+      )
+    ).rejects.toMatchObject({ statusCode: 503, statusMessage: expect.stringContaining('[host]') });
+  });
   it('sanitizes error details in thrown status message', async () => {
     const event = createEvent();
     const { edgeCache } = await import('@/server/utils/edgeCache');

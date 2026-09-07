@@ -23,7 +23,9 @@ describe('overlay URL validation', () => {
     'not-a-url',
   ])('falls back to the trusted HTTPS overlay for %s', async (overlayUrl) => {
     vi.stubEnv('OVERLAY_URL', overlayUrl);
-    const fetchMock = stubOverlayFetch({ $meta: { version: 'url-test-v1' } });
+    const fetchMock = stubOverlayFetch({
+      $meta: { version: 'url-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
+    });
     const { applyOverlay } = await import('@/server/utils/overlay');
     await applyOverlay({ data: { tasks: [] } });
     expect(fetchMock).toHaveBeenCalledWith(
@@ -33,7 +35,9 @@ describe('overlay URL validation', () => {
   });
   it('uses a configured HTTPS overlay URL', async () => {
     vi.stubEnv('OVERLAY_URL', 'https://overlay.example.com/custom.json');
-    const fetchMock = stubOverlayFetch({ $meta: { version: 'url-test-v1' } });
+    const fetchMock = stubOverlayFetch({
+      $meta: { version: 'url-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
+    });
     const { applyOverlay } = await import('@/server/utils/overlay');
     await applyOverlay({ data: { tasks: [] } });
     expect(fetchMock).toHaveBeenCalledWith(
@@ -78,7 +82,12 @@ describe('overlay redirect handling', () => {
       .fn()
       .mockResolvedValueOnce(redirectTo('https://overlay.example.com/redirected.json'))
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ $meta: { version: 'redirect-v1' } }), { status: 200 })
+        new Response(
+          JSON.stringify({
+            $meta: { version: 'redirect-v1', generated: '2026-09-07', sha256: 'test-sha' },
+          }),
+          { status: 200 }
+        )
       );
     vi.stubGlobal('fetch', fetchMock as typeof fetch);
     const { applyOverlay } = await import('@/server/utils/overlay');
@@ -111,7 +120,12 @@ describe('overlay redirect handling', () => {
       .fn()
       .mockResolvedValueOnce(redirectWithBody(location, cancel))
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ $meta: { version: 'redirect-v2' } }), { status: 200 })
+        new Response(
+          JSON.stringify({
+            $meta: { version: 'redirect-v2', generated: '2026-09-07', sha256: 'test-sha' },
+          }),
+          { status: 200 }
+        )
       );
     vi.stubGlobal('fetch', fetchMock as typeof fetch);
     const { applyOverlay } = await import('@/server/utils/overlay');
@@ -209,7 +223,10 @@ describe('applyOverlay locale integration', () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ $meta: { version: 'v1' } }), { status: 200 })
+        new Response(
+          JSON.stringify({ $meta: { version: 'v1', generated: '2026-09-07', sha256: 'test-sha' } }),
+          { status: 200 }
+        )
       )
       .mockReturnValueOnce(
         new Promise<Response>((resolve) => {
@@ -231,7 +248,12 @@ describe('applyOverlay locale integration', () => {
     expect(second.dataOverlay).toMatchObject({ status: 'stale', version: 'v1' });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(backgroundTasks).toHaveLength(1);
-    resolveRefresh(new Response(JSON.stringify({ $meta: { version: 'v2' } }), { status: 200 }));
+    resolveRefresh(
+      new Response(
+        JSON.stringify({ $meta: { version: 'v2', generated: '2026-09-07', sha256: 'test-sha' } }),
+        { status: 200 }
+      )
+    );
     await backgroundTasks[0];
     const refreshed = await applyOverlay(payload, { scheduleRefresh });
     expect(refreshed.dataOverlay).toMatchObject({ status: 'cached', version: 'v2' });
@@ -267,7 +289,10 @@ describe('applyOverlay locale integration', () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ $meta: { version: 'v1' } }), { status: 200 })
+        new Response(
+          JSON.stringify({ $meta: { version: 'v1', generated: '2026-09-07', sha256: 'test-sha' } }),
+          { status: 200 }
+        )
       )
       .mockRejectedValueOnce(new Error('overlay unavailable'));
     vi.stubGlobal('fetch', fetchMock as typeof fetch);
@@ -286,7 +311,7 @@ describe('applyOverlay locale integration', () => {
   });
   it('leaves unsupported locales unchanged by locale corrections', async () => {
     stubOverlayFetch({
-      $meta: { version: 'locale-test-v1' },
+      $meta: { version: 'locale-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
       locales: {
         en: { tasks: { 'task-1': { name: 'English Task' } } },
       },
@@ -303,7 +328,7 @@ describe('applyOverlay locale integration', () => {
     ['locale patch', { en: { tasks: { 'task-1': 'garbage' } } }],
   ])('handles a malformed %s without changing base data', async (_label, locales) => {
     stubOverlayFetch({
-      $meta: { version: 'locale-test-v1' },
+      $meta: { version: 'locale-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
       locales,
     });
     const { applyOverlay } = await import('@/server/utils/overlay');
@@ -320,14 +345,20 @@ describe('story overlay validation', () => {
     { storyChapters: [] },
   ])('retains the last good payload for malformed chapter records: %j', async (invalid) => {
     const fetchMock = stubOverlayFetch({
-      $meta: { version: 'good' },
+      $meta: { version: 'good', generated: '2026-09-07', sha256: 'test-sha' },
       storyChapters: { chapter: { name: 'Chapter', questUnlocks: [{ id: 'task' }] } },
     });
     const { applyOverlay } = await import('@/server/utils/overlay');
     const input = { data: { tasks: [{ id: 'task' }] } };
     await applyOverlay(input, { bypassCache: true });
     fetchMock.mockImplementation(
-      async () => new Response(JSON.stringify({ $meta: { version: 'invalid' }, ...invalid }))
+      async () =>
+        new Response(
+          JSON.stringify({
+            $meta: { version: 'invalid', generated: '2026-09-07', sha256: 'test-sha' },
+            ...invalid,
+          })
+        )
     );
     const result = await applyOverlay(input, { bypassCache: true });
     expect(result.dataOverlay).toMatchObject({ status: 'stale', version: 'good' });
@@ -339,7 +370,7 @@ describe('story overlay validation', () => {
 describe('overlay semantic fallback and diagnostics', () => {
   it('retains a last-good overlay when a prestige story reference is invalid', async () => {
     const good = {
-      $meta: { version: 'good', sha256: 'good-sha' },
+      $meta: { version: 'good', generated: '2026-09-07', sha256: 'good-sha' },
       tasks: { task: { name: 'Corrected' } },
     };
     const fetch = stubOverlayFetch(good);
@@ -349,7 +380,7 @@ describe('overlay semantic fallback and diagnostics', () => {
       new Response(
         JSON.stringify({
           ...good,
-          $meta: { version: 'bad' },
+          $meta: { version: 'bad', generated: '2026-09-07', sha256: 'test-sha' },
           prestige: {
             p: {
               storyRequirements: [
@@ -369,7 +400,10 @@ describe('overlay semantic fallback and diagnostics', () => {
     });
   });
   it('keeps unknown-section diagnostics on cached responses', async () => {
-    const fetch = stubOverlayFetch({ $meta: { version: '1' }, future: {} });
+    const fetch = stubOverlayFetch({
+      $meta: { version: '1', generated: '2026-09-07', sha256: 'test-sha' },
+      future: {},
+    });
     const { applyOverlay } = await import('@/server/utils/overlay');
     await applyOverlay({ data: { tasks: [] } });
     const cached = await applyOverlay({ data: { tasks: [] } });
@@ -377,3 +411,23 @@ describe('overlay semantic fallback and diagnostics', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 });
+it.each([{ version: 'truncated' }, { version: 'truncated', generated: '2026-09-07', sha256: '' }])(
+  'keeps the last-good catalog when provenance is malformed %j',
+  async ($meta) => {
+    const good = {
+      $meta: { version: 'good', generated: '2026-09-07', sha256: 'good-sha' },
+      tasks: { task: { name: 'Corrected' } },
+    };
+    const fetch = stubOverlayFetch(good);
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    await applyOverlay({ data: { tasks: [{ id: 'task' }] } });
+    fetch.mockResolvedValueOnce(new Response(JSON.stringify({ $meta })));
+    const result = await applyOverlay({ data: { tasks: [{ id: 'task' }] } }, { bypassCache: true });
+    expect(result.data.tasks[0]).toMatchObject({ name: 'Corrected' });
+    expect(result.dataOverlay).toMatchObject({
+      version: 'good',
+      status: 'stale',
+      error: 'validation_failed',
+    });
+  }
+);

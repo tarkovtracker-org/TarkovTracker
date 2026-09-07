@@ -105,7 +105,7 @@ flowchart LR
     Route --> Cache["edgeCache()<br/>app/server/utils/edgeCache.ts"]
     Cache -->|miss| Fetch["tarkov-json.ts<br/>fetch + adapt"]
     Fetch -->|HTTPS| Upstream["json.tarkov.dev"]
-    Fetch --> Overlay{"Overlay?<br/>(6 of 10 endpoints)"}
+    Fetch --> Overlay{"Overlay?"}
     Overlay -->|yes| ApplyOverlay["applyOverlay()<br/>app/server/utils/overlay.ts"]
     Overlay -->|no| Cache
     ApplyOverlay --> Cache
@@ -135,6 +135,10 @@ flowchart LR
 - Language is validated with `getValidatedLanguage()` and defaults to `en`.
 
 ---
+
+Overlay fleet verification requires `X-Cache-Status: PRECOMPUTE` and matching nonempty version/SHA identities in the published overlay, full-fleet manifest, and served response. Invalid timestamps or malformed provenance remain unverified. Filtered busts do not certify a complete release: rerun the unfiltered precompute before promotion. The production verifier uses the configured HTTPS `OVERLAY_URL` (defaulting to the published main overlay).
+
+Critical cache bundles carry mode/language scope and replace every matching collection, including empty arrays. Cached hydration owns the request tokens and clears stale errors/loading; superseded initializers and background callbacks cannot overwrite the new scope.
 
 ## 2. Data fetching pipeline
 

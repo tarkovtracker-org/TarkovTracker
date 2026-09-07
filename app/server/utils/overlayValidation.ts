@@ -1,3 +1,4 @@
+import { isGameEdition } from '@/utils/editionHelpers';
 import { isPlainObject } from './deepMerge';
 import { mergeOverlayRecords, overlayEntries, scopedOverlay } from './overlayProjectors';
 import type { OverlayData, OverlayRecords } from './overlayTypes';
@@ -105,6 +106,7 @@ const validEffectiveSections = (overlay: OverlayData, mode: string): boolean => 
   return [
     perks,
     crafts,
+    overlayEntries(scopedOverlay(overlay, 'editions', mode)).every(isGameEdition),
     chapters,
     overlayEntries(scopedOverlay(overlay, 'prestige', mode)).every(validPrestigePatch),
   ].every(Boolean);
@@ -122,8 +124,13 @@ const validLocalizedReferences = (overlay: OverlayData, mode: string): boolean =
     };
     return validEffectiveSections(localized, mode) && validChapterReferences(localized, mode);
   });
-const hasOverlayMeta = (value: Record<string, unknown>): boolean =>
-  isPlainObject(value.$meta) && typeof value.$meta.version === 'string';
+const hasOverlayMeta = (value: Record<string, unknown>): boolean => {
+  const meta = value.$meta;
+  if (!isPlainObject(meta)) return false;
+  return ['version', 'generated', 'sha256'].every(
+    (key) => typeof meta[key] === 'string' && meta[key].trim().length > 0
+  );
+};
 export const validateOverlayData = (value: unknown): value is OverlayData => {
   if (!isPlainObject(value)) return false;
   if (

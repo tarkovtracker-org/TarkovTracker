@@ -1,3 +1,4 @@
+import { logger } from './logger';
 import { overlayEntries, scopedOverlay } from './overlayProjectors';
 import { adaptHideoutResponse, adaptItemsResponse } from './tarkov-json';
 import type { OverlayData } from './overlayTypes';
@@ -40,6 +41,15 @@ export const addFallbackCrafts = (
   const additions = overlayEntries(scopedOverlay(overlay, 'craftsAdd', mode)).filter(
     (craft) => !existing.has(String(craft.id))
   );
+  const locations = new Set(
+    stations.flatMap((station) => station.levels.map((level) => `${station.id}:${level.level}`))
+  );
+  const unmatched = additions.filter((craft) => !locations.has(`${craft.station}:${craft.level}`));
+  if (unmatched.length)
+    logger.warn(
+      'Unconsumed craft additions:',
+      unmatched.map((craft) => craft.id)
+    );
   return stations.map((station) => ({
     ...station,
     levels: station.levels.map((level) => {

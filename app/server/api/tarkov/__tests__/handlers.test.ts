@@ -268,6 +268,7 @@ describe('Tarkov API handlers', () => {
   it('builds expected cache key for prestige', async () => {
     const { default: handler } = await import('@/server/api/tarkov/prestige.get');
     await handler(event);
+    expect(mockFetchOverlay).toHaveBeenCalledWith(false);
     expect(mockCreateTarkovJsonPrestigeFetcher).toHaveBeenCalledWith({
       lang: 'en',
       gameMode: 'regular',

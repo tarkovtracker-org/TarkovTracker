@@ -82,7 +82,7 @@ describe('mergeModeCorrections (via applyOverlay integration)', () => {
   });
   it('splits overlaid trader requirements into level and reputation fields', async () => {
     const fetchMock = stubOverlayFetch({
-      $meta: { version: 'split-test-v1' },
+      $meta: { version: 'split-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
       modes: {
         pve: {
           tasks: {
@@ -146,7 +146,7 @@ describe('mergeModeCorrections (via applyOverlay integration)', () => {
   });
   it('splits trader requirements on tasksAdd entries', async () => {
     const fetchMock = stubOverlayFetch({
-      $meta: { version: 'tasksadd-split-test-v1' },
+      $meta: { version: 'tasksadd-split-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
       tasksAdd: {
         'new-task': {
           id: 'new-task',
@@ -200,7 +200,7 @@ describe('mergeModeCorrections (via applyOverlay integration)', () => {
   });
   it('drops malformed trader requirement entries during the split', async () => {
     const fetchMock = stubOverlayFetch({
-      $meta: { version: 'malformed-split-test-v1' },
+      $meta: { version: 'malformed-split-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
       modes: {
         pve: {
           tasks: {
@@ -246,7 +246,7 @@ describe('mergeModeCorrections (via applyOverlay integration)', () => {
   it('drops level trader requirements with non-finite thresholds', async () => {
     const fetchMock = stubOverlayFetch(
       JSON.parse(
-        '{"$meta":{"version":"nonfinite-split-test-v1"},"modes":{"pve":{"tasks":{"task-1":{"traderRequirements":[{"id":"inf-level","requirementType":"level","compareMethod":">=","value":1e999,"trader":{"id":"trader-1","name":"Prapor"}}]}}}}}'
+        '{"$meta":{"version":"nonfinite-split-test-v1","generated":"2026-09-07","sha256":"test-sha"},"modes":{"pve":{"tasks":{"task-1":{"traderRequirements":[{"id":"inf-level","requirementType":"level","compareMethod":">=","value":1e999,"trader":{"id":"trader-1","name":"Prapor"}}]}}}}}'
       )
     );
     const { applyOverlay } = await import('@/server/utils/overlay');
@@ -495,7 +495,7 @@ describe('canonical progression overlay projection', () => {
   it('replaces trader requirements and keeps story routes scoped to the selected mode', async () => {
     vi.resetModules();
     stubOverlayFetch({
-      $meta: { version: 'test' },
+      $meta: { version: 'test', generated: '2026-09-07', sha256: 'test-sha' },
       tasks: {
         target: {
           traderRequirements: [

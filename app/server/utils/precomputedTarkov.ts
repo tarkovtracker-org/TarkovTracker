@@ -28,12 +28,14 @@ export function buildTasksCorePrecomputedKey(lang: string, gameMode: string): st
 }
 const overlayMeta = (payload: unknown) =>
   (payload as { dataOverlay?: { version?: unknown; sha256?: unknown } })?.dataOverlay;
+const nonemptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0;
 export function precomputedOverlayIdentity(
   payload: unknown
 ): { version: string; sha256: string } | null {
   const meta = overlayMeta(payload);
   if (!meta) return null;
-  if (typeof meta.version !== 'string' || typeof meta.sha256 !== 'string') return null;
+  if (!nonemptyString(meta.version) || !nonemptyString(meta.sha256)) return null;
   return { version: meta.version, sha256: meta.sha256 };
 }
 export function buildPrecomputedEnvelope<T>(payload: T): PrecomputedEnvelope<T> {

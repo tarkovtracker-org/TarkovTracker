@@ -1239,16 +1239,16 @@ export function createTarkovJsonHideoutFetcher(options: TarkovJsonOptions) {
   };
 }
 export function createTarkovJsonPrestigeFetcher(options: TarkovJsonPrestigeOptions) {
-  const regularOptions: TarkovJsonOptions = {
+  const sourceOptions: TarkovJsonOptions = {
     ...options,
     gameMode: options.gameMode ?? PRESTIGE_SOURCE_GAME_MODE,
   };
   return async () => {
     try {
       const [tasksPayload, hideoutPayload, tradersPayload] = await Promise.all([
-        fetchTarkovJsonEndpoint<JsonTasksPayload>('tasks', regularOptions),
-        fetchTarkovJsonEndpoint<unknown>('hideout', regularOptions),
-        fetchTarkovJsonEndpoint<unknown>('traders', regularOptions),
+        fetchTarkovJsonEndpoint<JsonTasksPayload>('tasks', sourceOptions),
+        fetchTarkovJsonEndpoint<unknown>('hideout', sourceOptions),
+        fetchTarkovJsonEndpoint<unknown>('traders', sourceOptions),
       ]);
       return adaptPrestigeResponse(options.project ? options.project(tasksPayload) : tasksPayload, {
         hideoutPayload,

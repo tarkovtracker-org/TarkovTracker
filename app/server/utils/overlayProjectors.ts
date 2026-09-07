@@ -35,7 +35,10 @@ const projectOverlayEntities = (
     id,
   }));
 };
-const patchExistingEntities = (entities: unknown, patches: OverlayRecords) =>
+const patchExistingEntities = (
+  entities: unknown,
+  patches: OverlayRecords
+): Array<Record<string, unknown>> =>
   overlayEntries(entities).map((entity) => ({
     ...deepMerge(entity, patches[String(entity.id)] ?? {}),
     id: entity.id,
@@ -92,7 +95,9 @@ export const projectRawPrestige = (
   const local = localeSections(overlay, locale);
   const tasks = prestigeTasks(payload.tasks, scopedOverlay(overlay, 'tasksAdd', mode));
   const correctedTasks = patchExistingEntities(tasks, scopedOverlay(overlay, 'tasks', mode));
-  const localizedTasks = patchExistingEntities(correctedTasks, local.tasks ?? {});
+  const localizedTasks = patchExistingEntities(correctedTasks, local.tasks ?? {}).filter(
+    (task) => task.disabled !== true
+  );
   const patches = scopedOverlay(overlay, 'prestige', mode);
   const prestige = patchPrestigeEntries(payload.prestige, patches);
   const chapters = projectStoryChapters(overlay, mode, locale);
@@ -117,6 +122,7 @@ const storyRequirementName = (
 const localizeStoryRequirements = (entry: Record<string, unknown>, chapters: StoryChapter[]) => {
   if (!Array.isArray(entry.storyRequirements)) return entry;
   const requirements = entry.storyRequirements.map((requirement) => {
+    if (!isPlainObject(requirement)) return requirement;
     const chapter = chapters.find((chapter) => chapter.id === requirement.storyChapter);
     const name = storyRequirementName(requirement, chapter);
     return { ...requirement, name: name ?? requirement.name, unresolved: !name };
