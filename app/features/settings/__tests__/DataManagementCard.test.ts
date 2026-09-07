@@ -1,7 +1,10 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ref, type Ref } from 'vue';
 import DataManagementCard from '@/features/settings/DataManagementCard.vue';
+import { ACTIVE_SEASON } from '@/utils/constants';
+import { parseEftLogsForQuestImport } from '@/utils/eftLogQuestParser';
 const {
   backupFns,
   backupState,
@@ -74,6 +77,7 @@ const {
     setIncludedVersions: vi.fn(),
   },
   eftLogsState: {
+    isImporting: {} as Ref<boolean>,
     importError: { __v_isRef: true as const, value: null as string | null },
     previewData: { __v_isRef: true as const, value: null as Record<string, unknown> | null },
     importState: {
@@ -140,6 +144,7 @@ vi.mock('@/composables/useTarkovDevImport', () => ({
 vi.mock('@/composables/useEftLogsImport', () => ({
   useEftLogsImport: () => ({
     importState: eftLogsState.importState,
+    isImporting: eftLogsState.isImporting,
     previewData: eftLogsState.previewData,
     importError: eftLogsState.importError,
     parseFile: eftLogsFns.parseFile,
@@ -239,6 +244,7 @@ describe('DataManagementCard', () => {
     tarkovDevState.previewData.value = null;
     eftLogsState.importError.value = null;
     eftLogsState.importState.value = 'idle';
+    eftLogsState.isImporting = ref(false);
     eftLogsState.previewData.value = null;
     tarkovStoreState.currentMode = 'pvp';
     tarkovStoreState.tarkovUid = null;
@@ -831,9 +837,9 @@ describe('DataManagementCard', () => {
     };
     const wrapper = createWrapper();
     expect(wrapper.find('game-mode-toggle-stub').exists()).toBe(false);
-    expect(wrapper.text()).toContain('settings.log_import.mode_summary_pvp');
+    expect(wrapper.text()).toContain('common.pvp');
   });
-  it('shows EFT mode toggle when unknown-mode events are present', () => {
+  it('shows EFT mode toggle and disables every mode while import is applying', async () => {
     eftLogsState.importState.value = 'preview';
     eftLogsState.previewData.value = {
       chatMessageCount: 2,
@@ -855,11 +861,57 @@ describe('DataManagementCard', () => {
     };
     const wrapper = createWrapper();
     expect(wrapper.find('game-mode-toggle-stub').exists()).toBe(true);
+    const toggle = wrapper.findComponent({ name: 'GameModeToggle' });
+    expect(toggle.props('disabledModes')).toEqual([]);
+    eftLogsState.isImporting.value = true;
+    await wrapper.vm.$nextTick();
+    expect(toggle.props('disabledModes')).toEqual(['pvp', 'pve', 'seasonal']);
     expect(wrapper.text()).toContain(
       'An Apple a Day Keeps the Doctor Away (61604635c725987e815b1a46)'
     );
     expect(wrapper.text()).toContain('Shortage (5ac2426c86f774138762edfe)');
   });
+  it.each(['before-season', 'missing-date'])(
+    'blocks invalid Seasonal preview dates (%s) before confirmation',
+    async (dateCase) => {
+      const questId = '61604635c725987e815b1a46';
+      const oldDate = new Date(Date.parse(ACTIVE_SEASON.startsOn) - 86400000)
+        .toISOString()
+        .replace('T', ' ')
+        .replace('Z', '');
+      const parsed = parseEftLogsForQuestImport(
+        [
+          {
+            name: 'notifications.log',
+            text: `${oldDate}|Info|notifications|Got notification | ChatMessageReceived\n${JSON.stringify({ eventId: 'old', message: { type: 12, templateId: questId } })}\n`,
+          },
+        ],
+        [questId],
+        { taskIdsByMode: { pvp: [questId], pve: [questId], seasonal: [questId] } }
+      );
+      if (dateCase === 'missing-date') parsed.events[0]!.timestamp = null;
+      eftLogsState.importState.value = 'preview';
+      eftLogsState.previewData.value = {
+        ...parsed,
+        scannedEntries: 1,
+        sourceFileName: 'notifications.log',
+      };
+      tarkovStoreState.currentMode = 'seasonal';
+      const wrapper = createWrapper();
+      const vm = asVm<{ eftLogsCompletedCount: number }>(wrapper.vm);
+      expect(vm.eftLogsCompletedCount).toBe(0);
+      expect(wrapper.text()).toContain('settings.log_import.errors.outside_active_season');
+      const confirm = wrapper
+        .findAll('button')
+        .find((button) => button.text().includes('common.confirm_import'))!;
+      expect(confirm.attributes('disabled')).toBeDefined();
+      await wrapper.findComponent({ name: 'GameModeToggle' }).vm.$emit('update:modelValue', 'pvp');
+      await wrapper.vm.$nextTick();
+      expect(vm.eftLogsCompletedCount).toBe(1);
+      expect(wrapper.text()).not.toContain('settings.log_import.errors.outside_active_season');
+      expect(confirm.attributes('disabled')).toBeUndefined();
+    }
+  );
   it('excludes completed tasks from EFT active task count', () => {
     eftLogsState.importState.value = 'preview';
     eftLogsState.previewData.value = {
@@ -884,6 +936,29 @@ describe('DataManagementCard', () => {
       unmatchedQuestIds: [],
       unmatchedStartedQuestIds: [],
     };
+    eftLogsState.previewData.value.events = [
+      {
+        eventKey: 'complete',
+        questId: '61604635c725987e815b1a46',
+        mode: 'pvp',
+        status: 'completed',
+        timestamp: '2026-08-29 10:00:00.000',
+      },
+      {
+        eventKey: 'start',
+        questId: '61604635c725987e815b1a46',
+        mode: 'pvp',
+        status: 'started',
+        timestamp: '2026-08-29 09:00:00.000',
+      },
+      {
+        eventKey: 'active',
+        questId: '5ac2426c86f774138762edfe',
+        mode: 'pvp',
+        status: 'started',
+        timestamp: '2026-08-29 09:00:00.000',
+      },
+    ];
     const wrapper = createWrapper();
     expect(asVm<{ eftLogsCompletedCount: number }>(wrapper.vm).eftLogsCompletedCount).toBe(1);
     expect(asVm<{ eftLogsActiveCount: number }>(wrapper.vm).eftLogsActiveCount).toBe(1);

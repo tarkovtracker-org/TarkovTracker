@@ -1,3 +1,4 @@
+import type { Task } from '@/types/tarkov';
 /**
  * Task Normalization Utilities
  *
@@ -40,4 +41,43 @@ export function normalizeTaskObjectives<T = unknown>(objectives: unknown): T[] {
     );
   }
   return [];
+}
+/** Checks whether an objective ID is shared by multiple tasks. */
+function hasDuplicateObjective(counts: Map<string, number>, id: string): boolean {
+  return (counts.get(id) ?? 0) > 1;
+}
+/** Records the task-qualified replacements used for a shared upstream objective ID. */
+function recordDuplicateObjective(
+  duplicates: Map<string, string[]>,
+  id: string,
+  newId: string
+): void {
+  const existing = duplicates.get(id) ?? [];
+  existing.push(newId);
+  duplicates.set(id, existing);
+}
+/** Keep persisted objective keys identical across metadata hydration and imports. */
+export function dedupeTaskObjectiveIds(tasks: Task[]) {
+  const objectiveCounts = new Map<string, number>();
+  tasks.forEach((task) => {
+    task.objectives?.forEach((objective) => {
+      if (!objective?.id) return;
+      objectiveCounts.set(objective.id, (objectiveCounts.get(objective.id) ?? 0) + 1);
+    });
+  });
+  const duplicateObjectiveIds = new Map<string, string[]>();
+  const updatedTasks = tasks.map((task) => {
+    if (!task.objectives?.length) return task;
+    let changed = false;
+    const objectives = task.objectives.map((objective) => {
+      if (!objective?.id) return objective;
+      if (!hasDuplicateObjective(objectiveCounts, objective.id)) return objective;
+      const newId = `${objective.id}:${task.id}`;
+      recordDuplicateObjective(duplicateObjectiveIds, objective.id, newId);
+      changed = true;
+      return { ...objective, id: newId };
+    });
+    return changed ? { ...task, objectives } : task;
+  });
+  return { tasks: updatedTasks, duplicateObjectiveIds };
 }

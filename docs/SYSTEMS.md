@@ -664,6 +664,46 @@ flowchart LR
    only `pvp` (and `pve`, which the UI still gates off) and never writes the Seasonal row. The store
    rejects a Seasonal prestige before any request, and the settings card reports prestige as
    unavailable in Seasonal PvP.
+9. EFT log import restores explicit quest notification states in PvP, PvE, and active Seasonal
+   PvP. Message types 10/11/12 identify started/failed/completed tasks; rewards, backend requests,
+   diagnostics, and group-member snapshots do not establish additional player progress. See
+   `docs/eft-log-reference/` for the audited format inventory (through `1.1.0.1.46911`) and
+   [TarkovMonitor's message type contract](https://github.com/the-hideout/TarkovMonitor/blob/master/TarkovMonitor/GameWatcher.cs).
+   The importer accepts legacy/rotated notification and backend filenames, and application/output
+   context, in folders, individual files, and ZIPs. Inputs are limited to 512 MiB per selected file,
+   32 MiB per log, and 256 MiB of combined log bytes across raw files and ZIPs. Readers count
+   bytes against the remaining combined budget before decoding raw files or decompressing ZIP
+   entries; preview assembly reuses those totals without re-encoding log text.
+   Arena is excluded. Multiline JSON is bounded
+   by log records so a truncated event cannot consume the next notification.
+   Mode routing uses preceding explicit session declarations or gateway/WebSocket connections;
+   legacy prod backend requests remain a fallback when explicit PvP/Seasonal routing is absent.
+   Unparseable signal timestamps are discarded. Delayed responses and shared mode/locale routes
+   and URLs inside notification payloads are not switches. Conflicting simultaneous
+   signals and events before the first signal remain unresolved and require a destination choice.
+   Original notification message times (`dt`) order replayed history when present; record timestamps
+   still locate the mode signal. Without `dt`, record time is the fallback.
+   Stable server event/message identities are deduplicated across modes before progress is
+   applied; routing follows the earliest receipt, regardless of file order or replay receipt mode.
+   Sparse fallback identities stay mode-scoped, using receipt time when no original time exists.
+   Conflicting or unresolved simultaneous deliveries remain unresolved: unknown may represent
+   contradictory signals, not just absent context, so a partial copy cannot override it. States are
+   then reconciled per mode and quest after unresolved-mode routing; tied timestamps prefer completed, failed, then started.
+   Explicit failure notifications use the persistent manual-failure flag so automatic repair cannot
+   discard them when a triggering quest is missing from the logs. Existing completed tracker tasks
+   are preserved. Catalogs share metadata hydration's task-qualified duplicate-objective IDs.
+   All destination task/objective catalogs are
+   loaded before mutations, without changing the active metadata store. Destination catalogs
+   determine task eligibility and objective counts, and the original progress mode is restored. Application is not transactional across modes:
+   failures explicitly warn that some progress may remain applied. Users can select the same logs
+   to retry; state-setting operations preserve successful completions.
+   Seasonal events outside the active season are skipped; assigning unresolved out-of-season
+   events to Seasonal is blocked. Preview counts exclude those events and the shared confirmation
+   guard shows the date warning and disables confirmation immediately for an invalid selection.
+   Malformed/skipped records are reported in the preview.
+   Version filters are compatibility filters, not account/wipe/prestige boundaries: users must
+   select the character sessions they intend to restore. Missing logs, objective handovers, XP,
+   skills, and hideout progress cannot be reconstructed from these quest notifications.
 
 ### Files
 
@@ -770,6 +810,83 @@ flowchart LR
   tear the team channel down and schedule one rebuild a minute later, replacing Realtime's unbounded
   rejoin loop with a bounded retry cycle.
 - `user_system` is included in `supabase_realtime`, and sign-out tears down all client channels.
+- The shared browser Realtime transport disconnects after 60 seconds continuously hidden. Channel
+  ownership is retained, new connect attempts are gated while suspended, and a visible tab waits for
+  an outstanding disconnect before reconnecting once. Auth, local persistence, and outbound saves
+  remain active. Rejoined consumers refresh authoritative snapshots; owner progress uses existing
+  merge/epoch rules, and snapshot responses cannot overwrite newer live events or another session.
+  A three-way merge compares each field with its acknowledged baseline, retaining only locally
+  changed paths while accepting unrelated remote changes, including changes in other modes.
+  Live mode rows and startup snapshots resolve counts by entry timestamp rather than maximum,
+  so an acknowledged count clear is not resurrected. Pending fields (including explicit clears) survive reconnect reads, incoming live events,
+  and edits made during those reads; a higher reset epoch still wins over an older epoch's edits.
+- Progress RPC upserts compare sanitized account/mode values before updating. Identical saves do not
+  change progress timestamps or emit progress-row events. The legacy compatibility trigger remains;
+  its normalized write makes the subsequent identical RPC upsert a no-op. Startup account metadata
+  uses the account timestamp; each mode independently uses `progress_updated_at`, which changes only
+  with sanitized progress. Visibility-only writes never advance it. Historical rows retain null until
+  progress changes; unknown normalized mode freshness stays unknown instead of borrowing metadata
+  freshness. Known local mode clocks preserve offline scalar edits while entry timestamps and reset
+  epochs still reconcile progress. With both mode clocks unknown, remote scalar fields win;
+  progress scores from unrelated modes cannot choose them. Only progress actually read from a
+  legacy row uses that row's clock.
+  During the additive freshness-column rollout, startup and reconnect reads retry once without
+  `progress_updated_at` only when PostgreSQL/PostgREST reports that column missing. Those rows
+  retain unknown mode freshness; account timestamps never substitute for it. Other errors and
+  failed fallback reads remain failures. Each read probes the column again so completed migrations
+  take effect without a reload.
+  When a mode is newer than account metadata, startup merges progress by entry timestamps and reset epochs;
+  clearable profile fields use the preferred snapshot verbatim, including null names and empty offsets.
+  Startup skill-offset maps are atomic: absent keys represent deletions, and historical snapshots
+  have no per-offset timestamps or deletion markers to safely union concurrent edits.
+  Local envelopes retain `_timestamp` for envelope compatibility and add `_metadataTimestamp` for
+  account settings plus independent `_modeTimestamps` for progress. Only changes
+  within a mode advance its local clock; account hydration keeps the server metadata clock, and switching modes or editing another mode does not. Legacy
+  envelopes seed unchanged modes from their original timestamp (unknown history stays zero).
+  Startup and Realtime hydration retain remote progress freshness, rather than download time.
+  Accepted envelopes are persisted even when a matching acknowledgement needs no Pinia patch,
+  provided shared storage still matches the tab's prior data and clocks. Divergence skips that
+  acknowledgement write so another tab's unsaved edits remain stored;
+  merged snapshots that retain local fields use at least one millisecond beyond the incoming
+  snapshot clock, so reload cannot discard pending edits on a timestamp tie. Each tab compares
+  with its own prior snapshot so another tab's storage write cannot make stale fields look edited.
+  Visibility changes update `updated_at`, never `progress_updated_at`, and cannot justify replacing whole mode snapshots.
+  Team rejoin refreshes membership and rebuilds changed filters before hydrating teammates; initial
+  joins do not trigger an additional hydration. Replacement of a previously joined channel after
+  connection failure also hydrates after successful membership refresh and the replacement join.
+  Only the winning membership refresh may trigger
+  hydration after a successful membership read; a failed read neither hydrates nor rebuilds.
+  Pending hydration follows the winning replacement team when a team switch retains teammate
+  stores during reconnect; it fires only after the replacement joins. Leaving all teams or disposing
+  the controller clears that intent.
+  A superseded reconnect request cannot race ahead of a newer filter rebuild. Optional missing account metadata never blocks
+  normalized reconnect progress. Deferred legacy reads retain startup retries and API error mapping.
+  Unmaterialized normalized rows are absent for startup fallback and freshness. Outbound writes are
+  serialized with captured payloads and versions; resumed saves cannot overtake an in-flight save.
+  Save acknowledgements advance only their changed paths, preserving unrelated remote values
+  accepted while the save was queued or in flight. Pending captures track intervening accepted remote
+  changes separately from local acknowledgements, so older live events cannot override newer snapshots.
+  Domain merges do not acknowledge unsaved local fields. A newer remote reset invalidates older
+  save acknowledgements for that mode; a newer local reset stays pending until its save succeeds.
+  Owner and teammate reconnect/live mode hydration ignore unmaterialized placeholder rows.
+  Teammates retain previously hydrated progress if the legacy fallback read fails.
+  Realtime SDK callbacks forward only their payload to reconciliation handlers; transport message
+  references must never be interpreted as snapshot reconciliation functions.
+  Reconnect reads wait for in-flight saves and hold new outbound writes until snapshot application
+  completes. Local changes remain tracked and are saved afterward; read failures also release this barrier.
+  Supporter status refreshes after the first join as well as subsequent joins to close the
+  initial read/join gap. An owner or generic subscription whose first join is delayed by suspension reconciles on its first
+  eventual join. Initialization delegates the initial status read to the subscription, with a
+  fallback status read if the subscription declines or the initial join fails. Initialization marks status loaded only after a
+  successful read; initial callers share the latest request's result even when a refresh supersedes
+  the initial query. Session reset releases waiters, and failed reads can retry on the existing channel.
+  Skipped saves do not run payload transforms. Actual RPC writes temporarily mark the self-origin
+  timeline before awaiting the response; failure removes that marker, success retains it, and
+  session reset invalidates outstanding markers.
+- Startup fetches metadata and normalized modes before requesting missing persistent legacy columns.
+  Shared-profile, gateway, and teammate reads request legacy progress only when their existing
+  fallback rules require it. Public visibility and team authorization still precede fallback use.
+  This reduces Supabase transfer; gateway response ETags alone do not avoid upstream reads.
 - New clients read teammate progress from mode rows. When a persistent normalized row is missing or
   carries no `level`, `useTeamStore` calls `get_teammate_legacy_progress` for only the teammate's
   authorized mode column; the raw `user_progress` teammate policy is not used. Account-wide metadata
@@ -781,7 +898,8 @@ flowchart LR
   `pvp`/`pve`, `user_prestige_runs` keeps its `mode IN ('pvp','pve')` constraint, and no Seasonal
   progress is written through a prestige.
 - Tarkov.dev profile imports can target Seasonal through the verified `pvp-season` source. EFT-log
-  imports cannot target Seasonal until their source data is verified.
+  imports can target Seasonal using the verified notification formats and active-season guards
+  specified in section 7; unresolved-mode events require an explicit destination choice.
 
 ---
 
@@ -867,8 +985,8 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
   cost protection, per the design principle in `docs/RATE_LIMITING.md`.
 - Ordinary success responses are browser-cacheable (`private`); explicit `fresh=1` responses and
   error responses never are.
-- The client accepts the verified Tarkov.dev `pvp-season` profile source for Seasonal progress and
-  rejects Seasonal EFT-log imports before mutating progress until that source is verified.
+- The client accepts the verified Tarkov.dev `pvp-season` profile source for Seasonal progress.
+  Seasonal EFT-log imports use the event and active-season safeguards specified in section 7.
 
 ---
 
