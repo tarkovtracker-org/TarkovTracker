@@ -664,6 +664,46 @@ flowchart LR
    only `pvp` (and `pve`, which the UI still gates off) and never writes the Seasonal row. The store
    rejects a Seasonal prestige before any request, and the settings card reports prestige as
    unavailable in Seasonal PvP.
+9. EFT log import restores explicit quest notification states in PvP, PvE, and active Seasonal
+   PvP. Message types 10/11/12 identify started/failed/completed tasks; rewards, backend requests,
+   diagnostics, and group-member snapshots do not establish additional player progress. See
+   `docs/eft-log-reference/` for the audited format inventory (through `1.1.0.1.46911`) and
+   [TarkovMonitor's message type contract](https://github.com/the-hideout/TarkovMonitor/blob/master/TarkovMonitor/GameWatcher.cs).
+   The importer accepts legacy/rotated notification and backend filenames, and application/output
+   context, in folders, individual files, and ZIPs. Inputs are limited to 512 MiB per selected file,
+   32 MiB per log, and 256 MiB of combined log bytes across raw files and ZIPs. Readers count
+   bytes against the remaining combined budget before decoding raw files or decompressing ZIP
+   entries; preview assembly reuses those totals without re-encoding log text.
+   Arena is excluded. Multiline JSON is bounded
+   by log records so a truncated event cannot consume the next notification.
+   Mode routing uses preceding explicit session declarations or gateway/WebSocket connections;
+   legacy prod backend requests remain a fallback when explicit PvP/Seasonal routing is absent.
+   Unparseable signal timestamps are discarded. Delayed responses and shared mode/locale routes
+   and URLs inside notification payloads are not switches. Conflicting simultaneous
+   signals and events before the first signal remain unresolved and require a destination choice.
+   Original notification message times (`dt`) order replayed history when present; record timestamps
+   still locate the mode signal. Without `dt`, record time is the fallback.
+   Stable server event/message identities are deduplicated across modes before progress is
+   applied; routing follows the earliest receipt, regardless of file order or replay receipt mode.
+   Sparse fallback identities stay mode-scoped, using receipt time when no original time exists.
+   Conflicting or unresolved simultaneous deliveries remain unresolved: unknown may represent
+   contradictory signals, not just absent context, so a partial copy cannot override it. States are
+   then reconciled per mode and quest after unresolved-mode routing; tied timestamps prefer completed, failed, then started.
+   Explicit failure notifications use the persistent manual-failure flag so automatic repair cannot
+   discard them when a triggering quest is missing from the logs. Existing completed tracker tasks
+   are preserved. Catalogs share metadata hydration's task-qualified duplicate-objective IDs.
+   All destination task/objective catalogs are
+   loaded before mutations, without changing the active metadata store. Destination catalogs
+   determine task eligibility and objective counts, and the original progress mode is restored. Application is not transactional across modes:
+   failures explicitly warn that some progress may remain applied. Users can select the same logs
+   to retry; state-setting operations preserve successful completions.
+   Seasonal events outside the active season are skipped; assigning unresolved out-of-season
+   events to Seasonal is blocked. Preview counts exclude those events and the shared confirmation
+   guard shows the date warning and disables confirmation immediately for an invalid selection.
+   Malformed/skipped records are reported in the preview.
+   Version filters are compatibility filters, not account/wipe/prestige boundaries: users must
+   select the character sessions they intend to restore. Missing logs, objective handovers, XP,
+   skills, and hideout progress cannot be reconstructed from these quest notifications.
 
 ### Files
 
@@ -858,7 +898,8 @@ flowchart LR
   `pvp`/`pve`, `user_prestige_runs` keeps its `mode IN ('pvp','pve')` constraint, and no Seasonal
   progress is written through a prestige.
 - Tarkov.dev profile imports can target Seasonal through the verified `pvp-season` source. EFT-log
-  imports cannot target Seasonal until their source data is verified.
+  imports can target Seasonal using the verified notification formats and active-season guards
+  specified in section 7; unresolved-mode events require an explicit destination choice.
 
 ---
 
@@ -944,8 +985,8 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
   cost protection, per the design principle in `docs/RATE_LIMITING.md`.
 - Ordinary success responses are browser-cacheable (`private`); explicit `fresh=1` responses and
   error responses never are.
-- The client accepts the verified Tarkov.dev `pvp-season` profile source for Seasonal progress and
-  rejects Seasonal EFT-log imports before mutating progress until that source is verified.
+- The client accepts the verified Tarkov.dev `pvp-season` profile source for Seasonal progress.
+  Seasonal EFT-log imports use the event and active-season safeguards specified in section 7.
 
 ---
 

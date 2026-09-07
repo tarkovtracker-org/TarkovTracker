@@ -445,8 +445,9 @@
                   :key="version"
                   :model-value="eftLogsIncludedVersions.includes(version)"
                   :disabled="
-                    eftLogsIncludedVersions.length === 1 &&
-                    eftLogsIncludedVersions.includes(version)
+                    eftLogsIsImporting ||
+                    (eftLogsIncludedVersions.length === 1 &&
+                      eftLogsIncludedVersions.includes(version))
                   "
                   :label="formatEftLogsVersionLabel(version)"
                   @update:model-value="
@@ -605,11 +606,35 @@
                 </div>
               </div>
             </div>
+            <div v-if="eftLogsUnknownFailedTaskIds.length" class="space-y-1">
+              <p class="text-surface-400 text-xs">
+                {{ $t('settings.log_import.unknown_failed_events') }}
+              </p>
+              <ul class="text-surface-100 space-y-1 text-xs">
+                <li v-for="taskId in eftLogsUnknownFailedTaskIds" :key="`unknown-failed-${taskId}`">
+                  {{ formatEftLogsUnknownTask(taskId) }}
+                </li>
+              </ul>
+            </div>
+            <p class="text-surface-300 text-sm">
+              {{ $t('settings.log_import.failed_tasks', { count: eftLogsFailedCount }) }}
+            </p>
+            <UAlert
+              v-if="eftLogsPreview.parseErrorCount || eftLogsPreview.skippedSeasonalEventCount"
+              color="warning"
+              :description="eftLogsSkippedEventsMessage"
+            />
+            <UAlert v-if="eftLogsPreviewError" color="error" :description="eftLogsPreviewError" />
             <div v-if="eftLogsRequiresManualModeSelection" class="space-y-1">
               <label class="text-surface-200 text-sm font-semibold">
                 {{ $t('settings.log_import.import_unknown_to_mode') }}
               </label>
-              <GameModeToggle v-model="eftLogsTargetMode" :disabled-modes="[GAME_MODES.SEASONAL]" />
+              <GameModeToggle
+                v-model="eftLogsTargetMode"
+                :disabled-modes="
+                  eftLogsIsImporting ? [GAME_MODES.PVP, GAME_MODES.PVE, GAME_MODES.SEASONAL] : []
+                "
+              />
               <p class="text-surface-400 text-xs">
                 {{ $t('settings.log_import.import_unknown_to_mode_hint') }}
               </p>
@@ -622,11 +647,19 @@
                 icon="i-mdi-check"
                 color="primary"
                 class="flex-1"
+                :loading="eftLogsIsImporting"
+                :disabled="eftLogsHasOutsideSeasonEvents"
                 @click="handleEftLogsConfirm"
               >
                 {{ $t('common.confirm_import') }}
               </UButton>
-              <UButton variant="soft" color="neutral" class="flex-1" @click="resetEftLogsImport()">
+              <UButton
+                variant="soft"
+                color="neutral"
+                class="flex-1"
+                :disabled="eftLogsIsImporting"
+                @click="resetEftLogsImport()"
+              >
                 {{ $t('common.cancel') }}
               </UButton>
             </div>
@@ -646,6 +679,7 @@
                 $t('settings.log_import.success_description', {
                   active_count: eftLogsActiveCount,
                   complete_count: eftLogsCompletedCount,
+                  failed_count: eftLogsFailedCount,
                 })
               "
             />
@@ -959,8 +993,13 @@
     getGameModeLabel,
     sortSkillsByGameOrder,
     type GameMode,
-    type ImportableGameMode,
   } from '@/utils/constants';
+  import {
+    hasOutsideSeasonEvents,
+    isCurrentSeasonLogEvent,
+    isEligibleImportEvent,
+    latestEftQuestEvents,
+  } from '@/utils/eftLogQuestParser';
   import { logger } from '@/utils/logger';
   import { getImportCooldownRemainingMs } from '@/utils/tarkovDevImportCooldown';
   import { buildTarkovDevProfileUrl } from '@/utils/tarkovDevProfileUrl';
@@ -1103,8 +1142,7 @@
   const tarkovDevProfileUrlInput = ref('');
   const tarkovDevRequestGeneration = ref(0);
   const currentTarkovDevMode = (): GameMode => tarkovStore.getCurrentGameMode();
-  const currentImportableMode = (): ImportableGameMode =>
-    tarkovStore.getCurrentGameMode() === GAME_MODES.PVE ? GAME_MODES.PVE : GAME_MODES.PVP;
+  const currentImportableMode = (): GameMode => tarkovStore.getCurrentGameMode();
   const tarkovDevFixedTargetMode = ref<GameMode | null>(null);
   const tarkovDevTargetMode = ref<GameMode>(currentTarkovDevMode());
   const tarkovDevRefetchMode = ref<TarkovDevRefetchMode>(currentTarkovDevMode());
@@ -1113,6 +1151,7 @@
   );
   const isTarkovDevProfileUrlLoading = computed(() => tarkovDevImportState.value === 'loading');
   const {
+    isImporting: eftLogsIsImporting,
     importState: eftLogsImportState,
     previewData: eftLogsPreview,
     importError: eftLogsImportError,
@@ -1126,7 +1165,7 @@
     t('settings.log_import.session_folder_example_path')
   );
   const eftLogsFolderInputRef = ref<HTMLInputElement | null>(null);
-  const eftLogsTargetMode = ref<ImportableGameMode>(currentImportableMode());
+  const eftLogsTargetMode = ref<GameMode>(currentImportableMode());
   const eftLogsNoQuestEventsError = computed(() =>
     t('settings.log_import.errors.no_quest_events_found')
   );
@@ -1439,62 +1478,82 @@
     if (!taskName) return taskId;
     return `${taskName} (${taskId})`;
   }
-  const eftLogsCompletedCount = computed(() => eftLogsPreview.value?.matchedTaskIds.length ?? 0);
-  const eftLogsActiveTaskIds = computed(() => {
-    const matchedTaskIds = eftLogsPreview.value?.matchedTaskIds ?? [];
-    const matchedStartedTaskIds = eftLogsPreview.value?.matchedStartedTaskIds ?? [];
-    if (matchedStartedTaskIds.length === 0) return [];
-    if (matchedTaskIds.length === 0) return matchedStartedTaskIds;
-    const completedTaskIdSet = new Set(matchedTaskIds);
-    return matchedStartedTaskIds.filter((taskId) => !completedTaskIdSet.has(taskId));
-  });
-  const eftLogsActiveCount = computed(() => eftLogsActiveTaskIds.value.length);
+  /** Uses only eligible, in-season latest states for the selected destination's preview totals. */
+  const eftLogsEffectiveEvents = computed(() =>
+    latestEftQuestEvents(eftLogsPreview.value?.events ?? [], eftLogsTargetMode.value)
+      .filter(isEligibleImportEvent)
+      .filter((event) => event.mode !== GAME_MODES.SEASONAL || isCurrentSeasonLogEvent(event))
+  );
+  /** Applies the confirmation guard before enabling a Seasonal import. */
+  const eftLogsHasOutsideSeasonEvents = computed(() =>
+    hasOutsideSeasonEvents(eftLogsPreview.value?.events ?? [], eftLogsTargetMode.value)
+  );
+  /** Shows invalid Seasonal selections immediately while preserving application errors. */
+  const eftLogsPreviewError = computed(
+    () =>
+      eftLogsImportError.value ??
+      (eftLogsHasOutsideSeasonEvents.value
+        ? t('settings.log_import.errors.outside_active_season')
+        : null)
+  );
+  const eftLogsCompletedCount = computed(
+    () => eftLogsEffectiveEvents.value.filter((event) => event.status === 'completed').length
+  );
+  const eftLogsActiveCount = computed(
+    () => eftLogsEffectiveEvents.value.filter((event) => event.status === 'started').length
+  );
+  const eftLogsFailedCount = computed(
+    () => eftLogsEffectiveEvents.value.filter((event) => event.status === 'failed').length
+  );
   const eftLogsAvailableVersions = computed(() => eftLogsPreview.value?.availableVersions ?? []);
   const eftLogsIncludedVersions = computed(() => eftLogsPreview.value?.includedVersions ?? []);
   const eftLogsVersionSessionCounts = computed(
     () => eftLogsPreview.value?.versionSessionCounts ?? {}
   );
-  const eftLogsPvpCount = computed(() => {
-    const matchedTaskIdsByMode = eftLogsPreview.value?.matchedTaskIdsByMode;
-    const matchedStartedTaskIdsByMode = eftLogsPreview.value?.matchedStartedTaskIdsByMode;
-    if (!matchedTaskIdsByMode || !matchedStartedTaskIdsByMode) return 0;
-    return matchedTaskIdsByMode.pvp.length + matchedStartedTaskIdsByMode.pvp.length;
+  /** Formats a nonzero skipped-event count using the appropriate singular or plural message. */
+  const eftLogsSkippedClause = (kind: 'malformed' | 'seasonal', count: number) => {
+    if (count <= 0) return '';
+    return t(`settings.log_import.skipped_${kind}.${count === 1 ? 'single' : 'plural'}`, { count });
+  };
+  /** Combines only the applicable malformed-record and out-of-season warnings. */
+  const eftLogsSkippedEventsMessage = computed(() => {
+    const preview = eftLogsPreview.value;
+    if (!preview) return '';
+    const malformed = preview.parseErrorCount ?? 0;
+    const seasonal = preview.skippedSeasonalEventCount ?? 0;
+    return [
+      eftLogsSkippedClause('malformed', malformed),
+      eftLogsSkippedClause('seasonal', seasonal),
+    ]
+      .filter(Boolean)
+      .join(' ');
   });
-  const eftLogsPveCount = computed(() => {
-    const matchedTaskIdsByMode = eftLogsPreview.value?.matchedTaskIdsByMode;
-    const matchedStartedTaskIdsByMode = eftLogsPreview.value?.matchedStartedTaskIdsByMode;
-    if (!matchedTaskIdsByMode || !matchedStartedTaskIdsByMode) return 0;
-    return matchedTaskIdsByMode.pve.length + matchedStartedTaskIdsByMode.pve.length;
-  });
-  const eftLogsUnknownCount = computed(() => {
-    const matchedTaskIdsByMode = eftLogsPreview.value?.matchedTaskIdsByMode;
-    const matchedStartedTaskIdsByMode = eftLogsPreview.value?.matchedStartedTaskIdsByMode;
-    if (!matchedTaskIdsByMode || !matchedStartedTaskIdsByMode) return 0;
-    return matchedTaskIdsByMode.unknown.length + matchedStartedTaskIdsByMode.unknown.length;
-  });
+  /** Counts eligible raw mode buckets before the user routes unresolved events. */
+  const eftLogsModeCount = (mode: GameMode | 'unknown') => {
+    const preview = eftLogsPreview.value;
+    if (!preview) return 0;
+    return [
+      preview.matchedTaskIdsByMode,
+      preview.matchedStartedTaskIdsByMode,
+      preview.matchedFailedTaskIdsByMode,
+    ].reduce((count, buckets) => count + (buckets?.[mode]?.length ?? 0), 0);
+  };
+  const eftLogsUnknownCount = computed(() => eftLogsModeCount('unknown'));
   const eftLogsUnknownCompletedTaskIds = computed(
     () => eftLogsPreview.value?.matchedTaskIdsByMode.unknown ?? []
   );
   const eftLogsUnknownStartedTaskIds = computed(
     () => eftLogsPreview.value?.matchedStartedTaskIdsByMode.unknown ?? []
   );
-  const eftLogsHasPvpMatches = computed(() => eftLogsPvpCount.value > 0);
-  const eftLogsHasPveMatches = computed(() => eftLogsPveCount.value > 0);
-  const eftLogsRequiresManualModeSelection = computed(
-    () =>
-      eftLogsUnknownCount.value > 0 || (!eftLogsHasPvpMatches.value && !eftLogsHasPveMatches.value)
+  const eftLogsUnknownFailedTaskIds = computed(
+    () => eftLogsPreview.value?.matchedFailedTaskIdsByMode?.unknown ?? []
   );
+  const eftLogsRequiresManualModeSelection = computed(() => eftLogsUnknownCount.value > 0);
   const eftLogsModeSummaryLabel = computed(() => {
-    if (eftLogsHasPvpMatches.value && eftLogsHasPveMatches.value) {
-      return t('settings.log_import.mode_summary_both');
-    }
-    if (eftLogsHasPveMatches.value) {
-      return t('settings.log_import.mode_summary_pve');
-    }
-    if (eftLogsHasPvpMatches.value) {
-      return t('settings.log_import.mode_summary_pvp');
-    }
-    return t('common.unknown');
+    const labels = [GAME_MODES.PVP, GAME_MODES.PVE, GAME_MODES.SEASONAL]
+      .filter((mode) => eftLogsModeCount(mode) > 0)
+      .map((mode) => t(getGameModeLabel(mode)));
+    return labels.length ? labels.join(' + ') : t('common.unknown');
   });
   const editionLabelFromBackup = computed(() => getEditionLabel(backupPreview.value?.gameEdition));
   const showImportTools = computed(() => props.view === 'all' || props.view === 'imports');
