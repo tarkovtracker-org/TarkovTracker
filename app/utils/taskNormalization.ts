@@ -81,3 +81,20 @@ export function dedupeTaskObjectiveIds(tasks: Task[]) {
   });
   return { tasks: updatedTasks, duplicateObjectiveIds };
 }
+/** Read legacy shared-profile keys without mutating the owner's stored progress. */
+export function projectDuplicateObjectiveProgress<T>(
+  progress: Record<string, T>,
+  duplicates: ReadonlyMap<string, readonly string[]>
+): Record<string, T> {
+  let projected = { ...progress };
+  for (const [originalId, qualifiedIds] of duplicates) {
+    const legacy = progress[originalId];
+    if (legacy === undefined) continue;
+    qualifiedIds.forEach((id) => {
+      if (!Object.hasOwn(projected, id)) projected[id] = legacy;
+    });
+    const { [originalId]: _legacy, ...rest } = projected;
+    projected = rest;
+  }
+  return projected;
+}
