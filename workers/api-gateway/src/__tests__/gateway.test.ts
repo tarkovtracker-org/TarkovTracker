@@ -1086,8 +1086,8 @@ describe('api-gateway', () => {
     return requestUrl ? new URL(requestUrl) : undefined;
   };
   it.each([
-    ['pvp', 0, 'user_id,game_edition,pvp_data'],
-    ['pve', 0, 'user_id,game_edition,pve_data'],
+    ['pvp', 0, 'user_id,game_edition'],
+    ['pve', 0, 'user_id,game_edition'],
     ['seasonal', 1, 'user_id,game_edition'],
   ] as const)(
     'loads the normalized %s progress row for its season',
@@ -1253,11 +1253,11 @@ describe('api-gateway', () => {
     const editionRequest = fetchMock.mock.calls
       .map((call) => new URL(String(call[0])))
       .find((url) => url.pathname.endsWith('/rest/v1/user_progress'));
-    expect(editionRequest?.searchParams.get('select')).toBe('user_id,game_edition,pve_data');
+    expect(editionRequest?.searchParams.get('select')).toBe('user_id,game_edition');
   });
   it.each([
-    ['pvp', 'user_id,game_edition,pvp_data'],
-    ['pve', 'user_id,game_edition,pve_data'],
+    ['pvp', 'user_id,game_edition'],
+    ['pve', 'user_id,game_edition'],
     ['seasonal', 'user_id,game_edition'],
   ] as const)(
     'narrows the solo team-progress edition select for %s',

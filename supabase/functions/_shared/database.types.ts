@@ -470,6 +470,7 @@ export type Database = {
           game_mode: string
           profile_public: boolean
           progress_data: Json
+          progress_updated_at: string | null
           season_number: number
           updated_at: string
           user_id: string
@@ -479,6 +480,7 @@ export type Database = {
           game_mode: string
           profile_public?: boolean
           progress_data?: Json
+          progress_updated_at?: string | null
           season_number?: number
           updated_at?: string
           user_id: string
@@ -488,6 +490,7 @@ export type Database = {
           game_mode?: string
           profile_public?: boolean
           progress_data?: Json
+          progress_updated_at?: string | null
           season_number?: number
           updated_at?: string
           user_id?: string
