@@ -16,8 +16,16 @@ const partialFailure = (results: PromiseSettledResult<unknown>[]): Error | null 
   const failure = results.find((result) => result.status === 'rejected');
   return failure?.status === 'rejected' ? profileMetadataError(failure.reason) : null;
 };
-const optionalChapters = (overlay: { data: { storyChapters: StoryChapter[] } } | undefined) =>
-  overlay?.data.storyChapters ?? [];
+const optionalChapters = (overlay: { data: { storyChapters: StoryChapter[] } }): StoryChapter[] => {
+  const chapters = overlay?.data?.storyChapters;
+  if (
+    !Array.isArray(chapters) ||
+    chapters.some((chapter) => !chapter || typeof chapter.id !== 'string')
+  ) {
+    throw new Error('Invalid optional story chapter catalog');
+  }
+  return chapters;
+};
 const optionalPrestige = (prestige: { data: { prestige: PrestigeLevel[] } } | undefined) =>
   prestige?.data.prestige ?? [];
 const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: AbortSignal) => {
@@ -26,12 +34,14 @@ const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: Abo
   const [coreResult, objectivesResult, overlayResult, prestigeResult] = await Promise.allSettled([
     $fetch<{ data: TarkovTasksCoreQueryResult }>('/api/tarkov/tasks-core', options),
     $fetch<{ data: { tasks: Task[] } }>('/api/tarkov/tasks-objectives', options),
-    $fetch<{ data: { storyChapters: StoryChapter[] } }>('/api/tarkov/editions', options),
+    $fetch<{ data: { storyChapters: StoryChapter[] } }>('/api/tarkov/editions', options).then(
+      optionalChapters
+    ),
     $fetch<{ data: { prestige: PrestigeLevel[] } }>('/api/tarkov/prestige', options),
   ]);
   const core = requiredResult(coreResult);
   const objectives = requiredResult(objectivesResult);
-  const overlay = optionalResult(overlayResult);
+  const chapters = optionalResult(overlayResult);
   const prestige = optionalResult(prestigeResult);
   const byId = new Map(objectives.data.tasks.map((task) => [task.id, task]));
   const merged = core.data.tasks.map((task) => ({ ...task, ...byId.get(task.id) }));
@@ -44,7 +54,7 @@ const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: Abo
   return {
     tasks: useGraphBuilder().processTaskData(normalized.tasks).tasks,
     duplicateObjectiveIds: normalized.duplicateObjectiveIds,
-    chapters: optionalChapters(overlay),
+    chapters: chapters ?? [],
     prestige: optionalPrestige(prestige),
     failure: partialFailure([overlayResult, prestigeResult]),
   };
