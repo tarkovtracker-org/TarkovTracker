@@ -2276,7 +2276,19 @@
         "no_quest_events_found": "在所选日志中未找到任务开始/完成事件。",
         "parse_failed": "解析 EFT 日志失败。",
         "selected_logs_too_large": "所选日志内容过多（最大 {max_mb} MB）。",
-        "task_metadata_not_loaded": "任务元数据尚未加载。请刷新后重试。"
+        "task_metadata_not_loaded": "任务元数据尚未加载。请刷新后重试。",
+        "invalid_mode": "选择一个有效的目标游戏模式。",
+        "outside_active_season": "这些日志包含活动季节以外或没有可用日期的事件。从活动季节选择会话，然后导入季节性PvP。"
+      },
+      "failed_tasks": "Matched failed tasks: {count}",
+      "unknown_failed_events": "任务失败(未知模式)",
+      "skipped_malformed": {
+        "single": "Skipped {count} malformed notification.",
+        "plural": "Skipped {count} malformed notifications."
+      },
+      "skipped_seasonal": {
+        "single": "Skipped {count} Seasonal event outside the active season or without a valid date.",
+        "plural": "Skipped {count} Seasonal events outside the active season or without valid dates."
       }
     },
     "tarkov_dev_import": {

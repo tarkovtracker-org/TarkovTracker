@@ -2276,7 +2276,19 @@
         "no_quest_events_found": "Ve vybraných záznamech nebyly nalezeny žádné start/dokončovací události.",
         "parse_failed": "Nepodařilo se analyzovat protokoly EFT.",
         "selected_logs_too_large": "Vybrané protokoly obsahují příliš mnoho obsahu (max {max_mb} MB).",
-        "task_metadata_not_loaded": "Metadata úkolů ještě nejsou načtena. Prosím aktualizujte a zkuste to znovu."
+        "task_metadata_not_loaded": "Metadata úkolů ještě nejsou načtena. Prosím aktualizujte a zkuste to znovu.",
+        "invalid_mode": "Vyberte platný cílový herní režim.",
+        "outside_active_season": "Tyto protokoly obsahují události mimo aktivní sezónu nebo bez data použitelnosti. Před importem do sezony vyberte relace z aktivní sezóny."
+      },
+      "failed_tasks": "Odpovídající neúspěšné úkoly: {count}",
+      "unknown_failed_events": "Neúspěšné úkoly (neznámý režim)",
+      "skipped_malformed": {
+        "single": "Přeskočeno {count} chybné oznámení.",
+        "plural": "Přeskočeno {count} chybná oznámení."
+      },
+      "skipped_seasonal": {
+        "single": "Přeskočeno {count} Sezónní událost mimo aktivní sezónu nebo bez platného data.",
+        "plural": "Přeskočeno {count} Sezónní události mimo aktivní sezónu nebo bez platných dat."
       }
     },
     "tarkov_dev_import": {

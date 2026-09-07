@@ -2276,7 +2276,19 @@
         "no_quest_events_found": "Nessun evento di avvio/completamento missioni trovato nei log selezionati.",
         "parse_failed": "Analisi dei log EFT non riuscita.",
         "selected_logs_too_large": "I log selezionati contengono troppi contenuti (max {max_mb} MB).",
-        "task_metadata_not_loaded": "I metadati delle missioni non sono ancora stati caricati. Si prega di aggiornare e riprovare."
+        "task_metadata_not_loaded": "I metadati delle missioni non sono ancora stati caricati. Si prega di aggiornare e riprovare.",
+        "invalid_mode": "Seleziona una modalità di gioco di destinazione valida.",
+        "outside_active_season": "Questi registri contengono eventi al di fuori della stagione attiva o senza una data utilizzabile. Seleziona sessioni dalla stagione attiva prima di importare in PvP stagionale."
+      },
+      "failed_tasks": "Attività corrisposte non riuscite: {count}",
+      "unknown_failed_events": "Attività Non Riuscite (Modalità Sconosciuta)",
+      "skipped_malformed": {
+        "single": "Notifica errata {count}.",
+        "plural": "Skipped {count} malformed notifications."
+      },
+      "skipped_seasonal": {
+        "single": "Saltato {count} Evento stagionale al di fuori della stagione attiva o senza data valida.",
+        "plural": "Saltato {count} Eventi stagionali al di fuori della stagione attiva o senza date valide."
       }
     },
     "tarkov_dev_import": {

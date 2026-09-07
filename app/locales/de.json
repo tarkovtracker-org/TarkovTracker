@@ -2276,7 +2276,19 @@
         "no_quest_events_found": "In den ausgewählten Logs wurden keine Quest-Start- oder Abschlussereignisse gefunden.",
         "parse_failed": "EFT-Logs konnten nicht verarbeitet werden.",
         "selected_logs_too_large": "Ausgewählte Logs enthalten zu viele Daten (max. {max_mb} MB).",
-        "task_metadata_not_loaded": "Aufgabenmetadaten sind noch nicht geladen. Bitte aktualisieren und erneut versuchen."
+        "task_metadata_not_loaded": "Aufgabenmetadaten sind noch nicht geladen. Bitte aktualisieren und erneut versuchen.",
+        "invalid_mode": "Wählen Sie einen gültigen Zielspielmodus.",
+        "outside_active_season": "Diese Protokolle enthalten Ereignisse außerhalb der aktiven Saison oder ohne ein verwendbares Datum. Wählen Sie Sessions aus der aktiven Saison aus, bevor Sie in das PvP der Saison importieren."
+      },
+      "failed_tasks": "Fehlgeschlagene Aufgaben: {count}",
+      "unknown_failed_events": "Fehlerhafte Aufgaben (Unbekannter Modus)",
+      "skipped_malformed": {
+        "single": "{count} fehlerhafte Benachrichtigung übersprungen.",
+        "plural": "{count} fehlerhafte Benachrichtigungen übersprungen."
+      },
+      "skipped_seasonal": {
+        "single": "{count} saisonales Ereignis außerhalb der aktiven Saison oder ohne gültiges Datum übersprungen.",
+        "plural": "{count} saisonale Ereignisse außerhalb der aktiven Saison oder ohne gültige Termine übersprungen."
       }
     },
     "tarkov_dev_import": {
