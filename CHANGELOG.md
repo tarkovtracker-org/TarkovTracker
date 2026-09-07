@@ -1,3 +1,10 @@
+## [1.76.7](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.6...v1.76.7) (2026-09-07)
+
+
+### Bug Fixes
+
+* classify team creation membership races ([#820](https://github.com/tarkovtracker-org/TarkovTracker/issues/820)) ([c8add78](https://github.com/tarkovtracker-org/TarkovTracker/commit/c8add784a3632ea301d2e548d8aae7125ae5b35c))
+
 ## [1.76.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.5...v1.76.6) (2026-09-07)
 
 
