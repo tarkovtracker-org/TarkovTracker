@@ -15,7 +15,9 @@ export const resolveGameModeSeason = async (
   try {
     const url = new URL(config.supabaseUrl);
     if (url.protocol !== 'https:') throw new Error('Expected HTTPS');
-    url.pathname = `${url.pathname.replace(/\/+$/, '')}/rest/v1/rpc/get_active_season_number`;
+    let path = url.pathname;
+    while (path.endsWith('/')) path = path.slice(0, -1);
+    url.pathname = `${path}/rest/v1/rpc/get_active_season_number`;
     url.search = '';
     url.hash = '';
     const response = await fetchWithTimeout(
