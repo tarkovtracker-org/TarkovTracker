@@ -657,8 +657,8 @@ describe('Team Members API', () => {
           expect(
             mockFetch.mock.calls.filter((call) =>
               String(call[0]).includes('team_member_mode_summary')
-            ).length
-          ).toBe(summaryCallsBefore);
+            )
+          ).toHaveLength(summaryCallsBefore);
         } finally {
           if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
           else process.env.NODE_ENV = originalNodeEnv;
