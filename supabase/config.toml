@@ -376,6 +376,7 @@ verify_jwt = false
 
 [functions.team-create]
 verify_jwt = false
+import_map = "./functions/deno.json"
 
 [functions.team-kick]
 verify_jwt = false

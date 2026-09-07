@@ -5,7 +5,8 @@
   "imports": {
     "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
     "@supabase/functions-js/edge-runtime": "jsr:@supabase/functions-js@2/edge-runtime.d.ts",
-    "shared/auth": "./_shared/auth.ts"
+    "shared/auth": "./_shared/auth.ts",
+    "shared/team-create-error": "./_shared/team-create-error.ts"
   },
   "lint": {
     "rules": {
