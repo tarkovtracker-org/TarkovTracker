@@ -602,7 +602,7 @@ describe('Team Members API', () => {
           const season = gameMode === 'seasonal' ? 2 : 0;
           mockFetch.mockImplementation(async (url: string | URL) => {
             const target = String(url);
-            if (target.includes('/rpc/get_active_season_number'))
+            if (gameMode === 'seasonal' && target.includes('/rpc/get_active_season_number'))
               return activeSeasonResponse(season);
             if (target.includes('team_memberships?')) {
               return membershipResponse(gameMode);
