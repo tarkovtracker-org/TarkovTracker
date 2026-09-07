@@ -1493,11 +1493,12 @@
   );
   const eftLogsModeCount = (mode: GameMode | 'unknown') => {
     const preview = eftLogsPreview.value;
-    return (
-      (preview?.matchedTaskIdsByMode[mode]?.length ?? 0) +
-      (preview?.matchedStartedTaskIdsByMode[mode]?.length ?? 0) +
-      (preview?.matchedFailedTaskIdsByMode?.[mode]?.length ?? 0)
-    );
+    if (!preview) return 0;
+    return [
+      preview.matchedTaskIdsByMode,
+      preview.matchedStartedTaskIdsByMode,
+      preview.matchedFailedTaskIdsByMode,
+    ].reduce((count, buckets) => count + (buckets?.[mode]?.length ?? 0), 0);
   };
   const eftLogsUnknownCount = computed(() => eftLogsModeCount('unknown'));
   const eftLogsUnknownCompletedTaskIds = computed(

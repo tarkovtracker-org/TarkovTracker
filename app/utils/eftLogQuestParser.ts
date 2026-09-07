@@ -5,7 +5,7 @@ const BACKEND_URL_PATTERN =
 const LOG_LINE_TIMESTAMP_PATTERN =
   /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}(?: [+-]\d{2}:\d{2})?)/;
 const RECORD_PATTERN =
-  /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}(?: [+-]\d{2}:\d{2})?\|(?:\d+(?:\.\d+){4}\|)?[^|\r\n]+\|([^|\r\n]+)\|([^\r\n]*)/gm;
+  /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}(?: [+-]\d{2}:\d{2})?\|([^\r\n]*)/gm;
 const SESSION_VERSION_PATTERN = /(?:^|[_\s-])(\d+\.\d+\.\d+\.\d+\.\d+)(?=$|[_\s-])/;
 const UNKNOWN_MODE = 'unknown' as const;
 export const UNKNOWN_LOG_VERSION = 'unknown';
@@ -103,10 +103,12 @@ function* readLogRecords(text: string): Generator<LogRecord> {
   if (previous) yield toLogRecord(text, previous, text.length);
 }
 function toLogRecord(text: string, match: RegExpExecArray, end: number): LogRecord {
+  const fields = match[1]!.split('|');
+  const channelIndex = /^\d+(?:\.\d+){4}$/.test(fields[0] ?? '') ? 2 : 1;
   return {
     timestamp: extractLogLineTimestamp(match[0])!,
-    channel: match[1]!.toLowerCase(),
-    message: match[2]!,
+    channel: (fields[channelIndex] ?? '').toLowerCase(),
+    message: fields.slice(channelIndex + 1).join('|'),
     body: text.slice(match.index + match[0].length, end).trim(),
   };
 }
@@ -181,29 +183,29 @@ function toChatMessagePayload(value: unknown): ChatMessagePayload | null {
   if (!isPlainObject(value.message)) return null;
   return value as unknown as ChatMessagePayload;
 }
+function isSessionDirectory(directory: string, slashIndex: number): boolean {
+  return slashIndex >= 0 && /(?:^|\/)log_/.test(directory);
+}
 function toSessionKey(fileName: string): string {
   const normalized = fileName.replaceAll('\\', '/').toLowerCase();
   const slashIndex = normalized.lastIndexOf('/');
   const directory = normalized.slice(0, slashIndex);
-  if (slashIndex !== -1 && /(?:^|\/)log_/.test(directory)) return directory;
+  if (isSessionDirectory(directory, slashIndex)) return directory;
   // Preserve sessions when files are selected individually instead of as a directory.
-  const prefix = normalized
-    .slice(slashIndex + 1)
-    .match(/^(\d{4}\.\d{2}\.\d{2}_\d{1,2}-\d{2}-\d{2}_\d+(?:\.\d+){4})(?=[ _-])/);
-  return prefix
-    ? `${normalized.slice(0, slashIndex + 1)}log_${prefix[1]}`
-    : slashIndex === -1
-      ? '__root__'
-      : normalized.slice(0, slashIndex);
+  const prefix = /^(\d{4}\.\d{2}\.\d{2}_\d{1,2}-\d{2}-\d{2}_\d+(?:\.\d+){4})(?=[ _-])/.exec(
+    normalized.slice(slashIndex + 1)
+  );
+  if (prefix) return `${normalized.slice(0, slashIndex + 1)}log_${prefix[1]}`;
+  return slashIndex === -1 ? '__root__' : directory;
 }
 function extractLogLineTimestamp(text: string): string | null {
-  const match = text.match(LOG_LINE_TIMESTAMP_PATTERN);
+  const match = LOG_LINE_TIMESTAMP_PATTERN.exec(text);
   if (!match) return null;
   return match[1] ?? null;
 }
 function extractSessionVersion(value: string): string | null {
   const normalized = value.replaceAll('\\', '/').toLowerCase();
-  const match = normalized.match(SESSION_VERSION_PATTERN);
+  const match = SESSION_VERSION_PATTERN.exec(normalized);
   if (!match) return null;
   const version = match[1]?.trim();
   if (!version) return null;
@@ -242,39 +244,62 @@ function isSharedProdModePath(path: string): boolean {
   if (path.startsWith('/client/menu/locale')) return true;
   return false;
 }
+function declaredRecordMode(record: LogRecord): GameMode | undefined {
+  if (!['application', 'output'].includes(record.channel)) return undefined;
+  const declared = /(?:^|\s)Session mode:\s*(Regular|Pve|PvpSeason)\b/i.exec(record.message);
+  const modes: Record<string, GameMode> = {
+    regular: GAME_MODES.PVP,
+    pve: GAME_MODES.PVE,
+    pvpseason: GAME_MODES.SEASONAL,
+  };
+  return modes[declared?.[1]?.toLowerCase() ?? ''];
+}
+function gatewayMode(host: string): GameMode | undefined {
+  if (/^(gw|wsn)-pvp[-_]season(?:[-.]|$)/.test(host)) return GAME_MODES.SEASONAL;
+  if (/^(gw|wsn)-pve(?:[-.]|$)/.test(host)) return GAME_MODES.PVE;
+  if (/^(gw|wsn)-pvp(?:[-.]|$)/.test(host)) return GAME_MODES.PVP;
+  return undefined;
+}
+function isModeSignalRecord(record: LogRecord): boolean {
+  if (record.channel === 'backend') return record.message.includes('---> Request');
+  return ['notifications', 'push-notifications'].includes(record.channel);
+}
+function isLegacyModeUrl(host: string, path: string): boolean {
+  return host.startsWith('prod-') && !isSharedProdModePath(path);
+}
+function collectUrlModeSignal(
+  match: RegExpExecArray,
+  timestamp: string,
+  timeline: BackendModeSignal[],
+  legacy: BackendModeSignal[]
+): void {
+  const host = match[1]!.toLowerCase();
+  const path = (match[2] ?? '').toLowerCase();
+  const mode = gatewayMode(host);
+  if (mode) timeline.push({ mode, timestamp: timestamp });
+  else if (isLegacyModeUrl(host, path)) {
+    legacy.push({ mode: GAME_MODES.PVP, timestamp: timestamp });
+  }
+}
+function collectRecordModeSignals(
+  record: LogRecord,
+  timeline: BackendModeSignal[],
+  legacy: BackendModeSignal[]
+): void {
+  const declared = declaredRecordMode(record);
+  if (declared) timeline.push({ mode: declared, timestamp: record.timestamp });
+  // Delayed responses and URLs inside JSON chat text are not mode switches.
+  if (!isModeSignalRecord(record)) return;
+  for (const match of record.message.matchAll(new RegExp(BACKEND_URL_PATTERN))) {
+    collectUrlModeSignal(match, record.timestamp, timeline, legacy);
+  }
+}
 function collectBackendModeSignals(files: EftLogInputFile[]): BackendModeSignals {
   const timeline: BackendModeSignal[] = [];
   const legacy: BackendModeSignal[] = [];
   for (const file of files) {
     for (const record of readLogRecords(file.text)) {
-      const declared = /(?:^|\s)Session mode:\s*(Regular|Pve|PvpSeason)\b/i.exec(record.message);
-      if (declared && ['application', 'output'].includes(record.channel)) {
-        const mode = declared[1]!.toLowerCase();
-        timeline.push({
-          mode:
-            mode === 'pve'
-              ? GAME_MODES.PVE
-              : mode === 'pvpseason'
-                ? GAME_MODES.SEASONAL
-                : GAME_MODES.PVP,
-          timestamp: record.timestamp,
-        });
-      }
-      // Delayed responses and URLs inside JSON chat text are not mode switches.
-      if (record.channel === 'backend' && !record.message.includes('---> Request')) continue;
-      if (!['backend', 'notifications', 'push-notifications'].includes(record.channel)) continue;
-      for (const match of record.message.matchAll(new RegExp(BACKEND_URL_PATTERN))) {
-        const host = match[1]!.toLowerCase();
-        const path = (match[2] ?? '').toLowerCase();
-        let mode: GameMode | undefined;
-        if (/^(gw|wsn)-pvp[-_]season(?:[-.]|$)/.test(host)) mode = GAME_MODES.SEASONAL;
-        else if (/^(gw|wsn)-pve(?:[-.]|$)/.test(host)) mode = GAME_MODES.PVE;
-        else if (/^(gw|wsn)-pvp(?:[-.]|$)/.test(host)) mode = GAME_MODES.PVP;
-        if (mode) timeline.push({ mode, timestamp: record.timestamp });
-        else if (host.startsWith('prod-') && !isSharedProdModePath(path)) {
-          legacy.push({ mode: GAME_MODES.PVP, timestamp: record.timestamp });
-        }
-      }
+      collectRecordModeSignals(record, timeline, legacy);
     }
   }
   // Legacy prod hosts remain useful alongside PvE, but must not override explicit PvP/Season signals.
@@ -284,21 +309,24 @@ function collectBackendModeSignals(files: EftLogInputFile[]): BackendModeSignals
     )
   )
     timeline.push(...legacy);
-  timeline.sort(
-    (left, right) =>
-      (eftLogTimestampMillis(left.timestamp) ?? 0) - (eftLogTimestampMillis(right.timestamp) ?? 0)
-  );
+  return { timeline: combineModeSignals(timeline) };
+}
+function signalTime(signal: BackendModeSignal): number {
+  return eftLogTimestampMillis(signal.timestamp) ?? 0;
+}
+function reconcileModeSignal(prior: EftQuestEventMode, mode: EftQuestEventMode): EftQuestEventMode {
+  return prior === mode ? mode : UNKNOWN_MODE;
+}
+function combineModeSignals(timeline: BackendModeSignal[]): BackendModeSignal[] {
+  timeline.sort((left, right) => signalTime(left) - signalTime(right));
   const combined: BackendModeSignal[] = [];
   for (const signal of timeline) {
     const prior = combined.at(-1);
-    if (
-      prior &&
-      eftLogTimestampMillis(prior.timestamp) === eftLogTimestampMillis(signal.timestamp)
-    ) {
-      if (prior.mode !== signal.mode) prior.mode = UNKNOWN_MODE;
+    if (prior && signalTime(prior) === signalTime(signal)) {
+      prior.mode = reconcileModeSignal(prior.mode, signal.mode);
     } else combined.push({ ...signal });
   }
-  return { timeline: combined };
+  return combined;
 }
 function resolveEventModeFromTimeline(
   timestamp: string | null,
@@ -324,6 +352,11 @@ export function parseEftNotificationLogText(text: string): EftLogTextParseResult
   const completionEvents: EftQuestEvent[] = [];
   const startedEvents: EftQuestEvent[] = [];
   const failedEvents: EftQuestEvent[] = [];
+  const eventBuckets = new Map<unknown, EftQuestEvent[]>([
+    [10, startedEvents],
+    [11, failedEvents],
+    [12, completionEvents],
+  ]);
   let chatMessageCount = 0;
   let parseErrorCount = 0;
   for (const record of readLogRecords(text)) {
@@ -356,14 +389,7 @@ export function parseEftNotificationLogText(text: string): EftLogTextParseResult
     if (typeof message.templateId !== 'string') continue;
     const questId = extractQuestId(message.templateId);
     if (!questId) continue;
-    const events =
-      message.type === 12
-        ? completionEvents
-        : message.type === 10
-          ? startedEvents
-          : message.type === 11
-            ? failedEvents
-            : null;
+    const events = eventBuckets.get(message.type);
     if (!events) continue;
     events.push({
       eventKey: buildEventKey(payload, questId),
@@ -391,7 +417,7 @@ function isArenaLog(fileName: string): boolean {
 function matchesChannel(fileName: string, channel: string): boolean {
   if (isArenaLog(fileName)) return false;
   const name = fileName.replaceAll('\\', '/').split('/').pop() ?? '';
-  return new RegExp(`(?:^|[ _-])${channel}(?:_\\d+)?\\.log$`, 'i').test(name);
+  return new RegExp(String.raw`(?:^|[ _-])${channel}(?:_\d+)?\.log$`, 'i').test(name);
 }
 export function isEftNotificationLogFileName(fileName: string): boolean {
   return matchesChannel(fileName, '(?:push-notifications|notifications)');
@@ -408,28 +434,42 @@ export function isEftImportLogFileName(fileName: string): boolean {
 function modeBuckets<T>(create: () => T): Record<EftQuestEventMode, T> {
   return { pvp: create(), pve: create(), seasonal: create(), unknown: create() };
 }
+function knownQuestEventTime(event: EftQuestEvent): number | null {
+  return event.occurredAt ?? eftLogTimestampMillis(event.timestamp);
+}
+function questEventTime(event: EftQuestEvent): number {
+  return event.occurredAt ?? eftLogTimestampMillis(event.timestamp) ?? -1;
+}
+function supersedesQuestEvent(event: EftQuestImportEvent, prior: EftQuestImportEvent): boolean {
+  const time = questEventTime(event);
+  const priorTime = questEventTime(prior);
+  const rank = { started: 0, failed: 1, completed: 2 };
+  return time > priorTime || (time === priorTime && rank[event.status] > rank[prior.status]);
+}
+function routeUnknownEvent(event: EftQuestImportEvent, targetMode?: GameMode): EftQuestImportEvent {
+  return event.mode === UNKNOWN_MODE && targetMode ? { ...event, mode: targetMode } : event;
+}
 // Reconcile after routing unknown events too, so a restart and completion cannot land in different buckets.
 export function latestEftQuestEvents(
   events: EftQuestImportEvent[],
   targetMode?: GameMode
 ): EftQuestImportEvent[] {
   const latest = new Map<string, EftQuestImportEvent>();
-  const rank = { started: 0, failed: 1, completed: 2 };
   for (const original of events) {
-    const event =
-      original.mode === UNKNOWN_MODE && targetMode ? { ...original, mode: targetMode } : original;
+    const event = routeUnknownEvent(original, targetMode);
     const key = `${event.mode}:${event.questId}`;
     const prior = latest.get(key);
-    const time = event.occurredAt ?? eftLogTimestampMillis(event.timestamp) ?? -1;
-    const priorTime = prior?.occurredAt ?? eftLogTimestampMillis(prior?.timestamp ?? null) ?? -1;
-    if (
-      !prior ||
-      time > priorTime ||
-      (time === priorTime && rank[event.status] > rank[prior.status])
-    )
-      latest.set(key, event);
+    if (!prior || supersedesQuestEvent(event, prior)) latest.set(key, event);
   }
   return [...latest.values()];
+}
+function retainEarliestEvent(duplicate: EftQuestEvent, event: EftQuestEvent): void {
+  const time = knownQuestEventTime(event) ?? Infinity;
+  const priorTime = knownQuestEventTime(duplicate) ?? Infinity;
+  if (time < priorTime) {
+    duplicate.timestamp = event.timestamp;
+    duplicate.occurredAt = event.occurredAt;
+  }
 }
 export function parseEftLogsForQuestImport(
   files: EftLogInputFile[],
@@ -454,7 +494,7 @@ export function parseEftLogsForQuestImport(
       version:
         extractSessionVersion(sessionKey) ??
         extractSessionVersion(file.name) ??
-        file.text.match(/^\d{4}-[^\r\n|]+\|(\d+(?:\.\d+){4})\|/m)?.[1] ??
+        /^\d{4}-[^\r\n|]+\|(\d+(?:\.\d+){4})\|/m.exec(file.text)?.[1] ??
         UNKNOWN_LOG_VERSION,
     };
     if (isEftNotificationLogFileName(file.name)) {
@@ -465,7 +505,7 @@ export function parseEftLogsForQuestImport(
     if (group.version === UNKNOWN_LOG_VERSION) {
       group.version =
         extractSessionVersion(file.name) ??
-        file.text.match(/^\d{4}-[^\r\n|]+\|(\d+(?:\.\d+){4})\|/m)?.[1] ??
+        /^\d{4}-[^\r\n|]+\|(\d+(?:\.\d+){4})\|/m.exec(file.text)?.[1] ??
         UNKNOWN_LOG_VERSION;
     }
     groupedFiles.set(sessionKey, group);
@@ -511,13 +551,7 @@ export function parseEftLogsForQuestImport(
         const key = `${mode}:${status}:${event.questId}:${event.eventKey}`;
         const duplicate = seen.get(key);
         if (duplicate) {
-          const time = event.occurredAt ?? eftLogTimestampMillis(event.timestamp) ?? Infinity;
-          const priorTime =
-            duplicate.occurredAt ?? eftLogTimestampMillis(duplicate.timestamp) ?? Infinity;
-          if (time < priorTime) {
-            duplicate.timestamp = event.timestamp;
-            duplicate.occurredAt = event.occurredAt;
-          }
+          retainEarliestEvent(duplicate, event);
           return;
         }
         const imported = { ...event, mode, status };
@@ -553,12 +587,14 @@ export function parseEftLogsForQuestImport(
   const idsFor = (status: EftQuestEventStatus) =>
     [
       ...new Set(latest.filter((event) => event.status === status).map((event) => event.questId)),
-    ].sort();
+    ].sort((left, right) => left.localeCompare(right));
   const matchedByMode = (status: EftQuestEventStatus) => {
     const buckets = modeBuckets<string[]>(() => []);
     for (const event of latest)
       if (event.status === status && isMatched(event)) buckets[event.mode].push(event.questId);
-    Object.values(buckets).forEach((ids) => ids.sort());
+    Object.values(buckets).forEach((ids) => {
+      ids.sort((left, right) => left.localeCompare(right));
+    });
     return buckets;
   };
   const matchedIdsFor = (status: EftQuestEventStatus) =>
@@ -568,7 +604,7 @@ export function parseEftLogsForQuestImport(
           .filter((event) => event.status === status && isMatched(event))
           .map((event) => event.questId)
       ),
-    ].sort();
+    ].sort((left, right) => left.localeCompare(right));
   const questIds = idsFor('completed');
   const startedQuestIds = idsFor('started');
   const failedQuestIds = idsFor('failed');

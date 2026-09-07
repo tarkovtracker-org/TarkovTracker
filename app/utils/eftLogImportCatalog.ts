@@ -7,6 +7,14 @@ import type {
   TarkovTaskObjectivesQueryResult,
   TarkovTasksCoreQueryResult,
 } from '@/types/tarkov';
+function requireCatalogTasks<T extends { tasks: unknown[] }>(
+  response: FetchResponse<T>
+): T['tasks'] {
+  if (!isFetchSuccess<T>(response) || !Array.isArray(response.data?.tasks)) {
+    throw new Error('Task metadata could not be loaded for log import.');
+  }
+  return response.data.tasks;
+}
 // Read isolated snapshots: switching the UI mode does not await metadata hydration.
 export async function loadEftImportTaskCatalog(mode: GameMode): Promise<Task[]> {
   const query = { gameMode: API_GAME_MODES[mode], lang: 'en' };
@@ -20,17 +28,11 @@ export async function loadEftImportTaskCatalog(mode: GameMode): Promise<Task[]> 
       timeout: 15000,
     }),
   ]);
-  if (
-    !isFetchSuccess<TarkovTasksCoreQueryResult>(core) ||
-    !Array.isArray(core.data?.tasks) ||
-    !core.data.tasks.length ||
-    !isFetchSuccess<TarkovTaskObjectivesQueryResult>(objectives) ||
-    !Array.isArray(objectives.data?.tasks)
-  ) {
-    throw new Error('Task metadata could not be loaded for log import.');
-  }
-  const byId = new Map(objectives.data.tasks.map((task) => [task.id, task]));
-  const tasks = core.data.tasks.map((task) => {
+  const coreTasks = requireCatalogTasks(core);
+  const objectiveTasks = requireCatalogTasks(objectives);
+  if (!coreTasks.length) throw new Error('Task metadata could not be loaded for log import.');
+  const byId = new Map(objectiveTasks.map((task) => [task.id, task]));
+  const tasks = coreTasks.map((task) => {
     const details = byId.get(task.id);
     if (!details) throw new Error('Task objectives are incomplete for log import.');
     return {

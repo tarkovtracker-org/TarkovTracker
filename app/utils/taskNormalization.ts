@@ -42,6 +42,18 @@ export function normalizeTaskObjectives<T = unknown>(objectives: unknown): T[] {
   }
   return [];
 }
+function hasDuplicateObjective(counts: Map<string, number>, id: string): boolean {
+  return (counts.get(id) ?? 0) > 1;
+}
+function recordDuplicateObjective(
+  duplicates: Map<string, string[]>,
+  id: string,
+  newId: string
+): void {
+  const existing = duplicates.get(id) ?? [];
+  existing.push(newId);
+  duplicates.set(id, existing);
+}
 /** Keep persisted objective keys identical across metadata hydration and imports. */
 export function dedupeTaskObjectiveIds(tasks: Task[]) {
   const objectiveCounts = new Map<string, number>();
@@ -57,15 +69,9 @@ export function dedupeTaskObjectiveIds(tasks: Task[]) {
     let changed = false;
     const objectives = task.objectives.map((objective) => {
       if (!objective?.id) return objective;
-      const count = objectiveCounts.get(objective.id) ?? 0;
-      if (count <= 1) return objective;
+      if (!hasDuplicateObjective(objectiveCounts, objective.id)) return objective;
       const newId = `${objective.id}:${task.id}`;
-      const existing = duplicateObjectiveIds.get(objective.id);
-      if (existing) {
-        existing.push(newId);
-      } else {
-        duplicateObjectiveIds.set(objective.id, [newId]);
-      }
+      recordDuplicateObjective(duplicateObjectiveIds, objective.id, newId);
       changed = true;
       return { ...objective, id: newId };
     });
