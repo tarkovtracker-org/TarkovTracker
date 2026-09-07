@@ -101,6 +101,9 @@ interface MetadataState {
   initialized: boolean;
   initializationFailed: boolean;
   loading: boolean;
+  // Only core replacement advances this token; detail and item merges leave it unchanged.
+  tasksCoreRevision: number;
+  tasksCoreRefreshing: boolean;
   // Indicates objectives still need to be fetched (set when tasks exist but objectives not yet loaded)
   tasksObjectivesPending: boolean;
   tasksObjectivesHydrated: boolean;
@@ -166,11 +169,51 @@ const deriveStaticMapKey = (mapName: string, normalizedName?: string): string =>
   const lower = mapName.toLowerCase();
   return MAP_NAME_MAPPING[lower] ?? lower.replace(/[\s+-]/g, '');
 };
+const beginTaskCoreRefresh = (state: Pick<MetadataState, 'tasksCoreRefreshing'>): symbol => {
+  const token = Symbol('taskCoreRefresh');
+  getPromiseStore(state).taskCoreRefreshes.add(token);
+  state.tasksCoreRefreshing = true;
+  return token;
+};
+const finishTaskCoreRefresh = (
+  state: Pick<MetadataState, 'tasksCoreRefreshing'>,
+  token: symbol
+) => {
+  const promises = getPromiseStore(state);
+  promises.taskCoreRefreshes.delete(token);
+  state.tasksCoreRefreshing = promises.taskCoreRefreshes.size > 0;
+};
+type CachedEditions = { editions?: GameEdition[]; storyChapters?: StoryChapter[] };
+const readCachedEditions = async (): Promise<CachedEditions> => {
+  if (typeof window === 'undefined') return {};
+  try {
+    return (await getCachedData<CachedEditions>('editions' as CacheType, 'all', 'en')) ?? {};
+  } catch (error) {
+    logger.warn('[MetadataStore] Editions cache read failed:', error);
+    return {};
+  }
+};
+const applyCachedEditions = async (
+  state: Pick<MetadataState, 'editions' | 'storyChapters'>,
+  isCurrent: () => boolean
+): Promise<boolean> => {
+  const { editions = [], storyChapters = [] } = await readCachedEditions();
+  if (!isCurrent() || !editions.length) return false;
+  state.editions = markRaw(editions);
+  if (!storyChapters.length) return false;
+  state.storyChapters = markRaw(
+    storyChapters.map((chapter) => normalizeStoryChapter(chapter)).sort((a, b) => a.order - b.order)
+  );
+  logger.debug('[MetadataStore] Editions loaded from cache');
+  return true;
+};
 export const useMetadataStore = defineStore('metadata', {
   state: (): MetadataState => ({
     initialized: false,
     initializationFailed: false,
     loading: false,
+    tasksCoreRevision: 0,
+    tasksCoreRefreshing: false,
     tasksObjectivesPending: false,
     tasksObjectivesHydrated: false,
     hideoutLoading: false,
@@ -380,6 +423,7 @@ export const useMetadataStore = defineStore('metadata', {
       }
       promiseStore.isInitializing = true;
       promiseStore.initPromise = (async () => {
+        const taskCoreRefreshId = beginTaskCoreRefresh(this);
         try {
           this.updateLanguageAndGameMode(undefined, options?.gameMode);
           await this.loadStaticMapData();
@@ -391,7 +435,13 @@ export const useMetadataStore = defineStore('metadata', {
               logger.debug('[MetadataStore] Critical cache exists, skipping loading screen');
             }
           }
-          await this.fetchAllData(forceRefresh, { deferHeavy: !forceRefresh, cachedData });
+          const dataRefresh = this.fetchAllData(forceRefresh, {
+            deferHeavy: !forceRefresh,
+            cachedData,
+          });
+          // fetchAllData registers its core phase synchronously; release setup ownership now.
+          finishTaskCoreRefresh(this, taskCoreRefreshId);
+          await dataRefresh;
           this.assertCriticalMetadataReady();
           this.initialized = true;
           this.initializationFailed = false;
@@ -402,6 +452,7 @@ export const useMetadataStore = defineStore('metadata', {
           // Rethrow to allow caller (e.g. metadata plugin) to handle retries or critical failure
           throw err;
         } finally {
+          finishTaskCoreRefresh(this, taskCoreRefreshId);
           promiseStore.isInitializing = false;
           promiseStore.initPromise = null;
           perfEnd(perfTimer, {
@@ -833,45 +884,53 @@ export const useMetadataStore = defineStore('metadata', {
           logger.error('[MetadataStore] Error during cache cleanup:', err)
         );
       }
-      if (cachedData && !forceRefresh) {
-        this.applyCriticalCachedData(cachedData);
-      }
-      await this.fetchBootstrapData(forceRefresh);
-      // Use pre-loaded cache data if available, otherwise fetch
+      const promiseStore = getPromiseStore(this);
+      const taskCoreRefreshId = beginTaskCoreRefresh(this);
       let hideoutPromise: Promise<void>;
       let prestigePromise: Promise<void> = Promise.resolve();
       let editionsPromise: Promise<void> = Promise.resolve();
       let tasksCorePromise: Promise<void>;
-      if (cachedData && !forceRefresh) {
-        hideoutPromise = Promise.resolve();
-        if (!this.storyChapters.length) {
-          editionsPromise = this.fetchEditionsData(false);
+      try {
+        if (cachedData && !forceRefresh) {
+          this.applyCriticalCachedData(cachedData);
         }
-        tasksCorePromise = Promise.resolve();
-      } else {
-        hideoutPromise = this.fetchHideoutData(forceRefresh);
-        if (deferHeavy) {
-          queueIdleTask(
-            () =>
-              this.fetchPrestigeData(forceRefresh).catch((err) =>
-                logger.error('[MetadataStore] Error fetching deferred prestige data:', err)
-              ),
-            { timeout: 3000, minTime: 8, priority: 'normal' }
-          );
-          queueIdleTask(
-            () =>
-              this.fetchEditionsData(forceRefresh).catch((err) =>
-                logger.error('[MetadataStore] Error fetching deferred editions data:', err)
-              ),
-            { timeout: 3500, minTime: 8, priority: 'normal' }
-          );
+        await this.fetchBootstrapData(forceRefresh);
+        if (cachedData && !forceRefresh) {
+          hideoutPromise = Promise.resolve();
+          if (!this.storyChapters.length) {
+            editionsPromise = this.fetchEditionsData(false);
+          }
+          tasksCorePromise = Promise.resolve();
         } else {
-          prestigePromise = this.fetchPrestigeData(forceRefresh);
-          editionsPromise = this.fetchEditionsData(forceRefresh);
+          hideoutPromise = this.fetchHideoutData(forceRefresh);
+          if (deferHeavy) {
+            queueIdleTask(
+              () =>
+                this.fetchPrestigeData(forceRefresh).catch((err) =>
+                  logger.error('[MetadataStore] Error fetching deferred prestige data:', err)
+                ),
+              { timeout: 3000, minTime: 8, priority: 'normal' }
+            );
+            const editionsRequestVersion = promiseStore.editionsRequestVersion;
+            queueIdleTask(
+              () => {
+                if (promiseStore.editionsRequestVersion !== editionsRequestVersion) return;
+                return this.fetchEditionsData(forceRefresh).catch((err) =>
+                  logger.error('[MetadataStore] Error fetching deferred editions data:', err)
+                );
+              },
+              { timeout: 3500, minTime: 8, priority: 'normal' }
+            );
+          } else {
+            prestigePromise = this.fetchPrestigeData(forceRefresh);
+            editionsPromise = this.fetchEditionsData(forceRefresh);
+          }
+          tasksCorePromise = this.fetchTasksCoreData(forceRefresh);
         }
-        tasksCorePromise = this.fetchTasksCoreData(forceRefresh);
+        await tasksCorePromise;
+      } finally {
+        finishTaskCoreRefresh(this, taskCoreRefreshId);
       }
-      await tasksCorePromise;
       // Fetch critical data directly (not deferred) - needed for UI to render
       const itemsLitePromise = this.fetchItemsLiteData(forceRefresh);
       let taskObjectivesPromise: Promise<void> = Promise.resolve();
@@ -888,11 +947,14 @@ export const useMetadataStore = defineStore('metadata', {
       }
       // Only defer non-critical task rewards
       if (this.tasks.length && deferHeavy) {
+        const rewardsRequestVersion = promiseStore.taskRewardsRequestVersion;
         queueIdleTask(
-          () =>
-            this.fetchTaskRewardsData(forceRefresh).catch((err) =>
+          () => {
+            if (promiseStore.taskRewardsRequestVersion !== rewardsRequestVersion) return;
+            return this.fetchTaskRewardsData(forceRefresh).catch((err) =>
               logger.error('[MetadataStore] Error fetching deferred data:', err)
-            ),
+            );
+          },
           { timeout: 4000, minTime: 8, priority: 'normal' }
         );
       } else if (this.tasks.length) {
@@ -958,8 +1020,6 @@ export const useMetadataStore = defineStore('metadata', {
         throwOnError: true,
       });
     },
-    // Fallow cannot follow this method through the typed composable boundary.
-    // fallow-ignore-next-line unused-store-member -- accessed through typed composable boundary
     async fetchMapSpawnsData(forceRefresh = false) {
       if (this.mapSpawnsLoaded && !forceRefresh) return;
       const requestLanguage = this.languageCode;
@@ -1080,7 +1140,7 @@ export const useMetadataStore = defineStore('metadata', {
             this.languageCode !== requestLanguageCode ||
             this.tasks !== requestTasks
           ) {
-            return;
+            return 'stale' as const;
           }
           const otherModeTasks = (response.data.tasks || []).map((task) => ({
             id: task.id,
@@ -1113,7 +1173,7 @@ export const useMetadataStore = defineStore('metadata', {
             this.languageCode !== requestLanguageCode ||
             this.tasks !== requestTasks
           ) {
-            return;
+            return 'stale' as const;
           }
           this.objectiveModeCountDifferences = markRaw(differences);
           this.objectiveModeCountDifferencesHydrated = true;
@@ -1123,7 +1183,7 @@ export const useMetadataStore = defineStore('metadata', {
             this.languageCode !== requestLanguageCode ||
             this.tasks !== requestTasks
           ) {
-            return;
+            return 'stale' as const;
           }
           this.objectiveModeCountDifferences = markRaw({});
           this.objectiveModeCountDifferencesHydrated = false;
@@ -1132,7 +1192,7 @@ export const useMetadataStore = defineStore('metadata', {
       })();
       promiseStore.objectiveModeCountDifferencesPromise = promise;
       try {
-        await promise;
+        return await promise;
       } finally {
         promiseStore.objectiveModeCountDifferencesPromise = null;
       }
@@ -1141,6 +1201,7 @@ export const useMetadataStore = defineStore('metadata', {
      * Fetch task rewards data
      */
     async fetchTaskRewardsData(forceRefresh = false) {
+      getPromiseStore(this).taskRewardsRequestVersion += 1;
       const requestLanguage = this.languageCode;
       const requestGameMode = this.getApiGameMode();
       const requestKey = `${requestLanguage}-${requestGameMode}`;
@@ -1349,6 +1410,15 @@ export const useMetadataStore = defineStore('metadata', {
         promiseRequestKey: requestLanguage,
       });
     },
+    /** Join or reuse universal edition data for task readiness. */
+    async ensureEditionsData() {
+      const promises = getPromiseStore(this);
+      if (!promises.editionsRequestVersion) return this.fetchEditionsData();
+      // Universal editions already requested this session: join or reuse their settlement.
+      // This caller also consumes a queued idle load, even when joining another request.
+      promises.editionsRequestVersion += 1;
+      return promises.editionsPromise;
+    },
     /**
      * Fetch game editions data directly from GitHub overlay.
      * Editions are universal (not language or game-mode specific).
@@ -1356,38 +1426,29 @@ export const useMetadataStore = defineStore('metadata', {
      */
     async fetchEditionsData(forceRefresh = false) {
       const promiseStore = getPromiseStore(this);
+      promiseStore.editionsRequestVersion += 1;
       const existingPromise = promiseStore.editionsPromise;
       if (existingPromise && !forceRefresh) {
         return existingPromise;
       }
-      const promise = (async () => {
+      // Register the promise before requests can settle or throw synchronously.
+      // fallow-ignore-next-line complexity -- CRAP assumes zero coverage; measured coverage and reduced complexity are documented in docs/task-performance-validation.md
+      const promise = Promise.resolve().then(async () => {
         this.editionsError = null;
-        const existingEditions = this.editions;
-        const existingStoryChapters = this.storyChapters;
-        if (!forceRefresh && typeof window !== 'undefined') {
-          try {
-            const cached = await getCachedData<{
-              editions: GameEdition[];
-              storyChapters?: StoryChapter[];
-            }>('editions' as CacheType, 'all', 'en');
-            if (cached?.editions) {
-              this.editions = markRaw(cached.editions);
-            }
-            if (cached?.editions && cached.storyChapters && cached.storyChapters.length > 0) {
-              logger.debug('[MetadataStore] Editions loaded from cache');
-              const sorted = cached.storyChapters
-                .map((chapter) => normalizeStoryChapter(chapter))
-                .sort((a, b) => a.order - b.order);
-              this.storyChapters = markRaw(sorted);
-              void this.fetchEditionsData(true).catch((err) =>
-                logger.warn('[MetadataStore] Background editions revalidation failed:', err)
-              );
-              return;
-            }
-          } catch (cacheErr) {
-            logger.warn('[MetadataStore] Editions cache read failed:', cacheErr);
-          }
+        const isCurrent = () => promiseStore.editionsPromise === promise;
+        if (
+          !forceRefresh &&
+          (await applyCachedEditions(this, isCurrent).catch((error) => {
+            logger.warn('[MetadataStore] Editions cache read failed:', error);
+            return false;
+          }))
+        ) {
+          void this.fetchEditionsData(true).catch((error) =>
+            logger.warn('[MetadataStore] Background editions revalidation failed:', error)
+          );
+          return;
         }
+        if (!isCurrent()) return;
         this.editionsLoading = true;
         try {
           const OVERLAY_URL =
@@ -1398,21 +1459,16 @@ export const useMetadataStore = defineStore('metadata', {
           }>(OVERLAY_URL, {
             parseResponse: JSON.parse,
           });
-          if (overlay?.editions) {
-            this.editions = markRaw(Object.values(overlay.editions));
-          } else {
+          if (promiseStore.editionsPromise !== promise) return;
+          // Normalize both before assigning so malformed chapters cannot partially replace eligibility.
+          const editions = Object.values(overlay?.editions ?? {});
+          const chapters = Object.values(overlay?.storyChapters ?? {})
+            .map((chapter) => normalizeStoryChapter(chapter))
+            .sort((a, b) => a.order - b.order);
+          if (!overlay?.editions)
             logger.warn('[MetadataStore] No editions found in overlay response');
-            this.editions = markRaw([]);
-          }
-          if (overlay?.storyChapters) {
-            const chaptersArray = Object.values(overlay.storyChapters).map((chapter) =>
-              normalizeStoryChapter(chapter)
-            );
-            chaptersArray.sort((a, b) => a.order - b.order);
-            this.storyChapters = markRaw(chaptersArray);
-          } else {
-            this.storyChapters = markRaw([]);
-          }
+          this.editions = markRaw(editions);
+          this.storyChapters = markRaw(chapters);
           if (typeof window !== 'undefined') {
             setCachedData(
               'editions' as CacheType,
@@ -1423,26 +1479,19 @@ export const useMetadataStore = defineStore('metadata', {
             ).catch((err) => logger.error('[MetadataStore] Error caching editions:', err));
           }
         } catch (err) {
+          if (promiseStore.editionsPromise !== promise) return;
           logger.error('[MetadataStore] Error fetching editions data:', err);
           this.editionsError = err as Error;
-          if (!this.editions.length && existingEditions.length) {
-            this.editions = markRaw(existingEditions);
-          }
-          if (!this.storyChapters.length && existingStoryChapters.length) {
-            this.storyChapters = markRaw(existingStoryChapters);
-          }
-          if (!this.editions.length) {
-            this.editions = markRaw([]);
-          }
-        } finally {
-          this.editionsLoading = false;
         }
-      })();
+      });
       promiseStore.editionsPromise = promise;
       try {
         await promise;
       } finally {
-        promiseStore.editionsPromise = null;
+        if (promiseStore.editionsPromise === promise) {
+          this.editionsLoading = false;
+          promiseStore.editionsPromise = null;
+        }
       }
     },
     applyCriticalCachedData(cachedData: {
@@ -1511,6 +1560,7 @@ export const useMetadataStore = defineStore('metadata', {
         maps: data.maps || [],
         traders: data.traders || [],
       });
+      this.tasksCoreRevision += 1;
       perfEnd(perfTimer, { tasks: this.tasks.length });
     },
     mergeMapSpawns(data: TarkovMapSpawnsQueryResult) {

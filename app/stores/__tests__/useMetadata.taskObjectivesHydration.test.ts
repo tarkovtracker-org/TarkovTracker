@@ -59,6 +59,13 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     });
     expect(store.tasksObjectivesHydrated).toBe(true);
   });
+  it('reports handled count failures without marking them stale', async () => {
+    const store = useMetadataStore();
+    store.tasks = [{ id: 'task-1', objectives: [] }] as Task[];
+    vi.stubGlobal('$fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    expect(await store.fetchObjectiveModeCountDifferences()).toBeUndefined();
+    expect(store.objectiveModeCountDifferencesHydrated).toBe(false);
+  });
   it('ignores stale objective mode differences response after mode changes', async () => {
     const store = useMetadataStore();
     store.currentGameMode = GAME_MODES.PVP;
@@ -115,7 +122,7 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
         ],
       },
     });
-    await pending;
+    expect(await pending).toBe('stale');
     expect(store.objectiveModeCountDifferences).toEqual({
       stable: { pve: 6, pvp: 5 },
     });

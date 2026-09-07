@@ -1,3 +1,10 @@
+## [1.76.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.3...v1.76.4) (2026-09-06)
+
+
+### Bug Fixes
+
+* **tasks:** stabilize initial cards and complete performance validation ([#809](https://github.com/tarkovtracker-org/TarkovTracker/issues/809)) ([e6da507](https://github.com/tarkovtracker-org/TarkovTracker/commit/e6da507e72e5eab49c4b59bee39ec27ba4bb11d0))
+
 ## [1.76.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.2...v1.76.3) (2026-09-06)
 
 

@@ -576,6 +576,7 @@
   } = storeToRefs(preferencesStore);
   const metadataStore = useMetadataStore();
   const { tasks, loading: tasksLoading } = storeToRefs(metadataStore);
+  const taskDetailsReady = useTaskDetailReadiness();
   const maps = computed(() => metadataStore.mapsWithSvg);
   const sortedTraders = computed(() => metadataStore.sortedTraders);
   const editions = computed(() => metadataStore.editions);
@@ -904,16 +905,27 @@
   };
   const route = useRoute();
   useTaskRouteSync({ maps, traders: sortedTraders });
+  const canRefreshVisibleTasks = computed(
+    () =>
+      metadataStore.hasInitialized &&
+      !tasksLoading.value &&
+      !metadataStore.tasksCoreRefreshing &&
+      taskDetailsReady.value
+  );
   // Metadata readiness can precede the first debounced filter refresh.
   const hasRefreshedVisibleTasks = ref(false);
+  let visibleTaskRefreshGeneration = 0;
   /** Refresh filters before allowing initial results to replace the loading state. */
   const refreshVisibleTasks = async () => {
+    const generation = ++visibleTaskRefreshGeneration;
     try {
       await updateVisibleTasks(mapTaskVisibilityFilterOptions.value, tasksLoading.value);
     } catch (error) {
       logger.error('[Tasks] Failed to refresh tasks:', error);
     } finally {
-      hasRefreshedVisibleTasks.value = metadataStore.hasInitialized && !tasksLoading.value;
+      if (generation === visibleTaskRefreshGeneration) {
+        hasRefreshedVisibleTasks.value = canRefreshVisibleTasks.value;
+      }
     }
   };
   const debouncedRefreshVisibleTasks = debounce(refreshVisibleTasks, 50);
@@ -960,6 +972,7 @@
       getHideCompletedMapObjectives,
       getPinnedTaskIds,
       () => metadataStore.hasInitialized,
+      taskDetailsReady,
       tasksLoading,
       tasks,
       maps,
@@ -971,7 +984,8 @@
       editions,
     ],
     () => {
-      if (!metadataStore.hasInitialized || tasksLoading.value) {
+      if (!canRefreshVisibleTasks.value) {
+        visibleTaskRefreshGeneration += 1;
         hasRefreshedVisibleTasks.value = false;
         debouncedRefreshVisibleTasks.cancel();
         return;
@@ -984,7 +998,7 @@
     { immediate: true, flush: 'post' }
   );
   const isLoading = computed(
-    () => !metadataStore.hasInitialized || tasksLoading.value || !hasRefreshedVisibleTasks.value
+    () => !canRefreshVisibleTasks.value || !hasRefreshedVisibleTasks.value
   );
   const {
     activeSearchCount,
@@ -1096,7 +1110,7 @@
     selectedMapData,
     showMapDisplay,
     stopResize,
-    tasksLoading,
+    tasksLoading: isLoading,
     visibleTaskCount,
   });
   onBeforeUnmount(() => {

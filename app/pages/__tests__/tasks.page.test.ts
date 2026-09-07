@@ -1,4 +1,5 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime';
+import { flushPromises } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, inject, isRef, nextTick, ref } from 'vue';
 import { jumpToMapObjectiveKey } from '@/features/tasks/task-context';
@@ -70,6 +71,17 @@ const metadataStoreMock = reactive({
   tasks: [defaultTask],
   loading: false,
   hasInitialized: true,
+  languageCode: 'en',
+  tasksCoreRevision: 0,
+  tasksCoreRefreshing: false,
+  editionsLoading: false,
+  objectiveModeCountDifferencesHydrated: true,
+  getApiGameMode: () => 'regular',
+  fetchTaskObjectivesData: vi.fn(() => Promise.resolve()),
+  fetchTaskRewardsData: vi.fn(() => Promise.resolve()),
+  fetchItemsLiteData: vi.fn(() => Promise.resolve()),
+  ensureEditionsData: vi.fn(() => Promise.resolve()),
+  fetchObjectiveModeCountDifferences: vi.fn(() => Promise.resolve()),
   mapsWithSvg: [] as Array<{ id: string; name: string }>,
   objectives: [],
   sortedTraders: [],
@@ -374,6 +386,50 @@ describe('tasks page', () => {
   afterEach(() => {
     wrapper?.unmount();
   });
+  it('defers deep links until cached detail readiness clears with unchanged task IDs', async () => {
+    let release!: () => void;
+    metadataStoreMock.fetchTaskRewardsData.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        })
+    );
+    metadataStoreMock.tasksCoreRevision += 1;
+    await nextTick();
+    handleTaskQueryParamMock.mockClear();
+    await wrapper.vm.$router.replace({ query: { task: defaultTask.id } });
+    await nextTick();
+    expect(handleTaskQueryParamMock).not.toHaveBeenCalled();
+    release();
+    await vi.waitFor(() => expect(handleTaskQueryParamMock).toHaveBeenCalled());
+  });
+  it.each([
+    'fetchTaskObjectivesData',
+    'fetchTaskRewardsData',
+    'ensureEditionsData',
+    'fetchItemsLiteData',
+  ] as const)('filters merged details before revealing the first cards (%s)', async (action) => {
+    wrapper.unmount();
+    updateVisibleTasksMock.mockClear();
+    let finishRewards: () => void = () => {};
+    metadataStoreMock[action].mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishRewards = resolve;
+        })
+    );
+    wrapper = await mountSuspended(TasksPage, {
+      global: { stubs: defaultGlobalStubs },
+    });
+    await flushPromises();
+    expect(metadataStoreMock[action]).toHaveBeenCalled();
+    expect(wrapper.find('task-loading-state-stub').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="task-card"]').exists()).toBe(false);
+    expect(updateVisibleTasksMock).not.toHaveBeenCalled();
+    finishRewards();
+    await vi.waitFor(() => expect(wrapper.find('[data-testid="task-card"]').exists()).toBe(true));
+    expect(updateVisibleTasksMock).toHaveBeenCalled();
+  });
   it.each([true, false])(
     'keeps the loading state until the initial filter refresh finishes (has tasks: %s)',
     async (hasTasks) => {
@@ -409,6 +465,36 @@ describe('tasks page', () => {
     await vi.waitFor(() => expect(updateVisibleTasksMock).toHaveBeenCalled());
     await vi.waitFor(() => expect(wrapper.find('task-loading-state-stub').exists()).toBe(false));
     expect(wrapper.find('[data-testid="task-card"]').exists()).toBe(true);
+  });
+  it('ignores a filter refresh settling from an earlier metadata cycle', async () => {
+    let finishOld: () => void = () => {};
+    let finishCurrent: () => void = () => {};
+    updateVisibleTasksMock.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishOld = resolve;
+        })
+    );
+    metadataStoreMock.loading = true;
+    await nextTick();
+    updateVisibleTasksMock.mockClear();
+    metadataStoreMock.loading = false;
+    await vi.waitFor(() => expect(updateVisibleTasksMock).toHaveBeenCalledTimes(1));
+    metadataStoreMock.loading = true;
+    await nextTick();
+    updateVisibleTasksMock.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishCurrent = resolve;
+        })
+    );
+    metadataStoreMock.loading = false;
+    await vi.waitFor(() => expect(updateVisibleTasksMock).toHaveBeenCalledTimes(2));
+    finishOld();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(wrapper.find('task-loading-state-stub').exists()).toBe(true);
+    finishCurrent();
+    await vi.waitFor(() => expect(wrapper.find('[data-testid="task-card"]').exists()).toBe(true));
   });
   it('keeps the loading state across a metadata reload until the new refresh finishes', async () => {
     metadataStoreMock.loading = true;
