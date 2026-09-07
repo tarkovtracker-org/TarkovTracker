@@ -26,6 +26,12 @@ const channelRelease = createChannelReleaseLatch();
 let channelUserId: string | null = null;
 let statusRequestVersion = 0;
 let subscriptionRequestVersion = 0;
+let statusLoadedForUserId: string | null = null;
+let initialRead: {
+  userId: string;
+  promise: Promise<boolean>;
+  resolve: (success: boolean) => void;
+} | null = null;
 export function useSupporter() {
   const { $supabase } = useNuxtApp();
   const isCurrentStatusRequest = (userId: string, requestVersion: number) => {
@@ -54,11 +60,19 @@ export function useSupporter() {
     if (tier === 'supporter') return 'Supporter';
     return tier.charAt(0).toUpperCase() + tier.slice(1);
   });
-  async function fetchStatus(userId: string) {
-    if (!$supabase || !userId) return;
+  const finishStatusRequest = (userId: string, requestVersion: number, success: boolean) => {
+    if (!isCurrentStatusRequest(userId, requestVersion)) return;
+    loading.value = false;
+    if (initialRead?.userId !== userId) return;
+    initialRead.resolve(success);
+    initialRead = null;
+  };
+  async function fetchStatus(userId: string): Promise<boolean> {
+    if (!$supabase || !userId) return false;
     const requestVersion = ++statusRequestVersion;
     loading.value = true;
     error.value = null;
+    let success = false;
     try {
       const { data, error: err } = await $supabase.client
         .from('supporters')
@@ -67,11 +81,11 @@ export function useSupporter() {
         .maybeSingle();
       if (err) {
         logger.error('Failed to fetch supporter status', { userId, err });
-        if (!isCurrentStatusRequest(userId, requestVersion)) return;
+        if (!isCurrentStatusRequest(userId, requestVersion)) return false;
         error.value = err.message;
-        return;
+        return false;
       }
-      if (!isCurrentStatusRequest(userId, requestVersion)) return;
+      if (!isCurrentStatusRequest(userId, requestVersion)) return false;
       if (data) {
         supporterState.value = {
           tier: data.tier,
@@ -84,20 +98,28 @@ export function useSupporter() {
       } else {
         supporterState.value = null;
       }
+      statusLoadedForUserId = userId;
+      success = true;
+      return true;
     } catch (e: unknown) {
       logger.error('fetchStatus threw', { userId, err: e });
-      if (!isCurrentStatusRequest(userId, requestVersion)) return;
+      if (!isCurrentStatusRequest(userId, requestVersion)) return false;
       error.value = e instanceof Error ? e.message : 'Failed to load supporter status';
       supporterState.value = null;
+      return false;
     } finally {
-      if (isCurrentStatusRequest(userId, requestVersion)) {
-        loading.value = false;
-      }
+      finishStatusRequest(userId, requestVersion, success);
     }
   }
-  async function subscribe(userId: string) {
-    if (!$supabase || !userId) return;
-    if (channel && channelUserId === userId) return;
+  async function subscribe(userId: string): Promise<boolean> {
+    if (!$supabase || !userId) return false;
+    if (channel && channelUserId === userId) {
+      if (statusLoadedForUserId === userId) return true;
+      return initialRead?.promise ?? fetchStatus(userId);
+    }
+    initialRead?.resolve(false);
+    initialRead = null;
+    statusLoadedForUserId = null;
     const requestVersion = ++subscriptionRequestVersion;
     const previousChannel = channel;
     channel = null;
@@ -108,11 +130,18 @@ export function useSupporter() {
     const topic = `supporters:${userId}`;
     // Resubscribing to the same user reuses the topic, so its leave has to finish
     // first; an unclean leave declines the topic entirely.
-    if (!(await channelRelease.release(topic))) return;
-    if (requestVersion !== subscriptionRequestVersion) return;
-    if ($supabase.user?.loggedIn === false || $supabase.user?.id !== userId) return;
-    if (channel || channelUserId) return;
+    if (!(await channelRelease.release(topic))) return false;
+    if (requestVersion !== subscriptionRequestVersion) return false;
+    if ($supabase.user?.loggedIn === false || $supabase.user?.id !== userId) return false;
+    if (channel || channelUserId) return false;
     const client = $supabase.client;
+    let initialReadStarted = false;
+    let resolveInitial!: (success: boolean) => void;
+    const promise = new Promise<boolean>((resolve) => {
+      resolveInitial = resolve;
+    });
+    const pending = { userId, promise, resolve: resolveInitial };
+    initialRead = pending;
     const nextChannel = client
       .channel(topic)
       .on(
@@ -124,19 +153,29 @@ export function useSupporter() {
           filter: `user_id=eq.${userId}`,
         },
         () => {
+          if (requestVersion !== subscriptionRequestVersion) return;
           fetchStatus(userId).catch((err) => {
             logger.error('Realtime supporter status refresh failed', { userId, err });
           });
         }
       )
       .subscribe((status, err) => {
+        if (requestVersion !== subscriptionRequestVersion) return;
         logChannelSubscribeFailure('Supporter', status, err, { userId });
+        // Subscribe reports either a join or a failure. Read once even if the initial join fails.
+        if (status !== 'SUBSCRIBED' && initialReadStarted) return;
+        initialReadStarted = true;
+        void fetchStatus(userId);
       });
     channel = { channel: nextChannel, client, topic };
     channelUserId = userId;
+    return promise;
   }
   function unsubscribe() {
     subscriptionRequestVersion += 1;
+    initialRead?.resolve(false);
+    initialRead = null;
+    statusLoadedForUserId = null;
     const channelToRemove = channel;
     channel = null;
     channelUserId = null;

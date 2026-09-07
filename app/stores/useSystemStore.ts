@@ -266,6 +266,9 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
         () => void refreshTeamMemberships(userId, sessionId)
       )
       .subscribe((status, error) => {
+        if (status === 'SUBSCRIBED' && isCurrentMembershipSession(sessionId, userId)) {
+          void refreshTeamMemberships(userId, sessionId);
+        }
         logChannelSubscribeFailure('SystemStore', status, error, {
           table: 'team_memberships',
         });

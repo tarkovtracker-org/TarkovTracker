@@ -8,6 +8,7 @@ import {
   type GameMode,
 } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import { hasMaterializedProgress } from '@/utils/modeProgressFallback';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 type SupabaseError = { code?: string; message: string };
 export type ProgressRpcClient = {
@@ -20,6 +21,7 @@ type ModeProgressRow = {
   game_mode: string;
   progress_data: unknown;
   season_number: number;
+  progress_updated_at?: string | null;
 };
 type ModeProgressQuery = PromiseLike<{
   data: ModeProgressRow[] | null;
@@ -38,6 +40,20 @@ export type ModeProgressClient = {
     };
   };
 };
+const isMissingProgressFreshness = (error: SupabaseError | null): boolean =>
+  error !== null &&
+  ['42703', 'PGRST204'].includes(error.code ?? '') &&
+  /\bprogress_updated_at\b/.test(error.message);
+/** Retry only the additive freshness column; all other read failures stay visible. */
+export const readWithProgressFreshness = async <T extends { error: SupabaseError | null }>(
+  read: (includeFreshness: boolean) => PromiseLike<T>
+): Promise<T> => {
+  const result = await read(true);
+  if (isMissingProgressFreshness(result.error)) {
+    return await read(false);
+  }
+  return result;
+};
 const getPersistenceErrorCode = (error: unknown): string | undefined => {
   try {
     const code = (error as { code?: unknown }).code;
@@ -53,6 +69,7 @@ const getActiveModeProgress = (
 ): { mode: GameMode; progress: UserProgressData } | null => {
   if (!isGameMode(row.game_mode)) return null;
   if (row.season_number !== getGameModeSeasonNumber(row.game_mode)) return null;
+  if (!hasMaterializedProgress(row.progress_data)) return null;
   return { mode: row.game_mode, progress: row.progress_data as UserProgressData };
 };
 const normalizePersistenceError = (error: unknown): SupabaseError => ({
@@ -87,27 +104,49 @@ export const syncProgressState = async (
     return { error: normalizedError };
   }
 };
+// fallow-ignore-next-line complexity -- active-mode timestamp and legacy fallback branches are covered in progressPersistence.test.ts
 export const loadModeProgress = async (
   client: ModeProgressClient,
   userId: string
 ): Promise<{
   data: Partial<Record<GameMode, UserProgressData>>;
+  updatedAt?: number;
+  updatedAtByMode?: Partial<Record<GameMode, number>>;
   error: SupabaseError | null;
 }> => {
   try {
-    const { data: rows, error } = await client
-      .from('user_game_mode_progress')
-      .select('game_mode,season_number,progress_data')
-      .eq('user_id', userId)
-      .in('game_mode', GAME_MODE_VALUES)
-      .in('season_number', [0, ACTIVE_SEASON_NUMBER]);
+    const { data: rows, error } = await readWithProgressFreshness((includeFreshness) =>
+      client
+        .from('user_game_mode_progress')
+        .select(
+          includeFreshness
+            ? 'game_mode,season_number,progress_data,progress_updated_at'
+            : 'game_mode,season_number,progress_data'
+        )
+        .eq('user_id', userId)
+        .in('game_mode', GAME_MODE_VALUES)
+        .in('season_number', [0, ACTIVE_SEASON_NUMBER])
+    );
     if (error) return { data: {}, error };
     const entries = (rows ?? []).flatMap((row) => {
       const activeProgress = getActiveModeProgress(row);
       return activeProgress ? [[activeProgress.mode, activeProgress.progress] as const] : [];
     });
     const data = Object.fromEntries(entries) as Partial<Record<GameMode, UserProgressData>>;
-    return { data, error: null };
+    const updatedAtByMode = Object.fromEntries(
+      (rows ?? []).flatMap((row) => {
+        const active = getActiveModeProgress(row);
+        const timestamp = Date.parse(row.progress_updated_at ?? '');
+        return active && Number.isFinite(timestamp) ? [[active.mode, timestamp]] : [];
+      })
+    ) as Partial<Record<GameMode, number>>;
+    const timestamps = Object.values(updatedAtByMode);
+    return {
+      data,
+      error: null,
+      updatedAtByMode,
+      updatedAt: timestamps.length > 0 ? Math.max(...timestamps) : undefined,
+    };
   } catch (error) {
     const normalizedError = normalizePersistenceError(error);
     logger.error(

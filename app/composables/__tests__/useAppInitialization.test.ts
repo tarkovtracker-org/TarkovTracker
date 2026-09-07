@@ -92,7 +92,7 @@ describe('useAppInitialization locale setup', () => {
   beforeEach(async () => {
     mockSupabase.client.auth.getSession.mockReset().mockResolvedValue({ data: { session: null } });
     mockSupporter.fetchStatus.mockReset().mockResolvedValue(undefined);
-    mockSupporter.subscribe.mockReset().mockResolvedValue(undefined);
+    mockSupporter.subscribe.mockReset().mockResolvedValue(true);
     mockSupporter.reset.mockReset();
     localeRef.value = 'en';
     setLocale.mockClear();
@@ -263,20 +263,45 @@ describe('useAppInitialization locale setup', () => {
     pending.resolve(undefined);
     await flushPromises();
     expect(mockMigrateDataIfNeeded).toHaveBeenCalledTimes(1);
-    expect(mockSupporter.fetchStatus).toHaveBeenCalledExactlyOnceWith('user-2');
+    expect(mockSupporter.subscribe).toHaveBeenCalledExactlyOnceWith('user-2');
+    expect(mockSupporter.fetchStatus).not.toHaveBeenCalled();
   });
-  it('does not subscribe to a former account when its supporter lookup finishes late', async () => {
-    const pending = Promise.withResolvers<undefined>();
-    mockSupporter.fetchStatus.mockReturnValueOnce(pending.promise);
+  it('does not resubscribe to a former account when its subscription finishes late', async () => {
+    const pending = Promise.withResolvers<boolean>();
+    mockSupporter.subscribe.mockReturnValueOnce(pending.promise);
     mockSupabaseUser.loggedIn = true;
     mockSupabaseUser.id = 'user-1';
     await mountWithComposable();
     await flushPromises();
     mockSupabaseUser.id = 'user-2';
     await flushPromises();
-    pending.resolve(undefined);
+    pending.resolve(false);
     await flushPromises();
-    expect(mockSupporter.subscribe).toHaveBeenCalledExactlyOnceWith('user-2');
+    expect(mockSupporter.subscribe.mock.calls.map(([userId]) => userId)).toEqual([
+      'user-1',
+      'user-2',
+    ]);
+    expect(mockSupporter.fetchStatus).not.toHaveBeenCalled();
+  });
+  it('loads supporter status when a same-user relogin cannot recreate its channel', async () => {
+    mockSupporter.subscribe.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    mockSupporter.fetchStatus.mockResolvedValue(true);
+    mockSupabaseUser.loggedIn = true;
+    mockSupabaseUser.id = 'user-1';
+    const wrapper = await mountWithComposable();
+    await flushPromises();
+    expect(mockSupporter.fetchStatus).not.toHaveBeenCalled();
+    mockSupabaseUser.loggedIn = false;
+    await flushPromises();
+    mockSupabaseUser.loggedIn = true;
+    await flushPromises();
+    expect(mockSupporter.subscribe.mock.calls.map(([userId]) => userId)).toEqual([
+      'user-1',
+      'user-1',
+    ]);
+    expect(mockSupporter.fetchStatus).toHaveBeenCalledExactlyOnceWith('user-1');
+    expect(mockShowLoadFailed).not.toHaveBeenCalled();
+    wrapper.unmount();
   });
   it('records account activity with the session token after initialization', async () => {
     const fetch = vi.fn().mockResolvedValue({ recorded: true });
@@ -293,15 +318,20 @@ describe('useAppInitialization locale setup', () => {
       headers: { Authorization: 'Bearer fixture-token' },
     });
   });
-  it('keeps sync usable when optional supporter and activity requests fail', async () => {
-    mockSupporter.fetchStatus.mockRejectedValue(new Error('supporter offline'));
-    mockSupabase.client.auth.getSession.mockRejectedValue(new Error('session unavailable'));
-    mockSupabaseUser.loggedIn = true;
-    mockSupabaseUser.id = 'user-1';
-    await mountWithComposable();
-    await flushPromises();
-    expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
-    expect(mockMigrateDataIfNeeded).toHaveBeenCalledTimes(1);
-    expect(mockShowLoadFailed).not.toHaveBeenCalled();
-  });
+  it.each(['throw', 'failed read'])(
+    'keeps sync usable when optional supporter status fails: %s',
+    async (outcome) => {
+      if (outcome === 'throw')
+        mockSupporter.subscribe.mockRejectedValue(new Error('supporter offline'));
+      else mockSupporter.subscribe.mockResolvedValue(false);
+      mockSupabase.client.auth.getSession.mockRejectedValue(new Error('session unavailable'));
+      mockSupabaseUser.loggedIn = true;
+      mockSupabaseUser.id = 'user-1';
+      await mountWithComposable();
+      await flushPromises();
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
+      expect(mockMigrateDataIfNeeded).toHaveBeenCalledTimes(1);
+      expect(mockShowLoadFailed).not.toHaveBeenCalled();
+    }
+  );
 });

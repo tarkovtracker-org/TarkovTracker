@@ -67,20 +67,22 @@ export function useAppInitialization() {
     resetTarkovStoreForSessionTransition(previousUserId, reason);
     activityLogStore.resetForSession();
   };
+  const isCurrentSupporterRequest = (expectedUserId?: string, expectedToken?: number) =>
+    (!expectedUserId || getAuthenticatedUserId() === expectedUserId) &&
+    (expectedToken === undefined || expectedToken === authChangeToken);
   const loadSupporterStatusIfNeeded = async (expectedUserId?: string, expectedToken?: number) => {
     const authenticatedUserId = getAuthenticatedUserId();
-    if (expectedUserId && authenticatedUserId !== expectedUserId) return;
-    if (expectedToken !== undefined && expectedToken !== authChangeToken) return;
+    if (!isCurrentSupporterRequest(expectedUserId, expectedToken)) return;
     if (!authenticatedUserId) return;
     if (supporterLoadedForUserId === authenticatedUserId) return;
     try {
-      await supporter.fetchStatus(authenticatedUserId);
-      if (expectedUserId && getAuthenticatedUserId() !== expectedUserId) return;
-      if (expectedToken !== undefined && expectedToken !== authChangeToken) return;
-      await supporter.subscribe(authenticatedUserId);
-      if (expectedUserId && getAuthenticatedUserId() !== expectedUserId) return;
-      if (expectedToken !== undefined && expectedToken !== authChangeToken) return;
-      supporterLoadedForUserId = authenticatedUserId;
+      let loaded = await supporter.subscribe(authenticatedUserId);
+      if (!isCurrentSupporterRequest(expectedUserId, expectedToken)) return;
+      // An unclean channel leave can decline the subscription before any status
+      // request runs. Supporter status remains available over the normal read.
+      if (!loaded) loaded = await supporter.fetchStatus(authenticatedUserId);
+      if (!isCurrentSupporterRequest(expectedUserId, expectedToken)) return;
+      if (loaded) supporterLoadedForUserId = authenticatedUserId;
     } catch (error) {
       logger.error('[useAppInitialization] Failed to load supporter status:', error);
     }

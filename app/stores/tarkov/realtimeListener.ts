@@ -2,7 +2,9 @@ import { useToastI18n } from '@/composables/useToastI18n';
 import { maybeNotifyApiUpdate } from '@/stores/tarkov/apiUpdateNotifier';
 import { detectDataConflicts } from '@/stores/tarkov/conflictDetection';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
-import { coerceGameMode, mergeProgressData } from '@/stores/tarkov/progressMerge';
+import { progressStorageSerializer } from '@/stores/tarkov/localStorage';
+import { coerceGameMode, mergeProgressData, toProgressEpoch } from '@/stores/tarkov/progressMerge';
+import { readWithProgressFreshness } from '@/stores/tarkov/progressPersistence';
 import {
   getLastLocalSyncTime,
   isLikelySelfOriginUpdate,
@@ -11,6 +13,12 @@ import {
 import { useMetadataStore } from '@/stores/useMetadata';
 import { getGameModeSeasonNumber, isGameMode, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import { hasMaterializedProgress } from '@/utils/modeProgressFallback';
+import {
+  createPendingStateTracker,
+  type RemoteStateMerge,
+  type WithRemoteSnapshot,
+} from '@/utils/pendingState';
 import {
   sanitizeGameEdition,
   sanitizeOwnedProgressData,
@@ -22,10 +30,15 @@ import {
   removeOwnedChannel,
   subscribeAndWaitForRealtimeChannel,
   type OwnedRealtimeChannel,
+  REALTIME_SUBSCRIPTION_TIMEOUT_MS,
 } from '@/utils/realtimeChannel';
+import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 const SYNC_RESUME_DELAY_MS = 1000;
 export type SyncControllerHandle = {
+  hasPendingChanges?: () => boolean;
+  captureRemoteMerge?: () => RemoteStateMerge;
+  withSnapshot?: WithRemoteSnapshot;
   pause: () => void;
   resume: () => void;
 };
@@ -38,6 +51,7 @@ type RealtimeModeProgress = {
   mode: GameMode;
   progress: UserProgressData;
   updateTime: number;
+  progressTime: number;
 };
 type LegacyProgressMetadata = {
   current_game_mode?: string;
@@ -65,18 +79,25 @@ const parseRealtimeUpdateTime = (value: unknown): number => {
   const parsed = typeof value === 'string' ? Date.parse(value) : Number.NaN;
   return Number.isNaN(parsed) ? Date.now() : parsed;
 };
-const isActiveRealtimeModeRow = (
+const isMaterializedActiveModeRow = (
   row: Record<string, unknown>
 ): row is Record<string, unknown> & { game_mode: GameMode } =>
-  isGameMode(row.game_mode) && row.season_number === getGameModeSeasonNumber(row.game_mode);
+  isGameMode(row.game_mode) &&
+  row.season_number === getGameModeSeasonNumber(row.game_mode) &&
+  hasMaterializedProgress(row.progress_data);
+const parseProgressTime = (value: unknown): number => {
+  const parsed = typeof value === 'string' ? Date.parse(value) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : 0;
+};
 const parseRealtimeModeProgress = (value: unknown): RealtimeModeProgress | null => {
   if (!value || typeof value !== 'object') return null;
   const row = value as Record<string, unknown>;
-  if (!isActiveRealtimeModeRow(row)) return null;
+  if (!isMaterializedActiveModeRow(row)) return null;
   return {
     mode: row.game_mode,
     progress: sanitizeOwnedProgressData(row.progress_data),
     updateTime: parseRealtimeUpdateTime(row.updated_at),
+    progressTime: parseProgressTime(row.progress_updated_at),
   };
 };
 const buildLegacyMetadataState = (
@@ -226,6 +247,9 @@ async function runSetupRealtimeListener(
   const currentUserId = $supabase.user.id;
   if (!$supabase.user.loggedIn || !currentUserId) return;
   if (!(await prepareProgressTopic(currentUserId, generation))) return;
+  const fallbackTracker = createPendingStateTracker(() => tarkovStore.$state);
+  const captureRemoteMerge = () =>
+    getRegisteredSyncController()?.captureRemoteMerge?.() ?? fallbackTracker.capture();
   const latestModeUpdateTimes = new Map<GameMode, number>();
   const acceptModeUpdate = (mode: GameMode, updateTime: number): boolean => {
     const latestUpdateTime = latestModeUpdateTimes.get(mode);
@@ -252,15 +276,35 @@ async function runSetupRealtimeListener(
     latestLegacyMetadataUpdateTime = updateTime;
     return true;
   };
-  const isCurrentRealtimeUser = () => stillOwnsSetup(currentUserId, generation);
+  const isCurrentRealtimeUser = () =>
+    stillOwnsSetup(currentUserId, generation) &&
+    !($supabase.client.realtime && isRealtimeSuspended($supabase.client.realtime));
   logger.debug('[TarkovStore] Setting up realtime listener for multi-device sync');
-  const handleProgressChange = (payload: { new: unknown; old: unknown }) => {
+  const handleProgressChange = (
+    payload: { new: unknown; old: unknown },
+    reconcile = captureRemoteMerge()
+  ) => {
     if (!isCurrentRealtimeUser()) return;
     const remoteData = payload.new as LegacyProgressMetadata;
     const updateTime = parseRealtimeUpdateTime(remoteData.updated_at);
     if (!acceptLegacyMetadataUpdate(updateTime)) return;
     const localState = sanitizeOwnedUserState(tarkovStore.$state);
-    const nextState = buildLegacyMetadataState(remoteData, localState);
+    const remoteState = buildLegacyMetadataState(remoteData, localState);
+    const remoteMetadata = {
+      currentGameMode: remoteState.currentGameMode,
+      gameEdition: remoteState.gameEdition,
+      tarkovUid: remoteState.tarkovUid,
+    };
+    const metadata = reconcile(remoteMetadata);
+    const nextState = { ...localState, ...metadata } as UserState;
+    progressStorageSerializer.acceptRemote({
+      state: localState,
+      userId: currentUserId,
+      remote: remoteMetadata,
+      next: nextState,
+      updatedAtByMode: {},
+      metadataTimestamp: updateTime,
+    });
     if (shouldIgnoreLegacyMetadataUpdate(updateTime, nextState, localState)) return;
     const isLikelySelfOrigin = isLikelySelfOriginUpdate(updateTime);
     logger.debug('[TarkovStore] Remote metadata update detected, applying changes', {
@@ -277,13 +321,30 @@ async function runSetupRealtimeListener(
     });
     scheduleSyncResume();
   };
-  const handleModeProgressChange = (payload: { new: unknown }) => {
+  const handleModeProgressChange = (
+    payload: { new: unknown },
+    reconcile = captureRemoteMerge()
+  ) => {
     if (!isCurrentRealtimeUser()) return;
     const remote = acceptRealtimeModeProgress(payload.new);
     if (!remote) return;
     const { mode, progress: remoteProgress, updateTime } = remote;
     const localState = sanitizeOwnedUserState(tarkovStore.$state);
-    const nextProgress = mergeProgressData(localState[mode], remoteProgress);
+    const merged = mergeProgressData(localState[mode], remoteProgress, true);
+    const nextProgress = reconcile(
+      { [mode]: remoteProgress },
+      { [mode]: merged },
+      toProgressEpoch(localState[mode]) >= toProgressEpoch(remoteProgress)
+    )[mode] as UserProgressData;
+    progressStorageSerializer.acceptRemote({
+      state: localState,
+      userId: currentUserId,
+      remote: { [mode]: remoteProgress },
+      next: { [mode]: nextProgress },
+      updatedAtByMode: {
+        [mode]: remote.progressTime,
+      },
+    });
     if (shouldIgnoreModeProgressUpdate(mode, updateTime, nextProgress, localState[mode])) return;
     const conflicts = detectDataConflicts(localState[mode], remoteProgress);
     const apiUpdateHandled = maybeNotifyApiUpdate(
@@ -334,6 +395,42 @@ async function runSetupRealtimeListener(
       },
       handleProgressChange
     );
+  let refreshGeneration = 0;
+  // fallow-ignore-next-line complexity -- snapshot/event/edit races are covered in realtimeListener.seasonal.test.ts; keep generation checks together
+  const refreshSnapshot = async (reconcile: RemoteStateMerge, request: number) => {
+    if (!isCurrentRealtimeUser() || request !== refreshGeneration) return;
+    try {
+      const [metadata, modes] = await Promise.all([
+        client
+          .from('user_progress')
+          .select('current_game_mode,game_edition,tarkov_uid,updated_at')
+          .eq('user_id', currentUserId)
+          .single(),
+        readWithProgressFreshness((includeFreshness) => {
+          const query = client.from('user_game_mode_progress');
+          return includeFreshness
+            ? query
+                .select('game_mode,season_number,progress_data,updated_at,progress_updated_at')
+                .eq('user_id', currentUserId)
+            : query
+                .select('game_mode,season_number,progress_data,updated_at')
+                .eq('user_id', currentUserId);
+        }),
+      ]);
+      if (!isCurrentRealtimeUser() || request !== refreshGeneration) return;
+      if (modes.error) throw modes.error;
+      if (metadata.error && metadata.error.code !== 'PGRST116') throw metadata.error;
+      if (metadata.data) {
+        handleProgressChange({ new: metadata.data, old: null }, reconcile);
+      }
+      for (const row of modes.data ?? []) {
+        if (!isGameMode(row.game_mode)) continue;
+        handleModeProgressChange({ new: row }, reconcile);
+      }
+    } catch (error) {
+      logger.warn('[TarkovStore] Reconnect snapshot failed', error);
+    }
+  };
   const owned = { channel, client, topic } satisfies OwnedRealtimeChannel;
   if (!stillOwnsSetup(currentUserId, generation)) {
     await releaseProgressChannel(owned);
@@ -343,9 +440,25 @@ async function runSetupRealtimeListener(
   // this channel instead of creating a duplicate subscription for the topic.
   realtimeChannel = owned;
   try {
-    await subscribeAndWaitForRealtimeChannel(channel, 'TarkovStore', {
-      table: 'user_progress',
-    });
+    await subscribeAndWaitForRealtimeChannel(
+      channel,
+      'TarkovStore',
+      {
+        table: 'user_progress',
+      },
+      REALTIME_SUBSCRIPTION_TIMEOUT_MS,
+      () => {
+        const request = ++refreshGeneration;
+        const read = (reconcile: RemoteStateMerge) => refreshSnapshot(reconcile, request);
+        const controller = getRegisteredSyncController();
+        const refreshing = controller?.withSnapshot
+          ? controller.withSnapshot(read)
+          : read(captureRemoteMerge());
+        refreshing.catch((error: unknown) => {
+          logger.warn('[TarkovStore] Reconnect snapshot barrier failed', error);
+        });
+      }
+    );
   } catch (error) {
     if (realtimeChannel === owned) await releaseProgressChannel(owned);
     // A newer setup or teardown intentionally superseded this request. Its

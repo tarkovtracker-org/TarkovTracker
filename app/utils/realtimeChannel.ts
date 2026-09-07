@@ -1,4 +1,5 @@
 import { logger } from '@/utils/logger';
+import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 /**
  * The channel type `SupabaseClient.channel()` actually returns.
@@ -143,18 +144,27 @@ export const subscribeAndWaitForRealtimeChannel = (
   channel: SupabaseRealtimeChannel,
   label: string,
   context: Record<string, unknown>,
-  timeoutMs = REALTIME_SUBSCRIPTION_TIMEOUT_MS
+  timeoutMs = REALTIME_SUBSCRIPTION_TIMEOUT_MS,
+  onRejoined?: () => void
 ): Promise<void> =>
   new Promise<void>((resolve, reject) => {
     let settled = false;
-    const timeout = setTimeout(() => {
+    let joined = false;
+    const suspended = () => channel.socket && isRealtimeSuspended(channel.socket);
+    let needsRefresh = Boolean(suspended());
+    const timeoutJoin = () => {
+      if (suspended()) {
+        timeout = setTimeout(timeoutJoin, timeoutMs);
+        return;
+      }
       const error = new Error(`Realtime subscription timed out after ${timeoutMs}ms for ${label}`);
       logger.warn(`[${label}] Realtime subscription timed out:`, {
         ...context,
         timeoutMs,
       });
       settle(error);
-    }, timeoutMs);
+    };
+    let timeout = setTimeout(timeoutJoin, timeoutMs);
     const settle = (error?: Error): void => {
       if (settled) return;
       settled = true;
@@ -163,12 +173,18 @@ export const subscribeAndWaitForRealtimeChannel = (
       else resolve();
     };
     try {
+      // fallow-ignore-next-line complexity -- tested join/rejoin state machine; inferred coverage misses the SDK callback
       channel.subscribe((status: string, error?: Error) => {
         logger.debug(`[${label}] Realtime subscription status: ${status}`);
         if (status === 'SUBSCRIBED') {
+          if (joined || needsRefresh) onRejoined?.();
+          needsRefresh = false;
+          joined = true;
           settle();
           return;
         }
+        needsRefresh = true;
+        if (suspended()) return;
         if (
           logChannelSubscribeFailure(label, status, error, context, {
             treatClosedAsFailure: true,

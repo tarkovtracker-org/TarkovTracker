@@ -87,6 +87,11 @@ const createClientMock = (initialUserId: string) => {
   const removeAllChannels = vi.fn().mockResolvedValue([]);
   mockCreateClient.mockReturnValue({
     removeAllChannels,
+    realtime: {
+      connect: vi.fn(),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+      getChannels: vi.fn(() => []),
+    },
     auth: {
       getSession: vi.fn().mockResolvedValue({
         data: {

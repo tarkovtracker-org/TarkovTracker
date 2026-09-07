@@ -65,6 +65,214 @@ describe('useSupabaseSync', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+  it.each(['paused', 'signed-out', 'disposed'])(
+    'does not transform a gated %s save',
+    async (gate) => {
+      const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+      const transform = vi.fn((state) => state);
+      const sync = useSupabaseSync({
+        store: createMockStore({ value: 1 }),
+        table: 'test_table',
+        transform,
+      });
+      if (gate === 'paused') sync.pause();
+      if (gate === 'signed-out') supabaseContext.user.loggedIn = false;
+      if (gate === 'disposed') sync.cleanup();
+      await sync.syncToSupabase();
+      expect(transform).not.toHaveBeenCalled();
+      expect(upsert).not.toHaveBeenCalled();
+      sync.cleanup();
+    }
+  );
+  it('merges only pending paths and protects edits saved during a snapshot read', async () => {
+    const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+    const store = createMockStore({ pvp: { name: 'old', count: 5 }, pve: { name: 'old' } });
+    const sync = useSupabaseSync({ store, table: 'test_table' });
+    store.$state.pvp.count = 0;
+    store.notifySubscriber();
+    const reconcile = sync.captureRemoteMerge!();
+    await sync.syncToSupabase();
+    expect(sync.hasPendingChanges!()).toBe(false);
+    const remote = { pvp: { name: 'remote', count: 5 }, pve: { name: 'other device' } };
+    const result = reconcile(remote);
+    expect(result).toEqual({ pvp: { name: 'remote', count: 0 }, pve: { name: 'other device' } });
+    Object.assign(store.$state, result);
+    // The saved zero remains acknowledged after the stale snapshot: a later
+    // remote change must not be mistaken for a conflict with a pending edit.
+    expect(sync.captureRemoteMerge!()({ pvp: { name: 'remote', count: 3 } })).toEqual({
+      pvp: { name: 'remote', count: 3 },
+    });
+    // Applying one remote value must not make it a permanent local override.
+    expect(sync.captureRemoteMerge!()({ pve: { name: 'newer remote' } })).toEqual({
+      pve: { name: 'newer remote' },
+    });
+    sync.cleanup();
+  });
+  it('does not regress remote fields when a prior save finishes after reconciliation', async () => {
+    const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+    let finish!: (result: { error: null }) => void;
+    upsert.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
+    const store = createMockStore({ pvp: { count: 5, name: 'old' } });
+    const sync = useSupabaseSync({ store, table: 'test_table' });
+    store.$state.pvp.count = 0;
+    store.notifySubscriber();
+    const saving = sync.syncToSupabase();
+    expect(upsert).toHaveBeenCalledOnce();
+    Object.assign(store.$state, sync.captureRemoteMerge!()({ pvp: { count: 5, name: 'remote' } }));
+    expect(store.$state.pvp).toEqual({ count: 0, name: 'remote' });
+    finish({ error: null });
+    await saving;
+    const newer = sync.captureRemoteMerge!()({ pvp: { count: 3, name: 'newer remote' } });
+    expect(newer).toEqual({ pvp: { count: 3, name: 'newer remote' } });
+    sync.cleanup();
+  });
+  it('reads snapshots after saves and holds newer edits until reconciliation finishes', async () => {
+    const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+    let finishSave!: (result: { error: null }) => void;
+    let finishRead!: () => void;
+    upsert.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishSave = resolve;
+        })
+    );
+    const store = createMockStore({ count: 5, name: 'old' });
+    const sync = useSupabaseSync({ store, table: 'test_table', debounceMs: 10 });
+    store.$state.count = 0;
+    store.notifySubscriber();
+    const saving = sync.syncToSupabase();
+    const read = vi.fn(async (reconcile) => {
+      await new Promise<void>((resolve) => {
+        finishRead = resolve;
+      });
+      Object.assign(store.$state, reconcile({ count: 3, name: 'old' }));
+    });
+    const snapshot = sync.withSnapshot!(read);
+    await flushSync(0);
+    expect(read).not.toHaveBeenCalled();
+    finishSave({ error: null });
+    await saving;
+    await flushSync(0);
+    expect(read).toHaveBeenCalledOnce();
+    store.$state.name = 'pending local';
+    store.notifySubscriber();
+    sync.resume(); // A live-event resume cannot release the snapshot barrier.
+    await flushSync(10);
+    expect(upsert).toHaveBeenCalledOnce();
+    finishRead();
+    await snapshot;
+    expect(store.$state).toEqual({ count: 3, name: 'pending local' });
+    await flushSync(10);
+    expect(upsert).toHaveBeenLastCalledWith({ count: 3, name: 'pending local', user_id: 'user-1' });
+    sync.cleanup();
+  });
+  it('retains a domain-merged pending edit after the deferred save fails', async () => {
+    const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+    const store = createMockStore({ mode: { count: 5, name: 'old' } });
+    const sync = useSupabaseSync({ store, table: 'test_table', debounceMs: 10 });
+    await sync.withSnapshot!(async (reconcile) => {
+      store.$state.mode.count = 0;
+      store.notifySubscriber();
+      Object.assign(
+        store.$state,
+        reconcile({ mode: { count: 3, name: 'remote' } }, { mode: { count: 0, name: 'remote' } })
+      );
+    });
+    upsert.mockResolvedValueOnce({ error: { code: '42501', message: 'write denied' } });
+    await flushSync(10);
+    expect(upsert).toHaveBeenCalledOnce();
+    expect(sync.hasPendingChanges!()).toBe(true);
+    Object.assign(store.$state, sync.captureRemoteMerge!()({ mode: { count: 4, name: 'newer' } }));
+    expect(store.$state.mode).toEqual({ count: 0, name: 'newer' });
+    await sync.syncToSupabase();
+    expect(sync.hasPendingChanges!()).toBe(false);
+    expect(sync.captureRemoteMerge!()({ mode: { count: 6, name: 'latest' } })).toEqual({
+      mode: { count: 6, name: 'latest' },
+    });
+    sync.cleanup();
+  });
+  it('releases the snapshot barrier after a failed read', async () => {
+    const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+    const store = createMockStore({ count: 0 });
+    const sync = useSupabaseSync({ store, table: 'test_table', debounceMs: 10 });
+    await expect(
+      sync.withSnapshot!(async () => {
+        throw new Error('read failed');
+      })
+    ).rejects.toThrow('read failed');
+    store.$state.count = 1;
+    store.notifySubscriber();
+    await flushSync(10);
+    expect(upsert).toHaveBeenCalledWith({ count: 1, user_id: 'user-1' });
+    sync.cleanup();
+  });
+  it('queues resumed saves behind an in-flight write', async () => {
+    const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+    let finishFirst!: (result: { error: null }) => void;
+    upsert.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishFirst = resolve;
+        })
+    );
+    const store = createMockStore({ value: 1 });
+    const sync = useSupabaseSync({ store, table: 'test_table', debounceMs: 10 });
+    const first = sync.syncToSupabase();
+    store.$state.value = 2;
+    store.notifySubscriber();
+    sync.pause();
+    sync.resume();
+    await flushSync(10);
+    expect(upsert).toHaveBeenCalledTimes(1);
+    expect(upsert.mock.calls[0]?.[0]).toMatchObject({ value: 1 });
+    finishFirst({ error: null });
+    await first;
+    await flushSync(0);
+    expect(upsert).toHaveBeenCalledTimes(2);
+    expect(upsert.mock.calls[1]?.[0]).toMatchObject({ value: 2 });
+    expect(sync.hasPendingChanges?.()).toBe(false);
+    sync.cleanup();
+  });
+  it('retains pending local edits across a remote reconciliation pause', async () => {
+    const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+    const state = { local: 1, remote: 0 };
+    const store = createMockStore(state);
+    const sync = useSupabaseSync({ store, table: 'user_progress', debounceMs: 5 });
+    store.notifySubscriber();
+    expect(sync.hasPendingChanges?.()).toBe(true);
+    sync.pause();
+    state.remote = 2;
+    store.notifySubscriber();
+    await flushSync(5);
+    expect(upsert).not.toHaveBeenCalled();
+    sync.resume();
+    await flushSync(5);
+    expect(upsert).toHaveBeenCalledWith({ local: 1, remote: 2, user_id: 'user-1' });
+    expect(sync.hasPendingChanges?.()).toBe(false);
+    sync.cleanup();
+  });
+  it('saves an edit first made during a pause even when its debounce expires while paused', async () => {
+    const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+    const state = { count: 0 };
+    const store = createMockStore(state);
+    const sync = useSupabaseSync({ store, table: 'user_progress', debounceMs: 5 });
+    sync.pause();
+    state.count = 3;
+    store.notifySubscriber();
+    await flushSync(5);
+    expect(upsert).not.toHaveBeenCalled();
+    expect(sync.hasPendingChanges?.()).toBe(true);
+    sync.resume();
+    await flushSync(5);
+    expect(upsert).toHaveBeenCalledWith({ count: 3, user_id: 'user-1' });
+    expect(sync.hasPendingChanges?.()).toBe(false);
+    sync.cleanup();
+  });
   it('syncs transformed data when store state contains non-cloneable references', async () => {
     const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
     const storeState = reactive({

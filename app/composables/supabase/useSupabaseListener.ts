@@ -7,7 +7,9 @@ import {
   removeOwnedChannel,
   type OwnedRealtimeChannel,
 } from '@/utils/realtimeChannel';
+import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
 import { clearStaleState, resetStore, safePatchStore } from '@/utils/storeHelpers';
+import type { RemoteStateMerge, WithRemoteSnapshot } from '@/utils/pendingState';
 import type { PostgrestError, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import type { StateTree, Store } from 'pinia';
 // Local imports
@@ -23,7 +25,13 @@ export interface SupabaseListenerConfig<
   onData?: (data: TData | null) => void;
   patchStore?: boolean;
   /** Optional sync controller to pause during remote updates */
-  syncController?: { pause: () => void; resume: () => void };
+  syncController?: {
+    pause: () => void;
+    resume: () => void;
+    hasPendingChanges?: () => boolean;
+    captureRemoteMerge?: () => RemoteStateMerge;
+    withSnapshot?: WithRemoteSnapshot;
+  };
   scope?: ListenerScope;
 }
 interface SupabaseListenerReturn {
@@ -104,35 +112,54 @@ export function useSupabaseListener<
   let pendingSyncResumeTimeout: ReturnType<typeof setTimeout> | null = null;
   // Helper to get current filter value (supports both string and ref)
   const getFilterValue = (): string | undefined => unref(filter);
+  const parseFilter = (currentFilter = '') => {
+    const [column, value] = currentFilter.split('=eq.');
+    if (column && value) return { column, value };
+    if (currentFilter) {
+      logger.error(`[${storeIdForLogging}] Invalid filter format. Expected 'col=eq.val'`);
+    }
+    hasInitiallyLoaded.value = true;
+    return null;
+  };
+  const applyFetchedData = (data: TData | null) => {
+    if (patchStore) {
+      if (data) {
+        safePatchStore(store, data as Partial<TStoreState>);
+        clearStaleState(store, data);
+      } else {
+        resetStore(store);
+      }
+    }
+    onData?.(data);
+  };
+  const reconcileData = (data: TData | null, reconcile?: RemoteStateMerge): TData | null => {
+    if (!reconcile) return data;
+    if (data) return reconcile(data) as TData;
+    // A deleted/missing row clears acknowledged fields, but must not erase
+    // local edits that are still waiting for upload.
+    const cleared = Object.fromEntries(Object.keys(store.$state).map((key) => [key, undefined]));
+    const merged = reconcile(cleared);
+    return Object.values(merged).some((value) => value !== undefined) ? (merged as TData) : null;
+  };
   // Initial fetch
-  const fetchData = async () => {
+  // fallow-ignore-next-line complexity -- tested fetch cancellation and pending-save guards must share one response boundary
+  const fetchData = async (
+    reconnecting = false,
+    reconcile = syncController?.captureRemoteMerge?.()
+  ) => {
+    const pendingBeforeRead = syncController?.hasPendingChanges?.() === true;
     const fetchVersion = ++latestFetchVersion;
     activeFetchController?.abort();
     const fetchController = new AbortController();
     activeFetchController = fetchController;
     loadError.value = null;
-    const currentFilter = getFilterValue();
-    if (!currentFilter) {
-      if (fetchVersion === latestFetchVersion) {
-        hasInitiallyLoaded.value = true;
-      }
-      return;
-    }
-    // Parse filter to get column and value
-    // Expecting format "column=eq.value"
-    const [column, rest] = currentFilter.split('=eq.');
-    if (!column || !rest) {
-      logger.error(`[${storeIdForLogging}] Invalid filter format. Expected 'col=eq.val'`);
-      if (fetchVersion === latestFetchVersion) {
-        hasInitiallyLoaded.value = true;
-      }
-      return;
-    }
+    const filterQuery = parseFilter(getFilterValue());
+    if (!filterQuery) return;
     try {
       const queryBuilder = $supabase.client
         .from(table)
         .select('*')
-        .eq(column, rest)
+        .eq(filterQuery.column, filterQuery.value)
         .single() as QueryBuilderWithAbortSignal<TData>;
       const result =
         typeof queryBuilder.abortSignal === 'function'
@@ -148,18 +175,17 @@ export function useSupabaseListener<
         hasInitiallyLoaded.value = true;
         return;
       }
-      if (data) {
-        if (patchStore) {
-          safePatchStore(store, data as Partial<TStoreState>);
-          clearStaleState(store, data);
-        }
-        if (onData) onData(data);
-      } else {
-        if (patchStore) {
-          resetStore(store);
-        }
-        if (onData) onData(null);
+      // A reconnect must not replace state that still belongs to an outbound
+      // save, including edits that were saved while this request was in flight.
+      if (
+        reconnecting &&
+        !reconcile &&
+        (pendingBeforeRead || syncController?.hasPendingChanges?.())
+      ) {
+        hasInitiallyLoaded.value = true;
+        return;
       }
+      applyFetchedData(reconcileData(data, reconcile));
       hasInitiallyLoaded.value = true;
     } catch (error) {
       if (fetchController.signal.aborted || isAbortError(error)) {
@@ -173,6 +199,12 @@ export function useSupabaseListener<
       }
     }
   };
+  const readData = (reconnecting = false) => {
+    const version = cleanupVersion;
+    const read = (reconcile = syncController?.captureRemoteMerge?.()) =>
+      version === cleanupVersion ? fetchData(reconnecting, reconcile) : Promise.resolve();
+    return syncController?.withSnapshot ? syncController.withSnapshot(read) : read();
+  };
   const listenerTopic = (currentFilter: string) => `public:${table}:${currentFilter}`;
   const createSubscription = () => {
     const currentFilter = getFilterValue();
@@ -180,6 +212,8 @@ export function useSupabaseListener<
     if (!currentFilter) return;
     const subscriptionVersion = cleanupVersion;
     const client = $supabase.client;
+    const suspended = () => Boolean(client.realtime && isRealtimeSuspended(client.realtime));
+    let needsSnapshot = suspended();
     const nextChannel = client
       .channel(listenerTopic(currentFilter))
       .on(
@@ -192,23 +226,20 @@ export function useSupabaseListener<
         },
         (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
           if (subscriptionVersion !== cleanupVersion) return;
+          latestFetchVersion += 1;
+          activeFetchController?.abort();
           syncController?.pause();
           try {
             if (subscriptionVersion !== cleanupVersion) return;
-            if (payload.eventType === 'DELETE') {
-              if (patchStore) {
-                resetStore(store);
-              }
-              if (onData) onData(null);
-            } else {
-              // INSERT or UPDATE
-              const newData = payload.new as TData;
-              if (patchStore) {
-                safePatchStore(store, newData as Partial<TStoreState>);
-                clearStaleState(store, newData);
-              }
-              if (onData) onData(newData);
+            const reconcile = syncController?.captureRemoteMerge?.();
+            if (!reconcile && syncController?.hasPendingChanges?.()) {
+              hasInitiallyLoaded.value = true;
+              return;
             }
+            const data = payload.eventType === 'DELETE' ? null : (payload.new as TData);
+            applyFetchedData(reconcileData(data, reconcile));
+            hasInitiallyLoaded.value = true;
+            loadError.value = null;
           } finally {
             if (subscriptionVersion === cleanupVersion) {
               if (pendingSyncResumeTimeout) clearTimeout(pendingSyncResumeTimeout);
@@ -224,7 +255,16 @@ export function useSupabaseListener<
         // Cleanup can start while the join is still pending; a disposed channel
         // must not flip `isSubscribed` back on or log for a listener that is gone.
         if (subscriptionVersion !== cleanupVersion) return;
+        if (suspended()) {
+          isSubscribed.value = false;
+          needsSnapshot = true;
+          return;
+        }
         isSubscribed.value = status === 'SUBSCRIBED';
+        if (isSubscribed.value) {
+          if (needsSnapshot) void readData(true);
+          needsSnapshot = true;
+        }
         logChannelSubscribeFailure(storeIdForLogging, status, error, { table });
       });
     channel.value = { channel: nextChannel, client, topic: listenerTopic(currentFilter) };
@@ -298,7 +338,7 @@ export function useSupabaseListener<
           return;
         }
         hasInitiallyLoaded.value = false;
-        fetchData();
+        readData();
         setupSubscription();
       },
       { immediate: true }
@@ -314,6 +354,6 @@ export function useSupabaseListener<
       stopFilterWatch?.();
       cleanup();
     },
-    fetchData,
+    fetchData: readData,
   };
 }

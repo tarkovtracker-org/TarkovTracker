@@ -166,7 +166,8 @@ const mergeHideoutModules = (
 };
 const mergeCountableObjects = <T extends Record<string, CountableEntry>>(
   local: T | undefined,
-  remote: T | undefined
+  remote: T | undefined,
+  preferNewerCount = false
 ): T => {
   const merged = { ...local, ...remote } as T;
   for (const id of Object.keys(merged)) {
@@ -181,7 +182,9 @@ const mergeCountableObjects = <T extends Record<string, CountableEntry>>(
       const olderHasComplete = typeof older.complete === 'boolean';
       merged[id as keyof T] = {
         complete: newerHasComplete ? newer.complete : olderHasComplete ? older.complete : false,
-        count: Math.max(l.count || 0, r.count || 0),
+        count: preferNewerCount
+          ? (newer.count ?? older.count ?? 0)
+          : Math.max(l.count || 0, r.count || 0),
         timestamp: Math.max(localTs, remoteTs) || undefined,
       } as T[keyof T];
     }
@@ -288,7 +291,8 @@ const mergeApiUpdateHistory = (
 };
 export function mergeProgressData(
   local: UserProgressData | undefined,
-  remote: UserProgressData | undefined
+  remote: UserProgressData | undefined,
+  preferNewerCount = false
 ): UserProgressData {
   if (!local && !remote) return {} as UserProgressData;
   if (!local) return structuredClone(remote!);
@@ -374,9 +378,13 @@ export function mergeProgressData(
       }
       return merged;
     })(),
-    taskObjectives: mergeCountableObjects(local.taskObjectives, remote.taskObjectives),
+    taskObjectives: mergeCountableObjects(
+      local.taskObjectives,
+      remote.taskObjectives,
+      preferNewerCount
+    ),
     hideoutModules: mergeHideoutModules(local.hideoutModules, remote.hideoutModules),
-    hideoutParts: mergeCountableObjects(local.hideoutParts, remote.hideoutParts),
+    hideoutParts: mergeCountableObjects(local.hideoutParts, remote.hideoutParts, preferNewerCount),
     storyChapters: mergeStoryChapterProgress(local.storyChapters, remote.storyChapters),
     traders: {
       ...local.traders,

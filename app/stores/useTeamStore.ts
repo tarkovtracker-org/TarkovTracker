@@ -7,7 +7,7 @@ import { replayProgressMetadataMigration } from '@/stores/tarkov/metadataStoreBr
 import { getTeamIdFromState, useSystemStoreWithSupabase } from '@/stores/useSystemStore';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { getCurrentGameMode } from '@/stores/utils/gameMode';
-import { ACTIVE_SEASON_NUMBER, GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
+import { GAME_MODES, getGameModeSeasonNumber, isGameMode, type GameMode } from '@/utils/constants';
 import { getErrorStatus } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 import { hasMaterializedProgress, summarizeModeProgressData } from '@/utils/modeProgressFallback';
@@ -19,6 +19,7 @@ import {
   type OwnedRealtimeChannel,
   type SupabaseRealtimeChannel,
 } from '@/utils/realtimeChannel';
+import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
 import type { MemberProfile, TeamGetters, TeamState } from '@/types/tarkov';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Store } from 'pinia';
@@ -161,7 +162,7 @@ const isTrackedTeammate = (
 const isActiveSeasonProgressEvent = (data: Record<string, unknown>): boolean => {
   const mode = data.game_mode;
   if (!isGameMode(mode)) return false;
-  const expectedSeason = mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
+  const expectedSeason = getGameModeSeasonNumber(mode);
   return data.season_number === expectedSeason;
 };
 /**
@@ -228,7 +229,7 @@ export type TeamChannelDeps = {
   getTeamId: () => string | null;
   getMembers: () => string[] | undefined;
   applyProgress: (data: Record<string, unknown>) => void;
-  refreshMembers: (force?: boolean) => Promise<void>;
+  refreshMembers: (force?: boolean) => Promise<boolean>;
 };
 export type TeamChannelController = {
   /** Leaves the channel and waits for the leave to settle. */
@@ -257,6 +258,27 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
   let retryTimeout: ReturnType<typeof setTimeout> | null = null;
   const release = createChannelReleaseLatch();
   let disposed = false;
+  const previouslyJoined = new WeakSet<OwnedRealtimeChannel>();
+  let hydrationTeam: string | null = null;
+  const dispatchHydration = (teamId: string | null) => {
+    if (!teamId || hydrationTeam !== teamId) return;
+    hydrationTeam = null;
+    if (typeof window !== 'undefined')
+      window.dispatchEvent(new Event('teammate-progress-reconnected'));
+  };
+  const transferHydration = (teamId: string) => {
+    // Retained teammate stores need the missed snapshot even if the winning
+    // membership refresh moved us to another team while reconnect was pending.
+    if (hydrationTeam !== null) hydrationTeam = teamId;
+  };
+  const reconcileRejoin = async (teamId: string) => {
+    hydrationTeam = teamId;
+    try {
+      await refresh();
+    } catch (error) {
+      logger.warn('[TeamStore] Reconnect member refresh failed', error);
+    }
+  };
   const clearRetry = () => {
     if (retryTimeout === null) return;
     clearTimeout(retryTimeout);
@@ -302,6 +324,7 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
    * invisible while Realtime rejoins forever. The binding is recorded as joined
    * only here, so a join that silently no-ops is never mistaken for a live one.
    */
+  // fallow-ignore-next-line complexity -- tested subscription ownership and recovery state machine; inferred coverage misses callback calls
   const handleStatus = (
     owned: OwnedRealtimeChannel,
     teamId: string,
@@ -310,15 +333,26 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     error?: Error
   ) => {
     if (channel.value !== owned) return;
+    if (deps.getClient().realtime && isRealtimeSuspended(deps.getClient().realtime)) {
+      previouslyJoined.add(owned);
+      return;
+    }
     if (status === 'SUBSCRIBED') {
       joinedTeamId = teamId;
       joinedFilter = filter;
       errorCount = 0;
-      void deps.refreshMembers();
+      if (previouslyJoined.has(owned)) void reconcileRejoin(teamId);
+      else {
+        previouslyJoined.add(owned);
+        dispatchHydration(teamId);
+      }
       return;
     }
     // A closed channel is no longer joined, so drop the binding to let the next
     // membership event rebuild it.
+    // Recovery can replace the owned channel before it rejoins. Carry the
+    // missed-progress refresh across that replacement, too.
+    if (previouslyJoined.has(owned)) hydrationTeam = teamId;
     joinedTeamId = null;
     joinedFilter = undefined;
     recordStatusFailure(status, error);
@@ -349,6 +383,7 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     if (progressFilter) next = bindProgress(next, progressFilter);
     const owned: OwnedRealtimeChannel = { channel: next, client, topic };
     channel.value = owned;
+    if (client.realtime && isRealtimeSuspended(client.realtime)) previouslyJoined.add(owned);
     next.subscribe((status, error) => handleStatus(owned, teamId, progressFilter, status, error));
   };
   const canBuild = (setupVersion: number): boolean => !disposed && setupVersion === version;
@@ -361,6 +396,7 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     // The latch is shared, so an overlapping setup waits on the same leave.
     if (!(await release.release(teamTopic(teamId)))) return;
     if (!canBuild(setupVersion)) return;
+    transferHydration(teamId);
     buildChannel(teamId, buildMemberProgressFilter(deps.getMembers()));
   };
   const isCurrentBinding = (teamId: string): boolean =>
@@ -371,6 +407,7 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
   const resolveTargetTeam = async (): Promise<string | null> => {
     const teamId = deps.getTeamId();
     if (teamId) return teamId;
+    hydrationTeam = null;
     await cleanup();
     return null;
   };
@@ -384,18 +421,25 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
   const isStale = (requestVersion: number): boolean => disposed || requestVersion !== version;
   const shouldContinue = async (requestVersion: number): Promise<boolean> =>
     !isStale(requestVersion) && (await resolveTargetTeam()) !== null;
+  // fallow-ignore-next-line complexity -- refresh success and generation fences are covered in teamChannelController.test.ts and useTeamStore.test.ts
   const refresh = async (): Promise<void> => {
     const requestVersion = ++version;
     if (!(await shouldContinue(requestVersion))) return;
-    await deps.refreshMembers(true);
+    if (!(await deps.refreshMembers(true))) return;
     if (!(await shouldContinue(requestVersion))) return;
-    if (!needsRebuild(deps.getTeamId())) return;
+    if (!needsRebuild(deps.getTeamId())) {
+      // Only the winning refresh can hydrate an unchanged binding. An older
+      // reconnect request may have been superseded by a membership event.
+      dispatchHydration(joinedTeamId);
+      return;
+    }
     await setup(requestVersion);
   };
   return {
     cleanup,
     dispose: () => {
       disposed = true;
+      hydrationTeam = null;
       version += 1;
       clearRetry();
       return cleanup();
@@ -416,7 +460,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   const { $supabase } = useNuxtApp();
   const listenerScope = effectScope(true);
   let lastMembersRefreshAt = 0;
-  let refreshInFlight: Promise<void> | null = null;
+  let refreshInFlight: Promise<boolean> | null = null;
   let refreshInFlightTeamId: string | null = null;
   let latestMembersRequestVersion = 0;
   // Computed reference to the team document based on system store
@@ -465,7 +509,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         state.members = [];
         state.memberProfiles = {};
       });
-      return;
+      return false;
     }
     if (refreshInFlight) {
       const currentTeamId = getTeamIdFromSystemStore(systemStore);
@@ -474,23 +518,23 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         refreshInFlightTeamId = null;
       } else {
         try {
-          await refreshInFlight;
+          return await refreshInFlight;
         } catch (error) {
           const status = getErrorStatus(error);
           if (status === 401 || status === 403) {
             logger.debug('[TeamStore] Skipping team member refresh due auth/membership status:', {
               status,
             });
-            return;
+            return false;
           }
           logger.warn('[TeamStore] Failed to load team members:', error);
         }
-        return;
+        return false;
       }
     }
     const now = Date.now();
     if (!force && now - lastMembersRefreshAt < 2000) {
-      return;
+      return false;
     }
     const currentTeamId = getTeamIdFromSystemStore(systemStore);
     if (!currentTeamId) {
@@ -499,36 +543,38 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         state.memberProfiles = {};
       });
       await teamChannel.cleanup();
-      return;
+      return false;
     }
     const requestVersion = ++latestMembersRequestVersion;
     const inFlightRequest = (async () => {
       const { getTeamMembers } = useEdgeFunctions();
       const result = await getTeamMembers(currentTeamId, force);
       if (requestVersion !== latestMembersRequestVersion) {
-        return;
+        return false;
       }
       if (getTeamIdFromSystemStore(systemStore) !== currentTeamId) {
-        return;
+        return false;
       }
       teamStore.$patch((state) => {
         state.members = result?.members || [];
         state.memberProfiles = result?.profiles || {};
       });
+      return true;
     })();
     refreshInFlight = inFlightRequest;
     refreshInFlightTeamId = currentTeamId;
     try {
-      await inFlightRequest;
+      return await inFlightRequest;
     } catch (error) {
       const status = getErrorStatus(error);
       if (status === 401 || status === 403) {
         logger.debug('[TeamStore] Skipping team member refresh due auth/membership status:', {
           status,
         });
-        return;
+        return false;
       }
       logger.warn('[TeamStore] Failed to load team members:', error);
+      return false;
     } finally {
       if (refreshInFlight === inFlightRequest) {
         lastMembersRefreshAt = Date.now();
@@ -738,8 +784,11 @@ export function useTeammateStores() {
       ): GameMode | null => {
         const mode = row.game_mode;
         if (!isGameMode(mode)) return null;
-        const expectedSeason = mode === GAME_MODES.SEASONAL ? ACTIVE_SEASON_NUMBER : 0;
+        const expectedSeason = getGameModeSeasonNumber(mode);
         if (row.season_number !== expectedSeason) return null;
+        // Visibility can create a row without progress. Keep the last usable
+        // snapshot and let legacy hydration recover, even after a live event.
+        if (!hasMaterializedProgress(row.progress_data)) return null;
         applyProgressData(mode, row.progress_data, authoritative);
         return mode;
       };
@@ -765,20 +814,31 @@ export function useTeammateStores() {
         if (!isHydrationActive()) return;
         replayProgressMetadataMigration();
       };
+      let hydrationRequest = 0;
+      // fallow-ignore-next-line complexity -- hydration ordering and stale-event guards are covered in useTeamStore.test.ts
       const hydrateModeProgress = async () => {
+        const request = ++hydrationRequest;
+        appliedModes.clear();
         try {
-          const [modeRows, legacyRow] = await Promise.all([
-            $supabase.client
-              .from('user_game_mode_progress')
-              .select('game_mode,season_number,progress_data')
-              .eq('user_id', teammateId),
-            fetchLegacyTeammateProgress($supabase.client, teammateId, legacyMode),
-          ]);
-          if (!isHydrationActive()) return;
+          const modeRows = await $supabase.client
+            .from('user_game_mode_progress')
+            .select('game_mode,season_number,progress_data')
+            .eq('user_id', teammateId);
+          if (!isHydrationActive() || request !== hydrationRequest) return;
           if (modeRows.error) {
             logTeammateModeProgressHydrationFailure(modeRows.error, teammateId);
             return;
           }
+          const needsLegacy = !(modeRows.data ?? []).some(
+            (row) =>
+              row.game_mode === legacyMode &&
+              row.season_number === 0 &&
+              hasMaterializedProgress(row.progress_data)
+          );
+          const legacyRow = needsLegacy
+            ? await fetchLegacyTeammateProgress($supabase.client, teammateId, legacyMode)
+            : { data: null, error: null };
+          if (!isHydrationActive() || request !== hydrationRequest) return;
           applyModeProgressRows(modeRows.data);
           applyLegacyModeProgress(legacyRow);
           replayHydratedProgressMetadata();
@@ -793,11 +853,13 @@ export function useTeammateStores() {
       };
       if (typeof window !== 'undefined') {
         window.addEventListener('teammate-mode-progress', handleModeProgress);
+        window.addEventListener('teammate-progress-reconnected', hydrateModeProgress);
       }
       teammateUnsubscribes.value[teammateId] = () => {
         hydrationActive = false;
         if (typeof window !== 'undefined') {
           window.removeEventListener('teammate-mode-progress', handleModeProgress);
+          window.removeEventListener('teammate-progress-reconnected', hydrateModeProgress);
         }
       };
       void hydrateModeProgress();

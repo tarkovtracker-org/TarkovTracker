@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTeamChannelController, type TeamChannelDeps } from '@/stores/useTeamStore';
+import { installRealtimeVisibility } from '@/utils/realtimeVisibility';
 import type { SupabaseClient } from '@supabase/supabase-js';
 const loggerMock = vi.hoisted(() => ({
   debug: vi.fn(),
@@ -65,7 +66,7 @@ const createHarness = (options: { removeStatus?: string | Promise<string> } = {}
     teamId: 'team-1' as string | null,
   };
   const applyProgress = vi.fn();
-  const refreshMembers = vi.fn(async () => undefined);
+  const refreshMembers = vi.fn(async () => true);
   const deps: TeamChannelDeps = {
     applyProgress,
     getClient: () => client,
@@ -114,14 +115,155 @@ describe('createTeamChannelController', () => {
     await controller.refresh();
     expect(harness.channels[0]?.bindings.map(({ table }) => table)).toEqual(['team_memberships']);
   });
-  it('refreshes members once the join is acknowledged', async () => {
+  it('refreshes members on rejoin without duplicating the initial refresh', async () => {
     const harness = createHarness();
     const controller = createTeamChannelController(harness.deps);
     await controller.refresh();
     harness.refreshMembers.mockClear();
     harness.channels[0]?.status?.('SUBSCRIBED');
+    expect(harness.refreshMembers).not.toHaveBeenCalled();
+    harness.channels[0]?.status?.('SUBSCRIBED');
+    await vi.advanceTimersByTimeAsync(0);
     expect(harness.refreshMembers).toHaveBeenCalledTimes(1);
   });
+  it.each([true, false])(
+    'reconciles a suspended first join (suspended at creation: %s)',
+    async (suspendedAtCreation) => {
+      const harness = createHarness();
+      const transport = { connect: vi.fn(), disconnect: vi.fn(), getChannels: () => [] };
+      Object.assign(harness.client, { realtime: transport });
+      const page = Object.assign(new EventTarget(), {
+        visibilityState: 'hidden' as DocumentVisibilityState,
+      });
+      const releaseVisibility = installRealtimeVisibility(transport, page);
+      const controller = createTeamChannelController(harness.deps);
+      const hydrated = vi.fn();
+      window.addEventListener('teammate-progress-reconnected', hydrated);
+      try {
+        if (suspendedAtCreation) await vi.advanceTimersByTimeAsync(60_000);
+        await controller.refresh();
+        if (!suspendedAtCreation) {
+          await vi.advanceTimersByTimeAsync(60_000);
+          harness.channels[0]?.status?.('CLOSED');
+        }
+        harness.refreshMembers.mockClear();
+        harness.state.members = [MEMBER_A, MEMBER_C];
+        page.visibilityState = 'visible';
+        page.dispatchEvent(new Event('visibilitychange'));
+        await vi.advanceTimersByTimeAsync(0);
+        harness.channels[0]?.status?.('SUBSCRIBED');
+        await vi.advanceTimersByTimeAsync(0);
+        expect(harness.refreshMembers).toHaveBeenCalledOnce();
+        expect(harness.channels).toHaveLength(2);
+        expect(harness.channels[1]?.bindings[1]?.filter).toBe(
+          `user_id=in.(${MEMBER_A},${MEMBER_C})`
+        );
+        expect(hydrated).not.toHaveBeenCalled();
+        harness.channels[1]?.status?.('SUBSCRIBED');
+        expect(hydrated).toHaveBeenCalledOnce();
+      } finally {
+        window.removeEventListener('teammate-progress-reconnected', hydrated);
+        releaseVisibility();
+        await controller.dispose();
+      }
+    }
+  );
+  it('reports a rejected reconnect refresh without dispatching hydration', async () => {
+    const harness = createHarness();
+    const controller = createTeamChannelController(harness.deps);
+    const hydrated = vi.fn();
+    window.addEventListener('teammate-progress-reconnected', hydrated);
+    try {
+      await controller.refresh();
+      harness.channels[0]?.status?.('SUBSCRIBED');
+      harness.refreshMembers.mockRejectedValueOnce(new Error('network unavailable'));
+      harness.channels[0]?.status?.('SUBSCRIBED');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(hydrated).not.toHaveBeenCalled();
+      expect(harness.channels).toHaveLength(1);
+    } finally {
+      window.removeEventListener('teammate-progress-reconnected', hydrated);
+      await controller.dispose();
+    }
+  });
+  it('lets a newer membership refresh finish before reconnect hydration', async () => {
+    const harness = createHarness();
+    const controller = createTeamChannelController(harness.deps);
+    const hydrated = vi.fn();
+    window.addEventListener('teammate-progress-reconnected', hydrated);
+    try {
+      await controller.refresh();
+      harness.channels[0]?.status?.('SUBSCRIBED');
+      let finishOld!: () => void;
+      let finishNew!: () => void;
+      harness.refreshMembers
+        .mockImplementationOnce(
+          () =>
+            new Promise<boolean>((resolve) => {
+              finishOld = () => resolve(true);
+            })
+        )
+        .mockImplementationOnce(
+          () =>
+            new Promise<boolean>((resolve) => {
+              finishNew = () => resolve(true);
+            })
+        );
+      harness.channels[0]?.status?.('SUBSCRIBED');
+      await vi.advanceTimersByTimeAsync(0);
+      const newer = controller.refresh();
+      await vi.advanceTimersByTimeAsync(0);
+      finishOld();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(hydrated).not.toHaveBeenCalled();
+      harness.state.members = [MEMBER_A, MEMBER_B, MEMBER_C];
+      finishNew();
+      await newer;
+      expect(hydrated).not.toHaveBeenCalled();
+      expect(harness.channels).toHaveLength(2);
+      harness.channels[1]?.status?.('SUBSCRIBED');
+      expect(hydrated).toHaveBeenCalledOnce();
+    } finally {
+      window.removeEventListener('teammate-progress-reconnected', hydrated);
+      await controller.dispose();
+    }
+  });
+  it.each([true, false])(
+    'transfers reconnect hydration to a replacement team (old refresh finishes first: %s)',
+    async (oldFinishesFirst) => {
+      const harness = createHarness();
+      const controller = createTeamChannelController(harness.deps);
+      const hydrated = vi.fn();
+      window.addEventListener('teammate-progress-reconnected', hydrated);
+      try {
+        await controller.refresh();
+        harness.channels[0]?.status?.('SUBSCRIBED');
+        let finishOld!: (success: boolean) => void;
+        harness.refreshMembers.mockImplementationOnce(
+          () =>
+            new Promise<boolean>((resolve) => {
+              finishOld = resolve;
+            })
+        );
+        harness.channels[0]?.status?.('SUBSCRIBED');
+        await vi.advanceTimersByTimeAsync(0);
+        // The same teammate store survives the team change and needs a snapshot.
+        harness.state.teamId = 'team-2';
+        const replacement = controller.refresh();
+        if (oldFinishesFirst) finishOld(true);
+        await replacement;
+        expect(hydrated).not.toHaveBeenCalled();
+        harness.channels[1]?.status?.('SUBSCRIBED');
+        expect(hydrated).toHaveBeenCalledOnce();
+        if (!oldFinishesFirst) finishOld(true);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(hydrated).toHaveBeenCalledOnce();
+      } finally {
+        window.removeEventListener('teammate-progress-reconnected', hydrated);
+        await controller.dispose();
+      }
+    }
+  );
   it('does not rebuild while the topic and member filter are unchanged', async () => {
     const harness = createHarness();
     const controller = createTeamChannelController(harness.deps);
@@ -162,6 +304,36 @@ describe('createTeamChannelController', () => {
     await controller.refresh();
     expect(harness.channels).toHaveLength(2);
   });
+  it.each(['CLOSED', 'CHANNEL_ERROR'])(
+    'hydrates missed teammate progress after replacing a joined channel on %s',
+    async (status) => {
+      const harness = createHarness();
+      const controller = createTeamChannelController(harness.deps);
+      const hydrated = vi.fn();
+      window.addEventListener('teammate-progress-reconnected', hydrated);
+      try {
+        await controller.refresh();
+        harness.channels[0]?.status?.('SUBSCRIBED');
+        expect(hydrated).not.toHaveBeenCalled();
+        if (status === 'CHANNEL_ERROR') {
+          for (let attempt = 0; attempt < 5; attempt += 1) {
+            harness.channels[0]?.status?.(status, new Error('connection lost'));
+          }
+          await vi.advanceTimersByTimeAsync(60_000);
+        } else {
+          harness.channels[0]?.status?.(status);
+          await controller.refresh();
+        }
+        expect(harness.channels).toHaveLength(2);
+        expect(hydrated).not.toHaveBeenCalled();
+        harness.channels[1]?.status?.('SUBSCRIBED');
+        expect(hydrated).toHaveBeenCalledOnce();
+      } finally {
+        window.removeEventListener('teammate-progress-reconnected', hydrated);
+        await controller.dispose();
+      }
+    }
+  );
   it('tears the channel down when the team disappears', async () => {
     const harness = createHarness();
     const controller = createTeamChannelController(harness.deps);
