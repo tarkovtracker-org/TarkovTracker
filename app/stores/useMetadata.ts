@@ -43,7 +43,7 @@ import {
   getCachedData,
   setCachedData,
 } from '@/utils/tarkovCache';
-import { normalizeTaskObjectives } from '@/utils/taskNormalization';
+import { dedupeTaskObjectiveIds, normalizeTaskObjectives } from '@/utils/taskNormalization';
 import type {
   FinishRewards,
   GameEdition,
@@ -1588,34 +1588,7 @@ export const useMetadataStore = defineStore('metadata', {
       this.mapSpawnsLoaded = true;
     },
     dedupeObjectiveIds(tasks: Task[]) {
-      const objectiveCounts = new Map<string, number>();
-      tasks.forEach((task) => {
-        task.objectives?.forEach((objective) => {
-          if (!objective?.id) return;
-          objectiveCounts.set(objective.id, (objectiveCounts.get(objective.id) ?? 0) + 1);
-        });
-      });
-      const duplicateObjectiveIds = new Map<string, string[]>();
-      const updatedTasks = tasks.map((task) => {
-        if (!task.objectives?.length) return task;
-        let changed = false;
-        const objectives = task.objectives.map((objective) => {
-          if (!objective?.id) return objective;
-          const count = objectiveCounts.get(objective.id) ?? 0;
-          if (count <= 1) return objective;
-          const newId = `${objective.id}:${task.id}`;
-          const existing = duplicateObjectiveIds.get(objective.id);
-          if (existing) {
-            existing.push(newId);
-          } else {
-            duplicateObjectiveIds.set(objective.id, [newId]);
-          }
-          changed = true;
-          return { ...objective, id: newId };
-        });
-        return changed ? { ...task, objectives } : task;
-      });
-      return { tasks: updatedTasks, duplicateObjectiveIds };
+      return dedupeTaskObjectiveIds(tasks);
     },
     buildObjectiveCountMap(tasks: Array<Pick<Task, 'id' | 'objectives'>>): Map<string, number> {
       const counts = new Map<string, number>();

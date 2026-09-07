@@ -1,3 +1,4 @@
+import type { Task } from '@/types/tarkov';
 /**
  * Task Normalization Utilities
  *
@@ -40,4 +41,35 @@ export function normalizeTaskObjectives<T = unknown>(objectives: unknown): T[] {
     );
   }
   return [];
+}
+/** Keep persisted objective keys identical across metadata hydration and imports. */
+export function dedupeTaskObjectiveIds(tasks: Task[]) {
+  const objectiveCounts = new Map<string, number>();
+  tasks.forEach((task) => {
+    task.objectives?.forEach((objective) => {
+      if (!objective?.id) return;
+      objectiveCounts.set(objective.id, (objectiveCounts.get(objective.id) ?? 0) + 1);
+    });
+  });
+  const duplicateObjectiveIds = new Map<string, string[]>();
+  const updatedTasks = tasks.map((task) => {
+    if (!task.objectives?.length) return task;
+    let changed = false;
+    const objectives = task.objectives.map((objective) => {
+      if (!objective?.id) return objective;
+      const count = objectiveCounts.get(objective.id) ?? 0;
+      if (count <= 1) return objective;
+      const newId = `${objective.id}:${task.id}`;
+      const existing = duplicateObjectiveIds.get(objective.id);
+      if (existing) {
+        existing.push(newId);
+      } else {
+        duplicateObjectiveIds.set(objective.id, [newId]);
+      }
+      changed = true;
+      return { ...objective, id: newId };
+    });
+    return changed ? { ...task, objectives } : task;
+  });
+  return { tasks: updatedTasks, duplicateObjectiveIds };
 }

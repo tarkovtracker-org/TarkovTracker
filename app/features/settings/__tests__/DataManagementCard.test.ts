@@ -831,7 +831,7 @@ describe('DataManagementCard', () => {
     };
     const wrapper = createWrapper();
     expect(wrapper.find('game-mode-toggle-stub').exists()).toBe(false);
-    expect(wrapper.text()).toContain('settings.log_import.mode_summary_pvp');
+    expect(wrapper.text()).toContain('common.pvp');
   });
   it('shows EFT mode toggle when unknown-mode events are present', () => {
     eftLogsState.importState.value = 'preview';
@@ -884,6 +884,29 @@ describe('DataManagementCard', () => {
       unmatchedQuestIds: [],
       unmatchedStartedQuestIds: [],
     };
+    eftLogsState.previewData.value.events = [
+      {
+        eventKey: 'complete',
+        questId: '61604635c725987e815b1a46',
+        mode: 'pvp',
+        status: 'completed',
+        timestamp: '2026-08-29 10:00:00.000',
+      },
+      {
+        eventKey: 'start',
+        questId: '61604635c725987e815b1a46',
+        mode: 'pvp',
+        status: 'started',
+        timestamp: '2026-08-29 09:00:00.000',
+      },
+      {
+        eventKey: 'active',
+        questId: '5ac2426c86f774138762edfe',
+        mode: 'pvp',
+        status: 'started',
+        timestamp: '2026-08-29 09:00:00.000',
+      },
+    ];
     const wrapper = createWrapper();
     expect(asVm<{ eftLogsCompletedCount: number }>(wrapper.vm).eftLogsCompletedCount).toBe(1);
     expect(asVm<{ eftLogsActiveCount: number }>(wrapper.vm).eftLogsActiveCount).toBe(1);

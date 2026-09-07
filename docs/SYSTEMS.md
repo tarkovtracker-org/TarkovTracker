@@ -664,6 +664,33 @@ flowchart LR
    only `pvp` (and `pve`, which the UI still gates off) and never writes the Seasonal row. The store
    rejects a Seasonal prestige before any request, and the settings card reports prestige as
    unavailable in Seasonal PvP.
+9. EFT log import restores explicit quest notification states in PvP, PvE, and active Seasonal
+   PvP. Message types 10/11/12 identify started/failed/completed tasks; rewards, backend requests,
+   diagnostics, and group-member snapshots do not establish additional player progress. See
+   `docs/eft-log-reference/` for the audited format inventory (through `1.1.0.1.46911`) and
+   [TarkovMonitor's message type contract](https://github.com/the-hideout/TarkovMonitor/blob/master/TarkovMonitor/GameWatcher.cs).
+   The importer accepts legacy/rotated notification and backend filenames, and application/output
+   context, in folders, individual files, and ZIPs. Arena is excluded. Multiline JSON is bounded
+   by log records so a truncated event cannot consume the next notification.
+   Mode routing uses preceding explicit session declarations or gateway/WebSocket connections;
+   legacy prod backend requests remain a fallback when explicit PvP/Seasonal routing is absent.
+   Delayed responses and shared mode/locale routes are not switches. Conflicting simultaneous
+   signals and events before the first signal remain unresolved and require a destination choice.
+   Original notification message times (`dt`) order replayed history when present; record timestamps
+   still locate the mode signal. Without `dt`, record time is the fallback.
+   Events are deduplicated per mode, quest, and state, then reconciled chronologically after
+   unresolved-mode routing; tied timestamps prefer completed, then failed, then started.
+   Explicit failure notifications use the persistent manual-failure flag so automatic repair cannot
+   discard them when a triggering quest is missing from the logs. Existing completed tracker tasks
+   are preserved. Catalogs share metadata hydration's task-qualified duplicate-objective IDs.
+   All destination task/objective catalogs are
+   loaded before mutations, without changing the active metadata store. Destination catalogs
+   determine task eligibility and objective counts, and the original progress mode is restored.
+   Seasonal events outside the active season are skipped; assigning unresolved out-of-season
+   events to Seasonal is blocked. Malformed/skipped records are reported in the preview.
+   Version filters are compatibility filters, not account/wipe/prestige boundaries: users must
+   select the character sessions they intend to restore. Missing logs, objective handovers, XP,
+   skills, and hideout progress cannot be reconstructed from these quest notifications.
 
 ### Files
 
