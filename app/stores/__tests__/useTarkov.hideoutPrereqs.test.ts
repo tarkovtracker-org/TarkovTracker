@@ -117,6 +117,18 @@ describe('useTarkovStore hideout skill prerequisites', () => {
     expect(store.isHideoutModuleComplete(level.id)).toBe(false);
     expect(store.isHideoutPartComplete('part-1')).toBe(false);
   });
+  it('preserves existing out-of-range loyalty values that satisfy the requirement', () => {
+    const level = useMetadataStore().hideoutStations[0]!.levels[0]!;
+    level.skillRequirements = [];
+    level.traderRequirements = [
+      { id: 'trader-req', trader: { id: 'prapor' }, compareMethod: '>=', value: 5 },
+    ] as typeof level.traderRequirements;
+    const store = useTarkovStore();
+    store.setTraderLevel('prapor', 5);
+    store.setHideoutModuleComplete(level.id);
+    expect(store.enforceHideoutPrereqsNow()).toBe(0);
+    expect(store.isHideoutModuleComplete(level.id)).toBe(true);
+  });
   it('preserves completed modules when trader gating is disabled', () => {
     const level = useMetadataStore().hideoutStations[0]!.levels[0]!;
     level.skillRequirements = [];

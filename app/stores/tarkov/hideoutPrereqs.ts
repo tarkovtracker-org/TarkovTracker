@@ -94,10 +94,13 @@ const checkTraderReqsMet = (module: HideoutModuleMeta, options: HideoutCheckOpti
       if (!req?.trader?.id || typeof req?.value !== 'number') return true;
       const playerTraderLevel = options.traders?.[req.trader.id]?.level ?? 1;
       // Building is permanent when loyalty increases past an upper-bound requirement.
-      return loyaltyLevels.some(
-        (level) =>
-          level <= playerTraderLevel &&
-          compareRequirement(level, req.compareMethod ?? '>=', req.value)
+      const compareMethod = req.compareMethod ?? '>=';
+      return (
+        compareRequirement(playerTraderLevel, compareMethod, req.value) ||
+        loyaltyLevels.some(
+          (level) =>
+            level <= playerTraderLevel && compareRequirement(level, compareMethod, req.value)
+        )
       );
     }) ?? true
   );

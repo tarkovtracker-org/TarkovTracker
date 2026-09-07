@@ -27,14 +27,24 @@ const optionalChapters = (
     | undefined,
   mode: string
 ) => mergeStoryChapters(overlay?.storyChapters, modeChapters(overlay ?? {}, mode));
+const validProfilePrestigeLevel = (level: number): boolean =>
+  Number.isInteger(level) && level >= 0 && level <= 6;
+const validProfilePrestigeConditions = (conditions: PrestigeLevel['conditions']): boolean =>
+  conditions === undefined ||
+  (Array.isArray(conditions) &&
+    conditions.every((condition) => condition && typeof condition === 'object'));
+const validProfilePrestige = (entry: PrestigeLevel): boolean => {
+  if (!entry) return false;
+  return [
+    typeof entry.id === 'string' && entry.id.trim().length > 0,
+    validProfilePrestigeLevel(entry.level),
+    validProfilePrestigeLevel(entry.prestigeLevel ?? entry.level),
+    validProfilePrestigeConditions(entry.conditions),
+  ].every(Boolean);
+};
 const optionalPrestige = (response: { data: { prestige: PrestigeLevel[] } }): PrestigeLevel[] => {
   const prestige = response?.data?.prestige;
-  if (
-    !Array.isArray(prestige) ||
-    prestige.some(
-      (entry) => !entry || typeof entry.id !== 'string' || !Number.isFinite(entry.level)
-    )
-  ) {
+  if (!Array.isArray(prestige) || !prestige.every(validProfilePrestige)) {
     throw new Error('Invalid optional prestige catalog');
   }
   return prestige;
