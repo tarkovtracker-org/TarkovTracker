@@ -88,10 +88,38 @@ describe('profile mode metadata', () => {
     const scope = effectScope();
     const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pve'), ref('en')))!;
     await vi.advanceTimersByTimeAsync(15000);
-    expect(result.tasks.value).toEqual([{ id: 'task' }]);
+    expect(result.tasks.value).toEqual([expect.objectContaining({ id: 'task' })]);
     expect(result.error.value?.message).toBe('Profile metadata request timed out');
     expect(result.loading.value).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
     scope.stop();
   });
+});
+it('qualifies shared objectives and enriches the isolated prerequisite graph', async () => {
+  const tasks = [
+    { id: 'a', taskRequirements: [], objectives: [{ id: 'shared' }] },
+    {
+      id: 'b',
+      taskRequirements: [{ task: { id: 'a' }, status: ['complete'] }],
+      objectives: [{ id: 'shared' }],
+    },
+    { id: 'c', taskRequirements: [{ task: { id: 'b' }, status: ['complete'] }], objectives: [] },
+  ];
+  const original = structuredClone(tasks);
+  vi.stubGlobal(
+    '$fetch',
+    vi.fn((url: string) => {
+      if (url.includes('tasks-')) return Promise.resolve({ data: { tasks } });
+      if (url.includes('prestige')) return Promise.resolve({ data: { prestige: [] } });
+      return Promise.resolve({ data: { storyChapters: [] } });
+    })
+  );
+  const scope = effectScope();
+  const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pve'), ref('en')))!;
+  await flushPromises();
+  expect(result.tasks.value[0]?.objectives?.[0]?.id).toBe('shared:a');
+  expect(result.tasks.value[1]?.objectives?.[0]?.id).toBe('shared:b');
+  expect(result.tasks.value[2]?.predecessors).toEqual(expect.arrayContaining(['a', 'b']));
+  expect(tasks).toEqual(original);
+  scope.stop();
 });

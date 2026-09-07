@@ -1,5 +1,7 @@
+import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import { API_GAME_MODES } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import { dedupeTaskObjectiveIds, normalizeTaskObjectives } from '@/utils/taskNormalization';
 import type { Task, TarkovTasksCoreQueryResult, StoryChapter, PrestigeLevel } from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
 const profileMetadataError = (cause: unknown): Error =>
@@ -32,8 +34,15 @@ const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: Abo
   const overlay = optionalResult(overlayResult);
   const prestige = optionalResult(prestigeResult);
   const byId = new Map(objectives.data.tasks.map((task) => [task.id, task]));
+  const merged = core.data.tasks.map((task) => ({ ...task, ...byId.get(task.id) }));
+  const normalized = dedupeTaskObjectiveIds(
+    merged.map((task) => ({
+      ...task,
+      objectives: normalizeTaskObjectives<import('@/types/tarkov').TaskObjective>(task.objectives),
+    }))
+  );
   return {
-    tasks: core.data.tasks.map((task) => ({ ...task, ...byId.get(task.id) })),
+    tasks: useGraphBuilder().processTaskData(normalized.tasks).tasks,
     chapters: optionalChapters(overlay),
     prestige: optionalPrestige(prestige),
     failure: partialFailure([overlayResult, prestigeResult]),

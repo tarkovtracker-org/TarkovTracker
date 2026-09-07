@@ -1390,6 +1390,8 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
   `required_items` / `required_keys` labels; an untitled standalone group keeps the `h3` level and
   the longer `*_summary` labels.
 
+Isolated profile catalogs normalize and qualify duplicate objective IDs and build the same task predecessor graph as active metadata, without mutating active progress. EFT completion imports apply trader implications only when the trader-gating preference captured at confirmation is enabled; task completion and player-level implications remain authoritative.
+
 ## 13. Fallow audit snapshots
 
 **Summary.** Local and CI `lint:fallow` commands use `scripts/fallow-audit.mjs` to create a

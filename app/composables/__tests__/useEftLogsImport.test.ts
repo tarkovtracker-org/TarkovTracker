@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ACTIVE_SEASON } from '@/utils/constants';
 import type { Task } from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
+const preferences = { getTasksRequireTraderLevels: true };
+vi.mock('@/stores/usePreferences', () => ({ usePreferencesStore: () => preferences }));
 const metadataStore: { tasks: Task[] } = {
   tasks: [{ id: '61604635c725987e815b1a46' }],
 };
@@ -623,5 +625,57 @@ describe('restart semantics', () => {
     await importer.parseFile(new File([startedLog(id)], 'notifications.log'));
     await importer.confirmImport('pvp');
     expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith(id);
+  });
+});
+describe('trader gating preference during import', () => {
+  it.each([false, true])('respects trader gating = %s in the destination', async (enabled) => {
+    vi.clearAllMocks();
+    preferences.getTasksRequireTraderLevels = enabled;
+    const id = '61604635c725987e815b1a46';
+    metadataStore.tasks = [
+      {
+        id,
+        minPlayerLevel: 5,
+        traderRequirements: [
+          {
+            id: 'll',
+            requirementType: 'level',
+            trader: { id: 'prapor' },
+            compareMethod: '>=',
+            value: 2,
+          },
+          {
+            id: 'rep',
+            requirementType: 'reputation',
+            trader: { id: 'prapor' },
+            compareMethod: '>=',
+            value: 0.2,
+          },
+        ],
+      },
+    ] as Task[];
+    let current: GameMode = 'pvp';
+    const writtenModes: GameMode[] = [];
+    tarkovStore.getCurrentGameMode.mockImplementation(() => current);
+    tarkovStore.switchGameMode.mockImplementation(async (mode) => {
+      current = mode;
+    });
+    tarkovStore.setTraderLevel.mockImplementation(() => {
+      writtenModes.push(current);
+    });
+    tarkovStore.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
+    const importer = await loadComposable();
+    await importer.parseFiles([
+      new File([backendLog('gw-pve-01.escapefromtarkov.com')], 'backend.log'),
+      new File([completionLog(id)], 'notifications.log'),
+    ]);
+    await importer.confirmImport('pvp');
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith(id);
+    expect(tarkovStore.setLevel).toHaveBeenCalledWith(5);
+    expect(tarkovStore.setTraderLevel).toHaveBeenCalledTimes(enabled ? 1 : 0);
+    expect(tarkovStore.setTraderReputation).toHaveBeenCalledTimes(enabled ? 1 : 0);
+    expect(writtenModes).toEqual(enabled ? ['pve'] : []);
+    expect(current).toBe('pvp');
+    preferences.getTasksRequireTraderLevels = true;
   });
 });
