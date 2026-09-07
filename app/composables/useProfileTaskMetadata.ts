@@ -9,6 +9,51 @@ const modeChapters = (
 ) => overlay.modes?.[mode]?.storyChapters;
 const profileMetadataError = (cause: unknown): Error =>
   cause instanceof Error ? cause : new Error(String(cause));
+const requiredResult = <T>(result: PromiseSettledResult<T>): T => {
+  if (result.status === 'rejected') throw result.reason;
+  return result.value;
+};
+const optionalResult = <T>(result: PromiseSettledResult<T>): T | undefined =>
+  result.status === 'fulfilled' ? result.value : undefined;
+const partialFailure = (results: PromiseSettledResult<unknown>[]): Error | null => {
+  const failure = results.find((result) => result.status === 'rejected');
+  return failure?.status === 'rejected' ? profileMetadataError(failure.reason) : null;
+};
+const optionalChapters = (
+  overlay:
+    | (Parameters<typeof modeChapters>[0] & { storyChapters?: Record<string, StoryChapter> })
+    | undefined,
+  mode: string
+) => mergeStoryChapters(overlay?.storyChapters, modeChapters(overlay ?? {}, mode));
+const optionalPrestige = (prestige: { data: { prestige: PrestigeLevel[] } } | undefined) =>
+  prestige?.data.prestige ?? [];
+const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: AbortSignal) => {
+  const query = { gameMode: API_GAME_MODES[gameMode], lang };
+  const options = { query, signal: signal };
+  const [coreResult, objectivesResult, overlayResult, prestigeResult] = await Promise.allSettled([
+    $fetch<{ data: TarkovTasksCoreQueryResult }>('/api/tarkov/tasks-core', options),
+    $fetch<{ data: { tasks: Task[] } }>('/api/tarkov/tasks-objectives', options),
+    $fetch<{
+      storyChapters?: Record<string, StoryChapter>;
+      modes?: Record<string, { storyChapters?: Record<string, StoryChapter> }>;
+    }>(
+      'https://raw.githubusercontent.com/tarkovtracker-org/tarkov-data-overlay/main/dist/overlay.json',
+      { parseResponse: JSON.parse, signal: signal }
+    ),
+    $fetch<{ data: { prestige: PrestigeLevel[] } }>('/api/tarkov/prestige', options),
+  ]);
+  const core = requiredResult(coreResult);
+  const objectives = requiredResult(objectivesResult);
+  const overlay = optionalResult(overlayResult);
+  const prestige = optionalResult(prestigeResult);
+  const byId = new Map(objectives.data.tasks.map((task) => [task.id, task]));
+  return {
+    tasks: core.data.tasks.map((task) => ({ ...task, ...byId.get(task.id) })),
+    chapters: optionalChapters(overlay, query.gameMode),
+    prestige: optionalPrestige(prestige),
+    failure: partialFailure([overlayResult, prestigeResult]),
+  };
+};
 /** Read another profile mode without changing the application's active metadata. */
 export function useProfileTaskMetadata(mode: Ref<GameMode>, language: Ref<string>) {
   const snapshot = shallowRef<{
@@ -23,40 +68,33 @@ export function useProfileTaskMetadata(mode: Ref<GameMode>, language: Ref<string
     [mode, language],
     async ([gameMode, lang], _, onCleanup) => {
       let current = true;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(
+        () => controller.abort(new Error('Profile metadata request timed out')),
+        15000
+      );
       onCleanup(() => {
         current = false;
+        controller.abort();
+        clearTimeout(timeoutId);
       });
       error.value = null;
       const requestScope = scope.value;
       try {
-        const query = { gameMode: API_GAME_MODES[gameMode], lang };
-        const [core, objectives, overlay, prestige] = await Promise.all([
-          $fetch<{ data: TarkovTasksCoreQueryResult }>('/api/tarkov/tasks-core', { query }),
-          $fetch<{ data: { tasks: Task[] } }>('/api/tarkov/tasks-objectives', { query }),
-          $fetch<{
-            storyChapters?: Record<string, StoryChapter>;
-            modes?: Record<string, { storyChapters?: Record<string, StoryChapter> }>;
-          }>(
-            'https://raw.githubusercontent.com/tarkovtracker-org/tarkov-data-overlay/main/dist/overlay.json',
-            { parseResponse: JSON.parse }
-          ),
-          $fetch<{ data: { prestige: PrestigeLevel[] } }>('/api/tarkov/prestige', { query }),
-        ]);
-        const byId = new Map(objectives.data.tasks.map((task) => [task.id, task]));
-        if (current)
-          snapshot.value = {
-            scope: requestScope,
-            tasks: core.data.tasks.map((task) => ({ ...task, ...byId.get(task.id) })),
-            chapters: mergeStoryChapters(
-              overlay.storyChapters,
-              modeChapters(overlay, query.gameMode)
-            ),
-            prestige: prestige.data.prestige,
-          };
+        const { failure, ...catalogs } = await loadProfileCatalogs(
+          gameMode,
+          lang,
+          controller.signal
+        );
+        if (!current) return;
+        error.value = failure;
+        snapshot.value = { scope: requestScope, ...catalogs };
       } catch (cause) {
         if (!current) return;
         error.value = profileMetadataError(cause);
         logger.warn('[Profile] Mode metadata unavailable:', cause);
+      } finally {
+        clearTimeout(timeoutId);
       }
     },
     { immediate: true }
