@@ -40,3 +40,10 @@ describe('Seasonal perk reference hydration', () => {
     expect(perk.effects[0]).not.toHaveProperty('resolvedItemFilter');
   });
 });
+it.each([undefined, null, {}])(
+  'keeps malformed cached effects from breaking perk consumers: %j',
+  (effects) => {
+    const result = resolveSeasonalPerks([{ id: 'broken', effects } as unknown as SeasonalPerk], []);
+    expect(result[0]).toMatchObject({ id: 'broken', effects: [] });
+  }
+);

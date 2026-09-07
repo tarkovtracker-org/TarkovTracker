@@ -1,4 +1,3 @@
-import { scheduleBackgroundTask } from '~/server/utils/backgroundTask';
 import { shouldBypassCache } from '~/server/utils/edgeCache';
 import { getValidatedLanguage } from '~/server/utils/language-helpers';
 import { fetchOverlay } from '~/server/utils/overlay';
@@ -13,9 +12,7 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const lang = getValidatedLanguage(query);
   const gameMode = validateGameMode(query.gameMode);
-  const { overlay, meta } = await fetchOverlay(shouldBypassCache(event), (task) =>
-    scheduleBackgroundTask(event, task)
-  );
+  const { overlay, meta } = await fetchOverlay(shouldBypassCache(event));
   if (!overlay)
     throw createError({ statusCode: 503, statusMessage: 'Progression metadata unavailable' });
   const response = {

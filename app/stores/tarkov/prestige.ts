@@ -507,7 +507,7 @@ export const buildPrestigeRequirementRows = (
       href: chapter?.wikiLink,
       id: `story:${requirement.storyChapter}:${requirement.objective ?? 'chapter'}`,
       kind: 'storyChapter',
-      name: requirement.name,
+      name: requirement.name || chapter?.name || requirement.storyChapter,
       source: 'overlay',
       status: isComplete ? 'met' : 'unmet',
       targetPrestige: targetPrestigeLevel,

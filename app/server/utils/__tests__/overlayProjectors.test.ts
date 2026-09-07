@@ -283,3 +283,15 @@ it('reports craft additions whose destination level is absent', () => {
     warn.mockRestore();
   }
 });
+it('gives chapters with missing or nonfinite order an explicit stable fallback', () => {
+  const projected = projectStoryChapters(
+    { storyChapters: { missing: {}, nonfinite: { order: Number.NaN }, ordered: { order: 2 } } },
+    'regular',
+    'en'
+  );
+  expect(projected.map((chapter) => [chapter.id, chapter.order])).toEqual([
+    ['missing', 0],
+    ['nonfinite', 0],
+    ['ordered', 2],
+  ]);
+});

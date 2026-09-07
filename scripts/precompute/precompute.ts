@@ -38,7 +38,13 @@ export type PrecomputeResult = {
   durationMs: number;
   failures: { error: string; key: string }[];
   successes: string[];
-  manifest: Array<{ key: string; lang: string; gameMode: string; overlay: { version: string; sha256: string }; storedAt: number }>;
+  manifest: Array<{
+    key: string;
+    lang: string;
+    gameMode: string;
+    overlay: { version: string; sha256: string };
+    storedAt: number;
+  }>;
 };
 /**
  * Returns an error message when a filter value matches no supported
@@ -100,7 +106,7 @@ export async function runPrecompute(
     }
   }
   if (isCompleteFleet(filter, failures)) {
-    await kv.put('overlay-precompute-manifest-json-v4', JSON.stringify({ completedAt: Date.now(), entries: manifest }), { expirationTtl: PRECOMPUTED_TTL_SECONDS });
+    failures.push(...(await publishManifest(kv, manifest)));
   }
   return {
     manifest,
@@ -109,18 +115,35 @@ export async function runPrecompute(
     successes,
   };
 }
-const isCompleteFleet = (filter: PrecomputeFilter, failures: unknown[]) => !failures.length && !filter.lang && !filter.gameMode;
+const publishManifest = async (
+  kv: KvWriter,
+  manifest: PrecomputeResult['manifest']
+): Promise<PrecomputeResult['failures']> => {
+  const key = 'overlay-precompute-manifest-json-v4';
+  try {
+    await kv.put(key, JSON.stringify({ completedAt: Date.now(), entries: manifest }), {
+      expirationTtl: PRECOMPUTED_TTL_SECONDS,
+    });
+    return [];
+  } catch (error) {
+    return [{ key, error: error instanceof Error ? error.message : String(error) }];
+  }
+};
+const isCompleteFleet = (filter: PrecomputeFilter, failures: unknown[]) =>
+  !failures.length && !filter.lang && !filter.gameMode;
 const requiredOverlayIdentity = (payload: unknown, expectedSha: string | undefined) => {
   const overlay = precomputedOverlayIdentity(payload);
   if (!overlay) throw new Error('Overlay provenance missing; retaining the previous KV entry');
-  if (expectedSha && overlay.sha256 !== expectedSha) throw new Error('Overlay SHA differs from the requested release');
+  if (expectedSha && overlay.sha256 !== expectedSha)
+    throw new Error('Overlay SHA differs from the requested release');
   return overlay;
 };
 async function precomputeTasksCore(lang: string, gameMode: ValidGameMode): Promise<unknown> {
   const baseFetcher = createTarkovJsonTasksCoreFetcher({ gameMode, lang });
   const payload = await applyOverlay(await baseFetcher(), { gameMode, locale: lang });
   assertLooksLikeTasksCore(payload);
-  const unknown = (payload as { dataOverlay?: { unconsumedSections?: string[] } }).dataOverlay?.unconsumedSections;
+  const unknown = (payload as { dataOverlay?: { unconsumedSections?: string[] } }).dataOverlay
+    ?.unconsumedSections;
   if (unknown?.length) throw new Error(`Unconsumed overlay sections: ${unknown.join(', ')}`);
   return payload;
 }

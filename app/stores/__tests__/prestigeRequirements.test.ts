@@ -216,7 +216,7 @@ describe('buildPrestigeRequirementRows', () => {
       {
         type: 'storyChapterStatus',
         storyChapter: 'the-ticket',
-        name: 'The Ticket',
+        name: '',
         status: ['complete'],
       },
     ];

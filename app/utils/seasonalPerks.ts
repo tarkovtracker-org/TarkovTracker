@@ -14,7 +14,7 @@ export function resolveSeasonalPerks(perks: SeasonalPerk[], items: TarkovItem[])
     ids.map((id) => ({ id, value: byId.get(id) ?? null }));
   return perks.map((perk) => ({
     ...perk,
-    effects: perk.effects.map((effect) => ({
+    effects: (Array.isArray(perk.effects) ? perk.effects : []).map((effect) => ({
       ...effect,
       resolvedItemFilter: effect.itemFilter
         ? {

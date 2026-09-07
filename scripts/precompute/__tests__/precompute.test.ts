@@ -5,7 +5,11 @@ import {
 } from '@/server/utils/precomputedTarkov';
 import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
 import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
-import { PRECOMPUTED_TTL_SECONDS, runPrecompute, validatePrecomputeFilter } from '@@/scripts/precompute/precompute';
+import {
+  PRECOMPUTED_TTL_SECONDS,
+  runPrecompute,
+  validatePrecomputeFilter,
+} from '@@/scripts/precompute/precompute';
 import type { KvWriter } from '@@/scripts/precompute/precompute';
 const { applyOverlayMock, createFetcherMock, fetcherMock } = vi.hoisted(() => {
   const hoistedFetcherMock = vi.fn();
@@ -43,7 +47,25 @@ describe('runPrecompute', () => {
   beforeEach(() => {
     fetcherMock.mockReset().mockResolvedValue({ raw: true });
     createFetcherMock.mockClear();
-    applyOverlayMock.mockReset().mockResolvedValue({ data: { tasks: [{ id: 'task-1' }] }, dataOverlay: { version: '1', sha256: 'release-sha' } });
+    applyOverlayMock
+      .mockReset()
+      .mockResolvedValue({
+        data: { tasks: [{ id: 'task-1' }] },
+        dataOverlay: { version: '1', sha256: 'release-sha' },
+      });
+  });
+  it('retains all payload provenance when final manifest publication fails', async () => {
+    const kv = createKvMock();
+    kv.put.mockImplementation(async (key: string) => {
+      if (key === 'overlay-precompute-manifest-json-v4') throw new Error('manifest unavailable');
+    });
+    const result = await runPrecompute(kv);
+    expect(result.successes).toHaveLength(48);
+    expect(result.manifest).toHaveLength(48);
+    expect(result.failures).toEqual([
+      { key: 'overlay-precompute-manifest-json-v4', error: 'manifest unavailable' },
+    ]);
+    expect(result.manifest.every((entry) => entry.overlay.sha256 === 'release-sha')).toBe(true);
   });
   it('writes a valid envelope per combination with the 7-day TTL', async () => {
     const kv = createKvMock();
@@ -65,7 +87,10 @@ describe('runPrecompute', () => {
     expect(PRECOMPUTED_TTL_SECONDS).toBe(604800);
     const envelope = JSON.parse(value as string);
     expect(isPrecomputedEnvelope(envelope)).toBe(true);
-    expect(envelope.payload).toEqual({ data: { tasks: [{ id: 'task-1' }] }, dataOverlay: { version: '1', sha256: 'release-sha' } });
+    expect(envelope.payload).toEqual({
+      data: { tasks: [{ id: 'task-1' }] },
+      dataOverlay: { version: '1', sha256: 'release-sha' },
+    });
   });
   it('passes lang and gameMode through to the pipeline', async () => {
     const kv = createKvMock();
@@ -88,7 +113,10 @@ describe('runPrecompute', () => {
   it('records a pipeline failure and continues with remaining combinations', async () => {
     applyOverlayMock
       .mockRejectedValueOnce(new Error('upstream 502'))
-      .mockResolvedValue({ data: { tasks: [{ id: 'task-1' }] }, dataOverlay: { version: '1', sha256: 'release-sha' } });
+      .mockResolvedValue({
+        data: { tasks: [{ id: 'task-1' }] },
+        dataOverlay: { version: '1', sha256: 'release-sha' },
+      });
     const kv = createKvMock();
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toEqual([
@@ -115,7 +143,10 @@ describe('runPrecompute', () => {
   it('refuses to write a structurally empty payload to KV', async () => {
     applyOverlayMock
       .mockResolvedValueOnce({ data: { tasks: [] } })
-      .mockResolvedValue({ data: { tasks: [{ id: 'task-1' }] }, dataOverlay: { version: '1', sha256: 'release-sha' } });
+      .mockResolvedValue({
+        data: { tasks: [{ id: 'task-1' }] },
+        dataOverlay: { version: '1', sha256: 'release-sha' },
+      });
     const kv = createKvMock();
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toEqual([
@@ -133,7 +164,10 @@ describe('runPrecompute', () => {
   it('refuses to publish malformed task entries', async () => {
     applyOverlayMock
       .mockResolvedValueOnce({ data: { tasks: [null, { id: 'task-good', objectives: [] }] } })
-      .mockResolvedValue({ data: { tasks: [{ id: 'task-good', objectives: [] }] }, dataOverlay: { version: '1', sha256: 'release-sha' } });
+      .mockResolvedValue({
+        data: { tasks: [{ id: 'task-good', objectives: [] }] },
+        dataOverlay: { version: '1', sha256: 'release-sha' },
+      });
     const kv = createKvMock();
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toEqual([
@@ -153,7 +187,10 @@ describe('runPrecompute', () => {
       .mockResolvedValueOnce({
         data: { tasks: [{ id: 'task-bad', objectives: { objective: { count: 2 } } }] },
       })
-      .mockResolvedValue({ data: { tasks: [{ id: 'task-good', objectives: [] }] }, dataOverlay: { version: '1', sha256: 'release-sha' } });
+      .mockResolvedValue({
+        data: { tasks: [{ id: 'task-good', objectives: [] }] },
+        dataOverlay: { version: '1', sha256: 'release-sha' },
+      });
     const kv = createKvMock();
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toEqual([
@@ -172,8 +209,14 @@ describe('runPrecompute', () => {
 });
 describe('overlay provenance gate', () => {
   it('retains old entries when a release changes midway through the run', async () => {
-    const payload = (sha256: string) => ({ data: { tasks: [{ id: 'task' }] }, dataOverlay: { version: '1', sha256 } });
-    applyOverlayMock.mockReset().mockResolvedValueOnce(payload('first')).mockResolvedValue(payload('second'));
+    const payload = (sha256: string) => ({
+      data: { tasks: [{ id: 'task' }] },
+      dataOverlay: { version: '1', sha256 },
+    });
+    applyOverlayMock
+      .mockReset()
+      .mockResolvedValueOnce(payload('first'))
+      .mockResolvedValue(payload('second'));
     const kv = createKvMock();
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.successes).toHaveLength(1);
@@ -181,7 +224,13 @@ describe('overlay provenance gate', () => {
     expect(kv.put).toHaveBeenCalledTimes(1);
   });
   it('refuses unknown sections and missing provenance', async () => {
-    applyOverlayMock.mockReset().mockResolvedValueOnce({ data: { tasks: [{ id: 'task' }] }, dataOverlay: { version: '1', sha256: 'sha', unconsumedSections: ['future'] } }).mockResolvedValue({ data: { tasks: [{ id: 'task' }] } });
+    applyOverlayMock
+      .mockReset()
+      .mockResolvedValueOnce({
+        data: { tasks: [{ id: 'task' }] },
+        dataOverlay: { version: '1', sha256: 'sha', unconsumedSections: ['future'] },
+      })
+      .mockResolvedValue({ data: { tasks: [{ id: 'task' }] } });
     const kv = createKvMock();
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toHaveLength(3);

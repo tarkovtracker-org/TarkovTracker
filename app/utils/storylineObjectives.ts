@@ -139,6 +139,7 @@ export const toggleStoryChapterWithLinearObjectives = (
 export const normalizeStoryChapter = (chapter: StoryChapter): StoryChapter => {
   return {
     ...chapter,
+    order: Number.isFinite(chapter.order) ? chapter.order : 0,
     objectives: normalizeStoryObjectives(chapter.objectives),
   };
 };

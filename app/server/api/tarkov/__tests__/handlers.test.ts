@@ -260,6 +260,7 @@ describe('Tarkov API handlers', () => {
       const { default: handler } = await import('@/server/api/tarkov/editions.get');
       const response = await handler(event);
       expect(response.data.editions[0]?.id).toBe('standard');
+      expect(mockFetchOverlay).toHaveBeenCalledWith(false);
       expect(response.data.storyChapters).toHaveLength(gameMode === 'pve' ? 2 : 1);
       expect(response.data.seasonalPerks).toHaveLength(gameMode === 'pvp-season' ? 1 : 0);
       expect(mockSetOverlayResponseHeaders).toHaveBeenCalledWith(event, response);
