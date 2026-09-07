@@ -7,6 +7,12 @@ const metadataStore: { tasks: Task[] } = {
   tasks: [{ id: '61604635c725987e815b1a46' }],
 };
 const tarkovStore = {
+  playerLevel: vi.fn(() => 1),
+  setLevel: vi.fn(),
+  getTraderLevel: vi.fn(() => 1),
+  getTraderReputation: vi.fn(() => 0),
+  setTraderLevel: vi.fn(),
+  setTraderReputation: vi.fn(),
   getObjectiveCount: vi.fn(() => 0),
   getCurrentGameMode: vi.fn<() => GameMode>(() => 'pvp'),
   getCurrentProgressData: vi.fn(() => ({ taskCompletions: {} })),

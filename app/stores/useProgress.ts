@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia';
 import { registerProgressMetadataHooks } from '@/stores/tarkov/metadataStoreBridge';
 import {
-  buildTaskAvailability,
-  type TaskAvailabilityMap,
+  buildTaskEvaluations,
+  type TaskEvaluationMap,
   type TaskAvailabilityTeamData,
 } from '@/stores/taskAvailability';
 import { useMetadataStore } from '@/stores/useMetadata';
@@ -41,16 +41,12 @@ const createTaskAvailabilityTeamData = (
     faction: currentData.pmcFaction ?? 'USEC',
     completions: currentData.taskCompletions ?? {},
     traders: currentData.traders ?? {},
+    prestigeLevel: currentData.prestigeLevel,
+    storyChapters: currentData.storyChapters,
   };
 };
 const hasTaskAvailabilityInputs = (tasks: Task[], teamIds: string[]) =>
   [tasks.length > 0, teamIds.length > 0].every(Boolean);
-const getFenceTraderId = (
-  traders: Array<{ id: string; normalizedName?: string }>
-): string | null => {
-  const fence = traders.find((trader) => trader.normalizedName === 'fence');
-  return fence ? fence.id : null;
-};
 type TeamStoresMap = Record<string, Store<string, UserState>>;
 type CompletionsMap = Record<string, Record<string, boolean>>;
 type FailedTasksMap = Record<string, Record<string, boolean>>;
@@ -159,11 +155,10 @@ export const useProgressStore = defineStore('progress', () => {
    * Pre-collects team data once, then iterates tasks with early exits.
    * This reduces redundant store lookups that were happening per-task-per-team.
    */
-  const unlockedTasks = computed(() => {
+  const taskEvaluations = computed<TaskEvaluationMap>(() => {
     const perfTimer = perfStart('[Progress] unlockedTasks', {
       tasks: metadataStore.tasks.length,
     });
-    const available: TaskAvailabilityMap = {};
     const tasks = metadataStore.tasks as Task[];
     const teamIds = Object.keys(visibleTeamStores.value);
     if (!hasTaskAvailabilityInputs(tasks, teamIds)) {
@@ -174,18 +169,23 @@ export const useProgressStore = defineStore('progress', () => {
     for (const [teamId, store] of Object.entries(visibleTeamStores.value)) {
       teamDataCache.set(teamId, createTaskAvailabilityTeamData(store, getLevel(teamId)));
     }
-    Object.assign(
-      available,
-      buildTaskAvailability(
-        tasks,
-        teamDataCache,
-        getFenceTraderId(metadataStore.traders),
-        preferencesStore.getTasksRequireTraderLevels
-      )
-    );
+    const evaluations = buildTaskEvaluations(tasks, teamDataCache, {
+      requireTraderLevels: preferencesStore.getTasksRequireTraderLevels,
+      prestigeTaskMap: metadataStore.prestigeTaskMap,
+    });
     perfEnd(perfTimer, { tasks: tasks.length, teams: teamIds.length });
-    return available;
+    return evaluations;
   });
+  const unlockedTasks = computed(() =>
+    Object.fromEntries(
+      Object.entries(taskEvaluations.value).map(([taskId, users]) => [
+        taskId,
+        Object.fromEntries(
+          Object.entries(users).map(([userId, evaluation]) => [userId, evaluation.available])
+        ),
+      ])
+    )
+  );
   const objectiveCompletions = computed(() => {
     const perfTimer = perfStart('[Progress] objectiveCompletions', {
       objectives: metadataStore.objectives.length,
@@ -589,6 +589,7 @@ export const useProgressStore = defineStore('progress', () => {
     gameEditionData,
     playerFaction,
     unlockedTasks,
+    taskEvaluations,
     objectiveCompletions,
     invalidTasks,
     hideoutLevels,

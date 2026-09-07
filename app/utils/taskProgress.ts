@@ -1,4 +1,11 @@
-import type { Task, TaskObjective } from '@/types/tarkov';
+import { getTaskTraderRequirements } from '@/utils/taskRequirements';
+import {
+  isTaskComplete,
+  isTaskFailed,
+  isTaskActive,
+  type RawTaskCompletion,
+} from '@/utils/taskStatus';
+import type { Task, TaskObjective, TaskRequirement } from '@/types/tarkov';
 type TaskObjectiveProgressStore = {
   getObjectiveCount: (objectiveId: string) => number;
   setObjectiveCount: (objectiveId: string, count: number) => void;
@@ -133,93 +140,77 @@ export function uncompleteTaskForProgress(options: {
 }
 export function ensureTaskMinPlayerLevel(store: TaskLevelProgressStore, task: Task): void {
   const minLevel = task.minPlayerLevel ?? 0;
-  if (store.playerLevel() >= minLevel) return;
+  if (minLevel <= 0 || store.playerLevel() >= minLevel) return;
   store.setLevel(minLevel);
 }
-const applyTraderLevelRequirement = (
+type KnownTraderRequirement = Exclude<
+  ReturnType<typeof getTaskTraderRequirements>[number],
+  { requirementType: 'unknown' }
+>;
+const applyLoyaltyMinimum = (
   store: TaskTraderProgressStore,
-  traderId: string,
-  requiredLevel: number
+  requirement: KnownTraderRequirement
 ) => {
-  if (store.getTraderLevel(traderId) >= requiredLevel) return;
-  store.setTraderLevel(traderId, requiredLevel);
+  const minimum = requirement.value + (requirement.compareMethod === '>' ? 1 : 0);
+  if (minimum <= 4 && store.getTraderLevel(requirement.trader.id) < minimum)
+    store.setTraderLevel(requirement.trader.id, minimum);
 };
-const getPositiveRequiredReputation = (currentReputation: number, requiredReputation: number) =>
-  currentReputation < requiredReputation ? requiredReputation : undefined;
-const getNegativeFenceRequiredReputation = (
-  currentReputation: number,
-  requiredReputation: number,
-  isFence: boolean
-) => {
-  if (!isFence) return undefined;
-  return currentReputation > requiredReputation ? requiredReputation : undefined;
-};
-const getRequiredTraderReputation = (
-  currentReputation: number,
-  requiredReputation: number,
-  isFence: boolean
-) => {
-  if (requiredReputation >= 0) {
-    return getPositiveRequiredReputation(currentReputation, requiredReputation);
-  }
-  return getNegativeFenceRequiredReputation(currentReputation, requiredReputation, isFence);
-};
-const applyTraderReputationRequirement = (
+const applyTraderMinimum = (
   store: TaskTraderProgressStore,
-  traderId: string,
-  requiredReputation: number,
-  fenceId: string | undefined
+  requirement: KnownTraderRequirement
 ) => {
-  const reputation = getRequiredTraderReputation(
-    store.getTraderReputation(traderId),
-    requiredReputation,
-    traderId === fenceId
-  );
-  if (reputation === undefined) return;
-  store.setTraderReputation(traderId, reputation);
+  if (requirement.requirementType === 'level') return applyLoyaltyMinimum(store, requirement);
+  // A strict standing bound proves the threshold, not an invented next increment.
+  if (store.getTraderReputation(requirement.trader.id) < requirement.value)
+    store.setTraderReputation(requirement.trader.id, requirement.value);
 };
-const getTraderId = (requirement: { trader?: { id: string } }) => requirement.trader?.id;
-const getTaskTraderLevelRequirements = (task: Task) => task.traderLevelRequirements ?? [];
-const getTaskTraderReputationRequirements = (task: Task) => task.traderRequirements ?? [];
-const applyTaskTraderLevelRequirements = (store: TaskTraderProgressStore, task: Task) => {
-  for (const requirement of getTaskTraderLevelRequirements(task)) {
-    const traderId = getTraderId(requirement);
-    if (!traderId) continue;
-    applyTraderLevelRequirement(store, traderId, requirement.level);
-  }
-};
-const applyTaskTraderReputationRequirements = (
-  store: TaskTraderProgressStore,
-  task: Task,
-  fenceId: string | undefined
-) => {
-  for (const requirement of getTaskTraderReputationRequirements(task)) {
-    const traderId = getTraderId(requirement);
-    if (!traderId) continue;
-    applyTraderReputationRequirement(store, traderId, requirement.value, fenceId);
-  }
-};
+/** Completion proves lower bounds, never that earned progress should be reduced. */
 export function applyTaskTraderRequirements(options: {
   store: TaskTraderProgressStore;
   task: Task;
-  fenceId?: string;
 }): void {
-  const { store, task, fenceId } = options;
-  applyTaskTraderLevelRequirements(store, task);
-  applyTaskTraderReputationRequirements(store, task, fenceId);
+  for (const requirement of getTaskTraderRequirements(options.task)) {
+    if (requirement.requirementType === 'unknown') continue;
+    if (['>=', '>', '=', '=='].includes(requirement.compareMethod))
+      applyTraderMinimum(options.store, requirement);
+  }
 }
+const completedStatusMet = (completion: RawTaskCompletion, values: string[]) =>
+  (!values.length || hasAnyStatus(values, ['complete', 'completed'])) && isTaskComplete(completion);
+const activeStatusMet = (completion: RawTaskCompletion, values: string[]) =>
+  hasAnyStatus(values, ['active', 'accept', 'accepted']) &&
+  (isTaskActive(completion) || isTaskComplete(completion));
+const alreadyMeetsStatus = (completion: RawTaskCompletion, statuses?: string[]): boolean => {
+  const values = normalizeStatuses(statuses);
+  return (
+    completedStatusMet(completion, values) ||
+    (values.includes('failed') && isTaskFailed(completion)) ||
+    activeStatusMet(completion, values)
+  );
+};
+const requiredTaskId = (requirement: TaskRequirement) => requirement?.task?.id;
 export function applyTaskAvailabilityRequirements(options: {
+  getCompletion?: (taskId: string) => RawTaskCompletion;
+  skipTaskRequirements?: boolean;
   onCompleteRequirement: (taskId: string) => void;
   onFailRequirement: (taskId: string) => void;
   task: Task;
 }): void {
-  const { task, onCompleteRequirement, onFailRequirement } = options;
+  const {
+    task,
+    onCompleteRequirement,
+    onFailRequirement,
+    getCompletion = () => undefined,
+  } = options;
+  if (options.skipTaskRequirements) return;
   const handledRequirementTaskIds = new Set<string>();
   const taskRequirements = Array.isArray(task.taskRequirements) ? task.taskRequirements : [];
   const predecessors = Array.isArray(task.predecessors) ? task.predecessors : [];
   taskRequirements.forEach((requirement) => {
-    const requirementTaskId = requirement?.task?.id;
+    const requirementTaskId = requiredTaskId(requirement);
     if (!requirementTaskId) return;
+    handledRequirementTaskIds.add(requirementTaskId);
+    if (alreadyMeetsStatus(getCompletion(requirementTaskId), requirement.status)) return;
     if (isFailedOnlyRequirement(requirement.status)) {
       onFailRequirement(requirementTaskId);
     } else {

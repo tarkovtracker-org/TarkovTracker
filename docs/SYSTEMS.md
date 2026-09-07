@@ -357,9 +357,9 @@ sequenceDiagram
   `traderRequirements` list discriminated by `requirementType` (`level` gates
   trader loyalty level, `reputation` gates standing). `applyOverlay` re-splits
   a patched task's merged list into `traderLevelRequirements` and
-  `traderRequirements` (reputation-only) so availability and progress checks
-  evaluate the right metric; a patch's `traderRequirements` replaces the whole
-  requirement set.
+  `traderRequirements` (reputation-only) for compatibility, and regenerates the canonical
+  `normalizedTraderRequirements` consumed by availability, badges and progress implications
+  (section 15). A patch's `traderRequirements` replaces the whole requirement set.
 - On fetch failure, serves the last good overlay (stale) rather than failing the request.
 - Overlay supports mode-specific corrections under `modes[gameMode]` plus global corrections.
 - Per-locale corrections under `locales[locale]` patch `tasks`, `items`, and `traders`
@@ -445,7 +445,7 @@ flowchart LR
 - The envelope shape is `{ payload, storedAt, version }` with
   `PRECOMPUTED_ENVELOPE_VERSION = 1`.
 - The cache key for `tasks-core` is built by `buildTasksCorePrecomputedKey(lang, gameMode)` and is
-  `tasks-core-json-v2-<lang>-<gameMode>`. Both the precompute script and the request handler import
+  `tasks-core-json-v3-<lang>-<gameMode>`. Both the precompute script and the request handler import
   this function from `precomputedTarkov.ts`, so the keys can never drift.
 - Writes go through the Cloudflare REST API (one PUT per key) because the bulk endpoint's request
   size ceiling cannot hold all ~4.2MB envelopes in one call, and per-key writes isolate failures per
@@ -1496,3 +1496,59 @@ Shadow rollout forces every check while printing the proposed selection. See
 - Only deliberately unselected jobs may report skipped; systems drift always runs.
 - Existing shard discovery, coverage enforcement, secret restrictions, and merge governance remain.
 - The aggregate covers repository CI jobs, not independently reported Security or Codecov statuses.
+
+## 15. Canonical task progression
+
+`app/utils/taskRequirements.ts` normalizes the discriminated trader collection at the server
+boundary. `tarkov-json.ts` builds `normalizedTraderRequirements` after reference adaptation;
+`overlay.ts` rebuilds it when an overlay replaces trader requirements. Legacy split lists remain
+compatibility projections. Missing types, malformed references/values and unsupported comparisons
+become diagnostic unknown requirements, not reputation guesses. A missing comparison on a known
+legacy requirement defaults to `>=`. Declared `>=`, `>`, `<=`, `<`, `=`, `==` and `!=` are evaluated
+literally. Neither trader identity nor the sign of a value selects its meaning.
+
+`app/stores/taskAvailability.ts` evaluates each task/user with memoization and cycle protection.
+The result carries availability and blockers for levels, loyalty, reputation, quest statuses,
+failed branches, faction, trader unlocks, prestige and unsupported data. `useProgress.taskEvaluations`
+is the source for explanations and sorting; `unlockedTasks` is its boolean projection. The task
+card and dashboard use `useTaskBlockerText` for the same explanations. Shared/non-current profile
+views call the same evaluator with their own mode progress. Completed and failed tasks are terminal.
+The existing acceptance-unknown interpretation is retained; this does not introduce #715's
+explicit Accept workflow.
+
+Shared story chapters followed by matching mode corrections produce `Task.storyUnlocks` from
+`questUnlocks`. Availability requires all independent gates AND (all quest requirements OR any
+wired chapter with recorded completion/objective progress). Chapter ordering is never an unlock
+condition. `complete|failed` accepts either terminal outcome. A story route cannot bypass trader,
+faction or prestige gates. Required prestige uses the existing authoritative prestige task map;
+unresolved references remain blocked until metadata is available.
+
+Sorting lives in `app/utils/taskSorter.ts`. Progression sorts available tasks first, then a single
+numeric gate by relative distance, a quest-chain gate, multiple gates, completed tasks, terminal
+blocked tasks, and unknown data. All-users views use the best visible user's rank. Trader sort
+uses trader order, that trader's required loyalty, readiness, and stable name/ID ties. Pinned
+partitions and map/status grouping remain intact. Item distribution retains Kappa priority and
+uses progression within it; Kappa chain groups use progression while keeping parts adjacent.
+The existing impact default remains. Saved `level` values retain player-level sorting, now labelled
+Player level; `progression` is additive and invalid saved/query values retain the `none` fallback.
+Genuine level badges, graph levels and XP/level projections remain player-level values.
+
+Completion/availability actions and EFT completion imports share `taskProgress.ts` implications:
+raise known loyalty/reputation lower bounds without reducing earned values. Integer strict loyalty
+bounds advance to the next level; strict reputation bounds imply only the known threshold, not an
+invented increment, and may remain unmet until the user records the actual value. Upper bounds and
+`!=` do not infer a new minimum. Existing terminal prerequisite outcomes are preserved. EFT
+completion of a task with a story alternative does not prove which quest path was taken, so it
+does not backfill that path. Imports still load and mutate only their selected destination mode;
+Seasonal log eligibility and restoration guards are unchanged. Tarkov.dev profile import does
+not import quest completions and therefore has no trader/task backfill path.
+
+**Invariants**
+
+- Canonical requirements, blockers, status comparisons and story alternatives are shared by UI and
+  recommendations; no new dependency on the removed upstream task `alternatives` is introduced.
+- Known trader gates may be disabled by preference; unknown data never silently unlocks a task.
+- PvP, PvE and Seasonal evaluate only their own progress and mode-specific task metadata.
+- `tasks-core-json-v3` keys invalidate incompatible edge/precompute payloads together. Browser
+  IndexedDB schema 8 clears the old task contract. Missing new KV entries fall back to the normal
+  fetch/adapt/overlay pipeline, allowing deployment before the next precompute run.

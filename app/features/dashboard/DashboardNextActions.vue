@@ -355,6 +355,7 @@
   const getPrimarySummary = (recommendation: DashboardRecommendation) => {
     const task = recommendation.taskName || '';
     const blocker = getPrimaryBlocker(recommendation);
+    if (blocker.description) return blocker.description;
     switch (recommendation.reason) {
       case 'unlock-trader':
         return t('page.dashboard.focus.summary.unlock_trader', {
@@ -421,6 +422,7 @@
   };
   const getProofText = (recommendation: DashboardRecommendation) => {
     const blocker = getPrimaryBlocker(recommendation);
+    if (blocker.description) return blocker.description;
     if (recommendation.kind === 'filters') {
       return getCountLabel(
         recommendation.hiddenAvailableCount ?? 0,
@@ -514,6 +516,7 @@
   };
   const getStatusText = (recommendation: DashboardRecommendation) => {
     const blocker = getPrimaryBlocker(recommendation);
+    if (blocker.description) return blocker.description;
     switch (blocker.type) {
       case 'ready':
         if (recommendation.progress.remaining <= 0) {

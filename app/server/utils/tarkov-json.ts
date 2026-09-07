@@ -4,6 +4,7 @@ import { useRuntimeConfig } from '#imports';
 import { createLogger } from '@/server/utils/logger';
 import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
 import { buildSkillImageUrl } from '@/utils/tarkovUrls';
+import { normalizeTraderRequirements } from '@/utils/taskRequirements';
 import type { ValidGameMode } from '@/server/utils/tarkov-cache-config';
 import type {
   FinishRewards,
@@ -832,6 +833,11 @@ function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
     objectives: [],
     failConditions: [],
     ...adaptTraderRequirements(raw.traderRequirements, context),
+    normalizedTraderRequirements: normalizeTraderRequirements(
+      Array.isArray(raw.traderRequirements)
+        ? raw.traderRequirements.map((requirement) => adaptTraderRequirement(requirement, context))
+        : raw.traderRequirements
+    ),
     factionName: typeof raw.factionName === 'string' ? raw.factionName : undefined,
   }) as Task;
 }

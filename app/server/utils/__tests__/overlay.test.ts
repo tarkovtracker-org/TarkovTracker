@@ -491,3 +491,54 @@ describe('applyTaskObjectiveAdditions', () => {
     expect(result).not.toHaveProperty('objectivesAdd');
   });
 });
+describe('canonical progression overlay projection', () => {
+  it('replaces trader requirements and keeps story routes scoped to the selected mode', async () => {
+    vi.resetModules();
+    stubOverlayFetch({
+      $meta: { version: 'test' },
+      tasks: {
+        target: {
+          traderRequirements: [
+            {
+              id: 'rep',
+              requirementType: 'reputation',
+              value: -2,
+              compareMethod: '<=',
+              trader: { id: 'fence', name: 'Fence' },
+            },
+          ],
+        },
+      },
+      storyChapters: { shared: { name: 'Shared', questUnlocks: [{ id: 'target' }] } },
+      modes: {
+        pve: {
+          storyChapters: {
+            shared: { questUnlocks: [] },
+            pve: { name: 'PvE route', questUnlocks: [{ id: 'target' }] },
+          },
+        },
+      },
+    });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const input = {
+      data: {
+        tasks: [
+          {
+            id: 'target',
+            normalizedTraderRequirements: [{ id: 'old', requirementType: 'unknown' }],
+          },
+        ],
+      },
+    };
+    const pvp = await applyOverlay(input, { gameMode: 'pvp', bypassCache: true });
+    const pve = await applyOverlay(input, { gameMode: 'pve', bypassCache: true });
+    expect(pvp.data.tasks[0]).toMatchObject({
+      normalizedTraderRequirements: [
+        { id: 'rep', requirementType: 'reputation', value: -2, compareMethod: '<=' },
+      ],
+      storyUnlocks: [{ id: 'shared', name: 'Shared' }],
+    });
+    expect(pve.data.tasks[0]).toMatchObject({ storyUnlocks: [{ id: 'pve', name: 'PvE route' }] });
+    expect(input.data.tasks[0]!.normalizedTraderRequirements[0]!.id).toBe('old');
+  });
+});

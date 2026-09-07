@@ -177,6 +177,7 @@ describe('applyOverlay locale integration', () => {
         {
           id: 'task-1',
           name: 'English Task',
+          storyUnlocks: [],
           objectives: [{ id: 'objective-1', description: 'English objective' }],
         },
       ],
@@ -293,7 +294,7 @@ describe('applyOverlay locale integration', () => {
     const { applyOverlay } = await import('@/server/utils/overlay');
     const payload = { data: { tasks: [{ id: 'task-1', name: 'Base Task' }] } };
     const result = await applyOverlay(payload, { locale: 'fr' });
-    expect(result.data?.tasks).toEqual([{ id: 'task-1', name: 'Base Task' }]);
+    expect(result.data?.tasks).toEqual([{ id: 'task-1', name: 'Base Task', storyUnlocks: [] }]);
   });
   it.each([
     ['locale map', []],
@@ -308,7 +309,30 @@ describe('applyOverlay locale integration', () => {
     const { applyOverlay } = await import('@/server/utils/overlay');
     const payload = { data: { tasks: [{ id: 'task-1', name: 'Base Task' }] } };
     const result = await applyOverlay(payload);
-    expect(result.data).toEqual(payload.data);
+    expect(result.data).toEqual({ tasks: [{ ...payload.data.tasks[0], storyUnlocks: [] }] });
     expect(result.dataOverlay.status).toBe('fresh');
+  });
+});
+describe('story overlay validation', () => {
+  it.each([
+    { storyChapters: { broken: null } },
+    { modes: { pve: { storyChapters: { broken: null } } } },
+    { storyChapters: [] },
+  ])('retains the last good payload for malformed chapter records: %j', async (invalid) => {
+    const fetchMock = stubOverlayFetch({
+      $meta: { version: 'good' },
+      storyChapters: { chapter: { name: 'Chapter', questUnlocks: [{ id: 'task' }] } },
+    });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const input = { data: { tasks: [{ id: 'task' }] } };
+    await applyOverlay(input, { bypassCache: true });
+    fetchMock.mockImplementation(
+      async () => new Response(JSON.stringify({ $meta: { version: 'invalid' }, ...invalid }))
+    );
+    const result = await applyOverlay(input, { bypassCache: true });
+    expect(result.dataOverlay).toMatchObject({ status: 'stale', version: 'good' });
+    expect(result.data.tasks[0]).toMatchObject({
+      storyUnlocks: [{ id: 'chapter', name: 'Chapter' }],
+    });
   });
 });

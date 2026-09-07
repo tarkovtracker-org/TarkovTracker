@@ -1,6 +1,8 @@
 import { useMetadataStore } from '@/stores/useMetadata';
+import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { logger } from '@/utils/logger';
+import { sortTasksByProgression } from '@/utils/taskSorter';
 import type { NeededItemHideoutModule, NeededItemTaskObjective } from '@/types/tarkov';
 export interface ObjectiveUpdate {
   id: string;
@@ -34,6 +36,7 @@ export type UseItemDistributionReturn = {
 export function useItemDistribution(): UseItemDistributionReturn {
   const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
+  const progressStore = useProgressStore();
   function getObjectiveCurrentCount(
     objective: NeededItemTaskObjective | NeededItemHideoutModule
   ): number {
@@ -43,15 +46,26 @@ export function useItemDistribution(): UseItemDistributionReturn {
     return tarkovStore.getHideoutPartCount(objective.id) ?? 0;
   }
   function sortTaskObjectives(objectives: NeededItemTaskObjective[]): NeededItemTaskObjective[] {
+    const tasks = [...new Set(objectives.map((objective) => objective.taskId))].flatMap((id) => {
+      const task = metadataStore.getTaskById(id);
+      return task ? [{ ...task, id }] : [];
+    });
+    const order = new Map(
+      sortTasksByProgression(tasks, 'asc', progressStore.taskEvaluations).map((task, index) => [
+        task.id,
+        index,
+      ])
+    );
     return [...objectives].sort((a, b) => {
       const taskA = metadataStore.getTaskById(a.taskId);
       const taskB = metadataStore.getTaskById(b.taskId);
       const kappaA = taskA?.kappaRequired ? 0 : 1;
       const kappaB = taskB?.kappaRequired ? 0 : 1;
       if (kappaA !== kappaB) return kappaA - kappaB;
-      const levelA = taskA?.minPlayerLevel ?? 999;
-      const levelB = taskB?.minPlayerLevel ?? 999;
-      return levelA - levelB;
+      return (
+        (order.get(a.taskId) ?? Number.MAX_SAFE_INTEGER) -
+          (order.get(b.taskId) ?? Number.MAX_SAFE_INTEGER) || a.id.localeCompare(b.id)
+      );
     });
   }
   function sortHideoutModules(modules: NeededItemHideoutModule[]): NeededItemHideoutModule[] {

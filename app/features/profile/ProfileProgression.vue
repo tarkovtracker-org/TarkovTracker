@@ -255,6 +255,7 @@
   } from '@/features/profile/profileStats';
   import ProfileStorylineTab from '@/features/profile/ProfileStorylineTab.vue';
   import ProfileTasksTab from '@/features/profile/ProfileTasksTab.vue';
+  import { buildTaskEvaluations } from '@/stores/taskAvailability';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
@@ -714,42 +715,32 @@
     const completion = taskCompletions.value[taskId] as RawTaskCompletion;
     return getCompletionFlags(completion).failed;
   };
+  const profileTaskEvaluations = computed(() =>
+    buildTaskEvaluations(
+      metadataStore.tasks ?? [],
+      new Map([
+        [
+          'profile',
+          {
+            mode: selectedMode.value,
+            level: profileLevel.value,
+            faction: modeFaction.value,
+            completions: taskCompletions.value,
+            traders: modeData.value.traders ?? {},
+            prestigeLevel: modeData.value.prestigeLevel,
+            storyChapters: modeData.value.storyChapters,
+          },
+        ],
+      ]),
+      {
+        requireTraderLevels: preferencesStore.getTasksRequireTraderLevels,
+        prestigeTaskMap: metadataStore.prestigeTaskMap,
+      }
+    )
+  );
   const isTaskLocked = (taskId: string): boolean => {
     if (isTaskSuccessful(taskId) || isTaskFailed(taskId)) return false;
-    if (isViewingCurrentMode.value) {
-      return progressStore.unlockedTasks[taskId]?.self !== true;
-    }
-    const task = relevantTasks.value.find((t) => t.id === taskId);
-    if (!task) return true;
-    if (task.minPlayerLevel && profileLevel.value < task.minPlayerLevel) return true;
-    if (task.taskRequirements) {
-      const allMet = task.taskRequirements.every((req) => {
-        const reqStatuses = (req.status ?? []).map((s) => s.toLowerCase());
-        const requiresComplete =
-          reqStatuses.length === 0 ||
-          reqStatuses.some((s) => s === 'complete' || s === 'completed');
-        const requiresFailed = reqStatuses.some((s) => s === 'failed');
-        const requiresActive = reqStatuses.some(
-          (s) => s === 'active' || s === 'accept' || s === 'accepted'
-        );
-        const reqFlags = getCompletionFlags(
-          taskCompletions.value[req.task.id] as RawTaskCompletion
-        );
-        if (requiresComplete && reqFlags.complete) return true;
-        if (requiresFailed && reqFlags.failed) return true;
-        if (requiresActive) return true;
-        return false;
-      });
-      if (!allMet) return true;
-    }
-    if (task.failedRequirements) {
-      const hasFailed = task.failedRequirements.some((req) => {
-        if (!req?.task?.id) return false;
-        return getCompletionFlags(taskCompletions.value[req.task.id] as RawTaskCompletion).failed;
-      });
-      if (hasFailed) return true;
-    }
-    return false;
+    return profileTaskEvaluations.value[taskId]?.profile?.available !== true;
   };
   const normalizedTaskCompletions = computed<
     Record<string, { complete?: boolean; failed?: boolean }>

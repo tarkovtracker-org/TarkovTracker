@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { TaskEvaluationMap } from '@/stores/taskAvailability';
 import type { NeededItemHideoutModule, NeededItemTaskObjective, TarkovItem } from '@/types/tarkov';
 const mockStoreState = {
+  taskEvaluations: {} as TaskEvaluationMap,
   tasks: new Map<string, { kappaRequired?: boolean; minPlayerLevel?: number }>(),
   objectiveCounts: {} as Record<string, number>,
   hideoutPartCounts: {} as Record<string, number>,
   patchedState: null as unknown,
 };
+vi.mock('@/stores/useProgress', () => ({
+  useProgressStore: () => ({ taskEvaluations: mockStoreState.taskEvaluations }),
+}));
 vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => ({
     getTaskById: (id: string) => mockStoreState.tasks.get(id),
@@ -90,6 +95,7 @@ const createHideoutModule = (
 });
 describe('useItemDistribution', () => {
   beforeEach(() => {
+    mockStoreState.taskEvaluations = {};
     mockStoreState.tasks.clear();
     mockStoreState.objectiveCounts = {};
     mockStoreState.hideoutPartCounts = {};
@@ -134,7 +140,16 @@ describe('useItemDistribution', () => {
       expect(first.taskId).toBe('task-kappa');
       expect(second.taskId).toBe('task-normal');
     });
-    it('sorts by minPlayerLevel within same kappa priority', async () => {
+    it('sorts by canonical readiness within same kappa priority', async () => {
+      mockStoreState.taskEvaluations = {
+        'task-low': { self: { available: true, blockers: [] } },
+        'task-mid': {
+          self: { available: false, blockers: [{ type: 'trader_level', current: 2, required: 3 }] },
+        },
+        'task-high': {
+          self: { available: false, blockers: [{ type: 'prerequisite', requirements: [] }] },
+        },
+      };
       mockStoreState.tasks.set('task-high', { kappaRequired: true, minPlayerLevel: 30 });
       mockStoreState.tasks.set('task-low', { kappaRequired: true, minPlayerLevel: 10 });
       mockStoreState.tasks.set('task-mid', { kappaRequired: true, minPlayerLevel: 20 });

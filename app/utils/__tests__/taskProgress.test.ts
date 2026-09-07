@@ -132,20 +132,32 @@ describe('task progress requirements', () => {
         { id: 'prapor-level', trader: { id: 'prapor', name: 'Prapor' }, level: 3 },
       ],
       traderRequirements: [
-        { id: 'fence-reputation', trader: { id: 'fence', name: 'Fence' }, value: -2 },
-        { id: 'prapor-reputation', trader: { id: 'prapor', name: 'Prapor' }, value: -1 },
+        {
+          id: 'fence-reputation',
+          trader: { id: 'fence', name: 'Fence' },
+          value: -2,
+          requirementType: 'reputation',
+          compareMethod: '<=',
+        },
+        {
+          id: 'prapor-reputation',
+          trader: { id: 'prapor', name: 'Prapor' },
+          value: -1,
+          requirementType: 'reputation',
+          compareMethod: '>=',
+        },
         {
           id: 'therapist-reputation',
           trader: { id: 'therapist', name: 'Therapist' },
           value: 0.5,
+          requirementType: 'reputation',
         },
       ],
     };
-    applyTaskTraderRequirements({ store, task, fenceId: 'fence' });
+    applyTaskTraderRequirements({ store, task });
     expect(store.setTraderLevel).toHaveBeenCalledTimes(1);
     expect(store.setTraderLevel).toHaveBeenCalledWith('fence', 2);
-    expect(store.setTraderReputation).toHaveBeenCalledTimes(2);
-    expect(store.setTraderReputation).toHaveBeenCalledWith('fence', -2);
+    expect(store.setTraderReputation).toHaveBeenCalledTimes(1);
     expect(store.setTraderReputation).toHaveBeenCalledWith('therapist', 0.5);
   });
   it('applies each requirement task once with failure taking precedence', () => {

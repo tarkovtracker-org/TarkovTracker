@@ -233,7 +233,15 @@ describe('useProgressStore', () => {
         name: 'Prapor Rep Task',
         factionName: 'Any',
         trader: { id: 'skier', name: 'Skier', normalizedName: 'skier' },
-        traderRequirements: [{ id: 'req-2', trader: { id: praporId, name: 'Prapor' }, value: 0.5 }],
+        traderRequirements: [
+          {
+            id: 'req-2',
+            requirementType: 'reputation',
+            compareMethod: '>=',
+            trader: { id: praporId, name: 'Prapor' },
+            value: 0.5,
+          },
+        ],
       };
       setupMocks({
         selfState: createStoreState({ pvpTraders: { [praporId]: { reputation: 0.2 } } }),
@@ -250,7 +258,15 @@ describe('useProgressStore', () => {
         name: 'Prapor Rep Task',
         factionName: 'Any',
         trader: { id: 'skier', name: 'Skier', normalizedName: 'skier' },
-        traderRequirements: [{ id: 'req-2', trader: { id: praporId, name: 'Prapor' }, value: 0.5 }],
+        traderRequirements: [
+          {
+            id: 'req-2',
+            requirementType: 'reputation',
+            compareMethod: '>=',
+            trader: { id: praporId, name: 'Prapor' },
+            value: 0.5,
+          },
+        ],
       };
       setupMocks({
         selfState: createStoreState({ pvpTraders: { [praporId]: { reputation: 0.5 } } }),
@@ -261,13 +277,21 @@ describe('useProgressStore', () => {
       const store = useProgressStore();
       expect(store.unlockedTasks['prapor-rep-task']?.self).toBe(true);
     });
-    it('keeps the Fence negative-reputation special case gating', async () => {
+    it('honors the declared Fence reputation upper bound', async () => {
       const lowKarmaTask = {
         id: 'fence-low-karma-task',
         name: 'Low Karma Task',
         factionName: 'Any',
         trader: { id: 'fence', name: 'Fence', normalizedName: 'fence' },
-        traderRequirements: [{ id: 'req-3', trader: { id: 'fence', name: 'Fence' }, value: -3 }],
+        traderRequirements: [
+          {
+            id: 'req-3',
+            requirementType: 'reputation',
+            compareMethod: '<=',
+            trader: { id: 'fence', name: 'Fence' },
+            value: -3,
+          },
+        ],
       };
       setupMocks({
         selfState: createStoreState({ pvpTraders: { fence: { reputation: 0 } } }),
@@ -278,14 +302,20 @@ describe('useProgressStore', () => {
       const store = useProgressStore();
       expect(store.unlockedTasks['fence-low-karma-task']?.self).toBe(false);
     });
-    it('ignores negative reputation requirements for non-Fence traders', async () => {
+    it('honors negative reputation lower bounds for every trader', async () => {
       const negativeRepTask = {
         id: 'negative-rep-task',
         name: 'Negative Rep Task',
         factionName: 'Any',
         trader: { id: 'skier', name: 'Skier', normalizedName: 'skier' },
         traderRequirements: [
-          { id: 'req-4', trader: { id: praporId, name: 'Prapor' }, value: -0.5 },
+          {
+            id: 'req-4',
+            requirementType: 'reputation',
+            compareMethod: '>=',
+            trader: { id: praporId, name: 'Prapor' },
+            value: -0.5,
+          },
         ],
       };
       setupMocks({
@@ -314,7 +344,15 @@ describe('useProgressStore', () => {
         name: 'Prapor Rep Task',
         factionName: 'Any',
         trader: { id: 'skier', name: 'Skier', normalizedName: 'skier' },
-        traderRequirements: [{ id: 'req-2', trader: { id: praporId, name: 'Prapor' }, value: 0.5 }],
+        traderRequirements: [
+          {
+            id: 'req-2',
+            requirementType: 'reputation',
+            compareMethod: '>=',
+            trader: { id: praporId, name: 'Prapor' },
+            value: 0.5,
+          },
+        ],
       };
       setupMocks({
         selfState: createStoreState({ pvpTraders: { [praporId]: { reputation: 0.2 } } }),
@@ -332,7 +370,15 @@ describe('useProgressStore', () => {
         name: 'Low Karma Task',
         factionName: 'Any',
         trader: { id: 'fence', name: 'Fence', normalizedName: 'fence' },
-        traderRequirements: [{ id: 'req-3', trader: { id: 'fence', name: 'Fence' }, value: -3 }],
+        traderRequirements: [
+          {
+            id: 'req-3',
+            requirementType: 'reputation',
+            compareMethod: '<=',
+            trader: { id: 'fence', name: 'Fence' },
+            value: -3,
+          },
+        ],
       };
       setupMocks({
         selfState: createStoreState({ pvpTraders: { fence: { reputation: 0 } } }),

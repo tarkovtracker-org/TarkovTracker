@@ -1,6 +1,7 @@
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { sortTasksByProgression } from '@/utils/taskSorter';
 import { isTaskCounted, isTaskRelevant } from '@/utils/taskStatus';
 import type { Task, Trader } from '@/types/tarkov';
 export type KappaTaskStatus = 'available' | 'complete' | 'failed' | 'locked';
@@ -163,25 +164,20 @@ export function useKappaOverview(tab: () => KappaTabKey) {
         completedCount: row.status === 'complete' ? 1 : 0,
       });
     }
-    /**
-     * Sort each trader column by required player level, but keep multi-part
-     * quest chains adjacent and ordered by part number. The reference
-     * spreadsheet groups chains like 'Healthcare Privacy - Part 1/2/3'
-     * together anchored at the first part's level, even when later parts have
-     * higher level requirements that would otherwise scatter them across the
-     * column. Tasks outside a chain sort by their own level then name.
-     */
+    // Order chain groups by the best player-relative progression rank, keeping parts adjacent.
     type SortMeta = { anchorLevel: number; isChain: number; anchorIndex: number; part: number };
     const sortGroupRows = (rows: KappaRowEntry[]): KappaRowEntry[] => {
       const taskOrderIndex = new Map<string, number>();
-      metadataStore.tasks.forEach((task, index) => {
-        taskOrderIndex.set(task.id, index);
-      });
+      sortTasksByProgression(metadataStore.tasks, 'asc', progressStore.taskEvaluations).forEach(
+        (task, index) => {
+          taskOrderIndex.set(task.id, index);
+        }
+      );
       const chainAnchors = new Map<string, { level: number; index: number }>();
       for (const row of rows) {
         const chainKey = parseChainKey(row.task.name);
         if (!chainKey) continue;
-        const level = row.task.minPlayerLevel ?? 0;
+        const level = taskOrderIndex.get(row.task.id) ?? Number.MAX_SAFE_INTEGER;
         const taskIndex = taskOrderIndex.get(row.task.id) ?? Number.MAX_SAFE_INTEGER;
         const existing = chainAnchors.get(chainKey.chain);
         if (
@@ -193,7 +189,7 @@ export function useKappaOverview(tab: () => KappaTabKey) {
         }
       }
       const metaFor = (row: KappaRowEntry): SortMeta => {
-        const ownLevel = row.task.minPlayerLevel ?? 0;
+        const ownLevel = taskOrderIndex.get(row.task.id) ?? Number.MAX_SAFE_INTEGER;
         const ownIndex = taskOrderIndex.get(row.task.id) ?? Number.MAX_SAFE_INTEGER;
         const chainKey = parseChainKey(row.task.name);
         if (chainKey) {

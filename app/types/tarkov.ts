@@ -87,22 +87,33 @@ export interface SkillRequirement {
   level: number;
   skill?: Skill;
 }
+export type RequirementComparison = '>=' | '>' | '<=' | '<' | '=' | '==' | '!=';
+export type NormalizedTraderRequirement =
+  | {
+      id: string;
+      requirementType: 'level' | 'reputation';
+      compareMethod: RequirementComparison;
+      value: number;
+      trader: { id: string; name: string };
+    }
+  | {
+      id: string;
+      requirementType: 'unknown';
+      reason: 'shape' | 'type' | 'comparison' | 'value' | 'trader';
+    };
 export interface TraderRequirement {
   id: string;
   trader: { id: string; name: string };
   value: number;
   requirementType?: 'level' | 'reputation';
-  compareMethod?: '>=' | '<' | '<=' | '>';
+  compareMethod?: RequirementComparison;
 }
 export interface TaskTraderLevelRequirement {
   id: string;
   trader: { id: string; name: string };
   level: number;
   requirementType?: 'level' | 'reputation';
-  compareMethod?: '>=' | '<' | '<=' | '>';
-}
-export interface TraderLevelRequirementWithMet extends TaskTraderLevelRequirement {
-  met: boolean;
+  compareMethod?: RequirementComparison;
 }
 export interface Craft {
   id: string;
@@ -235,9 +246,11 @@ export interface Task {
   trader?: { id: string; name?: string; normalizedName?: string; imageLink?: string };
   objectives?: TaskObjective[];
   taskRequirements?: TaskRequirement[];
+  storyUnlocks?: Array<{ id: string; name: string }>;
   minPlayerLevel?: number;
   requiredPrestige?: { id: string };
   failedRequirements?: TaskRequirement[];
+  normalizedTraderRequirements?: NormalizedTraderRequirement[];
   traderLevelRequirements?: TaskTraderLevelRequirement[];
   traderRequirements?: TraderRequirement[];
   factionName?: string;
@@ -381,6 +394,7 @@ export interface StoryChapter {
   chapterRequirements?: Array<{ id: string; name: string }>;
   mapUnlocks?: Array<{ id: string; name: string }>;
   traderUnlocks?: Array<{ id: string; name: string }>;
+  questUnlocks?: Array<{ id: string; name: string }>;
   description?: string | null;
   notes?: string | null;
   objectives?: { [objectiveId: string]: StoryObjective };

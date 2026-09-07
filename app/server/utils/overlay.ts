@@ -1,3 +1,4 @@
+import { normalizeTraderRequirements } from '@/utils/taskRequirements';
 /**
  * Overlay utility for applying tarkov-data-overlay corrections to tarkov.dev API data.
  *
@@ -18,6 +19,7 @@ import { TARKOVTRACKER_USER_AGENT } from './userAgent';
 const logger = createLogger('Overlay');
 // Overlay data structure
 interface ModeOverlayData {
+  storyChapters?: Record<string, Record<string, unknown>>;
   tasks?: Record<string, Record<string, unknown>>;
   tasksAdd?: Record<string, Record<string, unknown>>;
 }
@@ -27,6 +29,7 @@ interface LocaleOverlayData {
   traders?: Record<string, Record<string, unknown>>;
 }
 interface OverlayData {
+  storyChapters?: Record<string, Record<string, unknown>>;
   tasks?: Record<string, Record<string, unknown>>;
   tasksAdd?: Record<string, Record<string, unknown>>;
   items?: Record<string, Record<string, unknown>>;
@@ -92,6 +95,17 @@ let lastOverlayMeta: OverlayMeta = {
   status: 'missing',
   sourceUrl: OVERLAY_URL_WITH_BUSTER,
 };
+const validChapterEntries = (chapters: unknown): boolean => {
+  if (chapters === undefined) return true;
+  if (!isPlainObject(chapters)) return false;
+  return Object.values(chapters).every(isPlainObject);
+};
+const validStoryCollections = (overlay: OverlayData): boolean => {
+  if (!validChapterEntries(overlay.storyChapters)) return false;
+  return Object.values(overlay.modes ?? {}).every((mode) =>
+    validChapterEntries(mode.storyChapters)
+  );
+};
 /**
  * Validate overlay data structure
  */
@@ -131,7 +145,7 @@ function isValidOverlayData(data: unknown): data is OverlayData {
       }
     }
   }
-  return true;
+  return validStoryCollections(overlay);
 }
 function buildOverlayMeta(
   overlay: OverlayData | null,
@@ -479,6 +493,7 @@ const hasFiniteLevelThreshold = (requirement: Record<string, unknown>): boolean 
 };
 function applyTraderRequirementSplit(task: Record<string, unknown>): void {
   const raw = task.traderRequirements;
+  task.normalizedTraderRequirements = normalizeTraderRequirements(raw);
   if (!Array.isArray(raw)) return;
   const traderLevelRequirements = raw
     .filter(isLevelRequirement)
@@ -535,6 +550,27 @@ function applyEntityCollectionOverlay(
   if (!patches || !Array.isArray(entities)) return;
   target[collection] = applyEntityOverlay(entities, patches);
 }
+const chapterTaskIds = (chapter: Record<string, unknown>): string[] => {
+  if (!Array.isArray(chapter.questUnlocks)) return [];
+  return chapter.questUnlocks
+    .filter(isPlainObject)
+    .map((unlock) => unlock.id)
+    .filter((id): id is string => typeof id === 'string');
+};
+const storyChapterName = (chapter: Record<string, unknown>, id: string) =>
+  typeof chapter.name === 'string' ? chapter.name : id;
+const collectStoryUnlocks = (chapters: Record<string, Record<string, unknown>> = {}) => {
+  const byTask = new Map<string, Array<{ id: string; name: string }>>();
+  for (const [id, chapter] of Object.entries(chapters)) {
+    const name = storyChapterName(chapter, id);
+    for (const taskId of chapterTaskIds(chapter)) {
+      const entries = byTask.get(taskId) ?? [];
+      entries.push({ id, name });
+      byTask.set(taskId, entries);
+    }
+  }
+  return byTask;
+};
 export async function applyOverlay<T extends { data?: OverlayTargetData }>(
   data: T,
   options: {
@@ -585,7 +621,12 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
     const existingIds = new Set(correctedTasks.map((task) => task.id));
     const dedupedAdditions = addedTasks.filter((task) => !existingIds.has(task.id));
     logger.info(`Overlay tasksAdd: ${dedupedAdditions.length} additions after dedupe`);
-    result.data.tasks = [...correctedTasks, ...dedupedAdditions];
+    const chapters = mergeModeCorrections(overlay.storyChapters, modeOverlay?.storyChapters);
+    const storyUnlocksByTask = collectStoryUnlocks(chapters);
+    result.data.tasks = [...correctedTasks, ...dedupedAdditions].map((task) => ({
+      ...task,
+      storyUnlocks: storyUnlocksByTask.get(task.id) ?? [],
+    }));
   }
   applyEntityCollectionOverlay(result.data, 'items', overlay.items);
   applyEntityCollectionOverlay(result.data, 'traders', overlay.traders);

@@ -579,6 +579,7 @@
     impact: 'i-mdi-chart-line',
     alphabetical: 'i-mdi-sort-alphabetical-ascending',
     level: 'i-mdi-sort-numeric-ascending',
+    progression: 'i-mdi-stairs-up',
     trader: 'i-mdi-account',
     teammates: 'i-mdi-account-multiple',
     xp: 'i-mdi-star',

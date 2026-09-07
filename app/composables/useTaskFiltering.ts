@@ -8,8 +8,12 @@ import { isAllUsersView } from '@/types/taskFilter';
 import { TRADER_ORDER } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { perfEnabled, perfEnd, perfNow, perfStart } from '@/utils/perf';
-import { buildTaskImpactScores, resolveImpactTeamIds } from '@/utils/taskImpact';
+import { resolveImpactTeamIds } from '@/utils/taskImpact';
 import { normalizeTaskObjectives } from '@/utils/taskNormalization';
+import {
+  buildTraderOrderMap as createTraderOrderMap,
+  sortTasks as sortTaskList,
+} from '@/utils/taskSorter';
 import {
   buildTaskTypeFilterOptions,
   filterTasksByTypeSettings as filterTasksByTypeSettingsUtil,
@@ -427,16 +431,6 @@ export function useTaskFiltering() {
     perfEnd(perfTimer, { mapsWithCounts: Object.keys(mapTaskCounts).length });
     return mapTaskCounts;
   };
-  const buildTraderOrderMap = (): Map<string, number> => {
-    const orderMap = new Map<string, number>();
-    const traders = metadataStore.traders || [];
-    traders.forEach((trader) => {
-      const normalized = trader.normalizedName?.toLowerCase() ?? trader.name.toLowerCase();
-      const index = TRADER_ORDER.indexOf(normalized as (typeof TRADER_ORDER)[number]);
-      orderMap.set(trader.id, index === -1 ? TRADER_ORDER.length : index);
-    });
-    return orderMap;
-  };
   /**
    * Get cached trader order map, rebuilding only when traders change
    */
@@ -446,7 +440,7 @@ export function useTaskFiltering() {
     if (cachedTraderOrderMap && cachedTradersRef === traders) {
       return cachedTraderOrderMap;
     }
-    cachedTraderOrderMap = buildTraderOrderMap();
+    cachedTraderOrderMap = createTraderOrderMap(metadataStore.traders ?? [], TRADER_ORDER);
     cachedTradersRef = traders;
     return cachedTraderOrderMap;
   };
@@ -456,121 +450,6 @@ export function useTaskFiltering() {
   const resetTraderOrderMapCache = () => {
     cachedTraderOrderMap = null;
     cachedTradersRef = null;
-  };
-  const buildTeammateAvailableCounts = (taskList: Task[]): Map<string, number> => {
-    const teamIds = Object.keys(progressStore.visibleTeamStores || {});
-    const counts = new Map<string, number>();
-    if (!teamIds.length) {
-      taskList.forEach((task) => counts.set(task.id, 0));
-      return counts;
-    }
-    taskList.forEach((task) => {
-      const availableCount = teamIds.filter((teamId) => {
-        const isUnlocked = progressStore.unlockedTasks?.[task.id]?.[teamId] === true;
-        const isCompleted = progressStore.tasksCompletions?.[task.id]?.[teamId] === true;
-        const isFailed = progressStore.tasksFailed?.[task.id]?.[teamId] === true;
-        return isUnlocked && !isCompleted && !isFailed;
-      }).length;
-      counts.set(task.id, availableCount);
-    });
-    return counts;
-  };
-  const sortTasksByImpact = (
-    taskList: Task[],
-    userView: string,
-    sortDirection: TaskSortDirection
-  ): Task[] => {
-    const directionFactor = sortDirection === 'desc' ? -1 : 1;
-    const teamIds = resolveImpactTeamIds(userView, progressStore.visibleTeamStores);
-    const impactEligibleTaskIds = preferencesStore.getRespectTaskFiltersForImpact
-      ? new Set(
-          filterTasksByRequiredKeysSetting(filterTasksByTypeSettings(metadataStore.tasks)).map(
-            (task) => task.id
-          )
-        )
-      : undefined;
-    const impactScores = buildTaskImpactScores(
-      taskList,
-      teamIds,
-      {
-        tasksCompletions: progressStore.tasksCompletions,
-        tasksFailed: progressStore.tasksFailed,
-      },
-      impactEligibleTaskIds
-    );
-    return [...taskList].sort((a, b) => {
-      const impactA = impactScores.get(a.id) ?? 0;
-      const impactB = impactScores.get(b.id) ?? 0;
-      if (impactA !== impactB) return (impactA - impactB) * directionFactor;
-      const nameA = a.name?.toLowerCase() ?? '';
-      const nameB = b.name?.toLowerCase() ?? '';
-      return nameA.localeCompare(nameB) * directionFactor;
-    });
-  };
-  const sortTasksByName = (taskList: Task[], sortDirection: TaskSortDirection): Task[] => {
-    const directionFactor = sortDirection === 'desc' ? -1 : 1;
-    return [...taskList].sort((a, b) => {
-      const nameA = a.name?.toLowerCase() ?? '';
-      const nameB = b.name?.toLowerCase() ?? '';
-      if (nameA !== nameB) return nameA.localeCompare(nameB) * directionFactor;
-      return a.id.localeCompare(b.id) * directionFactor;
-    });
-  };
-  const sortTasksByLevel = (taskList: Task[], sortDirection: TaskSortDirection): Task[] => {
-    const directionFactor = sortDirection === 'desc' ? -1 : 1;
-    return [...taskList].sort((a, b) => {
-      const levelA = a.minPlayerLevel ?? 0;
-      const levelB = b.minPlayerLevel ?? 0;
-      if (levelA !== levelB) return (levelA - levelB) * directionFactor;
-      const nameA = a.name?.toLowerCase() ?? '';
-      const nameB = b.name?.toLowerCase() ?? '';
-      return nameA.localeCompare(nameB) * directionFactor;
-    });
-  };
-  const sortTasksByTrader = (taskList: Task[], sortDirection: TaskSortDirection): Task[] => {
-    const directionFactor = sortDirection === 'desc' ? -1 : 1;
-    const orderMap = getTraderOrderMap();
-    return [...taskList].sort((a, b) => {
-      const traderA = a.trader?.id
-        ? (orderMap.get(a.trader.id) ?? TRADER_ORDER.length)
-        : TRADER_ORDER.length;
-      const traderB = b.trader?.id
-        ? (orderMap.get(b.trader.id) ?? TRADER_ORDER.length)
-        : TRADER_ORDER.length;
-      if (traderA !== traderB) return (traderA - traderB) * directionFactor;
-      const levelA = a.minPlayerLevel ?? 0;
-      const levelB = b.minPlayerLevel ?? 0;
-      if (levelA !== levelB) return (levelA - levelB) * directionFactor;
-      const nameA = a.name?.toLowerCase() ?? '';
-      const nameB = b.name?.toLowerCase() ?? '';
-      return nameA.localeCompare(nameB) * directionFactor;
-    });
-  };
-  const sortTasksByTeammatesAvailable = (
-    taskList: Task[],
-    sortDirection: TaskSortDirection
-  ): Task[] => {
-    const directionFactor = sortDirection === 'desc' ? -1 : 1;
-    const counts = buildTeammateAvailableCounts(taskList);
-    return [...taskList].sort((a, b) => {
-      const countA = counts.get(a.id) ?? 0;
-      const countB = counts.get(b.id) ?? 0;
-      if (countA !== countB) return (countA - countB) * directionFactor;
-      const nameA = a.name?.toLowerCase() ?? '';
-      const nameB = b.name?.toLowerCase() ?? '';
-      return nameA.localeCompare(nameB) * directionFactor;
-    });
-  };
-  const sortTasksByXp = (taskList: Task[], sortDirection: TaskSortDirection): Task[] => {
-    const directionFactor = sortDirection === 'desc' ? -1 : 1;
-    return [...taskList].sort((a, b) => {
-      const xpA = a.experience ?? 0;
-      const xpB = b.experience ?? 0;
-      if (xpA !== xpB) return (xpA - xpB) * directionFactor;
-      const nameA = a.name?.toLowerCase() ?? '';
-      const nameB = b.name?.toLowerCase() ?? '';
-      return nameA.localeCompare(nameB) * directionFactor;
-    });
   };
   const getTraderStatusSortRank = (task: Task, userView: string): number => {
     if (isAllUsersView(userView)) {
@@ -674,25 +553,30 @@ export function useTaskFiltering() {
         unpinnedTasks.push(task);
       }
     }
-    const applySort = (tasks: Task[]) => {
-      switch (sortMode) {
-        case 'alphabetical':
-          return sortTasksByName(tasks, sortDirection);
-        case 'level':
-          return sortTasksByLevel(tasks, sortDirection);
-        case 'impact':
-          return sortTasksByImpact(tasks, userView, sortDirection);
-        case 'trader':
-          return sortTasksByTrader(tasks, sortDirection);
-        case 'teammates':
-          return sortTasksByTeammatesAvailable(tasks, sortDirection);
-        case 'xp':
-          return sortTasksByXp(tasks, sortDirection);
-        case 'none':
-        default:
-          return sortDirection === 'desc' ? [...tasks].reverse() : [...tasks];
-      }
-    };
+    const impactEligibleTaskIds = preferencesStore.getRespectTaskFiltersForImpact
+      ? new Set(
+          filterTasksByRequiredKeysSetting(filterTasksByTypeSettings(metadataStore.tasks)).map(
+            (task) => task.id
+          )
+        )
+      : undefined;
+    const applySort = (tasks: Task[]) =>
+      sortTaskList(tasks, sortMode, sortDirection, {
+        evaluations: progressStore.taskEvaluations,
+        teamIds: isAllUsersView(userView)
+          ? Object.keys(progressStore.visibleTeamStores ?? {})
+          : [userView],
+        traderOrderMap: getTraderOrderMap(),
+        defaultTraderOrder: TRADER_ORDER.length,
+        progressData: {
+          visibleTeamStores: progressStore.visibleTeamStores,
+          tasksCompletions: progressStore.tasksCompletions,
+          tasksFailed: progressStore.tasksFailed,
+          unlockedTasks: progressStore.unlockedTasks,
+          impactTeamIds: resolveImpactTeamIds(userView, progressStore.visibleTeamStores),
+          impactEligibleTaskIds,
+        },
+      });
     return [...applySort(pinnedTasks), ...applySort(unpinnedTasks)];
   };
   const filterSharedByAllTasks = (

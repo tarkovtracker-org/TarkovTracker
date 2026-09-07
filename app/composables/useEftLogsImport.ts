@@ -17,6 +17,8 @@ import {
 import { logger } from '@/utils/logger';
 import {
   applyTaskAvailabilityRequirements,
+  applyTaskTraderRequirements,
+  ensureTaskMinPlayerLevel,
   completeTaskForProgress,
   failTaskForProgress,
 } from '@/utils/taskProgress';
@@ -228,6 +230,11 @@ const applyCompletedImports = (
   const completeTask = (taskId: string) => {
     if (processedCompleted.has(taskId) || explicitOtherStates.has(taskId)) return;
     completeTaskForProgress({ store, taskId, tasksMap });
+    const task = tasksMap.get(taskId);
+    if (task) {
+      ensureTaskMinPlayerLevel(store, task);
+      applyTaskTraderRequirements({ store, task });
+    }
     processedCompleted.add(taskId);
   };
   const failTask = (taskId: string) => {
@@ -243,6 +250,8 @@ const applyCompletedImports = (
     const task = tasksMap.get(taskId);
     if (task) {
       applyTaskAvailabilityRequirements({
+        getCompletion: (id) => store.getCurrentProgressData().taskCompletions?.[id],
+        skipTaskRequirements: Boolean(task.storyUnlocks?.length),
         onCompleteRequirement: completeTask,
         onFailRequirement: failTask,
         task,
