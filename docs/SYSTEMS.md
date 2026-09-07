@@ -685,8 +685,9 @@ flowchart LR
    Stable server event/message identities are deduplicated across modes before progress is
    applied; routing follows the earliest receipt, regardless of file order or replay receipt mode.
    Sparse fallback identities stay mode-scoped, using receipt time when no original time exists.
-   Conflicting simultaneous deliveries remain unresolved. States are then reconciled per mode
-   and quest after unresolved-mode routing; tied timestamps prefer completed, failed, then started.
+   Conflicting or unresolved simultaneous deliveries remain unresolved: unknown may represent
+   contradictory signals, not just absent context, so a partial copy cannot override it. States are
+   then reconciled per mode and quest after unresolved-mode routing; tied timestamps prefer completed, failed, then started.
    Explicit failure notifications use the persistent manual-failure flag so automatic repair cannot
    discard them when a triggering quest is missing from the logs. Existing completed tracker tasks
    are preserved. Catalogs share metadata hydration's task-qualified duplicate-objective IDs.
@@ -694,7 +695,9 @@ flowchart LR
    loaded before mutations, without changing the active metadata store. Destination catalogs
    determine task eligibility and objective counts, and the original progress mode is restored.
    Seasonal events outside the active season are skipped; assigning unresolved out-of-season
-   events to Seasonal is blocked. Malformed/skipped records are reported in the preview.
+   events to Seasonal is blocked. Preview counts exclude those events and the shared confirmation
+   guard shows the date warning and disables confirmation immediately for an invalid selection.
+   Malformed/skipped records are reported in the preview.
    Version filters are compatibility filters, not account/wipe/prestige boundaries: users must
    select the character sessions they intend to restore. Missing logs, objective handovers, XP,
    skills, and hideout progress cannot be reconstructed from these quest notifications.

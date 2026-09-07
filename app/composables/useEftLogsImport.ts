@@ -1,18 +1,18 @@
 import { strFromU8, unzipSync } from 'fflate';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
-import { GAME_MODES, GAME_MODE_VALUES, isGameMode, type GameMode } from '@/utils/constants';
+import { GAME_MODE_VALUES, isGameMode, type GameMode } from '@/utils/constants';
 import { loadEftImportTaskCatalog } from '@/utils/eftLogImportCatalog';
 import {
   isEftImportLogFileName,
-  isCurrentSeasonLogEvent,
+  hasOutsideSeasonEvents,
+  isEligibleImportEvent,
   latestEftQuestEvents,
   isEftNotificationLogFileName,
   parseEftLogsForQuestImport,
   UNKNOWN_LOG_VERSION,
   type EftLogInputFile,
   type EftQuestImportPreview,
-  type EftQuestImportEvent,
 } from '@/utils/eftLogQuestParser';
 import { logger } from '@/utils/logger';
 import {
@@ -196,22 +196,9 @@ type ImportTaskSets = {
   started: ImportTaskIds;
   failed: ImportTaskIds;
 };
-/** Checks whether the destination catalog recognizes a routed quest event. */
-const isEligibleImportEvent = (event: EftQuestImportEvent) =>
-  event.matchedModes?.includes(event.mode as GameMode) ?? true;
 /** Reports whether any authoritative task state will be applied to a destination. */
 const hasModeImports = (sets: ImportTaskSets, mode: GameMode) =>
   [sets.completed[mode], sets.started[mode], sets.failed[mode]].some((ids) => ids.size > 0);
-/** Prevents manually routed, eligible old history from modifying the active Seasonal profile. */
-const hasOutsideSeasonEvents = (preview: EftLogsImportPreviewData, targetMode: GameMode) => {
-  if (targetMode !== GAME_MODES.SEASONAL) return false;
-  return latestEftQuestEvents(preview.events, targetMode).some(
-    (event) =>
-      event.mode === GAME_MODES.SEASONAL &&
-      isEligibleImportEvent(event) &&
-      !isCurrentSeasonLogEvent(event)
-  );
-};
 /** Reconciles routed events into disjoint completion, start, and failure sets for every mode. */
 const buildImportTaskSets = (
   preview: EftLogsImportPreviewData,
@@ -220,7 +207,7 @@ const buildImportTaskSets = (
   const create = (): ImportTaskIds => ({ pvp: new Set(), pve: new Set(), seasonal: new Set() });
   const sets = { completed: create(), started: create(), failed: create() };
   for (const event of latestEftQuestEvents(preview.events, targetMode)) {
-    if (event.mode === UNKNOWN_MODE || !isEligibleImportEvent(event)) continue;
+    if (!isEligibleImportEvent(event)) continue;
     sets[event.status][event.mode].add(event.questId);
   }
   return { completed: sets.completed, started: sets.started, failed: sets.failed };
@@ -531,7 +518,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
       importError.value = t('settings.log_import.errors.invalid_mode');
       return null;
     }
-    if (hasOutsideSeasonEvents(preview, targetMode)) {
+    if (hasOutsideSeasonEvents(preview.events, targetMode)) {
       importError.value = t('settings.log_import.errors.outside_active_season');
       return null;
     }

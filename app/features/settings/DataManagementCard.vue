@@ -623,7 +623,7 @@
               color="warning"
               :description="eftLogsSkippedEventsMessage"
             />
-            <UAlert v-if="eftLogsImportError" color="error" :description="eftLogsImportError" />
+            <UAlert v-if="eftLogsPreviewError" color="error" :description="eftLogsPreviewError" />
             <div v-if="eftLogsRequiresManualModeSelection" class="space-y-1">
               <label class="text-surface-200 text-sm font-semibold">
                 {{ $t('settings.log_import.import_unknown_to_mode') }}
@@ -647,6 +647,7 @@
                 color="primary"
                 class="flex-1"
                 :loading="eftLogsIsImporting"
+                :disabled="eftLogsHasOutsideSeasonEvents"
                 @click="handleEftLogsConfirm"
               >
                 {{ $t('common.confirm_import') }}
@@ -992,7 +993,12 @@
     sortSkillsByGameOrder,
     type GameMode,
   } from '@/utils/constants';
-  import { latestEftQuestEvents } from '@/utils/eftLogQuestParser';
+  import {
+    hasOutsideSeasonEvents,
+    isCurrentSeasonLogEvent,
+    isEligibleImportEvent,
+    latestEftQuestEvents,
+  } from '@/utils/eftLogQuestParser';
   import { logger } from '@/utils/logger';
   import { getImportCooldownRemainingMs } from '@/utils/tarkovDevImportCooldown';
   import { buildTarkovDevProfileUrl } from '@/utils/tarkovDevProfileUrl';
@@ -1471,11 +1477,23 @@
     if (!taskName) return taskId;
     return `${taskName} (${taskId})`;
   }
+  /** Uses only eligible, in-season latest states for the selected destination's preview totals. */
   const eftLogsEffectiveEvents = computed(() =>
-    latestEftQuestEvents(eftLogsPreview.value?.events ?? [], eftLogsTargetMode.value).filter(
-      (event) =>
-        event.mode !== 'unknown' && (!event.matchedModes || event.matchedModes.includes(event.mode))
-    )
+    latestEftQuestEvents(eftLogsPreview.value?.events ?? [], eftLogsTargetMode.value)
+      .filter(isEligibleImportEvent)
+      .filter((event) => event.mode !== GAME_MODES.SEASONAL || isCurrentSeasonLogEvent(event))
+  );
+  /** Applies the confirmation guard before enabling a Seasonal import. */
+  const eftLogsHasOutsideSeasonEvents = computed(() =>
+    hasOutsideSeasonEvents(eftLogsPreview.value?.events ?? [], eftLogsTargetMode.value)
+  );
+  /** Shows invalid Seasonal selections immediately while preserving application errors. */
+  const eftLogsPreviewError = computed(
+    () =>
+      eftLogsImportError.value ??
+      (eftLogsHasOutsideSeasonEvents.value
+        ? t('settings.log_import.errors.outside_active_season')
+        : null)
   );
   const eftLogsCompletedCount = computed(
     () => eftLogsEffectiveEvents.value.filter((event) => event.status === 'completed').length

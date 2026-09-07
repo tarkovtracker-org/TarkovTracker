@@ -498,6 +498,26 @@ function routeUnknownEvent(event: EftQuestImportEvent, targetMode?: GameMode): E
   return event.mode === UNKNOWN_MODE && targetMode ? { ...event, mode: targetMode } : event;
 }
 // Reconcile after routing unknown events too, so a restart and completion cannot land in different buckets.
+/** Recognizes quest events eligible for their resolved destination catalog. */
+export function isEligibleImportEvent(
+  event: EftQuestImportEvent
+): event is EftQuestImportEvent & { mode: GameMode } {
+  if (event.mode === UNKNOWN_MODE) return false;
+  return event.matchedModes?.includes(event.mode) ?? true;
+}
+/** Checks the same Seasonal eligibility constraint for both preview and progress application. */
+export function hasOutsideSeasonEvents(
+  events: EftQuestImportEvent[],
+  targetMode: GameMode
+): boolean {
+  if (targetMode !== GAME_MODES.SEASONAL) return false;
+  return latestEftQuestEvents(events, targetMode).some(
+    (event) =>
+      event.mode === GAME_MODES.SEASONAL &&
+      isEligibleImportEvent(event) &&
+      !isCurrentSeasonLogEvent(event)
+  );
+}
 /** Reconciles each destination and quest after manual routing, retaining one authoritative state. */
 export function latestEftQuestEvents(
   events: EftQuestImportEvent[],

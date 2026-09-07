@@ -3,6 +3,8 @@ import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref, type Ref } from 'vue';
 import DataManagementCard from '@/features/settings/DataManagementCard.vue';
+import { ACTIVE_SEASON } from '@/utils/constants';
+import { parseEftLogsForQuestImport } from '@/utils/eftLogQuestParser';
 const {
   backupFns,
   backupState,
@@ -869,6 +871,47 @@ describe('DataManagementCard', () => {
     );
     expect(wrapper.text()).toContain('Shortage (5ac2426c86f774138762edfe)');
   });
+  it.each(['before-season', 'missing-date'])(
+    'blocks invalid Seasonal preview dates (%s) before confirmation',
+    async (dateCase) => {
+      const questId = '61604635c725987e815b1a46';
+      const oldDate = new Date(Date.parse(ACTIVE_SEASON.startsOn) - 86400000)
+        .toISOString()
+        .replace('T', ' ')
+        .replace('Z', '');
+      const parsed = parseEftLogsForQuestImport(
+        [
+          {
+            name: 'notifications.log',
+            text: `${oldDate}|Info|notifications|Got notification | ChatMessageReceived\n${JSON.stringify({ eventId: 'old', message: { type: 12, templateId: questId } })}\n`,
+          },
+        ],
+        [questId],
+        { taskIdsByMode: { pvp: [questId], pve: [questId], seasonal: [questId] } }
+      );
+      if (dateCase === 'missing-date') parsed.events[0]!.timestamp = null;
+      eftLogsState.importState.value = 'preview';
+      eftLogsState.previewData.value = {
+        ...parsed,
+        scannedEntries: 1,
+        sourceFileName: 'notifications.log',
+      };
+      tarkovStoreState.currentMode = 'seasonal';
+      const wrapper = createWrapper();
+      const vm = asVm<{ eftLogsCompletedCount: number }>(wrapper.vm);
+      expect(vm.eftLogsCompletedCount).toBe(0);
+      expect(wrapper.text()).toContain('settings.log_import.errors.outside_active_season');
+      const confirm = wrapper
+        .findAll('button')
+        .find((button) => button.text().includes('common.confirm_import'))!;
+      expect(confirm.attributes('disabled')).toBeDefined();
+      await wrapper.findComponent({ name: 'GameModeToggle' }).vm.$emit('update:modelValue', 'pvp');
+      await wrapper.vm.$nextTick();
+      expect(vm.eftLogsCompletedCount).toBe(1);
+      expect(wrapper.text()).not.toContain('settings.log_import.errors.outside_active_season');
+      expect(confirm.attributes('disabled')).toBeUndefined();
+    }
+  );
   it('excludes completed tasks from EFT active task count', () => {
     eftLogsState.importState.value = 'preview';
     eftLogsState.previewData.value = {

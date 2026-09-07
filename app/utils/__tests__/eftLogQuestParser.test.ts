@@ -563,6 +563,33 @@ describe('notification replays', () => {
       }
     }
   );
+  it('does not erase conflicting mode evidence with a partial same-time copy', () => {
+    const text = notification(
+      'same-event',
+      12,
+      `${seasonDay}T10:00:00Z`,
+      `${seasonDay} 10:00:00.000`
+    );
+    const files = [
+      {
+        name: 'log_conflict/application.log',
+        text: `${seasonDay} 09:00:00.000|Info|application|Session mode: Regular\n${seasonDay} 09:00:00.000|Info|application|Session mode: Pve`,
+      },
+      { name: 'log_conflict/notifications.log', text },
+      {
+        name: 'log_partial/application.log',
+        text: `${seasonDay} 09:00:00.000|Info|application|Session mode: Regular`,
+      },
+      { name: 'log_partial/notifications.log', text },
+    ];
+    for (const input of [files, [...files].reverse()]) {
+      const result = parseEftLogsForQuestImport(input, [quest]);
+      expect(result.dedupedCompletionEventCount).toBe(1);
+      expect(result.matchedTaskIdsByMode.unknown).toEqual([quest]);
+      expect(result.matchedTaskIdsByMode.pvp).toEqual([]);
+      expect(result.matchedTaskIdsByMode.pve).toEqual([]);
+    }
+  });
   it('deduplicates legacy message IDs across modes without a server event ID', () => {
     const message = {
       _id: 'stable-message',
