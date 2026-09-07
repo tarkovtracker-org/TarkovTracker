@@ -27,8 +27,18 @@ const optionalChapters = (
     | undefined,
   mode: string
 ) => mergeStoryChapters(overlay?.storyChapters, modeChapters(overlay ?? {}, mode));
-const optionalPrestige = (prestige: { data: { prestige: PrestigeLevel[] } } | undefined) =>
-  prestige?.data.prestige ?? [];
+const optionalPrestige = (response: { data: { prestige: PrestigeLevel[] } }): PrestigeLevel[] => {
+  const prestige = response?.data?.prestige;
+  if (
+    !Array.isArray(prestige) ||
+    prestige.some(
+      (entry) => !entry || typeof entry.id !== 'string' || !Number.isFinite(entry.level)
+    )
+  ) {
+    throw new Error('Invalid optional prestige catalog');
+  }
+  return prestige;
+};
 const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: AbortSignal) => {
   const query = { gameMode: API_GAME_MODES[gameMode], lang };
   const options = { query, signal: signal };
@@ -42,7 +52,9 @@ const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: Abo
       'https://raw.githubusercontent.com/tarkovtracker-org/tarkov-data-overlay/main/dist/overlay.json',
       { parseResponse: JSON.parse, signal: signal }
     ).then((overlay) => optionalChapters(overlay, query.gameMode)),
-    $fetch<{ data: { prestige: PrestigeLevel[] } }>('/api/tarkov/prestige', options),
+    $fetch<{ data: { prestige: PrestigeLevel[] } }>('/api/tarkov/prestige', options).then(
+      optionalPrestige
+    ),
   ]);
   const core = requiredResult(coreResult);
   const objectives = requiredResult(objectivesResult);
@@ -60,7 +72,7 @@ const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: Abo
     tasks: useGraphBuilder().processTaskData(normalized.tasks).tasks,
     duplicateObjectiveIds: normalized.duplicateObjectiveIds,
     chapters: chapters ?? [],
-    prestige: optionalPrestige(prestige),
+    prestige: prestige ?? [],
     failure: partialFailure([overlayResult, prestigeResult]),
   };
 };
