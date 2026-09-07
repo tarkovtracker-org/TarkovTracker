@@ -392,8 +392,8 @@ describe('documented log formats and state history', () => {
     expect(result.matchedTaskIdsByMode.pve).toEqual([quest]);
   });
   it('keeps individually selected timestamped files in separate sessions', () => {
-    const prefixA = '2026.08.29_09-00-00_1.1.0.1.46911';
-    const prefixB = '2026.08.29_09-30-00_1.1.0.1.46911';
+    const prefixA = `${day.replaceAll('-', '.')}_09-00-00_1.1.0.1.46911`;
+    const prefixB = `${day.replaceAll('-', '.')}_09-30-00_1.1.0.1.46911`;
     const result = parseEftLogsForQuestImport(
       [
         {

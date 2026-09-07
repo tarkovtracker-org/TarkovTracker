@@ -2287,8 +2287,8 @@
         "plural": "Skipped {count} malformed notifications."
       },
       "skipped_seasonal": {
-        "single": "Skipped {count} Seasonal event outside the active season.",
-        "plural": "Skipped {count} Seasonal events outside the active season."
+        "single": "Skipped {count} Seasonal event outside the active season or without a valid date.",
+        "plural": "Skipped {count} Seasonal events outside the active season or without valid dates."
       }
     },
     "tarkov_dev_import": {

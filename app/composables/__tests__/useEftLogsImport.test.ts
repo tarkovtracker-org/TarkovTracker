@@ -397,12 +397,14 @@ describe('expanded log import', () => {
   });
   it('imports a current Seasonal notification and restores the original mode', async () => {
     const importer = await loadComposable();
+    const session = `${seasonDay.replaceAll('-', '.')}_10-00-00_1.1.0.1.46911`;
     const archive = zipSync({
-      'Logs/log_2026.08.29_10-00-00_1.1.0.1.46911/application.log': strToU8(
+      [`Logs/log_${session}/application.log`]: strToU8(
         `${seasonDay} 10:00:00.000|1.1.0.1.46911|Info|application|Session mode: PvpSeason`
       ),
-      'Logs/log_2026.08.29_10-00-00_1.1.0.1.46911/2026.08.29_10-00-00_1.1.0.1.46911 push-notifications.log':
-        strToU8(completionLog(undefined, seasonDay)),
+      [`Logs/log_${session}/${session} push-notifications.log`]: strToU8(
+        completionLog(undefined, seasonDay)
+      ),
     });
     await importer.parseFile(new File([new Uint8Array(archive)], 'Logs.zip'));
     expect(importer.previewData.value?.matchedTaskIdsByMode.seasonal).toEqual([
