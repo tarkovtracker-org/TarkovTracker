@@ -154,3 +154,25 @@ it('keeps required catalogs when optional chapter normalization fails', async ()
   expect(result.loading.value).toBe(false);
   scope.stop();
 });
+it.each([{}, { data: null }, { data: { prestige: {} } }, { data: { prestige: [null] } }])(
+  'keeps task catalogs when optional prestige is malformed: %j',
+  async (payload) => {
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn((url: string) => {
+        if (url.includes('tasks-'))
+          return Promise.resolve({ data: { tasks: [{ id: 'task', objectives: [] }] } });
+        if (url.includes('prestige')) return Promise.resolve(payload);
+        return Promise.resolve({ data: { storyChapters: [] } });
+      })
+    );
+    const scope = effectScope();
+    const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pvp'), ref('en')))!;
+    await flushPromises();
+    expect(result.tasks.value[0]?.id).toBe('task');
+    expect(result.prestige.value).toEqual([]);
+    expect(result.error.value?.message).toBe('Invalid optional prestige catalog');
+    expect(result.loading.value).toBe(false);
+    scope.stop();
+  }
+);
