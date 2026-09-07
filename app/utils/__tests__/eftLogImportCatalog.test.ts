@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadEftImportTaskCatalog } from '@/utils/eftLogImportCatalog';
 describe('loadEftImportTaskCatalog', () => {
   afterEach(() => vi.unstubAllGlobals());
-  it('loads the destination mode and joins objective data without changing the metadata store', async () => {
+  it('loads the destination mode and joins objective data into the task catalog', async () => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce({ data: { tasks: [{ id: 'task', name: 'Task' }] } })

@@ -1,5 +1,6 @@
 import { strToU8, zipSync } from 'fflate';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ACTIVE_SEASON } from '@/utils/constants';
 import type { Task } from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
 const metadataStore: { tasks: Task[] } = {
@@ -76,6 +77,9 @@ vi.mock('vue-i18n', async (importOriginal) => ({
 vi.mock('@/utils/logger', () => ({
   logger: mockLogger,
 }));
+const seasonDay = new Date(Date.parse(ACTIVE_SEASON.startsOn) + 86400000)
+  .toISOString()
+  .slice(0, 10);
 const completionLog = (questId = '61604635c725987e815b1a46', day = '2026-02-21') => `
 ${day} 10:14:24.222|Info|push-notifications|Got notification | ChatMessageReceived
 {
@@ -125,6 +129,24 @@ describe('useEftLogsImport', () => {
     tarkovStore.getCurrentGameMode.mockReturnValue('pvp');
     tarkovStore.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
     tarkovStore.switchGameMode.mockImplementation(async () => undefined);
+  });
+  it('enforces the aggregate byte limit across raw logs and ZIP entries', async () => {
+    const rawFiles = Array.from({ length: 8 }, (_, index) => {
+      const file = new File([completionLog()], `${index} notifications.log`);
+      Object.defineProperty(file, 'size', { value: 32 * 1024 * 1024 });
+      return file;
+    });
+    const archive = new File(
+      [new Uint8Array(zipSync({ 'notifications.log': strToU8(completionLog()) }))],
+      'Logs.zip'
+    );
+    const composable = await loadComposable();
+    await composable.parseFiles([...rawFiles, archive]);
+    expect(composable.importState.value).toBe('error');
+    expect(composable.importError.value).toBe(
+      'Selected logs contain too much content (max 256 MB).'
+    );
+    expect(tarkovStore.switchGameMode).not.toHaveBeenCalled();
   });
   it('parses a single log file and exposes preview data', async () => {
     const composable = await loadComposable();
@@ -377,10 +399,10 @@ describe('expanded log import', () => {
     const importer = await loadComposable();
     const archive = zipSync({
       'Logs/log_2026.08.29_10-00-00_1.1.0.1.46911/application.log': strToU8(
-        '2026-08-29 10:00:00.000|1.1.0.1.46911|Info|application|Session mode: PvpSeason'
+        `${seasonDay} 10:00:00.000|1.1.0.1.46911|Info|application|Session mode: PvpSeason`
       ),
       'Logs/log_2026.08.29_10-00-00_1.1.0.1.46911/2026.08.29_10-00-00_1.1.0.1.46911 push-notifications.log':
-        strToU8(completionLog(undefined, '2026-08-29')),
+        strToU8(completionLog(undefined, seasonDay)),
     });
     await importer.parseFile(new File([new Uint8Array(archive)], 'Logs.zip'));
     expect(importer.previewData.value?.matchedTaskIdsByMode.seasonal).toEqual([
@@ -393,9 +415,7 @@ describe('expanded log import', () => {
   });
   it('allows current unresolved events to be assigned to Seasonal', async () => {
     const importer = await loadComposable();
-    await importer.parseFile(
-      new File([completionLog(undefined, '2026-08-29')], 'notifications.log')
-    );
+    await importer.parseFile(new File([completionLog(undefined, seasonDay)], 'notifications.log'));
     await importer.confirmImport('seasonal');
     expect(importer.importState.value).toBe('success');
     expect(tarkovStore.switchGameMode.mock.calls).toEqual([['seasonal'], ['pvp']]);
@@ -457,7 +477,7 @@ describe('destination catalog eligibility', () => {
     const importer = await loadComposable();
     await importer.parseFiles([
       new File([completionLog('aaaaaaaaaaaaaaaaaaaaaaaa')], 'notifications.log'),
-      new File([completionLog(undefined, '2026-08-29')], 'push-notifications_001.log'),
+      new File([completionLog(undefined, seasonDay)], 'push-notifications_001.log'),
     ]);
     await importer.confirmImport('seasonal');
     expect(importer.importState.value).toBe('success');
@@ -467,7 +487,7 @@ describe('destination catalog eligibility', () => {
     const importer = await loadComposable();
     await importer.parseFiles([
       new File([startedLog()], 'notifications.log'),
-      new File([completionLog(undefined, '2026-08-29')], 'push-notifications_001.log'),
+      new File([completionLog(undefined, seasonDay)], 'push-notifications_001.log'),
     ]);
     await importer.confirmImport('seasonal');
     expect(importer.importState.value).toBe('success');

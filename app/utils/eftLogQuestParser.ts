@@ -1,7 +1,7 @@
 import { ACTIVE_SEASON, GAME_MODES, type GameMode } from '@/utils/constants';
 const CHAT_MESSAGE_MARKER = 'Got notification | ChatMessageReceived';
 const BACKEND_URL_PATTERN =
-  /(?:https?|wss?):\/\/([A-Za-z0-9.-]+\.escapefromtarkov\.com)(\/[A-Za-z0-9_./-]*)?/g;
+  /(?:https?|wss?):\/\/([A-Za-z0-9._-]+\.escapefromtarkov\.com)(\/[A-Za-z0-9_./-]*)?/g;
 const LOG_LINE_TIMESTAMP_PATTERN =
   /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}(?: [+-]\d{2}:\d{2})?)/;
 const RECORD_PATTERN =
@@ -93,6 +93,7 @@ interface LogRecord {
   message: string;
   body: string;
 }
+/** Yields timestamp-delimited records without allowing malformed JSON to consume the next record. */
 function* readLogRecords(text: string): Generator<LogRecord> {
   const matches = text.matchAll(new RegExp(RECORD_PATTERN));
   let previous: RegExpExecArray | undefined;
@@ -102,6 +103,7 @@ function* readLogRecords(text: string): Generator<LogRecord> {
   }
   if (previous) yield toLogRecord(text, previous, text.length);
 }
+/** Decodes versioned and legacy pipe-delimited headers while preserving message delimiters. */
 function toLogRecord(text: string, match: RegExpExecArray, end: number): LogRecord {
   const fields = match[1]!.split('|');
   const channelIndex = /^\d+(?:\.\d+){4}$/.test(fields[0] ?? '') ? 2 : 1;
@@ -112,12 +114,14 @@ function toLogRecord(text: string, match: RegExpExecArray, end: number): LogReco
     body: text.slice(match.index + match[0].length, end).trim(),
   };
 }
+/** Parses log timestamps as UTC when no explicit offset is present; invalid values return null. */
 export function eftLogTimestampMillis(timestamp: string | null): number | null {
   if (!timestamp) return null;
   const normalized = timestamp.replace(' ', 'T').replace(/ ([+-])/, '$1');
   const millis = Date.parse(/[+-]\d{2}:\d{2}$/.test(normalized) ? normalized : `${normalized}Z`);
   return Number.isFinite(millis) ? millis : null;
 }
+/** Checks the original event time against the active season, including its start but excluding its end. */
 export function isCurrentSeasonLogEvent(event: EftQuestEvent): boolean {
   const time = event.occurredAt ?? eftLogTimestampMillis(event.timestamp);
   return (
@@ -126,9 +130,11 @@ export function isCurrentSeasonLogEvent(event: EftQuestEvent): boolean {
     time < Date.parse(ACTIVE_SEASON.endsAt)
   );
 }
+/** Rejects arrays and null when validating notification payload objects. */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
+/** Finds a balanced JSON object while respecting quoted braces and escape sequences. */
 function readJsonBlock(text: string, start: number): JsonBlock | null {
   let depth = 0;
   let inString = false;
@@ -165,10 +171,12 @@ function readJsonBlock(text: string, start: number): JsonBlock | null {
   }
   return null;
 }
+/** Accepts only a 24-character quest ID from the first notification template token. */
 function extractQuestId(templateId: string): string | null {
   const questId = templateId.trim().split(/\s+/)[0];
   return questId && /^[a-f\d]{24}$/i.test(questId) ? questId : null;
 }
+/** Uses the server event ID, or stable message fields, to identify replayed notifications. */
 function buildEventKey(payload: ChatMessagePayload, questId: string): string {
   if (typeof payload.eventId === 'string' && payload.eventId.trim().length > 0) {
     return `event:${payload.eventId.trim()}`;
@@ -178,14 +186,17 @@ function buildEventKey(payload: ChatMessagePayload, questId: string): string {
   const dt = typeof message?.dt === 'number' && Number.isFinite(message.dt) ? message.dt : -1;
   return `fallback:${messageId}:${dt}:${questId}`;
 }
+/** Validates the object envelope before interpreting quest notification fields. */
 function toChatMessagePayload(value: unknown): ChatMessagePayload | null {
   if (!isPlainObject(value)) return null;
   if (!isPlainObject(value.message)) return null;
   return value as unknown as ChatMessagePayload;
 }
+/** Recognizes an actual log session directory rather than a standalone filename. */
 function isSessionDirectory(directory: string, slashIndex: number): boolean {
   return slashIndex >= 0 && /(?:^|\/)log_/.test(directory);
 }
+/** Groups related files by session directory or the timestamp/build prefix of individual filenames. */
 function toSessionKey(fileName: string): string {
   const normalized = fileName.replaceAll('\\', '/').toLowerCase();
   const slashIndex = normalized.lastIndexOf('/');
@@ -198,11 +209,13 @@ function toSessionKey(fileName: string): string {
   if (prefix) return `${normalized.slice(0, slashIndex + 1)}log_${prefix[1]}`;
   return slashIndex === -1 ? '__root__' : directory;
 }
+/** Extracts the receipt timestamp from a record header without its channel or payload. */
 function extractLogLineTimestamp(text: string): string | null {
   const match = LOG_LINE_TIMESTAMP_PATTERN.exec(text);
   if (!match) return null;
   return match[1] ?? null;
 }
+/** Reads a five-part EFT build version from a session path or filename. */
 function extractSessionVersion(value: string): string | null {
   const normalized = value.replaceAll('\\', '/').toLowerCase();
   const match = SESSION_VERSION_PATTERN.exec(normalized);
@@ -211,6 +224,7 @@ function extractSessionVersion(value: string): string | null {
   if (!version) return null;
   return version;
 }
+/** Converts version components to nonnegative integers for numeric ordering. */
 function parseVersionParts(value: string): number[] | null {
   const parts = value.split('.');
   if (parts.length < 2) return null;
@@ -218,6 +232,7 @@ function parseVersionParts(value: string): number[] | null {
   if (parsed.some((part) => Number.isNaN(part) || part < 0)) return null;
   return parsed;
 }
+/** Orders newer builds first and leaves unknown builds after known versions. */
 function compareVersionKeys(left: string, right: string): number {
   if (left === right) return 0;
   if (left === UNKNOWN_LOG_VERSION) return 1;
@@ -236,14 +251,17 @@ function compareVersionKeys(left: string, right: string): number {
   }
   return left.localeCompare(right);
 }
+/** Returns distinct build identifiers in the preview selection order. */
 function sortVersionKeys(versions: Iterable<string>): string[] {
   return Array.from(new Set(versions)).sort(compareVersionKeys);
 }
+/** Excludes shared backend requests that do not identify the active character mode. */
 function isSharedProdModePath(path: string): boolean {
   if (path.startsWith('/client/game/mode')) return true;
   if (path.startsWith('/client/menu/locale')) return true;
   return false;
 }
+/** Reads explicit mode declarations only from application and output channels. */
 function declaredRecordMode(record: LogRecord): GameMode | undefined {
   if (!['application', 'output'].includes(record.channel)) return undefined;
   const declared = /(?:^|\s)Session mode:\s*(Regular|Pve|PvpSeason)\b/i.exec(record.message);
@@ -254,19 +272,23 @@ function declaredRecordMode(record: LogRecord): GameMode | undefined {
   };
   return modes[declared?.[1]?.toLowerCase() ?? ''];
 }
+/** Maps known gateway and notification hosts to persistent or Seasonal progress modes. */
 function gatewayMode(host: string): GameMode | undefined {
   if (/^(gw|wsn)-pvp[-_]season(?:[-.]|$)/.test(host)) return GAME_MODES.SEASONAL;
   if (/^(gw|wsn)-pve(?:[-.]|$)/.test(host)) return GAME_MODES.PVE;
   if (/^(gw|wsn)-pvp(?:[-.]|$)/.test(host)) return GAME_MODES.PVP;
   return undefined;
 }
+/** Accepts outgoing backend requests and notification connection records as URL evidence. */
 function isModeSignalRecord(record: LogRecord): boolean {
   if (record.channel === 'backend') return record.message.includes('---> Request');
   return ['notifications', 'push-notifications'].includes(record.channel);
 }
+/** Allows legacy production hosts only when their request path is mode-specific. */
 function isLegacyModeUrl(host: string, path: string): boolean {
   return host.startsWith('prod-') && !isSharedProdModePath(path);
 }
+/** Separates explicit gateway evidence from the lower-priority legacy PvP fallback. */
 function collectUrlModeSignal(
   match: RegExpExecArray,
   timestamp: string,
@@ -281,19 +303,26 @@ function collectUrlModeSignal(
     legacy.push({ mode: GAME_MODES.PVP, timestamp: timestamp });
   }
 }
+/** Adds a recognized session declaration at its receipt timestamp. */
+function collectDeclaredModeSignal(record: LogRecord, timeline: BackendModeSignal[]): void {
+  const declared = declaredRecordMode(record);
+  if (declared) timeline.push({ mode: declared, timestamp: record.timestamp });
+}
+/** Rejects invalid timestamps before collecting declarations and eligible connection URLs. */
 function collectRecordModeSignals(
   record: LogRecord,
   timeline: BackendModeSignal[],
   legacy: BackendModeSignal[]
 ): void {
-  const declared = declaredRecordMode(record);
-  if (declared) timeline.push({ mode: declared, timestamp: record.timestamp });
+  if (eftLogTimestampMillis(record.timestamp) === null) return;
+  collectDeclaredModeSignal(record, timeline);
   // Delayed responses and URLs inside JSON chat text are not mode switches.
   if (!isModeSignalRecord(record)) return;
   for (const match of record.message.matchAll(new RegExp(BACKEND_URL_PATTERN))) {
     collectUrlModeSignal(match, record.timestamp, timeline, legacy);
   }
 }
+/** Builds a session timeline, enabling legacy fallback only without explicit PvP or Seasonal evidence. */
 function collectBackendModeSignals(files: EftLogInputFile[]): BackendModeSignals {
   const timeline: BackendModeSignal[] = [];
   const legacy: BackendModeSignal[] = [];
@@ -311,12 +340,15 @@ function collectBackendModeSignals(files: EftLogInputFile[]): BackendModeSignals
     timeline.push(...legacy);
   return { timeline: combineModeSignals(timeline) };
 }
+/** Returns a numeric timestamp for chronological mode-signal ordering. */
 function signalTime(signal: BackendModeSignal): number {
   return eftLogTimestampMillis(signal.timestamp) ?? 0;
 }
+/** Keeps agreement at one instant and marks conflicting simultaneous modes as unknown. */
 function reconcileModeSignal(prior: EftQuestEventMode, mode: EftQuestEventMode): EftQuestEventMode {
   return prior === mode ? mode : UNKNOWN_MODE;
 }
+/** Sorts signals and combines simultaneous evidence before binary-search routing. */
 function combineModeSignals(timeline: BackendModeSignal[]): BackendModeSignal[] {
   timeline.sort((left, right) => signalTime(left) - signalTime(right));
   const combined: BackendModeSignal[] = [];
@@ -328,6 +360,7 @@ function combineModeSignals(timeline: BackendModeSignal[]): BackendModeSignal[] 
   }
   return combined;
 }
+/** Uses the latest preceding valid signal; future signals never identify an earlier event. */
 function resolveEventModeFromTimeline(
   timestamp: string | null,
   timeline: BackendModeSignal[]
@@ -348,6 +381,7 @@ function resolveEventModeFromTimeline(
   }
   return resolved;
 }
+/** Extracts quest starts, failures, and completions and counts malformed notification payloads. */
 export function parseEftNotificationLogText(text: string): EftLogTextParseResult {
   const completionEvents: EftQuestEvent[] = [];
   const startedEvents: EftQuestEvent[] = [];
@@ -411,45 +445,56 @@ export function parseEftNotificationLogText(text: string): EftLogTextParseResult
     parseErrorCount,
   };
 }
+/** Recognizes Arena session paths so their notifications cannot enter EFT progress. */
 function isArenaLog(fileName: string): boolean {
   return /(?:^|[/\\])(?:log_)?arena[_/\\]/i.test(fileName);
 }
+/** Matches supported log channel filenames, including numbered rotations, while excluding Arena. */
 function matchesChannel(fileName: string, channel: string): boolean {
   if (isArenaLog(fileName)) return false;
   const name = fileName.replaceAll('\\', '/').split('/').pop() ?? '';
   return new RegExp(String.raw`(?:^|[ _-])${channel}(?:_\d+)?\.log$`, 'i').test(name);
 }
+/** Identifies legacy and current quest notification filenames. */
 export function isEftNotificationLogFileName(fileName: string): boolean {
   return matchesChannel(fileName, '(?:push-notifications|notifications)');
 }
+/** Identifies backend logs that can provide session mode evidence. */
 export function isEftBackendLogFileName(fileName: string): boolean {
   return matchesChannel(fileName, 'backend');
 }
+/** Accepts notification records and the application, output, and backend context needed for routing. */
 export function isEftImportLogFileName(fileName: string): boolean {
   return (
     isEftNotificationLogFileName(fileName) ||
     matchesChannel(fileName, '(?:backend|application|output)')
   );
 }
+/** Creates independent values for each detected mode and the unresolved-mode bucket. */
 function modeBuckets<T>(create: () => T): Record<EftQuestEventMode, T> {
   return { pvp: create(), pve: create(), seasonal: create(), unknown: create() };
 }
+/** Prefers original server time and otherwise uses the notification receipt timestamp. */
 function knownQuestEventTime(event: EftQuestEvent): number | null {
   return event.occurredAt ?? eftLogTimestampMillis(event.timestamp);
 }
+/** Places events without usable timestamps before dated history during reconciliation. */
 function questEventTime(event: EftQuestEvent): number {
   return event.occurredAt ?? eftLogTimestampMillis(event.timestamp) ?? -1;
 }
+/** Chooses later history, breaking equal-time ties as completed, failed, then started. */
 function supersedesQuestEvent(event: EftQuestImportEvent, prior: EftQuestImportEvent): boolean {
   const time = questEventTime(event);
   const priorTime = questEventTime(prior);
   const rank = { started: 0, failed: 1, completed: 2 };
   return time > priorTime || (time === priorTime && rank[event.status] > rank[prior.status]);
 }
+/** Routes unresolved events only when an explicit import destination is supplied. */
 function routeUnknownEvent(event: EftQuestImportEvent, targetMode?: GameMode): EftQuestImportEvent {
   return event.mode === UNKNOWN_MODE && targetMode ? { ...event, mode: targetMode } : event;
 }
 // Reconcile after routing unknown events too, so a restart and completion cannot land in different buckets.
+/** Reconciles each destination and quest after manual routing, retaining one authoritative state. */
 export function latestEftQuestEvents(
   events: EftQuestImportEvent[],
   targetMode?: GameMode
@@ -463,6 +508,7 @@ export function latestEftQuestEvents(
   }
   return [...latest.values()];
 }
+/** Preserves the earliest available occurrence when the same notification is replayed. */
 function retainEarliestEvent(duplicate: EftQuestEvent, event: EftQuestEvent): void {
   const time = knownQuestEventTime(event) ?? Infinity;
   const priorTime = knownQuestEventTime(duplicate) ?? Infinity;
@@ -471,6 +517,7 @@ function retainEarliestEvent(duplicate: EftQuestEvent, event: EftQuestEvent): vo
     duplicate.occurredAt = event.occurredAt;
   }
 }
+/** Builds a version-filtered preview with mode routing, deduplication, season guards, and catalog eligibility. */
 export function parseEftLogsForQuestImport(
   files: EftLogInputFile[],
   taskIds: Iterable<string>,

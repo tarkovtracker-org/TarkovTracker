@@ -1,6 +1,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ref, type Ref } from 'vue';
 import DataManagementCard from '@/features/settings/DataManagementCard.vue';
 const {
   backupFns,
@@ -74,6 +75,7 @@ const {
     setIncludedVersions: vi.fn(),
   },
   eftLogsState: {
+    isImporting: {} as Ref<boolean>,
     importError: { __v_isRef: true as const, value: null as string | null },
     previewData: { __v_isRef: true as const, value: null as Record<string, unknown> | null },
     importState: {
@@ -140,6 +142,7 @@ vi.mock('@/composables/useTarkovDevImport', () => ({
 vi.mock('@/composables/useEftLogsImport', () => ({
   useEftLogsImport: () => ({
     importState: eftLogsState.importState,
+    isImporting: eftLogsState.isImporting,
     previewData: eftLogsState.previewData,
     importError: eftLogsState.importError,
     parseFile: eftLogsFns.parseFile,
@@ -239,6 +242,7 @@ describe('DataManagementCard', () => {
     tarkovDevState.previewData.value = null;
     eftLogsState.importError.value = null;
     eftLogsState.importState.value = 'idle';
+    eftLogsState.isImporting = ref(false);
     eftLogsState.previewData.value = null;
     tarkovStoreState.currentMode = 'pvp';
     tarkovStoreState.tarkovUid = null;
@@ -833,7 +837,7 @@ describe('DataManagementCard', () => {
     expect(wrapper.find('game-mode-toggle-stub').exists()).toBe(false);
     expect(wrapper.text()).toContain('common.pvp');
   });
-  it('shows EFT mode toggle when unknown-mode events are present', () => {
+  it('shows EFT mode toggle and disables every mode while import is applying', async () => {
     eftLogsState.importState.value = 'preview';
     eftLogsState.previewData.value = {
       chatMessageCount: 2,
@@ -855,6 +859,11 @@ describe('DataManagementCard', () => {
     };
     const wrapper = createWrapper();
     expect(wrapper.find('game-mode-toggle-stub').exists()).toBe(true);
+    const toggle = wrapper.findComponent({ name: 'GameModeToggle' });
+    expect(toggle.props('disabledModes')).toEqual([]);
+    eftLogsState.isImporting.value = true;
+    await wrapper.vm.$nextTick();
+    expect(toggle.props('disabledModes')).toEqual(['pvp', 'pve', 'seasonal']);
     expect(wrapper.text()).toContain(
       'An Apple a Day Keeps the Doctor Away (61604635c725987e815b1a46)'
     );

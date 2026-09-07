@@ -2282,7 +2282,14 @@
       },
       "failed_tasks": "Matched failed tasks: {count}",
       "unknown_failed_events": "Failed Tasks (Unknown Mode)",
-      "skipped_events": "Skipped {malformed} malformed notifications and {seasonal} Seasonal events outside the active season."
+      "skipped_malformed": {
+        "single": "Skipped {count} malformed notification.",
+        "plural": "Skipped {count} malformed notifications."
+      },
+      "skipped_seasonal": {
+        "single": "Skipped {count} Seasonal event outside the active season.",
+        "plural": "Skipped {count} Seasonal events outside the active season."
+      }
     },
     "tarkov_dev_import": {
       "title": "Tarkov.dev Profile Import",

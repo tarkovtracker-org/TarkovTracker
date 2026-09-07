@@ -621,19 +621,19 @@
             <UAlert
               v-if="eftLogsPreview.parseErrorCount || eftLogsPreview.skippedSeasonalEventCount"
               color="warning"
-              :description="
-                $t('settings.log_import.skipped_events', {
-                  malformed: eftLogsPreview.parseErrorCount,
-                  seasonal: eftLogsPreview.skippedSeasonalEventCount,
-                })
-              "
+              :description="eftLogsSkippedEventsMessage"
             />
             <UAlert v-if="eftLogsImportError" color="error" :description="eftLogsImportError" />
             <div v-if="eftLogsRequiresManualModeSelection" class="space-y-1">
               <label class="text-surface-200 text-sm font-semibold">
                 {{ $t('settings.log_import.import_unknown_to_mode') }}
               </label>
-              <GameModeToggle v-model="eftLogsTargetMode" :disabled="eftLogsIsImporting" />
+              <GameModeToggle
+                v-model="eftLogsTargetMode"
+                :disabled-modes="
+                  eftLogsIsImporting ? [GAME_MODES.PVP, GAME_MODES.PVE, GAME_MODES.SEASONAL] : []
+                "
+              />
               <p class="text-surface-400 text-xs">
                 {{ $t('settings.log_import.import_unknown_to_mode_hint') }}
               </p>
@@ -1491,6 +1491,25 @@
   const eftLogsVersionSessionCounts = computed(
     () => eftLogsPreview.value?.versionSessionCounts ?? {}
   );
+  /** Formats a nonzero skipped-event count using the appropriate singular or plural message. */
+  const eftLogsSkippedClause = (kind: 'malformed' | 'seasonal', count: number) => {
+    if (count <= 0) return '';
+    return t(`settings.log_import.skipped_${kind}.${count === 1 ? 'single' : 'plural'}`, { count });
+  };
+  /** Combines only the applicable malformed-record and out-of-season warnings. */
+  const eftLogsSkippedEventsMessage = computed(() => {
+    const preview = eftLogsPreview.value;
+    if (!preview) return '';
+    const malformed = preview.parseErrorCount ?? 0;
+    const seasonal = preview.skippedSeasonalEventCount ?? 0;
+    return [
+      eftLogsSkippedClause('malformed', malformed),
+      eftLogsSkippedClause('seasonal', seasonal),
+    ]
+      .filter(Boolean)
+      .join(' ');
+  });
+  /** Counts eligible raw mode buckets before the user routes unresolved events. */
   const eftLogsModeCount = (mode: GameMode | 'unknown') => {
     const preview = eftLogsPreview.value;
     if (!preview) return 0;

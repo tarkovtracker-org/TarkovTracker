@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { ACTIVE_SEASON } from '@/utils/constants';
 import {
   isEftBackendLogFileName,
   isEftNotificationLogFileName,
   parseEftLogsForQuestImport,
   parseEftNotificationLogText,
 } from '@/utils/eftLogQuestParser';
+const seasonStart = Date.parse(ACTIVE_SEASON.startsOn);
+const seasonDate = (millis: number) =>
+  new Date(millis).toISOString().replace('T', ' ').replace('Z', '');
+const seasonDay = new Date(seasonStart + 86400000).toISOString().slice(0, 10);
 const completionPayload = (
   eventId: string,
   templateId: string,
@@ -238,7 +243,7 @@ describe('isEftBackendLogFileName', () => {
 });
 describe('documented log formats and state history', () => {
   const quest = '61604635c725987e815b1a46';
-  const day = '2026-08-29';
+  const day = seasonDay;
   const event = (id: string, type: number, time = `${day} 10:00:00.000`) =>
     completionPayload(id, `${quest} successMessageText`, time).replace(
       '"type": 12',
@@ -289,6 +294,8 @@ describe('documented log formats and state history', () => {
   });
   it.each([
     'gw-pvp-season-01',
+    'gw-pvp_season',
+    'wsn-pvp_season',
     'wsn-pvp-season-01',
     'gw-pvp-01',
     'wsn-pvp-01',
@@ -335,6 +342,20 @@ describe('documented log formats and state history', () => {
     expect(result.matchedTaskIdsByMode.pvp).toEqual([quest]);
     expect(result.matchedStartedTaskIdsByMode.seasonal).toEqual([quest]);
     expect(result.matchedFailedTaskIdsByMode.pve).toEqual([quest]);
+  });
+  it('ignores malformed mode timestamps while retaining valid earlier signals', () => {
+    const result = parseEftLogsForQuestImport(
+      [
+        {
+          name: 'application.log',
+          text: `2024-13-01 00:00:00.000|Info|application|Session mode: PvpSeason\n${day} 09:00:00.000|Info|application|Session mode: Pve`,
+        },
+        { name: 'notifications.log', text: event('event', 12) },
+      ],
+      [quest]
+    );
+    expect(result.matchedTaskIdsByMode.pve).toEqual([quest]);
+    expect(result.matchedTaskIdsByMode.unknown).toEqual([]);
   });
   it('does not apply future mode signals to preceding events', () => {
     const result = parseEftLogsForQuestImport(
@@ -448,20 +469,22 @@ describe('documented log formats and state history', () => {
           text: backendPayload(
             'gw-pvp-season-01.escapefromtarkov.com',
             '/client/quest/list',
-            '2026-01-01 00:00:00.000'
+            seasonDate(seasonStart - 86400000)
           ),
         },
         {
           name: 'notifications.log',
           text:
-            event('old', 12, '2026-08-02 23:59:59.999') +
-            event('end', 12, '2026-12-07 10:00:00.000') +
+            event('old', 12, seasonDate(seasonStart - 1)) +
+            event('start-boundary', 10, seasonDate(seasonStart)) +
+            event('end', 12, seasonDate(Date.parse(ACTIVE_SEASON.endsAt))) +
             event('current', 10),
         },
       ],
       [quest]
     );
     expect(result.skippedSeasonalEventCount).toBe(2);
+    expect(result.dedupedStartedEventCount).toBe(2);
     expect(result.matchedTaskIds).toEqual([]);
     expect(result.matchedStartedTaskIdsByMode.seasonal).toEqual([quest]);
   });
@@ -490,11 +513,16 @@ describe('notification replays', () => {
       [
         {
           name: 'application.log',
-          text: '2026-08-29 08:00:00.000|Info|application|Session mode: PvpSeason',
+          text: `${seasonDay} 08:00:00.000|Info|application|Session mode: PvpSeason`,
         },
         {
           name: 'notifications.log',
-          text: notification('old', 12, '2026-07-01T09:00:00Z', '2026-08-29 12:00:00.000'),
+          text: notification(
+            'old',
+            12,
+            new Date(seasonStart - 86400000).toISOString(),
+            `${seasonDay} 12:00:00.000`
+          ),
         },
       ],
       [quest]

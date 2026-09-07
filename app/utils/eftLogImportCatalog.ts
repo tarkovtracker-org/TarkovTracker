@@ -7,6 +7,7 @@ import type {
   TarkovTaskObjectivesQueryResult,
   TarkovTasksCoreQueryResult,
 } from '@/types/tarkov';
+/** Rejects failed or malformed metadata responses before any progress can be changed. */
 function requireCatalogTasks<T extends { tasks: unknown[] }>(
   response: FetchResponse<T>
 ): T['tasks'] {
@@ -16,6 +17,7 @@ function requireCatalogTasks<T extends { tasks: unknown[] }>(
   return response.data.tasks;
 }
 // Read isolated snapshots: switching the UI mode does not await metadata hydration.
+/** Loads an isolated destination catalog and normalizes objective IDs exactly as metadata hydration does. */
 export async function loadEftImportTaskCatalog(mode: GameMode): Promise<Task[]> {
   const query = { gameMode: API_GAME_MODES[mode], lang: 'en' };
   const [core, objectives] = await Promise.all([

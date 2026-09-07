@@ -42,9 +42,11 @@ export function normalizeTaskObjectives<T = unknown>(objectives: unknown): T[] {
   }
   return [];
 }
+/** Checks whether an objective ID is shared by multiple tasks. */
 function hasDuplicateObjective(counts: Map<string, number>, id: string): boolean {
   return (counts.get(id) ?? 0) > 1;
 }
+/** Records the task-qualified replacements used for a shared upstream objective ID. */
 function recordDuplicateObjective(
   duplicates: Map<string, string[]>,
   id: string,

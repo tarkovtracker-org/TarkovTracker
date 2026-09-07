@@ -670,11 +670,15 @@ flowchart LR
    `docs/eft-log-reference/` for the audited format inventory (through `1.1.0.1.46911`) and
    [TarkovMonitor's message type contract](https://github.com/the-hideout/TarkovMonitor/blob/master/TarkovMonitor/GameWatcher.cs).
    The importer accepts legacy/rotated notification and backend filenames, and application/output
-   context, in folders, individual files, and ZIPs. Arena is excluded. Multiline JSON is bounded
+   context, in folders, individual files, and ZIPs. Inputs are limited to 512 MiB per selected file,
+   32 MiB per log, and 256 MiB of combined log bytes across raw files and ZIPs. Readers count
+   bytes before decoding; preview assembly reuses those totals without re-encoding log text.
+   Arena is excluded. Multiline JSON is bounded
    by log records so a truncated event cannot consume the next notification.
    Mode routing uses preceding explicit session declarations or gateway/WebSocket connections;
    legacy prod backend requests remain a fallback when explicit PvP/Seasonal routing is absent.
-   Delayed responses and shared mode/locale routes are not switches. Conflicting simultaneous
+   Unparseable signal timestamps are discarded. Delayed responses and shared mode/locale routes
+   are not switches. Conflicting simultaneous
    signals and events before the first signal remain unresolved and require a destination choice.
    Original notification message times (`dt`) order replayed history when present; record timestamps
    still locate the mode signal. Without `dt`, record time is the fallback.
@@ -885,7 +889,8 @@ flowchart LR
   `pvp`/`pve`, `user_prestige_runs` keeps its `mode IN ('pvp','pve')` constraint, and no Seasonal
   progress is written through a prestige.
 - Tarkov.dev profile imports can target Seasonal through the verified `pvp-season` source. EFT-log
-  imports cannot target Seasonal until their source data is verified.
+  imports can target Seasonal using the verified notification formats and active-season guards
+  specified in section 7; unresolved-mode events require an explicit destination choice.
 
 ---
 
@@ -971,8 +976,8 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
   cost protection, per the design principle in `docs/RATE_LIMITING.md`.
 - Ordinary success responses are browser-cacheable (`private`); explicit `fresh=1` responses and
   error responses never are.
-- The client accepts the verified Tarkov.dev `pvp-season` profile source for Seasonal progress and
-  rejects Seasonal EFT-log imports before mutating progress until that source is verified.
+- The client accepts the verified Tarkov.dev `pvp-season` profile source for Seasonal progress.
+  Seasonal EFT-log imports use the event and active-season safeguards specified in section 7.
 
 ---
 
