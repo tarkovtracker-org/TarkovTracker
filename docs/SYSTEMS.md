@@ -795,7 +795,8 @@ flowchart LR
   within a mode advance its local clock; account hydration keeps the server metadata clock, and switching modes or editing another mode does not. Legacy
   envelopes seed unchanged modes from their original timestamp (unknown history stays zero).
   Startup and Realtime hydration retain remote progress freshness, rather than download time;
-  merged snapshots that retain local fields also retain their local edit clock. Each tab compares
+  merged snapshots that retain local fields use at least one millisecond beyond the incoming
+  snapshot clock, so reload cannot discard pending edits on a timestamp tie. Each tab compares
   with its own prior snapshot so another tab's storage write cannot make stale fields look edited.
   Visibility changes update `updated_at`, never `progress_updated_at`, and cannot justify replacing whole mode snapshots.
   Team rejoin refreshes membership and rebuilds changed filters before hydrating teammates; initial
@@ -810,10 +811,12 @@ flowchart LR
   Save acknowledgements advance only their changed paths, preserving unrelated remote values
   accepted while the save was queued or in flight. Pending captures track intervening accepted remote
   changes separately from local acknowledgements, so older live events cannot override newer snapshots.
+  Domain merges do not acknowledge unsaved local fields. A newer remote reset invalidates older
+  save acknowledgements for that mode; a newer local reset stays pending until its save succeeds.
   Reconnect reads wait for in-flight saves and hold new outbound writes until snapshot application
   completes. Local changes remain tracked and are saved afterward; read failures also release this barrier.
   Supporter status refreshes after the first join as well as subsequent joins to close the
-  initial read/join gap. A progress subscription begun while suspended also reconciles on its first
+  initial read/join gap. An owner or generic subscription whose first join is delayed by suspension reconciles on its first
   eventual join. Initialization delegates the initial status read to the subscription, with a
   single fallback read if the initial join fails. Initialization marks status loaded only after a
   successful read; initial callers share the latest request's result even when a refresh supersedes

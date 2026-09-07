@@ -171,6 +171,31 @@ describe('useSupabaseSync', () => {
     expect(upsert).toHaveBeenLastCalledWith({ count: 3, name: 'pending local', user_id: 'user-1' });
     sync.cleanup();
   });
+  it('retains a domain-merged pending edit after the deferred save fails', async () => {
+    const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+    const store = createMockStore({ mode: { count: 5, name: 'old' } });
+    const sync = useSupabaseSync({ store, table: 'test_table', debounceMs: 10 });
+    await sync.withSnapshot!(async (reconcile) => {
+      store.$state.mode.count = 0;
+      store.notifySubscriber();
+      Object.assign(
+        store.$state,
+        reconcile({ mode: { count: 3, name: 'remote' } }, { mode: { count: 0, name: 'remote' } })
+      );
+    });
+    upsert.mockResolvedValueOnce({ error: { code: '42501', message: 'write denied' } });
+    await flushSync(10);
+    expect(upsert).toHaveBeenCalledOnce();
+    expect(sync.hasPendingChanges!()).toBe(true);
+    Object.assign(store.$state, sync.captureRemoteMerge!()({ mode: { count: 4, name: 'newer' } }));
+    expect(store.$state.mode).toEqual({ count: 0, name: 'newer' });
+    await sync.syncToSupabase();
+    expect(sync.hasPendingChanges!()).toBe(false);
+    expect(sync.captureRemoteMerge!()({ mode: { count: 6, name: 'latest' } })).toEqual({
+      mode: { count: 6, name: 'latest' },
+    });
+    sync.cleanup();
+  });
   it('releases the snapshot barrier after a failed read', async () => {
     const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
     const store = createMockStore({ count: 0 });

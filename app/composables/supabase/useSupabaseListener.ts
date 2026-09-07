@@ -7,6 +7,7 @@ import {
   removeOwnedChannel,
   type OwnedRealtimeChannel,
 } from '@/utils/realtimeChannel';
+import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
 import { clearStaleState, resetStore, safePatchStore } from '@/utils/storeHelpers';
 import type { RemoteStateMerge, WithRemoteSnapshot } from '@/utils/pendingState';
 import type { PostgrestError, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
@@ -210,8 +211,9 @@ export function useSupabaseListener<
     if (channel.value) return;
     if (!currentFilter) return;
     const subscriptionVersion = cleanupVersion;
-    let joined = false;
     const client = $supabase.client;
+    const suspended = () => Boolean(client.realtime && isRealtimeSuspended(client.realtime));
+    let needsSnapshot = suspended();
     const nextChannel = client
       .channel(listenerTopic(currentFilter))
       .on(
@@ -253,10 +255,15 @@ export function useSupabaseListener<
         // Cleanup can start while the join is still pending; a disposed channel
         // must not flip `isSubscribed` back on or log for a listener that is gone.
         if (subscriptionVersion !== cleanupVersion) return;
+        if (suspended()) {
+          isSubscribed.value = false;
+          needsSnapshot = true;
+          return;
+        }
         isSubscribed.value = status === 'SUBSCRIBED';
         if (isSubscribed.value) {
-          if (joined) void readData(true);
-          joined = true;
+          if (needsSnapshot) void readData(true);
+          needsSnapshot = true;
         }
         logChannelSubscribeFailure(storeIdForLogging, status, error, { table });
       });

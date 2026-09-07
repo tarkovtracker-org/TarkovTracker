@@ -332,7 +332,7 @@ async function runSetupRealtimeListener(
     const nextProgress = reconcile(
       { [mode]: remoteProgress },
       { [mode]: merged },
-      toProgressEpoch(localState[mode]) === toProgressEpoch(remoteProgress)
+      toProgressEpoch(localState[mode]) >= toProgressEpoch(remoteProgress)
     )[mode] as UserProgressData;
     progressStorageSerializer.acceptRemote({
       state: localState,

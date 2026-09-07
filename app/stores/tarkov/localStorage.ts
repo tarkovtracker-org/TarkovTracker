@@ -53,7 +53,7 @@ const acceptedRemoteTimestamp = (
   matchesRemote: boolean,
   localTimestamp = 0,
   remoteTimestamp = 0
-): number => Math.max(matchesRemote ? 0 : localTimestamp, remoteTimestamp);
+): number => (matchesRemote ? remoteTimestamp : Math.max(localTimestamp, remoteTimestamp + 1));
 const acceptRemoteMetadata = (
   accepted: PersistedProgressSnapshot,
   snapshot: RemoteProgressSnapshot

@@ -79,6 +79,48 @@ describe('local mode freshness', () => {
       parseUserScopedStorage(serializer.serialize(next, 'user-1', 40))?._modeTimestamps?.pvp
     ).toBe(30);
   });
+  it('keeps mixed pending fields newer than the snapshot that supplied unrelated changes', () => {
+    const local = structuredClone(defaultState);
+    const serializer = createProgressStorageSerializer(() => null);
+    serializer.serialize(local, 'user-1', 10);
+    local.pvp.displayName = 'pending name';
+    local.gameEdition = 4;
+    serializer.serialize(local, 'user-1', 20);
+    const remote = structuredClone(defaultState);
+    remote.pvp.level = 3;
+    remote.currentGameMode = 'pve';
+    const next = structuredClone(remote);
+    next.pvp.displayName = 'pending name';
+    next.gameEdition = 4;
+    serializer.acceptRemote({
+      state: local,
+      userId: 'user-1',
+      remote,
+      next,
+      updatedAtByMode: { pvp: 30, pve: 30, seasonal: 30 },
+      metadataTimestamp: 30,
+    });
+    const persisted = parseUserScopedStorage<typeof local>(
+      serializer.serialize(next, 'user-1', 40)
+    )!;
+    const restored = resolveInitialSyncState(
+      persisted.data,
+      remote,
+      persisted._metadataTimestamp!,
+      30,
+      1,
+      1,
+      {
+        mergeModeSnapshots: true,
+        localModeTimestamps: persisted._modeTimestamps,
+        modeUpdatedAt: { pvp: 30, pve: 30, seasonal: 30 },
+      }
+    );
+    expect(restored.pvp.displayName).toBe('pending name');
+    expect(restored.pvp.level).toBe(3);
+    expect(restored.gameEdition).toBe(4);
+    expect(restored.currentGameMode).toBe('pve');
+  });
   it('does not let a recent PvP edit make stale PvE fields win at startup', () => {
     const local = structuredClone(defaultState);
     local.pve.displayName = 'stale';

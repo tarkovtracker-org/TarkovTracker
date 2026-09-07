@@ -2,6 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPendingStateTracker } from '@/utils/pendingState';
+import { installRealtimeVisibility } from '@/utils/realtimeVisibility';
 import type { WithRemoteSnapshot } from '@/utils/pendingState';
 import type { Store } from 'pinia';
 const { channel, client, loggerMock, removeChannel } = vi.hoisted(() => {
@@ -26,6 +27,7 @@ const { channel, client, loggerMock, removeChannel } = vi.hoisted(() => {
       Promise.resolve(resolve({ data: null, error: null })),
   };
   const supabaseClient = {
+    realtime: undefined as Parameters<typeof installRealtimeVisibility>[0] | undefined,
     channel: vi.fn(() => realtimeChannel),
     from: vi.fn(() => query),
     removeChannel: removeChannelMock,
@@ -66,6 +68,58 @@ describe('useSupabaseListener cleanup', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+  it.each([
+    { suspendedBeforeCreation: true, disposed: false },
+    { suspendedBeforeCreation: false, disposed: false },
+    { suspendedBeforeCreation: true, disposed: true },
+    { suspendedBeforeCreation: false, disposed: true },
+  ])(
+    'refreshes a suspended first join unless disposed: %j',
+    async ({ suspendedBeforeCreation, disposed }) => {
+      const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
+      const page = Object.assign(new EventTarget(), {
+        visibilityState: 'hidden' as DocumentVisibilityState,
+      });
+      const transport = {
+        connect: vi.fn(),
+        disconnect: vi.fn(async () => 'ok' as const),
+        getChannels: vi.fn(() => []),
+      };
+      client.realtime = transport;
+      const disposeVisibility = installRealtimeVisibility(transport, page);
+      channel.subscribe.mockImplementationOnce(() => channel);
+      let listener: ReturnType<typeof useSupabaseListener> | undefined;
+      try {
+        if (suspendedBeforeCreation) await vi.advanceTimersByTimeAsync(60_000);
+        listener = useSupabaseListener({
+          filter: 'id=eq.row-1',
+          store: createStore(),
+          table: 'test_table',
+          patchStore: false,
+        });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(client.from).toHaveBeenCalledOnce();
+        const status = channel.subscribe.mock.calls[0]![0];
+        if (!suspendedBeforeCreation) {
+          await vi.advanceTimersByTimeAsync(60_000);
+          status('CHANNEL_ERROR');
+        }
+        expect(transport.disconnect).toHaveBeenCalledOnce();
+        if (disposed) listener.cleanup();
+        page.visibilityState = 'visible';
+        page.dispatchEvent(new Event('visibilitychange'));
+        await vi.advanceTimersByTimeAsync(0);
+        status('SUBSCRIBED');
+        await vi.advanceTimersByTimeAsync(0);
+        expect(client.from).toHaveBeenCalledTimes(disposed ? 1 : 2);
+        expect(listener.isSubscribed.value).toBe(!disposed);
+      } finally {
+        listener?.cleanup();
+        disposeVisibility();
+        client.realtime = undefined;
+      }
+    }
+  );
   it.each([false, true])(
     'waits for the snapshot barrier and respects cleanup while waiting: %s',
     async (disposed) => {

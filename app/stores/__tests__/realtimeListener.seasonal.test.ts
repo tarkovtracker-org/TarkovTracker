@@ -208,6 +208,39 @@ describe('seasonal progress realtime synchronization', () => {
       registerSyncControllerGetter(() => null);
     }
   });
+  it('keeps a newer local reset pending when older remote progress arrives', async () => {
+    const { setupRealtimeListener, registerSyncControllerGetter } =
+      await import('@/stores/tarkov/realtimeListener');
+    const { createPendingStateTracker, snapshotSyncState } = await import('@/utils/pendingState');
+    const tracker = createPendingStateTracker(() => state);
+    registerSyncControllerGetter(() => ({
+      pause: vi.fn(),
+      resume: vi.fn(),
+      captureRemoteMerge: tracker.capture,
+    }));
+    try {
+      await setupRealtimeListener(store);
+      state.pvp.progressEpoch = 1;
+      state.pvp.displayName = 'pending reset name';
+      const emit = (progressEpoch: number, displayName: string, updatedAt: string) =>
+        handlers.get('user_game_mode_progress')?.({
+          new: {
+            game_mode: 'pvp',
+            season_number: 0,
+            progress_data: { ...structuredClone(defaultState.pvp), progressEpoch, displayName },
+            updated_at: updatedAt,
+          },
+        });
+      emit(0, 'old remote', '2026-09-06T12:00:00Z');
+      emit(1, 'remote same epoch', '2026-09-06T12:01:00Z');
+      expect(state.pvp.displayName).toBe('pending reset name');
+      tracker.captureAcknowledgement(snapshotSyncState(state))();
+      emit(1, 'after save', '2026-09-06T12:02:00Z');
+      expect(state.pvp.displayName).toBe('after save');
+    } finally {
+      registerSyncControllerGetter(() => null);
+    }
+  });
   it('ignores late progress events while the shared transport is suspended', async () => {
     vi.useFakeTimers();
     const page = Object.assign(new EventTarget(), { visibilityState: 'hidden' as const });
