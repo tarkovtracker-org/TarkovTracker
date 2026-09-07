@@ -754,6 +754,12 @@ flowchart LR
 - Team actions and invite links are unavailable until the active team row has loaded and its ID
   matches the mode-specific system-store team ID; stale owner or join-code state is never combined
   with another team's ID.
+- Nitro shared-profile and team-member reads resolve Seasonal through the service-role-only
+  `get_active_season_number` RPC on each request before cache lookup. Cache keys include the resolved
+  season; missing credentials, failed lookups and invalid responses return 503 rather than falling
+  back to the bundled season. Persistent modes use season 0 without an RPC. The resolver is
+  `app/server/utils/gameModeSeason.ts`. A request uses one resolved season for its reads; a rollover
+  during that request is observed by the next request.
 - App `ACTIVE_SEASON` metadata must match the database's `private.active_season_*()` functions;
   the Worker resolves the active Seasonal number through the database instead of carrying a
   second runtime constant.

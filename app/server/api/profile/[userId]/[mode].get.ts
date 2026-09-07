@@ -7,6 +7,7 @@ import {
 } from 'h3';
 import { normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
 import { fetchWithTimeout, isAbortError } from '@/server/utils/fetchWithTimeout';
+import { resolveGameModeSeason } from '@/server/utils/gameModeSeason';
 import { createLogger } from '@/server/utils/logger';
 import { getProxyAwareClientIdentifier } from '@/server/utils/requestIdentity';
 import {
@@ -18,12 +19,7 @@ import {
   type SharedCacheHandle,
 } from '@/server/utils/sharedEdgeStore';
 import { fetchTarkovJsonEndpoint, type JsonTasksPayload } from '@/server/utils/tarkov-json';
-import {
-  API_GAME_MODES,
-  getGameModeSeasonNumber,
-  isGameMode,
-  type GameMode,
-} from '@/utils/constants';
+import { API_GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
 import { getLegacyModeProgressField, resolveModeProgressData } from '@/utils/modeProgressFallback';
 import {
   isRecord,
@@ -602,7 +598,8 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 429, statusMessage: 'Too many requests' });
     }
   }
-  const sharedProfileCacheKey = `${userId}:${mode}:${requesterKey}`;
+  const seasonNumber = await resolveGameModeSeason(mode, { supabaseUrl, supabaseServiceKey });
+  const sharedProfileCacheKey = `${userId}:${mode}:${seasonNumber}:${requesterKey}`;
   if (!isTestEnvironment) {
     const cached = await getCachedProfile(sharedCacheHandle, sharedProfileCacheKey);
     if (cached) {
@@ -646,7 +643,7 @@ export default defineEventHandler(async (event) => {
     [progressResponse, modeProgressResponse, preferencesResponse] = await Promise.all([
       restFetch(`user_progress?select=${progressSelect}&user_id=eq.${userId}&limit=1`),
       restFetch(
-        `user_game_mode_progress?select=user_id,progress_data,profile_public&user_id=eq.${userId}&game_mode=eq.${mode}&season_number=eq.${getGameModeSeasonNumber(mode)}&limit=1`
+        `user_game_mode_progress?select=user_id,progress_data,profile_public&user_id=eq.${userId}&game_mode=eq.${mode}&season_number=eq.${seasonNumber}&limit=1`
       ),
       restFetch(
         `user_preferences?select=streamer_mode,profile_share_pvp_public,profile_share_pve_public&user_id=eq.${userId}&limit=1`

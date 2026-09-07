@@ -388,13 +388,14 @@ describe('Shared Profile API', () => {
       return undefined;
     });
     mockFetch
+      .mockResolvedValueOnce({ ok: true, json: async () => 2 })
       .mockResolvedValueOnce(progressResponse())
       .mockResolvedValueOnce(modeProgressResponse({ displayName: 'SeasonOne', level: 18 }))
       .mockResolvedValueOnce(preferencesResponse());
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
     const result = await handler(mockEvent as H3Event);
-    expect(String(mockFetch.mock.calls[1]?.[0])).toContain('game_mode=eq.seasonal');
-    expect(String(mockFetch.mock.calls[1]?.[0])).toContain('season_number=eq.1');
+    expect(String(mockFetch.mock.calls[2]?.[0])).toContain('game_mode=eq.seasonal');
+    expect(String(mockFetch.mock.calls[2]?.[0])).toContain('season_number=eq.2');
     expect(result).toMatchObject({
       data: { displayName: 'SeasonOne', level: 18 },
       mode: 'seasonal',
@@ -408,6 +409,7 @@ describe('Shared Profile API', () => {
       return undefined;
     });
     mockFetch
+      .mockResolvedValueOnce({ ok: true, json: async () => 2 })
       .mockResolvedValueOnce(progressResponse())
       .mockResolvedValueOnce({ ok: true, json: async () => [] })
       .mockResolvedValueOnce(preferencesResponse());
@@ -415,7 +417,6 @@ describe('Shared Profile API', () => {
     await expect(handler(mockEvent as H3Event)).rejects.toThrow('Profile is private for this mode');
   });
   it('returns an empty owner payload when the Seasonal row does not exist yet', async () => {
-    runtimeConfig.supabaseServiceKey = '';
     mockGetRequestHeader.mockImplementation((_, key: string) => {
       if (key === 'authorization') return 'Bearer owner-token';
       return undefined;
@@ -430,6 +431,7 @@ describe('Shared Profile API', () => {
         ok: true,
         json: async () => ({ id: '11111111-1111-4111-8111-111111111111' }),
       })
+      .mockResolvedValueOnce({ ok: true, json: async () => 2 })
       .mockResolvedValueOnce(progressResponse(2))
       .mockResolvedValueOnce({ ok: true, json: async () => [] })
       .mockResolvedValueOnce(preferencesResponse());
@@ -626,6 +628,65 @@ describe('Shared Profile API', () => {
       expect(second.data).toEqual({ displayName: 'PublicPlayer', level: 24 });
       expect(third.data).toEqual({ displayName: 'RefreshedPlayer', level: 30 });
       expect(mockFetch).toHaveBeenCalledTimes(6);
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+      vi.unstubAllGlobals();
+      vi.stubGlobal('fetch', mockFetch as typeof fetch);
+      vi.resetModules();
+    }
+  });
+  it('does not reuse a cached Seasonal profile after database rollover', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = 'development';
+      runtimeConfig.sharedProfileCacheTtlMs = 5000;
+      mockGetRouterParam.mockImplementation((_, key: string) =>
+        key === 'mode' ? 'seasonal' : '11111111-1111-4111-8111-111111111111'
+      );
+      runtimeConfig.sharedProfileRateLimitPerMinute = 1000;
+      vi.resetModules();
+      const sharedCacheEntries = new Map<string, string>();
+      const cacheApi = {
+        match: vi.fn(async (request: Request) => {
+          const payload = sharedCacheEntries.get(request.url);
+          return payload
+            ? new Response(payload, { headers: { 'Content-Type': 'application/json' } })
+            : undefined;
+        }),
+        put: vi.fn(async (request: Request, response: Response) => {
+          sharedCacheEntries.set(request.url, await response.clone().text());
+        }),
+      };
+      vi.stubGlobal('caches', { default: cacheApi });
+      let now = 0;
+      vi.spyOn(Date, 'now').mockImplementation(() => now);
+      mockFetch
+        .mockResolvedValueOnce({ ok: true, json: async () => 2 })
+        .mockResolvedValueOnce(progressResponse())
+        .mockResolvedValueOnce(modeProgressResponse({ displayName: 'PublicPlayer', level: 24 }))
+        .mockResolvedValueOnce(preferencesResponse())
+        .mockResolvedValueOnce({ ok: true, json: async () => 2 })
+        .mockResolvedValueOnce({ ok: true, json: async () => 3 })
+        .mockResolvedValueOnce(progressResponse())
+        .mockResolvedValueOnce(modeProgressResponse({ displayName: 'RefreshedPlayer', level: 30 }))
+        .mockResolvedValueOnce(preferencesResponse());
+      const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+      const first = await handler(mockEvent as H3Event);
+      now = 30;
+      const second = await handler(mockEvent as H3Event);
+      now = 60;
+      const third = await handler(mockEvent as H3Event);
+      expect(first.data).toEqual({ displayName: 'PublicPlayer', level: 24 });
+      expect(second.data).toEqual({ displayName: 'PublicPlayer', level: 24 });
+      expect(third.data).toEqual({ displayName: 'RefreshedPlayer', level: 30 });
+      expect(mockFetch).toHaveBeenCalledTimes(9);
+      const reads = mockFetch.mock.calls.filter((call) =>
+        String(call[0]).includes('user_game_mode_progress')
+      );
+      expect(String(reads[0]?.[0])).toContain('season_number=eq.2');
+      expect(String(reads[1]?.[0])).toContain('season_number=eq.3');
+      mockFetch.mockResolvedValueOnce({ ok: false });
+      await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({ statusCode: 503 });
     } finally {
       process.env.NODE_ENV = originalNodeEnv;
       vi.unstubAllGlobals();

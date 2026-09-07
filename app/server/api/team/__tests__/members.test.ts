@@ -489,6 +489,7 @@ describe('Team Members API', () => {
             { game_mode: 'seasonal', user_id: '11111111-1111-4111-8111-111111111111' },
           ],
         })
+        .mockResolvedValueOnce({ ok: true, json: async () => 2 })
         .mockResolvedValueOnce({
           ok: true,
           json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
@@ -510,9 +511,9 @@ describe('Team Members API', () => {
         });
       const { default: handler } = await import('@/server/api/team/members');
       await handler(mockEvent as H3Event);
-      const profileUrl = String(mockFetch.mock.calls[2]?.[0] ?? '');
+      const profileUrl = String(mockFetch.mock.calls[3]?.[0] ?? '');
       expect(profileUrl).toContain('team_member_mode_summary');
-      expect(profileUrl).toContain('season_number=eq.1');
+      expect(profileUrl).toContain('season_number=eq.2');
       expect(profileUrl).not.toContain('progress_data');
       expect(mockFetch.mock.calls.some((call) => String(call[0]).includes('progress_data'))).toBe(
         false
@@ -529,6 +530,7 @@ describe('Team Members API', () => {
               { game_mode: 'seasonal', user_id: '11111111-1111-4111-8111-111111111111' },
             ],
           })
+          .mockResolvedValueOnce({ ok: true, json: async () => 2 })
           .mockResolvedValueOnce({
             ok: true,
             json: async () => [{ user_id: '11111111-1111-4111-8111-111111111111' }],
