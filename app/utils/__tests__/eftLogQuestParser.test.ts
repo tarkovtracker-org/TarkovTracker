@@ -357,6 +357,21 @@ describe('documented log formats and state history', () => {
     expect(result.matchedTaskIdsByMode.pve).toEqual([quest]);
     expect(result.matchedTaskIdsByMode.unknown).toEqual([]);
   });
+  it('does not treat URLs in inline chat payloads as mode switches', () => {
+    const chat = `${day} 09:30:00.000|Info|notifications|Got notification | ChatMessageReceived ${JSON.stringify({ message: { type: 1, text: 'https://gw-pve-01.escapefromtarkov.com/client/quest/list' } })}\n`;
+    const result = parseEftLogsForQuestImport(
+      [
+        {
+          name: 'application.log',
+          text: `${day} 09:00:00.000|Info|application|Session mode: Regular`,
+        },
+        { name: 'notifications.log', text: chat + event('quest', 12) },
+      ],
+      [quest]
+    );
+    expect(result.matchedTaskIdsByMode.pvp).toEqual([quest]);
+    expect(result.matchedTaskIdsByMode.pve).toEqual([]);
+  });
   it('does not apply future mode signals to preceding events', () => {
     const result = parseEftLogsForQuestImport(
       [

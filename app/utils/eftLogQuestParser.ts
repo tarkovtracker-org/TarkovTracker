@@ -282,7 +282,10 @@ function gatewayMode(host: string): GameMode | undefined {
 /** Accepts outgoing backend requests and notification connection records as URL evidence. */
 function isModeSignalRecord(record: LogRecord): boolean {
   if (record.channel === 'backend') return record.message.includes('---> Request');
-  return ['notifications', 'push-notifications'].includes(record.channel);
+  return (
+    ['notifications', 'push-notifications'].includes(record.channel) &&
+    !record.message.trimStart().startsWith('Got notification |')
+  );
 }
 /** Allows legacy production hosts only when their request path is mode-specific. */
 function isLegacyModeUrl(host: string, path: string): boolean {

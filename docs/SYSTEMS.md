@@ -678,7 +678,7 @@ flowchart LR
    Mode routing uses preceding explicit session declarations or gateway/WebSocket connections;
    legacy prod backend requests remain a fallback when explicit PvP/Seasonal routing is absent.
    Unparseable signal timestamps are discarded. Delayed responses and shared mode/locale routes
-   are not switches. Conflicting simultaneous
+   and URLs inside notification payloads are not switches. Conflicting simultaneous
    signals and events before the first signal remain unresolved and require a destination choice.
    Original notification message times (`dt`) order replayed history when present; record timestamps
    still locate the mode signal. Without `dt`, record time is the fallback.
