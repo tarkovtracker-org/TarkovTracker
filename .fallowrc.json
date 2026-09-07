@@ -21,6 +21,7 @@
     "scripts/check-ci-result.mjs"
   ],
   "ignoreDependencies": [
+    "shared",
     "@iconify-json/heroicons",
     "@iconify-json/lucide",
     "@nuxt/image",

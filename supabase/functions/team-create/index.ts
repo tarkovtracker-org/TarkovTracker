@@ -13,7 +13,7 @@ import {
 } from '../_shared/authenticated-mutation.ts';
 import { isTeamGameMode, type TeamGameMode } from '../_shared/team-mode.ts';
 import { rejectExistingTeamMembership } from '../_shared/team-membership.ts';
-import { isMembershipConflict } from '../_shared/team-create-error.ts';
+import { isMembershipConflict } from 'shared/team-create-error';
 const DEFAULT_MAX_TEAM_MEMBERS = 5;
 type TeamRow = {
   created_at: string;
