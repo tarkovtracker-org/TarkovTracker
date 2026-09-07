@@ -716,6 +716,8 @@ flowchart LR
 - `supabase/migrations/20260829120000_add_atomic_team_disband.sql` — owner-scoped atomic team
   disband RPC and grants
 - `supabase/functions/team-disband/index.ts` — authenticated owner disband endpoint
+- `supabase/functions/team-create/index.ts`, `supabase/functions/_shared/team-create-error.ts` —
+  authenticated team creation and database membership-conflict classification
 - `supabase/migrations/20260806120000_add_game_mode_progress_backfill_helper.sql` — retained,
   revoked helper for optional one-range-at-a-time operational maintenance. Correctness does not
   depend on running it; see the Database Migrations section of `docs/runbook.md`
@@ -739,6 +741,12 @@ flowchart LR
 - `pvp` and `pve` always use season `0`; `seasonal` always uses a positive season.
 - Legacy `user_system.team` / `team_id` values are used only when neither persistent mode-specific
   team ID exists. They must never make a PvP team appear as the active PvE team or vice versa.
+- Team creation maps both the `team_memberships_user_mode_unique` SQLSTATE `23505` conflict and
+  the exact SQLSTATE `P0001` message `You are already a member of a team for this game mode` from
+  `create_team_with_owner` to the existing actionable HTTP 400 membership response. The initial
+  membership check cannot prevent races; forward migrations changing that message or constraint
+  name must update the classifier and its regression tests together. Other exceptions retain their
+  existing HTTP 409/500 handling.
 - Team actions and invite links are unavailable until the active team row has loaded and its ID
   matches the mode-specific system-store team ID; stale owner or join-code state is never combined
   with another team's ID.
