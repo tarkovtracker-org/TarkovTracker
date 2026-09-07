@@ -3,6 +3,7 @@ import { flushPromises } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { effectScope, ref } from 'vue';
 import { useProfileTaskMetadata } from '@/composables/useProfileTaskMetadata';
+import { projectDuplicateObjectiveProgress } from '@/utils/taskNormalization';
 import { createDeferred } from '@/utils/test-helpers';
 import type { GameMode } from '@/utils/constants';
 afterEach(() => {
@@ -120,6 +121,17 @@ it('qualifies shared objectives and enriches the isolated prerequisite graph', a
   expect(result.tasks.value[0]?.objectives?.[0]?.id).toBe('shared:a');
   expect(result.tasks.value[1]?.objectives?.[0]?.id).toBe('shared:b');
   expect(result.tasks.value[2]?.predecessors).toEqual(expect.arrayContaining(['a', 'b']));
+  const legacy = {
+    shared: { complete: true, count: 2 },
+    'shared:b': { complete: false, count: 1 },
+  };
+  const projected = projectDuplicateObjectiveProgress(legacy, result.duplicateObjectiveIds.value);
+  expect(projected).toEqual({
+    'shared:a': { complete: true, count: 2 },
+    'shared:b': { complete: false, count: 1 },
+  });
+  expect(legacy.shared).toEqual({ complete: true, count: 2 });
+  expect(legacy).not.toHaveProperty('shared:a');
   expect(tasks).toEqual(original);
   scope.stop();
 });

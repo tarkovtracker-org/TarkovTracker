@@ -81,6 +81,7 @@ vi.mock('@/stores/useTarkov', () => ({
 vi.mock('@/composables/useProfileTaskMetadata', () => ({
   useProfileTaskMetadata: () => ({
     tasks: ref([]),
+    duplicateObjectiveIds: ref(new Map()),
     chapters: ref(storyChaptersMetadata),
     prestige: ref([]),
     error: ref(null),

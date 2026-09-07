@@ -280,6 +280,7 @@
     toggleStoryChapterWithLinearObjectives,
   } from '@/utils/storylineObjectives';
   import { buildTarkovDevProfileUrl } from '@/utils/tarkovDevProfileUrl';
+  import { projectDuplicateObjectiveProgress } from '@/utils/taskNormalization';
   import { getCompletionFlags, type RawTaskCompletion } from '@/utils/taskStatus';
   import { filterTasksByTypeSettings, type TaskTypeFilterOptions } from '@/utils/taskTypeFilters';
   import type {
@@ -432,6 +433,7 @@
   );
   const {
     tasks: profileTasks,
+    duplicateObjectiveIds: profileDuplicateObjectiveIds,
     chapters: profileChapters,
     prestige: profilePrestige,
     error: profileMetadataError,
@@ -713,7 +715,12 @@
     return lookup;
   });
   const taskCompletions = computed(() => modeData.value.taskCompletions ?? {});
-  const objectiveCompletions = computed(() => modeData.value.taskObjectives ?? {});
+  const objectiveCompletions = computed(() =>
+    projectDuplicateObjectiveProgress(
+      modeData.value.taskObjectives ?? {},
+      profileDuplicateObjectiveIds.value
+    )
+  );
   const hideoutModuleCompletions = computed(() => modeData.value.hideoutModules ?? {});
   const hideoutPartCompletions = computed(() => modeData.value.hideoutParts ?? {});
   const getTaskTimestamp = (taskId: string): number | null => {

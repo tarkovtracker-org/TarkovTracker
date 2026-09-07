@@ -43,6 +43,7 @@ const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: Abo
   );
   return {
     tasks: useGraphBuilder().processTaskData(normalized.tasks).tasks,
+    duplicateObjectiveIds: normalized.duplicateObjectiveIds,
     chapters: optionalChapters(overlay),
     prestige: optionalPrestige(prestige),
     failure: partialFailure([overlayResult, prestigeResult]),
@@ -53,6 +54,7 @@ export function useProfileTaskMetadata(mode: Ref<GameMode>, language: Ref<string
   const snapshot = shallowRef<{
     scope: string;
     tasks: Task[];
+    duplicateObjectiveIds: Map<string, string[]>;
     chapters: StoryChapter[];
     prestige: PrestigeLevel[];
   } | null>(null);
@@ -98,6 +100,9 @@ export function useProfileTaskMetadata(mode: Ref<GameMode>, language: Ref<string
   );
   return {
     chapters: computed(() => activeSnapshot.value?.chapters ?? []),
+    duplicateObjectiveIds: computed(
+      () => activeSnapshot.value?.duplicateObjectiveIds ?? new Map<string, string[]>()
+    ),
     prestige: computed(() => activeSnapshot.value?.prestige ?? []),
     tasks: computed(() => activeSnapshot.value?.tasks ?? []),
     loading: computed(() => !activeSnapshot.value && !error.value),

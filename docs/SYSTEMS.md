@@ -1398,8 +1398,6 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
   `required_items` / `required_keys` labels; an untitled standalone group keeps the `h3` level and
   the longer `*_summary` labels.
 
-Isolated profile catalogs normalize and qualify duplicate objective IDs and build the same task predecessor graph as active metadata, without mutating active progress. EFT completion imports apply trader implications only when the trader-gating preference captured at confirmation is enabled; task completion and player-level implications remain authoritative.
-
 ## 13. Fallow audit snapshots
 
 **Summary.** Local and CI `lint:fallow` commands use `scripts/fallow-audit.mjs` to create a
@@ -1567,6 +1565,8 @@ Shadow rollout forces every check while printing the proposed selection. See
 - The aggregate covers repository CI jobs, not independently reported Security or Codecov statuses.
 
 ## 15. Canonical task progression
+
+Isolated profile catalogs normalize and qualify duplicate objective IDs and build the same task predecessor graph as active metadata, without mutating active progress. EFT completion imports apply trader implications only when the trader-gating preference captured at confirmation is enabled; task completion and player-level implications remain authoritative. Shared profiles project legacy objective keys through the duplicate-ID mapping without modifying stored progress; explicit task-qualified values take precedence.
 
 `app/utils/taskRequirements.ts` normalizes the discriminated trader collection at the server
 boundary. `tarkov-json.ts` builds `normalizedTraderRequirements` after reference adaptation;
