@@ -177,14 +177,15 @@ function extractQuestId(templateId: string): string | null {
   return questId && /^[a-f\d]{24}$/i.test(questId) ? questId : null;
 }
 /** Uses the server event ID, or stable message fields, to identify replayed notifications. */
-function buildEventKey(payload: ChatMessagePayload, questId: string): string {
+function buildEventKey(payload: ChatMessagePayload, questId: string, timestamp: string): string {
   if (typeof payload.eventId === 'string' && payload.eventId.trim().length > 0) {
     return `event:${payload.eventId.trim()}`;
   }
   const message = payload.message;
-  const messageId = typeof message?._id === 'string' ? message._id : '';
+  const messageId = typeof message?._id === 'string' ? message._id.trim() : '';
+  if (messageId) return `message:${messageId}:${questId}`;
   const dt = typeof message?.dt === 'number' && Number.isFinite(message.dt) ? message.dt : -1;
-  return `fallback:${messageId}:${dt}:${questId}`;
+  return `fallback:${dt > 0 ? dt : timestamp}:${questId}`;
 }
 /** Validates the object envelope before interpreting quest notification fields. */
 function toChatMessagePayload(value: unknown): ChatMessagePayload | null {
@@ -429,7 +430,7 @@ export function parseEftNotificationLogText(text: string): EftLogTextParseResult
     const events = eventBuckets.get(message.type);
     if (!events) continue;
     events.push({
-      eventKey: buildEventKey(payload, questId),
+      eventKey: buildEventKey(payload, questId, record.timestamp),
       questId,
       timestamp: record.timestamp,
       ...(typeof message.dt === 'number' && Number.isFinite(message.dt) && message.dt > 0
@@ -483,7 +484,7 @@ function knownQuestEventTime(event: EftQuestEvent): number | null {
 }
 /** Places events without usable timestamps before dated history during reconciliation. */
 function questEventTime(event: EftQuestEvent): number {
-  return event.occurredAt ?? eftLogTimestampMillis(event.timestamp) ?? -1;
+  return knownQuestEventTime(event) ?? -1;
 }
 /** Chooses later history, breaking equal-time ties as completed, failed, then started. */
 function supersedesQuestEvent(event: EftQuestImportEvent, prior: EftQuestImportEvent): boolean {
@@ -511,13 +512,23 @@ export function latestEftQuestEvents(
   }
   return [...latest.values()];
 }
-/** Preserves the earliest available occurrence when the same notification is replayed. */
-function retainEarliestEvent(duplicate: EftQuestEvent, event: EftQuestEvent): void {
-  const time = knownQuestEventTime(event) ?? Infinity;
-  const priorTime = knownQuestEventTime(duplicate) ?? Infinity;
+/** Keeps strong server identities global; sparse fallback identities remain scoped to their mode. */
+function eventDeduplicationKey(event: EftQuestImportEvent): string {
+  const scope = event.eventKey.startsWith('fallback:') ? `${event.mode}:` : '';
+  return `${scope}${event.status}:${event.questId}:${event.eventKey}`;
+}
+/** Uses receipt time for routing evidence even when all replays share the same original event time. */
+function eventReceiptTime(event: EftQuestEvent): number {
+  return eftLogTimestampMillis(event.timestamp) ?? Infinity;
+}
+/** Retains the earliest delivery's routing, marking conflicting simultaneous deliveries as unknown. */
+function retainEarliestEvent(duplicate: EftQuestImportEvent, event: EftQuestImportEvent): void {
+  const time = eventReceiptTime(event);
+  const priorTime = eventReceiptTime(duplicate);
   if (time < priorTime) {
-    duplicate.timestamp = event.timestamp;
-    duplicate.occurredAt = event.occurredAt;
+    Object.assign(duplicate, event);
+  } else if (time === priorTime) {
+    duplicate.mode = reconcileModeSignal(duplicate.mode, event.mode);
   }
 }
 /** Builds a version-filtered preview with mode routing, deduplication, season guards, and catalog eligibility. */
@@ -598,13 +609,13 @@ export function parseEftLogsForQuestImport(
       parseErrorCount += result.parseErrorCount;
       const add = (event: EftQuestEvent, status: EftQuestEventStatus) => {
         const mode = resolveEventModeFromTimeline(event.timestamp, signals.timeline);
-        const key = `${mode}:${status}:${event.questId}:${event.eventKey}`;
+        const imported = { ...event, mode, status };
+        const key = eventDeduplicationKey(imported);
         const duplicate = seen.get(key);
         if (duplicate) {
-          retainEarliestEvent(duplicate, event);
+          retainEarliestEvent(duplicate, imported);
           return;
         }
-        const imported = { ...event, mode, status };
         seen.set(key, imported);
         events.push(imported);
       };

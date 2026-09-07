@@ -427,8 +427,8 @@ describe('documented log formats and state history', () => {
             `${day} 09:30:00.000`
           ),
         },
-        { name: `${prefixA} notifications.log`, text: event('same-id', 12) },
-        { name: `${prefixB} notifications.log`, text: event('same-id', 12) },
+        { name: `${prefixA} notifications.log`, text: event('seasonal-event', 12) },
+        { name: `${prefixB} notifications.log`, text: event('pve-event', 12) },
       ],
       [quest]
     );
@@ -522,6 +522,106 @@ describe('notification replays', () => {
     );
     expect(result.matchedTaskIds).toEqual([]);
     expect(result.matchedStartedTaskIds).toEqual([quest]);
+  });
+  it.each(['Pve', 'PvpSeason'])(
+    'keeps the earliest routing when an event is replayed in %s',
+    (mode) => {
+      const files = [
+        {
+          name: 'log_original/application.log',
+          text: `${seasonDay} 09:00:00.000|Info|application|Session mode: Regular`,
+        },
+        {
+          name: 'log_original/notifications.log',
+          text: notification(
+            'stable-event',
+            12,
+            `${seasonDay}T10:00:00Z`,
+            `${seasonDay} 10:00:01.000`
+          ),
+        },
+        {
+          name: 'log_replay/application.log',
+          text: `${seasonDay} 11:00:00.000|Info|application|Session mode: ${mode}`,
+        },
+        {
+          name: 'log_replay/notifications.log',
+          text: notification(
+            'stable-event',
+            12,
+            `${seasonDay}T10:00:00Z`,
+            `${seasonDay} 12:00:00.000`
+          ),
+        },
+      ];
+      for (const input of [files, [...files].reverse()]) {
+        const result = parseEftLogsForQuestImport(input, [quest]);
+        expect(result.dedupedCompletionEventCount).toBe(1);
+        expect(result.matchedTaskIdsByMode.pvp).toEqual([quest]);
+        expect(result.matchedTaskIdsByMode.pve).toEqual([]);
+        expect(result.matchedTaskIdsByMode.seasonal).toEqual([]);
+      }
+    }
+  );
+  it('deduplicates legacy message IDs across modes without a server event ID', () => {
+    const message = {
+      _id: 'stable-message',
+      type: 12,
+      templateId: quest,
+      dt: Date.parse(`${seasonDay}T10:00:00Z`) / 1000,
+    };
+    const line = (hour: string) =>
+      `${seasonDay} ${hour}:00:00.000|Info|notifications|Got notification | ChatMessageReceived\n${JSON.stringify({ message })}\n`;
+    const result = parseEftLogsForQuestImport(
+      [
+        {
+          name: 'application.log',
+          text: `${seasonDay} 09:00:00.000|Info|application|Session mode: Regular\n${seasonDay} 11:00:00.000|Info|application|Session mode: Pve`,
+        },
+        { name: 'notifications.log', text: line('12') + line('10') },
+      ],
+      [quest]
+    );
+    expect(result.dedupedCompletionEventCount).toBe(1);
+    expect(result.matchedTaskIdsByMode.pvp).toEqual([quest]);
+    expect(result.matchedTaskIdsByMode.pve).toEqual([]);
+  });
+  it('preserves independent mode events when only a quest and original time are available', () => {
+    const message = {
+      type: 12,
+      templateId: quest,
+      dt: Date.parse(`${seasonDay}T10:00:00Z`) / 1000,
+    };
+    const text = `${seasonDay} 10:00:00.000|Info|notifications|Got notification | ChatMessageReceived\n${JSON.stringify({ message })}\n`;
+    const result = parseEftLogsForQuestImport(
+      [
+        {
+          name: 'log_pvp/application.log',
+          text: `${seasonDay} 09:00:00.000|Info|application|Session mode: Regular`,
+        },
+        { name: 'log_pvp/notifications.log', text },
+        {
+          name: 'log_pve/application.log',
+          text: `${seasonDay} 09:00:00.000|Info|application|Session mode: Pve`,
+        },
+        { name: 'log_pve/notifications.log', text },
+      ],
+      [quest]
+    );
+    expect(result.dedupedCompletionEventCount).toBe(2);
+    expect(result.matchedTaskIdsByMode.pvp).toEqual([quest]);
+    expect(result.matchedTaskIdsByMode.pve).toEqual([quest]);
+  });
+  it('keeps distinct deliveries when sparse logs have neither identity nor original time', () => {
+    const line = (hour: string, type: number) =>
+      `${seasonDay} ${hour}:00:00.000|Info|notifications|Got notification | ChatMessageReceived\n${JSON.stringify({ message: { type, templateId: quest } })}\n`;
+    const result = parseEftLogsForQuestImport(
+      [{ name: 'notifications.log', text: line('10', 12) + line('11', 10) + line('12', 12) }],
+      [quest]
+    );
+    expect(result.dedupedCompletionEventCount).toBe(2);
+    expect(result.matchedTaskIds).toEqual([quest]);
+    expect(result.matchedStartedTaskIds).toEqual([]);
   });
   it('rejects a prior-season message replayed during the active season', () => {
     const result = parseEftLogsForQuestImport(

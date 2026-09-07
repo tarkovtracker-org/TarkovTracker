@@ -682,8 +682,11 @@ flowchart LR
    signals and events before the first signal remain unresolved and require a destination choice.
    Original notification message times (`dt`) order replayed history when present; record timestamps
    still locate the mode signal. Without `dt`, record time is the fallback.
-   Events are deduplicated per mode, quest, and state, then reconciled chronologically after
-   unresolved-mode routing; tied timestamps prefer completed, then failed, then started.
+   Stable server event/message identities are deduplicated across modes before progress is
+   applied; routing follows the earliest receipt, regardless of file order or replay receipt mode.
+   Sparse fallback identities stay mode-scoped, using receipt time when no original time exists.
+   Conflicting simultaneous deliveries remain unresolved. States are then reconciled per mode
+   and quest after unresolved-mode routing; tied timestamps prefer completed, failed, then started.
    Explicit failure notifications use the persistent manual-failure flag so automatic repair cannot
    discard them when a triggering quest is missing from the logs. Existing completed tracker tasks
    are preserved. Catalogs share metadata hydration's task-qualified duplicate-objective IDs.

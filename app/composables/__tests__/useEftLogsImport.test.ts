@@ -395,6 +395,24 @@ describe('expanded log import', () => {
     tarkovStore.switchGameMode.mockImplementation(async () => undefined);
     tarkovStore.isTaskComplete.mockReturnValue(false);
   });
+  it('does not write a notification replay into the mode active at replay time', async () => {
+    const importer = await loadComposable();
+    const original = completionLog(undefined, seasonDay);
+    const replay = original.replace(`${seasonDay} 10:14:24.222`, `${seasonDay} 12:00:00.000`);
+    await importer.parseFiles([
+      new File(
+        [
+          `${seasonDay} 09:00:00.000|Info|application|Session mode: Regular\n${seasonDay} 11:00:00.000|Info|application|Session mode: Pve`,
+        ],
+        'application.log'
+      ),
+      new File([replay], 'late notifications.log'),
+      new File([original], 'early notifications.log'),
+    ]);
+    await importer.confirmImport('pvp');
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledTimes(1);
+    expect(tarkovStore.switchGameMode).not.toHaveBeenCalled();
+  });
   it('imports a current Seasonal notification and restores the original mode', async () => {
     const importer = await loadComposable();
     const session = `${seasonDay.replaceAll('-', '.')}_10-00-00_1.1.0.1.46911`;
