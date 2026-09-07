@@ -318,37 +318,67 @@ describe('Shared Profile API', () => {
       userId: '11111111-1111-4111-8111-111111111111',
       visibility: 'public',
     });
+    const restCalls = mockFetch.mock.calls
+      .map(([url]) => new URL(String(url)))
+      .filter((url) => url.pathname.includes('/rest/v1/'));
+    expect(restCalls).toHaveLength(3);
+    expect(
+      restCalls.find((url) => url.pathname.endsWith('/user_progress'))?.searchParams.get('select')
+    ).toBe('user_id,game_edition');
   });
-  it('falls back to legacy persistent progress and visibility when the normalized row is missing', async () => {
+  it.each(['network', 'json'])('normalizes deferred legacy %s failures to 502', async (failure) => {
     mockFetch
-      .mockResolvedValueOnce(
-        progressResponse(3, { pvp_data: { displayName: 'LegacyPlayer', level: 39 } })
-      )
+      .mockResolvedValueOnce(progressResponse(3))
       .mockResolvedValueOnce({ ok: true, json: async () => [] })
       .mockResolvedValueOnce(preferencesResponse(false, { pvp: true }));
+    if (failure === 'network') mockFetch.mockRejectedValueOnce(new Error('offline'));
+    else
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => {
+          throw new Error('invalid json');
+        },
+      });
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
-    const result = await handler(mockEvent as H3Event);
-    expect(result).toMatchObject({
-      data: { displayName: 'LegacyPlayer', level: 39 },
-      gameEdition: 3,
-      mode: 'pvp',
-      visibility: 'public',
-    });
+    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({ statusCode: 502 });
   });
-  it('falls back to legacy progress when the normalized row carries no level', async () => {
+  it.each(['missing', 'placeholder'])(
+    'loads deferred legacy data for a %s normalized row',
+    async (kind) => {
+      mockFetch
+        .mockResolvedValueOnce(progressResponse(3))
+        .mockResolvedValueOnce(
+          kind === 'missing'
+            ? { ok: true, json: async () => [] }
+            : modeProgressResponse({ taskCompletions: {} }, true)
+        )
+        .mockResolvedValueOnce(preferencesResponse(false, { pvp: true }))
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => [{ pvp_data: { displayName: 'LegacyPlayer', level: 39 } }],
+        });
+      const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+      expect(await handler(mockEvent as H3Event)).toMatchObject({
+        data: { displayName: 'LegacyPlayer', level: 39 },
+        gameEdition: 3,
+        mode: 'pvp',
+        visibility: 'public',
+      });
+    }
+  );
+  it.each(['http', 'abort', 'timeout'])('normalizes deferred legacy %s errors', async (failure) => {
     mockFetch
-      .mockResolvedValueOnce(
-        progressResponse(3, { pvp_data: { displayName: 'LegacyPlayer', level: 39 } })
-      )
-      .mockResolvedValueOnce(modeProgressResponse({ taskCompletions: {} }, true))
+      .mockResolvedValueOnce(progressResponse(3))
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
       .mockResolvedValueOnce(preferencesResponse(false, { pvp: true }));
+    if (failure === 'http') mockFetch.mockResolvedValueOnce({ ok: false });
+    else
+      mockFetch.mockRejectedValueOnce(
+        failure === 'abort' ? createAbortError() : { statusCode: 504 }
+      );
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
-    const result = await handler(mockEvent as H3Event);
-    expect(result).toMatchObject({
-      data: { displayName: 'LegacyPlayer', level: 39 },
-      gameEdition: 3,
-      mode: 'pvp',
-      visibility: 'public',
+    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({
+      statusCode: failure === 'http' ? 502 : 504,
     });
   });
   it('loads Seasonal profiles from the active season row', async () => {

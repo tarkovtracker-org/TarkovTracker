@@ -1,3 +1,10 @@
+## [1.76.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.4...v1.76.5) (2026-09-07)
+
+
+### Bug Fixes
+
+* **app:** reduce Supabase realtime and transfer waste ([#810](https://github.com/tarkovtracker-org/TarkovTracker/issues/810)) ([ca5433a](https://github.com/tarkovtracker-org/TarkovTracker/commit/ca5433af5029e01d078de4db08d99f96ac887836))
+
 ## [1.76.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.3...v1.76.4) (2026-09-06)
 
 
