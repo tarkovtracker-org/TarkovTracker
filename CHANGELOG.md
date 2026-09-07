@@ -1,3 +1,10 @@
+## [1.76.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.5...v1.76.6) (2026-09-07)
+
+
+### Bug Fixes
+
+* **settings:** restore quest history across EFT log versions and modes ([#817](https://github.com/tarkovtracker-org/TarkovTracker/issues/817)) ([6d6abc1](https://github.com/tarkovtracker-org/TarkovTracker/commit/6d6abc1bcd1686ab4f6226a2146073a1b41cd290))
+
 ## [1.76.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.4...v1.76.5) (2026-09-07)
 
 
