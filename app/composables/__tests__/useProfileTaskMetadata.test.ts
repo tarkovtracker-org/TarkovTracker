@@ -135,3 +135,22 @@ it('qualifies shared objectives and enriches the isolated prerequisite graph', a
   expect(tasks).toEqual(original);
   scope.stop();
 });
+it('keeps required catalogs when optional chapter normalization fails', async () => {
+  vi.stubGlobal(
+    '$fetch',
+    vi.fn((url: string) => {
+      if (url.includes('tasks-'))
+        return Promise.resolve({ data: { tasks: [{ id: 'task', objectives: [] }] } });
+      if (url.includes('prestige')) return Promise.resolve({ data: { prestige: [] } });
+      return Promise.resolve({ storyChapters: { broken: null } });
+    })
+  );
+  const scope = effectScope();
+  const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pve'), ref('en')))!;
+  await flushPromises();
+  expect(result.tasks.value[0]?.id).toBe('task');
+  expect(result.chapters.value).toEqual([]);
+  expect(result.error.value).toBeInstanceOf(Error);
+  expect(result.loading.value).toBe(false);
+  scope.stop();
+});

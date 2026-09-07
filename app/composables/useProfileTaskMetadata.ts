@@ -41,12 +41,12 @@ const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: Abo
     }>(
       'https://raw.githubusercontent.com/tarkovtracker-org/tarkov-data-overlay/main/dist/overlay.json',
       { parseResponse: JSON.parse, signal: signal }
-    ),
+    ).then((overlay) => optionalChapters(overlay, query.gameMode)),
     $fetch<{ data: { prestige: PrestigeLevel[] } }>('/api/tarkov/prestige', options),
   ]);
   const core = requiredResult(coreResult);
   const objectives = requiredResult(objectivesResult);
-  const overlay = optionalResult(overlayResult);
+  const chapters = optionalResult(overlayResult);
   const prestige = optionalResult(prestigeResult);
   const byId = new Map(objectives.data.tasks.map((task) => [task.id, task]));
   const merged = core.data.tasks.map((task) => ({ ...task, ...byId.get(task.id) }));
@@ -59,7 +59,7 @@ const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: Abo
   return {
     tasks: useGraphBuilder().processTaskData(normalized.tasks).tasks,
     duplicateObjectiveIds: normalized.duplicateObjectiveIds,
-    chapters: optionalChapters(overlay, query.gameMode),
+    chapters: chapters ?? [],
     prestige: optionalPrestige(prestige),
     failure: partialFailure([overlayResult, prestigeResult]),
   };
