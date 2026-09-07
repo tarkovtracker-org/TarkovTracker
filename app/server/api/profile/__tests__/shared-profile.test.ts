@@ -1,7 +1,11 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BASE_SITE_CONTEXT, createRouterStub } from '@/server/utils/__tests__/eventStubs';
+import {
+  BASE_SITE_CONTEXT,
+  createRouterStub,
+  stubEdgeCache,
+} from '@/server/utils/__tests__/eventStubs';
 import type { H3Event } from 'h3';
 const { mockGetRequestHeader, mockGetRouterParam, mockFetch } = vi.hoisted(() => ({
   mockGetRequestHeader: vi.fn(),
@@ -589,18 +593,7 @@ describe('Shared Profile API', () => {
           key === 'mode' ? mode : '11111111-1111-4111-8111-111111111111'
         );
         vi.resetModules();
-        const entries = new Map<string, string>();
-        vi.stubGlobal('caches', {
-          default: {
-            match: async (request: Request) => {
-              const payload = entries.get(request.url);
-              return payload ? new Response(payload) : undefined;
-            },
-            put: async (request: Request, response: Response) => {
-              entries.set(request.url, await response.clone().text());
-            },
-          },
-        });
+        stubEdgeCache();
         let now = 0;
         let season = 2;
         let lookupOk = true;

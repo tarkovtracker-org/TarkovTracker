@@ -18,3 +18,19 @@ export const createRouterStub = () => ({
   beforeResolve: vi.fn(),
   onError: vi.fn(),
 });
+// Minimal Cache API implementation shared by server cache integration tests.
+export const stubEdgeCache = () => {
+  const entries = new Map<string, string>();
+  vi.stubGlobal('caches', {
+    default: {
+      match: async (request: Request) => {
+        const payload = entries.get(request.url);
+        return payload ? new Response(payload) : undefined;
+      },
+      put: async (request: Request, response: Response) => {
+        entries.set(request.url, await response.clone().text());
+      },
+    },
+  });
+  return entries;
+};

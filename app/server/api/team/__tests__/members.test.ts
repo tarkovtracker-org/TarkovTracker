@@ -9,7 +9,11 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { BASE_SITE_CONTEXT, createRouterStub } from '@/server/utils/__tests__/eventStubs';
+import {
+  BASE_SITE_CONTEXT,
+  createRouterStub,
+  stubEdgeCache,
+} from '@/server/utils/__tests__/eventStubs';
 import type { H3Event } from 'h3';
 const VALID_TEAM_ID = 'a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5';
 const VALID_USER_ID = '11111111-1111-4111-8111-111111111111';
@@ -591,18 +595,7 @@ describe('Team Members API', () => {
       try {
         process.env.NODE_ENV = 'development';
         vi.resetModules();
-        const entries = new Map<string, string>();
-        vi.stubGlobal('caches', {
-          default: {
-            match: async (request: Request) => {
-              const payload = entries.get(request.url);
-              return payload ? new Response(payload) : undefined;
-            },
-            put: async (request: Request, response: Response) => {
-              entries.set(request.url, await response.clone().text());
-            },
-          },
-        });
+        const entries = stubEdgeCache();
         mockGetQuery.mockReturnValue({ teamId: VALID_TEAM_ID });
         mockFetch.mockImplementation(async (url: string | URL) => {
           const target = String(url);
