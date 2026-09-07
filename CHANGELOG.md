@@ -1,3 +1,10 @@
+# [1.77.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.7...v1.77.0) (2026-09-07)
+
+
+### Features
+
+* **needed-items:** search pooled quest objectives by any accepted item ([#819](https://github.com/tarkovtracker-org/TarkovTracker/issues/819)) ([255071a](https://github.com/tarkovtracker-org/TarkovTracker/commit/255071a335b48a8819f9e49d4300e4376140620d)), closes [#812](https://github.com/tarkovtracker-org/TarkovTracker/issues/812)
+
 ## [1.76.7](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.6...v1.76.7) (2026-09-07)
 
 
