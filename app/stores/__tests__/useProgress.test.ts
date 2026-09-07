@@ -96,6 +96,12 @@ const setupMocks = ({
     teammateStores,
   };
 };
+const reputationRequirement = (
+  id: string,
+  trader: { id: string; name: string },
+  value: number,
+  compareMethod: '>=' | '<=' = '>='
+) => ({ id, requirementType: 'reputation' as const, compareMethod, trader, value });
 describe('useProgressStore', () => {
   it('treats boolean teammate completions as completed', async () => {
     setupMocks({
@@ -234,13 +240,7 @@ describe('useProgressStore', () => {
         factionName: 'Any',
         trader: { id: 'skier', name: 'Skier', normalizedName: 'skier' },
         traderRequirements: [
-          {
-            id: 'req-2',
-            requirementType: 'reputation',
-            compareMethod: '>=',
-            trader: { id: praporId, name: 'Prapor' },
-            value: 0.5,
-          },
+          reputationRequirement('req-2', { id: praporId, name: 'Prapor' }, 0.5, '>='),
         ],
       };
       setupMocks({
@@ -259,13 +259,7 @@ describe('useProgressStore', () => {
         factionName: 'Any',
         trader: { id: 'skier', name: 'Skier', normalizedName: 'skier' },
         traderRequirements: [
-          {
-            id: 'req-2',
-            requirementType: 'reputation',
-            compareMethod: '>=',
-            trader: { id: praporId, name: 'Prapor' },
-            value: 0.5,
-          },
+          reputationRequirement('req-2', { id: praporId, name: 'Prapor' }, 0.5, '>='),
         ],
       };
       setupMocks({
@@ -284,13 +278,7 @@ describe('useProgressStore', () => {
         factionName: 'Any',
         trader: { id: 'fence', name: 'Fence', normalizedName: 'fence' },
         traderRequirements: [
-          {
-            id: 'req-3',
-            requirementType: 'reputation',
-            compareMethod: '<=',
-            trader: { id: 'fence', name: 'Fence' },
-            value: -3,
-          },
+          reputationRequirement('req-3', { id: 'fence', name: 'Fence' }, -3, '<='),
         ],
       };
       setupMocks({
@@ -309,13 +297,7 @@ describe('useProgressStore', () => {
         factionName: 'Any',
         trader: { id: 'skier', name: 'Skier', normalizedName: 'skier' },
         traderRequirements: [
-          {
-            id: 'req-4',
-            requirementType: 'reputation',
-            compareMethod: '>=',
-            trader: { id: praporId, name: 'Prapor' },
-            value: -0.5,
-          },
+          reputationRequirement('req-4', { id: praporId, name: 'Prapor' }, -0.5, '>='),
         ],
       };
       setupMocks({
@@ -345,13 +327,7 @@ describe('useProgressStore', () => {
         factionName: 'Any',
         trader: { id: 'skier', name: 'Skier', normalizedName: 'skier' },
         traderRequirements: [
-          {
-            id: 'req-2',
-            requirementType: 'reputation',
-            compareMethod: '>=',
-            trader: { id: praporId, name: 'Prapor' },
-            value: 0.5,
-          },
+          reputationRequirement('req-2', { id: praporId, name: 'Prapor' }, 0.5, '>='),
         ],
       };
       setupMocks({
@@ -371,13 +347,7 @@ describe('useProgressStore', () => {
         factionName: 'Any',
         trader: { id: 'fence', name: 'Fence', normalizedName: 'fence' },
         traderRequirements: [
-          {
-            id: 'req-3',
-            requirementType: 'reputation',
-            compareMethod: '<=',
-            trader: { id: 'fence', name: 'Fence' },
-            value: -3,
-          },
+          reputationRequirement('req-3', { id: 'fence', name: 'Fence' }, -3, '<='),
         ],
       };
       setupMocks({
