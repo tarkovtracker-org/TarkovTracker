@@ -24,10 +24,14 @@ describe('progression sorting', () => {
       ids.toReversed()
     );
   });
-  it.each([1, 2])('ranks strict loyalty using the next attainable level from LL%s', (current) => {
+  it.each([
+    { type: 'trader_level' as const, current: 1 },
+    { type: 'trader_level' as const, current: 2 },
+    { type: 'player_level' as const, current: 2 },
+  ])('ranks strict $type using the next attainable level from $current', ({ type, current }) => {
     const evaluations: TaskEvaluationMap = {
-      a: { self: blocked({ type: 'trader_level', current, required: 3, compareMethod: '>=' }) },
-      z: { self: blocked({ type: 'trader_level', current, required: 2, compareMethod: '>' }) },
+      a: { self: blocked({ type, current, required: 3, compareMethod: '>=' }) },
+      z: { self: blocked({ type, current, required: 2, compareMethod: '>' }) },
     };
     expect(
       sortTasksByProgression([task('z'), task('a')], 'asc', evaluations).map((t) => t.id)

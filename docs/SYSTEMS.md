@@ -763,7 +763,8 @@ flowchart LR
    then reconciled per mode and quest after unresolved-mode routing; tied timestamps prefer completed, failed, then started.
    Explicit failure notifications use the persistent manual-failure flag so automatic repair cannot
    discard them when a triggering quest is missing from the logs. Existing completed tracker tasks
-   are preserved. Catalogs share metadata hydration's task-qualified duplicate-objective IDs.
+   are preserved. Inferred prerequisite completions only write task IDs present in the destination
+   catalog; explicit imported completion states remain authoritative. Catalogs share metadata hydration's task-qualified duplicate-objective IDs.
    All destination task/objective catalogs are
    loaded before mutations, without changing the active metadata store. Destination catalogs
    determine task eligibility and objective counts, and the original progress mode is restored. Application is not transactional across modes:
