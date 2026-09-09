@@ -784,7 +784,7 @@ describe('seasonal progress realtime synchronization', () => {
     handlers.get('user_game_mode_progress')?.({
       new: {
         game_mode: 'seasonal',
-        progress_data: { taskCompletions: { task: remoteTask } },
+        progress_data: { level: 12, taskCompletions: { task: remoteTask } },
         season_number: 1,
         updated_at: new Date().toISOString(),
       },

@@ -1096,7 +1096,7 @@ describe('api-gateway', () => {
     await expectErrorResponse(
       res,
       400,
-      `Invalid state "${display}" (must be completed, uncompleted, or failed)`
+      `Invalid state "${display}" (must be active, completed, uncompleted, or failed)`
     );
     expect(res.headers.get('X-RateLimit-Limit')).toBe('100');
     expect(res.headers.get('X-RateLimit-Remaining')).toBe('10');
