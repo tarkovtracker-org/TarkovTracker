@@ -163,8 +163,7 @@ const createTeamEvaluator = (
     const taskId = requirement.task.id;
     const completion = data.completions[taskId];
     const statuses = normalizeStatuses(requirement);
-    if (!tasksById.has(taskId))
-      return result([{ type: 'unknown', taskId, reason: 'task_reference' }]);
+    if (!tasksById.has(taskId)) return missingTaskResult(taskId);
     if (terminalStatusMet(statuses, completion)) return result([]);
     return acceptsActive(statuses)
       ? activeRequirementResult(taskId, completion)

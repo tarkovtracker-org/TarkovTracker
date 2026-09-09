@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Task, TaskObjective } from '@/types/tarkov';
+import type { TaskFilterAndSortOptions } from '@/types/taskFilter';
 const createTasks = (): Task[] => [
   {
     id: 'task-map',
@@ -928,4 +929,29 @@ describe('useTaskFiltering', () => {
       expect(countsWithoutHiding['map-1']! - countsWithHiding['map-1']!).toBe(1);
     });
   });
+});
+it('handles absent team snapshots and recovers deterministic sorting without trader metadata', async () => {
+  const { taskFiltering, metadataStore, progressStore } = await setup();
+  Object.assign(metadataStore, { traders: undefined });
+  Object.assign(progressStore, { visibleTeamStores: undefined });
+  const filters: TaskFilterAndSortOptions = {
+    primaryView: 'all',
+    secondaryView: 'all',
+    userView: 'all',
+    mapView: 'all',
+    traderView: 'all',
+    mergedMaps: [],
+    sortMode: 'progression',
+    sortDirection: 'asc',
+  };
+  await taskFiltering.updateVisibleTasks(filters, false);
+  expect(taskFiltering.visibleTasks.value).toEqual([]);
+  expect(taskFiltering.reloadingTasks.value).toBe(false);
+  progressStore.visibleTeamStores = { self: {} };
+  await taskFiltering.updateVisibleTasks(filters, false);
+  const first = taskFiltering.visibleTasks.value.map((task) => task.id);
+  expect(first.length).toBeGreaterThan(0);
+  expect(new Set(first).size).toBe(first.length);
+  await taskFiltering.updateVisibleTasks(filters, false);
+  expect(taskFiltering.visibleTasks.value.map((task) => task.id)).toEqual(first);
 });

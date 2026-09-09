@@ -600,3 +600,21 @@ describe('tarkov JSON adapters', () => {
     expect(prestige?.conditions?.[1]?.task).toMatchObject({ id: 'task1', name: 'Debut' });
   });
 });
+it.each([undefined, null, {}])(
+  'normalizes non-array trader requirements without losing the task: %j',
+  (traderRequirements) => {
+    const result = adaptTasksCoreResponse(
+      { tasks: { sparse: { id: 'sparse', traderRequirements } } },
+      {},
+      {}
+    ).data.tasks;
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ id: 'sparse' });
+    expect(result[0]?.traderLevelRequirements).toBeUndefined();
+    expect(result[0]?.normalizedTraderRequirements).toEqual(
+      traderRequirements === undefined
+        ? []
+        : [expect.objectContaining({ requirementType: 'unknown' })]
+    );
+  }
+);

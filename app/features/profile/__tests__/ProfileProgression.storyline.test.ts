@@ -181,7 +181,8 @@ const createWrapper = async () => {
           template: '<div data-testid="overview-tab" :data-state="kappaProjection.state" />',
         },
         ProfileTasksTab: {
-          props: ['countedTasks', 'isTaskLocked'],
+          name: 'ProfileTasksTab',
+          props: ['countedTasks', 'isTaskLocked', 'objectiveCompletions'],
           template:
             '<div data-testid="tasks-tab"><span v-for="task in countedTasks" :key="task.id" :data-task="task.id" :data-locked="String(isTaskLocked(task.id))" /></div>',
         },
@@ -236,6 +237,32 @@ describe('ProfileProgression storyline chapter toggle', () => {
         gameEdition: 1,
       })
     );
+  });
+  it('renders legacy progress without objective or trader records as incomplete', async () => {
+    pvpOverrides = { taskObjectives: undefined, traders: undefined };
+    profileMetadataTasks.value = [
+      {
+        id: 'legacy',
+        name: 'Legacy task',
+        objectives: [{ id: 'objective', type: 'shoot', count: 1 }],
+        normalizedTraderRequirements: [
+          {
+            id: 'loyalty',
+            trader: { id: 'prapor', name: 'Prapor' },
+            requirementType: 'level',
+            value: 2,
+            compareMethod: '>=',
+          },
+        ],
+      },
+    ];
+    const wrapper = await createWrapper();
+    await wrapper.get('[data-testid="select-tasks-tab"]').trigger('click');
+    expect(wrapper.get('[data-task="legacy"]').attributes('data-locked')).toBe('true');
+    expect(
+      wrapper.findComponent({ name: 'ProfileTasksTab' }).props('objectiveCompletions')
+    ).toEqual({});
+    wrapper.unmount();
   });
   it('uses isolated profile requirements to label available and locked tasks', async () => {
     profileMetadataTasks.value = [
