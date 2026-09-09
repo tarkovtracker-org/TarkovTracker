@@ -2,7 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref, type Ref } from 'vue';
 import type { Task } from '@/types/tarkov';
 const profileMetadataTasks = ref<Task[]>([]);
@@ -215,6 +215,9 @@ const expectNoStoryStoreWrites = () => {
   expect(setStoryObjectiveUncompleteMock).not.toHaveBeenCalled();
 };
 describe('ProfileProgression storyline chapter toggle', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     setActivePinia(createPinia());
@@ -257,7 +260,7 @@ describe('ProfileProgression storyline chapter toggle', () => {
   });
   it('projects remaining Kappa progress using the isolated task graph', async () => {
     const now = Date.UTC(2026, 8, 8);
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    vi.spyOn(Date, 'now').mockReturnValue(now);
     profileMetadataTasks.value = Array.from({ length: 4 }, (_, index) => ({
       id: `kappa-${index}`,
       name: `Kappa ${index}`,
@@ -275,7 +278,6 @@ describe('ProfileProgression storyline chapter toggle', () => {
     const wrapper = await createWrapper();
     expect(wrapper.get('[data-testid="overview-tab"]').attributes('data-state')).toBe('projected');
     wrapper.unmount();
-    clock.mockRestore();
   });
   it('shows a metadata error while keeping profile controls available', async () => {
     profileMetadataError.value = new Error('Catalog unavailable');

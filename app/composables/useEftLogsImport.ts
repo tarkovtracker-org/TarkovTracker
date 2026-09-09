@@ -240,6 +240,7 @@ const applyCompletedImports = (
   const processedFailed = new Set<string>();
   const completeTask = (taskId: string) => {
     if (processedCompleted.has(taskId) || explicitOtherStates.has(taskId)) return;
+    if (!tasksMap.has(taskId) && !completedTaskIds.has(taskId)) return;
     completeTaskForProgress({ store, taskId, tasksMap });
     applyImportedTaskRequirements(store, tasksMap.get(taskId), requireTraders);
     processedCompleted.add(taskId);

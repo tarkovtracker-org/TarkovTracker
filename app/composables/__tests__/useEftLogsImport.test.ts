@@ -307,7 +307,8 @@ describe('useEftLogsImport', () => {
     );
     await composable.confirmImport('pvp');
     expect(composable.importState.value).toBe('success');
-    expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith(taskId);
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledExactlyOnceWith(taskId);
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalledWith('missing-prerequisite');
     expect(tarkovStore.setTraderLevel).not.toHaveBeenCalled();
   });
   it('backfills required prerequisite tasks when importing a later completed task', async () => {

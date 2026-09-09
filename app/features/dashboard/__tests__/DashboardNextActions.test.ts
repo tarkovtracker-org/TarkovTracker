@@ -28,6 +28,7 @@ const translations: Record<string, string> = {
   'page.dashboard.focus.proof.blocked_level_other': 'Closest unlock: only {count} levels away.',
   'page.dashboard.focus.proof.blocked_trader_unlock':
     'Closest unlock: finish {task} to unlock {trader}.',
+  'page.dashboard.focus.proof.ready_other': 'Best available: {count} objectives left.',
   'page.dashboard.focus.proof.complete': 'No visible work remains in this dashboard scope.',
   'page.dashboard.focus.proof.impact_one': 'Highest payoff: opens 1 follow-up task.',
   'page.dashboard.focus.proof.impact_other': 'Highest payoff: opens {count} follow-up tasks.',
@@ -234,6 +235,6 @@ describe('DashboardNextActions', () => {
 });
 it('explains ordinary ready tasks when no payoff or special goal applies', async () => {
   const wrapper = await mountWithRecommendation(createRecommendation(), 'actionable');
-  expect(wrapper.text()).toContain('page.dashboard.focus.proof.ready_other');
+  expect(wrapper.text()).toContain('Best available: 3 objectives left.');
   wrapper.unmount();
 });

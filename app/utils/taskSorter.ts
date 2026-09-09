@@ -312,7 +312,9 @@ const finalRanks = new Map<string, number>([
 ]);
 const distanceTarget = (blocker: TaskAvailabilityResult['blockers'][number]) => {
   const required = blocker.required ?? 0;
-  return blocker.type === 'trader_level' && blocker.compareMethod === '>' ? required + 1 : required;
+  return ['trader_level', 'player_level'].includes(blocker.type) && blocker.compareMethod === '>'
+    ? required + 1
+    : required;
 };
 const blockerDistance = (blocker: TaskAvailabilityResult['blockers'][number]) => {
   const target = distanceTarget(blocker);
