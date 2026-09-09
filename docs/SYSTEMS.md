@@ -117,7 +117,9 @@ flowchart LR
 
 ### Files
 
-- `app/server/api/tarkov/*.get.ts` — one handler per endpoint; thin wrappers around `edgeCache`.
+- `app/server/api/tarkov/*.get.ts` — one handler per endpoint. Most are thin wrappers around
+  `edgeCache`; `editions.get.ts` projects the overlay directly and `overlay-status.get.ts` reads the
+  precompute manifest, so neither goes through the cache layers.
 - `app/server/utils/tarkov-json.ts` — upstream fetch + adapt into client types.
 - `app/server/utils/tarkov-cache-config.ts` — TTL constants and game-mode validation.
 - `app/types/tarkov.ts` — the adapted shapes the client stores.
@@ -313,9 +315,10 @@ flowchart TD
   layer or reorder them.
 - A `STALE` response must always trigger exactly one background refresh (guarded by
   `inFlightRevalidations`).
-- `X-Cache-Status` must be set on every successful response. Error responses from the
-  catch block (502 on upstream failure) do not set it — the invariant covers the success
-  paths only.
+- `X-Cache-Status` must be set on every successful response served through `edgeCache`. Responses
+  from its catch block do not set it (`503` when the failure already carried `503`, otherwise `502`),
+  and the routes that deliberately bypass the cache layers (`editions`, `overlay-status`) do not set
+  it either — the invariant covers the `edgeCache` success paths only.
 - The cache key must include language and game mode so two locales or modes never share an entry.
 - Hideout edge-cache entries must contain the adapted base payload, not the overlay-applied response;
   `hideout.get.ts` applies the overlay after `edgeCache()` and restores the overlay metadata headers.

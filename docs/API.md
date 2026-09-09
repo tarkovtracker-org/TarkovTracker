@@ -204,14 +204,44 @@ Fetches prestige level requirements.
 
 **Query Parameters:**
 
-| Parameter | Type   | Default | Description   |
-| --------- | ------ | ------- | ------------- |
-| `lang`    | string | `en`    | Language code |
+| Parameter  | Type   | Default   | Description                                   |
+| ---------- | ------ | --------- | --------------------------------------------- |
+| `lang`     | string | `en`      | Language code                                 |
+| `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
 
-Prestige is intentionally sourced from `regular/tasks` and cached by language only because
-`json.tarkov.dev` currently has no PvE prestige data.
+Prestige requirements come from the upstream task payload with overlay corrections applied, so the
+response is cached per language **and** game mode.
 
 **Cache TTL:** 24 hours
+
+---
+
+### GET /api/tarkov/editions
+
+Fetches game editions, story chapters, and seasonal perks projected from the overlay.
+
+**Query Parameters:**
+
+| Parameter  | Type   | Default   | Description                                   |
+| ---------- | ------ | --------- | --------------------------------------------- |
+| `lang`     | string | `en`      | Language code                                 |
+| `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
+
+This endpoint is served directly from the overlay rather than through `edgeCache`, so it returns no
+`X-Cache-Status` header. It answers `503` when the overlay is unavailable.
+
+---
+
+### GET /api/tarkov/overlay-status
+
+Returns the precompute fleet manifest with the overlay identity recorded for each entry. Used by the
+`verify:overlay` release gate to confirm that published precompute entries were built from the
+currently published overlay.
+
+**Query Parameters:** none
+
+Responses are sent with `Cache-Control: no-store` and carry no `X-Cache-Status` header. The endpoint
+answers `503` when the manifest is missing or the precomputed store cannot be read.
 
 ---
 

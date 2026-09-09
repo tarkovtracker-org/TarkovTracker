@@ -20,10 +20,12 @@ const {
   mockCreateTarkovJsonTasksCoreFetcher,
   mockEdgeCache,
   mockFetch,
+  mockGetPrecomputedStore,
   mockGetQuery,
   mockGetValidatedLanguage,
   mockSanitizeTaskRewards,
   mockScheduleBackgroundTask,
+  mockSetHeader,
   mockSetOverlayResponseHeaders,
   mockSetResponseHeaders,
   mockShouldBypassCache,
@@ -41,10 +43,12 @@ const {
   mockCreateTarkovJsonTasksCoreFetcher: vi.fn(),
   mockEdgeCache: vi.fn(),
   mockFetch: vi.fn(),
+  mockGetPrecomputedStore: vi.fn(),
   mockGetQuery: vi.fn(),
   mockGetValidatedLanguage: vi.fn(),
   mockSanitizeTaskRewards: vi.fn(),
   mockScheduleBackgroundTask: vi.fn(),
+  mockSetHeader: vi.fn(),
   mockSetOverlayResponseHeaders: vi.fn(),
   mockSetResponseHeaders: vi.fn(),
   mockShouldBypassCache: vi.fn(),
@@ -87,6 +91,12 @@ vi.mock('~/server/utils/overlay', () => ({
 vi.mock('~/server/utils/overlayResponseHeaders', () => ({
   setOverlayResponseHeaders: mockSetOverlayResponseHeaders,
 }));
+vi.mock('~/server/utils/precomputedTarkov', async () => {
+  const actual = await vi.importActual<typeof import('~/server/utils/precomputedTarkov')>(
+    '~/server/utils/precomputedTarkov'
+  );
+  return { ...actual, getPrecomputedStore: mockGetPrecomputedStore };
+});
 vi.mock('~/server/utils/tarkov-cache-config', () => ({
   CACHE_TTL_DEFAULT: 111,
   CACHE_TTL_EXTENDED: 222,
@@ -130,8 +140,10 @@ describe('Tarkov API handlers', () => {
     mockEdgeCache.mockImplementation(async (_eventArg, _key, fetcher: () => Promise<unknown>) => {
       return await fetcher();
     });
+    mockGetPrecomputedStore.mockReturnValue(null);
     vi.stubGlobal('defineEventHandler', (handler: unknown) => handler);
     vi.stubGlobal('getQuery', mockGetQuery);
+    vi.stubGlobal('setHeader', mockSetHeader);
     vi.stubGlobal('useRuntimeConfig', () => runtimeConfig);
     vi.stubGlobal('fetch', mockFetch as typeof fetch);
   });
@@ -281,6 +293,37 @@ describe('Tarkov API handlers', () => {
       expect(mockCreateTarkovJsonPrestigeFetcher).not.toHaveBeenCalled();
     }
   );
+  describe('overlay-status', () => {
+    const loadHandler = async () =>
+      (await import('@/server/api/tarkov/overlay-status.get')).default;
+    it('serves the precompute manifest without storing it', async () => {
+      const manifest = { entries: [{ key: 'tasks-core-json-v4-en-regular', overlay: 'sha-1' }] };
+      const get = vi.fn(async () => manifest);
+      mockGetPrecomputedStore.mockReturnValue({ get });
+      const handler = await loadHandler();
+      await expect(handler(event)).resolves.toEqual(manifest);
+      expect(get).toHaveBeenCalledWith('overlay-precompute-manifest-json-v4', 'json');
+      expect(mockSetHeader).toHaveBeenCalledWith(event, 'Cache-Control', 'no-store');
+    });
+    it.each([
+      ['the binding is missing', () => null],
+      ['the manifest is absent', () => ({ get: vi.fn(async () => null) })],
+    ])('answers 503 when %s', async (_case, store) => {
+      mockGetPrecomputedStore.mockReturnValue(store());
+      const handler = await loadHandler();
+      await expect(handler(event)).rejects.toMatchObject({ statusCode: 503 });
+      expect(mockSetHeader).not.toHaveBeenCalled();
+    });
+    it('answers 503 instead of surfacing a store read failure', async () => {
+      mockGetPrecomputedStore.mockReturnValue({
+        get: vi.fn(async () => {
+          throw new Error('KV unavailable');
+        }),
+      });
+      const handler = await loadHandler();
+      await expect(handler(event)).rejects.toMatchObject({ statusCode: 503 });
+    });
+  });
   it('passes raw prestige payloads through the scoped overlay projector', async () => {
     const { default: handler } = await import('@/server/api/tarkov/prestige.get');
     mockFetchOverlay.mockResolvedValueOnce({
