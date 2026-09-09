@@ -1541,6 +1541,9 @@ blocked tasks, and unknown data. All-users views use the best visible user's ran
 uses trader order, that trader's required loyalty, readiness, and stable name/ID ties. Pinned
 partitions and map/status grouping remain intact. Item distribution retains Kappa priority and
 uses progression within it; Kappa chain groups use progression while keeping parts adjacent.
+The row sorter accepts a partial progression index: chains inherit their best known rank, and
+wholly unranked groups sort last. Catalog changes recompute the overview reactively; removed
+tasks are not retained as stale rows.
 The existing impact default remains. Saved `level` values retain player-level sorting, now labelled
 Player level; `progression` is additive and invalid saved/query values retain the `none` fallback.
 Genuine level badges, graph levels and XP/level projections remain player-level values.

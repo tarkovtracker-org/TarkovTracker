@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ref } from 'vue';
-import { useKappaOverview } from '@/features/kappa/useKappaOverview';
+import { reactive, ref } from 'vue';
+import { sortKappaRowsByProgression, useKappaOverview } from '@/features/kappa/useKappaOverview';
+import type { KappaRowEntry } from '@/features/kappa/useKappaOverview';
 import type { Task, Trader } from '@/types/tarkov';
 mockNuxtImport('useI18n', () => () => ({ t: (key: string) => key }));
 const traders: Trader[] = [
@@ -10,7 +11,7 @@ const traders: Trader[] = [
   { id: 'therapist', name: 'Therapist', normalizedName: 'therapist' },
   { id: 'jaeger', name: 'Jaeger', normalizedName: 'jaeger' },
 ];
-const tasks: Task[] = [
+const tasks = reactive<Task[]>([
   {
     id: 't-prapor-low',
     name: 'Prapor Low Level',
@@ -45,7 +46,7 @@ const tasks: Task[] = [
     name: 'Orphan Quest',
     kappaRequired: true,
   },
-];
+]);
 let completionState: Record<string, boolean> = {};
 let failedState: Record<string, boolean> = {};
 let unlockedState: Record<string, { self: boolean }> = {};
@@ -80,28 +81,16 @@ describe('useKappaOverview', () => {
     unlockedState = {};
     invalidState = {};
   });
-  it('retains cached rows when the ordering catalog no longer includes their task IDs', () => {
+  it('drops removed catalog tasks from reactive overview rows', () => {
     const original = [...tasks];
-    const chain = {
-      id: 'cached-chain',
-      name: 'Cached - Part 1',
-      kappaRequired: true,
-      trader: { id: 'prapor', name: 'Prapor' },
-    };
     try {
-      tasks.push(chain);
       const overview = useKappaOverview(() => 'kappa');
-      const rowIds = overview.tasksWithStatus.value.map((row) => row.task.id);
+      expect(overview.tasksWithStatus.value.map((row) => row.task.id)).toContain('t-prapor-low');
       tasks.splice(0, tasks.length, ...original.filter((task) => task.id === 't-prapor-mid'));
-      const groupedIds = overview.groupedByTrader.value.flatMap((group) =>
-        group.rows.map((row) => row.task.id)
-      );
-      expect(groupedIds.toSorted()).toEqual(rowIds.toSorted());
+      expect(overview.tasksWithStatus.value.map((row) => row.task.id)).toEqual(['t-prapor-mid']);
       expect(
-        overview.groupedByTrader.value
-          .find((group) => group.trader.id === 'prapor')
-          ?.rows.map((row) => row.task.id)
-      ).toEqual(['t-prapor-mid', 't-prapor-low', 'cached-chain']);
+        overview.groupedByTrader.value.flatMap((group) => group.rows.map((row) => row.task.id))
+      ).toEqual(['t-prapor-mid']);
     } finally {
       tasks.splice(0, tasks.length, ...original);
     }
@@ -264,5 +253,48 @@ describe('useKappaOverview chain ordering', () => {
     vi.doUnmock('@/stores/useMetadata');
     vi.doUnmock('@/stores/useTarkov');
     vi.doUnmock('@/stores/useProgress');
+  });
+});
+describe('sortKappaRowsByProgression', () => {
+  const row = (id: string, name: string = id): KappaRowEntry => ({
+    task: { id, name },
+    status: 'locked',
+    isInvalid: false,
+  });
+  it('places missing IDs after ranked rows and keeps unranked chain parts together', () => {
+    const rows = [
+      row('part-2', 'Chain - Part 2'),
+      row('unranked'),
+      row('ranked'),
+      row('part-1', 'Chain - Part 1'),
+    ];
+    const original = structuredClone(rows);
+    expect(
+      sortKappaRowsByProgression(rows, new Map([['ranked', 0]])).map((entry) => entry.task.id)
+    ).toEqual(['ranked', 'unranked', 'part-1', 'part-2']);
+    expect(rows).toEqual(original);
+  });
+  it('anchors every chain part at its best known rank regardless of input or part order', () => {
+    const rows = [
+      row('part-3', 'Chain - Part 3'),
+      row('standalone'),
+      row('part-2', 'Chain - Part 2'),
+      row('part-1', 'Chain - Part 1'),
+      row('other', 'Other - Part 1'),
+    ];
+    const order = new Map([
+      ['part-1', 2],
+      ['part-2', 0],
+      ['standalone', 1],
+      ['other', 3],
+    ]);
+    expect(sortKappaRowsByProgression(rows, order).map((entry) => entry.task.id)).toEqual([
+      'part-1',
+      'part-2',
+      'part-3',
+      'standalone',
+      'other',
+    ]);
+    expect(sortKappaRowsByProgression([], order)).toEqual([]);
   });
 });
