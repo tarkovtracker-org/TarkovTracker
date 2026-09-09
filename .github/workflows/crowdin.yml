@@ -1,0 +1,47 @@
+name: Crowdin Sync
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/locales/en.json'
+      - 'crowdin.yml'
+      - '.github/workflows/crowdin.yml'
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+# All triggers share the same Crowdin project and localization branch.
+concurrency:
+  group: crowdin-sync
+  cancel-in-progress: false
+jobs:
+  sync:
+    if: github.repository == 'tarkovtracker-org/TarkovTracker' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Synchronize Crowdin translations
+        uses: crowdin/github-action@0d5670f539973aea2f01abce61a8989934df0025 # v3
+        with:
+          upload_sources: true
+          upload_translations: false
+          download_translations: true
+          crowdin_branch_name: main
+          localization_branch_name: locales
+          create_pull_request: true
+          pull_request_base_branch_name: main
+          pull_request_title: 'New Crowdin updates'
+          pull_request_body: 'Automated translation updates from Crowdin.'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CROWDIN_PROJECT_ID: ${{ secrets.CROWDIN_PROJECT_ID }}
+          CROWDIN_PERSONAL_TOKEN: ${{ secrets.CROWDIN_PERSONAL_TOKEN }}

@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Session, SupabaseClient } from '@supabase/supabase-js';
 export interface SupabaseUser {
   id: string | null;
   email: string | null;
@@ -33,7 +33,7 @@ export interface SupabasePlugin {
     options?: { skipBrowserRedirect?: boolean; redirectTo?: string }
   ) => Promise<{ url?: string }>;
   signOut: () => Promise<void>;
-  ready: () => Promise<void>;
+  ready: () => Promise<Session | null>;
 }
 declare module '#app' {
   interface NuxtApp {

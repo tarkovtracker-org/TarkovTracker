@@ -2,7 +2,8 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultState, type UserState } from '@/stores/progressState';
-import { performReset } from '@/stores/tarkov/resetEngine';
+import { mergeProgressData } from '@/stores/tarkov/progressMerge';
+import { performReset, resolveInitialSyncState } from '@/stores/tarkov/resetEngine';
 import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 const { clearProgressStorageMock, supabaseContext, syncProgressStateMock } = vi.hoisted(() => ({
   clearProgressStorageMock: vi.fn(),
@@ -44,6 +45,130 @@ describe('performReset seasonal', () => {
     supabaseContext.user.id = 'user-1';
     syncProgressStateMock.mockResolvedValue({ error: null });
   });
+  it('merges timestamped progress when a visibility-only mode timestamp is newer', () => {
+    const local = structuredClone(defaultState);
+    const remote = structuredClone(defaultState);
+    local.pvp.taskCompletions.localTask = { complete: true, timestamp: 20 };
+    local.pvp.hideoutModules.module = { complete: true, timestamp: 20 };
+    remote.pvp.taskCompletions.remoteTask = { complete: true, timestamp: 10 };
+    const result = resolveInitialSyncState(local, remote, 20, 30, 2, 1, {
+      mergeModeSnapshots: true,
+    });
+    expect(result.pvp.taskCompletions.localTask?.complete).toBe(true);
+    expect(result.pvp.taskCompletions.remoteTask?.complete).toBe(true);
+    expect(result.pvp.hideoutModules.module?.complete).toBe(true);
+    remote.pvp.progressEpoch = 1;
+    expect(
+      resolveInitialSyncState(local, remote, 20, 30, 2, 1, { mergeModeSnapshots: true }).pvp
+        .taskCompletions.localTask
+    ).toBeUndefined();
+  });
+  it('does not use unrelated mode scores when both mode clocks are unknown', () => {
+    const local = structuredClone(defaultState);
+    const remote = structuredClone(defaultState);
+    local.pve.displayName = 'stale local name';
+    local.pve.taskObjectives.objective = { count: 4, timestamp: 20 };
+    remote.pve.displayName = 'remote name';
+    remote.pve.taskObjectives.objective = { count: 1, timestamp: 10 };
+    const result = resolveInitialSyncState(local, remote, 0, 30, 99, 1, {
+      localModeTimestamps: { pve: 0 },
+      modeUpdatedAt: {},
+    });
+    expect(result.pve.displayName).toBe('remote name');
+    expect(result.pve.taskObjectives.objective?.count).toBe(4);
+  });
+  it.each(['pvp', 'pve', 'seasonal'] as const)(
+    'does not lend account metadata freshness to unknown %s progress',
+    (mode) => {
+      const local = structuredClone(defaultState);
+      const remote = structuredClone(defaultState);
+      local[mode].displayName = null;
+      local[mode].xpOffset = 0;
+      local[mode].skillOffsets = {};
+      local[mode].taskObjectives.objective = { count: 0, timestamp: 20 };
+      remote[mode].displayName = 'older name';
+      remote[mode].xpOffset = 100;
+      remote[mode].skillOffsets = { Endurance: 4 };
+      remote[mode].taskObjectives.objective = { count: 5, timestamp: 10 };
+      remote[mode].taskCompletions.remoteTask = { complete: true, timestamp: 10 };
+      remote.gameEdition = 4;
+      const result = resolveInitialSyncState(local, remote, 10, 30, 1, 99, {
+        localModeTimestamps: { [mode]: 20 },
+        modeUpdatedAt: {},
+      });
+      expect(result.gameEdition).toBe(4);
+      expect(result[mode]).toMatchObject({ displayName: null, xpOffset: 0, skillOffsets: {} });
+      expect(result[mode].skillOffsets).toEqual({});
+      expect(result[mode].taskObjectives.objective?.count).toBe(0);
+      expect(result[mode].taskCompletions.remoteTask?.complete).toBe(true);
+      remote[mode].progressEpoch = 1;
+      const reset = resolveInitialSyncState(local, remote, 10, 30, 1, 99, {
+        localModeTimestamps: { [mode]: 20 },
+        modeUpdatedAt: {},
+      });
+      expect(reset[mode].progressEpoch).toBe(1);
+      expect(reset[mode].displayName).toBe('older name');
+    }
+  );
+  it.each([true, false])(
+    'preserves newer count decrements and explicit clears (local preferred: %s)',
+    (preferLocal) => {
+      const local = structuredClone(defaultState);
+      const remote = structuredClone(defaultState);
+      const preferred = preferLocal ? local : remote;
+      const older = preferLocal ? remote : local;
+      preferred.pvp.taskObjectives.objective = { count: 0, complete: false };
+      older.pvp.taskObjectives.objective = { count: 5, complete: true };
+      // Per-entry timestamps override the overall snapshot preference.
+      preferred.pvp.hideoutParts.part = { count: 8, timestamp: 10 };
+      older.pvp.hideoutParts.part = { count: 2, timestamp: 20 };
+      const result = resolveInitialSyncState(local, remote, preferLocal ? 30 : 10, 20, 1, 1, {
+        mergeModeSnapshots: true,
+      });
+      expect(result.pvp.taskObjectives.objective?.count).toBe(0);
+      expect(result.pvp.taskObjectives.objective?.complete).toBe(false);
+      expect(result.pvp.hideoutParts.part?.count).toBe(2);
+    }
+  );
+  it.each([false, true])(
+    'handles count entries without numeric counts (timestamp preference: %s)',
+    (preferNewerCount) => {
+      const local = structuredClone(defaultState.pvp);
+      const remote = structuredClone(defaultState.pvp);
+      local.taskObjectives.noCounts = { complete: false, timestamp: 1 };
+      remote.taskObjectives.noCounts = { complete: true, timestamp: 2 };
+      local.hideoutParts.olderCount = { count: 4, timestamp: 1 };
+      remote.hideoutParts.olderCount = { complete: true, timestamp: 2 };
+      local.taskObjectives.decreased = { count: 4, timestamp: 1 };
+      remote.taskObjectives.decreased = { count: 2, timestamp: 2 };
+      const result = mergeProgressData(local, remote, preferNewerCount);
+      expect(result.taskObjectives.decreased?.count).toBe(preferNewerCount ? 2 : 4);
+      expect(result.taskObjectives.noCounts?.count).toBe(0);
+      expect(result.hideoutParts.olderCount?.count).toBe(4);
+    }
+  );
+  it.each([true, false])(
+    'preserves preferred profile clears at startup (local: %s)',
+    (localWins) => {
+      const local = structuredClone(defaultState);
+      const remote = structuredClone(defaultState);
+      const preferred = localWins ? local : remote;
+      const older = localWins ? remote : local;
+      preferred.pvp.displayName = null;
+      preferred.pvp.skillOffsets = {};
+      preferred.pvp.xpOffset = 0;
+      older.pvp.displayName = 'old name';
+      older.pvp.skillOffsets = { Endurance: 4 };
+      older.pvp.xpOffset = 100;
+      older.pvp.taskCompletions.remoteTask = { complete: true, timestamp: 10 };
+      const result = resolveInitialSyncState(local, remote, localWins ? 30 : 10, 20, 1, 1, {
+        mergeModeSnapshots: true,
+      });
+      expect(result.pvp).toMatchObject({ displayName: null, skillOffsets: {}, xpOffset: 0 });
+      expect(result.pvp.skillOffsets).toEqual({});
+      expect(result.pvp.taskCompletions.remoteTask?.complete).toBe(true);
+    }
+  );
   it('resets only the seasonal mode and leaves persistent progress untouched', async () => {
     const store = createStore();
     await performReset('seasonal', store);

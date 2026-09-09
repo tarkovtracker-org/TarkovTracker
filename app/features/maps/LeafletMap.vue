@@ -656,6 +656,10 @@
   import { createApp } from 'vue';
   import { type MapViewState, useLeafletMap, withoutZoomSnap } from '@/composables/useLeafletMap';
   import {
+    mapObjectiveCategory,
+    type MapObjectiveCategory,
+  } from '@/composables/useMapObjectiveMarks';
+  import {
     MAP_BUTTON_ACTIVE_CLASS,
     MAP_BUTTON_INACTIVE_CLASS,
     PAN_SPEED_MAX,
@@ -669,10 +673,6 @@
   } from '@/features/maps/composables/useLeafletMapControls';
   import LeafletObjectiveTooltip from '@/features/maps/LeafletObjectiveTooltip.vue';
   import { getMarksHash, type MapMark } from '@/features/maps/utils/marksHash';
-  import {
-    getObjectiveCategory,
-    type ObjectiveCategory,
-  } from '@/features/maps/utils/objectiveCategory';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { logger } from '@/utils/logger';
   import { clusterSpawns } from '@/utils/mapClustering';
@@ -779,7 +779,7 @@
     set: (value: boolean) => preferencesStore.setMapShowTeamObjectives(value),
   });
   interface ObjectiveChip {
-    key: ObjectiveCategory;
+    key: MapObjectiveCategory;
     label: string;
     color: string;
     isOn: boolean;
@@ -1561,12 +1561,12 @@
       }
       return Math.abs(sum / 2);
     };
-    const categoryColors: Record<ObjectiveCategory, string> = {
+    const categoryColors: Record<MapObjectiveCategory, string> = {
       self: mapColors.value.SELF_OBJECTIVE,
       pinned: mapColors.value.PINNED_OBJECTIVE,
       team: mapColors.value.TEAM_OBJECTIVE,
     };
-    const categoryEnabled: Record<ObjectiveCategory, boolean> = {
+    const categoryEnabled: Record<MapObjectiveCategory, boolean> = {
       self: mapShowSelfObjectives.value,
       pinned: mapShowPinnedObjectives.value,
       team: mapShowTeamObjectives.value,
@@ -1574,7 +1574,7 @@
     props.marks.forEach((mark) => {
       const objectiveId = mark.id;
       if (!objectiveId) return;
-      const category = getObjectiveCategory(mark);
+      const category = mapObjectiveCategory(mark.pinned === true, mark.users ?? []);
       if (!categoryEnabled[category]) return;
       const markerColor = categoryColors[category];
       mark.possibleLocations?.forEach((location) => {

@@ -10,7 +10,9 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 **Concurrency:** Outdated runs are automatically cancelled for the same PR or branch.
 **Jobs:**
 
-- `Lint & Format` — ESLint + Prettier checks
+- `Validation plan` — proposed scope plus full effective scope during shadow rollout
+- `CI Result` — strict aggregate of selected jobs; missing data or unexpected skips fail
+- `Lint & Format` — ESLint + Prettier, i18n, and Node workflow fixtures
 - `Fallow audit` — changed-file dead code, duplication, and complexity gate
 - `Type Check` — `vue-tsc` / Nuxt type checking
 - `Test (shard 1/4)` … `Test (shard 4/4)` — Vitest with coverage, sharded across 4 parallel jobs. The `github-actions` reporter annotates failed tests directly on the PR diff so the failing test name and assertion are visible without digging into logs. Shards report imported files only to avoid duplicate zero-filled entries, and Codecov merges the per-shard coverage. Unsharded local coverage retains the full `app/**/*.{ts,vue}` denominator.
@@ -20,14 +22,51 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 - `Workers` — Validate api-gateway (generated types, typecheck, OpenAPI, deployment dry-run, Node
   unit tests, and a workerd smoke using the production Wrangler configuration)
 
-All jobs run in parallel; the `Workers` job no longer waits for `Validate` to finish.
+Heavy jobs run in parallel after classification; systems drift runs independently.
+Lighthouse scope detection runs independently of PR metadata installation and commitlint.
+
+### Crowdin Sync (`crowdin.yml`)
+
+**Triggers:** English source, Crowdin config, or sync workflow changes on `main`; every six hours
+at minute 17 UTC; manual dispatch on `main`. Runs are serialized without cancelling an active sync.
+The workflow uploads `app/locales/en.json` to the Crowdin `main` branch and downloads translations
+to `app/locales/%two_letters_code%.json`, preserving the directory hierarchy. It never uploads
+local translations. The existing `locales` branch supplies translation PRs targeting `main`.
+
+Repository secrets `CROWDIN_PROJECT_ID` and `CROWDIN_PERSONAL_TOKEN` authenticate to Crowdin only.
+GitHub writes use the automatic `secrets.GITHUB_TOKEN`, with only `contents: write` and
+`pull-requests: write`, so newly created PRs are authored by `github-actions[bot]`.
+
+Before enabling this workflow on `main`:
+
+1. Confirm the existing Crowdin source is under the Crowdin branch `main` at
+   `app/locales/en.json`. Crowdin branches are separate from GitHub branches; if the source lives
+   at the Crowdin project root, omit `crowdin_branch_name` before the first run.
+2. Disable the native Crowdin GitHub integration's synchronization for this repository so both
+   integrations cannot write concurrently. Preserve the Crowdin project, translations, and GitHub
+   `locales` branch.
+3. Review and merge or close any existing `locales` PR authored by a personal account. The Action
+   reuses open PRs and cannot change their author. Keep the branch when disposing of the old PR.
+4. Ensure Actions may create PRs and the repository's selected-action policy permits
+   the pinned `crowdin/github-action` v3 commit and `actions/checkout@v7`.
+
+After merging, inspect the first sync run and the next translation PR: verify its author, base,
+and that its diff contains only expected non-English locale exports. The Action creates a PR
+when it commits changed translations; a no-change run may create no PR. If necessary, dispatch
+`Crowdin Sync` on `main` after new translations are available. Do not enable runner debug logging
+for this workflow: the upstream Action prints its environment in debug mode.
 
 ### Crowdin locale PRs
 
-PRs whose changes are limited to the non-English locale exports in `app/locales/` do not trigger
-`CI`, `PR Checks`, `Security`, or `Dependabot Auto Merge`. This prevents each burst of Crowdin
-synchronization commits from starting redundant repository-owned jobs. Changes to source code,
-workflow files, or `app/locales/en.json` still run the normal checks.
+`CI`, `PR Checks`, and `Security` report for translation-only PRs. During shadow rollout they retain
+full validation. The proposed classifier selects formatting, i18n, and systems drift for locales;
+only a verified follow-up change enables expensive-check skips. Non-English locale formatting
+exclusions remain intact. See the rollout checklist in `docs/WORKFLOW_AUTOMATION.md`.
+
+Crowdin Sync now creates PRs using `GITHUB_TOKEN`. GitHub creates their PR workflow runs in an
+approval-required state; a repository writer must approve them before they execute. Removing path
+exclusions does not bypass this platform requirement. See
+[GitHub token event behavior](https://docs.github.com/en/actions/concepts/security/github_token).
 
 ### Security (`security.yml`)
 
@@ -36,13 +75,17 @@ workflow files, or `app/locales/en.json` still run the normal checks.
 
 ### Release (`release.yml`)
 
-**Trigger:** Push to main (excluding `**.md`, `docs/**`)
-**Jobs:** `Release` (build + semantic-release)
+**Trigger:** Successful completion of `CI` for a same-repository push to `main`.
+**Jobs:** `Release` (validate the CI run and current main SHA, build, recheck, semantic-release).
+The workflow reuses CI's test shards and database checks. It rejects stale commits and CI attempts,
+PR/fork events, and automation-skip directives before publishing. Documentation-only pushes can
+reach the gate; conventional commits determine whether a version is warranted. Publication is
+serialized without cancelling an active release. See `docs/WORKFLOW_AUTOMATION.md` for details.
 
 ### PR Checks (`pr-checks.yml`)
 
 **Trigger:** PR opened/updated/reopened
-**Jobs:** `PR Meta` (labels, size, commit validation, Lighthouse gating), `Lighthouse` (conditional on UI file changes, Lighthouse configuration/workflow changes, or `ui`/`performance` labels)
+**Jobs:** `PR Meta` (labels, size, commit validation), `Lighthouse scope` (lightweight detection), `Lighthouse` (conditional on UI file changes, Lighthouse configuration/workflow changes, or `ui`/`performance` labels)
 **Lighthouse server:** Builds the Cloudflare Pages app and serves it with `wrangler pages dev`
 so `/api/*` routes are available during audits. The build sets
 `NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED=false` so audits measure the app itself rather than the
@@ -75,15 +118,14 @@ introduce a new pinned SHA.
 **Trigger:** Daily schedule
 **Jobs:** Mark inactive issues/PRs stale, then close stale items unless labeled `never-stale`
 
-## Check Count
+## Merge checks
 
-| Context       | Checks                                                                                                                                                           |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PR            | ~15 (Fallow audit, Lint & Format, Type Check, Test ×4 shards, Validate, Supabase DB, Systems drift check, Workers, PR Meta, Security Scan, CodeQL, Lighthouse\*) |
-| Dependabot PR | ~16 (standard PR checks plus Dependabot Auto Merge when allowlisted)                                                                                             |
-| Main push     | ~14 (Fallow audit, Lint & Format, Type Check, Test ×4 shards, Validate, Supabase DB, Systems drift check, Workers, Security Scan, CodeQL, Release)               |
+Existing check names and Dependabot's expected-check list are preserved. New classification and
+aggregate jobs supplement them. Keep branch protection and external Codecov/Security gates unchanged
+while shadow mode is validated; `CI Result` does not replace them.
 
-\*Lighthouse runs only when the PR touches UI paths or already carries `performance`/`ui`
+Successful main CI completion separately triggers the gated `Release` workflow.
+Lighthouse runs only when the PR touches UI paths or already carries `performance`/`ui`.
 
 ## Secrets
 
@@ -91,16 +133,10 @@ Workflow-specific secrets are not required for the Gitleaks step anymore. The wo
 
 ## AI Review Bots
 
-Cubic is the primary automatic reviewer, with Greptile retained as a useful secondary reviewer.
-CodeRabbit remains enabled and skips PRs whose titles contain `Crowdin` via `.coderabbit.yaml`, but
-its frequent rate limits make it best-effort rather than a required review dependency. Kilo Code is
-disabled because its signal was low. CodeAnt is a removal candidate because its AI, quality,
-security, and coverage checks overlap with retained integrations; its locale exclusions live in
-`.codeant/configuration.json` while its activation remains dashboard-controlled. GitHub-managed
-Copilot review and the duplicate CodeQL workflow (`dynamic/github-code-scanning/codeql`) are also
-controlled outside this repository; the checked-in `Security` workflow already runs CodeQL for
-normal code PRs. Socket PR alerts are limited to dependency manifest changes by the root
-`socket.yml`; Snyk and Supabase preview behavior are controlled by their integration settings.
+Codex is the intended primary reviewer, with one best-effort local CodeRabbit pass for substantial
+behavior changes. Existing automatic provider settings remain unchanged until Codex delivery and
+exclusions are verified on representative PRs. See the reviewer transition checklist in
+`docs/WORKFLOW_AUTOMATION.md`; dashboard settings are not proven by checked-in configuration.
 
 ## Commands
 

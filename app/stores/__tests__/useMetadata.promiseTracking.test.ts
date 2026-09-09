@@ -69,6 +69,18 @@ describe('useMetadataStore promise tracking', () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
+  it('advances the core revision on cache replacement but not detail merges', async () => {
+    const store = useMetadataStore();
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(tasksCorePayload());
+    await store.fetchTasksCoreData();
+    expect(store.tasksCoreRevision).toBe(1);
+    expect(store.loading).toBe(false);
+    await store.fetchTasksCoreData();
+    expect(store.tasksCoreRevision).toBe(2);
+    expect(store.loading).toBe(false);
+    store.mergeTaskObjectives([{ id: 'task-1', objectives: [], failConditions: [] }]);
+    expect(store.tasksCoreRevision).toBe(2);
+  });
   it('populates tasks and hideout when JSON API responses return valid { data } envelopes', async () => {
     const store = useMetadataStore();
     const fetchMock = vi.fn(async (endpoint: string) => {

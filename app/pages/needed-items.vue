@@ -80,6 +80,7 @@
                   :need="item"
                   item-style="row"
                   :initially-visible="index < adjustedRenderCount"
+                  :search="search"
                 />
               </div>
               <div
@@ -99,6 +100,7 @@
                   item-style="card"
                   :card-style="cardStyle"
                   :initially-visible="index < adjustedRenderCount"
+                  :search="search"
                   :data-index="index"
                   class="content-visibility-auto-240 h-full"
                 />

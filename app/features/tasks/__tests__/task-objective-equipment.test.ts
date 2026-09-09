@@ -92,6 +92,23 @@ describe('task-objective-equipment', () => {
     );
     expect(equipment).toEqual([shared]);
   });
+  it('excludes the canonical item in all mode so task-card chips stay unchanged', () => {
+    const item = createItem('canonical-item');
+    const weaponEquipment = getObjectiveEquipmentItems(
+      createObjective({
+        type: 'buildWeapon',
+        item,
+      })
+    );
+    expect(weaponEquipment).toEqual([]);
+    const bringEquipment = getObjectiveEquipmentItems(
+      createObjective({
+        type: 'plantItem',
+        item,
+      })
+    );
+    expect(bringEquipment).toEqual([]);
+  });
   it('includes items for bring-type objectives when mode is set to "bring"', () => {
     const item1 = createItem('item-1');
     const equipment = getObjectiveEquipmentItems(
@@ -102,6 +119,28 @@ describe('task-objective-equipment', () => {
       'bring'
     );
     expect(equipment).toEqual([item1]);
+  });
+  it('includes the canonical item for bring-type objectives when items is absent', () => {
+    const item = createItem('canonical-item');
+    const equipment = getObjectiveEquipmentItems(
+      createObjective({
+        type: 'plantItem',
+        item,
+      }),
+      'bring'
+    );
+    expect(equipment).toEqual([item]);
+  });
+  it('excludes the canonical item for non-bring objectives in bring mode', () => {
+    const item = createItem('non-bring-item');
+    const equipment = getObjectiveEquipmentItems(
+      createObjective({
+        type: 'giveItem',
+        item,
+      }),
+      'bring'
+    );
+    expect(equipment).toEqual([]);
   });
   it('excludes items for non-bring objectives when mode is set to "bring"', () => {
     const item2 = createItem('item-2');

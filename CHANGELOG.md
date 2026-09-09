@@ -1,3 +1,101 @@
+# [1.77.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.7...v1.77.0) (2026-09-07)
+
+
+### Features
+
+* **needed-items:** search pooled quest objectives by any accepted item ([#819](https://github.com/tarkovtracker-org/TarkovTracker/issues/819)) ([255071a](https://github.com/tarkovtracker-org/TarkovTracker/commit/255071a335b48a8819f9e49d4300e4376140620d)), closes [#812](https://github.com/tarkovtracker-org/TarkovTracker/issues/812)
+
+## [1.76.7](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.6...v1.76.7) (2026-09-07)
+
+
+### Bug Fixes
+
+* classify team creation membership races ([#820](https://github.com/tarkovtracker-org/TarkovTracker/issues/820)) ([c8add78](https://github.com/tarkovtracker-org/TarkovTracker/commit/c8add784a3632ea301d2e548d8aae7125ae5b35c))
+
+## [1.76.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.5...v1.76.6) (2026-09-07)
+
+
+### Bug Fixes
+
+* **settings:** restore quest history across EFT log versions and modes ([#817](https://github.com/tarkovtracker-org/TarkovTracker/issues/817)) ([6d6abc1](https://github.com/tarkovtracker-org/TarkovTracker/commit/6d6abc1bcd1686ab4f6226a2146073a1b41cd290))
+
+## [1.76.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.4...v1.76.5) (2026-09-07)
+
+
+### Bug Fixes
+
+* **app:** reduce Supabase realtime and transfer waste ([#810](https://github.com/tarkovtracker-org/TarkovTracker/issues/810)) ([ca5433a](https://github.com/tarkovtracker-org/TarkovTracker/commit/ca5433af5029e01d078de4db08d99f96ac887836))
+
+## [1.76.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.3...v1.76.4) (2026-09-06)
+
+
+### Bug Fixes
+
+* **tasks:** stabilize initial cards and complete performance validation ([#809](https://github.com/tarkovtracker-org/TarkovTracker/issues/809)) ([e6da507](https://github.com/tarkovtracker-org/TarkovTracker/commit/e6da507e72e5eab49c4b59bee39ec27ba4bb11d0))
+
+## [1.76.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.2...v1.76.3) (2026-09-06)
+
+
+### Performance Improvements
+
+* **tasks:** avoid premature rendering during startup ([#808](https://github.com/tarkovtracker-org/TarkovTracker/issues/808)) ([8f0c638](https://github.com/tarkovtracker-org/TarkovTracker/commit/8f0c63896ffa8df08d40df241474dcc0e21701c2)), closes [#444](https://github.com/tarkovtracker-org/TarkovTracker/issues/444)
+
+## [1.76.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.1...v1.76.2) (2026-09-06)
+
+
+### Bug Fixes
+
+* **ci:** reuse validated main CI for releases ([#805](https://github.com/tarkovtracker-org/TarkovTracker/issues/805)) ([c3f2ab2](https://github.com/tarkovtracker-org/TarkovTracker/commit/c3f2ab271dfabb0332fb449314116c6c502d5b8b))
+
+## [1.76.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.0...v1.76.1) (2026-09-06)
+
+
+### Bug Fixes
+
+* **api:** safely describe invalid progress states ([#803](https://github.com/tarkovtracker-org/TarkovTracker/issues/803)) ([d00f723](https://github.com/tarkovtracker-org/TarkovTracker/commit/d00f72323580663483c0aea21595c73657b29834))
+
+# [1.76.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.75.4...v1.76.0) (2026-09-06)
+
+
+### Features
+
+* **tasks:** use compact cards with optional collapse and hidden rewards ([#781](https://github.com/tarkovtracker-org/TarkovTracker/issues/781)) ([63b0926](https://github.com/tarkovtracker-org/TarkovTracker/commit/63b09261aab6d50c846c01536ec02dae80899a0e))
+
+## [1.75.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.75.3...v1.75.4) (2026-09-06)
+
+
+### Bug Fixes
+
+* **api:** bound profile reads and localize cache purge errors ([#802](https://github.com/tarkovtracker-org/TarkovTracker/issues/802)) ([0844256](https://github.com/tarkovtracker-org/TarkovTracker/commit/0844256ec4c9baf06e0bf2a5cb3124163afc83ab))
+
+## [1.75.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.75.2...v1.75.3) (2026-09-06)
+
+
+### Bug Fixes
+
+* **ci:** preserve Nuxt context in Fallow audits ([#800](https://github.com/tarkovtracker-org/TarkovTracker/issues/800)) ([0befdd7](https://github.com/tarkovtracker-org/TarkovTracker/commit/0befdd748150e7152f21944b8f357a5c4a77e2e6))
+
+## [1.75.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.75.1...v1.75.2) (2026-09-06)
+
+
+### Bug Fixes
+
+* harden auth and realtime resource usage ([#786](https://github.com/tarkovtracker-org/TarkovTracker/issues/786)) ([74c4ec2](https://github.com/tarkovtracker-org/TarkovTracker/commit/74c4ec2c27c2a8cdf03aefa4cd73788733b7eb0a))
+
+## [1.75.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.75.0...v1.75.1) (2026-09-03)
+
+
+### Bug Fixes
+
+* **ci:** deploy the version-bump commit so the footer shows the real version ([#796](https://github.com/tarkovtracker-org/TarkovTracker/issues/796)) ([d35d533](https://github.com/tarkovtracker-org/TarkovTracker/commit/d35d5334b8bb704329152278e3928616252fa1f7))
+
+# [1.75.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.74.1...v1.75.0) (2026-09-03)
+
+
+### Features
+
+* **maps:** split map requirements strip into pinned and active groups ([#748](https://github.com/tarkovtracker-org/TarkovTracker/issues/748)) ([c4704b1](https://github.com/tarkovtracker-org/TarkovTracker/commit/c4704b18674400059db2cd9c48aa4805aa4c95ac))
+
 ## [1.74.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.74.0...v1.74.1) (2026-08-30)
 
 
