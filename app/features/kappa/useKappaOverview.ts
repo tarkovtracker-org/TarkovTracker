@@ -61,7 +61,7 @@ export const sortKappaRowsByProgression = (
     return { row, anchor, isChain: 1, part: chain.part };
   });
   return rankedRows
-    .sort((a, b) => a.anchor.rank - b.anchor.rank || a.isChain - b.isChain || a.part - b.part)
+    .toSorted((a, b) => a.anchor.rank - b.anchor.rank || a.isChain - b.isChain || a.part - b.part)
     .map(({ row }) => row);
 };
 const taskFilterFor = (tab: KappaTabKey) =>
