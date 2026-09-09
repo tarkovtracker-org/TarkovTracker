@@ -298,6 +298,18 @@ describe('useEftLogsImport', () => {
     expect(tarkovStore.switchGameMode).not.toHaveBeenCalled();
     expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
   });
+  it('imports completions when predecessor metadata is missing', async () => {
+    const taskId = '61604635c725987e815b1a46';
+    metadataStore.tasks = [{ id: taskId, predecessors: ['missing-prerequisite'] }];
+    const composable = await loadComposable();
+    await composable.parseFile(
+      new File([completionLog(taskId)], 'notifications.log', { type: 'text/plain' })
+    );
+    await composable.confirmImport('pvp');
+    expect(composable.importState.value).toBe('success');
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith(taskId);
+    expect(tarkovStore.setTraderLevel).not.toHaveBeenCalled();
+  });
   it('backfills required prerequisite tasks when importing a later completed task', async () => {
     const prerequisiteTaskId = '5ac2426c86f774138762edfe';
     const completedTaskId = '61604635c725987e815b1a46';

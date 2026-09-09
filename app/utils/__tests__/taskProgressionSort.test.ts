@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sortTasksByProgression, sortTasksByTrader } from '@/utils/taskSorter';
+import { sortTasks, sortTasksByProgression, sortTasksByTrader } from '@/utils/taskSorter';
 import type { TaskBlocker, TaskEvaluationMap } from '@/stores/taskAvailability';
 import type { Task } from '@/types/tarkov';
 const task = (id: string, overrides: Partial<Task> = {}): Task => ({ id, name: id, ...overrides });
@@ -75,4 +75,22 @@ describe('progression sorting', () => {
       sortTasksByTrader([own, other], new Map([['prapor', 0]]), 1, 'asc').map((t) => t.id)
     ).toEqual(['other', 'own']);
   });
+});
+it('dispatches progression and trader sorts with the selected team readiness', () => {
+  const tasks = [task('blocked'), task('ready')];
+  const config = {
+    evaluations: {
+      blocked: { teammate: blocked({ type: 'player_level', required: 10 }) },
+      ready: { teammate: available },
+    },
+    teamIds: ['teammate'],
+    progressData: { tasksCompletions: {}, tasksFailed: {}, unlockedTasks: {} },
+    traderOrderMap: new Map<string, number>(),
+    defaultTraderOrder: 1,
+  };
+  for (const mode of ['progression', 'trader'] as const)
+    expect(sortTasks(tasks, mode, 'asc', config).map((entry) => entry.id)).toEqual([
+      'ready',
+      'blocked',
+    ]);
 });

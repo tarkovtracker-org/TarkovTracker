@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { Task } from '@/types/tarkov';
 const stubOverlayFetch = (overlay: unknown) => {
   const fetchMock = vi.fn(async () => {
     return new Response(JSON.stringify(overlay), {
@@ -335,4 +336,17 @@ describe('story overlay validation', () => {
       storyUnlocks: [{ id: 'chapter', name: 'Chapter' }],
     });
   });
+});
+it('retains chapter IDs as unlock labels when optional chapter names are missing', async () => {
+  stubOverlayFetch({
+    $meta: { version: 'chapter', generated: '2026-09-07', sha256: 'chapter-sha' },
+    storyChapters: {
+      chapter: { objectives: {}, questUnlocks: [{ id: 'task' }] },
+      empty: { objectives: {} },
+    },
+  });
+  const { applyOverlay } = await import('@/server/utils/overlay');
+  const tasks: Task[] = [{ id: 'task' }];
+  const result = await applyOverlay({ data: { tasks } });
+  expect(result.data.tasks[0]?.storyUnlocks).toEqual([{ id: 'chapter', name: 'chapter' }]);
 });

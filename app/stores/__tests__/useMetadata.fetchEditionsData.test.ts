@@ -40,6 +40,33 @@ describe('useMetadataStore fetchEditionsData', () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
+  it('joins an in-flight editions request for the same scope', async () => {
+    const store = useMetadataStore();
+    const response = createDeferred<object>();
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    vi.stubGlobal('$fetch', vi.fn().mockReturnValue(response.promise));
+    const first = store.fetchEditionsData();
+    await flushPromises();
+    const joined = store.fetchEditionsData();
+    response.resolve({ editions: {}, storyChapters: {} });
+    await Promise.all([first, joined]);
+    expect($fetch).toHaveBeenCalledTimes(1);
+    expect(store.editionsLoading).toBe(false);
+  });
+  it('continues to the network when the editions cache cannot be read', async () => {
+    const store = useMetadataStore();
+    vi.spyOn(cacheUtils, 'getCachedData').mockRejectedValue(new Error('Cache unavailable'));
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    vi.stubGlobal('$fetch', vi.fn().mockResolvedValue({ editions: {}, storyChapters: {} }));
+    await store.fetchEditionsData();
+    expect($fetch).toHaveBeenCalledTimes(1);
+    expect(store.editionsError).toBeNull();
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      '[MetadataStore] Editions cache read failed:',
+      expect.any(Error)
+    );
+  });
   it('keeps cached editions when story chapters cache is missing and overlay fetch fails', async () => {
     const store = useMetadataStore();
     const cachedEdition = createEdition('cached-edition', 1, 'Cached Edition');

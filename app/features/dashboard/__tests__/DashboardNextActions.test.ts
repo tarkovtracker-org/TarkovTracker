@@ -232,3 +232,8 @@ describe('DashboardNextActions', () => {
     expect(wrapper.text()).not.toContain('Reach level 15');
   });
 });
+it('explains ordinary ready tasks when no payoff or special goal applies', async () => {
+  const wrapper = await mountWithRecommendation(createRecommendation(), 'actionable');
+  expect(wrapper.text()).toContain('page.dashboard.focus.proof.ready_other');
+  wrapper.unmount();
+});

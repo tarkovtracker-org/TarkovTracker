@@ -11,6 +11,7 @@ const createTarkovStore = (options: {
   isTaskComplete?: boolean | ((taskId: string) => boolean);
   isTaskFailed?: boolean;
   taskCompletions?: Record<string, unknown>;
+  storyChapters?: Record<string, { complete: boolean }>;
   traderLevels?: Record<string, number>;
   traderReputations?: Record<string, number>;
   traders?: Array<{ id: string; name: string; normalizedName: string }>;
@@ -52,6 +53,7 @@ const createTarkovStore = (options: {
     isTaskFailed: vi.fn(() => options.isTaskFailed ?? false),
     getCurrentProgressData: vi.fn(() => ({
       taskCompletions: options.taskCompletions ?? {},
+      storyChapters: options.storyChapters,
     })),
   };
 };
@@ -569,4 +571,17 @@ describe('useTaskActions', () => {
       expect.objectContaining({ action: 'available', taskId: 'task-simple' })
     );
   });
+});
+it('does not backfill prerequisites already bypassed by storyline progress', async () => {
+  const prerequisite: Task = { id: 'prior' };
+  const task: Task = {
+    id: 'target',
+    storyUnlocks: [{ id: 'chapter', name: 'Chapter' }],
+    taskRequirements: [{ task: { id: 'prior' }, status: ['complete'] }],
+  };
+  const { actions, tarkovStore } = await setup(task, [task, prerequisite], {
+    storyChapters: { chapter: { complete: true } },
+  });
+  actions.markTaskAvailable();
+  expect(tarkovStore.setTaskComplete).not.toHaveBeenCalledWith('prior');
 });

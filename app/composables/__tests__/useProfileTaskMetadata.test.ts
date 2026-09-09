@@ -188,3 +188,42 @@ it.each([
   expect(result.loading.value).toBe(false);
   scope.stop();
 });
+it.each(['core', 'objectives'])(
+  'reports required %s failures and clears loading',
+  async (failedCatalog) => {
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn((url: string) => {
+        if (url.includes(`tasks-${failedCatalog}`)) return Promise.reject('Catalog unavailable');
+        if (url.includes('tasks-')) return Promise.resolve({ data: { tasks: [] } });
+        if (url.includes('prestige')) return Promise.resolve({ data: { prestige: [] } });
+        return Promise.resolve(undefined);
+      })
+    );
+    const scope = effectScope();
+    const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pvp'), ref('en')))!;
+    expect(result.loading.value).toBe(true);
+    expect(result.tasks.value).toEqual([]);
+    expect(result.chapters.value).toEqual([]);
+    expect(result.prestige.value).toEqual([]);
+    expect(result.duplicateObjectiveIds.value.size).toBe(0);
+    await flushPromises();
+    expect(result.error.value?.message).toBe('Catalog unavailable');
+    expect(result.loading.value).toBe(false);
+    scope.stop();
+  }
+);
+it('ignores a required catalog rejection after its scope is disposed', async () => {
+  const pending = createDeferred<object>();
+  vi.stubGlobal(
+    '$fetch',
+    vi.fn(() => pending.promise)
+  );
+  const scope = effectScope();
+  const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pvp'), ref('en')))!;
+  scope.stop();
+  pending.reject(new Error('Old request failed'));
+  await flushPromises();
+  expect(result.error.value).toBeNull();
+  expect(result.tasks.value).toEqual([]);
+});
