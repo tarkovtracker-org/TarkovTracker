@@ -175,6 +175,23 @@ describe('useKappaOverview', () => {
     expect(mid?.status).toBe('available');
     expect(mid?.lockedBy).toBeUndefined();
   });
+  it('skips malformed requirements instead of failing every row', () => {
+    const original = tasks[1]!.taskRequirements;
+    tasks[1]!.taskRequirements = [
+      undefined,
+      {},
+      { task: undefined },
+      { task: { id: '' } },
+      { task: { id: 't-prapor-low', name: 'Prapor Low Level' } },
+    ] as unknown as Task['taskRequirements'];
+    try {
+      const { tasksWithStatus } = useKappaOverview(() => 'kappa');
+      const mid = tasksWithStatus.value.find((row) => row.task.id === 't-prapor-mid');
+      expect(mid?.lockedBy).toEqual({ id: 't-prapor-low', name: 'Prapor Low Level' });
+    } finally {
+      tasks[1]!.taskRequirements = original;
+    }
+  });
   it('excludes invalid locked tasks from group totals and overview total', () => {
     invalidState['t-prapor-mid'] = { self: true };
     const { totals, groupedByTrader } = useKappaOverview(() => 'kappa');

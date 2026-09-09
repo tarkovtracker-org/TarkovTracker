@@ -745,7 +745,7 @@
         if (requiresFailed && reqFlags.failed) return true;
         if (
           requiresActive &&
-          (reqFlags.complete ||
+          ((reqFlags.complete && !reqFlags.failed) ||
             isTaskActive(taskCompletions.value[req.task.id] as RawTaskCompletion))
         ) {
           return true;

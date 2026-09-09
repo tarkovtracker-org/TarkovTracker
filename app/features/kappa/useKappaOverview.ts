@@ -70,9 +70,9 @@ const findLockedBy = (
   isTaskComplete: (taskId: string) => boolean
 ): KappaRowEntry['lockedBy'] => {
   const requiredTask = (task.taskRequirements ?? [])
-    .map(({ task: requiredTask }) => requiredTask)
-    .find(({ id }) => id && !isTaskComplete(id));
-  if (!requiredTask) return undefined;
+    .map((requirement) => requirement?.task)
+    .find((candidate) => candidate?.id && !isTaskComplete(candidate.id));
+  if (!requiredTask?.id) return undefined;
   const required = tasksById.get(requiredTask.id);
   return {
     id: requiredTask.id,
