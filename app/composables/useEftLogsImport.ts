@@ -240,7 +240,6 @@ const applyCompletedImports = (
   const processedFailed = new Set<string>();
   const completeTask = (taskId: string) => {
     if (processedCompleted.has(taskId) || explicitOtherStates.has(taskId)) return;
-    if (!tasksMap.has(taskId) && !completedTaskIds.has(taskId)) return;
     completeTaskForProgress({ store, taskId, tasksMap });
     applyImportedTaskRequirements(store, tasksMap.get(taskId), requireTraders);
     processedCompleted.add(taskId);
@@ -261,7 +260,9 @@ const applyCompletedImports = (
         getCompletion: (id) => store.getCurrentProgressData().taskCompletions?.[id],
         // A completion log does not identify which OR route the player used.
         skipTaskRequirements: Boolean(task.storyUnlocks?.length),
-        onCompleteRequirement: completeTask,
+        onCompleteRequirement: (id) => {
+          if (tasksMap.has(id)) completeTask(id);
+        },
         onFailRequirement: failTask,
         task,
       });
