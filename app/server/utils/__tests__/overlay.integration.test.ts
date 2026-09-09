@@ -459,27 +459,35 @@ it.each([
     });
   }
 );
-it('applies added crafts through the full hideout overlay pipeline', async () => {
-  stubOverlayFetch({
-    $meta: { version: 'craft', generated: '2026-09-07', sha256: 'craft-sha' },
-    editions: testOverlayEditions,
-    craftsAdd: {
-      added: {
-        station: 'station',
-        level: 1,
-        requiredItems: [],
-        productItem: { id: 'product', count: 1 },
+it.each([undefined, 'unlock-task', { id: 'unlock-task' }])(
+  'applies added crafts through the full hideout overlay pipeline with unlock %j',
+  async (taskUnlock) => {
+    stubOverlayFetch({
+      $meta: { version: 'craft', generated: '2026-09-07', sha256: 'craft-sha' },
+      editions: testOverlayEditions,
+      craftsAdd: {
+        added: {
+          station: 'station',
+          level: 1,
+          requiredItems: [],
+          productItem: { id: 'product', count: 1 },
+          taskUnlock,
+        },
       },
-    },
-  });
-  const { applyOverlay } = await import('@/server/utils/overlay');
-  const result = await applyOverlay({
-    data: { hideoutStations: [{ id: 'station', levels: [{ level: 1, crafts: [] }] }] },
-  });
-  expect(result.data.hideoutStations[0]?.levels[0]?.crafts).toEqual([
-    expect.objectContaining({ id: 'added' }),
-  ]);
-});
+    });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const result = await applyOverlay({
+      data: { hideoutStations: [{ id: 'station', levels: [{ level: 1, crafts: [] }] }] },
+    });
+    expect(result.data.hideoutStations[0]?.levels[0]?.crafts).toEqual([
+      expect.objectContaining({
+        id: 'added',
+        taskUnlock: taskUnlock ? expect.objectContaining({ id: 'unlock-task' }) : null,
+        unlockState: taskUnlock ? 'task' : 'unknown',
+      }),
+    ]);
+  }
+);
 it('retains chapter IDs as unlock labels when optional chapter names are missing', async () => {
   stubOverlayFetch({
     $meta: { version: 'chapter', generated: '2026-09-07', sha256: 'chapter-sha' },
