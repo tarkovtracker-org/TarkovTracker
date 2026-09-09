@@ -221,10 +221,9 @@ const buildImportTaskSets = (
 };
 const applyImportedTaskRequirements = (
   store: ReturnType<typeof useTarkovStore>,
-  task: Task | undefined,
+  task: Task,
   requireTraders: boolean
 ) => {
-  if (!task) return;
   ensureTaskMinPlayerLevel(store, task);
   if (requireTraders) applyTaskTraderRequirements({ store, task });
 };
@@ -239,9 +238,11 @@ const applyCompletedImports = (
   const processedCompleted = new Set<string>();
   const processedFailed = new Set<string>();
   const completeTask = (taskId: string) => {
+    const task = tasksMap.get(taskId);
+    if (!task) return;
     if (processedCompleted.has(taskId) || explicitOtherStates.has(taskId)) return;
     completeTaskForProgress({ store, taskId, tasksMap });
-    applyImportedTaskRequirements(store, tasksMap.get(taskId), requireTraders);
+    applyImportedTaskRequirements(store, task, requireTraders);
     processedCompleted.add(taskId);
   };
   const failTask = (taskId: string) => {
@@ -260,9 +261,7 @@ const applyCompletedImports = (
         getCompletion: (id) => store.getCurrentProgressData().taskCompletions?.[id],
         // A completion log does not identify which OR route the player used.
         skipTaskRequirements: Boolean(task.storyUnlocks?.length),
-        onCompleteRequirement: (id) => {
-          if (tasksMap.has(id)) completeTask(id);
-        },
+        onCompleteRequirement: completeTask,
         onFailRequirement: failTask,
         task,
       });

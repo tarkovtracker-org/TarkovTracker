@@ -631,3 +631,21 @@ it('defaults prestige to its upstream source mode when no mode is supplied', asy
   const response = await createTarkovJsonPrestigeFetcher({ deps: { fetcher } })();
   expect(response.data.prestige).toEqual([]);
 });
+it.each([undefined, null, {}])(
+  'normalizes non-array trader requirements without losing the task: %j',
+  (traderRequirements) => {
+    const result = adaptTasksCoreResponse(
+      { tasks: { sparse: { id: 'sparse', traderRequirements } } },
+      {},
+      {}
+    ).data.tasks;
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ id: 'sparse' });
+    expect(result[0]?.traderLevelRequirements).toBeUndefined();
+    expect(result[0]?.normalizedTraderRequirements).toEqual(
+      traderRequirements === undefined
+        ? []
+        : [expect.objectContaining({ requirementType: 'unknown' })]
+    );
+  }
+);

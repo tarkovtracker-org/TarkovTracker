@@ -350,3 +350,17 @@ it.each([null, [], { ...overlay, $meta: null }, { ...overlay, $meta: [] }])(
   'rejects malformed overlay roots and provenance containers: %j',
   (candidate) => expect(validateOverlayData(candidate)).toBe(false)
 );
+it('keeps a sparse craft addition empty rather than inventing an output item', () => {
+  const station = {
+    id: 'station',
+    levels: [{ level: 1, crafts: [] }],
+  } as unknown as HideoutStation;
+  const result = addFallbackCrafts(
+    [station],
+    { craftsAdd: { sparse: { station: 'station', level: 1, requiredItems: [] } } },
+    'regular'
+  );
+  expect(result[0]?.levels[0]?.crafts).toEqual([
+    expect.objectContaining({ id: 'sparse', rewardItems: [], unlockState: 'unknown' }),
+  ]);
+});

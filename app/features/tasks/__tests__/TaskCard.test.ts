@@ -196,6 +196,13 @@ describe('TaskCard expansion controls', () => {
     metadataStoreMock.getTaskById.mockReset();
     tarkovStoreMock.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
   });
+  it('keeps a locked card usable before its evaluation snapshot is available', async () => {
+    progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
+    const wrapper = await mountTaskCard();
+    expect(wrapper.get('[data-testid="task-card-title"]').text()).toBe('Sample task');
+    expect(wrapper.find('[data-testid="task-blockers"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
   it('renders canonical blockers and evaluates reputation badges', async () => {
     progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
     progressStoreMock.taskEvaluations = {

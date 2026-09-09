@@ -40,6 +40,34 @@ describe('useMetadataStore fetchEditionsData', () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
+  it('clears stale Seasonal perks when an edition response omits them', async () => {
+    const store = useMetadataStore();
+    store.currentGameMode = 'seasonal';
+    store.seasonalPerks = [
+      {
+        id: 'stale',
+        type: 'perk',
+        name: 'Stale',
+        description: '',
+        points: 0,
+        mutuallyExclusiveSeasonalPerkIds: [],
+        effects: [],
+      },
+    ];
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn().mockResolvedValue({ data: { editions: [], storyChapters: [] } })
+    );
+    await store.fetchEditionsData(true);
+    expect(store.editionsError).toBeNull();
+    expect(store.seasonalPerks).toEqual([]);
+    expect($fetch).toHaveBeenCalledWith(
+      '/api/tarkov/editions',
+      expect.objectContaining({ query: expect.objectContaining({ gameMode: 'pvp-season' }) })
+    );
+  });
   it('joins an in-flight editions request for the same scope', async () => {
     const store = useMetadataStore();
     const response = createDeferred<object>();

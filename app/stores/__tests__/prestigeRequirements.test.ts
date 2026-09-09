@@ -444,3 +444,31 @@ it.each([false, true])(
     });
   }
 );
+it('does not satisfy an objective requirement from chapter completion when its objective ID is missing', () => {
+  const progress = createProgressData();
+  progress.storyChapters = {
+    chapter: { complete: true, objectives: { existing: { complete: true } } },
+  };
+  const prestige = createPrestigeLevel(1, []);
+  prestige.storyRequirements = [
+    {
+      type: 'storyObjectiveStatus',
+      name: 'Missing objective',
+      storyChapter: 'chapter',
+      status: ['complete'],
+    },
+  ];
+  const rows = buildPrestigeRequirementRows({
+    currentPrestigeLevel: 0,
+    edition,
+    hideoutStations,
+    prestigeLevels: [prestige],
+    modeProgress: progress,
+    storyChapters: [],
+    tasks: [],
+  });
+  expect(rows.find((row) => row.id === 'story:chapter:chapter')).toMatchObject({
+    status: 'unmet',
+    currentValue: 'incomplete',
+  });
+});

@@ -80,6 +80,32 @@ describe('useKappaOverview', () => {
     unlockedState = {};
     invalidState = {};
   });
+  it('retains cached rows when the ordering catalog no longer includes their task IDs', () => {
+    const original = [...tasks];
+    const chain = {
+      id: 'cached-chain',
+      name: 'Cached - Part 1',
+      kappaRequired: true,
+      trader: { id: 'prapor', name: 'Prapor' },
+    };
+    try {
+      tasks.push(chain);
+      const overview = useKappaOverview(() => 'kappa');
+      const rowIds = overview.tasksWithStatus.value.map((row) => row.task.id);
+      tasks.splice(0, tasks.length, ...original.filter((task) => task.id === 't-prapor-mid'));
+      const groupedIds = overview.groupedByTrader.value.flatMap((group) =>
+        group.rows.map((row) => row.task.id)
+      );
+      expect(groupedIds.toSorted()).toEqual(rowIds.toSorted());
+      expect(
+        overview.groupedByTrader.value
+          .find((group) => group.trader.id === 'prapor')
+          ?.rows.map((row) => row.task.id)
+      ).toEqual(['t-prapor-mid', 't-prapor-low', 'cached-chain']);
+    } finally {
+      tasks.splice(0, tasks.length, ...original);
+    }
+  });
   it('filters by kappaRequired tab', () => {
     const tab = ref<'kappa' | 'lightkeeper'>('kappa');
     const { sourceTasks } = useKappaOverview(() => tab.value);

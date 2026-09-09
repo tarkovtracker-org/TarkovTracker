@@ -132,7 +132,7 @@ describe('useMetadataStore initialize', () => {
 const cacheBundle = (scope: string, id: string) => ({
   scope,
   tasksCore: { tasks: [{ id }], maps: [], traders: [] },
-  hideout: { hideoutStations: [{ id: `hideout-${id}`, levels: [] }] },
+  hideout: { hideoutStations: [{ id: `hideout-${id}`, name: 'Station', levels: [] }] },
   prestige: { prestige: [] },
   editions: { editions: [], storyChapters: [], seasonalPerks: [] },
 });
@@ -144,6 +144,23 @@ describe('critical mode cache ownership', () => {
     vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
   });
   afterEach(() => vi.unstubAllGlobals());
+  it('clears stale chapters when a legacy cache contains only editions', () => {
+    const store = useMetadataStore();
+    const bundle = { ...cacheBundle('regular-en', 'legacy'), editions: { editions: [] } };
+    store.storyChapters = [
+      {
+        id: 'stale',
+        name: 'Stale',
+        order: 1,
+        objectives: {},
+        wikiLink: '',
+        normalizedName: 'stale',
+      },
+    ];
+    expect(store.applyCriticalCachedData(bundle)).toBe(true);
+    expect(store.storyChapters).toEqual([]);
+    expect(store.tasks.map((task) => task.id)).toEqual(['legacy']);
+  });
   it('orders cached chapters and resolves perks only for Seasonal profiles', () => {
     const store = useMetadataStore();
     const bundle = {
