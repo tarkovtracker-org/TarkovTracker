@@ -164,7 +164,6 @@ const setCachedTeamMembers = async (
   );
 };
 type LegacyTeamFetchers = {
-  restFetch: (path: string) => Promise<Response>;
   serviceFetch: (path: string) => Promise<Response | null>;
 };
 const legacyTeamProgressPath = (gameMode: GameMode, memberIds: string[]): string | null => {
@@ -181,8 +180,14 @@ const fetchLegacyTeamProgressRows = async (
   teamId: string
 ): Promise<LegacyProgressRow[]> => {
   try {
-    const response =
-      (await fetchers.serviceFetch(legacyPath)) ?? (await fetchers.restFetch(legacyPath));
+    const response = await fetchers.serviceFetch(legacyPath);
+    if (!response) {
+      // `user_progress` is readable only by its owner, so retrying this with the
+      // caller's JWT would always return an empty list. Surface the missing
+      // service-role key instead of silently dropping the fallback.
+      logger.warn('Team legacy progress fallback skipped without a service role key', { teamId });
+      return [];
+    }
     if (response.ok) return (await response.json()) as LegacyProgressRow[];
     logger.warn('Team legacy progress fallback fetch failed', { status: response.status, teamId });
   } catch (error) {
@@ -441,7 +446,7 @@ export default defineEventHandler(async (event) => {
       validMemberIds.filter((id) => profileMap[id]?.level == null)
     );
     const legacyRows = legacyPath
-      ? await fetchLegacyTeamProgressRows({ restFetch, serviceFetch }, legacyPath, teamId)
+      ? await fetchLegacyTeamProgressRows({ serviceFetch }, legacyPath, teamId)
       : [];
     for (const row of legacyRows) {
       applyLegacyTeamProfile(row, gameMode, profileMap, editionsByUserId.get(row.user_id));

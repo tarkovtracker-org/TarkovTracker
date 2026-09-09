@@ -4,14 +4,12 @@ coverage:
       default:
         target: auto
         threshold: 5%
-      # Absolute floor replacing the vitest per-metric thresholds
-      # (branches: 15, functions: 20, lines: 20, statements: 20) that were
-      # disabled when test sharding landed. Codecov merges the per-shard lcov
-      # uploads, so this gate sees the full-project coverage number. Actual
-      # coverage is ~56% statements / ~45% branches, so 20% is a catastrophic-
-      # drop guard, not a quality bar — same role the vitest thresholds played.
+      # Codecov merges imported-file reports from all shards. Keep a meaningful
+      # merged line-coverage floor; local Vitest also includes unimported app
+      # files and enforces per-metric and targeted module floors.
+      # Baseline and denominator differences: docs/testing-coverage.md.
       absolute-floor:
-        target: 20
+        target: 65
         threshold: 0%
       # Fork PRs intentionally skip the coverage upload (no org secrets) and
       # Codecov statuses default to if_not_found: success, so forks are not

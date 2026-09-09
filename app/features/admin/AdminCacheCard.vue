@@ -1,6 +1,7 @@
 <script setup lang="ts">
   import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
   import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
+  import { ADMIN_ERROR_LOCALE_KEYS, getAdminErrorCode } from '@/utils/adminErrors';
   import { logger } from '@/utils/logger';
   import { STORAGE_KEYS } from '@/utils/storageKeys';
   import type { PurgeCacheResponse } from '@/types/edge';
@@ -149,6 +150,10 @@
       logger.warn('[AdminCacheCard] Failed to fetch last purge record', error);
     }
   };
+  const getPurgeErrorMessage = (error: unknown): string => {
+    const code = getAdminErrorCode(error);
+    return t(code ? ADMIN_ERROR_LOCALE_KEYS[code] : 'admin.purge_failed_description');
+  };
   const handlePurgeTarkovData = async () => {
     if (!$supabase.user.loggedIn) {
       toast.add({
@@ -176,7 +181,7 @@
     } catch (error) {
       toast.add({
         title: t('admin.purge_failed_title'),
-        description: error instanceof Error ? error.message : t('admin.purge_failed_description'),
+        description: getPurgeErrorMessage(error),
         color: 'error',
         icon: 'i-mdi-alert-circle',
       });
@@ -212,7 +217,7 @@
     } catch (error) {
       toast.add({
         title: t('admin.purge_failed_title'),
-        description: error instanceof Error ? error.message : t('admin.purge_failed_description'),
+        description: getPurgeErrorMessage(error),
         color: 'error',
         icon: 'i-mdi-alert-circle',
       });

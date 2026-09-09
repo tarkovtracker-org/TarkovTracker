@@ -52,24 +52,59 @@ export const resolveInitialSyncState = (
   localTimestamp: number | null,
   remoteUpdatedAt: number | null,
   localScore: number,
-  remoteScore: number
+  remoteScore: number,
+  options: {
+    mergeModeSnapshots?: boolean;
+    modeUpdatedAt?: Partial<Record<GameMode, number>>;
+    localModeTimestamps?: Partial<Record<GameMode, number>>;
+  } = {}
 ): UserState => {
+  const { mergeModeSnapshots = false, modeUpdatedAt } = options;
   const preferLocalMetadata = shouldPreferLocalStartupMetadata(
     localTimestamp,
     remoteUpdatedAt,
     localScore,
     remoteScore
   );
+  // fallow-ignore-next-line complexity -- startup merge/reset precedence is covered in resetEngine.seasonalReset.test.ts
   const resolveModeData = (
     localModeData: UserProgressData,
-    remoteModeData: UserProgressData
+    remoteModeData: UserProgressData,
+    mode: GameMode
   ): UserProgressData => {
     const localEpoch = toProgressEpoch(localModeData);
     const remoteEpoch = toProgressEpoch(remoteModeData);
     if (localEpoch !== remoteEpoch) {
       return mergeProgressData(localModeData, remoteModeData);
     }
-    const preferredModeData = preferLocalMetadata ? localModeData : remoteModeData;
+    const localModeTimestamp = options.localModeTimestamps?.[mode] ?? localTimestamp;
+    // An explicit clock map distinguishes historical unknown progress from
+    // callers using the legacy account-clock contract. Account-only changes
+    // cannot establish whether an unknown mode is newer than an offline edit.
+    const unknownModeClock = modeUpdatedAt !== undefined && modeUpdatedAt[mode] === undefined;
+    const preferLocalMode = unknownModeClock
+      ? (localModeTimestamp ?? 0) > 0
+      : shouldPreferLocalStartupMetadata(
+          localModeTimestamp,
+          modeUpdatedAt?.[mode] ?? remoteUpdatedAt,
+          localScore,
+          remoteScore
+        );
+    const preferredModeData = preferLocalMode ? localModeData : remoteModeData;
+    // Seasonal writes can advance independently of account metadata. Keep entry
+    // timestamps and reset epochs while using this mode's own progress freshness.
+    if (mergeModeSnapshots || unknownModeClock) {
+      const merged = preferLocalMode
+        ? mergeProgressData(remoteModeData, localModeData, true)
+        : mergeProgressData(localModeData, remoteModeData, true);
+      return {
+        ...merged,
+        displayName: preferredModeData.displayName,
+        pmcFaction: preferredModeData.pmcFaction,
+        xpOffset: preferredModeData.xpOffset,
+        skillOffsets: preferredModeData.skillOffsets,
+      };
+    }
     return {
       ...preferredModeData,
       storyChapters: mergeStoryChapterProgress(
@@ -86,9 +121,9 @@ export const resolveInitialSyncState = (
     tarkovUid: preferLocalMetadata
       ? (localState.tarkovUid ?? null)
       : (remoteState.tarkovUid ?? null),
-    pvp: resolveModeData(localState.pvp, remoteState.pvp),
-    pve: resolveModeData(localState.pve, remoteState.pve),
-    seasonal: resolveModeData(localState.seasonal, remoteState.seasonal),
+    pvp: resolveModeData(localState.pvp, remoteState.pvp, GAME_MODES.PVP),
+    pve: resolveModeData(localState.pve, remoteState.pve, GAME_MODES.PVE),
+    seasonal: resolveModeData(localState.seasonal, remoteState.seasonal, GAME_MODES.SEASONAL),
     seasonalSeasonNumber: ACTIVE_SEASON_NUMBER,
   };
 };

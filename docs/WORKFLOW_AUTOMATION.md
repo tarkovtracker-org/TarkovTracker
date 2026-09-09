@@ -13,22 +13,141 @@ Complete workflow automation setup for TarkovTracker with CI/CD pipelines, quali
 - Pre-commit hooks for code quality
 - Dependency update automation via Dependabot
 - Conservative auto-merge for low-risk Dependabot updates
-- AI review integrations are configured in their GitHub App dashboards. Cubic is currently the most consistent automatic reviewer; Greptile is a useful secondary reviewer. CodeRabbit remains useful when available but is frequently rate-limited. Kilo Code is disabled because its signal was low.
+- Codex is the intended primary PR reviewer. GitHub App delivery and exclusions must be verified before disabling existing automatic providers; dashboard state is not inferred from repository configuration.
+
+## Agent validation and review
+
+`package.json` defines commands; `AGENTS.md` defines required validation and review.
+`code_review.md` supplements that contract with risk areas, without requiring the full suite for
+unrelated changes. Worktree setup and the shared CI setup action use `scripts/ensure-pnpm.sh` to
+verify pnpm against `packageManager`, preparing its complete integrity-qualified pin even when the installed version matches.
+
+Run focused checks while implementing, then required checks after the diff stabilizes. Record the
+commit, dirty worktree state, commands, and results in the PR summary. Invalidate affected results
+when their inputs change. Batch substantiated corrections; defer unrelated cleanup.
+
+Documentation, translation, and mechanical formatting changes need deterministic checks and
+self-review. Routine executable changes also receive Codex PR review. Substantial behavior changes
+(public contracts, persisted state, cross-module behavior, auth, billing, migrations, concurrency)
+also receive one best-effort local CodeRabbit review of the complete branch diff after it stabilizes.
+Auth, billing, migration, and concurrency changes require independent review; another provider or
+human substitutes if needed. Record missing/rate-limited review as incomplete without retry loops.
+Only substantial behavioral corrections or unresolved significant findings warrant a local rerun.
+
+### Reviewer transition: external verification pending
+
+1. Verify Codex delivers a review on a representative application PR.
+2. Verify a translation-only PR consumes no automatic review, and a mixed translation/code PR is
+   still reviewed. Use selective review requests until exclusions are demonstrated.
+3. After delivery is established, disable duplicate automatic CodeRabbit, Cubic, and Greptile
+   reviews in their repository/dashboard settings; retain manual access. Record the PR links and
+   observed settings here. Existing settings remain unchanged until that evidence exists.
+4. Check an existing-review revision and unavailable/quota-exhausted behavior: preserve completed
+   review evidence by revision and never report an unavailable review as successful.
 
 ## GitHub Actions Workflows
 
 ### 1. CI Pipeline (`.github/workflows/ci.yml`)
 
-Runs on every push and PR:
+Runs on pushes to `main`, `develop`, and `wip/**`, and PRs targeting `main` or `develop`,
+including translation-only PRs. All eligible push runs retain full validation.
 
-**Jobs:**
+The lightweight `changes` job emits proposed and effective selections. **Shadow rollout is enabled**:
+the effective selection runs every existing CI job. `CI Result` always evaluates the job outcomes and
+fails on missing classifier data, selected failures/cancellations, or unexpected skips. Systems drift
+runs independently on every CI run. Existing check names, Dependabot expectations, fork restrictions,
+security checks, and Codecov statuses remain unchanged; the aggregate does not replace external gates.
 
-- `validate` - Lint, type checking, format check, tests, production build (sequential steps)
-- `workers` - Cloudflare Worker generated-type drift check, typecheck, OpenAPI validation,
-  deployment dry-run, and API gateway tests (Node unit tests plus a workerd smoke using the
-  production Wrangler configuration)
+The shared setup action uses `.nvmrc`, the full `packageManager` pin, pnpm caching, and a frozen
+installation. Each caller owns checkout history and credential settings. `Lint & Format` runs lint
+and Prettier once each (lint already includes blank-line validation), plus i18n and workflow fixtures.
+The four Vitest shards, dedicated Deno tests, Supabase validation, Worker validation, and production
+build retain their existing commands and environment behavior. Tests in `scripts/ci-tests/` use
+Node's built-in runner via `pnpm run test:workflow`; their filenames deliberately avoid Vitest discovery.
 
-**Triggers:** Push to `main`, `develop`, `wip/**` branches and all PRs
+#### Local validation selection
+
+```bash
+pnpm run validate:changes --base origin/main --explain
+pnpm run validate:changes --base origin/main
+pnpm run validate:changes --mode ci --base <base-sha> --head <head-sha> --explain
+pnpm run validate:changes --mode full --base origin/main
+```
+
+Execution reuses the absolute package-manager entry from `pnpm run`; direct Node invocation is
+only supported for `--explain`. Git defaults to `/usr/bin/git` on Unix and
+`C:/Program Files/Git/cmd/git.exe` on Windows; set `GIT_EXECUTABLE` to an absolute trusted path for a nonstandard install.
+The full profile requires Bash at `/bin/bash` for the existing Deno test command.
+
+Local mode combines the merge-base diff with staged, unstaged, and untracked paths. Explicit CI
+mode reads only the revision diff; full mode forces full selection. Explanation mode executes no
+checks. Local mode runs lint, formatting, typecheck, workflow fixtures, unit tests, i18n, and systems
+drift for executable changes; apply path-specific `AGENTS.md` checks as well. CI/full execution adds
+Fallow, build, database and Worker checks, and Deno tests, requiring their usual runtimes and build
+environment. CI itself retains sharding, secrets/fork rules, and report uploads in workflow jobs.
+Link validation remains in the existing Link Check workflow for applicable documentation paths.
+
+The proposed reduced selection covers only root `.md` files, Markdown under `docs/` and `.github/`,
+and `app/locales/*.json`. `DESIGN.md`, generated code, scripts, dependencies, configuration, public
+assets, and unknown paths select full validation. Renames include both paths and deletions remain
+visible. Empty diffs, missing refs, malformed arguments, and Git errors conservatively select full
+validation. The i18n check rejects missing supported locale files, including deletions and
+renames, while missing translation keys still use the non-fatal English fallback.
+Non-English formatting exclusions and Crowdin ownership remain intact.
+
+#### CI rollout and measurements
+
+1. Merge policy/setup, then the shadow classifier and aggregate. Capture a successful and failing
+   executable PR, a documentation-only PR, a translation-only PR, and a mixed PR. Confirm the proposed
+   selections and aggregate conclusions, including the existing Dependabot and coverage behavior.
+2. Only after that evidence, remove `--shadow` from the classifier invocation in a follow-up change.
+   Retain `--full` for push events. Check required-check settings before enabling skips; do not change
+   those settings in this rollout. Roll back selection by restoring `--shadow`.
+3. Release deduplication is handled separately in [PR #805](https://github.com/tarkovtracker-org/TarkovTracker/pull/805).
+   This shadow rollout does not change release triggers, validation, or main-run cancellation.
+   Do not treat local fixtures as evidence of GitHub App or branch-protection behavior.
+
+The initial observations are recorded in [the baseline report](ci-turnaround-baseline.md).
+The read-only `scripts/workflow-metrics.mjs` collector samples the preceding 20 merged PRs and emits
+per-PR CI and release timings as JSON. Run it with authenticated `gh` and save stdout to a report:
+
+```bash
+node scripts/workflow-metrics.mjs --before <rollout-ISO-time>
+node scripts/workflow-metrics.mjs --after <rollout-ISO-time> --count 20
+```
+
+The follow-up selects the first 20 merges after the boundary; record the actual rollout timestamp.
+Compare categories separately (documentation, translations, mixed documentation/translations,
+executable). Runner minutes sum job durations across attempts, not billed rounding. Workflow duration
+uses completion metadata as a proxy. Historical PR association can be inferred from repository,
+branch, and PR lifetime when GitHub omits the association; the report labels that limitation.
+Correction-push counts, review-to-correction delay, and agent usage remain null without retained
+telemetry rather than being inferred from commit counts. A 30% reduction is a measured objective,
+not an acceptance gate. Test-project changes, finer subsystem selection, and code cleanup are deferred.
+
+#### Fallow changed-file gate
+
+Run `pnpm run lint:fallow` locally; CI uses the same command with `--base <event-base-sha>`.
+The default base is `origin/main`. The command resolves the merge base with the current HEAD,
+includes staged, unstaged, and non-ignored untracked files (respecting the source checkout's
+local and configured Git exclusions, while retaining force-tracked files), and keeps Fallow's native
+`--gate new-only` behavior and configured severities. New error findings fail; inherited findings
+and warning-only findings do not. No persistent finding baseline is maintained.
+
+`scripts/fallow-audit.mjs` creates a temporary local clone and two analysis commits. Both contain
+a physical copy of the current generated `.nuxt` context; the second contains the current source
+tree. This prevents Fallow's internal base snapshot from symlinking the generated tsconfig and
+resolving its relative `@/` aliases against the wrong directory. Dependencies are linked from the
+installed checkout. Neither the source index, source files, branches, nor Git worktree registrations
+are modified, and the temporary clone is removed after success or failure. Run `pnpm install`
+first, as usual, to prepare dependencies and Nuxt types.
+
+Use `--format json` for structured findings. Each run uses fresh analysis without reusable caches.
+The report's Git IDs belong to the temporary analysis commits; the original source base and HEAD
+are printed on stderr. Invalid refs and setup/analyzer failures exit nonzero instead of skipping the gate.
+
+Regression checks live in `scripts/fallow-audit.test.mjs` and run with the regular test suite or
+`pnpm exec vitest run scripts/fallow-audit.test.mjs`.
 
 ### 2. Security Scanning (`.github/workflows/security.yml`)
 
@@ -36,7 +155,7 @@ Weekly security audits:
 
 **Jobs:**
 
-- `security-scan` - pnpm audit (prod and all deps), outdated check, checksum-verified Gitleaks secret detection
+- `security-scan` - pnpm audit (prod and all deps), schedule-only informational outdated check, checksum-verified Gitleaks secret detection
 - `codeql` - CodeQL static analysis
 
 **Triggers:** Push to main/develop, all PRs, weekly (Sunday 00:00 UTC)
@@ -47,14 +166,64 @@ Semantic versioning with automated releases:
 
 **Jobs:**
 
-- Runs tests and build
-- Resets and lints local Supabase migrations and runs pgTAP database regressions with
-  `pnpm run supabase:check`
+- Reuses the successful `CI` run for the exact `main` push commit, including all four test shards
+  and the Supabase reset, lint, and pgTAP checks
+- Runs the production build before publishing
 - Generates changelog from conventional commits
 - Creates GitHub releases
 - Updates version in package.json
 
-**Triggers:** Push to `main` (non-docs changes)
+**Triggers:** Completion of `CI` for a successful same-repository push to `main`. PR runs, failed
+or cancelled CI, and fork runs cannot publish. Successful CI reruns can retry release eligibility;
+there is no manual bypass of the CI gate. Documentation-only pushes may reach the gate, but
+semantic-release still decides whether the accumulated conventional commits warrant a version.
+
+`release-gate.mjs` re-reads the triggering run and `refs/heads/main` before dependency setup and
+again immediately before publishing. It verifies the CI workflow path, conclusion, SHA, and run
+attempt. Superseded commits skip; release never substitutes a newer, unvalidated checkout.
+The gate initially loads from the trusted default-branch SHA and is copied to `RUNNER_TEMP` so
+both checks use the same source even after checkout replacement. Only after validation does a
+second checkout pin the triggering CI SHA for building and publishing; it never executes a fork
+candidate.
+
+Only release jobs share the non-cancelling `release-main` concurrency group. CI can cancel obsolete
+validation independently; an active publisher is not cancelled by a newer merge. A merge in the
+small interval after the last check remains subject to semantic-release's upstream check and git's
+non-fast-forward push protection. No force push or rebase onto an unvalidated commit is permitted.
+
+This removes the duplicate full test suite and database reset from the serialized release path.
+The production build remains a release check. Cloudflare deployments continue independently;
+this workflow controls release/version publication, not when the initial deployment starts.
+
+**Version-bump commit:** `@semantic-release/git` commits the bumped `package.json` and `CHANGELOG.md`
+as `chore(release): <version> [skip actions]`. The marker is deliberately `[skip actions]` rather
+than `[skip ci]`:
+
+- GitHub Actions treats `[skip actions]` as a skip marker, so this workflow does not re-trigger
+  itself. ([Skipping workflow runs](https://docs.github.com/en/actions/managing-workflow-runs/skipping-workflow-runs))
+- Cloudflare Pages does **not** recognize `[skip actions]`. Its skip markers are `[CI Skip]`,
+  `[CI-Skip]`, `[Skip CI]`, `[Skip-CI]`, and `[CF-Pages-Skip]`.
+  ([GitHub integration](https://developers.cloudflare.com/pages/configuration/git-integration/github-integration/))
+
+That asymmetry is the point. The footer version comes from `packageJson.version` in
+`nuxt.config.ts`, which is baked into the bundle at build time and surfaced through
+`runtimeConfig.public.appVersion`. The merge commit is built _before_ semantic-release bumps
+`package.json`, so if Cloudflare also skipped the bump commit the deployed site would advertise the
+previous version until the next unrelated push to `main`. Letting Pages build the bump commit costs
+one extra deploy per release and keeps the displayed version honest.
+
+> [!WARNING]
+> Never write a bracketed skip marker verbatim in a commit message — including when merely
+> describing one — or you will silently skip CI, Release, and the deploy for that commit. Refer to
+> them unbracketed (`skip ci`, `skip actions`) instead.
+>
+> GitHub scans the commit message of a push and the HEAD commit of a pull request. It does **not**
+> scan PR titles. Cloudflare's docs describe its markers as a commit-message _prefix_, but observed
+> behaviour in this repository is broader — both `chore(release): 1.75.0 [skip ci]` (marker trailing
+> the subject) and a commit carrying `[skip ci]` only in its body produced no Pages deploy at all.
+> Assume any position matches.
+>
+> Prose inside repository files, such as this paragraph, is not scanned by either provider.
 
 **Commit Convention:**
 
@@ -283,6 +452,11 @@ Push to `main` triggers:
 GitHub Actions itself deploys nothing; items 2-4 are separate Git integrations. See the Deployment
 section of [`runbook.md`](./runbook.md) for what to verify after each merge.
 
+A releasing merge deploys twice: once for the merge commit, then again for the
+`chore(release): <version> [skip actions]` commit that carries the bumped `package.json`. The second
+deploy is what makes the footer version match the release, so treat it as part of the merge rather
+than a stray build.
+
 ### Manual Deployment
 
 Fallback only, for when an integration fails. Supabase fallbacks (`supabase db push --linked`,
@@ -306,6 +480,7 @@ pnpm --filter api-gateway exec wrangler deploy
 - Test results (JUnit XML) are uploaded via `codecov/codecov-action` with `report_type: test_results`. Vitest outputs `test-report.junit.xml` when `CI=true` (configured in `vitest.config.ts`). The upload step is `!cancelled()`-gated so failing shards' reports still reach Codecov.
 - The CI `test` job runs as a 4-way shard matrix (`Test (shard 1/4)` through `Test (shard 4/4)`). Each shard sets `VITEST_SHARD=N/4`, which enables the `github-actions` reporter (annotates failed tests on the PR diff), disables per-shard coverage thresholds, and reports only files imported by that shard. Codecov merges the per-shard lcov uploads and enforces an absolute floor via the `absolute-floor` project status in `codecov.yml`.
 - Local `pnpm run test` / `pnpm run test:coverage` remain unsharded. Coverage runs retain the full `app/**/*.{ts,vue}` denominator and enforce the Vitest thresholds.
+- The measured logic baseline, current module mapping, coverage floors, and reproduction commands are documented in [testing-coverage.md](testing-coverage.md). Run Nuxt-generating checks separately from coverage to avoid regeneration races.
 
 ## Local Development Workflow
 
@@ -403,7 +578,7 @@ pnpm run lint:fix
 - Keep PRs focused (prefer size/S or size/M)
 - Update tests for new features
 - Run format/lint before pushing
-- Wait for CI before requesting review
+- Start local review alongside relevant checks after the diff stabilizes; request PR review selectively under the root review policy
 
 ### Dependencies
 

@@ -133,7 +133,8 @@ export interface PreferencesState {
   showExperienceRewards: boolean;
   showNextQuests: boolean;
   showPreviousQuests: boolean;
-  taskCardDensity: 'comfortable' | 'compact';
+  taskCollapseDefault: boolean;
+  hideTaskRewards: boolean;
   enableManualTaskFail: boolean;
   hideCompletedTaskObjectives: boolean;
   showAllFilter: boolean;
@@ -222,7 +223,8 @@ export const preferencesDefaultState: PreferencesState = {
   showExperienceRewards: true,
   showNextQuests: true,
   showPreviousQuests: true,
-  taskCardDensity: 'compact',
+  taskCollapseDefault: false,
+  hideTaskRewards: false,
   enableManualTaskFail: false,
   hideCompletedTaskObjectives: true,
   showAllFilter: true,
@@ -595,8 +597,11 @@ export const usePreferencesStore = defineStore('preferences', {
     getShowPreviousQuests: (state) => {
       return state.showPreviousQuests ?? true;
     },
-    getTaskCardDensity: (state) => {
-      return state.taskCardDensity ?? 'compact';
+    getTaskCollapseDefault: (state) => {
+      return state.taskCollapseDefault ?? false;
+    },
+    getHideTaskRewards: (state) => {
+      return state.hideTaskRewards ?? false;
     },
     getEnableManualTaskFail: (state) => {
       return state.enableManualTaskFail ?? false;
@@ -863,8 +868,11 @@ export const usePreferencesStore = defineStore('preferences', {
     setShowPreviousQuests(show: boolean) {
       this.showPreviousQuests = show;
     },
-    setTaskCardDensity(density: 'comfortable' | 'compact') {
-      this.taskCardDensity = density;
+    setTaskCollapseDefault(collapse: boolean) {
+      this.taskCollapseDefault = collapse;
+    },
+    setHideTaskRewards(hide: boolean) {
+      this.hideTaskRewards = hide;
     },
     setEnableManualTaskFail(enable: boolean) {
       this.enableManualTaskFail = enable;
@@ -1005,7 +1013,8 @@ export const usePreferencesStore = defineStore('preferences', {
       'showExperienceRewards',
       'showNextQuests',
       'showPreviousQuests',
-      'taskCardDensity',
+      'taskCollapseDefault',
+      'hideTaskRewards',
       'enableManualTaskFail',
       'hideCompletedTaskObjectives',
       'showAllFilter',

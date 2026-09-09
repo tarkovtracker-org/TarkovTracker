@@ -15,9 +15,13 @@
     "app/server/routes/**/*.ts",
     "app/server/middleware/**/*.ts",
     "app/**/*.test.ts",
-    "scripts/**/*.test.mjs"
+    "scripts/**/*.test.mjs",
+    "scripts/ci-tests/*.mjs",
+    "scripts/workflow-metrics.mjs",
+    "scripts/check-ci-result.mjs"
   ],
   "ignoreDependencies": [
+    "shared",
     "@iconify-json/heroicons",
     "@iconify-json/lucide",
     "@nuxt/image",

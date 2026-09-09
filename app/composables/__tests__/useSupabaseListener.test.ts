@@ -1,0 +1,347 @@
+// @vitest-environment happy-dom
+import { mockNuxtImport } from '@nuxt/test-utils/runtime';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createPendingStateTracker } from '@/utils/pendingState';
+import { installRealtimeVisibility } from '@/utils/realtimeVisibility';
+import type { WithRemoteSnapshot } from '@/utils/pendingState';
+import type { Store } from 'pinia';
+const { channel, client, loggerMock, removeChannel } = vi.hoisted(() => {
+  const realtimeChannel = {
+    // Tests read the handler back from `on.mock.calls`, so keep the parameters
+    // typed rather than collapsing them away.
+    on: vi.fn(
+      (_event: string, _config: Record<string, unknown>, _handler: (payload: unknown) => void) =>
+        realtimeChannel
+    ),
+    subscribe: vi.fn((callback: (status: string) => void) => {
+      callback('SUBSCRIBED');
+      return realtimeChannel;
+    }),
+  };
+  const removeChannelMock = vi.fn().mockResolvedValue('ok');
+  const query = {
+    eq: vi.fn(() => query),
+    select: vi.fn(() => query),
+    single: vi.fn(() => query),
+    then: (resolve: (value: { data: null; error: null }) => unknown) =>
+      Promise.resolve(resolve({ data: null, error: null })),
+  };
+  const supabaseClient = {
+    realtime: undefined as Parameters<typeof installRealtimeVisibility>[0] | undefined,
+    channel: vi.fn(() => realtimeChannel),
+    from: vi.fn(() => query),
+    removeChannel: removeChannelMock,
+  };
+  return {
+    channel: realtimeChannel,
+    client: supabaseClient,
+    loggerMock: {
+      debug: vi.fn(),
+      error: vi.fn(),
+      warn: vi.fn(),
+    },
+    removeChannel: removeChannelMock,
+  };
+});
+mockNuxtImport('useNuxtApp', () => () => ({
+  $supabase: { client },
+}));
+vi.mock('@/utils/logger', () => ({
+  logger: loggerMock,
+}));
+vi.mock('@/utils/storeHelpers', () => ({
+  clearStaleState: vi.fn(),
+  resetStore: vi.fn(),
+  safePatchStore: vi.fn(),
+}));
+const createStore = (): Store<string, Record<string, unknown>> =>
+  ({
+    $id: 'listener-test',
+    $state: {},
+    $patch: vi.fn(),
+  }) as unknown as Store<string, Record<string, unknown>>;
+describe('useSupabaseListener cleanup', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  it.each([
+    { suspendedBeforeCreation: true, disposed: false },
+    { suspendedBeforeCreation: false, disposed: false },
+    { suspendedBeforeCreation: true, disposed: true },
+    { suspendedBeforeCreation: false, disposed: true },
+  ])(
+    'refreshes a suspended first join unless disposed: %j',
+    async ({ suspendedBeforeCreation, disposed }) => {
+      const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
+      const page = Object.assign(new EventTarget(), {
+        visibilityState: 'hidden' as DocumentVisibilityState,
+      });
+      const transport = {
+        connect: vi.fn(),
+        disconnect: vi.fn(async () => 'ok' as const),
+        getChannels: vi.fn(() => []),
+      };
+      client.realtime = transport;
+      const disposeVisibility = installRealtimeVisibility(transport, page);
+      channel.subscribe.mockImplementationOnce(() => channel);
+      let listener: ReturnType<typeof useSupabaseListener> | undefined;
+      try {
+        if (suspendedBeforeCreation) await vi.advanceTimersByTimeAsync(60_000);
+        listener = useSupabaseListener({
+          filter: 'id=eq.row-1',
+          store: createStore(),
+          table: 'test_table',
+          patchStore: false,
+        });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(client.from).toHaveBeenCalledOnce();
+        const status = channel.subscribe.mock.calls[0]![0];
+        if (!suspendedBeforeCreation) {
+          await vi.advanceTimersByTimeAsync(60_000);
+          status('CHANNEL_ERROR');
+        }
+        expect(transport.disconnect).toHaveBeenCalledOnce();
+        if (disposed) listener.cleanup();
+        page.visibilityState = 'visible';
+        page.dispatchEvent(new Event('visibilitychange'));
+        await vi.advanceTimersByTimeAsync(0);
+        status('SUBSCRIBED');
+        await vi.advanceTimersByTimeAsync(0);
+        expect(client.from).toHaveBeenCalledTimes(disposed ? 1 : 2);
+        expect(listener.isSubscribed.value).toBe(!disposed);
+      } finally {
+        listener?.cleanup();
+        disposeVisibility();
+        client.realtime = undefined;
+      }
+    }
+  );
+  it.each([false, true])(
+    'waits for the snapshot barrier and respects cleanup while waiting: %s',
+    async (disposed) => {
+      const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const withSnapshot: WithRemoteSnapshot = async (read) => {
+        await gate;
+        return read((remote) => remote);
+      };
+      const listener = useSupabaseListener({
+        filter: 'id=eq.row-1',
+        store: createStore(),
+        table: 'test_table',
+        patchStore: false,
+        syncController: { pause: vi.fn(), resume: vi.fn(), withSnapshot },
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(client.from).not.toHaveBeenCalled();
+      if (disposed) listener.cleanup();
+      release();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(client.from).toHaveBeenCalledTimes(disposed ? 0 : 1);
+      listener.cleanup();
+    }
+  );
+  it('does not replace pending local state on reconnect', async () => {
+    const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
+    const onData = vi.fn();
+    let pending = false;
+    const listener = useSupabaseListener({
+      filter: 'id=eq.row-1',
+      store: createStore(),
+      table: 'test_table',
+      onData,
+      patchStore: false,
+      syncController: { pause: vi.fn(), resume: vi.fn(), hasPendingChanges: () => pending },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    onData.mockClear();
+    pending = true;
+    channel.subscribe.mock.calls[0]?.[0]('SUBSCRIBED');
+    pending = false;
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onData).not.toHaveBeenCalled();
+    expect(listener.hasInitiallyLoaded.value).toBe(true);
+    listener.cleanup();
+  });
+  it('preserves a pending live edit while applying unrelated remote fields', async () => {
+    const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
+    const store = createStore();
+    store.$state = { name: 'old', count: 5 };
+    const tracker = createPendingStateTracker(() => store.$state);
+    const onData = vi.fn((data) => {
+      store.$state = data ?? {};
+    });
+    const listener = useSupabaseListener({
+      filter: 'id=eq.row-1',
+      store,
+      table: 'test_table',
+      patchStore: false,
+      onData,
+      syncController: { pause: vi.fn(), resume: vi.fn(), captureRemoteMerge: tracker.capture },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    store.$state = { name: 'old', count: 5 };
+    tracker.captureAcknowledgement({ ...store.$state })();
+    store.$state.count = 0;
+    onData.mockClear();
+    channel.on.mock.calls[0]?.[2]({ eventType: 'UPDATE', new: { name: 'remote', count: 5 } });
+    expect(onData).toHaveBeenCalledWith({ name: 'remote', count: 0 });
+    listener.cleanup();
+  });
+  it('applies a reconnect row while preserving unrelated fields changed during the read', async () => {
+    const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
+    const store = createStore();
+    store.$state = { teamName: 'old', memberProfiles: {} };
+    const tracker = createPendingStateTracker(() => store.$state);
+    let finish!: (value: unknown) => void;
+    const pending = new Promise((resolve) => {
+      finish = resolve;
+    });
+    const queryFor = (result: Promise<unknown>) => {
+      const query = { select: () => query, eq: () => query, single: () => result };
+      return query;
+    };
+    client.from
+      .mockReturnValueOnce(
+        queryFor(Promise.resolve({ data: { teamName: 'old' }, error: null })) as never
+      )
+      .mockReturnValueOnce(queryFor(pending) as never);
+    const onData = vi.fn((data) => Object.assign(store.$state, data));
+    const listener = useSupabaseListener({
+      filter: 'id=eq.row-1',
+      store,
+      table: 'test_table',
+      patchStore: false,
+      onData,
+      syncController: { pause: vi.fn(), resume: vi.fn(), captureRemoteMerge: tracker.capture },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    channel.subscribe.mock.calls[0]?.[0]('SUBSCRIBED');
+    store.$state.memberProfiles = { teammate: 'new' };
+    finish({ data: { teamName: 'remote name' }, error: null });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(store.$state).toEqual({ teamName: 'remote name', memberProfiles: { teammate: 'new' } });
+    listener.cleanup();
+  });
+  it.each(['UPDATE', 'DELETE'])(
+    'completes initialization when %s supersedes the initial fetch',
+    async (eventType) => {
+      const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
+      const onData = vi.fn();
+      const listener = useSupabaseListener({
+        filter: 'id=eq.row-1',
+        onData,
+        patchStore: false,
+        store: createStore(),
+        table: 'test_table',
+      });
+      expect(listener.hasInitiallyLoaded.value).toBe(false);
+      const payloadHandler = channel.on.mock.calls[0]?.[2];
+      payloadHandler?.({ eventType, new: { id: 'row-1' } });
+      expect(listener.hasInitiallyLoaded.value).toBe(true);
+      expect(listener.loadError.value).toBeNull();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(onData).toHaveBeenCalledOnce();
+      expect(onData).toHaveBeenCalledWith(eventType === 'DELETE' ? null : { id: 'row-1' });
+      listener.cleanup();
+    }
+  );
+  it('does not resume sync after a delayed realtime update is cleaned up', async () => {
+    const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
+    const syncController = {
+      pause: vi.fn(),
+      resume: vi.fn(),
+    };
+    const listener = useSupabaseListener({
+      filter: 'id=eq.row-1',
+      patchStore: false,
+      store: createStore(),
+      syncController,
+      table: 'test_table',
+    });
+    syncController.resume.mockClear();
+    const payloadHandler = channel.on.mock.calls[0]?.[2] as
+      ((payload: unknown) => void) | undefined;
+    payloadHandler?.({ eventType: 'UPDATE', new: { id: 'row-1' } });
+    expect(syncController.pause).toHaveBeenCalledOnce();
+    listener.cleanup();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(syncController.resume).toHaveBeenCalledOnce();
+    expect(removeChannel).toHaveBeenCalledOnce();
+  });
+  it('ignores payloads from a channel after cleanup', async () => {
+    const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
+    const syncController = {
+      pause: vi.fn(),
+      resume: vi.fn(),
+    };
+    const onData = vi.fn();
+    const listener = useSupabaseListener({
+      filter: 'id=eq.row-1',
+      onData,
+      patchStore: false,
+      store: createStore(),
+      syncController,
+      table: 'test_table',
+    });
+    const payloadHandler = channel.on.mock.calls[0]?.[2] as
+      ((payload: unknown) => void) | undefined;
+    listener.cleanup();
+    payloadHandler?.({ eventType: 'UPDATE', new: { id: 'row-1' } });
+    expect(syncController.pause).not.toHaveBeenCalled();
+    expect(onData).not.toHaveBeenCalled();
+  });
+  it('waits for the previous channel to leave before rejoining the same topic', async () => {
+    const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
+    let resolveRemoval: ((status: string) => void) | undefined;
+    removeChannel.mockImplementationOnce(
+      () =>
+        new Promise<string>((resolve) => {
+          resolveRemoval = resolve;
+        })
+    );
+    const filter = ref<string | undefined>('id=eq.row-1');
+    const listener = useSupabaseListener({
+      filter,
+      patchStore: false,
+      store: createStore(),
+      table: 'test_table',
+    });
+    expect(client.channel).toHaveBeenCalledTimes(1);
+    // Same topic again: the rejoin must not happen while the leave is in flight.
+    filter.value = undefined;
+    await nextTick();
+    filter.value = 'id=eq.row-1';
+    await nextTick();
+    expect(client.channel).toHaveBeenCalledTimes(1);
+    resolveRemoval?.('ok');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(client.channel).toHaveBeenCalledTimes(2);
+    listener.cleanup();
+  });
+  it('logs a channel error instead of failing silently', async () => {
+    const { useSupabaseListener } = await import('@/composables/supabase/useSupabaseListener');
+    channel.subscribe.mockImplementationOnce((callback: (s: string, e?: Error) => void) => {
+      callback('CHANNEL_ERROR', new Error('nope'));
+      return channel;
+    });
+    const listener = useSupabaseListener({
+      filter: 'id=eq.row-1',
+      patchStore: false,
+      store: createStore(),
+      table: 'test_table',
+    });
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      '[listener-test] Realtime channel is not subscribed:',
+      expect.objectContaining({ error: 'nope', status: 'CHANNEL_ERROR' })
+    );
+    listener.cleanup();
+  });
+});

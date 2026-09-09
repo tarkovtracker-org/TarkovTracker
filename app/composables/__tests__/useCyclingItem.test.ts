@@ -114,4 +114,63 @@ describe('useCyclingItem', () => {
     // Falls back to the primary item; no out-of-bounds access.
     expect(currentItem.value?.id).toBe('a');
   });
+  it('pins the display to the preferred index and pauses rotation', async () => {
+    const items = [makeItem('a'), makeItem('b'), makeItem('c')];
+    const preferredIndex = ref(-1);
+    const { currentItem, isCycling } = useCyclingItem(items, () => items[0] ?? null, {
+      intervalMs: 1000,
+      preferredIndex,
+    });
+    await nextTick();
+    expect(isCycling.value).toBe(true);
+    vi.advanceTimersByTime(2000);
+    expect(currentItem.value?.id).toBe('c');
+    preferredIndex.value = 1;
+    await nextTick();
+    expect(isCycling.value).toBe(false);
+    expect(currentItem.value?.id).toBe('b');
+    // Rotation stays paused while pinned.
+    vi.advanceTimersByTime(5000);
+    expect(currentItem.value?.id).toBe('b');
+  });
+  it('resumes normal rotation when the preferred index is cleared', async () => {
+    const items = [makeItem('a'), makeItem('b'), makeItem('c')];
+    const preferredIndex = ref(2);
+    const { currentItem, isCycling } = useCyclingItem(items, () => items[0] ?? null, {
+      intervalMs: 1000,
+      preferredIndex,
+    });
+    await nextTick();
+    expect(currentItem.value?.id).toBe('c');
+    preferredIndex.value = -1;
+    await nextTick();
+    expect(isCycling.value).toBe(true);
+    // Pin cleared: rotation restarts from the primary item.
+    expect(currentItem.value?.id).toBe('a');
+    vi.advanceTimersByTime(1000);
+    expect(currentItem.value?.id).toBe('b');
+  });
+  it('falls back to the primary item for an out-of-range preferred index', async () => {
+    const items = [makeItem('a'), makeItem('b')];
+    const preferredIndex = ref(7);
+    const { currentItem, isCycling } = useCyclingItem(items, () => items[0] ?? null, {
+      intervalMs: 1000,
+      preferredIndex,
+    });
+    await nextTick();
+    // Out-of-range pin shows the primary item and does not rotate.
+    expect(isCycling.value).toBe(false);
+    vi.advanceTimersByTime(1000);
+    expect(currentItem.value?.id).toBe('a');
+    // Becomes pinned once the index is in range.
+    preferredIndex.value = 1;
+    await nextTick();
+    expect(currentItem.value?.id).toBe('b');
+  });
+  it('pins to the primary item with an empty accepted list', () => {
+    const primary = makeItem('primary');
+    const { currentItem, isCycling } = useCyclingItem([], primary, { preferredIndex: 0 });
+    expect(isCycling.value).toBe(false);
+    expect(currentItem.value?.id).toBe('primary');
+  });
 });

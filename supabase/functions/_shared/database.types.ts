@@ -470,6 +470,7 @@ export type Database = {
           game_mode: string
           profile_public: boolean
           progress_data: Json
+          progress_updated_at: string | null
           season_number: number
           updated_at: string
           user_id: string
@@ -479,6 +480,7 @@ export type Database = {
           game_mode: string
           profile_public?: boolean
           progress_data?: Json
+          progress_updated_at?: string | null
           season_number?: number
           updated_at?: string
           user_id: string
@@ -488,6 +490,7 @@ export type Database = {
           game_mode?: string
           profile_public?: boolean
           progress_data?: Json
+          progress_updated_at?: string | null
           season_number?: number
           updated_at?: string
           user_id?: string
@@ -504,6 +507,7 @@ export type Database = {
           hide_completed_task_objectives: boolean | null
           hide_global_tasks: boolean | null
           hide_non_kappa_tasks: boolean | null
+          hide_task_rewards: boolean | null
           hideout_collapse_completed: boolean
           hideout_primary_view: string | null
           hideout_require_skill_levels: boolean
@@ -556,6 +560,7 @@ export type Database = {
           skill_sort_mode: string | null
           streamer_mode: boolean | null
           task_card_density: string | null
+          task_collapse_default: boolean | null
           task_filter_presets: Json | null
           task_map_view: string | null
           task_primary_view: string | null
@@ -583,6 +588,7 @@ export type Database = {
           hide_completed_task_objectives?: boolean | null
           hide_global_tasks?: boolean | null
           hide_non_kappa_tasks?: boolean | null
+          hide_task_rewards?: boolean | null
           hideout_collapse_completed?: boolean
           hideout_primary_view?: string | null
           hideout_require_skill_levels?: boolean
@@ -635,6 +641,7 @@ export type Database = {
           skill_sort_mode?: string | null
           streamer_mode?: boolean | null
           task_card_density?: string | null
+          task_collapse_default?: boolean | null
           task_filter_presets?: Json | null
           task_map_view?: string | null
           task_primary_view?: string | null
@@ -662,6 +669,7 @@ export type Database = {
           hide_completed_task_objectives?: boolean | null
           hide_global_tasks?: boolean | null
           hide_non_kappa_tasks?: boolean | null
+          hide_task_rewards?: boolean | null
           hideout_collapse_completed?: boolean
           hideout_primary_view?: string | null
           hideout_require_skill_levels?: boolean
@@ -714,6 +722,7 @@ export type Database = {
           skill_sort_mode?: string | null
           streamer_mode?: boolean | null
           task_card_density?: string | null
+          task_collapse_default?: boolean | null
           task_filter_presets?: Json | null
           task_map_view?: string | null
           task_primary_view?: string | null

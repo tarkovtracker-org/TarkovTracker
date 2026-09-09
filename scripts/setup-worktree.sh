@@ -11,15 +11,7 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "ERROR: not inside a git work tree" >&2
   exit 1
 fi
-if ! command -v pnpm >/dev/null 2>&1; then
-  if command -v corepack >/dev/null 2>&1; then
-    corepack enable
-    corepack prepare pnpm@10.34.5 --activate
-  else
-    echo "ERROR: pnpm not found (and corepack unavailable)" >&2
-    exit 1
-  fi
-fi
+bash scripts/ensure-pnpm.sh
 echo "Installing dependencies (frozen lockfile)..."
 pnpm install --frozen-lockfile
 echo "Installing husky hooks..."

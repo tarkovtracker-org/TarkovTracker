@@ -5,11 +5,14 @@ export interface PromiseStore {
   readonly itemsFullPromise: Promise<void> | null;
   readonly itemsLitePromise: Promise<void> | null;
   readonly mapSpawnsPromise: Promise<void> | null;
-  readonly objectiveModeCountDifferencesPromise: Promise<void> | null;
+  readonly objectiveModeCountDifferencesPromise: Promise<'stale' | undefined> | null;
   readonly taskObjectivesPromise: Promise<void> | null;
   readonly taskRewardsPromise: Promise<void> | null;
   readonly prestigePromise: Promise<void> | null;
   readonly editionsPromise: Promise<void> | null;
+  readonly editionsRequestVersion: number;
+  readonly taskRewardsRequestVersion: number;
+  readonly taskCoreRefreshes: Set<symbol>;
   readonly initPromise: Promise<void> | null;
   readonly isInitializing: boolean;
 }
@@ -52,6 +55,9 @@ export function getPromiseStore(storeInstance: object): MutablePromiseStore {
       taskRewardsPromise: null,
       prestigePromise: null,
       editionsPromise: null,
+      editionsRequestVersion: 0,
+      taskRewardsRequestVersion: 0,
+      taskCoreRefreshes: new Set(),
       initPromise: null,
       isInitializing: false,
     });

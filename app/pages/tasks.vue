@@ -155,6 +155,7 @@
                     <MapRequiredItemsSummary
                       v-if="selectedMapData"
                       :map-id="selectedMapData.id"
+                      :objective-visibility="mapObjectiveVisibility"
                       :tasks="filteredTasks"
                     />
                   </div>
@@ -175,7 +176,7 @@
               <div
                 v-if="focusedTaskInSlice.length > 0"
                 data-testid="focused-task-section"
-                class="mb-6"
+                :class="taskSectionGapClass"
               >
                 <div class="mb-3 flex items-center justify-between gap-3">
                   <div class="flex min-w-0 items-center gap-2">
@@ -200,7 +201,11 @@
                   </UButton>
                 </div>
                 <div>
-                  <div v-for="task in focusedTaskInSlice" :key="`focused-${task.id}`" class="pb-4">
+                  <div
+                    v-for="task in focusedTaskInSlice"
+                    :key="`focused-${task.id}`"
+                    :class="taskCardGapClass"
+                  >
                     <TaskCard
                       :accent-variant="
                         shouldGroupGlobalTasks && isGlobalTask(task) ? 'global' : 'default'
@@ -211,7 +216,7 @@
                   </div>
                 </div>
               </div>
-              <div v-if="pinnedTasksInSlice.length > 0" class="mb-6">
+              <div v-if="pinnedTasksInSlice.length > 0" :class="taskSectionGapClass">
                 <div class="mb-3 flex items-center gap-2">
                   <div class="bg-surface-700 h-px flex-1" />
                   <div class="flex items-center gap-2">
@@ -223,7 +228,11 @@
                   <div class="bg-surface-700 h-px flex-1" />
                 </div>
                 <div>
-                  <div v-for="task in pinnedTasksInSlice" :key="`pinned-${task.id}`" class="pb-4">
+                  <div
+                    v-for="task in pinnedTasksInSlice"
+                    :key="`pinned-${task.id}`"
+                    :class="taskCardGapClass"
+                  >
                     <TaskCard
                       :accent-variant="
                         shouldGroupGlobalTasks && isGlobalTask(task) ? 'global' : 'default'
@@ -249,11 +258,15 @@
                 @toggle="toggleMapTaskVisibilityFilter"
               />
               <div>
-                <div v-for="task in mapSpecificTasksInSlice" :key="`task-${task.id}`" class="pb-4">
+                <div
+                  v-for="task in mapSpecificTasksInSlice"
+                  :key="`task-${task.id}`"
+                  :class="taskCardGapClass"
+                >
                   <TaskCard :task="task" @on-task-action="handleTaskAction" />
                 </div>
               </div>
-              <div v-if="globalTasksInSlice.length > 0" class="mt-2 mb-6">
+              <div v-if="globalTasksInSlice.length > 0" class="mt-2" :class="taskSectionGapClass">
                 <div class="mb-3 flex items-center gap-2">
                   <div class="bg-surface-700 h-px flex-1" />
                   <div class="flex items-center gap-2">
@@ -265,7 +278,11 @@
                   <div class="bg-surface-700 h-px flex-1" />
                 </div>
                 <div>
-                  <div v-for="task in globalTasksInSlice" :key="`global-${task.id}`" class="pb-4">
+                  <div
+                    v-for="task in globalTasksInSlice"
+                    :key="`global-${task.id}`"
+                    :class="taskCardGapClass"
+                  >
                     <TaskCard
                       accent-variant="global"
                       :task="task"
@@ -559,6 +576,7 @@
   } = storeToRefs(preferencesStore);
   const metadataStore = useMetadataStore();
   const { tasks, loading: tasksLoading } = storeToRefs(metadataStore);
+  const taskDetailsReady = useTaskDetailReadiness();
   const maps = computed(() => metadataStore.mapsWithSvg);
   const sortedTraders = computed(() => metadataStore.sortedTraders);
   const editions = computed(() => metadataStore.editions);
@@ -576,6 +594,8 @@
   const showMapDisplay = computed(() => {
     return getTaskPrimaryView.value === 'maps' && getTaskMapView.value !== 'all';
   });
+  const taskCardGapClass = 'pb-2';
+  const taskSectionGapClass = 'mb-4';
   const showGraphView = computed(() => {
     return getTaskPrimaryView.value === 'graph';
   });
@@ -662,7 +682,7 @@
   const sourceMapTasks = computed(() =>
     isSearchActive.value ? filteredTasks.value : visibleTasks.value
   );
-  const { mapObjectiveMarks } = useMapObjectiveMarks({
+  const { mapObjectiveMarks, mapObjectiveVisibility } = useMapObjectiveMarks({
     mapId: selectedMapId,
     shouldShowCompletedObjectives,
     tasks: sourceMapTasks,
@@ -885,21 +905,35 @@
   };
   const route = useRoute();
   useTaskRouteSync({ maps, traders: sortedTraders });
-  const refreshVisibleTasks = () => {
+  const canRefreshVisibleTasks = computed(
+    () =>
+      metadataStore.hasInitialized &&
+      !tasksLoading.value &&
+      !metadataStore.tasksCoreRefreshing &&
+      taskDetailsReady.value
+  );
+  // Metadata readiness can precede the first debounced filter refresh.
+  const hasRefreshedVisibleTasks = ref(false);
+  let visibleTaskRefreshGeneration = 0;
+  /** Refresh filters before allowing initial results to replace the loading state. */
+  const refreshVisibleTasks = async () => {
+    const generation = ++visibleTaskRefreshGeneration;
     try {
-      updateVisibleTasks(mapTaskVisibilityFilterOptions.value, tasksLoading.value);
+      await updateVisibleTasks(mapTaskVisibilityFilterOptions.value, tasksLoading.value);
     } catch (error) {
       logger.error('[Tasks] Failed to refresh tasks:', error);
+    } finally {
+      if (generation === visibleTaskRefreshGeneration) {
+        hasRefreshedVisibleTasks.value = canRefreshVisibleTasks.value;
+      }
     }
   };
-  const debouncedRefreshVisibleTasks = debounce(() => {
-    refreshVisibleTasks();
-  }, 50);
+  const debouncedRefreshVisibleTasks = debounce(refreshVisibleTasks, 50);
   const handleTaskAction = (payload: TaskActionPayload) => {
     onTaskAction(payload);
     trackFocusedTaskAction(payload);
     void nextTick(() => {
-      refreshVisibleTasks();
+      void refreshVisibleTasks();
       debouncedRefreshVisibleTasks.cancel();
     });
   };
@@ -937,6 +971,8 @@
       getHideGlobalTasks,
       getHideCompletedMapObjectives,
       getPinnedTaskIds,
+      () => metadataStore.hasInitialized,
+      taskDetailsReady,
       tasksLoading,
       tasks,
       maps,
@@ -948,6 +984,12 @@
       editions,
     ],
     () => {
+      if (!canRefreshVisibleTasks.value) {
+        visibleTaskRefreshGeneration += 1;
+        hasRefreshedVisibleTasks.value = false;
+        debouncedRefreshVisibleTasks.cancel();
+        return;
+      }
       void debouncedRefreshVisibleTasks().catch((error) => {
         if (isDebounceRejection(error)) return;
         logger.error('[Tasks] Debounced refresh failed:', error);
@@ -955,7 +997,9 @@
     },
     { immediate: true, flush: 'post' }
   );
-  const isLoading = computed(() => !metadataStore.hasInitialized || tasksLoading.value);
+  const isLoading = computed(
+    () => !canRefreshVisibleTasks.value || !hasRefreshedVisibleTasks.value
+  );
   const {
     activeSearchCount,
     cleanup: cleanupTaskFilters,
@@ -1066,7 +1110,7 @@
     selectedMapData,
     showMapDisplay,
     stopResize,
-    tasksLoading,
+    tasksLoading: isLoading,
     visibleTaskCount,
   });
   onBeforeUnmount(() => {
