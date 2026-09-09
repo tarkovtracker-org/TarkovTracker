@@ -3,19 +3,13 @@ import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { isAllUsersView } from '@/types/taskFilter';
+import { matchesAllUsersView, type TeamTaskStatus } from '@/utils/allUsersTaskStatus';
 import { perfEnd, perfStart } from '@/utils/perf';
 import type { Task } from '@/types/tarkov';
 import type { TaskSecondaryView } from '@/types/taskFilter';
 type TaskCountStatus = 'active' | 'available' | 'locked' | 'completed' | 'failed';
 type TaskStatusCounts = Record<'all' | TaskCountStatus, number>;
-type TeamTaskStatus = {
-  teamId: string;
-  isUnlocked: boolean;
-  isActive: boolean;
-  isCompleted: boolean;
-  isFailed: boolean;
-};
-type TaskCountResult = { status: TaskCountStatus | null };
+type TaskCountResult = { statuses: readonly TaskCountStatus[] };
 type TaskLifecycleStatus = 'active' | 'completed' | 'failed' | 'incomplete';
 type TaskCountFilterContext = {
   showKappa: boolean;
@@ -35,12 +29,6 @@ const TASK_STATUS_TO_COUNT_STATUS: Record<
   completed: 'completed',
   failed: 'failed',
 };
-const isAvailableTeamTask = ({
-  isUnlocked,
-  isActive,
-  isCompleted,
-  isFailed,
-}: TeamTaskStatus): boolean => isUnlocked && !isActive && !isCompleted && !isFailed;
 const taskHasRequiredKeys = (task: Task): boolean => (task.requiredKeys?.length ?? 0) > 0;
 const isKappaTaskVisible = (task: Task, context: TaskCountFilterContext): boolean =>
   task.kappaRequired === true && context.showKappa;
@@ -80,18 +68,24 @@ const resolveUnstartedTaskStatus = (
   if (isUnlocked) return 'available';
   return 'locked';
 };
-const resolveAllUsersTaskStatus = (
+const ALL_USERS_COUNT_STATUSES: readonly TaskCountStatus[] = [
+  'available',
+  'active',
+  'completed',
+  'failed',
+  'locked',
+];
+/**
+ * All-users chips are independent membership tests rather than one exclusive
+ * bucket, so a task available to one teammate and active for another is counted
+ * under both. Sharing `matchesAllUsersView` with the filters keeps each badge
+ * equal to the number of tasks its own view renders.
+ */
+const resolveAllUsersTaskStatuses = (
   statuses: TeamTaskStatus[],
   isInvalid: boolean
-): TaskCountStatus | null => {
-  const terminalStatus = [
-    { status: 'failed' as const, matches: statuses.some(({ isFailed }) => isFailed) },
-    { status: 'completed' as const, matches: statuses.every(({ isCompleted }) => isCompleted) },
-    { status: 'active' as const, matches: statuses.some(({ isActive }) => isActive) },
-  ].find(({ matches }) => matches)?.status;
-  if (terminalStatus) return terminalStatus;
-  return resolveUnstartedTaskStatus(statuses.some(isAvailableTeamTask), isInvalid);
-};
+): readonly TaskCountStatus[] =>
+  ALL_USERS_COUNT_STATUSES.filter((status) => matchesAllUsersView(status, statuses, isInvalid));
 const resolveUserTaskStatus = (
   status: TaskLifecycleStatus,
   isUnlocked: boolean,
@@ -147,7 +141,7 @@ export function useTaskCounts() {
     if (relevantTeamIds.length === 0) return null;
     const statuses = relevantTeamIds.map((teamId) => getTeamTaskStatus(task.id, teamId));
     const isInvalid = isTaskInvalid(task.id, 'all', visibleTeamIds);
-    return { status: resolveAllUsersTaskStatus(statuses, isInvalid) };
+    return { statuses: resolveAllUsersTaskStatuses(statuses, isInvalid) };
   };
   const getUserTaskCount = (task: Task, userView: string): TaskCountResult | null => {
     const userFaction = progressStore.playerFaction[userView];
@@ -155,9 +149,8 @@ export function useTaskCounts() {
     const status = progressStore.getTaskStatus(userView, task.id);
     const isUnlocked = progressStore.unlockedTasks?.[task.id]?.[userView] === true;
     const isInvalid = isTaskInvalid(task.id, userView);
-    return {
-      status: resolveUserTaskStatus(status, isUnlocked, isInvalid),
-    };
+    const resolved = resolveUserTaskStatus(status, isUnlocked, isInvalid);
+    return { statuses: resolved ? [resolved] : [] };
   };
   const getTaskCountResult = (
     task: Task,
@@ -168,7 +161,7 @@ export function useTaskCounts() {
     isAllUsers ? getAllUsersTaskCount(task, visibleTeamIds) : getUserTaskCount(task, userView);
   const addTaskStatusCount = (counts: TaskStatusCounts, result: TaskCountResult): void => {
     counts.all++;
-    if (result.status) counts[result.status]++;
+    for (const status of result.statuses) counts[status]++;
   };
   const countTaskStatuses = (
     tasks: Task[],
@@ -230,35 +223,14 @@ export function useTaskCounts() {
         });
         if (relevantTeamIds.length === 0) continue;
         const taskStatuses = relevantTeamIds.map((teamId) => getTeamTaskStatus(task.id, teamId));
-        let shouldCount = false;
-        switch (secondaryView) {
-          case 'all':
-            shouldCount = true;
-            break;
-          case 'available':
-            if (isTaskInvalid(task.id, 'all', visibleTeamIds)) continue;
-            shouldCount = taskStatuses.some(isAvailableTeamTask);
-            break;
-          case 'active':
-            shouldCount = taskStatuses.some(({ isActive }) => isActive);
-            break;
-          case 'locked':
-            if (isTaskInvalid(task.id, 'all', visibleTeamIds)) continue;
-            shouldCount =
-              !taskStatuses.some(isAvailableTeamTask) &&
-              !taskStatuses.some(({ isActive }) => isActive) &&
-              !taskStatuses.every(({ isCompleted }) => isCompleted) &&
-              !taskStatuses.some(({ isFailed }) => isFailed);
-            break;
-          case 'completed':
-            shouldCount = taskStatuses.every(
-              ({ isCompleted, isFailed }) => isCompleted && !isFailed
-            );
-            break;
-          case 'failed':
-            shouldCount = taskStatuses.some(({ isFailed }) => isFailed);
-            break;
-        }
+        const shouldCount =
+          secondaryView === 'all'
+            ? true
+            : matchesAllUsersView(
+                secondaryView,
+                taskStatuses,
+                isTaskInvalid(task.id, 'all', visibleTeamIds)
+              );
         if (shouldCount) counts[traderId]++;
       } else {
         const userFaction = progressStore.playerFaction[userView];
