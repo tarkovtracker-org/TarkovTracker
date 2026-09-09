@@ -4,7 +4,10 @@ import { mount } from '@vue/test-utils';
 import { createPinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
-import type { StorylineNormalizedChapterView } from '@/composables/useStorylineChapters';
+import type {
+  useStorylineChapters,
+  StorylineNormalizedChapterView,
+} from '@/composables/useStorylineChapters';
 const TEST_CHAPTERS: StorylineNormalizedChapterView[] = [
   {
     id: 'chapter-1',
@@ -162,8 +165,12 @@ const requireDefined = <T>(value: T | null | undefined, message: string): T => {
   }
   return value;
 };
+const storylineOptions = vi.fn<(options: Parameters<typeof useStorylineChapters>[0]) => void>();
 vi.mock('@/composables/useStorylineChapters', () => ({
-  useStorylineChapters: () => ({ normalizedChapters }),
+  useStorylineChapters: (options: Parameters<typeof useStorylineChapters>[0]) => {
+    storylineOptions(options);
+    return { normalizedChapters };
+  },
 }));
 mockNuxtImport('useI18n', () => () => ({
   t: (key: string) => key,
@@ -273,4 +280,22 @@ describe('ProfileStorylineTab', () => {
     expect(wrapper.emitted('toggleChapter')).toEqual([['chapter-1']]);
     wrapper.unmount();
   });
+});
+it('reads the isolated chapter catalog supplied by the profile', async () => {
+  const wrapper = await createWrapper(false);
+  const options = storylineOptions.mock.calls.at(-1)![0]!;
+  expect(options.chapters?.()).toEqual([]);
+  const chapters = [
+    {
+      id: 'isolated',
+      name: 'Isolated',
+      order: 1,
+      normalizedName: 'isolated',
+      wikiLink: '',
+      objectives: {},
+    },
+  ];
+  await wrapper.setProps({ chapters });
+  expect(options.chapters?.()).toEqual(chapters);
+  wrapper.unmount();
 });

@@ -412,3 +412,35 @@ describe('buildPrestigeRequirementRows', () => {
     }
   );
 });
+it.each([false, true])(
+  'requires the declared story objective, independently of chapter completion: %s',
+  (complete) => {
+    const progress = createProgressData();
+    progress.storyChapters = {
+      chapter: { complete: true, objectives: { objective: { complete } } },
+    };
+    const prestige = createPrestigeLevel(1, []);
+    prestige.storyRequirements = [
+      {
+        type: 'storyObjectiveStatus',
+        storyChapter: 'chapter',
+        objective: 'objective',
+        name: '',
+        status: ['complete'],
+      },
+    ];
+    const rows = buildPrestigeRequirementRows({
+      currentPrestigeLevel: 0,
+      edition,
+      hideoutStations,
+      prestigeLevels: [prestige],
+      modeProgress: progress,
+      storyChapters: [],
+      tasks: [],
+    });
+    expect(rows.find((row) => row.id === 'story:chapter:objective')).toMatchObject({
+      status: complete ? 'met' : 'unmet',
+      name: 'chapter',
+    });
+  }
+);

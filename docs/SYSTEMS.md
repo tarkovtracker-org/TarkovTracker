@@ -105,11 +105,14 @@ flowchart LR
     Route --> Cache["edgeCache()<br/>app/server/utils/edgeCache.ts"]
     Cache -->|miss| Fetch["tarkov-json.ts<br/>fetch + adapt"]
     Fetch -->|HTTPS| Upstream["json.tarkov.dev"]
-    Fetch --> Overlay{"Overlay?"}
+    Fetch -->|hideout: adapted base| Cache
+    Fetch -->|other routes| Overlay{"Overlay?"}
     Overlay -->|yes| ApplyOverlay["applyOverlay()<br/>app/server/utils/overlay.ts"]
     Overlay -->|no| Cache
     ApplyOverlay --> Cache
-    Cache --> Browser
+    Cache -->|other routes: final response| Browser
+    Cache -->|hideout: cached or fetched base| HideoutOverlay["applyOverlay()<br/>current overlay on every read"]
+    HideoutOverlay --> Browser
 ```
 
 ### Files

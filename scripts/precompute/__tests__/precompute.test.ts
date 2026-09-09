@@ -1,3 +1,8 @@
+import {
+  PRECOMPUTED_TTL_SECONDS,
+  runPrecompute,
+  validatePrecomputeFilter,
+} from '@@/scripts/precompute/precompute';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildTasksCorePrecomputedKey,
@@ -5,11 +10,6 @@ import {
 } from '@/server/utils/precomputedTarkov';
 import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
 import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
-import {
-  PRECOMPUTED_TTL_SECONDS,
-  runPrecompute,
-  validatePrecomputeFilter,
-} from '@@/scripts/precompute/precompute';
 import type { KvWriter } from '@@/scripts/precompute/precompute';
 const { applyOverlayMock, createFetcherMock, fetcherMock } = vi.hoisted(() => {
   const hoistedFetcherMock = vi.fn();
@@ -47,12 +47,10 @@ describe('runPrecompute', () => {
   beforeEach(() => {
     fetcherMock.mockReset().mockResolvedValue({ raw: true });
     createFetcherMock.mockClear();
-    applyOverlayMock
-      .mockReset()
-      .mockResolvedValue({
-        data: { tasks: [{ id: 'task-1' }] },
-        dataOverlay: { version: '1', sha256: 'release-sha' },
-      });
+    applyOverlayMock.mockReset().mockResolvedValue({
+      data: { tasks: [{ id: 'task-1' }] },
+      dataOverlay: { version: '1', sha256: 'release-sha' },
+    });
   });
   it('retains all payload provenance when final manifest publication fails', async () => {
     const kv = createKvMock();
@@ -111,12 +109,10 @@ describe('runPrecompute', () => {
     expect(kv.put).toHaveBeenCalledTimes(expectedKeys.length + 1);
   });
   it('records a pipeline failure and continues with remaining combinations', async () => {
-    applyOverlayMock
-      .mockRejectedValueOnce(new Error('upstream 502'))
-      .mockResolvedValue({
-        data: { tasks: [{ id: 'task-1' }] },
-        dataOverlay: { version: '1', sha256: 'release-sha' },
-      });
+    applyOverlayMock.mockRejectedValueOnce(new Error('upstream 502')).mockResolvedValue({
+      data: { tasks: [{ id: 'task-1' }] },
+      dataOverlay: { version: '1', sha256: 'release-sha' },
+    });
     const kv = createKvMock();
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toEqual([
@@ -140,39 +136,23 @@ describe('runPrecompute', () => {
       'tasks-core-json-v4-en-pvp-season',
     ]);
   });
-  it('refuses to write a structurally empty payload to KV', async () => {
-    applyOverlayMock
-      .mockResolvedValueOnce({ data: { tasks: [] } })
-      .mockResolvedValue({
-        data: { tasks: [{ id: 'task-1' }] },
-        dataOverlay: { version: '1', sha256: 'release-sha' },
-      });
+  it.each([
+    { name: 'empty tasks', tasks: [], error: 'payload has no tasks' },
+    {
+      name: 'malformed task entries',
+      tasks: [null, { id: 'task-good', objectives: [] }],
+      error: 'payload contains a malformed task',
+    },
+  ])('refuses to publish $name to KV', async ({ tasks, error }) => {
+    applyOverlayMock.mockResolvedValueOnce({ data: { tasks } }).mockResolvedValue({
+      data: { tasks: [{ id: 'task-good', objectives: [] }] },
+      dataOverlay: { version: '1', sha256: 'release-sha' },
+    });
     const kv = createKvMock();
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toEqual([
       {
-        error: 'Sanity check failed: payload has no tasks; refusing to write to KV',
-        key: 'tasks-core-json-v4-en-regular',
-      },
-    ]);
-    expect(result.successes).toEqual([
-      'tasks-core-json-v4-en-pve',
-      'tasks-core-json-v4-en-pvp-season',
-    ]);
-    expect(kv.put).toHaveBeenCalledTimes(2);
-  });
-  it('refuses to publish malformed task entries', async () => {
-    applyOverlayMock
-      .mockResolvedValueOnce({ data: { tasks: [null, { id: 'task-good', objectives: [] }] } })
-      .mockResolvedValue({
-        data: { tasks: [{ id: 'task-good', objectives: [] }] },
-        dataOverlay: { version: '1', sha256: 'release-sha' },
-      });
-    const kv = createKvMock();
-    const result = await runPrecompute(kv, { lang: 'en' });
-    expect(result.failures).toEqual([
-      {
-        error: 'Sanity check failed: payload contains a malformed task; refusing to write to KV',
+        error: `Sanity check failed: ${error}; refusing to write to KV`,
         key: 'tasks-core-json-v4-en-regular',
       },
     ]);

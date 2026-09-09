@@ -243,3 +243,16 @@ describe('canonical task availability', () => {
     });
   });
 });
+it('fails closed on missing failed-branch references and foreign factions', () => {
+  expect(
+    evaluate({ id: 'target', failedRequirements: [{ task: { id: 'missing' } }] }).blockers
+  ).toContainEqual({ type: 'unknown', taskId: 'missing', reason: 'failed_requirement' });
+  expect(evaluate({ id: 'target', factionName: 'BEAR' }).blockers).toContainEqual({
+    type: 'faction',
+    reason: 'BEAR',
+  });
+});
+it('fails closed when a failed-branch requirement has no task reference', () => {
+  const task = { id: 'target', failedRequirements: [{}] } as Task;
+  expect(evaluate(task).blockers).toContainEqual({ type: 'unknown', reason: 'failed_requirement' });
+});

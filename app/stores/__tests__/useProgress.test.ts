@@ -203,6 +203,24 @@ describe('useProgressStore', () => {
       { id: 'fence', normalizedName: 'fence', name: 'Fence' },
       { id: praporId, normalizedName: 'prapor', name: 'Prapor' },
     ];
+    const repTask = {
+      id: 'prapor-rep-task',
+      name: 'Prapor Rep Task',
+      factionName: 'Any',
+      trader: { id: 'skier', name: 'Skier', normalizedName: 'skier' },
+      traderRequirements: [
+        reputationRequirement('req-2', { id: praporId, name: 'Prapor' }, 0.5, '>='),
+      ],
+    };
+    const lowKarmaTask = {
+      id: 'fence-low-karma-task',
+      name: 'Low Karma Task',
+      factionName: 'Any',
+      trader: { id: 'fence', name: 'Fence', normalizedName: 'fence' },
+      traderRequirements: [
+        reputationRequirement('req-3', { id: 'fence', name: 'Fence' }, -3, '<='),
+      ],
+    };
     it('locks a task when the trader loyalty level requirement is not met', async () => {
       setupMocks({
         selfState: createStoreState({ pvpTraders: { [praporId]: { level: 1 } } }),
@@ -234,15 +252,6 @@ describe('useProgressStore', () => {
       expect(store.unlockedTasks['prapor-ll2-task']?.self).toBe(false);
     });
     it('locks a task when a non-Fence positive reputation requirement is not met', async () => {
-      const repTask = {
-        id: 'prapor-rep-task',
-        name: 'Prapor Rep Task',
-        factionName: 'Any',
-        trader: { id: 'skier', name: 'Skier', normalizedName: 'skier' },
-        traderRequirements: [
-          reputationRequirement('req-2', { id: praporId, name: 'Prapor' }, 0.5, '>='),
-        ],
-      };
       setupMocks({
         selfState: createStoreState({ pvpTraders: { [praporId]: { reputation: 0.2 } } }),
         tasks: [repTask],
@@ -253,15 +262,6 @@ describe('useProgressStore', () => {
       expect(store.unlockedTasks['prapor-rep-task']?.self).toBe(false);
     });
     it('unlocks a task when a non-Fence positive reputation requirement is met', async () => {
-      const repTask = {
-        id: 'prapor-rep-task',
-        name: 'Prapor Rep Task',
-        factionName: 'Any',
-        trader: { id: 'skier', name: 'Skier', normalizedName: 'skier' },
-        traderRequirements: [
-          reputationRequirement('req-2', { id: praporId, name: 'Prapor' }, 0.5, '>='),
-        ],
-      };
       setupMocks({
         selfState: createStoreState({ pvpTraders: { [praporId]: { reputation: 0.5 } } }),
         tasks: [repTask],
@@ -272,15 +272,6 @@ describe('useProgressStore', () => {
       expect(store.unlockedTasks['prapor-rep-task']?.self).toBe(true);
     });
     it('honors the declared Fence reputation upper bound', async () => {
-      const lowKarmaTask = {
-        id: 'fence-low-karma-task',
-        name: 'Low Karma Task',
-        factionName: 'Any',
-        trader: { id: 'fence', name: 'Fence', normalizedName: 'fence' },
-        traderRequirements: [
-          reputationRequirement('req-3', { id: 'fence', name: 'Fence' }, -3, '<='),
-        ],
-      };
       setupMocks({
         selfState: createStoreState({ pvpTraders: { fence: { reputation: 0 } } }),
         tasks: [lowKarmaTask],
@@ -321,15 +312,6 @@ describe('useProgressStore', () => {
       expect(store.unlockedTasks['prapor-ll2-task']?.self).toBe(true);
     });
     it('skips reputation gating when the preference is disabled', async () => {
-      const repTask = {
-        id: 'prapor-rep-task',
-        name: 'Prapor Rep Task',
-        factionName: 'Any',
-        trader: { id: 'skier', name: 'Skier', normalizedName: 'skier' },
-        traderRequirements: [
-          reputationRequirement('req-2', { id: praporId, name: 'Prapor' }, 0.5, '>='),
-        ],
-      };
       setupMocks({
         selfState: createStoreState({ pvpTraders: { [praporId]: { reputation: 0.2 } } }),
         tasks: [repTask],
@@ -341,15 +323,6 @@ describe('useProgressStore', () => {
       expect(store.unlockedTasks['prapor-rep-task']?.self).toBe(true);
     });
     it('skips Fence negative-reputation gating when the preference is disabled', async () => {
-      const lowKarmaTask = {
-        id: 'fence-low-karma-task',
-        name: 'Low Karma Task',
-        factionName: 'Any',
-        trader: { id: 'fence', name: 'Fence', normalizedName: 'fence' },
-        traderRequirements: [
-          reputationRequirement('req-3', { id: 'fence', name: 'Fence' }, -3, '<='),
-        ],
-      };
       setupMocks({
         selfState: createStoreState({ pvpTraders: { fence: { reputation: 0 } } }),
         tasks: [lowKarmaTask],

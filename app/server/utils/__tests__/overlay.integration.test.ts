@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { testOverlayEditions } from '@/server/utils/__tests__/overlayFixtures';
+import type { Task } from '@/types/tarkov';
 const stubOverlayFetch = (overlay: unknown) => {
   const fetchMock = vi.fn(async () => {
     return new Response(JSON.stringify(overlay), {
@@ -458,3 +459,38 @@ it.each([
     });
   }
 );
+it('applies added crafts through the full hideout overlay pipeline', async () => {
+  stubOverlayFetch({
+    $meta: { version: 'craft', generated: '2026-09-07', sha256: 'craft-sha' },
+    editions: testOverlayEditions,
+    craftsAdd: {
+      added: {
+        station: 'station',
+        level: 1,
+        requiredItems: [],
+        productItem: { id: 'product', count: 1 },
+      },
+    },
+  });
+  const { applyOverlay } = await import('@/server/utils/overlay');
+  const result = await applyOverlay({
+    data: { hideoutStations: [{ id: 'station', levels: [{ level: 1, crafts: [] }] }] },
+  });
+  expect(result.data.hideoutStations[0]?.levels[0]?.crafts).toEqual([
+    expect.objectContaining({ id: 'added' }),
+  ]);
+});
+it('retains chapter IDs as unlock labels when optional chapter names are missing', async () => {
+  stubOverlayFetch({
+    $meta: { version: 'chapter', generated: '2026-09-07', sha256: 'chapter-sha' },
+    editions: testOverlayEditions,
+    storyChapters: {
+      chapter: { objectives: {}, questUnlocks: [{ id: 'task' }] },
+      empty: { objectives: {} },
+    },
+  });
+  const { applyOverlay } = await import('@/server/utils/overlay');
+  const tasks: Task[] = [{ id: 'task' }];
+  const result = await applyOverlay({ data: { tasks } });
+  expect(result.data.tasks[0]?.storyUnlocks).toEqual([{ id: 'chapter', name: 'chapter' }]);
+});

@@ -11,6 +11,7 @@ import {
   adaptTaskRewardsResponse,
   adaptTasksCoreResponse,
   fetchTarkovJsonEndpoint,
+  createTarkovJsonPrestigeFetcher,
 } from '@/server/utils/tarkov-json';
 type TestJsonFetcher = <T = unknown>(
   url: string,
@@ -599,4 +600,34 @@ describe('tarkov JSON adapters', () => {
     ]);
     expect(prestige?.conditions?.[1]?.task).toMatchObject({ id: 'task1', name: 'Debut' });
   });
+});
+it.each(['regular', 'pve', 'pvp-season'] as const)(
+  'projects raw prestige before adaptation in %s',
+  async (gameMode) => {
+    const fetcher = createFetcher({
+      [`https://json.tarkov.dev/${gameMode}/tasks`]: { data: { tasks: {}, prestige: [] } },
+      [`https://json.tarkov.dev/${gameMode}/hideout`]: { data: {} },
+      [`https://json.tarkov.dev/${gameMode}/traders`]: { data: {} },
+    });
+    const project = vi.fn((payload) => ({
+      ...payload,
+      prestige: [{ id: 'prestige', level: 1, conditions: [] }],
+    }));
+    const response = await createTarkovJsonPrestigeFetcher({
+      gameMode,
+      deps: { fetcher },
+      project,
+    })();
+    expect(project).toHaveBeenCalledOnce();
+    expect(response.data.prestige[0]).toMatchObject({ id: 'prestige', level: 1 });
+  }
+);
+it('defaults prestige to its upstream source mode when no mode is supplied', async () => {
+  const fetcher = createFetcher({
+    'https://json.tarkov.dev/regular/tasks': { data: { tasks: {}, prestige: [] } },
+    'https://json.tarkov.dev/regular/hideout': { data: {} },
+    'https://json.tarkov.dev/regular/traders': { data: {} },
+  });
+  const response = await createTarkovJsonPrestigeFetcher({ deps: { fetcher } })();
+  expect(response.data.prestige).toEqual([]);
 });

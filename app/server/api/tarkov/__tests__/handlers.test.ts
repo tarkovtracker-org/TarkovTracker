@@ -266,6 +266,33 @@ describe('Tarkov API handlers', () => {
       expect(mockSetOverlayResponseHeaders).toHaveBeenCalledWith(event, response);
     }
   );
+  it.each(['editions', 'prestige'] as const)(
+    'fails closed when the %s overlay is unavailable',
+    async (catalog) => {
+      mockFetchOverlay.mockResolvedValueOnce({
+        overlay: null as unknown as object,
+        meta: { status: 'unavailable' },
+      });
+      const { default: handler } =
+        catalog === 'editions'
+          ? await import('@/server/api/tarkov/editions.get')
+          : await import('@/server/api/tarkov/prestige.get');
+      await expect(handler(event)).rejects.toMatchObject({ statusCode: 503 });
+      expect(mockCreateTarkovJsonPrestigeFetcher).not.toHaveBeenCalled();
+    }
+  );
+  it('passes raw prestige payloads through the scoped overlay projector', async () => {
+    const { default: handler } = await import('@/server/api/tarkov/prestige.get');
+    mockFetchOverlay.mockResolvedValueOnce({
+      overlay: { prestige: { level: { level: 2 } } },
+      meta: { status: 'fresh' },
+    });
+    await handler(event);
+    const project = mockCreateTarkovJsonPrestigeFetcher.mock.calls[0]![0].project;
+    expect(project({ prestige: [{ id: 'level', level: 1 }] }).prestige).toEqual([
+      expect.objectContaining({ id: 'level', level: 2 }),
+    ]);
+  });
   it('builds expected cache key for prestige', async () => {
     const { default: handler } = await import('@/server/api/tarkov/prestige.get');
     await handler(event);

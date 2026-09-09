@@ -144,6 +144,26 @@ describe('critical mode cache ownership', () => {
     vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
   });
   afterEach(() => vi.unstubAllGlobals());
+  it('orders cached chapters and resolves perks only for Seasonal profiles', () => {
+    const store = useMetadataStore();
+    const bundle = {
+      ...cacheBundle('pvp-season-en', 'seasonal'),
+      editions: {
+        editions: [],
+        seasonalPerks: [{ id: 'perk', effects: [] }],
+        storyChapters: [
+          { id: 'later', name: 'Later', order: 2, objectives: {} },
+          { id: 'first', name: 'First', order: 1, objectives: {} },
+        ],
+      },
+    };
+    store.currentGameMode = 'seasonal';
+    expect(store.applyCriticalCachedData(bundle as never)).toBe(true);
+    expect(store.storyChapters.map((chapter) => chapter.id)).toEqual(['first', 'later']);
+    expect(store.resolvedSeasonalPerks).toMatchObject([{ id: 'perk', effects: [] }]);
+    store.currentGameMode = 'pve';
+    expect(store.resolvedSeasonalPerks).toEqual([]);
+  });
   it('replaces previous-mode collections including authoritative empties', () => {
     const store = useMetadataStore();
     store.tasks = [{ id: 'pvp' }];

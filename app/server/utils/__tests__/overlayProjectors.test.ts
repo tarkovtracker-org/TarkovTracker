@@ -298,3 +298,55 @@ it('gives chapters with missing or nonfinite order an explicit stable fallback',
 it.each([undefined, {}])('rejects a missing or empty required editions catalog: %j', (editions) => {
   expect(validateOverlayData({ ...overlay, editions })).toBe(false);
 });
+it.each([
+  { allowedItems: [], excludedItems: [], allowedCategories: [], excludedCategories: [] },
+  null,
+  { allowedItems: 'bad' },
+])('validates Seasonal perk item filters: %j', (itemFilter) => {
+  const candidate = {
+    ...overlay,
+    seasonalPerks: {
+      perk: {
+        effects: [{ effectId: 'filter', itemFilter }],
+        mutuallyExclusiveSeasonalPerkIds: [],
+      },
+    },
+  };
+  expect(validateOverlayData(candidate)).toBe(
+    itemFilter !== null && Array.isArray(itemFilter.allowedItems)
+  );
+});
+it.each([0.2, 'bad', Infinity])('validates edition trader reputation bonuses: %s', (bonus) => {
+  const candidate = {
+    ...overlay,
+    editions: {
+      standard: {
+        ...overlay.editions!.standard,
+        traderRepBonus: { prapor: bonus },
+      },
+    },
+  };
+  expect(validateOverlayData(candidate)).toBe(bonus === 0.2);
+});
+it.each([undefined, 'quest', { id: 'quest' }, 7])(
+  'validates added craft unlock references: %j',
+  (taskUnlock) => {
+    const candidate = {
+      ...overlay,
+      craftsAdd: {
+        craft: {
+          station: 'workbench',
+          level: 1,
+          requiredItems: [],
+          productItem: { id: 'item', count: 1 },
+          taskUnlock,
+        },
+      },
+    };
+    expect(validateOverlayData(candidate)).toBe(taskUnlock !== 7);
+  }
+);
+it.each([null, [], { ...overlay, $meta: null }, { ...overlay, $meta: [] }])(
+  'rejects malformed overlay roots and provenance containers: %j',
+  (candidate) => expect(validateOverlayData(candidate)).toBe(false)
+);

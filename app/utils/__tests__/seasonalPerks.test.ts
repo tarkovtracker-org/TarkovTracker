@@ -73,3 +73,27 @@ it.each([undefined, null, {}, 'bad'])(
     });
   }
 );
+it('hydrates singular categories and effects without item filters', () => {
+  const category = { id: 'category', name: 'Category' };
+  const item = { id: 'item', category } as TarkovItem;
+  const perk = {
+    id: 'perk',
+    effects: [
+      { effectId: 'plain' },
+      {
+        effectId: 'filter',
+        itemFilter: {
+          allowedItems: [],
+          excludedItems: [],
+          allowedCategories: ['category'],
+          excludedCategories: [],
+        },
+      },
+    ],
+  } as SeasonalPerk;
+  const result = resolveSeasonalPerks([perk], [item]);
+  expect(result[0]?.effects[0]?.resolvedItemFilter).toBeUndefined();
+  expect(result[0]?.effects[1]?.resolvedItemFilter?.allowedCategories).toEqual([
+    { id: 'category', value: category },
+  ]);
+});

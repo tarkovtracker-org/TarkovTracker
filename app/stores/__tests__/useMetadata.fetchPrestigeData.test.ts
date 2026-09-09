@@ -22,6 +22,29 @@ describe('useMetadataStore fetchPrestigeData', () => {
       })
     );
   });
+  it.each(['mode', 'language'] as const)(
+    'ignores stale prestige callbacks after the %s changes',
+    async (scope) => {
+      const store = useMetadataStore();
+      store.prestigeLevels = [{ id: 'retained', level: 1 }];
+      const fetch = vi.spyOn(store, 'fetchWithCache').mockResolvedValue();
+      await store.fetchPrestigeData();
+      const config = fetch.mock.calls[0]![0];
+      if (scope === 'mode') store.currentGameMode = 'pve';
+      else store.languageCode = 'de';
+      config.processData({ prestige: [] });
+      config.onEmpty?.();
+      expect(store.prestigeLevels).toEqual([{ id: 'retained', level: 1 }]);
+    }
+  );
+  it('clears prestige after an empty response in the active scope', async () => {
+    const store = useMetadataStore();
+    store.prestigeLevels = [{ id: 'old', level: 1 }];
+    const fetch = vi.spyOn(store, 'fetchWithCache').mockResolvedValue();
+    await store.fetchPrestigeData();
+    fetch.mock.calls[0]![0].onEmpty?.();
+    expect(store.prestigeLevels).toEqual([]);
+  });
   it('hydrates prestige item conditions from cached items', async () => {
     const store = useMetadataStore();
     const fetchWithCacheSpy = vi.spyOn(store, 'fetchWithCache').mockResolvedValue(undefined);
