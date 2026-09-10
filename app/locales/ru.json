@@ -605,6 +605,7 @@
           "filter_hidden_other": "Текущие фильтры скрывают {count} доступных заданий.",
           "blocked_level_one": "{task} — ваша ближайшая разблокировка, но вам не хватает ещё 1 уровня.",
           "blocked_level_other": "{task} — ваша ближайшая разблокировка, но вам не хватает ещё {count} уровней.",
+          "blocked_requirement": "{task} заблокирован по его требованиям.",
           "blocked_prerequisite": "{task} близко, но всё ещё заблокировано предыдущими заданиями.",
           "blocked_fence": "{task} ждёт репутацию Скупщика.",
           "blocked_trader_unlock": "{task} заблокировано другой задачей на разблокировку торговца.",
@@ -898,7 +899,8 @@
         "xp": "По количеству опыта",
         "ascending": "По возрастанию",
         "descending": "По убыванию",
-        "aria_label": "Сортировка заданий"
+        "aria_label": "Сортировка заданий",
+        "progression": "Прогресс"
       },
       "settings": {
         "title": "Настройки заданий",
@@ -1078,7 +1080,32 @@
         "previous_tasks": "Предыдущее(ие) задание(я):",
         "progress": "Прогресс {completed}/{total}",
         "rewards": "Награды",
-        "unlocks_count": "{count} разблокировок"
+        "unlocks_count": "{count} разблокировок",
+        "trader_requirement_badge": "{trader} {kind} {comparison} {value}",
+        "loyalty_level": "LL",
+        "reputation": "Репутация"
+      },
+      "blockers": {
+        "player_level": "Требуется уровень игрока {comparison} {required} (текущее значение: {current}).",
+        "trader_level": "Требуется {trader} уровень лояльности {comparison} {required} (текущее значение: {current}).",
+        "trader_reputation": "{trader} reputation {comparison} {required} required (current: {current}).",
+        "prerequisite": "Выполните необходимые статусы задач для: {tasks}.",
+        "story_route": "Познакомьтесь с требуемыми статусами задач для {tasks}, или пройдите одну из этих глав истории: {chapters}.",
+        "failed_branch": "Заблокировано неудачной задаче: {task}.",
+        "faction": "Доступно для {faction} символов.",
+        "trader_unlock": "Разблокируйте {trader} , закончив {task}.",
+        "prestige": "Requires Prestige {required} (current: {current}).",
+        "unknown": "Данные запроса недоступны или не поддерживаются. Доступность не может быть подтверждена.",
+        "cycle": "Необходимая цепочка содержит цикл. Доступность не может быть подтверждена.",
+        "complete": "Задача выполнена.",
+        "failed": "Эта задача не выполнена.",
+        "disabled": "Эта задача отключена.",
+        "task_status": "{task} ({status})",
+        "status_complete": "выполнена",
+        "status_failed": "провалена",
+        "status_active": "активен или принят",
+        "status_unknown": "неизвестный статус",
+        "status_or": " или "
       }
     },
     "hideout": {

@@ -605,6 +605,7 @@
           "filter_hidden_other": "Vos filtres actuels masquent {count} quêtes disponibles.",
           "blocked_level_one": "{task} est votre déblocage le plus proche, mais il vous manque encore 1 niveau.",
           "blocked_level_other": "{task} est votre déblocage le plus proche, mais il vous manque encore {count} niveaux.",
+          "blocked_requirement": "{task} est bloqué par ses exigences.",
           "blocked_prerequisite": "{task} est proche, mais reste bloquée par des quêtes préalables.",
           "blocked_fence": "{task} attend la réputation Fence.",
           "blocked_trader_unlock": "{task} est bloquée derrière une autre quête de déblocage de marchand.",
@@ -898,7 +899,8 @@
         "xp": "Récompense XP",
         "ascending": "Ascendant",
         "descending": "Descendant",
-        "aria_label": "Trier les tâches"
+        "aria_label": "Trier les tâches",
+        "progression": "Progression"
       },
       "settings": {
         "title": "Paramètres de tâche",
@@ -1078,7 +1080,32 @@
         "previous_tasks": "Quête(s) précédente(s) :",
         "progress": "Progression {completed}/{total}",
         "rewards": "Récompenses",
-        "unlocks_count": "{count} déblocages"
+        "unlocks_count": "{count} déblocages",
+        "trader_requirement_badge": "{trader} {kind} {comparison} {value}",
+        "loyalty_level": "LG",
+        "reputation": "Représentant"
+      },
+      "blockers": {
+        "player_level": "Niveau de joueur {comparison} {required} requis (courant: {current}).",
+        "trader_level": "{trader} Niveau de Fidélité {comparison} {required} requis (actuel: {current}).",
+        "trader_reputation": "La réputation {trader} {comparison} {required} est requise (courant: {current}).",
+        "prerequisite": "Répondre aux statuts de tâches requis pour : {tasks}.",
+        "story_route": "Rencontrez les statuts de tâches requis pour {tasks}, ou progressez dans l'un de ces chapitres d'histoire : {chapters}.",
+        "failed_branch": "Bloqué par une tâche échouée : {task}.",
+        "faction": "Disponible pour les caractères {faction}.",
+        "trader_unlock": "Débloquez {trader} en complétant {task}.",
+        "prestige": "Nécessite le Prestige {required} (actuel: {current}).",
+        "unknown": "Les données requises sont indisponibles ou non pris en charge. La disponibilité ne peut pas être confirmée.",
+        "cycle": "La chaîne de prérequis contient un cycle. La disponibilité ne peut pas être confirmée.",
+        "complete": "Cette tâche est terminée.",
+        "failed": "Cette tâche a échoué.",
+        "disabled": "Cette tâche est désactivée.",
+        "task_status": "{task} ({status})",
+        "status_complete": "terminée",
+        "status_failed": "échouée",
+        "status_active": "actif ou accepté",
+        "status_unknown": "statut inconnu",
+        "status_or": " ou "
       }
     },
     "hideout": {

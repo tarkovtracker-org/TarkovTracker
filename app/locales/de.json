@@ -605,6 +605,7 @@
           "filter_hidden_other": "Deine aktuellen Filter blenden {count} verfügbare Aufgaben aus.",
           "blocked_level_one": "{task} ist deine nächste Freischaltung, aber dir fehlt noch 1 Level.",
           "blocked_level_other": "{task} ist deine nächste Freischaltung, aber dir fehlen noch {count} Level.",
+          "blocked_requirement": "{task} wird durch seine Anforderungen blockiert.",
           "blocked_prerequisite": "{task} ist nah dran, wird aber noch durch vorausgesetzte Aufgaben blockiert.",
           "blocked_fence": "{task} wartet auf Fence-Ruf.",
           "blocked_trader_unlock": "{task} ist hinter einer anderen Händler-Freischaltungsaufgabe gesperrt.",
@@ -898,7 +899,8 @@
         "xp": "XP-Belohnung",
         "ascending": "Aufsteigend",
         "descending": "Absteigend",
-        "aria_label": "Aufgaben sortieren"
+        "aria_label": "Aufgaben sortieren",
+        "progression": "Fortschritt"
       },
       "settings": {
         "title": "Aufgabeneinstellungen",
@@ -1078,7 +1080,32 @@
         "previous_tasks": "Vorherige Aufgabe(n):",
         "progress": "Fortschritt {completed}/{total}",
         "rewards": "Belohnungen",
-        "unlocks_count": "{count} Freischaltungen"
+        "unlocks_count": "{count} Freischaltungen",
+        "trader_requirement_badge": "{trader} {kind} {comparison} {value}",
+        "loyalty_level": "LL",
+        "reputation": "Rep"
+      },
+      "blockers": {
+        "player_level": "Spielerlevel {comparison} {required} erforderlich (aktuell: {current}).",
+        "trader_level": "{trader} Treue-Level {comparison} {required} erforderlich (aktuell: {current}).",
+        "trader_reputation": "{trader} Ruf {comparison} {required} erforderlich (aktuell: {current}).",
+        "prerequisite": "Erfülle den benötigten Aufgabenstatus für: {tasks}.",
+        "story_route": "Erfülle den benötigten Aufgabenstatus für {tasks}, oder komm eines dieser Kapitel vor: {chapters}.",
+        "failed_branch": "Blockiert durch fehlgeschlagene Aufgabe: {task}.",
+        "faction": "Verfügbar für {faction} Zeichen.",
+        "trader_unlock": "Schalte {trader} frei, indem du {task} abschließt.",
+        "prestige": "Benötigt Prestige {required} (aktuell: {current}).",
+        "unknown": "Anforderungsdaten sind nicht verfügbar oder werden nicht unterstützt. Verfügbarkeit kann nicht bestätigt werden.",
+        "cycle": "Die vorausgesetzte Kette enthält einen Zyklus. Die Verfügbarkeit kann nicht bestätigt werden.",
+        "complete": "Diese Aufgabe ist abgeschlossen.",
+        "failed": "Diese Aufgabe ist fehlgeschlagen.",
+        "disabled": "Diese Aufgabe ist deaktiviert.",
+        "task_status": "{task} ({status})",
+        "status_complete": "abgeschlossen",
+        "status_failed": "fehlgeschlagen",
+        "status_active": "aktiv oder akzeptiert",
+        "status_unknown": "unbekannter Status",
+        "status_or": " oder "
       }
     },
     "hideout": {
