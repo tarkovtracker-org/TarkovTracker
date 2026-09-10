@@ -1,6 +1,7 @@
 import { strToU8, zipSync } from 'fflate';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ACTIVE_SEASON } from '@/utils/constants';
+import * as logFileReader from '@/utils/eftLogFileReader';
 import type { Task } from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
 const preferences = { getTasksRequireTraderLevels: true };
@@ -157,6 +158,43 @@ describe('useEftLogsImport', () => {
     expect(importer.importError.value).toBe('The selected file is no longer readable.');
     expect(importer.isParsing.value).toBe(false);
     expect(importer.previewData.value).toBeNull();
+  });
+  it.each([new Error('   '), null])(
+    'uses the localized fallback for unreadable errors: %s',
+    async (error) => {
+      const importer = await loadComposable();
+      const file = new File([completionLog()], 'notifications.log');
+      vi.spyOn(file, 'slice').mockImplementation(() => {
+        throw error;
+      });
+      await importer.parseFile(file);
+      expect(importer.importError.value).toBe('Failed to parse EFT logs.');
+      expect(importer.isParsing.value).toBe(false);
+      expect(importer.previewData.value).toBeNull();
+      expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+    }
+  );
+  it('ignores queued progress from a replaced reader', async () => {
+    const importer = await loadComposable();
+    let reportProgress!: Parameters<typeof logFileReader.readEftLogSources>[1]['onProgress'];
+    let finishRead!: (result: Awaited<ReturnType<typeof logFileReader.readEftLogSources>>) => void;
+    vi.spyOn(logFileReader, 'readEftLogSources').mockImplementationOnce((_files, options) => {
+      reportProgress = options.onProgress;
+      return new Promise((resolve) => {
+        finishRead = resolve;
+      });
+    });
+    const pending = importer.parseFile(new File([completionLog()], 'notifications.log'));
+    await importer.parseFile(new File([startedLog()], 'notifications.log'));
+    const progress = { ...importer.parseProgress.value };
+    const preview = importer.previewData.value;
+    reportProgress({ bytesRead: 999, totalBytes: 1000 });
+    finishRead({ sources: [], scanned: 0 });
+    await pending;
+    expect(importer.parseProgress.value).toEqual(progress);
+    expect(importer.previewData.value).toBe(preview);
+    expect(importer.importState.value).toBe('preview');
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
   });
   it('cancels an in-flight folder read without previewing or applying progress', async () => {
     const importer = await loadComposable();

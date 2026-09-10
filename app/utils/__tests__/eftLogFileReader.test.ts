@@ -173,6 +173,23 @@ describe('readEftLogSources', () => {
       read([new File([new Uint8Array(archive.slice(0, -22))], 'Logs.zip')])
     ).rejects.toBeInstanceOf(EftLogArchiveError);
   });
+  it('rejects an end record whose comment length extends beyond the archive', async () => {
+    const archive = zipSync({ 'notifications.log': strToU8(notification) });
+    new DataView(archive.buffer).setUint16(archive.length - 2, 1, true);
+    await expect(read([new File([new Uint8Array(archive)], 'Logs.zip')])).rejects.toBeInstanceOf(
+      EftLogArchiveError
+    );
+  });
+  it('rejects a DEFLATE member without its final block', async () => {
+    const archive = zipSync({ 'notifications.log': strToU8(notification) });
+    const header = new DataView(archive.buffer);
+    const dataStart = 30 + header.getUint16(26, true) + header.getUint16(28, true);
+    // Clear the DEFLATE final-block bit while retaining complete ZIP metadata.
+    archive[dataStart] = archive[dataStart]! & 254;
+    await expect(read([new File([new Uint8Array(archive)], 'Logs.zip')])).rejects.toThrow(
+      'unexpected EOF'
+    );
+  });
   it('accepts a valid empty ZIP and archives with comments', async () => {
     expect((await read([new File([new Uint8Array(zipSync({}))], 'empty.zip')])).sources).toEqual(
       []

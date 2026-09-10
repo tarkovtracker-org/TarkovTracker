@@ -99,10 +99,8 @@ async function readZip(
   await checkZipEnd(file, signal);
   const files: EftParsedLogFile[] = [];
   let scanned = 0;
-  let pending = 0;
   const finish = (source: EftParsedLogFile) => {
     files.push(source);
-    pending--;
   };
   const unzip = new Unzip((entry) => {
     scanned++;
@@ -114,7 +112,6 @@ async function readZip(
     // resolves the decoder from that registry inside entry.start(), so restore both first.
     unzip.register(UnzipInflate);
     unzip.register(UnzipPassThrough);
-    pending++;
     startZipLog(entry, finish);
   });
   await readChunks(
@@ -124,7 +121,6 @@ async function readZip(
     onChunk,
     signal
   );
-  if (pending > 0) throw new EftLogArchiveError();
   return { files, scanned };
 }
 /** Reads a raw log through the same incremental UTF-8/record parser as archive entries. */
