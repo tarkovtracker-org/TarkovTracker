@@ -165,9 +165,10 @@ Treat cyclomatic 4 as the practical ceiling for new functions.
 
 Suppress only when the finding is provably not actionable, such as an external contract or framework
 indirection the analyzer cannot model (store state hydrated through `$state` is the recurring
-example). The comment must be a single line directly above the flagged declaration — a multi-line
-comment block suppresses the wrong line and silently fails — and must explain why the finding cannot
-be fixed. A suppression is a reviewable decision, not a formality. Existing suppressions are
+example). Put `// fallow-ignore-next-line` directly above the flagged declaration and explain why
+the finding cannot be fixed. Explanatory `//` lines may precede the directive; the directive must be
+the final comment line. Placing more comment lines between the directive and declaration targets the
+wrong line and leaves the finding unsuppressed. A suppression is a reviewable decision, not a formality. Existing suppressions are
 grandfathered; remove them opportunistically when already editing that function rather than as
 unrelated cleanup in someone else's change.
 
