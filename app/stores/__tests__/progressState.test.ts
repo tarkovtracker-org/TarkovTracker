@@ -62,6 +62,42 @@ describe('progressState getters task completion compatibility', () => {
     expect(getters.isTaskFailed(state)('task-1')).toBe(true);
   });
 });
+describe('progressState task lifecycle', () => {
+  it('writes canonical active, completed, failed, and neutral states', () => {
+    const state = createBaseState();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(5000);
+    try {
+      actions.setTaskActive.call(state, 'task-1');
+      expect(state.pvp.taskCompletions['task-1']).toEqual({
+        active: true,
+        complete: false,
+        failed: false,
+        manual: false,
+        timestamp: 5000,
+      });
+      actions.setTaskComplete.call(state, 'task-1');
+      expect(state.pvp.taskCompletions['task-1']).toMatchObject({
+        active: false,
+        complete: true,
+        failed: false,
+      });
+      actions.setTaskFailed.call(state, 'task-1');
+      expect(state.pvp.taskCompletions['task-1']).toMatchObject({
+        active: false,
+        complete: true,
+        failed: true,
+      });
+      actions.setTaskUncompleted.call(state, 'task-1');
+      expect(state.pvp.taskCompletions['task-1']).toMatchObject({
+        active: false,
+        complete: false,
+        failed: false,
+      });
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+});
 describe('progressState storyline timestamps', () => {
   it('records timestamps for storyline uncomplete actions', () => {
     const state = createBaseState();

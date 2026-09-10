@@ -3,9 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import TrackerSummary from '@/features/kappa/TrackerSummary.vue';
 vi.mock('@/composables/useTaskActions', () => ({
   useTaskActions: () => ({
+    markTaskActive: vi.fn(),
     markTaskComplete: vi.fn(),
     markTaskUncomplete: vi.fn(),
-    markTaskAvailable: vi.fn(),
   }),
 }));
 vi.mock('@/stores/useProgress', () => ({

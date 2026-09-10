@@ -54,6 +54,36 @@ describe('sanitizeOwnedProgressData', () => {
       Strength: 0,
     });
   });
+  it('preserves explicit active values without backfilling legacy unknown values', () => {
+    const result = sanitizeOwnedProgressData({
+      apiUpdateHistory: [
+        {
+          at: 100,
+          id: 'update-1',
+          source: 'api',
+          tasks: [{ id: 'active-task', state: 'active' }],
+        },
+      ],
+      taskCompletions: {
+        active: { active: true, complete: false, failed: false },
+        legacy: { complete: false, failed: false },
+        neutral: { active: false, complete: false, failed: false },
+      },
+    });
+    expect(result.taskCompletions).toEqual({
+      active: { active: true, complete: false, failed: false },
+      legacy: { complete: false, failed: false },
+      neutral: { active: false, complete: false, failed: false },
+    });
+    expect(result.apiUpdateHistory).toEqual([
+      {
+        at: 100,
+        id: 'update-1',
+        source: 'api',
+        tasks: [{ id: 'active-task', state: 'active' }],
+      },
+    ]);
+  });
   it('preserves millisecond apiUpdate timestamps without int32 clamping', () => {
     const millisecondAt = 1780660259335;
     const result = sanitizeOwnedProgressData({

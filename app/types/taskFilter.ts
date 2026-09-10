@@ -4,11 +4,18 @@
  * Defines view modes and filter options for the task filtering system.
  * Replaces scattered string literals with type-safe constants.
  */
-export const TASK_PRIMARY_VIEWS = ['all', 'maps', 'traders', 'graph'] as const;
+const TASK_PRIMARY_VIEWS = ['all', 'maps', 'traders', 'graph'] as const;
 export type TaskPrimaryView = (typeof TASK_PRIMARY_VIEWS)[number];
-export const TASK_SECONDARY_VIEWS = ['all', 'available', 'locked', 'completed', 'failed'] as const;
+export const TASK_SECONDARY_VIEWS = [
+  'all',
+  'active',
+  'available',
+  'locked',
+  'completed',
+  'failed',
+] as const;
 export type TaskSecondaryView = (typeof TASK_SECONDARY_VIEWS)[number];
-export const TASK_USER_VIEWS = {
+const TASK_USER_VIEWS = {
   ALL: 'all',
 } as const;
 export interface MergedMap {

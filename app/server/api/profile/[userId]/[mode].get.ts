@@ -76,6 +76,7 @@ type ModeProgressRow = {
 type SanitizedTaskCompletion = {
   complete?: boolean;
   failed?: boolean;
+  active?: boolean;
   manual?: boolean;
   timestamp?: number;
 };
@@ -94,7 +95,7 @@ type SanitizedTrader = {
 };
 type SanitizedApiTaskUpdate = {
   id: string;
-  state: 'completed' | 'failed' | 'uncompleted';
+  state: 'active' | 'completed' | 'failed' | 'uncompleted';
 };
 type SanitizedApiUpdateMeta = {
   id: string;
@@ -170,7 +171,13 @@ const sanitizeApiUpdateMeta = (value: unknown): SanitizedApiUpdateMeta | null =>
       }
       const taskId = toCleanString(task.id, 128);
       const state = task.state;
-      if (!taskId || (state !== 'completed' && state !== 'failed' && state !== 'uncompleted')) {
+      if (
+        !taskId ||
+        (state !== 'active' &&
+          state !== 'completed' &&
+          state !== 'failed' &&
+          state !== 'uncompleted')
+      ) {
         continue;
       }
       tasks.push({ id: taskId, state });
@@ -379,6 +386,7 @@ const applyDerivedTaskFailures = (
       ...(targetCompletion ?? {}),
       complete: true,
       failed: true,
+      active: false,
     };
     if (nextCompletion.timestamp === undefined && triggerTimestamp !== undefined) {
       nextCompletion.timestamp = triggerTimestamp;

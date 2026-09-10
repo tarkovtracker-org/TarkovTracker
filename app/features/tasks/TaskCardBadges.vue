@@ -98,6 +98,15 @@
     <UBadge v-if="isFailed" size="xs" color="error" variant="soft" class="shrink-0 text-[11px]">
       {{ t('common.failed', 'Failed') }}
     </UBadge>
+    <UBadge
+      v-else-if="isActive"
+      size="xs"
+      color="primary"
+      variant="soft"
+      class="shrink-0 text-[11px]"
+    >
+      {{ t('common.active', 'Active') }}
+    </UBadge>
     <AppTooltip
       v-if="isInvalid && !isFailed"
       :text="
@@ -182,6 +191,7 @@
     traderLevelReqs: TraderLevelRequirementWithMet[];
     locationTooltip: string;
     isFailed: boolean;
+    isActive: boolean;
     isInvalid: boolean;
     showRequiredLabels: boolean;
     exclusiveEditionBadge?: string;

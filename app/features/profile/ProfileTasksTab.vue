@@ -128,6 +128,14 @@
 </template>
 <script setup lang="ts">
   import type { Task } from '@/types/tarkov';
+  type ProfileTaskStatus = 'failed' | 'complete' | 'active' | 'locked' | 'default';
+  const TASK_STATUS_PRESENTATION: Record<ProfileTaskStatus, { icon: string; color: string }> = {
+    failed: { icon: 'i-mdi-close-circle', color: 'text-error-400' },
+    complete: { icon: 'i-mdi-check-circle', color: 'text-success-400' },
+    active: { icon: 'i-mdi-play-circle', color: 'text-primary-400' },
+    locked: { icon: 'i-mdi-lock', color: 'text-warning-400' },
+    default: { icon: 'i-mdi-circle-outline', color: 'text-info-400' },
+  };
   interface ObjectiveCompletion {
     complete?: boolean;
     count?: number;
@@ -137,6 +145,7 @@
     countedTasks: Task[];
     isTaskSuccessful: (taskId: string) => boolean;
     isTaskFailed: (taskId: string) => boolean;
+    isTaskActive: (taskId: string) => boolean;
     isTaskLocked: (taskId: string) => boolean;
     objectiveCompletions: Record<string, ObjectiveCompletion>;
   }
@@ -171,12 +180,15 @@
     tasks: Task[];
   }
   const sections = computed<StatusSection[]>(() => {
+    const active: Task[] = [];
     const available: Task[] = [];
     const locked: Task[] = [];
     const completed: Task[] = [];
     for (const task of props.countedTasks) {
       if (props.isTaskSuccessful(task.id) || props.isTaskFailed(task.id)) {
         completed.push(task);
+      } else if (props.isTaskActive(task.id)) {
+        active.push(task);
       } else if (props.isTaskLocked(task.id)) {
         locked.push(task);
       } else {
@@ -185,11 +197,19 @@
     }
     return [
       {
+        key: 'active',
+        label: t('common.active', 'Active'),
+        icon: 'i-mdi-play-circle-outline',
+        chipClass: 'bg-primary-700/25',
+        iconClass: 'text-primary-300',
+        tasks: active,
+      },
+      {
         key: 'available',
         label: t('common.available', 'Available'),
         icon: 'i-mdi-clipboard-check-outline',
-        chipClass: 'bg-primary-700/25',
-        iconClass: 'text-primary-300',
+        chipClass: 'bg-info-700/25',
+        iconClass: 'text-info-300',
         tasks: available,
       },
       {
@@ -210,18 +230,18 @@
       },
     ];
   });
-  const taskStatusIcon = (taskId: string): string => {
-    if (props.isTaskFailed(taskId)) return 'i-mdi-close-circle';
-    if (props.isTaskSuccessful(taskId)) return 'i-mdi-check-circle';
-    if (props.isTaskLocked(taskId)) return 'i-mdi-lock';
-    return 'i-mdi-circle-outline';
+  const getTaskStatusPresentation = (taskId: string) => {
+    const checks: Array<{ status: ProfileTaskStatus; matches: () => boolean }> = [
+      { status: 'failed', matches: () => props.isTaskFailed(taskId) },
+      { status: 'complete', matches: () => props.isTaskSuccessful(taskId) },
+      { status: 'active', matches: () => props.isTaskActive(taskId) },
+      { status: 'locked', matches: () => props.isTaskLocked(taskId) },
+    ];
+    const status = checks.find(({ matches }) => matches())?.status ?? 'default';
+    return TASK_STATUS_PRESENTATION[status];
   };
-  const taskStatusColor = (taskId: string): string => {
-    if (props.isTaskFailed(taskId)) return 'text-error-400';
-    if (props.isTaskSuccessful(taskId)) return 'text-success-400';
-    if (props.isTaskLocked(taskId)) return 'text-warning-400';
-    return 'text-primary-400';
-  };
+  const taskStatusIcon = (taskId: string): string => getTaskStatusPresentation(taskId).icon;
+  const taskStatusColor = (taskId: string): string => getTaskStatusPresentation(taskId).color;
   const objectiveIcon = (objectiveId: string): string => {
     return props.objectiveCompletions[objectiveId]?.complete
       ? 'i-mdi-check-circle'

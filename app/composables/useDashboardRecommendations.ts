@@ -212,10 +212,14 @@ export function useDashboardRecommendations(): {
       const requiresFailed = hasRequirementStatus(statuses, FAILED_STATUSES);
       const isComplete = tarkovStore.isTaskComplete(requiredTaskId);
       const isFailed = tarkovStore.isTaskFailed(requiredTaskId);
-      const isUnlocked = isTaskAvailable(requiredTaskId);
+      const isActive = tarkovStore.isTaskActive(requiredTaskId);
       if (requiresComplete && isComplete) return false;
       if (requiresFailed && isFailed) return false;
-      if (requiresActive && (isComplete || isUnlocked)) return false;
+      // Deliberately strict: a legacy row without `active` stays a blocker
+      // rather than being inferred as accepted. `taskAvailability.ts` keeps an
+      // `isUnlockable` fallback so legacy trees do not lock up, but that is a
+      // compatibility valve for availability, not a claim about acceptance.
+      if (requiresActive && (isComplete || isActive)) return false;
       return true;
     });
   };

@@ -10,7 +10,10 @@ const isApiTaskUpdate = (value: unknown): value is ApiTaskUpdate => {
   }
   return (
     typeof value.id === 'string' &&
-    (value.state === 'completed' || value.state === 'failed' || value.state === 'uncompleted')
+    (value.state === 'active' ||
+      value.state === 'completed' ||
+      value.state === 'failed' ||
+      value.state === 'uncompleted')
   );
 };
 export const normalizeMode = (value: unknown): GameMode | null => {

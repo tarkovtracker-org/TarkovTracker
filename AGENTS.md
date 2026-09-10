@@ -81,6 +81,10 @@ unless executable or test logic changes make it relevant.
   Do not add new runtime dependencies on the removed task `alternatives` field.
 - Internal modes are `pvp`, `pve`, and `seasonal`; Seasonal maps to upstream `pvp-season`. Keep
   `ACTIVE_SEASON` synchronized with the database functions and preserve Seasonal history.
+- Ordinary task acceptance is stored as the optional `active` flag. New writes are canonical:
+  active is `{complete:false, failed:false, active:true}`; completed, failed, and neutral writes set
+  `active:false`. A missing `active` means unknown — never infer it from incomplete flags or
+  backfill ambiguous rows, and keep auto-unlocked successors neutral rather than active.
 - Keep secrets in runtime environment or platform secret stores. Use canonical environment names;
   never commit credentials, service-role keys, or generated secret-bearing files.
 - API gateway routes authenticate and enforce quota before decoding or validating input. Validation

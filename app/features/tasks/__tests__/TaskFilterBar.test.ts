@@ -37,7 +37,9 @@ type SetupOptions = {
   traderCounts?: Record<string, number>;
   mapTaskTotals?: Record<string, number>;
   mapTaskTotalsHideCompleted?: Record<string, number>;
-  statusCounts?: Partial<Record<'all' | 'available' | 'locked' | 'completed' | 'failed', number>>;
+  statusCounts?: Partial<
+    Record<'all' | 'active' | 'available' | 'locked' | 'completed' | 'failed', number>
+  >;
   teammates?: string[];
   teamMembers?: string[];
   hiddenTeammates?: Record<string, boolean>;
@@ -89,6 +91,7 @@ const setup = async (options: SetupOptions = {}) => {
   const mapTaskTotalsHideCompleted = options.mapTaskTotalsHideCompleted ?? { 'map-1': 1 };
   const statusCounts = {
     all: 2,
+    active: 0,
     available: 1,
     locked: 0,
     completed: 1,
@@ -285,6 +288,13 @@ describe('TaskFilterBar', () => {
     expect(availableButton).toBeTruthy();
     expect(availableButton!.text()).toContain('0');
     expect(availableButton!.text()).not.toContain('1');
+  });
+  it('renders active separately from available', async () => {
+    const { TaskFilterBar } = await setup({ statusCounts: { active: 2, available: 1 } });
+    const wrapper = mountTaskFilterBar(TaskFilterBar);
+    const buttonTexts = wrapper.findAll('button').map((button) => button.text());
+    expect(buttonTexts.some((text) => text.includes('Active2'))).toBe(true);
+    expect(buttonTexts.some((text) => text.includes('available1'))).toBe(true);
   });
   it('applies stronger selected styling to the active primary and status views', async () => {
     const { TaskFilterBar } = await setup({

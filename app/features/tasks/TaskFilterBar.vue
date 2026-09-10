@@ -106,12 +106,6 @@
           <template #leading>
             <UIcon :name="currentSortIcon" class="h-4 w-4" />
           </template>
-          <template #item="{ item }">
-            <div class="flex items-center gap-2">
-              <UIcon :name="item.icon" class="h-4 w-4" />
-              <span>{{ item.label }}</span>
-            </div>
-          </template>
         </SelectMenuFixed>
         <UButton
           color="neutral"
@@ -190,6 +184,28 @@
               :class="displayStatusCounts.available > 0 ? 'bg-info-500' : 'bg-surface-600'"
             >
               {{ displayStatusCounts.available }}
+            </span>
+          </UButton>
+          <UButton
+            v-if="!isGraphView && preferencesStore.getShowAvailableFilter"
+            variant="ghost"
+            color="neutral"
+            size="sm"
+            class="leading-none"
+            :disabled="secondaryView === 'active'"
+            :aria-pressed="secondaryView === 'active'"
+            :class="getStatusButtonClass('active', secondaryView === 'active')"
+            @click="setSecondaryView('active')"
+          >
+            <UIcon name="i-mdi-progress-check" class="hidden h-4 w-4 shrink-0 sm:mr-1 sm:block" />
+            <span class="text-xs leading-none uppercase sm:text-sm">
+              {{ t('common.active', 'Active') }}
+            </span>
+            <span
+              class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
+              :class="displayStatusCounts.active > 0 ? 'bg-primary-500' : 'bg-surface-600'"
+            >
+              {{ displayStatusCounts.active }}
             </span>
           </UButton>
           <UButton
@@ -486,16 +502,17 @@
   const showFailedFilterButton = computed(() => {
     return !isGraphView.value && preferencesStore.getShowFailedFilter;
   });
-  type StatusToggleView = 'all' | 'available' | 'locked' | 'completed' | 'failed';
+  type StatusToggleView = 'all' | 'active' | 'available' | 'locked' | 'completed' | 'failed';
   const statusViewVisibility = computed<Record<StatusToggleView, boolean>>(() => ({
     all: showAllStatusButton.value,
+    active: !isGraphView.value && preferencesStore.getShowAvailableFilter,
     available: !isGraphView.value && preferencesStore.getShowAvailableFilter,
     locked: !isGraphView.value && preferencesStore.getShowLockedFilter,
     completed: showCompletedFilterButton.value,
     failed: showFailedFilterButton.value,
   }));
   const visibleStatusViews = computed<TaskSecondaryView[]>(() => {
-    return (['all', 'available', 'locked', 'completed', 'failed'] as const).filter(
+    return (['all', 'active', 'available', 'locked', 'completed', 'failed'] as const).filter(
       (view) => statusViewVisibility.value[view]
     );
   });
@@ -510,6 +527,7 @@
   const neutralSelectedToggleClass = 'border-white/15 bg-white/10 text-white ring-1 ring-white/10';
   const statusToggleSelectedClasses: Record<StatusToggleView, string> = {
     all: selectedToggleClass,
+    active: 'border-primary-500/45 bg-primary-500/12 text-white ring-1 ring-primary-500/25',
     available: 'border-info-500/45 bg-info-500/12 text-white ring-1 ring-info-500/25',
     locked: neutralSelectedToggleClass,
     completed: 'border-success-500/45 bg-success-500/12 text-white ring-1 ring-success-500/25',

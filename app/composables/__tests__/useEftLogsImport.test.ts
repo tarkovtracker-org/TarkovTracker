@@ -12,6 +12,7 @@ const tarkovStore = {
   getCurrentProgressData: vi.fn(() => ({ taskCompletions: {} })),
   isTaskComplete: vi.fn(() => false),
   setObjectiveCount: vi.fn(),
+  setTaskActive: vi.fn(),
   setTaskComplete: vi.fn(),
   setTaskFailed: vi.fn(),
   setTaskObjectiveComplete: vi.fn(),
@@ -349,18 +350,49 @@ describe('useEftLogsImport', () => {
     });
     await composable.parseFile(file);
     await composable.confirmImport('pvp');
-    expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith('61604635c725987e815b1a46');
+    expect(tarkovStore.setTaskActive).toHaveBeenCalledWith('61604635c725987e815b1a46');
     expect(composable.importState.value).toBe('success');
   });
-  it('does not mark started tasks active when same task is also imported as completed', async () => {
+  it('restarts a previously failed task as active when a started event is imported', async () => {
+    tarkovStore.getCurrentProgressData.mockReturnValue({
+      taskCompletions: {
+        '61604635c725987e815b1a46': { complete: true, failed: true, active: false },
+      },
+    });
     const composable = await loadComposable();
-    const file = new File([startedLog() + completionLog()], 'notifications.log', {
+    const file = new File([startedLog()], 'notifications.log', {
+      type: 'text/plain',
+    });
+    await composable.parseFile(file);
+    await composable.confirmImport('pvp');
+    expect(tarkovStore.setTaskActive).toHaveBeenCalledWith('61604635c725987e815b1a46');
+  });
+  it('preserves a successfully completed task when a started event is imported', async () => {
+    tarkovStore.getCurrentProgressData.mockReturnValue({
+      taskCompletions: {
+        '61604635c725987e815b1a46': { complete: true, failed: false, active: false },
+      },
+    });
+    const composable = await loadComposable();
+    const file = new File([startedLog()], 'notifications.log', {
+      type: 'text/plain',
+    });
+    await composable.parseFile(file);
+    await composable.confirmImport('pvp');
+    expect(tarkovStore.setTaskActive).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['started before completed', startedLog() + completionLog()],
+    ['completed before started', completionLog() + startedLog()],
+  ])('keeps completion authoritative when %s events are imported', async (_case, log) => {
+    const composable = await loadComposable();
+    const file = new File([log], 'notifications.log', {
       type: 'text/plain',
     });
     await composable.parseFile(file);
     await composable.confirmImport('pvp');
     expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith('61604635c725987e815b1a46');
-    expect(tarkovStore.setTaskUncompleted).not.toHaveBeenCalled();
+    expect(tarkovStore.setTaskActive).not.toHaveBeenCalled();
   });
   it('auto-routes import mode from backend logs when session mode is detectable', async () => {
     const composable = await loadComposable();
@@ -514,7 +546,7 @@ describe('expanded log import', () => {
       new File([startedLog(undefined, '2026-02-21', '10:14:30.000')], 'push-notifications_001.log'),
     ]);
     await importer.confirmImport('pvp');
-    expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith('61604635c725987e815b1a46');
+    expect(tarkovStore.setTaskActive).toHaveBeenCalledWith('61604635c725987e815b1a46');
     expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
   });
   it('keeps a single folder-selected file version instead of dropping its relative path', async () => {
@@ -598,6 +630,6 @@ describe('restart semantics', () => {
     const importer = await loadComposable();
     await importer.parseFile(new File([startedLog(id)], 'notifications.log'));
     await importer.confirmImport('pvp');
-    expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith(id);
+    expect(tarkovStore.setTaskActive).toHaveBeenCalledWith(id);
   });
 });

@@ -1,19 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { ActionButtonState } from '@/features/tasks/types';
-const computeActionButtonState = (options: {
-  isOurFaction: boolean;
-  isFailed: boolean;
-  isLocked: boolean;
-  isComplete: boolean;
-  showHotWheelsFail: boolean;
-}): ActionButtonState => {
-  if (!options.isOurFaction) return 'none';
-  if (options.isFailed) return 'complete';
-  if (options.isLocked) return 'locked';
-  if (options.isComplete) return 'complete';
-  if (options.showHotWheelsFail) return 'hotwheels';
-  return 'available';
-};
+import { resolveTaskActionButtonState } from '@/features/tasks/types';
+const computeActionButtonState = (
+  options: Omit<Parameters<typeof resolveTaskActionButtonState>[0], 'isActive'> & {
+    isActive?: boolean;
+  }
+) => resolveTaskActionButtonState({ isActive: false, ...options });
 describe('TaskCard action button state', () => {
   it('uses complete-state actions when task is failed', () => {
     const state = computeActionButtonState({
@@ -54,5 +45,16 @@ describe('TaskCard action button state', () => {
       showHotWheelsFail: false,
     });
     expect(state).toBe('available');
+  });
+  it('distinguishes active tasks from available tasks', () => {
+    const state = computeActionButtonState({
+      isOurFaction: true,
+      isFailed: false,
+      isLocked: false,
+      isComplete: false,
+      isActive: true,
+      showHotWheelsFail: false,
+    });
+    expect(state).toBe('active');
   });
 });

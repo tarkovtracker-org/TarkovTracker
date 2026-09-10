@@ -39,15 +39,13 @@ export const getCurrentTaskStatusForRequirement = (
 };
 export const isTaskRequirementSatisfied = (
   statuses: string[] | undefined,
-  completion: RawTaskCompletion,
-  isUnlockable = false
+  completion: RawTaskCompletion
 ): boolean => {
   const requiredStatuses = getRequiredTaskStatuses(statuses);
   if (requiredStatuses.includes('completed') && isTaskComplete(completion)) return true;
   if (requiredStatuses.includes('failed') && isTaskFailed(completion)) return true;
   if (requiredStatuses.includes('active')) {
     if (isTaskActive(completion) || isTaskComplete(completion)) return true;
-    if (isUnlockable) return true;
   }
   return false;
 };

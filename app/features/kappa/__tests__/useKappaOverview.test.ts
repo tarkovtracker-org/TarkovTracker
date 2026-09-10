@@ -48,6 +48,7 @@ const tasks: Task[] = [
 ];
 let completionState: Record<string, boolean> = {};
 let failedState: Record<string, boolean> = {};
+let activeState: Record<string, boolean> = {};
 let unlockedState: Record<string, { self: boolean }> = {};
 let invalidState: Record<string, { self: boolean }> = {};
 vi.mock('@/stores/useMetadata', () => ({
@@ -62,6 +63,7 @@ vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
     isTaskComplete: (id: string) => completionState[id] === true,
     isTaskFailed: (id: string) => failedState[id] === true,
+    isTaskActive: (id: string) => activeState[id] === true,
     getPMCFaction: () => 'Any',
     getGameEdition: () => undefined,
     getPrestigeLevel: () => 0,
@@ -77,6 +79,7 @@ describe('useKappaOverview', () => {
   beforeEach(() => {
     completionState = {};
     failedState = {};
+    activeState = {};
     unlockedState = {};
     invalidState = {};
   });
@@ -115,6 +118,13 @@ describe('useKappaOverview', () => {
       't-therapist': 'available',
       't-no-trader': 'locked',
     });
+  });
+  it('classifies explicitly active tasks separately while counting them as available', () => {
+    activeState['t-therapist'] = true;
+    const { totals, tasksWithStatus } = useKappaOverview(() => 'kappa');
+    const active = tasksWithStatus.value.find((row) => row.task.id === 't-therapist');
+    expect(active?.status).toBe('active');
+    expect(totals.value.available).toBe(1);
   });
   it('excludes failed tasks from group totalCount and overview total', () => {
     completionState['t-prapor-low'] = true;
@@ -164,6 +174,23 @@ describe('useKappaOverview', () => {
     const mid = tasksWithStatus.value.find((row) => row.task.id === 't-prapor-mid');
     expect(mid?.status).toBe('available');
     expect(mid?.lockedBy).toBeUndefined();
+  });
+  it('skips malformed requirements instead of failing every row', () => {
+    const original = tasks[1]!.taskRequirements;
+    tasks[1]!.taskRequirements = [
+      undefined,
+      {},
+      { task: undefined },
+      { task: { id: '' } },
+      { task: { id: 't-prapor-low', name: 'Prapor Low Level' } },
+    ] as unknown as Task['taskRequirements'];
+    try {
+      const { tasksWithStatus } = useKappaOverview(() => 'kappa');
+      const mid = tasksWithStatus.value.find((row) => row.task.id === 't-prapor-mid');
+      expect(mid?.lockedBy).toEqual({ id: 't-prapor-low', name: 'Prapor Low Level' });
+    } finally {
+      tasks[1]!.taskRequirements = original;
+    }
   });
   it('excludes invalid locked tasks from group totals and overview total', () => {
     invalidState['t-prapor-mid'] = { self: true };
@@ -219,6 +246,7 @@ describe('useKappaOverview chain ordering', () => {
       useTarkovStore: () => ({
         isTaskComplete: () => false,
         isTaskFailed: () => false,
+        isTaskActive: () => false,
         getPMCFaction: () => 'Any',
         getGameEdition: () => undefined,
         getPrestigeLevel: () => 0,
