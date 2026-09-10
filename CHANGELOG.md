@@ -1,3 +1,10 @@
+## [1.77.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.0...v1.77.1) (2026-09-10)
+
+
+### Bug Fixes
+
+* **api:** align seasonal profile reads with database season ([#824](https://github.com/tarkovtracker-org/TarkovTracker/issues/824)) ([b8f1530](https://github.com/tarkovtracker-org/TarkovTracker/commit/b8f1530b2b4455787c034a5c76e90d29ff0f50f8))
+
 # [1.77.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.7...v1.77.0) (2026-09-07)
 
 
