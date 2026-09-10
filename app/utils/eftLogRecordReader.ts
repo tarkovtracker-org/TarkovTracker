@@ -1,7 +1,6 @@
 // A file can contain any number of records; only an unfinished individual record is buffered.
 const MAX_RECORD_CHARS = 8 * 1024 * 1024;
-const RECORD_START =
-  /(?:^|\n)(?=\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}(?: [+-]\d{2}:\d{2})?\|)/g;
+const RECORD_START = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}(?: [+-]\d{2}:\d{2})?\|/gm;
 export class EftLogRecordSizeError extends Error {
   constructor(readonly path: string) {
     super('An individual EFT log record exceeds the parser buffer.');

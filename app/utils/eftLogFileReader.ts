@@ -52,7 +52,7 @@ function createLogDecoder(name: string) {
 /** Consumes ignored ZIP entries without inflation or fflate's deferred-entry buffering. */
 function discardZipEntry(unzip: Unzip, entry: UnzipFile): void {
   class DiscardEntry extends UnzipPassThrough {
-    static override compression = entry.compression;
+    static override readonly compression = entry.compression;
   }
   unzip.register(DiscardEntry);
   entry.ondata = () => {};

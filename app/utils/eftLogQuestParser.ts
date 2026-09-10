@@ -362,7 +362,7 @@ function combineModeSignals(timeline: BackendModeSignal[]): BackendModeSignal[] 
   const combined: BackendModeSignal[] = [];
   for (const signal of timeline) {
     const prior = combined.at(-1);
-    if (prior && prior.timestamp === signal.timestamp) {
+    if (prior?.timestamp === signal.timestamp) {
       prior.mode = reconcileModeSignal(prior.mode, signal.mode);
     } else combined.push({ ...signal });
   }
