@@ -1,3 +1,11 @@
+## [1.77.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.5...v1.77.6) (2026-09-10)
+
+
+### Bug Fixes
+
+* stream large EFT log folders and archives ([#834](https://github.com/tarkovtracker-org/TarkovTracker/issues/834)) ([9b96d7f](https://github.com/tarkovtracker-org/TarkovTracker/commit/9b96d7ff59d852a167275ac74bdfa2f4487a96ab))
+* **ci:** use valid Codecov comment layout separators ([#836](https://github.com/tarkovtracker-org/TarkovTracker/issues/836)) ([15920d2](https://github.com/tarkovtracker-org/TarkovTracker/commit/15920d2f139fe270ebfa0d2c437a3e3e98c17f4c))
+
 ## [1.77.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.4...v1.77.5) (2026-09-10)
 
 
