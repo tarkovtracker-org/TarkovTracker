@@ -2241,6 +2241,8 @@
       "confirm_word": "SUPPRIMER"
     },
     "log_import": {
+      "reading_logs": "Reading logs and preparing the preview…",
+      "large_folder_hint": "Large folders are read locally in chunks. Keep this page open; you can cancel while logs are being read.",
       "upload_hint": "Sélectionnez votre dossier Logs d'Escape from Tarkov pour importer la progression des quêtes.",
       "deleted_logs_hint": "Si d'anciennes sessions de journaux ont été supprimées, elles ne peuvent pas être importées.",
       "deleted_logs_hint_tooltip": "L'importation des journaux lit uniquement les événements de quêtes encore présents dans votre dossier Logs actuel.",
@@ -2290,19 +2292,14 @@
       "cleared_logs_toast_title": "D’anciens journaux ont probablement été nettoyés",
       "cleared_logs_toast_description": "L'importation des journaux ne peut lire que l'historique des quêtes encore présent dans votre dossier Logs. Les sessions supprimées ne peuvent pas être récupérées.",
       "errors": {
+        "invalid_archive": "The ZIP archive is incomplete or contains an invalid log entry. No progress was imported.",
+        "record_too_large": "An individual log record in {path} is too large to parse safely. No progress was imported. Please report this log format.",
         "apply_import_failed": "Impossible d'appliquer les données importées de progression des quêtes.",
-        "archive_log_file_too_large": "Le fichier journal dans l'archive est trop volumineux : {path}",
-        "archive_logs_too_large": "L'archive contient trop de données de journaux (max {max_mb} Mo).",
-        "import_file_too_large": "Le fichier d'importation est trop volumineux (max {max_mb} Mo).",
-        "log_file_too_large": "Le fichier journal est trop volumineux (max {max_mb} Mo).",
-        "log_file_too_large_path": "Le fichier journal est trop volumineux : {path}",
         "no_files_selected": "Aucun fichier n'a été sélectionné.",
-        "no_logs_in_archive": "Aucun journal EFT n'a été trouvé dans l'archive.",
         "no_matching_tasks_found": "Des événements de quête ont été trouvés, mais aucun ne correspond aux tâches TarkovTracker actuelles.",
         "no_notification_logs_found": "Aucun journal de notifications n'a été trouvé dans les fichiers sélectionnés.",
         "no_quest_events_found": "Aucun événement de début/fin de quête n'a été trouvé dans les journaux sélectionnés.",
         "parse_failed": "Impossible d'analyser les journaux EFT.",
-        "selected_logs_too_large": "Les journaux sélectionnés contiennent trop de données (max {max_mb} Mo).",
         "task_metadata_not_loaded": "Les métadonnées des tâches ne sont pas encore chargées. Actualisez puis réessayez.",
         "invalid_mode": "Sélectionnez un mode de jeu de destination valide.",
         "outside_active_season": "Ces logs contiennent des événements en dehors de la saison active ou sans date d'utilisation. Sélectionnez les sessions de la saison active avant d'importer dans le JcJ saisonnier."

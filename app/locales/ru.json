@@ -2241,6 +2241,8 @@
       "confirm_word": "УДАЛИТЬ"
     },
     "log_import": {
+      "reading_logs": "Reading logs and preparing the preview…",
+      "large_folder_hint": "Large folders are read locally in chunks. Keep this page open; you can cancel while logs are being read.",
       "upload_hint": "Выберите папку Logs игры Escape from Tarkov, чтобы импортировать прогресс заданий.",
       "deleted_logs_hint": "Если старые сессии логов были удалены, их нельзя импортировать.",
       "deleted_logs_hint_tooltip": "Импорт логов читает только события заданий, которые всё ещё есть в вашей текущей папке Logs.",
@@ -2290,19 +2292,14 @@
       "cleared_logs_toast_title": "Вероятно, старые логи были очищены",
       "cleared_logs_toast_description": "Импорт логов может читать только историю заданий, которая всё ещё есть в папке Logs. Удалённые сессии нельзя восстановить.",
       "errors": {
+        "invalid_archive": "The ZIP archive is incomplete or contains an invalid log entry. No progress was imported.",
+        "record_too_large": "An individual log record in {path} is too large to parse safely. No progress was imported. Please report this log format.",
         "apply_import_failed": "Не удалось применить импортированные данные о завершении заданий.",
-        "archive_log_file_too_large": "Файл лога в архиве слишком большой: {path}",
-        "archive_logs_too_large": "Архив содержит слишком много данных логов (макс. {max_mb} МБ).",
-        "import_file_too_large": "Файл импорта слишком большой (макс. {max_mb} МБ).",
-        "log_file_too_large": "Файл лога слишком большой (макс. {max_mb} МБ).",
-        "log_file_too_large_path": "Файл лога слишком большой: {path}",
         "no_files_selected": "Файлы не выбраны.",
-        "no_logs_in_archive": "В архиве не найдены логи EFT.",
         "no_matching_tasks_found": "События заданий найдены, но ни одно не совпадает с текущими задачами TarkovTracker.",
         "no_notification_logs_found": "В выбранных файлах не найдены логи уведомлений.",
         "no_quest_events_found": "В выбранных логах не найдены события начала/завершения заданий.",
         "parse_failed": "Не удалось обработать логи EFT.",
-        "selected_logs_too_large": "Выбранные логи содержат слишком много данных (макс. {max_mb} МБ).",
         "task_metadata_not_loaded": "Метаданные заданий ещё не загружены. Обновите страницу и попробуйте снова.",
         "invalid_mode": "Выберите правильный режим назначения.",
         "outside_active_season": "Эти журналы содержат события вне активного сезона или без подходящей даты. Выберите сеансы активного сезона перед импортом в сезон PvP."

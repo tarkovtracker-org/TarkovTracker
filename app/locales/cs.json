@@ -2241,6 +2241,8 @@
       "confirm_word": "ODSTRANIT"
     },
     "log_import": {
+      "reading_logs": "Reading logs and preparing the preview…",
+      "large_folder_hint": "Large folders are read locally in chunks. Keep this page open; you can cancel while logs are being read.",
       "upload_hint": "Vyberte únik ze složky Tarkov Logs pro import úkolu.",
       "deleted_logs_hint": "Pokud byly staré relace smazány, nelze je importovat.",
       "deleted_logs_hint_tooltip": "Protokol importu pouze pro čtení událostí v úkolu, které jsou stále přítomny ve vaší aktuální složce protokolů.",
@@ -2290,19 +2292,14 @@
       "cleared_logs_toast_title": "Staré logy byly pravděpodobně vymazány",
       "cleared_logs_toast_description": "Import protokolu může číst pouze historii výprav, která je stále ve složce logů. Odstraněné relace nelze obnovit.",
       "errors": {
+        "invalid_archive": "The ZIP archive is incomplete or contains an invalid log entry. No progress was imported.",
+        "record_too_large": "An individual log record in {path} is too large to parse safely. No progress was imported. Please report this log format.",
         "apply_import_failed": "Použití importovaných dat dokončení úkolu se nezdařilo.",
-        "archive_log_file_too_large": "Soubor protokolu je v archivu příliš velký: {path}",
-        "archive_logs_too_large": "Archiv obsahuje příliš mnoho logů (max {max_mb} MB).",
-        "import_file_too_large": "Importovaný soubor je příliš velký (max {max_mb} MB).",
-        "log_file_too_large": "Soubor protokolu je příliš velký (max {max_mb} MB).",
-        "log_file_too_large_path": "Soubor protokolu je příliš velký: {path}",
         "no_files_selected": "Nebyly vybrány žádné soubory.",
-        "no_logs_in_archive": "V archivu nebyly nalezeny žádné protokoly EFT.",
         "no_matching_tasks_found": "Úkolové události byly nalezeny, ale žádný neodpovídá aktuálním úkolům TarkovTrackeru.",
         "no_notification_logs_found": "Ve vybraných souborech nebyly nalezeny žádné protokoly oznámení.",
         "no_quest_events_found": "Ve vybraných záznamech nebyly nalezeny žádné start/dokončovací události.",
         "parse_failed": "Nepodařilo se analyzovat protokoly EFT.",
-        "selected_logs_too_large": "Vybrané protokoly obsahují příliš mnoho obsahu (max {max_mb} MB).",
         "task_metadata_not_loaded": "Metadata úkolů ještě nejsou načtena. Prosím aktualizujte a zkuste to znovu.",
         "invalid_mode": "Vyberte platný cílový herní režim.",
         "outside_active_season": "Tyto protokoly obsahují události mimo aktivní sezónu nebo bez data použitelnosti. Před importem do sezony vyberte relace z aktivní sezóny."
