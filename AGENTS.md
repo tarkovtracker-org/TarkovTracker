@@ -68,6 +68,17 @@ unless executable or test logic changes make it relevant.
   `pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run`.
 - Formatting is enforced by the repository hook and CI `format:check`; do not run the broad format
   command unless the hook is bypassed.
+- Fix Fallow findings; do not suppress them. `// fallow-ignore-next-line` hides a finding without
+  resolving it, and a hidden finding is never revisited. Resolve dead code by deleting it or
+  narrowing the export, and resolve complexity by decomposition: extract helpers, split validation
+  from assembly, and share an algorithm instead of duplicating it. Note that CRAP assumes zero
+  coverage, so a new function at cyclomatic 5 already breaches; treat cyclomatic 4 as the practical
+  ceiling for new functions. Suppress only when the finding is provably not actionable — an external
+  contract or framework indirection the analyzer cannot see, such as store state hydrated through
+  `$state`. A suppression must state why the finding cannot be fixed, not merely that tests cover the
+  code, and it is a reviewable decision rather than a formality. Existing suppressions are
+  grandfathered; remove them opportunistically when already editing that function, not as unrelated
+  cleanup in someone else's change.
 - Mock Supabase and network calls in tests so they stay deterministic.
 
 ## Invariants

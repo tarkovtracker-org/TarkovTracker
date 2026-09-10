@@ -149,6 +149,28 @@ are printed on stderr. Invalid refs and setup/analyzer failures exit nonzero ins
 Regression checks live in `scripts/fallow-audit.test.mjs` and run with the regular test suite or
 `pnpm exec vitest run scripts/fallow-audit.test.mjs`.
 
+##### Resolving findings instead of suppressing them
+
+Fix findings at the source. `// fallow-ignore-next-line` hides a finding without resolving it, and
+because no baseline is maintained, a hidden finding is never revisited — the debt simply stops being
+reported. Resolve dead code by deleting it or narrowing the export; resolve complexity by
+decomposition (extract helpers, split validation from assembly, share an algorithm rather than
+duplicating it).
+
+Complexity findings usually report `exceeded: crap`. CRAP is `complexity² × (1 − coverage)³ +
+complexity` and the audit runs without coverage data, so it assumes zero coverage: a function at
+cyclomatic 5 scores exactly the threshold of 30 and breaches. "It is covered by tests" is therefore
+not a resolution — the analyzer cannot see that coverage, and the finding will recur on every run.
+Treat cyclomatic 4 as the practical ceiling for new functions.
+
+Suppress only when the finding is provably not actionable, such as an external contract or framework
+indirection the analyzer cannot model (store state hydrated through `$state` is the recurring
+example). The comment must be a single line directly above the flagged declaration — a multi-line
+comment block suppresses the wrong line and silently fails — and must explain why the finding cannot
+be fixed. A suppression is a reviewable decision, not a formality. Existing suppressions are
+grandfathered; remove them opportunistically when already editing that function rather than as
+unrelated cleanup in someone else's change.
+
 ### 2. Security Scanning (`.github/workflows/security.yml`)
 
 Weekly security audits:
