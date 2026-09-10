@@ -40,6 +40,7 @@ describe('theme utils', () => {
     document.documentElement.style.colorScheme = '';
   });
   afterEach(() => {
+    vi.unstubAllGlobals();
     if (originalLocalStorage) {
       Object.defineProperty(window, 'localStorage', originalLocalStorage);
     }
@@ -88,6 +89,10 @@ describe('theme utils', () => {
       const customStorage = { getItem: () => null };
       expect(readStoredThemeMode(customStorage)).toBe('dark');
     });
+    it('falls back to dark when window is undefined', () => {
+      vi.stubGlobal('window', undefined);
+      expect(readStoredThemeMode()).toBe('dark');
+    });
   });
   describe('persistThemeMode', () => {
     it('writes the mode to localStorage', () => {
@@ -103,6 +108,10 @@ describe('theme utils', () => {
     });
     it('swallows storage failures without throwing', () => {
       stubThrowingStorage();
+      expect(() => persistThemeMode('light')).not.toThrow();
+    });
+    it('handles undefined window safely without throwing', () => {
+      vi.stubGlobal('window', undefined);
       expect(() => persistThemeMode('light')).not.toThrow();
     });
   });
@@ -126,6 +135,10 @@ describe('theme utils', () => {
     });
     it('handles null/undefined root safely without throwing', () => {
       expect(() => applyThemeMode('light', null as unknown as HTMLElement)).not.toThrow();
+    });
+    it('handles undefined document safely without throwing', () => {
+      vi.stubGlobal('document', undefined);
+      expect(() => applyThemeMode('light')).not.toThrow();
     });
     it('swallows DOM access errors without throwing', () => {
       const throwingRoot = {
