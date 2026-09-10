@@ -141,67 +141,96 @@ export function useSupabaseListener<
     const merged = reconcile(cleared);
     return Object.values(merged).some((value) => value !== undefined) ? (merged as TData) : null;
   };
-  // Initial fetch
-  // fallow-ignore-next-line complexity -- tested fetch cancellation and pending-save guards must share one response boundary
-  const fetchData = async (
-    reconnecting = false,
-    reconcile = syncController?.captureRemoteMerge?.()
-  ) => {
-    const pendingBeforeRead = syncController?.hasPendingChanges?.() === true;
-    const fetchVersion = ++latestFetchVersion;
+  const captureRemoteMerge = () => syncController?.captureRemoteMerge?.();
+  const hasPendingSaves = (): boolean => syncController?.hasPendingChanges?.() === true;
+  /**
+   * A reconnect must not replace state that still belongs to an outbound save,
+   * including edits saved while this request was in flight. A reconciled read
+   * merges instead of replacing, so it is always safe to apply.
+   */
+  const wouldClobberPendingSaves = (
+    reconnecting: boolean,
+    reconcile: RemoteStateMerge | undefined,
+    pendingBeforeRead: boolean
+  ): boolean => reconnecting && !reconcile && (pendingBeforeRead || hasPendingSaves());
+  /** Supersedes any in-flight read and returns the controller for this one. */
+  const beginFetch = (): AbortController => {
     activeFetchController?.abort();
-    const fetchController = new AbortController();
-    activeFetchController = fetchController;
+    const controller = new AbortController();
+    activeFetchController = controller;
+    return controller;
+  };
+  const endFetch = (controller: AbortController): void => {
+    if (activeFetchController === controller) activeFetchController = null;
+  };
+  const runSingleRowQuery = async (
+    filterQuery: { column: string; value: string },
+    signal: AbortSignal
+  ): Promise<{ data: TData | null; error: PostgrestError | null }> => {
+    const queryBuilder = $supabase.client
+      .from(table)
+      .select('*')
+      .eq(filterQuery.column, filterQuery.value)
+      .single() as QueryBuilderWithAbortSignal<TData>;
+    return typeof queryBuilder.abortSignal === 'function'
+      ? await queryBuilder.abortSignal(signal)
+      : await queryBuilder;
+  };
+  /**
+   * `PGRST116` is PostgREST's "no rows": a missing row is a valid state that the
+   * caller applies as a reset, not a read failure.
+   *
+   * @returns `true` when the read failed and must not be applied.
+   */
+  const reportFetchError = (error: PostgrestError): boolean => {
+    if (error.code === 'PGRST116') return false;
+    logger.error(`[${storeIdForLogging}] Error fetching initial data:`, error);
+    loadError.value = error;
+    hasInitiallyLoaded.value = true;
+    return true;
+  };
+  const applyFetchResult = (
+    result: { data: TData | null; error: PostgrestError | null },
+    context: { pendingBeforeRead: boolean; reconcile?: RemoteStateMerge; reconnecting: boolean }
+  ): void => {
+    if (result.error && reportFetchError(result.error)) return;
+    if (
+      wouldClobberPendingSaves(context.reconnecting, context.reconcile, context.pendingBeforeRead)
+    ) {
+      hasInitiallyLoaded.value = true;
+      return;
+    }
+    applyFetchedData(reconcileData(result.data, context.reconcile));
+    hasInitiallyLoaded.value = true;
+  };
+  const reportFetchFailure = (error: unknown, signal: AbortSignal): void => {
+    // An aborted request was superseded on purpose; there is nothing to report.
+    if (signal.aborted || isAbortError(error)) return;
+    logger.error(`[${storeIdForLogging}] Error fetching initial data:`, error);
+    hasInitiallyLoaded.value = true;
+  };
+  // Initial fetch
+  const fetchData = async (reconnecting = false, reconcile = captureRemoteMerge()) => {
+    const pendingBeforeRead = hasPendingSaves();
+    const fetchVersion = ++latestFetchVersion;
+    const fetchController = beginFetch();
     loadError.value = null;
     const filterQuery = parseFilter(getFilterValue());
     if (!filterQuery) return;
     try {
-      const queryBuilder = $supabase.client
-        .from(table)
-        .select('*')
-        .eq(filterQuery.column, filterQuery.value)
-        .single() as QueryBuilderWithAbortSignal<TData>;
-      const result =
-        typeof queryBuilder.abortSignal === 'function'
-          ? await queryBuilder.abortSignal(fetchController.signal)
-          : await queryBuilder;
-      if (fetchVersion !== latestFetchVersion) {
-        return;
-      }
-      const { data, error } = result;
-      if (error && error.code !== 'PGRST116') {
-        logger.error(`[${storeIdForLogging}] Error fetching initial data:`, error);
-        loadError.value = error;
-        hasInitiallyLoaded.value = true;
-        return;
-      }
-      // A reconnect must not replace state that still belongs to an outbound
-      // save, including edits that were saved while this request was in flight.
-      if (
-        reconnecting &&
-        !reconcile &&
-        (pendingBeforeRead || syncController?.hasPendingChanges?.())
-      ) {
-        hasInitiallyLoaded.value = true;
-        return;
-      }
-      applyFetchedData(reconcileData(data, reconcile));
-      hasInitiallyLoaded.value = true;
+      const result = await runSingleRowQuery(filterQuery, fetchController.signal);
+      // A newer request superseded this one, so its response is no longer current.
+      if (fetchVersion !== latestFetchVersion) return;
+      applyFetchResult(result, { pendingBeforeRead, reconcile, reconnecting });
     } catch (error) {
-      if (fetchController.signal.aborted || isAbortError(error)) {
-        return;
-      }
-      logger.error(`[${storeIdForLogging}] Error fetching initial data:`, error);
-      hasInitiallyLoaded.value = true;
+      reportFetchFailure(error, fetchController.signal);
     } finally {
-      if (activeFetchController === fetchController) {
-        activeFetchController = null;
-      }
+      endFetch(fetchController);
     }
   };
   const readData = (reconnecting = false) => {
     const version = cleanupVersion;
-    const read = (reconcile = syncController?.captureRemoteMerge?.()) =>
+    const read = (reconcile = captureRemoteMerge()) =>
       version === cleanupVersion ? fetchData(reconnecting, reconcile) : Promise.resolve();
     return syncController?.withSnapshot ? syncController.withSnapshot(read) : read();
   };

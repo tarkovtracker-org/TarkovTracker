@@ -350,8 +350,13 @@ Fallow classifies the refactored inherited callback as new and estimates zero co
 CRAP 210. A focused V8 coverage diagnostic instead measured **30/33 statements** and **17/18
 branches** covered inside this callback across ten edition tests. Using statement coverage in
 Fallow's documented CRAP formula puts it below 15, under the default 30 threshold. The narrowly
-scoped Fallow annotation documents this mismatch; no repository threshold or CI gate is changed.
+scoped Fallow annotation documented this mismatch; no repository threshold or CI gate was changed.
 Sonar's cognitive-complexity rule remains enabled.
+
+That annotation has since been removed (issue #832). The callback body was decomposed into
+`fetchProgressionCatalog`, `applyProgressionCatalog`, `cacheProgressionCatalog`, and
+`loadProgressionCatalog`, so the finding is resolved at the source and no longer depends on
+unmeasured coverage.
 
 The diagnostic command was `pnpm run test app/stores/__tests__/useMetadata.fetchEditionsData.test.ts
 --coverage --coverage.reporter=json`. Its ten tests passed; the command exits nonzero because a

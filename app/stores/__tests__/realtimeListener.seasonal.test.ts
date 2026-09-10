@@ -384,6 +384,48 @@ describe('seasonal progress realtime synchronization', () => {
     await setup;
     expect(settled).toBe(true);
   });
+  it('reports an initial subscription failure and releases its channel', async () => {
+    subscribeGate.defer = true;
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    const setup = setupRealtimeListener(store);
+    const error = new Error('Join failed');
+    const rejected = expect(setup).rejects.toThrow('Join failed');
+    await vi.waitFor(() => expect(createdChannels[0]?.subscribeCallback).toBeDefined());
+    createdChannels[0]!.subscribeCallback!('CHANNEL_ERROR', error);
+    await rejected;
+    expect(openTopics.size).toBe(0);
+    expect(supabaseContext.client.removeChannel).toHaveBeenCalledWith(createdChannels[0]);
+  });
+  it('ignores a superseded join failure without removing the replacement', async () => {
+    subscribeGate.defer = true;
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    const older = setupRealtimeListener(store);
+    await vi.waitFor(() => expect(createdChannels[0]?.subscribeCallback).toBeDefined());
+    subscribeGate.defer = false;
+    await setupRealtimeListener(store);
+    createdChannels[0]!.subscribeCallback!('CHANNEL_ERROR', new Error('Obsolete join'));
+    await expect(older).resolves.toBeUndefined();
+    expect(createdChannels.filter(({ subscribed }) => subscribed)).toEqual([createdChannels[1]]);
+    expect(openTopics.size).toBe(1);
+  });
+  it('declines a same-topic replacement when the previous leave fails', async () => {
+    const previousUserId = supabaseContext.user.id;
+    supabaseContext.user.id = '33333333-3333-4333-8333-333333333333';
+    try {
+      const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+      await setupRealtimeListener(store);
+      supabaseContext.client.removeChannel.mockRejectedValueOnce(new Error('Leave failed'));
+      await setupRealtimeListener(store);
+      expect(createdChannels).toHaveLength(1);
+      expect(createdChannels[0]!.subscribe).toHaveBeenCalledOnce();
+      expect(logger.warn).toHaveBeenCalledWith(
+        '[TarkovStore] Failed to remove realtime channel:',
+        expect.any(Error)
+      );
+    } finally {
+      supabaseContext.user.id = previousUserId;
+    }
+  });
   it('does not block a new user on a different topic leave', async () => {
     try {
       const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
@@ -420,6 +462,26 @@ describe('seasonal progress realtime synchronization', () => {
     // Teardown while the second setup is waiting for the old leave must win.
     const teardown = cleanupRealtimeListener();
     await Promise.all([queued, teardown]);
+    expect(createdChannels.filter(({ subscribed }) => subscribed)).toEqual([]);
+    expect(openTopics.size).toBe(0);
+  });
+  it('never joins a channel that teardown removed after ownership was published', async () => {
+    const { cleanupRealtimeListener, setupRealtimeListener } =
+      await import('@/stores/tarkov/realtimeListener');
+    const createChannel = supabaseContext.client.channel.getMockImplementation()!;
+    let teardown: Promise<void> | null = null;
+    // Queue teardown from the synchronous channel construction so it runs at the
+    // first microtask checkpoint after ownership is published. Publishing
+    // ownership and calling `subscribe()` must share one synchronous segment: if
+    // an await separates them, this teardown removes the channel and the setup
+    // then joins it anyway, leaving an orphan no ownership check can reclaim.
+    supabaseContext.client.channel.mockImplementationOnce((topic: string) => {
+      const created = createChannel(topic);
+      teardown = Promise.resolve().then(() => cleanupRealtimeListener());
+      return created;
+    });
+    await setupRealtimeListener(store);
+    await teardown;
     expect(createdChannels.filter(({ subscribed }) => subscribed)).toEqual([]);
     expect(openTopics.size).toBe(0);
   });

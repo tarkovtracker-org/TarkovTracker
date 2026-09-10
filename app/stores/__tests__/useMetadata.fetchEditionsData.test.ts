@@ -107,6 +107,25 @@ describe('useMetadataStore fetchEditionsData', () => {
       expect.any(Error)
     );
   });
+  it('keeps the fetched catalog usable when its cache write fails', async () => {
+    const store = useMetadataStore();
+    const edition = createEdition('standard', 1, 'Standard');
+    const error = new Error('Storage quota exceeded');
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cacheUtils, 'setCachedData').mockRejectedValue(error);
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn().mockResolvedValue({
+        data: { editions: [edition], storyChapters: [] },
+      })
+    );
+    await store.fetchEditionsData(true);
+    await flushPromises();
+    expect(store.editions).toEqual([edition]);
+    expect(store.editionsError).toBeNull();
+    expect(store.editionsLoading).toBe(false);
+    expect(loggerMock.error).toHaveBeenCalledWith('[MetadataStore] Error caching editions:', error);
+  });
   it('caches a structured-cloneable editions payload in a persistent mode', async () => {
     const store = useMetadataStore();
     const setCachedDataMock = vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
