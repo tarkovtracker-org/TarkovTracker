@@ -115,14 +115,18 @@
       </aside>
       <section class="w-full min-w-0 xl:flex-1">
         <UCard
-          class="prose prose-lg prose-invert prose-headings:text-primary-100 prose-a:text-link prose-strong:text-primary-200 max-w-none"
+          class="prose prose-lg prose-invert prose-headings:text-primary-100 prose-a:text-link prose-strong:text-primary-200 light:prose-headings:text-primary-800 light:prose-strong:text-surface-50 max-w-none"
         >
           <div class="terms-content space-y-12 [&>section]:scroll-mt-28">
             <div
               id="top"
               class="border-surface-700/50 mb-8 flex items-center justify-between border-b pb-4"
             >
-              <p class="text-primary-400 mb-0 text-sm tracking-[0.2em] uppercase">Legal Document</p>
+              <p
+                class="text-primary-400 light:text-primary-700 mb-0 text-sm tracking-[0.2em] uppercase"
+              >
+                Legal Document
+              </p>
               <p class="text-surface-400 mb-0 text-sm">Last Updated: {{ lastUpdated }}</p>
             </div>
             <!-- 1. ACCEPTANCE OF TERMS -->

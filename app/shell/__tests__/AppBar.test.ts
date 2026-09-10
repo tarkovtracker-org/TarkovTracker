@@ -85,12 +85,15 @@ vi.mock('@vueuse/core', async (importOriginal) => ({
 vi.mock('@/composables/useKeybinds', () => ({
   useKeybinds: vi.fn(),
 }));
+const mockThemeModeRef = ref<'dark' | 'light'>('dark');
+const mockIsLightThemeRef = ref(false);
+const mockToggleThemeMode = vi.fn();
 vi.mock('@/composables/useTheme', () => ({
   useTheme: () => ({
-    themeMode: ref('dark'),
-    isLightTheme: ref(false),
+    themeMode: mockThemeModeRef,
+    isLightTheme: mockIsLightThemeRef,
     setThemeMode: vi.fn(),
-    toggleThemeMode: vi.fn(),
+    toggleThemeMode: mockToggleThemeMode,
   }),
 }));
 vi.mock('@/composables/useSupporter', () => ({
@@ -587,6 +590,50 @@ describe('AppBar authenticated state', () => {
     await img.trigger('error');
     await flushPromises();
     expect(img.attributes('src')).toBe('/img/default-avatar.svg');
+    wrapper.unmount();
+  });
+});
+describe('AppBar theme toggle', () => {
+  beforeEach(() => {
+    mockThemeModeRef.value = 'dark';
+    mockIsLightThemeRef.value = false;
+    mockToggleThemeMode.mockClear();
+  });
+  it('renders sun icon and switch-to-light label in dark mode and calls toggleThemeMode on click', async () => {
+    const wrapper = await mountAppBar();
+    const themeBtn = wrapper.find('button[data-icon="i-heroicons-sun"]');
+    expect(themeBtn.exists()).toBe(true);
+    expect(themeBtn.attributes('aria-label')).toBe('app_bar.switch_to_light_theme');
+    await themeBtn.trigger('click');
+    expect(mockToggleThemeMode).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
+  it('renders moon icon and switch-to-dark label when light mode is active', async () => {
+    mockThemeModeRef.value = 'light';
+    mockIsLightThemeRef.value = true;
+    const wrapper = await mountAppBar();
+    const themeBtn = wrapper.find('button[data-icon="i-heroicons-moon"]');
+    expect(themeBtn.exists()).toBe(true);
+    expect(themeBtn.attributes('aria-label')).toBe('app_bar.switch_to_dark_theme');
+    await themeBtn.trigger('click');
+    expect(mockToggleThemeMode).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
+  it('wraps the header theme button in hidden sm:inline-flex for responsive visibility', async () => {
+    const wrapper = await mountAppBar();
+    const themeBtn = wrapper.find('button[data-icon="i-heroicons-sun"]');
+    expect(themeBtn.classes()).toContain('hidden');
+    expect(themeBtn.classes()).toContain('sm:inline-flex');
+    wrapper.unmount();
+  });
+  it('includes the theme toggle in the mobile More dropdown items', async () => {
+    const wrapper = await mountAppBar();
+    const moreMenuItems = wrapper.findAll('[data-menu-item]');
+    const labels = moreMenuItems.map((el) => el.attributes('data-menu-item'));
+    expect(labels).toContain('app_bar.switch_to_light_theme');
+    const themeItem = wrapper.find('[data-menu-item="app_bar.switch_to_light_theme"]');
+    await themeItem.trigger('click');
+    expect(mockToggleThemeMode).toHaveBeenCalledOnce();
     wrapper.unmount();
   });
 });

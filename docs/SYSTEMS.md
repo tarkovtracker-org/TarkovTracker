@@ -1839,5 +1839,5 @@ App boot
 - `app/utils/theme.ts` — ThemeMode, normalization, storage, apply, `THEME_BOOT_SCRIPT`
 - `app/composables/useTheme.ts` — singleton state + set/toggle
 - `app/features/settings/AppearanceCard.vue` — Settings > Preferences theme selector
-- `app/shell/AppBar.vue` — sun/moon toggle in the utilities group
+- `app/shell/AppBar.vue` — sun/moon toggle in the utilities group (collapses into More menu on mobile)
 - `nuxt.config.ts` — boot script, light skeleton fallbacks, pinned `colorMode`

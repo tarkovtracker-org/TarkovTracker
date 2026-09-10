@@ -101,10 +101,7 @@
     twitch: 'text-white ring-1 ring-white/10',
   };
   const getProviderBadgeClass = (provider: AuthProvider) => {
-    return (
-      PROVIDER_BADGE_CLASSES[provider] ??
-      'text-white ring-1 ring-white/10 light:text-surface-50 light:ring-surface-600/60'
-    );
+    return PROVIDER_BADGE_CLASSES[provider];
   };
   const getProviderBadgeStyle = (provider: AuthProvider) => {
     if (provider === 'discord') return { backgroundColor: 'var(--color-discord)' };

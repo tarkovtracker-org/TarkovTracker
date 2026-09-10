@@ -361,8 +361,9 @@
       heroBackdrop:
         'bg-gradient-to-r from-warning-950 via-warning-900/25 to-surface-900 light:from-warning-100/80 light:via-warning-100/40 light:to-surface-850',
       icon: 'i-mdi-calendar-star',
-      iconTint: 'text-warning-300',
-      modeBadgeClass: 'border border-warning-500/30 bg-warning-700/20 text-warning-200',
+      iconTint: 'text-warning-300 light:text-warning-700',
+      modeBadgeClass:
+        'border border-warning-500/30 bg-warning-700/20 text-warning-200 light:border-warning-600/40 light:text-warning-800',
       storyHighlight: 'pvp',
       timelineHighlight: 'pvp',
     },

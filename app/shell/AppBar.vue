@@ -67,7 +67,7 @@
               size="md"
               :icon="isLightTheme ? 'i-heroicons-moon' : 'i-heroicons-sun'"
               :aria-label="themeToggleLabel"
-              class="h-9 w-9"
+              class="hidden h-9 w-9 sm:inline-flex"
               @click="toggleThemeMode"
             />
           </AppTooltip>
@@ -374,6 +374,13 @@
   ]);
   const moreMenuItems = computed<DropdownMenuItem[][]>(() => [
     [
+      {
+        icon: isLightTheme.value ? 'i-heroicons-moon' : 'i-heroicons-sun',
+        label: themeToggleLabel.value,
+        onSelect: () => {
+          toggleThemeMode();
+        },
+      },
       {
         icon: 'i-mdi-translate',
         label: t('settings.locale'),

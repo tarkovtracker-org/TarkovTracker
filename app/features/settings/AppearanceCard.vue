@@ -23,29 +23,34 @@
               }}
             </p>
           </div>
-          <div
-            role="radiogroup"
-            :aria-labelledby="themeLabelId"
-            class="bg-surface-800 border-surface-700 flex shrink-0 items-center gap-1 rounded-lg border p-1"
-          >
-            <button
-              v-for="option in themeOptions"
-              :key="option.value"
-              type="button"
-              role="radio"
-              :aria-checked="themeMode === option.value"
-              class="flex min-h-9 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
-              :class="
-                themeMode === option.value
-                  ? 'bg-surface-700 text-surface-50 shadow-sm'
-                  : 'text-surface-400 hover:bg-surface-700/60 hover:text-surface-200'
-              "
-              @click="setThemeMode(option.value)"
+          <fieldset class="m-0 border-0 p-0" :aria-labelledby="themeLabelId">
+            <legend class="sr-only">{{ $t('settings.appearance.theme', 'Theme') }}</legend>
+            <div
+              class="bg-surface-800 border-surface-700 flex shrink-0 items-center gap-1 rounded-lg border p-1"
             >
-              <UIcon :name="option.icon" class="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span>{{ option.label }}</span>
-            </button>
-          </div>
+              <label
+                v-for="option in themeOptions"
+                :key="option.value"
+                class="focus-within:ring-primary-500 relative flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-within:ring-2"
+                :class="
+                  themeMode === option.value
+                    ? 'bg-surface-700 text-surface-50 shadow-sm'
+                    : 'text-surface-400 hover:bg-surface-700/60 hover:text-surface-200'
+                "
+              >
+                <input
+                  type="radio"
+                  name="theme-mode-selection"
+                  :value="option.value"
+                  :checked="themeMode === option.value"
+                  class="sr-only"
+                  @change="setThemeMode(option.value)"
+                />
+                <UIcon :name="option.icon" class="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{{ option.label }}</span>
+              </label>
+            </div>
+          </fieldset>
         </div>
       </div>
     </template>

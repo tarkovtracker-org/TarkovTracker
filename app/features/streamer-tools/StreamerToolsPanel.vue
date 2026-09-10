@@ -125,7 +125,7 @@
                   :class="
                     selectedMode === GAME_MODES.SEASONAL
                       ? 'bg-warning-700 text-warning-50'
-                      : 'text-warning-300 hover:bg-warning-950/60'
+                      : 'text-warning-300 hover:bg-warning-950/60 light:text-warning-700 light:hover:bg-warning-100/70'
                   "
                   @click="selectedMode = GAME_MODES.SEASONAL"
                 >

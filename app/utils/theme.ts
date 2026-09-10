@@ -41,7 +41,7 @@ export const applyThemeMode = (mode: ThemeMode): void => {
   if (!import.meta.client) {
     return;
   }
-  document.documentElement.setAttribute('data-theme', mode);
+  document.documentElement.dataset.theme = mode;
   document.documentElement.style.colorScheme = mode;
 };
 /**
@@ -51,12 +51,13 @@ export const applyThemeMode = (mode: ThemeMode): void => {
  */
 export const THEME_BOOT_SCRIPT: string = [
   '(function(){',
+  `var t=${JSON.stringify(DEFAULT_THEME_MODE)};`,
   'try{',
-  `var t=window.localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});`,
-  `if(t!=="light"&&t!=="dark"){t=${JSON.stringify(DEFAULT_THEME_MODE)};}`,
+  `var s=window.localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});`,
+  'if(s==="light"||s==="dark"){t=s;}',
+  '}catch(e){}',
   'var e=document.documentElement;',
   'e.setAttribute("data-theme",t);',
   'e.style.colorScheme=t;',
-  '}catch(e){}',
   '})();',
 ].join('');

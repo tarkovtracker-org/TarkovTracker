@@ -115,11 +115,11 @@ describe('theme utils', () => {
       new Function(THEME_BOOT_SCRIPT)();
       expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
     });
-    it('never throws when storage is unavailable', () => {
+    it('normalizes to dark when storage is unavailable', () => {
       stubThrowingStorage();
       expect(() => new Function(THEME_BOOT_SCRIPT)()).not.toThrow();
-      // The guard leaves the document untouched when storage fails.
-      expect(document.documentElement.getAttribute('data-theme')).toBeNull();
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+      expect(document.documentElement.style.colorScheme).toBe('dark');
     });
   });
 });

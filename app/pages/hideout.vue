@@ -33,7 +33,7 @@
                       <span class="text-xs sm:text-sm">{{ view.title.toUpperCase() }}</span>
                       <span
                         :class="[
-                          'light:text-surface-50 ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
+                          'ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
                           view.badgeColor,
                         ]"
                       >
@@ -662,7 +662,7 @@
       icon: 'mdi-lock',
       view: 'locked',
       count: stationCounts.value.locked,
-      badgeColor: 'bg-surface-600',
+      badgeColor: 'bg-surface-600 light:text-surface-50',
     },
     {
       title: t('common.maxed'),
