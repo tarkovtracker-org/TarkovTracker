@@ -605,6 +605,7 @@
           "filter_hidden_other": "你当前的筛选隐藏了 {count} 个可用任务。",
           "blocked_level_one": "{task} 是你最近的解锁项，但你还差 1 级。",
           "blocked_level_other": "{task} 是你最近的解锁项，但你还差 {count} 级。",
+          "blocked_requirement": "{task} is blocked by its requirements.",
           "blocked_prerequisite": "{task} 已经很接近了，但仍被前置任务限制。",
           "blocked_fence": "{task} 正在等待 Fence 声望。",
           "blocked_trader_unlock": "{task} 被另一个商人解锁任务卡住了。",
@@ -898,7 +899,8 @@
         "xp": "经验奖励",
         "ascending": "升序排列",
         "descending": "降序排列",
-        "aria_label": "任务排序"
+        "aria_label": "任务排序",
+        "progression": "进度"
       },
       "settings": {
         "title": "任务设置",
@@ -1078,7 +1080,32 @@
         "previous_tasks": "前置任务：",
         "progress": "进步 {completed}/{total}",
         "rewards": "奖励",
-        "unlocks_count": "{count} 项解锁"
+        "unlocks_count": "{count} 项解锁",
+        "trader_requirement_badge": "{trader} {kind} {comparison} {value}",
+        "loyalty_level": "LL",
+        "reputation": "重写"
+      },
+      "blockers": {
+        "player_level": "Player level {comparison} {required} required (current: {current}).",
+        "trader_level": "{trader} Loyalty Level {comparison} {required} required (current: {current}).",
+        "trader_reputation": "{trader} reputation {comparison} {required} required (current: {current}).",
+        "prerequisite": "Meet the required task statuses for: {tasks}.",
+        "story_route": "Meet the required task statuses for {tasks}, or progress one of these story chapters: {chapters}.",
+        "failed_branch": "Blocked by failed task: {task}.",
+        "faction": "Available to {faction} characters.",
+        "trader_unlock": "Unlock {trader} by completing {task}.",
+        "prestige": "Requires Prestige {required} (current: {current}).",
+        "unknown": "要求数据不可用或不支持。可用性无法确认。",
+        "cycle": "必备链包含一个周期。可用性无法确认。",
+        "complete": "此任务已完成。",
+        "failed": "此任务失败。",
+        "disabled": "此任务已禁用。",
+        "task_status": "{task} ({status})",
+        "status_complete": "已完成",
+        "status_failed": "失败",
+        "status_active": "活动或接受",
+        "status_unknown": "未知状态",
+        "status_or": " 或 "
       }
     },
     "hideout": {

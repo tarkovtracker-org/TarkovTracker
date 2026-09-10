@@ -605,6 +605,7 @@
           "filter_hidden_other": "Your current filters hide {count} available tasks.",
           "blocked_level_one": "{task} is your closest unlock, but you still need 1 more level.",
           "blocked_level_other": "{task} is your closest unlock, but you still need {count} more levels.",
+          "blocked_requirement": "{task} é bloqueado por seus requisitos.",
           "blocked_prerequisite": "{task} is close, but it is still gated by prerequisite tasks.",
           "blocked_fence": "{task} is waiting on Fence reputation.",
           "blocked_trader_unlock": "{task} is locked behind another trader unlock task.",
@@ -892,13 +893,14 @@
         "none": "Default order",
         "impact": "Impact",
         "alphabetical": "Alphabetical",
-        "level": "Level Required",
+        "level": "Player level",
         "trader": "Trader Order",
         "teammates": "Available to Teammates",
         "xp": "XP Reward",
         "ascending": "Ascending",
         "descending": "Descending",
-        "aria_label": "Sort tasks"
+        "aria_label": "Sort tasks",
+        "progression": "Progresso"
       },
       "settings": {
         "title": "Task Settings",
@@ -1078,7 +1080,32 @@
         "previous_tasks": "Previous Task(s):",
         "progress": "Progress {completed}/{total}",
         "rewards": "Rewards",
-        "unlocks_count": "{count} unlocks"
+        "unlocks_count": "{count} unlocks",
+        "trader_requirement_badge": "{trader} {kind} {comparison} {value}",
+        "loyalty_level": "LL",
+        "reputation": "Reputação"
+      },
+      "blockers": {
+        "player_level": "{comparison} Nível do Jogador {required} necessário (atual: {current}).",
+        "trader_level": "{trader} Nível de Lealdade {comparison} {required} necessário (atual: {current}).",
+        "trader_reputation": "{trader} reputação {comparison} {required} necessária (atual: {current}).",
+        "prerequisite": "Conheça os status de tarefa necessários para: {tasks}.",
+        "story_route": "Conheça o status de tarefas necessárias para {tasks}, ou o progresso de um desses capítulos da história: {chapters}.",
+        "failed_branch": "Bloqueado por tarefas falhadas: {task}.",
+        "faction": "Disponível a {faction} caracteres.",
+        "trader_unlock": "Desbloqueie {trader} completando {task}.",
+        "prestige": "Requer Prestígio {required} (atual: {current}).",
+        "unknown": "Os dados do requisito não estão disponíveis ou não são suportados. Disponibilidade não pode ser confirmada.",
+        "cycle": "A cadeia de pré-requisitos contém um ciclo. A disponibilidade não pode ser confirmada.",
+        "complete": "Esta tarefa foi concluída.",
+        "failed": "A tarefa está com falha",
+        "disabled": "Esta tarefa está desabilitada.",
+        "task_status": "{task} ({status})",
+        "status_complete": "concluído",
+        "status_failed": "falha",
+        "status_active": "ativo ou aceito",
+        "status_unknown": "status desconhecido",
+        "status_or": " ou "
       }
     },
     "hideout": {

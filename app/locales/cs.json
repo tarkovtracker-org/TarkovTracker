@@ -605,6 +605,7 @@
           "filter_hidden_other": "Vaše aktuální filtry skrývají {count} dostupné úkoly.",
           "blocked_level_one": "{task} je vaše nejbližší odemknutí, ale stále potřebujete ještě jednu úroveň.",
           "blocked_level_other": "{task} je vaše nejbližší odemknutí, ale stále potřebujete {count} další úrovně.",
+          "blocked_requirement": "{task} je zablokován svými požadavky.",
           "blocked_prerequisite": "{task} je blízko, ale stále je dán nezbytnými úkoly.",
           "blocked_fence": "{task} čeká na reputaci plotu.",
           "blocked_trader_unlock": "{task} je uzamčen za jiným úkolem pro odemknutí obchodníka.",
@@ -898,7 +899,8 @@
         "xp": "XP Odměna",
         "ascending": "Vzestupně",
         "descending": "sestupně",
-        "aria_label": "Třídit úkoly"
+        "aria_label": "Třídit úkoly",
+        "progression": "Pokrok"
       },
       "settings": {
         "title": "Nastavení úkolu",
@@ -1078,7 +1080,32 @@
         "previous_tasks": "Předchozí úkol(y):",
         "progress": "Postup {completed}/{total}",
         "rewards": "Odměny",
-        "unlocks_count": "Odemkne {count}"
+        "unlocks_count": "Odemkne {count}",
+        "trader_requirement_badge": "{trader} {kind} {comparison} {value}",
+        "loyalty_level": "LL",
+        "reputation": "Odpověď"
+      },
+      "blockers": {
+        "player_level": "Úroveň hráče {comparison} {required} je vyžadována (aktuální: {current}).",
+        "trader_level": "{trader} Věrnostní úroveň {comparison} {required} vyžadována (aktuální: {current}).",
+        "trader_reputation": "{trader} reputace {comparison} {required} vyžadována (aktuální: {current}).",
+        "prerequisite": "Seznamte se s požadovanými stavy úkolů: {tasks}.",
+        "story_route": "Seznamte se s požadovanými stavy úkolu pro {tasks}nebo postupujte v jedné z kapitol příběhu: {chapters}.",
+        "failed_branch": "Zablokováno selháním úkolu: {task}.",
+        "faction": "K dispozici na {faction} znaků.",
+        "trader_unlock": "Odemknout {trader} dokončením {task}.",
+        "prestige": "Vyžaduje Prestige {required} (aktuální: {current}).",
+        "unknown": "Data požadavků jsou nedostupná nebo nepodporovaná. Dostupnost nemůže být potvrzena.",
+        "cycle": "Předpokladový řetězec obsahuje cyklus. Dostupnost nemůže být potvrzena.",
+        "complete": "Tento úkol je dokončen.",
+        "failed": "Tento úkol se nezdařil.",
+        "disabled": "Tento úkol je zakázán.",
+        "task_status": "{task} ({status})",
+        "status_complete": "dokončeno",
+        "status_failed": "selhalo",
+        "status_active": "aktivní nebo přijaté",
+        "status_unknown": "neznámý stav",
+        "status_or": " nebo "
       }
     },
     "hideout": {
