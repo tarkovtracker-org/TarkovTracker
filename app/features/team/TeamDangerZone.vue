@@ -97,6 +97,7 @@
   import { useTeamStoreWithSupabase } from '@/stores/useTeamStore';
   import { GAME_MODES, type GameMode } from '@/utils/constants';
   import { logger } from '@/utils/logger';
+  import type { SystemState } from '@/types/tarkov';
   const { $supabase } = useNuxtApp();
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
@@ -130,17 +131,21 @@
   watch(confirmationOpen, (isOpen) => {
     if (!isOpen) pendingAction.value = null;
   });
+  // The legacy `team`/`team_id` columns predate per-mode keys and only ever
+  // mirror the non-seasonal team, so they are cleared alongside it.
+  const clearLegacyTeamColumns = (state: SystemState, removedTeamId: string) => {
+    if (state.team === removedTeamId) state.team = null;
+    if (state.team_id === removedTeamId) state.team_id = null;
+  };
   const clearLocalTeam = (mode: GameMode, removedTeamId: string) => {
     const key = getTeamIdStateKey(mode);
     if (getTeamIdFromState(systemStore.$state, mode) !== removedTeamId) return;
-    // fallow-ignore-next-line complexity -- cleanup guards protect replacement team state
     systemStore.$patch((state) => {
+      // Re-check inside the patch: a replacement team may have been joined
+      // between the guard above and this mutation.
       if (getTeamIdFromState(state, mode) !== removedTeamId) return;
       state[key] = null;
-      if (mode !== GAME_MODES.SEASONAL) {
-        if (state.team === removedTeamId) state.team = null;
-        if (state.team_id === removedTeamId) state.team_id = null;
-      }
+      if (mode !== GAME_MODES.SEASONAL) clearLegacyTeamColumns(state, removedTeamId);
     });
     if (teamStore.id === removedTeamId) teamStore.$reset();
   };

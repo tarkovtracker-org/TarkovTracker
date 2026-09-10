@@ -37,7 +37,14 @@ function getTeamIdFromSystemStore(
  */
 export const useTeamStore = defineStore<string, TeamState, TeamGetters>('team', {
   state: (): TeamState => ({
-    // fallow-ignore-next-line unused-store-member -- read directly by Team page consumers
+    // Consumers do read this, as `teamStore.id` in useTeamInviteLink.ts and
+    // TeamDangerZone.vue, but Fallow does not attribute a `.id` read to this
+    // state key: `teamStore.owner`, read on the same line of TeamDangerZone.vue,
+    // is attributed and reports clean, while `id` stays flagged. Adding another
+    // consumer read cannot resolve it, and the key belongs to the row shape
+    // hydrated by `$patch(transformed as Partial<TeamState>)`, so renaming it to
+    // sidestep the rule would change the persisted contract.
+    // fallow-ignore-next-line unused-store-member -- not actionable: Fallow does not attribute `.id` reads to a state key
     id: null,
     owner: null,
     joinCode: null,
@@ -223,6 +230,7 @@ export const applyTeammateProgressEvent = (
   });
   dispatchTeammateProgressEvent(data);
 };
+type OwnedTeamChannel = OwnedRealtimeChannel & { client: SupabaseClient };
 export type TeamChannelDeps = {
   /** Resolved per call: the plugin replaces the client during initialization. */
   getClient: () => SupabaseClient;
@@ -316,6 +324,44 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     if (errorCount < MAX_CHANNEL_ERRORS) return;
     scheduleRecovery();
   };
+  /** A deliberately suspended socket is disconnected by design, not a join failure. */
+  const isTransportSuspended = (owned: OwnedTeamChannel): boolean => {
+    const { realtime } = owned.client;
+    return Boolean(realtime) && isRealtimeSuspended(realtime);
+  };
+  const handleJoined = (
+    owned: OwnedRealtimeChannel,
+    teamId: string,
+    filter: string | undefined
+  ) => {
+    joinedTeamId = teamId;
+    joinedFilter = filter;
+    errorCount = 0;
+    if (previouslyJoined.has(owned)) {
+      void reconcileRejoin(teamId);
+      return;
+    }
+    previouslyJoined.add(owned);
+    dispatchHydration(teamId);
+  };
+  /**
+   * A closed or failed channel is no longer joined, so drop the binding and let
+   * the next membership event rebuild it.
+   *
+   * Recovery can replace the owned channel before it rejoins, so the
+   * missed-progress refresh is carried across that replacement.
+   */
+  const handleLostChannel = (
+    owned: OwnedRealtimeChannel,
+    teamId: string,
+    status: string,
+    error?: Error
+  ) => {
+    if (previouslyJoined.has(owned)) hydrationTeam = teamId;
+    joinedTeamId = null;
+    joinedFilter = undefined;
+    recordStatusFailure(status, error);
+  };
   /**
    * Reacts to every subscribe status rather than only `SUBSCRIBED`.
    *
@@ -324,38 +370,20 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
    * invisible while Realtime rejoins forever. The binding is recorded as joined
    * only here, so a join that silently no-ops is never mistaken for a live one.
    */
-  // fallow-ignore-next-line complexity -- tested subscription ownership and recovery state machine; inferred coverage misses callback calls
   const handleStatus = (
-    owned: OwnedRealtimeChannel,
+    owned: OwnedTeamChannel,
     teamId: string,
     filter: string | undefined,
     status: string,
     error?: Error
   ) => {
     if (channel.value !== owned) return;
-    if (deps.getClient().realtime && isRealtimeSuspended(deps.getClient().realtime)) {
+    if (isTransportSuspended(owned)) {
       previouslyJoined.add(owned);
       return;
     }
-    if (status === 'SUBSCRIBED') {
-      joinedTeamId = teamId;
-      joinedFilter = filter;
-      errorCount = 0;
-      if (previouslyJoined.has(owned)) void reconcileRejoin(teamId);
-      else {
-        previouslyJoined.add(owned);
-        dispatchHydration(teamId);
-      }
-      return;
-    }
-    // A closed channel is no longer joined, so drop the binding to let the next
-    // membership event rebuild it.
-    // Recovery can replace the owned channel before it rejoins. Carry the
-    // missed-progress refresh across that replacement, too.
-    if (previouslyJoined.has(owned)) hydrationTeam = teamId;
-    joinedTeamId = null;
-    joinedFilter = undefined;
-    recordStatusFailure(status, error);
+    if (status === 'SUBSCRIBED') handleJoined(owned, teamId, filter);
+    else handleLostChannel(owned, teamId, status, error);
   };
   const bindProgress = (source: SupabaseRealtimeChannel, filter: string): SupabaseRealtimeChannel =>
     source.on(
@@ -381,7 +409,7 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
       () => void refresh()
     );
     if (progressFilter) next = bindProgress(next, progressFilter);
-    const owned: OwnedRealtimeChannel = { channel: next, client, topic };
+    const owned: OwnedTeamChannel = { channel: next, client, topic };
     channel.value = owned;
     if (client.realtime && isRealtimeSuspended(client.realtime)) previouslyJoined.add(owned);
     next.subscribe((status, error) => handleStatus(owned, teamId, progressFilter, status, error));
@@ -421,18 +449,33 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
   const isStale = (requestVersion: number): boolean => disposed || requestVersion !== version;
   const shouldContinue = async (requestVersion: number): Promise<boolean> =>
     !isStale(requestVersion) && (await resolveTargetTeam()) !== null;
-  // fallow-ignore-next-line complexity -- refresh success and generation fences are covered in teamChannelController.test.ts and useTeamStore.test.ts
+  /**
+   * Refreshes membership on behalf of a still-current request.
+   *
+   * @returns `false` when the request was superseded or the membership read
+   *   failed, in which case the channel must be left alone.
+   */
+  const refreshMembersForRequest = async (requestVersion: number): Promise<boolean> => {
+    if (!(await shouldContinue(requestVersion))) return false;
+    if (!(await deps.refreshMembers(true))) return false;
+    return await shouldContinue(requestVersion);
+  };
+  /**
+   * Hydrates an unchanged binding instead of rebuilding it. Only the winning
+   * refresh may do so: an older reconnect request may have been superseded by a
+   * membership event.
+   *
+   * @returns `true` when the existing channel already carries the right bindings.
+   */
+  const reuseCurrentBinding = (): boolean => {
+    if (needsRebuild(deps.getTeamId())) return false;
+    dispatchHydration(joinedTeamId);
+    return true;
+  };
   const refresh = async (): Promise<void> => {
     const requestVersion = ++version;
-    if (!(await shouldContinue(requestVersion))) return;
-    if (!(await deps.refreshMembers(true))) return;
-    if (!(await shouldContinue(requestVersion))) return;
-    if (!needsRebuild(deps.getTeamId())) {
-      // Only the winning refresh can hydrate an unchanged binding. An older
-      // reconnect request may have been superseded by a membership event.
-      dispatchHydration(joinedTeamId);
-      return;
-    }
+    if (!(await refreshMembersForRequest(requestVersion))) return;
+    if (reuseCurrentBinding()) return;
     await setup(requestVersion);
   };
   return {
@@ -815,32 +858,57 @@ export function useTeammateStores() {
         replayProgressMetadataMigration();
       };
       let hydrationRequest = 0;
-      // fallow-ignore-next-line complexity -- hydration ordering and stale-event guards are covered in useTeamStore.test.ts
+      const hydrationIsStale = (request: number): boolean =>
+        !isHydrationActive() || request !== hydrationRequest;
+      /**
+       * A season-0 row is the materialized copy of legacy progress. Without one,
+       * the legacy per-mode column on `user_progress` is still authoritative.
+       */
+      const hasMaterializedLegacyRow = (
+        rows: Array<Record<string, unknown>> | null | undefined
+      ): boolean =>
+        (rows ?? []).some(
+          (row) =>
+            row.game_mode === legacyMode &&
+            row.season_number === 0 &&
+            hasMaterializedProgress(row.progress_data)
+        );
+      const readLegacyTeammateProgress = async (
+        rows: Array<Record<string, unknown>> | null | undefined
+      ): Promise<{ data: unknown; error: unknown }> =>
+        hasMaterializedLegacyRow(rows)
+          ? { data: null, error: null }
+          : await fetchLegacyTeammateProgress($supabase.client, teammateId, legacyMode);
+      /**
+       * Reads the teammate's materialized mode rows, plus the legacy column when
+       * no materialized copy exists.
+       *
+       * @returns `null` when the request went stale or the read failed; a failed
+       *   read has already been reported.
+       */
+      const readTeammateProgressRows = async (request: number) => {
+        const modeRows = await $supabase.client
+          .from('user_game_mode_progress')
+          .select('game_mode,season_number,progress_data')
+          .eq('user_id', teammateId);
+        if (hydrationIsStale(request)) return null;
+        if (modeRows.error) {
+          logTeammateModeProgressHydrationFailure(modeRows.error, teammateId);
+          return null;
+        }
+        return {
+          legacyRow: await readLegacyTeammateProgress(modeRows.data),
+          modeRows: modeRows.data,
+        };
+      };
       const hydrateModeProgress = async () => {
         const request = ++hydrationRequest;
         appliedModes.clear();
         try {
-          const modeRows = await $supabase.client
-            .from('user_game_mode_progress')
-            .select('game_mode,season_number,progress_data')
-            .eq('user_id', teammateId);
-          if (!isHydrationActive() || request !== hydrationRequest) return;
-          if (modeRows.error) {
-            logTeammateModeProgressHydrationFailure(modeRows.error, teammateId);
-            return;
-          }
-          const needsLegacy = !(modeRows.data ?? []).some(
-            (row) =>
-              row.game_mode === legacyMode &&
-              row.season_number === 0 &&
-              hasMaterializedProgress(row.progress_data)
-          );
-          const legacyRow = needsLegacy
-            ? await fetchLegacyTeammateProgress($supabase.client, teammateId, legacyMode)
-            : { data: null, error: null };
-          if (!isHydrationActive() || request !== hydrationRequest) return;
-          applyModeProgressRows(modeRows.data);
-          applyLegacyModeProgress(legacyRow);
+          const rows = await readTeammateProgressRows(request);
+          if (!rows || hydrationIsStale(request)) return;
+          applyModeProgressRows(rows.modeRows);
+          applyLegacyModeProgress(rows.legacyRow);
           replayHydratedProgressMetadata();
         } catch (error) {
           logTeammateModeProgressHydrationFailure(error, teammateId);

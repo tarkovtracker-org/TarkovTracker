@@ -11,34 +11,49 @@ export type RemoteStateMerge = (
 ) => Snapshot;
 const isRecord = (value: unknown): value is Snapshot =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
+// Marks a field the persistence contract cannot carry, so the caller can tell
+// an explicit undefined field apart from a value JSON cannot serialize.
+const UNSERIALIZABLE = Symbol('unserializable');
+const cloneSerializable = (value: unknown): unknown => {
+  try {
+    const json = JSON.stringify(value);
+    if (json === undefined) return value === undefined ? undefined : UNSERIALIZABLE;
+    return JSON.parse(json);
+  } catch {
+    // Cyclic or otherwise non-encodable UI state.
+    return UNSERIALIZABLE;
+  }
+};
 // Snapshot JSON-backed fields independently so transient UI references cannot
 // prevent reconciliation of the persisted fields next to them.
-// fallow-ignore-next-line complexity -- JSON/undefined/cyclic fields are covered directly in pendingState.test.ts; estimated coverage reports none
 export const snapshotSyncState = (state: unknown): Snapshot => {
   const result: Snapshot = {};
   if (!isRecord(state)) return result;
   for (const [key, value] of Object.entries(state)) {
-    try {
-      const json = JSON.stringify(value);
-      result[key] = json === undefined ? undefined : JSON.parse(json);
-    } catch {
-      // Non-serializable UI state is not part of the persistence contract.
+    const clone = cloneSerializable(value);
+    if (clone !== UNSERIALIZABLE) result[key] = clone;
+  }
+  return result;
+};
+// Applies the per-key half of the three-way merge: a key the local side dropped
+// is deleted from the remote result, and every other key recurses.
+const mergePendingKeys = (base: Snapshot, local: Snapshot, remote: unknown): Snapshot => {
+  const result: Snapshot = isRecord(remote) ? { ...remote } : {};
+  for (const key of new Set([...Object.keys(base), ...Object.keys(local)])) {
+    if (Object.hasOwn(local, key)) {
+      result[key] = preservePendingPaths(base[key], local[key], result[key]);
+    } else {
+      Reflect.deleteProperty(result, key);
     }
   }
   return result;
 };
 // Three-way merge: retain only paths changed locally since the acknowledged
 // baseline. Remote changes to other paths still apply, including other modes.
-// fallow-ignore-next-line complexity -- deletion/array/remote-field merges are covered in pendingState.test.ts and live/snapshot integration tests
 export const preservePendingPaths = (base: unknown, local: unknown, remote: unknown): unknown => {
   if (deepEqual(base, local)) return remote;
   if (!isRecord(base) || !isRecord(local)) return local;
-  const result: Snapshot = isRecord(remote) ? { ...remote } : {};
-  for (const key of new Set([...Object.keys(base), ...Object.keys(local)])) {
-    if (!Object.hasOwn(local, key)) Reflect.deleteProperty(result, key);
-    else result[key] = preservePendingPaths(base[key], local[key], result[key]);
-  }
-  return result;
+  return mergePendingKeys(base, local, remote);
 };
 const reconcileValue = (
   base: unknown,
