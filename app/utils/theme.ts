@@ -16,15 +16,13 @@ export const normalizeThemeMode = (value: unknown): ThemeMode => {
 };
 const resolveStorage = <T>(custom?: T): T | Storage | undefined => {
   if (custom) return custom;
-  if (typeof window !== 'undefined') return window.localStorage;
-  return undefined;
+  return typeof window !== 'undefined' ? window.localStorage : undefined;
 };
 const resolveRootElement = (
   root?: Pick<HTMLElement, 'dataset' | 'style'>
 ): Pick<HTMLElement, 'dataset' | 'style'> | undefined => {
   if (root) return root;
-  if (typeof document !== 'undefined') return document.documentElement;
-  return undefined;
+  return typeof document !== 'undefined' ? document.documentElement : undefined;
 };
 /** Read the persisted theme mode. Client-only; falls back to dark on any failure. */
 export const readStoredThemeMode = (storage?: Pick<Storage, 'getItem'>): ThemeMode => {

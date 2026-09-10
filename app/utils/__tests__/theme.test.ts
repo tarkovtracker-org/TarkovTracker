@@ -84,6 +84,10 @@ describe('theme utils', () => {
       stubThrowingStorage();
       expect(readStoredThemeMode()).toBe('dark');
     });
+    it('falls back to dark when storage item is null', () => {
+      const customStorage = { getItem: () => null };
+      expect(readStoredThemeMode(customStorage)).toBe('dark');
+    });
   });
   describe('persistThemeMode', () => {
     it('writes the mode to localStorage', () => {
@@ -122,6 +126,15 @@ describe('theme utils', () => {
     });
     it('handles null/undefined root safely without throwing', () => {
       expect(() => applyThemeMode('light', null as unknown as HTMLElement)).not.toThrow();
+    });
+    it('swallows DOM access errors without throwing', () => {
+      const throwingRoot = {
+        get dataset() {
+          throw new Error('access denied');
+        },
+        style: {} as CSSStyleDeclaration,
+      };
+      expect(() => applyThemeMode('light', throwingRoot as unknown as HTMLElement)).not.toThrow();
     });
   });
   describe('THEME_BOOT_SCRIPT', () => {

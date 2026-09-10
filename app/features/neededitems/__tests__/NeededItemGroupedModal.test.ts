@@ -33,14 +33,20 @@ const mockCounts = {
   objectiveCount: 1,
   hideoutCount: 2,
 };
+const mockSetObjectiveCount = vi.fn();
+const mockSetHideoutPartCount = vi.fn();
+const mockSetHideoutPartComplete = vi.fn();
+const mockSetHideoutPartUncomplete = vi.fn();
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
     getObjectiveCount: () => mockCounts.objectiveCount,
     getHideoutPartCount: () => mockCounts.hideoutCount,
     isTaskComplete: () => false,
     isHideoutModuleComplete: () => false,
-    setTaskObjectiveCount: vi.fn(),
-    setHideoutModuleItemCount: vi.fn(),
+    setObjectiveCount: mockSetObjectiveCount,
+    setHideoutPartCount: mockSetHideoutPartCount,
+    setHideoutPartComplete: mockSetHideoutPartComplete,
+    setHideoutPartUncomplete: mockSetHideoutPartUncomplete,
     isTaskObjectiveComplete: () => false,
   }),
 }));
@@ -115,12 +121,13 @@ describe('NeededItemGroupedModal', () => {
       },
     });
   it('renders task objective and hideout counts with theme-aware text classes', () => {
+    mockCounts.objectiveCount = 1;
+    mockCounts.hideoutCount = 1;
     const wrapper = createWrapper();
-    // Objective count is 1/3 (incomplete, so light:text-surface-50 text-white)
     const countBadges = wrapper.findAll('.font-semibold.border-x');
-    expect(countBadges.length).toBeGreaterThanOrEqual(1);
+    expect(countBadges.length).toBeGreaterThanOrEqual(2);
     expect(countBadges[0]!.classes()).toContain('light:text-surface-50');
-    // Close button has light:hover:text-surface-50
+    expect(countBadges[1]!.classes()).toContain('light:text-surface-50');
     const closeBtn = wrapper.find('button[aria-label="common.close"]');
     expect(closeBtn.classes()).toContain('light:hover:text-surface-50');
   });
@@ -129,7 +136,31 @@ describe('NeededItemGroupedModal', () => {
     mockCounts.hideoutCount = 2;
     const wrapper = createWrapper();
     const countBadges = wrapper.findAll('.font-semibold.border-x');
-    expect(countBadges.length).toBeGreaterThanOrEqual(1);
+    expect(countBadges.length).toBeGreaterThanOrEqual(2);
     expect(countBadges[0]!.classes()).toContain('text-success-400');
+    expect(countBadges[1]!.classes()).toContain('text-success-400');
+  });
+  it('calls store setters when clicking objective increment button', async () => {
+    mockCounts.objectiveCount = 1;
+    const wrapper = createWrapper();
+    const increaseBtn = wrapper.find(
+      'button[aria-label*="needed_items.aria.increase_objective_count"]'
+    );
+    expect(increaseBtn.exists()).toBe(true);
+    expect(increaseBtn.classes()).toContain('light:hover:text-surface-50');
+    await increaseBtn.trigger('click');
+    expect(mockSetObjectiveCount).toHaveBeenCalledWith('obj-1', 2);
+  });
+  it('calls store setters when clicking hideout increment button', async () => {
+    mockCounts.hideoutCount = 1;
+    const wrapper = createWrapper();
+    const increaseBtn = wrapper.find(
+      'button[aria-label*="needed_items.aria.increase_hideout_count"]'
+    );
+    expect(increaseBtn.exists()).toBe(true);
+    expect(increaseBtn.classes()).toContain('light:hover:text-surface-50');
+    await increaseBtn.trigger('click');
+    expect(mockSetHideoutPartCount).toHaveBeenCalledWith('module-1', 2);
+    expect(mockSetHideoutPartComplete).toHaveBeenCalledWith('module-1');
   });
 });

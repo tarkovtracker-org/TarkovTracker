@@ -41,6 +41,7 @@ describe('DashboardTraderCard', () => {
   beforeEach(() => {
     mockState.isLocked = false;
     mockState.traderLevel = 1;
+    document.documentElement.removeAttribute('data-theme');
     vi.clearAllMocks();
   });
   const baseTrader: Trader & { levels: TraderLoyaltyLevel[] } = {
@@ -116,7 +117,8 @@ describe('DashboardTraderCard', () => {
         },
       },
     });
-  it('renders active and inactive loyalty buttons with theme tokens', () => {
+  it('renders active and inactive loyalty buttons with theme tokens in light mode', () => {
+    document.documentElement.setAttribute('data-theme', 'light');
     const wrapper = createWrapper();
     const buttons = wrapper.findAll(
       'button[aria-label*="page.dashboard.traders.set_loyalty_level"]'
