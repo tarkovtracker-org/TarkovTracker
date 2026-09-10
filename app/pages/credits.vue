@@ -42,7 +42,6 @@
   import ContributorsList from '@/features/credits/ContributorsList.vue';
   import CreditMemberList from '@/features/credits/CreditMemberList.vue';
   import { staticCreditSections, type CreditSection } from '@/features/credits/creditSections';
-  import { resolveCanonicalSiteUrl } from '@/utils/runtimeConfig';
   const { t } = useI18n({ useScope: 'global' });
   const creditsDescription = computed(() =>
     t(
@@ -50,22 +49,15 @@
       'Meet the beta testers and open source contributors behind Tarkov Tracker.'
     )
   );
-  const runtimeConfig = useRuntimeConfig();
-  const siteUrl = resolveCanonicalSiteUrl(runtimeConfig.public.appUrl);
-  const creditsCanonicalUrl = `${siteUrl}/credits`;
   const creditsTitle = computed(() => t('common.credits'));
   useSeoMeta({
     title: creditsTitle,
     description: creditsDescription,
     ogTitle: creditsTitle,
     ogDescription: creditsDescription,
-    ogUrl: creditsCanonicalUrl,
     twitterTitle: creditsTitle,
     twitterDescription: creditsDescription,
   });
-  useHead(() => ({
-    link: [{ rel: 'canonical', href: creditsCanonicalUrl }],
-  }));
   const teamLinkClasses =
     'text-info-400 hover:text-info-300 focus-visible:ring-primary-500 inline-flex min-h-11 items-center gap-1.5 rounded text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none';
   const SECTION_CLASSES = 'bg-surface-900/80 rounded-lg border border-white/10 p-5 sm:p-6';

@@ -30,7 +30,9 @@ describe('teamMembers roster', () => {
     }
   });
   it('prefers GitHub avatar URLs over monograms when a username is verified', () => {
-    expect(memberAvatarUrl({ ...teamMembers[0]! })).toBe('https://github.com/dysektai.png?size=96');
+    const dysekt = teamMembers.find((member) => member.id === 'dysektai');
+    expect(dysekt).toBeDefined();
+    expect(memberAvatarUrl(dysekt!)).toBe('https://github.com/dysektai.png?size=96');
     const dio = teamMembers.find((member) => member.id === 'dio');
     expect(dio).toBeDefined();
     expect(memberAvatarUrl(dio!)).toBeUndefined();

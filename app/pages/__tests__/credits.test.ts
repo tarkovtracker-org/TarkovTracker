@@ -46,11 +46,8 @@ describe('credits page', () => {
     expect(metadata.description.value).toBe(
       'Meet the beta testers and open source contributors behind Tarkov Tracker.'
     );
-    expect(metadata.ogUrl).toBe('https://tarkovtracker.org/credits');
-    const headConfig = head.mock.calls[0]?.[0]();
-    expect(headConfig.link).toEqual(
-      expect.arrayContaining([{ rel: 'canonical', href: 'https://tarkovtracker.org/credits' }])
-    );
+    expect(metadata.ogUrl).toBeUndefined();
+    expect(head).not.toHaveBeenCalled();
   });
   it('links to the about page for the team directory', async () => {
     const { default: CreditsPage } = await import('@/pages/credits.vue');

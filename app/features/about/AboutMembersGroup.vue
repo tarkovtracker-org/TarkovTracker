@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div v-if="members.length">
     <h3 class="text-primary-300/80 text-xs font-semibold tracking-widest uppercase">
       {{ t(labelKey) }}
     </h3>

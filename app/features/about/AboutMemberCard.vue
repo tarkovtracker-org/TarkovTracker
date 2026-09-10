@@ -5,7 +5,7 @@
         <NuxtImg
           v-if="avatarUrl && !avatarFailed"
           :src="avatarUrl"
-          :alt="member.displayName"
+          alt=""
           width="48"
           height="48"
           loading="lazy"

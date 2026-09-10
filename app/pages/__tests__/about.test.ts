@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 const { seoMeta, head } = vi.hoisted(() => ({ seoMeta: vi.fn(), head: vi.fn() }));
 mockNuxtImport('useSeoMeta', () => seoMeta);
 mockNuxtImport('useHead', () => head);
@@ -14,6 +14,16 @@ vi.mock('vue-i18n', async (importOriginal) => ({
     t: (key: string, fallback?: string) => fallback ?? key,
   }),
 }));
+const { hiddenGroups } = vi.hoisted(() => ({ hiddenGroups: new Set<string>() }));
+vi.mock('@/features/about/teamMembers', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/about/teamMembers')>();
+  return {
+    ...actual,
+    membersByGroup: (group: Parameters<typeof actual.membersByGroup>[0]) =>
+      hiddenGroups.has(group) ? [] : actual.membersByGroup(group),
+  };
+});
+afterEach(() => hiddenGroups.clear());
 const mountAbout = async () => {
   const { default: AboutPage } = await import('@/pages/about.vue');
   return mount(AboutPage, {
@@ -39,6 +49,18 @@ const mountAbout = async () => {
   });
 };
 describe('about page', () => {
+  it.each([['core'], ['support'], ['core', 'support', 'partner']])(
+    'omits empty roster sections for hidden groups %j',
+    async (...groups) => {
+      groups.forEach((group) => hiddenGroups.add(group));
+      const wrapper = await mountAbout();
+      expect(wrapper.find('section#team').exists()).toBe(
+        !(hiddenGroups.has('core') && hiddenGroups.has('support'))
+      );
+      expect(wrapper.find('section#partners').exists()).toBe(!hiddenGroups.has('partner'));
+      expect(wrapper.find('section#help').exists()).toBe(true);
+    }
+  );
   it('renders team, partners, and help sections with semantic headings', async () => {
     const wrapper = await mountAbout();
     expect(wrapper.get('h1').text()).toBe('page.about.title');
@@ -57,21 +79,20 @@ describe('about page', () => {
     expect(partnerCards.length).toBeGreaterThan(0);
     expect(wrapper.findAll('[data-testid="help-links"]')).toHaveLength(1);
   });
-  it('configures localized metadata, canonical link, and Organization JSON-LD', async () => {
+  it('configures localized metadata and accurate Organization JSON-LD', async () => {
     await mountAbout();
     expect(seoMeta).toHaveBeenCalledWith(
       expect.objectContaining({
         title: expect.any(Object),
         description: expect.any(Object),
-        ogUrl: 'https://tarkovtracker.org/about',
       })
     );
     const metadata = seoMeta.mock.calls[0]?.[0];
     expect(metadata.title.value).toBe('page.about.title');
     const headConfig = head.mock.calls[0]?.[0]();
-    expect(headConfig.link).toEqual(
-      expect.arrayContaining([{ rel: 'canonical', href: 'https://tarkovtracker.org/about' }])
-    );
+    expect(headConfig.link).toBeUndefined();
+    expect(metadata.ogUrl).toBeUndefined();
+    expect(metadata.description.value).toBe('page.about.description');
     const jsonLdScript = headConfig.script?.find(
       (entry: { type?: string }) => entry.type === 'application/ld+json'
     );
@@ -79,6 +100,11 @@ describe('about page', () => {
     const organization = JSON.parse(jsonLdScript.innerHTML);
     expect(organization['@type']).toBe('Organization');
     expect(organization.url).toBe('https://tarkovtracker.org');
-    expect(organization.member.map((m: { name: string }) => m.name)).toContain('DysektAI');
+    expect(organization.member).toEqual(
+      ['DysektAI', 'Niv', 'Chica', 'Adealia', 'Dio', 'MrBreachie'].map((name) => ({
+        '@type': 'Person',
+        name,
+      }))
+    );
   });
 });

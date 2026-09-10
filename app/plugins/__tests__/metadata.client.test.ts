@@ -75,6 +75,7 @@ describe('metadata plugin', () => {
     expect(metadataStoreMock.initialize).toHaveBeenCalledTimes(1);
   });
   it.each([
+    ['/about'],
     ['/changelog'],
     ['/credits'],
     ['/privacy'],
@@ -101,6 +102,7 @@ describe('metadata plugin', () => {
     expect(metadataStoreMock.initialize).not.toHaveBeenCalled();
   });
   it.each([
+    ['/about-tracker'],
     ['/changelog-archive'],
     ['/credits-team'],
     ['/privacy-policy-2'],

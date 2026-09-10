@@ -60,12 +60,11 @@
   import AboutHelpLinks from '@/features/about/AboutHelpLinks.vue';
   import AboutMemberCard from '@/features/about/AboutMemberCard.vue';
   import AboutMembersGroup from '@/features/about/AboutMembersGroup.vue';
-  import { membersByGroup, teamMembers } from '@/features/about/teamMembers';
+  import { membersByGroup } from '@/features/about/teamMembers';
   import { resolveCanonicalSiteUrl } from '@/utils/runtimeConfig';
   const { t } = useI18n({ useScope: 'global' });
   const runtimeConfig = useRuntimeConfig();
   const siteUrl = resolveCanonicalSiteUrl(runtimeConfig.public.appUrl);
-  const canonicalUrl = `${siteUrl}/about`;
   const coreMembers = computed(() => membersByGroup('core'));
   const supportMembers = computed(() => membersByGroup('support'));
   const partnerMembers = computed(() => membersByGroup('partner'));
@@ -76,7 +75,6 @@
     description: seoDescription,
     ogTitle: seoTitle,
     ogDescription: seoDescription,
-    ogUrl: canonicalUrl,
     twitterTitle: seoTitle,
     twitterDescription: seoDescription,
   });
@@ -87,14 +85,12 @@
     url: siteUrl,
     logo: `${siteUrl}/img/logos/tarkovtrackerlogo-light.webp`,
     sameAs: ['https://github.com/tarkovtracker-org/TarkovTracker'],
-    member: teamMembers.map((member) => ({
+    member: [...coreMembers.value, ...supportMembers.value].map((member) => ({
       '@type': 'Person',
       name: member.displayName,
-      ...(member.projectUrl ? { url: member.projectUrl } : {}),
     })),
   }));
   useHead(() => ({
-    link: [{ rel: 'canonical', href: canonicalUrl }],
     script: [
       {
         key: 'about-organization-jsonld',
