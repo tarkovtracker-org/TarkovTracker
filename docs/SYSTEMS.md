@@ -1804,10 +1804,10 @@ so the pre-paint boot script and the in-app `useTheme` composable read the same 
 ```
 First paint
   → THEME_BOOT_SCRIPT (inline <head> script in nuxt.config)
-      reads tt_theme → normalizeThemeMode → sets <html data-theme> + colorScheme
+      reads tt_theme → validates value (mirrors normalizeThemeMode) → sets <html data-theme> + colorScheme
       → pre-hydration skeleton style block matches the light canvas (no dark flash)
 App boot
-  → useTheme() hydrates a useState ref from the same key and re-applies idempotently
+  → useTheme() restores the client-persisted mode over any SSR-hydrated state and re-applies idempotently
   → toggle (AppBar sun/moon button or Settings > Appearance card)
       → setThemeMode persists tt_theme + sets data-theme + colorScheme atomically
 ```
@@ -1836,8 +1836,9 @@ App boot
   are inert in dark mode and every component `light:` utility requires `data-theme='light'`.
 - Theme state lives in `tt_theme` only; keep it out of the user-scoped preferences store so the
   boot script never depends on auth state. Account-level sync is a separate follow-up.
-- `normalizeThemeMode` is the single validator — every entry point (boot script, composable,
-  future readers) must pass through it; unknown values are dark.
+- `normalizeThemeMode` is the runtime validator (unknown values become dark). The synchronous
+  inline `THEME_BOOT_SCRIPT` mirrors this accepted-value validation check identically before runtime
+  modules load.
 - New components should prefer `surface-*`/semantic tokens over hardcoded `white`/`black` so both
   themes work without `light:` overrides; reserve `light:` for accent-on-accent cases.
 

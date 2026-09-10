@@ -38,4 +38,12 @@ describe('useTheme', () => {
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
   });
+  it('restores persisted mode on client when hydrated with dark SSR state', () => {
+    useState('theme-mode', () => 'dark');
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'light');
+    const { themeMode, isLightTheme } = useTheme();
+    expect(themeMode.value).toBe('light');
+    expect(isLightTheme.value).toBe(true);
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+  });
 });
