@@ -216,7 +216,7 @@
                               :class="
                                 isCollected
                                   ? 'bg-success-600 border-success-500 hover:bg-success-500 text-white'
-                                  : 'bg-surface-700 text-surface-200 hover:bg-surface-600 border-white/20 hover:text-white'
+                                  : 'bg-surface-700 text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 border-white/20 hover:text-white'
                               "
                               :aria-label="
                                 isCollected
@@ -301,7 +301,7 @@
                       :class="
                         isCollected
                           ? 'bg-success-600 border-success-500 hover:bg-success-500 text-white'
-                          : 'bg-surface-700 text-surface-200 hover:bg-surface-600 border-white/20 hover:text-white'
+                          : 'bg-surface-700 text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 border-white/20 hover:text-white'
                       "
                       :aria-label="
                         isCollected

@@ -85,6 +85,14 @@ vi.mock('@vueuse/core', async (importOriginal) => ({
 vi.mock('@/composables/useKeybinds', () => ({
   useKeybinds: vi.fn(),
 }));
+vi.mock('@/composables/useTheme', () => ({
+  useTheme: () => ({
+    themeMode: ref('dark'),
+    isLightTheme: ref(false),
+    setThemeMode: vi.fn(),
+    toggleThemeMode: vi.fn(),
+  }),
+}));
 vi.mock('@/composables/useSupporter', () => ({
   useSupporter: () => mockUseSupporter(),
 }));

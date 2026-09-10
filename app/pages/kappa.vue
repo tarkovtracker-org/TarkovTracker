@@ -8,7 +8,7 @@
           <UIcon name="i-mdi-trophy" class="text-kappa h-5 w-5" />
         </span>
         <div>
-          <h1 class="text-2xl font-bold text-white">
+          <h1 class="light:text-surface-50 text-2xl font-bold text-white">
             {{ t('page.kappa.title') }}
           </h1>
           <p class="text-surface-400 text-sm">
@@ -28,7 +28,7 @@
         list: 'gap-0 rounded-lg border border-white/[0.08] bg-surface-900/60 p-0.5',
         indicator: 'rounded-md bg-white/[0.08]',
         trigger:
-          'relative px-4 py-2 text-sm font-medium transition-colors rounded-md data-[state=active]:text-white',
+          'relative px-4 py-2 text-sm font-medium transition-colors rounded-md data-[state=active]:text-white light:data-[state=active]:text-surface-50',
       }"
     >
       <template #default="{ item }">

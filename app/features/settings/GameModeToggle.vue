@@ -56,7 +56,8 @@
     },
   };
   const getModeClasses = (mode: GameMode) => {
-    if (disabledModes.includes(mode)) return 'cursor-not-allowed bg-transparent text-white/25';
+    if (disabledModes.includes(mode))
+      return 'cursor-not-allowed bg-transparent text-white/25 light:text-surface-500';
     return modeClasses[mode][modelValue === mode ? 'active' : 'inactive'];
   };
 </script>

@@ -180,7 +180,7 @@
     () => preferencesStore.getUseAutomaticLevelCalculation
   );
   const STEPPER_BUTTON_CLASS =
-    'flex h-5.5 w-5.5 items-center justify-center p-0 text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40';
+    'flex h-5.5 w-5.5 items-center justify-center p-0 text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 light:text-surface-300 light:hover:bg-surface-700/50 light:hover:text-surface-50';
   const displayedLevel = computed<number>(() => {
     return useAutomaticLevel.value ? xpCalculation.derivedLevel.value : tarkovStore.playerLevel();
   });

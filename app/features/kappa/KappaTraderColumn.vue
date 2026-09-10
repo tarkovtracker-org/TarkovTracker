@@ -20,7 +20,7 @@
         </div>
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-1.5">
-            <span class="truncate text-xs font-semibold text-white">
+            <span class="light:text-surface-50 truncate text-xs font-semibold text-white">
               {{ group.trader.name }}
             </span>
           </div>

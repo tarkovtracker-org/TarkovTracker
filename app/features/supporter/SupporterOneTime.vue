@@ -2,7 +2,7 @@
   <div class="border-surface-700/50 bg-surface-900/60 rounded-2xl border p-6">
     <div class="flex flex-col gap-6 sm:flex-row sm:items-stretch sm:justify-between">
       <div class="flex flex-col sm:flex-1">
-        <h3 class="text-base font-bold text-white">
+        <h3 class="light:text-surface-50 text-base font-bold text-white">
           {{ t('page.supporter.one_time_title') }}
         </h3>
         <p class="text-surface-400 mt-1 text-sm">

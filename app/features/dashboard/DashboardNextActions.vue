@@ -62,7 +62,9 @@
                     </span>
                   </div>
                   <div class="space-y-2">
-                    <h2 class="max-w-3xl text-2xl font-semibold text-white sm:text-3xl">
+                    <h2
+                      class="light:text-surface-50 max-w-3xl text-2xl font-semibold text-white sm:text-3xl"
+                    >
                       {{ primaryHeading }}
                     </h2>
                     <p class="text-surface-200 max-w-3xl text-sm leading-6 sm:text-base">
@@ -88,7 +90,7 @@
                   <div class="text-surface-200 text-[11px] tracking-[0.2em] uppercase">
                     {{ t('page.dashboard.focus.stat.why') }}
                   </div>
-                  <div class="mt-2 text-sm leading-6 font-medium text-white">
+                  <div class="light:text-surface-50 mt-2 text-sm leading-6 font-medium text-white">
                     {{ primaryWhy }}
                   </div>
                 </div>
@@ -155,7 +157,7 @@
               />
             </div>
             <div class="min-w-0 flex-1">
-              <div class="truncate text-sm font-semibold text-white">
+              <div class="light:text-surface-50 truncate text-sm font-semibold text-white">
                 {{ getSecondaryHeading(recommendation) }}
               </div>
               <div class="text-surface-300 mt-1 text-xs leading-5">
@@ -212,74 +214,81 @@
     }
   > = {
     primary: {
-      badge: 'border-primary-400/20 bg-primary-500/10 text-primary-50',
-      eyebrow: 'text-primary-200',
+      badge:
+        'border-primary-400/20 bg-primary-500/10 text-primary-50 light:text-primary-700 light:border-primary-500/30',
+      eyebrow: 'text-primary-200 light:text-primary-700',
       halo: 'bg-primary-500/18',
-      icon: 'text-primary-200',
+      icon: 'text-primary-200 light:text-primary-600',
       iconBg: 'border-primary-400/20 bg-primary-500/10',
       proofCard: 'border-primary-400/30 bg-surface-900/88 ring-primary-400/10 ring-1',
       shell:
-        'border-primary-500/20 bg-gradient-to-br from-surface-900 via-primary-950/55 to-accent-950/45',
+        'border-primary-500/20 bg-gradient-to-br from-surface-900 via-primary-950/55 to-accent-950/45 light:border-primary-500/30 light:from-primary-100/70 light:via-surface-850 light:to-surface-850',
     },
     accent: {
-      badge: 'border-accent-400/20 bg-accent-500/10 text-accent-50',
-      eyebrow: 'text-accent-200',
+      badge:
+        'border-accent-400/20 bg-accent-500/10 text-accent-50 light:text-accent-700 light:border-accent-500/30',
+      eyebrow: 'text-accent-200 light:text-accent-700',
       halo: 'bg-accent-500/18',
-      icon: 'text-accent-200',
+      icon: 'text-accent-200 light:text-accent-600',
       iconBg: 'border-accent-400/20 bg-accent-500/10',
       proofCard: 'border-accent-400/30 bg-surface-900/88 ring-accent-400/10 ring-1',
       shell:
-        'border-accent-500/20 bg-gradient-to-br from-surface-900 via-accent-950/55 to-secondary-950/45',
+        'border-accent-500/20 bg-gradient-to-br from-surface-900 via-accent-950/55 to-secondary-950/45 light:border-accent-500/30 light:from-accent-100/70 light:via-surface-850 light:to-surface-850',
     },
     info: {
-      badge: 'border-info-400/20 bg-info-500/10 text-info-50',
-      eyebrow: 'text-info-200',
+      badge:
+        'border-info-400/20 bg-info-500/10 text-info-50 light:text-info-700 light:border-info-500/30',
+      eyebrow: 'text-info-200 light:text-info-700',
       halo: 'bg-info-500/18',
-      icon: 'text-info-200',
+      icon: 'text-info-200 light:text-info-600',
       iconBg: 'border-info-400/20 bg-info-500/10',
       proofCard: 'border-info-400/30 bg-surface-900/88 ring-info-400/10 ring-1',
       shell:
-        'border-info-500/20 bg-gradient-to-br from-surface-900 via-info-950/55 to-secondary-950/45',
+        'border-info-500/20 bg-gradient-to-br from-surface-900 via-info-950/55 to-secondary-950/45 light:border-info-500/30 light:from-info-100/70 light:via-surface-850 light:to-surface-850',
     },
     warning: {
-      badge: 'border-warning-400/20 bg-warning-500/10 text-warning-50',
-      eyebrow: 'text-warning-200',
+      badge:
+        'border-warning-400/20 bg-warning-500/10 text-warning-50 light:text-warning-700 light:border-warning-500/30',
+      eyebrow: 'text-warning-200 light:text-warning-700',
       halo: 'bg-warning-500/18',
-      icon: 'text-warning-200',
+      icon: 'text-warning-200 light:text-warning-600',
       iconBg: 'border-warning-400/20 bg-warning-500/10',
       proofCard: 'border-warning-400/30 bg-surface-900/88 ring-warning-400/10 ring-1',
       shell:
-        'border-warning-500/20 bg-gradient-to-br from-surface-900 via-warning-950/55 to-surface-950',
+        'border-warning-500/20 bg-gradient-to-br from-surface-900 via-warning-950/55 to-surface-950 light:border-warning-500/30 light:from-warning-100/70 light:via-surface-850 light:to-surface-850',
     },
     success: {
-      badge: 'border-success-400/20 bg-success-500/10 text-success-50',
-      eyebrow: 'text-success-200',
+      badge:
+        'border-success-400/20 bg-success-500/10 text-success-50 light:text-success-700 light:border-success-500/30',
+      eyebrow: 'text-success-200 light:text-success-700',
       halo: 'bg-success-500/18',
-      icon: 'text-success-200',
+      icon: 'text-success-200 light:text-success-600',
       iconBg: 'border-success-400/20 bg-success-500/10',
       proofCard: 'border-success-400/30 bg-surface-900/88 ring-success-400/10 ring-1',
       shell:
-        'border-success-500/20 bg-gradient-to-br from-surface-900 via-success-950/55 to-accent-950/35',
+        'border-success-500/20 bg-gradient-to-br from-surface-900 via-success-950/55 to-accent-950/35 light:border-success-500/30 light:from-success-100/70 light:via-surface-850 light:to-surface-850',
     },
     kappa: {
-      badge: 'border-kappa-400/20 bg-kappa-500/10 text-kappa-50',
-      eyebrow: 'text-kappa-200',
+      badge:
+        'border-kappa-400/20 bg-kappa-500/10 text-kappa-50 light:text-kappa-700 light:border-kappa-500/30',
+      eyebrow: 'text-kappa-200 light:text-kappa-700',
       halo: 'bg-kappa-500/18',
-      icon: 'text-kappa-200',
+      icon: 'text-kappa-200 light:text-kappa-600',
       iconBg: 'border-kappa-400/20 bg-kappa-500/10',
       proofCard: 'border-kappa-400/30 bg-surface-900/88 ring-kappa-400/10 ring-1',
       shell:
-        'border-kappa-500/20 bg-gradient-to-br from-surface-900 via-kappa-950/55 to-surface-950',
+        'border-kappa-500/20 bg-gradient-to-br from-surface-900 via-kappa-950/55 to-surface-950 light:border-kappa-500/30 light:from-kappa-100/70 light:via-surface-850 light:to-surface-850',
     },
     lightkeeper: {
-      badge: 'border-lightkeeper-400/20 bg-lightkeeper-500/10 text-lightkeeper-50',
-      eyebrow: 'text-lightkeeper-200',
+      badge:
+        'border-lightkeeper-400/20 bg-lightkeeper-500/10 text-lightkeeper-50 light:text-lightkeeper-700 light:border-lightkeeper-500/30',
+      eyebrow: 'text-lightkeeper-200 light:text-lightkeeper-700',
       halo: 'bg-lightkeeper-500/18',
-      icon: 'text-lightkeeper-200',
+      icon: 'text-lightkeeper-200 light:text-lightkeeper-600',
       iconBg: 'border-lightkeeper-400/20 bg-lightkeeper-500/10',
       proofCard: 'border-lightkeeper-400/30 bg-surface-900/88 ring-lightkeeper-400/10 ring-1',
       shell:
-        'border-lightkeeper-500/20 bg-gradient-to-br from-surface-900 via-lightkeeper-950/55 to-surface-950',
+        'border-lightkeeper-500/20 bg-gradient-to-br from-surface-900 via-lightkeeper-950/55 to-surface-950 light:border-lightkeeper-500/30 light:from-lightkeeper-100/70 light:via-surface-850 light:to-surface-850',
     },
   };
   const getToneClasses = (recommendation: DashboardRecommendation) => toneMap[recommendation.tone];

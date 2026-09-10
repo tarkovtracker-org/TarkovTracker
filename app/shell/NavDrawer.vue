@@ -48,7 +48,7 @@
           />
         </div>
         <div v-if="!isCollapsed" class="mt-1 text-center">
-          <div class="text-base leading-tight font-medium text-white">
+          <div class="light:text-surface-50 text-base leading-tight font-medium text-white">
             {{ t('navigation_drawer.brand_name') }}
           </div>
         </div>

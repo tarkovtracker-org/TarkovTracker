@@ -21,7 +21,7 @@
     </div>
     <div class="flex flex-1 flex-col gap-5 p-6">
       <div>
-        <h3 class="text-lg font-bold text-white uppercase">
+        <h3 class="light:text-surface-50 text-lg font-bold text-white uppercase">
           {{ t(`page.supporter.tier_${tier.id}_name`) }}
         </h3>
         <p class="text-surface-400 mt-0.5 text-sm">
@@ -30,7 +30,7 @@
       </div>
       <div>
         <div class="flex items-end gap-1">
-          <span class="text-4xl font-bold tracking-tight text-white">
+          <span class="light:text-surface-50 text-4xl font-bold tracking-tight text-white">
             {{ formattedMonthlyCharge }}
           </span>
           <span class="text-surface-400 mb-1 text-sm">
@@ -45,7 +45,9 @@
             class="border-surface-700/50 flex items-center justify-between gap-2 border-b pb-1.5"
           >
             <dt class="text-surface-300">{{ billedLabel }}</dt>
-            <dd class="font-semibold text-white">{{ formattedChargeTotal }}</dd>
+            <dd class="light:text-surface-50 font-semibold text-white">
+              {{ formattedChargeTotal }}
+            </dd>
           </div>
           <div class="flex items-center justify-between gap-2">
             <dt class="text-surface-400 text-xs">

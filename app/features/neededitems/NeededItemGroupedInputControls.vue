@@ -13,7 +13,7 @@
               'text-surface-200 flex h-8 w-8 items-center justify-center rounded-l-lg transition-colors',
               isFirDecreaseDisabled
                 ? 'opacity-40'
-                : 'hover:bg-surface-600 active:bg-surface-500 hover:text-white',
+                : 'hover:bg-surface-600 active:bg-surface-500 light:hover:text-surface-50 hover:text-white',
             ]"
             :aria-label="$t('needed_items.aria.decrease_fir')"
             @click="decreaseFir"
@@ -31,14 +31,14 @@
               :min="0"
               :max="firNeeded"
               step="1"
-              class="bg-surface-900 focus:ring-primary-500 h-full w-full px-2 text-center text-sm font-semibold text-white focus:ring-2 focus:outline-none focus:ring-inset"
+              class="bg-surface-900 focus:ring-primary-500 light:text-surface-50 h-full w-full px-2 text-center text-sm font-semibold text-white focus:ring-2 focus:outline-none focus:ring-inset"
               @blur="submitFirEdit"
               @keydown.enter="submitFirEdit"
               @keydown.escape="cancelFirEdit"
             />
             <button
               v-else
-              class="hover:bg-surface-600 h-full w-full px-2 text-sm font-semibold text-white transition-colors"
+              class="hover:bg-surface-600 light:text-surface-50 h-full w-full px-2 text-sm font-semibold text-white transition-colors"
               @click="startFirEdit"
             >
               {{ firCurrent }}
@@ -50,7 +50,7 @@
               'text-surface-200 flex h-8 w-8 items-center justify-center rounded-r-lg transition-colors',
               isFirIncreaseDisabled
                 ? 'opacity-40'
-                : 'hover:bg-surface-600 active:bg-surface-500 hover:text-white',
+                : 'hover:bg-surface-600 active:bg-surface-500 light:hover:text-surface-50 hover:text-white',
             ]"
             :aria-label="$t('needed_items.aria.increase_fir')"
             @click="increaseFir"
@@ -76,7 +76,7 @@
               'text-surface-200 flex h-8 w-8 items-center justify-center rounded-l-lg transition-colors',
               isNonFirDecreaseDisabled
                 ? 'opacity-40'
-                : 'hover:bg-surface-600 active:bg-surface-500 hover:text-white',
+                : 'hover:bg-surface-600 active:bg-surface-500 light:hover:text-surface-50 hover:text-white',
             ]"
             :aria-label="$t('needed_items.aria.decrease_non_fir')"
             @click="decreaseNonFir"
@@ -94,14 +94,14 @@
               :min="0"
               :max="nonFirNeeded"
               step="1"
-              class="bg-surface-900 focus:ring-primary-500 h-full w-full px-2 text-center text-sm font-semibold text-white focus:ring-2 focus:outline-none focus:ring-inset"
+              class="bg-surface-900 focus:ring-primary-500 light:text-surface-50 h-full w-full px-2 text-center text-sm font-semibold text-white focus:ring-2 focus:outline-none focus:ring-inset"
               @blur="submitNonFirEdit"
               @keydown.enter="submitNonFirEdit"
               @keydown.escape="cancelNonFirEdit"
             />
             <button
               v-else
-              class="hover:bg-surface-600 h-full w-full px-2 text-sm font-semibold text-white transition-colors"
+              class="hover:bg-surface-600 light:text-surface-50 h-full w-full px-2 text-sm font-semibold text-white transition-colors"
               @click="startNonFirEdit"
             >
               {{ nonFirCurrent }}
@@ -113,7 +113,7 @@
               'text-surface-200 flex h-8 w-8 items-center justify-center rounded-r-lg transition-colors',
               isNonFirIncreaseDisabled
                 ? 'opacity-40'
-                : 'hover:bg-surface-600 active:bg-surface-500 hover:text-white',
+                : 'hover:bg-surface-600 active:bg-surface-500 light:hover:text-surface-50 hover:text-white',
             ]"
             :aria-label="$t('needed_items.aria.increase_non_fir')"
             @click="increaseNonFir"

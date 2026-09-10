@@ -2,7 +2,7 @@
   <div class="mx-auto w-full max-w-5xl px-4 py-5 sm:px-6 sm:py-6">
     <div class="flex flex-col gap-5">
       <header class="mx-auto max-w-2xl space-y-2 text-center">
-        <h1 class="text-2xl font-bold tracking-wide text-white sm:text-3xl">
+        <h1 class="light:text-surface-50 text-2xl font-bold tracking-wide text-white sm:text-3xl">
           {{ t('page.resources.title', 'Resources & Guides') }}
         </h1>
         <p class="text-surface-300 text-sm leading-relaxed sm:text-base">
@@ -54,7 +54,7 @@
               'min-h-9 px-4',
               activeCategory === filter.id
                 ? 'ring-primary-400/40 ring-1'
-                : 'text-surface-200 hover:text-white',
+                : 'text-surface-200 light:hover:text-surface-50 hover:text-white',
             ]"
             :label="filter.label"
             @click="activeCategory = filter.id"
@@ -112,7 +112,7 @@
       >
         <div class="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div class="min-w-0 space-y-1">
-            <h2 class="text-base font-semibold tracking-wide text-white">
+            <h2 class="light:text-surface-50 text-base font-semibold tracking-wide text-white">
               {{ t('page.resources.suggest_title', 'Know a useful Tarkov resource?') }}
             </h2>
             <p class="text-surface-400 text-sm leading-relaxed sm:text-[0.9375rem]">

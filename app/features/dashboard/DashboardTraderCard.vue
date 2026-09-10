@@ -40,7 +40,13 @@
         <div class="min-w-0 flex-1">
           <div
             class="truncate text-sm font-semibold"
-            :class="isLocked ? 'text-surface-400' : isComplete ? 'text-surface-300' : 'text-white'"
+            :class="
+              isLocked
+                ? 'text-surface-400'
+                : isComplete
+                  ? 'text-surface-300'
+                  : 'light:text-surface-50 text-white'
+            "
           >
             {{ trader.name }}
           </div>
@@ -287,7 +293,7 @@
         : 'text-surface-500 hover:bg-surface-700/40 hover:text-surface-400';
     }
     return isActive
-      ? 'bg-surface-600 text-white'
+      ? 'bg-surface-600 text-white light:text-surface-50'
       : 'text-surface-300 hover:bg-surface-700/70 hover:text-surface-100';
   };
   const nextLevelInfo = computed(() => {

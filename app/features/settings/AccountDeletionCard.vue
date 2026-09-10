@@ -94,10 +94,17 @@
     if (provider === 'github') return 'i-mdi-github';
     return 'i-mdi-account';
   };
+  const PROVIDER_BADGE_CLASSES: Record<AuthProvider, string> = {
+    google: 'ring-surface-600 text-surface-900 ring-1 light:text-black',
+    github: 'ring-surface-600 text-white ring-1',
+    discord: 'text-white ring-1 ring-white/10',
+    twitch: 'text-white ring-1 ring-white/10',
+  };
   const getProviderBadgeClass = (provider: AuthProvider) => {
-    if (provider === 'google') return 'ring-surface-600 text-surface-900 ring-1';
-    if (provider === 'github') return 'ring-surface-600 text-white ring-1';
-    return 'text-white ring-1 ring-white/10';
+    return (
+      PROVIDER_BADGE_CLASSES[provider] ??
+      'text-white ring-1 ring-white/10 light:text-surface-50 light:ring-surface-600/60'
+    );
   };
   const getProviderBadgeStyle = (provider: AuthProvider) => {
     if (provider === 'discord') return { backgroundColor: 'var(--color-discord)' };

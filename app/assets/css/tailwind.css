@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 @import '@nuxt/ui';
+/* Light theme variant for per-spot overrides; the base token flip lives at the end of this file */
+@custom-variant light (&:where([data-theme='light'], [data-theme='light'] *));
 /* Smooth scrolling for hash anchor navigation */
 html {
   scroll-behavior: smooth;
@@ -1007,4 +1009,68 @@ summary {
 .vue-flow__background pattern line {
   stroke: var(--vf-surface-grid) !important;
   fill: var(--vf-surface-grid) !important;
+}
+/*
+ * Light theme ("warm paper")
+ *
+ * Dark remains the default and is unchanged. The light theme flips only the
+ * neutral surface ladder and its companion text/state/border tokens through
+ * [data-theme='light'] on <html>; gameplay accent palettes (primary, pvp, pve,
+ * success, ...) are intentionally theme-agnostic. The ladder is role-mapped
+ * rather than strictly reversed: the page canvas is a soft parchment (never
+ * pure white), cards/panels sit slightly lighter for elevation, and the
+ * 50-500 range becomes the dark-ink text ramp.
+ */
+:root[data-theme='light'] {
+  color-scheme: light;
+  /* Surface ladder: canvas(950) → shell(900) → content(850) → raised(800) → state(700) */
+  --color-surface-50: hsl(32 16% 12%); /* Primary ink (was brightest text) */
+  --color-surface-100: hsl(31 14% 16%);
+  --color-surface-200: hsl(30 12% 22%);
+  --color-surface-300: hsl(30 10% 30%);
+  --color-surface-400: hsl(30 8% 40%);
+  --color-surface-500: hsl(30 7% 46%); /* Dimmed text / placeholders */
+  --color-surface-600: hsl(36 12% 74%); /* Borders/dividers */
+  --color-surface-700: hsl(38 16% 82%); /* State fallback */
+  --color-surface-800: hsl(40 33% 98%); /* Raised/interactive */
+  --color-surface-850: hsl(40 30% 96%); /* Content surfaces */
+  --color-surface-900: hsl(38 18% 87%); /* Shell chrome */
+  --color-surface-950: hsl(40 24% 92%); /* Page canvas (soft parchment, not white) */
+  /* Text hierarchy mirrors the inverted ladder */
+  --color-text: var(--color-surface-50);
+  --color-text-secondary: var(--color-surface-200);
+  --color-text-muted: var(--color-surface-400);
+  --color-text-disabled: hsl(30 8% 56%);
+  /* State overlays + borders become warm dark alphas */
+  --state-hover: rgba(49, 37, 24, 0.05);
+  --state-pressed: rgba(49, 37, 24, 0.09);
+  --state-selected: rgba(146, 103, 54, 0.16);
+  --border-subtle: rgba(49, 37, 24, 0.08);
+  --border-default: rgba(49, 37, 24, 0.14);
+  --border-strong: rgba(49, 37, 24, 0.22);
+  /* Links and status colors tuned for light backgrounds */
+  --color-link: hsl(208 80% 38%);
+  --color-link-hover: hsl(208 85% 30%);
+  --color-tasklink: var(--color-info-600);
+  --color-failed: var(--color-error-600);
+  /* Transparent-image checkerboard */
+  --color-checker-dark: hsl(36 10% 76%);
+  --color-checker-bg: hsl(40 16% 86%);
+  /* Nuxt UI aliases that are hardcoded to white in the upstream dark block */
+  --ui-text-highlighted: var(--color-primary-600);
+  --ui-bg-inverted: var(--color-surface-50);
+  --ui-border-inverted: var(--color-surface-50);
+}
+/* Nuxt UI applies dark color-scheme to body via its pinned .dark class; restore light */
+:root[data-theme='light'] body {
+  color-scheme: light;
+}
+/* Vue Flow scopes its tokens on .vue-flow, so light overrides must match that scope */
+:root[data-theme='light'] .vue-flow {
+  --vf-text-75: var(--color-surface-400);
+  --vf-text-80: var(--color-surface-300);
+  --vf-text-95: var(--color-surface-50);
+  --vf-node-text: var(--color-surface-100);
+  --vf-connection-path: var(--color-surface-500);
+  --vf-handle: var(--color-surface-500);
 }

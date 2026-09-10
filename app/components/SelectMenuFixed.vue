@@ -59,7 +59,7 @@
     content:
       'bg-surface-900 border border-surface-700 rounded-lg shadow-xl z-[9999] max-w-[90vw] min-w-fit overflow-auto',
     viewport: 'p-1 max-h-60 overflow-y-auto',
-    item: 'px-3 py-2 text-sm cursor-pointer transition-colors rounded text-surface-300 data-[highlighted]:bg-surface-800 data-[highlighted]:text-white data-[state=checked]:bg-surface-700 data-[state=checked]:text-white data-[state=checked]:font-medium',
+    item: 'px-3 py-2 text-sm cursor-pointer transition-colors rounded text-surface-300 data-[highlighted]:bg-surface-800 data-[highlighted]:text-white light:data-[highlighted]:text-surface-50 data-[state=checked]:bg-surface-700 data-[state=checked]:text-white light:data-[state=checked]:text-surface-50 data-[state=checked]:font-medium',
     itemLabel: 'break-words whitespace-normal',
     itemTrailingIcon: 'text-surface-400 shrink-0',
   };

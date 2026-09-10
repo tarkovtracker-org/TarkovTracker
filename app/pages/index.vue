@@ -115,7 +115,7 @@
           <div class="mb-4 flex w-full items-center">
             <button
               type="button"
-              class="group flex min-w-0 flex-1 cursor-pointer items-center text-2xl font-bold text-white"
+              class="group light:text-surface-50 flex min-w-0 flex-1 cursor-pointer items-center text-2xl font-bold text-white"
               :aria-expanded="!tradersSectionCollapsed"
               @click="tradersSectionCollapsed = !tradersSectionCollapsed"
             >
@@ -181,7 +181,7 @@
             @click="showLockedTraders = !showLockedTraders"
           >
             <UIcon name="i-mdi-lock" class="text-warning-400/80 h-5 w-5 shrink-0" />
-            <span class="text-sm font-semibold text-white">
+            <span class="light:text-surface-50 text-sm font-semibold text-white">
               {{ $t('page.dashboard.traders.locked_summary', { count: lockedTraderStats.length }) }}
             </span>
             <UIcon
@@ -217,7 +217,7 @@
         <div class="content-visibility-auto-240">
           <button
             type="button"
-            class="group mb-4 flex w-full cursor-pointer items-center text-2xl font-bold text-white"
+            class="group light:text-surface-50 mb-4 flex w-full cursor-pointer items-center text-2xl font-bold text-white"
             :aria-expanded="!milestonesSectionCollapsed"
             @click="milestonesSectionCollapsed = !milestonesSectionCollapsed"
           >

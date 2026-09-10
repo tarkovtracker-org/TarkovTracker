@@ -8,7 +8,7 @@
     title-classes="text-lg font-semibold"
   >
     <template #content>
-      <div class="space-y-6 px-4 py-4 text-white">
+      <div class="light:text-surface-50 space-y-6 px-4 py-4 text-white">
         <div class="space-y-4">
           <template v-for="(field, index) in keybindFields" :key="field.id">
             <USeparator v-if="index > 0" />

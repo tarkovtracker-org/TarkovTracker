@@ -14,7 +14,7 @@
         indicator: 'hidden',
         leadingIcon: 'h-4 w-4 sm:h-5 sm:w-5',
         trigger:
-          'data-[state=active]:border-surface-200 data-[state=active]:bg-transparent data-[state=active]:text-white rounded-none border-b-2 border-transparent px-2 sm:px-3',
+          'data-[state=active]:border-surface-200 data-[state=active]:bg-transparent data-[state=active]:text-white light:data-[state=active]:text-surface-50 rounded-none border-b-2 border-transparent px-2 sm:px-3',
       }"
     >
       <template #default="{ item }">
@@ -24,7 +24,7 @@
           </span>
           <span
             :class="[
-              'ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white sm:ml-2 sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
+              'light:text-surface-50 ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white sm:ml-2 sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
               item.badgeClass,
             ]"
           >
@@ -168,7 +168,11 @@
             icon="i-mdi-cog"
             :aria-label="t('page.needed_items.settings.title', 'Needed Items Settings')"
             :aria-pressed="isSettingsDrawerOpen"
-            :class="isSettingsDrawerOpen ? 'bg-white/10 text-white' : 'text-surface-400'"
+            :class="
+              isSettingsDrawerOpen
+                ? 'light:bg-surface-700/70 light:text-surface-50 bg-white/10 text-white'
+                : 'text-surface-400'
+            "
             @click="toggleSettingsDrawer"
           >
             <UBadge v-if="activeFiltersCount > 0" color="primary" variant="soft" size="sm">

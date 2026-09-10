@@ -70,7 +70,7 @@
       </div>
       <div
         v-if="props.itemName"
-        class="flex items-center justify-center text-center text-sm leading-tight font-bold text-white"
+        class="light:text-surface-50 flex items-center justify-center text-center text-sm leading-tight font-bold text-white"
       >
         {{ props.itemName }}
       </div>

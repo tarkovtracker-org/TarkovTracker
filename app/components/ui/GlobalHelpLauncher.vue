@@ -502,7 +502,7 @@
   );
   const buttonToneClass = computed(() => {
     return isMenuOpen.value || isOnboardingOpen.value || isCurrentPageGuideOpen.value
-      ? 'bg-white/10 text-white'
+      ? 'bg-white/10 text-white light:bg-surface-700/70 light:text-surface-50'
       : 'text-surface-400';
   });
   const openPageGuide = () => {

@@ -101,7 +101,9 @@
           :class="getEndingCardClass(ending.routeState)"
         >
           <div class="flex flex-wrap items-center gap-1">
-            <span class="text-xs font-semibold text-white">{{ ending.label }}</span>
+            <span class="light:text-surface-50 text-xs font-semibold text-white">
+              {{ ending.label }}
+            </span>
             <UBadge
               v-if="ending.routeChoiceIndex !== null"
               variant="subtle"

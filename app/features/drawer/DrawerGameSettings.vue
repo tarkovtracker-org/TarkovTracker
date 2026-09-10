@@ -37,10 +37,10 @@
         class="flex min-h-8 flex-1 items-center justify-center px-2 py-1.5 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:ring-white/40 focus:outline-none"
         :class="[
           faction === currentFaction
-            ? 'bg-white/15 text-white'
+            ? 'light:bg-surface-700/70 light:text-surface-50 bg-white/15 text-white'
             : dataLoading
-              ? 'bg-transparent text-white/50'
-              : 'bg-transparent text-white/50 hover:bg-white/5 hover:text-white/80',
+              ? 'light:text-surface-400 bg-transparent text-white/50'
+              : 'light:text-surface-400 light:hover:bg-surface-700/40 light:hover:text-surface-100 bg-transparent text-white/50 hover:bg-white/5 hover:text-white/80',
           dataLoading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
         ]"
         :disabled="dataLoading"

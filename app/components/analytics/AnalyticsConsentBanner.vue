@@ -31,7 +31,10 @@
               </UBadge>
             </div>
             <div class="space-y-1">
-              <h2 :id="consentTitleId" class="text-lg font-semibold text-white">
+              <h2
+                :id="consentTitleId"
+                class="light:text-surface-50 text-lg font-semibold text-white"
+              >
                 {{ consentTitle }}
               </h2>
               <p

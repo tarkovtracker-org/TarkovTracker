@@ -204,7 +204,7 @@
               :ui="{
                 fieldset: 'w-full',
                 item: 'rounded-lg border border-surface-700 bg-surface-800/50 px-3 py-3 data-[state=checked]:border-primary-500 data-[state=checked]:bg-primary-500/10',
-                label: 'text-sm font-medium text-white',
+                label: 'text-sm font-medium text-white light:text-surface-50',
               }"
             />
           </UFormField>

@@ -33,7 +33,7 @@
                       <span class="text-xs sm:text-sm">{{ view.title.toUpperCase() }}</span>
                       <span
                         :class="[
-                          'ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
+                          'light:text-surface-50 ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
                           view.badgeColor,
                         ]"
                       >
@@ -60,7 +60,11 @@
                     data-help-target="hideout-settings-button"
                     :aria-label="t('common.settings')"
                     :aria-pressed="isSettingsOpen"
-                    :class="isSettingsOpen ? 'bg-white/10 text-white' : 'text-surface-400'"
+                    :class="
+                      isSettingsOpen
+                        ? 'light:bg-surface-700/70 light:text-surface-50 bg-white/10 text-white'
+                        : 'text-surface-400'
+                    "
                     @click="toggleSettingsDrawer"
                   >
                     <span class="hidden sm:inline">
@@ -82,7 +86,7 @@
           <template #content>
             <UCard class="w-full max-w-sm">
               <template #header>
-                <div class="px-4 py-3 text-lg font-semibold text-white">
+                <div class="light:text-surface-50 px-4 py-3 text-lg font-semibold text-white">
                   {{ prereqConfirmTitle }}
                 </div>
               </template>
