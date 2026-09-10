@@ -6,6 +6,7 @@ import { usePreferencesStore } from '@/stores/usePreferences';
 import {
   initializeTarkovSync,
   resetTarkovStoreForSessionTransition,
+  resetTarkovSync,
   useTarkovStore,
 } from '@/stores/useTarkov';
 import { logger } from '@/utils/logger';
@@ -20,8 +21,8 @@ interface AccountActivityResponse {
  * attempts cover roughly 2.5 minutes of transient unavailability without
  * retrying forever against a hard-down server.
  */
-const SYNC_RETRY_DELAY_MS = 30_000;
-const SYNC_RETRY_MAX_ATTEMPTS = 5;
+export const SYNC_RETRY_DELAY_MS = 30_000;
+export const SYNC_RETRY_MAX_ATTEMPTS = 5;
 /**
  * Handles app-level initialization:
  * - Locale setup from user preferences
@@ -105,6 +106,12 @@ export function useAppInitialization() {
   };
   const handleSyncFailure = (expectedUserId?: string, expectedToken?: number) => {
     if (isStaleInitialization(expectedUserId, expectedToken) || !getAuthenticatedUserId()) return;
+    // A failure after the sync controller or realtime listener was created
+    // leaves them partially initialized; the same-user guard inside
+    // initializeTarkovSync would then skip listener setup on the retry and
+    // disconnect cross-device updates. Tear the machinery down so the retry
+    // starts from a clean slate.
+    resetTarkovSync('initial sync failed');
     reportSyncFailure();
     if (syncRetryAttempts >= SYNC_RETRY_MAX_ATTEMPTS) {
       showLoadFailed();

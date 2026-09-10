@@ -213,6 +213,34 @@ describe('sanitizeManualActivityHistory', () => {
     );
     expect(sanitizeManualActivityHistory([entry()])[0]).not.toHaveProperty('details');
   });
+  it('drops lone surrogates so jsonb accepts the serialized payload', () => {
+    const unpairedSurrogate =
+      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+    const [survivor] = sanitizeManualActivityHistory([
+      entry({
+        details: `kept \uD83D\uDE00 dropped \uD800 tail`,
+        id: `manual-\uD800-1`,
+        timestamp: 10,
+        title: `kept \uD83D\uDE00 dropped \uDBFF`,
+      }),
+    ]);
+    expect(survivor?.id).toBe('manual--1');
+    expect(survivor?.title).toBe('kept 😀 dropped ');
+    expect(survivor?.details).toBe('kept 😀 dropped  tail');
+    for (const value of [survivor?.id, survivor?.title, survivor?.details]) {
+      expect(unpairedSurrogate.test(value ?? '')).toBe(false);
+    }
+    const [surrogateOnly] = sanitizeManualActivityHistory([
+      entry({ id: '\uD800', title: '\uDBFF\uDFFF' }),
+    ]);
+    expect(surrogateOnly).toBeUndefined();
+    expect(sanitizeOwnedProgressData({ displayName: 'name \uDC00' }).displayName).toBe('name ');
+    expect(
+      unpairedSurrogate.test(
+        sanitizeOwnedProgressData({ displayName: 'name \uDC00' }).displayName ?? ''
+      )
+    ).toBe(false);
+  });
 });
 describe('sanitizeOwnedUserState', () => {
   it('normalizes top-level user state and per-mode payloads', () => {

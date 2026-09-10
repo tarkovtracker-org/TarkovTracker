@@ -19,10 +19,17 @@ export const isRecord = (value: unknown): value is Record<string, unknown> =>
 export const toFiniteNumber = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
 /**
- * Trim a string field and clamp it to `maxLength` code points. Blank and non-string values are
- * `null`. Clamping by code point matches PostgreSQL `left()`, so client and database sanitization
- * agree on the same id and cannot split a supplementary character into a lone surrogate, which
- * `jsonb` rejects.
+ * True for a single unpaired surrogate code unit. `Array.from` keeps such a
+ * character intact, and PostgreSQL `jsonb` rejects the whole document when a
+ * lone surrogate reaches it, so the sanitizer drops them before clamping.
+ */
+const isLoneSurrogate = (character: string): boolean =>
+  character.length === 1 && character >= '\uD800' && character <= '\uDFFF';
+/**
+ * Trim a string field, drop lone surrogates, and clamp it to `maxLength` code points. Blank,
+ * non-string, and surrogate-only values are `null`. Clamping by code point matches PostgreSQL
+ * `left()`, so client and database sanitization agree on the same id and cannot split a
+ * supplementary character, and no lone surrogate survives to the `jsonb` parameter.
  */
 const sanitizeClampedText = (value: unknown, maxLength: number): string | null => {
   if (typeof value !== 'string') {
@@ -32,7 +39,11 @@ const sanitizeClampedText = (value: unknown, maxLength: number): string | null =
   if (trimmed.length === 0) {
     return null;
   }
-  return Array.from(trimmed).slice(0, maxLength).join('');
+  const characters = Array.from(trimmed).filter((character) => !isLoneSurrogate(character));
+  if (characters.length === 0) {
+    return null;
+  }
+  return characters.slice(0, maxLength).join('');
 };
 export const sanitizeDisplayName = (value: unknown): string | null =>
   sanitizeClampedText(value, 64);

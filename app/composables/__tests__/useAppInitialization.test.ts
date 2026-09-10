@@ -3,7 +3,11 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { flushPromises, mount } from '@vue/test-utils';
 import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, reactive, ref } from 'vue';
-import { useAppInitialization } from '@/composables/useAppInitialization';
+import {
+  SYNC_RETRY_DELAY_MS,
+  SYNC_RETRY_MAX_ATTEMPTS,
+  useAppInitialization,
+} from '@/composables/useAppInitialization';
 const localeRef = ref('en');
 const setLocale = vi.fn(async (value: string) => {
   localeRef.value = value;
@@ -34,6 +38,7 @@ const mockSupporter = { fetchStatus: vi.fn(), subscribe: vi.fn(), reset: vi.fn()
 vi.mock('@/composables/useSupporter', () => ({ useSupporter: () => mockSupporter }));
 const mockInitializeTarkovSync = vi.fn(async () => {});
 const mockResetTarkovStoreForSessionTransition = vi.fn();
+const mockResetTarkovSync = vi.fn();
 const mockMigrateDataIfNeeded = vi.fn(async () => {});
 const mockActivityLogResetForSession = vi.fn();
 const mockActivityLogMigrateLegacyManualEntries = vi.fn();
@@ -73,6 +78,7 @@ vi.mock('@/stores/useTarkov', () => ({
   initializeTarkovSync: () => mockInitializeTarkovSync(),
   resetTarkovStoreForSessionTransition: (...args: unknown[]) =>
     mockResetTarkovStoreForSessionTransition(...args),
+  resetTarkovSync: (...args: unknown[]) => mockResetTarkovSync(...args),
   useTarkovStore: () => ({
     migrateDataIfNeeded: () => mockMigrateDataIfNeeded(),
   }),
@@ -114,6 +120,7 @@ describe('useAppInitialization locale setup', () => {
     mockInitializeTarkovSync.mockClear();
     mockInitializeTarkovSync.mockResolvedValue(undefined);
     mockResetTarkovStoreForSessionTransition.mockClear();
+    mockResetTarkovSync.mockClear();
     mockMigrateDataIfNeeded.mockClear();
     mockMigrateDataIfNeeded.mockResolvedValue(undefined);
     mockActivityLogResetForSession.mockClear();
@@ -360,13 +367,10 @@ describe('useAppInitialization locale setup', () => {
     }
   );
   describe('initial sync retry', () => {
-    // Mirrors the un-exported bounded retry window: 5 attempts, 30s apart.
-    const RETRY_DELAY_MS = 30_000;
-    const MAX_ATTEMPTS = 5;
     afterEach(() => {
       vi.useRealTimers();
     });
-    it('retries a failed initial sync and adopts legacy activity in the same session', async () => {
+    it('tears down partial sync state and retries within the same session', async () => {
       vi.useFakeTimers();
       mockInitializeTarkovSync.mockRejectedValueOnce(new Error('offline'));
       mockSupabaseUser.loggedIn = true;
@@ -374,14 +378,16 @@ describe('useAppInitialization locale setup', () => {
       const wrapper = await mountWithComposable();
       await vi.advanceTimersByTimeAsync(0);
       expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
+      expect(mockResetTarkovSync).toHaveBeenCalledWith('initial sync failed');
       expect(mockActivityLogMigrateLegacyManualEntries).not.toHaveBeenCalled();
       expect(mockShowLoadFailed).toHaveBeenCalledTimes(1);
-      await vi.advanceTimersByTimeAsync(RETRY_DELAY_MS);
+      await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS);
       expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(2);
       expect(mockActivityLogMigrateLegacyManualEntries).toHaveBeenCalledTimes(1);
       expect(mockShowLoadFailed).toHaveBeenCalledTimes(1);
-      await vi.advanceTimersByTimeAsync(RETRY_DELAY_MS * 2);
+      await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS * 2);
       expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(2);
+      expect(mockResetTarkovSync).toHaveBeenCalledTimes(1);
       wrapper.unmount();
     });
     it('stops retrying after the bounded number of attempts', async () => {
@@ -392,8 +398,8 @@ describe('useAppInitialization locale setup', () => {
       const wrapper = await mountWithComposable();
       await vi.advanceTimersByTimeAsync(0);
       expect(mockShowLoadFailed).toHaveBeenCalledTimes(1);
-      await vi.advanceTimersByTimeAsync(RETRY_DELAY_MS * (MAX_ATTEMPTS + 5));
-      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1 + MAX_ATTEMPTS);
+      await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS * (SYNC_RETRY_MAX_ATTEMPTS + 5));
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1 + SYNC_RETRY_MAX_ATTEMPTS);
       expect(mockShowLoadFailed).toHaveBeenCalledTimes(2);
       wrapper.unmount();
     });
@@ -408,11 +414,11 @@ describe('useAppInitialization locale setup', () => {
       mockSupabaseUser.loggedIn = false;
       mockSupabaseUser.id = null;
       await vi.advanceTimersByTimeAsync(0);
-      await vi.advanceTimersByTimeAsync(RETRY_DELAY_MS * 5);
+      await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS * 5);
       expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
       wrapper.unmount();
     });
-    it('does not continue retrying a former account after switching users', async () => {
+    it('does not tear down or retry a former account after switching users', async () => {
       vi.useFakeTimers();
       mockInitializeTarkovSync.mockRejectedValueOnce(new Error('offline'));
       mockSupabaseUser.loggedIn = true;
@@ -420,12 +426,14 @@ describe('useAppInitialization locale setup', () => {
       const wrapper = await mountWithComposable();
       await vi.advanceTimersByTimeAsync(0);
       expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
+      mockResetTarkovSync.mockClear();
       mockSupabaseUser.id = 'user-2';
       await vi.advanceTimersByTimeAsync(0);
       expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(2);
-      await vi.advanceTimersByTimeAsync(RETRY_DELAY_MS * 5);
+      await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS * 5);
       expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(2);
       expect(mockActivityLogMigrateLegacyManualEntries).toHaveBeenCalledTimes(1);
+      expect(mockResetTarkovSync).not.toHaveBeenCalled();
       wrapper.unmount();
     });
   });
