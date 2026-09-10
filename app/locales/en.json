@@ -2241,6 +2241,9 @@
       "confirm_word": "DELETE"
     },
     "log_import": {
+      "skipped_large_logs": "Skipped oversized logs: {count}",
+      "skipped_large_logs_hint": "Logs larger than 32 MiB were skipped. Progress may be incomplete, and missing session logs can leave game modes unknown. Review the detected modes and destination before confirming.",
+      "skipped_paths": "Show skipped file paths",
       "upload_hint": "Select your Escape from Tarkov Logs folder or a selection of session folders to import quest starts, completions, and failures.",
       "deleted_logs_hint": "If old log sessions were deleted, they cannot be imported.",
       "deleted_logs_hint_tooltip": "Log import only reads quest events still present in your current Logs folder.",

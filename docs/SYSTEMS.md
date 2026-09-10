@@ -755,10 +755,15 @@ flowchart LR
    `docs/eft-log-reference/` for the audited format inventory (through `1.1.0.1.46911`) and
    [TarkovMonitor's message type contract](https://github.com/the-hideout/TarkovMonitor/blob/master/TarkovMonitor/GameWatcher.cs).
    The importer accepts legacy/rotated notification and backend filenames, and application/output
-   context, in folders, individual files, and ZIPs. Inputs are limited to 512 MiB per selected file,
-   32 MiB per log, and 256 MiB of combined log bytes across raw files and ZIPs. Readers count
-   bytes against the remaining combined budget before decoding raw files or decompressing ZIP
-   entries; preview assembly reuses those totals without re-encoding log text.
+   context, in folders, individual files, and ZIPs. ZIP inputs are limited to 512 MiB per archive.
+   Supported raw logs and ZIP entries over 32 MiB are skipped before reading or inflation;
+   skipped entries consume no content budget. One shared 256 MiB budget counts accepted log bytes
+   across all raw files and ZIPs before decoding or decompression. Exceeding either hard budget
+   aborts the selection without applying progress. Empty/irrelevant archives do not block other
+   usable inputs; a selection without usable notification logs still fails. The UI reports skipped
+   paths (including archive names) and counts on preview, success, and error, warning that progress
+   may be incomplete and mode context missing. Diagnostics survive version selection and clear on
+   reset or a new selection; stale parsing requests cannot overwrite them.
    Arena is excluded. Multiline JSON is bounded
    by log records so a truncated event cannot consume the next notification.
    Mode routing uses preceding explicit session declarations or gateway/WebSocket connections;

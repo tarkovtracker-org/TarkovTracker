@@ -158,6 +158,114 @@ describe('useEftLogsImport', () => {
     expect(lastRawRead).not.toHaveBeenCalled();
     expect(tarkovStore.switchGameMode).not.toHaveBeenCalled();
   });
+  it.each([32 * 1024 * 1024 + 1, 513 * 1024 * 1024])(
+    'skips oversized raw logs (%i bytes) without reading them',
+    async (size) => {
+      const importer = await loadComposable();
+      const oversized = new File(['unused'], 'output_000.log');
+      Object.defineProperty(oversized, 'size', { value: size });
+      Object.defineProperty(oversized, 'webkitRelativePath', {
+        value: 'Logs/session/output_000.log',
+      });
+      const read = vi.spyOn(oversized, 'text');
+      await importer.parseFiles([oversized, new File([completionLog()], 'notifications.log')]);
+      expect(importer.importState.value).toBe('preview');
+      expect(read).not.toHaveBeenCalled();
+      expect(importer.skippedLogPaths.value).toEqual(['Logs/session/output_000.log']);
+      importer.setIncludedVersions(importer.previewData.value!.availableVersions);
+      expect(importer.skippedLogPaths.value).toHaveLength(1);
+      await importer.confirmImport('pve');
+      expect(importer.importState.value).toBe('success');
+      expect(importer.skippedLogPaths.value).toHaveLength(1);
+      importer.reset();
+      expect(importer.skippedLogPaths.value).toEqual([]);
+    }
+  );
+  it('skips oversized ZIP entries before inflation and identifies their archive', async () => {
+    const importer = await loadComposable();
+    const archive = zipSync({
+      'session/output_000.log': new Uint8Array(32 * 1024 * 1024 + 1),
+      'session/notifications.log': strToU8(completionLog()),
+    });
+    await importer.parseFile(new File([new Uint8Array(archive)], 'Logs.zip'));
+    expect(importer.importState.value).toBe('preview');
+    expect(importer.skippedLogPaths.value).toEqual(['Logs.zip: session/output_000.log']);
+    expect(importer.previewData.value?.scannedEntries).toBe(2);
+    expect(importer.previewData.value?.matchedTaskIds).toEqual(['61604635c725987e815b1a46']);
+  });
+  it('reports skipped paths when no usable notifications remain and clears them on reselection', async () => {
+    const importer = await loadComposable();
+    const oversized = new File(['unused'], 'notifications.log');
+    Object.defineProperty(oversized, 'size', { value: 32 * 1024 * 1024 + 1 });
+    await importer.parseFile(oversized);
+    expect(importer.importState.value).toBe('error');
+    expect(importer.importError.value).toContain('No notification logs');
+    expect(importer.skippedLogPaths.value).toEqual(['notifications.log']);
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+    await importer.parseFile(new File([completionLog()], 'notifications.log'));
+    expect(importer.importState.value).toBe('preview');
+    expect(importer.skippedLogPaths.value).toEqual([]);
+  });
+  it('reports an archive containing only oversized notifications without applying progress', async () => {
+    const importer = await loadComposable();
+    const archive = zipSync({ 'notifications.log': new Uint8Array(32 * 1024 * 1024 + 1) });
+    await importer.parseFile(new File([new Uint8Array(archive)], 'Large.zip'));
+    expect(importer.importState.value).toBe('error');
+    expect(importer.importError.value).toContain('No notification logs');
+    expect(importer.skippedLogPaths.value).toEqual(['Large.zip: notifications.log']);
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+  });
+  it('does not let a stale read restore skipped paths after a new selection', async () => {
+    const importer = await loadComposable();
+    const oversized = new File([], 'output.log');
+    Object.defineProperty(oversized, 'size', { value: 33 * 1024 * 1024 });
+    const delayed = new File([], 'notifications.log');
+    let finishRead!: (text: string) => void;
+    vi.spyOn(delayed, 'text').mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishRead = resolve;
+        })
+    );
+    const first = importer.parseFiles([oversized, delayed]);
+    await importer.parseFile(new File([completionLog()], 'notifications.log'));
+    finishRead(completionLog());
+    await first;
+    expect(importer.importState.value).toBe('preview');
+    expect(importer.skippedLogPaths.value).toEqual([]);
+  });
+  it('allows the exact combined budget and does not charge skipped logs', async () => {
+    const importer = await loadComposable();
+    const files = Array.from({ length: 8 }, (_, index) => {
+      const file = new File([completionLog()], `${index} notifications.log`);
+      Object.defineProperty(file, 'size', { value: 32 * 1024 * 1024 });
+      return file;
+    });
+    const oversized = new File(['unused'], 'output.log');
+    Object.defineProperty(oversized, 'size', { value: 33 * 1024 * 1024 });
+    await importer.parseFiles([oversized, ...files]);
+    expect(importer.importState.value).toBe('preview');
+    expect(importer.skippedLogPaths.value).toEqual(['output.log']);
+  });
+  it('ignores irrelevant archives alongside usable raw logs', async () => {
+    const importer = await loadComposable();
+    const archive = new File(
+      [new Uint8Array(zipSync({ 'readme.txt': strToU8('ignored') }))],
+      'Other.zip'
+    );
+    await importer.parseFiles([archive, new File([completionLog()], 'notifications.log')]);
+    expect(importer.importState.value).toBe('preview');
+  });
+  it('rejects an oversized archive before reading it', async () => {
+    const importer = await loadComposable();
+    const archive = new File([], 'Logs.zip');
+    Object.defineProperty(archive, 'size', { value: 512 * 1024 * 1024 + 1 });
+    const read = vi.spyOn(archive, 'arrayBuffer');
+    await importer.parseFile(archive);
+    expect(importer.importState.value).toBe('error');
+    expect(importer.importError.value).toContain('max 512 MB');
+    expect(read).not.toHaveBeenCalled();
+  });
   it('parses a single log file and exposes preview data', async () => {
     const composable = await loadComposable();
     const file = new File([completionLog()], '2026.02.21 notifications.log', {

@@ -429,6 +429,25 @@
               </ul>
             </div>
           </template>
+          <div v-if="eftLogsSkippedPaths.length" role="status" class="space-y-2">
+            <UAlert
+              icon="i-mdi-alert"
+              color="warning"
+              variant="soft"
+              :title="
+                $t('settings.log_import.skipped_large_logs', { count: eftLogsSkippedPaths.length })
+              "
+              :description="$t('settings.log_import.skipped_large_logs_hint')"
+            />
+            <details>
+              <summary class="cursor-pointer">
+                {{ $t('settings.log_import.skipped_paths') }}
+              </summary>
+              <ul class="max-h-40 overflow-auto text-sm break-all">
+                <li v-for="(path, index) in eftLogsSkippedPaths" :key="index">{{ path }}</li>
+              </ul>
+            </details>
+          </div>
           <template v-if="eftLogsImportState === 'preview' && eftLogsPreview">
             <div class="space-y-1">
               <div class="flex items-center gap-1">
@@ -1155,6 +1174,7 @@
     importState: eftLogsImportState,
     previewData: eftLogsPreview,
     importError: eftLogsImportError,
+    skippedLogPaths: eftLogsSkippedPaths,
     parseFiles: parseEftLogsFiles,
     setIncludedVersions: setEftLogsIncludedVersions,
     confirmImport: confirmEftLogsImport,

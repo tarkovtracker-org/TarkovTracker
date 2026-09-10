@@ -37,6 +37,7 @@ export interface EftLogsImportPreviewData extends EftQuestImportPreview {
 export interface UseEftLogsImportReturn {
   isImporting: Ref<boolean>;
   importError: Ref<string | null>;
+  skippedLogPaths: Ref<string[]>;
   importState: Ref<EftLogsImportState>;
   parseFile: (file: File) => Promise<void>;
   parseFiles: (files: File[]) => Promise<void>;
@@ -114,87 +115,58 @@ function ensureImportFileSize(file: File): void {
     max_mb: 512,
   });
 }
-/** Enforces the combined raw-file and archive log-content budget without re-encoding text. */
-function ensureTotalLogBytes(bytes: number): void {
-  if (bytes <= MAX_TOTAL_LOG_CONTENT_BYTES) return;
-  throw createImportError('settings.log_import.errors.selected_logs_too_large', { max_mb: 256 });
+interface LogReadBudget {
+  bytes: number;
+  skippedPaths: string[];
 }
-/** Reads supported raw logs, preserving paths and counting source bytes before decoding. */
+/** Reserves accepted log bytes once, before reading or decompressing any content. */
+function acceptLog(
+  budget: LogReadBudget,
+  path: string,
+  bytes: number,
+  displayPath = path
+): boolean {
+  if (!isEftImportLogFileName(path)) return false;
+  if (bytes > MAX_SINGLE_LOG_SIZE_BYTES) {
+    budget.skippedPaths.push(displayPath);
+    return false;
+  }
+  if (budget.bytes + bytes > MAX_TOTAL_LOG_CONTENT_BYTES) {
+    throw createImportError('settings.log_import.errors.selected_logs_too_large', { max_mb: 256 });
+  }
+  budget.bytes += bytes;
+  return true;
+}
+/** Reads supported raw logs within the shared selection budget. */
 async function readRawImportLogFiles(
   files: File[],
-  previousLogBytes: number
-): Promise<{ files: EftLogInputFile[]; scanned: number; bytes: number }> {
-  let totalLogBytes = 0;
+  budget: LogReadBudget
+): Promise<{ files: EftLogInputFile[]; scanned: number }> {
   const extracted: EftLogInputFile[] = [];
   for (const file of files) {
-    const relativePath = file.webkitRelativePath;
-    const filePath = relativePath && relativePath.length > 0 ? relativePath : file.name;
-    if (!isEftImportLogFileName(filePath)) continue;
-    if (file.size > MAX_SINGLE_LOG_SIZE_BYTES) {
-      throw createImportError('settings.log_import.errors.log_file_too_large_path', {
-        path: filePath,
-      });
-    }
-    totalLogBytes += file.size;
-    if (totalLogBytes > MAX_TOTAL_LOG_CONTENT_BYTES) {
-      throw createImportError('settings.log_import.errors.selected_logs_too_large', {
-        max_mb: 256,
-      });
-    }
-    ensureTotalLogBytes(previousLogBytes + totalLogBytes);
-    extracted.push({
-      name: filePath,
-      text: await file.text(),
-    });
+    const path = file.webkitRelativePath || file.name;
+    if (!acceptLog(budget, path, file.size)) continue;
+    extracted.push({ name: path, text: await file.text() });
   }
-  return {
-    files: extracted,
-    scanned: files.length,
-    bytes: totalLogBytes,
-  };
+  return { files: extracted, scanned: files.length };
 }
-/** Filters supported archive entries and enforces declared log sizes before decompression. */
+/** Filters oversized entries before inflation, sharing the raw-file content budget. */
 async function readZipLogs(
   file: File,
-  previousLogBytes: number
-): Promise<{ files: EftLogInputFile[]; scanned: number; bytes: number }> {
+  budget: LogReadBudget
+): Promise<{ files: EftLogInputFile[]; scanned: number }> {
+  ensureImportFileSize(file);
   const bytes = new Uint8Array(await file.arrayBuffer());
-  let scannedEntries = 0;
-  let totalLogBytes = 0;
-  let notificationEntries = 0;
+  let scanned = 0;
   const extracted = unzipSync(bytes, {
     filter: (entry) => {
-      scannedEntries += 1;
-      if (!isEftImportLogFileName(entry.name)) {
-        return false;
-      }
-      notificationEntries += 1;
-      if (entry.originalSize > MAX_SINGLE_LOG_SIZE_BYTES) {
-        throw createImportError('settings.log_import.errors.archive_log_file_too_large', {
-          path: entry.name,
-        });
-      }
-      totalLogBytes += entry.originalSize;
-      if (totalLogBytes > MAX_TOTAL_LOG_CONTENT_BYTES) {
-        throw createImportError('settings.log_import.errors.archive_logs_too_large', {
-          max_mb: 256,
-        });
-      }
-      ensureTotalLogBytes(previousLogBytes + totalLogBytes);
-      return true;
+      scanned += 1;
+      return acceptLog(budget, entry.name, entry.originalSize, `${file.name}: ${entry.name}`);
     },
   });
-  if (notificationEntries === 0) {
-    throw createImportError('settings.log_import.errors.no_logs_in_archive');
-  }
-  const files = Object.entries(extracted).map(([name, content]) => ({
-    name,
-    text: strFromU8(content),
-  }));
   return {
-    files,
-    scanned: scannedEntries,
-    bytes: totalLogBytes,
+    files: Object.entries(extracted).map(([name, content]) => ({ name, text: strFromU8(content) })),
+    scanned,
   };
 }
 type ImportTaskIds = Record<GameMode, Set<string>>;
@@ -384,6 +356,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   const importState = ref<EftLogsImportState>('idle');
   const previewData = ref<EftLogsImportPreviewData | null>(null);
   const importError = ref<string | null>(null);
+  const skippedLogPaths = ref<string[]>([]);
   const sourceFiles = ref<EftLogInputFile[]>([]);
   const selectedVersions = ref<string[]>([]);
   const sourceFileName = ref(t('settings.log_import.selected_files'));
@@ -431,6 +404,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     selectedVersions.value = [];
     sourceFileName.value = t('settings.log_import.selected_files');
     scannedEntriesCount.value = 0;
+    skippedLogPaths.value = [];
   }
   /** Reads the selected sources, validates their combined size, and loads all catalogs before previewing. */
   async function parseFiles(files: File[]): Promise<void> {
@@ -444,35 +418,31 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     selectedVersions.value = [];
     sourceFileName.value = t('settings.log_import.selected_files');
     scannedEntriesCount.value = 0;
+    skippedLogPaths.value = [];
     if (!Array.isArray(files) || files.length === 0) {
       importState.value = 'error';
       importError.value = t('settings.log_import.errors.no_files_selected');
       return;
     }
+    const budget: LogReadBudget = { bytes: 0, skippedPaths: [] };
     try {
       let scannedEntries = 0;
       const importFiles: EftLogInputFile[] = [];
-      let totalLogBytes = 0;
       const rawLogFiles: File[] = [];
       for (const file of files) {
-        ensureImportFileSize(file);
         if (isZipFile(file)) {
-          const zipSource = await readZipLogs(file, totalLogBytes);
+          const zipSource = await readZipLogs(file, budget);
           if (!isActiveRequest()) return;
           scannedEntries += zipSource.scanned;
-          totalLogBytes += zipSource.bytes;
-          ensureTotalLogBytes(totalLogBytes);
           importFiles.push(...zipSource.files);
           continue;
         }
         rawLogFiles.push(file);
       }
       if (rawLogFiles.length > 0) {
-        const rawSource = await readRawImportLogFiles(rawLogFiles, totalLogBytes);
+        const rawSource = await readRawImportLogFiles(rawLogFiles, budget);
         if (!isActiveRequest()) return;
         scannedEntries += rawSource.scanned;
-        totalLogBytes += rawSource.bytes;
-        ensureTotalLogBytes(totalLogBytes);
         importFiles.push(...rawSource.files);
       }
       if (!isActiveRequest()) return;
@@ -541,6 +511,8 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
       importState.value = 'error';
       importError.value = normalizeErrorMessage(error, t);
       logger.error('[EftLogsImport] Parse error:', error);
+    } finally {
+      if (isActiveRequest()) skippedLogPaths.value = budget.skippedPaths;
     }
   }
   /** Routes a single selected file through the same guarded multi-source import flow. */
@@ -607,6 +579,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   }
   return {
     isImporting,
+    skippedLogPaths,
     importError,
     importState,
     parseFile,
