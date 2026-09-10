@@ -429,24 +429,28 @@
               </ul>
             </div>
           </template>
-          <div v-if="eftLogsSkippedPaths.length" aria-live="polite" class="space-y-2">
-            <UAlert
-              icon="i-mdi-alert"
-              color="warning"
-              variant="soft"
-              :title="
-                $t('settings.log_import.skipped_large_logs', { count: eftLogsSkippedPaths.length })
-              "
-              :description="$t('settings.log_import.skipped_large_logs_hint')"
-            />
-            <details>
-              <summary class="cursor-pointer">
-                {{ $t('settings.log_import.skipped_paths') }}
-              </summary>
-              <ul class="max-h-40 overflow-auto text-sm break-all">
-                <li v-for="(path, index) in eftLogsSkippedPaths" :key="index">{{ path }}</li>
-              </ul>
-            </details>
+          <div aria-live="polite" class="space-y-2">
+            <template v-if="eftLogsSkippedPaths.length">
+              <UAlert
+                icon="i-mdi-alert"
+                color="warning"
+                variant="soft"
+                :title="
+                  $t('settings.log_import.skipped_large_logs', {
+                    count: eftLogsSkippedPaths.length,
+                  })
+                "
+                :description="$t('settings.log_import.skipped_large_logs_hint')"
+              />
+              <details>
+                <summary class="cursor-pointer">
+                  {{ $t('settings.log_import.skipped_paths') }}
+                </summary>
+                <ul class="max-h-40 overflow-auto text-sm break-all">
+                  <li v-for="(path, index) in eftLogsSkippedPaths" :key="index">{{ path }}</li>
+                </ul>
+              </details>
+            </template>
           </div>
           <template v-if="eftLogsImportState === 'preview' && eftLogsPreview">
             <div class="space-y-1">

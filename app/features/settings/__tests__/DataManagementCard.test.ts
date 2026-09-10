@@ -298,6 +298,17 @@ describe('DataManagementCard', () => {
         },
       },
     });
+  it('keeps the warning live region mounted before skipped logs arrive', async () => {
+    const wrapper = createWrapper({ view: 'imports' });
+    const liveRegion = wrapper.find('[aria-live="polite"]');
+    expect(liveRegion.exists()).toBe(true);
+    expect(liveRegion.text()).toBe('');
+    eftLogsState.skippedLogPaths.value = ['output_000.log'];
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[aria-live="polite"]').element).toBe(liveRegion.element);
+    expect(liveRegion.text()).toContain('settings.log_import.skipped_large_logs');
+    wrapper.unmount();
+  });
   it('shows skipped paths and the partial-import warning on errors and clears the display', async () => {
     eftLogsState.importState.value = 'error';
     eftLogsState.importError.value = 'settings.log_import.errors.no_notification_logs_found';
