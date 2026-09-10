@@ -1,3 +1,5 @@
+## [1.77.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.2...v1.77.3) (2026-09-10)
+
 ## [1.77.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.1...v1.77.2) (2026-09-10)
 
 
