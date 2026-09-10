@@ -1677,6 +1677,15 @@ empty list, so an older payload cannot make availability read a broken collectio
 That guard covers the evaluator only: other task consumers still assume a list, and a pre-fix payload
 that dropped a gate without recording a diagnostic stays unlocked until the refresh below replaces it.
 
+An authoritative `prestigeTaskMap` entry still governs the prestige gate and takes precedence over a
+`prestige_reference` diagnostic for the same task, including an entry inferred from a New Beginning
+task id or wikiLink. The gate is enforced from the resolved level rather than reported as unreadable,
+exactly as it already is for a valid reference that no prestige row resolves. Two adjacent paths keep
+the diagnostic intact rather than losing it: a locale task patch is re-normalized after it merges,
+because locale corrections are applied last, and `useProfileTaskMetadata.mergeProfileTasks` takes only
+objective data from the objectives catalog, so a stray gate field an overlay patch merged into that
+response cannot replace the core catalog's gates.
+
 `app/stores/taskAvailability.ts` evaluates each task/user with memoization and cycle protection.
 The result carries availability and blockers for levels, loyalty, reputation, quest statuses,
 failed branches, faction, trader unlocks, prestige and unsupported data. `useProgress.taskEvaluations`
@@ -1735,11 +1744,12 @@ not import quest completions and therefore has no trader/task backfill path.
 - A declared gate that cannot be interpreted never reads as an absent gate. An absent optional gate
   leaves the task available; a malformed explicit prerequisite collection or prestige reference keeps
   it blocked behind an unknown blocker.
-- `requirementDiagnostics` is additive to the `tasks-core-json-v3` contract and deliberately does not
-  bump the precompute or browser cache versions. A payload without the field behaves exactly as it
-  did before, the evaluator independently blocks a non-list `taskRequirements` from any payload
-  vintage, and the 12-hour edge TTL plus the matching precompute cron close the remaining gap without
-  the operator-gated 48-key rollout below.
+- `requirementDiagnostics` is additive to the `tasks-core-json-v3` contract, so recording it does not
+  bump the precompute or browser cache versions and adds no new rollout requirement. The
+  `tasks-core-json-v3` operator rollout in the next invariant is unchanged and still applies on its
+  own terms. A payload without the field behaves exactly as it did before, the evaluator
+  independently blocks a non-list `taskRequirements` from any payload vintage, and the 12-hour edge
+  TTL plus the matching precompute cron bound how long a pre-diagnostic payload can survive.
 - PvP, PvE and Seasonal evaluate only their own progress and mode-specific task metadata.
 - `tasks-core-json-v3` keys invalidate incompatible edge/precompute payloads together. Browser
   IndexedDB schema 8 clears the old task contract. Missing new KV entries fall back to the normal

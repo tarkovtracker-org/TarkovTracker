@@ -516,19 +516,27 @@ function applyDeclaredGateNormalization(
   recordGateDiagnostics(task, [...retained, ...diagnosticsFor(dropped)]);
 }
 /**
- * Re-normalize a corrected upstream task. Only patched tasks are fresh `deepMerge` results, so
- * normalization is scoped to the fields a patch actually touched to avoid mutating shared input
- * and to let a correction clear a diagnostic the adapter recorded for that same field.
+ * Normalize the gates a patch touched. Only patched entities are fresh `deepMerge` results, so this
+ * both avoids mutating shared input and lets a correction clear the diagnostic for the field it
+ * rewrote while leaving an untouched field's diagnostic intact.
  */
+function applyPatchedGateNormalization<T extends { id: string }>(
+  task: T,
+  patch: Record<string, unknown> | undefined
+): T {
+  if (!patchesDeclaredGates(patch)) return task;
+  const record = task as Record<string, unknown>;
+  applyDeclaredGateNormalization(record, retainedGateDiagnostics(record, patch));
+  return task;
+}
+/** Re-normalize a corrected upstream task. */
 function applyTaskPatchNormalization<T extends { id: string }>(
   task: T,
   patch: Record<string, unknown> | undefined
 ): T {
   const record = task as Record<string, unknown>;
   if (patchesField(patch, 'traderRequirements')) applyTraderRequirementSplit(record);
-  if (patchesDeclaredGates(patch))
-    applyDeclaredGateNormalization(record, retainedGateDiagnostics(record, patch));
-  return applyTaskObjectiveAdditions(task);
+  return applyTaskObjectiveAdditions(applyPatchedGateNormalization(task, patch));
 }
 /** Overlay additions never pass through the adapter, so their raw gates are all still readable. */
 function applyTaskAdditionNormalization<T extends { id: string }>(task: T): T {
@@ -563,11 +571,20 @@ type OverlayTargetData = {
   hideoutStations?: Array<{ id: string }>;
 };
 function applyLocaleOverlays(target: OverlayTargetData, localeOverlay: LocaleOverlayData): void {
-  for (const collection of ['tasks', 'items', 'maps', 'traders'] as const) {
+  for (const collection of ['items', 'maps', 'traders'] as const) {
     const entities = target[collection];
     if (Array.isArray(entities))
       target[collection] = applyLocaleOverlay(entities, localeOverlay[collection]);
   }
+  // Locale patches land after the main task pass, so a gate one of them declares needs the same
+  // normalization. Locale corrections are meant to be locale-sensitive fields only; this keeps a
+  // stray gate from reaching consumers unchecked rather than trusting that convention.
+  const tasks = target.tasks;
+  if (!Array.isArray(tasks)) return;
+  const patches = localeOverlay.tasks;
+  target.tasks = applyLocaleOverlay(tasks, patches).map((task) =>
+    applyPatchedGateNormalization(task, patches?.[task.id])
+  );
 }
 function applyEntityCollectionOverlay(
   target: OverlayTargetData,

@@ -3,6 +3,7 @@ import {
   compareRequirement,
   getTaskTraderRequirements,
   hasMalformedTaskRequirements,
+  isDeclaredGate,
 } from '@/utils/taskRequirements';
 import {
   isTaskActive,
@@ -153,7 +154,7 @@ const terminalBlockers = (
   return undefined;
 };
 const missingPrestige = (task: Task): TaskBlocker[] =>
-  task.requiredPrestige || hasDiagnostic(task, 'prestige_reference')
+  isDeclaredGate(task.requiredPrestige) || hasDiagnostic(task, 'prestige_reference')
     ? [{ type: 'unknown', reason: 'prestige_reference' }]
     : [];
 const traderNameFor = (task: Task) =>

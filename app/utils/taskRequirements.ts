@@ -102,7 +102,7 @@ export const isDeclaredGate = (value: unknown): boolean => value !== null && val
 // json.tarkov.dev may serialize requiredPrestige as a bare id string or as an object ref.
 // Accept both shapes.
 const nonemptyString = (value: unknown): value is string =>
-  typeof value === 'string' && value.length > 0;
+  typeof value === 'string' && value.trim().length > 0;
 const declaredId = (value: unknown): string | undefined => {
   if (!isRecord(value) || value.id == null) return undefined;
   const id = String(value.id);

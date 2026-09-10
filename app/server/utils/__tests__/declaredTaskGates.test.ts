@@ -109,6 +109,7 @@ describe('malformed declared prestige references', () => {
     ['an empty object', {}],
     ['an empty string', ''],
     ['an empty id', { id: '' }],
+    ['a blank id', { id: '   ' }],
     ['a number', 3],
     ['a list', ['prestige-1']],
   ])('blocks a declared prestige reference serialized as %s', (_label, requiredPrestige) => {
@@ -116,6 +117,17 @@ describe('malformed declared prestige references', () => {
     expect(task.requirementDiagnostics).toEqual(['prestige_reference']);
     expect(evaluate(task).available).toBe(false);
   });
+  // A stale payload can still carry a declared falsy reference the adapter would now drop.
+  it.each([[''], [0], [false]])(
+    'blocks a declared falsy reference reaching the evaluator as %p',
+    (requiredPrestige) => {
+      const stale = { id: 'target', requiredPrestige } as unknown as Task;
+      expect(evaluate(stale)).toEqual({
+        available: false,
+        blockers: [{ type: 'unknown', reason: 'prestige_reference' }],
+      });
+    }
+  );
   it('keeps a genuinely absent reference unlocked', () => {
     for (const raw of [{}, { requiredPrestige: null }]) {
       const task = adaptTask(raw);
@@ -286,5 +298,34 @@ describe('overlay declared-gate normalization', () => {
     expect(task.requirementDiagnostics).toBeUndefined();
     expect(task.requiredPrestige).toEqual(requiredPrestige);
     expect(buildPrestigeTaskMap([task], []).get(task.id)).toBe(4);
+  });
+  // Locale corrections are applied last, so a gate one of them declares needs the same treatment.
+  it('diagnoses a malformed gate introduced by a locale correction', async () => {
+    stubOverlayFetch({
+      ...overlayMeta,
+      locales: { en: { tasks: { target: { taskRequirements: { task: 'missing' } } } } },
+    });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const result = await applyOverlay({
+      data: { tasks: [adaptTask({}) as unknown as { id: string }] },
+    });
+    const task = result.data!.tasks![0] as unknown as Task;
+    expect(task.taskRequirements).toBeUndefined();
+    expect(task.requirementDiagnostics).toEqual(['task_requirement']);
+    expect(evaluate(task).available).toBe(false);
+  });
+  it('leaves an ordinary locale correction free of a fabricated diagnostic', async () => {
+    stubOverlayFetch({
+      ...overlayMeta,
+      locales: { en: { tasks: { target: { name: 'Localized' } } } },
+    });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const result = await applyOverlay({
+      data: { tasks: [adaptTask({ requiredPrestige: 'prestige1' }) as unknown as { id: string }] },
+    });
+    const task = result.data!.tasks![0] as unknown as Task;
+    expect(task.name).toBe('Localized');
+    expect(task.requiredPrestige).toEqual({ id: 'prestige1' });
+    expect(task.requirementDiagnostics).toBeUndefined();
   });
 });
