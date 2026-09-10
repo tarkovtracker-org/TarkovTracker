@@ -4,6 +4,18 @@ import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { classifyPaths, fullJobs } from '../validation-plan.mjs';
 const read = (path) => readFileSync(path, 'utf8');
+// Slice a workflow into the text of one job or one of its steps so assertions
+// cannot be satisfied by an unrelated job or by a key on a neighbouring step.
+// Kept to string slicing because these tests run on Node built-ins alone.
+const blockAfter = (text, header, nextPattern) => {
+  const start = text.indexOf(header);
+  assert.notEqual(start, -1, `missing ${header.trim()}`);
+  const rest = text.slice(start + header.length);
+  const next = rest.search(nextPattern);
+  return next === -1 ? rest : rest.slice(0, next);
+};
+const jobBlock = (workflow, job) => blockAfter(workflow, `\n  ${job}:\n`, /\n {2}\S/);
+const workflowStep = (job, name) => blockAfter(job, `      - name: ${name}\n`, /\n {6}- /);
 test('Dependabot expected check names remain supplied by repository workflows', () => {
   const gate = read('.github/workflows/dependabot-auto-merge.yml');
   const expected = [...gate.match(/expected_checks=\(([\s\S]*?)\)/)[1].matchAll(/"([^"]+)"/g)].map(
@@ -31,6 +43,17 @@ test('shadow rollout and fork restrictions retain existing CI coverage and Deno 
   assert.match(ci, /vitest run --coverage --shard=/);
   assert.match(ci, /deno test supabase\/functions\/_shared\/\*\.deno\.test\.ts/);
   assert.match(ci, /github.event.pull_request.head.repo.fork != true/);
+  // Coverage and bundle uploads need the org token, so they stay fork-gated.
+  // The production build needs no secrets and must run on fork pull requests.
+  // Scope both to the owning job and step: YAML step keys are unordered, so a
+  // whole-file regex would still pass if `if:` were reintroduced after `run:`.
+  const buildStep = workflowStep(jobBlock(ci, 'validate'), 'Build');
+  assert.match(buildStep, /run: pnpm run build/);
+  assert.doesNotMatch(buildStep, /^[ \t]+if:/m);
+  assert.match(
+    workflowStep(jobBlock(ci, 'test'), 'Upload coverage to Codecov'),
+    /if:[^\n]*fork != true/
+  );
   assert.match(ci, /ci-result:[\s\S]*if: always\(\)/);
   for (const name of ['ci', 'pr-checks', 'security'])
     assert.ok(!read(`.github/workflows/${name}.yml`).includes('paths-ignore:'));
