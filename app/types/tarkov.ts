@@ -108,6 +108,11 @@ export interface TraderRequirement {
   requirementType?: 'level' | 'reputation';
   compareMethod?: RequirementComparison;
 }
+/**
+ * A gate the source declared but that could not be interpreted. Absence of an optional gate is
+ * never a diagnostic, so these values keep a malformed explicit gate distinguishable from no gate.
+ */
+export type TaskRequirementDiagnostic = 'prestige_reference' | 'task_requirement';
 export interface TaskTraderLevelRequirement {
   id: string;
   trader: { id: string; name: string };
@@ -250,7 +255,16 @@ export interface Task {
   taskRequirements?: TaskRequirement[];
   storyUnlocks?: Array<{ id: string; name: string }>;
   minPlayerLevel?: number;
+  /**
+   * Adapted upstream references are always `{ id }`. Overlay-injected tasks may instead carry the
+   * declared reference verbatim (`{ name, prestigeLevel }`), so readers use `?.id` or truthiness.
+   */
   requiredPrestige?: { id: string };
+  /**
+   * Declared gates dropped because they could not be interpreted. The evaluator turns each one
+   * into an unknown blocker so a malformed gate cannot pass as a genuinely absent optional gate.
+   */
+  requirementDiagnostics?: TaskRequirementDiagnostic[];
   failedRequirements?: TaskRequirement[];
   normalizedTraderRequirements?: NormalizedTraderRequirement[];
   traderLevelRequirements?: TaskTraderLevelRequirement[];

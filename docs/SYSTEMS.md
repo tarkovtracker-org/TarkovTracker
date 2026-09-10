@@ -377,6 +377,16 @@ sequenceDiagram
   `traderRequirements` (reputation-only) for compatibility, and regenerates the canonical
   `normalizedTraderRequirements` consumed by availability, badges and progress implications
   (section 15). A patch's `traderRequirements` replaces the whole requirement set.
+- Overlay corrections and `tasksAdd` entries merge into already-adapted tasks, so `applyOverlay`
+  re-normalizes the declared prerequisite and prestige gates it can reach. A corrected task is
+  re-normalized only when the patch touches `taskRequirements` or `requiredPrestige`, and a
+  recomputation clears only the diagnostic for the field that patch rewrote: the adapter already
+  dropped the other malformed value, so its diagnostic is retained rather than recomputed away. Every
+  injected task is re-normalized because additions never pass through the adapter. `taskRequirements`
+  stays a list and a resolvable `requiredPrestige` becomes a normalized `{ id }` reference. The
+  overlay keeps an id-less `{ name, prestigeLevel }` reference verbatim, so it is not a loss and gets
+  no diagnostic; only a declared gate the normalization had to drop becomes a
+  `requirementDiagnostics` entry (section 15).
 - On fetch failure, serves the last good overlay (stale) rather than failing the request.
 - Overlay supports mode-specific corrections under `modes[gameMode]` plus global corrections.
 - Per-locale corrections under `locales[locale]` patch `tasks`, `items`, `traders` and `maps`
@@ -1650,6 +1660,23 @@ become diagnostic unknown requirements, not reputation guesses. A missing compar
 legacy requirement defaults to `>=`. Declared `>=`, `>`, `<=`, `<`, `=`, `==` and `!=` are evaluated
 literally. Neither trader identity nor the sign of a value selects its meaning.
 
+Declared prerequisite collections and prestige references follow the same rule. `null` and
+`undefined` mean the optional gate is absent; every other value is a gate the source declared, so it
+either survives normalization or is recorded in `Task.requirementDiagnostics` as `task_requirement`
+or `prestige_reference`. `tarkov-json.ts` models `requiredPrestige` as an id reference only, so it
+drops anything else and records the diagnostic; `overlay.ts` reports exactly the gates its own
+normalization dropped; `taskAvailability.ts` turns each diagnostic into an unknown blocker. Supported
+source shapes are unaffected: a bare prerequisite task id, a bare prestige id string, and a prestige
+object reference all still resolve, an absent or empty collection still leaves the task available,
+and the overlay keeps the id-less `{ name, prestigeLevel }` gate of an injected New Beginning task
+verbatim (its level comes from `buildPrestigeTaskMap`'s task id/wikiLink inference, not from the
+reference). A satisfied story route continues to unlock a task whose quest group is uninterpretable,
+because that route is an alternative to the group rather than a bypass of an independent gate. The
+evaluator additionally treats a non-list `taskRequirements` as the same diagnostic rather than as an
+empty list, so an older payload cannot make availability read a broken collection as no collection.
+That guard covers the evaluator only: other task consumers still assume a list, and a pre-fix payload
+that dropped a gate without recording a diagnostic stays unlocked until the refresh below replaces it.
+
 `app/stores/taskAvailability.ts` evaluates each task/user with memoization and cycle protection.
 The result carries availability and blockers for levels, loyalty, reputation, quest statuses,
 failed branches, faction, trader unlocks, prestige and unsupported data. `useProgress.taskEvaluations`
@@ -1705,6 +1732,14 @@ not import quest completions and therefore has no trader/task backfill path.
 - Canonical requirements, blockers, status comparisons and story alternatives are shared by UI and
   recommendations; no new dependency on the removed upstream task `alternatives` is introduced.
 - Known trader gates may be disabled by preference; unknown data never silently unlocks a task.
+- A declared gate that cannot be interpreted never reads as an absent gate. An absent optional gate
+  leaves the task available; a malformed explicit prerequisite collection or prestige reference keeps
+  it blocked behind an unknown blocker.
+- `requirementDiagnostics` is additive to the `tasks-core-json-v3` contract and deliberately does not
+  bump the precompute or browser cache versions. A payload without the field behaves exactly as it
+  did before, the evaluator independently blocks a non-list `taskRequirements` from any payload
+  vintage, and the 12-hour edge TTL plus the matching precompute cron close the remaining gap without
+  the operator-gated 48-key rollout below.
 - PvP, PvE and Seasonal evaluate only their own progress and mode-specific task metadata.
 - `tasks-core-json-v3` keys invalidate incompatible edge/precompute payloads together. Browser
   IndexedDB schema 8 clears the old task contract. Missing new KV entries fall back to the normal

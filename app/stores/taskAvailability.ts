@@ -1,5 +1,9 @@
 import { resolveTraderUnlockTaskIds, type GameMode } from '@/utils/constants';
-import { compareRequirement, getTaskTraderRequirements } from '@/utils/taskRequirements';
+import {
+  compareRequirement,
+  getTaskTraderRequirements,
+  hasMalformedTaskRequirements,
+} from '@/utils/taskRequirements';
 import {
   isTaskActive,
   isTaskComplete,
@@ -7,7 +11,12 @@ import {
   type RawTaskCompletion,
 } from '@/utils/taskStatus';
 import type { UserProgressData } from '@/types/progress';
-import type { RequirementComparison, Task, TaskRequirement } from '@/types/tarkov';
+import type {
+  RequirementComparison,
+  Task,
+  TaskRequirement,
+  TaskRequirementDiagnostic,
+} from '@/types/tarkov';
 export type TaskAvailabilityTeamData = {
   completions: Record<string, RawTaskCompletion>;
   faction: string;
@@ -66,6 +75,17 @@ const isValidRequirement = (
 ): requirement is TaskRequirement =>
   Boolean(requirement?.task?.id) &&
   normalizeStatuses(requirement!).every((status) => KNOWN_STATUSES.has(status));
+const hasDiagnostic = (task: Task, diagnostic: TaskRequirementDiagnostic): boolean =>
+  (task.requirementDiagnostics ?? []).includes(diagnostic);
+/**
+ * A declared prerequisite collection the server had to drop, or one that survived in a stale
+ * payload as a non-list, cannot be read as "no prerequisites": the task stays blocked instead.
+ */
+const interpretableRequirements = (task: Task): boolean => {
+  if (hasMalformedTaskRequirements(task.taskRequirements)) return false;
+  if (hasDiagnostic(task, 'task_requirement')) return false;
+  return (task.taskRequirements ?? []).every(isValidRequirement);
+};
 const completedObjective = (
   objectives: NonNullable<UserProgressData['storyChapters']>[string]['objectives'] = {}
 ) => Object.values(objectives).some((objective) => objective.complete === true);
@@ -133,7 +153,9 @@ const terminalBlockers = (
   return undefined;
 };
 const missingPrestige = (task: Task): TaskBlocker[] =>
-  task.requiredPrestige ? [{ type: 'unknown', reason: 'prestige_reference' }] : [];
+  task.requiredPrestige || hasDiagnostic(task, 'prestige_reference')
+    ? [{ type: 'unknown', reason: 'prestige_reference' }]
+    : [];
 const traderNameFor = (task: Task) =>
   task.trader?.normalizedName || task.trader?.name?.toLowerCase();
 const traderDisplayName = (task: Task, fallback: string) => task.trader?.name || fallback;
@@ -196,13 +218,11 @@ const createTeamEvaluator = (
       return knownTraderBlockers(requirement);
     });
   const prerequisiteBlockers = (task: Task): TaskBlocker[] => {
-    const requirements = task.taskRequirements ?? [];
     const chapterIds = storyChapterIds(task);
     // A wired story route can satisfy the quest group, never trader/faction/prestige gates.
     if (chapterIds.some((id) => hasStoryUnlockProgress(id, data))) return [];
-    const malformed = requirements.filter((requirement) => !isValidRequirement(requirement));
-    if (malformed.length) return [{ type: 'unknown', reason: 'task_requirement' }];
-    return unmetPrerequisiteBlockers(requirements, chapterIds);
+    if (!interpretableRequirements(task)) return [{ type: 'unknown', reason: 'task_requirement' }];
+    return unmetPrerequisiteBlockers(task.taskRequirements ?? [], chapterIds);
   };
   const unmetPrerequisiteBlockers = (
     requirements: TaskRequirement[],

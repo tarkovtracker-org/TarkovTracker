@@ -1,7 +1,10 @@
 import {
+  hasDeclaredPrestigeLevel,
+  isDeclaredGate,
   isValidTraderLevel,
   normalizeTraderReference,
   normalizeTraderRequirements,
+  resolveRequiredPrestige,
 } from '@/utils/taskRequirements';
 /**
  * Overlay utility for applying tarkov-data-overlay corrections to tarkov.dev API data.
@@ -24,7 +27,7 @@ import { mergeOverlayRecords, scopedOverlay } from './overlayProjectors';
 import { validateOverlayData, unknownOverlaySections } from './overlayValidation';
 import { TARKOVTRACKER_USER_AGENT } from './userAgent';
 import type { OverlayData, OverlayLocaleData as LocaleOverlayData } from './overlayTypes';
-import type { HideoutStation, TarkovItem } from '@/types/tarkov';
+import type { HideoutStation, TarkovItem, Task, TaskRequirementDiagnostic } from '@/types/tarkov';
 const logger = createLogger('Overlay');
 type OverlayStatus = 'fresh' | 'cached' | 'stale' | 'missing';
 export interface OverlayMeta {
@@ -447,6 +450,93 @@ function applyTraderRequirementSplit(task: Record<string, unknown>): void {
     traderLevelRequirements.length > 0 ? traderLevelRequirements : undefined;
   task.traderRequirements = traderRequirements.length > 0 ? traderRequirements : undefined;
 }
+const DECLARED_GATE_DIAGNOSTICS = {
+  taskRequirements: 'task_requirement',
+  requiredPrestige: 'prestige_reference',
+} as const satisfies Partial<Record<keyof Task, TaskRequirementDiagnostic>>;
+type DeclaredGateField = keyof typeof DECLARED_GATE_DIAGNOSTICS;
+const DECLARED_GATE_FIELDS = Object.keys(DECLARED_GATE_DIAGNOSTICS) as DeclaredGateField[];
+const patchesField = (patch: Record<string, unknown> | undefined, field: string): boolean =>
+  patch != null && field in patch;
+const patchesDeclaredGates = (patch: Record<string, unknown> | undefined): boolean =>
+  DECLARED_GATE_FIELDS.some((field) => patchesField(patch, field));
+const declaredGateFields = (task: Record<string, unknown>): DeclaredGateField[] =>
+  DECLARED_GATE_FIELDS.filter((field) => isDeclaredGate(task[field]));
+const diagnosticsFor = (fields: DeclaredGateField[]): TaskRequirementDiagnostic[] =>
+  fields.map((field) => DECLARED_GATE_DIAGNOSTICS[field]);
+const normalizeDeclaredRequirements = (task: Record<string, unknown>): void => {
+  if (Array.isArray(task.taskRequirements)) return;
+  delete task.taskRequirements;
+};
+const normalizeDeclaredPrestige = (task: Record<string, unknown>): void => {
+  const resolved = resolveRequiredPrestige(task.requiredPrestige);
+  if (resolved) task.requiredPrestige = resolved;
+  else if (!hasDeclaredPrestigeLevel(task.requiredPrestige)) delete task.requiredPrestige;
+};
+const orderedGateDiagnostics = (
+  diagnostics: TaskRequirementDiagnostic[]
+): TaskRequirementDiagnostic[] =>
+  diagnosticsFor(DECLARED_GATE_FIELDS).filter((diagnostic) => diagnostics.includes(diagnostic));
+const recordGateDiagnostics = (
+  task: Record<string, unknown>,
+  diagnostics: TaskRequirementDiagnostic[]
+): void => {
+  if (diagnostics.length) task.requirementDiagnostics = orderedGateDiagnostics(diagnostics);
+  else delete task.requirementDiagnostics;
+};
+const recordedGateDiagnostics = (task: Record<string, unknown>): TaskRequirementDiagnostic[] =>
+  Array.isArray(task.requirementDiagnostics)
+    ? (task.requirementDiagnostics as TaskRequirementDiagnostic[])
+    : [];
+/**
+ * A patch that leaves a gate field alone must not clear the diagnostic the adapter recorded for it:
+ * the adapter already dropped the value a recomputation would need in order to re-detect it.
+ */
+const retainedGateDiagnostics = (
+  task: Record<string, unknown>,
+  patch: Record<string, unknown> | undefined
+): TaskRequirementDiagnostic[] => {
+  const untouched = DECLARED_GATE_FIELDS.filter((field) => !patchesField(patch, field));
+  const kept = new Set(diagnosticsFor(untouched));
+  return recordedGateDiagnostics(task).filter((diagnostic) => kept.has(diagnostic));
+};
+/**
+ * The overlay merges into already-adapted tasks, so a correction or an injected task can reintroduce
+ * a raw gate the adapter would have normalized. Recomputing here keeps `taskRequirements` a list and
+ * resolves `requiredPrestige`, then reports exactly the declared gates normalization had to drop.
+ */
+function applyDeclaredGateNormalization(
+  task: Record<string, unknown>,
+  retained: TaskRequirementDiagnostic[]
+): void {
+  const declared = declaredGateFields(task);
+  normalizeDeclaredRequirements(task);
+  normalizeDeclaredPrestige(task);
+  const dropped = declared.filter((field) => task[field] === undefined);
+  recordGateDiagnostics(task, [...retained, ...diagnosticsFor(dropped)]);
+}
+/**
+ * Re-normalize a corrected upstream task. Only patched tasks are fresh `deepMerge` results, so
+ * normalization is scoped to the fields a patch actually touched to avoid mutating shared input
+ * and to let a correction clear a diagnostic the adapter recorded for that same field.
+ */
+function applyTaskPatchNormalization<T extends { id: string }>(
+  task: T,
+  patch: Record<string, unknown> | undefined
+): T {
+  const record = task as Record<string, unknown>;
+  if (patchesField(patch, 'traderRequirements')) applyTraderRequirementSplit(record);
+  if (patchesDeclaredGates(patch))
+    applyDeclaredGateNormalization(record, retainedGateDiagnostics(record, patch));
+  return applyTaskObjectiveAdditions(task);
+}
+/** Overlay additions never pass through the adapter, so their raw gates are all still readable. */
+function applyTaskAdditionNormalization<T extends { id: string }>(task: T): T {
+  const record = task as Record<string, unknown>;
+  if ('traderRequirements' in record) applyTraderRequirementSplit(record);
+  applyDeclaredGateNormalization(record, []);
+  return applyTaskObjectiveAdditions(task);
+}
 function mergeModeCorrections(
   shared: Record<string, Record<string, unknown>> | undefined,
   modeSpecific: Record<string, Record<string, unknown>> | undefined
@@ -537,13 +627,7 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
     const correctedTasks = applyEntityOverlay(
       result.data.tasks as Array<{ id: string }>,
       mergedTasks
-    ).map((task) => {
-      const patch = mergedTasks?.[task.id];
-      if (patch && 'traderRequirements' in patch) {
-        applyTraderRequirementSplit(task as Record<string, unknown>);
-      }
-      return applyTaskObjectiveAdditions(task);
-    });
+    ).map((task) => applyTaskPatchNormalization(task, mergedTasks?.[task.id]));
     const normalizedAdditions = normalizeTaskAdditions(mergedTasksAdd);
     logger.info(
       `Overlay tasksAdd: ${normalizedAdditions.length} additions after filtering disabled`
@@ -551,12 +635,7 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
     const addedTasks = applyEntityOverlay(normalizedAdditions, mergedTasks, {
       logLabel: 'tasksAdd',
       logEvenWhenZero: false,
-    }).map((task) => {
-      if ('traderRequirements' in task) {
-        applyTraderRequirementSplit(task as Record<string, unknown>);
-      }
-      return applyTaskObjectiveAdditions(task);
-    });
+    }).map(applyTaskAdditionNormalization);
     const existingIds = new Set(correctedTasks.map((task) => task.id));
     const dedupedAdditions = addedTasks.filter((task) => !existingIds.has(task.id));
     logger.info(`Overlay tasksAdd: ${dedupedAdditions.length} additions after dedupe`);

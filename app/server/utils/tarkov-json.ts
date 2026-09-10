@@ -4,7 +4,12 @@ import { useRuntimeConfig } from '#imports';
 import { createLogger } from '@/server/utils/logger';
 import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
 import { buildSkillImageUrl } from '@/utils/tarkovUrls';
-import { isValidTraderLevel, normalizeTraderRequirements } from '@/utils/taskRequirements';
+import {
+  isValidTraderLevel,
+  normalizeTraderRequirements,
+  resolveRequiredPrestige,
+  taskRequirementDiagnostics,
+} from '@/utils/taskRequirements';
 import type { ValidGameMode } from '@/server/utils/tarkov-cache-config';
 import type {
   FinishRewards,
@@ -809,13 +814,6 @@ function adaptTraderRequirements(
     traderRequirements: onlyIfPopulated(traderRequirements),
   };
 }
-// json.tarkov.dev may serialize requiredPrestige as a bare id string or as an object ref.
-// Accept both shapes.
-function adaptRequiredPrestigeRef(value: unknown): { id: string } | undefined {
-  if (typeof value === 'string' && value) return { id: value };
-  if (isRecord(value) && value.id != null) return { id: String(value.id) };
-  return undefined;
-}
 function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
   return compactObject({
     id: stringId(raw) ?? '',
@@ -828,10 +826,12 @@ function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
     experience: typeof raw.experience === 'number' ? raw.experience : undefined,
     wikiLink: typeof raw.wikiLink === 'string' ? raw.wikiLink : undefined,
     minPlayerLevel: typeof raw.minPlayerLevel === 'number' ? raw.minPlayerLevel : undefined,
-    requiredPrestige: adaptRequiredPrestigeRef(raw.requiredPrestige),
+    requiredPrestige: resolveRequiredPrestige(raw.requiredPrestige),
     taskRequirements: Array.isArray(raw.taskRequirements)
       ? raw.taskRequirements.map((requirement) => adaptTaskRequirement(requirement, context))
       : undefined,
+    // Dropping a declared gate above must stay observable, or a malformed gate reads as no gate.
+    requirementDiagnostics: onlyIfPopulated(taskRequirementDiagnostics(raw)),
     objectives: [],
     failConditions: [],
     ...adaptTraderRequirements(raw.traderRequirements, context),
