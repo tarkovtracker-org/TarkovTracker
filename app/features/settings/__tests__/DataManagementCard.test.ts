@@ -307,7 +307,7 @@ describe('DataManagementCard', () => {
     });
   it('keeps a live region mounted and shows cancellable folder-read progress', async () => {
     const wrapper = createWrapper({ view: 'imports' });
-    const liveRegion = wrapper.find('[aria-live="polite"]');
+    const liveRegion = wrapper.find('output');
     expect(liveRegion.exists()).toBe(true);
     eftLogsState.isParsing.value = true;
     eftLogsState.parseProgress.value = { bytesRead: 0, totalBytes: 0 };
@@ -315,7 +315,7 @@ describe('DataManagementCard', () => {
     expect(wrapper.find('progress').attributes()).toMatchObject({ value: '0', max: '1' });
     eftLogsState.parseProgress.value = { bytesRead: 50, totalBytes: 100 };
     await wrapper.vm.$nextTick();
-    expect(wrapper.find('[aria-live="polite"]').element).toBe(liveRegion.element);
+    expect(wrapper.find('output').element).toBe(liveRegion.element);
     expect(liveRegion.text()).toContain('settings.log_import.reading_logs');
     expect(wrapper.find('progress').attributes()).toMatchObject({ value: '50', max: '100' });
     expect(
@@ -330,8 +330,8 @@ describe('DataManagementCard', () => {
     eftLogsState.isParsing.value = true;
     eftLogsState.parseProgress.value = { bytesRead: 25, totalBytes: 100 };
     await wrapper.vm.$nextTick();
-    const liveRegion = wrapper.find('[role="status"][aria-live="polite"]');
-    expect(liveRegion.attributes('aria-atomic')).toBe('true');
+    // <output> is an implicit polite status region, so no explicit role/aria-live is needed.
+    const liveRegion = wrapper.find('output');
     expect(liveRegion.text()).toContain('settings.log_import.reading_logs');
     // Progress updates and the Cancel control must not be re-announced on every slice.
     expect(liveRegion.find('progress').exists()).toBe(false);

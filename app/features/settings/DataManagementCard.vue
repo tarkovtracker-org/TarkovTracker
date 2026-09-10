@@ -432,11 +432,11 @@
             </div>
           </template>
           <div class="space-y-2">
-            <div role="status" aria-live="polite" aria-atomic="true">
-              <p v-if="eftLogsIsParsing" class="text-sm">
+            <output class="block">
+              <span v-if="eftLogsIsParsing" class="text-sm">
                 {{ $t('settings.log_import.reading_logs') }}
-              </p>
-            </div>
+              </span>
+            </output>
             <template v-if="eftLogsIsParsing">
               <progress
                 :value="eftLogsParseProgress.bytesRead"
