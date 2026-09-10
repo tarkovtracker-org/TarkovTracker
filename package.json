@@ -101,6 +101,7 @@
     "lint:fix": "NODE_ENV=development nuxt prepare && eslint app shared --fix && pnpm run format:blank-lines",
     "lint:unused": "knip --reporter compact",
     "postinstall": "nuxt prepare",
+    "verify:overlay": "tsx --tsconfig scripts/precompute/tsconfig.json scripts/precompute/check-overlay.ts",
     "precompute:tarkov": "tsx --tsconfig scripts/precompute/tsconfig.json scripts/precompute/run.ts",
     "prod-db:test": "vitest run scripts/prod-db.test.mjs",
     "prepare": "husky || true",

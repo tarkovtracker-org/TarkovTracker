@@ -1,10 +1,12 @@
+import { buildTaskImpactScores } from '@/utils/taskImpact';
+import { getTaskTraderRequirements } from '@/utils/taskRequirements';
+import type { TaskAvailabilityResult, TaskEvaluationMap } from '@/stores/taskAvailability';
 /**
  * TaskSorter - Utility for sorting tasks by various criteria
  *
  * Extracts sorting logic from useTaskFiltering.ts for better testability
  * and reusability across the application.
  */
-import { buildTaskImpactScores } from '@/utils/taskImpact';
 import type { Task } from '@/types/tarkov';
 import type { TaskSortDirection, TaskSortMode } from '@/types/taskSort';
 /**
@@ -12,6 +14,8 @@ import type { TaskSortDirection, TaskSortMode } from '@/types/taskSort';
  * Used to calculate how many incomplete successor tasks each task has.
  */
 export interface ImpactScoreData {
+  impactTeamIds?: string[];
+  impactEligibleTaskIds?: Set<string>;
   /** Task completion status keyed by taskId -> teamId -> boolean */
   tasksCompletions: Record<string, Record<string, boolean>>;
   /** Task failure status keyed by taskId -> teamId -> boolean */
@@ -58,8 +62,8 @@ function getTeamIds(data: { visibleTeamStores?: Record<string, unknown> }): stri
  * Derives teamIds from data.visibleTeamStores for consistency with buildTeammateAvailableCounts.
  */
 export function buildImpactScores(tasks: Task[], data: ImpactScoreData): Map<string, number> {
-  const teamIds = getTeamIds(data);
-  return buildTaskImpactScores(tasks, teamIds, data);
+  const teamIds = data.impactTeamIds ?? getTeamIds(data);
+  return buildTaskImpactScores(tasks, teamIds, data, data.impactEligibleTaskIds);
 }
 /**
  * Build teammate availability counts for tasks
@@ -137,7 +141,7 @@ export function sortTasksByImpact(
     }
     const nameA = a.name?.toLowerCase() ?? '';
     const nameB = b.name?.toLowerCase() ?? '';
-    return compareStrings(nameA, nameB, factor);
+    return compareStrings(nameA, nameB, factor) || compareStrings(a.id, b.id, factor);
   });
 }
 /**
@@ -149,7 +153,7 @@ export function sortTasksByName(tasks: Task[], direction: TaskSortDirection): Ta
     const nameA = a.name?.toLowerCase() ?? '';
     const nameB = b.name?.toLowerCase() ?? '';
     if (nameA !== nameB) {
-      return compareStrings(nameA, nameB, factor);
+      return compareStrings(nameA, nameB, factor) || compareStrings(a.id, b.id, factor);
     }
     return compareStrings(a.id, b.id, factor);
   });
@@ -167,7 +171,7 @@ export function sortTasksByLevel(tasks: Task[], direction: TaskSortDirection): T
     }
     const nameA = a.name?.toLowerCase() ?? '';
     const nameB = b.name?.toLowerCase() ?? '';
-    return compareStrings(nameA, nameB, factor);
+    return compareStrings(nameA, nameB, factor) || compareStrings(a.id, b.id, factor);
   });
 }
 /**
@@ -177,7 +181,9 @@ export function sortTasksByTrader(
   tasks: Task[],
   traderOrderMap: Map<string, number>,
   defaultOrder: number,
-  direction: TaskSortDirection
+  direction: TaskSortDirection,
+  evaluations?: TaskEvaluationMap,
+  teamIds: string[] = ['self']
 ): Task[] {
   const factor = getDirectionFactor(direction);
   return [...tasks].sort((a, b) => {
@@ -186,14 +192,16 @@ export function sortTasksByTrader(
     if (traderA !== traderB) {
       return compareNumbers(traderA, traderB, factor);
     }
-    const levelA = a.minPlayerLevel ?? 0;
-    const levelB = b.minPlayerLevel ?? 0;
+    const levelA = getTaskTraderLoyaltyLevel(a);
+    const levelB = getTaskTraderLoyaltyLevel(b);
     if (levelA !== levelB) {
       return compareNumbers(levelA, levelB, factor);
     }
+    const statusOrder = compareProgression(a.id, b.id, evaluations, teamIds, factor);
+    if (statusOrder) return statusOrder;
     const nameA = a.name?.toLowerCase() ?? '';
     const nameB = b.name?.toLowerCase() ?? '';
-    return compareStrings(nameA, nameB, factor);
+    return compareStrings(nameA, nameB, factor) || compareStrings(a.id, b.id, factor);
   });
 }
 /**
@@ -214,7 +222,7 @@ export function sortTasksByTeammatesAvailable(
     }
     const nameA = a.name?.toLowerCase() ?? '';
     const nameB = b.name?.toLowerCase() ?? '';
-    return compareStrings(nameA, nameB, factor);
+    return compareStrings(nameA, nameB, factor) || compareStrings(a.id, b.id, factor);
   });
 }
 /**
@@ -230,13 +238,15 @@ export function sortTasksByXp(tasks: Task[], direction: TaskSortDirection): Task
     }
     const nameA = a.name?.toLowerCase() ?? '';
     const nameB = b.name?.toLowerCase() ?? '';
-    return compareStrings(nameA, nameB, factor);
+    return compareStrings(nameA, nameB, factor) || compareStrings(a.id, b.id, factor);
   });
 }
 /**
  * Configuration for the sortTasks function
  */
 export interface SortTasksConfig {
+  evaluations?: TaskEvaluationMap;
+  teamIds?: string[];
   progressData: ImpactScoreData & TeammateAvailabilityData;
   traderOrderMap: Map<string, number>;
   defaultTraderOrder: number;
@@ -259,10 +269,19 @@ export function sortTasks(
       return sortTasksByName(tasks, direction);
     case 'level':
       return sortTasksByLevel(tasks, direction);
+    case 'progression':
+      return sortTasksByProgression(tasks, direction, config.evaluations, config.teamIds);
     case 'impact':
       return sortTasksByImpact(tasks, config.progressData, direction);
     case 'trader':
-      return sortTasksByTrader(tasks, config.traderOrderMap, config.defaultTraderOrder, direction);
+      return sortTasksByTrader(
+        tasks,
+        config.traderOrderMap,
+        config.defaultTraderOrder,
+        direction,
+        config.evaluations,
+        config.teamIds
+      );
     case 'teammates':
       return sortTasksByTeammatesAvailable(tasks, config.progressData, direction);
     case 'xp':
@@ -272,3 +291,92 @@ export function sortTasks(
       return direction === 'desc' ? [...tasks].reverse() : [...tasks];
   }
 }
+/** Only this task's trader LL participates in trader grouping; LL is not a universal difficulty. */
+const getTaskTraderLoyaltyLevel = (task: Task): number =>
+  Math.max(
+    0,
+    ...getTaskTraderRequirements(task).flatMap((req) => {
+      if (req.requirementType !== 'level' || req.trader.id !== task.trader?.id) return [];
+      if (req.compareMethod === '>') return [req.value + 1];
+      return ['>=', '=', '=='].includes(req.compareMethod) ? [req.value] : [];
+    })
+  );
+const finalRanks = new Map<string, number>([
+  ['complete', 4],
+  ['failed', 5],
+  ['failed_branch', 5],
+  ['faction', 5],
+  ['disabled', 5],
+  ['unknown', 6],
+  ['cycle', 6],
+]);
+const distanceTarget = (blocker: TaskAvailabilityResult['blockers'][number]) => {
+  const required = blocker.required ?? 0;
+  return ['trader_level', 'player_level'].includes(blocker.type) && blocker.compareMethod === '>'
+    ? required + 1
+    : required;
+};
+const blockerDistance = (blocker: TaskAvailabilityResult['blockers'][number]) => {
+  const target = distanceTarget(blocker);
+  return (
+    Math.max(Number.EPSILON, Math.abs(target - (blocker.current ?? 0))) /
+    Math.max(1, Math.abs(target))
+  );
+};
+const singleBlockerRank = (
+  blocker: TaskAvailabilityResult['blockers'][number]
+): [number, number] => {
+  if (['prerequisite', 'trader_unlock'].includes(blocker.type))
+    return [2, blocker.requirements?.length ?? 1];
+  return [1, blockerDistance(blocker)];
+};
+const blockedRank = (blockers: TaskAvailabilityResult['blockers']): [number, number] => {
+  const finalRank = blockers
+    .map((blocker) => finalRanks.get(blocker.type))
+    .find((rank) => rank !== undefined);
+  if (finalRank !== undefined) return [finalRank, 0];
+  if (blockers.length > 1) return [3, blockers.length];
+  return blockers[0] ? singleBlockerRank(blockers[0]) : [6, 0];
+};
+const progressionRank = (evaluation?: TaskAvailabilityResult): [number, number] => {
+  if (!evaluation) return [6, 0];
+  return evaluation.available ? [0, 0] : blockedRank(evaluation.blockers);
+};
+const compareProgressionRanks = (a: [number, number], b: [number, number]) =>
+  a[0] - b[0] || a[1] - b[1];
+const bestProgressionRank = (
+  taskId: string,
+  evaluations: TaskEvaluationMap | undefined,
+  teamIds: string[]
+): [number, number] => {
+  const ranks = teamIds.map((id) => progressionRank(evaluations?.[taskId]?.[id]));
+  return ranks.reduce<[number, number]>(
+    (best, rank) => (compareProgressionRanks(rank, best) < 0 ? rank : best),
+    [6, 0]
+  );
+};
+const compareProgression = (
+  a: string,
+  b: string,
+  evaluations: TaskEvaluationMap | undefined,
+  teamIds: string[],
+  factor: number
+): number => {
+  const left = bestProgressionRank(a, evaluations, teamIds);
+  const right = bestProgressionRank(b, evaluations, teamIds);
+  return compareProgressionRanks(left, right) * factor;
+};
+export const sortTasksByProgression = (
+  tasks: Task[],
+  direction: TaskSortDirection,
+  evaluations?: TaskEvaluationMap,
+  teamIds: string[] = ['self']
+): Task[] => {
+  const factor = getDirectionFactor(direction);
+  return [...tasks].sort(
+    (a, b) =>
+      compareProgression(a.id, b.id, evaluations, teamIds, factor) ||
+      compareStrings(a.name?.toLowerCase() ?? '', b.name?.toLowerCase() ?? '', factor) ||
+      compareStrings(a.id, b.id, factor)
+  );
+};

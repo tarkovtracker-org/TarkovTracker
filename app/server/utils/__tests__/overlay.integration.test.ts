@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { testOverlayEditions } from '@/server/utils/__tests__/overlayFixtures';
+import type { Task } from '@/types/tarkov';
 const stubOverlayFetch = (overlay: unknown) => {
   const fetchMock = vi.fn(async () => {
     return new Response(JSON.stringify(overlay), {
@@ -23,7 +25,10 @@ describe('overlay URL validation', () => {
     'not-a-url',
   ])('falls back to the trusted HTTPS overlay for %s', async (overlayUrl) => {
     vi.stubEnv('OVERLAY_URL', overlayUrl);
-    const fetchMock = stubOverlayFetch({ $meta: { version: 'url-test-v1' } });
+    const fetchMock = stubOverlayFetch({
+      editions: testOverlayEditions,
+      $meta: { version: 'url-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
+    });
     const { applyOverlay } = await import('@/server/utils/overlay');
     await applyOverlay({ data: { tasks: [] } });
     expect(fetchMock).toHaveBeenCalledWith(
@@ -33,7 +38,10 @@ describe('overlay URL validation', () => {
   });
   it('uses a configured HTTPS overlay URL', async () => {
     vi.stubEnv('OVERLAY_URL', 'https://overlay.example.com/custom.json');
-    const fetchMock = stubOverlayFetch({ $meta: { version: 'url-test-v1' } });
+    const fetchMock = stubOverlayFetch({
+      editions: testOverlayEditions,
+      $meta: { version: 'url-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
+    });
     const { applyOverlay } = await import('@/server/utils/overlay');
     await applyOverlay({ data: { tasks: [] } });
     expect(fetchMock).toHaveBeenCalledWith(
@@ -78,7 +86,13 @@ describe('overlay redirect handling', () => {
       .fn()
       .mockResolvedValueOnce(redirectTo('https://overlay.example.com/redirected.json'))
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ $meta: { version: 'redirect-v1' } }), { status: 200 })
+        new Response(
+          JSON.stringify({
+            editions: testOverlayEditions,
+            $meta: { version: 'redirect-v1', generated: '2026-09-07', sha256: 'test-sha' },
+          }),
+          { status: 200 }
+        )
       );
     vi.stubGlobal('fetch', fetchMock as typeof fetch);
     const { applyOverlay } = await import('@/server/utils/overlay');
@@ -111,7 +125,13 @@ describe('overlay redirect handling', () => {
       .fn()
       .mockResolvedValueOnce(redirectWithBody(location, cancel))
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ $meta: { version: 'redirect-v2' } }), { status: 200 })
+        new Response(
+          JSON.stringify({
+            editions: testOverlayEditions,
+            $meta: { version: 'redirect-v2', generated: '2026-09-07', sha256: 'test-sha' },
+          }),
+          { status: 200 }
+        )
       );
     vi.stubGlobal('fetch', fetchMock as typeof fetch);
     const { applyOverlay } = await import('@/server/utils/overlay');
@@ -122,6 +142,7 @@ describe('overlay redirect handling', () => {
 describe('applyOverlay locale integration', () => {
   it('applies the selected locale after global and mode corrections', async () => {
     const fetchMock = stubOverlayFetch({
+      editions: testOverlayEditions,
       $meta: {
         generated: '2026-08-14T12:00:00.000Z',
         sha256: 'overlay-sha',
@@ -177,6 +198,7 @@ describe('applyOverlay locale integration', () => {
         {
           id: 'task-1',
           name: 'English Task',
+          storyUnlocks: [],
           objectives: [{ id: 'objective-1', description: 'English objective' }],
         },
       ],
@@ -208,7 +230,13 @@ describe('applyOverlay locale integration', () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ $meta: { version: 'v1' } }), { status: 200 })
+        new Response(
+          JSON.stringify({
+            editions: testOverlayEditions,
+            $meta: { version: 'v1', generated: '2026-09-07', sha256: 'test-sha' },
+          }),
+          { status: 200 }
+        )
       )
       .mockReturnValueOnce(
         new Promise<Response>((resolve) => {
@@ -230,7 +258,15 @@ describe('applyOverlay locale integration', () => {
     expect(second.dataOverlay).toMatchObject({ status: 'stale', version: 'v1' });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(backgroundTasks).toHaveLength(1);
-    resolveRefresh(new Response(JSON.stringify({ $meta: { version: 'v2' } }), { status: 200 }));
+    resolveRefresh(
+      new Response(
+        JSON.stringify({
+          editions: testOverlayEditions,
+          $meta: { version: 'v2', generated: '2026-09-07', sha256: 'test-sha' },
+        }),
+        { status: 200 }
+      )
+    );
     await backgroundTasks[0];
     const refreshed = await applyOverlay(payload, { scheduleRefresh });
     expect(refreshed.dataOverlay).toMatchObject({ status: 'cached', version: 'v2' });
@@ -266,7 +302,13 @@ describe('applyOverlay locale integration', () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ $meta: { version: 'v1' } }), { status: 200 })
+        new Response(
+          JSON.stringify({
+            editions: testOverlayEditions,
+            $meta: { version: 'v1', generated: '2026-09-07', sha256: 'test-sha' },
+          }),
+          { status: 200 }
+        )
       )
       .mockRejectedValueOnce(new Error('overlay unavailable'));
     vi.stubGlobal('fetch', fetchMock as typeof fetch);
@@ -285,7 +327,8 @@ describe('applyOverlay locale integration', () => {
   });
   it('leaves unsupported locales unchanged by locale corrections', async () => {
     stubOverlayFetch({
-      $meta: { version: 'locale-test-v1' },
+      editions: testOverlayEditions,
+      $meta: { version: 'locale-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
       locales: {
         en: { tasks: { 'task-1': { name: 'English Task' } } },
       },
@@ -293,7 +336,7 @@ describe('applyOverlay locale integration', () => {
     const { applyOverlay } = await import('@/server/utils/overlay');
     const payload = { data: { tasks: [{ id: 'task-1', name: 'Base Task' }] } };
     const result = await applyOverlay(payload, { locale: 'fr' });
-    expect(result.data?.tasks).toEqual([{ id: 'task-1', name: 'Base Task' }]);
+    expect(result.data?.tasks).toEqual([{ id: 'task-1', name: 'Base Task', storyUnlocks: [] }]);
   });
   it.each([
     ['locale map', []],
@@ -302,13 +345,165 @@ describe('applyOverlay locale integration', () => {
     ['locale patch', { en: { tasks: { 'task-1': 'garbage' } } }],
   ])('handles a malformed %s without changing base data', async (_label, locales) => {
     stubOverlayFetch({
-      $meta: { version: 'locale-test-v1' },
+      editions: testOverlayEditions,
+      $meta: { version: 'locale-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
       locales,
     });
     const { applyOverlay } = await import('@/server/utils/overlay');
     const payload = { data: { tasks: [{ id: 'task-1', name: 'Base Task' }] } };
     const result = await applyOverlay(payload);
     expect(result.data).toEqual(payload.data);
-    expect(result.dataOverlay.status).toBe('fresh');
+    expect(result.dataOverlay.status).toBe('missing');
   });
+});
+describe('story overlay validation', () => {
+  it.each([
+    { storyChapters: { broken: null } },
+    { modes: { pve: { storyChapters: { broken: null } } } },
+    { storyChapters: [] },
+  ])('retains the last good payload for malformed chapter records: %j', async (invalid) => {
+    const fetchMock = stubOverlayFetch({
+      editions: testOverlayEditions,
+      $meta: { version: 'good', generated: '2026-09-07', sha256: 'test-sha' },
+      storyChapters: { chapter: { name: 'Chapter', questUnlocks: [{ id: 'task' }] } },
+    });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const input = { data: { tasks: [{ id: 'task' }] } };
+    await applyOverlay(input, { bypassCache: true });
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            editions: testOverlayEditions,
+            $meta: { version: 'invalid', generated: '2026-09-07', sha256: 'test-sha' },
+            ...invalid,
+          })
+        )
+    );
+    const result = await applyOverlay(input, { bypassCache: true });
+    expect(result.dataOverlay).toMatchObject({ status: 'stale', version: 'good' });
+    expect(result.data.tasks[0]).toMatchObject({
+      storyUnlocks: [{ id: 'chapter', name: 'Chapter' }],
+    });
+  });
+});
+describe('overlay semantic fallback and diagnostics', () => {
+  it('retains a last-good overlay when a prestige story reference is invalid', async () => {
+    const good = {
+      editions: testOverlayEditions,
+      $meta: { version: 'good', generated: '2026-09-07', sha256: 'good-sha' },
+      tasks: { task: { name: 'Corrected' } },
+    };
+    const fetch = stubOverlayFetch(good);
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    await applyOverlay({ data: { tasks: [{ id: 'task' }] } });
+    fetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          ...good,
+          editions: testOverlayEditions,
+          $meta: { version: 'bad', generated: '2026-09-07', sha256: 'test-sha' },
+          prestige: {
+            p: {
+              storyRequirements: [
+                { type: 'storyChapterStatus', storyChapter: 'missing', status: ['complete'] },
+              ],
+            },
+          },
+        })
+      )
+    );
+    const result = await applyOverlay({ data: { tasks: [{ id: 'task' }] } }, { bypassCache: true });
+    expect(result.data.tasks[0]).toMatchObject({ name: 'Corrected' });
+    expect(result.dataOverlay).toMatchObject({
+      version: 'good',
+      status: 'stale',
+      error: 'validation_failed',
+    });
+  });
+  it('keeps unknown-section diagnostics on cached responses', async () => {
+    const fetch = stubOverlayFetch({
+      editions: testOverlayEditions,
+      $meta: { version: '1', generated: '2026-09-07', sha256: 'test-sha' },
+      future: {},
+    });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    await applyOverlay({ data: { tasks: [] } });
+    const cached = await applyOverlay({ data: { tasks: [] } });
+    expect(cached.dataOverlay.unconsumedSections).toEqual(['future']);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});
+it.each([
+  { version: 'truncated' },
+  { version: 'truncated', generated: '2026-09-07', sha256: '' },
+  { version: 'truncated', generated: '2026-09-07', sha256: 'complete-but-no-catalog' },
+])(
+  'keeps the last-good catalog when provenance or required catalogs are missing %j',
+  async ($meta) => {
+    const good = {
+      editions: testOverlayEditions,
+      $meta: { version: 'good', generated: '2026-09-07', sha256: 'good-sha' },
+      tasks: { task: { name: 'Corrected' } },
+    };
+    const fetch = stubOverlayFetch(good);
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    await applyOverlay({ data: { tasks: [{ id: 'task' }] } });
+    fetch.mockResolvedValueOnce(new Response(JSON.stringify({ $meta })));
+    const result = await applyOverlay({ data: { tasks: [{ id: 'task' }] } }, { bypassCache: true });
+    expect(result.data.tasks[0]).toMatchObject({ name: 'Corrected' });
+    expect(result.dataOverlay).toMatchObject({
+      version: 'good',
+      status: 'stale',
+      error: 'validation_failed',
+    });
+  }
+);
+it.each([undefined, 'unlock-task', { id: 'unlock-task' }])(
+  'applies added crafts through the full hideout overlay pipeline with unlock %j',
+  async (taskUnlock) => {
+    stubOverlayFetch({
+      $meta: { version: 'craft', generated: '2026-09-07', sha256: 'craft-sha' },
+      editions: testOverlayEditions,
+      craftsAdd: {
+        added: {
+          station: 'station',
+          level: 1,
+          requiredItems: [],
+          productItem: { item: 'product', count: 1 },
+          taskUnlock,
+        },
+      },
+    });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const result = await applyOverlay({
+      data: { hideoutStations: [{ id: 'station', levels: [{ level: 1, crafts: [] }] }] },
+    });
+    expect(result.data.hideoutStations[0]?.levels[0]?.crafts).toEqual([
+      expect.objectContaining({
+        id: 'added',
+        // The product must survive adaptation as a resolvable reward item;
+        // an unresolved reference is silently dropped by buildCraftSourcesMap.
+        rewardItems: [
+          expect.objectContaining({ item: expect.objectContaining({ id: 'product' }) }),
+        ],
+        taskUnlock: taskUnlock ? expect.objectContaining({ id: 'unlock-task' }) : null,
+        unlockState: taskUnlock ? 'task' : 'unknown',
+      }),
+    ]);
+  }
+);
+it('retains chapter IDs as unlock labels when optional chapter names are missing', async () => {
+  stubOverlayFetch({
+    $meta: { version: 'chapter', generated: '2026-09-07', sha256: 'chapter-sha' },
+    editions: testOverlayEditions,
+    storyChapters: {
+      chapter: { objectives: {}, questUnlocks: [{ id: 'task' }] },
+      empty: { objectives: {} },
+    },
+  });
+  const { applyOverlay } = await import('@/server/utils/overlay');
+  const tasks: Task[] = [{ id: 'task' }];
+  const result = await applyOverlay({ data: { tasks } });
+  expect(result.data.tasks[0]?.storyUnlocks).toEqual([{ id: 'chapter', name: 'chapter' }]);
 });

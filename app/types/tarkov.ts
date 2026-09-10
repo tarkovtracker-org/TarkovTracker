@@ -87,24 +87,37 @@ export interface SkillRequirement {
   level: number;
   skill?: Skill;
 }
+export type RequirementComparison = '>=' | '>' | '<=' | '<' | '=' | '==' | '!=';
+export type NormalizedTraderRequirement =
+  | {
+      id: string;
+      requirementType: 'level' | 'reputation';
+      compareMethod: RequirementComparison;
+      value: number;
+      trader: { id: string; name: string };
+    }
+  | {
+      id: string;
+      requirementType: 'unknown';
+      reason: 'shape' | 'type' | 'comparison' | 'value' | 'trader';
+    };
 export interface TraderRequirement {
   id: string;
   trader: { id: string; name: string };
   value: number;
   requirementType?: 'level' | 'reputation';
-  compareMethod?: '>=' | '<' | '<=' | '>';
+  compareMethod?: RequirementComparison;
 }
 export interface TaskTraderLevelRequirement {
   id: string;
   trader: { id: string; name: string };
   level: number;
   requirementType?: 'level' | 'reputation';
-  compareMethod?: '>=' | '<' | '<=' | '>';
-}
-export interface TraderLevelRequirementWithMet extends TaskTraderLevelRequirement {
-  met: boolean;
+  compareMethod?: RequirementComparison;
 }
 export interface Craft {
+  taskUnlock?: { id: string; name?: string } | null;
+  unlockState?: 'unknown' | 'task';
   id: string;
   duration: number;
   requiredItems: ItemRequirement[];
@@ -235,9 +248,11 @@ export interface Task {
   trader?: { id: string; name?: string; normalizedName?: string; imageLink?: string };
   objectives?: TaskObjective[];
   taskRequirements?: TaskRequirement[];
+  storyUnlocks?: Array<{ id: string; name: string }>;
   minPlayerLevel?: number;
   requiredPrestige?: { id: string };
   failedRequirements?: TaskRequirement[];
+  normalizedTraderRequirements?: NormalizedTraderRequirement[];
   traderLevelRequirements?: TaskTraderLevelRequirement[];
   traderRequirements?: TraderRequirement[];
   factionName?: string;
@@ -345,8 +360,35 @@ export interface PlayerLevel {
   exp: number; // Cumulative XP required to reach this level (transformed from API)
   levelBadgeImageLink: string;
 }
+export interface SeasonalPerk {
+  id: string;
+  type: string;
+  name: string;
+  description: string;
+  points: number | null;
+  mutuallyExclusiveSeasonalPerkIds?: string[];
+  effects: Array<{
+    effectId: string;
+    itemFilter?: {
+      allowedItems: string[];
+      excludedItems: string[];
+      allowedCategories: string[];
+      excludedCategories: string[];
+    };
+    [key: string]: unknown;
+  }>;
+}
+export interface PrestigeStoryRequirement {
+  type: 'storyChapterStatus' | 'storyObjectiveStatus';
+  storyChapter: string;
+  objective?: string;
+  name: string;
+  status: string[];
+  unresolved?: boolean;
+}
 // Prestige System Types
 export interface PrestigeLevel {
+  storyRequirements?: PrestigeStoryRequirement[];
   id: string;
   level: number; // 0-6
   name?: string;
@@ -381,6 +423,7 @@ export interface StoryChapter {
   chapterRequirements?: Array<{ id: string; name: string }>;
   mapUnlocks?: Array<{ id: string; name: string }>;
   traderUnlocks?: Array<{ id: string; name: string }>;
+  questUnlocks?: Array<{ id: string; name: string }>;
   description?: string | null;
   notes?: string | null;
   objectives?: { [objectiveId: string]: StoryObjective };

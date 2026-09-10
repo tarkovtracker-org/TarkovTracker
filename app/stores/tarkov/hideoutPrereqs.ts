@@ -11,6 +11,7 @@ import {
   getCanonicalSkillKey,
   resolveSkillKey,
 } from '@/utils/skillHelpers';
+import { compareRequirement, MAX_TRADER_LEVEL } from '@/utils/taskRequirements';
 import type { GameEdition, HideoutStation, Task } from '@/types/tarkov';
 type TarkovStoreInstance = UserState & {
   $state: UserState;
@@ -85,13 +86,22 @@ const checkSkillReqsMet = (module: HideoutModuleMeta, options: HideoutCheckOptio
     }) ?? true
   );
 };
+const loyaltyLevels = Array.from({ length: MAX_TRADER_LEVEL }, (_, index) => index + 1);
 const checkTraderReqsMet = (module: HideoutModuleMeta, options: HideoutCheckOptions): boolean => {
   if (!options.requireTraderLoyalty) return true;
   return (
     module.traderRequirements?.every((req) => {
       if (!req?.trader?.id || typeof req?.value !== 'number') return true;
       const playerTraderLevel = options.traders?.[req.trader.id]?.level ?? 1;
-      return playerTraderLevel >= req.value;
+      // Building is permanent when loyalty increases past an upper-bound requirement.
+      const compareMethod = req.compareMethod ?? '>=';
+      return (
+        compareRequirement(playerTraderLevel, compareMethod, req.value) ||
+        loyaltyLevels.some(
+          (level) =>
+            level <= playerTraderLevel && compareRequirement(level, compareMethod, req.value)
+        )
+      );
     }) ?? true
   );
 };

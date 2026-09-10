@@ -2,7 +2,7 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { normalizeStoryObjectives, orderedStoryObjectives } from '@/utils/storylineObjectives';
 import type { ComputedRef } from '#imports';
-import type { StoryObjective, StoryRewards } from '@/types/tarkov';
+import type { StoryChapter, StoryObjective, StoryRewards } from '@/types/tarkov';
 export interface StorylineLinkEntry {
   id: string;
   name: string;
@@ -79,6 +79,7 @@ export interface StorylineNormalizedChapterView extends Omit<
   requirements: StorylineRequirementView[];
 }
 interface UseStorylineChaptersOptions {
+  chapters?: () => StoryChapter[];
   isChapterComplete?: (chapterId: string) => boolean;
   isObjectiveComplete?: (chapterId: string, objectiveId: string) => boolean;
 }
@@ -375,7 +376,7 @@ export function useStorylineChapters(options: UseStorylineChaptersOptions = {}):
   const isChapterComplete = options.isChapterComplete ?? tarkovStore.isStoryChapterComplete;
   const isObjectiveComplete = options.isObjectiveComplete ?? tarkovStore.isStoryObjectiveComplete;
   const chapters = computed<StorylineChapterView[]>(() => {
-    return (metadataStore.storyChapters ?? []).map((chapter) => {
+    return (options.chapters?.() ?? metadataStore.storyChapters ?? []).map((chapter) => {
       const objectiveMap = normalizeStoryObjectives(chapter.objectives);
       return {
         id: chapter.id,

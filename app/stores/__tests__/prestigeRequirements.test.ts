@@ -163,8 +163,8 @@ describe('buildPrestigeRequirementRows', () => {
       status: 'manual',
       tracked: false,
     });
-    expect(rows.find((row) => row.name === 'Tour')).toBeTruthy();
-    expect(rows.find((row) => row.name === 'They Are Already Here')).toBeTruthy();
+    expect(rows.find((row) => row.name === 'Tour')).toBeUndefined();
+    expect(rows.filter((row) => row.kind === 'storyChapter')).toEqual([]);
   });
   it('uses the prestige 6 story chapter rule and marks ready state from tracked rows only', () => {
     const pvpProgress = createProgressData();
@@ -211,6 +211,14 @@ describe('buildPrestigeRequirementRows', () => {
           playerLevel: 47,
         },
       ]),
+    ];
+    prestigeLevels[0]!.storyRequirements = [
+      {
+        type: 'storyChapterStatus',
+        storyChapter: 'the-ticket',
+        name: '',
+        status: ['complete'],
+      },
     ];
     const rows = buildPrestigeRequirementRows({
       currentPrestigeLevel: 5,
@@ -403,4 +411,64 @@ describe('buildPrestigeRequirementRows', () => {
       });
     }
   );
+});
+it.each([false, true])(
+  'requires the declared story objective, independently of chapter completion: %s',
+  (complete) => {
+    const progress = createProgressData();
+    progress.storyChapters = {
+      chapter: { complete: true, objectives: { objective: { complete } } },
+    };
+    const prestige = createPrestigeLevel(1, []);
+    prestige.storyRequirements = [
+      {
+        type: 'storyObjectiveStatus',
+        storyChapter: 'chapter',
+        objective: 'objective',
+        name: '',
+        status: ['complete'],
+      },
+    ];
+    const rows = buildPrestigeRequirementRows({
+      currentPrestigeLevel: 0,
+      edition,
+      hideoutStations,
+      prestigeLevels: [prestige],
+      modeProgress: progress,
+      storyChapters: [],
+      tasks: [],
+    });
+    expect(rows.find((row) => row.id === 'story:chapter:objective')).toMatchObject({
+      status: complete ? 'met' : 'unmet',
+      name: 'chapter',
+    });
+  }
+);
+it('does not satisfy an objective requirement from chapter completion when its objective ID is missing', () => {
+  const progress = createProgressData();
+  progress.storyChapters = {
+    chapter: { complete: true, objectives: { existing: { complete: true } } },
+  };
+  const prestige = createPrestigeLevel(1, []);
+  prestige.storyRequirements = [
+    {
+      type: 'storyObjectiveStatus',
+      name: 'Missing objective',
+      storyChapter: 'chapter',
+      status: ['complete'],
+    },
+  ];
+  const rows = buildPrestigeRequirementRows({
+    currentPrestigeLevel: 0,
+    edition,
+    hideoutStations,
+    prestigeLevels: [prestige],
+    modeProgress: progress,
+    storyChapters: [],
+    tasks: [],
+  });
+  expect(rows.find((row) => row.id === 'story:chapter:chapter')).toMatchObject({
+    status: 'unmet',
+    currentValue: 'incomplete',
+  });
 });

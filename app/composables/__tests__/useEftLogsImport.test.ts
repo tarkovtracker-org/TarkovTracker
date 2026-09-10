@@ -3,10 +3,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ACTIVE_SEASON } from '@/utils/constants';
 import type { Task } from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
+const preferences = { getTasksRequireTraderLevels: true };
+vi.mock('@/stores/usePreferences', () => ({ usePreferencesStore: () => preferences }));
 const metadataStore: { tasks: Task[] } = {
   tasks: [{ id: '61604635c725987e815b1a46' }],
 };
 const tarkovStore = {
+  playerLevel: vi.fn(() => 1),
+  setLevel: vi.fn(),
+  getTraderLevel: vi.fn(() => 1),
+  getTraderReputation: vi.fn(() => 0),
+  setTraderLevel: vi.fn(),
+  setTraderReputation: vi.fn(),
   getObjectiveCount: vi.fn(() => 0),
   getCurrentGameMode: vi.fn<() => GameMode>(() => 'pvp'),
   getCurrentProgressData: vi.fn(() => ({ taskCompletions: {} })),
@@ -290,6 +298,19 @@ describe('useEftLogsImport', () => {
     expect(tarkovStore.switchGameMode).not.toHaveBeenCalled();
     expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
   });
+  it('imports completions when predecessor metadata is missing', async () => {
+    const taskId = '61604635c725987e815b1a46';
+    metadataStore.tasks = [{ id: taskId, predecessors: ['missing-prerequisite'] }];
+    const composable = await loadComposable();
+    await composable.parseFile(
+      new File([completionLog(taskId)], 'notifications.log', { type: 'text/plain' })
+    );
+    await composable.confirmImport('pvp');
+    expect(composable.importState.value).toBe('success');
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledExactlyOnceWith(taskId);
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalledWith('missing-prerequisite');
+    expect(tarkovStore.setTraderLevel).not.toHaveBeenCalled();
+  });
   it('backfills required prerequisite tasks when importing a later completed task', async () => {
     const prerequisiteTaskId = '5ac2426c86f774138762edfe';
     const completedTaskId = '61604635c725987e815b1a46';
@@ -316,6 +337,24 @@ describe('useEftLogsImport', () => {
     expect(tarkovStore.setTaskObjectiveComplete).toHaveBeenCalledWith('obj-prerequisite');
     expect(tarkovStore.setObjectiveCount).toHaveBeenCalledWith('obj-prerequisite', 2);
     expect(composable.importState.value).toBe('success');
+  });
+  it('does not infer a quest route from missing story progress', async () => {
+    const prerequisiteTaskId = '5ac2426c86f774138762edfe';
+    const completedTaskId = '61604635c725987e815b1a46';
+    metadataStore.tasks = [
+      { id: prerequisiteTaskId },
+      {
+        id: completedTaskId,
+        storyUnlocks: [{ id: 'chapter', name: 'Story route' }],
+        taskRequirements: [{ task: { id: prerequisiteTaskId }, status: ['Complete'] }],
+      },
+    ];
+    const composable = await loadComposable();
+    await composable.parseFile(
+      new File([completionLog(completedTaskId)], 'notifications.log', { type: 'text/plain' })
+    );
+    await composable.confirmImport('pvp');
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledExactlyOnceWith(completedTaskId);
   });
   it('applies failed-only prerequisite requirements when importing completed tasks', async () => {
     const failedPrerequisiteTaskId = '593aa4be86f77457f56379f8';
@@ -599,5 +638,57 @@ describe('restart semantics', () => {
     await importer.parseFile(new File([startedLog(id)], 'notifications.log'));
     await importer.confirmImport('pvp');
     expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith(id);
+  });
+});
+describe('trader gating preference during import', () => {
+  it.each([false, true])('respects trader gating = %s in the destination', async (enabled) => {
+    vi.clearAllMocks();
+    preferences.getTasksRequireTraderLevels = enabled;
+    const id = '61604635c725987e815b1a46';
+    metadataStore.tasks = [
+      {
+        id,
+        minPlayerLevel: 5,
+        traderRequirements: [
+          {
+            id: 'll',
+            requirementType: 'level',
+            trader: { id: 'prapor' },
+            compareMethod: '>=',
+            value: 2,
+          },
+          {
+            id: 'rep',
+            requirementType: 'reputation',
+            trader: { id: 'prapor' },
+            compareMethod: '>=',
+            value: 0.2,
+          },
+        ],
+      },
+    ] as Task[];
+    let current: GameMode = 'pvp';
+    const writtenModes: GameMode[] = [];
+    tarkovStore.getCurrentGameMode.mockImplementation(() => current);
+    tarkovStore.switchGameMode.mockImplementation(async (mode) => {
+      current = mode;
+    });
+    tarkovStore.setTraderLevel.mockImplementation(() => {
+      writtenModes.push(current);
+    });
+    tarkovStore.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
+    const importer = await loadComposable();
+    await importer.parseFiles([
+      new File([backendLog('gw-pve-01.escapefromtarkov.com')], 'backend.log'),
+      new File([completionLog(id)], 'notifications.log'),
+    ]);
+    await importer.confirmImport('pvp');
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith(id);
+    expect(tarkovStore.setLevel).toHaveBeenCalledWith(5);
+    expect(tarkovStore.setTraderLevel).toHaveBeenCalledTimes(enabled ? 1 : 0);
+    expect(tarkovStore.setTraderReputation).toHaveBeenCalledTimes(enabled ? 1 : 0);
+    expect(writtenModes).toEqual(enabled ? ['pve'] : []);
+    expect(current).toBe('pvp');
+    preferences.getTasksRequireTraderLevels = true;
   });
 });

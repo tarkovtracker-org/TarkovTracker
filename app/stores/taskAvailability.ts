@@ -1,188 +1,296 @@
 import { resolveTraderUnlockTaskIds, type GameMode } from '@/utils/constants';
+import { compareRequirement, getTaskTraderRequirements } from '@/utils/taskRequirements';
 import {
   isTaskActive,
   isTaskComplete,
   isTaskFailed,
   type RawTaskCompletion,
 } from '@/utils/taskStatus';
-import type { Task, TaskRequirement } from '@/types/tarkov';
-export type TaskAvailabilityMap = Record<string, Record<string, boolean>>;
+import type { UserProgressData } from '@/types/progress';
+import type { RequirementComparison, Task, TaskRequirement } from '@/types/tarkov';
 export type TaskAvailabilityTeamData = {
   completions: Record<string, RawTaskCompletion>;
   faction: string;
   level: number;
   mode: GameMode;
   traders: Record<string, { level?: number; reputation?: number }>;
+  prestigeLevel?: number;
+  storyChapters?: UserProgressData['storyChapters'];
 };
-type EvaluationContext = {
-  fenceTraderId: string | null;
+export type TaskBlocker = {
+  type:
+    | 'player_level'
+    | 'trader_level'
+    | 'trader_reputation'
+    | 'prerequisite'
+    | 'failed_branch'
+    | 'faction'
+    | 'trader_unlock'
+    | 'prestige'
+    | 'unknown'
+    | 'cycle'
+    | 'complete'
+    | 'failed'
+    | 'disabled';
+  requirementId?: string;
+  current?: number;
+  required?: number;
+  compareMethod?: RequirementComparison;
+  trader?: { id: string; name: string };
+  taskId?: string;
+  requirements?: TaskRequirement[];
+  chapterIds?: string[];
+  reason?: string;
+};
+export type TaskAvailabilityResult = { available: boolean; blockers: TaskBlocker[] };
+export type TaskEvaluationMap = Record<string, Record<string, TaskAvailabilityResult>>;
+export type TaskEvaluationOptions = {
   requireTraderLevels: boolean;
-  tasksById: Map<string, Task>;
-  teamData: TaskAvailabilityTeamData;
+  prestigeTaskMap?: ReadonlyMap<string, number>;
 };
-const normalizeStatuses = (statuses?: string[]) =>
-  (statuses ?? []).map((status) => status.toLowerCase());
-const requiresCompletedStatus = (statuses: string[]): boolean => {
-  if (!statuses.length) return true;
-  return statuses.includes('complete') || statuses.includes('completed');
+const result = (blockers: TaskBlocker[]): TaskAvailabilityResult => ({
+  available: blockers.length === 0,
+  blockers,
+});
+const KNOWN_STATUSES = new Set(['complete', 'completed', 'failed', 'active', 'accept', 'accepted']);
+const requirementStatuses = (requirement: TaskRequirement): unknown[] => {
+  if (Array.isArray(requirement.status)) return requirement.status;
+  return requirement.status === undefined ? [] : ['unknown'];
 };
-const matchesActiveStatus = (
-  completion: RawTaskCompletion,
-  taskId: string,
-  isUnlockable: (taskId: string) => boolean
-): boolean => {
-  if (isTaskActive(completion)) return true;
-  if (isTaskComplete(completion)) return true;
-  return isUnlockable(taskId);
-};
-const requiresActiveStatus = (statuses: string[]): boolean =>
-  ['active', 'accept', 'accepted'].some((status) => statuses.includes(status));
-const matchesRequiredActiveStatus = (
-  statuses: string[],
-  completion: RawTaskCompletion,
-  taskId: string,
-  isUnlockable: (taskId: string) => boolean
-): boolean => {
-  if (!requiresActiveStatus(statuses)) return false;
-  return matchesActiveStatus(completion, taskId, isUnlockable);
-};
-const hasRequiredTaskStatus = (
-  requirement: TaskRequirement,
-  teamData: TaskAvailabilityTeamData,
-  isUnlockable: (taskId: string) => boolean
-): boolean => {
-  const taskId = requirement.task?.id;
-  if (!taskId) return true;
-  const statuses = normalizeStatuses(requirement.status);
-  const completion = teamData.completions[taskId];
-  const matches = [
-    { met: isTaskComplete(completion), required: requiresCompletedStatus(statuses) },
-    { met: isTaskFailed(completion), required: statuses.includes('failed') },
-    {
-      met: matchesRequiredActiveStatus(statuses, completion, taskId, isUnlockable),
-      required: true,
-    },
-  ];
-  return matches.some(({ met, required }) => met && required);
-};
-const failsTraderLevelRequirement = (
-  requirement: NonNullable<Task['traderLevelRequirements']>[number],
-  teamData: TaskAvailabilityTeamData
-): boolean => {
-  const trader = requirement.trader;
-  if (!trader) return false;
-  const level = teamData.traders[trader.id]?.level;
-  const resolvedLevel = typeof level === 'number' ? level : 1;
-  return resolvedLevel < requirement.level;
-};
-const meetsTraderLevelRequirements = (task: Task, teamData: TaskAvailabilityTeamData): boolean =>
-  !(task.traderLevelRequirements ?? []).some((requirement) =>
-    failsTraderLevelRequirement(requirement, teamData)
+const normalizeStatuses = (requirement: TaskRequirement): string[] =>
+  requirementStatuses(requirement).map((status) =>
+    typeof status === 'string' ? status.toLowerCase() : 'unknown'
   );
-const failsTraderReputationRequirement = (
-  requirement: NonNullable<Task['traderRequirements']>[number],
-  teamData: TaskAvailabilityTeamData,
-  fenceTraderId: string | null
+const isValidRequirement = (
+  requirement: TaskRequirement | null | undefined
+): requirement is TaskRequirement =>
+  Boolean(requirement?.task?.id) &&
+  normalizeStatuses(requirement!).every((status) => KNOWN_STATUSES.has(status));
+const completedObjective = (
+  objectives: NonNullable<UserProgressData['storyChapters']>[string]['objectives'] = {}
+) => Object.values(objectives).some((objective) => objective.complete === true);
+export const hasStoryUnlockProgress = (
+  chapterId: string,
+  data: Pick<TaskAvailabilityTeamData, 'storyChapters'>
 ): boolean => {
-  const trader = requirement.trader;
-  if (!trader) return false;
-  const traderState = teamData.traders[trader.id];
-  const reputation = getTraderReputation(traderState);
-  if (requirement.value >= 0) return reputation < requirement.value;
-  if (trader.id !== fenceTraderId) return false;
-  return reputation > requirement.value;
+  const progress = data.storyChapters?.[chapterId];
+  if (!progress) return false;
+  return progress.complete === true || completedObjective(progress.objectives);
 };
-function getTraderReputation(trader: { reputation?: number } | undefined): number {
-  if (!trader) return 0;
-  return typeof trader.reputation === 'number' ? trader.reputation : 0;
-}
-const meetsTraderReputationRequirements = (
+const acceptsCompleted = (statuses: string[]) =>
+  !statuses.length || statuses.some((status) => ['complete', 'completed'].includes(status));
+const acceptsActive = (statuses: string[]) =>
+  statuses.some((status) => ['active', 'accept', 'accepted'].includes(status));
+const terminalStatusMet = (statuses: string[], completion: RawTaskCompletion) =>
+  (acceptsCompleted(statuses) && isTaskComplete(completion)) ||
+  (statuses.includes('failed') && isTaskFailed(completion));
+const traderMetric = (
+  type: 'level' | 'reputation',
+  trader: { level?: number; reputation?: number }
+) => (type === 'level' ? (trader.level ?? 1) : (trader.reputation ?? 0));
+const traderCurrentValue = (
+  requirement: Exclude<
+    ReturnType<typeof getTaskTraderRequirements>[number],
+    { requirementType: 'unknown' }
+  >,
+  data: TaskAvailabilityTeamData
+) => {
+  const trader = data.traders[requirement.trader.id] ?? {};
+  return traderMetric(requirement.requirementType, trader);
+};
+const failedBranchBlockers = (
   task: Task,
-  teamData: TaskAvailabilityTeamData,
-  fenceTraderId: string | null
-): boolean =>
-  !(task.traderRequirements ?? []).some((requirement) =>
-    failsTraderReputationRequirement(requirement, teamData, fenceTraderId)
-  );
-const meetsTraderRequirements = (task: Task, context: EvaluationContext): boolean =>
-  !context.requireTraderLevels ||
-  (meetsTraderLevelRequirements(task, context.teamData) &&
-    meetsTraderReputationRequirements(task, context.teamData, context.fenceTraderId));
-const getTaskTraderName = (task: Task): string | null => {
-  const trader = task.trader;
-  if (!trader) return null;
-  if (trader.normalizedName) return trader.normalizedName;
-  return String(trader.name ?? '').toLowerCase();
+  data: TaskAvailabilityTeamData,
+  tasksById: Map<string, Task>
+): TaskBlocker[] =>
+  (task.failedRequirements ?? []).flatMap<TaskBlocker>((requirement) => {
+    if (!isValidRequirement(requirement))
+      return [{ type: 'unknown', reason: 'failed_requirement' }];
+    if (!tasksById.has(requirement.task.id))
+      return [{ type: 'unknown', taskId: requirement.task.id, reason: 'failed_requirement' }];
+    return isTaskFailed(data.completions[requirement.task.id])
+      ? [{ type: 'failed_branch', taskId: requirement.task.id }]
+      : [];
+  });
+const playerLevelBlockers = (task: Task, data: TaskAvailabilityTeamData): TaskBlocker[] => {
+  const required = task.minPlayerLevel ?? 0;
+  return data.level < required
+    ? [{ type: 'player_level', current: data.level, required, compareMethod: '>=' }]
+    : [];
 };
-const meetsTraderUnlockRequirement = (task: Task, context: EvaluationContext): boolean => {
-  const traderName = getTaskTraderName(task);
-  if (!traderName) return true;
-  const unlockTaskIds = resolveTraderUnlockTaskIds(traderName, context.teamData.mode).filter(
-    (taskId) => [taskId !== task.id, context.tasksById.has(taskId)].every(Boolean)
-  );
-  if (!unlockTaskIds.length) return true;
-  return unlockTaskIds.some((taskId) => isTaskComplete(context.teamData.completions[taskId]));
+const factionBlockers = (task: Task, data: TaskAvailabilityTeamData): TaskBlocker[] => {
+  if (!task.factionName || task.factionName === 'Any' || task.factionName === data.faction)
+    return [];
+  return [{ type: 'faction', reason: task.factionName }];
 };
-const createTeamEvaluator = (context: EvaluationContext) => {
-  const availabilityMemo = new Map<string, boolean>();
-  const unlockableMemo = new Map<string, boolean>();
-  const visitingAvailable = new Set<string>();
-  const visitingUnlockable = new Set<string>();
-  let isUnlockable = (_taskId: string): boolean => false;
-  const compute = (
+const terminalBlockers = (
+  completion: RawTaskCompletion,
+  taskId: string,
+  allowCompleted: boolean
+): TaskAvailabilityResult | undefined => {
+  if (isTaskFailed(completion)) return result([{ type: 'failed', taskId }]);
+  if (!allowCompleted && isTaskComplete(completion)) return result([{ type: 'complete', taskId }]);
+  return undefined;
+};
+const missingPrestige = (task: Task): TaskBlocker[] =>
+  task.requiredPrestige ? [{ type: 'unknown', reason: 'prestige_reference' }] : [];
+const traderNameFor = (task: Task) =>
+  task.trader?.normalizedName || task.trader?.name?.toLowerCase();
+const traderDisplayName = (task: Task, fallback: string) => task.trader?.name || fallback;
+const storyChapterIds = (task: Task) => (task.storyUnlocks ?? []).map((chapter) => chapter.id);
+const traderUnlocked = (ids: string[], data: TaskAvailabilityTeamData) =>
+  !ids.length || ids.some((id) => isTaskComplete(data.completions[id]));
+const disabledBlockers = (task: Task): TaskBlocker[] =>
+  task.disabled ? [{ type: 'disabled', taskId: task.id }] : [];
+const missingTaskResult = (taskId: string) =>
+  result([{ type: 'unknown', taskId, reason: 'task_reference' }]);
+const createTeamEvaluator = (
+  tasksById: Map<string, Task>,
+  data: TaskAvailabilityTeamData,
+  options: TaskEvaluationOptions
+) => {
+  const memo = new Map<string, TaskAvailabilityResult>();
+  const visiting = new Set<string>();
+  const activeRequirementResult = (
     taskId: string,
-    allowCompleted: boolean,
-    memo: Map<string, boolean>,
-    visiting: Set<string>
-  ): boolean => {
-    const cached = memo.get(taskId);
-    if (cached !== undefined) return cached;
-    if (visiting.has(taskId)) return false;
-    const task = context.tasksById.get(taskId);
-    if (!task) return false;
-    visiting.add(taskId);
-    const checks = [
-      () => allowCompleted || !isTaskComplete(context.teamData.completions[taskId]),
-      () =>
-        !(task.failedRequirements ?? []).some((requirement) =>
-          isTaskFailed(context.teamData.completions[requirement.task?.id ?? ''])
-        ),
-      () => !task.minPlayerLevel || context.teamData.level >= task.minPlayerLevel,
-      () => meetsTraderRequirements(task, context),
-      () =>
-        (task.taskRequirements ?? []).every((requirement) =>
-          hasRequiredTaskStatus(requirement, context.teamData, isUnlockable)
-        ),
-      () =>
-        !task.factionName ||
-        task.factionName === 'Any' ||
-        task.factionName === context.teamData.faction,
-      () => meetsTraderUnlockRequirement(task, context),
-    ];
-    const available = checks.every((check) => check());
-    visiting.delete(taskId);
-    memo.set(taskId, available);
-    return available;
+    completion: RawTaskCompletion
+  ): TaskAvailabilityResult => {
+    if (isTaskFailed(completion)) return result([{ type: 'prerequisite' }]);
+    if (isTaskActive(completion) || isTaskComplete(completion)) return result([]);
+    return evaluate(taskId, true);
   };
-  isUnlockable = (taskId) => compute(taskId, true, unlockableMemo, visitingUnlockable);
-  return (taskId: string) => compute(taskId, false, availabilityMemo, visitingAvailable);
+  const requiredTaskResult = (requirement: TaskRequirement): TaskAvailabilityResult => {
+    const taskId = requirement.task.id;
+    const completion = data.completions[taskId];
+    const statuses = normalizeStatuses(requirement);
+    if (!tasksById.has(taskId)) return missingTaskResult(taskId);
+    if (terminalStatusMet(statuses, completion)) return result([]);
+    return acceptsActive(statuses)
+      ? activeRequirementResult(taskId, completion)
+      : result([{ type: 'prerequisite' }]);
+  };
+  const knownTraderBlockers = (
+    requirement: Exclude<
+      ReturnType<typeof getTaskTraderRequirements>[number],
+      { requirementType: 'unknown' }
+    >
+  ): TaskBlocker[] => {
+    if (!options.requireTraderLevels) return [];
+    const current = traderCurrentValue(requirement, data);
+    if (compareRequirement(current, requirement.compareMethod, requirement.value)) return [];
+    return [
+      {
+        type: requirement.requirementType === 'level' ? 'trader_level' : 'trader_reputation',
+        requirementId: requirement.id,
+        trader: requirement.trader,
+        current,
+        required: requirement.value,
+        compareMethod: requirement.compareMethod,
+      },
+    ];
+  };
+  const traderBlockers = (task: Task): TaskBlocker[] =>
+    getTaskTraderRequirements(task).flatMap<TaskBlocker>((requirement) => {
+      if (requirement.requirementType === 'unknown')
+        return [{ type: 'unknown', requirementId: requirement.id, reason: requirement.reason }];
+      return knownTraderBlockers(requirement);
+    });
+  const prerequisiteBlockers = (task: Task): TaskBlocker[] => {
+    const requirements = task.taskRequirements ?? [];
+    const chapterIds = storyChapterIds(task);
+    // A wired story route can satisfy the quest group, never trader/faction/prestige gates.
+    if (chapterIds.some((id) => hasStoryUnlockProgress(id, data))) return [];
+    const malformed = requirements.filter((requirement) => !isValidRequirement(requirement));
+    if (malformed.length) return [{ type: 'unknown', reason: 'task_requirement' }];
+    return unmetPrerequisiteBlockers(requirements, chapterIds);
+  };
+  const unmetPrerequisiteBlockers = (
+    requirements: TaskRequirement[],
+    chapterIds: string[]
+  ): TaskBlocker[] => {
+    const evaluated = requirements.map((requirement) => ({
+      requirement,
+      result: requiredTaskResult(requirement),
+    }));
+    const unmet = evaluated.filter((entry) => !entry.result.available);
+    if (!unmet.length) return [];
+    const diagnostics = unmet
+      .flatMap((entry) => entry.result.blockers)
+      .filter((blocker) => ['cycle', 'unknown'].includes(blocker.type));
+    const ordinary = unmet.filter((entry) =>
+      entry.result.blockers.every((blocker) => !['cycle', 'unknown'].includes(blocker.type))
+    );
+    if (!ordinary.length) return diagnostics;
+    return [
+      ...diagnostics,
+      {
+        type: 'prerequisite',
+        requirements: ordinary.map((entry) => entry.requirement),
+        chapterIds,
+      },
+    ];
+  };
+  const unlockBlockers = (task: Task): TaskBlocker[] => {
+    const traderName = traderNameFor(task);
+    if (!traderName) return [];
+    const ids = resolveTraderUnlockTaskIds(traderName, data.mode).filter(
+      (id) => id !== task.id && tasksById.has(id)
+    );
+    if (traderUnlocked(ids, data)) return [];
+    return [
+      {
+        type: 'trader_unlock',
+        taskId: ids[0],
+        trader: { id: task.trader!.id, name: traderDisplayName(task, traderName) },
+      },
+    ];
+  };
+  const prestigeBlockers = (task: Task): TaskBlocker[] => {
+    const required = options.prestigeTaskMap?.get(task.id);
+    if (required === undefined) return missingPrestige(task);
+    const current = data.prestigeLevel ?? 0;
+    return current === required
+      ? []
+      : [{ type: 'prestige', current, required, compareMethod: '=' }];
+  };
+  const cachedResult = (key: string, taskId: string) =>
+    memo.get(key) ?? (visiting.has(key) ? result([{ type: 'cycle', taskId }]) : undefined);
+  const evaluate = (taskId: string, allowCompleted = false): TaskAvailabilityResult => {
+    const key = `${allowCompleted}:${taskId}`;
+    const cached = cachedResult(key, taskId);
+    if (cached) return cached;
+    const task = tasksById.get(taskId);
+    if (!task) return missingTaskResult(taskId);
+    const terminal = terminalBlockers(data.completions[taskId], taskId, allowCompleted);
+    if (terminal) return terminal;
+    visiting.add(key);
+    const blockers: TaskBlocker[] = disabledBlockers(task);
+    blockers.push(
+      ...playerLevelBlockers(task, data),
+      ...factionBlockers(task, data),
+      ...failedBranchBlockers(task, data, tasksById),
+      ...traderBlockers(task),
+      ...prestigeBlockers(task),
+      ...prerequisiteBlockers(task),
+      ...unlockBlockers(task)
+    );
+    visiting.delete(key);
+    const evaluated = result(blockers);
+    memo.set(key, evaluated);
+    return evaluated;
+  };
+  return (taskId: string) => evaluate(taskId);
 };
-export const buildTaskAvailability = (
+export const buildTaskEvaluations = (
   tasks: Task[],
   teams: Map<string, TaskAvailabilityTeamData>,
-  fenceTraderId: string | null,
-  requireTraderLevels: boolean
-): TaskAvailabilityMap => {
-  const available = Object.fromEntries(tasks.map((task) => [task.id, {}])) as TaskAvailabilityMap;
+  options: TaskEvaluationOptions
+): TaskEvaluationMap => {
+  const evaluations: TaskEvaluationMap = Object.fromEntries(tasks.map((task) => [task.id, {}]));
   const tasksById = new Map(tasks.map((task) => [task.id, task]));
-  for (const [teamId, teamData] of teams) {
-    const isAvailable = createTeamEvaluator({
-      fenceTraderId,
-      requireTraderLevels,
-      tasksById,
-      teamData,
-    });
-    for (const task of tasks) available[task.id]![teamId] = isAvailable(task.id);
+  for (const [teamId, data] of teams) {
+    const evaluate = createTeamEvaluator(tasksById, data, options);
+    for (const task of tasks) evaluations[task.id]![teamId] = evaluate(task.id);
   }
-  return available;
+  return evaluations;
 };

@@ -1,4 +1,27 @@
 import type { GameEdition } from '@/types/tarkov';
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+const optionalIds = (value: unknown): boolean =>
+  value === undefined || (Array.isArray(value) && value.every((id) => typeof id === 'string'));
+const nonemptyTitle = (value: unknown): boolean =>
+  typeof value === 'string' && value.trim().length > 0;
+/** Validate the complete catalog record before replacing a last-good edition. */
+export function isGameEdition(value: unknown): value is GameEdition {
+  if (!isRecord(value)) return false;
+  return [
+    nonemptyTitle(value.id),
+    nonemptyTitle(value.title),
+    ['value', 'defaultStashLevel', 'defaultCultistCircleLevel'].every(
+      (key) => typeof value[key] === 'number' && Number.isFinite(value[key]) && value[key] >= 0
+    ),
+    isRecord(value.traderRepBonus) &&
+      Object.values(value.traderRepBonus).every(
+        (bonus) => typeof bonus === 'number' && Number.isFinite(bonus)
+      ),
+    optionalIds(value.exclusiveTaskIds),
+    optionalIds(value.excludedTaskIds),
+  ].every(Boolean);
+}
 /**
  * Check if a task is available for a given edition.
  * A task is NOT available if:

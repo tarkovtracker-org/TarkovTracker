@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
+import { testOverlayEditions } from '@/server/utils/__tests__/overlayFixtures';
 import { deepMerge } from '@/server/utils/deepMerge';
 import {
   applyLocaleOverlay,
@@ -6,9 +7,10 @@ import {
   expandObjectiveAdditions,
   getObjectiveItemIds,
 } from '@/server/utils/overlay';
-const stubOverlayFetch = (overlay: unknown) => {
+const stubOverlayFetch = (overlay: Record<string, unknown>) => {
+  const payload = { editions: testOverlayEditions, ...overlay };
   const fetchMock = vi.fn(async () => {
-    return new Response(JSON.stringify(overlay), {
+    return new Response(JSON.stringify(payload), {
       headers: { 'Content-Type': 'application/json' },
       status: 200,
     });
@@ -82,7 +84,8 @@ describe('mergeModeCorrections (via applyOverlay integration)', () => {
   });
   it('splits overlaid trader requirements into level and reputation fields', async () => {
     const fetchMock = stubOverlayFetch({
-      $meta: { version: 'split-test-v1' },
+      editions: testOverlayEditions,
+      $meta: { version: 'split-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
       modes: {
         pve: {
           tasks: {
@@ -146,7 +149,8 @@ describe('mergeModeCorrections (via applyOverlay integration)', () => {
   });
   it('splits trader requirements on tasksAdd entries', async () => {
     const fetchMock = stubOverlayFetch({
-      $meta: { version: 'tasksadd-split-test-v1' },
+      editions: testOverlayEditions,
+      $meta: { version: 'tasksadd-split-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
       tasksAdd: {
         'new-task': {
           id: 'new-task',
@@ -200,7 +204,8 @@ describe('mergeModeCorrections (via applyOverlay integration)', () => {
   });
   it('drops malformed trader requirement entries during the split', async () => {
     const fetchMock = stubOverlayFetch({
-      $meta: { version: 'malformed-split-test-v1' },
+      editions: testOverlayEditions,
+      $meta: { version: 'malformed-split-test-v1', generated: '2026-09-07', sha256: 'test-sha' },
       modes: {
         pve: {
           tasks: {
@@ -246,7 +251,7 @@ describe('mergeModeCorrections (via applyOverlay integration)', () => {
   it('drops level trader requirements with non-finite thresholds', async () => {
     const fetchMock = stubOverlayFetch(
       JSON.parse(
-        '{"$meta":{"version":"nonfinite-split-test-v1"},"modes":{"pve":{"tasks":{"task-1":{"traderRequirements":[{"id":"inf-level","requirementType":"level","compareMethod":">=","value":1e999,"trader":{"id":"trader-1","name":"Prapor"}}]}}}}}'
+        '{"$meta":{"version":"nonfinite-split-test-v1","generated":"2026-09-07","sha256":"test-sha"},"modes":{"pve":{"tasks":{"task-1":{"traderRequirements":[{"id":"inf-level","requirementType":"level","compareMethod":">=","value":1e999,"trader":{"id":"trader-1","name":"Prapor"}}]}}}}}'
       )
     );
     const { applyOverlay } = await import('@/server/utils/overlay');
@@ -489,5 +494,57 @@ describe('applyTaskObjectiveAdditions', () => {
     };
     const result = applyTaskObjectiveAdditions(task);
     expect(result).not.toHaveProperty('objectivesAdd');
+  });
+});
+describe('canonical progression overlay projection', () => {
+  it('replaces trader requirements and keeps story routes scoped to the selected mode', async () => {
+    vi.resetModules();
+    stubOverlayFetch({
+      editions: testOverlayEditions,
+      $meta: { version: 'test', generated: '2026-09-07', sha256: 'test-sha' },
+      tasks: {
+        target: {
+          traderRequirements: [
+            {
+              id: 'rep',
+              requirementType: 'reputation',
+              value: -2,
+              compareMethod: '<=',
+              trader: 'fence',
+            },
+          ],
+        },
+      },
+      storyChapters: { shared: { name: 'Shared', questUnlocks: [{ id: 'target' }] } },
+      modes: {
+        pve: {
+          storyChapters: {
+            shared: { questUnlocks: [] },
+            pve: { name: 'PvE route', questUnlocks: [{ id: 'target' }] },
+          },
+        },
+      },
+    });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const input = {
+      data: {
+        tasks: [
+          {
+            id: 'target',
+            normalizedTraderRequirements: [{ id: 'old', requirementType: 'unknown' }],
+          },
+        ],
+      },
+    };
+    const pvp = await applyOverlay(input, { gameMode: 'pvp', bypassCache: true });
+    const pve = await applyOverlay(input, { gameMode: 'pve', bypassCache: true });
+    expect(pvp.data.tasks[0]).toMatchObject({
+      normalizedTraderRequirements: [
+        { id: 'rep', requirementType: 'reputation', value: -2, compareMethod: '<=' },
+      ],
+      storyUnlocks: [{ id: 'shared', name: 'Shared' }],
+    });
+    expect(pve.data.tasks[0]).toMatchObject({ storyUnlocks: [{ id: 'pve', name: 'PvE route' }] });
+    expect(input.data.tasks[0]!.normalizedTraderRequirements[0]!.id).toBe('old');
   });
 });

@@ -8,8 +8,8 @@ import {
 describe('precomputedTarkov', () => {
   describe('buildTasksCorePrecomputedKey', () => {
     it('matches the tasks-core edge cache key format', () => {
-      expect(buildTasksCorePrecomputedKey('en', 'regular')).toBe('tasks-core-json-v2-en-regular');
-      expect(buildTasksCorePrecomputedKey('de', 'pve')).toBe('tasks-core-json-v2-de-pve');
+      expect(buildTasksCorePrecomputedKey('en', 'regular')).toBe('tasks-core-json-v3-en-regular');
+      expect(buildTasksCorePrecomputedKey('de', 'pve')).toBe('tasks-core-json-v3-de-pve');
     });
   });
   describe('envelope round trip', () => {
@@ -17,8 +17,23 @@ describe('precomputedTarkov', () => {
       const envelope = buildPrecomputedEnvelope({ data: { tasks: [] } });
       expect(isPrecomputedEnvelope(envelope)).toBe(true);
       expect(envelope.payload).toEqual({ data: { tasks: [] } });
-      expect(envelope.version).toBe(1);
+      expect(envelope.version).toBe(2);
       expect(Number.isFinite(envelope.storedAt)).toBe(true);
+    });
+    it('rejects the superseded progression-only envelope at the shared v3 key', () => {
+      const payload = { data: { tasks: [{ id: 'task-1' }] } };
+      const legacy = { payload, storedAt: Date.now(), version: 1 };
+      expect(isPrecomputedEnvelope(legacy)).toBe(false);
+      expect(isPrecomputedEnvelope(buildPrecomputedEnvelope(payload))).toBe(true);
+    });
+    it('rejects provenance that differs from the served payload', () => {
+      const envelope = buildPrecomputedEnvelope({
+        dataOverlay: { version: '1', sha256: 'published' },
+      });
+      expect(envelope.overlay).toEqual({ version: '1', sha256: 'published' });
+      expect(
+        isPrecomputedEnvelope({ ...envelope, overlay: { version: '1', sha256: 'other' } })
+      ).toBe(false);
     });
     it('rejects non-envelope values', () => {
       expect(isPrecomputedEnvelope(null)).toBe(false);
@@ -44,8 +59,12 @@ describe('precomputedTarkov', () => {
       expect(isPrecomputedEnvelope({ payload: {}, storedAt: 'now', version: 1 })).toBe(false);
     });
     it('accepts falsy-but-valid payloads such as empty arrays', () => {
-      expect(isPrecomputedEnvelope({ payload: [], storedAt: Date.now(), version: 1 })).toBe(true);
-      expect(isPrecomputedEnvelope({ payload: 0, storedAt: Date.now(), version: 1 })).toBe(true);
+      expect(
+        isPrecomputedEnvelope({ payload: [], storedAt: Date.now(), version: 2, overlay: null })
+      ).toBe(true);
+      expect(
+        isPrecomputedEnvelope({ payload: 0, storedAt: Date.now(), version: 2, overlay: null })
+      ).toBe(true);
     });
   });
   describe('getPrecomputedStore', () => {
@@ -67,4 +86,9 @@ describe('precomputedTarkov', () => {
       ).toBeNull();
     });
   });
+});
+it.each(['', '   '])('rejects empty overlay identity fields %j', async (empty) => {
+  const { precomputedOverlayIdentity } = await import('@/server/utils/precomputedTarkov');
+  expect(precomputedOverlayIdentity({ dataOverlay: { version: empty, sha256: 'sha' } })).toBeNull();
+  expect(precomputedOverlayIdentity({ dataOverlay: { version: 'v1', sha256: empty } })).toBeNull();
 });

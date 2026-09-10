@@ -4,6 +4,7 @@ import { useRuntimeConfig } from '#imports';
 import { createLogger } from '@/server/utils/logger';
 import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
 import { buildSkillImageUrl } from '@/utils/tarkovUrls';
+import { isValidTraderLevel, normalizeTraderRequirements } from '@/utils/taskRequirements';
 import type { ValidGameMode } from '@/server/utils/tarkov-cache-config';
 import type {
   FinishRewards,
@@ -79,7 +80,9 @@ type TarkovJsonOptions = {
   timeoutMs?: number;
   deps?: TarkovJsonDependencies;
 };
-type TarkovJsonPrestigeOptions = Omit<TarkovJsonOptions, 'gameMode'>;
+type TarkovJsonPrestigeOptions = TarkovJsonOptions & {
+  project?: (payload: JsonTasksPayload) => JsonTasksPayload;
+};
 type JsonPathResult = {
   parent?: unknown;
   parentProperty?: string | number;
@@ -761,7 +764,7 @@ function adaptTraderRequirement(raw: unknown, context: AdapterContext) {
 const onlyIfPopulated = <T>(items: T[]): T[] | undefined => (items.length > 0 ? items : undefined);
 function readFiniteLevel(adapted: TraderRequirement & { level?: number }): number | undefined {
   const level = adapted.level ?? adapted.value;
-  return typeof level === 'number' && Number.isFinite(level) ? level : undefined;
+  return typeof level === 'number' && isValidTraderLevel(level) ? level : undefined;
 }
 function pushTraderRequirement(
   adapted: (TraderRequirement & { level?: number }) | undefined,
@@ -832,6 +835,11 @@ function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
     objectives: [],
     failConditions: [],
     ...adaptTraderRequirements(raw.traderRequirements, context),
+    normalizedTraderRequirements: normalizeTraderRequirements(
+      Array.isArray(raw.traderRequirements)
+        ? raw.traderRequirements.map((requirement) => adaptTraderRequirement(requirement, context))
+        : raw.traderRequirements
+    ),
     factionName: typeof raw.factionName === 'string' ? raw.factionName : undefined,
   }) as Task;
 }
@@ -1231,15 +1239,21 @@ export function createTarkovJsonHideoutFetcher(options: TarkovJsonOptions) {
   };
 }
 export function createTarkovJsonPrestigeFetcher(options: TarkovJsonPrestigeOptions) {
-  const regularOptions: TarkovJsonOptions = { ...options, gameMode: PRESTIGE_SOURCE_GAME_MODE };
+  const sourceOptions: TarkovJsonOptions = {
+    ...options,
+    gameMode: options.gameMode ?? PRESTIGE_SOURCE_GAME_MODE,
+  };
   return async () => {
     try {
       const [tasksPayload, hideoutPayload, tradersPayload] = await Promise.all([
-        fetchTarkovJsonEndpoint<JsonTasksPayload>('tasks', regularOptions),
-        fetchTarkovJsonEndpoint<unknown>('hideout', regularOptions),
-        fetchTarkovJsonEndpoint<unknown>('traders', regularOptions),
+        fetchTarkovJsonEndpoint<JsonTasksPayload>('tasks', sourceOptions),
+        fetchTarkovJsonEndpoint<unknown>('hideout', sourceOptions),
+        fetchTarkovJsonEndpoint<unknown>('traders', sourceOptions),
       ]);
-      return adaptPrestigeResponse(tasksPayload, { hideoutPayload, tradersPayload });
+      return adaptPrestigeResponse(options.project ? options.project(tasksPayload) : tasksPayload, {
+        hideoutPayload,
+        tradersPayload,
+      });
     } catch (error) {
       logger.error('Failed to build prestige payload from tasks, hideout, and traders', {
         error,

@@ -23,7 +23,11 @@ on:
         required: false
         type: string
       gameMode:
-        description: 'Restrict to one game mode (regular or pve). Empty runs both.'
+        description: 'Restrict to one game mode (regular, pve, or pvp-season). Empty runs all.'
+        required: false
+        type: string
+      expectedOverlaySha:
+        description: 'Required overlay SHA for this release (optional).'
         required: false
         type: string
 concurrency:
@@ -49,9 +53,18 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           TARKOV_DATA_KV_NAMESPACE_ID: ${{ vars.TARKOV_DATA_KV_NAMESPACE_ID }}
+          EXPECTED_OVERLAY_SHA: ${{ inputs.expectedOverlaySha }}
           PRECOMPUTE_LANG: ${{ inputs.lang }}
           PRECOMPUTE_GAME_MODE: ${{ inputs.gameMode }}
         run: pnpm run precompute:tarkov
+      - name: Upload overlay provenance
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: overlay-precompute-manifest
+          path: precompute-manifest.json
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Open or update failure issue
         if: failure() && github.event_name == 'schedule'
         continue-on-error: true

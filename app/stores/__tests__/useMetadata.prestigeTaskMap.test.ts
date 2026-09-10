@@ -182,4 +182,11 @@ describe('useMetadataStore prestigeTaskMap', () => {
     expect(map.has('unknown-ref-task')).toBe(false);
     expect(map.size).toBe(0);
   });
+  it('uses the level fallback for condition-based New Beginning mappings', () => {
+    const store = useMetadataStore();
+    store.prestigeLevels = [
+      { id: 'p5', level: 5, conditions: [createCondition('new-beginning', 'New Beginning')] },
+    ];
+    expect(store.prestigeTaskMap.get('new-beginning')).toBe(4);
+  });
 });

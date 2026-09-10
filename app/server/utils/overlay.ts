@@ -1,3 +1,8 @@
+import {
+  isValidTraderLevel,
+  normalizeTraderReference,
+  normalizeTraderRequirements,
+} from '@/utils/taskRequirements';
 /**
  * Overlay utility for applying tarkov-data-overlay corrections to tarkov.dev API data.
  *
@@ -14,33 +19,13 @@ import {
   inferObjectiveType,
   normalizeObjectiveList,
 } from './objectiveTypeInferrer';
+import { addFallbackCrafts, addFallbackItems } from './overlayAdditions';
+import { mergeOverlayRecords, scopedOverlay } from './overlayProjectors';
+import { validateOverlayData, unknownOverlaySections } from './overlayValidation';
 import { TARKOVTRACKER_USER_AGENT } from './userAgent';
+import type { OverlayData, OverlayLocaleData as LocaleOverlayData } from './overlayTypes';
+import type { HideoutStation, TarkovItem } from '@/types/tarkov';
 const logger = createLogger('Overlay');
-// Overlay data structure
-interface ModeOverlayData {
-  tasks?: Record<string, Record<string, unknown>>;
-  tasksAdd?: Record<string, Record<string, unknown>>;
-}
-interface LocaleOverlayData {
-  tasks?: Record<string, Record<string, unknown>>;
-  items?: Record<string, Record<string, unknown>>;
-  traders?: Record<string, Record<string, unknown>>;
-}
-interface OverlayData {
-  tasks?: Record<string, Record<string, unknown>>;
-  tasksAdd?: Record<string, Record<string, unknown>>;
-  items?: Record<string, Record<string, unknown>>;
-  traders?: Record<string, Record<string, unknown>>;
-  hideout?: Record<string, Record<string, unknown>>;
-  editions?: Record<string, unknown>;
-  modes?: Record<string, ModeOverlayData>;
-  locales?: Record<string, LocaleOverlayData>;
-  $meta?: {
-    version: string;
-    generated: string;
-    sha256: string;
-  };
-}
 type OverlayStatus = 'fresh' | 'cached' | 'stale' | 'missing';
 export interface OverlayMeta {
   status: OverlayStatus;
@@ -51,6 +36,7 @@ export interface OverlayMeta {
   fetchedAt?: string;
   cacheAgeMs?: number;
   error?: string;
+  unconsumedSections?: string[];
 }
 // Module-level cache behavior: cachedOverlay and cacheTimestamp persist across requests in
 // long-running Node.js processes but reset on cold starts in serverless/edge platforms.
@@ -92,58 +78,19 @@ let lastOverlayMeta: OverlayMeta = {
   status: 'missing',
   sourceUrl: OVERLAY_URL_WITH_BUSTER,
 };
-/**
- * Validate overlay data structure
- */
-function isValidOverlayData(data: unknown): data is OverlayData {
-  if (!data || typeof data !== 'object') return false;
-  const overlay = data as OverlayData;
-  // Check for required $meta field with version
-  if (!overlay.$meta || typeof overlay.$meta !== 'object') {
-    logger.warn('Invalid overlay: missing $meta');
-    return false;
-  }
-  if (typeof overlay.$meta.version !== 'string') {
-    logger.warn('Invalid overlay: missing or invalid $meta.version');
-    return false;
-  }
-  // Validate optional entity collections are records if present
-  const collections = ['tasks', 'tasksAdd', 'items', 'traders', 'hideout'] as const;
-  for (const collection of collections) {
-    if (
-      overlay[collection] !== undefined &&
-      (typeof overlay[collection] !== 'object' || overlay[collection] === null)
-    ) {
-      logger.warn(`Invalid overlay: ${collection} is not an object`);
-      return false;
-    }
-  }
-  // Validate optional modes field
-  if (overlay.modes !== undefined) {
-    if (typeof overlay.modes !== 'object' || overlay.modes === null) {
-      logger.warn('Invalid overlay: modes is not an object');
-      return false;
-    }
-    for (const [mode, modeData] of Object.entries(overlay.modes)) {
-      if (typeof modeData !== 'object' || modeData === null) {
-        logger.warn(`Invalid overlay: modes.${mode} is not an object`);
-        return false;
-      }
-    }
-  }
-  return true;
-}
 function buildOverlayMeta(
   overlay: OverlayData | null,
   status: OverlayStatus,
   extra?: Partial<OverlayMeta>
 ): OverlayMeta {
+  const { version, generated, sha256 } = overlay?.$meta ?? {};
   return {
     status,
-    version: overlay?.$meta?.version,
-    generated: overlay?.$meta?.generated,
-    sha256: overlay?.$meta?.sha256,
+    version,
+    generated,
+    sha256,
     sourceUrl: OVERLAY_URL_WITH_BUSTER,
+    unconsumedSections: overlay ? unknownOverlaySections(overlay) : [],
     ...extra,
   };
 }
@@ -204,14 +151,17 @@ async function processOverlayResponse(
     return buildOverlayFailure(`HTTP ${response.status}`);
   }
   const parsedData = await response.json();
-  if (!isValidOverlayData(parsedData)) {
+  if (!validateOverlayData(parsedData)) {
     logger.warn('Fetched overlay failed validation, using stale cache');
     return buildOverlayFailure('validation_failed');
   }
+  const unconsumed = unknownOverlaySections(parsedData);
+  if (unconsumed.length) logger.warn('Unconsumed overlay sections:', unconsumed);
   cachedOverlay = parsedData;
   cacheTimestamp = now;
-  logger.info(`Loaded overlay v${cachedOverlay.$meta?.version}`);
+  logger.info(`Loaded overlay v${cachedOverlay.$meta!.version}`);
   lastOverlayMeta = buildOverlayMeta(cachedOverlay, 'fresh', {
+    unconsumedSections: unconsumed,
     fetchedAt: new Date(now).toISOString(),
     cacheAgeMs: 0,
   });
@@ -271,7 +221,7 @@ function scheduleOverlayRefresh(now: number, scheduleRefresh: OverlayRefreshSche
   const refresh = startOverlayRefresh(now);
   if (refresh.started) scheduleRefresh(refresh.promise);
 }
-async function fetchOverlay(
+export async function fetchOverlay(
   forceRefresh: boolean = false,
   scheduleRefresh?: OverlayRefreshScheduler
 ): Promise<OverlayFetchResult> {
@@ -475,16 +425,22 @@ const isLevelRequirement = (requirement: unknown): requirement is Record<string,
   isPlainObject(requirement) && requirement.requirementType === 'level';
 const hasFiniteLevelThreshold = (requirement: Record<string, unknown>): boolean => {
   const level = requirement.level ?? requirement.value;
-  return typeof level === 'number' && Number.isFinite(level);
+  return typeof level === 'number' && isValidTraderLevel(level);
 };
 function applyTraderRequirementSplit(task: Record<string, unknown>): void {
   const raw = task.traderRequirements;
+  task.normalizedTraderRequirements = normalizeTraderRequirements(raw);
   if (!Array.isArray(raw)) return;
-  const traderLevelRequirements = raw
+  const adapted = raw.map((requirement) =>
+    isPlainObject(requirement)
+      ? { ...requirement, trader: normalizeTraderReference(requirement.trader) }
+      : requirement
+  );
+  const traderLevelRequirements = adapted
     .filter(isLevelRequirement)
     .filter(hasFiniteLevelThreshold)
     .map((requirement) => ({ ...requirement, level: requirement.level ?? requirement.value }));
-  const traderRequirements = raw.filter(
+  const traderRequirements = adapted.filter(
     (requirement) => isPlainObject(requirement) && requirement.requirementType !== 'level'
   );
   task.traderLevelRequirements =
@@ -510,31 +466,49 @@ function mergeModeCorrections(
  * @returns The data with overlay corrections applied
  */
 type OverlayTargetData = {
+  maps?: Array<{ id: string }>;
   tasks?: Array<{ id: string }>;
   items?: Array<{ id: string }>;
   traders?: Array<{ id: string }>;
   hideoutStations?: Array<{ id: string }>;
 };
 function applyLocaleOverlays(target: OverlayTargetData, localeOverlay: LocaleOverlayData): void {
-  if (Array.isArray(target.tasks)) {
-    target.tasks = applyLocaleOverlay(target.tasks, localeOverlay.tasks);
-  }
-  if (Array.isArray(target.items)) {
-    target.items = applyLocaleOverlay(target.items, localeOverlay.items);
-  }
-  if (Array.isArray(target.traders)) {
-    target.traders = applyLocaleOverlay(target.traders, localeOverlay.traders);
+  for (const collection of ['tasks', 'items', 'maps', 'traders'] as const) {
+    const entities = target[collection];
+    if (Array.isArray(entities))
+      target[collection] = applyLocaleOverlay(entities, localeOverlay[collection]);
   }
 }
 function applyEntityCollectionOverlay(
   target: OverlayTargetData,
-  collection: 'hideoutStations' | 'items' | 'traders',
+  collection: 'hideoutStations' | 'items' | 'traders' | 'maps',
   patches: Record<string, Record<string, unknown>> | undefined
 ): void {
   const entities = target[collection];
   if (!patches || !Array.isArray(entities)) return;
   target[collection] = applyEntityOverlay(entities, patches);
 }
+const chapterTaskIds = (chapter: Record<string, unknown>): string[] => {
+  if (!Array.isArray(chapter.questUnlocks)) return [];
+  return chapter.questUnlocks
+    .filter(isPlainObject)
+    .map((unlock) => unlock.id)
+    .filter((id): id is string => typeof id === 'string');
+};
+const storyChapterName = (chapter: Record<string, unknown>, id: string) =>
+  typeof chapter.name === 'string' ? chapter.name : id;
+const collectStoryUnlocks = (chapters: Record<string, Record<string, unknown>> = {}) => {
+  const byTask = new Map<string, Array<{ id: string; name: string }>>();
+  for (const [id, chapter] of Object.entries(chapters)) {
+    const name = storyChapterName(chapter, id);
+    for (const taskId of chapterTaskIds(chapter)) {
+      const entries = byTask.get(taskId) ?? [];
+      entries.push({ id, name });
+      byTask.set(taskId, entries);
+    }
+  }
+  return byTask;
+};
 export async function applyOverlay<T extends { data?: OverlayTargetData }>(
   data: T,
   options: {
@@ -553,6 +527,7 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
     return result;
   }
   result.data = { ...data.data };
+  const locale = options.locale?.trim() || 'en';
   // Apply task corrections and inject overlay task additions
   if (Array.isArray(result.data.tasks)) {
     // Merge mode-specific task corrections on top of shared corrections
@@ -585,12 +560,33 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
     const existingIds = new Set(correctedTasks.map((task) => task.id));
     const dedupedAdditions = addedTasks.filter((task) => !existingIds.has(task.id));
     logger.info(`Overlay tasksAdd: ${dedupedAdditions.length} additions after dedupe`);
-    result.data.tasks = [...correctedTasks, ...dedupedAdditions];
+    const chapters = mergeOverlayRecords(
+      scopedOverlay(overlay, 'storyChapters', options.gameMode ?? 'regular'),
+      overlay.locales?.[locale]?.storyChapters
+    );
+    const storyUnlocksByTask = collectStoryUnlocks(chapters);
+    result.data.tasks = [...correctedTasks, ...dedupedAdditions].map((task) => ({
+      ...task,
+      storyUnlocks: storyUnlocksByTask.get(task.id) ?? [],
+    }));
   }
-  applyEntityCollectionOverlay(result.data, 'items', overlay.items);
-  applyEntityCollectionOverlay(result.data, 'traders', overlay.traders);
-  applyEntityCollectionOverlay(result.data, 'hideoutStations', overlay.hideout);
-  const locale = options.locale?.trim() || 'en';
+  const mode = options.gameMode ?? 'regular';
+  if (Array.isArray(result.data.items))
+    result.data.items = addFallbackItems(result.data.items as TarkovItem[], overlay, mode);
+  if (Array.isArray(result.data.hideoutStations))
+    result.data.hideoutStations = addFallbackCrafts(
+      result.data.hideoutStations as HideoutStation[],
+      overlay,
+      mode
+    );
+  applyEntityCollectionOverlay(result.data, 'items', scopedOverlay(overlay, 'items', mode));
+  applyEntityCollectionOverlay(result.data, 'traders', scopedOverlay(overlay, 'traders', mode));
+  applyEntityCollectionOverlay(
+    result.data,
+    'hideoutStations',
+    scopedOverlay(overlay, 'hideout', mode)
+  );
+  applyEntityCollectionOverlay(result.data, 'maps', scopedOverlay(overlay, 'maps', mode));
   const localeOverlay = overlay.locales?.[locale];
   if (localeOverlay) {
     applyLocaleOverlays(result.data, localeOverlay);

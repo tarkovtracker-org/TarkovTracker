@@ -2,6 +2,8 @@ import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import TaskCard from '@/features/tasks/TaskCard.vue';
+import type { TaskEvaluationMap } from '@/stores/taskAvailability';
+import type { UserProgressData } from '@/types/progress';
 import type { Task } from '@/types/tarkov';
 const taskState = reactive({
   complete: false,
@@ -14,6 +16,7 @@ const preferencesState = reactive({
   pinnedTaskIds: [] as string[],
 });
 const progressStoreMock = {
+  taskEvaluations: {} as TaskEvaluationMap,
   invalidTasks: {} as Record<string, Record<string, boolean>>,
   tasksCompletions: {} as Record<string, Record<string, boolean>>,
   tasksFailed: {} as Record<string, Record<string, boolean>>,
@@ -21,7 +24,7 @@ const progressStoreMock = {
   visibleTeamStores: { self: {} } as Record<string, Record<string, never>>,
 };
 const tarkovStoreMock = {
-  getCurrentProgressData: vi.fn(() => ({ taskCompletions: {} })),
+  getCurrentProgressData: vi.fn((): Partial<UserProgressData> => ({ taskCompletions: {} })),
   getObjectiveCount: vi.fn(() => 0),
   getPMCFaction: vi.fn(() => 'USEC'),
   getTraderLevel: vi.fn(() => 1),
@@ -122,7 +125,7 @@ const TaskCardHeaderStub = {
 };
 const TaskCardBadgesStub = {
   template: '<div data-testid="task-card-badges"><slot name="actions" /></div>',
-  props: ['task'],
+  props: ['task', 'traderRequirements'],
 };
 const TaskCardActionsStub = {
   template: '<div data-testid="task-card-actions" />',
@@ -184,12 +187,63 @@ describe('TaskCard expansion controls', () => {
     preferencesState.hideRewards = false;
     preferencesState.primaryView = 'all';
     preferencesState.pinnedTaskIds = [];
+    progressStoreMock.taskEvaluations = {};
     progressStoreMock.invalidTasks = {};
     progressStoreMock.tasksCompletions = {};
     progressStoreMock.tasksFailed = {};
     progressStoreMock.unlockedTasks = { 'task-1': { self: true } };
     vi.clearAllMocks();
+    metadataStoreMock.getTaskById.mockReset();
+    tarkovStoreMock.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
   });
+  it('keeps a locked card usable before its evaluation snapshot is available', async () => {
+    progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
+    const wrapper = await mountTaskCard();
+    expect(wrapper.get('[data-testid="task-card-title"]').text()).toBe('Sample task');
+    expect(wrapper.find('[data-testid="task-blockers"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it('renders canonical blockers and evaluates reputation badges', async () => {
+    progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
+    progressStoreMock.taskEvaluations = {
+      'task-1': {
+        self: { available: false, blockers: [{ type: 'player_level', current: 1, required: 20 }] },
+      },
+    };
+    const wrapper = await mountTaskCard({
+      normalizedTraderRequirements: [
+        {
+          id: 'rep',
+          trader: { id: 'prapor', name: 'Prapor' },
+          requirementType: 'reputation',
+          value: 0.5,
+          compareMethod: '>=',
+        },
+      ],
+    });
+    expect(wrapper.get('[data-testid="task-blockers"]').text()).not.toBe('');
+    expect(wrapper.findComponent(TaskCardBadgesStub).props('traderRequirements')).toEqual([
+      expect.objectContaining({ id: 'rep', met: false }),
+    ]);
+    wrapper.unmount();
+  });
+  it.each([false, true])(
+    'shows pending prerequisites only without storyline progress: %s',
+    async (complete) => {
+      tarkovStoreMock.getCurrentProgressData.mockReturnValue({
+        taskCompletions: {},
+        storyChapters: { chapter: { complete } },
+      });
+      metadataStoreMock.getTaskById.mockReturnValue({ id: 'prior', name: 'Prior quest' });
+      const wrapper = await mountTaskCard({
+        parents: ['prior'],
+        storyUnlocks: [{ id: 'chapter', name: 'Chapter' }],
+        taskRequirements: [{ task: { id: 'prior' }, status: ['complete'] }],
+      });
+      expect(wrapper.text().includes('Prior quest')).toBe(!complete);
+      wrapper.unmount();
+    }
+  );
   it('renders a dedicated toggle button in compact mode without making the header interactive', async () => {
     const wrapper = await mountTaskCard();
     const header = wrapper.get('[data-testid="task-card-header"]');

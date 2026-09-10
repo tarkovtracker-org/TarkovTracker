@@ -12,6 +12,7 @@
  *   TARKOV_DATA_KV_NAMESPACE_ID - id of the TARKOV_DATA namespace
  */
 import { parseArgs } from 'node:util';
+import { writeFile } from 'node:fs/promises';
 import { createKvRestWriter } from './kv';
 import { runPrecompute, validatePrecomputeFilter } from './precompute';
 function fail(message: string): never {
@@ -42,6 +43,18 @@ const kv = createKvRestWriter({
 });
 try {
   const result = await runPrecompute(kv, filter);
+  try {
+    await writeFile(
+      'precompute-manifest.json',
+      JSON.stringify(
+        { completedAt: Date.now(), entries: result.manifest, failures: result.failures },
+        null,
+        2
+      )
+    );
+  } catch (error) {
+    console.warn('[precompute] Could not write local diagnostic manifest:', error);
+  }
   console.log(
     JSON.stringify(
       {

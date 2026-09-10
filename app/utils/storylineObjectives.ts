@@ -109,7 +109,7 @@ export const getAutoCompletableObjectiveIds = (objectives: StoryObjectiveInput):
 export interface ToggleStoryChapterWithLinearObjectivesOptions {
   chapterId: string;
   isChapterComplete: boolean;
-  objectives?: StoryObjectiveInput;
+  objectives?: Exclude<StoryObjectiveInput, undefined>;
   isObjectiveComplete: (objectiveId: string) => boolean;
   setChapterComplete: (chapterId: string) => void;
   setChapterUncomplete: (chapterId: string) => void;
@@ -139,6 +139,7 @@ export const toggleStoryChapterWithLinearObjectives = (
 export const normalizeStoryChapter = (chapter: StoryChapter): StoryChapter => {
   return {
     ...chapter,
+    order: Number.isFinite(chapter.order) ? chapter.order : 0,
     objectives: normalizeStoryObjectives(chapter.objectives),
   };
 };

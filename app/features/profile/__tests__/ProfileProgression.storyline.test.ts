@@ -2,7 +2,12 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ref, type Ref } from 'vue';
+import type { Task } from '@/types/tarkov';
+const profileMetadataTasks = ref<Task[]>([]);
+const profileMetadataError = ref<Error | null>(null);
+const profileMetadataScopes = vi.fn();
 const setStoryChapterCompleteMock = vi.fn();
 const setStoryChapterUncompleteMock = vi.fn();
 const setStoryObjectiveCompleteMock = vi.fn();
@@ -77,16 +82,33 @@ vi.mock('@/stores/useTarkov', () => ({
     getTarkovUid: () => null,
   }),
 }));
+vi.mock('@/composables/useProfileTaskMetadata', () => ({
+  useProfileTaskMetadata: (mode: Ref<string>, language: Ref<string>) => {
+    profileMetadataScopes(mode, language);
+    return {
+      tasks: profileMetadataTasks,
+      duplicateObjectiveIds: ref(new Map()),
+      chapters: ref(storyChaptersMetadata),
+      editions: ref([]),
+      prestige: ref([]),
+      error: profileMetadataError,
+      loading: ref(false),
+    };
+  },
+}));
 vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => ({
-    storyChapters: storyChaptersMetadata,
+    storyChapters: [],
     tasks: [],
     hideoutStations: [],
     loading: false,
+    languageCode: 'en',
+    editions: [],
   }),
 }));
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => ({
+    getTasksRequireTraderLevels: true,
     getUseAutomaticLevelCalculation: false,
     getProfileSharePvpPublic: false,
     getProfileSharePvePublic: false,
@@ -109,11 +131,8 @@ vi.mock('@/utils/formatters', () => ({
 vi.mock('@/utils/tarkovDevProfileUrl', () => ({
   buildTarkovDevProfileUrl: () => undefined,
 }));
-vi.mock('@/utils/taskStatus', () => ({
-  getCompletionFlags: () => ({ complete: false, failed: false }),
-}));
 vi.mock('@/utils/taskTypeFilters', () => ({
-  filterTasksByTypeSettings: () => [],
+  filterTasksByTypeSettings: (tasks: Task[]) => tasks,
 }));
 vi.mock('@/utils/progressInvalidation', () => ({
   computeInvalidProgress: () => ({ invalidTasks: [], invalidObjectives: [] }),
@@ -158,10 +177,19 @@ const createWrapper = async () => {
     global: {
       plugins: [createPinia()],
       stubs: {
-        ProfileOverviewTab: { template: '<div data-testid="overview-tab" />' },
-        ProfileTasksTab: { template: '<div data-testid="tasks-tab" />' },
+        ProfileOverviewTab: {
+          props: ['kappaProjection'],
+          template: '<div data-testid="overview-tab" :data-state="kappaProjection.state" />',
+        },
+        ProfileTasksTab: {
+          name: 'ProfileTasksTab',
+          props: ['countedTasks', 'isTaskLocked', 'objectiveCompletions'],
+          template:
+            '<div data-testid="tasks-tab"><span v-for="task in countedTasks" :key="task.id" :data-task="task.id" :data-locked="String(isTaskLocked(task.id))" /></div>',
+        },
         ProfileHideoutTab: { template: '<div data-testid="hideout-tab" />' },
         ProfileStorylineTab: {
+          name: 'ProfileStorylineTab',
           props: ['readOnly'],
           emits: ['toggle-chapter', 'toggle-objective'],
           template:
@@ -171,7 +199,7 @@ const createWrapper = async () => {
           props: ['items', 'modelValue'],
           emits: ['update:model-value'],
           template:
-            '<div data-testid="tabs"><button data-testid="select-storyline-tab" @click="$emit(\'update:model-value\', 3)" /></div>',
+            '<div data-testid="tabs"><button data-testid="select-tasks-tab" @click="$emit(\'update:model-value\', 1)" /><button data-testid="select-storyline-tab" @click="$emit(\'update:model-value\', 3)" /></div>',
         },
         UAlert: true,
         UBadge: { template: '<span><slot /></span>' },
@@ -189,9 +217,14 @@ const expectNoStoryStoreWrites = () => {
   expect(setStoryObjectiveUncompleteMock).not.toHaveBeenCalled();
 };
 describe('ProfileProgression storyline chapter toggle', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     setActivePinia(createPinia());
+    profileMetadataTasks.value = [];
+    profileMetadataError.value = null;
     pvpOverrides = {};
     pveOverrides = {};
     routeState.params = {};
@@ -205,6 +238,90 @@ describe('ProfileProgression storyline chapter toggle', () => {
         gameEdition: 1,
       })
     );
+  });
+  it('renders legacy progress without objective or trader records as incomplete', async () => {
+    pvpOverrides = { taskObjectives: undefined, traders: undefined };
+    profileMetadataTasks.value = [
+      {
+        id: 'legacy',
+        name: 'Legacy task',
+        objectives: [{ id: 'objective', type: 'shoot', count: 1 }],
+        normalizedTraderRequirements: [
+          {
+            id: 'loyalty',
+            trader: { id: 'prapor', name: 'Prapor' },
+            requirementType: 'level',
+            value: 2,
+            compareMethod: '>=',
+          },
+        ],
+      },
+    ];
+    const wrapper = await createWrapper();
+    await wrapper.get('[data-testid="select-tasks-tab"]').trigger('click');
+    expect(wrapper.get('[data-task="legacy"]').attributes('data-locked')).toBe('true');
+    expect(
+      wrapper.findComponent({ name: 'ProfileTasksTab' }).props('objectiveCompletions')
+    ).toEqual({});
+    wrapper.unmount();
+  });
+  it('uses isolated profile requirements to label available and locked tasks', async () => {
+    profileMetadataTasks.value = [
+      { id: 'ready', name: 'Ready', factionName: 'Any', objectives: [] },
+      { id: 'locked', name: 'Locked', minPlayerLevel: 20, objectives: [] },
+      { id: 'wrong-faction', name: 'BEAR', factionName: 'BEAR', objectives: [] },
+    ];
+    const wrapper = await createWrapper();
+    await wrapper.get('[data-testid="select-tasks-tab"]').trigger('click');
+    expect(wrapper.get('[data-task="ready"]').attributes('data-locked')).toBe('false');
+    expect(wrapper.get('[data-task="locked"]').attributes('data-locked')).toBe('true');
+    expect(wrapper.find('[data-task="wrong-faction"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it('passes the selected profile mode and language to the isolated metadata loader', async () => {
+    routeState.query = { mode: 'pve' };
+    const wrapper = await createWrapper();
+    const [mode, language] = profileMetadataScopes.mock.calls.at(-1)!;
+    expect(mode.value).toBe('pve');
+    expect(language.value).toBe('en');
+    wrapper.unmount();
+  });
+  it('projects remaining Kappa progress using the isolated task graph', async () => {
+    const now = Date.UTC(2026, 8, 8);
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+    profileMetadataTasks.value = Array.from({ length: 4 }, (_, index) => ({
+      id: `kappa-${index}`,
+      name: `Kappa ${index}`,
+      kappaRequired: true,
+      objectives: [],
+    }));
+    pvpOverrides = {
+      taskCompletions: Object.fromEntries(
+        [0, 1, 2].map((index) => [
+          `kappa-${index}`,
+          { complete: true, timestamp: now - (4 - index) * 86400000 },
+        ])
+      ),
+    };
+    const wrapper = await createWrapper();
+    expect(wrapper.get('[data-testid="overview-tab"]').attributes('data-state')).toBe('projected');
+    wrapper.unmount();
+  });
+  it('shows a metadata error while keeping profile controls available', async () => {
+    profileMetadataError.value = new Error('Catalog unavailable');
+    const wrapper = await createWrapper();
+    expect(wrapper.find('u-alert-stub').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="tabs"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+  it('toggles an objective from the isolated chapter catalog', async () => {
+    const wrapper = await createWrapper();
+    await wrapper.get('[data-testid="select-storyline-tab"]').trigger('click');
+    wrapper
+      .findComponent({ name: 'ProfileStorylineTab' })
+      .vm.$emit('toggle-objective', 'chapter-1', 'obj-1');
+    expect(setStoryObjectiveCompleteMock).toHaveBeenCalledWith('chapter-1', 'obj-1');
+    wrapper.unmount();
   });
   it('delegates chapter toggle to store and auto-completes non-route objectives', async () => {
     const wrapper = await createWrapper();

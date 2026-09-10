@@ -263,9 +263,10 @@ export async function edgeCache<T>(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(`Error in edgeCache for ${fullCacheKey}:`, error);
+    const statusCode = (error as { statusCode?: unknown } | null)?.statusCode === 503 ? 503 : 502;
     const sanitizedErrorMessage = sanitizeErrorMessage(errorMessage);
     throw createErrorFn({
-      statusCode: 502,
+      statusCode,
       statusMessage: sanitizedErrorMessage
         ? `Failed to fetch data for ${fullCacheKey}: ${sanitizedErrorMessage}`
         : `Failed to fetch data for ${fullCacheKey}`,

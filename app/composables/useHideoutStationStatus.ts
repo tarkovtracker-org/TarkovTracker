@@ -4,6 +4,7 @@ import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { logger } from '@/utils/logger';
 import { getCanonicalSkillKey } from '@/utils/skillHelpers';
+import { compareRequirement } from '@/utils/taskRequirements';
 import type {
   HideoutLevel,
   HideoutStation,
@@ -62,7 +63,7 @@ export const useHideoutStationStatus = (): UseHideoutStationStatusReturn => {
       return true;
     }
     const currentLevel = tarkovStore.getTraderLevel(requirement.trader.id);
-    return currentLevel >= requirement.value;
+    return compareRequirement(currentLevel, requirement.compareMethod ?? '>=', requirement.value);
   };
   const arePrereqsMet = (nextLevel: HideoutLevel | null): boolean => {
     if (!nextLevel) return false;

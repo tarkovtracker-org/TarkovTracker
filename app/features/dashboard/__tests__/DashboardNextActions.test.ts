@@ -28,6 +28,7 @@ const translations: Record<string, string> = {
   'page.dashboard.focus.proof.blocked_level_other': 'Closest unlock: only {count} levels away.',
   'page.dashboard.focus.proof.blocked_trader_unlock':
     'Closest unlock: finish {task} to unlock {trader}.',
+  'page.dashboard.focus.proof.ready_other': 'Best available: {count} objectives left.',
   'page.dashboard.focus.proof.complete': 'No visible work remains in this dashboard scope.',
   'page.dashboard.focus.proof.impact_one': 'Highest payoff: opens 1 follow-up task.',
   'page.dashboard.focus.proof.impact_other': 'Highest payoff: opens {count} follow-up tasks.',
@@ -42,6 +43,7 @@ const translations: Record<string, string> = {
   'page.dashboard.focus.status.level_other': 'Reach level {required} ({count} more levels to go).',
   'page.dashboard.focus.status.ready_other': 'Ready now. {count} objectives left.',
   'page.dashboard.focus.status.trader_unlock': 'Complete {task} to unlock {trader}.',
+  'page.dashboard.focus.summary.blocked_requirement': '{task} is blocked by its requirements.',
   'page.dashboard.focus.summary.blocked_trader_unlock':
     '{task} is blocked until a trader unlock is complete.',
   'page.dashboard.focus.summary.blocked_level_other':
@@ -150,7 +152,8 @@ describe('DashboardNextActions', () => {
           {
             count: 2,
             required: 15,
-            type: 'level',
+            type: 'requirement',
+            description: 'Reach level 15 (2 more levels to go).',
           },
         ],
         progress: {
@@ -158,7 +161,7 @@ describe('DashboardNextActions', () => {
           remaining: 1,
           total: 1,
         },
-        reason: 'blocked-level',
+        reason: 'blocked-requirement',
         score: -8,
         taskName: 'Wet Job - Part 1',
         tone: 'warning',
@@ -166,7 +169,8 @@ describe('DashboardNextActions', () => {
       'blocked'
     );
     expect(wrapper.text()).toContain('Why it won');
-    expect(wrapper.text()).toContain('Closest unlock: only 2 levels away.');
+    expect(wrapper.text()).toContain('Reach level 15 (2 more levels to go).');
+    expect(wrapper.text()).toContain('Wet Job - Part 1 is blocked by its requirements.');
     expect(wrapper.text()).toContain('Closest unlock: Wet Job - Part 1');
   });
   it('tracks primary recommendation clicks', async () => {
@@ -200,19 +204,13 @@ describe('DashboardNextActions', () => {
     const primarySurfaceLink = wrapper.get('a[data-task="task-impact"]');
     expect(primarySurfaceLink.text()).toContain('Impact Task');
   });
-  it('uses blocker priority instead of insertion order for blocked cards', async () => {
+  it('renders canonical blocker detail once with a separate summary and status', async () => {
     const wrapper = await mountWithRecommendation(
       createRecommendation({
         blockers: [
           {
-            count: 2,
-            required: 15,
-            type: 'level',
-          },
-          {
-            taskName: 'Getting Acquainted',
-            traderName: 'Lightkeeper',
-            type: 'trader-unlock',
+            type: 'requirement',
+            description: 'Complete Getting Acquainted to unlock Lightkeeper.',
           },
         ],
         progress: {
@@ -220,19 +218,23 @@ describe('DashboardNextActions', () => {
           remaining: 1,
           total: 1,
         },
-        reason: 'blocked-trader-unlock',
+        reason: 'blocked-requirement',
         score: -12,
         taskName: 'Top Secret',
         tone: 'warning',
       }),
       'blocked'
     );
-    expect(wrapper.text()).toContain('Top Secret is blocked until a trader unlock is complete.');
-    expect(wrapper.text()).toContain(
-      'Closest unlock: finish Getting Acquainted to unlock Lightkeeper.'
+    expect(wrapper.text().split('Complete Getting Acquainted to unlock Lightkeeper.')).toHaveLength(
+      2
     );
     expect(wrapper.text()).toContain('Complete Getting Acquainted to unlock Lightkeeper.');
     expect(wrapper.text()).not.toContain('only 2 levels away');
     expect(wrapper.text()).not.toContain('Reach level 15');
   });
+});
+it('explains ordinary ready tasks when no payoff or special goal applies', async () => {
+  const wrapper = await mountWithRecommendation(createRecommendation(), 'actionable');
+  expect(wrapper.text()).toContain('Best available: 3 objectives left.');
+  wrapper.unmount();
 });

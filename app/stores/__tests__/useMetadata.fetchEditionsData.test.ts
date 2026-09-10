@@ -40,6 +40,64 @@ describe('useMetadataStore fetchEditionsData', () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
+  it('clears stale Seasonal perks when an edition response omits them', async () => {
+    const store = useMetadataStore();
+    store.currentGameMode = 'seasonal';
+    store.seasonalPerks = [
+      {
+        id: 'stale',
+        type: 'perk',
+        name: 'Stale',
+        description: '',
+        points: 0,
+        mutuallyExclusiveSeasonalPerkIds: [],
+        effects: [],
+      },
+    ];
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn().mockResolvedValue({ data: { editions: [], storyChapters: [] } })
+    );
+    await store.fetchEditionsData(true);
+    expect(store.editionsError).toBeNull();
+    expect(store.seasonalPerks).toEqual([]);
+    expect($fetch).toHaveBeenCalledWith(
+      '/api/tarkov/editions',
+      expect.objectContaining({ query: expect.objectContaining({ gameMode: 'pvp-season' }) })
+    );
+  });
+  it('joins an in-flight editions request for the same scope', async () => {
+    const store = useMetadataStore();
+    const response = createDeferred<object>();
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    vi.stubGlobal('$fetch', vi.fn().mockReturnValue(response.promise));
+    const first = store.fetchEditionsData();
+    await flushPromises();
+    const joined = store.fetchEditionsData();
+    response.resolve({ data: { editions: [], storyChapters: [] } });
+    await Promise.all([first, joined]);
+    expect($fetch).toHaveBeenCalledTimes(1);
+    expect(store.editionsLoading).toBe(false);
+  });
+  it('continues to the network when the editions cache cannot be read', async () => {
+    const store = useMetadataStore();
+    vi.spyOn(cacheUtils, 'getCachedData').mockRejectedValue(new Error('Cache unavailable'));
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn().mockResolvedValue({ data: { editions: [], storyChapters: [] } })
+    );
+    await store.fetchEditionsData();
+    expect($fetch).toHaveBeenCalledTimes(1);
+    expect(store.editionsError).toBeNull();
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      '[MetadataStore] Editions cache read failed:',
+      expect.any(Error)
+    );
+  });
   it('keeps cached editions when story chapters cache is missing and overlay fetch fails', async () => {
     const store = useMetadataStore();
     const cachedEdition = createEdition('cached-edition', 1, 'Cached Edition');
@@ -50,6 +108,19 @@ describe('useMetadataStore fetchEditionsData', () => {
     await store.fetchEditionsData(false);
     expect(store.editions).toEqual([cachedEdition]);
     expect(store.storyChapters).toEqual([]);
+    expect(store.editionsError).toBeInstanceOf(Error);
+  });
+  it('preserves the last-good catalog on malformed edition records', async () => {
+    const store = useMetadataStore();
+    const existing = createEdition('existing', 1, 'Existing');
+    store.editions = [existing];
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn().mockResolvedValue({ data: { editions: [{ id: 'broken' }], storyChapters: [] } })
+    );
+    await store.fetchEditionsData(true);
+    expect(store.editions).toEqual([existing]);
     expect(store.editionsError).toBeInstanceOf(Error);
   });
   it('preserves already-loaded editions when overlay fetch fails', async () => {
@@ -76,7 +147,10 @@ describe('useMetadataStore fetchEditionsData', () => {
     const store = useMetadataStore();
     vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
     vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
-    vi.stubGlobal('$fetch', vi.fn().mockResolvedValue({ editions: {}, storyChapters: {} }));
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn().mockResolvedValue({ data: { editions: [], storyChapters: [] } })
+    );
     await store.fetchEditionsData();
     await store.ensureEditionsData();
     expect($fetch).toHaveBeenCalledTimes(1);
@@ -85,7 +159,10 @@ describe('useMetadataStore fetchEditionsData', () => {
     const store = useMetadataStore();
     vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
     vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
-    vi.stubGlobal('$fetch', vi.fn().mockResolvedValue({ editions: {}, storyChapters: {} }));
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn().mockResolvedValue({ data: { editions: [], storyChapters: [] } })
+    );
     await store.ensureEditionsData();
     expect($fetch).toHaveBeenCalledTimes(1);
   });
@@ -133,12 +210,9 @@ describe('useMetadataStore fetchEditionsData', () => {
       const first = store.fetchEditionsData(true);
       await flushPromises();
       const second = store.fetchEditionsData(true);
-      current.resolve({
-        editions: { latest: latestEdition },
-        storyChapters: { latest: latestChapter },
-      });
+      current.resolve({ data: { editions: [latestEdition], storyChapters: [latestChapter] } });
       await second;
-      if (outcome === 'resolve') older.resolve({ editions: {}, storyChapters: {} });
+      if (outcome === 'resolve') older.resolve({ data: { editions: [], storyChapters: [] } });
       else older.reject(new Error('obsolete failure'));
       await first;
       expect(store.editions).toEqual([latestEdition]);
@@ -154,7 +228,9 @@ describe('useMetadataStore fetchEditionsData', () => {
     const latest = createEdition('latest', 3, 'Latest');
     vi.spyOn(cacheUtils, 'getCachedData').mockReturnValue(cache.promise);
     vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
-    const fetchMock = vi.fn().mockResolvedValue({ editions: { latest } });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ data: { editions: [latest], storyChapters: [] } });
     vi.stubGlobal('$fetch', fetchMock);
     const older = store.fetchEditionsData();
     await flushPromises();
@@ -188,8 +264,7 @@ describe('useMetadataStore fetchEditionsData', () => {
     vi.stubGlobal(
       '$fetch',
       vi.fn().mockResolvedValue({
-        editions: { replacement: createEdition('replacement', 2, 'Replacement') },
-        storyChapters: { invalid: null },
+        data: { editions: [createEdition('replacement', 2, 'Replacement')], storyChapters: [null] },
       })
     );
     await store.fetchEditionsData(true);
@@ -217,8 +292,7 @@ describe('useMetadataStore fetchEditionsData', () => {
     const refreshedEdition = createEdition('refreshed-edition', 2, 'Refreshed Edition');
     const refreshedChapter = createStoryChapter('refreshed-chapter', 2, 'Refreshed Chapter');
     const overlayResponse = createDeferred<{
-      editions: Record<string, GameEdition>;
-      storyChapters: Record<string, StoryChapter>;
+      data: { editions: GameEdition[]; storyChapters: StoryChapter[] };
     }>();
     vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue({
       editions: [cachedEdition],
@@ -238,15 +312,74 @@ describe('useMetadataStore fetchEditionsData', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(secondSettled).toBe(false);
     overlayResponse.resolve({
-      editions: {
-        [refreshedEdition.id]: refreshedEdition,
-      },
-      storyChapters: {
-        [refreshedChapter.id]: refreshedChapter,
-      },
+      data: { editions: [refreshedEdition], storyChapters: [refreshedChapter] },
     });
     await Promise.all([firstRequest, secondRequest]);
     expect(store.editions).toEqual([refreshedEdition]);
     expect(store.storyChapters).toEqual([refreshedChapter]);
+  });
+  it('requests and caches the current mode/language catalog', async () => {
+    const store = useMetadataStore();
+    store.currentGameMode = 'pve';
+    store.languageCode = 'de';
+    const cacheWrite = vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    const chapter = createStoryChapter('mode-only', 1, 'PvE chapter');
+    const fetch = vi.fn().mockResolvedValue({ data: { editions: [], storyChapters: [chapter] } });
+    vi.stubGlobal('$fetch', fetch);
+    await store.fetchEditionsData(true);
+    expect(store.storyChapters).toEqual([chapter]);
+    expect(fetch).toHaveBeenCalledWith('/api/tarkov/editions', {
+      query: { lang: 'de', gameMode: 'pve', cacheBust: '1' },
+    });
+    expect(cacheWrite).toHaveBeenCalledWith(
+      'editions',
+      'overlay-v2-pve',
+      'de',
+      expect.any(Object),
+      expect.any(Number)
+    );
+  });
+  it('retries a mode whose obsolete request settled after switching away', async () => {
+    const store = useMetadataStore();
+    const pending = createDeferred<object>();
+    const fetch = vi
+      .fn()
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValue({ data: { editions: [], storyChapters: [] } });
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.stubGlobal('$fetch', fetch);
+    const request = store.fetchEditionsData(true);
+    await flushPromises();
+    store.currentGameMode = 'pve';
+    pending.resolve({ data: { editions: [], storyChapters: [] } });
+    await request;
+    store.currentGameMode = 'pvp';
+    await store.ensureEditionsData();
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  it('reloads A after switching from loaded A to pending B and back to A', async () => {
+    const store = useMetadataStore();
+    const pending = createDeferred<object>();
+    const edition = createEdition('a', 1, 'A');
+    const response = { data: { editions: [edition], storyChapters: [] } };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(response)
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValue(response);
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    vi.stubGlobal('$fetch', fetch);
+    await store.fetchEditionsData(true);
+    store.currentGameMode = 'pve';
+    const other = store.fetchEditionsData(true);
+    await flushPromises();
+    store.currentGameMode = 'pvp';
+    await store.ensureEditionsData();
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(store.editions).toEqual([edition]);
+    pending.resolve({ data: { editions: [], storyChapters: [] } });
+    await other;
+    expect(store.editions).toEqual([edition]);
   });
 });
