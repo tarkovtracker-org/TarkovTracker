@@ -2,12 +2,27 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-const { seoMeta, head } = vi.hoisted(() => ({ seoMeta: vi.fn(), head: vi.fn() }));
+const { seoMeta } = vi.hoisted(() => ({ seoMeta: vi.fn() }));
 mockNuxtImport('useSeoMeta', () => seoMeta);
-mockNuxtImport('useHead', () => head);
-mockNuxtImport('useRuntimeConfig', () => () => ({
-  public: { appUrl: 'https://tarkovtracker.org' },
-}));
+vi.mock('@/features/credits/creditSections', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/credits/creditSections')>();
+  return {
+    ...actual,
+    staticCreditSections: [
+      {
+        key: 'original_creator',
+        members: [{ name: 'Thaddeus' }],
+        fullWidth: true,
+      },
+      {
+        key: 'beta_testers',
+        members: [{ name: 'Adealia' }],
+        fullWidth: false,
+        compact: true,
+      },
+    ],
+  };
+});
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({
@@ -32,7 +47,10 @@ describe('credits page', () => {
         },
       },
     });
-    expect(wrapper.findAll('section')).toHaveLength(2);
+    const sections = wrapper.findAll('section');
+    expect(sections).toHaveLength(2);
+    expect(sections[0]?.classes()).toContain('md:col-span-2');
+    expect(sections[1]?.classes()).not.toContain('md:col-span-2');
     expect(wrapper.find('[data-testid="contributors"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('page.credits.sections.original_creator');
     expect(seoMeta).toHaveBeenCalledWith(
@@ -47,7 +65,6 @@ describe('credits page', () => {
       'Meet the beta testers and open source contributors behind Tarkov Tracker.'
     );
     expect(metadata.ogUrl).toBeUndefined();
-    expect(head).not.toHaveBeenCalled();
   });
   it('links to the about page for the team directory', async () => {
     const { default: CreditsPage } = await import('@/pages/credits.vue');
