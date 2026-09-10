@@ -61,24 +61,29 @@ export const useSystemStore = defineStore<string, SystemState, SystemGetters>('s
     team: null,
     // fallow-ignore-next-line unused-store-member -- not actionable: read via a plain `SystemState` parameter, not the store
     team_id: null,
-    // Reached only as `state[getTeamIdStateKey(mode)]`. A computed key cannot be
-    // resolved statically, so no access to these three can ever be attributed.
-    // fallow-ignore-next-line unused-store-member -- not actionable: only reachable through a computed key
+    // Read only by `getTeamIdFromState(state)` from a plain `SystemState`
+    // parameter, whose active-mode lookup is the computed key
+    // `state[getTeamIdStateKey(mode)]`; no consumer names them on the store.
+    // fallow-ignore-next-line unused-store-member -- not actionable: read via a plain `SystemState` parameter and a computed key
     pvp_team_id: null,
-    // fallow-ignore-next-line unused-store-member -- not actionable: only reachable through a computed key
+    // fallow-ignore-next-line unused-store-member -- not actionable: read via a plain `SystemState` parameter and a computed key
     pve_team_id: null,
-    // fallow-ignore-next-line unused-store-member -- not actionable: only reachable through a computed key
+    // fallow-ignore-next-line unused-store-member -- not actionable: read via a plain `SystemState` parameter and a computed key
     seasonal_team_id: null,
-    // Read only by this store's own `isAdmin` getter, through its `state`
-    // parameter; no consumer touches `systemStore.is_admin` directly.
-    // fallow-ignore-next-line unused-store-member -- not actionable: consumed by this store's own getter, not by a consumer
+    // Read as `systemStore.$state.is_admin` by the admin route guard
+    // (`app/middleware/admin.ts`), the same erased-`$state` access as `user_id`:
+    // the assertion-free `$state` read never names this store member.
+    // fallow-ignore-next-line unused-store-member -- not actionable: reads go through `$state`, which names no store member
     is_admin: false,
   }),
   getters: {
-    // Consumers read `systemStore.userTeam`, but the wrapper exposes the store as
-    // the declared type `Store<string, SystemState, SystemGetters>`, which does not
-    // resolve back to this `defineStore` call, so the access is invisible here.
-    // fallow-ignore-next-line unused-store-member -- not actionable: reads resolve against the wrapper's declared store type
+    // Consumers read `systemStore.userTeam`, but only through
+    // `useSystemStoreWithSupabase()`, whose declared return type is the alias
+    // `Store<string, SystemState, SystemGetters>` and does not resolve back to
+    // this `defineStore` call. The sibling `isAdmin` getter reports clean purely
+    // because settings.vue also holds a direct `useSystemStore()` instance, so the
+    // only fix would be forcing consumers off the wrapper.
+    // fallow-ignore-next-line unused-store-member -- not actionable: reads resolve against the wrapper's aliased store type
     userTeam(state): string | null {
       return getTeamIdFromState(state);
     },
