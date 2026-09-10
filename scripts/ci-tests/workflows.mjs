@@ -49,7 +49,7 @@ test('shadow rollout and fork restrictions retain existing CI coverage and Deno 
   // whole-file regex would still pass if `if:` were reintroduced after `run:`.
   const buildStep = workflowStep(jobBlock(ci, 'validate'), 'Build');
   assert.match(buildStep, /run: pnpm run build/);
-  assert.doesNotMatch(buildStep, /^\s+if:/m);
+  assert.doesNotMatch(buildStep, /^[ \t]+if:/m);
   assert.match(
     workflowStep(jobBlock(ci, 'test'), 'Upload coverage to Codecov'),
     /if:[^\n]*fork != true/
