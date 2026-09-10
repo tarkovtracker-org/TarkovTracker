@@ -2241,8 +2241,8 @@
       "confirm_word": "SUPPRIMER"
     },
     "log_import": {
-      "reading_logs": "Reading logs and preparing the preview…",
-      "large_folder_hint": "Large folders are read locally in chunks. Keep this page open; you can cancel while logs are being read.",
+      "reading_logs": "Lecture des journaux et préparation de l'aperçu…",
+      "large_folder_hint": "Les grands dossiers sont lus localement dans les chunks. Gardez cette page ouverte; vous pouvez annuler pendant que les journaux sont en cours de lecture.",
       "upload_hint": "Sélectionnez votre dossier Logs d'Escape from Tarkov pour importer la progression des quêtes.",
       "deleted_logs_hint": "Si d'anciennes sessions de journaux ont été supprimées, elles ne peuvent pas être importées.",
       "deleted_logs_hint_tooltip": "L'importation des journaux lit uniquement les événements de quêtes encore présents dans votre dossier Logs actuel.",
@@ -2292,8 +2292,8 @@
       "cleared_logs_toast_title": "D’anciens journaux ont probablement été nettoyés",
       "cleared_logs_toast_description": "L'importation des journaux ne peut lire que l'historique des quêtes encore présent dans votre dossier Logs. Les sessions supprimées ne peuvent pas être récupérées.",
       "errors": {
-        "invalid_archive": "The ZIP archive is incomplete or contains an invalid log entry. No progress was imported.",
-        "record_too_large": "An individual log record in {path} is too large to parse safely. No progress was imported. Please report this log format.",
+        "invalid_archive": "L'archive ZIP est incomplète ou contient une entrée de journal invalide. Aucune progression n'a été importée.",
+        "record_too_large": "Un enregistrement individuel dans {path} est trop volumineux pour être analysé en toute sécurité. Aucune progression n'a été importée. Veuillez signaler ce format de journal.",
         "apply_import_failed": "Impossible d'appliquer les données importées de progression des quêtes.",
         "no_files_selected": "Aucun fichier n'a été sélectionné.",
         "no_matching_tasks_found": "Des événements de quête ont été trouvés, mais aucun ne correspond aux tâches TarkovTracker actuelles.",
