@@ -1,3 +1,10 @@
+## [1.77.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.1...v1.77.2) (2026-09-10)
+
+
+### Bug Fixes
+
+* **app:** unify progression and overlay in one v3 release ([#826](https://github.com/tarkovtracker-org/TarkovTracker/issues/826)) ([dbcad5b](https://github.com/tarkovtracker-org/TarkovTracker/commit/dbcad5be38e1f23aa9fbedbed336c821b1f22541))
+
 ## [1.77.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.0...v1.77.1) (2026-09-10)
 
 
