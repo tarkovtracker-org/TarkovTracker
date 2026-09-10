@@ -17,6 +17,8 @@ const OVERLAY_SECTION_OWNERS = {
   maps: 'tasks',
 } as const;
 const sectionNames = new Set(Object.keys(OVERLAY_SECTION_OWNERS));
+/** Upstream mode scopes an overlay may vary a section under. */
+const OVERLAY_MODES = ['regular', 'pve', 'pvp-season'] as const;
 const isRecordCollection = (value: unknown): boolean =>
   isPlainObject(value) && Object.values(value).every(isPlainObject);
 const validCollections = (sections: Record<string, unknown>): boolean =>
@@ -42,14 +44,17 @@ const chapterHasObjective = (
 ): boolean =>
   requirement.type !== 'storyObjectiveStatus' ||
   overlayEntries(chapter.objectives).some((objective) => objective.id === requirement.objective);
+// `localizeStoryRequirements` compares the projected string chapter ID against
+// this value, so a coerced number would validate here and then never resolve.
+const validChapterId = (value: unknown, chapters: OverlayRecords): value is string =>
+  typeof value === 'string' && value.length > 0 && Object.hasOwn(chapters, value);
 const validStoryReference = (requirement: unknown, chapters: OverlayRecords): boolean => {
   if (!isPlainObject(requirement)) return false;
   if (!validRequirementShape(requirement)) return false;
-  const chapterId = String(requirement.storyChapter);
-  if (!Object.hasOwn(chapters, chapterId)) return false;
-  const chapter = chapters[chapterId];
+  const chapterId = requirement.storyChapter;
+  if (!validChapterId(chapterId, chapters)) return false;
   // Section validation already guarantees that every own chapter entry is a record.
-  return chapterHasObjective(chapter!, requirement);
+  return chapterHasObjective(chapters[chapterId]!, requirement);
 };
 const storyRequirements = (level: Record<string, unknown>) =>
   Array.isArray(level.storyRequirements) ? level.storyRequirements : [];
@@ -81,11 +86,21 @@ const validCraftUnlock = (unlock: unknown): boolean =>
   unlock == null || typeof unlock === 'string' || validTaskReference(unlock);
 const validCraftLocation = (craft: Record<string, unknown>): boolean =>
   typeof craft.station === 'string' && typeof craft.level === 'number';
+// `adaptAddedCraft` forwards `productItem` as a reward requirement and
+// `adaptHideoutRequirement` resolves its reference from `productItem.item` via
+// `adaptItemRef`, which accepts either a string ID or a `{ id }` record. A craft
+// that carries the ID directly (`productItem.id`) yields no `reward.item`, so
+// `buildCraftSourcesMap` silently drops the product.
+const validCraftProduct = (productItem: unknown): boolean => {
+  if (!isPlainObject(productItem)) return false;
+  const item = productItem.item;
+  return typeof item === 'string' ? item.length > 0 : validTaskReference(item);
+};
 const validCraft = (craft: Record<string, unknown>): boolean =>
   [
     validCraftLocation(craft),
     Array.isArray(craft.requiredItems),
-    isPlainObject(craft.productItem),
+    validCraftProduct(craft.productItem),
     validCraftUnlock(craft.taskUnlock),
   ].every(Boolean);
 const validPrestigePatch = (patch: Record<string, unknown>): boolean => {
@@ -148,7 +163,7 @@ export const validateOverlayData = (value: unknown): value is OverlayData => {
   )
     return false;
   const overlay = value as OverlayData;
-  return ['regular', 'pve', 'pvp-season'].every((mode) =>
+  return OVERLAY_MODES.every((mode) =>
     [
       validEffectiveSections(overlay, mode),
       validChapterReferences(overlay, mode),
@@ -163,17 +178,23 @@ const unknownSectionNames = (value: object, prefix: string, allowed: Set<string>
 const scopedUnknownSections = (
   prefix: string,
   allowed: Set<string>,
-  container: Record<string, object> = {}
+  container: Record<string, object> = {},
+  allowedScopes?: Set<string>
 ): string[] =>
   Object.entries(container).flatMap(([scope, sections]) =>
-    unknownSectionNames(sections, `${prefix}.${scope}.`, allowed)
+    // A misspelled scope such as `modes.pv` has recognizable section names
+    // inside it, so report the scope itself rather than approving the fleet
+    // with a correction no runtime consumer will ever read.
+    allowedScopes && !allowedScopes.has(scope)
+      ? [`${prefix}.${scope}`]
+      : unknownSectionNames(sections, `${prefix}.${scope}.`, allowed)
   );
 export const unknownOverlaySections = (overlay: OverlayData): string[] => {
   const rootNames = new Set([...sectionNames, '$meta', 'modes', 'locales']);
   const localeNames = new Set(['tasks', 'items', 'traders', 'maps', 'prestige', 'storyChapters']);
   return [
     ...unknownSectionNames(overlay, '', rootNames),
-    ...scopedUnknownSections('modes', sectionNames, overlay.modes),
+    ...scopedUnknownSections('modes', sectionNames, overlay.modes, new Set(OVERLAY_MODES)),
     ...scopedUnknownSections('locales', localeNames, overlay.locales),
   ];
 };

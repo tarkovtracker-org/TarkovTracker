@@ -89,6 +89,7 @@ vi.mock('@/composables/useProfileTaskMetadata', () => ({
       tasks: profileMetadataTasks,
       duplicateObjectiveIds: ref(new Map()),
       chapters: ref(storyChaptersMetadata),
+      editions: ref([]),
       prestige: ref([]),
       error: profileMetadataError,
       loading: ref(false),

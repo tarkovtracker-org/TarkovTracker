@@ -25,7 +25,7 @@ describe('profile mode metadata', () => {
           data: { tasks: [{ id: 'pve', objectives: [{ id: 'pve-objective' }] }] },
         });
       if (url.includes('prestige')) return Promise.resolve({ data: { prestige: [] } });
-      return Promise.resolve({ data: { storyChapters: [] } });
+      return Promise.resolve({ data: { editions: [], storyChapters: [] } });
     });
     vi.stubGlobal('$fetch', fetch);
     const scope = effectScope();
@@ -71,7 +71,7 @@ describe('profile mode metadata', () => {
     expect(result.loading.value).toBe(false);
     scope.stop();
   });
-  it('aborts hanging optional requests after 15 seconds and exposes completed tasks', async () => {
+  it('aborts hanging optional requests after the server retry budget and exposes completed tasks', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     vi.stubGlobal(
       '$fetch',
@@ -88,7 +88,7 @@ describe('profile mode metadata', () => {
     );
     const scope = effectScope();
     const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pve'), ref('en')))!;
-    await vi.advanceTimersByTimeAsync(15000);
+    await vi.advanceTimersByTimeAsync(60000);
     expect(result.tasks.value).toEqual([expect.objectContaining({ id: 'task' })]);
     expect(result.error.value?.message).toBe('Profile metadata request timed out');
     expect(result.loading.value).toBe(false);
@@ -112,7 +112,7 @@ it('qualifies shared objectives and enriches the isolated prerequisite graph', a
     vi.fn((url: string) => {
       if (url.includes('tasks-')) return Promise.resolve({ data: { tasks } });
       if (url.includes('prestige')) return Promise.resolve({ data: { prestige: [] } });
-      return Promise.resolve({ data: { storyChapters: [] } });
+      return Promise.resolve({ data: { editions: [], storyChapters: [] } });
     })
   );
   const scope = effectScope();
@@ -142,7 +142,7 @@ it('keeps required catalogs when optional chapter normalization fails', async ()
       if (url.includes('tasks-'))
         return Promise.resolve({ data: { tasks: [{ id: 'task', objectives: [] }] } });
       if (url.includes('prestige')) return Promise.resolve({ data: { prestige: [] } });
-      return Promise.resolve({ data: { storyChapters: [null] } });
+      return Promise.resolve({ data: { editions: [], storyChapters: [null] } });
     })
   );
   const scope = effectScope();
@@ -176,7 +176,7 @@ it.each([
       if (url.includes('tasks-'))
         return Promise.resolve({ data: { tasks: [{ id: 'task', objectives: [] }] } });
       if (url.includes('prestige')) return Promise.resolve(payload);
-      return Promise.resolve({ data: { storyChapters: [] } });
+      return Promise.resolve({ data: { editions: [], storyChapters: [] } });
     })
   );
   const scope = effectScope();

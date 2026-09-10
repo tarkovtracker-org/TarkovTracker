@@ -470,7 +470,7 @@ it.each([undefined, 'unlock-task', { id: 'unlock-task' }])(
           station: 'station',
           level: 1,
           requiredItems: [],
-          productItem: { id: 'product', count: 1 },
+          productItem: { item: 'product', count: 1 },
           taskUnlock,
         },
       },
@@ -482,6 +482,11 @@ it.each([undefined, 'unlock-task', { id: 'unlock-task' }])(
     expect(result.data.hideoutStations[0]?.levels[0]?.crafts).toEqual([
       expect.objectContaining({
         id: 'added',
+        // The product must survive adaptation as a resolvable reward item;
+        // an unresolved reference is silently dropped by buildCraftSourcesMap.
+        rewardItems: [
+          expect.objectContaining({ item: expect.objectContaining({ id: 'product' }) }),
+        ],
         taskUnlock: taskUnlock ? expect.objectContaining({ id: 'unlock-task' }) : null,
         unlockState: taskUnlock ? 'task' : 'unknown',
       }),

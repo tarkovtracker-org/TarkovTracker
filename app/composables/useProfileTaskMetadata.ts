@@ -2,7 +2,13 @@ import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import { API_GAME_MODES } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { dedupeTaskObjectiveIds, normalizeTaskObjectives } from '@/utils/taskNormalization';
-import type { Task, TarkovTasksCoreQueryResult, StoryChapter, PrestigeLevel } from '@/types/tarkov';
+import type {
+  Task,
+  TarkovTasksCoreQueryResult,
+  StoryChapter,
+  PrestigeLevel,
+  GameEdition,
+} from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
 const profileMetadataError = (cause: unknown): Error =>
   cause instanceof Error ? cause : new Error(String(cause));
@@ -16,15 +22,26 @@ const partialFailure = (results: PromiseSettledResult<unknown>[]): Error | null 
   const failure = results.find((result) => result.status === 'rejected');
   return failure?.status === 'rejected' ? profileMetadataError(failure.reason) : null;
 };
-const optionalChapters = (overlay: { data: { storyChapters: StoryChapter[] } }): StoryChapter[] => {
-  const chapters = overlay?.data?.storyChapters;
-  if (
-    !Array.isArray(chapters) ||
-    chapters.some((chapter) => !chapter || typeof chapter.id !== 'string')
-  ) {
-    throw new Error('Invalid optional story chapter catalog');
-  }
-  return chapters;
+const validChapterCatalog = (value: unknown): value is StoryChapter[] =>
+  Array.isArray(value) && value.every((chapter) => chapter && typeof chapter.id === 'string');
+const validEditionCatalog = (value: unknown): value is GameEdition[] =>
+  Array.isArray(value) && value.every((edition) => edition && typeof edition.value === 'number');
+const requireCatalog = <T>(
+  value: unknown,
+  valid: (candidate: unknown) => candidate is T[],
+  label: string
+): T[] => {
+  if (!valid(value)) throw new Error(`Invalid optional ${label} catalog`);
+  return value;
+};
+const optionalCatalog = (overlay: {
+  data: { editions: GameEdition[]; storyChapters: StoryChapter[] };
+}): { editions: GameEdition[]; chapters: StoryChapter[] } => {
+  const data = overlay?.data;
+  return {
+    chapters: requireCatalog(data?.storyChapters, validChapterCatalog, 'story chapter'),
+    editions: requireCatalog(data?.editions, validEditionCatalog, 'edition'),
+  };
 };
 const validProfilePrestigeLevel = (level: number): boolean =>
   Number.isInteger(level) && level >= 0 && level <= 6;
@@ -49,39 +66,62 @@ const optionalPrestige = (response: { data: { prestige: PrestigeLevel[] } }): Pr
   }
   return prestige;
 };
+const EMPTY_CATALOG: { editions: GameEdition[]; chapters: StoryChapter[] } = {
+  editions: [],
+  chapters: [],
+};
+/** Merge the core and objectives catalogs, then dedupe shared objective IDs. */
+const mergeProfileTasks = (
+  core: { data: TarkovTasksCoreQueryResult },
+  objectives: { data: { tasks: Task[] } }
+) => {
+  const byId = new Map(objectives.data.tasks.map((task) => [task.id, task]));
+  const merged = core.data.tasks.map((task) => ({ ...task, ...byId.get(task.id) }));
+  return dedupeTaskObjectiveIds(
+    merged.map((task) => ({
+      ...task,
+      objectives: normalizeTaskObjectives<import('@/types/tarkov').TaskObjective>(task.objectives),
+    }))
+  );
+};
 const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: AbortSignal) => {
   const query = { gameMode: API_GAME_MODES[gameMode], lang };
   const options = { query, signal: signal };
   const [coreResult, objectivesResult, overlayResult, prestigeResult] = await Promise.allSettled([
     $fetch<{ data: TarkovTasksCoreQueryResult }>('/api/tarkov/tasks-core', options),
     $fetch<{ data: { tasks: Task[] } }>('/api/tarkov/tasks-objectives', options),
-    $fetch<{ data: { storyChapters: StoryChapter[] } }>('/api/tarkov/editions', options).then(
-      optionalChapters
-    ),
+    $fetch<{ data: { editions: GameEdition[]; storyChapters: StoryChapter[] } }>(
+      '/api/tarkov/editions',
+      options
+    ).then(optionalCatalog),
     $fetch<{ data: { prestige: PrestigeLevel[] } }>('/api/tarkov/prestige', options).then(
       optionalPrestige
     ),
   ]);
-  const core = requiredResult(coreResult);
-  const objectives = requiredResult(objectivesResult);
-  const chapters = optionalResult(overlayResult);
-  const prestige = optionalResult(prestigeResult);
-  const byId = new Map(objectives.data.tasks.map((task) => [task.id, task]));
-  const merged = core.data.tasks.map((task) => ({ ...task, ...byId.get(task.id) }));
-  const normalized = dedupeTaskObjectiveIds(
-    merged.map((task) => ({
-      ...task,
-      objectives: normalizeTaskObjectives<import('@/types/tarkov').TaskObjective>(task.objectives),
-    }))
+  const catalog = optionalResult(overlayResult) ?? EMPTY_CATALOG;
+  const normalized = mergeProfileTasks(
+    requiredResult(coreResult),
+    requiredResult(objectivesResult)
   );
   return {
     tasks: useGraphBuilder().processTaskData(normalized.tasks).tasks,
     duplicateObjectiveIds: normalized.duplicateObjectiveIds,
-    chapters: chapters ?? [],
-    prestige: prestige ?? [],
+    chapters: catalog.chapters,
+    editions: catalog.editions,
+    prestige: optionalResult(prestigeResult) ?? [],
     failure: partialFailure([overlayResult, prestigeResult]),
   };
 };
+/**
+ * Client budget for one profile-mode catalog load.
+ *
+ * A cold cache legitimately needs longer than a single attempt: the proxy allows
+ * two 12s attempts per envelope plus backoff across the base and translation
+ * legs, roughly 55s worst case per route (`docs/SYSTEMS.md`, retry budget).
+ * Aborting earlier leaves the profile with no snapshot and no retry until the
+ * mode or language changes.
+ */
+const PROFILE_METADATA_TIMEOUT_MS = 60000;
 /** Read another profile mode without changing the application's active metadata. */
 export function useProfileTaskMetadata(mode: Ref<GameMode>, language: Ref<string>) {
   const snapshot = shallowRef<{
@@ -89,6 +129,7 @@ export function useProfileTaskMetadata(mode: Ref<GameMode>, language: Ref<string
     tasks: Task[];
     duplicateObjectiveIds: Map<string, string[]>;
     chapters: StoryChapter[];
+    editions: GameEdition[];
     prestige: PrestigeLevel[];
   } | null>(null);
   const error = shallowRef<Error | null>(null);
@@ -100,7 +141,7 @@ export function useProfileTaskMetadata(mode: Ref<GameMode>, language: Ref<string
       const controller = new AbortController();
       const timeoutId = setTimeout(
         () => controller.abort(new Error('Profile metadata request timed out')),
-        15000
+        PROFILE_METADATA_TIMEOUT_MS
       );
       onCleanup(() => {
         current = false;
@@ -133,6 +174,7 @@ export function useProfileTaskMetadata(mode: Ref<GameMode>, language: Ref<string
   );
   return {
     chapters: computed(() => activeSnapshot.value?.chapters ?? []),
+    editions: computed(() => activeSnapshot.value?.editions ?? []),
     duplicateObjectiveIds: computed(
       () => activeSnapshot.value?.duplicateObjectiveIds ?? new Map<string, string[]>()
     ),

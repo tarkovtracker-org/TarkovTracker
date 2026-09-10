@@ -435,6 +435,7 @@
     tasks: profileTasks,
     duplicateObjectiveIds: profileDuplicateObjectiveIds,
     chapters: profileChapters,
+    editions: profileEditions,
     prestige: profilePrestige,
     error: profileMetadataError,
     loading: profileMetadataLoading,
@@ -693,7 +694,7 @@
       if (taskFaction !== 'Any' && taskFaction !== faction) {
         return false;
       }
-      return checkTaskEdition(task.id, profileGameEdition.value, metadataStore.editions);
+      return checkTaskEdition(task.id, profileGameEdition.value, profileEditions.value);
     });
     const options: TaskTypeFilterOptions = {
       showKappa: true,
@@ -858,7 +859,7 @@
   });
   const totalHideoutModules = computed(() => hideoutModuleLabelById.value.size);
   const hideoutModuleCompletionState = computed<Record<string, boolean>>(() => {
-    const editionData = metadataStore.editions.find(
+    const editionData = profileEditions.value.find(
       (edition) => edition.value === profileGameEdition.value
     );
     return buildHideoutModuleCompletionState(

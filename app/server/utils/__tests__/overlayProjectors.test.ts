@@ -359,6 +359,48 @@ it.each([0.2, 'bad', Infinity])('validates edition trader reputation bonuses: %s
   };
   expect(validateOverlayData(candidate)).toBe(bonus === 0.2);
 });
+it.each([
+  ['string reference', { item: 'item', count: 1 }, true],
+  ['record reference', { item: { id: 'item' }, count: 1 }, true],
+  ['id placed directly on the product', { id: 'item', count: 1 }, false],
+  ['empty string reference', { item: '', count: 1 }, false],
+  ['no reference at all', { count: 1 }, false],
+])('validates the added craft product reference: %s', (_case, productItem, expected) => {
+  const candidate = {
+    ...overlay,
+    craftsAdd: { craft: { station: 'workbench', level: 1, requiredItems: [], productItem } },
+  };
+  expect(validateOverlayData(candidate as unknown as OverlayData)).toBe(expected);
+});
+it.each([
+  ['string chapter', 'tour', true],
+  ['numeric chapter', 1, false],
+  ['empty chapter', '', false],
+])('requires a string prestige story chapter: %s', (_case, storyChapter, expected) => {
+  const candidate = {
+    ...overlay,
+    storyChapters: { ...overlay.storyChapters, 1: { name: 'One', order: 2, objectives: {} } },
+    modes: {
+      ...overlay.modes,
+      regular: {
+        ...overlay.modes!.regular,
+        prestige: {
+          p5: {
+            storyRequirements: [{ type: 'storyChapterStatus', storyChapter, status: ['complete'] }],
+          },
+        },
+      },
+    },
+  };
+  expect(validateOverlayData(candidate as unknown as OverlayData)).toBe(expected);
+});
+it('reports an unsupported overlay mode scope as unconsumed', () => {
+  const candidate = {
+    ...overlay,
+    modes: { ...overlay.modes, pv: { tasks: { patched: { disabled: true } } } },
+  } as unknown as OverlayData;
+  expect(unknownOverlaySections(candidate)).toEqual(['modes.pv']);
+});
 it.each([undefined, 'quest', { id: 'quest' }, 7])(
   'validates added craft unlock references: %j',
   (taskUnlock) => {
@@ -369,7 +411,7 @@ it.each([undefined, 'quest', { id: 'quest' }, 7])(
           station: 'workbench',
           level: 1,
           requiredItems: [],
-          productItem: { id: 'item', count: 1 },
+          productItem: { item: 'item', count: 1 },
           taskUnlock,
         },
       },
