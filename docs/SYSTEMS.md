@@ -806,6 +806,8 @@ flowchart LR
   depend on running it; see the Database Migrations section of `docs/runbook.md`
 - `supabase/migrations/20260806160000_seed_unmaterialized_mode_progress_on_merge.sql` — seeds an
   unmaterialized persistent row from its legacy column inside `merge_progress_data`'s row lock
+- `supabase/migrations/20260910050000_add_manual_activity_history_to_progress.sql` — adds
+  `manualActivityHistory` to the persisted progress allowlist and its entry/history sanitizers
 - `app/stores/tarkov/progressPersistence.ts`, `app/stores/tarkov/realtimeListener.ts`,
   `app/stores/useTarkov.ts` — load, merge, write, and realtime flow
 - `app/stores/useSystemStore.ts`, `app/stores/useTeamStore.ts` — mode-specific teams and teammate
@@ -997,6 +999,18 @@ flowchart LR
 - Tarkov.dev profile imports can target Seasonal through the verified `pvp-season` source. EFT-log
   imports can target Seasonal using the verified notification formats and active-season guards
   specified in section 7; unresolved-mode events require an explicit destination choice.
+- Manual activity-log entries live in the selected mode's progress blob as `manualActivityHistory`,
+  next to `apiUpdateHistory`, and never in a standalone browser store. They share the progress
+  lifecycle: the client and persisted sanitizers accept them, `mergeProgressData` unions them by
+  stable id in the equal-epoch branch, a reset/prestige epoch win discards the losing side's feed
+  with the rest of that side's data, and a session transition clears them through the progress store
+  rather than through a second storage adapter. Both sanitizers require a non-empty id and title, a
+  numeric millisecond `timestamp`, and a known `type`/`action`; ids, titles, and details are clamped
+  and each mode keeps at most 50 entries so three full feeds stay far below the sync RPC's 512 KiB
+  ceiling. Adding a progress field requires a forward migration recreating
+  `sanitize_user_progress_mode_data`, because that allowlist is the single gate on every write and
+  silently drops keys it does not name. Read state (`lastReadTimestamp`) stays device-local. Backups
+  strip the feed alongside `apiUpdateHistory`, and teammate/public API projections never include it.
 
 ---
 

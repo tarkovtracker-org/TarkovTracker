@@ -36,6 +36,7 @@ const mockInitializeTarkovSync = vi.fn(async () => {});
 const mockResetTarkovStoreForSessionTransition = vi.fn();
 const mockMigrateDataIfNeeded = vi.fn(async () => {});
 const mockActivityLogResetForSession = vi.fn();
+const mockActivityLogMigrateLegacyManualEntries = vi.fn();
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({
@@ -60,6 +61,7 @@ vi.mock('@/stores/useMetadata', () => ({
 vi.mock('@/stores/useActivityLogStore', () => ({
   useActivityLogStore: () => ({
     resetForSession: mockActivityLogResetForSession,
+    migrateLegacyManualEntries: mockActivityLogMigrateLegacyManualEntries,
   }),
 }));
 vi.mock('@/composables/useToastI18n', () => ({
@@ -115,6 +117,7 @@ describe('useAppInitialization locale setup', () => {
     mockMigrateDataIfNeeded.mockClear();
     mockMigrateDataIfNeeded.mockResolvedValue(undefined);
     mockActivityLogResetForSession.mockClear();
+    mockActivityLogMigrateLegacyManualEntries.mockClear();
     mockShowLoadFailed.mockClear();
     const { logger } = await import('@/utils/logger');
     (logger.error as Mock).mockClear();

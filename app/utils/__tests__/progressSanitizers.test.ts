@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { ACTIVE_SEASON_NUMBER, MAX_SKILL_LEVEL } from '@/utils/constants';
 import {
   hasDeprecatedTarkovDevProfileData,
+  MANUAL_ACTIVITY_HISTORY_LIMIT,
+  sanitizeManualActivityHistory,
   sanitizeOwnedProgressData,
   sanitizeOwnedUserState,
 } from '@/utils/progressSanitizers';
@@ -31,6 +33,7 @@ describe('sanitizeOwnedProgressData', () => {
       hideoutModules: {},
       hideoutParts: {},
       level: 24,
+      manualActivityHistory: [],
       pmcFaction: 'USEC',
       prestigeLevel: 2,
       progressEpoch: 5,
@@ -70,6 +73,7 @@ describe('sanitizeOwnedProgressData', () => {
       apiUpdateHistory: [],
       displayName: null,
       level: 1,
+      manualActivityHistory: [],
       pmcFaction: 'USEC',
       skills: {},
       taskCompletions: {},
@@ -79,11 +83,107 @@ describe('sanitizeOwnedProgressData', () => {
       apiUpdateHistory: [],
       displayName: null,
       level: 1,
+      manualActivityHistory: [],
       pmcFaction: 'USEC',
       skills: {},
       taskCompletions: {},
       xpOffset: 0,
     });
+  });
+  it('preserves valid manual activity history entries', () => {
+    const result = sanitizeOwnedProgressData({
+      manualActivityHistory: [
+        {
+          action: 'complete',
+          details: 'PvP',
+          id: 'manual-1',
+          timestamp: 1780660259335,
+          title: 'Completed Task: Debut',
+          type: 'task',
+        },
+      ],
+    });
+    expect(result.manualActivityHistory).toEqual([
+      {
+        action: 'complete',
+        details: 'PvP',
+        id: 'manual-1',
+        timestamp: 1780660259335,
+        title: 'Completed Task: Debut',
+        type: 'task',
+      },
+    ]);
+  });
+  it('normalizes a non-array manual activity history to an empty array', () => {
+    expect(
+      sanitizeOwnedProgressData({ manualActivityHistory: 'nope' }).manualActivityHistory
+    ).toEqual([]);
+  });
+});
+describe('sanitizeManualActivityHistory', () => {
+  const entry = (overrides: Record<string, unknown> = {}) => ({
+    action: 'complete',
+    id: 'manual-1',
+    timestamp: 1000,
+    title: 'Completed Task: Debut',
+    type: 'task',
+    ...overrides,
+  });
+  it('drops entries missing a required field or carrying an unknown enum value', () => {
+    expect(
+      sanitizeManualActivityHistory([
+        entry({ id: '   ' }),
+        entry({ id: 'no-title', title: '  ' }),
+        entry({ id: 'bad-type', type: 'quest' }),
+        entry({ id: 'bad-action', action: 'deleted' }),
+        entry({ id: 'no-timestamp', timestamp: 'later' }),
+        entry({ id: 'infinite', timestamp: Number.POSITIVE_INFINITY }),
+        'nonsense',
+        null,
+        undefined,
+      ])
+    ).toEqual([]);
+  });
+  it('collapses duplicate ids to the newest entry and sorts newest first', () => {
+    expect(
+      sanitizeManualActivityHistory([
+        entry({ id: 'dup', timestamp: 100, title: 'Older' }),
+        entry({ id: 'dup', timestamp: 900, title: 'Newer' }),
+        entry({ id: 'other', timestamp: 500, title: 'Middle' }),
+      ])
+    ).toEqual([
+      entry({ id: 'dup', timestamp: 900, title: 'Newer' }),
+      entry({ id: 'other', timestamp: 500, title: 'Middle' }),
+    ]);
+  });
+  it('caps the history at the shared limit, retaining the newest entries', () => {
+    const result = sanitizeManualActivityHistory(
+      Array.from({ length: MANUAL_ACTIVITY_HISTORY_LIMIT + 20 }, (_unused, index) =>
+        entry({ id: `manual-${index}`, timestamp: 1000 + index })
+      )
+    );
+    expect(result).toHaveLength(MANUAL_ACTIVITY_HISTORY_LIMIT);
+    expect(result[0]?.id).toBe(`manual-${MANUAL_ACTIVITY_HISTORY_LIMIT + 19}`);
+  });
+  it('clamps oversized strings and normalizes negative timestamps', () => {
+    const [result] = sanitizeManualActivityHistory([
+      entry({
+        details: 'd'.repeat(600),
+        id: 'i'.repeat(200),
+        timestamp: -50,
+        title: 't'.repeat(400),
+      }),
+    ]);
+    expect(result?.id).toHaveLength(128);
+    expect(result?.title).toHaveLength(200);
+    expect(result?.details).toHaveLength(300);
+    expect(result?.timestamp).toBe(0);
+  });
+  it('omits details when absent or blank', () => {
+    expect(sanitizeManualActivityHistory([entry({ details: '   ' })])[0]).not.toHaveProperty(
+      'details'
+    );
+    expect(sanitizeManualActivityHistory([entry()])[0]).not.toHaveProperty('details');
   });
 });
 describe('sanitizeOwnedUserState', () => {

@@ -157,7 +157,10 @@ classDiagram
 
 Maps keyed by id: `taskObjectives`, `taskCompletions`, `hideoutParts`, `hideoutModules`,
 `traders`, `skills`, `skillOffsets`, `storyChapters`. Also tracks `lastApiUpdate` and
-`apiUpdateHistory` for API-driven changes.
+`apiUpdateHistory` for API-driven changes, and `manualActivityHistory` (`ManualActivityEntry[]`:
+`id`, `timestamp`, `type`, `action`, `title`, optional `details`) for user-initiated activity-log
+entries. Both history arrays are deduplicated by id, ordered newest first, and capped at 50 entries
+per mode.
 
 ## Store State Types
 

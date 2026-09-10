@@ -1,4 +1,11 @@
 import {
+  MANUAL_ACTIVITY_ACTIONS,
+  MANUAL_ACTIVITY_TYPES,
+  type ManualActivityAction,
+  type ManualActivityEntry,
+  type ManualActivityType,
+} from '@/types/progress';
+import {
   ACTIVE_SEASON_NUMBER,
   GAME_MODE_VALUES,
   GAME_MODES,
@@ -181,6 +188,13 @@ export const sanitizeStoryChaptersMap = (value: unknown): UserProgressData['stor
   return sanitized;
 };
 const API_UPDATE_HISTORY_LIMIT = 50;
+// Manual activity entries are cosmetic feed rows that ride along in the synced
+// progress blob. The limit and the string clamps keep the blob well below the
+// sync RPC's 512 KiB payload ceiling even when all three modes are full.
+export const MANUAL_ACTIVITY_HISTORY_LIMIT = 50;
+const MANUAL_ACTIVITY_ID_MAX_LENGTH = 128;
+const MANUAL_ACTIVITY_TITLE_MAX_LENGTH = 200;
+const MANUAL_ACTIVITY_DETAILS_MAX_LENGTH = 300;
 export const createDefaultOwnedProgressData = (): UserProgressData => ({
   level: 1,
   pmcFaction: 'USEC',
@@ -197,6 +211,7 @@ export const createDefaultOwnedProgressData = (): UserProgressData => ({
   skillOffsets: {},
   storyChapters: {},
   apiUpdateHistory: [],
+  manualActivityHistory: [],
 });
 const sanitizeApiTaskUpdates = (value: unknown): ApiTaskUpdate[] => {
   if (!Array.isArray(value)) {
@@ -243,6 +258,54 @@ export const sanitizeApiUpdateHistory = (value: unknown): ApiUpdateMeta[] => {
   return Array.from(deduped.values())
     .sort((left, right) => right.at - left.at)
     .slice(0, API_UPDATE_HISTORY_LIMIT);
+};
+export const sanitizeManualActivityEntry = (value: unknown): ManualActivityEntry | undefined => {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const id = typeof value.id === 'string' ? value.id.trim() : '';
+  const title = typeof value.title === 'string' ? value.title.trim() : '';
+  const timestamp = toFiniteNumber(value.timestamp);
+  if (
+    !id ||
+    !title ||
+    timestamp === null ||
+    !MANUAL_ACTIVITY_TYPES.includes(value.type as ManualActivityType) ||
+    !MANUAL_ACTIVITY_ACTIONS.includes(value.action as ManualActivityAction)
+  ) {
+    return undefined;
+  }
+  const sanitized: ManualActivityEntry = {
+    id: id.slice(0, MANUAL_ACTIVITY_ID_MAX_LENGTH),
+    timestamp: Math.max(0, Math.trunc(timestamp)),
+    type: value.type as ManualActivityType,
+    action: value.action as ManualActivityAction,
+    title: title.slice(0, MANUAL_ACTIVITY_TITLE_MAX_LENGTH),
+  };
+  const details = typeof value.details === 'string' ? value.details.trim() : '';
+  if (details) {
+    sanitized.details = details.slice(0, MANUAL_ACTIVITY_DETAILS_MAX_LENGTH);
+  }
+  return sanitized;
+};
+export const sanitizeManualActivityHistory = (value: unknown): ManualActivityEntry[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const deduped = new Map<string, ManualActivityEntry>();
+  for (const entry of value) {
+    const normalized = sanitizeManualActivityEntry(entry);
+    if (!normalized) {
+      continue;
+    }
+    const existing = deduped.get(normalized.id);
+    if (!existing || normalized.timestamp >= existing.timestamp) {
+      deduped.set(normalized.id, normalized);
+    }
+  }
+  return Array.from(deduped.values())
+    .sort((left, right) => right.timestamp - left.timestamp)
+    .slice(0, MANUAL_ACTIVITY_HISTORY_LIMIT);
 };
 const sanitizeGameMode = (value: unknown): GameMode => {
   return GAME_MODE_VALUES.includes(value as GameMode) ? (value as GameMode) : GAME_MODES.PVP;
@@ -302,6 +365,7 @@ export const sanitizeOwnedProgressData = (value: unknown): UserProgressData => {
   sanitized.taskObjectives = sanitizeObjectiveProgressMap(value.taskObjectives);
   sanitized.traders = sanitizeTraderMap(value.traders);
   sanitized.apiUpdateHistory = sanitizeApiUpdateHistory(value.apiUpdateHistory);
+  sanitized.manualActivityHistory = sanitizeManualActivityHistory(value.manualActivityHistory);
   if (level !== null) {
     sanitized.level = Math.max(1, Math.trunc(level));
   }

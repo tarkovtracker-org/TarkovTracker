@@ -67,6 +67,11 @@ export function useAppInitialization() {
     resetTarkovStoreForSessionTransition(previousUserId, reason);
     activityLogStore.resetForSession();
   };
+  // Adopt pre-#445 standalone manual activity entries into the synced progress
+  // blob. Runs before the auth watcher so a guest's entries participate in the
+  // startup local/remote merge, and again after each successful sync start so a
+  // payload scoped to the signed-in user is claimed once that session loads.
+  activityLogStore.migrateLegacyManualEntries();
   const isCurrentSupporterRequest = (expectedUserId?: string, expectedToken?: number) =>
     (!expectedUserId || getAuthenticatedUserId() === expectedUserId) &&
     (expectedToken === undefined || expectedToken === authChangeToken);
@@ -124,7 +129,9 @@ export function useAppInitialization() {
       }
       if (expectedToken !== undefined && expectedToken !== authChangeToken) {
         syncStarted = false;
+        return;
       }
+      activityLogStore.migrateLegacyManualEntries();
     } catch (error) {
       syncStarted = false;
       logger.error('[useAppInitialization] Error initializing Supabase sync:', error);

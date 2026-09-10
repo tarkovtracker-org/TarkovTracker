@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { hasProgress, mergeProgressData } from '@/stores/tarkov/progressMerge';
-import type { UserProgressData, UserState } from '@/stores/progressState';
+import type { ManualActivityEntry, UserProgressData, UserState } from '@/stores/progressState';
 const createProgressData = (
   storyChapters: UserProgressData['storyChapters']
 ): UserProgressData => ({
@@ -178,5 +178,79 @@ describe('mergeProgressData progress epoch', () => {
       'chapter-1': { complete: true, timestamp: 1000 },
       'chapter-2': { complete: true, timestamp: 2000 },
     });
+  });
+});
+describe('mergeProgressData manual activity history', () => {
+  const entry = (overrides: Partial<ManualActivityEntry> = {}): ManualActivityEntry => ({
+    id: 'manual-1',
+    timestamp: 1000,
+    type: 'task',
+    action: 'complete',
+    title: 'Completed Task: Debut',
+    ...overrides,
+  });
+  const withHistory = (history: ManualActivityEntry[], progressEpoch = 0): UserProgressData => ({
+    ...createProgressData({}),
+    manualActivityHistory: history,
+    progressEpoch,
+  });
+  it('unions both sides on the equal-epoch branch, newest first', () => {
+    const merged = mergeProgressData(
+      withHistory([entry({ id: 'local-1', timestamp: 3000, title: 'Local' })]),
+      withHistory([entry({ id: 'remote-1', timestamp: 5000, title: 'Remote' })])
+    );
+    expect(merged.manualActivityHistory?.map((item) => item.id)).toEqual(['remote-1', 'local-1']);
+  });
+  it('keeps the newest entry when both sides share an id', () => {
+    const merged = mergeProgressData(
+      withHistory([entry({ id: 'shared', timestamp: 9000, title: 'Local newer' })]),
+      withHistory([entry({ id: 'shared', timestamp: 1000, title: 'Remote older' })])
+    );
+    expect(merged.manualActivityHistory).toEqual([
+      entry({ id: 'shared', timestamp: 9000, title: 'Local newer' }),
+    ]);
+  });
+  it('drops malformed entries from either side', () => {
+    const merged = mergeProgressData(
+      withHistory([
+        entry({ id: 'good', timestamp: 4000 }),
+        { id: 'bad', title: 'no type or action' } as unknown as ManualActivityEntry,
+      ]),
+      withHistory(['nonsense' as unknown as ManualActivityEntry])
+    );
+    expect(merged.manualActivityHistory?.map((item) => item.id)).toEqual(['good']);
+  });
+  it('caps the merged history at the shared limit', () => {
+    const merged = mergeProgressData(
+      withHistory(
+        Array.from({ length: 40 }, (_unused, index) =>
+          entry({ id: `local-${index}`, timestamp: 1000 + index })
+        )
+      ),
+      withHistory(
+        Array.from({ length: 40 }, (_unused, index) =>
+          entry({ id: `remote-${index}`, timestamp: 5000 + index })
+        )
+      )
+    );
+    expect(merged.manualActivityHistory).toHaveLength(50);
+    expect(merged.manualActivityHistory?.[0]?.id).toBe('remote-39');
+  });
+  it('treats a missing history as empty rather than dropping the other side', () => {
+    const merged = mergeProgressData(
+      createProgressData({}),
+      withHistory([entry({ id: 'remote' })])
+    );
+    expect(merged.manualActivityHistory?.map((item) => item.id)).toEqual(['remote']);
+  });
+  it('discards the losing side when a reset epoch wins', () => {
+    const local = withHistory([entry({ id: 'local-only', timestamp: 9000 })], 1);
+    const remote = withHistory([entry({ id: 'remote-only', timestamp: 1000 })], 2);
+    const remoteWins = mergeProgressData(local, remote);
+    expect(remoteWins.progressEpoch).toBe(2);
+    expect(remoteWins.manualActivityHistory?.map((item) => item.id)).toEqual(['remote-only']);
+    const localWins = mergeProgressData(remote, local);
+    expect(localWins.progressEpoch).toBe(2);
+    expect(localWins.manualActivityHistory?.map((item) => item.id)).toEqual(['remote-only']);
   });
 });

@@ -7,7 +7,11 @@ import {
 } from '@/stores/progressState';
 import { GAME_MODES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
-import { sanitizeOwnedProgressData } from '@/utils/progressSanitizers';
+import {
+  sanitizeManualActivityHistory,
+  sanitizeOwnedProgressData,
+} from '@/utils/progressSanitizers';
+import type { ManualActivityEntry } from '@/types/progress';
 import type { RawTaskCompletion } from '@/utils/taskStatus';
 const API_UPDATE_HISTORY_LIMIT = 50;
 type CountableEntry = { count?: number; complete?: boolean; timestamp?: number };
@@ -289,6 +293,21 @@ const mergeApiUpdateHistory = (
     ...buildApiUpdateHistory(remote),
   ]);
 };
+/**
+ * Union manual activity entries from both sides, keeping the newest entry per
+ * stable id and the newest entries up to the shared history limit. This mirrors
+ * `mergeApiUpdateHistory`: the feed is append-only per device, so a union is
+ * always the correct resolution for the equal-epoch branch.
+ */
+export const mergeManualActivityHistory = (
+  local: UserProgressData | undefined,
+  remote: UserProgressData | undefined
+): ManualActivityEntry[] => {
+  return sanitizeManualActivityHistory([
+    ...(Array.isArray(local?.manualActivityHistory) ? local.manualActivityHistory : []),
+    ...(Array.isArray(remote?.manualActivityHistory) ? remote.manualActivityHistory : []),
+  ]);
+};
 export function mergeProgressData(
   local: UserProgressData | undefined,
   remote: UserProgressData | undefined,
@@ -361,6 +380,7 @@ export function mergeProgressData(
     xpOffset: remote.xpOffset !== undefined ? remote.xpOffset : local.xpOffset,
     lastApiUpdate: resolveApiUpdate(local.lastApiUpdate, remote.lastApiUpdate),
     apiUpdateHistory: mergeApiUpdateHistory(local, remote),
+    manualActivityHistory: mergeManualActivityHistory(local, remote),
     taskCompletions: (() => {
       const allKeys = new Set([
         ...Object.keys(local.taskCompletions || {}),

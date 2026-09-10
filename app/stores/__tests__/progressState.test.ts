@@ -3,6 +3,7 @@ import {
   actions,
   getters,
   migrateToGameModeStructure,
+  type ManualActivityEntry,
   type UserState,
 } from '@/stores/progressState';
 import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
@@ -156,5 +157,80 @@ describe('migrateToGameModeStructure', () => {
     expect(migrated.seasonalSeasonNumber).toBe(ACTIVE_SEASON_NUMBER);
     expect(migrated.pvp.level).toBe(5);
     expect(migrated.pve.level).toBe(3);
+  });
+});
+describe('manual activity history actions', () => {
+  const entry = (overrides: Partial<ManualActivityEntry> = {}): ManualActivityEntry => ({
+    id: 'manual-1',
+    timestamp: 1000,
+    type: 'task',
+    action: 'complete',
+    title: 'Completed Task: Debut',
+    ...overrides,
+  });
+  it('writes entries into the selected mode only', () => {
+    const state = createBaseState();
+    actions.addManualActivityEntries.call(state, [entry({ id: 'pvp-1' })]);
+    expect(
+      getters
+        .getManualActivityHistory(state)()
+        .map((item) => item.id)
+    ).toEqual(['pvp-1']);
+    expect(state.pve.manualActivityHistory ?? []).toEqual([]);
+    actions.switchGameMode.call(state, 'pve');
+    expect(getters.getManualActivityHistory(state)()).toEqual([]);
+    actions.addManualActivityEntries.call(state, [entry({ id: 'pve-1' })]);
+    expect(
+      getters
+        .getManualActivityHistory(state)()
+        .map((item) => item.id)
+    ).toEqual(['pve-1']);
+    expect(state.pvp.manualActivityHistory?.map((item) => item.id)).toEqual(['pvp-1']);
+  });
+  it('orders entries newest first and collapses duplicate ids', () => {
+    const state = createBaseState();
+    actions.addManualActivityEntries.call(state, [entry({ id: 'dup', timestamp: 100 })]);
+    actions.addManualActivityEntries.call(state, [entry({ id: 'other', timestamp: 500 })]);
+    actions.addManualActivityEntries.call(state, [
+      entry({ id: 'dup', timestamp: 900, title: 'Newer' }),
+    ]);
+    const history = getters.getManualActivityHistory(state)();
+    expect(history.map((item) => item.id)).toEqual(['dup', 'other']);
+    expect(history[0]?.title).toBe('Newer');
+  });
+  it('caps the history at 50 entries, retaining the newest', () => {
+    const state = createBaseState();
+    actions.addManualActivityEntries.call(
+      state,
+      Array.from({ length: 70 }, (_unused, index) =>
+        entry({ id: `manual-${index}`, timestamp: 1000 + index })
+      )
+    );
+    const history = getters.getManualActivityHistory(state)();
+    expect(history).toHaveLength(50);
+    expect(history[0]?.id).toBe('manual-69');
+    expect(history.at(-1)?.id).toBe('manual-20');
+  });
+  it('drops malformed entries', () => {
+    const state = createBaseState();
+    actions.addManualActivityEntries.call(state, [
+      { id: '', timestamp: 1, type: 'task', action: 'complete', title: 'no id' },
+      { id: 'no-title', timestamp: 1, type: 'task', action: 'complete', title: '   ' },
+      { id: 'bad-type', timestamp: 1, type: 'quest', action: 'complete', title: 'x' },
+      { id: 'bad-action', timestamp: 1, type: 'task', action: 'deleted', title: 'x' },
+      { id: 'no-timestamp', timestamp: Number.NaN, type: 'task', action: 'complete', title: 'x' },
+    ] as unknown as ManualActivityEntry[]);
+    expect(getters.getManualActivityHistory(state)()).toEqual([]);
+  });
+  it('ignores an empty batch and clears only the selected mode', () => {
+    const state = createBaseState();
+    actions.addManualActivityEntries.call(state, [entry({ id: 'pvp-1' })]);
+    actions.addManualActivityEntries.call(state, []);
+    expect(getters.getManualActivityHistory(state)()).toHaveLength(1);
+    actions.switchGameMode.call(state, 'pve');
+    actions.addManualActivityEntries.call(state, [entry({ id: 'pve-1' })]);
+    actions.clearManualActivityHistory.call(state);
+    expect(state.pve.manualActivityHistory).toEqual([]);
+    expect(state.pvp.manualActivityHistory?.map((item) => item.id)).toEqual(['pvp-1']);
   });
 });

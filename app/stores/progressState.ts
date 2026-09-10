@@ -17,6 +17,7 @@
 import { ACTIVE_SEASON_NUMBER, GAME_MODES, type GameMode } from '@/utils/constants';
 import {
   reconcileSeasonalProgressSeason,
+  sanitizeManualActivityHistory,
   sanitizeOwnedProgressData,
 } from '@/utils/progressSanitizers';
 import {
@@ -24,9 +25,16 @@ import {
   isTaskFailed as isTaskCompletionFailed,
   type RawTaskCompletion,
 } from '@/utils/taskStatus';
-import type { TaskCompletion, UserProgressData } from '@/types/progress';
+import type { ManualActivityEntry, TaskCompletion, UserProgressData } from '@/types/progress';
 import type { _GettersTree } from 'pinia';
-export type { ApiTaskUpdate, ApiUpdateMeta, UserProgressData } from '@/types/progress';
+export type {
+  ApiTaskUpdate,
+  ApiUpdateMeta,
+  ManualActivityAction,
+  ManualActivityEntry,
+  ManualActivityType,
+  UserProgressData,
+} from '@/types/progress';
 export interface UserState {
   currentGameMode: GameMode;
   gameEdition: number;
@@ -52,6 +60,7 @@ const defaultProgressData: UserProgressData = {
   skillOffsets: {},
   storyChapters: {},
   apiUpdateHistory: [],
+  manualActivityHistory: [],
 };
 export const defaultState: UserState = {
   currentGameMode: GAME_MODES.PVP,
@@ -162,6 +171,7 @@ const getCurrentData = (state: UserState): UserProgressData => {
       skillOffsets: {},
       storyChapters: {},
       apiUpdateHistory: [],
+      manualActivityHistory: [],
     };
   }
   return state[state.currentGameMode];
@@ -195,6 +205,8 @@ export const getters = {
   isHideoutModuleComplete: (state: UserState) => (hideoutId: string) =>
     getCurrentData(state)?.hideoutModules?.[hideoutId]?.complete ?? false,
   getCurrentProgressData: (state: UserState) => () => getCurrentData(state),
+  getManualActivityHistory: (state: UserState) => (): ManualActivityEntry[] =>
+    getCurrentData(state)?.manualActivityHistory ?? [],
   getModeProgressData: (state: UserState) => (mode: GameMode) => state[mode],
   getPvPProgressData: (state: UserState) => () => state.pvp,
   getPvEProgressData: (state: UserState) => () => state.pve,
@@ -457,6 +469,28 @@ export const actions = {
     } else {
       actions.setStoryObjectiveComplete.call(this, chapterId, objectiveId);
     }
+  },
+  /**
+   * Append manual activity entries to the selected mode's synced history.
+   *
+   * The history is stored inside the mode's progress blob so it shares the
+   * lifecycle, sanitization, merge, and reset rules of every other progress
+   * field. Entries are deduplicated by id, sorted newest first, and capped by
+   * the shared sanitizer limit.
+   */
+  addManualActivityEntries(this: UserState, entries: ManualActivityEntry[]) {
+    if (!Array.isArray(entries) || entries.length === 0) return;
+    const currentData = getCurrentData(this);
+    const existing = Array.isArray(currentData.manualActivityHistory)
+      ? currentData.manualActivityHistory
+      : [];
+    const merged = sanitizeManualActivityHistory([...entries, ...existing]);
+    if (merged.length === 0 && existing.length === 0) return;
+    currentData.manualActivityHistory = merged;
+  },
+  clearManualActivityHistory(this: UserState) {
+    const currentData = getCurrentData(this);
+    currentData.manualActivityHistory = [];
   },
 } as const;
 export type UserActions = typeof actions;
