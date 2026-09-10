@@ -1016,6 +1016,10 @@ flowchart LR
   History-only state starts sync and passes the empty-state guard. Deferred startup explicitly
   persists the mutation that created the subscription, including post-load legacy adoption. Initial
   saves retry once after a failure, retain pending state, and stop retrying after a session change.
+  A failed authenticated initial sync retries within the same session on a bounded 30-second cycle
+  (five attempts, first failure and exhaustion toast, intermediate failures log a warning) so the
+  deferred legacy adoption is not stranded until the next login. Identity changes cancel the
+  pending retry and reset the attempt budget, and success cancels the cycle.
   Clearing advances
   `manualActivityEpoch` without changing gameplay or `progressEpoch`; only histories from the
   highest history generation participate in the union. Full progress reset epochs take precedence.

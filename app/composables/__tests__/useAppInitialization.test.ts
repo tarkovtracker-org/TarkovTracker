@@ -359,4 +359,74 @@ describe('useAppInitialization locale setup', () => {
       expect(mockShowLoadFailed).not.toHaveBeenCalled();
     }
   );
+  describe('initial sync retry', () => {
+    // Mirrors the un-exported bounded retry window: 5 attempts, 30s apart.
+    const RETRY_DELAY_MS = 30_000;
+    const MAX_ATTEMPTS = 5;
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+    it('retries a failed initial sync and adopts legacy activity in the same session', async () => {
+      vi.useFakeTimers();
+      mockInitializeTarkovSync.mockRejectedValueOnce(new Error('offline'));
+      mockSupabaseUser.loggedIn = true;
+      mockSupabaseUser.id = 'user-1';
+      const wrapper = await mountWithComposable();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
+      expect(mockActivityLogMigrateLegacyManualEntries).not.toHaveBeenCalled();
+      expect(mockShowLoadFailed).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(RETRY_DELAY_MS);
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(2);
+      expect(mockActivityLogMigrateLegacyManualEntries).toHaveBeenCalledTimes(1);
+      expect(mockShowLoadFailed).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(RETRY_DELAY_MS * 2);
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(2);
+      wrapper.unmount();
+    });
+    it('stops retrying after the bounded number of attempts', async () => {
+      vi.useFakeTimers();
+      mockInitializeTarkovSync.mockRejectedValue(new Error('offline'));
+      mockSupabaseUser.loggedIn = true;
+      mockSupabaseUser.id = 'user-1';
+      const wrapper = await mountWithComposable();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mockShowLoadFailed).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(RETRY_DELAY_MS * (MAX_ATTEMPTS + 5));
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1 + MAX_ATTEMPTS);
+      expect(mockShowLoadFailed).toHaveBeenCalledTimes(2);
+      wrapper.unmount();
+    });
+    it('does not retry after logout cancels the pending retry', async () => {
+      vi.useFakeTimers();
+      mockInitializeTarkovSync.mockRejectedValue(new Error('offline'));
+      mockSupabaseUser.loggedIn = true;
+      mockSupabaseUser.id = 'user-1';
+      const wrapper = await mountWithComposable();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
+      mockSupabaseUser.loggedIn = false;
+      mockSupabaseUser.id = null;
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(RETRY_DELAY_MS * 5);
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
+      wrapper.unmount();
+    });
+    it('does not continue retrying a former account after switching users', async () => {
+      vi.useFakeTimers();
+      mockInitializeTarkovSync.mockRejectedValueOnce(new Error('offline'));
+      mockSupabaseUser.loggedIn = true;
+      mockSupabaseUser.id = 'user-1';
+      const wrapper = await mountWithComposable();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
+      mockSupabaseUser.id = 'user-2';
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(RETRY_DELAY_MS * 5);
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(2);
+      expect(mockActivityLogMigrateLegacyManualEntries).toHaveBeenCalledTimes(1);
+      wrapper.unmount();
+    });
+  });
 });
