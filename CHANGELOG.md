@@ -1,3 +1,10 @@
+## [1.77.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.4...v1.77.5) (2026-09-10)
+
+
+### Bug Fixes
+
+* **tasks:** block tasks whose declared gate cannot be interpreted ([#835](https://github.com/tarkovtracker-org/TarkovTracker/issues/835)) ([3879e95](https://github.com/tarkovtracker-org/TarkovTracker/commit/3879e952294fdb02c1eee892ef3f3a48b39fcf96)), closes [#727](https://github.com/tarkovtracker-org/TarkovTracker/issues/727)
+
 ## [1.77.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.3...v1.77.4) (2026-09-10)
 
 
