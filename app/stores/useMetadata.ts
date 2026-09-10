@@ -89,8 +89,14 @@ const PRESTIGE_CACHE_VERSION = 'json-v3';
 const EDITIONS_CACHE_VERSION = 'overlay-v2';
 const settledEditionScope = (requested: string, current: string) =>
   requested === current ? requested : '';
+/**
+ * Resolve the perk list for a mode, always returning a raw array. A plain array
+ * assigned to store state becomes a reactive proxy, and `structuredClone` rejects
+ * a proxy, so leaving the non-Seasonal branch unmarked made every IndexedDB
+ * editions write fail with `DataCloneError`.
+ */
 const perksForMode = (perks: SeasonalPerk[], mode: string) =>
-  mode === 'pvp-season' ? markRaw(perks) : [];
+  markRaw(mode === 'pvp-season' ? perks : []);
 const editionsPromiseForScope = (store: ReturnType<typeof getPromiseStore>, scope: string) =>
   store.editionsScope === scope ? store.editionsPromise : null;
 const CACHE_PURGE_STORAGE_KEY = STORAGE_KEYS.cachePurgeAt;
@@ -1519,8 +1525,7 @@ export const useMetadataStore = defineStore('metadata', {
           this.editions = markRaw(editions);
           this.storyChapters = markRaw(chapters);
           promiseStore.editionsSettledScope = scope;
-          this.seasonalPerks =
-            requestMode === 'pvp-season' ? markRaw(overlay.seasonalPerks ?? []) : [];
+          this.seasonalPerks = perksForMode(overlay.seasonalPerks ?? [], requestMode);
           if (typeof window !== 'undefined') {
             setCachedData(
               'editions' as CacheType,

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useMetadataStore } from '@/stores/useMetadata';
 import * as cacheUtils from '@/utils/tarkovCache';
 import { createDeferred } from '@/utils/test-helpers';
-import type { GameEdition, StoryChapter } from '@/types/tarkov';
+import type { GameEdition, SeasonalPerk, StoryChapter } from '@/types/tarkov';
 const loggerMock = vi.hoisted(() => ({
   debug: vi.fn(),
   error: vi.fn(),
@@ -30,6 +30,15 @@ const createStoryChapter = (id: string, order: number, name: string): StoryChapt
   objectives: {},
   order,
   wikiLink: `https://example.com/${id}`,
+});
+const createSeasonalPerk = (id: string, name: string): SeasonalPerk => ({
+  id,
+  type: 'perk',
+  name,
+  description: '',
+  points: 0,
+  mutuallyExclusiveSeasonalPerkIds: [],
+  effects: [],
 });
 describe('useMetadataStore fetchEditionsData', () => {
   beforeEach(() => {
@@ -97,6 +106,56 @@ describe('useMetadataStore fetchEditionsData', () => {
       '[MetadataStore] Editions cache read failed:',
       expect.any(Error)
     );
+  });
+  it('caches a structured-cloneable editions payload in a persistent mode', async () => {
+    const store = useMetadataStore();
+    const setCachedDataMock = vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn().mockResolvedValue({
+        data: { editions: [createEdition('standard', 1, 'Standard')], storyChapters: [] },
+      })
+    );
+    await store.fetchEditionsData(true);
+    expect(setCachedDataMock).toHaveBeenCalledTimes(1);
+    const payload = setCachedDataMock.mock.calls.at(-1)?.[3];
+    expect(payload).toEqual({
+      editions: [createEdition('standard', 1, 'Standard')],
+      storyChapters: [],
+      seasonalPerks: [],
+    });
+    // IndexedDB stores values with the structured clone algorithm, which throws
+    // DataCloneError on a Vue reactive proxy. Reaching the cache with reactive
+    // state silently disables the editions cache for every visit. The payload is
+    // asserted first because structuredClone(undefined) would pass vacuously.
+    expect(() => structuredClone(payload)).not.toThrow();
+  });
+  it('caches a structured-cloneable editions payload in Seasonal', async () => {
+    const store = useMetadataStore();
+    store.currentGameMode = 'seasonal';
+    const setCachedDataMock = vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn().mockResolvedValue({
+        data: {
+          editions: [createEdition('standard', 1, 'Standard')],
+          storyChapters: [],
+          seasonalPerks: [createSeasonalPerk('perk-1', 'Perk One')],
+        },
+      })
+    );
+    await store.fetchEditionsData(true);
+    expect(store.seasonalPerks).toEqual([createSeasonalPerk('perk-1', 'Perk One')]);
+    expect(setCachedDataMock).toHaveBeenCalledTimes(1);
+    const payload = setCachedDataMock.mock.calls.at(-1)?.[3];
+    expect(payload).toEqual({
+      editions: [createEdition('standard', 1, 'Standard')],
+      storyChapters: [],
+      seasonalPerks: [createSeasonalPerk('perk-1', 'Perk One')],
+    });
+    expect(() => structuredClone(payload)).not.toThrow();
   });
   it('keeps cached editions when story chapters cache is missing and overlay fetch fails', async () => {
     const store = useMetadataStore();

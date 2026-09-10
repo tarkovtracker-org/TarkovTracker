@@ -239,7 +239,10 @@ replaces the key with the translated string.
    caching entirely and always fetch. Sets `X-Cache-Status: DEV`.
 
 On top of these, the **client** has its own IndexedDB cache in `useMetadataStore` so the browser
-does not re-fetch on every navigation. That layer is documented in `ARCHITECTURE.md`.
+does not re-fetch on every navigation. That layer is documented in `ARCHITECTURE.md`. Anything passed
+to `setCachedData` must be structured-cloneable, so store-held catalogs stay `markRaw` on every
+assignment including empty fallbacks: a plain array assigned to store state becomes a reactive proxy,
+and IndexedDB rejects a proxy with `DataCloneError`, disabling that cache entry for every visit.
 
 ### Stale-while-revalidate
 
