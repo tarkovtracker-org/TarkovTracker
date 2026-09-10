@@ -297,12 +297,12 @@ describe('Tarkov API handlers', () => {
     const loadHandler = async () =>
       (await import('@/server/api/tarkov/overlay-status.get')).default;
     it('serves the precompute manifest without storing it', async () => {
-      const manifest = { entries: [{ key: 'tasks-core-json-v4-en-regular', overlay: 'sha-1' }] };
+      const manifest = { entries: [{ key: 'tasks-core-json-v3-en-regular', overlay: 'sha-1' }] };
       const get = vi.fn(async () => manifest);
       mockGetPrecomputedStore.mockReturnValue({ get });
       const handler = await loadHandler();
       await expect(handler(event)).resolves.toEqual(manifest);
-      expect(get).toHaveBeenCalledWith('overlay-precompute-manifest-json-v4', 'json');
+      expect(get).toHaveBeenCalledWith('overlay-precompute-manifest-json-v3', 'json');
       expect(mockSetHeader).toHaveBeenCalledWith(event, 'Cache-Control', 'no-store');
     });
     it.each([
@@ -385,7 +385,7 @@ describe('Tarkov API handlers', () => {
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
-      'tasks-core-json-v4-en-regular',
+      'tasks-core-json-v3-en-regular',
       expect.any(Function),
       111,
       { cacheKeyPrefix: 'tarkov', precomputed: true }

@@ -215,6 +215,37 @@ describe('endpoint overlay projectors', () => {
       validateOverlayData({ ...published, storyChapters: { tour: { objectives: [null] } } })
     ).toBe(false);
   });
+  it.each(['constructor', 'toString', '__proto__'])(
+    'rejects inherited chapter reference %s',
+    (storyChapter) => {
+      expect(
+        validateOverlayData({
+          ...overlay,
+          modes: {
+            regular: {
+              prestige: {
+                p5: {
+                  storyRequirements: [
+                    { type: 'storyChapterStatus', storyChapter, status: ['complete'] },
+                  ],
+                },
+              },
+            },
+          },
+        })
+      ).toBe(false);
+    }
+  );
+  it('accepts omitted perk exclusions but rejects malformed exclusions', () => {
+    const withExclusions = (exclusions: unknown) => ({
+      ...overlay,
+      seasonalPerks: { perk: { effects: [], mutuallyExclusiveSeasonalPerkIds: exclusions } },
+    });
+    expect(validateOverlayData(withExclusions(undefined))).toBe(true);
+    expect(validateOverlayData(withExclusions([]))).toBe(true);
+    expect(validateOverlayData(withExclusions(null))).toBe(false);
+    expect(validateOverlayData(withExclusions([1]))).toBe(false);
+  });
   it('rejects bad references and malformed known sections, while reporting unknown sections', () => {
     expect(validateOverlayData(overlay)).toBe(true);
     expect(validateOverlayData({ ...overlay, storyChapters: {} })).toBe(false);

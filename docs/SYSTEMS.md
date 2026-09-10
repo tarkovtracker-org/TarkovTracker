@@ -418,8 +418,12 @@ precompute refuses to publish payloads with unconsumed sections.
 Prestige fetches the requested upstream mode; regular corrections cannot leak into PvE or Seasonal.
 An empty upstream prestige collection stays empty. Client prestige and edition catalogs are keyed
 by mode and language (`json-v3` and `overlay-v2`), and stale responses cannot replace another scope.
-The item contract advances to `json-v2`, hideout to `json-v5`, tasks-core to `json-v4`, and IndexedDB
-schema 9 clears incompatible browser payloads.
+The item contract advances to `json-v2`, hideout to `json-v5`, tasks-core to `json-v3`, and IndexedDB
+schema 8 clears incompatible browser payloads. The combined progression/overlay release skips the
+standalone progression deployment: v3 always uses envelope format 2 with overlay provenance.
+The superseded progression-only writer must never publish to these keys; rollback uses v2.
+Story references must name own chapter entries, never inherited object properties. Seasonal perk
+exclusion lists may be omitted; when present, every entry must be a string.
 
 ### Files
 
@@ -486,7 +490,7 @@ flowchart LR
 - The envelope shape is `{ payload, overlay: { version, sha256 }, storedAt, version }` with
   `PRECOMPUTED_ENVELOPE_VERSION = 2`.
 - The cache key for `tasks-core` is built by `buildTasksCorePrecomputedKey(lang, gameMode)` and is
-  `tasks-core-json-v4-<lang>-<gameMode>`. Both the precompute script and the request handler import
+  `tasks-core-json-v3-<lang>-<gameMode>`. Both the precompute script and the request handler import
   this function from `precomputedTarkov.ts`, so the keys can never drift.
 - Writes go through the Cloudflare REST API (one PUT per key) because the bulk endpoint's request
   size ceiling cannot hold all ~4.2MB envelopes in one call, and per-key writes isolate failures per
@@ -499,7 +503,7 @@ Missing provenance, a different SHA, invalid task payloads or unconsumed section
 combination before its KV write. Previous entries survive failed combinations. Each successful
 entry records language, mode, storage time and overlay identity; envelope validation requires its
 identity to agree with `payload.dataOverlay`. Writes remain per-key, not atomic across the fleet. A verifier exit code of zero can include `propagating` rows within the 14-hour window; post-deployment confirmation requires all 48 rows to be `current`, while pre-deployment approval requires the complete matching precompute manifest.
-Only a complete, unfiltered, failure-free run updates `overlay-precompute-manifest-json-v4`.
+Only a complete, unfiltered, failure-free run updates `overlay-precompute-manifest-json-v3`.
 The workflow uploads `precompute-manifest.json` even for partial failures, so operators can see
 which entries changed. `/api/tarkov/overlay-status` returns the last complete manifest without caching.
 
@@ -1638,8 +1642,8 @@ not import quest completions and therefore has no trader/task backfill path.
   recommendations; no new dependency on the removed upstream task `alternatives` is introduced.
 - Known trader gates may be disabled by preference; unknown data never silently unlocks a task.
 - PvP, PvE and Seasonal evaluate only their own progress and mode-specific task metadata.
-- `tasks-core-json-v4` keys invalidate incompatible edge/precompute payloads together. Browser
-  IndexedDB schema 9 clears the old task contract. Missing new KV entries fall back to the normal
+- `tasks-core-json-v3` keys invalidate incompatible edge/precompute payloads together. Browser
+  IndexedDB schema 8 clears the old task contract. Missing new KV entries fall back to the normal
   fetch/adapt/overlay pipeline, which exceeds the free-tier CPU budget on a cold request. Before
   merging or promoting the app, an authorized operator must run the precompute workflow from the
   approved branch revision with no language/mode filters, verify all 48 new-key writes succeeded,

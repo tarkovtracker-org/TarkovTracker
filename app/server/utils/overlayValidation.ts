@@ -45,7 +45,9 @@ const chapterHasObjective = (
 const validStoryReference = (requirement: unknown, chapters: OverlayRecords): boolean => {
   if (!isPlainObject(requirement)) return false;
   if (!validRequirementShape(requirement)) return false;
-  const chapter = chapters[String(requirement.storyChapter)];
+  const chapterId = String(requirement.storyChapter);
+  if (!Object.hasOwn(chapters, chapterId)) return false;
+  const chapter = chapters[chapterId];
   return Boolean(chapter) && chapterHasObjective(chapter!, requirement);
 };
 const storyRequirements = (level: Record<string, unknown>) =>
@@ -69,7 +71,8 @@ const validEffect = (effect: unknown): boolean =>
   validItemFilter(effect.itemFilter);
 const validPerk = (perk: Record<string, unknown>): boolean =>
   Array.isArray(perk.effects) &&
-  stringList(perk.mutuallyExclusiveSeasonalPerkIds) &&
+  (perk.mutuallyExclusiveSeasonalPerkIds === undefined ||
+    stringList(perk.mutuallyExclusiveSeasonalPerkIds)) &&
   perk.effects.every(validEffect);
 const validTaskReference = (value: unknown): boolean =>
   isPlainObject(value) && typeof value.id === 'string';

@@ -1,7 +1,7 @@
 import { createLogger } from '~/server/utils/logger';
 import { getPrecomputedStore } from '~/server/utils/precomputedTarkov';
 const logger = createLogger('TarkovOverlayStatus');
-const MANIFEST_KEY = 'overlay-precompute-manifest-json-v4';
+const MANIFEST_KEY = 'overlay-precompute-manifest-json-v3';
 export default defineEventHandler(async (event) => {
   const store = getPrecomputedStore(event);
   let manifest: unknown = null;

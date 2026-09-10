@@ -8,8 +8,8 @@ import {
 describe('precomputedTarkov', () => {
   describe('buildTasksCorePrecomputedKey', () => {
     it('matches the tasks-core edge cache key format', () => {
-      expect(buildTasksCorePrecomputedKey('en', 'regular')).toBe('tasks-core-json-v4-en-regular');
-      expect(buildTasksCorePrecomputedKey('de', 'pve')).toBe('tasks-core-json-v4-de-pve');
+      expect(buildTasksCorePrecomputedKey('en', 'regular')).toBe('tasks-core-json-v3-en-regular');
+      expect(buildTasksCorePrecomputedKey('de', 'pve')).toBe('tasks-core-json-v3-de-pve');
     });
   });
   describe('envelope round trip', () => {
@@ -19,6 +19,12 @@ describe('precomputedTarkov', () => {
       expect(envelope.payload).toEqual({ data: { tasks: [] } });
       expect(envelope.version).toBe(2);
       expect(Number.isFinite(envelope.storedAt)).toBe(true);
+    });
+    it('rejects the superseded progression-only envelope at the shared v3 key', () => {
+      const payload = { data: { tasks: [{ id: 'task-1' }] } };
+      const legacy = { payload, storedAt: Date.now(), version: 1 };
+      expect(isPrecomputedEnvelope(legacy)).toBe(false);
+      expect(isPrecomputedEnvelope(buildPrecomputedEnvelope(payload))).toBe(true);
     });
     it('rejects provenance that differs from the served payload', () => {
       const envelope = buildPrecomputedEnvelope({

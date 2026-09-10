@@ -617,14 +617,26 @@ Pi access. Do not make production role provisioning or the canary an automatic m
    - Full ownership map (Worker DO vs Edge mutation limits vs Pages vs Auth): [`RATE_LIMITING.md`](./RATE_LIMITING.md).
 3. If API protection blocks valid traffic, update `API_ALLOWED_HOSTS` and redeploy.
 
-### Task cache contract rollout (v3 to v4)
+### Combined task cache contract rollout (v2 to v3)
 
-For the `tasks-core-json-v3-*` to `tasks-core-json-v4-*` transition, an authorized operator must dispatch
-`.github/workflows/precompute-tarkov-data.yml` from the approved change revision before merging
+The progression and overlay changes ship together through PR #826, which supersedes PR #825.
+Do not merge or dispatch the standalone #825 branch: its envelope-format-1 writer uses the same
+v3 keys as the combined envelope-format-2 contract and would replace incompatible payloads.
+Only the combined revision may publish v3 entries. There is no intermediate application release.
+
+For the `tasks-core-json-v2-*` to `tasks-core-json-v3-*` transition, an authorized operator must dispatch
+`.github/workflows/precompute-tarkov-data.yml` from the approved combined revision before merging
 or promoting the app. Leave both workflow inputs, `lang` and `gameMode`, empty to include all
 48 combinations across `regular`, `pve`, and `pvp-season`. Require `succeeded: 48` and `failed: 0`,
-verify every `tasks-core-json-v4-*` entry was written, and attach the run and approved revision
-to the release. Set `expectedOverlaySha` to the approved published SHA and verify the
-`overlay-precompute-manifest-json-v4` contains all 48 matching identities. Before relying on the previous app for rollback, confirm its existing
-`tasks-core-json-v3-*` entries remain within their seven-day TTL. The cold fetch/adapt/overlay fallback
-can exceed the free-tier CPU budget and is not a safe bridge during a cache-key rollout.
+verify every `tasks-core-json-v3-*` entry uses envelope format 2, and attach the run and approved
+revision to the release. Set `expectedOverlaySha` to the approved published SHA and verify
+`overlay-precompute-manifest-json-v3` contains all 48 matching identities.
+
+Before rollout, confirm neither original PR revision has a production deployment or an in-flight
+precompute run. After the v3 population is verified, merge the combined PR only and
+close #825 as superseded. The scheduled workflow then refreshes the combined v3 contract.
+Before relying on the previous app for rollback, confirm its existing `tasks-core-json-v2-*`
+entries remain within their seven-day TTL. Roll back to the previous v2 application, never the
+standalone #825 application. The cold fetch/adapt/overlay fallback is not a safe bridge during
+this cache-key rollout. After deployment, run `pnpm run verify:overlay` and retain the served
+fleet verification before closing issue #729.

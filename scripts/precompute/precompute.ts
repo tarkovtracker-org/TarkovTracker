@@ -119,7 +119,7 @@ const publishManifest = async (
   kv: KvWriter,
   manifest: PrecomputeResult['manifest']
 ): Promise<PrecomputeResult['failures']> => {
-  const key = 'overlay-precompute-manifest-json-v4';
+  const key = 'overlay-precompute-manifest-json-v3';
   try {
     await kv.put(key, JSON.stringify({ completedAt: Date.now(), entries: manifest }), {
       expirationTtl: PRECOMPUTED_TTL_SECONDS,

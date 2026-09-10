@@ -55,13 +55,13 @@ describe('runPrecompute', () => {
   it('retains all payload provenance when final manifest publication fails', async () => {
     const kv = createKvMock();
     kv.put.mockImplementation(async (key: string) => {
-      if (key === 'overlay-precompute-manifest-json-v4') throw new Error('manifest unavailable');
+      if (key === 'overlay-precompute-manifest-json-v3') throw new Error('manifest unavailable');
     });
     const result = await runPrecompute(kv);
     expect(result.successes).toHaveLength(48);
     expect(result.manifest).toHaveLength(48);
     expect(result.failures).toEqual([
-      { key: 'overlay-precompute-manifest-json-v4', error: 'manifest unavailable' },
+      { key: 'overlay-precompute-manifest-json-v3', error: 'manifest unavailable' },
     ]);
     expect(result.manifest.every((entry) => entry.overlay.sha256 === 'release-sha')).toBe(true);
   });
@@ -72,13 +72,13 @@ describe('runPrecompute', () => {
     expect(result.successes).toHaveLength(3);
     expect(result.successes).toEqual(
       expect.arrayContaining([
-        'tasks-core-json-v4-en-regular',
-        'tasks-core-json-v4-en-pve',
-        'tasks-core-json-v4-en-pvp-season',
+        'tasks-core-json-v3-en-regular',
+        'tasks-core-json-v3-en-pve',
+        'tasks-core-json-v3-en-pvp-season',
       ])
     );
     expect(kv.put).toHaveBeenCalledTimes(3);
-    const putCall = kv.put.mock.calls.find(([key]) => key === 'tasks-core-json-v4-en-regular');
+    const putCall = kv.put.mock.calls.find(([key]) => key === 'tasks-core-json-v3-en-regular');
     expect(putCall).toBeDefined();
     const [, value, options] = putCall!;
     expect(options).toEqual({ expirationTtl: PRECOMPUTED_TTL_SECONDS });
@@ -116,11 +116,11 @@ describe('runPrecompute', () => {
     const kv = createKvMock();
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toEqual([
-      { error: 'upstream 502', key: 'tasks-core-json-v4-en-regular' },
+      { error: 'upstream 502', key: 'tasks-core-json-v3-en-regular' },
     ]);
     expect(result.successes).toEqual([
-      'tasks-core-json-v4-en-pve',
-      'tasks-core-json-v4-en-pvp-season',
+      'tasks-core-json-v3-en-pve',
+      'tasks-core-json-v3-en-pvp-season',
     ]);
     expect(kv.put).toHaveBeenCalledTimes(2);
   });
@@ -129,11 +129,11 @@ describe('runPrecompute', () => {
     kv.put.mockRejectedValueOnce(new Error('KV write failed')).mockResolvedValue(undefined);
     const result = await runPrecompute(kv, { lang: 'en' });
     expect(result.failures).toEqual([
-      { error: 'KV write failed', key: 'tasks-core-json-v4-en-regular' },
+      { error: 'KV write failed', key: 'tasks-core-json-v3-en-regular' },
     ]);
     expect(result.successes).toEqual([
-      'tasks-core-json-v4-en-pve',
-      'tasks-core-json-v4-en-pvp-season',
+      'tasks-core-json-v3-en-pve',
+      'tasks-core-json-v3-en-pvp-season',
     ]);
   });
   it.each([
@@ -153,12 +153,12 @@ describe('runPrecompute', () => {
     expect(result.failures).toEqual([
       {
         error: `Sanity check failed: ${error}; refusing to write to KV`,
-        key: 'tasks-core-json-v4-en-regular',
+        key: 'tasks-core-json-v3-en-regular',
       },
     ]);
     expect(result.successes).toEqual([
-      'tasks-core-json-v4-en-pve',
-      'tasks-core-json-v4-en-pvp-season',
+      'tasks-core-json-v3-en-pve',
+      'tasks-core-json-v3-en-pvp-season',
     ]);
     expect(kv.put).toHaveBeenCalledTimes(2);
   });
@@ -177,12 +177,12 @@ describe('runPrecompute', () => {
       {
         error:
           'Sanity check failed: task "task-bad" has malformed objective arrays; refusing to write to KV',
-        key: 'tasks-core-json-v4-en-regular',
+        key: 'tasks-core-json-v3-en-regular',
       },
     ]);
     expect(result.successes).toEqual([
-      'tasks-core-json-v4-en-pve',
-      'tasks-core-json-v4-en-pvp-season',
+      'tasks-core-json-v3-en-pve',
+      'tasks-core-json-v3-en-pvp-season',
     ]);
     expect(kv.put).toHaveBeenCalledTimes(2);
   });
