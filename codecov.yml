@@ -24,7 +24,7 @@ bundle_analysis:
   warning_threshold: 5%
 comment:
   # Codecov names these layout entries with underscores; hyphenated values fail validation and
-  # invalidate the whole file, which silently discards the coverage statuses defined above.
+  # invalidate the whole file, causing Codecov to reuse the last valid repository YAML.
   layout: 'condensed_header, condensed_files, footer'
   require_changes: true
   require_bundle_changes: true
