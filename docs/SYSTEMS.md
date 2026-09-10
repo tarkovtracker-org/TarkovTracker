@@ -1682,6 +1682,7 @@ inferred from a New Beginning task id or wikiLink: inference cannot repair a mal
 Without a diagnostic, the map continues to govern supported prestige references and inferred tasks.
 The overlay's supported id-less prestige shape is retained without a diagnostic. Two adjacent paths keep
 the diagnostic intact rather than losing it: task patches are normalized using their original id,
+and retain pre-merge diagnostics rather than accepting a patch-supplied diagnostic array,
 including locale patches after they merge,
 because locale corrections are applied last, and `useProfileTaskMetadata.mergeProfileTasks` takes only
 objective data from the objectives catalog, so a stray gate field an overlay patch merged into that

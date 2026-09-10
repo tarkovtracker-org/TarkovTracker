@@ -243,7 +243,7 @@ export async function fetchOverlay(
  * Filters out entities marked as disabled after applying corrections
  */
 type ApplyEntityOverlayOptions<T extends { id: string }> = {
-  normalize?: (task: T, patch: Record<string, unknown>) => T;
+  normalize?: (task: T, patch: Record<string, unknown>, original: T) => T;
   logLabel?: string;
   /** If true, log even when appliedCount and disabledCount are both zero. Default: true */
   logEvenWhenZero?: boolean;
@@ -264,7 +264,7 @@ function applyEntityOverlay<T extends { id: string }>(
         logger.debug(`Applying correction to ${entity.id}:`, correction);
         // Deep merge the correction into the entity (recursively merges nested objects)
         const merged = deepMerge(entity as Record<string, unknown>, correction) as T;
-        return options.normalize ? options.normalize(merged, correction) : merged;
+        return options.normalize ? options.normalize(merged, correction, entity) : merged;
       }
       return entity;
     })
@@ -524,21 +524,25 @@ function applyDeclaredGateNormalization(
  */
 function applyPatchedGateNormalization<T extends { id: string }>(
   task: T,
-  patch: Record<string, unknown> | undefined
+  patch: Record<string, unknown> | undefined,
+  original: T
 ): T {
-  if (!patchesDeclaredGates(patch)) return task;
   const record = task as Record<string, unknown>;
+  // Diagnostics are derived state: corrections cannot replace the adapter's evidence.
+  recordGateDiagnostics(record, recordedGateDiagnostics(original as Record<string, unknown>));
+  if (!patchesDeclaredGates(patch)) return task;
   applyDeclaredGateNormalization(record, retainedGateDiagnostics(record, patch));
   return task;
 }
 /** Re-normalize a corrected upstream task. */
 function applyTaskPatchNormalization<T extends { id: string }>(
   task: T,
-  patch: Record<string, unknown> | undefined
+  patch: Record<string, unknown> | undefined,
+  original: T
 ): T {
   const record = task as Record<string, unknown>;
   if (patchesField(patch, 'traderRequirements')) applyTraderRequirementSplit(record);
-  return applyPatchedGateNormalization(task, patch);
+  return applyPatchedGateNormalization(task, patch, original);
 }
 /** Overlay additions never pass through the adapter, so their raw gates are all still readable. */
 function applyTaskAdditionNormalization<T extends { id: string }>(task: T): T {
@@ -588,7 +592,7 @@ function applyLocaleOverlays(target: OverlayTargetData, localeOverlay: LocaleOve
     const patch = localeOverlay.tasks?.[task.id];
     if (!isPlainObject(patch)) return task;
     const merged = deepMerge(task as Record<string, unknown>, patch) as { id: string };
-    return applyPatchedGateNormalization(merged, patch);
+    return applyPatchedGateNormalization(merged, patch, task);
   });
 }
 function applyEntityCollectionOverlay(

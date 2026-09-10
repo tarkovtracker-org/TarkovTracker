@@ -236,6 +236,27 @@ describe('overlay declared-gate normalization', () => {
     expect(task.requirementDiagnostics).toEqual(['task_requirement', 'prestige_reference']);
     expect(evaluate(task).available).toBe(false);
   });
+  it.each(['ordinary', 'locale'])(
+    'ignores diagnostic overrides in %s corrections',
+    async (scope) => {
+      const patch = { name: 'Renamed', requirementDiagnostics: [] };
+      const tasks = { target: patch };
+      const overlay = scope === 'locale' ? { locales: { en: { tasks } } } : { tasks };
+      const task = await correct(overlay, [brokenTask()]);
+      expect(task.requirementDiagnostics).toEqual(['task_requirement', 'prestige_reference']);
+      expect(evaluate(task).available).toBe(false);
+    }
+  );
+  it.each(['ordinary', 'locale'])(
+    'retains untouched diagnostics when %s corrections repair one gate',
+    async (scope) => {
+      const tasks = { target: { taskRequirements: [], requirementDiagnostics: [] } };
+      const overlay = scope === 'locale' ? { locales: { en: { tasks } } } : { tasks };
+      const task = await correct(overlay, [brokenTask()]);
+      expect(task.requirementDiagnostics).toEqual(['prestige_reference']);
+      expect(evaluate(task).available).toBe(false);
+    }
+  );
   it('normalizes an ordinary correction using its original task id', async () => {
     const patch = { id: 'renamed', requiredPrestige: {}, taskRequirements: {} };
     const task = await correct({ tasks: { target: patch } }, [baseTask()]);
