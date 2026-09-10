@@ -1677,11 +1677,12 @@ empty list, so an older payload cannot make availability read a broken collectio
 That guard covers the evaluator only: other task consumers still assume a list, and a pre-fix payload
 that dropped a gate without recording a diagnostic stays unlocked until the refresh below replaces it.
 
-An authoritative `prestigeTaskMap` entry still governs the prestige gate and takes precedence over a
-`prestige_reference` diagnostic for the same task, including an entry inferred from a New Beginning
-task id or wikiLink. The gate is enforced from the resolved level rather than reported as unreadable,
-exactly as it already is for a valid reference that no prestige row resolves. Two adjacent paths keep
-the diagnostic intact rather than losing it: a locale task patch is re-normalized after it merges,
+A `prestige_reference` diagnostic blocks independently of `prestigeTaskMap`, including entries
+inferred from a New Beginning task id or wikiLink: inference cannot repair a malformed declared gate.
+Without a diagnostic, the map continues to govern supported prestige references and inferred tasks.
+The overlay's supported id-less prestige shape is retained without a diagnostic. Two adjacent paths keep
+the diagnostic intact rather than losing it: task patches are normalized using their original id,
+including locale patches after they merge,
 because locale corrections are applied last, and `useProfileTaskMetadata.mergeProfileTasks` takes only
 objective data from the objectives catalog, so a stray gate field an overlay patch merged into that
 response cannot replace the core catalog's gates.
@@ -1748,8 +1749,11 @@ not import quest completions and therefore has no trader/task backfill path.
   bump the precompute or browser cache versions and adds no new rollout requirement. The
   `tasks-core-json-v3` operator rollout in the next invariant is unchanged and still applies on its
   own terms. A payload without the field behaves exactly as it did before, the evaluator
-  independently blocks a non-list `taskRequirements` from any payload vintage, and the 12-hour edge
-  TTL plus the matching precompute cron bound how long a pre-diagnostic payload can survive.
+  independently blocks a non-list `taskRequirements` from any payload vintage. Successful precompute
+  refreshes run every 12 hours, after which edge and browser caches must also refresh. This is not
+  a strict 12-hour recovery bound: failed runs can leave older KV entries serving for their seven-day
+  TTL. Verify a successful precompute from the deployed fix before claiming production diagnostics
+  are active; already-discarded gates cannot be recovered by the evaluator alone.
 - PvP, PvE and Seasonal evaluate only their own progress and mode-specific task metadata.
 - `tasks-core-json-v3` keys invalidate incompatible edge/precompute payloads together. Browser
   IndexedDB schema 8 clears the old task contract. Missing new KV entries fall back to the normal

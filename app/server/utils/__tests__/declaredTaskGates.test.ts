@@ -118,6 +118,29 @@ describe('malformed declared prestige references', () => {
     expect(task.requirementDiagnostics).toEqual(['prestige_reference']);
     expect(evaluate(task).available).toBe(false);
   });
+  it.each([0, 4, 5])(
+    'blocks a malformed gate despite an inferred level at prestige %i',
+    (prestigeLevel) => {
+      const task = adaptTask({
+        id: 'new_beginning_prestige_5',
+        requiredPrestige: { unexpected: 'prestige-id' },
+        storyUnlocks: [{ id: 'chapter-1', name: 'Batya' }],
+      });
+      const prestigeTaskMap = buildPrestigeTaskMap([task], []);
+      expect(prestigeTaskMap.get(task.id)).toBe(4);
+      const evaluated = buildTaskEvaluations(
+        [task],
+        new Map([
+          ['self', progress({ prestigeLevel, storyChapters: { 'chapter-1': { complete: true } } })],
+        ]),
+        { requireTraderLevels: false, prestigeTaskMap }
+      )[task.id]!.self!;
+      expect(evaluated).toEqual({
+        available: false,
+        blockers: [{ type: 'unknown', reason: 'prestige_reference' }],
+      });
+    }
+  );
   it('still coerces a numeric id rather than narrowing a supported shape', () => {
     const task = adaptTask({ requiredPrestige: { id: 42 } });
     expect(task.requiredPrestige).toEqual({ id: '42' });
@@ -213,6 +236,13 @@ describe('overlay declared-gate normalization', () => {
     expect(task.requirementDiagnostics).toEqual(['task_requirement', 'prestige_reference']);
     expect(evaluate(task).available).toBe(false);
   });
+  it('normalizes an ordinary correction using its original task id', async () => {
+    const patch = { id: 'renamed', requiredPrestige: {}, taskRequirements: {} };
+    const task = await correct({ tasks: { target: patch } }, [baseTask()]);
+    expect(task.id).toBe('renamed');
+    expect(task.requirementDiagnostics).toEqual(['task_requirement', 'prestige_reference']);
+    expect(evaluate(task).available).toBe(false);
+  });
   it('clears an adapter diagnostic when a correction repairs the gate', async () => {
     const patch = { requiredPrestige: 'prestige1', taskRequirements: [] };
     const task = await correct({ tasks: { target: patch } }, [brokenTask()]);
@@ -258,7 +288,14 @@ describe('overlay declared-gate normalization', () => {
     const task = await correct({ tasksAdd: { new_beginning_prestige_5: added } }, []);
     expect(task.requirementDiagnostics).toBeUndefined();
     expect(task.requiredPrestige).toEqual(requiredPrestige);
-    expect(buildPrestigeTaskMap([task], []).get(task.id)).toBe(4);
+    const prestigeTaskMap = buildPrestigeTaskMap([task], []);
+    expect(prestigeTaskMap.get(task.id)).toBe(4);
+    expect(
+      buildTaskEvaluations([task], new Map([['self', progress({ prestigeLevel: 4 })]]), {
+        requireTraderLevels: false,
+        prestigeTaskMap,
+      })[task.id]!.self!.available
+    ).toBe(true);
   });
   // Locale corrections are applied last, so a gate one of them declares needs the same treatment.
   // The patch is keyed by the pre-patch id, so one that also rewrites `id` must still be seen.

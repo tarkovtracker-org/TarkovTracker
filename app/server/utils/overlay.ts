@@ -242,7 +242,8 @@ export async function fetchOverlay(
  * Apply overlay corrections to an array of entities
  * Filters out entities marked as disabled after applying corrections
  */
-type ApplyEntityOverlayOptions = {
+type ApplyEntityOverlayOptions<T extends { id: string }> = {
+  normalize?: (task: T, patch: Record<string, unknown>) => T;
   logLabel?: string;
   /** If true, log even when appliedCount and disabledCount are both zero. Default: true */
   logEvenWhenZero?: boolean;
@@ -250,7 +251,7 @@ type ApplyEntityOverlayOptions = {
 function applyEntityOverlay<T extends { id: string }>(
   entities: T[],
   corrections: Record<string, Record<string, unknown>> | undefined,
-  options: ApplyEntityOverlayOptions = {}
+  options: ApplyEntityOverlayOptions<T> = {}
 ): T[] {
   if (!corrections || !entities) return entities;
   let appliedCount = 0;
@@ -262,7 +263,8 @@ function applyEntityOverlay<T extends { id: string }>(
         appliedCount++;
         logger.debug(`Applying correction to ${entity.id}:`, correction);
         // Deep merge the correction into the entity (recursively merges nested objects)
-        return deepMerge(entity as Record<string, unknown>, correction) as T;
+        const merged = deepMerge(entity as Record<string, unknown>, correction) as T;
+        return options.normalize ? options.normalize(merged, correction) : merged;
       }
       return entity;
     })
@@ -536,7 +538,7 @@ function applyTaskPatchNormalization<T extends { id: string }>(
 ): T {
   const record = task as Record<string, unknown>;
   if (patchesField(patch, 'traderRequirements')) applyTraderRequirementSplit(record);
-  return applyTaskObjectiveAdditions(applyPatchedGateNormalization(task, patch));
+  return applyPatchedGateNormalization(task, patch);
 }
 /** Overlay additions never pass through the adapter, so their raw gates are all still readable. */
 function applyTaskAdditionNormalization<T extends { id: string }>(task: T): T {
@@ -646,8 +648,9 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
     const mergedTasksAdd = mergeModeCorrections(overlay.tasksAdd, modeOverlay?.tasksAdd);
     const correctedTasks = applyEntityOverlay(
       result.data.tasks as Array<{ id: string }>,
-      mergedTasks
-    ).map((task) => applyTaskPatchNormalization(task, mergedTasks?.[task.id]));
+      mergedTasks,
+      { normalize: applyTaskPatchNormalization }
+    ).map(applyTaskObjectiveAdditions);
     const normalizedAdditions = normalizeTaskAdditions(mergedTasksAdd);
     logger.info(
       `Overlay tasksAdd: ${normalizedAdditions.length} additions after filtering disabled`

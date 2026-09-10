@@ -157,6 +157,9 @@ const missingPrestige = (task: Task): TaskBlocker[] =>
   isDeclaredGate(task.requiredPrestige) || hasDiagnostic(task, 'prestige_reference')
     ? [{ type: 'unknown', reason: 'prestige_reference' }]
     : [];
+/** Compare a resolved prestige gate independently of malformed-reference detection. */
+const resolvedPrestigeBlockers = (current: number, required: number): TaskBlocker[] =>
+  current === required ? [] : [{ type: 'prestige', current, required, compareMethod: '=' }];
 const traderNameFor = (task: Task) =>
   task.trader?.normalizedName || task.trader?.name?.toLowerCase();
 const traderDisplayName = (task: Task, fallback: string) => task.trader?.name || fallback;
@@ -267,12 +270,10 @@ const createTeamEvaluator = (
     ];
   };
   const prestigeBlockers = (task: Task): TaskBlocker[] => {
+    if (hasDiagnostic(task, 'prestige_reference')) return missingPrestige(task);
     const required = options.prestigeTaskMap?.get(task.id);
     if (required === undefined) return missingPrestige(task);
-    const current = data.prestigeLevel ?? 0;
-    return current === required
-      ? []
-      : [{ type: 'prestige', current, required, compareMethod: '=' }];
+    return resolvedPrestigeBlockers(data.prestigeLevel ?? 0, required);
   };
   const cachedResult = (key: string, taskId: string) =>
     memo.get(key) ?? (visiting.has(key) ? result([{ type: 'cycle', taskId }]) : undefined);
