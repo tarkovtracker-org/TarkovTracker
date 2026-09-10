@@ -930,6 +930,9 @@ flowchart LR
   invalidates older work at each asynchronous boundary and rejects progress and metadata callbacks
   from the superseded listener, including while its channel is leaving. A different user's topic may
   proceed while the previous user's topic is leaving, while a same-topic rejoin still waits for its leave.
+  Publishing channel ownership and starting the subscription share one synchronous segment: an
+  asynchronous boundary between them would let a teardown remove the published channel before it
+  joined, and the resulting subscription could no longer be attributed to this setup for cleanup.
 - The team channel records itself as bound only after `SUBSCRIBED`, so a silently failed join is never
   mistaken for a live one. Membership events rebuild it only when the topic or teammate-progress
   filter changed, and any non-subscribed status drops the binding so the next event rebuilds.

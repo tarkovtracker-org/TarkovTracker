@@ -252,20 +252,24 @@ const prepareProgressTopic = async (
 const resolveActiveUserId = (user: { id: string | null; loggedIn: boolean }): string | null =>
   user.loggedIn && user.id ? user.id : null;
 /**
- * Publishes channel ownership before the join is awaited, so a newer setup can
- * tear this channel down instead of creating a duplicate subscription.
+ * Publishes channel ownership so a newer setup can tear this channel down
+ * instead of creating a duplicate subscription.
  *
- * @returns `false` when this setup was superseded before it could publish.
+ * Deliberately synchronous: it must run in the same segment as the `subscribe()`
+ * call that follows. An await between the two would let a teardown remove or
+ * replace this channel after it was published but before it joined, leaving an
+ * orphaned subscription that later ownership checks can no longer clean up,
+ * because `realtimeChannel` would already point at the newer owner.
+ *
+ * @returns `false` when this setup was superseded before it could publish; the
+ *   caller still owns releasing `owned`.
  */
-const claimProgressChannel = async (
+const claimProgressChannel = (
   owned: OwnedRealtimeChannel,
   currentUserId: string,
   generation: number
-): Promise<boolean> => {
-  if (!stillOwnsSetup(currentUserId, generation)) {
-    await releaseProgressChannel(owned);
-    return false;
-  }
+): boolean => {
+  if (!stillOwnsSetup(currentUserId, generation)) return false;
   realtimeChannel = owned;
   return true;
 };
@@ -526,7 +530,12 @@ async function runSetupRealtimeListener(
     }
   };
   const owned = { channel, client, topic } satisfies OwnedRealtimeChannel;
-  if (!(await claimProgressChannel(owned, currentUserId, generation))) return;
+  // No await between the claim and the join: `joinProgressChannel` reaches
+  // `channel.subscribe()` synchronously, so ownership cannot change in between.
+  if (!claimProgressChannel(owned, currentUserId, generation)) {
+    await releaseProgressChannel(owned);
+    return;
+  }
   await joinProgressChannel(owned, currentUserId, generation, () => {
     const request = ++refreshGeneration;
     const read = (reconcile: RemoteStateMerge) => refreshSnapshot(reconcile, request);

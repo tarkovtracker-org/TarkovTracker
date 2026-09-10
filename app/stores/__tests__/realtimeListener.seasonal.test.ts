@@ -423,6 +423,26 @@ describe('seasonal progress realtime synchronization', () => {
     expect(createdChannels.filter(({ subscribed }) => subscribed)).toEqual([]);
     expect(openTopics.size).toBe(0);
   });
+  it('never joins a channel that teardown removed after ownership was published', async () => {
+    const { cleanupRealtimeListener, setupRealtimeListener } =
+      await import('@/stores/tarkov/realtimeListener');
+    const createChannel = supabaseContext.client.channel.getMockImplementation()!;
+    let teardown: Promise<void> | null = null;
+    // Queue teardown from the synchronous channel construction so it runs at the
+    // first microtask checkpoint after ownership is published. Publishing
+    // ownership and calling `subscribe()` must share one synchronous segment: if
+    // an await separates them, this teardown removes the channel and the setup
+    // then joins it anyway, leaving an orphan no ownership check can reclaim.
+    supabaseContext.client.channel.mockImplementationOnce((topic: string) => {
+      const created = createChannel(topic);
+      teardown = Promise.resolve().then(() => cleanupRealtimeListener());
+      return created;
+    });
+    await setupRealtimeListener(store);
+    await teardown;
+    expect(createdChannels.filter(({ subscribed }) => subscribed)).toEqual([]);
+    expect(openTopics.size).toBe(0);
+  });
   it('ignores progress and metadata from a listener after teardown starts', async () => {
     const { cleanupRealtimeListener, setupRealtimeListener } =
       await import('@/stores/tarkov/realtimeListener');
