@@ -109,6 +109,15 @@ export interface TraderRequirement {
   compareMethod?: RequirementComparison;
 }
 /**
+ * A task's declared prestige gate. Adapted upstream references carry `id`; overlay-injected tasks
+ * keep the declared reference verbatim, which names a level instead. Readers must not assume `id`.
+ */
+export interface TaskPrestigeReference {
+  id?: string;
+  name?: string;
+  prestigeLevel?: number;
+}
+/**
  * A gate the source declared but that could not be interpreted. Absence of an optional gate is
  * never a diagnostic, so these values keep a malformed explicit gate distinguishable from no gate.
  */
@@ -255,11 +264,7 @@ export interface Task {
   taskRequirements?: TaskRequirement[];
   storyUnlocks?: Array<{ id: string; name: string }>;
   minPlayerLevel?: number;
-  /**
-   * Adapted upstream references are always `{ id }`. Overlay-injected tasks may instead carry the
-   * declared reference verbatim (`{ name, prestigeLevel }`), so readers use `?.id` or truthiness.
-   */
-  requiredPrestige?: { id: string };
+  requiredPrestige?: TaskPrestigeReference;
   /**
    * Declared gates dropped because they could not be interpreted. The evaluator turns each one
    * into an unknown blocker so a malformed gate cannot pass as a genuinely absent optional gate.

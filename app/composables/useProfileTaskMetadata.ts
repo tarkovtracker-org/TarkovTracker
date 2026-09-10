@@ -81,8 +81,9 @@ const mergeProfileTasks = (
     if (!update) return task;
     return {
       ...task,
-      objectives: update.objectives ?? task.objectives,
-      failConditions: update.failConditions ?? task.failConditions,
+      objectives: update.objectives !== undefined ? update.objectives : task.objectives,
+      failConditions:
+        update.failConditions !== undefined ? update.failConditions : task.failConditions,
     };
   });
   return dedupeTaskObjectiveIds(

@@ -110,12 +110,18 @@ describe('malformed declared prestige references', () => {
     ['an empty string', ''],
     ['an empty id', { id: '' }],
     ['a blank id', { id: '   ' }],
+    ['an object id', { id: {} }],
     ['a number', 3],
     ['a list', ['prestige-1']],
   ])('blocks a declared prestige reference serialized as %s', (_label, requiredPrestige) => {
     const task = adaptTask({ requiredPrestige });
     expect(task.requirementDiagnostics).toEqual(['prestige_reference']);
     expect(evaluate(task).available).toBe(false);
+  });
+  it('still coerces a numeric id rather than narrowing a supported shape', () => {
+    const task = adaptTask({ requiredPrestige: { id: 42 } });
+    expect(task.requiredPrestige).toEqual({ id: '42' });
+    expect(task.requirementDiagnostics).toBeUndefined();
   });
   // A stale payload can still carry a declared falsy reference the adapter would now drop.
   it.each([[''], [0], [false]])(
@@ -327,5 +333,23 @@ describe('overlay declared-gate normalization', () => {
     expect(task.name).toBe('Localized');
     expect(task.requiredPrestige).toEqual({ id: 'prestige1' });
     expect(task.requirementDiagnostics).toBeUndefined();
+  });
+  // The patch is keyed by the pre-patch id, so a patch that also rewrites `id` must still be seen.
+  it('normalizes a locale correction that rewrites the task id', async () => {
+    stubOverlayFetch({
+      ...overlayMeta,
+      locales: {
+        en: { tasks: { target: { id: 'renamed', taskRequirements: { task: 'missing' } } } },
+      },
+    });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const result = await applyOverlay({
+      data: { tasks: [adaptTask({}) as unknown as { id: string }] },
+    });
+    const task = result.data!.tasks![0] as unknown as Task;
+    expect(task.id).toBe('renamed');
+    expect(task.taskRequirements).toBeUndefined();
+    expect(task.requirementDiagnostics).toEqual(['task_requirement']);
+    expect(evaluate(task).available).toBe(false);
   });
 });

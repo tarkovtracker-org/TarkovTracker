@@ -103,9 +103,11 @@ export const isDeclaredGate = (value: unknown): boolean => value !== null && val
 // Accept both shapes.
 const nonemptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
+// A numeric id is coerced because it still names a real prestige row; anything else would fabricate
+// a reference (`String({})` is `'[object Object]'`), so it is treated as unresolved and reported.
 const declaredId = (value: unknown): string | undefined => {
-  if (!isRecord(value) || value.id == null) return undefined;
-  const id = String(value.id);
+  if (!isRecord(value)) return undefined;
+  const id = typeof value.id === 'number' ? String(value.id) : value.id;
   return nonemptyString(id) ? id : undefined;
 };
 export const resolveRequiredPrestige = (value: unknown): { id: string } | undefined => {

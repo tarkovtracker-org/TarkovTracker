@@ -578,13 +578,16 @@ function applyLocaleOverlays(target: OverlayTargetData, localeOverlay: LocaleOve
   }
   // Locale patches land after the main task pass, so a gate one of them declares needs the same
   // normalization. Locale corrections are meant to be locale-sensitive fields only; this keeps a
-  // stray gate from reaching consumers unchecked rather than trusting that convention.
+  // stray gate from reaching consumers unchecked rather than trusting that convention. The merge and
+  // the normalization share one pass so the patch stays associated with its pre-patch task id.
   const tasks = target.tasks;
   if (!Array.isArray(tasks)) return;
-  const patches = localeOverlay.tasks;
-  target.tasks = applyLocaleOverlay(tasks, patches).map((task) =>
-    applyPatchedGateNormalization(task, patches?.[task.id])
-  );
+  target.tasks = tasks.map((task) => {
+    const patch = localeOverlay.tasks?.[task.id];
+    if (!isPlainObject(patch)) return task;
+    const merged = deepMerge(task as Record<string, unknown>, patch) as { id: string };
+    return applyPatchedGateNormalization(merged, patch);
+  });
 }
 function applyEntityCollectionOverlay(
   target: OverlayTargetData,
