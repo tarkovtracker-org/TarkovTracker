@@ -1,5 +1,6 @@
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import { API_GAME_MODES } from '@/utils/constants';
+import { isGameEdition } from '@/utils/editionHelpers';
 import { logger } from '@/utils/logger';
 import { dedupeTaskObjectiveIds, normalizeTaskObjectives } from '@/utils/taskNormalization';
 import type {
@@ -25,7 +26,7 @@ const partialFailure = (results: PromiseSettledResult<unknown>[]): Error | null 
 const validChapterCatalog = (value: unknown): value is StoryChapter[] =>
   Array.isArray(value) && value.every((chapter) => chapter && typeof chapter.id === 'string');
 const validEditionCatalog = (value: unknown): value is GameEdition[] =>
-  Array.isArray(value) && value.every((edition) => edition && typeof edition.value === 'number');
+  Array.isArray(value) && value.every(isGameEdition);
 const requireCatalog = <T>(
   value: unknown,
   valid: (candidate: unknown) => candidate is T[],
@@ -34,15 +35,13 @@ const requireCatalog = <T>(
   if (!valid(value)) throw new Error(`Invalid optional ${label} catalog`);
   return value;
 };
-const optionalCatalog = (overlay: {
-  data: { editions: GameEdition[]; storyChapters: StoryChapter[] };
-}): { editions: GameEdition[]; chapters: StoryChapter[] } => {
-  const data = overlay?.data;
-  return {
-    chapters: requireCatalog(data?.storyChapters, validChapterCatalog, 'story chapter'),
-    editions: requireCatalog(data?.editions, validEditionCatalog, 'edition'),
-  };
-};
+type ProgressionResponse = { data: { editions: GameEdition[]; storyChapters: StoryChapter[] } };
+// The chapter and edition catalogs share one request but settle separately, so a
+// malformed chapter list cannot discard an otherwise valid edition catalog.
+const optionalChapters = (overlay: ProgressionResponse): StoryChapter[] =>
+  requireCatalog(overlay?.data?.storyChapters, validChapterCatalog, 'story chapter');
+const optionalEditions = (overlay: ProgressionResponse): GameEdition[] =>
+  requireCatalog(overlay?.data?.editions, validEditionCatalog, 'edition');
 const validProfilePrestigeLevel = (level: number): boolean =>
   Number.isInteger(level) && level >= 0 && level <= 6;
 const isProfileConditionRecord = (condition: unknown): boolean =>
@@ -66,10 +65,6 @@ const optionalPrestige = (response: { data: { prestige: PrestigeLevel[] } }): Pr
   }
   return prestige;
 };
-const EMPTY_CATALOG: { editions: GameEdition[]; chapters: StoryChapter[] } = {
-  editions: [],
-  chapters: [],
-};
 /** Merge the core and objectives catalogs, then dedupe shared objective IDs. */
 const mergeProfileTasks = (
   core: { data: TarkovTasksCoreQueryResult },
@@ -87,18 +82,17 @@ const mergeProfileTasks = (
 const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: AbortSignal) => {
   const query = { gameMode: API_GAME_MODES[gameMode], lang };
   const options = { query, signal: signal };
-  const [coreResult, objectivesResult, overlayResult, prestigeResult] = await Promise.allSettled([
-    $fetch<{ data: TarkovTasksCoreQueryResult }>('/api/tarkov/tasks-core', options),
-    $fetch<{ data: { tasks: Task[] } }>('/api/tarkov/tasks-objectives', options),
-    $fetch<{ data: { editions: GameEdition[]; storyChapters: StoryChapter[] } }>(
-      '/api/tarkov/editions',
-      options
-    ).then(optionalCatalog),
-    $fetch<{ data: { prestige: PrestigeLevel[] } }>('/api/tarkov/prestige', options).then(
-      optionalPrestige
-    ),
-  ]);
-  const catalog = optionalResult(overlayResult) ?? EMPTY_CATALOG;
+  const progressionRequest = $fetch<ProgressionResponse>('/api/tarkov/editions', options);
+  const [coreResult, objectivesResult, chaptersResult, editionsResult, prestigeResult] =
+    await Promise.allSettled([
+      $fetch<{ data: TarkovTasksCoreQueryResult }>('/api/tarkov/tasks-core', options),
+      $fetch<{ data: { tasks: Task[] } }>('/api/tarkov/tasks-objectives', options),
+      progressionRequest.then(optionalChapters),
+      progressionRequest.then(optionalEditions),
+      $fetch<{ data: { prestige: PrestigeLevel[] } }>('/api/tarkov/prestige', options).then(
+        optionalPrestige
+      ),
+    ]);
   const normalized = mergeProfileTasks(
     requiredResult(coreResult),
     requiredResult(objectivesResult)
@@ -106,10 +100,10 @@ const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: Abo
   return {
     tasks: useGraphBuilder().processTaskData(normalized.tasks).tasks,
     duplicateObjectiveIds: normalized.duplicateObjectiveIds,
-    chapters: catalog.chapters,
-    editions: catalog.editions,
+    chapters: optionalResult(chaptersResult) ?? [],
+    editions: optionalResult(editionsResult) ?? [],
     prestige: optionalResult(prestigeResult) ?? [],
-    failure: partialFailure([overlayResult, prestigeResult]),
+    failure: partialFailure([chaptersResult, editionsResult, prestigeResult]),
   };
 };
 /**

@@ -86,15 +86,17 @@ const validCraftUnlock = (unlock: unknown): boolean =>
   unlock == null || typeof unlock === 'string' || validTaskReference(unlock);
 const validCraftLocation = (craft: Record<string, unknown>): boolean =>
   typeof craft.station === 'string' && typeof craft.level === 'number';
+const nonEmptyItemId = (value: unknown): boolean =>
+  isPlainObject(value) && typeof value.id === 'string' && value.id.length > 0;
 // `adaptAddedCraft` forwards `productItem` as a reward requirement and
 // `adaptHideoutRequirement` resolves its reference from `productItem.item` via
 // `adaptItemRef`, which accepts either a string ID or a `{ id }` record. A craft
-// that carries the ID directly (`productItem.id`) yields no `reward.item`, so
-// `buildCraftSourcesMap` silently drops the product.
+// that carries the ID directly (`productItem.id`), or whose reference is blank,
+// yields no `reward.item`, so `buildCraftSourcesMap` silently drops the product.
 const validCraftProduct = (productItem: unknown): boolean => {
   if (!isPlainObject(productItem)) return false;
   const item = productItem.item;
-  return typeof item === 'string' ? item.length > 0 : validTaskReference(item);
+  return typeof item === 'string' ? item.length > 0 : nonEmptyItemId(item);
 };
 const validCraft = (craft: Record<string, unknown>): boolean =>
   [

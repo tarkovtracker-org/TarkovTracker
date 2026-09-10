@@ -443,6 +443,14 @@
     selectedMode,
     computed(() => metadataStore.languageCode)
   );
+  // Prefer the selected mode's catalog and fall back to the active mode's while
+  // the mode-scoped request is pending or has failed. An empty catalog would
+  // otherwise remove every edition restriction and drop edition-granted hideout
+  // levels. The published overlay carries no mode-scoped editions today, so the
+  // two agree in practice.
+  const effectiveEditions = computed(() =>
+    profileEditions.value.length > 0 ? profileEditions.value : metadataStore.editions
+  );
   const profilePrestigeTaskMap = computed(() =>
     buildPrestigeTaskMap(profileTasks.value, profilePrestige.value)
   );
@@ -694,7 +702,7 @@
       if (taskFaction !== 'Any' && taskFaction !== faction) {
         return false;
       }
-      return checkTaskEdition(task.id, profileGameEdition.value, profileEditions.value);
+      return checkTaskEdition(task.id, profileGameEdition.value, effectiveEditions.value);
     });
     const options: TaskTypeFilterOptions = {
       showKappa: true,
@@ -859,7 +867,7 @@
   });
   const totalHideoutModules = computed(() => hideoutModuleLabelById.value.size);
   const hideoutModuleCompletionState = computed<Record<string, boolean>>(() => {
-    const editionData = profileEditions.value.find(
+    const editionData = effectiveEditions.value.find(
       (edition) => edition.value === profileGameEdition.value
     );
     return buildHideoutModuleCompletionState(

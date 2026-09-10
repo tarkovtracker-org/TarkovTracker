@@ -363,6 +363,7 @@ it.each([
   ['string reference', { item: 'item', count: 1 }, true],
   ['record reference', { item: { id: 'item' }, count: 1 }, true],
   ['id placed directly on the product', { id: 'item', count: 1 }, false],
+  ['blank record reference', { item: { id: '' }, count: 1 }, false],
   ['empty string reference', { item: '', count: 1 }, false],
   ['no reference at all', { count: 1 }, false],
 ])('validates the added craft product reference: %s', (_case, productItem, expected) => {
