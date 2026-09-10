@@ -17,7 +17,7 @@
 | `progressState`         | `progressState.ts`         | Low-level progress mutation primitives (set/toggle task, objective, hideout, skill, trader, story, prestige, game-mode switch/migration).                                              |
 | `taskAvailability`      | `taskAvailability.ts`      | Task prerequisite-aware availability state.                                                                                                                                            |
 | `useActionHistoryStore` | `useActionHistoryStore.ts` | Undo/redo action history tracking.                                                                                                                                                     |
-| `useActivityLogStore`   | `useActivityLogStore.ts`   | User activity log entries.                                                                                                                                                             |
+| `useActivityLogStore`   | `useActivityLogStore.ts`   | Activity log feed over the selected mode's `apiUpdateHistory` and `manualActivityHistory`; only the unread marker is device-local.                                                     |
 
 ### Tarkov store internals (`app/stores/tarkov/`)
 

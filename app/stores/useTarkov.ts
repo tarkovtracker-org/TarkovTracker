@@ -1071,8 +1071,26 @@ export const useTarkovStore = defineStore('swapTarkov', {
 // Export type for future typing
 type TarkovStore = ReturnType<typeof useTarkovStore>;
 // Store reference to sync controller for pause/resume during resets
-let syncController: SupabaseSyncReturn<UserState, UserProgressSyncPayload> | null = null;
+type ProgressSyncController = SupabaseSyncReturn<UserState, UserProgressSyncPayload>;
+let syncController: ProgressSyncController | null = null;
 let syncUserId: string | null = null;
+const isCurrentProgressController = (controller: ProgressSyncController, userId: string): boolean =>
+  syncController === controller && syncUserId === userId;
+const attemptInitialProgressSync = async (controller: ProgressSyncController) => {
+  try {
+    return await controller.syncToSupabase();
+  } catch (error) {
+    logger.error('[TarkovStore] Failed to sync initial tracked progress:', error);
+    return null;
+  }
+};
+const syncInitialTrackedProgress = async (controller: ProgressSyncController, userId: string) => {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (!isCurrentProgressController(controller, userId)) return;
+    if (await attemptInitialProgressSync(controller)) return;
+    await delay(1000);
+  }
+};
 let pendingSyncWatchStop: (() => void) | null = null;
 let pendingResetProgressSnapshot: {
   snapshot: PersistedProgressSnapshot | null;
@@ -1748,6 +1766,9 @@ export async function initializeTarkovSync() {
         (hasTrackedProgress) => {
           if (hasTrackedProgress) {
             startSync();
+            // The subscription was created after this mutation (including legacy
+            // history adoption), so explicitly persist the snapshot that started it.
+            if (syncController) void syncInitialTrackedProgress(syncController, currentUserId);
           }
         },
         { flush: 'post' }

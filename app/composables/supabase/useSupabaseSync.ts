@@ -275,7 +275,7 @@ export function useSupabaseSync<
         logger.debug(`[Sync] ✅ Successfully synced to ${table}`);
         onSynced?.();
       }
-      return transformedState;
+      return synced ? transformedState : null;
     } catch (err) {
       logger.error('[Sync] Unexpected error:', err);
       return null;
@@ -378,6 +378,11 @@ export function useSupabaseSync<
     cleanup,
     pause,
     resume,
-    syncToSupabase: enqueueSync,
+    syncToSupabase: (state) => {
+      // Imperative saves can precede the subscription's first mutation.
+      pendingLocalChanges = true;
+      localVersion += 1;
+      return enqueueSync(state);
+    },
   };
 }

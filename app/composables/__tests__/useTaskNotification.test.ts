@@ -6,6 +6,7 @@ const createTarkovStore = (options: {
   objectiveCounts?: Record<string, number>;
 }) => {
   const objectiveCounts = new Map<string, number>(Object.entries(options.objectiveCounts ?? {}));
+  const manualActivityHistory: unknown[] = [];
   return {
     setTaskComplete: vi.fn(),
     setTaskFailed: vi.fn(),
@@ -19,6 +20,14 @@ const createTarkovStore = (options: {
     playerLevel: vi.fn(() => 1),
     setLevel: vi.fn(),
     isTaskComplete: vi.fn((taskId: string) => options.isTaskComplete?.(taskId) ?? false),
+    // Manual activity-log entries live in the synced progress blob (issue #445).
+    getManualActivityHistory: vi.fn(() => manualActivityHistory),
+    addManualActivityEntries: vi.fn((entries: unknown[]) => {
+      manualActivityHistory.unshift(...entries);
+    }),
+    clearManualActivityHistory: vi.fn(() => {
+      manualActivityHistory.length = 0;
+    }),
   };
 };
 const setup = async (tasks: Task[], options: Parameters<typeof createTarkovStore>[0] = {}) => {

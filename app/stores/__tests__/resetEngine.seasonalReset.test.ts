@@ -220,3 +220,39 @@ describe('performReset seasonal', () => {
     expect(store.$state.pvp.level).toBe(42);
   });
 });
+describe('startup manual activity history', () => {
+  it.each(['pvp', 'pve', 'seasonal'] as const)(
+    'unions %s history when selecting one progress snapshot',
+    (mode) => {
+      const local = structuredClone(defaultState);
+      const remote = structuredClone(defaultState);
+      const entry = {
+        timestamp: 100,
+        type: 'task' as const,
+        action: 'complete' as const,
+        title: 'Task',
+      };
+      local[mode].manualActivityHistory = [{ ...entry, id: 'local' }];
+      remote[mode].manualActivityHistory = [{ ...entry, id: 'remote' }];
+      for (const localTime of [10, 30]) {
+        const result = resolveInitialSyncState(local, remote, localTime, 20, 1, 1);
+        expect(result[mode].manualActivityHistory?.map((row) => row.id)).toEqual([
+          'local',
+          'remote',
+        ]);
+      }
+      remote[mode].manualActivityEpoch = 1;
+      remote[mode].manualActivityHistory = [];
+      expect(
+        resolveInitialSyncState(local, remote, 30, 20, 1, 1)[mode].manualActivityHistory
+      ).toEqual([]);
+      // Drop back to an equal history generation so the assertion below can only
+      // pass through the full-reset epoch branch.
+      remote[mode].manualActivityEpoch = 0;
+      remote[mode].progressEpoch = 1;
+      expect(
+        resolveInitialSyncState(local, remote, 30, 20, 1, 1)[mode].manualActivityHistory
+      ).toEqual([]);
+    }
+  );
+});

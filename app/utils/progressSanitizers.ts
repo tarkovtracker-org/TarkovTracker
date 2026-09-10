@@ -1,4 +1,11 @@
 import {
+  MANUAL_ACTIVITY_ACTIONS,
+  MANUAL_ACTIVITY_TYPES,
+  type ManualActivityAction,
+  type ManualActivityEntry,
+  type ManualActivityType,
+} from '@/types/progress';
+import {
   ACTIVE_SEASON_NUMBER,
   GAME_MODE_VALUES,
   GAME_MODES,
@@ -11,13 +18,35 @@ export const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
 export const toFiniteNumber = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
-export const sanitizeDisplayName = (value: unknown): string | null => {
+/**
+ * True for a single unpaired surrogate code unit. `Array.from` keeps such a
+ * character intact, and PostgreSQL `jsonb` rejects the whole document when a
+ * lone surrogate reaches it, so the sanitizer drops them before clamping.
+ */
+const isLoneSurrogate = (character: string): boolean =>
+  character.length === 1 && character >= '\uD800' && character <= '\uDFFF';
+/**
+ * Trim a string field, drop lone surrogates, and clamp it to `maxLength` code points. Blank,
+ * non-string, and surrogate-only values are `null`. Clamping by code point matches PostgreSQL
+ * `left()`, so client and database sanitization agree on the same id and cannot split a
+ * supplementary character, and no lone surrogate survives to the `jsonb` parameter.
+ */
+const sanitizeClampedText = (value: unknown, maxLength: number): string | null => {
   if (typeof value !== 'string') {
     return null;
   }
   const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed.slice(0, 64) : null;
+  if (trimmed.length === 0) {
+    return null;
+  }
+  const characters = Array.from(trimmed).filter((character) => !isLoneSurrogate(character));
+  if (characters.length === 0) {
+    return null;
+  }
+  return characters.slice(0, maxLength).join('');
 };
+export const sanitizeDisplayName = (value: unknown): string | null =>
+  sanitizeClampedText(value, 64);
 export const sanitizeFaction = (value: unknown): 'BEAR' | 'USEC' =>
   value === 'BEAR' ? 'BEAR' : 'USEC';
 export const sanitizeTaskCompletionMap = (value: unknown): UserProgressData['taskCompletions'] => {
@@ -181,6 +210,15 @@ export const sanitizeStoryChaptersMap = (value: unknown): UserProgressData['stor
   return sanitized;
 };
 const API_UPDATE_HISTORY_LIMIT = 50;
+// Manual activity entries are cosmetic feed rows that ride along in the synced
+// progress blob. The limit and the string clamps keep the blob well below the
+// sync RPC's 512 KiB payload ceiling even when all three modes are full.
+export const MANUAL_ACTIVITY_HISTORY_LIMIT = 50;
+const MANUAL_ACTIVITY_ID_MAX_LENGTH = 128;
+const MANUAL_ACTIVITY_TITLE_MAX_LENGTH = 200;
+const MANUAL_ACTIVITY_DETAILS_MAX_LENGTH = 300;
+const MANUAL_ACTIVITY_TYPE_VALUES: ReadonlySet<unknown> = new Set(MANUAL_ACTIVITY_TYPES);
+const MANUAL_ACTIVITY_ACTION_VALUES: ReadonlySet<unknown> = new Set(MANUAL_ACTIVITY_ACTIONS);
 export const createDefaultOwnedProgressData = (): UserProgressData => ({
   level: 1,
   pmcFaction: 'USEC',
@@ -197,6 +235,8 @@ export const createDefaultOwnedProgressData = (): UserProgressData => ({
   skillOffsets: {},
   storyChapters: {},
   apiUpdateHistory: [],
+  manualActivityHistory: [],
+  manualActivityEpoch: 0,
 });
 const sanitizeApiTaskUpdates = (value: unknown): ApiTaskUpdate[] => {
   if (!Array.isArray(value)) {
@@ -225,24 +265,113 @@ export const sanitizeApiUpdateMeta = (value: unknown): ApiUpdateMeta | undefined
     ...(tasks.length > 0 ? { tasks } : {}),
   };
 };
-export const sanitizeApiUpdateHistory = (value: unknown): ApiUpdateMeta[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  const deduped = new Map<string, ApiUpdateMeta>();
-  for (const entry of value) {
-    const normalized = sanitizeApiUpdateMeta(entry);
-    if (!normalized) {
-      continue;
-    }
-    const existing = deduped.get(normalized.id);
-    if (!existing || normalized.at >= existing.at) {
-      deduped.set(normalized.id, normalized);
+/** Keep only the newest entry per id, preserving first-seen order of the survivors. */
+const dedupeNewestById = <T extends { id: string }>(
+  entries: T[],
+  getTimestamp: (entry: T) => number
+): T[] => {
+  const deduped = new Map<string, T>();
+  for (const entry of entries) {
+    const existing = deduped.get(entry.id);
+    if (!existing || getTimestamp(entry) >= getTimestamp(existing)) {
+      deduped.set(entry.id, entry);
     }
   }
-  return Array.from(deduped.values())
-    .sort((left, right) => right.at - left.at)
-    .slice(0, API_UPDATE_HISTORY_LIMIT);
+  return Array.from(deduped.values());
+};
+/**
+ * Normalization for API history stored in the progress blob: sanitize each
+ * element, keep the newest entry per id, order newest first, and cap the length.
+ */
+const sanitizeHistory = <T extends { id: string }>(
+  value: unknown,
+  sanitizeEntry: (entry: unknown) => T | undefined,
+  getTimestamp: (entry: T) => number,
+  limit: number
+): T[] => {
+  const raw = Array.isArray(value) ? value : [];
+  const sanitized = raw
+    .map((entry) => sanitizeEntry(entry))
+    .filter((entry): entry is T => entry !== undefined);
+  return dedupeNewestById(sanitized, getTimestamp)
+    .sort((left, right) => getTimestamp(right) - getTimestamp(left))
+    .slice(0, limit);
+};
+export const sanitizeApiUpdateHistory = (value: unknown): ApiUpdateMeta[] =>
+  sanitizeHistory(value, sanitizeApiUpdateMeta, (entry) => entry.at, API_UPDATE_HISTORY_LIMIT);
+const sanitizeManualActivityType = (value: unknown): ManualActivityType | null =>
+  MANUAL_ACTIVITY_TYPE_VALUES.has(value) ? (value as ManualActivityType) : null;
+const sanitizeManualActivityAction = (value: unknown): ManualActivityAction | null =>
+  MANUAL_ACTIVITY_ACTION_VALUES.has(value) ? (value as ManualActivityAction) : null;
+const sanitizeEpochMs = (value: unknown): number | null => {
+  const timestamp = toFiniteNumber(value);
+  return timestamp === null
+    ? null
+    : Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.trunc(timestamp)));
+};
+type RequiredManualActivityFields = Omit<ManualActivityEntry, 'details'>;
+/**
+ * Validate the fields a manual activity entry cannot omit. Returns `null` when
+ * any one of them is missing or malformed, so a partially valid row is dropped
+ * rather than persisted with invented defaults.
+ */
+const sanitizeRequiredManualActivityFields = (
+  value: Record<string, unknown>
+): RequiredManualActivityFields | null => {
+  const fields = {
+    action: sanitizeManualActivityAction(value.action),
+    id: sanitizeClampedText(value.id, MANUAL_ACTIVITY_ID_MAX_LENGTH),
+    timestamp: sanitizeEpochMs(value.timestamp),
+    title: sanitizeClampedText(value.title, MANUAL_ACTIVITY_TITLE_MAX_LENGTH),
+    type: sanitizeManualActivityType(value.type),
+  };
+  return Object.values(fields).includes(null) ? null : (fields as RequiredManualActivityFields);
+};
+export const sanitizeManualActivityEntry = (value: unknown): ManualActivityEntry | undefined => {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const fields = sanitizeRequiredManualActivityFields(value);
+  if (fields === null) {
+    return undefined;
+  }
+  const details = sanitizeClampedText(value.details, MANUAL_ACTIVITY_DETAILS_MAX_LENGTH);
+  return details === null ? fields : { ...fields, details };
+};
+export const sanitizeManualActivityEpoch = (value: unknown): number => {
+  const epoch = toFiniteNumber(value) ?? 0;
+  return Math.max(0, Math.min(2147483647, Math.trunc(epoch)));
+};
+// PostgreSQL uses UTF-8 byte order (COLLATE "C") for the same tie-break fields.
+const activityTextKey = (value: string): string =>
+  Array.from(value, (character) => character.codePointAt(0)!.toString(16).padStart(6, '0')).join(
+    ''
+  );
+const manualActivitySortKey = (entry: ManualActivityEntry): string =>
+  [entry.id, entry.type, entry.action, entry.title, entry.details ?? '']
+    .map(activityTextKey)
+    .join('/');
+const compareManualActivityEntries = (
+  left: ManualActivityEntry,
+  right: ManualActivityEntry
+): number => {
+  const timestampOrder = right.timestamp - left.timestamp;
+  if (timestampOrder !== 0) return timestampOrder;
+  const leftKey = manualActivitySortKey(left);
+  const rightKey = manualActivitySortKey(right);
+  return leftKey < rightKey ? -1 : Number(leftKey > rightKey);
+};
+export const sanitizeManualActivityHistory = (value: unknown): ManualActivityEntry[] => {
+  const raw = Array.isArray(value) ? value : [];
+  const ordered = raw
+    .map(sanitizeManualActivityEntry)
+    .filter((entry): entry is ManualActivityEntry => entry !== undefined)
+    .sort(compareManualActivityEntries);
+  const deduped = new Map<string, ManualActivityEntry>();
+  for (const entry of ordered) {
+    if (!deduped.has(entry.id)) deduped.set(entry.id, entry);
+  }
+  return Array.from(deduped.values()).slice(0, MANUAL_ACTIVITY_HISTORY_LIMIT);
 };
 const sanitizeGameMode = (value: unknown): GameMode => {
   return GAME_MODE_VALUES.includes(value as GameMode) ? (value as GameMode) : GAME_MODES.PVP;
@@ -302,6 +431,8 @@ export const sanitizeOwnedProgressData = (value: unknown): UserProgressData => {
   sanitized.taskObjectives = sanitizeObjectiveProgressMap(value.taskObjectives);
   sanitized.traders = sanitizeTraderMap(value.traders);
   sanitized.apiUpdateHistory = sanitizeApiUpdateHistory(value.apiUpdateHistory);
+  sanitized.manualActivityHistory = sanitizeManualActivityHistory(value.manualActivityHistory);
+  sanitized.manualActivityEpoch = sanitizeManualActivityEpoch(value.manualActivityEpoch);
   if (level !== null) {
     sanitized.level = Math.max(1, Math.trunc(level));
   }

@@ -504,6 +504,21 @@ reconnect, and reload. Verify no saved progress is lost or resurrected, retained
 and resumed saves succeed. Frontend rollback remains compatible with these additive migrations;
 preserve applied migrations.
 
+### Manual activity history rollout
+
+Apply `20260910050000_add_manual_activity_history_to_progress` and
+`20260910055448_harden_manual_activity_history_sync` before deploying the client that writes
+`manualActivityHistory` and `manualActivityEpoch`. Cloudflare and Supabase deployment jobs are
+independent: merging them together does not guarantee database-first ordering. Verify both migration
+versions and the affected sanitizer, history-merge helper, row triggers, and sync RPC definitions
+before releasing the client. The forward correction preserves existing migration history and does
+not rewrite stored rows.
+
+Old clients remain compatible after both migrations: omission preserves existing history, and
+full progress resets still discard the prior feed. A frontend rollback must leave the database
+migrations in place. Verify an old-client sync retains new history and a stale device cannot undo a
+history clear; regression coverage is in `manual_activity_history.test.sql`.
+
 ### Reconcile migration `20260630075121_reconcile_prod_schema_drift`
 
 - Captures schema changes that were previously made directly in the dashboard (teams

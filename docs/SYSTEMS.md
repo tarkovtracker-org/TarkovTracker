@@ -806,6 +806,8 @@ flowchart LR
   depend on running it; see the Database Migrations section of `docs/runbook.md`
 - `supabase/migrations/20260806160000_seed_unmaterialized_mode_progress_on_merge.sql` — seeds an
   unmaterialized persistent row from its legacy column inside `merge_progress_data`'s row lock
+- `supabase/migrations/20260910050000_add_manual_activity_history_to_progress.sql` — adds
+  `manualActivityHistory` to the persisted progress allowlist and its entry/history sanitizers
 - `app/stores/tarkov/progressPersistence.ts`, `app/stores/tarkov/realtimeListener.ts`,
   `app/stores/useTarkov.ts` — load, merge, write, and realtime flow
 - `app/stores/useSystemStore.ts`, `app/stores/useTeamStore.ts` — mode-specific teams and teammate
@@ -997,6 +999,53 @@ flowchart LR
 - Tarkov.dev profile imports can target Seasonal through the verified `pvp-season` source. EFT-log
   imports can target Seasonal using the verified notification formats and active-season guards
   specified in section 7; unresolved-mode events require an explicit destination choice.
+- Manual activity-log entries live in the selected mode's progress blob as `manualActivityHistory`,
+  next to `apiUpdateHistory`, and never in a standalone browser store. They share the progress
+  lifecycle: the client and persisted sanitizers accept them, `mergeProgressData` unions them by
+  stable id in the equal-epoch branch, a reset/prestige epoch win discards the losing side's feed
+  with the rest of that side's data, and a session transition clears them through the progress store
+  rather than through a second storage adapter. Both sanitizers require a non-empty id and title, a
+  numeric millisecond `timestamp`, and a known `type`/`action`; ids, titles, and details are clamped
+  and each mode keeps at most 50 entries so three full feeds stay far below the sync RPC's 512 KiB
+  ceiling. Adding a progress field requires a forward migration recreating
+  `sanitize_user_progress_mode_data`, because that allowlist is the single gate on every write and
+  silently drops keys it does not name. Read state (`lastReadByMode`) stays device-local and is
+  isolated by mode. Backups strip the feed and its clear generation alongside `apiUpdateHistory`,
+  and teammate/public API projections never include them.
+- Manual histories merge during preferred-snapshot startup as well as realtime reconciliation.
+  History-only state starts sync and passes the empty-state guard. Deferred startup explicitly
+  persists the mutation that created the subscription, including post-load legacy adoption. Initial
+  saves retry once after a failure, retain pending state, and stop retrying after a session change.
+  A failed authenticated initial sync retries within the same session on a bounded 30-second cycle
+  (five attempts, first failure and exhaustion toast, intermediate failures log a warning) so the
+  deferred legacy adoption is not stranded until the next login. Each failed attempt first tears
+  down the partially initialized sync controller and realtime listener (`resetTarkovSync`) so the
+  retry rebuilds from a clean slate instead of skipping listener setup; stale-session failures
+  skip both teardown and retry. Identity changes cancel the pending retry and reset the attempt
+  budget, and success cancels the cycle.
+  Clearing advances
+  `manualActivityEpoch` without changing gameplay or `progressEpoch`; only histories from the
+  highest history generation participate in the union. Full progress reset epochs take precedence.
+  The sync RPC merges histories under its existing account lock before unchanged-write comparisons,
+  and row triggers preserve that contract for legacy/API writers. Omitted fields from older clients
+  preserve existing server history; a higher full reset epoch intentionally discards it.
+- Equal-timestamp manual entries sort by ID; conflicting same-ID entries use type, action, title,
+  then details as ascending Unicode code-point tie-breakers. Client and database use the same order
+  before the 50-entry cap, so device argument order cannot change the retained feed. The cap applies
+  to the merged feed, not per device: when two devices at the same history generation together hold
+  more than 50 entries, the union keeps the 50 newest and drops the rest by design. Ids, titles, and
+  details clamp by Unicode code point on both sides, matching SQL `left()`, so neither side can
+  produce a different id for the same entry. The client additionally strips lone surrogates before
+  clamping: `jsonb` rejects the whole `p_modes` document at parameter binding, before the SQL
+  sanitizer can run, so no client-sanitized string can carry one.
+- The sync RPC merges each mode against the persisted payload for that mode, and seeds from the
+  account row's locked legacy column when the normalized row is an unmaterialized placeholder. Row
+  triggers re-merge against each table's own stored row, so the seeding is what keeps the RPC's
+  unchanged-write comparison accurate: without it a placeholder makes every sync rewrite an
+  otherwise unchanged account row.
+- Legacy activity envelopes with no owner are adoptable guest data. Authenticated startup waits
+  until progress sync restores the selected mode before adoption. Another account's envelope is
+  retained for its owner. The legacy key is removed only after entries have been added to progress.
 
 ---
 
