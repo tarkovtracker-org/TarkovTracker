@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { H3Event, H3EventContext } from 'h3';
-type SiteConfigStackEntry = Record<string, unknown>;
+import { BASE_SITE_CONTEXT, createRouterStub } from '@/server/utils/__tests__/eventStubs';
+import type { H3Event } from 'h3';
 const {
   mockComputeStreamerKappaMetrics,
   mockGetRequestHeader,
@@ -34,24 +34,11 @@ vi.mock('@/composables/useGraphBuilder', () => ({
 vi.mock('@/server/utils/streamerKappa', () => ({
   computeStreamerKappaMetrics: mockComputeStreamerKappaMetrics,
 }));
-mockNuxtImport('useRouter', () => () => ({
-  afterEach: vi.fn(),
-  beforeEach: vi.fn(),
-  beforeResolve: vi.fn(),
-  onError: vi.fn(),
-}));
+mockNuxtImport('useRouter', () => () => createRouterStub());
 describe('Streamer Kappa API', () => {
   const USER_ID = '11111111-1111-4111-8111-111111111111';
   let mockEvent: Partial<H3Event>;
   let originalFetch: typeof mockDollarFetch | undefined;
-  const BASE_SITE_CONTEXT: Pick<H3EventContext, 'siteConfig' | 'siteConfigNitroOrigin'> = {
-    siteConfig: {
-      stack: [] as Partial<SiteConfigStackEntry>[],
-      push: vi.fn(() => () => {}),
-      get: vi.fn(() => ({})),
-    },
-    siteConfigNitroOrigin: '',
-  };
   beforeEach(() => {
     vi.resetAllMocks();
     mockEvent = {
