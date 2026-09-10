@@ -237,6 +237,8 @@ const prepareEditionScope = (
 };
 const hasValidCachedEditions = (editions: GameEdition[]): boolean =>
   editions.length > 0 && editions.every(isGameEdition);
+const sortedStoryChapters = (chapters: StoryChapter[]): StoryChapter[] =>
+  chapters.map((chapter) => normalizeStoryChapter(chapter)).sort((a, b) => a.order - b.order);
 const applyCachedEditions = async (
   state: Pick<MetadataState, 'editions' | 'storyChapters' | 'seasonalPerks'>,
   isCurrent: () => boolean,
@@ -252,11 +254,110 @@ const applyCachedEditions = async (
   state.editions = markRaw(editions);
   state.seasonalPerks = perksForMode(seasonalPerks, mode);
   if (!storyChapters.length) return false;
-  state.storyChapters = markRaw(
-    storyChapters.map((chapter) => normalizeStoryChapter(chapter)).sort((a, b) => a.order - b.order)
-  );
+  state.storyChapters = markRaw(sortedStoryChapters(storyChapters));
   logger.debug('[MetadataStore] Editions loaded from cache');
   return true;
+};
+/** A cache read must never fail the request that can still fetch live data. */
+const applyCachedEditionsOrIgnore = (
+  state: Pick<MetadataState, 'editions' | 'storyChapters' | 'seasonalPerks'>,
+  isCurrent: () => boolean,
+  mode: string,
+  language: string
+): Promise<boolean> =>
+  applyCachedEditions(state, isCurrent, mode, language).catch((error) => {
+    logger.warn('[MetadataStore] Editions cache read failed:', error);
+    return false;
+  });
+/** An overlay response that carries a complete, well-formed progression catalog. */
+type ProgressionCatalog = CachedEditions & {
+  editions: GameEdition[];
+  storyChapters: StoryChapter[];
+};
+const isProgressionCatalog = (
+  overlay: CachedEditions | undefined
+): overlay is ProgressionCatalog => {
+  if (!overlay) return false;
+  if (!Array.isArray(overlay.storyChapters)) return false;
+  return Array.isArray(overlay.editions) && overlay.editions.every(isGameEdition);
+};
+const fetchProgressionCatalog = async (
+  mode: string,
+  language: string,
+  forceRefresh: boolean
+): Promise<ProgressionCatalog> => {
+  const response = await $fetch<{ data: CachedEditions }>('/api/tarkov/editions', {
+    query: {
+      lang: language,
+      gameMode: mode,
+      ...(forceRefresh ? { cacheBust: '1' } : {}),
+    },
+  });
+  const overlay = response.data;
+  // Reject the whole payload up front so malformed chapters cannot partially
+  // replace edition eligibility.
+  if (!isProgressionCatalog(overlay)) throw new TypeError('Invalid progression catalog');
+  return overlay;
+};
+const applyProgressionCatalog = (
+  state: Pick<MetadataState, 'editions' | 'storyChapters' | 'seasonalPerks'>,
+  overlay: ProgressionCatalog,
+  mode: string
+) => {
+  // Normalize before assigning; the guard already proved both lists are present.
+  const chapters = sortedStoryChapters([...overlay.storyChapters]);
+  state.editions = markRaw([...overlay.editions]);
+  state.storyChapters = markRaw(chapters);
+  state.seasonalPerks = perksForMode(overlay.seasonalPerks ?? [], mode);
+};
+const cacheProgressionCatalog = (
+  state: Pick<MetadataState, 'editions' | 'storyChapters' | 'seasonalPerks'>,
+  mode: string,
+  language: string
+) => {
+  if (typeof window === 'undefined') return;
+  setCachedData(
+    'editions' as CacheType,
+    `${EDITIONS_CACHE_VERSION}-${mode}`,
+    language,
+    {
+      editions: state.editions,
+      storyChapters: state.storyChapters,
+      seasonalPerks: state.seasonalPerks,
+    },
+    CACHE_CONFIG.MAX_TTL
+  ).catch((err) => logger.error('[MetadataStore] Error caching editions:', err));
+};
+/**
+ * Fetch, validate, apply, and cache the progression catalog. Every state write
+ * is fenced behind `isCurrent()` so a superseded scope cannot publish its result.
+ */
+const loadProgressionCatalog = async (
+  state: Pick<MetadataState, 'editions' | 'editionsError' | 'seasonalPerks' | 'storyChapters'>,
+  promiseStore: ReturnType<typeof getPromiseStore>,
+  context: {
+    forceRefresh: boolean;
+    isCurrent: () => boolean;
+    language: string;
+    mode: string;
+    scope: string;
+  }
+): Promise<void> => {
+  try {
+    const overlay = await fetchProgressionCatalog(
+      context.mode,
+      context.language,
+      context.forceRefresh
+    );
+    if (!context.isCurrent()) return;
+    applyProgressionCatalog(state, overlay, context.mode);
+    promiseStore.editionsSettledScope = context.scope;
+    cacheProgressionCatalog(state, context.mode, context.language);
+  } catch (err) {
+    if (!context.isCurrent()) return;
+    logger.error('[MetadataStore] Error fetching editions data:', err);
+    state.editionsError = err as Error;
+  }
 };
 export const useMetadataStore = defineStore('metadata', {
   state: (): MetadataState => ({
@@ -1475,7 +1576,6 @@ export const useMetadataStore = defineStore('metadata', {
       prepareEditionScope(this, promiseStore, scope);
       this.seasonalPerks = perksForMode(this.seasonalPerks, requestMode);
       // Register the promise before requests can settle or throw synchronously.
-      // fallow-ignore-next-line complexity -- CRAP assumes zero coverage; measured coverage and reduced complexity are documented in docs/task-performance-validation.md
       const promise = Promise.resolve().then(async () => {
         this.editionsError = null;
         const isCurrent = () =>
@@ -1484,12 +1584,7 @@ export const useMetadataStore = defineStore('metadata', {
           this.languageCode === requestLanguage;
         if (
           !forceRefresh &&
-          (await applyCachedEditions(this, isCurrent, requestMode, requestLanguage).catch(
-            (error) => {
-              logger.warn('[MetadataStore] Editions cache read failed:', error);
-              return false;
-            }
-          ))
+          (await applyCachedEditionsOrIgnore(this, isCurrent, requestMode, requestLanguage))
         ) {
           void this.fetchEditionsData(true).catch((error) =>
             logger.warn('[MetadataStore] Background editions revalidation failed:', error)
@@ -1498,52 +1593,13 @@ export const useMetadataStore = defineStore('metadata', {
         }
         if (!isCurrent()) return;
         this.editionsLoading = true;
-        try {
-          const response = await $fetch<{ data: CachedEditions }>('/api/tarkov/editions', {
-            query: {
-              lang: requestLanguage,
-              gameMode: requestMode,
-              ...(forceRefresh ? { cacheBust: '1' } : {}),
-            },
-          });
-          const overlay = response.data;
-          if (
-            !overlay ||
-            !Array.isArray(overlay.editions) ||
-            !overlay.editions.every(isGameEdition) ||
-            !Array.isArray(overlay.storyChapters)
-          )
-            throw new TypeError('Invalid progression catalog');
-          if (!isCurrent()) return;
-          // Normalize both before assigning so malformed chapters cannot partially replace eligibility.
-          const editions = Object.values(overlay?.editions ?? {});
-          const chapters = Object.values(overlay?.storyChapters ?? {})
-            .map((chapter) => normalizeStoryChapter(chapter))
-            .sort((a, b) => a.order - b.order);
-          if (!overlay?.editions)
-            logger.warn('[MetadataStore] No editions found in overlay response');
-          this.editions = markRaw(editions);
-          this.storyChapters = markRaw(chapters);
-          promiseStore.editionsSettledScope = scope;
-          this.seasonalPerks = perksForMode(overlay.seasonalPerks ?? [], requestMode);
-          if (typeof window !== 'undefined') {
-            setCachedData(
-              'editions' as CacheType,
-              `${EDITIONS_CACHE_VERSION}-${requestMode}`,
-              requestLanguage,
-              {
-                editions: this.editions,
-                storyChapters: this.storyChapters,
-                seasonalPerks: this.seasonalPerks,
-              },
-              CACHE_CONFIG.MAX_TTL
-            ).catch((err) => logger.error('[MetadataStore] Error caching editions:', err));
-          }
-        } catch (err) {
-          if (!isCurrent()) return;
-          logger.error('[MetadataStore] Error fetching editions data:', err);
-          this.editionsError = err as Error;
-        }
+        await loadProgressionCatalog(this, promiseStore, {
+          forceRefresh,
+          isCurrent,
+          language: requestLanguage,
+          mode: requestMode,
+          scope,
+        });
       });
       promiseStore.editionsPromise = promise;
       try {

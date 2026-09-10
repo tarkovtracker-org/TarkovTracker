@@ -117,6 +117,24 @@ function formatSupabaseError(error: SupabaseErrorLike) {
     message: error.message ?? null,
   };
 }
+/** Outcome of one write, including any columns dropped to satisfy an older schema. */
+type SupabaseSyncAttempt = {
+  synced: boolean;
+  error: SupabaseErrorLike | null;
+  removedMissingColumns: Set<string>;
+};
+/** An aborted write is worth one retry; every other failure is reported as-is. */
+const wasWriteAborted = (attempt: SupabaseSyncAttempt): boolean =>
+  !attempt.synced && attempt.error !== null && isAbortRequestError(attempt.error);
+const countModeTasks = (mode: UserProgressData | undefined): number =>
+  Object.keys(mode?.taskCompletions || {}).length;
+const describeProgressPayload = (userData: SupabaseUserData) => ({
+  gameMode: userData.current_game_mode,
+  pvpLevel: userData.pvp_data?.level,
+  pvpTasksCompleted: countModeTasks(userData.pvp_data),
+  pveLevel: userData.pve_data?.level,
+  pveTasksCompleted: countModeTasks(userData.pve_data),
+});
 export function useSupabaseSync<
   TState extends StateTree = StateTree,
   TPayload extends SupabaseSyncPayload = SupabaseSyncPayload,
@@ -139,29 +157,41 @@ export function useSupabaseSync<
   const pendingState = createPendingStateTracker(() => store.$state);
   let disposed = false;
   let syncQueue: Promise<TPayload | null> | null = null;
-  // fallow-ignore-next-line complexity -- development-only diagnostics exercised through sync tests; inferred coverage misses indirect calls
-  const logPayload = (dataToSave: TPayload) => {
-    // Log detailed info about what we're syncing (dev only)
-    if (import.meta.env.DEV) {
-      if (table === 'user_progress') {
-        const userData = dataToSave as SupabaseUserData;
-        const pvpTasks = Object.keys(userData.pvp_data?.taskCompletions || {}).length;
-        const pveTasks = Object.keys(userData.pve_data?.taskCompletions || {}).length;
-        logger.debug(`[Sync] About to upsert to ${table}:`, {
-          gameMode: userData.current_game_mode,
-          pvpLevel: userData.pvp_data?.level,
-          pvpTasksCompleted: pvpTasks,
-          pveLevel: userData.pve_data?.level,
-          pveTasksCompleted: pveTasks,
-        });
-      } else {
-        logger.debug('[Sync] About to upsert to', table);
-      }
+  /** Transmission is gated while paused or while a remote snapshot is in flight. */
+  const isSyncSuspended = (): boolean => isPaused.value || snapshotDepth > 0;
+  const syncOwnerId = (): string | null => ($supabase.user.loggedIn ? $supabase.user.id : null);
+  /**
+   * The user id this write may be sent for, or `null` when it must be dropped.
+   *
+   * Sync is gated rather than queued: the next store change re-triggers it.
+   */
+  const resolveSyncOwner = (): string | null => {
+    if (isSyncSuspended()) {
+      logger.debug('[Sync] Skipping - sync is paused');
+      return null;
     }
+    const ownerId = syncOwnerId();
+    if (!ownerId) logger.debug('[Sync] Skipping - user not logged in');
+    return ownerId;
+  };
+  const canQueueSync = (): boolean => !disposed && !isSyncSuspended() && syncOwnerId() !== null;
+  const logPayload = (dataToSave: TPayload) => {
+    // Development-only diagnostics; production builds skip the payload walk.
+    if (!import.meta.env.DEV) return;
+    if (table !== 'user_progress') {
+      logger.debug('[Sync] About to upsert to', table);
+      return;
+    }
+    logger.debug(
+      `[Sync] About to upsert to ${table}:`,
+      describeProgressPayload(dataToSave as SupabaseUserData)
+    );
   };
   const upsert = async (payload: Record<string, unknown>) =>
     sync ? sync(payload as TPayload) : $supabase.client.from(table).upsert(payload);
-  const upsertWithFallback = async (payload: Record<string, unknown>) => {
+  const upsertWithFallback = async (
+    payload: Record<string, unknown>
+  ): Promise<SupabaseSyncAttempt> => {
     let payloadToSync: Record<string, unknown> | null = payload;
     let error: SupabaseErrorLike | null = null;
     let synced = false;
@@ -189,43 +219,96 @@ export function useSupabaseSync<
     }
     return { synced, error, removedMissingColumns };
   };
-  // fallow-ignore-next-line complexity -- retry/fallback outcomes are covered by sync integration tests; keep error reporting with the write result
-  const writePayload = async (dataToSave: TPayload, ownerId: string): Promise<boolean> => {
-    let syncResult = await upsertWithFallback(dataToSave);
-    if (
-      !syncResult.synced &&
-      syncResult.error &&
-      isAbortRequestError(syncResult.error) &&
-      !isPaused.value
-    ) {
-      await delay(ABORT_RETRY_DELAY_MS);
-      if (
-        !isPaused.value &&
-        $supabase.user.loggedIn &&
-        $supabase.user.id === ownerId &&
-        !disposed
-      ) {
-        syncResult = await upsertWithFallback(dataToSave);
-      }
+  /** A retry is only valid while the same signed-in user still owns this write. */
+  const canRetryAbortedWrite = (ownerId: string): boolean =>
+    !isPaused.value && $supabase.user.loggedIn && $supabase.user.id === ownerId && !disposed;
+  const reportFailedWrite = (error: SupabaseErrorLike) => {
+    if (isAbortRequestError(error)) {
+      logger.warn(`[Sync] Sync to ${table} was aborted; retry did not succeed yet`, {
+        ...formatSupabaseError(error),
+        retryDelayMs: ABORT_RETRY_DELAY_MS,
+      });
+      return;
     }
-    if (syncResult.synced && syncResult.removedMissingColumns.size) {
-      logger.warn(
-        `[Sync] ${table} fallback sync succeeded after removing missing columns: ${Array.from(syncResult.removedMissingColumns).join(', ')}`
-      );
-    }
-    if (!syncResult.synced && syncResult.error) {
-      if (isAbortRequestError(syncResult.error)) {
-        logger.warn(`[Sync] Sync to ${table} was aborted; retry did not succeed yet`, {
-          ...formatSupabaseError(syncResult.error),
-          retryDelayMs: ABORT_RETRY_DELAY_MS,
-        });
-      } else {
-        logger.error(`[Sync] Error syncing to ${table}:`, formatSupabaseError(syncResult.error));
-      }
-    }
-    return syncResult.synced;
+    logger.error(`[Sync] Error syncing to ${table}:`, formatSupabaseError(error));
   };
-  // fallow-ignore-next-line complexity -- serialized save/cleanup/version guards are covered in useSupabaseSync.test.ts and sync integration tests
+  const reportWriteOutcome = (attempt: SupabaseSyncAttempt) => {
+    if (attempt.synced) {
+      if (attempt.removedMissingColumns.size) {
+        logger.warn(
+          `[Sync] ${table} fallback sync succeeded after removing missing columns: ${Array.from(attempt.removedMissingColumns).join(', ')}`
+        );
+      }
+      return;
+    }
+    if (attempt.error) reportFailedWrite(attempt.error);
+  };
+  const writePayload = async (dataToSave: TPayload, ownerId: string): Promise<boolean> => {
+    let attempt = await upsertWithFallback(dataToSave);
+    if (wasWriteAborted(attempt) && !isPaused.value) {
+      await delay(ABORT_RETRY_DELAY_MS);
+      if (canRetryAbortedWrite(ownerId)) attempt = await upsertWithFallback(dataToSave);
+    }
+    reportWriteOutcome(attempt);
+    return attempt.synced;
+  };
+  const clearPendingVersion = (syncVersion: number) => {
+    if (syncVersion === localVersion) pendingLocalChanges = false;
+  };
+  const buildSyncPayload = (transformedState: TPayload, ownerId: string): TPayload => {
+    const dataToSave: TPayload = { ...transformedState };
+    if (!dataToSave.user_id) dataToSave.user_id = ownerId;
+    return dataToSave;
+  };
+  /**
+   * A sign-out or teardown during the write means this payload no longer
+   * describes the signed-in user, so it must not be acknowledged.
+   */
+  const canCommitWrite = (ownerId: string): boolean => !disposed && $supabase.user.id === ownerId;
+  const commitSync = (currentHash: string, syncVersion: number, acknowledge: () => void) => {
+    acknowledge();
+    lastSyncedHash = currentHash;
+    clearPendingVersion(syncVersion);
+    logger.debug(`[Sync] ✅ Successfully synced to ${table}`);
+    onSynced?.();
+  };
+  const writeAndCommit = async (
+    dataToSave: TPayload,
+    transformedState: TPayload,
+    currentHash: string,
+    syncVersion: number,
+    acknowledge: () => void,
+    ownerId: string
+  ): Promise<TPayload | null> => {
+    logPayload(dataToSave);
+    const synced = await writePayload(dataToSave, ownerId);
+    if (synced && canCommitWrite(ownerId)) commitSync(currentHash, syncVersion, acknowledge);
+    return synced ? transformedState : null;
+  };
+  const runSyncToSupabase = async (
+    transformedState: TPayload,
+    syncVersion: number,
+    acknowledge: () => void,
+    ownerId: string
+  ): Promise<TPayload | null> => {
+    const dataToSave = buildSyncPayload(transformedState, ownerId);
+    // Skip unchanged writes; this is what keeps egress down.
+    const currentHash = hashState(dataToSave);
+    if (currentHash === lastSyncedHash) {
+      acknowledge();
+      clearPendingVersion(syncVersion);
+      logger.debug('[Sync] Skipping - data unchanged');
+      return null;
+    }
+    return await writeAndCommit(
+      dataToSave,
+      transformedState,
+      currentHash,
+      syncVersion,
+      acknowledge,
+      ownerId
+    );
+  };
   const syncToSupabase = async (
     transformedState: TPayload | null,
     syncVersion: number,
@@ -235,47 +318,16 @@ export function useSupabaseSync<
       loggedIn: $supabase.user.loggedIn,
       isPaused: isPaused.value,
     });
-    if (isPaused.value || snapshotDepth > 0) {
-      logger.debug('[Sync] Skipping - sync is paused');
+    const ownerId = resolveSyncOwner();
+    if (!ownerId) return null;
+    // Skip if transform returned null (e.g., during initial load)
+    if (!transformedState) {
+      logger.debug('[Sync] Skipping - transform returned null');
       return null;
     }
-    if (!$supabase.user.loggedIn || !$supabase.user.id) {
-      logger.debug('[Sync] Skipping - user not logged in');
-      return null;
-    }
-    const ownerId = $supabase.user.id;
     isSyncing.value = true;
     try {
-      // Skip if transform returned null (e.g., during initial load)
-      if (!transformedState) {
-        logger.debug('[Sync] Skipping - transform returned null');
-        isSyncing.value = false;
-        return null;
-      }
-      const dataToSave: TPayload = { ...transformedState };
-      // Ensure user_id is present if not already
-      if (!dataToSave.user_id) {
-        dataToSave.user_id = $supabase.user.id;
-      }
-      // Skip sync if data hasn't changed (reduces egress significantly)
-      const currentHash = hashState(dataToSave);
-      if (currentHash === lastSyncedHash) {
-        acknowledge();
-        if (syncVersion === localVersion) pendingLocalChanges = false;
-        logger.debug('[Sync] Skipping - data unchanged');
-        isSyncing.value = false;
-        return null;
-      }
-      logPayload(dataToSave);
-      const synced = await writePayload(dataToSave, ownerId);
-      if (synced && !disposed && $supabase.user.id === ownerId) {
-        acknowledge();
-        lastSyncedHash = currentHash;
-        if (syncVersion === localVersion) pendingLocalChanges = false;
-        logger.debug(`[Sync] ✅ Successfully synced to ${table}`);
-        onSynced?.();
-      }
-      return synced ? transformedState : null;
+      return await runSyncToSupabase(transformedState, syncVersion, acknowledge, ownerId);
     } catch (err) {
       logger.error('[Sync] Unexpected error:', err);
       return null;
@@ -295,18 +347,10 @@ export function useSupabaseSync<
       return null;
     }
   };
-  // fallow-ignore-next-line complexity -- save gates and serialization are exercised through the public method in useSupabaseSync.test.ts
   const enqueueSync = (state = store.$state as TState): Promise<TPayload | null> => {
     // Capture each request before queuing: later mutations must not change an
     // earlier payload, and resumed writes must not overtake an in-flight save.
-    if (
-      disposed ||
-      isPaused.value ||
-      snapshotDepth > 0 ||
-      !$supabase.user.loggedIn ||
-      !$supabase.user.id
-    )
-      return Promise.resolve(null);
+    if (!canQueueSync()) return Promise.resolve(null);
     const version = localVersion;
     const acknowledge = pendingState.captureAcknowledgement(snapshotSyncState(state));
     const snapshot = capturePayload(state);
