@@ -1100,6 +1100,44 @@ summary {
 :root[data-theme='light'] body {
   color-scheme: light;
 }
+/* Prose typography scopes its variables on .prose/.prose-invert; light overrides match that scope */
+:root[data-theme='light'] .prose,
+:root[data-theme='light'] .prose-invert {
+  --tw-prose-body: var(--color-surface-100);
+  --tw-prose-headings: var(--color-surface-50);
+  --tw-prose-lead: var(--color-surface-200);
+  --tw-prose-links: var(--color-link);
+  --tw-prose-bold: var(--color-surface-50);
+  --tw-prose-counters: var(--color-surface-400);
+  --tw-prose-bullets: var(--color-surface-400);
+  --tw-prose-hr: var(--border-default);
+  --tw-prose-quotes: var(--color-surface-100);
+  --tw-prose-quote-borders: var(--color-surface-600);
+  --tw-prose-captions: var(--color-surface-400);
+  --tw-prose-kbd: var(--color-surface-50);
+  --tw-prose-code: var(--color-surface-50);
+  --tw-prose-pre-code: var(--color-surface-100);
+  --tw-prose-pre-bg: var(--color-surface-900);
+  --tw-prose-th-borders: var(--color-surface-600);
+  --tw-prose-td-borders: var(--border-subtle);
+  --tw-prose-invert-body: var(--color-surface-100);
+  --tw-prose-invert-headings: var(--color-surface-50);
+  --tw-prose-invert-lead: var(--color-surface-200);
+  --tw-prose-invert-links: var(--color-link);
+  --tw-prose-invert-bold: var(--color-surface-50);
+  --tw-prose-invert-counters: var(--color-surface-400);
+  --tw-prose-invert-bullets: var(--color-surface-400);
+  --tw-prose-invert-hr: var(--border-default);
+  --tw-prose-invert-quotes: var(--color-surface-100);
+  --tw-prose-invert-quote-borders: var(--color-surface-600);
+  --tw-prose-invert-captions: var(--color-surface-400);
+  --tw-prose-invert-kbd: var(--color-surface-50);
+  --tw-prose-invert-code: var(--color-surface-50);
+  --tw-prose-invert-pre-code: var(--color-surface-100);
+  --tw-prose-invert-pre-bg: var(--color-surface-900);
+  --tw-prose-invert-th-borders: var(--color-surface-600);
+  --tw-prose-invert-td-borders: var(--border-subtle);
+}
 /* Vue Flow scopes its tokens on .vue-flow, so light overrides must match that scope */
 :root[data-theme='light'] .vue-flow {
   --vf-text-75: var(--color-surface-400);

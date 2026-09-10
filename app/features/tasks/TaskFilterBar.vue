@@ -238,7 +238,7 @@
               {{ t('common.completed') }}
             </span>
             <span
-              class="bg-success-500 ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
+              class="bg-success-500 light:text-surface-50 ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
             >
               {{ displayStatusCounts.completed }}
             </span>
