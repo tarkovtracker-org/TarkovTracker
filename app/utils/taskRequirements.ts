@@ -1,4 +1,9 @@
-import type { NormalizedTraderRequirement, RequirementComparison, Task } from '@/types/tarkov';
+import type {
+  NormalizedTraderRequirement,
+  RequirementComparison,
+  Task,
+  TaskRequirementDiagnostic,
+} from '@/types/tarkov';
 const comparisons = new Set(['>=', '>', '<=', '<', '=', '==', '!=']);
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -91,3 +96,47 @@ export const getTaskTraderRequirements = (task: Task): NormalizedTraderRequireme
     ...(task.traderRequirements ?? []),
   ].map((value, index) => normalizeTraderRequirement(value, index));
 };
+// `null` and `undefined` are how the source spells "no gate here". Every other value is a gate the
+// source declared, so it has to survive normalization or be reported rather than quietly disappear.
+export const isDeclaredGate = (value: unknown): boolean => value !== null && value !== undefined;
+// json.tarkov.dev may serialize requiredPrestige as a bare id string or as an object ref.
+// Accept both shapes.
+const nonemptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0;
+// A numeric id is coerced because it still names a real prestige row; anything else would fabricate
+// a reference (`String({})` is `'[object Object]'`), so it is treated as unresolved and reported.
+const declaredId = (value: unknown): string | undefined => {
+  if (!isRecord(value)) return undefined;
+  const id = typeof value.id === 'number' ? String(value.id) : value.id;
+  return nonemptyString(id) ? id : undefined;
+};
+export const resolveRequiredPrestige = (value: unknown): { id: string } | undefined => {
+  if (nonemptyString(value)) return { id: value };
+  const id = declaredId(value);
+  return id ? { id } : undefined;
+};
+/** A declared prerequisite collection has to be a list; a bare object is not an empty list. */
+export const hasMalformedTaskRequirements = (value: unknown): boolean =>
+  isDeclaredGate(value) && !Array.isArray(value);
+// The published overlay declares the prestige gate of an injected task as `{ name, prestigeLevel }`
+// with no id. `applyOverlay` keeps that reference verbatim, so nothing is lost and there is nothing
+// to report; the gate itself is resolved from the task id by `buildPrestigeTaskMap`.
+export const hasDeclaredPrestigeLevel = (value: unknown): boolean =>
+  isRecord(value) && Number.isFinite(value.prestigeLevel);
+const hasUnresolvablePrestigeReference = (value: unknown): boolean =>
+  isDeclaredGate(value) && !resolveRequiredPrestige(value);
+/**
+ * Diagnostics for the declared gates a caller had to drop. `tarkov-json.ts` models
+ * `requiredPrestige` as an id reference only, so every other declared reference is dropped and
+ * reported here. `overlay.ts` keeps some references verbatim and derives its own diagnostics from
+ * what it actually dropped.
+ */
+export const taskRequirementDiagnostics = (raw: {
+  requiredPrestige?: unknown;
+  taskRequirements?: unknown;
+}): TaskRequirementDiagnostic[] => [
+  ...(hasMalformedTaskRequirements(raw.taskRequirements) ? (['task_requirement'] as const) : []),
+  ...(hasUnresolvablePrestigeReference(raw.requiredPrestige)
+    ? (['prestige_reference'] as const)
+    : []),
+];

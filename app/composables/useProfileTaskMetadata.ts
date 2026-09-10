@@ -65,13 +65,27 @@ const optionalPrestige = (response: { data: { prestige: PrestigeLevel[] } }): Pr
   }
   return prestige;
 };
-/** Merge the core and objectives catalogs, then dedupe shared objective IDs. */
+/**
+ * Merge the core and objectives catalogs, then dedupe shared objective IDs. The objectives response
+ * contributes only objective data, matching `useMetadata.mergeTaskObjectives`: a blanket spread would
+ * let stray fields an overlay patch merged into that response replace the core catalog's declared
+ * gates and their `requirementDiagnostics`.
+ */
 const mergeProfileTasks = (
   core: { data: TarkovTasksCoreQueryResult },
   objectives: { data: { tasks: Task[] } }
 ) => {
   const byId = new Map(objectives.data.tasks.map((task) => [task.id, task]));
-  const merged = core.data.tasks.map((task) => ({ ...task, ...byId.get(task.id) }));
+  const merged = core.data.tasks.map((task) => {
+    const update = byId.get(task.id);
+    if (!update) return task;
+    return {
+      ...task,
+      objectives: update.objectives !== undefined ? update.objectives : task.objectives,
+      failConditions:
+        update.failConditions !== undefined ? update.failConditions : task.failConditions,
+    };
+  });
   return dedupeTaskObjectiveIds(
     merged.map((task) => ({
       ...task,

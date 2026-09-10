@@ -227,3 +227,39 @@ it('ignores a required catalog rejection after its scope is disposed', async () 
   expect(result.error.value).toBeNull();
   expect(result.tasks.value).toEqual([]);
 });
+it.each([undefined, null, [{ id: 'updated' }]])(
+  'preserves core gates while merging objective fields with value %j',
+  async (value) => {
+    const core = {
+      id: 'target',
+      requirementDiagnostics: ['task_requirement', 'prestige_reference'],
+      objectives: [{ id: 'original' }],
+      failConditions: [{ id: 'original-failure' }],
+    };
+    const update = {
+      id: 'target',
+      requirementDiagnostics: ['task_requirement'],
+      objectives: value,
+      failConditions: value,
+    };
+    const responses: Record<string, unknown> = {
+      '/api/tarkov/tasks-core': { data: { tasks: [core] } },
+      '/api/tarkov/tasks-objectives': { data: { tasks: [update] } },
+      '/api/tarkov/prestige': { data: { prestige: [] } },
+      '/api/tarkov/editions': { data: { editions: [], storyChapters: [] } },
+    };
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn(async (url: string) => responses[url])
+    );
+    const scope = effectScope();
+    const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pvp'), ref('en')))!;
+    await flushPromises();
+    expect(result.tasks.value[0]).toMatchObject({
+      requirementDiagnostics: core.requirementDiagnostics,
+      objectives: value === undefined ? core.objectives : (value ?? []),
+      failConditions: value === undefined ? core.failConditions : value,
+    });
+    scope.stop();
+  }
+);
