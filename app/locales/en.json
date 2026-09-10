@@ -2241,9 +2241,8 @@
       "confirm_word": "DELETE"
     },
     "log_import": {
-      "skipped_large_logs": "Skipped oversized logs: {count}",
-      "skipped_large_logs_hint": "Logs larger than 32 MiB were skipped. Progress may be incomplete, and missing session logs can leave game modes unknown. Review the detected modes and destination before confirming.",
-      "skipped_paths": "Show skipped file paths",
+      "reading_logs": "Reading logs and preparing the preview…",
+      "large_folder_hint": "Large folders are read locally in chunks. Keep this page open; you can cancel while logs are being read.",
       "upload_hint": "Select your Escape from Tarkov Logs folder or a selection of session folders to import quest starts, completions, and failures.",
       "deleted_logs_hint": "If old log sessions were deleted, they cannot be imported.",
       "deleted_logs_hint_tooltip": "Log import only reads quest events still present in your current Logs folder.",
@@ -2293,6 +2292,8 @@
       "cleared_logs_toast_title": "Old logs were likely cleared",
       "cleared_logs_toast_description": "Log import can only read quest history still in your Logs folder. Deleted sessions cannot be recovered.",
       "errors": {
+        "invalid_archive": "The ZIP archive is incomplete or contains an invalid log entry. No progress was imported.",
+        "record_too_large": "An individual log record in {path} is too large to parse safely. No progress was imported. Please report this log format.",
         "apply_import_failed": "Import could not finish. Some progress may already have been imported. Select the same logs again to retry; completed progress is preserved.",
         "archive_log_file_too_large": "Log file is too large in archive: {path}",
         "archive_logs_too_large": "Archive contains too much log content (max {max_mb} MB).",

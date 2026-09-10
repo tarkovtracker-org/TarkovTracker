@@ -77,7 +77,8 @@ const {
     setIncludedVersions: vi.fn(),
   },
   eftLogsState: {
-    skippedLogPaths: {} as Ref<string[]>,
+    isParsing: {} as Ref<boolean>,
+    parseProgress: {} as Ref<{ bytesRead: number; totalBytes: number }>,
     isImporting: {} as Ref<boolean>,
     importError: { __v_isRef: true as const, value: null as string | null },
     previewData: { __v_isRef: true as const, value: null as Record<string, unknown> | null },
@@ -144,7 +145,8 @@ vi.mock('@/composables/useTarkovDevImport', () => ({
 }));
 vi.mock('@/composables/useEftLogsImport', () => ({
   useEftLogsImport: () => ({
-    skippedLogPaths: eftLogsState.skippedLogPaths,
+    isParsing: eftLogsState.isParsing,
+    parseProgress: eftLogsState.parseProgress,
     importState: eftLogsState.importState,
     isImporting: eftLogsState.isImporting,
     previewData: eftLogsState.previewData,
@@ -247,7 +249,8 @@ describe('DataManagementCard', () => {
     eftLogsState.importError.value = null;
     eftLogsState.importState.value = 'idle';
     eftLogsState.isImporting = ref(false);
-    eftLogsState.skippedLogPaths = ref([]);
+    eftLogsState.isParsing = ref(false);
+    eftLogsState.parseProgress = ref({ bytesRead: 0, totalBytes: 0 });
     eftLogsState.previewData.value = null;
     tarkovStoreState.currentMode = 'pvp';
     tarkovStoreState.tarkovUid = null;
@@ -298,28 +301,21 @@ describe('DataManagementCard', () => {
         },
       },
     });
-  it('keeps the warning live region mounted before skipped logs arrive', async () => {
+  it('keeps a live region mounted and shows cancellable folder-read progress', async () => {
     const wrapper = createWrapper({ view: 'imports' });
     const liveRegion = wrapper.find('[aria-live="polite"]');
     expect(liveRegion.exists()).toBe(true);
-    expect(liveRegion.text()).toBe('');
-    eftLogsState.skippedLogPaths.value = ['output_000.log'];
+    eftLogsState.isParsing.value = true;
+    eftLogsState.parseProgress.value = { bytesRead: 50, totalBytes: 100 };
     await wrapper.vm.$nextTick();
     expect(wrapper.find('[aria-live="polite"]').element).toBe(liveRegion.element);
-    expect(liveRegion.text()).toContain('settings.log_import.skipped_large_logs');
-    wrapper.unmount();
-  });
-  it('shows skipped paths and the partial-import warning on errors and clears the display', async () => {
-    eftLogsState.importState.value = 'error';
-    eftLogsState.importError.value = 'settings.log_import.errors.no_notification_logs_found';
-    eftLogsState.skippedLogPaths.value = ['Logs/session/output_000.log'];
-    const wrapper = createWrapper({ view: 'imports' });
-    expect(wrapper.text()).toContain('settings.log_import.skipped_large_logs');
-    expect(wrapper.text()).toContain('settings.log_import.skipped_large_logs_hint');
-    expect(wrapper.find('details li').text()).toBe('Logs/session/output_000.log');
-    eftLogsState.skippedLogPaths.value = [];
-    await wrapper.vm.$nextTick();
-    expect(wrapper.text()).not.toContain('settings.log_import.skipped_large_logs');
+    expect(liveRegion.text()).toContain('settings.log_import.reading_logs');
+    expect(wrapper.find('progress').attributes()).toMatchObject({ value: '50', max: '100' });
+    expect(
+      findButtonByText(wrapper, 'settings.data_management.import_eft_logs_folder_button')
+    ).toBeUndefined();
+    await findButtonByText(wrapper, 'common.cancel')!.trigger('click');
+    expect(eftLogsFns.reset).toHaveBeenCalledOnce();
     wrapper.unmount();
   });
   it('limits the imports view to profile and log import actions', () => {

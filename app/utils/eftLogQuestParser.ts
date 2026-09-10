@@ -1,4 +1,5 @@
 import { ACTIVE_SEASON, GAME_MODES, type GameMode } from '@/utils/constants';
+import { createEftLogRecordReader } from '@/utils/eftLogRecordReader';
 const CHAT_MESSAGE_MARKER = 'Got notification | ChatMessageReceived';
 const BACKEND_URL_PATTERN =
   /(?:https?|wss?):\/\/([A-Za-z0-9._-]+\.escapefromtarkov\.com)(\/[A-Za-z0-9_./-]*)?/g;
@@ -82,7 +83,14 @@ interface JsonBlock {
 }
 interface BackendModeSignal {
   mode: EftQuestEventMode;
-  timestamp: string;
+  timestamp: number;
+}
+export interface EftParsedLogFile {
+  name: string;
+  version: string;
+  timeline: BackendModeSignal[];
+  legacy: BackendModeSignal[];
+  notifications: EftLogTextParseResult | null;
 }
 interface BackendModeSignals {
   timeline: BackendModeSignal[];
@@ -295,7 +303,7 @@ function isLegacyModeUrl(host: string, path: string): boolean {
 /** Separates explicit gateway evidence from the lower-priority legacy PvP fallback. */
 function collectUrlModeSignal(
   match: RegExpExecArray,
-  timestamp: string,
+  timestamp: number,
   timeline: BackendModeSignal[],
   legacy: BackendModeSignal[]
 ): void {
@@ -308,9 +316,13 @@ function collectUrlModeSignal(
   }
 }
 /** Adds a recognized session declaration at its receipt timestamp. */
-function collectDeclaredModeSignal(record: LogRecord, timeline: BackendModeSignal[]): void {
+function collectDeclaredModeSignal(
+  record: LogRecord,
+  timeline: BackendModeSignal[],
+  timestamp: number
+): void {
   const declared = declaredRecordMode(record);
-  if (declared) timeline.push({ mode: declared, timestamp: record.timestamp });
+  if (declared) timeline.push({ mode: declared, timestamp });
 }
 /** Rejects invalid timestamps before collecting declarations and eligible connection URLs. */
 function collectRecordModeSignals(
@@ -318,35 +330,27 @@ function collectRecordModeSignals(
   timeline: BackendModeSignal[],
   legacy: BackendModeSignal[]
 ): void {
-  if (eftLogTimestampMillis(record.timestamp) === null) return;
-  collectDeclaredModeSignal(record, timeline);
+  const timestamp = eftLogTimestampMillis(record.timestamp);
+  if (timestamp === null) return;
+  collectDeclaredModeSignal(record, timeline, timestamp);
   // Delayed responses and URLs inside JSON chat text are not mode switches.
   if (!isModeSignalRecord(record)) return;
   for (const match of record.message.matchAll(new RegExp(BACKEND_URL_PATTERN))) {
-    collectUrlModeSignal(match, record.timestamp, timeline, legacy);
+    collectUrlModeSignal(match, timestamp, timeline, legacy);
   }
 }
 /** Builds a session timeline, enabling legacy fallback only without explicit PvP or Seasonal evidence. */
-function collectBackendModeSignals(files: EftLogInputFile[]): BackendModeSignals {
-  const timeline: BackendModeSignal[] = [];
-  const legacy: BackendModeSignal[] = [];
-  for (const file of files) {
-    for (const record of readLogRecords(file.text)) {
-      collectRecordModeSignals(record, timeline, legacy);
-    }
-  }
+function collectBackendModeSignals(files: EftParsedLogFile[]): BackendModeSignals {
+  const timeline = files.flatMap((file) => file.timeline);
+  const legacy = files.flatMap((file) => file.legacy);
   // Legacy prod hosts remain useful alongside PvE, but must not override explicit PvP/Season signals.
   if (
     !timeline.some(
       (signal) => signal.mode === GAME_MODES.PVP || signal.mode === GAME_MODES.SEASONAL
     )
   )
-    timeline.push(...legacy);
+    for (const signal of legacy) timeline.push(signal);
   return { timeline: combineModeSignals(timeline) };
-}
-/** Returns a numeric timestamp for chronological mode-signal ordering. */
-function signalTime(signal: BackendModeSignal): number {
-  return eftLogTimestampMillis(signal.timestamp) ?? 0;
 }
 /** Keeps agreement at one instant and marks conflicting simultaneous modes as unknown. */
 function reconcileModeSignal(prior: EftQuestEventMode, mode: EftQuestEventMode): EftQuestEventMode {
@@ -354,11 +358,11 @@ function reconcileModeSignal(prior: EftQuestEventMode, mode: EftQuestEventMode):
 }
 /** Sorts signals and combines simultaneous evidence before binary-search routing. */
 function combineModeSignals(timeline: BackendModeSignal[]): BackendModeSignal[] {
-  timeline.sort((left, right) => signalTime(left) - signalTime(right));
+  timeline.sort((left, right) => left.timestamp - right.timestamp);
   const combined: BackendModeSignal[] = [];
   for (const signal of timeline) {
     const prior = combined.at(-1);
-    if (prior && signalTime(prior) === signalTime(signal)) {
+    if (prior && prior.timestamp === signal.timestamp) {
       prior.mode = reconcileModeSignal(prior.mode, signal.mode);
     } else combined.push({ ...signal });
   }
@@ -377,8 +381,7 @@ function resolveEventModeFromTimeline(
   while (low <= high) {
     const mid = Math.floor((low + high) / 2);
     const signal = timeline[mid]!;
-    const signalTime = eftLogTimestampMillis(signal.timestamp);
-    if (signalTime !== null && signalTime <= time) {
+    if (signal.timestamp <= time) {
       resolved = signal.mode;
       low = mid + 1;
     } else high = mid - 1;
@@ -448,6 +451,62 @@ export function parseEftNotificationLogText(text: string): EftLogTextParseResult
     failedEvents,
     parseErrorCount,
   };
+}
+/** Combines parsed notification evidence without retaining source text. */
+function appendNotificationResult(
+  target: EftLogTextParseResult,
+  source: EftLogTextParseResult
+): void {
+  const counts = [
+    'chatMessageCount',
+    'completionEventCount',
+    'startedEventCount',
+    'failedEventCount',
+    'parseErrorCount',
+  ] as const;
+  for (const key of counts) target[key] += source[key];
+  const buckets = ['completionEvents', 'startedEvents', 'failedEvents'] as const;
+  for (const key of buckets) {
+    for (const event of source[key]) target[key].push(event);
+  }
+}
+/** Uses the first versioned record header when the path did not identify a build. */
+function updateSourceVersion(source: EftParsedLogFile, text: string): void {
+  if (source.version !== UNKNOWN_LOG_VERSION) return;
+  source.version = /^\d{4}-[^\r\n|]+\|(\d+(?:\.\d+){4})\|/m.exec(text)?.[1] ?? UNKNOWN_LOG_VERSION;
+}
+/** Adds only quest notifications and mode signals from a batch of complete records. */
+function appendLogText(source: EftParsedLogFile, text: string): void {
+  updateSourceVersion(source, text);
+  for (const record of readLogRecords(text)) {
+    collectRecordModeSignals(record, source.timeline, source.legacy);
+  }
+  if (source.notifications)
+    appendNotificationResult(source.notifications, parseEftNotificationLogText(text));
+}
+/** Parses complete records once and retains only evidence needed for later version/mode selection. */
+export function createEftLogFileParser(name: string) {
+  const source: EftParsedLogFile = {
+    name,
+    version: extractSessionVersion(name) ?? UNKNOWN_LOG_VERSION,
+    timeline: [],
+    legacy: [],
+    notifications: isEftNotificationLogFileName(name) ? parseEftNotificationLogText('') : null,
+  };
+  const reader = createEftLogRecordReader((text) => appendLogText(source, text), name);
+  return {
+    push: reader.push,
+    finish: (): EftParsedLogFile => {
+      reader.finish();
+      return source;
+    },
+  };
+}
+/** Adapts in-memory callers to the same parser used by chunked file reads. */
+function parseEftLogFile(file: EftLogInputFile): EftParsedLogFile {
+  const parser = createEftLogFileParser(file.name);
+  parser.push(file.text);
+  return parser.finish();
 }
 /** Recognizes Arena session paths so their notifications cannot enter EFT progress. */
 function isArenaLog(fileName: string): boolean {
@@ -551,117 +610,145 @@ function retainEarliestEvent(duplicate: EftQuestImportEvent, event: EftQuestImpo
     duplicate.mode = reconcileModeSignal(duplicate.mode, event.mode);
   }
 }
-/** Builds a version-filtered preview with mode routing, deduplication, season guards, and catalog eligibility. */
-export function parseEftLogsForQuestImport(
-  files: EftLogInputFile[],
-  taskIds: Iterable<string>,
-  options: ParseEftLogsForQuestImportOptions = {}
-): EftQuestImportPreview {
-  const taskIdSet = new Set(Array.from(taskIds));
-  const groupedFiles = new Map<
-    string,
-    {
-      backend: EftLogInputFile[];
-      notifications: EftLogInputFile[];
-      version: string;
-    }
-  >();
-  for (const file of files) {
-    if (!isEftImportLogFileName(file.name)) continue;
-    const sessionKey = toSessionKey(file.name);
-    const group = groupedFiles.get(sessionKey) ?? {
-      backend: [],
-      notifications: [],
-      version:
-        extractSessionVersion(sessionKey) ??
-        extractSessionVersion(file.name) ??
-        /^\d{4}-[^\r\n|]+\|(\d+(?:\.\d+){4})\|/m.exec(file.text)?.[1] ??
-        UNKNOWN_LOG_VERSION,
-    };
-    if (isEftNotificationLogFileName(file.name)) {
-      group.notifications.push(file);
-    } else {
-      group.backend.push(file);
-    }
-    if (group.version === UNKNOWN_LOG_VERSION) {
-      group.version =
-        extractSessionVersion(file.name) ??
-        /^\d{4}-[^\r\n|]+\|(\d+(?:\.\d+){4})\|/m.exec(file.text)?.[1] ??
-        UNKNOWN_LOG_VERSION;
-    }
-    groupedFiles.set(sessionKey, group);
+interface SessionLogs {
+  files: EftParsedLogFile[];
+  version: string;
+}
+interface ImportCounts {
+  chatMessageCount: number;
+  completionEventCount: number;
+  startedEventCount: number;
+  failedEventCount: number;
+  parseErrorCount: number;
+  filesParsed: number;
+}
+/** Groups related evidence while preserving the first known session version. */
+function addSessionFile(groups: Map<string, SessionLogs>, file: EftParsedLogFile): void {
+  const sessionKey = toSessionKey(file.name);
+  const group = groups.get(sessionKey) ?? {
+    files: [],
+    version: extractSessionVersion(sessionKey) ?? file.version,
+  };
+  if (group.version === UNKNOWN_LOG_VERSION) group.version = file.version;
+  group.files.push(file);
+  groups.set(sessionKey, group);
+}
+/** Accepts both streamed evidence and existing small in-memory parser callers. */
+function groupLogSources(files: (EftLogInputFile | EftParsedLogFile)[]): SessionLogs[] {
+  const groups = new Map<string, SessionLogs>();
+  for (const input of files) {
+    if (!isEftImportLogFileName(input.name)) continue;
+    addSessionFile(groups, 'text' in input ? parseEftLogFile(input) : input);
   }
-  const versionSessionCounts: Record<string, number> = {};
-  for (const group of groupedFiles.values()) {
-    if (group.notifications.length === 0) continue;
-    const key = group.version || UNKNOWN_LOG_VERSION;
-    versionSessionCounts[key] = (versionSessionCounts[key] ?? 0) + 1;
+  return [...groups.values()];
+}
+/** Counts sessions with notification files, including empty logs, for the version selector. */
+function countVersionSessions(groups: SessionLogs[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const group of groups) {
+    if (!group.files.some((file) => file.notifications)) continue;
+    counts[group.version] = (counts[group.version] ?? 0) + 1;
   }
-  const availableVersions = sortVersionKeys(Object.keys(versionSessionCounts));
-  const availableVersionSet = new Set(availableVersions);
-  const requestedIncludedVersions =
-    options.includedVersions == null
-      ? availableVersions
-      : Array.from(new Set(options.includedVersions)).filter((version) =>
-          availableVersionSet.has(version)
-        );
-  const includedVersions = sortVersionKeys(requestedIncludedVersions);
-  const includedVersionSet = new Set(includedVersions);
-  let events: EftQuestImportEvent[] = [];
+  return counts;
+}
+/** Restricts requested builds to available versions and preserves newest-first ordering. */
+function selectIncludedVersions(
+  available: string[],
+  requested?: Iterable<string> | null
+): string[] {
+  if (requested == null) return available;
+  return sortVersionKeys([...requested].filter((version) => available.includes(version)));
+}
+/** Counts parsed notifications without retaining or re-reading their source text. */
+function addImportCounts(counts: ImportCounts, result: EftLogTextParseResult): void {
+  const keys = [
+    'chatMessageCount',
+    'completionEventCount',
+    'startedEventCount',
+    'failedEventCount',
+    'parseErrorCount',
+  ] as const;
+  for (const key of keys) counts[key] += result[key];
+  counts.filesParsed++;
+}
+/** Deduplicates strong event identities using the earliest delivery's routing evidence. */
+function retainImportEvent(
+  seen: Map<string, EftQuestImportEvent>,
+  event: EftQuestImportEvent
+): void {
+  const key = eventDeduplicationKey(event);
+  const duplicate = seen.get(key);
+  if (duplicate) retainEarliestEvent(duplicate, event);
+  else seen.set(key, event);
+}
+/** Routes each file's events against the complete session timeline, regardless of file order. */
+function collectFileEvents(
+  file: EftParsedLogFile,
+  timeline: BackendModeSignal[],
+  seen: Map<string, EftQuestImportEvent>,
+  counts: ImportCounts
+): void {
+  const result = file.notifications;
+  if (!result) return;
+  addImportCounts(counts, result);
+  const buckets = {
+    completed: result.completionEvents,
+    started: result.startedEvents,
+    failed: result.failedEvents,
+  };
+  for (const status of ['completed', 'started', 'failed'] as const) {
+    for (const event of buckets[status]) {
+      const mode = resolveEventModeFromTimeline(event.timestamp, timeline);
+      retainImportEvent(seen, { ...event, mode, status });
+    }
+  }
+}
+/** Collects evidence only from the selected versions before applying season or catalog guards. */
+function collectImportEvents(groups: SessionLogs[], included: Set<string>) {
   const seen = new Map<string, EftQuestImportEvent>();
-  let chatMessageCount = 0;
-  let completionEventCount = 0;
-  let startedEventCount = 0;
-  let failedEventCount = 0;
-  let parseErrorCount = 0;
-  let skippedSeasonalEventCount = 0;
-  let filesParsed = 0;
-  for (const group of groupedFiles.values()) {
-    if (!includedVersionSet.has(group.version)) continue;
-    const signals = collectBackendModeSignals([...group.backend, ...group.notifications]);
-    for (const file of group.notifications) {
-      const result = parseEftNotificationLogText(file.text);
-      filesParsed++;
-      chatMessageCount += result.chatMessageCount;
-      completionEventCount += result.completionEventCount;
-      startedEventCount += result.startedEventCount;
-      failedEventCount += result.failedEventCount;
-      parseErrorCount += result.parseErrorCount;
-      const add = (event: EftQuestEvent, status: EftQuestEventStatus) => {
-        const mode = resolveEventModeFromTimeline(event.timestamp, signals.timeline);
-        const imported = { ...event, mode, status };
-        const key = eventDeduplicationKey(imported);
-        const duplicate = seen.get(key);
-        if (duplicate) {
-          retainEarliestEvent(duplicate, imported);
-          return;
-        }
-        seen.set(key, imported);
-        events.push(imported);
-      };
-      result.completionEvents.forEach((event) => add(event, 'completed'));
-      result.startedEvents.forEach((event) => add(event, 'started'));
-      result.failedEvents.forEach((event) => add(event, 'failed'));
-    }
+  const counts: ImportCounts = {
+    chatMessageCount: 0,
+    completionEventCount: 0,
+    startedEventCount: 0,
+    failedEventCount: 0,
+    parseErrorCount: 0,
+    filesParsed: 0,
+  };
+  for (const group of groups) {
+    if (!included.has(group.version)) continue;
+    const signals = collectBackendModeSignals(group.files);
+    for (const file of group.files) collectFileEvents(file, signals.timeline, seen, counts);
   }
-  events = events.filter((event) => {
+  return { counts, events: [...seen.values()] };
+}
+/** Removes only out-of-season Seasonal history, retaining unresolved events for manual routing. */
+function filterSeasonEvents(events: EftQuestImportEvent[]) {
+  let skippedSeasonalEventCount = 0;
+  const included = events.filter((event) => {
     if (event.mode !== GAME_MODES.SEASONAL || isCurrentSeasonLogEvent(event)) return true;
     skippedSeasonalEventCount++;
     return false;
   });
-  if (options.taskIdsByMode) {
-    const idsByMode = new Map(
-      Object.entries(options.taskIdsByMode).map(([mode, ids]) => [mode, new Set(ids)])
-    );
-    for (const event of events) {
-      event.matchedModes = [...idsByMode]
-        .filter(
-          ([mode, ids]) =>
-            (event.mode === UNKNOWN_MODE || event.mode === mode) && ids.has(event.questId)
-        )
-        .map(([mode]) => mode as GameMode);
-    }
+  return { events: included, skippedSeasonalEventCount };
+}
+/** Annotates event eligibility without changing the active metadata store or progress mode. */
+function matchEventModes(
+  events: EftQuestImportEvent[],
+  catalogs: ParseEftLogsForQuestImportOptions['taskIdsByMode']
+): void {
+  if (!catalogs) return;
+  const idsByMode = new Map(Object.entries(catalogs).map(([mode, ids]) => [mode, new Set(ids)]));
+  for (const event of events) {
+    event.matchedModes = [...idsByMode]
+      .filter(
+        ([mode, ids]) =>
+          (event.mode === UNKNOWN_MODE || event.mode === mode) && ids.has(event.questId)
+      )
+      .map(([mode]) => mode as GameMode);
   }
+}
+/** Summarizes reconciled quest states while preserving the full deduplicated evidence for confirmation. */
+function summarizeImportEvents(events: EftQuestImportEvent[], taskIdSet: Set<string>) {
   const isMatched = (event: EftQuestImportEvent) =>
     event.matchedModes ? event.matchedModes.length > 0 : taskIdSet.has(event.questId);
   const latest = latestEftQuestEvents(events);
@@ -691,16 +778,9 @@ export function parseEftLogsForQuestImport(
   const failedQuestIds = idsFor('failed');
   return {
     events,
-    chatMessageCount,
-    completionEventCount,
-    startedEventCount,
-    failedEventCount,
     dedupedCompletionEventCount: events.filter((event) => event.status === 'completed').length,
     dedupedStartedEventCount: events.filter((event) => event.status === 'started').length,
     dedupedFailedEventCount: events.filter((event) => event.status === 'failed').length,
-    parseErrorCount,
-    skippedSeasonalEventCount,
-    filesParsed,
     questIds,
     startedQuestIds,
     matchedTaskIds: matchedIdsFor('completed'),
@@ -712,6 +792,25 @@ export function parseEftLogsForQuestImport(
     unmatchedQuestIds: questIds.filter((id) => !taskIdSet.has(id)),
     unmatchedStartedQuestIds: startedQuestIds.filter((id) => !taskIdSet.has(id)),
     unmatchedFailedQuestIds: failedQuestIds.filter((id) => !taskIdSet.has(id)),
+  };
+}
+/** Builds a version-filtered preview from compact evidence, preserving mode, identity and season guards. */
+export function parseEftLogsForQuestImport(
+  files: (EftLogInputFile | EftParsedLogFile)[],
+  taskIds: Iterable<string>,
+  options: ParseEftLogsForQuestImportOptions = {}
+): EftQuestImportPreview {
+  const groups = groupLogSources(files);
+  const versionSessionCounts = countVersionSessions(groups);
+  const availableVersions = sortVersionKeys(Object.keys(versionSessionCounts));
+  const includedVersions = selectIncludedVersions(availableVersions, options.includedVersions);
+  const collected = collectImportEvents(groups, new Set(includedVersions));
+  const seasonal = filterSeasonEvents(collected.events);
+  matchEventModes(seasonal.events, options.taskIdsByMode);
+  return {
+    ...summarizeImportEvents(seasonal.events, new Set(taskIds)),
+    ...collected.counts,
+    ...seasonal,
     availableVersions,
     includedVersions,
     versionSessionCounts,

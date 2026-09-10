@@ -10,7 +10,7 @@
   />
   <template v-if="showImportTools">
     <GenericCard
-      v-if="!isBlockedByOtherDataFlow && !isBackupOrEftLogsImportPreviewActive"
+      v-if="!isBlockedByOtherDataFlow && !isBackupOrEftLogsImportPreviewActive && !eftLogsIsParsing"
       icon="mdi-account-arrow-up"
       icon-color="info"
       highlight-color="info"
@@ -389,7 +389,7 @@
           <p class="text-surface-500 text-sm">
             {{ $t('settings.data_management.eft_logs_section_description') }}
           </p>
-          <template v-if="!isAnyImportPreviewActive">
+          <template v-if="!isAnyImportPreviewActive && !eftLogsIsParsing">
             <UButton
               icon="i-mdi-folder-upload-outline"
               block
@@ -404,6 +404,7 @@
             <div class="bg-surface-900/80 rounded-md border border-white/10 p-3">
               <p class="text-surface-300 text-xs font-semibold">
                 {{ $t('settings.log_import.upload_hint') }}
+                {{ $t('settings.log_import.large_folder_hint') }}
               </p>
               <ul class="text-surface-400 mt-2 list-disc space-y-1 pl-4 text-xs">
                 <li>{{ $t('settings.log_import.logs_folder_required') }}</li>
@@ -430,26 +431,17 @@
             </div>
           </template>
           <div aria-live="polite" class="space-y-2">
-            <template v-if="eftLogsSkippedPaths.length">
-              <UAlert
-                icon="i-mdi-alert"
-                color="warning"
-                variant="soft"
-                :title="
-                  $t('settings.log_import.skipped_large_logs', {
-                    count: eftLogsSkippedPaths.length,
-                  })
-                "
-                :description="$t('settings.log_import.skipped_large_logs_hint')"
+            <template v-if="eftLogsIsParsing">
+              <p class="text-sm">{{ $t('settings.log_import.reading_logs') }}</p>
+              <progress
+                :value="eftLogsParseProgress.bytesRead"
+                :max="eftLogsParseProgress.totalBytes || 1"
+                :aria-label="$t('settings.log_import.reading_logs')"
+                class="w-full"
               />
-              <details>
-                <summary class="cursor-pointer">
-                  {{ $t('settings.log_import.skipped_paths') }}
-                </summary>
-                <ul class="max-h-40 overflow-auto text-sm break-all">
-                  <li v-for="(path, index) in eftLogsSkippedPaths" :key="index">{{ path }}</li>
-                </ul>
-              </details>
+              <UButton color="neutral" variant="soft" @click="resetEftLogsImport()">
+                {{ $t('common.cancel') }}
+              </UButton>
             </template>
           </div>
           <template v-if="eftLogsImportState === 'preview' && eftLogsPreview">
@@ -727,7 +719,12 @@
   </template>
   <template v-if="showBackupTools">
     <GenericCard
-      v-if="!isBlockedByOtherDataFlow && !isTarkovDevImportPreviewActive && !isEftLogsPreviewActive"
+      v-if="
+        !isBlockedByOtherDataFlow &&
+        !isTarkovDevImportPreviewActive &&
+        !isEftLogsPreviewActive &&
+        !eftLogsIsParsing
+      "
       icon="mdi-backup-restore"
       icon-color="primary"
       highlight-color="primary"
@@ -747,7 +744,7 @@
           <p class="text-surface-500 text-sm">
             {{ $t('settings.data_management.backup_restore_section_description') }}
           </p>
-          <template v-if="!isAnyImportPreviewActive">
+          <template v-if="!isAnyImportPreviewActive && !eftLogsIsParsing">
             <div class="grid gap-3 md:grid-cols-2">
               <div class="bg-surface-900/80 space-y-4 rounded-md border border-white/10 p-4">
                 <div class="flex items-start gap-3">
@@ -1178,7 +1175,8 @@
     importState: eftLogsImportState,
     previewData: eftLogsPreview,
     importError: eftLogsImportError,
-    skippedLogPaths: eftLogsSkippedPaths,
+    isParsing: eftLogsIsParsing,
+    parseProgress: eftLogsParseProgress,
     parseFiles: parseEftLogsFiles,
     setIncludedVersions: setEftLogsIncludedVersions,
     confirmImport: confirmEftLogsImport,
@@ -1589,7 +1587,7 @@
     if (tarkovDevImportState.value === 'loading' || isTarkovDevImportPreviewActive.value) {
       return 'tarkov-dev';
     }
-    if (isEftLogsPreviewActive.value) {
+    if (isEftLogsPreviewActive.value || eftLogsIsParsing.value) {
       return 'eft-logs';
     }
     if (backupImportState.value === 'preview') {
@@ -1625,7 +1623,10 @@
     () => isBackupOrEftLogsImportPreviewActive.value || isTarkovDevImportPreviewActive.value
   );
   const isAnyImportActive = computed(
-    () => isAnyImportPreviewActive.value || tarkovDevImportState.value === 'loading'
+    () =>
+      isAnyImportPreviewActive.value ||
+      tarkovDevImportState.value === 'loading' ||
+      eftLogsIsParsing.value
   );
   function formatDate(ts: number): string {
     return new Date(ts).toLocaleDateString(undefined, {
