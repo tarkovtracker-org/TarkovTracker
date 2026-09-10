@@ -1024,7 +1024,16 @@ flowchart LR
   preserve existing server history; a higher full reset epoch intentionally discards it.
 - Equal-timestamp manual entries sort by ID; conflicting same-ID entries use type, action, title,
   then details as ascending Unicode code-point tie-breakers. Client and database use the same order
-  before the 50-entry cap, so device argument order cannot change the retained feed.
+  before the 50-entry cap, so device argument order cannot change the retained feed. The cap applies
+  to the merged feed, not per device: when two devices at the same history generation together hold
+  more than 50 entries, the union keeps the 50 newest and drops the rest by design. Ids, titles, and
+  details clamp by Unicode code point on both sides, matching SQL `left()`, so neither side can
+  produce a different id or a lone surrogate for the same entry.
+- The sync RPC merges each mode against the persisted payload for that mode, and seeds from the
+  account row's locked legacy column when the normalized row is an unmaterialized placeholder. Row
+  triggers re-merge against each table's own stored row, so the seeding is what keeps the RPC's
+  unchanged-write comparison accurate: without it a placeholder makes every sync rewrite an
+  otherwise unchanged account row.
 - Legacy activity envelopes with no owner are adoptable guest data. Authenticated startup waits
   until progress sync restores the selected mode before adoption. Another account's envelope is
   retained for its owner. The legacy key is removed only after entries have been added to progress.

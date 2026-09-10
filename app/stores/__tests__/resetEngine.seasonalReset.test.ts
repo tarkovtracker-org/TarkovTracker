@@ -246,6 +246,9 @@ describe('startup manual activity history', () => {
       expect(
         resolveInitialSyncState(local, remote, 30, 20, 1, 1)[mode].manualActivityHistory
       ).toEqual([]);
+      // Drop back to an equal history generation so the assertion below can only
+      // pass through the full-reset epoch branch.
+      remote[mode].manualActivityEpoch = 0;
       remote[mode].progressEpoch = 1;
       expect(
         resolveInitialSyncState(local, remote, 30, 20, 1, 1)[mode].manualActivityHistory

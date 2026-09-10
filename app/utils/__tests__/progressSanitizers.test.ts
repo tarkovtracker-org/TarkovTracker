@@ -182,6 +182,31 @@ describe('sanitizeManualActivityHistory', () => {
     expect(result?.details).toHaveLength(300);
     expect(result?.timestamp).toBe(0);
   });
+  it('clamps oversized strings by code point so no surrogate pair is split', () => {
+    const unpairedSurrogate =
+      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+    const [result] = sanitizeManualActivityHistory([
+      entry({
+        details: `${'d'.repeat(299)}😀x`,
+        id: `${'i'.repeat(127)}😀x`,
+        timestamp: 10,
+        title: `${'t'.repeat(199)}😀x`,
+      }),
+    ]);
+    expect(Array.from(result?.id ?? '')).toHaveLength(128);
+    expect(Array.from(result?.title ?? '')).toHaveLength(200);
+    expect(Array.from(result?.details ?? '')).toHaveLength(300);
+    for (const value of [result?.id, result?.title, result?.details]) {
+      expect(value?.endsWith('😀')).toBe(true);
+      expect(unpairedSurrogate.test(value ?? '')).toBe(false);
+    }
+    const displayName = sanitizeOwnedProgressData({
+      displayName: `${'n'.repeat(63)}😀x`,
+    }).displayName;
+    expect(Array.from(displayName ?? '')).toHaveLength(64);
+    expect(displayName?.endsWith('😀')).toBe(true);
+    expect(unpairedSurrogate.test(displayName ?? '')).toBe(false);
+  });
   it('omits details when absent or blank', () => {
     expect(sanitizeManualActivityHistory([entry({ details: '   ' })])[0]).not.toHaveProperty(
       'details'

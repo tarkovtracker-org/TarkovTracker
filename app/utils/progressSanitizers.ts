@@ -18,13 +18,21 @@ export const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
 export const toFiniteNumber = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
-/** Trim a string field and clamp it to `maxLength`. Blank and non-string values are `null`. */
+/**
+ * Trim a string field and clamp it to `maxLength` code points. Blank and non-string values are
+ * `null`. Clamping by code point matches PostgreSQL `left()`, so client and database sanitization
+ * agree on the same id and cannot split a supplementary character into a lone surrogate, which
+ * `jsonb` rejects.
+ */
 const sanitizeClampedText = (value: unknown, maxLength: number): string | null => {
   if (typeof value !== 'string') {
     return null;
   }
   const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed.slice(0, maxLength) : null;
+  if (trimmed.length === 0) {
+    return null;
+  }
+  return Array.from(trimmed).slice(0, maxLength).join('');
 };
 export const sanitizeDisplayName = (value: unknown): string | null =>
   sanitizeClampedText(value, 64);

@@ -387,6 +387,7 @@ DECLARE
   v_empty_object CONSTANT JSONB := '{}'::jsonb;
   v_progress JSONB;
   v_existing_mode JSONB;
+  v_legacy_mode JSONB;
   v_season_number SMALLINT;
   v_active_season SMALLINT := private.active_season_number();
   v_existing_pvp JSONB := v_empty_object;
@@ -460,11 +461,22 @@ BEGIN
     WHERE user_id = v_user_id AND game_mode = v_mode
       AND season_number = CASE WHEN v_mode = v_seasonal_mode THEN v_active_season ELSE 0 END
     FOR UPDATE;
-    v_existing_mode := COALESCE(v_existing_mode, CASE v_mode
+    v_legacy_mode := CASE v_mode
       WHEN v_pvp_mode THEN v_existing_pvp WHEN v_pve_mode THEN v_existing_pve
-      ELSE v_empty_object END);
+      ELSE v_empty_object END;
+    -- A placeholder row created by the visibility RPC or the legacy sharing trigger exists but
+    -- carries no level, so COALESCE alone would merge from the empty shape and drop the legacy
+    -- column's history and reset epoch. Seed from the legacy payload already locked above, using
+    -- the same numeric-level test as public.merge_progress_data, so a row that already holds real
+    -- data is never replaced. Seasonal has no legacy column, so its empty object never qualifies.
+    IF v_existing_mode IS NULL
+      OR (jsonb_typeof(v_existing_mode->'level') IS DISTINCT FROM 'number'
+          AND jsonb_typeof(v_legacy_mode->'level') = 'number') THEN
+      v_existing_mode := v_legacy_mode;
+    END IF;
     p_modes := jsonb_set(p_modes, ARRAY[v_mode],
-      public.merge_manual_activity_progress(v_existing_mode, v_progress));
+      public.merge_manual_activity_progress(
+        COALESCE(v_existing_mode, v_empty_object), v_progress));
   END LOOP;
 
   INSERT INTO public.user_progress (
