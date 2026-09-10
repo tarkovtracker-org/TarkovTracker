@@ -230,6 +230,7 @@ export const applyTeammateProgressEvent = (
   });
   dispatchTeammateProgressEvent(data);
 };
+type OwnedTeamChannel = OwnedRealtimeChannel & { client: SupabaseClient };
 export type TeamChannelDeps = {
   /** Resolved per call: the plugin replaces the client during initialization. */
   getClient: () => SupabaseClient;
@@ -324,8 +325,8 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     scheduleRecovery();
   };
   /** A deliberately suspended socket is disconnected by design, not a join failure. */
-  const isTransportSuspended = (): boolean => {
-    const { realtime } = deps.getClient();
+  const isTransportSuspended = (owned: OwnedTeamChannel): boolean => {
+    const { realtime } = owned.client;
     return Boolean(realtime) && isRealtimeSuspended(realtime);
   };
   const handleJoined = (
@@ -370,14 +371,14 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
    * only here, so a join that silently no-ops is never mistaken for a live one.
    */
   const handleStatus = (
-    owned: OwnedRealtimeChannel,
+    owned: OwnedTeamChannel,
     teamId: string,
     filter: string | undefined,
     status: string,
     error?: Error
   ) => {
     if (channel.value !== owned) return;
-    if (isTransportSuspended()) {
+    if (isTransportSuspended(owned)) {
       previouslyJoined.add(owned);
       return;
     }
@@ -408,7 +409,7 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
       () => void refresh()
     );
     if (progressFilter) next = bindProgress(next, progressFilter);
-    const owned: OwnedRealtimeChannel = { channel: next, client, topic };
+    const owned: OwnedTeamChannel = { channel: next, client, topic };
     channel.value = owned;
     if (client.realtime && isRealtimeSuspended(client.realtime)) previouslyJoined.add(owned);
     next.subscribe((status, error) => handleStatus(owned, teamId, progressFilter, status, error));

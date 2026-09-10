@@ -921,7 +921,9 @@ flowchart LR
   cleanup, so their channel lifetime is independent of the route that first created them.
 - Every channel is stored with the client that created it and removed through that client, because
   `$supabase.client` starts as an offline stub and is replaced once background initialization
-  completes. Removal is awaited before the same topic is rejoined: `RealtimeClient.channel()` returns
+  completes. Team subscription callbacks also check suspension on that owning client’s transport,
+  so replacing the current client cannot hide failures or tear down a deliberately suspended channel.
+  Removal is awaited before the same topic is rejoined: `RealtimeClient.channel()` returns
   the existing channel until its `phx_leave` settles and `subscribe()` only rejoins a closed channel,
   so rejoining early yields a channel that never joins and never reports an error. An unclean leave
   skips the rejoin rather than binding to an occupied topic.

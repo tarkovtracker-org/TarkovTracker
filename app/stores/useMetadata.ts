@@ -222,8 +222,9 @@ const readCachedEditions = async (mode: string, language: string): Promise<Cache
     return {};
   }
 };
+type ProgressionCatalogState = Pick<MetadataState, 'editions' | 'storyChapters' | 'seasonalPerks'>;
 const prepareEditionScope = (
-  state: Pick<MetadataState, 'editions' | 'storyChapters' | 'seasonalPerks'>,
+  state: ProgressionCatalogState,
   store: ReturnType<typeof getPromiseStore>,
   scope: string
 ) => {
@@ -240,7 +241,7 @@ const hasValidCachedEditions = (editions: GameEdition[]): boolean =>
 const sortedStoryChapters = (chapters: StoryChapter[]): StoryChapter[] =>
   chapters.map((chapter) => normalizeStoryChapter(chapter)).sort((a, b) => a.order - b.order);
 const applyCachedEditions = async (
-  state: Pick<MetadataState, 'editions' | 'storyChapters' | 'seasonalPerks'>,
+  state: ProgressionCatalogState,
   isCurrent: () => boolean,
   mode: string,
   language: string
@@ -260,7 +261,7 @@ const applyCachedEditions = async (
 };
 /** A cache read must never fail the request that can still fetch live data. */
 const applyCachedEditionsOrIgnore = (
-  state: Pick<MetadataState, 'editions' | 'storyChapters' | 'seasonalPerks'>,
+  state: ProgressionCatalogState,
   isCurrent: () => boolean,
   mode: string,
   language: string
@@ -300,7 +301,7 @@ const fetchProgressionCatalog = async (
   return overlay;
 };
 const applyProgressionCatalog = (
-  state: Pick<MetadataState, 'editions' | 'storyChapters' | 'seasonalPerks'>,
+  state: ProgressionCatalogState,
   overlay: ProgressionCatalog,
   mode: string
 ) => {
@@ -311,7 +312,7 @@ const applyProgressionCatalog = (
   state.seasonalPerks = perksForMode(overlay.seasonalPerks ?? [], mode);
 };
 const cacheProgressionCatalog = (
-  state: Pick<MetadataState, 'editions' | 'storyChapters' | 'seasonalPerks'>,
+  state: ProgressionCatalogState,
   mode: string,
   language: string
 ) => {
