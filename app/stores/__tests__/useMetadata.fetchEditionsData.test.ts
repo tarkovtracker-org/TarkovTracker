@@ -118,10 +118,17 @@ describe('useMetadataStore fetchEditionsData', () => {
       })
     );
     await store.fetchEditionsData(true);
+    expect(setCachedDataMock).toHaveBeenCalledTimes(1);
     const payload = setCachedDataMock.mock.calls.at(-1)?.[3];
+    expect(payload).toEqual({
+      editions: [createEdition('standard', 1, 'Standard')],
+      storyChapters: [],
+      seasonalPerks: [],
+    });
     // IndexedDB stores values with the structured clone algorithm, which throws
     // DataCloneError on a Vue reactive proxy. Reaching the cache with reactive
-    // state silently disables the editions cache for every visit.
+    // state silently disables the editions cache for every visit. The payload is
+    // asserted first because structuredClone(undefined) would pass vacuously.
     expect(() => structuredClone(payload)).not.toThrow();
   });
   it('caches a structured-cloneable editions payload in Seasonal', async () => {
@@ -141,7 +148,13 @@ describe('useMetadataStore fetchEditionsData', () => {
     );
     await store.fetchEditionsData(true);
     expect(store.seasonalPerks).toEqual([createSeasonalPerk('perk-1', 'Perk One')]);
+    expect(setCachedDataMock).toHaveBeenCalledTimes(1);
     const payload = setCachedDataMock.mock.calls.at(-1)?.[3];
+    expect(payload).toEqual({
+      editions: [createEdition('standard', 1, 'Standard')],
+      storyChapters: [],
+      seasonalPerks: [createSeasonalPerk('perk-1', 'Perk One')],
+    });
     expect(() => structuredClone(payload)).not.toThrow();
   });
   it('keeps cached editions when story chapters cache is missing and overlay fetch fails', async () => {
