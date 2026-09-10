@@ -629,7 +629,9 @@ For the `tasks-core-json-v2-*` to `tasks-core-json-v3-*` transition, an authoriz
 or promoting the app. Leave both workflow inputs, `lang` and `gameMode`, empty to include all
 48 combinations across `regular`, `pve`, and `pvp-season`. Require `succeeded: 48` and `failed: 0`,
 verify every `tasks-core-json-v3-*` entry uses envelope format 2, and attach the run and approved
-revision to the release. Set `expectedOverlaySha` to the approved published SHA and verify
+revision to the release. Fetch the published overlay metadata again for each rollout; never reuse
+a SHA from an older rehearsal. If the SHA changed, repeat the rehearsal and approve the new
+identity before dispatch. Set `expectedOverlaySha` to that approved published SHA and verify
 `overlay-precompute-manifest-json-v3` contains all 48 matching identities.
 
 Before rollout, confirm neither original PR revision has a production deployment or an in-flight

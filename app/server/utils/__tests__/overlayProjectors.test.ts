@@ -438,3 +438,25 @@ it('keeps a sparse craft addition empty rather than inventing an output item', (
     expect.objectContaining({ id: 'sparse', rewardItems: [], unlockState: 'unknown' }),
   ]);
 });
+it.each([
+  [{}, []],
+  [null, ['progressionCounters']],
+  [[], ['progressionCounters']],
+  ['invalid', ['progressionCounters']],
+  [{ regular: { counter: { revision: '1' } } }, ['progressionCounters']],
+  [{ regular: {} }, ['progressionCounters']],
+])('only consumes the empty root counter registry: %j', (progressionCounters, expected) => {
+  expect(unknownOverlaySections({ ...overlay, progressionCounters })).toEqual(expected);
+});
+it('keeps unknown and misplaced empty sections unconsumed', () => {
+  const candidate = {
+    ...overlay,
+    progressionCounters: {},
+    future: {},
+    modes: { regular: { progressionCounters: {} } },
+  } as unknown as OverlayData;
+  expect(unknownOverlaySections(candidate)).toEqual([
+    'future',
+    'modes.regular.progressionCounters',
+  ]);
+});

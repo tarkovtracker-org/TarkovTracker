@@ -191,8 +191,13 @@ const scopedUnknownSections = (
       ? [`${prefix}.${scope}`]
       : unknownSectionNames(sections, `${prefix}.${scope}.`, allowed)
   );
+// Only the published empty root registry is a no-op. Populated registries still
+// require an actual consumer before precompute may certify them.
+const emptyCounterRegistry = (value: unknown): boolean =>
+  isPlainObject(value) && Object.keys(value).length === 0;
 export const unknownOverlaySections = (overlay: OverlayData): string[] => {
   const rootNames = new Set([...sectionNames, '$meta', 'modes', 'locales']);
+  if (emptyCounterRegistry(overlay.progressionCounters)) rootNames.add('progressionCounters');
   const localeNames = new Set(['tasks', 'items', 'traders', 'maps', 'prestige', 'storyChapters']);
   return [
     ...unknownSectionNames(overlay, '', rootNames),

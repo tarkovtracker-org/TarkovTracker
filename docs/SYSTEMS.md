@@ -503,6 +503,9 @@ Missing provenance, a different SHA, invalid task payloads or unconsumed section
 combination before its KV write. Previous entries survive failed combinations. Each successful
 entry records language, mode, storage time and overlay identity; envelope validation requires its
 identity to agree with `payload.dataOverlay`. Writes remain per-key, not atomic across the fleet. A verifier exit code of zero can include `propagating` rows within the 14-hour window; post-deployment confirmation requires all 48 rows to be `current`, while pre-deployment approval requires the complete matching precompute manifest.
+The root `progressionCounters: {}` registry published by the overlay is an explicit no-op.
+A populated, malformed or mode-scoped counter registry remains unconsumed and blocks precompute;
+no counter derivation or global-variable unlock is inferred from this compatibility allowance.
 Only a complete, unfiltered, failure-free run updates `overlay-precompute-manifest-json-v3`.
 The workflow uploads `precompute-manifest.json` even for partial failures, so operators can see
 which entries changed. `/api/tarkov/overlay-status` returns the last complete manifest without caching.
@@ -1597,8 +1600,11 @@ card and dashboard use `useTaskBlockerText` for the same explanations. Shared/no
 views call the same evaluator with their own mode progress. Profile task/objective, prestige and
 story catalogs load for the selected mode without mutating the active metadata store; obsolete
 mode/language requests are aborted on scope change or unmount and late responses are ignored.
-Requests time out after 15 seconds. Independent story/prestige failures retain successful task
-and objective data with an error indicator; missing core/objective catalogs remain fatal.
+Requests time out after 60 seconds to accommodate the server retry budget. Edition and story
+catalogs share one request but validate independently; story, edition or prestige failures retain
+successful task and objective data with an error indicator. Profiles prefer the selected mode's
+editions, falling back to the active catalog while unavailable. Missing core/objective catalogs
+remain fatal.
 Completed and failed tasks are terminal.
 The existing acceptance-unknown interpretation is retained; this does not introduce #715's
 explicit Accept workflow.

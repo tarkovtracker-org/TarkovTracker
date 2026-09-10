@@ -22,6 +22,8 @@ export interface OverlayLocaleData {
   storyChapters?: OverlayRecords;
 }
 export interface OverlayData extends OverlaySections {
+  /** Reserved upstream registry; only an empty object is currently consumed as a no-op. */
+  progressionCounters?: unknown;
   modes?: Record<string, OverlaySections>;
   locales?: Record<string, OverlayLocaleData>;
   $meta?: { version: string; generated: string; sha256: string };
