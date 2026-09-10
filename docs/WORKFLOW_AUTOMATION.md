@@ -168,9 +168,9 @@ indirection the analyzer cannot model (store state hydrated through `$state` is 
 example). Put `// fallow-ignore-next-line` directly above the flagged declaration and explain why
 the finding cannot be fixed. Explanatory `//` lines may precede the directive; the directive must be
 the final comment line. Placing more comment lines between the directive and declaration targets the
-wrong line and leaves the finding unsuppressed. A suppression is a reviewable decision, not a formality. Existing suppressions are
-grandfathered; remove them opportunistically when already editing that function rather than as
-unrelated cleanup in someone else's change.
+wrong line and leaves the finding unsuppressed. A suppression is a reviewable decision, not a
+formality. Existing suppressions are grandfathered; remove them opportunistically when already
+editing that function rather than as unrelated cleanup in someone else's change.
 
 ### 2. Security Scanning (`.github/workflows/security.yml`)
 
