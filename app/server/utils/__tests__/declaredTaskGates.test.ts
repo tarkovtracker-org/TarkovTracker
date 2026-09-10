@@ -183,83 +183,42 @@ describe('overlay declared-gate normalization', () => {
   const overlayMeta = {
     $meta: { generated: '2026-09-10T00:00:00.000Z', sha256: 'gate-sha', version: 'gate-v1' },
   };
-  it('diagnoses a malformed gate introduced by a task correction', async () => {
-    stubOverlayFetch({
-      ...overlayMeta,
-      tasks: {
-        target: {
-          requiredPrestige: { unexpected: 'prestige-id' },
-          taskRequirements: { task: 'missing' },
-        },
-      },
-    });
+  /** Apply one overlay over one base task and return the corrected task. */
+  const correct = async (
+    overlay: Record<string, unknown>,
+    base: Array<Record<string, unknown>>
+  ): Promise<Task> => {
+    stubOverlayFetch({ ...overlayMeta, ...overlay });
     const { applyOverlay } = await import('@/server/utils/overlay');
+    const result = await applyOverlay({ data: { tasks: base as Array<{ id: string }> } });
+    return result.data!.tasks![0] as unknown as Task;
+  };
+  const brokenTask = () =>
+    adaptTask({
+      requiredPrestige: { unexpected: 'prestige-id' },
+      taskRequirements: { task: 'missing' },
+    }) as unknown as Record<string, unknown>;
+  const baseTask = (raw: Record<string, unknown> = {}) =>
+    adaptTask(raw) as unknown as Record<string, unknown>;
+  it('diagnoses a malformed gate introduced by a task correction', async () => {
     // deepMerge treats an object patch over an existing array as an id-keyed patch map, so the
     // reachable case is a correction that declares a gate the adapted task does not carry.
-    const result = await applyOverlay({
-      data: { tasks: [adaptTask({}) as unknown as { id: string }] },
-    });
-    const task = result.data!.tasks![0] as unknown as Task;
+    const patch = {
+      requiredPrestige: { unexpected: 'prestige-id' },
+      taskRequirements: { task: 'missing' },
+    };
+    const task = await correct({ tasks: { target: patch } }, [baseTask()]);
     expect(task.taskRequirements).toBeUndefined();
     expect(task.requiredPrestige).toBeUndefined();
     expect(task.requirementDiagnostics).toEqual(['task_requirement', 'prestige_reference']);
     expect(evaluate(task).available).toBe(false);
   });
   it('clears an adapter diagnostic when a correction repairs the gate', async () => {
-    stubOverlayFetch({
-      ...overlayMeta,
-      tasks: { target: { requiredPrestige: 'prestige1', taskRequirements: [] } },
-    });
-    const { applyOverlay } = await import('@/server/utils/overlay');
-    const broken = adaptTask({
-      requiredPrestige: { unexpected: 'prestige-id' },
-      taskRequirements: { task: 'missing' },
-    });
-    const result = await applyOverlay({
-      data: { tasks: [broken as unknown as { id: string }] },
-    });
-    const task = result.data!.tasks![0] as unknown as Task;
+    const patch = { requiredPrestige: 'prestige1', taskRequirements: [] };
+    const task = await correct({ tasks: { target: patch } }, [brokenTask()]);
     expect(task.requirementDiagnostics).toBeUndefined();
     expect(task.requiredPrestige).toEqual({ id: 'prestige1' });
     expect(task.taskRequirements).toEqual([]);
-  });
-  it('diagnoses a malformed gate on an overlay-injected task', async () => {
-    stubOverlayFetch({
-      ...overlayMeta,
-      tasksAdd: {
-        added: { id: 'added', name: 'Added', taskRequirements: { task: 'missing' } },
-      },
-    });
-    const { applyOverlay } = await import('@/server/utils/overlay');
-    const result = await applyOverlay({ data: { tasks: [] } });
-    const task = result.data!.tasks![0] as unknown as Task;
-    expect(task.id).toBe('added');
-    expect(task.taskRequirements).toBeUndefined();
-    expect(task.requirementDiagnostics).toEqual(['task_requirement']);
-    expect(evaluate(task).available).toBe(false);
-  });
-  it('leaves an untouched task free of a fabricated diagnostic', async () => {
-    stubOverlayFetch({ ...overlayMeta, tasks: { target: { name: 'Renamed' } } });
-    const { applyOverlay } = await import('@/server/utils/overlay');
-    const result = await applyOverlay({
-      data: { tasks: [adaptTask({ requiredPrestige: 'prestige1' }) as unknown as { id: string }] },
-    });
-    const task = result.data!.tasks![0] as unknown as Task;
-    expect(task.name).toBe('Renamed');
-    expect(task.requiredPrestige).toEqual({ id: 'prestige1' });
-    expect(task.requirementDiagnostics).toBeUndefined();
-  });
-  it('preserves an adapter diagnostic when a correction ignores the gate', async () => {
-    stubOverlayFetch({ ...overlayMeta, tasks: { target: { name: 'Renamed' } } });
-    const { applyOverlay } = await import('@/server/utils/overlay');
-    const result = await applyOverlay({
-      data: {
-        tasks: [adaptTask({ taskRequirements: { task: 'missing' } }) as unknown as { id: string }],
-      },
-    });
-    const task = result.data!.tasks![0] as unknown as Task;
-    expect(task.requirementDiagnostics).toEqual(['task_requirement']);
-    expect(evaluate(task).available).toBe(false);
   });
   // A correction may only clear the diagnostic for the gate it actually rewrites. The adapter has
   // already dropped the other malformed value, so a recomputation alone cannot re-detect it.
@@ -267,16 +226,7 @@ describe('overlay declared-gate normalization', () => {
     ['a prestige correction over a prerequisite diagnostic', 'requiredPrestige', 'prestige1'],
     ['a prerequisite correction over a prestige diagnostic', 'taskRequirements', []],
   ])('retains the untouched gate diagnostic under %s', async (_label, field, value) => {
-    stubOverlayFetch({ ...overlayMeta, tasks: { target: { [field]: value } } });
-    const { applyOverlay } = await import('@/server/utils/overlay');
-    const broken = adaptTask({
-      requiredPrestige: { unexpected: 'prestige-id' },
-      taskRequirements: { task: 'missing' },
-    });
-    const result = await applyOverlay({
-      data: { tasks: [broken as unknown as { id: string }] },
-    });
-    const task = result.data!.tasks![0] as unknown as Task;
+    const task = await correct({ tasks: { target: { [field]: value } } }, [brokenTask()]);
     const retained =
       field === 'requiredPrestige' ? 'task_requirement' : ('prestige_reference' as const);
     expect(task.requirementDiagnostics).toEqual([retained]);
@@ -284,72 +234,59 @@ describe('overlay declared-gate normalization', () => {
     expect(evaluated.available).toBe(false);
     expect(evaluated.blockers).toContainEqual({ type: 'unknown', reason: retained });
   });
+  it('preserves an adapter diagnostic when a correction ignores the gate', async () => {
+    const broken = adaptTask({ taskRequirements: { task: 'missing' } });
+    const task = await correct({ tasks: { target: { name: 'Renamed' } } }, [
+      broken as unknown as Record<string, unknown>,
+    ]);
+    expect(task.requirementDiagnostics).toEqual(['task_requirement']);
+    expect(evaluate(task).available).toBe(false);
+  });
+  it('diagnoses a malformed gate on an overlay-injected task', async () => {
+    const added = { id: 'added', name: 'Added', taskRequirements: { task: 'missing' } };
+    const task = await correct({ tasksAdd: { added } }, []);
+    expect(task.id).toBe('added');
+    expect(task.taskRequirements).toBeUndefined();
+    expect(task.requirementDiagnostics).toEqual(['task_requirement']);
+    expect(evaluate(task).available).toBe(false);
+  });
   // The published overlay declares injected prestige gates this way. `applyOverlay` keeps the
   // reference verbatim, so nothing is lost and the level still resolves from the task id.
   it('accepts the id-less prestige reference the overlay injects', async () => {
     const requiredPrestige = { name: 'Prestige 4', prestigeLevel: 4 };
-    stubOverlayFetch({
-      ...overlayMeta,
-      tasksAdd: {
-        new_beginning_prestige_5: {
-          id: 'new_beginning_prestige_5',
-          name: 'New Beginning',
-          requiredPrestige,
-        },
-      },
-    });
-    const { applyOverlay } = await import('@/server/utils/overlay');
-    const result = await applyOverlay({ data: { tasks: [] } });
-    const task = result.data!.tasks![0] as unknown as Task;
+    const added = { id: 'new_beginning_prestige_5', name: 'New Beginning', requiredPrestige };
+    const task = await correct({ tasksAdd: { new_beginning_prestige_5: added } }, []);
     expect(task.requirementDiagnostics).toBeUndefined();
     expect(task.requiredPrestige).toEqual(requiredPrestige);
     expect(buildPrestigeTaskMap([task], []).get(task.id)).toBe(4);
   });
   // Locale corrections are applied last, so a gate one of them declares needs the same treatment.
-  it('diagnoses a malformed gate introduced by a locale correction', async () => {
-    stubOverlayFetch({
-      ...overlayMeta,
-      locales: { en: { tasks: { target: { taskRequirements: { task: 'missing' } } } } },
-    });
-    const { applyOverlay } = await import('@/server/utils/overlay');
-    const result = await applyOverlay({
-      data: { tasks: [adaptTask({}) as unknown as { id: string }] },
-    });
-    const task = result.data!.tasks![0] as unknown as Task;
+  // The patch is keyed by the pre-patch id, so one that also rewrites `id` must still be seen.
+  it.each([
+    ['a locale correction', { taskRequirements: { task: 'missing' } }, 'target'],
+    [
+      'a locale correction that rewrites the task id',
+      { id: 'renamed', taskRequirements: {} },
+      'renamed',
+    ],
+  ])('diagnoses a malformed gate introduced by %s', async (_label, patch, expectedId) => {
+    const task = await correct({ locales: { en: { tasks: { target: patch } } } }, [baseTask()]);
+    expect(task.id).toBe(expectedId);
     expect(task.taskRequirements).toBeUndefined();
     expect(task.requirementDiagnostics).toEqual(['task_requirement']);
     expect(evaluate(task).available).toBe(false);
   });
-  it('leaves an ordinary locale correction free of a fabricated diagnostic', async () => {
-    stubOverlayFetch({
-      ...overlayMeta,
-      locales: { en: { tasks: { target: { name: 'Localized' } } } },
-    });
-    const { applyOverlay } = await import('@/server/utils/overlay');
-    const result = await applyOverlay({
-      data: { tasks: [adaptTask({ requiredPrestige: 'prestige1' }) as unknown as { id: string }] },
-    });
-    const task = result.data!.tasks![0] as unknown as Task;
-    expect(task.name).toBe('Localized');
+  it.each([
+    ['a task correction', { tasks: { target: { name: 'Renamed' } } }, 'Renamed'],
+    [
+      'a locale correction',
+      { locales: { en: { tasks: { target: { name: 'Localized' } } } } },
+      'Localized',
+    ],
+  ])('leaves %s free of a fabricated diagnostic', async (_label, overlay, expectedName) => {
+    const task = await correct(overlay, [baseTask({ requiredPrestige: 'prestige1' })]);
+    expect(task.name).toBe(expectedName);
     expect(task.requiredPrestige).toEqual({ id: 'prestige1' });
     expect(task.requirementDiagnostics).toBeUndefined();
-  });
-  // The patch is keyed by the pre-patch id, so a patch that also rewrites `id` must still be seen.
-  it('normalizes a locale correction that rewrites the task id', async () => {
-    stubOverlayFetch({
-      ...overlayMeta,
-      locales: {
-        en: { tasks: { target: { id: 'renamed', taskRequirements: { task: 'missing' } } } },
-      },
-    });
-    const { applyOverlay } = await import('@/server/utils/overlay');
-    const result = await applyOverlay({
-      data: { tasks: [adaptTask({}) as unknown as { id: string }] },
-    });
-    const task = result.data!.tasks![0] as unknown as Task;
-    expect(task.id).toBe('renamed');
-    expect(task.taskRequirements).toBeUndefined();
-    expect(task.requirementDiagnostics).toEqual(['task_requirement']);
-    expect(evaluate(task).available).toBe(false);
   });
 });
