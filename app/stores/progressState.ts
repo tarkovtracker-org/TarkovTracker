@@ -484,7 +484,7 @@ export const actions = {
     const currentData = getCurrentData(this);
     currentData.manualActivityHistory = sanitizeManualActivityHistory([
       ...entries,
-      ...(currentData.manualActivityHistory ?? []),
+      ...sanitizeManualActivityHistory(currentData.manualActivityHistory),
     ]);
   },
   clearManualActivityHistory(this: UserState) {

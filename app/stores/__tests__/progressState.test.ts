@@ -235,6 +235,19 @@ describe('manual activity history actions', () => {
   });
 });
 describe('manual activity clearing', () => {
+  it('discards malformed stored history before appending an entry', () => {
+    const state = createBaseState();
+    state.pvp.manualActivityHistory = {} as ManualActivityEntry[];
+    const entry: ManualActivityEntry = {
+      id: 'valid',
+      timestamp: 1,
+      type: 'task',
+      action: 'complete',
+      title: 'Valid',
+    };
+    expect(() => actions.addManualActivityEntries.call(state, [entry])).not.toThrow();
+    expect(state.pvp.manualActivityHistory).toEqual([entry]);
+  });
   it('advances the history generation without changing gameplay or another mode', () => {
     const state = createBaseState();
     state.pvp.level = 42;
