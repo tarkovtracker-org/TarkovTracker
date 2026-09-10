@@ -429,7 +429,7 @@
               </ul>
             </div>
           </template>
-          <div v-if="eftLogsSkippedPaths.length" role="status" class="space-y-2">
+          <div v-if="eftLogsSkippedPaths.length" aria-live="polite" class="space-y-2">
             <UAlert
               icon="i-mdi-alert"
               color="warning"
