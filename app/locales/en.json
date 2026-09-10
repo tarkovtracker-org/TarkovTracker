@@ -262,6 +262,7 @@
     "maps": "Maps",
     "clear_search": "Clear search",
     "settings": "Settings",
+    "about": "About",
     "credits": "Credits",
     "support": "Support",
     "privacy_policy": "Privacy Policy",
@@ -1347,8 +1348,6 @@
     "credits": {
       "sections": {
         "original_creator": "Original Creator",
-        "staff": "TarkovTracker.org Staff",
-        "support_members": "Support Members",
         "beta_testers": "Nuxt - Closed Beta Testers",
         "contributors": "Open Source Contributors"
       },
@@ -1363,7 +1362,44 @@
         "contributions": "{count} contribution | {count} contributions",
         "total": "{count} contributor | {count} contributors"
       },
-      "description": "Meet the creators, staff, support members, beta testers, and open source contributors behind Tarkov Tracker."
+      "description": "Meet the beta testers and open source contributors behind Tarkov Tracker.",
+      "team_link": "Maintained by the TarkovTracker team — meet them on the About page"
+    },
+    "about": {
+      "title": "About TarkovTracker",
+      "description": "Meet the team that maintains TarkovTracker.org, the partners behind its game data, and how to get help from the community.",
+      "intro": "TarkovTracker is a free, open source progress tracker for Escape from Tarkov. It keeps your quest and storyline progress, hideout upgrades, and item requirements in one place, and stays current with community-maintained game data. The project is run by a small volunteer team with help from open source contributors.",
+      "team": {
+        "heading": "Team",
+        "summary": "TarkovTracker.org is maintained by a small volunteer team. The people below keep the site running and support the Discord community.",
+        "core_heading": "Core team",
+        "support_heading": "Discord support"
+      },
+      "partners": {
+        "heading": "Partners & ecosystem",
+        "summary": "TarkovTracker builds on community projects. These maintainers run the independent tools and data sources the tracker relies on."
+      },
+      "help": {
+        "heading": "How to get help",
+        "routing": "For the fastest answer, use the channel-specific support workflows in our Discord instead of direct messages to team members. Reproducible bugs and feature ideas belong on GitHub, and security reports go through our private security policy.",
+        "discord": "Community support on Discord",
+        "github_issues": "Report a bug or request a feature on GitHub",
+        "security": "Report a security issue (private)",
+        "credits_link": "Beta testers and open source contributors — see Credits"
+      },
+      "github_profile": "GitHub profile",
+      "roles": {
+        "core_owner": "Core owner, maintainer & developer",
+        "discord_owner_developer": "Discord server owner, TrackerBot developer & maintainer",
+        "core_support": "Core support staff",
+        "discord_support": "Discord general support",
+        "tarkov_dev_maintainer": "Maintainer of Tarkov.dev",
+        "ratscanner_maintainer": "Owner & maintainer of RatScanner"
+      },
+      "projects": {
+        "tarkov_dev": "Tarkov.dev",
+        "ratscanner": "RatScanner"
+      }
     },
     "login": {
       "subtitle": "Sign in to access your account",

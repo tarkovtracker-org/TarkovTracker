@@ -15,24 +15,10 @@ const githubMember = (name: string, username: string): CreditMember => ({
 const sortMembers = (members: CreditMember[]) =>
   [...members].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 export const staticCreditSections: CreditSection[] = [
-  { key: 'original_creator', members: [githubMember('Thaddeus', 'thaddeus')] },
   {
-    key: 'staff',
-    members: sortMembers([
-      githubMember('DysektAI', 'dysektai'),
-      githubMember('Niv', 'nivmizz7'),
-      githubMember('Chica999', 'chica999'),
-    ]),
-  },
-  {
-    key: 'support_members',
-    members: sortMembers([
-      githubMember('Adealia', 'adealia'),
-      { name: 'Dio' },
-      { name: 'MrBreachie' },
-    ]),
+    key: 'original_creator',
+    members: [githubMember('Thaddeus', 'thaddeus')],
     fullWidth: true,
-    compact: true,
   },
   {
     key: 'beta_testers',
