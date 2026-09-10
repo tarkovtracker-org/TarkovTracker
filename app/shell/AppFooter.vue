@@ -78,6 +78,7 @@
     { label: t('common.storyline'), to: '/storyline' },
   ]);
   const projectItems = computed(() => [
+    { label: t('common.about'), to: '/about' },
     { label: t('common.team'), to: '/team' },
     { label: t('common.supporter'), to: '/supporter' },
     { label: t('navigation_drawer.resources'), to: '/resources' },
