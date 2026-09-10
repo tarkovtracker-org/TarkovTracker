@@ -10,7 +10,12 @@ import {
   serializeUserScopedStorage,
 } from '@/utils/userScopedStorage';
 import type { ApiUpdateMeta, ManualActivityEntry } from '@/types/progress';
-export interface ActivityLogEntry {
+/**
+ * Display row for the activity feed: a manual entry from the synced progress
+ * blob or a synthesized API sync row. Internal to this store — consumers read
+ * the inferred type off `allEntries`.
+ */
+interface ActivityLogEntry {
   id: string;
   timestamp: number;
   source: 'api' | 'manual';
@@ -74,6 +79,47 @@ const readLegacyManualEntries = (raw: string): ManualActivityEntry[] | null => {
   }
   return sanitizeManualActivityHistory(parseLegacyJson<unknown>(raw, []));
 };
+const LEGACY_MANUAL_ENTRY_KEYS = [
+  STORAGE_KEYS.activityLogManual,
+  LEGACY_STORAGE_KEYS.activityLogManual,
+] as const;
+const readLocalStorageItem = (key: string): string | null => {
+  try {
+    return localStorage.getItem(key);
+  } catch (error) {
+    logger.warn('[useActivityLogStore] Could not read legacy manual activity log', error);
+    return null;
+  }
+};
+const removeLocalStorageItem = (key: string): void => {
+  try {
+    localStorage.removeItem(key);
+  } catch (error) {
+    logger.warn('[useActivityLogStore] Could not clear legacy manual activity log', error);
+  }
+};
+/**
+ * Adopt one legacy storage key into the selected mode's progress blob. Returns
+ * whether any entry was adopted. A payload owned by another user is left in
+ * place; anything owned by this session is removed even when it held no usable
+ * entries, so the migration does not run again for that key.
+ */
+const adoptLegacyManualEntries = (key: string): boolean => {
+  const raw = readLocalStorageItem(key);
+  if (raw === null) {
+    return false;
+  }
+  const entries = readLegacyManualEntries(raw);
+  if (entries === null) {
+    return false;
+  }
+  removeLocalStorageItem(key);
+  if (entries.length === 0) {
+    return false;
+  }
+  useTarkovStore().addManualActivityEntries(entries);
+  return true;
+};
 export const useActivityLogStore = defineStore('activityLog', {
   state: () => ({
     // Read state is intentionally device-local: the unread badge tracks what
@@ -102,9 +148,8 @@ export const useActivityLogStore = defineStore('activityLog', {
         })
       );
       const combined = [...apiEntries, ...this.manualEntries];
-      return combined
-        .sort((a, b) => b.timestamp - a.timestamp)
-        .slice(0, ACTIVITY_LOG_DISPLAY_LIMIT);
+      combined.sort((a, b) => b.timestamp - a.timestamp);
+      return combined.slice(0, ACTIVITY_LOG_DISPLAY_LIMIT);
     },
     unreadCount(): number {
       const tarkovStore = useTarkovStore();
@@ -181,29 +226,10 @@ export const useActivityLogStore = defineStore('activityLog', {
      */
     migrateLegacyManualEntries(): boolean {
       if (!import.meta.client) return false;
-      let migrated = false;
-      for (const key of [STORAGE_KEYS.activityLogManual, LEGACY_STORAGE_KEYS.activityLogManual]) {
-        let raw: string | null;
-        try {
-          raw = localStorage.getItem(key);
-        } catch (error) {
-          logger.warn('[useActivityLogStore] Could not read legacy manual activity log', error);
-          continue;
-        }
-        if (raw === null) continue;
-        const legacyEntries = readLegacyManualEntries(raw);
-        if (!legacyEntries) continue;
-        if (legacyEntries.length > 0) {
-          useTarkovStore().addManualActivityEntries(legacyEntries);
-          migrated = true;
-        }
-        try {
-          localStorage.removeItem(key);
-        } catch (error) {
-          logger.warn('[useActivityLogStore] Could not clear legacy manual activity log', error);
-        }
-      }
-      return migrated;
+      // Both keys are adopted before reducing, so a hit on the first key cannot
+      // short-circuit adoption of the second.
+      const adopted = LEGACY_MANUAL_ENTRY_KEYS.map((key) => adoptLegacyManualEntries(key));
+      return adopted.includes(true);
     },
   },
 });

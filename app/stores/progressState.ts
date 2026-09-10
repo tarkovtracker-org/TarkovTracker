@@ -30,9 +30,7 @@ import type { _GettersTree } from 'pinia';
 export type {
   ApiTaskUpdate,
   ApiUpdateMeta,
-  ManualActivityAction,
   ManualActivityEntry,
-  ManualActivityType,
   UserProgressData,
 } from '@/types/progress';
 export interface UserState {
@@ -481,12 +479,10 @@ export const actions = {
   addManualActivityEntries(this: UserState, entries: ManualActivityEntry[]) {
     if (!Array.isArray(entries) || entries.length === 0) return;
     const currentData = getCurrentData(this);
-    const existing = Array.isArray(currentData.manualActivityHistory)
-      ? currentData.manualActivityHistory
-      : [];
-    const merged = sanitizeManualActivityHistory([...entries, ...existing]);
-    if (merged.length === 0 && existing.length === 0) return;
-    currentData.manualActivityHistory = merged;
+    currentData.manualActivityHistory = sanitizeManualActivityHistory([
+      ...entries,
+      ...(currentData.manualActivityHistory ?? []),
+    ]);
   },
   clearManualActivityHistory(this: UserState) {
     const currentData = getCurrentData(this);

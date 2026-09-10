@@ -293,21 +293,22 @@ const mergeApiUpdateHistory = (
     ...buildApiUpdateHistory(remote),
   ]);
 };
+const manualActivityEntries = (data: UserProgressData | undefined): ManualActivityEntry[] =>
+  Array.isArray(data?.manualActivityHistory) ? data.manualActivityHistory : [];
 /**
  * Union manual activity entries from both sides, keeping the newest entry per
  * stable id and the newest entries up to the shared history limit. This mirrors
  * `mergeApiUpdateHistory`: the feed is append-only per device, so a union is
  * always the correct resolution for the equal-epoch branch.
  */
-export const mergeManualActivityHistory = (
+const mergeManualActivityHistory = (
   local: UserProgressData | undefined,
   remote: UserProgressData | undefined
-): ManualActivityEntry[] => {
-  return sanitizeManualActivityHistory([
-    ...(Array.isArray(local?.manualActivityHistory) ? local.manualActivityHistory : []),
-    ...(Array.isArray(remote?.manualActivityHistory) ? remote.manualActivityHistory : []),
+): ManualActivityEntry[] =>
+  sanitizeManualActivityHistory([
+    ...manualActivityEntries(local),
+    ...manualActivityEntries(remote),
   ]);
-};
 export function mergeProgressData(
   local: UserProgressData | undefined,
   remote: UserProgressData | undefined,
