@@ -2241,6 +2241,8 @@
       "confirm_word": "DELETE"
     },
     "log_import": {
+      "reading_logs": "Reading logs and preparing the preview…",
+      "large_folder_hint": "Large folders are read locally in chunks. Keep this page open; you can cancel while logs are being read.",
       "upload_hint": "Select your Escape from Tarkov Logs folder or a selection of session folders to import quest starts, completions, and failures.",
       "deleted_logs_hint": "If old log sessions were deleted, they cannot be imported.",
       "deleted_logs_hint_tooltip": "Log import only reads quest events still present in your current Logs folder.",
@@ -2290,19 +2292,14 @@
       "cleared_logs_toast_title": "Old logs were likely cleared",
       "cleared_logs_toast_description": "Log import can only read quest history still in your Logs folder. Deleted sessions cannot be recovered.",
       "errors": {
+        "invalid_archive": "The ZIP archive is incomplete or contains an invalid log entry. No progress was imported.",
+        "record_too_large": "An individual log record in {path} is too large to parse safely. No progress was imported. Please report this log format.",
         "apply_import_failed": "Import could not finish. Some progress may already have been imported. Select the same logs again to retry; completed progress is preserved.",
-        "archive_log_file_too_large": "Log file is too large in archive: {path}",
-        "archive_logs_too_large": "Archive contains too much log content (max {max_mb} MB).",
-        "import_file_too_large": "Import file is too large (max {max_mb} MB).",
-        "log_file_too_large": "Log file is too large (max {max_mb} MB).",
-        "log_file_too_large_path": "Log file is too large: {path}",
         "no_files_selected": "No files were selected.",
-        "no_logs_in_archive": "No EFT logs were found in the archive.",
         "no_matching_tasks_found": "Quest events were found, but none match current TarkovTracker tasks.",
         "no_notification_logs_found": "No notification logs were found in the selected files.",
         "no_quest_events_found": "No quest start, completion, or failure events were found in the selected logs.",
         "parse_failed": "Failed to parse EFT logs.",
-        "selected_logs_too_large": "Selected logs contain too much content (max {max_mb} MB).",
         "task_metadata_not_loaded": "Task metadata is not loaded yet. Please refresh and try again.",
         "invalid_mode": "Select a valid destination game mode.",
         "outside_active_season": "These logs contain events outside the active season or without a usable date. Select sessions from the active season before importing into Seasonal PvP."

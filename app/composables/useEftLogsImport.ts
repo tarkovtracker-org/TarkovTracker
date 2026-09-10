@@ -1,20 +1,24 @@
-import { strFromU8, unzipSync } from 'fflate';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { GAME_MODE_VALUES, isGameMode, type GameMode } from '@/utils/constants';
+import {
+  EftLogArchiveError,
+  readEftLogSources,
+  type EftLogReadProgress,
+} from '@/utils/eftLogFileReader';
 import { loadEftImportTaskCatalog } from '@/utils/eftLogImportCatalog';
 import {
-  isEftImportLogFileName,
   hasOutsideSeasonEvents,
   isEligibleImportEvent,
   latestEftQuestEvents,
   isEftNotificationLogFileName,
   parseEftLogsForQuestImport,
   UNKNOWN_LOG_VERSION,
-  type EftLogInputFile,
+  type EftParsedLogFile,
   type EftQuestImportPreview,
 } from '@/utils/eftLogQuestParser';
+import { EftLogRecordSizeError } from '@/utils/eftLogRecordReader';
 import { logger } from '@/utils/logger';
 import {
   applyTaskAvailabilityRequirements,
@@ -25,9 +29,6 @@ import {
 } from '@/utils/taskProgress';
 import { getCompletionFlags } from '@/utils/taskStatus';
 import type { Task } from '@/types/tarkov';
-const MAX_IMPORT_FILE_SIZE_BYTES = 512 * 1024 * 1024;
-const MAX_SINGLE_LOG_SIZE_BYTES = 32 * 1024 * 1024;
-const MAX_TOTAL_LOG_CONTENT_BYTES = 256 * 1024 * 1024;
 const UNKNOWN_MODE = 'unknown' as const;
 export type EftLogsImportState = 'idle' | 'preview' | 'success' | 'error';
 export interface EftLogsImportPreviewData extends EftQuestImportPreview {
@@ -37,6 +38,8 @@ export interface EftLogsImportPreviewData extends EftQuestImportPreview {
 export interface UseEftLogsImportReturn {
   isImporting: Ref<boolean>;
   importError: Ref<string | null>;
+  isParsing: Ref<boolean>;
+  parseProgress: Ref<EftLogReadProgress>;
   importState: Ref<EftLogsImportState>;
   parseFile: (file: File) => Promise<void>;
   parseFiles: (files: File[]) => Promise<void>;
@@ -63,19 +66,25 @@ type TranslationFn = (key: string, values?: Record<string, unknown>) => string;
 function createImportError(key: string, values?: EftLogsImportErrorValues): EftLogsImportError {
   return new EftLogsImportError(key, values);
 }
+/** Maps parser safety/format errors to localized UI messages. */
+function translateReadError(error: unknown, t: TranslationFn): string | null {
+  if (error instanceof EftLogRecordSizeError) {
+    return t('settings.log_import.errors.record_too_large', { path: error.path });
+  }
+  if (error instanceof EftLogArchiveError) return t('settings.log_import.errors.invalid_archive');
+  return null;
+}
 /** Translates known import errors and preserves useful messages from unexpected failures. */
 function normalizeErrorMessage(error: unknown, t: TranslationFn): string {
   if (error instanceof EftLogsImportError) {
     return t(error.key, error.values);
   }
-  if (error instanceof Error && typeof error.message === 'string' && error.message.trim().length) {
+  const readError = translateReadError(error, t);
+  if (readError) return readError;
+  if (error instanceof Error && error.message.trim().length) {
     return error.message;
   }
   return t('settings.log_import.errors.parse_failed');
-}
-/** Identifies ZIP selections before choosing an archive or raw-file reader. */
-function isZipFile(file: File): boolean {
-  return file.name.toLowerCase().endsWith('.zip');
 }
 /** Extracts a known major release number for the initial version selection. */
 function parseVersionMajor(version: string): number | null {
@@ -106,96 +115,6 @@ function selectDefaultIncludedVersions(availableVersions: string[]): string[] {
     return latestMajorVersions;
   }
   return [knownVersions[0]!];
-}
-/** Rejects oversized selected files before allocating their contents. */
-function ensureImportFileSize(file: File): void {
-  if (file.size <= MAX_IMPORT_FILE_SIZE_BYTES) return;
-  throw createImportError('settings.log_import.errors.import_file_too_large', {
-    max_mb: 512,
-  });
-}
-/** Enforces the combined raw-file and archive log-content budget without re-encoding text. */
-function ensureTotalLogBytes(bytes: number): void {
-  if (bytes <= MAX_TOTAL_LOG_CONTENT_BYTES) return;
-  throw createImportError('settings.log_import.errors.selected_logs_too_large', { max_mb: 256 });
-}
-/** Reads supported raw logs, preserving paths and counting source bytes before decoding. */
-async function readRawImportLogFiles(
-  files: File[],
-  previousLogBytes: number
-): Promise<{ files: EftLogInputFile[]; scanned: number; bytes: number }> {
-  let totalLogBytes = 0;
-  const extracted: EftLogInputFile[] = [];
-  for (const file of files) {
-    const relativePath = file.webkitRelativePath;
-    const filePath = relativePath && relativePath.length > 0 ? relativePath : file.name;
-    if (!isEftImportLogFileName(filePath)) continue;
-    if (file.size > MAX_SINGLE_LOG_SIZE_BYTES) {
-      throw createImportError('settings.log_import.errors.log_file_too_large_path', {
-        path: filePath,
-      });
-    }
-    totalLogBytes += file.size;
-    if (totalLogBytes > MAX_TOTAL_LOG_CONTENT_BYTES) {
-      throw createImportError('settings.log_import.errors.selected_logs_too_large', {
-        max_mb: 256,
-      });
-    }
-    ensureTotalLogBytes(previousLogBytes + totalLogBytes);
-    extracted.push({
-      name: filePath,
-      text: await file.text(),
-    });
-  }
-  return {
-    files: extracted,
-    scanned: files.length,
-    bytes: totalLogBytes,
-  };
-}
-/** Filters supported archive entries and enforces declared log sizes before decompression. */
-async function readZipLogs(
-  file: File,
-  previousLogBytes: number
-): Promise<{ files: EftLogInputFile[]; scanned: number; bytes: number }> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  let scannedEntries = 0;
-  let totalLogBytes = 0;
-  let notificationEntries = 0;
-  const extracted = unzipSync(bytes, {
-    filter: (entry) => {
-      scannedEntries += 1;
-      if (!isEftImportLogFileName(entry.name)) {
-        return false;
-      }
-      notificationEntries += 1;
-      if (entry.originalSize > MAX_SINGLE_LOG_SIZE_BYTES) {
-        throw createImportError('settings.log_import.errors.archive_log_file_too_large', {
-          path: entry.name,
-        });
-      }
-      totalLogBytes += entry.originalSize;
-      if (totalLogBytes > MAX_TOTAL_LOG_CONTENT_BYTES) {
-        throw createImportError('settings.log_import.errors.archive_logs_too_large', {
-          max_mb: 256,
-        });
-      }
-      ensureTotalLogBytes(previousLogBytes + totalLogBytes);
-      return true;
-    },
-  });
-  if (notificationEntries === 0) {
-    throw createImportError('settings.log_import.errors.no_logs_in_archive');
-  }
-  const files = Object.entries(extracted).map(([name, content]) => ({
-    name,
-    text: strFromU8(content),
-  }));
-  return {
-    files,
-    scanned: scannedEntries,
-    bytes: totalLogBytes,
-  };
 }
 type ImportTaskIds = Record<GameMode, Set<string>>;
 type ImportTaskSets = {
@@ -384,11 +303,14 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   const importState = ref<EftLogsImportState>('idle');
   const previewData = ref<EftLogsImportPreviewData | null>(null);
   const importError = ref<string | null>(null);
-  const sourceFiles = ref<EftLogInputFile[]>([]);
+  const isParsing = ref(false);
+  const parseProgress = ref<EftLogReadProgress>({ bytesRead: 0, totalBytes: 0 });
+  const sourceFiles = shallowRef<EftParsedLogFile[]>([]);
   const selectedVersions = ref<string[]>([]);
   const sourceFileName = ref(t('settings.log_import.selected_files'));
   const scannedEntriesCount = ref(0);
   let parseFilesRequestId = 0;
+  let activeRead: AbortController | null = null;
   let catalogs = new Map<GameMode, Task[]>();
   function getTaskIds(): string[] {
     return [...new Set([...catalogs.values()].flatMap((tasks) => tasks.map((task) => task.id)))];
@@ -423,6 +345,8 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   function reset(): void {
     if (isImporting.value) return;
     parseFilesRequestId++;
+    activeRead?.abort();
+    activeRead = null;
     catalogs = new Map();
     importState.value = 'idle';
     previewData.value = null;
@@ -431,50 +355,30 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     selectedVersions.value = [];
     sourceFileName.value = t('settings.log_import.selected_files');
     scannedEntriesCount.value = 0;
+    isParsing.value = false;
+    parseProgress.value = { bytesRead: 0, totalBytes: 0 };
   }
-  /** Reads the selected sources, validates their combined size, and loads all catalogs before previewing. */
+  /** Streams selected sources with cancellation and loads all catalogs before previewing. */
   async function parseFiles(files: File[]): Promise<void> {
     if (isImporting.value) return;
-    const requestId = ++parseFilesRequestId;
+    reset();
+    const requestId = parseFilesRequestId;
     const isActiveRequest = () => requestId === parseFilesRequestId;
-    importState.value = 'idle';
-    previewData.value = null;
-    importError.value = null;
-    sourceFiles.value = [];
-    selectedVersions.value = [];
-    sourceFileName.value = t('settings.log_import.selected_files');
-    scannedEntriesCount.value = 0;
     if (!Array.isArray(files) || files.length === 0) {
       importState.value = 'error';
       importError.value = t('settings.log_import.errors.no_files_selected');
       return;
     }
+    const controller = new AbortController();
+    activeRead = controller;
+    isParsing.value = true;
     try {
-      let scannedEntries = 0;
-      const importFiles: EftLogInputFile[] = [];
-      let totalLogBytes = 0;
-      const rawLogFiles: File[] = [];
-      for (const file of files) {
-        ensureImportFileSize(file);
-        if (isZipFile(file)) {
-          const zipSource = await readZipLogs(file, totalLogBytes);
-          if (!isActiveRequest()) return;
-          scannedEntries += zipSource.scanned;
-          totalLogBytes += zipSource.bytes;
-          ensureTotalLogBytes(totalLogBytes);
-          importFiles.push(...zipSource.files);
-          continue;
-        }
-        rawLogFiles.push(file);
-      }
-      if (rawLogFiles.length > 0) {
-        const rawSource = await readRawImportLogFiles(rawLogFiles, totalLogBytes);
-        if (!isActiveRequest()) return;
-        scannedEntries += rawSource.scanned;
-        totalLogBytes += rawSource.bytes;
-        ensureTotalLogBytes(totalLogBytes);
-        importFiles.push(...rawSource.files);
-      }
+      const { sources: importFiles, scanned: scannedEntries } = await readEftLogSources(files, {
+        signal: controller.signal,
+        onProgress: (progress) => {
+          if (isActiveRequest()) parseProgress.value = progress;
+        },
+      });
       if (!isActiveRequest()) return;
       if (!importFiles.some((file) => isEftNotificationLogFileName(file.name))) {
         importState.value = 'error';
@@ -541,6 +445,11 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
       importState.value = 'error';
       importError.value = normalizeErrorMessage(error, t);
       logger.error('[EftLogsImport] Parse error:', error);
+    } finally {
+      if (isActiveRequest()) {
+        isParsing.value = false;
+        activeRead = null;
+      }
     }
   }
   /** Routes a single selected file through the same guarded multi-source import flow. */
@@ -607,6 +516,8 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   }
   return {
     isImporting,
+    isParsing,
+    parseProgress,
     importError,
     importState,
     parseFile,

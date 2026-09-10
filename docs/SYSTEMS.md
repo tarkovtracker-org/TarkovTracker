@@ -765,10 +765,25 @@ flowchart LR
    `docs/eft-log-reference/` for the audited format inventory (through `1.1.0.1.46911`) and
    [TarkovMonitor's message type contract](https://github.com/the-hideout/TarkovMonitor/blob/master/TarkovMonitor/GameWatcher.cs).
    The importer accepts legacy/rotated notification and backend filenames, and application/output
-   context, in folders, individual files, and ZIPs. Inputs are limited to 512 MiB per selected file,
-   32 MiB per log, and 256 MiB of combined log bytes across raw files and ZIPs. Readers count
-   bytes against the remaining combined budget before decoding raw files or decompressing ZIP
-   entries; preview assembly reuses those totals without re-encoding log text.
+   context, in folders, individual files, and ZIPs. Folder files and ZIP members are read incrementally without fixed file-count,
+   file-size, archive-size, or combined-byte limits. Raw reads use 256 KiB slices; compressed ZIP
+   input uses 16 KiB slices to bound each inflation step. These are buffer sizes, not import limits.
+   Supported members are consumed immediately; unsupported members use a discard decoder so
+   fflate cannot retain deferred compressed contents. Declared ZIP sizes never drive allocation;
+   synchronous decoders reject incomplete streams on final input; supported entries must match
+   their declared expanded size when present. A bounded
+   ZIP-tail read validates the end record and comment length before streaming, rejecting empty or
+   truncated input while accepting valid empty archives.
+   UTF-8 decoding and timestamp-delimited record framing preserve split characters, headers,
+   multiline JSON, and final records without a trailing newline. An individual unfinished record
+   is limited to 8 Mi characters to reject malformed/unbounded records; this fails the selection
+   explicitly instead of silently skipping history. No progress is applied on reading errors.
+   Completed text is discarded after extracting quest events and mode signals. Version selection
+   rebuilds previews from that evidence without rereading files. Memory still scales with meaningful
+   events, mode evidence, and selected-file metadata, not total source bytes; browser resources and
+   processing time remain practical limits. Progress reports selected source bytes (compressed bytes
+   for ZIPs). Cancel or reselection aborts between slices and invalidates pending catalog/preview
+   work; stale requests cannot update progress or restore cancelled results.
    Arena is excluded. Multiline JSON is bounded
    by log records so a truncated event cannot consume the next notification.
    Mode routing uses preceding explicit session declarations or gateway/WebSocket connections;
