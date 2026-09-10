@@ -56,6 +56,12 @@ describe('matchesAllUsersView', () => {
     expect(isLockedForAllUsers([LOCKED])).toBe(true);
     expect(isLockedForAllUsers([LOCKED, AVAILABLE])).toBe(false);
     expect(isLockedForAllUsers([LOCKED, ACTIVE])).toBe(false);
+    expect(isLockedForAllUsers([LOCKED, FAILED])).toBe(false);
+  });
+  it('does not report locked when one teammate has completed the task', () => {
+    expect(isLockedForAllUsers([LOCKED, COMPLETED])).toBe(false);
+    expect(matchesAllUsersView('locked', [LOCKED, COMPLETED], false)).toBe(false);
+    expect(matchesAllUsersView('completed', [LOCKED, COMPLETED], false)).toBe(false);
   });
 });
 describe('getAllUsersTraderRank', () => {

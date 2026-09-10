@@ -28,13 +28,20 @@ export const hasActiveForAnyUser = (statuses: readonly TeamTaskStatus[]): boolea
   statuses.some(isActiveTeamTask);
 export const hasFailedForAnyUser = (statuses: readonly TeamTaskStatus[]): boolean =>
   statuses.some(({ isFailed }) => isFailed);
+export const hasCompletedForAnyUser = (statuses: readonly TeamTaskStatus[]): boolean =>
+  statuses.some(({ isCompleted }) => isCompleted);
 export const isCompletedByAllUsers = (statuses: readonly TeamTaskStatus[]): boolean =>
   statuses.every(({ isCompleted, isFailed }) => isCompleted && !isFailed);
+/**
+ * True only when no teammate has the task available, active, completed, or
+ * failed. Every arm is a `some` check: one teammate having completed the task
+ * means it is not locked for all users, even when another is still locked out.
+ */
 export const isLockedForAllUsers = (statuses: readonly TeamTaskStatus[]): boolean =>
   [
     hasAvailableForAnyUser(statuses),
     hasActiveForAnyUser(statuses),
-    statuses.every(({ isCompleted }) => isCompleted),
+    hasCompletedForAnyUser(statuses),
     hasFailedForAnyUser(statuses),
   ].every((hasStatus) => !hasStatus);
 const ALL_USERS_VIEW_PREDICATES: Record<

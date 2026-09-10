@@ -198,12 +198,12 @@ export function useTaskFiltering() {
   /**
    * Check if a task is invalid (permanently blocked) for a user
    */
-  const isTaskInvalid = (taskId: string, userView: string): boolean => {
-    if (isAllUsersView(userView)) {
-      const teamIds = Object.keys(progressStore.visibleTeamStores || {});
-      return teamIds.every((teamId) => progressStore.invalidTasks?.[taskId]?.[teamId] === true);
-    }
-    return progressStore.invalidTasks?.[taskId]?.[userView] === true;
+  const allVisibleTeamIds = (): string[] => Object.keys(progressStore.visibleTeamStores || {});
+  const isTaskInvalidForTeams = (taskId: string, teamIds: string[]): boolean =>
+    teamIds.every((teamId) => progressStore.invalidTasks?.[taskId]?.[teamId] === true);
+  const isTaskInvalid = (taskId: string, userView: string, teamIds?: string[]): boolean => {
+    if (!isAllUsersView(userView)) return isTaskInvalidForTeams(taskId, [userView]);
+    return isTaskInvalidForTeams(taskId, teamIds ?? allVisibleTeamIds());
   };
   /**
    * Filter tasks by status (available, locked, completed) and user view
@@ -255,13 +255,21 @@ export function useTaskFiltering() {
     predicate: (status: TeamTaskStatus) => boolean
   ): string[] =>
     statuses.filter(predicate).map(({ teamId }) => progressStore.getDisplayName(teamId));
+  const isInvalidForStatuses = (task: Task, statuses: TeamTaskStatus[]): boolean =>
+    isTaskInvalid(
+      task.id,
+      'all',
+      statuses.map(({ teamId }) => teamId)
+    );
   const allUsersTaskBuilders: Record<TaskSecondaryView, AllUsersTaskBuilder> = {
     all: (task, statuses) => ({
       ...task,
       neededBy: getUsersWithStatus(statuses, isAvailableTeamTask),
     }),
     available: (task, statuses) => {
-      if (!matchesAllUsersView('available', statuses, isTaskInvalid(task.id, 'all'))) return null;
+      if (!matchesAllUsersView('available', statuses, isInvalidForStatuses(task, statuses))) {
+        return null;
+      }
       const usersWhoNeedTask = getUsersWithStatus(statuses, isAvailableTeamTask);
       if (usersWhoNeedTask.length > 1) {
         logger.debug(
@@ -272,19 +280,20 @@ export function useTaskFiltering() {
       return { ...task, neededBy: usersWhoNeedTask };
     },
     active: (task, statuses) => {
-      if (!matchesAllUsersView('active', statuses, isTaskInvalid(task.id, 'all'))) return null;
+      if (!matchesAllUsersView('active', statuses, isInvalidForStatuses(task, statuses)))
+        return null;
       return { ...task, neededBy: getUsersWithStatus(statuses, isActiveTeamTask) };
     },
     failed: (task, statuses) =>
-      matchesAllUsersView('failed', statuses, isTaskInvalid(task.id, 'all'))
+      matchesAllUsersView('failed', statuses, isInvalidForStatuses(task, statuses))
         ? { ...task, neededBy: [] }
         : null,
     locked: (task, statuses) =>
-      matchesAllUsersView('locked', statuses, isTaskInvalid(task.id, 'all'))
+      matchesAllUsersView('locked', statuses, isInvalidForStatuses(task, statuses))
         ? { ...task, neededBy: [] }
         : null,
     completed: (task, statuses) =>
-      matchesAllUsersView('completed', statuses, isTaskInvalid(task.id, 'all'))
+      matchesAllUsersView('completed', statuses, isInvalidForStatuses(task, statuses))
         ? { ...task, neededBy: [] }
         : null,
   };
@@ -579,12 +588,11 @@ export function useTaskFiltering() {
     });
   };
   const getAllUsersTraderStatusRank = (task: Task): number => {
-    const teamIds = Object.keys(progressStore.visibleTeamStores || {});
-    const relevantTeamIds = getRelevantTeamIds(task, teamIds);
+    const relevantTeamIds = getRelevantTeamIds(task, allVisibleTeamIds());
     if (relevantTeamIds.length === 0) return TRADER_SORT_RANK.notApplicable;
     return getAllUsersTraderRank(
       relevantTeamIds.map((teamId) => getTaskStatus(task.id, teamId)),
-      isTaskInvalid(task.id, 'all')
+      isTaskInvalid(task.id, 'all', relevantTeamIds)
     );
   };
   const getUserTraderStatusRank = (task: Task, userView: string): number =>

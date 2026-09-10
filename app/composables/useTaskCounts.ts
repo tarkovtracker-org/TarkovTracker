@@ -139,7 +139,7 @@ export function useTaskCounts() {
     const relevantTeamIds = visibleTeamIds.filter((teamId) => matchesViewFaction(task, teamId));
     if (relevantTeamIds.length === 0) return null;
     const statuses = relevantTeamIds.map((teamId) => getTeamTaskStatus(task.id, teamId));
-    const isInvalid = isTaskInvalid(task.id, 'all', visibleTeamIds);
+    const isInvalid = isTaskInvalid(task.id, 'all', relevantTeamIds);
     return { statuses: resolveAllUsersTaskStatuses(statuses, isInvalid) };
   };
   const getUserTaskCount = (task: Task, userView: string): TaskCountResult | null => {
@@ -228,7 +228,7 @@ export function useTaskCounts() {
             : matchesAllUsersView(
                 secondaryView,
                 taskStatuses,
-                isTaskInvalid(task.id, 'all', visibleTeamIds)
+                isTaskInvalid(task.id, 'all', relevantTeamIds)
               );
         if (shouldCount) counts[traderId]++;
       } else {
