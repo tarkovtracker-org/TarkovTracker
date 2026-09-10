@@ -306,6 +306,9 @@ describe('DataManagementCard', () => {
     const liveRegion = wrapper.find('[aria-live="polite"]');
     expect(liveRegion.exists()).toBe(true);
     eftLogsState.isParsing.value = true;
+    eftLogsState.parseProgress.value = { bytesRead: 0, totalBytes: 0 };
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('progress').attributes()).toMatchObject({ value: '0', max: '1' });
     eftLogsState.parseProgress.value = { bytesRead: 50, totalBytes: 100 };
     await wrapper.vm.$nextTick();
     expect(wrapper.find('[aria-live="polite"]').element).toBe(liveRegion.element);

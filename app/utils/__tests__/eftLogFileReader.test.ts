@@ -1,6 +1,6 @@
 import { strToU8, zipSync, Zip, ZipDeflate } from 'fflate';
 import { describe, expect, it, vi } from 'vitest';
-import { readEftLogSources } from '@/utils/eftLogFileReader';
+import { EftLogArchiveError, readEftLogSources } from '@/utils/eftLogFileReader';
 import { parseEftLogsForQuestImport } from '@/utils/eftLogQuestParser';
 import { EftLogRecordSizeError } from '@/utils/eftLogRecordReader';
 const QUEST = '657315ddab5a49b71f098853';
@@ -142,6 +142,21 @@ describe('readEftLogSources', () => {
     const slices = vi.spyOn(file, 'slice');
     await expect(read([file])).rejects.toBeInstanceOf(EftLogRecordSizeError);
     expect(slices.mock.calls.length).toBeLessThan(file.size / (256 * 1024));
+  });
+  it('rejects a ZIP entry whose declared expanded size does not match its contents', async () => {
+    const archive = zipSync({ 'notifications.log': strToU8(notification) });
+    const header = new DataView(archive.buffer);
+    header.setUint32(22, header.getUint32(22, true) + 1, true);
+    await expect(read([new File([new Uint8Array(archive)], 'Logs.zip')])).rejects.toBeInstanceOf(
+      EftLogArchiveError
+    );
+  });
+  it('rejects corrupted supported compressed content', async () => {
+    const archive = zipSync({ 'notifications.log': strToU8(notification) });
+    const header = new DataView(archive.buffer);
+    const dataStart = 30 + header.getUint16(26, true) + header.getUint16(28, true);
+    archive[dataStart] = 255;
+    await expect(read([new File([new Uint8Array(archive)], 'Logs.zip')])).rejects.toThrow();
   });
   it('rejects truncated ZIP content without returning a partial import', async () => {
     const archive = zipSync({ 'notifications.log': strToU8(notification) });

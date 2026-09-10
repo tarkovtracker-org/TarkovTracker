@@ -128,6 +128,36 @@ describe('useEftLogsImport', () => {
     tarkovStore.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
     tarkovStore.switchGameMode.mockImplementation(async () => undefined);
   });
+  it('reports an oversized individual record without retaining or applying a partial preview', async () => {
+    const importer = await loadComposable();
+    await importer.parseFile(new File(['x'.repeat(9 * 1024 * 1024)], 'notifications.log'));
+    expect(importer.importError.value).toBe('settings.log_import.errors.record_too_large');
+    expect(importer.importState.value).toBe('error');
+    expect(importer.isParsing.value).toBe(false);
+    expect(importer.previewData.value).toBeNull();
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+  });
+  it('translates invalid archive sizes without applying progress', async () => {
+    const importer = await loadComposable();
+    const archive = zipSync({ 'notifications.log': strToU8(completionLog()) });
+    const header = new DataView(archive.buffer);
+    header.setUint32(22, header.getUint32(22, true) + 1, true);
+    await importer.parseFile(new File([new Uint8Array(archive)], 'Logs.zip'));
+    expect(importer.importError.value).toBe('settings.log_import.errors.invalid_archive');
+    expect(importer.previewData.value).toBeNull();
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+  });
+  it('reports file access failures and clears the reading state', async () => {
+    const importer = await loadComposable();
+    const file = new File([completionLog()], 'notifications.log');
+    vi.spyOn(file, 'slice').mockImplementation(() => {
+      throw new Error('The selected file is no longer readable.');
+    });
+    await importer.parseFile(file);
+    expect(importer.importError.value).toBe('The selected file is no longer readable.');
+    expect(importer.isParsing.value).toBe(false);
+    expect(importer.previewData.value).toBeNull();
+  });
   it('cancels an in-flight folder read without previewing or applying progress', async () => {
     const importer = await loadComposable();
     const file = new File([completionLog()], 'notifications.log');
