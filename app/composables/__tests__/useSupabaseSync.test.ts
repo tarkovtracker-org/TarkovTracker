@@ -84,6 +84,25 @@ describe('useSupabaseSync', () => {
       sync.cleanup();
     }
   );
+  it.each(['resolved-error', 'rejected-error'])(
+    'retains a failed initial imperative save: %s',
+    async (failure) => {
+      const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+      if (failure === 'resolved-error')
+        upsert.mockResolvedValueOnce({ error: { message: 'offline' } });
+      else upsert.mockRejectedValueOnce(new Error('offline'));
+      const sync = useSupabaseSync({
+        store: createMockStore({ history: ['entry'] }),
+        table: 'test_table',
+      });
+      expect(await sync.syncToSupabase()).toBeNull();
+      expect(sync.hasPendingChanges!()).toBe(true);
+      expect(await sync.syncToSupabase()).toEqual({ history: ['entry'] });
+      expect(upsert).toHaveBeenCalledTimes(2);
+      expect(sync.hasPendingChanges!()).toBe(false);
+      sync.cleanup();
+    }
+  );
   it('merges only pending paths and protects edits saved during a snapshot read', async () => {
     const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
     const store = createMockStore({ pvp: { name: 'old', count: 5 }, pve: { name: 'old' } });

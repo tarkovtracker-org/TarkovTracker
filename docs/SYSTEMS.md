@@ -1014,7 +1014,9 @@ flowchart LR
   and teammate/public API projections never include them.
 - Manual histories merge during preferred-snapshot startup as well as realtime reconciliation.
   History-only state starts sync and passes the empty-state guard. Deferred startup explicitly
-  persists the mutation that created the subscription, including post-load legacy adoption. Clearing advances
+  persists the mutation that created the subscription, including post-load legacy adoption. Initial
+  saves retry once after a failure, retain pending state, and stop retrying after a session change.
+  Clearing advances
   `manualActivityEpoch` without changing gameplay or `progressEpoch`; only histories from the
   highest history generation participate in the union. Full progress reset epochs take precedence.
   The sync RPC merges histories under its existing account lock before unchanged-write comparisons,
