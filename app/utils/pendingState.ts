@@ -12,12 +12,13 @@ export type RemoteStateMerge = (
 const isRecord = (value: unknown): value is Snapshot =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 // Marks a field the persistence contract cannot carry, so the caller can tell
-// "cloned to undefined" (a real JSON result) apart from "not serializable".
+// an explicit undefined field apart from a value JSON cannot serialize.
 const UNSERIALIZABLE = Symbol('unserializable');
 const cloneSerializable = (value: unknown): unknown => {
   try {
     const json = JSON.stringify(value);
-    return json === undefined ? undefined : JSON.parse(json);
+    if (json === undefined) return value === undefined ? undefined : UNSERIALIZABLE;
+    return JSON.parse(json);
   } catch {
     // Cyclic or otherwise non-encodable UI state.
     return UNSERIALIZABLE;

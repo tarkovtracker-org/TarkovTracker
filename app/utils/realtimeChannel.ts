@@ -188,7 +188,7 @@ export const subscribeAndWaitForRealtimeChannel = (
       needsRefresh = true;
       if (suspended()) return;
       if (
-        logChannelSubscribeFailure(label, status, error, context, { treatClosedAsFailure: true })
+        logChannelSubscribeFailure(label, status, error, context, { treatClosedAsFailure: !joined })
       ) {
         settle(error ?? new Error(`Realtime subscription failed with status ${status}`));
       }

@@ -938,7 +938,8 @@ flowchart LR
 - The team channel records itself as bound only after `SUBSCRIBED`, so a silently failed join is never
   mistaken for a live one. Membership events rebuild it only when the topic or teammate-progress
   filter changed, and any non-subscribed status drops the binding so the next event rebuilds.
-- Subscribe callbacks log every status that is not `SUBSCRIBED` or `CLOSED`. Five consecutive failures
+- Subscribe callbacks log every status that is not `SUBSCRIBED` or `CLOSED`; an own-progress
+  `CLOSED` before the first join still fails that join. Five consecutive failures
   tear the team channel down and schedule one rebuild a minute later, replacing Realtime's unbounded
   rejoin loop with a bounded retry cycle.
 - `user_system` is included in `supabase_realtime`, and sign-out tears down all client channels.
@@ -947,6 +948,8 @@ flowchart LR
   an outstanding disconnect before reconnecting once. Auth, local persistence, and outbound saves
   remain active. Rejoined consumers refresh authoritative snapshots; owner progress uses existing
   merge/epoch rules, and snapshot responses cannot overwrite newer live events or another session.
+  Pending snapshots omit non-serializable fields, including functions and symbols, while retaining
+  explicit `undefined` fields. Removing transient state must not become a persisted field deletion.
   A three-way merge compares each field with its acknowledged baseline, retaining only locally
   changed paths while accepting unrelated remote changes, including changes in other modes.
   Live mode rows and startup snapshots resolve counts by entry timestamp rather than maximum,

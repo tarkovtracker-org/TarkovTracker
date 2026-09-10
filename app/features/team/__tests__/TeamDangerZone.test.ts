@@ -108,13 +108,15 @@ describe('TeamDangerZone', () => {
   it('preserves legacy aliases when leaving a Seasonal team', async () => {
     mockTarkovStore.getCurrentGameMode.mockReturnValue('seasonal');
     mockSystemState.seasonal_team_id = 'team-1';
+    mockSystemState.pvp_team_id = 'pvp-team';
+    // Matching legacy aliases make an accidental Seasonal alias cleanup observable.
     const wrapper = await mountDangerZone();
     await wrapper.find('[data-testid="open-team-danger-confirmation"]').trigger('click');
     await wrapper.find('[data-testid="confirm-team-danger-action"]').trigger('click');
     await flushPromises();
     expect(mockDisbandTeam).toHaveBeenCalledWith('team-1');
     expect(mockSystemState.seasonal_team_id).toBeNull();
-    expect(mockSystemState.pvp_team_id).toBe('team-1');
+    expect(mockSystemState.pvp_team_id).toBe('pvp-team');
     expect(mockSystemState.team).toBe('team-1');
     expect(mockSystemState.team_id).toBe('team-1');
     wrapper.unmount();
