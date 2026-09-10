@@ -366,7 +366,7 @@ export interface SeasonalPerk {
   name: string;
   description: string;
   points: number | null;
-  mutuallyExclusiveSeasonalPerkIds: string[];
+  mutuallyExclusiveSeasonalPerkIds?: string[];
   effects: Array<{
     effectId: string;
     itemFilter?: {
