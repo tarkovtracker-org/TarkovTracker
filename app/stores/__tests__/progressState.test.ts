@@ -234,3 +234,17 @@ describe('manual activity history actions', () => {
     expect(state.pvp.manualActivityHistory?.map((item) => item.id)).toEqual(['pvp-1']);
   });
 });
+describe('manual activity clearing', () => {
+  it('advances the history generation without changing gameplay or another mode', () => {
+    const state = createBaseState();
+    state.pvp.level = 42;
+    state.pvp.progressEpoch = 3;
+    actions.clearManualActivityHistory.call(state);
+    expect(state.pvp.manualActivityEpoch).toBe(1);
+    expect(state.pvp.level).toBe(42);
+    expect(state.pvp.progressEpoch).toBe(3);
+    expect(state.pve.manualActivityEpoch).toBeUndefined();
+    actions.clearManualActivityHistory.call(state);
+    expect(state.pvp.manualActivityEpoch).toBe(2);
+  });
+});

@@ -179,15 +179,36 @@ describe('useAppInitialization locale setup', () => {
     expect(mockMetadataStore.fetchAllData).toHaveBeenCalledWith(false);
     wrapper.unmount();
   });
+  it('adopts legacy activity for a guest', async () => {
+    const wrapper = await mountWithComposable();
+    await flushPromises();
+    expect(mockActivityLogMigrateLegacyManualEntries).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+  });
+  it('defers authenticated adoption until sync restores the selected mode', async () => {
+    const pending = Promise.withResolvers<undefined>();
+    mockInitializeTarkovSync.mockReturnValueOnce(pending.promise);
+    mockSupabaseUser.loggedIn = true;
+    mockSupabaseUser.id = 'user-1';
+    const wrapper = await mountWithComposable();
+    await flushPromises();
+    expect(mockActivityLogMigrateLegacyManualEntries).not.toHaveBeenCalled();
+    pending.resolve(undefined);
+    await flushPromises();
+    expect(mockActivityLogMigrateLegacyManualEntries).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+  });
   it('waits for a hydrated user id before starting sync and migration', async () => {
     mockSupabaseUser.loggedIn = true;
     const wrapper = await mountWithComposable();
     await flushPromises();
+    expect(mockActivityLogMigrateLegacyManualEntries).not.toHaveBeenCalled();
     expect(mockInitializeTarkovSync).not.toHaveBeenCalled();
     expect(mockMigrateDataIfNeeded).not.toHaveBeenCalled();
     mockSupabaseUser.id = 'user-1';
     await flushPromises();
     expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(1);
+    expect(mockActivityLogMigrateLegacyManualEntries).toHaveBeenCalledTimes(1);
     expect(mockMigrateDataIfNeeded).toHaveBeenCalledTimes(1);
     wrapper.unmount();
   });
@@ -265,6 +286,7 @@ describe('useAppInitialization locale setup', () => {
     await flushPromises();
     pending.resolve(undefined);
     await flushPromises();
+    expect(mockActivityLogMigrateLegacyManualEntries).toHaveBeenCalledTimes(1);
     expect(mockMigrateDataIfNeeded).toHaveBeenCalledTimes(1);
     expect(mockSupporter.subscribe).toHaveBeenCalledExactlyOnceWith('user-2');
     expect(mockSupporter.fetchStatus).not.toHaveBeenCalled();

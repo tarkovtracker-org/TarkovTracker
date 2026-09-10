@@ -1009,8 +1009,23 @@ flowchart LR
   and each mode keeps at most 50 entries so three full feeds stay far below the sync RPC's 512 KiB
   ceiling. Adding a progress field requires a forward migration recreating
   `sanitize_user_progress_mode_data`, because that allowlist is the single gate on every write and
-  silently drops keys it does not name. Read state (`lastReadTimestamp`) stays device-local. Backups
-  strip the feed alongside `apiUpdateHistory`, and teammate/public API projections never include it.
+  silently drops keys it does not name. Read state (`lastReadByMode`) stays device-local and is
+  isolated by mode. Backups strip the feed and its clear generation alongside `apiUpdateHistory`,
+  and teammate/public API projections never include them.
+- Manual histories merge during preferred-snapshot startup as well as realtime reconciliation.
+  History-only state starts sync and passes the empty-state guard. Deferred startup explicitly
+  persists the mutation that created the subscription, including post-load legacy adoption. Clearing advances
+  `manualActivityEpoch` without changing gameplay or `progressEpoch`; only histories from the
+  highest history generation participate in the union. Full progress reset epochs take precedence.
+  The sync RPC merges histories under its existing account lock before unchanged-write comparisons,
+  and row triggers preserve that contract for legacy/API writers. Omitted fields from older clients
+  preserve existing server history; a higher full reset epoch intentionally discards it.
+- Equal-timestamp manual entries sort by ID; conflicting same-ID entries use type, action, title,
+  then details as ascending Unicode code-point tie-breakers. Client and database use the same order
+  before the 50-entry cap, so device argument order cannot change the retained feed.
+- Legacy activity envelopes with no owner are adoptable guest data. Authenticated startup waits
+  until progress sync restores the selected mode before adoption. Another account's envelope is
+  retained for its owner. The legacy key is removed only after entries have been added to progress.
 
 ---
 

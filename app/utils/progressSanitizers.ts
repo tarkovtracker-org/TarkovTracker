@@ -217,6 +217,7 @@ export const createDefaultOwnedProgressData = (): UserProgressData => ({
   storyChapters: {},
   apiUpdateHistory: [],
   manualActivityHistory: [],
+  manualActivityEpoch: 0,
 });
 const sanitizeApiTaskUpdates = (value: unknown): ApiTaskUpdate[] => {
   if (!Array.isArray(value)) {
@@ -260,8 +261,7 @@ const dedupeNewestById = <T extends { id: string }>(
   return Array.from(deduped.values());
 };
 /**
- * Shared normalization for the id-keyed, newest-first history arrays stored in
- * the progress blob (`apiUpdateHistory`, `manualActivityHistory`): sanitize each
+ * Normalization for API history stored in the progress blob: sanitize each
  * element, keep the newest entry per id, order newest first, and cap the length.
  */
 const sanitizeHistory = <T extends { id: string }>(
@@ -286,7 +286,9 @@ const sanitizeManualActivityAction = (value: unknown): ManualActivityAction | nu
   MANUAL_ACTIVITY_ACTION_VALUES.has(value) ? (value as ManualActivityAction) : null;
 const sanitizeEpochMs = (value: unknown): number | null => {
   const timestamp = toFiniteNumber(value);
-  return timestamp === null ? null : Math.max(0, Math.trunc(timestamp));
+  return timestamp === null
+    ? null
+    : Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.trunc(timestamp)));
 };
 type RequiredManualActivityFields = Omit<ManualActivityEntry, 'details'>;
 /**
@@ -319,13 +321,41 @@ export const sanitizeManualActivityEntry = (value: unknown): ManualActivityEntry
   const details = sanitizeClampedText(value.details, MANUAL_ACTIVITY_DETAILS_MAX_LENGTH);
   return details === null ? fields : { ...fields, details };
 };
-export const sanitizeManualActivityHistory = (value: unknown): ManualActivityEntry[] =>
-  sanitizeHistory(
-    value,
-    sanitizeManualActivityEntry,
-    (entry) => entry.timestamp,
-    MANUAL_ACTIVITY_HISTORY_LIMIT
+export const sanitizeManualActivityEpoch = (value: unknown): number => {
+  const epoch = toFiniteNumber(value) ?? 0;
+  return Math.max(0, Math.min(2147483647, Math.trunc(epoch)));
+};
+// PostgreSQL uses UTF-8 byte order (COLLATE "C") for the same tie-break fields.
+const activityTextKey = (value: string): string =>
+  Array.from(value, (character) => character.codePointAt(0)!.toString(16).padStart(6, '0')).join(
+    ''
   );
+const manualActivitySortKey = (entry: ManualActivityEntry): string =>
+  [entry.id, entry.type, entry.action, entry.title, entry.details ?? '']
+    .map(activityTextKey)
+    .join('/');
+const compareManualActivityEntries = (
+  left: ManualActivityEntry,
+  right: ManualActivityEntry
+): number => {
+  const timestampOrder = right.timestamp - left.timestamp;
+  if (timestampOrder !== 0) return timestampOrder;
+  const leftKey = manualActivitySortKey(left);
+  const rightKey = manualActivitySortKey(right);
+  return leftKey < rightKey ? -1 : Number(leftKey > rightKey);
+};
+export const sanitizeManualActivityHistory = (value: unknown): ManualActivityEntry[] => {
+  const raw = Array.isArray(value) ? value : [];
+  const ordered = raw
+    .map(sanitizeManualActivityEntry)
+    .filter((entry): entry is ManualActivityEntry => entry !== undefined)
+    .sort(compareManualActivityEntries);
+  const deduped = new Map<string, ManualActivityEntry>();
+  for (const entry of ordered) {
+    if (!deduped.has(entry.id)) deduped.set(entry.id, entry);
+  }
+  return Array.from(deduped.values()).slice(0, MANUAL_ACTIVITY_HISTORY_LIMIT);
+};
 const sanitizeGameMode = (value: unknown): GameMode => {
   return GAME_MODE_VALUES.includes(value as GameMode) ? (value as GameMode) : GAME_MODES.PVP;
 };
@@ -385,6 +415,7 @@ export const sanitizeOwnedProgressData = (value: unknown): UserProgressData => {
   sanitized.traders = sanitizeTraderMap(value.traders);
   sanitized.apiUpdateHistory = sanitizeApiUpdateHistory(value.apiUpdateHistory);
   sanitized.manualActivityHistory = sanitizeManualActivityHistory(value.manualActivityHistory);
+  sanitized.manualActivityEpoch = sanitizeManualActivityEpoch(value.manualActivityEpoch);
   if (level !== null) {
     sanitized.level = Math.max(1, Math.trunc(level));
   }

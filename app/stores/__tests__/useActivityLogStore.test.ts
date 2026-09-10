@@ -10,6 +10,7 @@ const { currentUserId, tarkovState } = vi.hoisted(() => ({
     value: null as string | null,
   },
   tarkovState: {
+    currentGameMode: 'pvp' as 'pvp' | 'pve',
     apiUpdateHistory: [] as Array<{ id: string; at: number }>,
     manualActivityHistory: [] as ManualActivityEntry[],
   },
@@ -20,6 +21,7 @@ vi.mock('@/stores/useTarkov', async () => {
   >('@/utils/progressSanitizers');
   return {
     useTarkovStore: () => ({
+      getCurrentGameMode: () => tarkovState.currentGameMode,
       getCurrentProgressData: () =>
         ({
           apiUpdateHistory: tarkovState.apiUpdateHistory,
@@ -58,16 +60,19 @@ const legacyEntry = (overrides: Partial<ManualActivityEntry> = {}): ManualActivi
 describe('useActivityLogStore', () => {
   beforeEach(() => {
     localStorage.clear();
+    tarkovState.currentGameMode = 'pvp';
     tarkovState.apiUpdateHistory = [];
     tarkovState.manualActivityHistory = [];
     currentUserId.value = null;
     setActivePinia(createPinia());
   });
   afterEach(() => {
+    vi.restoreAllMocks();
     localStorage.clear();
   });
   it('adds manual entries to the synced progress blob, newest first', () => {
     const store = useActivityLogStore();
+    vi.spyOn(Date, 'now').mockReturnValueOnce(1000).mockReturnValueOnce(2000);
     store.addManualEntry({ id: 'm1', type: 'task', action: 'complete', title: 'First' });
     store.addManualEntry({ id: 'm2', type: 'task', action: 'fail', title: 'Second' });
     expect(tarkovState.manualActivityHistory).toHaveLength(2);
@@ -113,7 +118,7 @@ describe('useActivityLogStore', () => {
   it('tracks unread API history without requiring the sorted entry list', () => {
     tarkovState.apiUpdateHistory.push({ id: 'api-old', at: 1000 }, { id: 'api-new', at: 5000 });
     const store = useActivityLogStore();
-    store.lastReadTimestamp = 2000;
+    store.lastReadByMode.pvp = 2000;
     expect(store.hasUnread).toBe(true);
     expect(store.unreadCount).toBe(1);
     store.markAllAsRead();
@@ -142,16 +147,25 @@ describe('useActivityLogStore', () => {
     currentUserId.value = 'user-1';
     localStorage.setItem(
       STORAGE_KEYS.activityLogLastRead,
-      serializeUserScopedStorage(1500, 'user-1', 2000)
+      serializeUserScopedStorage({ pvp: 1500 }, 'user-1', 2000)
     );
     const store = useActivityLogStore();
     expect(store.lastReadTimestamp).toBe(1500);
+  });
+  it('marks only the selected mode read', () => {
+    const store = useActivityLogStore();
+    store.markAllAsRead();
+    expect(store.lastReadByMode.pvp).toBeGreaterThan(0);
+    expect(store.lastReadByMode.pve).toBeUndefined();
+    tarkovState.currentGameMode = 'pve';
+    store.markAllAsRead();
+    expect(store.lastReadByMode.pve).toBeGreaterThan(0);
   });
   it('ignores a read timestamp owned by another user', () => {
     currentUserId.value = 'user-2';
     localStorage.setItem(
       STORAGE_KEYS.activityLogLastRead,
-      serializeUserScopedStorage(1500, 'user-1', 2000)
+      serializeUserScopedStorage({ pvp: 1500 }, 'user-1', 2000)
     );
     const store = useActivityLogStore();
     expect(store.lastReadTimestamp).toBe(0);
@@ -174,6 +188,15 @@ describe('useActivityLogStore', () => {
       ]);
       expect(localStorage.getItem(STORAGE_KEYS.activityLogManual)).toBeNull();
       expect(localStorage.getItem(LEGACY_STORAGE_KEYS.activityLogManual)).toBeNull();
+    });
+    it('adopts guest-owned envelopes after authentication', () => {
+      currentUserId.value = 'user-1';
+      localStorage.setItem(
+        STORAGE_KEYS.activityLogManual,
+        serializeUserScopedStorage([legacyEntry()], null, 2000)
+      );
+      expect(useActivityLogStore().migrateLegacyManualEntries()).toBe(true);
+      expect(tarkovState.manualActivityHistory).toEqual([legacyEntry()]);
     });
     it('adopts entries scoped to the current user', () => {
       currentUserId.value = 'user-1';

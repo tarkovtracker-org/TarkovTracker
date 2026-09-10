@@ -364,7 +364,13 @@ function buildPreview(
   };
 }
 function stripInternalSyncMetadata(data: UserProgressData): UserProgressData {
-  const { apiUpdateHistory: _, lastApiUpdate: __, manualActivityHistory: ___, ...rest } = data;
+  const {
+    apiUpdateHistory: _,
+    lastApiUpdate: __,
+    manualActivityHistory: ___,
+    manualActivityEpoch: ____,
+    ...rest
+  } = data;
   return sanitizeOwnedProgressData(rest);
 }
 async function fingerprintValue(value: string | number | null | undefined): Promise<string | null> {

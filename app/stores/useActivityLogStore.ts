@@ -1,6 +1,7 @@
 import { useStorage } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { sanitizeManualActivityHistory } from '@/utils/progressSanitizers';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
@@ -41,20 +42,23 @@ const parseLegacyJson = <T>(raw: string, fallback: T): T => {
     return fallback;
   }
 };
+type ReadTimestamps = Partial<Record<GameMode, number>>;
 const activityLogTimestampSerializer = {
-  read: (raw: string): number => {
-    const currentUserId = getCurrentSupabaseUserId();
-    const wrapped = parseUserScopedStorage<number>(raw);
-    if (wrapped) {
-      return wrapped._userId === currentUserId && typeof wrapped.data === 'number'
-        ? wrapped.data
-        : 0;
-    }
-    const legacyTimestamp = parseLegacyJson<unknown>(raw, 0);
-    return typeof legacyTimestamp === 'number' ? legacyTimestamp : 0;
+  read: (raw: string): ReadTimestamps => {
+    const wrapped = parseUserScopedStorage<ReadTimestamps>(raw);
+    if (wrapped?._userId !== getCurrentSupabaseUserId()) return {};
+    const data = wrapped?.data;
+    // The old global timestamp cannot establish which mode was viewed.
+    if (!data || typeof data !== 'object') return {};
+    return Object.fromEntries(
+      GAME_MODE_VALUES.map((mode) => [mode, validReadTimestamp(data[mode])])
+    );
   },
-  write: (value: number): string => serializeUserScopedStorage(value, getCurrentSupabaseUserId()),
+  write: (value: ReadTimestamps): string =>
+    serializeUserScopedStorage(value, getCurrentSupabaseUserId()),
 };
+const validReadTimestamp = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0;
 const toActivityLogEntry = (entry: ManualActivityEntry): ActivityLogEntry => ({
   id: entry.id,
   timestamp: entry.timestamp,
@@ -73,7 +77,7 @@ const toActivityLogEntry = (entry: ManualActivityEntry): ActivityLogEntry => ({
 const readLegacyManualEntries = (raw: string): ManualActivityEntry[] | null => {
   const wrapped = parseUserScopedStorage<unknown>(raw);
   if (wrapped) {
-    return wrapped._userId === getCurrentSupabaseUserId()
+    return wrapped._userId === null || wrapped._userId === getCurrentSupabaseUserId()
       ? sanitizeManualActivityHistory(wrapped.data)
       : null;
   }
@@ -113,11 +117,12 @@ const adoptLegacyManualEntries = (key: string): boolean => {
   if (entries === null) {
     return false;
   }
-  removeLocalStorageItem(key);
   if (entries.length === 0) {
+    removeLocalStorageItem(key);
     return false;
   }
   useTarkovStore().addManualActivityEntries(entries);
+  removeLocalStorageItem(key);
   return true;
 };
 export const useActivityLogStore = defineStore('activityLog', {
@@ -125,11 +130,14 @@ export const useActivityLogStore = defineStore('activityLog', {
     // Read state is intentionally device-local: the unread badge tracks what
     // this browser has seen, not what the account has seen. Manual entries
     // themselves live in the synced per-mode progress blob (issue #445).
-    lastReadTimestamp: useStorage<number>(STORAGE_KEYS.activityLogLastRead, 0, undefined, {
+    lastReadByMode: useStorage<ReadTimestamps>(STORAGE_KEYS.activityLogLastRead, {}, undefined, {
       serializer: activityLogTimestampSerializer,
     }),
   }),
   getters: {
+    lastReadTimestamp(): number {
+      return this.lastReadByMode[useTarkovStore().getCurrentGameMode()] ?? 0;
+    },
     manualEntries(): ActivityLogEntry[] {
       return useTarkovStore().getManualActivityHistory().map(toActivityLogEntry);
     },
@@ -203,11 +211,15 @@ export const useActivityLogStore = defineStore('activityLog', {
       const latestManualTimestamp = tarkovStore
         .getManualActivityHistory()
         .reduce((latest, entry) => Math.max(latest, entry.timestamp), 0);
-      this.lastReadTimestamp = Math.max(latestApiTimestamp, latestManualTimestamp, Date.now());
+      this.lastReadByMode[tarkovStore.getCurrentGameMode()] = Math.max(
+        latestApiTimestamp,
+        latestManualTimestamp,
+        Date.now()
+      );
     },
     clearLog() {
       useTarkovStore().clearManualActivityHistory();
-      this.lastReadTimestamp = Date.now();
+      this.markAllAsRead();
     },
     /**
      * Reset only the device-local read marker. Manual entries now follow the
@@ -216,7 +228,7 @@ export const useActivityLogStore = defineStore('activityLog', {
      * auth state changed before the scoped read resolved.
      */
     resetForSession() {
-      this.lastReadTimestamp = 0;
+      this.lastReadByMode = {};
     },
     /**
      * One-time move of pre-#445 manual entries into the selected mode's synced

@@ -1,6 +1,7 @@
 import { defaultState, type UserProgressData, type UserState } from '@/stores/progressState';
 import {
   getNextProgressEpoch,
+  mergeManualActivityHistory,
   mergeProgressData,
   mergeStoryChapterProgress,
   toProgressEpoch,
@@ -107,6 +108,7 @@ export const resolveInitialSyncState = (
     }
     return {
       ...preferredModeData,
+      ...mergeManualActivityHistory(localModeData, remoteModeData),
       storyChapters: mergeStoryChapterProgress(
         localModeData.storyChapters,
         remoteModeData.storyChapters

@@ -17,6 +17,7 @@
 import { ACTIVE_SEASON_NUMBER, GAME_MODES, type GameMode } from '@/utils/constants';
 import {
   reconcileSeasonalProgressSeason,
+  sanitizeManualActivityEpoch,
   sanitizeManualActivityHistory,
   sanitizeOwnedProgressData,
 } from '@/utils/progressSanitizers';
@@ -59,6 +60,7 @@ const defaultProgressData: UserProgressData = {
   storyChapters: {},
   apiUpdateHistory: [],
   manualActivityHistory: [],
+  manualActivityEpoch: 0,
 };
 export const defaultState: UserState = {
   currentGameMode: GAME_MODES.PVP,
@@ -170,6 +172,7 @@ const getCurrentData = (state: UserState): UserProgressData => {
       storyChapters: {},
       apiUpdateHistory: [],
       manualActivityHistory: [],
+      manualActivityEpoch: 0,
     };
   }
   return state[state.currentGameMode];
@@ -486,6 +489,10 @@ export const actions = {
   },
   clearManualActivityHistory(this: UserState) {
     const currentData = getCurrentData(this);
+    currentData.manualActivityEpoch = Math.min(
+      2147483647,
+      sanitizeManualActivityEpoch(currentData.manualActivityEpoch) + 1
+    );
     currentData.manualActivityHistory = [];
   },
 } as const;

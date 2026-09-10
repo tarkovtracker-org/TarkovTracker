@@ -254,3 +254,62 @@ describe('mergeProgressData manual activity history', () => {
     expect(localWins.manualActivityHistory?.map((item) => item.id)).toEqual(['remote-only']);
   });
 });
+describe('manual history reconciliation regressions', () => {
+  const entry = (id: string, title = id): ManualActivityEntry => ({
+    id,
+    title,
+    timestamp: 1000,
+    type: 'task',
+    action: 'complete',
+  });
+  it('converges for equal timestamps, duplicate IDs and more than 50 entries', () => {
+    const local = {
+      ...createProgressData({}),
+      manualActivityHistory: [
+        entry('same', 'Z'),
+        ...Array.from({ length: 60 }, (_, i) => entry(`entry-${i}`)),
+      ],
+    };
+    const remote = {
+      ...createProgressData({}),
+      manualActivityHistory: [entry('same', 'A'), entry('0')],
+    };
+    const forward = mergeProgressData(local, remote).manualActivityHistory;
+    const reverse = mergeProgressData(remote, local).manualActivityHistory;
+    expect(forward).toEqual(reverse);
+    expect(forward).toHaveLength(50);
+    const duplicate = mergeProgressData(
+      { ...local, manualActivityHistory: [entry('same', 'Z')] },
+      remote
+    );
+    expect(duplicate.manualActivityHistory?.find((row) => row.id === 'same')?.title).toBe('A');
+  });
+  it('does not resurrect cleared history from a stale device, in either direction', () => {
+    const stale = { ...createProgressData({}), manualActivityHistory: [entry('old')] };
+    const cleared = {
+      ...createProgressData({}),
+      manualActivityEpoch: 1,
+      manualActivityHistory: [] as ManualActivityEntry[],
+    };
+    for (const [left, right] of [
+      [stale, cleared],
+      [cleared, stale],
+    ]) {
+      const result = mergeProgressData(left, right);
+      expect(result.manualActivityEpoch).toBe(1);
+      expect(result.manualActivityHistory).toEqual([]);
+      expect(result.progressEpoch).toBe(0);
+    }
+    cleared.manualActivityHistory = [entry('new')];
+    expect(mergeProgressData(stale, cleared).manualActivityHistory).toEqual([entry('new')]);
+  });
+  it('starts and permits synchronization for history-only state and its clear', () => {
+    const empty = createProgressData({});
+    const state = { pvp: empty, pve: empty, seasonal: empty };
+    expect(hasProgress(state)).toBe(false);
+    expect(
+      hasProgress({ ...state, pvp: { ...empty, manualActivityHistory: [entry('only')] } })
+    ).toBe(true);
+    expect(hasProgress({ ...state, pvp: { ...empty, manualActivityEpoch: 1 } })).toBe(true);
+  });
+});

@@ -82,4 +82,5 @@ export interface UserProgressData {
   lastApiUpdate?: ApiUpdateMeta;
   apiUpdateHistory?: ApiUpdateMeta[];
   manualActivityHistory?: ManualActivityEntry[];
+  manualActivityEpoch?: number;
 }

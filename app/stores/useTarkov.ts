@@ -1748,6 +1748,11 @@ export async function initializeTarkovSync() {
         (hasTrackedProgress) => {
           if (hasTrackedProgress) {
             startSync();
+            // The subscription was created after this mutation (including legacy
+            // history adoption), so explicitly persist the snapshot that started it.
+            void syncController?.syncToSupabase().catch((error) => {
+              logger.error('[TarkovStore] Failed to sync initial tracked progress:', error);
+            });
           }
         },
         { flush: 'post' }
