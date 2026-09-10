@@ -2241,6 +2241,8 @@
       "confirm_word": "ELIMINA"
     },
     "log_import": {
+      "reading_logs": "Reading logs and preparing the preview…",
+      "large_folder_hint": "Large folders are read locally in chunks. Keep this page open; you can cancel while logs are being read.",
       "upload_hint": "Seleziona la cartella Logs di Escape from Tarkov per importare i progressi delle missioni.",
       "deleted_logs_hint": "Se le vecchie sessioni log sono state eliminate, non possono essere importate.",
       "deleted_logs_hint_tooltip": "L'importazione log legge solo gli eventi delle missioni ancora presenti nella tua cartella log corrente.",
@@ -2290,19 +2292,14 @@
       "cleared_logs_toast_title": "Probabilmente i vecchi log sono stati cancellati",
       "cleared_logs_toast_description": "L'importazione può leggere solo la cronologia delle missioni ancora nelle cartelle log. Le sessioni eliminate non possono essere recuperate.",
       "errors": {
+        "invalid_archive": "The ZIP archive is incomplete or contains an invalid log entry. No progress was imported.",
+        "record_too_large": "An individual log record in {path} is too large to parse safely. No progress was imported. Please report this log format.",
         "apply_import_failed": "Applicazione dei dati di completamento delle missioni non riuscita.",
-        "archive_log_file_too_large": "Il file log è troppo grande nell'archivio: {path}",
-        "archive_logs_too_large": "L'archivio contiene troppi contenuti (max {max_mb} MB).",
-        "import_file_too_large": "Il file è troppo grande (max {max_mb} MB).",
-        "log_file_too_large": "Il file log è troppo grande (max {max_mb} MB).",
-        "log_file_too_large_path": "Il file log è troppo grande: {path}",
         "no_files_selected": "Nessun file selezionato.",
-        "no_logs_in_archive": "Nessun log EFT è stato trovato nell'archivio.",
         "no_matching_tasks_found": "Sono stati trovati eventi di missione, ma nessuno corrisponde alle missioni attuali di TarkovTracker.",
         "no_notification_logs_found": "Nessun log di notifica è stato trovato nei file selezionati.",
         "no_quest_events_found": "Nessun evento di avvio/completamento missioni trovato nei log selezionati.",
         "parse_failed": "Analisi dei log EFT non riuscita.",
-        "selected_logs_too_large": "I log selezionati contengono troppi contenuti (max {max_mb} MB).",
         "task_metadata_not_loaded": "I metadati delle missioni non sono ancora stati caricati. Si prega di aggiornare e riprovare.",
         "invalid_mode": "Seleziona una modalità di gioco di destinazione valida.",
         "outside_active_season": "Questi registri contengono eventi al di fuori della stagione attiva o senza una data utilizzabile. Seleziona sessioni dalla stagione attiva prima di importare in PvP stagionale."

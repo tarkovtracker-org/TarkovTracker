@@ -2241,6 +2241,8 @@
       "confirm_word": "ELIMINAR"
     },
     "log_import": {
+      "reading_logs": "Reading logs and preparing the preview…",
+      "large_folder_hint": "Large folders are read locally in chunks. Keep this page open; you can cancel while logs are being read.",
       "upload_hint": "Selecciona la carpeta Logs de Escape from Tarkov para importar el progreso de misiones.",
       "deleted_logs_hint": "Si se eliminaron sesiones antiguas de logs, no se pueden importar.",
       "deleted_logs_hint_tooltip": "La importación de logs solo lee eventos de misiones que aún existen en tu carpeta Logs actual.",
@@ -2290,19 +2292,14 @@
       "cleared_logs_toast_title": "Es probable que se hayan limpiado logs antiguos",
       "cleared_logs_toast_description": "La importación de logs solo puede leer historial de misiones que aún está en tu carpeta Logs. Las sesiones eliminadas no se pueden recuperar.",
       "errors": {
+        "invalid_archive": "The ZIP archive is incomplete or contains an invalid log entry. No progress was imported.",
+        "record_too_large": "An individual log record in {path} is too large to parse safely. No progress was imported. Please report this log format.",
         "apply_import_failed": "No se pudieron aplicar los datos importados de finalización de misiones.",
-        "archive_log_file_too_large": "El archivo de registro dentro del archivo comprimido es demasiado grande: {path}",
-        "archive_logs_too_large": "El archivo comprimido contiene demasiados datos de registros (máx. {max_mb} MB).",
-        "import_file_too_large": "El archivo de importación es demasiado grande (máx. {max_mb} MB).",
-        "log_file_too_large": "El archivo de registro es demasiado grande (máx. {max_mb} MB).",
-        "log_file_too_large_path": "El archivo de registro es demasiado grande: {path}",
         "no_files_selected": "No se seleccionaron archivos.",
-        "no_logs_in_archive": "No se encontraron registros de EFT en el archivo comprimido.",
         "no_matching_tasks_found": "Se encontraron eventos de misión, pero ninguno coincide con las misiones actuales de TarkovTracker.",
         "no_notification_logs_found": "No se encontraron registros de notificaciones en los archivos seleccionados.",
         "no_quest_events_found": "No se encontraron eventos de inicio/finalización de misiones en los registros seleccionados.",
         "parse_failed": "No se pudieron analizar los registros de EFT.",
-        "selected_logs_too_large": "Los registros seleccionados contienen demasiado contenido (máx. {max_mb} MB).",
         "task_metadata_not_loaded": "Los metadatos de misiones aún no se cargaron. Actualiza e inténtalo de nuevo.",
         "invalid_mode": "Selecciona un modo de juego de destino válido.",
         "outside_active_season": "Estos registros contienen eventos fuera de la temporada activa o sin una fecha utilizable. Seleccione sesiones de la temporada activa antes de importar en JcJ estacional."

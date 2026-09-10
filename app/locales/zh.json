@@ -2241,6 +2241,8 @@
       "confirm_word": "删除账户"
     },
     "log_import": {
+      "reading_logs": "Reading logs and preparing the preview…",
+      "large_folder_hint": "Large folders are read locally in chunks. Keep this page open; you can cancel while logs are being read.",
       "upload_hint": "选择你的 Escape from Tarkov Logs 文件夹以导入任务进度。",
       "deleted_logs_hint": "如果旧日志会话已删除，就无法导入。",
       "deleted_logs_hint_tooltip": "日志导入只能读取当前 Logs 文件夹中仍存在的任务事件。",
@@ -2290,19 +2292,14 @@
       "cleared_logs_toast_title": "旧日志可能已被清理",
       "cleared_logs_toast_description": "日志导入只能读取 Logs 文件夹里仍保留的任务历史。已删除的会话无法恢复。",
       "errors": {
+        "invalid_archive": "The ZIP archive is incomplete or contains an invalid log entry. No progress was imported.",
+        "record_too_large": "An individual log record in {path} is too large to parse safely. No progress was imported. Please report this log format.",
         "apply_import_failed": "无法应用导入的任务完成数据。",
-        "archive_log_file_too_large": "压缩包中的日志文件过大：{path}",
-        "archive_logs_too_large": "压缩包包含的日志内容过多（最大 {max_mb} MB）。",
-        "import_file_too_large": "导入文件过大（最大 {max_mb} MB）。",
-        "log_file_too_large": "日志文件过大（最大 {max_mb} MB）。",
-        "log_file_too_large_path": "日志文件过大：{path}",
         "no_files_selected": "未选择任何文件。",
-        "no_logs_in_archive": "压缩包中未找到 EFT 日志。",
         "no_matching_tasks_found": "已找到任务事件，但与当前 TarkovTracker 任务均不匹配。",
         "no_notification_logs_found": "在所选文件中未找到通知日志。",
         "no_quest_events_found": "在所选日志中未找到任务开始/完成事件。",
         "parse_failed": "解析 EFT 日志失败。",
-        "selected_logs_too_large": "所选日志内容过多（最大 {max_mb} MB）。",
         "task_metadata_not_loaded": "任务元数据尚未加载。请刷新后重试。",
         "invalid_mode": "选择一个有效的目标游戏模式。",
         "outside_active_season": "这些日志包含活动季节以外或没有可用日期的事件。从活动季节选择会话，然后导入季节性PvP。"
