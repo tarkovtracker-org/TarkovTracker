@@ -67,6 +67,14 @@ export function useAppInitialization() {
     resetTarkovStoreForSessionTransition(previousUserId, reason);
     activityLogStore.resetForSession();
   };
+  const resetInitializationState = (loggedIn: boolean) => {
+    syncStarted = false;
+    migrationAttempted = false;
+    accountActivityRecordedForUserId = null;
+    supporterLoadedForUserId = null;
+    supporter.reset();
+    if (!loggedIn) activityLogStore.migrateLegacyManualEntries();
+  };
   const isCurrentSupporterRequest = (expectedUserId?: string, expectedToken?: number) =>
     (!expectedUserId || getAuthenticatedUserId() === expectedUserId) &&
     (expectedToken === undefined || expectedToken === authChangeToken);
@@ -162,21 +170,12 @@ export function useAppInitialization() {
         } else if (!loggedIn && prevLoggedIn) {
           resetTarkovState('logout');
         }
-        syncStarted = false;
-        migrationAttempted = false;
-        accountActivityRecordedForUserId = null;
-        supporterLoadedForUserId = null;
-        supporter.reset();
-        if (!loggedIn) activityLogStore.migrateLegacyManualEntries();
+        resetInitializationState(loggedIn);
         return;
       }
       if (prevUserId && userId && prevUserId !== userId) {
         resetTarkovState('user switched', prevUserId);
-        syncStarted = false;
-        migrationAttempted = false;
-        accountActivityRecordedForUserId = null;
-        supporterLoadedForUserId = null;
-        supporter.reset();
+        resetInitializationState(loggedIn);
       }
       await startSyncIfNeeded(userId, token);
       if (token !== authChangeToken) return;

@@ -306,9 +306,7 @@ const sanitizeRequiredManualActivityFields = (
     title: sanitizeClampedText(value.title, MANUAL_ACTIVITY_TITLE_MAX_LENGTH),
     type: sanitizeManualActivityType(value.type),
   };
-  return Object.values(fields).some((field) => field === null)
-    ? null
-    : (fields as RequiredManualActivityFields);
+  return Object.values(fields).includes(null) ? null : (fields as RequiredManualActivityFields);
 };
 export const sanitizeManualActivityEntry = (value: unknown): ManualActivityEntry | undefined => {
   if (!isRecord(value)) {
