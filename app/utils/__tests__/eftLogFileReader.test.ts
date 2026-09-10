@@ -122,7 +122,7 @@ describe('readEftLogSources', () => {
         },
       })
     ).rejects.toMatchObject({ name: 'AbortError' });
-    expect(slices).toHaveBeenCalledOnce();
+    expect(slices).toHaveBeenCalledTimes(2);
   });
   it('cancels a raw file between slices without reading the rest', async () => {
     const file = largeOutputFile(64 * 1024 * 1024);
@@ -157,6 +157,31 @@ describe('readEftLogSources', () => {
     const dataStart = 30 + header.getUint16(26, true) + header.getUint16(28, true);
     archive[dataStart] = 255;
     await expect(read([new File([new Uint8Array(archive)], 'Logs.zip')])).rejects.toThrow();
+  });
+  it.each([0, 10, 30])(
+    'rejects ZIP input truncated to %i bytes before entries are emitted',
+    async (size) => {
+      const archive = zipSync({ 'notifications.log': strToU8(notification) });
+      await expect(
+        read([new File([new Uint8Array(archive.slice(0, size))], 'Logs.zip')])
+      ).rejects.toBeInstanceOf(EftLogArchiveError);
+    }
+  );
+  it('rejects a ZIP missing its end record even when its log data is complete', async () => {
+    const archive = zipSync({ 'notifications.log': strToU8(notification) });
+    await expect(
+      read([new File([new Uint8Array(archive.slice(0, -22))], 'Logs.zip')])
+    ).rejects.toBeInstanceOf(EftLogArchiveError);
+  });
+  it('accepts a valid empty ZIP and archives with comments', async () => {
+    expect((await read([new File([new Uint8Array(zipSync({}))], 'empty.zip')])).sources).toEqual(
+      []
+    );
+    const archive = zipSync(
+      { 'notifications.log': strToU8(notification) },
+      { comment: 'Logs archive' }
+    );
+    expect((await read([new File([new Uint8Array(archive)], 'Logs.zip')])).sources).toHaveLength(1);
   });
   it('rejects truncated ZIP content without returning a partial import', async () => {
     const archive = zipSync({ 'notifications.log': strToU8(notification) });

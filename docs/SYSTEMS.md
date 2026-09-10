@@ -760,7 +760,9 @@ flowchart LR
    input uses 16 KiB slices to bound each inflation step. These are buffer sizes, not import limits.
    Supported members are consumed immediately; unsupported members use a discard decoder so
    fflate cannot retain deferred compressed contents. Declared ZIP sizes never drive allocation;
-   supported entries must finish and match their declared expanded size when present.
+   supported entries must finish and match their declared expanded size when present. A bounded
+   ZIP-tail read validates the end record and comment length before streaming, rejecting empty or
+   truncated input while accepting valid empty archives.
    UTF-8 decoding and timestamp-delimited record framing preserve split characters, headers,
    multiline JSON, and final records without a trailing newline. An individual unfinished record
    is limited to 8 Mi characters to reject malformed/unbounded records; this fails the selection

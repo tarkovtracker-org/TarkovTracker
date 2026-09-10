@@ -78,12 +78,25 @@ function startZipLog(entry: UnzipFile, finish: (file: EftParsedLogFile) => void)
   };
   entry.start();
 }
+/** Verifies the end record in the bounded ZIP comment window, including ZIP64 archives. */
+async function checkZipEnd(file: File, signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted();
+  const tail = await file.slice(Math.max(0, file.size - 65557)).arrayBuffer();
+  signal.throwIfAborted();
+  const view = new DataView(tail);
+  for (let offset = view.byteLength - 22; offset >= 0; offset--) {
+    if (view.getUint32(offset, true) !== 0x06054b50) continue;
+    if (offset + 22 + view.getUint16(offset + 20, true) === view.byteLength) return;
+  }
+  throw new EftLogArchiveError();
+}
 /** Streams archive members immediately so neither compressed nor expanded whole files accumulate. */
 async function readZip(
   file: File,
   onChunk: (bytes: number) => void,
   signal: AbortSignal
 ): Promise<{ files: EftParsedLogFile[]; scanned: number }> {
+  await checkZipEnd(file, signal);
   const files: EftParsedLogFile[] = [];
   let scanned = 0;
   let pending = 0;
