@@ -260,9 +260,13 @@ describe('DataManagementCard', () => {
       tarkovDevState.previewData.value = null;
     });
   });
-  const createWrapper = (props: { view?: 'all' | 'imports' | 'backup' } = {}) =>
+  const createWrapper = (
+    props: { view?: 'all' | 'imports' | 'backup' } = {},
+    options: { attachTo?: HTMLElement } = {}
+  ) =>
     mount(DataManagementCard, {
       props,
+      attachTo: options.attachTo,
       global: {
         mocks: {
           $t: (key: string) => key,
@@ -319,6 +323,41 @@ describe('DataManagementCard', () => {
     ).toBeUndefined();
     await findButtonByText(wrapper, 'common.cancel')!.trigger('click');
     expect(eftLogsFns.reset).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
+  it('announces reading status without putting progress or controls in the live region', async () => {
+    const wrapper = createWrapper({ view: 'imports' });
+    eftLogsState.isParsing.value = true;
+    eftLogsState.parseProgress.value = { bytesRead: 25, totalBytes: 100 };
+    await wrapper.vm.$nextTick();
+    const liveRegion = wrapper.find('[role="status"][aria-live="polite"]');
+    expect(liveRegion.attributes('aria-atomic')).toBe('true');
+    expect(liveRegion.text()).toContain('settings.log_import.reading_logs');
+    // Progress updates and the Cancel control must not be re-announced on every slice.
+    expect(liveRegion.find('progress').exists()).toBe(false);
+    expect(liveRegion.find('button').exists()).toBe(false);
+    expect(wrapper.find('progress').exists()).toBe(true);
+    expect(findButtonByText(wrapper, 'common.cancel')).toBeTruthy();
+    wrapper.unmount();
+  });
+  it('returns focus to the folder picker after cancelling a folder read', async () => {
+    const wrapper = createWrapper({ view: 'imports' }, { attachTo: document.body });
+    eftLogsState.isParsing.value = true;
+    await wrapper.vm.$nextTick();
+    const cancelButton = findButtonByText(wrapper, 'common.cancel')!;
+    (cancelButton.element as HTMLButtonElement).focus();
+    expect(document.activeElement).toBe(cancelButton.element);
+    eftLogsFns.reset.mockImplementation(() => {
+      eftLogsState.isParsing.value = false;
+    });
+    await cancelButton.trigger('click');
+    await wrapper.vm.$nextTick();
+    const picker = findButtonByText(
+      wrapper,
+      'settings.data_management.import_eft_logs_folder_button'
+    );
+    expect(picker).toBeTruthy();
+    expect(document.activeElement).toBe(picker!.element);
     wrapper.unmount();
   });
   it('limits the imports view to profile and log import actions', () => {

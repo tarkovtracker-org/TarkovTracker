@@ -110,7 +110,8 @@ async function readZip(
       discardZipEntry(unzip, entry);
       return;
     }
-    // An ignored member may have temporarily registered a discard decoder for this method.
+    // discardZipEntry overwrites this method's entry in the shared decoder registry, and fflate
+    // resolves the decoder from that registry inside entry.start(), so restore both first.
     unzip.register(UnzipInflate);
     unzip.register(UnzipPassThrough);
     pending++;

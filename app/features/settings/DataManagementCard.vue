@@ -391,6 +391,7 @@
           </p>
           <template v-if="!isAnyImportPreviewActive && !eftLogsIsParsing">
             <UButton
+              ref="eftLogsFolderButtonRef"
               icon="i-mdi-folder-upload-outline"
               block
               :ui="{
@@ -430,16 +431,20 @@
               </ul>
             </div>
           </template>
-          <div aria-live="polite" class="space-y-2">
+          <div class="space-y-2">
+            <div role="status" aria-live="polite" aria-atomic="true">
+              <p v-if="eftLogsIsParsing" class="text-sm">
+                {{ $t('settings.log_import.reading_logs') }}
+              </p>
+            </div>
             <template v-if="eftLogsIsParsing">
-              <p class="text-sm">{{ $t('settings.log_import.reading_logs') }}</p>
               <progress
                 :value="eftLogsParseProgress.bytesRead"
                 :max="eftLogsParseProgress.totalBytes || 1"
                 :aria-label="$t('settings.log_import.reading_logs')"
                 class="w-full"
               />
-              <UButton color="neutral" variant="soft" @click="resetEftLogsImport()">
+              <UButton color="neutral" variant="soft" @click="cancelEftLogsParsing()">
                 {{ $t('common.cancel') }}
               </UButton>
             </template>
@@ -1187,6 +1192,7 @@
     t('settings.log_import.session_folder_example_path')
   );
   const eftLogsFolderInputRef = ref<HTMLInputElement | null>(null);
+  const eftLogsFolderButtonRef = ref<{ $el?: HTMLElement } | null>(null);
   const eftLogsTargetMode = ref<GameMode>(currentImportableMode());
   const eftLogsNoQuestEventsError = computed(() =>
     t('settings.log_import.errors.no_quest_events_found')
@@ -1333,6 +1339,11 @@
   );
   function showEftLogsFolderInput() {
     eftLogsFolderInputRef.value?.click();
+  }
+  /** Cancelling unmounts the Cancel button, so return focus to the picker it replaced. */
+  function cancelEftLogsParsing() {
+    resetEftLogsImport();
+    void nextTick(() => eftLogsFolderButtonRef.value?.$el?.focus());
   }
   function updateTarkovDevImportTarget(
     sourceMode: GameMode | null | undefined,
