@@ -43,4 +43,7 @@ Logs - Copy.zip
 __pycache__/
 *.py[cod]
 
+# Nuxt module setup bookkeeping (rewritten by `nuxt prepare` on every module version bump)
+.nuxtrc
+
 /precompute-manifest.json
