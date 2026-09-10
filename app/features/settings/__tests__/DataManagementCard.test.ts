@@ -77,6 +77,7 @@ const {
     setIncludedVersions: vi.fn(),
   },
   eftLogsState: {
+    skippedLogPaths: {} as Ref<string[]>,
     isImporting: {} as Ref<boolean>,
     importError: { __v_isRef: true as const, value: null as string | null },
     previewData: { __v_isRef: true as const, value: null as Record<string, unknown> | null },
@@ -143,6 +144,7 @@ vi.mock('@/composables/useTarkovDevImport', () => ({
 }));
 vi.mock('@/composables/useEftLogsImport', () => ({
   useEftLogsImport: () => ({
+    skippedLogPaths: eftLogsState.skippedLogPaths,
     importState: eftLogsState.importState,
     isImporting: eftLogsState.isImporting,
     previewData: eftLogsState.previewData,
@@ -245,6 +247,7 @@ describe('DataManagementCard', () => {
     eftLogsState.importError.value = null;
     eftLogsState.importState.value = 'idle';
     eftLogsState.isImporting = ref(false);
+    eftLogsState.skippedLogPaths = ref([]);
     eftLogsState.previewData.value = null;
     tarkovStoreState.currentMode = 'pvp';
     tarkovStoreState.tarkovUid = null;
@@ -295,6 +298,19 @@ describe('DataManagementCard', () => {
         },
       },
     });
+  it('shows skipped paths and the partial-import warning on errors and clears the display', async () => {
+    eftLogsState.importState.value = 'error';
+    eftLogsState.importError.value = 'settings.log_import.errors.no_notification_logs_found';
+    eftLogsState.skippedLogPaths.value = ['Logs/session/output_000.log'];
+    const wrapper = createWrapper({ view: 'imports' });
+    expect(wrapper.text()).toContain('settings.log_import.skipped_large_logs');
+    expect(wrapper.text()).toContain('settings.log_import.skipped_large_logs_hint');
+    expect(wrapper.find('details li').text()).toBe('Logs/session/output_000.log');
+    eftLogsState.skippedLogPaths.value = [];
+    await wrapper.vm.$nextTick();
+    expect(wrapper.text()).not.toContain('settings.log_import.skipped_large_logs');
+    wrapper.unmount();
+  });
   it('limits the imports view to profile and log import actions', () => {
     const wrapper = createWrapper({ view: 'imports' });
     expect(findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profile')).toBeTruthy();
