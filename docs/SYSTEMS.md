@@ -1018,8 +1018,11 @@ flowchart LR
   saves retry once after a failure, retain pending state, and stop retrying after a session change.
   A failed authenticated initial sync retries within the same session on a bounded 30-second cycle
   (five attempts, first failure and exhaustion toast, intermediate failures log a warning) so the
-  deferred legacy adoption is not stranded until the next login. Identity changes cancel the
-  pending retry and reset the attempt budget, and success cancels the cycle.
+  deferred legacy adoption is not stranded until the next login. Each failed attempt first tears
+  down the partially initialized sync controller and realtime listener (`resetTarkovSync`) so the
+  retry rebuilds from a clean slate instead of skipping listener setup; stale-session failures
+  skip both teardown and retry. Identity changes cancel the pending retry and reset the attempt
+  budget, and success cancels the cycle.
   Clearing advances
   `manualActivityEpoch` without changing gameplay or `progressEpoch`; only histories from the
   highest history generation participate in the union. Full progress reset epochs take precedence.
@@ -1032,7 +1035,9 @@ flowchart LR
   to the merged feed, not per device: when two devices at the same history generation together hold
   more than 50 entries, the union keeps the 50 newest and drops the rest by design. Ids, titles, and
   details clamp by Unicode code point on both sides, matching SQL `left()`, so neither side can
-  produce a different id or a lone surrogate for the same entry.
+  produce a different id for the same entry. The client additionally strips lone surrogates before
+  clamping: `jsonb` rejects the whole `p_modes` document at parameter binding, before the SQL
+  sanitizer can run, so no client-sanitized string can carry one.
 - The sync RPC merges each mode against the persisted payload for that mode, and seeds from the
   account row's locked legacy column when the normalized row is an unmaterialized placeholder. Row
   triggers re-merge against each table's own stored row, so the seeding is what keeps the RPC's
