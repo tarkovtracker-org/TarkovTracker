@@ -7,9 +7,11 @@ import { useTarkovStore } from '@/stores/useTarkov';
 import { isAllUsersView } from '@/types/taskFilter';
 import {
   getAllUsersTraderRank,
+  getUserTraderRank,
   isActiveTeamTask,
   isAvailableTeamTask,
   matchesAllUsersView,
+  TRADER_SORT_RANK,
   type TeamTaskStatus,
 } from '@/utils/allUsersTaskStatus';
 import { TRADER_ORDER } from '@/utils/constants';
@@ -576,27 +578,25 @@ export function useTaskFiltering() {
       return nameA.localeCompare(nameB) * directionFactor;
     });
   };
-  const getTraderStatusSortRank = (task: Task, userView: string): number => {
-    if (isAllUsersView(userView)) {
-      const teamIds = Object.keys(progressStore.visibleTeamStores || {});
-      const relevantTeamIds = getRelevantTeamIds(task, teamIds);
-      if (relevantTeamIds.length === 0) return 4;
-      const taskStatuses = relevantTeamIds.map((teamId) => getTaskStatus(task.id, teamId));
-      return getAllUsersTraderRank(taskStatuses, isTaskInvalid(task.id, 'all'));
-    }
-    const isUnlocked = progressStore.unlockedTasks?.[task.id]?.[userView] === true;
-    const { isActive, isCompleted, isFailed } = getUserTaskStatus(task.id, userView);
-    if (isUnlocked && !isActive && !isCompleted && !isFailed && !isTaskInvalid(task.id, userView)) {
-      return 0;
-    }
-    if (isCompleted && !isFailed) {
-      return 2;
-    }
-    if (isFailed) {
-      return 3;
-    }
-    return 1;
+  const getAllUsersTraderStatusRank = (task: Task): number => {
+    const teamIds = Object.keys(progressStore.visibleTeamStores || {});
+    const relevantTeamIds = getRelevantTeamIds(task, teamIds);
+    if (relevantTeamIds.length === 0) return TRADER_SORT_RANK.notApplicable;
+    return getAllUsersTraderRank(
+      relevantTeamIds.map((teamId) => getTaskStatus(task.id, teamId)),
+      isTaskInvalid(task.id, 'all')
+    );
   };
+  const getUserTraderStatusRank = (task: Task, userView: string): number =>
+    getUserTraderRank({
+      ...getUserTaskStatus(task.id, userView),
+      isUnlocked: progressStore.unlockedTasks?.[task.id]?.[userView] === true,
+      isInvalid: isTaskInvalid(task.id, userView),
+    });
+  const getTraderStatusSortRank = (task: Task, userView: string): number =>
+    isAllUsersView(userView)
+      ? getAllUsersTraderStatusRank(task)
+      : getUserTraderStatusRank(task, userView);
   const groupTraderTasksByStatus = (taskList: Task[], userView: string): Task[] => {
     const sortByStatusRank = (tasks: Task[]): Task[] =>
       tasks

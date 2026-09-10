@@ -133,23 +133,22 @@ export function useTaskCounts() {
       isFailed: status === 'failed',
     };
   };
+  const matchesViewFaction = (task: Task, teamId: string): boolean =>
+    task.factionName === 'Any' || task.factionName === progressStore.playerFaction[teamId];
   const getAllUsersTaskCount = (task: Task, visibleTeamIds: string[]): TaskCountResult | null => {
-    const relevantTeamIds = visibleTeamIds.filter((teamId) => {
-      const teamFaction = progressStore.playerFaction[teamId];
-      return task.factionName === 'Any' || task.factionName === teamFaction;
-    });
+    const relevantTeamIds = visibleTeamIds.filter((teamId) => matchesViewFaction(task, teamId));
     if (relevantTeamIds.length === 0) return null;
     const statuses = relevantTeamIds.map((teamId) => getTeamTaskStatus(task.id, teamId));
     const isInvalid = isTaskInvalid(task.id, 'all', visibleTeamIds);
     return { statuses: resolveAllUsersTaskStatuses(statuses, isInvalid) };
   };
   const getUserTaskCount = (task: Task, userView: string): TaskCountResult | null => {
-    const userFaction = progressStore.playerFaction[userView];
-    if (task.factionName !== 'Any' && task.factionName !== userFaction) return null;
-    const status = progressStore.getTaskStatus(userView, task.id);
-    const isUnlocked = progressStore.unlockedTasks?.[task.id]?.[userView] === true;
-    const isInvalid = isTaskInvalid(task.id, userView);
-    const resolved = resolveUserTaskStatus(status, isUnlocked, isInvalid);
+    if (!matchesViewFaction(task, userView)) return null;
+    const resolved = resolveUserTaskStatus(
+      progressStore.getTaskStatus(userView, task.id),
+      progressStore.unlockedTasks?.[task.id]?.[userView] === true,
+      isTaskInvalid(task.id, userView)
+    );
     return { statuses: resolved ? [resolved] : [] };
   };
   const getTaskCountResult = (

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   getAllUsersTraderRank,
+  getUserTraderRank,
   isLockedForAllUsers,
   matchesAllUsersView,
   type TeamTaskStatus,
+  type UserTraderRankState,
 } from '@/utils/allUsersTaskStatus';
 const status = (teamId: string, overrides: Partial<TeamTaskStatus> = {}): TeamTaskStatus => ({
   teamId,
@@ -76,5 +78,30 @@ describe('getAllUsersTraderRank', () => {
   });
   it('still surfaces a task someone can pick up over a terminal state elsewhere', () => {
     expect(getAllUsersTraderRank([AVAILABLE, FAILED], false)).toBe(0);
+  });
+});
+describe('getUserTraderRank', () => {
+  const state = (overrides: Partial<UserTraderRankState> = {}): UserTraderRankState => ({
+    isUnlocked: false,
+    isActive: false,
+    isCompleted: false,
+    isFailed: false,
+    isInvalid: false,
+    ...overrides,
+  });
+  it.each([
+    ['available', state({ isUnlocked: true }), 0],
+    ['active', state({ isUnlocked: true, isActive: true }), 1],
+    ['locked', state(), 1],
+    ['completed', state({ isUnlocked: true, isCompleted: true }), 2],
+    ['failed', state({ isUnlocked: true, isFailed: true }), 3],
+    [
+      'completed and failed together counts as failed',
+      state({ isCompleted: true, isFailed: true }),
+      3,
+    ],
+    ['unlocked but invalid falls through', state({ isUnlocked: true, isInvalid: true }), 1],
+  ])('ranks %s', (_case, value, expected) => {
+    expect(getUserTraderRank(value)).toBe(expected);
   });
 });
