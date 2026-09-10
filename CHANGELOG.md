@@ -1,3 +1,10 @@
+## [1.77.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.3...v1.77.4) (2026-09-10)
+
+
+### Bug Fixes
+
+* **app:** keep the editions cache payload structured-cloneable ([#833](https://github.com/tarkovtracker-org/TarkovTracker/issues/833)) ([5088485](https://github.com/tarkovtracker-org/TarkovTracker/commit/50884857e215a5ebfd3b407a9529ea8b44c86e04))
+
 ## [1.77.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.2...v1.77.3) (2026-09-10)
 
 ## [1.77.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.1...v1.77.2) (2026-09-10)
