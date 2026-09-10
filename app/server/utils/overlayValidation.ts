@@ -48,7 +48,8 @@ const validStoryReference = (requirement: unknown, chapters: OverlayRecords): bo
   const chapterId = String(requirement.storyChapter);
   if (!Object.hasOwn(chapters, chapterId)) return false;
   const chapter = chapters[chapterId];
-  return Boolean(chapter) && chapterHasObjective(chapter!, requirement);
+  // Section validation already guarantees that every own chapter entry is a record.
+  return chapterHasObjective(chapter!, requirement);
 };
 const storyRequirements = (level: Record<string, unknown>) =>
   Array.isArray(level.storyRequirements) ? level.storyRequirements : [];
