@@ -392,7 +392,10 @@ export default defineNuxtConfig({
     '@nuxt/image',
     '@nuxtjs/i18n',
     process.env.NODE_ENV === 'test' ? undefined : '@nuxtjs/sitemap',
-    process.env.CODECOV_TOKEN !== undefined
+    // A fork pull request has no org secrets, so `secrets.CODECOV_TOKEN`
+    // expands to an empty string rather than being absent. Require a non-empty
+    // value so the plugin cannot load without a usable upload token.
+    process.env.CODECOV_TOKEN
       ? ([
           '@codecov/nuxt-plugin',
           {

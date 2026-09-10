@@ -165,7 +165,6 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
       - name: Build
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
         run: pnpm run build
         env:
           NODE_ENV: production

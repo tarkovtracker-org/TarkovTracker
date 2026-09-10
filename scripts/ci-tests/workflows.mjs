@@ -31,6 +31,10 @@ test('shadow rollout and fork restrictions retain existing CI coverage and Deno 
   assert.match(ci, /vitest run --coverage --shard=/);
   assert.match(ci, /deno test supabase\/functions\/_shared\/\*\.deno\.test\.ts/);
   assert.match(ci, /github.event.pull_request.head.repo.fork != true/);
+  // Coverage and bundle uploads need the org token, so they stay fork-gated.
+  // The production build needs no secrets and must run on fork pull requests.
+  assert.match(ci, /- name: Upload coverage to Codecov\n\s+if: [^\n]*fork != true/);
+  assert.match(ci, /- name: Build\n\s+run: pnpm run build/);
   assert.match(ci, /ci-result:[\s\S]*if: always\(\)/);
   for (const name of ['ci', 'pr-checks', 'security'])
     assert.ok(!read(`.github/workflows/${name}.yml`).includes('paths-ignore:'));
