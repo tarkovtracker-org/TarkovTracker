@@ -76,7 +76,7 @@ vi.mock('@/composables/useHideoutStationStatus', () => ({
 }));
 vi.mock('@/composables/usePageSettingsDrawer', () => ({
   usePageSettingsDrawer: () => ({
-    isOpen: hideoutSettingsDrawerState,
+    isOpen: ref(hideoutSettingsDrawerState.value),
     open: vi.fn(),
     close: vi.fn(),
     toggle: vi.fn(),
@@ -255,5 +255,28 @@ describe('hideout page', () => {
       },
     });
     expect(wrapper.get('[data-testid="hideout-settings-drawer"]').text()).toContain('overlay');
+  });
+  it('renders settings button with active theme classes when open on desktop', async () => {
+    breakpointState.value = true;
+    hideoutSettingsDrawerState.value = true;
+    const wrapper = await mountSuspended(HideoutPage, {
+      global: {
+        stubs: {
+          HideoutSettingsDrawer: HideoutSettingsDrawerStub,
+          HideoutCard: { template: '<div data-testid="hideout-card" />' },
+          RefreshButton: true,
+          UAlert: true,
+          UButton: UButtonStub,
+          UIcon: true,
+          UModal: true,
+          teleport: true,
+        },
+      },
+    });
+    const settingsButton = wrapper.find('[data-help-target="hideout-settings-button"]');
+    expect(settingsButton.exists()).toBe(true);
+    expect(settingsButton.attributes('aria-pressed')).toBe('true');
+    expect(settingsButton.classes()).toContain('light:text-surface-50');
+    expect(settingsButton.classes()).toContain('light:bg-surface-700/70');
   });
 });

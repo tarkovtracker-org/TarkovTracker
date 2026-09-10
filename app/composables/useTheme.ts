@@ -14,10 +14,8 @@ import {
  */
 export const useTheme = () => {
   const themeMode = useState<ThemeMode>('theme-mode', () => readStoredThemeMode());
-  if (import.meta.client) {
-    // Idempotent sync with the boot script (also covers tests/CSP-blocked boots).
-    applyThemeMode(themeMode.value);
-  }
+  // Idempotent sync with the boot script (also covers tests/CSP-blocked boots).
+  applyThemeMode(themeMode.value);
   const setThemeMode = (mode: ThemeMode) => {
     const normalized = normalizeThemeMode(mode);
     themeMode.value = normalized;

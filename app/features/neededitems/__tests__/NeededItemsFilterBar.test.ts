@@ -146,4 +146,18 @@ describe('NeededItemsFilterBar', () => {
     expect(wrapper.emitted('update:sortBy')).toEqual([['count']]);
     expect(wrapper.emitted('update:sortDirection')).toEqual([['desc']]);
   });
+  it('toggles settings drawer button and applies light-theme active classes', async () => {
+    const NeededItemsFilterBar = await setup();
+    const wrapper = mount(NeededItemsFilterBar, {
+      props: createDefaultProps(),
+      global: createDefaultGlobal(),
+    });
+    const settingsButton = wrapper.find('button[data-icon="i-mdi-cog"]');
+    expect(settingsButton.attributes('aria-pressed')).toBe('false');
+    expect(settingsButton.classes()).toContain('text-surface-400');
+    await settingsButton.trigger('click');
+    expect(settingsButton.attributes('aria-pressed')).toBe('true');
+    expect(settingsButton.classes()).toContain('light:text-surface-50');
+    expect(settingsButton.classes()).toContain('light:bg-surface-700/70');
+  });
 });

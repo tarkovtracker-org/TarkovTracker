@@ -68,6 +68,13 @@ describe('theme utils', () => {
       window.localStorage.setItem(THEME_STORAGE_KEY, 'light');
       expect(readStoredThemeMode()).toBe('light');
     });
+    it('uses provided storage when given', () => {
+      const customStorage = {
+        getItem: vi.fn().mockReturnValue('light'),
+      };
+      expect(readStoredThemeMode(customStorage)).toBe('light');
+      expect(customStorage.getItem).toHaveBeenCalledWith(THEME_STORAGE_KEY);
+    });
     it('falls back to dark when nothing is stored or the value is invalid', () => {
       expect(readStoredThemeMode()).toBe('dark');
       window.localStorage.setItem(THEME_STORAGE_KEY, 'neon');
@@ -83,6 +90,13 @@ describe('theme utils', () => {
       persistThemeMode('light');
       expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
     });
+    it('uses provided storage when given', () => {
+      const customStorage = {
+        setItem: vi.fn(),
+      };
+      persistThemeMode('light', customStorage);
+      expect(customStorage.setItem).toHaveBeenCalledWith(THEME_STORAGE_KEY, 'light');
+    });
     it('swallows storage failures without throwing', () => {
       stubThrowingStorage();
       expect(() => persistThemeMode('light')).not.toThrow();
@@ -96,6 +110,18 @@ describe('theme utils', () => {
       applyThemeMode('dark');
       expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
       expect(document.documentElement.style.colorScheme).toBe('dark');
+    });
+    it('sets attributes on provided custom root element', () => {
+      const customRoot = {
+        dataset: {} as Record<string, string>,
+        style: {} as CSSStyleDeclaration,
+      };
+      applyThemeMode('light', customRoot as unknown as HTMLElement);
+      expect(customRoot.dataset.theme).toBe('light');
+      expect(customRoot.style.colorScheme).toBe('light');
+    });
+    it('handles null/undefined root safely without throwing', () => {
+      expect(() => applyThemeMode('light', null as unknown as HTMLElement)).not.toThrow();
     });
   });
   describe('THEME_BOOT_SCRIPT', () => {
