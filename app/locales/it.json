@@ -2241,8 +2241,8 @@
       "confirm_word": "ELIMINA"
     },
     "log_import": {
-      "reading_logs": "Reading logs and preparing the preview…",
-      "large_folder_hint": "Large folders are read locally in chunks. Keep this page open; you can cancel while logs are being read.",
+      "reading_logs": "Leggere i registri e preparare l'anteprima…",
+      "large_folder_hint": "Le cartelle grandi sono lette localmente in chunk. Mantieni questa pagina aperta; puoi annullare mentre i log sono in lettura.",
       "upload_hint": "Seleziona la cartella Logs di Escape from Tarkov per importare i progressi delle missioni.",
       "deleted_logs_hint": "Se le vecchie sessioni log sono state eliminate, non possono essere importate.",
       "deleted_logs_hint_tooltip": "L'importazione log legge solo gli eventi delle missioni ancora presenti nella tua cartella log corrente.",
@@ -2292,8 +2292,8 @@
       "cleared_logs_toast_title": "Probabilmente i vecchi log sono stati cancellati",
       "cleared_logs_toast_description": "L'importazione può leggere solo la cronologia delle missioni ancora nelle cartelle log. Le sessioni eliminate non possono essere recuperate.",
       "errors": {
-        "invalid_archive": "The ZIP archive is incomplete or contains an invalid log entry. No progress was imported.",
-        "record_too_large": "An individual log record in {path} is too large to parse safely. No progress was imported. Please report this log format.",
+        "invalid_archive": "L'archivio ZIP è incompleto o contiene una voce di registro non valida. Nessun progresso è stato importato.",
+        "record_too_large": "Un record di log individuale in {path} è troppo grande per analizzare in modo sicuro. Nessun progresso è stato importato. Si prega di segnalare questo formato di log.",
         "apply_import_failed": "Applicazione dei dati di completamento delle missioni non riuscita.",
         "no_files_selected": "Nessun file selezionato.",
         "no_matching_tasks_found": "Sono stati trovati eventi di missione, ma nessuno corrisponde alle missioni attuali di TarkovTracker.",

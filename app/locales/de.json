@@ -2241,8 +2241,8 @@
       "confirm_word": "DELETE"
     },
     "log_import": {
-      "reading_logs": "Reading logs and preparing the preview…",
-      "large_folder_hint": "Large folders are read locally in chunks. Keep this page open; you can cancel while logs are being read.",
+      "reading_logs": "Lese Protokolle und bereite die Vorschau… vor",
+      "large_folder_hint": "Große Ordner werden lokal in Chunks gelesen. Diese Seite öffnen; Sie können abbrechen, während Protokolle gelesen werden.",
       "upload_hint": "Wähle deinen Escape from Tarkov Logs-Ordner aus, um Quest-Fortschritt zu importieren.",
       "deleted_logs_hint": "Wenn alte Logsitzungen gelöscht wurden, können sie nicht importiert werden.",
       "deleted_logs_hint_tooltip": "Der Log-Import liest nur Quest-Ereignisse, die noch in deinem aktuellen Logs-Ordner vorhanden sind.",
@@ -2292,8 +2292,8 @@
       "cleared_logs_toast_title": "Alte Logs wurden wahrscheinlich gelöscht",
       "cleared_logs_toast_description": "Der Log-Import kann nur Questverlauf lesen, der noch in deinem Logs-Ordner vorhanden ist. Gelöschte Sitzungen können nicht wiederhergestellt werden.",
       "errors": {
-        "invalid_archive": "The ZIP archive is incomplete or contains an invalid log entry. No progress was imported.",
-        "record_too_large": "An individual log record in {path} is too large to parse safely. No progress was imported. Please report this log format.",
+        "invalid_archive": "Das ZIP-Archiv ist unvollständig oder enthält einen ungültigen Log-Eintrag. Es wurde kein Fortschritt importiert.",
+        "record_too_large": "Ein einzelner Logeintrag in {path} ist zu groß um sicher zu parsen. Es wurde kein Fortschritt importiert. Bitte melde dieses Log-Format.",
         "apply_import_failed": "Importierte Aufgabenabschlüsse konnten nicht angewendet werden.",
         "no_files_selected": "Es wurden keine Dateien ausgewählt.",
         "no_matching_tasks_found": "Quest-Ereignisse wurden gefunden, aber keines passt zu den aktuellen TarkovTracker-Aufgaben.",

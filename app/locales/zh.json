@@ -2241,8 +2241,8 @@
       "confirm_word": "删除账户"
     },
     "log_import": {
-      "reading_logs": "Reading logs and preparing the preview…",
-      "large_folder_hint": "Large folders are read locally in chunks. Keep this page open; you can cancel while logs are being read.",
+      "reading_logs": "正在读取日志并准备预览…",
+      "large_folder_hint": "大文件夹在区块中本地读取。保持此页面打开；当日志正在读取时，您可以取消。",
       "upload_hint": "选择你的 Escape from Tarkov Logs 文件夹以导入任务进度。",
       "deleted_logs_hint": "如果旧日志会话已删除，就无法导入。",
       "deleted_logs_hint_tooltip": "日志导入只能读取当前 Logs 文件夹中仍存在的任务事件。",
@@ -2292,7 +2292,7 @@
       "cleared_logs_toast_title": "旧日志可能已被清理",
       "cleared_logs_toast_description": "日志导入只能读取 Logs 文件夹里仍保留的任务历史。已删除的会话无法恢复。",
       "errors": {
-        "invalid_archive": "The ZIP archive is incomplete or contains an invalid log entry. No progress was imported.",
+        "invalid_archive": "ZIP存档不完整或包含无效的日志条目。未导入进度。",
         "record_too_large": "An individual log record in {path} is too large to parse safely. No progress was imported. Please report this log format.",
         "apply_import_failed": "无法应用导入的任务完成数据。",
         "no_files_selected": "未选择任何文件。",

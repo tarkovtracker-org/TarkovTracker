@@ -2241,8 +2241,8 @@
       "confirm_word": "ODSTRANIT"
     },
     "log_import": {
-      "reading_logs": "Reading logs and preparing the preview…",
-      "large_folder_hint": "Large folders are read locally in chunks. Keep this page open; you can cancel while logs are being read.",
+      "reading_logs": "Čtení protokolů a příprava náhledu…",
+      "large_folder_hint": "Velké složky jsou čteny lokálně v chuncích. Ponechte tuto stránku otevřenou a můžete ji zrušit, zatímco se protokoly čtou.",
       "upload_hint": "Vyberte únik ze složky Tarkov Logs pro import úkolu.",
       "deleted_logs_hint": "Pokud byly staré relace smazány, nelze je importovat.",
       "deleted_logs_hint_tooltip": "Protokol importu pouze pro čtení událostí v úkolu, které jsou stále přítomny ve vaší aktuální složce protokolů.",
@@ -2292,8 +2292,8 @@
       "cleared_logs_toast_title": "Staré logy byly pravděpodobně vymazány",
       "cleared_logs_toast_description": "Import protokolu může číst pouze historii výprav, která je stále ve složce logů. Odstraněné relace nelze obnovit.",
       "errors": {
-        "invalid_archive": "The ZIP archive is incomplete or contains an invalid log entry. No progress was imported.",
-        "record_too_large": "An individual log record in {path} is too large to parse safely. No progress was imported. Please report this log format.",
+        "invalid_archive": "ZIP archiv je neúplný nebo obsahuje neplatný záznam logu. Nebyl importován žádný průběh.",
+        "record_too_large": "Individuální záznam v {path} je příliš velký na bezpečné zpracování. Žádný postup nebyl importován. Nahlaste prosím tento formát logu.",
         "apply_import_failed": "Použití importovaných dat dokončení úkolu se nezdařilo.",
         "no_files_selected": "Nebyly vybrány žádné soubory.",
         "no_matching_tasks_found": "Úkolové události byly nalezeny, ale žádný neodpovídá aktuálním úkolům TarkovTrackeru.",
