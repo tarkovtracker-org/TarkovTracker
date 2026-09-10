@@ -14,10 +14,15 @@ import {
  */
 export const useTheme = () => {
   const themeMode = useState<ThemeMode>('theme-mode', () => readStoredThemeMode());
-  themeMode.value = readStoredThemeMode();
+  const isHydrated = useState<boolean>('theme-hydrated', () => false);
+  if (!isHydrated.value) {
+    themeMode.value = readStoredThemeMode();
+    isHydrated.value = true;
+  }
   // Idempotent sync with the boot script (also covers tests/CSP-blocked boots).
   applyThemeMode(themeMode.value);
   const setThemeMode = (mode: ThemeMode) => {
+    isHydrated.value = true;
     const normalized = normalizeThemeMode(mode);
     themeMode.value = normalized;
     persistThemeMode(normalized);

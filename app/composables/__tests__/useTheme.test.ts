@@ -1,12 +1,13 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTheme } from '@/composables/useTheme';
 import { THEME_STORAGE_KEY } from '@/utils/theme';
 describe('useTheme', () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     window.localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
     document.documentElement.style.colorScheme = '';
-    clearNuxtState('theme-mode');
+    clearNuxtState(['theme-mode', 'theme-hydrated']);
   });
   it('defaults to dark when nothing is persisted', () => {
     const { themeMode, isLightTheme } = useTheme();
@@ -44,6 +45,20 @@ describe('useTheme', () => {
     const { themeMode, isLightTheme } = useTheme();
     expect(themeMode.value).toBe('light');
     expect(isLightTheme.value).toBe(true);
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+  });
+  it('preserves in-memory mode across multiple useTheme calls when storage is unavailable', () => {
+    const { setThemeMode } = useTheme();
+    vi.spyOn(window.localStorage, 'getItem').mockImplementation(() => {
+      throw new Error('SecurityError: Access is denied for this document');
+    });
+    vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
+      throw new Error('SecurityError: Access is denied for this document');
+    });
+    setThemeMode('light');
+    const anotherConsumer = useTheme();
+    expect(anotherConsumer.themeMode.value).toBe('light');
+    expect(anotherConsumer.isLightTheme.value).toBe(true);
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
   });
 });

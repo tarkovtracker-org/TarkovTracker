@@ -3,11 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import HideoutPage from '@/pages/hideout.vue';
 import type { HideoutStation } from '@/types/tarkov';
-const { breakpointState, hideoutSettingsDrawerState, useInfiniteScrollMock } = vi.hoisted(() => ({
-  breakpointState: { value: true },
-  hideoutSettingsDrawerState: { value: false },
-  useInfiniteScrollMock: vi.fn(() => ({ checkAndLoadMore: vi.fn() })),
-}));
+const { breakpointState, hideoutSettingsDrawerState, useInfiniteScrollMock } = await vi.hoisted(
+  async () => {
+    const { ref } = await import('vue');
+    return {
+      breakpointState: ref(true),
+      hideoutSettingsDrawerState: ref(false),
+      useInfiniteScrollMock: vi.fn(() => ({ checkAndLoadMore: vi.fn() })),
+    };
+  }
+);
 const UButtonStub = {
   template: '<button><slot /></button>',
 };
@@ -76,7 +81,7 @@ vi.mock('@/composables/useHideoutStationStatus', () => ({
 }));
 vi.mock('@/composables/usePageSettingsDrawer', () => ({
   usePageSettingsDrawer: () => ({
-    isOpen: ref(hideoutSettingsDrawerState.value),
+    isOpen: hideoutSettingsDrawerState,
     open: vi.fn(),
     close: vi.fn(),
     toggle: vi.fn(),
