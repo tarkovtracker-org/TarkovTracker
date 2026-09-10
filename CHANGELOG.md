@@ -1,3 +1,10 @@
+# [1.78.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.6...v1.78.0) (2026-09-10)
+
+
+### Features
+
+* **about:** split team directory out of credits into /about ([#839](https://github.com/tarkovtracker-org/TarkovTracker/issues/839)) ([0948142](https://github.com/tarkovtracker-org/TarkovTracker/commit/09481428d18cea3831ee19ed055ce1ab3b50a5fd)), closes [#707](https://github.com/tarkovtracker-org/TarkovTracker/issues/707)
+
 ## [1.77.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.5...v1.77.6) (2026-09-10)
 
 
