@@ -49,7 +49,10 @@
         <div class="flex items-center justify-end gap-1">
           <AppTooltip v-if="dataError" :text="t('app_bar.error_loading')">
             <span class="flex h-9 w-9 items-center justify-center">
-              <UIcon name="i-mdi-database-alert" class="text-error-500 h-4 w-4" />
+              <UIcon
+                name="i-mdi-database-alert"
+                class="text-error-500 light:text-error-800 h-4 w-4"
+              />
             </span>
           </AppTooltip>
           <AppTooltip v-if="dataLoading || hideoutLoading" :text="t('app_bar.loading')">

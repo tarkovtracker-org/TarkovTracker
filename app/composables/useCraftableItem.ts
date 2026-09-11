@@ -75,7 +75,7 @@ export function useCraftableItem(
     if (!isCraftable.value) {
       return '';
     }
-    return isCraftableAvailable.value ? 'text-success-400' : 'text-error-500';
+    return isCraftableAvailable.value ? 'text-success-400' : 'text-error-500 light:text-error-800';
   });
   const craftableTitle = computed(() => {
     if (!isCraftable.value) {

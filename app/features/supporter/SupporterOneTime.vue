@@ -61,7 +61,11 @@
               <span class="text-surface-400 text-sm font-medium">$</span>
             </template>
           </UInput>
-          <p v-if="amountError" :id="amountErrorId" class="text-error-500 text-xs">
+          <p
+            v-if="amountError"
+            :id="amountErrorId"
+            class="text-error-500 light:text-error-800 text-xs"
+          >
             {{ amountError }}
           </p>
         </div>

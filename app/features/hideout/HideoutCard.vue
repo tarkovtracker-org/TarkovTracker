@@ -155,7 +155,7 @@
                     :class="
                       isStationReqMet(requirement)
                         ? 'text-info-500 light:text-info-800'
-                        : 'text-error-500'
+                        : 'text-error-500 light:text-error-800'
                     "
                   />
                   <i18n-t keypath="page.hideout.stationcard.requirements.station" scope="global">
@@ -191,7 +191,7 @@
                     :class="
                       isSkillReqMet(requirement)
                         ? 'text-warning-500 light:text-warning-800'
-                        : 'text-error-500'
+                        : 'text-error-500 light:text-error-800'
                     "
                   />
                   <i18n-t keypath="page.hideout.stationcard.requirements.skill" scope="global">
@@ -229,7 +229,7 @@
                     :class="
                       isTraderReqMet(requirement)
                         ? 'text-secondary-500 light:text-secondary-800'
-                        : 'text-error-500'
+                        : 'text-error-500 light:text-error-800'
                     "
                   />
                   <i18n-t keypath="page.hideout.stationcard.requirements.trader" scope="global">
@@ -394,7 +394,7 @@
     base: 'bg-success-500 hover:bg-success-600 active:bg-success-700 text-white border border-success-700',
   };
   const downgradeButtonUi = {
-    base: 'bg-error-900/40 light:bg-error-100 hover:bg-error-900/60 light:hover:bg-error-200 active:bg-error-900/80 light:active:bg-error-300 text-error-300 border border-error-700/50',
+    base: 'bg-error-900/40 light:bg-error-50 hover:bg-error-900/60 light:hover:bg-error-100 active:bg-error-900/80 light:active:bg-error-100 text-error-300 border border-error-700/50',
   };
   const highlightColor = computed((): 'success' | 'error' | 'primary' => {
     if (!nextLevel.value) return 'primary';

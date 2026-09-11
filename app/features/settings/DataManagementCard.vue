@@ -395,7 +395,7 @@
               icon="i-mdi-folder-upload-outline"
               block
               :ui="{
-                base: 'bg-info-900 light:bg-info-100 hover:bg-info-800 light:hover:bg-info-200 active:bg-info-700 light:active:bg-info-300 text-info-200 focus-visible:ring focus-visible:ring-info-500',
+                base: 'bg-info-900 light:bg-info-50 hover:bg-info-800 light:hover:bg-info-100 active:bg-info-700 light:active:bg-info-100 text-info-200 focus-visible:ring focus-visible:ring-info-500',
               }"
               :disabled="isAnyImportActive"
               @click="showEftLogsFolderInput"
@@ -771,7 +771,7 @@
                   icon="i-mdi-download"
                   block
                   :ui="{
-                    base: 'bg-primary-900 light:bg-primary-100 hover:bg-primary-800 light:hover:bg-primary-200 active:bg-primary-700 light:active:bg-primary-300 text-primary-200 focus-visible:ring focus-visible:ring-primary-500',
+                    base: 'bg-primary-900 light:bg-primary-50 hover:bg-primary-800 light:hover:bg-primary-100 active:bg-primary-700 light:active:bg-primary-100 text-primary-200 focus-visible:ring focus-visible:ring-primary-500',
                   }"
                   :disabled="isAnyImportActive"
                   @click="handleExportProgress"
@@ -799,7 +799,7 @@
                   icon="i-mdi-file-upload-outline"
                   block
                   :ui="{
-                    base: 'bg-primary-900 light:bg-primary-100 hover:bg-primary-800 light:hover:bg-primary-200 active:bg-primary-700 light:active:bg-primary-300 text-primary-200 focus-visible:ring focus-visible:ring-primary-500',
+                    base: 'bg-primary-900 light:bg-primary-50 hover:bg-primary-800 light:hover:bg-primary-100 active:bg-primary-700 light:active:bg-primary-100 text-primary-200 focus-visible:ring focus-visible:ring-primary-500',
                   }"
                   :disabled="isAnyImportActive"
                   @click="backupFileInputRef?.click()"
@@ -987,7 +987,7 @@
             icon="i-mdi-bug-outline"
             block
             :ui="{
-              base: 'bg-warning-900 light:bg-warning-100 hover:bg-warning-800 light:hover:bg-warning-200 active:bg-warning-700 light:active:bg-warning-300 text-warning-200 focus-visible:ring focus-visible:ring-warning-500',
+              base: 'bg-warning-900 light:bg-warning-50 hover:bg-warning-800 light:hover:bg-warning-100 active:bg-warning-700 light:active:bg-warning-100 text-warning-200 focus-visible:ring focus-visible:ring-warning-500',
             }"
             :disabled="isAnyImportActive"
             @click="handleExportDebugSnapshot"

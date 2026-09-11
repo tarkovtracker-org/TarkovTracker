@@ -227,7 +227,10 @@
                 class="text-xs sm:text-sm"
               >
                 <div class="text-error-400 flex items-center gap-1.5 font-semibold sm:gap-2">
-                  <UIcon name="i-mdi-home" class="text-error-500 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <UIcon
+                    name="i-mdi-home"
+                    class="text-error-500 light:text-error-800 h-3.5 w-3.5 sm:h-4 sm:w-4"
+                  />
                   <i18n-t keypath="page.hideout.stationcard.requirements.station" scope="global">
                     <template #level>{{ requirement.level }}</template>
                     <template #stationname>{{ requirement.station.name }}</template>
@@ -244,7 +247,10 @@
                 class="text-xs sm:text-sm"
               >
                 <div class="text-error-400 flex items-center gap-1.5 font-semibold sm:gap-2">
-                  <UIcon name="i-mdi-star" class="text-error-500 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <UIcon
+                    name="i-mdi-star"
+                    class="text-error-500 light:text-error-800 h-3.5 w-3.5 sm:h-4 sm:w-4"
+                  />
                   <i18n-t keypath="page.hideout.stationcard.requirements.skill" scope="global">
                     <template #level>{{ requirement.level }}</template>
                     <template #skillname>{{ requirement.name }}</template>
@@ -263,7 +269,7 @@
                 <div class="text-error-400 flex items-center gap-1.5 font-semibold sm:gap-2">
                   <UIcon
                     name="i-mdi-account-tie"
-                    class="text-error-500 h-3.5 w-3.5 sm:h-4 sm:w-4"
+                    class="text-error-500 light:text-error-800 h-3.5 w-3.5 sm:h-4 sm:w-4"
                   />
                   <i18n-t keypath="page.hideout.stationcard.requirements.trader" scope="global">
                     <template #loyaltylevel>{{ requirement.value }}</template>

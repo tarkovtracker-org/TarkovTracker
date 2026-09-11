@@ -5,7 +5,7 @@
         icon="i-mdi-shield-sword"
         block
         :ui="{
-          base: 'bg-pvp-900 light:bg-pvp-100 hover:bg-pvp-800 light:hover:bg-pvp-200 active:bg-pvp-700 light:active:bg-pvp-300 text-pvp-200 focus-visible:ring focus-visible:ring-pvp-500',
+          base: 'bg-pvp-900 light:bg-pvp-50 hover:bg-pvp-800 light:hover:bg-pvp-100 active:bg-pvp-700 light:active:bg-pvp-100 text-pvp-200 focus-visible:ring focus-visible:ring-pvp-500',
         }"
         @click="showResetPvPDialog = true"
       >
@@ -24,7 +24,7 @@
         icon="i-mdi-account-group"
         block
         :ui="{
-          base: 'bg-pve-900 light:bg-pve-100 hover:bg-pve-800 light:hover:bg-pve-200 active:bg-pve-700 light:active:bg-pve-300 text-pve-200 focus-visible:ring focus-visible:ring-pve-500',
+          base: 'bg-pve-900 light:bg-pve-50 hover:bg-pve-800 light:hover:bg-pve-100 active:bg-pve-700 light:active:bg-pve-100 text-pve-200 focus-visible:ring focus-visible:ring-pve-500',
         }"
         @click="showResetPvEDialog = true"
       >

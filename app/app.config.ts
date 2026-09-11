@@ -224,7 +224,7 @@ const uiConfig = {
       {
         color: 'pvp',
         variant: 'soft',
-        class: 'bg-pvp-900 light:bg-pvp-100 hover:bg-pvp-800 light:hover:bg-pvp-200 text-pvp-200',
+        class: 'bg-pvp-900 light:bg-pvp-50 hover:bg-pvp-800 light:hover:bg-pvp-100 text-pvp-200',
       },
       {
         color: 'pvp',
@@ -249,7 +249,7 @@ const uiConfig = {
       {
         color: 'pve',
         variant: 'soft',
-        class: 'bg-pve-900 light:bg-pve-100 hover:bg-pve-800 light:hover:bg-pve-200 text-pve-200',
+        class: 'bg-pve-900 light:bg-pve-50 hover:bg-pve-800 light:hover:bg-pve-100 text-pve-200',
       },
       {
         color: 'pve',
@@ -275,7 +275,7 @@ const uiConfig = {
         color: 'success',
         variant: 'soft',
         class:
-          'bg-success-950 light:bg-success-100 hover:bg-success-900 light:hover:bg-success-200 text-success-200',
+          'bg-success-950 light:bg-success-50 hover:bg-success-900 light:hover:bg-success-100 text-success-200',
       },
       {
         color: 'success',

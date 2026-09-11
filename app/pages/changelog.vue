@@ -81,7 +81,9 @@
                       +{{ getBulletStats(bullet)?.additions }}
                     </span>
                     <span class="text-surface-600">/</span>
-                    <span class="text-error-500">-{{ getBulletStats(bullet)?.deletions }}</span>
+                    <span class="text-error-500 light:text-error-800">
+                      -{{ getBulletStats(bullet)?.deletions }}
+                    </span>
                   </span>
                 </li>
               </ul>

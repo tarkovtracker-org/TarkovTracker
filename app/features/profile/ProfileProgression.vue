@@ -647,7 +647,7 @@
   });
   const pvpToggleClass = computed(() =>
     selectedMode.value === GAME_MODES.PVP
-      ? 'bg-pvp-800 light:bg-pvp-100 text-pvp-100 light:text-pvp-900 shadow-inner'
+      ? 'bg-pvp-800 text-pvp-100 shadow-inner'
       : 'bg-transparent text-pvp-500 hover:bg-pvp-950/50 hover:text-pvp-300 light:text-pvp-700 light:hover:bg-pvp-100/70 light:hover:text-pvp-800'
   );
   const pveToggleClass = computed(() =>

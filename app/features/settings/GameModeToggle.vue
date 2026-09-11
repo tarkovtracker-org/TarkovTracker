@@ -43,7 +43,7 @@
   ]);
   const modeClasses: Record<GameMode, { active: string; inactive: string }> = {
     [GAME_MODES.PVP]: {
-      active: 'bg-pvp-800 light:bg-pvp-100 text-pvp-100 light:text-pvp-900',
+      active: 'bg-pvp-800 text-pvp-100',
       inactive:
         'bg-transparent text-pvp-500 light:text-pvp-900 hover:bg-pvp-950/50 light:hover:bg-pvp-100',
     },

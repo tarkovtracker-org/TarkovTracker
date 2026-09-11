@@ -468,8 +468,8 @@
   </div>
   <UModal v-model:open="showConfirmationDialog" prevent-close>
     <template #title>
-      <div class="text-error-500 flex items-center text-xl font-medium">
-        <UIcon name="i-mdi-alert-circle" class="text-error-500 mr-2 h-6 w-6" />
+      <div class="text-error-500 light:text-error-800 flex items-center text-xl font-medium">
+        <UIcon name="i-mdi-alert-circle" class="text-error-500 light:text-error-800 mr-2 h-6 w-6" />
         {{ $t('settings.account_data.confirm_delete_title') }}
       </div>
     </template>
@@ -546,7 +546,7 @@
             :color="confirmationError ? 'error' : 'neutral'"
             @input="confirmationError = false"
           />
-          <div v-if="confirmationError" class="text-error-500 mt-1 text-xs">
+          <div v-if="confirmationError" class="text-error-500 light:text-error-800 mt-1 text-xs">
             {{
               $t('settings.account_data.confirm_phrase_error', {
                 phrase: $t('settings.account_data.confirm_phrase_value'),

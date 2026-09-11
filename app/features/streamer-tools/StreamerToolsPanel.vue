@@ -96,7 +96,7 @@
                   class="flex-1 rounded px-3 py-2 text-sm font-semibold transition-colors"
                   :class="
                     selectedMode === GAME_MODES.PVP
-                      ? 'bg-pvp-800 light:bg-pvp-100 text-pvp-100 light:text-pvp-900'
+                      ? 'bg-pvp-800 text-pvp-100'
                       : 'text-pvp-300 hover:bg-pvp-950/60 light:text-pvp-700 light:hover:bg-pvp-100/70'
                   "
                   @click="selectedMode = GAME_MODES.PVP"
