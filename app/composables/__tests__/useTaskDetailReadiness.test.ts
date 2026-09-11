@@ -34,9 +34,41 @@ const flush = async () => {
   await vi.advanceTimersByTimeAsync(0);
   await nextTick();
 };
+/*
+ * The composable's bounded wait is the only timer this suite owns, but the Nuxt
+ * test environment can start unrelated tickers of its own — the Supabase auth
+ * client schedules a token refresh as soon as it is configured. A global
+ * `vi.getTimerCount()` therefore measures the environment rather than the
+ * composable, and passes or fails depending on whether Supabase happens to be
+ * configured. Track the bounded wait by its duration instead.
+ */
+const TASK_DETAIL_WAIT_MS = 3000;
+type SetTimeoutFn = typeof globalThis.setTimeout;
+type ClearTimeoutFn = typeof globalThis.clearTimeout;
+const pendingWaitTimers = new Set<ReturnType<SetTimeoutFn>>();
+let restoreTimerTracking: (() => void) | undefined;
+const trackWaitTimers = () => {
+  const realSetTimeout: SetTimeoutFn = globalThis.setTimeout;
+  const realClearTimeout: ClearTimeoutFn = globalThis.clearTimeout;
+  globalThis.setTimeout = ((...args: Parameters<SetTimeoutFn>) => {
+    const id = realSetTimeout(...args);
+    if (args[1] === TASK_DETAIL_WAIT_MS) pendingWaitTimers.add(id);
+    return id;
+  }) as SetTimeoutFn;
+  globalThis.clearTimeout = ((...args: Parameters<ClearTimeoutFn>) => {
+    pendingWaitTimers.delete(args[0] as ReturnType<SetTimeoutFn>);
+    return realClearTimeout(...args);
+  }) as ClearTimeoutFn;
+  restoreTimerTracking = () => {
+    globalThis.setTimeout = realSetTimeout;
+    globalThis.clearTimeout = realClearTimeout;
+  };
+};
 describe('useTaskDetailReadiness', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    pendingWaitTimers.clear();
+    trackWaitTimers();
     scope = effectScope();
     metadata.hasInitialized = true;
     metadata.loading = false;
@@ -55,6 +87,8 @@ describe('useTaskDetailReadiness', () => {
   });
   afterEach(() => {
     scope.stop();
+    restoreTimerTracking?.();
+    restoreTimerTracking = undefined;
     vi.useRealTimers();
   });
   it('requests both details promptly and waits for both to settle', async () => {
@@ -72,7 +106,7 @@ describe('useTaskDetailReadiness', () => {
     rewards.resolve();
     await flush();
     expect(ready.value).toBe(true);
-    expect(vi.getTimerCount()).toBe(0);
+    expect(pendingWaitTimers.size).toBe(0);
   });
   it('waits for item-lite hydration before revealing localized cards', async () => {
     const items = deferred();
@@ -253,6 +287,6 @@ describe('useTaskDetailReadiness', () => {
     request.resolve();
     await flush();
     expect(ready.value).toBe(false);
-    expect(vi.getTimerCount()).toBe(0);
+    expect(pendingWaitTimers.size).toBe(0);
   });
 });
