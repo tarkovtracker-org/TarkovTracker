@@ -328,7 +328,10 @@ const uiConfig = {
       root: 'relative flex items-start',
       base: 'h-4 w-4 shrink-0 rounded border transition-all border-surface-500 data-[state=unchecked]:bg-surface-800',
       indicator: 'light:bg-success-100',
-      icon: 'h-4 w-4 text-surface-900 light:text-surface-50',
+      // Nuxt UI's indicator already sets the shared `text-inverted` foreground, which is the
+      // dark tick in dark mode; only the light-theme tick needs an explicit variant because the
+      // `--ui-text-inverted` alias flips to dark ink there.
+      icon: 'h-4 w-4 light:text-surface-50',
     },
     defaultVariants: {
       color: 'success',
