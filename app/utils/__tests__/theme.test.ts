@@ -10,40 +10,20 @@ import {
   THEME_MODES,
   THEME_STORAGE_KEY,
 } from '@/utils/theme';
+import { installThrowingStorageStub } from '#tests/test-helpers/storageStub';
 // happy-dom exposes window.localStorage as a Proxy, so vi.spyOn on its methods
 // leaks across tests. Replace the whole property instead and restore it after.
 describe('theme utils', () => {
-  let originalLocalStorage: PropertyDescriptor | undefined;
-  const stubThrowingStorage = () => {
-    Object.defineProperty(window, 'localStorage', {
-      configurable: true,
-      value: {
-        get length() {
-          return 0;
-        },
-        clear() {},
-        getItem(): string | null {
-          throw new Error('denied');
-        },
-        key: () => null,
-        removeItem() {},
-        setItem(): void {
-          throw new Error('denied');
-        },
-      } satisfies Storage,
-    });
-  };
+  let restoreStorage: (() => void) | undefined;
   beforeEach(() => {
-    originalLocalStorage = Object.getOwnPropertyDescriptor(window, 'localStorage');
     window.localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
     document.documentElement.style.colorScheme = '';
   });
   afterEach(() => {
     vi.unstubAllGlobals();
-    if (originalLocalStorage) {
-      Object.defineProperty(window, 'localStorage', originalLocalStorage);
-    }
+    restoreStorage?.();
+    restoreStorage = undefined;
     vi.restoreAllMocks();
   });
   describe('normalizeThemeMode', () => {
@@ -82,7 +62,7 @@ describe('theme utils', () => {
       expect(readStoredThemeMode()).toBe('dark');
     });
     it('falls back to dark when storage access throws', () => {
-      stubThrowingStorage();
+      restoreStorage = installThrowingStorageStub('denied');
       expect(readStoredThemeMode()).toBe('dark');
     });
     it('falls back to dark when storage item is null', () => {
@@ -107,7 +87,7 @@ describe('theme utils', () => {
       expect(customStorage.setItem).toHaveBeenCalledWith(THEME_STORAGE_KEY, 'light');
     });
     it('swallows storage failures without throwing', () => {
-      stubThrowingStorage();
+      restoreStorage = installThrowingStorageStub('denied');
       expect(() => persistThemeMode('light')).not.toThrow();
     });
     it('handles undefined window safely without throwing', () => {
@@ -168,7 +148,7 @@ describe('theme utils', () => {
       expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
     });
     it('normalizes to dark when storage is unavailable', () => {
-      stubThrowingStorage();
+      restoreStorage = installThrowingStorageStub('denied');
       expect(() => new Function(THEME_BOOT_SCRIPT)()).not.toThrow();
       expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
       expect(document.documentElement.style.colorScheme).toBe('dark');
