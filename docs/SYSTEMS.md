@@ -1811,7 +1811,7 @@ First paint
       reads tt_theme → validates value (mirrors normalizeThemeMode) → sets <html data-theme> + colorScheme
       → pre-hydration skeleton style block matches the light canvas (no dark flash)
 App boot
-  → useTheme() restores the client-persisted mode over any SSR-hydrated state and re-applies idempotently
+  → useTheme() restores the client-persisted mode and re-applies it idempotently
   → toggle (AppBar sun/moon button or Settings > Appearance card)
       → setThemeMode persists tt_theme + sets data-theme + colorScheme atomically
 ```
@@ -1825,9 +1825,9 @@ App boot
    `--vf-*` text vars) plus the accent foreground range described above: for every accent family
    `200 → 950`, `300 → 900`, `400 → 800` (pvp/pve take one extra step because their ladders sit
    near the neutral end), and the bare `--ui-<accent>` aliases resolve to step 800/900 so
-   `text-primary`, `bg-primary/10` and `ring-primary/25` stay legible together. `@custom-variant
-light` enables per-spot `light:` utilities where a specific component needs a different accent
-   treatment (tone gradients, badges, brand buttons).
+   `text-primary`, `bg-primary/10` and `ring-primary/25` stay legible together.
+   `@custom-variant light` enables per-spot `light:` utilities where a specific component needs a
+   different accent treatment (tone gradients, badges, brand buttons).
    Two consequences follow from the split and are load-bearing:
    - `text-<accent>-500` cannot be remapped at the token level (step 500 is the primary accent
      _background_), so those foregrounds carry explicit `light:text-<accent>-800/900` companions.

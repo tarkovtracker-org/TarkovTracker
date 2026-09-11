@@ -192,7 +192,7 @@
           <AppTooltip v-if="!isLoggedIn" :text="t('app_bar.login_aria', 'Log in to your account')">
             <NuxtLink
               to="/login"
-              class="bg-primary-500 light:bg-primary-700 hover:bg-primary-400 light:hover:bg-primary-800 border-primary-500 light:border-primary-700 text-surface-950 flex h-9 items-center gap-1.5 rounded-md border px-3.5 text-[13px] leading-none font-semibold transition-colors"
+              class="bg-primary-500 light:bg-primary-800 hover:bg-primary-400 light:hover:bg-primary-900 border-primary-500 light:border-primary-800 text-surface-950 flex h-9 items-center gap-1.5 rounded-md border px-3.5 text-[13px] leading-none font-semibold transition-colors"
               :aria-label="t('app_bar.login_aria', 'Log in to your account')"
             >
               <UIcon name="i-mdi-account-outline" class="h-4 w-4 shrink-0" />

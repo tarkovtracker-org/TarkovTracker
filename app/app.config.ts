@@ -169,7 +169,7 @@ const uiConfig = {
         color: 'primary',
         variant: 'solid',
         class:
-          'bg-primary-500 light:bg-primary-700 hover:bg-primary-400 light:hover:bg-primary-800 active:bg-primary-600 light:active:bg-primary-900 text-surface-950 font-medium',
+          'bg-primary-500 light:bg-primary-800 hover:bg-primary-400 light:hover:bg-primary-900 active:bg-primary-600 light:active:bg-primary-950 text-surface-950 font-medium',
       },
       {
         color: 'primary',
