@@ -46,7 +46,14 @@ const TASK_DETAIL_WAIT_MS = 3000;
 type SetTimeoutFn = typeof globalThis.setTimeout;
 type ClearTimeoutFn = typeof globalThis.clearTimeout;
 const pendingWaitTimers = new Set<ReturnType<SetTimeoutFn>>();
+let observedWaitTimers = 0;
 let restoreTimerTracking: (() => void) | undefined;
+const expectWaitSettled = () => {
+  // Guards against the tracker silently missing the wait (for example if the
+  // composable's duration changes), which would make the emptiness check vacuous.
+  expect(observedWaitTimers).toBeGreaterThan(0);
+  expect(pendingWaitTimers.size).toBe(0);
+};
 const trackWaitTimers = () => {
   const realSetTimeout: SetTimeoutFn = globalThis.setTimeout;
   const realClearTimeout: ClearTimeoutFn = globalThis.clearTimeout;
@@ -63,6 +70,7 @@ const trackWaitTimers = () => {
     };
     tracked.id = realSetTimeout(invoke, args[1]);
     pendingWaitTimers.add(tracked.id);
+    observedWaitTimers += 1;
     return tracked.id;
   }) as SetTimeoutFn;
   globalThis.clearTimeout = ((...args: Parameters<ClearTimeoutFn>) => {
@@ -78,6 +86,7 @@ describe('useTaskDetailReadiness', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     pendingWaitTimers.clear();
+    observedWaitTimers = 0;
     trackWaitTimers();
     scope = effectScope();
     metadata.hasInitialized = true;
@@ -116,7 +125,7 @@ describe('useTaskDetailReadiness', () => {
     rewards.resolve();
     await flush();
     expect(ready.value).toBe(true);
-    expect(pendingWaitTimers.size).toBe(0);
+    expectWaitSettled();
   });
   it('waits for item-lite hydration before revealing localized cards', async () => {
     const items = deferred();
@@ -297,6 +306,6 @@ describe('useTaskDetailReadiness', () => {
     request.resolve();
     await flush();
     expect(ready.value).toBe(false);
-    expect(pendingWaitTimers.size).toBe(0);
+    expectWaitSettled();
   });
 });

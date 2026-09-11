@@ -243,8 +243,9 @@
       emit('update:modelValue', normalizeNeededItemsFilterType(value));
     },
   });
-  // Light theme keeps the white numeral on saturated badges (info/surface-500 clear
-  // AA against white) and switches to ink only where the badge turns pale.
+  // Light theme picks whichever numeral clears AA on each badge: white stays on
+  // info-500 and surface-500, while the pale surface-600 badge and the saturated
+  // success-500 badge (where white is only ~3.9:1 but ink is ~4.2:1) switch to ink.
   const getTabBadgeColor = (tab: FilterTab): string => {
     switch (tab.value) {
       case 'completed':
