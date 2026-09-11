@@ -25,6 +25,7 @@ vi.mock('@/stores/useMetadata', () => ({
 }));
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => ({
+    setTaskPrimaryView: vi.fn(),
     setTaskTraderView: vi.fn(),
   }),
 }));
