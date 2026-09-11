@@ -41,11 +41,20 @@ describe('useTheme', () => {
   });
   it('restores persisted mode on client when hydrated with dark SSR state', () => {
     useState('theme-mode', () => 'dark');
+    useState('theme-hydrated', () => false);
     window.localStorage.setItem(THEME_STORAGE_KEY, 'light');
     const { themeMode, isLightTheme } = useTheme();
     expect(themeMode.value).toBe('light');
     expect(isLightTheme.value).toBe(true);
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+  });
+  it('skips hydration re-read when already marked as hydrated', () => {
+    useState('theme-mode', () => 'dark');
+    useState('theme-hydrated', () => true);
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'light');
+    const { themeMode, isLightTheme } = useTheme();
+    expect(themeMode.value).toBe('dark');
+    expect(isLightTheme.value).toBe(false);
   });
   it('preserves in-memory mode across multiple useTheme calls when storage is unavailable', () => {
     const { setThemeMode } = useTheme();

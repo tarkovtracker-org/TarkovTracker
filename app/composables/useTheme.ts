@@ -15,7 +15,7 @@ import {
 export const useTheme = () => {
   const themeMode = useState<ThemeMode>('theme-mode', () => readStoredThemeMode());
   const isHydrated = useState<boolean>('theme-hydrated', () => false);
-  if (!isHydrated.value) {
+  if (import.meta.client && !isHydrated.value) {
     themeMode.value = readStoredThemeMode();
     isHydrated.value = true;
   }
