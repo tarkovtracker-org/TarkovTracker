@@ -319,11 +319,15 @@ const uiConfig = {
       color: 'success',
     },
   },
-  // Checkbox configuration - neutral styling, primary accent when checked
+  // Checkbox configuration - neutral styling, success accent when checked.
+  // The checked indicator keeps its light tick from the shared `--ui-text-inverted` alias in
+  // both themes; light mode flips `--ui-success` to a dark plate, so the indicator chip uses
+  // the pale accent tint instead (the light tick otherwise sits at ~1.7:1 on the dark green).
   checkbox: {
     slots: {
       root: 'relative flex items-start',
       base: 'h-4 w-4 shrink-0 rounded border transition-all border-surface-500 data-[state=unchecked]:bg-surface-800',
+      indicator: 'light:bg-success-100',
       icon: 'h-4 w-4 text-surface-900 light:text-surface-50',
     },
     defaultVariants: {

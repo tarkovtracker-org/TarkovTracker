@@ -196,6 +196,17 @@ describe('TaskCard expansion controls', () => {
     metadataStoreMock.getTaskById.mockReset();
     tarkovStoreMock.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
   });
+  it('keeps the failed card on a dark surface in dark mode and a pale one in light mode', async () => {
+    taskState.failed = true;
+    const wrapper = await mountTaskCard();
+    const classes = wrapper.get('article').classes();
+    expect(classes).toContain('bg-error-950');
+    // Light mode flips the shared ink tokens to dark, so the failed surface must be pale or the
+    // card text lands near 1.5:1 against the dark red fill.
+    expect(classes).toContain('light:bg-error-100');
+    expect(classes).toContain('light:border-error-500/40');
+    wrapper.unmount();
+  });
   it('keeps a locked card usable before its evaluation snapshot is available', async () => {
     progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
     const wrapper = await mountTaskCard();
