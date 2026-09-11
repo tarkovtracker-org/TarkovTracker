@@ -1028,7 +1028,7 @@ summary {
   --color-surface-100: hsl(31 14% 16%);
   --color-surface-200: hsl(30 12% 22%);
   --color-surface-300: hsl(30 10% 30%);
-  --color-surface-400: hsl(30 8% 40%);
+  --color-surface-400: hsl(30 8% 34%); /* Muted text: >= 4.5:1 on every light surface */
   --color-surface-500: hsl(30 7% 46%); /* Dimmed text / placeholders */
   --color-surface-600: hsl(36 12% 74%); /* Borders/dividers */
   --color-surface-700: hsl(38 16% 82%); /* State fallback */
@@ -1049,17 +1049,75 @@ summary {
   --border-default: rgba(49, 37, 24, 0.14);
   --border-strong: rgba(49, 37, 24, 0.22);
   /* Links and status colors tuned for light backgrounds */
-  --color-link: hsl(208 80% 38%);
+  --color-link: hsl(208 80% 36%);
   --color-link-hover: hsl(208 85% 30%);
-  --color-tasklink: var(--color-info-600);
+  --color-tasklink: var(--color-info-700);
   --color-failed: var(--color-error-600);
   /* Transparent-image checkerboard */
   --color-checker-dark: hsl(36 10% 76%);
   --color-checker-bg: hsl(40 16% 86%);
   /* Nuxt UI aliases that are hardcoded to white in the upstream dark block */
-  --ui-text-highlighted: var(--color-primary-600);
+  --ui-text-highlighted: var(--color-primary-800);
   --ui-bg-inverted: var(--color-surface-50);
   --ui-border-inverted: var(--color-surface-50);
+  /*
+   * Accent foreground range.
+   *
+   * Steps 200-400 and the bare Nuxt UI accent aliases are authored as
+   * foregrounds for dark surfaces; on the paper canvas they land between
+   * 1.0:1 and 3.6:1, so accent labels, chips and links fail WCAG AA. Light
+   * mode resolves that range to the deep end of the same hue: the accent stays
+   * recognizable (same family, same identity) while clearing 4.5:1 against
+   * every surface in the light ladder, including the tinted `/10` and `/25`
+   * chip backgrounds that composite over it.
+   *
+   * Deliberately unchanged: steps 500-950, which carry accent *backgrounds*,
+   * rings, borders and gradient stops, and steps 50-100, which light mode uses
+   * as pale tints. Keeping those fixed is what preserves the gameplay palette.
+   * pvp/pve sit near the neutral end of their ladders, so they need one extra
+   * step of depth to clear the same threshold.
+   */
+  --color-primary-200: var(--color-primary-950);
+  --color-primary-300: var(--color-primary-900);
+  --color-primary-400: var(--color-primary-800);
+  --color-secondary-200: var(--color-secondary-950);
+  --color-secondary-300: var(--color-secondary-900);
+  --color-secondary-400: var(--color-secondary-800);
+  --color-success-200: var(--color-success-950);
+  --color-success-300: var(--color-success-900);
+  --color-success-400: var(--color-success-800);
+  --color-warning-200: var(--color-warning-950);
+  --color-warning-300: var(--color-warning-900);
+  --color-warning-400: var(--color-warning-800);
+  --color-error-200: var(--color-error-950);
+  --color-error-300: var(--color-error-900);
+  --color-error-400: var(--color-error-800);
+  --color-info-200: var(--color-info-950);
+  --color-info-300: var(--color-info-900);
+  --color-info-400: var(--color-info-800);
+  --color-kappa-200: var(--color-kappa-950);
+  --color-kappa-300: var(--color-kappa-900);
+  --color-kappa-400: var(--color-kappa-800);
+  --color-lightkeeper-200: var(--color-lightkeeper-950);
+  --color-lightkeeper-300: var(--color-lightkeeper-900);
+  --color-lightkeeper-400: var(--color-lightkeeper-800);
+  --color-pvp-200: var(--color-pvp-950);
+  --color-pvp-300: var(--color-pvp-900);
+  --color-pvp-400: var(--color-pvp-900);
+  --color-pve-200: var(--color-pve-950);
+  --color-pve-300: var(--color-pve-900);
+  --color-pve-400: var(--color-pve-900);
+  /* Bare Nuxt UI accent aliases back `text-primary`, `bg-primary/10`, `ring-primary`, ... */
+  --ui-primary: var(--color-primary-800);
+  --ui-secondary: var(--color-secondary-800);
+  --ui-success: var(--color-success-800);
+  --ui-warning: var(--color-warning-800);
+  --ui-error: var(--color-error-800);
+  --ui-info: var(--color-info-800);
+  --ui-kappa: var(--color-kappa-800);
+  --ui-lightkeeper: var(--color-lightkeeper-800);
+  --ui-pvp: var(--color-pvp-900);
+  --ui-pve: var(--color-pve-900);
 }
 /* Nuxt UI applies dark color-scheme to body via its pinned .dark class; restore light */
 :root[data-theme='light'] body {

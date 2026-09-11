@@ -118,7 +118,7 @@
                   class="shrink-0 text-lg font-bold"
                   :class="
                     getSkillLevel(skill.key) >= MAX_SKILL_LEVEL
-                      ? 'text-warning-500'
+                      ? 'text-warning-500 light:text-warning-800'
                       : 'text-primary-400'
                   "
                 >

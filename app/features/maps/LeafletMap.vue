@@ -548,7 +548,7 @@
           <div class="mt-2.5 flex items-center gap-3">
             <button
               type="button"
-              class="bg-primary-500 hover:bg-primary-400 text-surface-950 rounded px-3 py-1 text-xs font-semibold transition-colors"
+              class="bg-primary-500 light:bg-primary-700 hover:bg-primary-400 light:hover:bg-primary-800 text-surface-950 rounded px-3 py-1 text-xs font-semibold transition-colors"
               data-testid="map-hint-dismiss"
               @click="dismissFirstUseHint"
             >

@@ -577,8 +577,11 @@
   </UModal>
   <UModal v-model:open="showSuccessDialog" prevent-close>
     <template #title>
-      <div class="text-success-500 flex items-center text-xl font-medium">
-        <UIcon name="i-mdi-check-circle" class="text-success-500 mr-2 h-6 w-6" />
+      <div class="text-success-500 light:text-success-800 flex items-center text-xl font-medium">
+        <UIcon
+          name="i-mdi-check-circle"
+          class="text-success-500 light:text-success-800 mr-2 h-6 w-6"
+        />
         {{ $t('settings.account_data.delete_success_title') }}
       </div>
     </template>

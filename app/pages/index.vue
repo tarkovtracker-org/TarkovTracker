@@ -14,7 +14,10 @@
             :aria-expanded="!progressSectionCollapsed"
             @click="progressSectionCollapsed = !progressSectionCollapsed"
           >
-            <UIcon name="i-mdi-chart-line" class="text-primary-500 mr-2 h-6 w-6" />
+            <UIcon
+              name="i-mdi-chart-line"
+              class="text-primary-500 light:text-primary-800 mr-2 h-6 w-6"
+            />
             {{ $t('page.dashboard.progress.title') }}
             <UIcon
               :name="progressSectionCollapsed ? 'i-mdi-chevron-down' : 'i-mdi-chevron-up'"
@@ -119,7 +122,10 @@
               :aria-expanded="!tradersSectionCollapsed"
               @click="tradersSectionCollapsed = !tradersSectionCollapsed"
             >
-              <UIcon name="i-mdi-account-group" class="text-primary-500 mr-2 h-6 w-6 shrink-0" />
+              <UIcon
+                name="i-mdi-account-group"
+                class="text-primary-500 light:text-primary-800 mr-2 h-6 w-6 shrink-0"
+              />
               <span class="truncate">{{ $t('page.dashboard.traders.title') }}</span>
               <UIcon
                 :name="tradersSectionCollapsed ? 'i-mdi-chevron-down' : 'i-mdi-chevron-up'"
@@ -221,7 +227,10 @@
             :aria-expanded="!milestonesSectionCollapsed"
             @click="milestonesSectionCollapsed = !milestonesSectionCollapsed"
           >
-            <UIcon name="i-mdi-star-circle" class="text-primary-500 mr-2 h-6 w-6" />
+            <UIcon
+              name="i-mdi-star-circle"
+              class="text-primary-500 light:text-primary-800 mr-2 h-6 w-6"
+            />
             {{ $t('page.dashboard.milestones.title') }}
             <UIcon
               :name="milestonesSectionCollapsed ? 'i-mdi-chevron-down' : 'i-mdi-chevron-up'"

@@ -289,7 +289,7 @@
     const isActive = currentLevel.value === lvl;
     if (isComplete.value) {
       return isActive
-        ? 'bg-success-900/40 text-success-300/70'
+        ? 'bg-success-900/40 light:bg-success-100 text-success-300/70'
         : 'text-surface-500 hover:bg-surface-700/40 hover:text-surface-400';
     }
     return isActive

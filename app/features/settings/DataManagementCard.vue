@@ -395,7 +395,7 @@
               icon="i-mdi-folder-upload-outline"
               block
               :ui="{
-                base: 'bg-info-900 hover:bg-info-800 active:bg-info-700 text-info-200 focus-visible:ring focus-visible:ring-info-500',
+                base: 'bg-info-900 light:bg-info-100 hover:bg-info-800 light:hover:bg-info-200 active:bg-info-700 light:active:bg-info-300 text-info-200 focus-visible:ring focus-visible:ring-info-500',
               }"
               :disabled="isAnyImportActive"
               @click="showEftLogsFolderInput"
@@ -754,7 +754,7 @@
               <div class="bg-surface-900/80 space-y-4 rounded-md border border-white/10 p-4">
                 <div class="flex items-start gap-3">
                   <div
-                    class="bg-primary-900/70 text-primary-200 border-primary-700/60 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border"
+                    class="bg-primary-900/70 light:bg-primary-100 text-primary-200 border-primary-700/60 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border"
                   >
                     <UIcon name="i-mdi-download" class="h-5 w-5" />
                   </div>
@@ -771,7 +771,7 @@
                   icon="i-mdi-download"
                   block
                   :ui="{
-                    base: 'bg-primary-900 hover:bg-primary-800 active:bg-primary-700 text-primary-200 focus-visible:ring focus-visible:ring-primary-500',
+                    base: 'bg-primary-900 light:bg-primary-100 hover:bg-primary-800 light:hover:bg-primary-200 active:bg-primary-700 light:active:bg-primary-300 text-primary-200 focus-visible:ring focus-visible:ring-primary-500',
                   }"
                   :disabled="isAnyImportActive"
                   @click="handleExportProgress"
@@ -782,7 +782,7 @@
               <div class="bg-surface-900/80 space-y-4 rounded-md border border-white/10 p-4">
                 <div class="flex items-start gap-3">
                   <div
-                    class="bg-primary-900/70 text-primary-200 border-primary-700/60 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border"
+                    class="bg-primary-900/70 light:bg-primary-100 text-primary-200 border-primary-700/60 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border"
                   >
                     <UIcon name="i-mdi-file-upload-outline" class="h-5 w-5" />
                   </div>
@@ -799,7 +799,7 @@
                   icon="i-mdi-file-upload-outline"
                   block
                   :ui="{
-                    base: 'bg-primary-900 hover:bg-primary-800 active:bg-primary-700 text-primary-200 focus-visible:ring focus-visible:ring-primary-500',
+                    base: 'bg-primary-900 light:bg-primary-100 hover:bg-primary-800 light:hover:bg-primary-200 active:bg-primary-700 light:active:bg-primary-300 text-primary-200 focus-visible:ring focus-visible:ring-primary-500',
                   }"
                   :disabled="isAnyImportActive"
                   @click="backupFileInputRef?.click()"
@@ -987,7 +987,7 @@
             icon="i-mdi-bug-outline"
             block
             :ui="{
-              base: 'bg-warning-900 hover:bg-warning-800 active:bg-warning-700 text-warning-200 focus-visible:ring focus-visible:ring-warning-500',
+              base: 'bg-warning-900 light:bg-warning-100 hover:bg-warning-800 light:hover:bg-warning-200 active:bg-warning-700 light:active:bg-warning-300 text-warning-200 focus-visible:ring focus-visible:ring-warning-500',
             }"
             :disabled="isAnyImportActive"
             @click="handleExportDebugSnapshot"

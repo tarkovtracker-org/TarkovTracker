@@ -266,12 +266,12 @@
   });
   const currentModeBadgeClass = computed(() => {
     if (currentGameMode.value === GAME_MODES.PVE) {
-      return 'border border-pve-500/30 bg-pve-700/25 text-pve-200';
+      return 'border border-pve-500/30 bg-pve-700/25 text-pve-200 light:border-pve-600/40 light:text-pve-900';
     }
     if (currentGameMode.value === GAME_MODES.SEASONAL) {
       return 'border border-warning-500/30 bg-warning-700/20 text-warning-200';
     }
-    return 'border border-pvp-500/30 bg-pvp-700/25 text-pvp-200';
+    return 'border border-pvp-500/30 bg-pvp-700/25 text-pvp-200 light:border-pvp-600/40 light:text-pvp-900';
   });
   const objectiveModeCountDifferenceText = computed(() => {
     const difference = objectiveModeCountDifference.value;

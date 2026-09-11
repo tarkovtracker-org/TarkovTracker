@@ -78,7 +78,7 @@
         >
           <UIcon
             name="i-mdi-check-circle-outline"
-            class="text-success-500 mt-0.5 h-4 w-4 shrink-0"
+            class="text-success-500 light:text-success-800 mt-0.5 h-4 w-4 shrink-0"
           />
           {{ perk }}
         </li>

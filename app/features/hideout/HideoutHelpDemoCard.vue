@@ -92,7 +92,7 @@
             <div class="mb-2.5 flex items-center text-sm font-medium sm:mb-3 sm:text-[15px]">
               <UIcon
                 name="i-mdi-package-variant-closed-check"
-                class="text-success-500 mr-1.5 h-4 w-4 sm:mr-2 sm:h-5 sm:w-5"
+                class="text-success-500 light:text-success-800 mr-1.5 h-4 w-4 sm:mr-2 sm:h-5 sm:w-5"
               />
               {{ nextLevelLabel }}
             </div>
@@ -280,7 +280,7 @@
         </div>
         <div v-else class="bg-surface-800 rounded p-2.5 sm:p-3">
           <div
-            class="text-warning-500 flex items-center justify-center text-center text-sm font-medium sm:text-base"
+            class="text-warning-500 light:text-warning-800 flex items-center justify-center text-center text-sm font-medium sm:text-base"
           >
             <UIcon name="i-mdi-star-check" class="mr-1.5 h-5 w-5 sm:mr-2 sm:h-6 sm:w-6" />
             {{ maxedLabel }}

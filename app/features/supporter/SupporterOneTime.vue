@@ -17,7 +17,10 @@
             :key="perk.label"
             class="text-surface-300 flex items-start gap-2 text-sm"
           >
-            <UIcon :name="perk.icon" class="text-success-500 mt-0.5 h-4 w-4 shrink-0" />
+            <UIcon
+              :name="perk.icon"
+              class="text-success-500 light:text-success-800 mt-0.5 h-4 w-4 shrink-0"
+            />
             {{ perk.label }}
           </li>
         </ul>

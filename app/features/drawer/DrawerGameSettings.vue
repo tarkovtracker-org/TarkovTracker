@@ -34,7 +34,7 @@
       <button
         v-for="faction in factions"
         :key="faction"
-        class="light:focus:ring-surface-950/40 flex min-h-8 flex-1 items-center justify-center px-2 py-1.5 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:ring-white/40 focus:outline-none"
+        class="light:focus:ring-surface-300/70 flex min-h-8 flex-1 items-center justify-center px-2 py-1.5 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:ring-white/40 focus:outline-none"
         :class="[
           faction === currentFaction
             ? 'light:bg-surface-700/70 light:text-surface-50 bg-white/15 text-white'

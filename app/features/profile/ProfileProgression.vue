@@ -343,7 +343,7 @@
       icon: 'i-mdi-sword-cross',
       iconTint: 'text-pvp-300 light:text-pvp-700',
       modeBadgeClass:
-        'border border-pvp-500/30 bg-pvp-700/25 text-pvp-200 light:border-pvp-600/40 light:text-pvp-800',
+        'border border-pvp-500/30 bg-pvp-700/25 text-pvp-200 light:border-pvp-600/40 light:text-pvp-900',
       storyHighlight: 'pvp',
       timelineHighlight: 'pvp',
     },
@@ -353,7 +353,7 @@
       icon: 'i-mdi-account-group',
       iconTint: 'text-pve-300 light:text-pve-700',
       modeBadgeClass:
-        'border border-pve-500/30 bg-pve-700/25 text-pve-200 light:border-pve-600/40 light:text-pve-800',
+        'border border-pve-500/30 bg-pve-700/25 text-pve-200 light:border-pve-600/40 light:text-pve-900',
       storyHighlight: 'pve',
       timelineHighlight: 'pve',
     },
@@ -647,7 +647,7 @@
   });
   const pvpToggleClass = computed(() =>
     selectedMode.value === GAME_MODES.PVP
-      ? 'bg-pvp-800 text-pvp-100 shadow-inner'
+      ? 'bg-pvp-800 light:bg-pvp-100 text-pvp-100 light:text-pvp-900 shadow-inner'
       : 'bg-transparent text-pvp-500 hover:bg-pvp-950/50 hover:text-pvp-300 light:text-pvp-700 light:hover:bg-pvp-100/70 light:hover:text-pvp-800'
   );
   const pveToggleClass = computed(() =>

@@ -77,7 +77,9 @@
                     v-if="getBulletStats(bullet)"
                     class="text-surface-500 shrink-0 font-mono text-[10px]"
                   >
-                    <span class="text-success-500">+{{ getBulletStats(bullet)?.additions }}</span>
+                    <span class="text-success-500 light:text-success-800">
+                      +{{ getBulletStats(bullet)?.additions }}
+                    </span>
                     <span class="text-surface-600">/</span>
                     <span class="text-error-500">-{{ getBulletStats(bullet)?.deletions }}</span>
                   </span>

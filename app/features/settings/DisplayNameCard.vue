@@ -167,11 +167,11 @@
   };
   const getModeBadgeClass = (mode: DisplayNameMode) => {
     if (mode === GAME_MODES.PVE)
-      return 'border-pve-500/30 bg-pve-700/25 text-pve-200 light:border-pve-600/40 light:text-pve-800';
+      return 'border-pve-500/30 bg-pve-700/25 text-pve-200 light:border-pve-600/40 light:text-pve-900';
     if (mode === GAME_MODES.SEASONAL) {
       return 'border-warning-500/30 bg-warning-700/20 text-warning-200 light:border-warning-600/40 light:text-warning-800';
     }
-    return 'border-pvp-500/30 bg-pvp-700/25 text-pvp-200 light:border-pvp-600/40 light:text-pvp-800';
+    return 'border-pvp-500/30 bg-pvp-700/25 text-pvp-200 light:border-pvp-600/40 light:text-pvp-900';
   };
   const getModePanelClass = (mode: DisplayNameMode) => {
     if (currentGameMode.value !== mode) {

@@ -43,16 +43,19 @@
   ]);
   const modeClasses: Record<GameMode, { active: string; inactive: string }> = {
     [GAME_MODES.PVP]: {
-      active: 'bg-pvp-800 text-pvp-100',
-      inactive: 'bg-transparent text-pvp-500 hover:bg-pvp-950/50',
+      active: 'bg-pvp-800 light:bg-pvp-100 text-pvp-100 light:text-pvp-900',
+      inactive:
+        'bg-transparent text-pvp-500 light:text-pvp-900 hover:bg-pvp-950/50 light:hover:bg-pvp-100',
     },
     [GAME_MODES.PVE]: {
       active: 'bg-pve-600 text-white',
-      inactive: 'bg-transparent text-pve-500 hover:bg-pve-950/50',
+      inactive:
+        'bg-transparent text-pve-500 light:text-pve-900 hover:bg-pve-950/50 light:hover:bg-pve-100',
     },
     [GAME_MODES.SEASONAL]: {
       active: 'bg-warning-700 text-warning-50',
-      inactive: 'bg-transparent text-warning-500 hover:bg-warning-950/50',
+      inactive:
+        'bg-transparent text-warning-500 light:text-warning-800 hover:bg-warning-950/50 light:hover:bg-warning-100',
     },
   };
   const getModeClasses = (mode: GameMode) => {

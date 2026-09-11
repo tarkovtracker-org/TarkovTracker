@@ -24,7 +24,7 @@
           </span>
           <span
             :class="[
-              'light:text-surface-50 ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white sm:ml-2 sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
+              'ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white sm:ml-2 sm:h-7 sm:min-w-7 sm:px-1.5 sm:text-sm',
               item.badgeClass,
             ]"
           >
@@ -243,16 +243,18 @@
       emit('update:modelValue', normalizeNeededItemsFilterType(value));
     },
   });
+  // Light theme keeps the white numeral on saturated badges (info/surface-500 clear
+  // AA against white) and switches to ink only where the badge turns pale.
   const getTabBadgeColor = (tab: FilterTab): string => {
     switch (tab.value) {
       case 'completed':
-        return 'bg-success-500';
+        return 'bg-success-500 light:text-surface-50';
       case 'tasks':
       case 'hideout':
-        return tab.count > 0 ? 'bg-info-500' : 'bg-surface-600';
+        return tab.count > 0 ? 'bg-info-500' : 'bg-surface-600 light:text-surface-50';
       case 'all':
       default:
-        return tab.count > 0 ? 'bg-surface-500' : 'bg-surface-600';
+        return tab.count > 0 ? 'bg-surface-500' : 'bg-surface-600 light:text-surface-50';
     }
   };
   const filterTabItems = computed(() => {
