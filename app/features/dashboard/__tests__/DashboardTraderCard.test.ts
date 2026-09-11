@@ -109,7 +109,7 @@ describe('DashboardTraderCard', () => {
         },
       },
     });
-  it('renders active and inactive loyalty buttons with theme tokens in light mode', () => {
+  it('wires the light theme tokens onto the active and inactive loyalty buttons', () => {
     document.documentElement.setAttribute('data-theme', 'light');
     const wrapper = createWrapper();
     const buttons = wrapper.findAll(

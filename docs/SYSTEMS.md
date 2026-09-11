@@ -1824,7 +1824,8 @@ App boot
    `--color-checker-*`, three hardcoded Nuxt UI `--ui-*` aliases, and light-tinted `.vue-flow`
    `--vf-*` text vars) plus the accent foreground range described above: for every accent family
    `200 → 950`, `300 → 900`, `400 → 800` (pvp/pve take one extra step because their ladders sit
-   near the neutral end), and the bare `--ui-<accent>` aliases resolve to step 800/900 so
+   near the neutral end, and `accent` follows primary's steps), and the bare `--ui-<accent>`
+   aliases resolve to step 800/900 so
    `text-primary`, `bg-primary/10` and `ring-primary/25` stay legible together.
    `@custom-variant light` enables per-spot `light:` utilities where a specific component needs a
    different accent treatment (tone gradients, badges, brand buttons).

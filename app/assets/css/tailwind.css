@@ -1080,6 +1080,9 @@ summary {
   --color-primary-200: var(--color-primary-950);
   --color-primary-300: var(--color-primary-900);
   --color-primary-400: var(--color-primary-800);
+  --color-accent-200: var(--color-accent-950);
+  --color-accent-300: var(--color-accent-900);
+  --color-accent-400: var(--color-accent-800);
   --color-secondary-200: var(--color-secondary-950);
   --color-secondary-300: var(--color-secondary-900);
   --color-secondary-400: var(--color-secondary-800);
@@ -1109,6 +1112,7 @@ summary {
   --color-pve-400: var(--color-pve-900);
   /* Bare Nuxt UI accent aliases back `text-primary`, `bg-primary/10`, `ring-primary`, ... */
   --ui-primary: var(--color-primary-800);
+  --ui-accent: var(--color-accent-800);
   --ui-secondary: var(--color-secondary-800);
   --ui-success: var(--color-success-800);
   --ui-warning: var(--color-warning-800);
