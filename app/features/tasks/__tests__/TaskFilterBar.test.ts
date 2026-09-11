@@ -474,9 +474,13 @@ describe('TaskFilterBar', () => {
       statusCounts: { available: 0 },
     });
     const wrapper = mountTaskFilterBar(TaskFilterBar);
-    const badges = wrapper.findAll('.rounded-full');
-    expect(badges.length).toBeGreaterThan(0);
-    const availableBadge = badges.find((b) => b.classes().includes('bg-surface-600'));
-    expect(availableBadge).toBeDefined();
+    const availableButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('available'));
+    expect(availableButton).toBeTruthy();
+    const badge = availableButton!.find('.rounded-full');
+    expect(badge.exists()).toBe(true);
+    expect(badge.classes()).toContain('bg-surface-600');
+    expect(badge.classes()).toContain('light:text-surface-50');
   });
 });

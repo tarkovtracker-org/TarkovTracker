@@ -1,13 +1,40 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTheme } from '@/composables/useTheme';
 import { THEME_STORAGE_KEY } from '@/utils/theme';
 describe('useTheme', () => {
+  let originalLocalStorage: PropertyDescriptor | undefined;
+  const stubThrowingStorage = () => {
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: {
+        get length() {
+          return 0;
+        },
+        clear() {},
+        getItem(): string | null {
+          throw new Error('SecurityError: Access is denied for this document');
+        },
+        key: () => null,
+        removeItem() {},
+        setItem(): void {
+          throw new Error('SecurityError: Access is denied for this document');
+        },
+      } satisfies Storage,
+    });
+  };
   beforeEach(() => {
+    originalLocalStorage = Object.getOwnPropertyDescriptor(window, 'localStorage');
     vi.restoreAllMocks();
     window.localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
     document.documentElement.style.colorScheme = '';
     clearNuxtState(['theme-mode', 'theme-hydrated']);
+  });
+  afterEach(() => {
+    if (originalLocalStorage) {
+      Object.defineProperty(window, 'localStorage', originalLocalStorage);
+    }
+    vi.restoreAllMocks();
   });
   it('defaults to dark when nothing is persisted', () => {
     const { themeMode, isLightTheme } = useTheme();
@@ -58,12 +85,7 @@ describe('useTheme', () => {
   });
   it('preserves in-memory mode across multiple useTheme calls when storage is unavailable', () => {
     const { setThemeMode } = useTheme();
-    vi.spyOn(window.localStorage, 'getItem').mockImplementation(() => {
-      throw new Error('SecurityError: Access is denied for this document');
-    });
-    vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
-      throw new Error('SecurityError: Access is denied for this document');
-    });
+    stubThrowingStorage();
     setThemeMode('light');
     const anotherConsumer = useTheme();
     expect(anotherConsumer.themeMode.value).toBe('light');
