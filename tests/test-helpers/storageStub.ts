@@ -26,6 +26,8 @@ export const installThrowingStorageStub = (
   return () => {
     if (originalDescriptor) {
       Object.defineProperty(window, 'localStorage', originalDescriptor);
+    } else {
+      Reflect.deleteProperty(window, 'localStorage');
     }
   };
 };

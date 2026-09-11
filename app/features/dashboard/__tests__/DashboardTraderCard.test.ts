@@ -103,15 +103,6 @@ describe('DashboardTraderCard', () => {
             props: ['name'],
             template: '<i :data-icon="name" />',
           },
-          AppTooltip: {
-            template: '<div><slot /></div>',
-          },
-          DashboardLoyaltyProgressBar: {
-            template: '<div data-testid="loyalty-progress-bar" />',
-          },
-          DashboardLoyaltyPopover: {
-            template: '<div data-testid="loyalty-popover" />',
-          },
           ReputationInput: {
             template: '<div data-testid="reputation-input" />',
           },
