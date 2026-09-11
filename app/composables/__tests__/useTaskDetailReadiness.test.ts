@@ -51,9 +51,19 @@ const trackWaitTimers = () => {
   const realSetTimeout: SetTimeoutFn = globalThis.setTimeout;
   const realClearTimeout: ClearTimeoutFn = globalThis.clearTimeout;
   globalThis.setTimeout = ((...args: Parameters<SetTimeoutFn>) => {
-    const id = realSetTimeout(...args);
-    if (args[1] === TASK_DETAIL_WAIT_MS) pendingWaitTimers.add(id);
-    return id;
+    if (args[1] !== TASK_DETAIL_WAIT_MS) return realSetTimeout(...args);
+    const handler = args[0];
+    const handlerArgs = args.slice(2);
+    // Drop the id when the wait fires as well as when it is cleared, so the set
+    // tracks timers that are still pending rather than every timer created.
+    const tracked: { id?: ReturnType<SetTimeoutFn> } = {};
+    const invoke = () => {
+      if (tracked.id !== undefined) pendingWaitTimers.delete(tracked.id);
+      if (typeof handler === 'function') (handler as (...rest: unknown[]) => void)(...handlerArgs);
+    };
+    tracked.id = realSetTimeout(invoke, args[1]);
+    pendingWaitTimers.add(tracked.id);
+    return tracked.id;
   }) as SetTimeoutFn;
   globalThis.clearTimeout = ((...args: Parameters<ClearTimeoutFn>) => {
     pendingWaitTimers.delete(args[0] as ReturnType<SetTimeoutFn>);
