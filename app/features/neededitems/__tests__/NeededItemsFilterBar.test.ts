@@ -159,5 +159,10 @@ describe('NeededItemsFilterBar', () => {
     expect(settingsButton.attributes('aria-pressed')).toBe('true');
     expect(settingsButton.classes()).toContain('light:text-surface-50');
     expect(settingsButton.classes()).toContain('light:bg-surface-700/70');
+    // The drawer lives in shared Nuxt state, so leaving it open would leak into any
+    // later test that mounts the bar and expects the default-closed state.
+    await settingsButton.trigger('click');
+    expect(settingsButton.attributes('aria-pressed')).toBe('false');
+    expect(settingsButton.classes()).toContain('text-surface-400');
   });
 });
