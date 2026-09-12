@@ -94,10 +94,14 @@
     if (provider === 'github') return 'i-mdi-github';
     return 'i-mdi-account';
   };
+  const PROVIDER_BADGE_CLASSES: Record<AuthProvider, string> = {
+    google: 'ring-surface-600 text-surface-900 ring-1 light:text-black',
+    github: 'ring-surface-600 text-white ring-1',
+    discord: 'text-white ring-1 ring-white/10',
+    twitch: 'text-white ring-1 ring-white/10',
+  };
   const getProviderBadgeClass = (provider: AuthProvider) => {
-    if (provider === 'google') return 'ring-surface-600 text-surface-900 ring-1';
-    if (provider === 'github') return 'ring-surface-600 text-white ring-1';
-    return 'text-white ring-1 ring-white/10';
+    return PROVIDER_BADGE_CLASSES[provider];
   };
   const getProviderBadgeStyle = (provider: AuthProvider) => {
     if (provider === 'discord') return { backgroundColor: 'var(--color-discord)' };
@@ -464,8 +468,8 @@
   </div>
   <UModal v-model:open="showConfirmationDialog" prevent-close>
     <template #title>
-      <div class="text-error-500 flex items-center text-xl font-medium">
-        <UIcon name="i-mdi-alert-circle" class="text-error-500 mr-2 h-6 w-6" />
+      <div class="text-error-500 light:text-error-800 flex items-center text-xl font-medium">
+        <UIcon name="i-mdi-alert-circle" class="text-error-500 light:text-error-800 mr-2 h-6 w-6" />
         {{ $t('settings.account_data.confirm_delete_title') }}
       </div>
     </template>
@@ -542,7 +546,7 @@
             :color="confirmationError ? 'error' : 'neutral'"
             @input="confirmationError = false"
           />
-          <div v-if="confirmationError" class="text-error-500 mt-1 text-xs">
+          <div v-if="confirmationError" class="text-error-500 light:text-error-800 mt-1 text-xs">
             {{
               $t('settings.account_data.confirm_phrase_error', {
                 phrase: $t('settings.account_data.confirm_phrase_value'),
@@ -573,8 +577,11 @@
   </UModal>
   <UModal v-model:open="showSuccessDialog" prevent-close>
     <template #title>
-      <div class="text-success-500 flex items-center text-xl font-medium">
-        <UIcon name="i-mdi-check-circle" class="text-success-500 mr-2 h-6 w-6" />
+      <div class="text-success-500 light:text-success-800 flex items-center text-xl font-medium">
+        <UIcon
+          name="i-mdi-check-circle"
+          class="text-success-500 light:text-success-800 mr-2 h-6 w-6"
+        />
         {{ $t('settings.account_data.delete_success_title') }}
       </div>
     </template>

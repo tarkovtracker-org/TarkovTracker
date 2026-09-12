@@ -1,0 +1,159 @@
+// @vitest-environment happy-dom
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  applyThemeMode,
+  DEFAULT_THEME_MODE,
+  normalizeThemeMode,
+  persistThemeMode,
+  readStoredThemeMode,
+  THEME_BOOT_SCRIPT,
+  THEME_MODES,
+  THEME_STORAGE_KEY,
+} from '@/utils/theme';
+import { installThrowingStorageStub } from '#tests/test-helpers/storageStub';
+// happy-dom exposes window.localStorage as a Proxy, so vi.spyOn on its methods
+// leaks across tests. Replace the whole property instead and restore it after.
+describe('theme utils', () => {
+  let restoreStorage: (() => void) | undefined;
+  beforeEach(() => {
+    window.localStorage.clear();
+    document.documentElement.removeAttribute('data-theme');
+    document.documentElement.style.colorScheme = '';
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    restoreStorage?.();
+    restoreStorage = undefined;
+    vi.restoreAllMocks();
+  });
+  describe('normalizeThemeMode', () => {
+    it('keeps supported modes', () => {
+      expect(normalizeThemeMode('light')).toBe('light');
+      expect(normalizeThemeMode('dark')).toBe('dark');
+    });
+    it('falls back to dark for unknown or missing values', () => {
+      expect(normalizeThemeMode('solarized')).toBe('dark');
+      expect(normalizeThemeMode('')).toBe('dark');
+      expect(normalizeThemeMode(undefined)).toBe('dark');
+      expect(normalizeThemeMode(null)).toBe('dark');
+      expect(normalizeThemeMode(42)).toBe('dark');
+      expect(normalizeThemeMode({ value: 'light' })).toBe('dark');
+    });
+    it('treats modes and the default as dark-first', () => {
+      expect(THEME_MODES).toEqual(['dark', 'light']);
+      expect(DEFAULT_THEME_MODE).toBe('dark');
+    });
+  });
+  describe('readStoredThemeMode', () => {
+    it('returns the persisted mode', () => {
+      window.localStorage.setItem(THEME_STORAGE_KEY, 'light');
+      expect(readStoredThemeMode()).toBe('light');
+    });
+    it('uses provided storage when given', () => {
+      const customStorage = {
+        getItem: vi.fn().mockReturnValue('light'),
+      };
+      expect(readStoredThemeMode(customStorage)).toBe('light');
+      expect(customStorage.getItem).toHaveBeenCalledWith(THEME_STORAGE_KEY);
+    });
+    it('falls back to dark when nothing is stored or the value is invalid', () => {
+      expect(readStoredThemeMode()).toBe('dark');
+      window.localStorage.setItem(THEME_STORAGE_KEY, 'neon');
+      expect(readStoredThemeMode()).toBe('dark');
+    });
+    it('falls back to dark when storage access throws', () => {
+      restoreStorage = installThrowingStorageStub('denied');
+      expect(readStoredThemeMode()).toBe('dark');
+    });
+    it('falls back to dark when storage item is null', () => {
+      const customStorage = { getItem: () => null };
+      expect(readStoredThemeMode(customStorage)).toBe('dark');
+    });
+    it('falls back to dark when window is undefined', () => {
+      vi.stubGlobal('window', undefined);
+      expect(readStoredThemeMode()).toBe('dark');
+    });
+  });
+  describe('persistThemeMode', () => {
+    it('writes the mode to localStorage', () => {
+      persistThemeMode('light');
+      expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
+    });
+    it('uses provided storage when given', () => {
+      const customStorage = {
+        setItem: vi.fn(),
+      };
+      persistThemeMode('light', customStorage);
+      expect(customStorage.setItem).toHaveBeenCalledWith(THEME_STORAGE_KEY, 'light');
+    });
+    it('swallows storage failures without throwing', () => {
+      restoreStorage = installThrowingStorageStub('denied');
+      expect(() => persistThemeMode('light')).not.toThrow();
+    });
+    it('handles undefined window safely without throwing', () => {
+      vi.stubGlobal('window', undefined);
+      expect(() => persistThemeMode('light')).not.toThrow();
+    });
+  });
+  describe('applyThemeMode', () => {
+    it('sets data-theme and color-scheme on the document root', () => {
+      applyThemeMode('light');
+      expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+      expect(document.documentElement.style.colorScheme).toBe('light');
+      applyThemeMode('dark');
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+      expect(document.documentElement.style.colorScheme).toBe('dark');
+    });
+    it('sets attributes on provided custom root element', () => {
+      const customRoot = {
+        dataset: {} as Record<string, string>,
+        style: {} as CSSStyleDeclaration,
+      };
+      applyThemeMode('light', customRoot as unknown as HTMLElement);
+      expect(customRoot.dataset.theme).toBe('light');
+      expect(customRoot.style.colorScheme).toBe('light');
+    });
+    it('falls back to the document root when a null root is supplied', () => {
+      applyThemeMode('light', null as unknown as HTMLElement);
+      expect(document.documentElement.dataset.theme).toBe('light');
+      expect(document.documentElement.style.colorScheme).toBe('light');
+    });
+    it('handles undefined document safely without throwing', () => {
+      vi.stubGlobal('document', undefined);
+      expect(() => applyThemeMode('light')).not.toThrow();
+    });
+    it('swallows DOM access errors without throwing', () => {
+      const throwingRoot = {
+        get dataset() {
+          throw new Error('access denied');
+        },
+        style: {} as CSSStyleDeclaration,
+      };
+      expect(() => applyThemeMode('light', throwingRoot as unknown as HTMLElement)).not.toThrow();
+    });
+  });
+  describe('THEME_BOOT_SCRIPT', () => {
+    it('applies the stored light theme before paint', () => {
+      window.localStorage.setItem(THEME_STORAGE_KEY, 'light');
+      new Function(THEME_BOOT_SCRIPT)();
+      expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+      expect(document.documentElement.style.colorScheme).toBe('light');
+    });
+    it('defaults to dark when nothing is stored', () => {
+      new Function(THEME_BOOT_SCRIPT)();
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+      expect(document.documentElement.style.colorScheme).toBe('dark');
+    });
+    it('normalizes invalid stored values to dark', () => {
+      window.localStorage.setItem(THEME_STORAGE_KEY, 'blue');
+      new Function(THEME_BOOT_SCRIPT)();
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    });
+    it('normalizes to dark when storage is unavailable', () => {
+      restoreStorage = installThrowingStorageStub('denied');
+      expect(() => new Function(THEME_BOOT_SCRIPT)()).not.toThrow();
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+      expect(document.documentElement.style.colorScheme).toBe('dark');
+    });
+  });
+});

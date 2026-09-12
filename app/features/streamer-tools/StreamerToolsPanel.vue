@@ -97,7 +97,7 @@
                   :class="
                     selectedMode === GAME_MODES.PVP
                       ? 'bg-pvp-800 text-pvp-100'
-                      : 'text-pvp-300 hover:bg-pvp-950/60'
+                      : 'text-pvp-300 hover:bg-pvp-950/60 light:text-pvp-700 light:hover:bg-pvp-100/70'
                   "
                   @click="selectedMode = GAME_MODES.PVP"
                 >
@@ -111,7 +111,7 @@
                   :class="
                     selectedMode === GAME_MODES.PVE
                       ? 'bg-pve-700 text-pve-100'
-                      : 'text-pve-300 hover:bg-pve-950/60'
+                      : 'text-pve-300 hover:bg-pve-950/60 light:text-pve-700 light:hover:bg-pve-100/70'
                   "
                   @click="selectedMode = GAME_MODES.PVE"
                 >
@@ -125,7 +125,7 @@
                   :class="
                     selectedMode === GAME_MODES.SEASONAL
                       ? 'bg-warning-700 text-warning-50'
-                      : 'text-warning-300 hover:bg-warning-950/60'
+                      : 'text-warning-300 hover:bg-warning-950/60 light:text-warning-700 light:hover:bg-warning-100/70'
                   "
                   @click="selectedMode = GAME_MODES.SEASONAL"
                 >
@@ -154,7 +154,7 @@
                   class="rounded-md border px-3 py-2 text-left transition-colors"
                   :class="
                     selectedMetric === option.value
-                      ? 'border-primary-400 bg-primary-800/30 text-primary-100'
+                      ? 'border-primary-400 bg-primary-800/30 light:bg-primary-100 text-primary-100 light:text-primary-800'
                       : 'text-surface-200 hover:bg-surface-800/80 border-white/10'
                   "
                   @click="selectedMetric = option.value"

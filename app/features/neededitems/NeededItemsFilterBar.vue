@@ -14,7 +14,7 @@
         indicator: 'hidden',
         leadingIcon: 'h-4 w-4 sm:h-5 sm:w-5',
         trigger:
-          'data-[state=active]:border-surface-200 data-[state=active]:bg-transparent data-[state=active]:text-white rounded-none border-b-2 border-transparent px-2 sm:px-3',
+          'data-[state=active]:border-surface-200 data-[state=active]:bg-transparent data-[state=active]:text-white light:data-[state=active]:text-surface-50 rounded-none border-b-2 border-transparent px-2 sm:px-3',
       }"
     >
       <template #default="{ item }">
@@ -168,7 +168,11 @@
             icon="i-mdi-cog"
             :aria-label="t('page.needed_items.settings.title', 'Needed Items Settings')"
             :aria-pressed="isSettingsDrawerOpen"
-            :class="isSettingsDrawerOpen ? 'bg-white/10 text-white' : 'text-surface-400'"
+            :class="
+              isSettingsDrawerOpen
+                ? 'light:bg-surface-700/70 light:text-surface-50 bg-white/10 text-white'
+                : 'text-surface-400'
+            "
             @click="toggleSettingsDrawer"
           >
             <UBadge v-if="activeFiltersCount > 0" color="primary" variant="soft" size="sm">
@@ -239,16 +243,19 @@
       emit('update:modelValue', normalizeNeededItemsFilterType(value));
     },
   });
+  // Light theme picks whichever numeral clears AA on each badge: white stays on
+  // info-500 and surface-500, while the pale surface-600 badge and the saturated
+  // success-500 badge (where white is only ~3.9:1 but ink is ~4.2:1) switch to ink.
   const getTabBadgeColor = (tab: FilterTab): string => {
     switch (tab.value) {
       case 'completed':
-        return 'bg-success-500';
+        return 'bg-success-500 light:text-surface-50';
       case 'tasks':
       case 'hideout':
-        return tab.count > 0 ? 'bg-info-500' : 'bg-surface-600';
+        return tab.count > 0 ? 'bg-info-500' : 'bg-surface-600 light:text-surface-50';
       case 'all':
       default:
-        return tab.count > 0 ? 'bg-surface-500' : 'bg-surface-600';
+        return tab.count > 0 ? 'bg-surface-500' : 'bg-surface-600 light:text-surface-50';
     }
   };
   const filterTabItems = computed(() => {

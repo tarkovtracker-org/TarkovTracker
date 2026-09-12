@@ -43,6 +43,20 @@ describe('GameItem', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
+  it('keeps the copy action light over the fixed-dark action overlay', () => {
+    const wrapper = mount(GameItem, {
+      props: {
+        itemId: 'test-item',
+        itemName: 'Test Item',
+        devLink: 'https://tarkov.dev/item/test',
+      },
+      global: {
+        stubs: { ...defaultStubs, AppTooltip: { template: '<div><slot /></div>' } },
+      },
+    });
+    expect(wrapper.get('button').classes()).toContain('light:text-white');
+    wrapper.unmount();
+  });
   it('suppresses native context menu synchronously on right-click', async () => {
     const wrapper = mount(GameItem, {
       props: {

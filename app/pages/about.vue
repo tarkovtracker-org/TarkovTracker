@@ -2,7 +2,7 @@
   <UContainer class="px-4 py-10 sm:px-6 sm:py-14">
     <div class="mx-auto flex w-full max-w-6xl flex-col gap-10">
       <header class="border-surface-700/60 mx-auto w-full max-w-2xl border-b pb-8 text-center">
-        <h1 class="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+        <h1 class="text-surface-50 text-3xl font-bold tracking-tight sm:text-4xl">
           {{ t('page.about.title') }}
         </h1>
         <p class="text-surface-400 mt-3 text-sm leading-relaxed">
@@ -14,7 +14,7 @@
         id="team"
         aria-labelledby="about-team-heading"
       >
-        <h2 id="about-team-heading" class="text-xl font-semibold text-white">
+        <h2 id="about-team-heading" class="text-surface-50 text-xl font-semibold">
           {{ t('page.about.team.heading') }}
         </h2>
         <p class="text-surface-400 mt-2 max-w-2xl text-sm leading-relaxed">
@@ -34,7 +34,7 @@
         </div>
       </section>
       <section v-if="partnerMembers.length" id="partners" aria-labelledby="about-partners-heading">
-        <h2 id="about-partners-heading" class="text-xl font-semibold text-white">
+        <h2 id="about-partners-heading" class="text-surface-50 text-xl font-semibold">
           {{ t('page.about.partners.heading') }}
         </h2>
         <p class="text-surface-400 mt-2 max-w-2xl text-sm leading-relaxed">
@@ -45,7 +45,7 @@
         </ul>
       </section>
       <section id="help" aria-labelledby="about-help-heading">
-        <h2 id="about-help-heading" class="text-xl font-semibold text-white">
+        <h2 id="about-help-heading" class="text-surface-50 text-xl font-semibold">
           {{ t('page.about.help.heading') }}
         </h2>
         <p class="text-surface-400 mt-2 max-w-2xl text-sm leading-relaxed">

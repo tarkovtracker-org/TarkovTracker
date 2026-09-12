@@ -6,13 +6,13 @@
           class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border"
           :class="iconWrapClasses"
         >
-          <UIcon :name="tierIcon" class="h-6 w-6 text-white" />
+          <UIcon :name="tierIcon" class="h-6 w-6" :class="tierIconClasses" />
         </div>
         <div class="space-y-1">
           <p class="text-surface-300 text-xs font-semibold tracking-wider uppercase">
             {{ statusLabel }}
           </p>
-          <h2 class="text-xl font-bold text-white">
+          <h2 class="light:text-surface-50 text-xl font-bold text-white">
             {{ tierLabel }}
           </h2>
           <p class="text-surface-300 text-sm">
@@ -89,6 +89,12 @@
       default:
         return 'i-mdi-heart';
     }
+  });
+  const tierIconClasses = computed(() => {
+    if (supporter.value?.tier === 'scav') {
+      return 'text-white light:text-surface-50';
+    }
+    return 'text-white';
   });
   const statusLabel = computed(() => {
     if (!supporter.value) return '';

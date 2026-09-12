@@ -73,7 +73,7 @@
                 :class="
                   groupedItem.taskFirCurrent >= groupedItem.taskFir
                     ? 'text-success-400'
-                    : 'text-white'
+                    : 'light:text-surface-50 text-white'
                 "
               />
             </AppTooltip>
@@ -82,7 +82,7 @@
               :class="
                 groupedItem.taskFirCurrent >= groupedItem.taskFir
                   ? 'text-success-400'
-                  : 'text-white'
+                  : 'light:text-surface-50 text-white'
               "
             >
               {{ groupedItem.taskFirCurrent }}/{{ groupedItem.taskFir }}
@@ -103,7 +103,7 @@
               :class="
                 groupedItem.taskNonFirCurrent >= groupedItem.taskNonFir
                   ? 'text-success-400'
-                  : 'text-white'
+                  : 'light:text-surface-50 text-white'
               "
             >
               {{ groupedItem.taskNonFirCurrent }}/{{ groupedItem.taskNonFir }}
@@ -135,7 +135,7 @@
                 :class="
                   groupedItem.hideoutFirCurrent >= groupedItem.hideoutFir
                     ? 'text-success-400'
-                    : 'text-white'
+                    : 'light:text-surface-50 text-white'
                 "
               />
             </AppTooltip>
@@ -144,7 +144,7 @@
               :class="
                 groupedItem.hideoutFirCurrent >= groupedItem.hideoutFir
                   ? 'text-success-400'
-                  : 'text-white'
+                  : 'light:text-surface-50 text-white'
               "
             >
               {{ groupedItem.hideoutFirCurrent }}/{{ groupedItem.hideoutFir }}
@@ -165,7 +165,7 @@
               :class="
                 groupedItem.hideoutNonFirCurrent >= groupedItem.hideoutNonFir
                   ? 'text-success-400'
-                  : 'text-white'
+                  : 'light:text-surface-50 text-white'
               "
             >
               {{ groupedItem.hideoutNonFirCurrent }}/{{ groupedItem.hideoutNonFir }}

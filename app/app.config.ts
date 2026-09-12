@@ -53,7 +53,7 @@ const uiConfig = {
       group: 'p-1',
       label: 'px-2 py-1.5 text-xs font-semibold text-surface-400',
       separator: '-mx-1 my-1 h-px bg-surface-700',
-      item: 'px-3 py-2 text-sm cursor-pointer transition-colors rounded text-surface-300 data-[highlighted]:bg-surface-800 data-[highlighted]:text-white',
+      item: 'px-3 py-2 text-sm cursor-pointer transition-colors rounded text-surface-300 data-[highlighted]:bg-surface-800 data-[highlighted]:text-white light:data-[highlighted]:text-surface-50',
       itemLeadingIcon: 'text-surface-400 shrink-0 size-4',
       itemTrailingIcon: 'text-surface-400 shrink-0 size-4',
     },
@@ -98,7 +98,7 @@ const uiConfig = {
       empty: 'px-3 py-2 text-sm text-surface-500 text-center',
       label: 'px-2 py-1.5 text-xs font-semibold text-surface-400',
       separator: '-mx-1 my-1 h-px bg-surface-700',
-      item: 'px-3 py-2 text-sm cursor-pointer transition-colors rounded text-surface-300 data-[highlighted]:bg-surface-800 data-[highlighted]:text-white data-[state=checked]:bg-surface-700 data-[state=checked]:text-white data-[state=checked]:font-medium',
+      item: 'px-3 py-2 text-sm cursor-pointer transition-colors rounded text-surface-300 data-[highlighted]:bg-surface-800 data-[highlighted]:text-white light:data-[highlighted]:text-surface-50 data-[state=checked]:bg-surface-700 data-[state=checked]:text-white light:data-[state=checked]:text-surface-50 data-[state=checked]:font-medium',
       itemLeadingIcon: 'text-surface-400 shrink-0',
       itemLeadingAvatar: 'shrink-0',
       itemLeadingChip: 'shrink-0',
@@ -169,7 +169,7 @@ const uiConfig = {
         color: 'primary',
         variant: 'solid',
         class:
-          'bg-primary-500 hover:bg-primary-400 active:bg-primary-600 text-surface-950 font-medium',
+          'bg-primary-500 light:bg-primary-800 hover:bg-primary-400 light:hover:bg-primary-900 active:bg-primary-600 light:active:bg-primary-950 text-surface-950 font-medium',
       },
       {
         color: 'primary',
@@ -224,17 +224,17 @@ const uiConfig = {
       {
         color: 'pvp',
         variant: 'soft',
-        class: 'bg-pvp-900 hover:bg-pvp-800 text-pvp-200',
+        class: 'bg-pvp-900 light:bg-pvp-50 hover:bg-pvp-800 light:hover:bg-pvp-100 text-pvp-200',
       },
       {
         color: 'pvp',
         variant: 'ghost',
-        class: 'text-pvp-400 hover:bg-pvp-900',
+        class: 'text-pvp-400 hover:bg-pvp-900 light:hover:bg-pvp-100',
       },
       {
         color: 'pvp',
         variant: 'outline',
-        class: 'ring ring-inset ring-pvp-500 text-pvp-400 hover:bg-pvp-950',
+        class: 'ring ring-inset ring-pvp-500 text-pvp-400 hover:bg-pvp-950 light:hover:bg-pvp-100',
       },
       {
         color: 'pvp',
@@ -249,17 +249,17 @@ const uiConfig = {
       {
         color: 'pve',
         variant: 'soft',
-        class: 'bg-pve-900 hover:bg-pve-800 text-pve-200',
+        class: 'bg-pve-900 light:bg-pve-50 hover:bg-pve-800 light:hover:bg-pve-100 text-pve-200',
       },
       {
         color: 'pve',
         variant: 'ghost',
-        class: 'text-pve-400 hover:bg-pve-900',
+        class: 'text-pve-400 hover:bg-pve-900 light:hover:bg-pve-100',
       },
       {
         color: 'pve',
         variant: 'outline',
-        class: 'ring ring-inset ring-pve-500 text-pve-400 hover:bg-pve-950',
+        class: 'ring ring-inset ring-pve-500 text-pve-400 hover:bg-pve-950 light:hover:bg-pve-100',
       },
       {
         color: 'pve',
@@ -274,23 +274,26 @@ const uiConfig = {
       {
         color: 'success',
         variant: 'soft',
-        class: 'bg-success-950 hover:bg-success-900 text-success-200',
+        class:
+          'bg-success-950 light:bg-success-50 hover:bg-success-900 light:hover:bg-success-100 text-success-200',
       },
       {
         color: 'success',
         variant: 'ghost',
-        class: 'text-success-500 hover:bg-success-950',
+        class:
+          'text-success-500 light:text-success-800 hover:bg-success-950 light:hover:bg-success-100',
       },
       {
         color: 'success',
         variant: 'outline',
         class:
-          'ring ring-inset ring-success-500 text-success-500 hover:bg-success-950 hover:text-white',
+          'ring ring-inset ring-success-500 text-success-500 light:text-success-800 hover:bg-success-950 light:hover:bg-success-100 hover:text-white light:hover:text-success-800',
       },
       {
         color: 'success',
         variant: 'link',
-        class: 'text-success-500 hover:text-success-400 underline-offset-4 hover:underline',
+        class:
+          'text-success-500 light:text-success-800 hover:text-success-400 light:hover:text-success-900 underline-offset-4 hover:underline',
       },
     ],
   },
@@ -316,13 +319,22 @@ const uiConfig = {
       color: 'success',
     },
   },
-  // Checkbox configuration - neutral styling, primary accent when checked
+  // Checkbox configuration - neutral styling, success accent when checked.
+  // Pair the pale light-mode success plate with a dark tick. Scope both overrides to
+  // success: other colors retain dark plates and need Nuxt UI's inherited `text-inverted`
+  // foreground, which resolves to pale surface-950 in light mode.
   checkbox: {
     slots: {
       root: 'relative flex items-start',
       base: 'h-4 w-4 shrink-0 rounded border transition-all border-surface-500 data-[state=unchecked]:bg-surface-800',
-      icon: 'h-4 w-4 text-surface-900',
+      icon: 'h-4 w-4',
     },
+    compoundVariants: [
+      {
+        color: 'success',
+        class: { indicator: 'light:bg-success-100', icon: 'light:text-surface-50' },
+      },
+    ],
     defaultVariants: {
       color: 'success',
     },

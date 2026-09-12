@@ -15,7 +15,10 @@
     @keydown="handleKeydown"
   >
     <div class="mb-3 flex items-center justify-between">
-      <h2 id="hideout-settings-drawer-title" class="text-sm font-semibold text-white">
+      <h2
+        id="hideout-settings-drawer-title"
+        class="light:text-surface-50 text-sm font-semibold text-white"
+      >
         {{ copy('page.hideout.settings.title', 'Hideout settings') }}
       </h2>
       <UButton
@@ -31,7 +34,9 @@
       <section class="bg-surface-800/50 rounded-lg border border-white/5 p-3">
         <div class="mb-2 flex items-center gap-2">
           <UIcon name="i-mdi-tune-variant" class="text-info-400 h-4 w-4" />
-          <h3 class="text-xs font-semibold tracking-wide text-white uppercase">
+          <h3
+            class="light:text-surface-50 text-xs font-semibold tracking-wide text-white uppercase"
+          >
             {{ copy('page.hideout.settings.page_options', 'Page options') }}
           </h3>
         </div>
@@ -57,7 +62,9 @@
       <section class="bg-surface-800/50 rounded-lg border border-white/5 p-3">
         <div class="mb-2 flex items-center gap-2">
           <UIcon name="i-mdi-lock-outline" class="text-primary-400 h-4 w-4" />
-          <h3 class="text-xs font-semibold tracking-wide text-white uppercase">
+          <h3
+            class="light:text-surface-50 text-xs font-semibold tracking-wide text-white uppercase"
+          >
             {{ copy('page.hideout.prereq_filters.title', 'Availability requirements') }}
           </h3>
         </div>

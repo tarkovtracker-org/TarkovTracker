@@ -53,7 +53,7 @@
                       class="focus-visible:ring-primary-500/60 flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
                       :class="
                         activeTab === item.value
-                          ? 'bg-surface-800 text-white shadow-sm ring-1 ring-white/10'
+                          ? 'bg-surface-800 light:text-surface-50 light:ring-surface-600/40 text-white shadow-sm ring-1 ring-white/10'
                           : 'text-surface-300 hover:bg-surface-800/80 hover:text-surface-100'
                       "
                       :aria-current="activeTab === item.value ? 'page' : undefined"
@@ -99,6 +99,7 @@
               role="tabpanel"
               :aria-label="$t('common.preferences')"
             >
+              <AppearanceCard />
               <GeneralPreferencesCard />
               <TaskDisplayCard />
               <MapSettingsCard />
@@ -378,7 +379,7 @@
     list: 'bg-surface-900 flex w-full gap-1 overflow-x-auto rounded-xl border border-white/10 p-2 shadow-sm',
     indicator: 'hidden',
     trigger:
-      'text-surface-300 data-[state=active]:bg-surface-800 data-[state=active]:text-white flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors',
+      'text-surface-300 data-[state=active]:bg-surface-800 data-[state=active]:text-white light:data-[state=active]:text-surface-50 flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors',
     leadingIcon: 'h-4 w-4',
   };
   const scrollToHashTarget = async (hash: string) => {

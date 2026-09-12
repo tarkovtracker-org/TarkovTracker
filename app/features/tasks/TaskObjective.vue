@@ -14,7 +14,7 @@
     ]"
     @click="handleRowClick"
     @keydown.enter.self="handleRowClick"
-    @keydown.space.prevent.self="handleRowClick"
+    @keydown.space.self.prevent="handleRowClick"
     @mouseenter="objectiveMouseEnter()"
     @mouseleave="objectiveMouseLeave()"
   >
@@ -71,7 +71,7 @@
           </div>
         </AppTooltip>
       </div>
-      <div class="flex items-center gap-2" @click.stop>
+      <div class="flex items-center gap-2" data-objective-controls>
         <AppTooltip v-if="hasMapLocation" :text="t('page.tasks.questcard.jump_to_map')">
           <button
             type="button"
@@ -266,12 +266,12 @@
   });
   const currentModeBadgeClass = computed(() => {
     if (currentGameMode.value === GAME_MODES.PVE) {
-      return 'border border-pve-500/30 bg-pve-700/25 text-pve-200';
+      return 'border border-pve-500/30 bg-pve-700/25 text-pve-200 light:border-pve-600/40 light:text-pve-900';
     }
     if (currentGameMode.value === GAME_MODES.SEASONAL) {
-      return 'border border-warning-500/30 bg-warning-700/20 text-warning-200';
+      return 'border border-warning-500/30 bg-warning-700/20 text-warning-200 light:border-warning-600/40 light:text-warning-900';
     }
-    return 'border border-pvp-500/30 bg-pvp-700/25 text-pvp-200';
+    return 'border border-pvp-500/30 bg-pvp-700/25 text-pvp-200 light:border-pvp-600/40 light:text-pvp-900';
   });
   const objectiveModeCountDifferenceText = computed(() => {
     const difference = objectiveModeCountDifference.value;
@@ -297,7 +297,10 @@
     if (!taskId) return;
     trackTaskProgressInteraction?.(taskId, 'objective_progress');
   };
-  const handleRowClick = () => {
+  const isObjectiveControlEvent = (event: Event) =>
+    event.target instanceof Element && Boolean(event.target.closest('[data-objective-controls]'));
+  const handleRowClick = (event: Event) => {
+    if (isObjectiveControlEvent(event)) return;
     if (isParentTaskLocked.value) return;
     if (neededCount.value > 1) {
       toggleCount();

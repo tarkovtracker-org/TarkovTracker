@@ -129,7 +129,11 @@
             icon="i-mdi-cog"
             :aria-label="t('page.tasks.settings.title')"
             :aria-pressed="isDrawerOpen"
-            :class="isDrawerOpen ? 'bg-white/10 text-white' : 'text-surface-400'"
+            :class="
+              isDrawerOpen
+                ? 'light:bg-surface-700/70 light:text-surface-50 bg-white/10 text-white'
+                : 'text-surface-400'
+            "
             @click="toggleDrawer"
           />
         </AppTooltip>
@@ -160,7 +164,11 @@
             </span>
             <span
               class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
-              :class="displayStatusCounts.all > 0 ? 'bg-surface-500' : 'bg-surface-600'"
+              :class="
+                displayStatusCounts.all > 0
+                  ? 'bg-surface-500'
+                  : 'bg-surface-600 light:text-surface-50'
+              "
             >
               {{ displayStatusCounts.all }}
             </span>
@@ -187,7 +195,11 @@
             </span>
             <span
               class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
-              :class="displayStatusCounts.available > 0 ? 'bg-info-500' : 'bg-surface-600'"
+              :class="
+                displayStatusCounts.available > 0
+                  ? 'bg-info-500'
+                  : 'bg-surface-600 light:text-surface-50'
+              "
             >
               {{ displayStatusCounts.available }}
             </span>
@@ -208,7 +220,7 @@
               {{ t('common.locked') }}
             </span>
             <span
-              class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
+              class="light:text-surface-50 ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
               :class="displayStatusCounts.locked > 0 ? 'bg-surface-600' : 'bg-surface-700'"
             >
               {{ displayStatusCounts.locked }}
@@ -230,7 +242,7 @@
               {{ t('common.completed') }}
             </span>
             <span
-              class="bg-success-500 ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
+              class="bg-success-500 light:text-surface-50 ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
             >
               {{ displayStatusCounts.completed }}
             </span>
@@ -352,7 +364,7 @@
             <span class="text-xs font-medium whitespace-nowrap">{{ mapOption.label }}</span>
             <span
               :class="[
-                'inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white',
+                'light:text-surface-50 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white',
                 (mapOption.count ?? 0) > 0 ? 'bg-pve-500' : 'bg-surface-600',
               ]"
             >
@@ -395,7 +407,7 @@
               </div>
               <span
                 :class="[
-                  'absolute -top-1 -right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[10px] font-bold text-white',
+                  'light:text-surface-50 absolute -top-1 -right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[10px] font-bold text-white',
                   (traderCounts[trader.id] ?? 0) > 0 ? 'bg-pve-500' : 'bg-surface-600',
                 ]"
               >
@@ -502,18 +514,22 @@
   const toggleButtonBaseClass =
     'border border-transparent font-medium transition-colors duration-150 disabled:cursor-default disabled:opacity-100';
   const primaryToggleInactiveClass =
-    'text-surface-200 hover:border-white/10 hover:bg-white/5 hover:text-white';
+    'text-surface-200 hover:border-white/10 hover:bg-white/5 hover:text-white light:hover:text-surface-50';
   const secondaryToggleInactiveClass =
-    'text-surface-400 hover:border-white/10 hover:bg-white/5 hover:text-white';
+    'text-surface-400 hover:border-white/10 hover:bg-white/5 hover:text-white light:hover:text-surface-50';
   const selectedToggleClass =
-    'border-primary-500/45 bg-primary-500/12 text-white ring-1 ring-primary-500/25';
-  const neutralSelectedToggleClass = 'border-white/15 bg-white/10 text-white ring-1 ring-white/10';
+    'border-primary-500/45 bg-primary-500/12 text-white ring-1 ring-primary-500/25 light:text-primary-700';
+  const neutralSelectedToggleClass =
+    'border-white/15 bg-white/10 text-white ring-1 ring-white/10 light:border-surface-600 light:bg-surface-700/60 light:text-surface-50 light:ring-surface-600/40';
   const statusToggleSelectedClasses: Record<StatusToggleView, string> = {
     all: selectedToggleClass,
-    available: 'border-info-500/45 bg-info-500/12 text-white ring-1 ring-info-500/25',
+    available:
+      'border-info-500/45 bg-info-500/12 text-white ring-1 ring-info-500/25 light:text-info-700',
     locked: neutralSelectedToggleClass,
-    completed: 'border-success-500/45 bg-success-500/12 text-white ring-1 ring-success-500/25',
-    failed: 'border-error-500/45 bg-error-500/12 text-white ring-1 ring-error-500/25',
+    completed:
+      'border-success-500/45 bg-success-500/12 text-white ring-1 ring-success-500/25 light:text-success-700',
+    failed:
+      'border-error-500/45 bg-error-500/12 text-white ring-1 ring-error-500/25 light:text-error-700',
   };
   const getPrimaryViewButtonClass = (isActive: boolean): string[] => {
     return [toggleButtonBaseClass, isActive ? selectedToggleClass : primaryToggleInactiveClass];

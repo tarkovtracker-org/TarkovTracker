@@ -19,7 +19,9 @@
       </AppTooltip>
       <!-- Center: Page Title & Omnibar Search -->
       <span class="flex min-w-0 flex-1 items-center gap-4">
-        <span class="hidden truncate text-base leading-none font-semibold text-white md:inline">
+        <span
+          class="light:text-surface-50 hidden truncate text-base leading-none font-semibold text-white md:inline"
+        >
           {{ pageTitle }}
         </span>
         <button
@@ -47,17 +49,34 @@
         <div class="flex items-center justify-end gap-1">
           <AppTooltip v-if="dataError" :text="t('app_bar.error_loading')">
             <span class="flex h-9 w-9 items-center justify-center">
-              <UIcon name="i-mdi-database-alert" class="text-error-500 h-4 w-4" />
+              <UIcon
+                name="i-mdi-database-alert"
+                class="text-error-500 light:text-error-800 h-4 w-4"
+              />
             </span>
           </AppTooltip>
           <AppTooltip v-if="dataLoading || hideoutLoading" :text="t('app_bar.loading')">
             <span class="flex h-9 w-9 items-center justify-center">
-              <UIcon name="i-heroicons-arrow-path" class="text-primary-500 h-4 w-4 animate-spin" />
+              <UIcon
+                name="i-heroicons-arrow-path"
+                class="text-primary-500 light:text-primary-800 h-4 w-4 animate-spin"
+              />
             </span>
           </AppTooltip>
         </div>
-        <!-- Group 1: Utilities (Bell + Help) -->
+        <!-- Group 1: Utilities (Theme + Bell + Help) -->
         <div class="flex items-center gap-1">
+          <AppTooltip :text="themeToggleLabel">
+            <UButton
+              color="neutral"
+              variant="ghost"
+              size="md"
+              :icon="isLightTheme ? 'i-heroicons-moon' : 'i-heroicons-sun'"
+              :aria-label="themeToggleLabel"
+              class="hidden h-9 w-9 sm:inline-flex"
+              @click="toggleThemeMode"
+            />
+          </AppTooltip>
           <AppTooltip :text="t('common.activity_log', 'Activity Log')">
             <UPopover :content="{ align: 'end', side: 'bottom', sideOffset: 10 }">
               <UButton
@@ -173,7 +192,7 @@
           <AppTooltip v-if="!isLoggedIn" :text="t('app_bar.login_aria', 'Log in to your account')">
             <NuxtLink
               to="/login"
-              class="bg-primary-500 hover:bg-primary-400 border-primary-500 text-surface-950 flex h-9 items-center gap-1.5 rounded-md border px-3.5 text-[13px] leading-none font-semibold transition-colors"
+              class="bg-primary-500 light:bg-primary-800 hover:bg-primary-400 light:hover:bg-primary-900 border-primary-500 light:border-primary-800 text-surface-950 flex h-9 items-center gap-1.5 rounded-md border px-3.5 text-[13px] leading-none font-semibold transition-colors"
               :aria-label="t('app_bar.login_aria', 'Log in to your account')"
             >
               <UIcon name="i-mdi-account-outline" class="h-4 w-4 shrink-0" />
@@ -191,6 +210,7 @@
   import { storeToRefs } from 'pinia';
   import { useKeybinds } from '@/composables/useKeybinds';
   import { useSupporter } from '@/composables/useSupporter';
+  import { useTheme } from '@/composables/useTheme';
   import { getResourceBySlug } from '@/features/resources/resourceData';
   import { useActivityLogStore } from '@/stores/useActivityLogStore';
   import { useAppStore } from '@/stores/useApp';
@@ -203,6 +223,12 @@
   import { SHELL_DESKTOP_BREAKPOINT_PX } from '@/utils/shellConfig';
   import type { DropdownMenuItem } from '@nuxt/ui';
   const { availableLocales, locale, setLocale, t, te } = useI18n({ useScope: 'global' });
+  const { isLightTheme, toggleThemeMode } = useTheme();
+  const themeToggleLabel = computed(() =>
+    isLightTheme.value
+      ? t('app_bar.switch_to_dark_theme', 'Switch to dark theme')
+      : t('app_bar.switch_to_light_theme', 'Switch to light theme')
+  );
   const appStore = useAppStore();
   const activityLogStore = useActivityLogStore();
   const metadataStore = useMetadataStore();
@@ -354,6 +380,13 @@
   ]);
   const moreMenuItems = computed<DropdownMenuItem[][]>(() => [
     [
+      {
+        icon: isLightTheme.value ? 'i-heroicons-moon' : 'i-heroicons-sun',
+        label: themeToggleLabel.value,
+        onSelect: () => {
+          toggleThemeMode();
+        },
+      },
       {
         icon: 'i-mdi-translate',
         label: t('settings.locale'),
@@ -556,7 +589,7 @@
     base: 'focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 bg-surface-800/30 border-surface-700/40 hover:bg-surface-800/60 hover:border-surface-600/60 flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 py-1 ring-0 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-offset-2',
     content:
       'max-h-80 bg-surface-900 border border-surface-700 rounded-lg shadow-xl z-[9999] min-w-(--reka-combobox-trigger-width)',
-    item: 'px-3 py-2 text-sm cursor-pointer transition-colors rounded text-surface-300 data-[highlighted]:bg-surface-800 data-[highlighted]:text-white data-[state=checked]:bg-surface-700 data-[state=checked]:text-white data-[state=checked]:font-medium',
+    item: 'px-3 py-2 text-sm cursor-pointer transition-colors rounded text-surface-300 data-[highlighted]:bg-surface-800 data-[highlighted]:text-white light:data-[highlighted]:text-surface-50 data-[state=checked]:bg-surface-700 data-[state=checked]:text-white light:data-[state=checked]:text-surface-50 data-[state=checked]:font-medium',
     itemLabel: 'whitespace-nowrap uppercase',
     itemTrailingIcon: 'text-surface-400 shrink-0 size-4',
     leading: 'shrink-0 text-surface-400',

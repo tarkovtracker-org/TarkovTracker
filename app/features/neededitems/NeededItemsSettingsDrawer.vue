@@ -16,7 +16,7 @@
     <div class="mb-4 flex items-center justify-between gap-3">
       <h2
         id="needed-items-settings-drawer-title"
-        class="text-base font-semibold tracking-[0.04em] text-white"
+        class="light:text-surface-50 text-base font-semibold tracking-[0.04em] text-white"
       >
         {{ t('page.needed_items.settings.title') }}
       </h2>
@@ -48,7 +48,11 @@
               size="sm"
               class="flex-1"
               :aria-pressed="firFilter === 'all'"
-              :class="firFilter === 'all' ? 'bg-white/10 text-white' : 'text-surface-300'"
+              :class="
+                firFilter === 'all'
+                  ? 'light:bg-surface-700/70 light:text-surface-50 bg-white/10 text-white'
+                  : 'text-surface-300'
+              "
               @click="firFilter = 'all'"
             >
               {{ t('common.all') }}
@@ -59,7 +63,11 @@
               size="sm"
               class="flex-1"
               :aria-pressed="firFilter === 'fir'"
-              :class="firFilter === 'fir' ? 'bg-white/10 text-white' : 'text-surface-300'"
+              :class="
+                firFilter === 'fir'
+                  ? 'light:bg-surface-700/70 light:text-surface-50 bg-white/10 text-white'
+                  : 'text-surface-300'
+              "
               @click="firFilter = 'fir'"
             >
               {{ t('common.fir') }}
@@ -70,7 +78,11 @@
               size="sm"
               class="flex-1"
               :aria-pressed="firFilter === 'non-fir'"
-              :class="firFilter === 'non-fir' ? 'bg-white/10 text-white' : 'text-surface-300'"
+              :class="
+                firFilter === 'non-fir'
+                  ? 'light:bg-surface-700/70 light:text-surface-50 bg-white/10 text-white'
+                  : 'text-surface-300'
+              "
               @click="firFilter = 'non-fir'"
             >
               {{ t('page.needed_items.filters.non_fir') }}
@@ -117,7 +129,9 @@
               icon="i-mdi-view-list"
               :aria-pressed="!groupByItem && viewMode === 'list'"
               :class="
-                !groupByItem && viewMode === 'list' ? 'bg-white/10 text-white' : 'text-surface-300'
+                !groupByItem && viewMode === 'list'
+                  ? 'light:bg-surface-700/70 light:text-surface-50 bg-white/10 text-white'
+                  : 'text-surface-300'
               "
               @click="setListView"
             >
@@ -130,7 +144,9 @@
               icon="i-mdi-view-grid"
               :aria-pressed="!groupByItem && viewMode === 'grid'"
               :class="
-                !groupByItem && viewMode === 'grid' ? 'bg-white/10 text-white' : 'text-surface-300'
+                !groupByItem && viewMode === 'grid'
+                  ? 'light:bg-surface-700/70 light:text-surface-50 bg-white/10 text-white'
+                  : 'text-surface-300'
               "
               @click="setGridView"
             >
@@ -142,7 +158,11 @@
               size="sm"
               icon="i-mdi-group"
               :aria-pressed="groupByItem"
-              :class="groupByItem ? 'bg-white/10 text-white' : 'text-surface-300'"
+              :class="
+                groupByItem
+                  ? 'light:bg-surface-700/70 light:text-surface-50 bg-white/10 text-white'
+                  : 'text-surface-300'
+              "
               @click="setGroupedView"
             >
               {{ t('page.needed_items.view.combined') }}

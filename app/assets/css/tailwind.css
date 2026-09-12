@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 @import '@nuxt/ui';
+/* Light theme variant for per-spot overrides; the base token flip lives at the end of this file */
+@custom-variant light (&:where([data-theme='light'], [data-theme='light'] *));
 /* Smooth scrolling for hash anchor navigation */
 html {
   scroll-behavior: smooth;
@@ -904,6 +906,10 @@ summary {
     0 0 4px rgba(0, 0, 0, 0.6);
   white-space: nowrap;
 }
+/* Map tiles remain dark in both themes; spawn counts must retain a light foreground. */
+:root[data-theme='light'] .leaflet-tooltip.spawn-cluster-label {
+  color: var(--color-white) !important;
+}
 .leaflet-tooltip.spawn-cluster-label::before {
   display: none !important;
 }
@@ -1007,4 +1013,168 @@ summary {
 .vue-flow__background pattern line {
   stroke: var(--vf-surface-grid) !important;
   fill: var(--vf-surface-grid) !important;
+}
+/*
+ * Light theme ("warm paper")
+ *
+ * Dark remains the default and is unchanged. The light theme flips only the
+ * neutral surface ladder and its companion text/state/border tokens through
+ * [data-theme='light'] on <html>; gameplay accent palettes (primary, pvp, pve,
+ * success, ...) are intentionally theme-agnostic. The ladder is role-mapped
+ * rather than strictly reversed: the page canvas is a soft parchment (never
+ * pure white), cards/panels sit slightly lighter for elevation, and the
+ * 50-500 range becomes the dark-ink text ramp.
+ */
+:root[data-theme='light'] {
+  color-scheme: light;
+  /* Surface ladder: canvas(950) → shell(900) → content(850) → raised(800) → state(700) */
+  --color-surface-50: hsl(32 16% 12%); /* Primary ink (was brightest text) */
+  --color-surface-100: hsl(31 14% 16%);
+  --color-surface-200: hsl(30 12% 22%);
+  --color-surface-300: hsl(30 10% 30%);
+  --color-surface-400: hsl(30 8% 34%); /* Muted text: >= 4.5:1 on every light surface */
+  --color-surface-500: hsl(30 7% 46%); /* Dimmed text / placeholders */
+  --color-surface-600: hsl(36 12% 74%); /* Borders/dividers */
+  --color-surface-700: hsl(38 16% 82%); /* State fallback */
+  --color-surface-800: hsl(40 33% 98%); /* Raised/interactive */
+  --color-surface-850: hsl(40 30% 96%); /* Content surfaces */
+  --color-surface-900: hsl(38 18% 87%); /* Shell chrome */
+  --color-surface-950: hsl(40 24% 92%); /* Page canvas (soft parchment, not white) */
+  /* Text hierarchy mirrors the inverted ladder */
+  --color-text: var(--color-surface-50);
+  --color-text-secondary: var(--color-surface-200);
+  --color-text-muted: var(--color-surface-400);
+  --color-text-disabled: hsl(30 8% 56%);
+  /* State overlays + borders become warm dark alphas */
+  --state-hover: rgba(49, 37, 24, 0.05);
+  --state-pressed: rgba(49, 37, 24, 0.09);
+  --state-selected: rgba(146, 103, 54, 0.16);
+  --border-subtle: rgba(49, 37, 24, 0.08);
+  --border-default: rgba(49, 37, 24, 0.14);
+  --border-strong: rgba(49, 37, 24, 0.22);
+  /* Links and status colors tuned for light backgrounds */
+  --color-link: hsl(208 80% 36%);
+  --color-link-hover: hsl(208 85% 30%);
+  --color-tasklink: var(--color-info-700);
+  --color-failed: var(--color-error-600);
+  /* Transparent-image checkerboard */
+  --color-checker-dark: hsl(36 10% 76%);
+  --color-checker-bg: hsl(40 16% 86%);
+  /* Nuxt UI aliases that are hardcoded to white in the upstream dark block */
+  --ui-text-highlighted: var(--color-primary-800);
+  --ui-bg-inverted: var(--color-surface-50);
+  --ui-border-inverted: var(--color-surface-50);
+  /*
+   * Accent foreground range.
+   *
+   * Steps 200-400 and the bare Nuxt UI accent aliases are authored as
+   * foregrounds for dark surfaces; on the paper canvas they land between
+   * 1.0:1 and 3.6:1, so accent labels, chips and links fail WCAG AA. Light
+   * mode resolves that range to the deep end of the same hue: the accent stays
+   * recognizable (same family, same identity) while clearing 4.5:1 against
+   * every surface in the light ladder, including the tinted `/10` and `/25`
+   * chip backgrounds that composite over it.
+   *
+   * Deliberately unchanged: steps 500-950, which carry accent *backgrounds*,
+   * rings, borders and gradient stops, and steps 50-100, which light mode uses
+   * as pale tints. Keeping those fixed is what preserves the gameplay palette.
+   * pvp/pve sit near the neutral end of their ladders, so they need one extra
+   * step of depth to clear the same threshold.
+   */
+  --color-primary-200: var(--color-primary-950);
+  --color-primary-300: var(--color-primary-900);
+  --color-primary-400: var(--color-primary-800);
+  --color-accent-200: var(--color-accent-950);
+  --color-accent-300: var(--color-accent-900);
+  --color-accent-400: var(--color-accent-800);
+  --color-secondary-200: var(--color-secondary-950);
+  --color-secondary-300: var(--color-secondary-900);
+  --color-secondary-400: var(--color-secondary-800);
+  --color-success-200: var(--color-success-950);
+  --color-success-300: var(--color-success-900);
+  --color-success-400: var(--color-success-800);
+  --color-warning-200: var(--color-warning-950);
+  --color-warning-300: var(--color-warning-900);
+  --color-warning-400: var(--color-warning-800);
+  --color-error-200: var(--color-error-950);
+  --color-error-300: var(--color-error-900);
+  --color-error-400: var(--color-error-800);
+  --color-info-200: var(--color-info-950);
+  --color-info-300: var(--color-info-900);
+  --color-info-400: var(--color-info-800);
+  --color-kappa-200: var(--color-kappa-950);
+  --color-kappa-300: var(--color-kappa-900);
+  --color-kappa-400: var(--color-kappa-800);
+  --color-lightkeeper-200: var(--color-lightkeeper-950);
+  --color-lightkeeper-300: var(--color-lightkeeper-900);
+  --color-lightkeeper-400: var(--color-lightkeeper-800);
+  --color-pvp-200: var(--color-pvp-950);
+  --color-pvp-300: var(--color-pvp-900);
+  --color-pvp-400: var(--color-pvp-900);
+  --color-pve-200: var(--color-pve-950);
+  --color-pve-300: var(--color-pve-900);
+  --color-pve-400: var(--color-pve-900);
+  /* Bare Nuxt UI accent aliases back `text-primary`, `bg-primary/10`, `ring-primary`, ... */
+  --ui-primary: var(--color-primary-800);
+  --ui-accent: var(--color-accent-800);
+  --ui-secondary: var(--color-secondary-800);
+  --ui-success: var(--color-success-800);
+  --ui-warning: var(--color-warning-800);
+  --ui-error: var(--color-error-800);
+  --ui-info: var(--color-info-800);
+  --ui-kappa: var(--color-kappa-800);
+  --ui-lightkeeper: var(--color-lightkeeper-800);
+  --ui-pvp: var(--color-pvp-900);
+  --ui-pve: var(--color-pve-900);
+}
+/* Nuxt UI applies dark color-scheme to body via its pinned .dark class; restore light */
+:root[data-theme='light'] body {
+  color-scheme: light;
+}
+/* Prose typography scopes its variables on .prose/.prose-invert; light overrides match that scope */
+:root[data-theme='light'] .prose,
+:root[data-theme='light'] .prose-invert {
+  --tw-prose-body: var(--color-surface-100);
+  --tw-prose-headings: var(--color-surface-50);
+  --tw-prose-lead: var(--color-surface-200);
+  --tw-prose-links: var(--color-link);
+  --tw-prose-bold: var(--color-surface-50);
+  --tw-prose-counters: var(--color-surface-400);
+  --tw-prose-bullets: var(--color-surface-400);
+  --tw-prose-hr: var(--border-default);
+  --tw-prose-quotes: var(--color-surface-100);
+  --tw-prose-quote-borders: var(--color-surface-600);
+  --tw-prose-captions: var(--color-surface-400);
+  --tw-prose-kbd: var(--color-surface-50);
+  --tw-prose-code: var(--color-surface-50);
+  --tw-prose-pre-code: var(--color-surface-100);
+  --tw-prose-pre-bg: var(--color-surface-900);
+  --tw-prose-th-borders: var(--color-surface-600);
+  --tw-prose-td-borders: var(--border-subtle);
+  --tw-prose-invert-body: var(--color-surface-100);
+  --tw-prose-invert-headings: var(--color-surface-50);
+  --tw-prose-invert-lead: var(--color-surface-200);
+  --tw-prose-invert-links: var(--color-link);
+  --tw-prose-invert-bold: var(--color-surface-50);
+  --tw-prose-invert-counters: var(--color-surface-400);
+  --tw-prose-invert-bullets: var(--color-surface-400);
+  --tw-prose-invert-hr: var(--border-default);
+  --tw-prose-invert-quotes: var(--color-surface-100);
+  --tw-prose-invert-quote-borders: var(--color-surface-600);
+  --tw-prose-invert-captions: var(--color-surface-400);
+  --tw-prose-invert-kbd: var(--color-surface-50);
+  --tw-prose-invert-code: var(--color-surface-50);
+  --tw-prose-invert-pre-code: var(--color-surface-100);
+  --tw-prose-invert-pre-bg: var(--color-surface-900);
+  --tw-prose-invert-th-borders: var(--color-surface-600);
+  --tw-prose-invert-td-borders: var(--border-subtle);
+}
+/* Vue Flow scopes its tokens on .vue-flow, so light overrides must match that scope */
+:root[data-theme='light'] .vue-flow {
+  --vf-text-75: var(--color-surface-400);
+  --vf-text-80: var(--color-surface-300);
+  --vf-text-95: var(--color-surface-50);
+  --vf-node-text: var(--color-surface-100);
+  --vf-connection-path: var(--color-surface-500);
+  --vf-handle: var(--color-surface-500);
 }

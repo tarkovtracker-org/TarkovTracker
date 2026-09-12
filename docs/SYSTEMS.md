@@ -42,6 +42,8 @@ and have an agent verify the answer against the code.
 
 13. [Fallow audit snapshots](#13-fallow-audit-snapshots) — consistent generated context and local source attribution
 14. [CI validation selection](#14-ci-validation-selection) — conservative classification and strict aggregation
+15. [Canonical task progression](#15-canonical-task-progression) — declared trader gates and import semantics
+16. [Light/dark theme system](#16-lightdark-theme-system) — token flip, boot script, and theme controls
 
 ---
 
@@ -1785,3 +1787,99 @@ not import quest completions and therefore has no trader/task backfill path.
   merging or promoting the app, an authorized operator must run the precompute workflow from the
   approved branch revision with no language/mode filters, verify all 48 new-key writes succeeded,
   and record that evidence. Do not rely on cold fallback to bridge this cache-contract rollout.
+
+## 16. Light/dark theme system
+
+**Summary**: Dark is the default and only mandatory theme; light mode is an opt-in user
+preference (issue #102). The light theme never edits component markup globally: it flips the
+neutral `surface` ladder plus companion text/state/border tokens under `[data-theme='light']` on
+`<html>`, so every `surface-*` utility, Nuxt UI `neutral` alias, and the semantic
+`--color-bg/-text/-link` tokens re-render on a warm paper scale. Gameplay accent palettes keep
+their identity: accent _backgrounds_, rings, borders and gradient stops (steps 500-950) and the
+pale tint steps (50-100) are byte-identical in both themes. Only the accent _foreground_ range
+(steps 200-400, plus the bare Nuxt UI accent aliases) is re-pointed at the deep end of the same
+hue under light, because those steps are authored as foregrounds for dark surfaces and would
+otherwise land at 1.0-3.6:1 on paper. The preference
+is device-local: a dedicated `tt_theme` localStorage key (not the user-scoped preferences store)
+so the pre-paint boot script and the in-app `useTheme` composable read the same source.
+
+**Flow**
+
+```
+First paint
+  → THEME_BOOT_SCRIPT (inline <head> script in nuxt.config)
+      reads tt_theme → validates value (mirrors normalizeThemeMode) → sets <html data-theme> + colorScheme
+      → pre-hydration skeleton style block matches the light canvas (no dark flash)
+App boot
+  → useTheme() restores the client-persisted mode and re-applies it idempotently
+  → toggle (AppBar sun/moon button or Settings > Appearance card)
+      → setThemeMode persists tt_theme + sets data-theme + colorScheme atomically
+```
+
+**Step-by-step**
+
+1. `app/assets/css/tailwind.css` ends with `:root[data-theme='light'] { ... }`, which overrides
+   only the neutral tokens (surface ladder role-mapped to parchment canvas → snow cards → dark
+   ink; `--color-text*`, `--state-*`, `--border-*`, `--color-link`, `--color-failed`,
+   `--color-checker-*`, three hardcoded Nuxt UI `--ui-*` aliases, and light-tinted `.vue-flow`
+   `--vf-*` text vars) plus the accent foreground range described above: for every accent family
+   `200 → 950`, `300 → 900`, `400 → 800` (pvp/pve take one extra step because their ladders sit
+   near the neutral end, and `accent` follows primary's steps), and the bare `--ui-<accent>`
+   aliases resolve to step 800/900 so
+   `text-primary`, `bg-primary/10` and `ring-primary/25` stay legible together.
+   `@custom-variant light` enables per-spot `light:` utilities where a specific component needs a
+   different accent treatment (tone gradients, badges, brand buttons).
+   Two consequences follow from the split and are load-bearing:
+   - `text-<accent>-500` cannot be remapped at the token level (step 500 is the primary accent
+     _background_), so those foregrounds carry explicit `light:text-<accent>-800/900` companions.
+   - A dark accent plate paired with a light accent label (`bg-success-900` + `text-success-300`)
+     would collapse to one colour once the label deepens, so those surfaces carry
+     `light:bg-<accent>-100` companions that turn the plate pale instead.
+2. `app/utils/theme.ts` owns `ThemeMode`, `normalizeThemeMode` (invalid/missing → dark), storage
+   helpers, `applyThemeMode`, and `THEME_BOOT_SCRIPT`. Keeping the boot script next to the
+   normalization it mirrors is deliberate; nuxt.config imports the same constant.
+3. `nuxt.config.ts` inlines the boot script as the first `app.head.script` and extends the
+   pre-hydration skeleton `<style>` with light surface fallbacks scoped to `[data-theme='light']`.
+   It also pins `colorMode.preference/fallback` to `dark` so Nuxt UI's `.dark` alias block stays
+   deterministic; those aliases resolve through the flipped `surface` palette.
+4. `app/composables/useTheme.ts` exposes the singleton `themeMode` state and
+   `setThemeMode`/`toggleThemeMode` used by the AppBar toggle and the Settings AppearanceCard.
+
+**Invariants:**
+
+- Dark is the default and is pixel-identical to before: the `:root[data-theme='light']` overrides
+  are inert in dark mode and every component `light:` utility requires `data-theme='light'`.
+- Theme state lives in `tt_theme` only; keep it out of the user-scoped preferences store so the
+  boot script never depends on auth state. Account-level sync is a separate follow-up.
+- `normalizeThemeMode` is the runtime validator (unknown values become dark). The synchronous
+  inline `THEME_BOOT_SCRIPT` mirrors this accepted-value validation check identically before runtime
+  modules load.
+- New components should prefer `surface-*`/semantic tokens over hardcoded `white`/`black` so both
+  themes work without `light:` overrides; reserve `light:` for accent-on-accent cases.
+- Light mode must not be measurably worse than dark for text contrast. Both themes are audited
+  per route by resolving computed colours (including `oklch()` and composited alpha) against the
+  effective background and checking WCAG AA: 4.5:1 for body text, 3:1 for large text and non-text
+  indicators such as the checkbox tick and focus ring. A change that leaves any route with more
+  failures in light than in dark is a regression, even when the failing element is theme-agnostic.
+- Fixed-dark item action overlays and map tiles retain light foregrounds in light mode instead
+  of inheriting inverted neutral ink. The selected Appearance option has a contrasting inset ring.
+- Interactive card content uses native controls: trader navigation lives on the named header
+  button and skill editing on its labelled input, not redundant clickable containers. Objective
+  rows ignore events from their nested controls, and their Space handler checks `.self` before
+  preventing default so nested buttons retain keyboard activation.
+- Checkbox light-mode plate and tick overrides stay paired by color: success uses a pale
+  `success-100` plate with a dark `surface-50` tick; other colors retain their own plates and
+  inherit Nuxt UI's inverted foreground. Never apply the dark tick globally to dark accent plates.
+- Accent steps 500-950 and 50-100 are the stable contract. Deepening a light foreground by editing
+  those steps would move accent backgrounds and pale tints (`light:hover:bg-pvp-100/70` and the
+  `bg-<accent>-100` chip plates depend on 100 staying pale), so foreground fixes belong in the
+  200-400 remap or in an explicit `light:text-*` companion.
+
+### Files
+
+- `app/assets/css/tailwind.css` — `@custom-variant light` and the `[data-theme='light']` token block
+- `app/utils/theme.ts` — ThemeMode, normalization, storage, apply, `THEME_BOOT_SCRIPT`
+- `app/composables/useTheme.ts` — singleton state + set/toggle
+- `app/features/settings/AppearanceCard.vue` — Settings > Preferences theme selector
+- `app/shell/AppBar.vue` — sun/moon toggle in the utilities group (collapses into More menu on mobile)
+- `nuxt.config.ts` — boot script, light skeleton fallbacks, pinned `colorMode`
