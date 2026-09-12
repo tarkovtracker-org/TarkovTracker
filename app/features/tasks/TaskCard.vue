@@ -681,7 +681,7 @@
     // Light mode keeps the failure tint but on a pale surface: the shared ink tokens
     // flip to dark, so a dark error fill would leave the card text at ~1.5:1.
     if (isFailed.value)
-      return 'border-error-600/50 bg-error-950 light:border-error-500/40 light:bg-error-100';
+      return 'border-error-600/50 bg-error-950 light:border-error-700 light:bg-error-100';
     if (isInvalid.value) return 'border-surface-700/40 bg-surface-900 opacity-60';
     if (isLocked.value) return 'border-surface-700/40 bg-surface-900';
     return 'border-surface-700/40 bg-surface-900';

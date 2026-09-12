@@ -113,8 +113,10 @@ describe('theme utils', () => {
       expect(customRoot.dataset.theme).toBe('light');
       expect(customRoot.style.colorScheme).toBe('light');
     });
-    it('handles null/undefined root safely without throwing', () => {
-      expect(() => applyThemeMode('light', null as unknown as HTMLElement)).not.toThrow();
+    it('falls back to the document root when a null root is supplied', () => {
+      applyThemeMode('light', null as unknown as HTMLElement);
+      expect(document.documentElement.dataset.theme).toBe('light');
+      expect(document.documentElement.style.colorScheme).toBe('light');
     });
     it('handles undefined document safely without throwing', () => {
       vi.stubGlobal('document', undefined);

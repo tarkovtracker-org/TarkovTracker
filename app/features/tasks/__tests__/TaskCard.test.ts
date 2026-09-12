@@ -204,7 +204,7 @@ describe('TaskCard appearance and expansion controls', () => {
     // Light mode flips the shared ink tokens to dark, so the failed surface must be pale or the
     // card text lands near 1.5:1 against the dark red fill.
     expect(classes).toContain('light:bg-error-100');
-    expect(classes).toContain('light:border-error-500/40');
+    expect(classes).toContain('light:border-error-700');
     wrapper.unmount();
   });
   it('keeps a locked card usable before its evaluation snapshot is available', async () => {

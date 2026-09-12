@@ -25,12 +25,8 @@ describe('app config theme guards', () => {
     expect(successOverride?.class.icon).toBe('light:text-surface-50');
   });
   it('keeps other colors on their own plates with inherited inverted ticks', () => {
-    for (const entry of checkbox.compoundVariants) {
-      if (entry.color !== 'success') {
-        expect(entry.class.indicator ?? '').not.toContain('bg-success-100');
-        expect(entry.class.icon ?? '').not.toContain('light:text-surface-50');
-      }
-    }
+    // Force explicit review when another color gains a plate or foreground override.
+    expect(checkbox.compoundVariants.map((entry) => entry.color)).toEqual(['success']);
     // A global dark tick makes the info checkbox's checked state only 1.52:1 in light mode.
     expect(checkbox.slots.icon).toBe('h-4 w-4');
   });

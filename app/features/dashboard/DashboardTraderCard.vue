@@ -253,14 +253,9 @@
       return [
         'bg-surface-950/50 border-success-500/15',
         'hover:border-success-500/25 hover:shadow-lg',
-        'focus-visible:border-success-500/30 focus-visible:ring-success-700/30 focus-visible:ring-2',
       ];
     }
-    return [
-      'bg-surface-900 border-white/12',
-      'hover:border-surface-600 hover:shadow-lg',
-      'focus-visible:border-surface-500 focus-visible:ring-surface-700/50 focus-visible:ring-2',
-    ];
+    return ['bg-surface-900 border-white/12', 'hover:border-surface-600 hover:shadow-lg'];
   });
   const portraitClasses = computed(() => {
     if (isLocked.value) return 'bg-surface-800 border-surface-700/50 opacity-50 grayscale';
