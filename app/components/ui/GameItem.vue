@@ -2,7 +2,6 @@
   <div
     class="group relative cursor-default"
     :class="[containerClasses, { 'h-full w-full': size !== 'small' }]"
-    @click="handleClick"
     @contextmenu="handleContextMenu"
   >
     <!-- Simple image display mode (for ItemImage compatibility) -->
@@ -55,7 +54,7 @@
         />
       </div>
       <!-- Counter controls for multi-item objectives -->
-      <div v-if="showCounter" class="mr-2" @click.stop>
+      <div v-if="showCounter" class="mr-2">
         <ItemCountControls
           :current-count="currentCount"
           :needed-count="neededCount"
@@ -124,7 +123,7 @@
         >
           <button
             type="button"
-            class="text-surface-200 inline-flex cursor-pointer items-center justify-center rounded p-1.5 transition-colors hover:bg-white/20 hover:text-white"
+            class="text-surface-200 light:text-white inline-flex cursor-pointer items-center justify-center rounded p-1.5 transition-colors hover:bg-white/20 hover:text-white"
             @click.stop="copyItemName"
           >
             <UIcon name="i-mdi-content-copy" class="h-5 w-5" />
@@ -236,7 +235,6 @@
     isVisible?: boolean;
     backgroundColor?: string;
     // Click handling
-    clickable?: boolean;
     // Counter controls
     showCounter?: boolean;
     currentCount?: number;
@@ -268,7 +266,6 @@
     showActions: true,
     isVisible: true,
     backgroundColor: '',
-    clickable: false,
     showCounter: false,
     currentCount: 0,
     neededCount: 1,
@@ -277,7 +274,6 @@
     copyValue: null,
   });
   const emit = defineEmits<{
-    click: [event: MouseEvent];
     increase: [];
     decrease: [];
     toggle: [];
@@ -398,11 +394,6 @@
     const textToCopy = props.copyValue || props.itemName;
     if (textToCopy) {
       await copyToClipboard(textToCopy);
-    }
-  };
-  const handleClick = (event: MouseEvent) => {
-    if (props.clickable) {
-      emit('click', event);
     }
   };
   const handleContextMenu = (event: MouseEvent) => {

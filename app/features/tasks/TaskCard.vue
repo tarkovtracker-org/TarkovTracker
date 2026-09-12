@@ -274,7 +274,7 @@
               :text="resetItemCountsDisabledReason"
               :disabled="!resetItemCountsDisabledReason"
             >
-              <span class="inline-flex" @click.stop>
+              <span class="inline-flex">
                 <UButton
                   size="xs"
                   color="neutral"

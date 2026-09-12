@@ -1,13 +1,12 @@
 <template>
   <div
-    class="flex h-full min-h-44 cursor-pointer flex-col rounded-lg border px-5 py-4 shadow-md transition-all outline-none"
+    class="flex h-full min-h-44 flex-col rounded-lg border px-5 py-4 shadow-md transition-all"
     :class="cardContainerClasses"
-    @click="handleCardClick"
   >
     <div class="mb-3 flex items-center gap-3">
       <button
         type="button"
-        class="flex min-w-0 flex-1 items-center gap-3 text-left transition-opacity hover:opacity-80 focus:outline-none"
+        class="focus-visible:ring-primary-500 flex min-w-0 flex-1 items-center gap-3 rounded text-left transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:outline-none"
         :aria-label="$t('page.dashboard.traders.view_tasks', { name: trader.name })"
         @click="navigateToTraderTasks"
       >
@@ -289,7 +288,7 @@
     const isActive = currentLevel.value === lvl;
     if (isComplete.value) {
       return isActive
-        ? 'bg-success-900/40 light:bg-success-100 text-success-300/70'
+        ? 'bg-success-900/40 light:bg-success-100 text-success-300/70 light:text-success-900'
         : 'text-surface-500 hover:bg-surface-700/40 hover:text-surface-400';
     }
     return isActive
@@ -359,15 +358,6 @@
     if (event.key !== 'Enter') return;
     const target = event.target as HTMLInputElement;
     target.blur();
-  };
-  const isInteractiveTarget = (target: EventTarget | null) =>
-    target instanceof HTMLElement &&
-    Boolean(target.closest('a,button,input,label,select,textarea,[role="button"]'));
-  const handleCardClick = (event: MouseEvent) => {
-    if (isInteractiveTarget(event.target)) {
-      return;
-    }
-    navigateToTraderTasks();
   };
   const navigateToTraderTasks = () => {
     preferencesStore.setTaskPrimaryView('traders');

@@ -56,7 +56,6 @@
               :key="skill.key"
               class="rounded-lg border p-3 transition-colors"
               :class="skillCardClasses(skill.key)"
-              @click="handleSkillCardClick(skill.key, $event)"
             >
               <div class="mb-2 flex items-center gap-2">
                 <div class="group relative shrink-0">
@@ -135,7 +134,7 @@
                   "
                   class="flex-1"
                 >
-                  <div class="text-surface-400 cursor-default" @click.stop>
+                  <div class="text-surface-400 cursor-default">
                     {{ $t('settings.skills.quest') }}
                     <span class="text-surface-200 font-medium">
                       {{ getQuestSkillLevel(skill.key) }}
@@ -151,7 +150,7 @@
                   "
                   class="flex-1"
                 >
-                  <div class="text-surface-400 cursor-default" @click.stop>
+                  <div class="text-surface-400 cursor-default">
                     {{ $t('settings.skills.offset') }}
                     <span class="text-surface-200 font-medium">
                       {{ formatSkillOffset(getSkillOffset(skill.key)) }}
@@ -302,24 +301,6 @@
     `skill-input-${skillKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
   const getSkillRangeId = (skillKey: string): string =>
     `skill-range-${skillKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-  const isInteractiveTarget = (target: EventTarget | null) =>
-    target instanceof HTMLElement &&
-    Boolean(target.closest('a,button,input,label,select,textarea,[role="button"]'));
-  const focusSkillInput = (skillKey: string) => {
-    const target = document.getElementById(getSkillInputId(skillKey));
-    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
-      target.focus();
-      target.select();
-      return;
-    }
-    target?.querySelector<HTMLInputElement | HTMLTextAreaElement>('input, textarea')?.focus();
-  };
-  const handleSkillCardClick = (skillKey: string, event: MouseEvent) => {
-    if (isInteractiveTarget(event.target)) {
-      return;
-    }
-    focusSkillInput(skillKey);
-  };
   const getSkillLevel = (skillKey: string) => skillCalculation.getSkillLevel(skillKey);
   const getQuestSkillLevel = (skillKey: string) => skillCalculation.getQuestSkillLevel(skillKey);
   const getSkillOffset = (skillKey: string) => skillCalculation.getSkillOffset(skillKey);

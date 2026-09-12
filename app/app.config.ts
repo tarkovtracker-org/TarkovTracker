@@ -293,7 +293,7 @@ const uiConfig = {
         color: 'success',
         variant: 'link',
         class:
-          'text-success-500 light:text-success-800 hover:text-success-400 underline-offset-4 hover:underline',
+          'text-success-500 light:text-success-800 hover:text-success-400 light:hover:text-success-900 underline-offset-4 hover:underline',
       },
     ],
   },

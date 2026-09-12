@@ -34,7 +34,7 @@
                 class="focus-within:ring-primary-500 relative flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-within:ring-2"
                 :class="
                   themeMode === option.value
-                    ? 'bg-surface-700 text-surface-50 shadow-sm'
+                    ? 'bg-surface-700 text-surface-50 light:ring-surface-300 light:ring-2 light:ring-inset shadow-sm'
                     : 'text-surface-400 hover:bg-surface-700/60 hover:text-surface-200'
                 "
               >

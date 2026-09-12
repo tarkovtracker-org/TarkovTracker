@@ -132,7 +132,7 @@
                 class="text-surface-400 group-hover:text-surface-200 ml-2 h-5 w-5 shrink-0 transition-colors"
               />
             </button>
-            <div class="ml-auto flex shrink-0 items-center gap-1.5" @click.stop>
+            <div class="ml-auto flex shrink-0 items-center gap-1.5">
               <SelectMenuFixed
                 :model-value="traderSortMode"
                 :items="traderSortOptions"

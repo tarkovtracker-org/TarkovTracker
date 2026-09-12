@@ -906,6 +906,10 @@ summary {
     0 0 4px rgba(0, 0, 0, 0.6);
   white-space: nowrap;
 }
+/* Map tiles remain dark in both themes; spawn counts must retain a light foreground. */
+:root[data-theme='light'] .leaflet-tooltip.spawn-cluster-label {
+  color: var(--color-white) !important;
+}
 .leaflet-tooltip.spawn-cluster-label::before {
   display: none !important;
 }

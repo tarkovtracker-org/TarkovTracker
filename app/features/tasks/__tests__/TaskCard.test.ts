@@ -179,7 +179,7 @@ const mountTaskCard = async (taskOverrides: Partial<Task> = {}) =>
       },
     },
   });
-describe('TaskCard expansion controls', () => {
+describe('TaskCard appearance and expansion controls', () => {
   beforeEach(() => {
     taskState.complete = false;
     taskState.failed = false;

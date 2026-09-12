@@ -1861,6 +1861,12 @@ App boot
   effective background and checking WCAG AA: 4.5:1 for body text, 3:1 for large text and non-text
   indicators such as the checkbox tick and focus ring. A change that leaves any route with more
   failures in light than in dark is a regression, even when the failing element is theme-agnostic.
+- Fixed-dark item action overlays and map tiles retain light foregrounds in light mode instead
+  of inheriting inverted neutral ink. The selected Appearance option has a contrasting inset ring.
+- Interactive card content uses native controls: trader navigation lives on the named header
+  button and skill editing on its labelled input, not redundant clickable containers. Objective
+  rows ignore events from their nested controls, and their Space handler checks `.self` before
+  preventing default so nested buttons retain keyboard activation.
 - Checkbox light-mode plate and tick overrides stay paired by color: success uses a pale
   `success-100` plate with a dark `surface-50` tick; other colors retain their own plates and
   inherit Nuxt UI's inverted foreground. Never apply the dark tick globally to dark accent plates.

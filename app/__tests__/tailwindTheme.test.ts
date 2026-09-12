@@ -29,6 +29,11 @@ const FOREGROUND_FAMILIES = [
   'pve',
 ] as const;
 describe('light theme accent foreground remap', () => {
+  it('keeps spawn counts light over fixed-dark map tiles', () => {
+    expect(tailwindCss).toMatch(
+      /:root\[data-theme='light'\] \.leaflet-tooltip\.spawn-cluster-label\s*\{\s*color: var\(--color-white\) !important;/
+    );
+  });
   it.each(FOREGROUND_FAMILIES)('remaps 200/300/400 for %s', (family) => {
     const step200 = remap(family, 200);
     const step300 = remap(family, 300);

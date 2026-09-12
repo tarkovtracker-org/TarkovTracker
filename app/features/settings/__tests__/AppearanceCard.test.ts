@@ -65,6 +65,9 @@ describe('AppearanceCard', () => {
     const wrapper = mountCard();
     const options = wrapper.findAll('input[type="radio"]');
     expect((options[0]!.element as HTMLInputElement).checked).toBe(true);
+    expect(options[0]!.element.closest('label')!.classList.contains('light:ring-surface-300')).toBe(
+      true
+    );
     expect((options[1]!.element as HTMLInputElement).checked).toBe(false);
   });
   it('marks light as checked when light mode is active', () => {

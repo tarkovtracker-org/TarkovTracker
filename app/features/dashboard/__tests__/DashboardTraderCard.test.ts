@@ -12,9 +12,6 @@ const mockState = {
 mockNuxtImport('useRouter', () => () => ({
   push: vi.fn(),
 }));
-mockNuxtImport('useI18n', () => () => ({
-  t: (key: string) => key,
-}));
 vi.mock('@/features/dashboard/traderLockStatus', () => ({
   isTraderLocked: () => mockState.isLocked,
 }));
