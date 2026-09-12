@@ -1861,6 +1861,9 @@ App boot
   effective background and checking WCAG AA: 4.5:1 for body text, 3:1 for large text and non-text
   indicators such as the checkbox tick and focus ring. A change that leaves any route with more
   failures in light than in dark is a regression, even when the failing element is theme-agnostic.
+- Checkbox light-mode plate and tick overrides stay paired by color: success uses a pale
+  `success-100` plate with a dark `surface-50` tick; other colors retain their own plates and
+  inherit Nuxt UI's inverted foreground. Never apply the dark tick globally to dark accent plates.
 - Accent steps 500-950 and 50-100 are the stable contract. Deepening a light foreground by editing
   those steps would move accent backgrounds and pale tints (`light:hover:bg-pvp-100/70` and the
   `bg-<accent>-100` chip plates depend on 100 staying pale), so foreground fixes belong in the

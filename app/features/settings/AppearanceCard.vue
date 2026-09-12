@@ -9,7 +9,7 @@
   >
     <template #content>
       <div class="space-y-3 px-4 py-4">
-        <div class="flex items-center justify-between gap-3">
+        <div class="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <div class="space-y-1">
             <p :id="themeLabelId" class="text-surface-200 text-sm font-semibold">
               {{ $t('settings.appearance.theme', 'Theme') }}
@@ -23,7 +23,7 @@
               }}
             </p>
           </div>
-          <fieldset class="m-0 border-0 p-0" :aria-labelledby="themeLabelId">
+          <fieldset class="m-0 shrink-0 border-0 p-0" :aria-labelledby="themeLabelId">
             <legend class="sr-only">{{ $t('settings.appearance.theme', 'Theme') }}</legend>
             <div
               class="bg-surface-800 border-surface-700 flex shrink-0 items-center gap-1 rounded-lg border p-1"

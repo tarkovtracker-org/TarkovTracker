@@ -53,6 +53,14 @@ describe('AppearanceCard', () => {
     expect(wrapper.text()).toContain('settings.appearance.theme_dark');
     expect(wrapper.text()).toContain('settings.appearance.theme_light');
   });
+  it('stacks the selector below the copy on mobile without shrinking the controls', () => {
+    const wrapper = mountCard();
+    const fieldset = wrapper.get('fieldset');
+    expect(fieldset.classes()).toContain('shrink-0');
+    const layoutClasses = fieldset.element.parentElement!.classList;
+    expect(layoutClasses.contains('flex-col')).toBe(true);
+    expect(layoutClasses.contains('sm:flex-row')).toBe(true);
+  });
   it('marks the current mode as checked', () => {
     const wrapper = mountCard();
     const options = wrapper.findAll('input[type="radio"]');

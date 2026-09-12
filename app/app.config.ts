@@ -320,21 +320,19 @@ const uiConfig = {
     },
   },
   // Checkbox configuration - neutral styling, success accent when checked.
-  // Nuxt UI's indicator sets the shared `text-inverted` foreground. In light mode that alias
-  // resolves to dark ink on the dark `--ui-success` plate, so the checked indicator switches
-  // to the pale accent tint there (the tick measured ~1.7:1 on the dark green against the 3:1
-  // non-text minimum). The override is scoped to the success color so other checkbox colors
-  // keep their own plate.
+  // Pair the pale light-mode success plate with a dark tick. Scope both overrides to
+  // success: other colors retain dark plates and need Nuxt UI's inherited `text-inverted`
+  // foreground, which resolves to pale surface-950 in light mode.
   checkbox: {
     slots: {
       root: 'relative flex items-start',
       base: 'h-4 w-4 shrink-0 rounded border transition-all border-surface-500 data-[state=unchecked]:bg-surface-800',
-      icon: 'h-4 w-4 light:text-surface-50',
+      icon: 'h-4 w-4',
     },
     compoundVariants: [
       {
         color: 'success',
-        class: { indicator: 'light:bg-success-100' },
+        class: { indicator: 'light:bg-success-100', icon: 'light:text-surface-50' },
       },
     ],
     defaultVariants: {
