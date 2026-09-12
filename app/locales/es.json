@@ -262,6 +262,7 @@
     "maps": "Mapas",
     "clear_search": "Limpiar búsqueda",
     "settings": "Ajustes",
+    "about": "Acerca de",
     "credits": "Crédito",
     "support": "Soporte",
     "privacy_policy": "Política de privacidad",
@@ -1347,8 +1348,6 @@
     "credits": {
       "sections": {
         "original_creator": "Creador original del proyecto:",
-        "staff": "Personal de TarkovTracker.org:",
-        "support_members": "Miembros de soporte:",
         "beta_testers": "Nuxt - Probadores de beta cerrada:",
         "contributors": "Colaboradores de código abierto:"
       },
@@ -1363,7 +1362,44 @@
         "contributions": "{count} contribuciones",
         "total": "Colaborador {count} | Contribuyentes {count}"
       },
-      "description": "Conozca a los creadores, empleados, miembros de apoyo, beta testers y colaboradores de código abierto detrás de Tarkov Tracker."
+      "description": "Conozca a los creadores, empleados, miembros de apoyo, beta testers y colaboradores de código abierto detrás de Tarkov Tracker.",
+      "team_link": "Mantenido por el equipo TarkovTracker — conozca a ellos en la página Acerca"
+    },
+    "about": {
+      "title": "Acerca de TarkovTracker",
+      "description": "Conozca al equipo que mantiene TarkovTracker.org, los socios detrás de sus datos de juego y cómo obtener ayuda de la comunidad.",
+      "intro": "TarkovTracker es un rastreador de progreso gratuito de código abierto para Escape de Tarkov. Mantiene el progreso de tu misión y línea de historiales, ocultan las mejoras y los requisitos de objetos en un solo lugar, y permanece actualizado con los datos del juego mantenidos por la comunidad. El proyecto está dirigido por un pequeño equipo de voluntarios con la ayuda de colaboradores de código abierto.",
+      "team": {
+        "heading": "Equipo",
+        "summary": "TarkovTracker.org es mantenido por un pequeño equipo de voluntarios. La gente de abajo mantiene el sitio funcionando y apoya a la comunidad de Discord.",
+        "core_heading": "Equipo central",
+        "support_heading": "Soporte de Discord"
+      },
+      "partners": {
+        "heading": "Socios y ecosistema",
+        "summary": "TarkovTracker se basa en proyectos comunitarios. Estos mantenedores gestionan las herramientas y fuentes de datos independientes en las que el rastreador confía."
+      },
+      "help": {
+        "heading": "Cómo obtener ayuda",
+        "routing": "Para la respuesta más rápida, utilice los flujos de trabajo de soporte específicos de los canales en nuestro Discord en lugar de mensajes directos a los miembros del equipo. Los errores reproducibles y las ideas de características pertenecen a GitHub, y los informes de seguridad pasan por nuestra política de seguridad privada.",
+        "discord": "Soporte de la comunidad en Discord",
+        "github_issues": "Reportar un error o solicitar una característica en GitHub",
+        "security": "Reportar un problema de seguridad (privado)",
+        "credits_link": "Pruebas beta y colaboradores de código abierto — ver Créditos"
+      },
+      "github_profile": "GitHub profile",
+      "roles": {
+        "core_owner": "Propietario principal, mantenedor y desarrollador",
+        "discord_owner_developer": "Propietario del servidor de Discord, desarrollador y mantenedor de TrackerBot",
+        "core_support": "Personal de soporte básico",
+        "discord_support": "Soporte general de Discord",
+        "tarkov_dev_maintainer": "Mantenedor de Tarkov.dev",
+        "ratscanner_maintainer": "Propietario y mantenedor de RatScanner"
+      },
+      "projects": {
+        "tarkov_dev": "Tarkov.dev",
+        "ratscanner": "Escáner de puntuación"
+      }
     },
     "login": {
       "subtitle": "Inicia sesión para acceder a tu cuenta",

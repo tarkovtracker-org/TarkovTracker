@@ -66,7 +66,7 @@
     "supporter_override_enabled_description": "Enabled {tier} supporter access.",
     "supporter_override_disabled_description": "Disabled active supporter access.",
     "supporter_override_failed_description": "Could not update supporter access.",
-    "twitch_config_title": "Twitch 流",
+    "twitch_config_title": "Twitch直播",
     "twitch_config_description": "在站点的角落设置推广的Twitch频道。游客在几分钟内接听更改消息。",
     "twitch_channel_label": "频道",
     "twitch_channel_placeholder": "Twitch频道名称",
@@ -255,13 +255,14 @@
     "more": "更多",
     "needed_items": "需要的物品",
     "task": "任务",
-    "lightkeeper": "灯塔看守",
+    "lightkeeper": "Lightkeeper",
     "kappa": "Kappa",
     "storyline": "故事线",
     "mark_complete": "标记已完成",
     "maps": "地图",
     "clear_search": "清除搜索",
     "settings": "设置",
+    "about": "关于",
     "credits": "致谢",
     "support": "支持",
     "privacy_policy": "隐私政策",
@@ -1078,7 +1079,7 @@
         "next_tasks": "后续任务：",
         "open_item_on_tarkov_dev": "在 tarkov.dev 打开 {name}",
         "previous_tasks": "前置任务：",
-        "progress": "进步 {completed}/{total}",
+        "progress": "进度 {completed}/{total}",
         "rewards": "奖励",
         "unlocks_count": "{count} 项解锁",
         "trader_requirement_badge": "{trader} {kind} {comparison} {value}",
@@ -1347,8 +1348,6 @@
     "credits": {
       "sections": {
         "original_creator": "项目原作者：",
-        "staff": "Tarkov Tracker 运营团队：",
-        "support_members": "支持人员：",
         "beta_testers": "Nuxt封闭测试人员：",
         "contributors": "开源贡献者："
       },
@@ -1363,7 +1362,44 @@
         "contributions": "{count} 次贡献",
         "total": "{count} contributor | {count} contributors"
       },
-      "description": "会见TarkovTracker后面的创建者、工作人员、支持成员、beta测试人员和开源贡献者。"
+      "description": "会见TarkovTracker后面的创建者、工作人员、支持成员、beta测试人员和开源贡献者。",
+      "team_link": "由 TarkovTracker 团队维护——在关于页面上会见他们！"
+    },
+    "about": {
+      "title": "关于 TarkovTracker",
+      "description": "会见维护TarkovTracker.org的团队，其游戏数据背后的合作伙伴，以及如何从社区获得帮助。",
+      "intro": "TarkovTracker是逃离Tarkov的免费开放源码进度跟踪器。 它会使您的任务和故事在线进度，隐藏升级和物品需求在一个地方，并保持社区维护的游戏数据的随时更新。 该项目由一个小型志愿者小组在开放源码捐助者的帮助下管理。",
+      "team": {
+        "heading": "团队",
+        "summary": "TarkovTracker.org由一个小型志愿团队维护。下面的人保持站点运行并支持Discord社区。",
+        "core_heading": "核心团队",
+        "support_heading": "Discord 支持"
+      },
+      "partners": {
+        "heading": "合作伙伴与生态系统协会",
+        "summary": "TarkovTracker基于社区项目。这些维护者管理追踪器所依赖的独立工具和数据源。"
+      },
+      "help": {
+        "heading": "如何获得帮助",
+        "routing": "为了获得最快的答案，请使用我们Discord中的频道支持工作流，而不是直接给团队成员的消息。 可复现的 bug 和功能想法属于GitHub ，安全报告通过我们的私人安全政策。",
+        "discord": "Discord上的社区支持",
+        "github_issues": "在 GitHub 上报告错误或请求功能",
+        "security": "报告一个安全问题(私人)",
+        "credits_link": "Beta测试员和开源贡献者 — 见积分"
+      },
+      "github_profile": "GitHub profile",
+      "roles": {
+        "core_owner": "核心所有者、维护者和开发者",
+        "discord_owner_developer": "Discord 服务器所有者、TrackerBot开发者和维护者",
+        "core_support": "核心支助人员",
+        "discord_support": "Discord 一般支持",
+        "tarkov_dev_maintainer": "Tarkov.dev的维护者",
+        "ratscanner_maintainer": "RatScanner 的所有者和维护者"
+      },
+      "projects": {
+        "tarkov_dev": "Tarkov.dev",
+        "ratscanner": "Ratscanner"
+      }
     },
     "login": {
       "subtitle": "登录账号以访问全部功能",
