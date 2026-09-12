@@ -262,6 +262,7 @@
     "maps": "Mapy",
     "clear_search": "Vymazat hledání",
     "settings": "Nastavení",
+    "about": "O aplikaci",
     "credits": "Kredity",
     "support": "Podpora",
     "privacy_policy": "Ochrana osobních údajů",
@@ -1347,8 +1348,6 @@
     "credits": {
       "sections": {
         "original_creator": "Původní tvůrce projektu:",
-        "staff": "TarkovTracker.org personál:",
-        "support_members": "Členové podpory:",
         "beta_testers": "Nuxt - Uzavřené Beta Testery:",
         "contributors": "Open source přispěvatelé:"
       },
@@ -1363,7 +1362,44 @@
         "contributions": "{count} příspěvky",
         "total": "{count} přispěvatel | {count} přispěvatelé"
       },
-      "description": "Seznamte se s tvůrci, zaměstnanci, podporovanými členy, beta testery a open source přispěvateli za Tarkov Trackerem."
+      "description": "Seznamte se s tvůrci, zaměstnanci, podporovanými členy, beta testery a open source přispěvateli za Tarkov Trackerem.",
+      "team_link": "Zachováno týmem TarkovTracker – setkejte se s nimi na stránce O"
+    },
+    "about": {
+      "title": "O TarkovTrackeru",
+      "description": "Seznamte se s týmem, který udržuje TarkovTracker.org, partnery za svými herními daty a jak získat pomoc od komunity.",
+      "intro": "TarkovTracker je zdarma, open source sledování pokroku pro útěk z Tarkovu. Udržuje tvůj proces a storyline pokrok, skrývá vylepšení a požadavky na předměty na jednom místě a zůstane aktuální s komunitně udržovanými herními daty. Projekt spravuje malý dobrovolnický tým s pomocí open source přispěvatelů.",
+      "team": {
+        "heading": "Tým",
+        "summary": "TarkovTracker.org je udržován malým dobrovolnickým týmem. Lidé níže udržují stránku běžet a podporují Discord komunitu.",
+        "core_heading": "Hlavní tým",
+        "support_heading": "Discord podpora"
+      },
+      "partners": {
+        "heading": "Partneři a ekosystém",
+        "summary": "TarkovTracker staví na komunitních projektech. Tito správci provozují nezávislé nástroje a zdroje dat, na které tracker spoléhá."
+      },
+      "help": {
+        "heading": "Jak získat pomoc",
+        "routing": "Pro nejrychlejší odpověď použijte workflow specifické podpory kanálu v našem Discordu namísto přímých zpráv pro členy týmu. Reprodukovatelné chyby a nápady patří do GitHubu a bezpečnostní zprávy procházejí naší soukromou bezpečnostní politikou.",
+        "discord": "Komunitní podpora na Discordu",
+        "github_issues": "Nahlásit chybu nebo požádat o funkci na GitHubu",
+        "security": "Nahlásit bezpečnostní problém (soukromý)",
+        "credits_link": "Beta testery a open source přispěvatelé – viz kredity"
+      },
+      "github_profile": "GitHub profile",
+      "roles": {
+        "core_owner": "Hlavní vlastník, správce a vývojář",
+        "discord_owner_developer": "Vlastník Discord serveru, vývojář a správce TrackerBot",
+        "core_support": "Hlavní podpůrný personál",
+        "discord_support": "Discord obecná podpora",
+        "tarkov_dev_maintainer": "Správce Tarkov.dev",
+        "ratscanner_maintainer": "Vlastník a správce RatScanner"
+      },
+      "projects": {
+        "tarkov_dev": "Tarkov.dev",
+        "ratscanner": "Skener hodnocení"
+      }
     },
     "login": {
       "subtitle": "Pro přístup k vašemu účtu se přihlaste",
