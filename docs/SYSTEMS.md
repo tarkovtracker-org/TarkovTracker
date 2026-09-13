@@ -1862,7 +1862,8 @@ App boot
   indicators such as the checkbox tick and focus ring. A change that leaves any route with more
   failures in light than in dark is a regression, even when the failing element is theme-agnostic.
 - Fixed-dark item action overlays and map tiles retain light foregrounds in light mode instead
-  of inheriting inverted neutral ink. The selected Appearance option has a contrasting inset ring.
+  of inheriting inverted neutral ink. The selected Appearance option has a contrasting inset ring;
+  keyboard focus uses a separate offset outline so focusing never replaces the selection boundary.
 - Interactive card content uses native controls: trader navigation lives on the named header
   button and skill editing on its labelled input, not redundant clickable containers. Objective
   rows ignore events from their nested controls, and their Space handler checks `.self` before

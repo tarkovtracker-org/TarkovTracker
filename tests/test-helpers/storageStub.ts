@@ -1,6 +1,7 @@
 /**
- * Stubs window.localStorage with a throwing mock to test failure branches
- * without mutating or leaking across happy-dom's shared Proxy.
+ * Stubs localStorage getItem/setItem failures for theme persistence tests without
+ * mutating happy-dom's shared Proxy. Other operations stay inert so test-environment
+ * cleanup can clear storage; this does not simulate denial of the entire Storage API.
  */
 export const installThrowingStorageStub = (
   errorMessage: string = 'SecurityError: Access is denied for this document'

@@ -31,7 +31,7 @@
               <label
                 v-for="option in themeOptions"
                 :key="option.value"
-                class="focus-within:ring-primary-500 relative flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-within:ring-2"
+                class="focus-within:outline-primary-500 light:focus-within:outline-surface-50 relative flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-within:outline-2 focus-within:outline-offset-2"
                 :class="
                   themeMode === option.value
                     ? 'bg-surface-700 text-surface-50 light:ring-surface-300 light:ring-2 light:ring-inset shadow-sm'

@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
  */
 const cssPath = `${process.cwd()}/app/assets/css/tailwind.css`;
 const tailwindCss = readFileSync(cssPath, 'utf8');
-const lightBlock = tailwindCss.slice(tailwindCss.indexOf(":root[data-theme='light']"));
+const lightBlock = /:root\[data-theme='light'\]\s*\{([^}]+)\}/.exec(tailwindCss)?.[1] ?? '';
 const remap = (family: string, step: number) =>
   new RegExp(`--color-${family}-${step}:\\s*var\\(--color-${family}-(\\d+)\\)`).exec(
     lightBlock

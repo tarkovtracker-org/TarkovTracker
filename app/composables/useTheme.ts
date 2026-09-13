@@ -22,7 +22,6 @@ export const useTheme = () => {
   // Idempotent sync with the boot script (also covers tests/CSP-blocked boots).
   applyThemeMode(themeMode.value);
   const setThemeMode = (mode: ThemeMode) => {
-    isHydrated.value = true;
     const normalized = normalizeThemeMode(mode);
     themeMode.value = normalized;
     persistThemeMode(normalized);

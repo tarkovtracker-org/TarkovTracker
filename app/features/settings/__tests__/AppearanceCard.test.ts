@@ -61,6 +61,15 @@ describe('AppearanceCard', () => {
     expect(layoutClasses.contains('flex-col')).toBe(true);
     expect(layoutClasses.contains('sm:flex-row')).toBe(true);
   });
+  it('uses a separate offset focus outline without replacing the selection ring', () => {
+    const wrapper = mountCard();
+    for (const label of wrapper.findAll('label')) {
+      expect(label.classes()).toContain('focus-within:outline-2');
+      expect(label.classes()).toContain('focus-within:outline-offset-2');
+      expect(label.classes()).toContain('light:focus-within:outline-surface-50');
+      expect(label.classes()).not.toContain('focus-within:ring-primary-500');
+    }
+  });
   it('marks the current mode as checked', () => {
     const wrapper = mountCard();
     const options = wrapper.findAll('input[type="radio"]');
