@@ -2,6 +2,10 @@ import { createError, defineEventHandler, readBody } from 'h3';
 import Stripe from 'stripe';
 import { createLogger } from '@/server/utils/logger';
 import {
+  reserveProviderInitiation,
+  recordProviderInitiation,
+} from '@/server/utils/providerInitiation';
+import {
   SupporterCustomerLookupUnavailableError,
   getSupporterStripeCustomerId,
 } from '@/server/utils/supporterCustomerLookup';
@@ -42,10 +46,21 @@ export default defineEventHandler(async (event) => {
   const returnUrl = sanitizeReturnUrl(body?.returnUrl, appUrl);
   const stripe = new Stripe(stripeSecretKey);
   try {
-    const session = await stripe.billingPortal.sessions.create({
-      customer: customerId,
-      return_url: returnUrl,
-    });
+    const operation = await reserveProviderInitiation(
+      event,
+      userId,
+      'portal',
+      { customerId, returnUrl },
+      customerId
+    );
+    const session = await stripe.billingPortal.sessions.create(
+      {
+        customer: customerId,
+        return_url: returnUrl,
+      },
+      { idempotencyKey: `lifecycle-${operation}` }
+    );
+    await recordProviderInitiation(event, operation, session.id);
     return { url: session.url };
   } catch (err: unknown) {
     logger.error('[Stripe Portal] Portal session creation failed', { userId, err });

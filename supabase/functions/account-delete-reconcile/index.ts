@@ -1,24 +1,14 @@
-import {
-  authenticateUser,
-  handleCorsPreflight,
-  validateMethod,
-  createErrorResponse,
-  createSuccessResponse,
-  type AuthSuccess,
-} from 'shared/auth';
+import { runAccountDeletion } from '../_shared/account-deletion-workflow.ts';
+import { createErrorResponse, createSuccessResponse } from '../_shared/auth.ts';
+import { authenticateDeletionRequest } from '../_shared/account-deletion-request.ts';
+import { readJsonObject } from '../_shared/authenticated-mutation.ts';
 import {
   claimDeletionJob,
-  cleanupUserData,
-  deleteUserWithRetry,
   getDeletionJobState,
-  markDeletionCompleted,
-  recordDeletionFailure,
-  serializeError,
   type AccountDeletionClient,
-  type DeletionTransitionResult,
 } from '../_shared/account-deletion-lifecycle.ts';
 const DEFAULT_BATCH_LIMIT = 20;
-const MAX_BATCH_LIMIT = 100;
+const MAX_BATCH_LIMIT = 25;
 interface ReconcileRequest {
   action?: 'list' | 'process';
   userId?: string;
@@ -35,55 +25,21 @@ async function verifyAdminStatus(
     .select('is_admin')
     .eq('user_id', userId)
     .limit(1);
-  if (error || !data || data.length === 0) {
-    console.error('[account-delete-reconcile] Error checking admin status:', error);
-    return false;
-  }
-  return data[0]?.is_admin === true;
+  if (error) return false;
+  return data?.[0]?.is_admin === true;
 }
 const listJobs = async (
   supabase: AccountDeletionClient,
   limit: number,
   includeDeadLettered: boolean
 ) => {
-  const statuses = ['pending', 'failed', 'in_progress'];
-  if (includeDeadLettered) statuses.push('dead_lettered');
-  const statusFilter = statuses.map((status) => `status.eq.${status}`).join(',');
-  const selectColumns = [
-    'user_id',
-    'status',
-    'attempts',
-    'max_attempts',
-    'last_error',
-    'last_error_at',
-    'next_run_at',
-    'updated_at',
-    'dead_lettered_at',
-  ].join(',');
-  const { data, error } = await supabase
-    .from('account_deletion_jobs')
-    .select(selectColumns)
-    .or(statusFilter)
-    .order('next_run_at', { ascending: true, nullsFirst: false })
-    .limit(limit);
-  if (error) {
-    return { data: null, error } as const;
-  }
-  return { data: data ?? [], error: null } as const;
+  const { data, error } = await supabase.rpc('account_lifecycle_jobs', { p_limit: limit });
+  if (error) return { data: null, error } as const;
+  const rows = Array.isArray(data) ? data : [];
+  const jobs = rows.filter((job) => includeDeadLettered || job.status !== 'dead_lettered');
+  return { data: jobs, error: null } as const;
 };
-const getTransitionResult = async <T>(
-  transition: Promise<DeletionTransitionResult>,
-  result: T,
-  userId: string
-) => {
-  const transitionResult = await transition;
-  if (transitionResult === 'persisted') return result;
-  if (transitionResult === 'lease_lost') {
-    return { userId, status: 'lease_lost', skipped: true };
-  }
-  return { userId, status: 'transition_failed' };
-};
-const TERMINAL_DELETION_STATUSES = new Set(['completed', 'dead_lettered']);
+const TERMINAL_DELETION_STATUSES = new Set(['completed', 'dead_lettered', 'hold', 'blocked']);
 const getSkippedJobResult = (status: string | null, userId: string, dryRun: boolean) => {
   const normalizedStatus = status ?? 'pending';
   if (TERMINAL_DELETION_STATUSES.has(normalizedStatus)) {
@@ -98,6 +54,7 @@ const processDeletionJob = async (
   dryRun: boolean
 ) => {
   const { status } = await getDeletionJobState(supabase, userId, '[account-delete-reconcile]');
+  if (status === 'state_unavailable') return { userId, status, retryable: true };
   const skippedResult = getSkippedJobResult(status, userId, dryRun);
   if (skippedResult) return skippedResult;
   const claim = await claimDeletionJob(supabase, userId, false);
@@ -105,99 +62,55 @@ const processDeletionJob = async (
     console.error('[account-delete-reconcile] Failed to claim deletion job:', claim.error);
     return { userId, status: 'claim_failed' };
   }
-  if (!claim.claimed || !claim.claimToken) {
-    return { userId, status: claim.status ?? 'missing', skipped: true };
+  if (!claim.claimToken) {
+    return { userId, status: String(claim.status), skipped: true };
   }
-  const authDeleteResult = await deleteUserWithRetry(supabase, userId);
-  if (!authDeleteResult.ok) {
-    return getTransitionResult(
-      recordDeletionFailure(
-        supabase,
-        userId,
-        claim.claimToken,
-        'auth_delete_failed',
-        {
-          stage: 'auth_delete',
-          attempts: authDeleteResult.attempts,
-          error: serializeError(authDeleteResult.lastError),
-        },
-        '[account-delete-reconcile]'
-      ),
-      { userId, status: 'failed', stage: 'auth_delete' },
-      userId
-    );
-  }
-  const cleanupErrors = await cleanupUserData(supabase, userId);
-  if (Object.keys(cleanupErrors).length > 0) {
-    return getTransitionResult(
-      recordDeletionFailure(
-        supabase,
-        userId,
-        claim.claimToken,
-        'cleanup_failed',
-        { stage: 'cleanup', errors: cleanupErrors },
-        '[account-delete-reconcile]'
-      ),
-      { userId, status: 'failed', stage: 'cleanup', errors: cleanupErrors },
-      userId
-    );
-  }
-  return getTransitionResult(
-    markDeletionCompleted(supabase, userId, claim.claimToken, '[account-delete-reconcile]'),
-    { userId, status: 'completed' },
-    userId
-  );
+  const result = await runAccountDeletion(supabase, userId, claim.claimToken);
+  return { userId, ...result };
+};
+const getLimit = (body: ReconcileRequest) =>
+  Math.min(Math.max(body.limit ?? DEFAULT_BATCH_LIMIT, 1), MAX_BATCH_LIMIT);
+const respondWithJobs = async (
+  req: Request,
+  client: AccountDeletionClient,
+  body: ReconcileRequest
+) => {
+  const { data, error } = await listJobs(client, getLimit(body), Boolean(body.includeDeadLettered));
+  if (error) return createErrorResponse('Failed to list deletion jobs', 500, req);
+  return createSuccessResponse({ success: true, jobs: data }, 200, req);
+};
+const processDueJobs = async (client: AccountDeletionClient, body: ReconcileRequest) => {
+  const { data, error } = await listJobs(client, getLimit(body), Boolean(body.includeDeadLettered));
+  if (error) throw new Error('Failed to fetch deletion jobs');
+  const now = new Date().toISOString();
+  const due = (data ?? []).filter((job) => !job.next_run_at || job.next_run_at <= now);
+  const results = [];
+  for (const job of due)
+    results.push(await processDeletionJob(client, job.user_id, Boolean(body.dryRun)));
+  return results;
+};
+const processBody = async (client: AccountDeletionClient, body: ReconcileRequest) => {
+  if (body.userId) return [await processDeletionJob(client, body.userId, Boolean(body.dryRun))];
+  return processDueJobs(client, body);
+};
+const getAction = (body: ReconcileRequest) => body.action ?? (body.userId ? 'process' : 'list');
+const handleAdminRequest = async (req: Request, client: AccountDeletionClient, userId: string) => {
+  if (!(await verifyAdminStatus(client, userId))) return createErrorResponse('Forbidden', 403, req);
+  const body = (await readJsonObject(req)) as ReconcileRequest;
+  if (getAction(body) === 'list') return respondWithJobs(req, client, body);
+  const results = await processBody(client, body);
+  return createSuccessResponse({ success: true, results }, 200, req);
 };
 Deno.serve(async (req) => {
-  const corsResponse = handleCorsPreflight(req);
-  if (corsResponse) return corsResponse;
   try {
-    const methodError = validateMethod(req, ['POST']);
-    if (methodError) return methodError;
-    const authResult = await authenticateUser(req);
-    if ('error' in authResult) {
-      return createErrorResponse(authResult.error, authResult.status, req);
-    }
-    const { user, supabase: sbClient } = authResult as AuthSuccess;
-    const supabase = sbClient as unknown as AccountDeletionClient;
-    const isAdmin = await verifyAdminStatus(supabase, user.id);
-    if (!isAdmin) {
-      return createErrorResponse('Forbidden', 403, req);
-    }
-    let body: ReconcileRequest = {};
-    try {
-      body = (await req.json()) as ReconcileRequest;
-    } catch {
-      body = {};
-    }
-    const action = body.action ?? (body.userId ? 'process' : 'list');
-    const limit = Math.min(Math.max(body.limit ?? DEFAULT_BATCH_LIMIT, 1), MAX_BATCH_LIMIT);
-    if (action === 'list') {
-      const { data, error } = await listJobs(supabase, limit, Boolean(body.includeDeadLettered));
-      if (error) {
-        console.error('[account-delete-reconcile] Failed to list jobs:', error);
-        return createErrorResponse('Failed to list deletion jobs', 500, req);
-      }
-      return createSuccessResponse({ success: true, jobs: data }, 200, req);
-    }
-    const results: Array<Record<string, unknown>> = [];
-    if (body.userId) {
-      results.push(await processDeletionJob(supabase, body.userId, Boolean(body.dryRun)));
-    } else {
-      const { data, error } = await listJobs(supabase, limit, Boolean(body.includeDeadLettered));
-      if (error) {
-        console.error('[account-delete-reconcile] Failed to fetch jobs for processing:', error);
-        return createErrorResponse('Failed to fetch deletion jobs', 500, req);
-      }
-      const nowIso = new Date().toISOString();
-      const dueJobs = (data ?? []).filter((job) => !job.next_run_at || job.next_run_at <= nowIso);
-      for (const job of dueJobs) {
-        results.push(await processDeletionJob(supabase, job.user_id, Boolean(body.dryRun)));
-      }
-    }
-    return createSuccessResponse({ success: true, results }, 200, req);
-  } catch (error) {
-    console.error('[account-delete-reconcile] Unexpected error:', error);
+    const auth = await authenticateDeletionRequest(req);
+    if (auth instanceof Response) return auth;
+    return await handleAdminRequest(
+      req,
+      auth.supabase as unknown as AccountDeletionClient,
+      auth.user.id
+    );
+  } catch {
     return createErrorResponse('Internal server error', 500, req);
   }
 });

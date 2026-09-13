@@ -7,7 +7,7 @@ import {
   deleteUserWithRetry,
   getErrorMessage,
   isNotFoundError,
-  markDeletionCompleted,
+  recordDeletionFailure,
   type AccountDeletionClient,
 } from './account-deletion-lifecycle.ts';
 const asClient = (value: unknown) => value as AccountDeletionClient;
@@ -57,7 +57,7 @@ describe('account deletion lifecycle', () => {
     assertEquals(waits.length, 3);
     assertMatch(getErrorMessage(result.lastError), /failure 4/);
   });
-  it('treats a missing auth user as a completed deletion', async () => {
+  it('treats a missing Auth user as a completed Auth stage only', async () => {
     const client = asClient({
       auth: {
         admin: {
@@ -91,7 +91,7 @@ describe('account deletion lifecycle', () => {
     assertEquals(await claimDeletionJob(client, 'user-id', true), {
       claimed: false,
       status: 'in_progress',
-      claimToken: 'claim-token',
+      claimToken: null,
       error: null,
     });
     assertEquals(await consumeDeletionAttempt(client, 'user-id', '127.0.0.1', 'agent'), {
@@ -114,31 +114,31 @@ describe('account deletion lifecycle', () => {
       },
     ]);
   });
-  it('distinguishes a lost lease from a fenced transition error', async () => {
-    const filter = {
-      limit: () => Promise.resolve({ data: [], error: null }),
-    };
-    const update: Record<string, unknown> = {};
-    update.eq = () => update;
-    update.select = () => filter;
-    const client = asClient({
-      from: () => ({ update: () => update }),
-    });
+  it('distinguishes a lost lease from a fenced failure-recording error', async () => {
+    const client = asClient({ rpc: () => Promise.resolve({ data: false, error: null }) });
     assertEquals(
-      await markDeletionCompleted(client, 'user-id', 'stale-token', '[account-delete-test]'),
+      await recordDeletionFailure(
+        client,
+        'user-id',
+        'stale-token',
+        'synthetic',
+        { stage: 'prepare' },
+        '[test]'
+      ),
       'lease_lost'
     );
-    const errorFilter = {
-      limit: () => Promise.resolve({ data: null, error: new Error('database unavailable') }),
-    };
-    const errorUpdate: Record<string, unknown> = {};
-    errorUpdate.eq = () => errorUpdate;
-    errorUpdate.select = () => errorFilter;
     const errorClient = asClient({
-      from: () => ({ update: () => errorUpdate }),
+      rpc: () => Promise.resolve({ data: null, error: new Error('database unavailable') }),
     });
     assertEquals(
-      await markDeletionCompleted(errorClient, 'user-id', 'claim-token', '[account-delete-test]'),
+      await recordDeletionFailure(
+        errorClient,
+        'user-id',
+        'claim-token',
+        'synthetic',
+        { stage: 'prepare' },
+        '[test]'
+      ),
       'error'
     );
   });

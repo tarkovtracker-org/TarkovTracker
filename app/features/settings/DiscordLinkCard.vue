@@ -183,7 +183,6 @@
     unlinking.value = true;
     errorMessage.value = null;
     alertTone.value = 'error';
-    let restoreRolesOnFailure = false;
     try {
       const { data: userData, error: userError } = await $supabase.client.auth.getUser();
       if (userError) throw userError;
@@ -199,7 +198,6 @@
         );
         return;
       }
-      restoreRolesOnFailure = true;
       const { error: revokeError } = await $supabase.client.functions.invoke<DiscordUnlinkResponse>(
         'discord-unlink',
         { body: {} }
@@ -207,12 +205,8 @@
       if (revokeError) throw revokeError;
       const { error: unlinkError } = await $supabase.client.auth.unlinkIdentity(discordIdentity);
       if (unlinkError) throw unlinkError;
-      restoreRolesOnFailure = false;
       link.value = null;
     } catch (error) {
-      if (restoreRolesOnFailure) {
-        await synchronizeRoles();
-      }
       logger.error('[DiscordLinkCard] Failed to unlink Discord account', {
         userId: $supabase.user?.id,
         error,

@@ -19,6 +19,10 @@ vi.mock('h3', async () => {
     readBody: (...args: unknown[]) => mockReadBody(...args),
   };
 });
+vi.mock('@/server/utils/providerInitiation', () => ({
+  reserveProviderInitiation: vi.fn().mockResolvedValue('synthetic-operation'),
+  recordProviderInitiation: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('stripe', () => {
   function StripeMock() {
     return {
@@ -90,10 +94,13 @@ describe('POST /api/stripe/portal', () => {
     const { default: handler } = await import('@/server/api/stripe/portal.post');
     const result = await handler(makeEvent({ id: 'user-1' }));
     expect(result).toEqual({ url: 'https://billing.stripe.com/p/x' });
-    expect(mockCreatePortalSession).toHaveBeenCalledWith({
-      customer: 'cus_123',
-      return_url: 'https://tarkovtracker.org/supporter',
-    });
+    expect(mockCreatePortalSession).toHaveBeenCalledWith(
+      {
+        customer: 'cus_123',
+        return_url: 'https://tarkovtracker.org/supporter',
+      },
+      { idempotencyKey: 'lifecycle-synthetic-operation' }
+    );
   });
   it('honors a same-origin returnUrl', async () => {
     mockGetSupporterStripeCustomerId.mockResolvedValue('cus_123');
@@ -101,10 +108,13 @@ describe('POST /api/stripe/portal', () => {
     mockCreatePortalSession.mockResolvedValue({ url: 'https://billing.stripe.com/p/x' });
     const { default: handler } = await import('@/server/api/stripe/portal.post');
     await handler(makeEvent({ id: 'user-1' }));
-    expect(mockCreatePortalSession).toHaveBeenCalledWith({
-      customer: 'cus_123',
-      return_url: 'https://tarkovtracker.org/supporter?ref=app',
-    });
+    expect(mockCreatePortalSession).toHaveBeenCalledWith(
+      {
+        customer: 'cus_123',
+        return_url: 'https://tarkovtracker.org/supporter?ref=app',
+      },
+      { idempotencyKey: 'lifecycle-synthetic-operation' }
+    );
   });
   it('falls back to the default return url for cross-origin returnUrl', async () => {
     mockGetSupporterStripeCustomerId.mockResolvedValue('cus_123');
@@ -112,10 +122,13 @@ describe('POST /api/stripe/portal', () => {
     mockCreatePortalSession.mockResolvedValue({ url: 'https://billing.stripe.com/p/x' });
     const { default: handler } = await import('@/server/api/stripe/portal.post');
     await handler(makeEvent({ id: 'user-1' }));
-    expect(mockCreatePortalSession).toHaveBeenCalledWith({
-      customer: 'cus_123',
-      return_url: 'https://tarkovtracker.org/supporter',
-    });
+    expect(mockCreatePortalSession).toHaveBeenCalledWith(
+      {
+        customer: 'cus_123',
+        return_url: 'https://tarkovtracker.org/supporter',
+      },
+      { idempotencyKey: 'lifecycle-synthetic-operation' }
+    );
   });
   it('throws 502 when Stripe rejects the request', async () => {
     mockGetSupporterStripeCustomerId.mockResolvedValue('cus_123');

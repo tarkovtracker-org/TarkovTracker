@@ -434,3 +434,7 @@ s3_region = "env(S3_REGION)"
 s3_access_key = "env(S3_ACCESS_KEY)"
 # Configures AWS_SECRET_ACCESS_KEY for S3 bucket
 s3_secret_key = "env(S3_SECRET_KEY)"
+
+# Application-level Auth getUser validation, matching account-delete.
+[functions.account-deletion-state]
+verify_jwt = false

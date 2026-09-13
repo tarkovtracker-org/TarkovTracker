@@ -2,6 +2,10 @@ import { createError, defineEventHandler, readBody } from 'h3';
 import Stripe from 'stripe';
 import { createLogger } from '@/server/utils/logger';
 import {
+  reserveProviderInitiation,
+  recordProviderInitiation,
+} from '@/server/utils/providerInitiation';
+import {
   validateCheckoutBody,
   validateOneTimeAmount,
 } from '@/server/utils/stripeCheckoutValidation';
@@ -64,26 +68,37 @@ export default defineEventHandler(async (event) => {
   if (mode === 'payment') {
     const amountCents = validateOneTimeAmount(amount);
     try {
-      const session = await stripe.checkout.sessions.create({
-        mode: 'payment',
-        client_reference_id: userId,
-        ...customerFields,
-        ...(existingCustomerId ? {} : { customer_creation: 'always' as const }),
-        metadata: { tier: 'supporter', type: 'one_time', user_id: userId },
-        payment_intent_data: { metadata: { user_id: userId } },
-        line_items: [
-          {
-            price_data: {
-              currency: 'usd',
-              product_data: { name: 'TarkovTracker One-Time Support' },
-              unit_amount: amountCents,
+      const operation = await reserveProviderInitiation(
+        event,
+        userId,
+        'checkout',
+        { mode, amountCents, customerFields, appUrl },
+        existingCustomerId
+      );
+      const session = await stripe.checkout.sessions.create(
+        {
+          mode: 'payment',
+          client_reference_id: userId,
+          ...customerFields,
+          ...(existingCustomerId ? {} : { customer_creation: 'always' as const }),
+          metadata: { tier: 'supporter', type: 'one_time', user_id: userId },
+          payment_intent_data: { metadata: { user_id: userId } },
+          line_items: [
+            {
+              price_data: {
+                currency: 'usd',
+                product_data: { name: 'TarkovTracker One-Time Support' },
+                unit_amount: amountCents,
+              },
+              quantity: 1,
             },
-            quantity: 1,
-          },
-        ],
-        success_url: `${appUrl}/supporter?thanks=one_time`,
-        cancel_url: `${appUrl}/supporter`,
-      });
+          ],
+          success_url: `${appUrl}/supporter?thanks=one_time`,
+          cancel_url: `${appUrl}/supporter`,
+        },
+        { idempotencyKey: `lifecycle-${operation}` }
+      );
+      await recordProviderInitiation(event, operation, session.id);
       return { url: session.url };
     } catch (err: unknown) {
       logger.error('[Stripe Checkout] One-time session creation failed', { userId, err });
@@ -116,16 +131,27 @@ export default defineEventHandler(async (event) => {
     });
   }
   try {
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      client_reference_id: userId,
-      ...customerFields,
-      metadata: { tier, interval, type: 'subscription', user_id: userId },
-      subscription_data: { metadata: { tier, interval, user_id: userId } },
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${appUrl}/supporter?thanks=${tier}`,
-      cancel_url: `${appUrl}/supporter`,
-    });
+    const operation = await reserveProviderInitiation(
+      event,
+      userId,
+      'checkout',
+      { mode, priceId, customerFields, appUrl },
+      existingCustomerId
+    );
+    const session = await stripe.checkout.sessions.create(
+      {
+        mode: 'subscription',
+        client_reference_id: userId,
+        ...customerFields,
+        metadata: { tier, interval, type: 'subscription', user_id: userId },
+        subscription_data: { metadata: { tier, interval, user_id: userId } },
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${appUrl}/supporter?thanks=${tier}`,
+        cancel_url: `${appUrl}/supporter`,
+      },
+      { idempotencyKey: `lifecycle-${operation}` }
+    );
+    await recordProviderInitiation(event, operation, session.id);
     return { url: session.url };
   } catch (err: unknown) {
     logger.error('[Stripe Checkout] Subscription session creation failed', {

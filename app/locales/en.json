@@ -2131,6 +2131,13 @@
       "error_description": "Failed to reset data. Please try again."
     },
     "account_data": {
+      "deletion_waiting": "Your deletion request is waiting for billing or operator review. You can keep using your account and teams. You may withdraw before irreversible preparation starts.",
+      "deletion_preparing": "Account deletion preparation has started. New team membership, ownership, and provider links are restricted. Your account will remain until required cleanup is confirmed. Contact support if this remains pending.",
+      "deletion_withdrawn": "Your deletion request was withdrawn. Any scheduled subscription cancellation remains in place; billing has not been restarted.",
+      "deletion_status_unavailable": "Deletion status could not be verified. Refresh the status before making another deletion request.",
+      "deletion_refresh": "Refresh deletion status",
+      "deletion_withdraw": "Withdraw deletion request",
+      "deletion_policy": "Active subscriptions are scheduled to end at the end of their billing period. No automatic refund or credit is issued. You may withdraw the deletion request before preparation starts; this does not restart billing. After preparation starts, team transfers and app-managed Discord role removal cannot be withdrawn. Minimal restricted cleanup evidence may remain after account deletion.",
       "title": "Account & Data Management",
       "account_info_title": "Account Information",
       "username_label": "Username",
@@ -2158,7 +2165,7 @@
       "delete_item_progress": "Your progress tracking data",
       "delete_item_teams": "Team memberships and owned teams",
       "delete_item_tokens": "API tokens and settings",
-      "delete_item_personal": "All personal information",
+      "delete_item_personal": "Account profile information, with minimal restricted cleanup evidence retained",
       "not_affect_tarkov": "This does not affect your Escape from Tarkov account, only Tarkov Tracker data.",
       "team_transfer_title": "Team Ownership Transfer",
       "team_transfer_description": "If you own any teams, ownership will be automatically transferred to the oldest member in each team. Teams without other members will be deleted.",

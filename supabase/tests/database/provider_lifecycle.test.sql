@@ -1,0 +1,18 @@
+BEGIN;
+SELECT plan(12);
+SELECT ok(NOT has_schema_privilege('anon','private','USAGE'),'anon cannot reach private state');
+SELECT ok(NOT has_table_privilege('authenticated','private.lifecycle_requests','SELECT'),'authenticated cannot read other deletion requests');
+SELECT ok(NOT has_table_privilege('anon','private.lifecycle_work','SELECT'),'anon cannot read provider identifiers');
+SELECT ok(NOT has_table_privilege('authenticated','private.lifecycle_work','UPDATE'),'authenticated cannot advance provider work');
+SELECT ok(NOT has_function_privilege('anon','public.request_account_lifecycle(uuid,boolean)','EXECUTE'),'anon cannot request another account deletion');
+SELECT ok(NOT has_function_privilege('authenticated','public.finish_lifecycle_work(uuid,uuid,text,text,integer)','EXECUTE'),'clients cannot finish provider work');
+SELECT ok(has_function_privilege('service_role','public.finish_lifecycle_work(uuid,uuid,text,text,integer)','EXECUTE'),'service can finish fenced work');
+SELECT ok(NOT has_function_privilege('authenticated','public.review_provider_initiation(uuid,uuid,text,text[],boolean)','EXECUTE'),'clients cannot resolve provider ambiguity');
+SELECT ok(NOT has_function_privilege('authenticated','public.retry_lifecycle_work(uuid,uuid,text)','EXECUTE'),'clients cannot retry work');
+SELECT is(public.request_account_lifecycle('b1000000-0000-4000-8000-000000000001'),'operator_review','missing Auth with no snapshot is not automatic success');
+INSERT INTO public.stripe_events(event_id,event_type,received_at) VALUES('evt_synthetic_legacy_retention','synthetic',clock_timestamp()-interval '365 days');
+DELETE FROM public.stripe_events WHERE event_id='evt_synthetic_legacy_retention';
+SELECT is((SELECT count(*)::INTEGER FROM public.stripe_events WHERE event_id='evt_synthetic_legacy_retention'),1,'unknown legacy receipt survives age-based retention');
+SELECT ok(NOT has_table_privilege('authenticated','public.team_events','INSERT'),'Package A event containment retained');
+SELECT * FROM finish();
+ROLLBACK;

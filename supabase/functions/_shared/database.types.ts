@@ -1093,6 +1093,174 @@ export type Database = {
         }
         Returns: undefined
       }
+      account_lifecycle_jobs: {
+        Args: { p_limit?: number; p_user_id?: string }
+        Returns: {
+          attempts: number
+          claim_token: string | null
+          completed_at: string | null
+          created_at: string | null
+          dead_lettered_at: string | null
+          last_error: string | null
+          last_error_at: string | null
+          last_error_details: Json | null
+          max_attempts: number
+          next_run_at: string | null
+          status: string
+          updated_at: string | null
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "account_deletion_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      account_lifecycle_status: {
+        Args: { p_cancel?: boolean; p_user_id: string }
+        Returns: Json
+      }
+      authorize_account_auth_delete: {
+        Args: { p_claim_token: string; p_user_id: string }
+        Returns: boolean
+      }
+      bind_stripe_lifecycle: {
+        Args: { p_id: string; p_token: string; p_user_id: string }
+        Returns: boolean
+      }
+      claim_lifecycle_work: {
+        Args: { p_kind: string; p_limit?: number }
+        Returns: unknown[]
+        SetofOptions: {
+          from: "*"
+          to: "lifecycle_work"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      claim_stripe_lifecycle: {
+        Args: { p_event_id: string; p_type: string }
+        Returns: Json
+      }
+      complete_checkout_initiation: {
+        Args: {
+          p_customer_id: string
+          p_id: string
+          p_payment_status: string
+          p_session_id: string
+          p_status: string
+          p_subscription_id: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
+      defer_provider_initiation: {
+        Args: { p_error_code?: string; p_id: string; p_retryable: boolean }
+        Returns: undefined
+      }
+      discord_lifecycle_context: {
+        Args: { p_id: string; p_token: string }
+        Returns: Json
+      }
+      enqueue_stripe_discord_effect: {
+        Args: {
+          p_id: string
+          p_resource: string
+          p_token: string
+          p_user: string
+        }
+        Returns: undefined
+      }
+      fail_account_lifecycle: {
+        Args: {
+          p_claim_token: string
+          p_reason: string
+          p_stage: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
+      finish_account_deletion: {
+        Args: { p_claim_token: string; p_user_id: string }
+        Returns: string
+      }
+      finish_lifecycle_work: {
+        Args: {
+          p_code?: string
+          p_id: string
+          p_retry_seconds?: number
+          p_state: string
+          p_token: string
+        }
+        Returns: boolean
+      }
+      lifecycle_work_status: {
+        Args: { p_id: string; p_token?: string }
+        Returns: Json
+      }
+      park_account_lifecycle: {
+        Args: { p_claim_token: string; p_reason: string; p_user_id: string }
+        Returns: boolean
+      }
+      prepare_account_deletion: {
+        Args: { p_claim_token: string; p_user_id: string }
+        Returns: string
+      }
+      provider_initiation_candidates: {
+        Args: { p_limit?: number }
+        Returns: {
+          id: string
+          resource_id: string
+          user_id: string
+        }[]
+      }
+      receive_stripe_lifecycle: {
+        Args: { p_event_id: string; p_type: string }
+        Returns: string
+      }
+      record_provider_initiation: {
+        Args: { p_id: string; p_resource: string }
+        Returns: boolean
+      }
+      request_account_lifecycle: {
+        Args: { p_restart?: boolean; p_user_id: string }
+        Returns: string
+      }
+      reserve_provider_initiation: {
+        Args: {
+          p_customer_id?: string
+          p_fingerprint: string
+          p_operation: string
+          p_user_id: string
+        }
+        Returns: string
+      }
+      retry_lifecycle_work: {
+        Args: { p_actor: string; p_evidence_reference: string; p_id: string }
+        Returns: boolean
+      }
+      review_provider_initiation: {
+        Args: {
+          p_actor: string
+          p_evidence_reference: string
+          p_id: string
+          p_no_external_effect?: boolean
+          p_provider_ids?: string[]
+        }
+        Returns: boolean
+      }
+      seal_account_lifecycle: {
+        Args: { p_claim_token: string; p_user_id: string }
+        Returns: string
+      }
+      stripe_lifecycle_recovery_candidates: {
+        Args: { p_limit?: number }
+        Returns: {
+          event_id: string
+          event_type: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

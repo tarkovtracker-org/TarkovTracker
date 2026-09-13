@@ -2571,3 +2571,38 @@ deploys nor publishes required statuses. Ordinary CI still builds/uploads `pages
 - `scripts/github-ci-gate.sh`, `scripts/release-recovery.mjs` — dual-gate waits for automation
 - `wrangler.toml` — isolated `[env.preview.vars]`
 - `scripts/ci-tests/preview.mjs`, `scripts/ci-tests/preview-workflow.mjs`, `scripts/ci-tests/security.mjs` — regression tests
+## 20. Provider lifecycle candidate (not deployed)
+
+Package B's isolated candidate separates reversible deletion requests from irreversible preparation.
+Requested/provider-wait accounts remain usable. Only the sealing boundary prevents new team
+ownership/membership and new provider linkage. Team preparation follows the deployed Package C
+transactional contracts; provider calls and supported Auth deletion happen outside transactions.
+
+Provider identifiers live in restricted application-owned lifecycle work with no Auth foreign key.
+Stripe receipt is separate from completion; claims carry expiring fencing tokens and completion
+waits for required effects. Existing receipt-only history remains unknown historical. Discord unlink
+captures obligations at the existing application-owned identity trigger function and mapping-removal
+boundaries; triggers enqueue work and never call a provider. This candidate remains incomplete and
+must not be deployed until the complete effect, concurrency, and transport validation gates pass.
+
+**Invariants:** ordinary clients cannot access provider identifiers or task transitions; an expired
+worker cannot advance another claim; queued work is not externally completed; cancellation does not
+silently restart billing; unfinished work is never age-purged; importing worker code or applying the
+candidate migration starts no provider worker or schedule. A/C security and pointer contracts remain
+unchanged. See `docs/remediation/package-b-policy.md` for the approved candidate policy and provisional
+staging retention/retry defaults.
+
+The disposable validation harness exercises real Auth-issued credentials, supported Discord identity
+link/unlink endpoints, Edge handlers, PostgREST, and PostgreSQL. Discord OAuth is supplied by an
+isolated synthetic provider; role removal and Stripe provider effects are mocked. These results do
+not establish real Stripe test-mode or Discord guild behavior. Local reset tooling accepts only the
+fixed disposable project and exact synthetic provider configuration, never a production target.
+
+The legacy Stripe upgrade leaves existing receipt rows untouched and creates no processing work
+from them. A later duplicate delivery becomes an inspectable unknown-historical obligation rather
+than inferred completion or automatic replay. Retention eligibility requires completed work older
+than the provisional window; age alone never authorizes removal of unfinished or review-state work.
+
+The disabled operational delivery contract and aggregate observer checks are documented in
+`docs/remediation/package-b-operations.md`. This design does not establish a deployed worker,
+heartbeat, alert destination, or operator rotation; those integrations require explicit review.

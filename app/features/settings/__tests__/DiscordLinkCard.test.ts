@@ -187,7 +187,7 @@ describe('DiscordLinkCard', () => {
       'settings.discord_link.not_in_guild'
     );
   });
-  it('unlinks the identity after revoking the Linked role', async () => {
+  it('uses Auth unlink as the authoritative role-cleanup boundary', async () => {
     maybeSingleMock.mockResolvedValue({
       data: { discord_username: 'linked-user' },
       error: null,
@@ -200,40 +200,36 @@ describe('DiscordLinkCard', () => {
     expect(unlinkIdentityMock).toHaveBeenCalledWith({ id: 'identity-1', provider: 'discord' });
     expect(wrapper.text()).toContain('settings.discord_link.link_account');
   });
-  it('restores the Linked role when identity unlinking fails', async () => {
+  it('does not issue compensating role changes when identity unlinking fails', async () => {
     maybeSingleMock.mockResolvedValue({
       data: { discord_username: 'linked-user' },
       error: null,
     });
-    invokeMock
-      .mockResolvedValueOnce({ data: { revoked: true }, error: null })
-      .mockResolvedValueOnce({ data: { synced: true }, error: null });
+    invokeMock.mockResolvedValueOnce({
+      data: { cleanupOnUnlink: true, revoked: false },
+      error: null,
+    });
     unlinkIdentityMock.mockResolvedValue({ error: new Error('identity unlink failed') });
     const wrapper = await mountCard();
     await wrapper.findAll('button')[1]!.trigger('click');
     await flushPromises();
-    expect(invokeMock.mock.calls).toEqual([
-      ['discord-unlink', { body: {} }],
-      ['discord-role-sync', { body: {} }],
-    ]);
+    expect(invokeMock.mock.calls).toEqual([['discord-unlink', { body: {} }]]);
     expect(wrapper.text()).toContain('settings.discord_link.unlink_error');
   });
-  it('restores managed roles and keeps the identity linked when role revocation fails', async () => {
+  it('keeps the identity linked when authenticated unlink preflight fails', async () => {
     maybeSingleMock.mockResolvedValue({
       data: { discord_username: 'linked-user' },
       error: null,
     });
-    invokeMock
-      .mockResolvedValueOnce({ data: null, error: new Error('Discord unavailable') })
-      .mockResolvedValueOnce({ data: { synced: true }, error: null });
+    invokeMock.mockResolvedValueOnce({
+      data: null,
+      error: new Error('Unlink preflight unavailable'),
+    });
     const wrapper = await mountCard();
     await wrapper.findAll('button')[1]!.trigger('click');
     await flushPromises();
     expect(unlinkIdentityMock).not.toHaveBeenCalled();
-    expect(invokeMock.mock.calls).toEqual([
-      ['discord-unlink', { body: {} }],
-      ['discord-role-sync', { body: {} }],
-    ]);
+    expect(invokeMock.mock.calls).toEqual([['discord-unlink', { body: {} }]]);
     expect(wrapper.text()).toContain('settings.discord_link.unlink_error');
   });
   it('does not revoke roles when Discord is the only login identity', async () => {

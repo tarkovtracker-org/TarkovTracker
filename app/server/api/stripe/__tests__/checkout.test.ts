@@ -21,6 +21,10 @@ vi.mock('h3', async () => {
     readBody: (...args: unknown[]) => mockReadBody(...args),
   };
 });
+vi.mock('@/server/utils/providerInitiation', () => ({
+  reserveProviderInitiation: vi.fn().mockResolvedValue('synthetic-operation'),
+  recordProviderInitiation: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('stripe', () => {
   function StripeMock() {
     return {

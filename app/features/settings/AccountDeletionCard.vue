@@ -1,5 +1,6 @@
 <script setup lang="ts">
   import LoginRequiredAlert from '@/components/ui/LoginRequiredAlert.vue';
+  import AccountDeletionStatus from '@/features/settings/AccountDeletionStatus.vue';
   import { useActivityLogStore } from '@/stores/useActivityLogStore';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useSystemStore } from '@/stores/useSystemStore';
@@ -27,6 +28,7 @@
   const isDeleting = ref(false);
   const accountIdCopied = ref(false);
   const cleanupScheduled = ref(false);
+  const deletionStatusRevision = ref(0);
   const showUsername = ref(false);
   const showEmail = ref(false);
   const showAccountId = ref(false);
@@ -250,6 +252,9 @@
           cleanupScheduled.value = false;
         }
         showSuccessDialog.value = true;
+      } else if (typeof data?.status === 'string') {
+        showConfirmationDialog.value = false;
+        deletionStatusRevision.value++;
       } else {
         throw new Error('Failed to delete account.');
       }
@@ -301,6 +306,7 @@
             />
           </template>
           <template v-else>
+            <AccountDeletionStatus :key="deletionStatusRevision" />
             <div class="border-surface-700 bg-surface-800/50 mb-6 rounded-lg border p-4">
               <div class="mb-3 text-base font-bold">
                 {{ $t('settings.account_data.account_info_title') }}
@@ -554,6 +560,11 @@
             }}
           </div>
         </div>
+        <UAlert
+          color="warning"
+          variant="soft"
+          :description="t('settings.account_data.deletion_policy')"
+        />
         <UAlert v-if="deleteError" color="error" variant="soft" :title="deleteError" />
       </div>
     </template>
