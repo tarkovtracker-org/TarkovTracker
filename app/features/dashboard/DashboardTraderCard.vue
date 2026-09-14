@@ -6,7 +6,7 @@
     <div class="mb-3 flex items-center gap-3">
       <button
         type="button"
-        class="focus-visible:ring-primary-500 flex min-w-0 flex-1 items-center gap-3 rounded text-left transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:outline-none"
+        class="focus-visible:ring-primary-500 light:focus-visible:ring-primary-800 flex min-w-0 flex-1 items-center gap-3 rounded text-left transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:outline-none"
         :aria-label="$t('page.dashboard.traders.view_tasks', { name: trader.name })"
         @click="navigateToTraderTasks"
       >
