@@ -107,7 +107,6 @@ describe('DashboardTraderCard', () => {
       },
     });
   it('wires the light theme tokens onto the active and inactive loyalty buttons', () => {
-    document.documentElement.setAttribute('data-theme', 'light');
     const wrapper = createWrapper();
     const buttons = wrapper.findAll(
       'button[aria-label*="page.dashboard.traders.set_loyalty_level"]'

@@ -275,7 +275,7 @@
   });
   const percentageTextClass = computed(() => {
     if (isLocked.value) return 'text-surface-500';
-    if (isComplete.value) return 'text-success-400/70';
+    if (isComplete.value) return 'text-success-400/70 light:text-success-900';
     if (props.percentage <= 0) return 'text-surface-400';
     return '';
   });

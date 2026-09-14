@@ -63,7 +63,9 @@ describe('AppearanceCard', () => {
   });
   it('uses a separate offset focus outline without replacing the selection ring', () => {
     const wrapper = mountCard();
-    for (const label of wrapper.findAll('label')) {
+    const labels = wrapper.findAll('label');
+    expect(labels).toHaveLength(2);
+    for (const label of labels) {
       expect(label.classes()).toContain('focus-within:outline-2');
       expect(label.classes()).toContain('focus-within:outline-offset-2');
       expect(label.classes()).toContain('light:focus-within:outline-surface-50');

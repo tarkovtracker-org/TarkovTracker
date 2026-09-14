@@ -56,7 +56,7 @@
                     </span>
                     <span
                       v-if="hiddenAvailableCount > 0"
-                      class="border-warning-400/20 bg-warning-500/10 text-warning-100 inline-flex min-h-6 items-center rounded-full border px-2.5 py-1 text-[11px] leading-none"
+                      class="border-warning-400/20 bg-warning-500/10 text-warning-100 light:text-warning-900 inline-flex min-h-6 items-center rounded-full border px-2.5 py-1 text-[11px] leading-none"
                     >
                       <span class="leading-none">{{ hiddenTasksBadge }}</span>
                     </span>

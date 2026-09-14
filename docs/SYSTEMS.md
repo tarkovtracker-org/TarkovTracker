@@ -1854,6 +1854,9 @@ App boot
 - `normalizeThemeMode` is the runtime validator (unknown values become dark). The synchronous
   inline `THEME_BOOT_SCRIPT` mirrors this accepted-value validation check identically before runtime
   modules load.
+- Light-mode dimmed `surface-500` copy remains readable on shell chrome. Pale accent steps
+  50–100 and translucent accent labels require explicit opaque light-mode ink companions when
+  placed on paper surfaces; remapping the opaque accent ladder alone does not fix alpha contrast.
 - New components should prefer `surface-*`/semantic tokens over hardcoded `white`/`black` so both
   themes work without `light:` overrides; reserve `light:` for accent-on-accent cases.
 - Light mode must not be measurably worse than dark for text contrast. Both themes are audited

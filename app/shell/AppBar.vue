@@ -319,7 +319,7 @@
       case 'timmy':
         return 'border-primary-400 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-400 hover:to-primary-500';
       case 'scav':
-        return 'border-surface-500 bg-gradient-to-r from-surface-600 to-surface-700 hover:from-surface-500 hover:to-surface-600 light:text-surface-50 light:hover:from-surface-600 light:hover:to-surface-700';
+        return 'border-surface-500 bg-gradient-to-r from-surface-600 to-surface-700 hover:from-surface-500 hover:to-surface-600 light:text-surface-50 light:hover:from-surface-700 light:hover:to-surface-600';
       default:
         return 'border-success-500 bg-success-600 hover:border-success-400 hover:bg-success-500';
     }

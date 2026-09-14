@@ -234,7 +234,8 @@ const uiConfig = {
       {
         color: 'pvp',
         variant: 'outline',
-        class: 'ring ring-inset ring-pvp-500 text-pvp-400 hover:bg-pvp-950 light:hover:bg-pvp-100',
+        class:
+          'ring ring-inset ring-pvp-500 light:ring-pvp-700 text-pvp-400 hover:bg-pvp-950 light:hover:bg-pvp-100',
       },
       {
         color: 'pvp',

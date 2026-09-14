@@ -1033,7 +1033,7 @@ summary {
   --color-surface-200: hsl(30 12% 22%);
   --color-surface-300: hsl(30 10% 30%);
   --color-surface-400: hsl(30 8% 34%); /* Muted text: >= 4.5:1 on every light surface */
-  --color-surface-500: hsl(30 7% 46%); /* Dimmed text / placeholders */
+  --color-surface-500: hsl(30 7% 38%); /* Dimmed text / placeholders: readable on shell chrome */
   --color-surface-600: hsl(36 12% 74%); /* Borders/dividers */
   --color-surface-700: hsl(38 16% 82%); /* State fallback */
   --color-surface-800: hsl(40 33% 98%); /* Raised/interactive */
