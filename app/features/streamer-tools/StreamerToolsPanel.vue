@@ -795,11 +795,16 @@
                 </li>
               </ol>
             </details>
-            <div class="rounded-md border border-amber-500/30 bg-amber-950/30 px-3 py-2">
+            <div
+              class="light:bg-warning-100 rounded-md border border-amber-500/30 bg-amber-950/30 px-3 py-2"
+            >
               <div class="flex gap-2">
-                <UIcon name="i-mdi-alert-outline" class="mt-0.5 shrink-0 text-amber-400" />
+                <UIcon
+                  name="i-mdi-alert-outline"
+                  class="light:text-warning-900 mt-0.5 shrink-0 text-amber-400"
+                />
                 <div class="space-y-1">
-                  <p class="text-xs font-semibold text-amber-300">
+                  <p class="light:text-warning-900 text-xs font-semibold text-amber-300">
                     {{
                       t(
                         'streamer_tools.setup_scaling_warning_title',
@@ -807,7 +812,7 @@
                       )
                     }}
                   </p>
-                  <p class="text-xs text-amber-400/80">
+                  <p class="light:text-warning-900 text-xs text-amber-400/80">
                     {{
                       t(
                         'streamer_tools.setup_scaling_warning',

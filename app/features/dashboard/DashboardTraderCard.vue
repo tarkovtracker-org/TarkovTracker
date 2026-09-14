@@ -30,7 +30,7 @@
           </div>
           <div
             v-else-if="isComplete"
-            class="bg-success-900/80 ring-success-500/50 absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full ring-1"
+            class="bg-success-900/80 light:bg-success-100 ring-success-500/50 absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full ring-1"
             aria-hidden="true"
           >
             <UIcon name="i-mdi-check-bold" class="text-success-400 h-3 w-3" />
