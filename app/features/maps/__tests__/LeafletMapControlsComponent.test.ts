@@ -142,6 +142,25 @@ describe('LeafletMap controls', () => {
     mockMapInstance.zoomIn.mockClear();
     mockMapInstance.zoomOut.mockClear();
   });
+  it('keeps enabled extract labels readable on the light toolbar and updates when toggled', async () => {
+    const wrapper = await mountMap({ showPmcExtracts: true });
+    const toggle = wrapper.findAll('button').find((button) => button.text() === 'PMC')!;
+    expect(toggle.attributes('aria-pressed')).toBe('true');
+    expect(toggle.classes()).toContain('text-primary-100');
+    expect(toggle.classes()).toContain('light:text-primary-900');
+    await toggle.trigger('click');
+    expect(toggle.attributes('aria-pressed')).toBe('false');
+    expect(toggle.classes()).not.toContain('light:text-primary-900');
+    wrapper.unmount();
+  });
+  it('uses the same theme-aware active foreground for the opened help control', async () => {
+    const wrapper = await mountMap();
+    await wrapper.find('[data-testid="map-hint-all-controls"]').trigger('click');
+    expect(wrapper.get('[data-testid="map-help-toggle"]').classes()).toContain(
+      'light:text-primary-900'
+    );
+    wrapper.unmount();
+  });
   it('emits toggle-fullscreen from the fullscreen control', async () => {
     const wrapper = await mountMap();
     const toggle = wrapper.find('[data-testid="map-fullscreen-toggle"]');

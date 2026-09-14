@@ -123,7 +123,7 @@
                 class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                 :class="
                   mapColorsOpen
-                    ? 'border-primary-400/60 bg-primary-500/15 text-primary-100'
+                    ? MAP_BUTTON_ACTIVE_CLASS
                     : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
                 "
               >
@@ -195,7 +195,7 @@
                 class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                 :class="
                   mapSettingsOpen
-                    ? 'border-primary-400/60 bg-primary-500/15 text-primary-100'
+                    ? MAP_BUTTON_ACTIVE_CLASS
                     : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
                 "
               >
@@ -307,7 +307,7 @@
                 class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 relative flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                 :class="
                   mapHelpOpen
-                    ? 'border-primary-400/60 bg-primary-500/15 text-primary-100'
+                    ? MAP_BUTTON_ACTIVE_CLASS
                     : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
                 "
               >
