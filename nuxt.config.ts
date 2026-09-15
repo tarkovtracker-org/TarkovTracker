@@ -26,6 +26,7 @@ import {
   SHELL_DRAWER_RAIL_STORAGE_KEY,
 } from './app/utils/shellConfig';
 import { stripBareNodeImports } from './app/utils/stripBareNodeImports';
+import { THEME_BOOT_SCRIPT } from './app/utils/theme';
 import { TURNSTILE_TEST_SECRET_KEY, TURNSTILE_TEST_SITE_KEY } from './app/utils/turnstileKeys';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const appDir = resolve(__dirname, 'app');
@@ -287,6 +288,13 @@ export default defineNuxtConfig({
           textContent: [
             `:root{--shell-w:${SHELL_DRAWER_EXPANDED_WIDTH}}`,
             'body{background:var(--color-surface-950,hsl(0 0% 4%))}',
+            // Light theme pre-hydration: match the warm-paper surface values from
+            // tailwind.css so the skeleton never flashes dark for light-theme users.
+            `[data-theme='light']{`,
+            '--color-surface-950:hsl(40 24% 92%);',
+            '--color-surface-900:hsl(38 18% 87%);',
+            '--color-surface-700:hsl(38 16% 82%)',
+            '}',
             '#__nuxt:empty::before{',
             'content:"";',
             'display:block;',
@@ -316,6 +324,10 @@ export default defineNuxtConfig({
         },
       ],
       script: [
+        {
+          // Applies data-theme + color-scheme before first paint (issue #102).
+          innerHTML: THEME_BOOT_SCRIPT,
+        },
         {
           innerHTML: ENTRY_RECOVERY_SCRIPT,
         },
@@ -500,6 +512,14 @@ export default defineNuxtConfig({
     clientBundle: {
       scan: true,
     },
+  },
+  // Pin Nuxt UI to its dark alias block regardless of OS preference. The app's
+  // light theme is driven by [data-theme='light'] flipping the shared surface
+  // palette, which the Nuxt UI neutral aliases resolve through. Without this,
+  // light-OS users would get mixed light/dark Nuxt UI internals (issue #102).
+  colorMode: {
+    preference: 'dark',
+    fallback: 'dark',
   },
   ui: {
     theme: {

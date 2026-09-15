@@ -3,7 +3,7 @@
     <div class="mx-auto max-w-350 space-y-4">
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="text-xl font-bold text-white sm:text-2xl">
+          <h1 class="light:text-surface-50 text-xl font-bold text-white sm:text-2xl">
             {{ t('common.storyline', 'Storyline') }}
           </h1>
           <p class="text-surface-400 mt-1 text-sm">

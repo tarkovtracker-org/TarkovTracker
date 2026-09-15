@@ -51,7 +51,7 @@
       </template>
       <div
         v-if="displayedTraderUnlock?.name"
-        class="bg-warning-900 inline-flex items-center gap-1 rounded px-1.5 py-0.5 leading-none"
+        class="bg-warning-900 light:bg-warning-100 inline-flex items-center gap-1 rounded px-1.5 py-0.5 leading-none"
       >
         <UIcon
           name="i-mdi-lock-open-variant"
@@ -64,7 +64,7 @@
       </div>
       <div
         v-if="itemRewards.length > 0"
-        class="bg-success-900 inline-flex items-center gap-1 rounded px-1.5 py-0.5 leading-none"
+        class="bg-success-900 light:bg-success-100 inline-flex items-center gap-1 rounded px-1.5 py-0.5 leading-none"
       >
         <UIcon
           name="i-mdi-package-variant"
@@ -83,7 +83,7 @@
       </div>
       <div
         v-if="offerUnlockRewards.length > 0"
-        class="bg-info-900 inline-flex items-center gap-1 rounded px-1.5 py-0.5 leading-none"
+        class="bg-info-900 light:bg-info-100 inline-flex items-center gap-1 rounded px-1.5 py-0.5 leading-none"
       >
         <UIcon
           name="i-mdi-cart-check"
@@ -102,7 +102,7 @@
       </div>
       <div
         v-if="showExperienceRewards && experienceValue > 0"
-        class="bg-warning-900 inline-flex items-center gap-1 rounded px-1.5 py-0.5 leading-none"
+        class="bg-warning-900 light:bg-warning-100 inline-flex items-center gap-1 rounded px-1.5 py-0.5 leading-none"
       >
         <UIcon name="i-mdi-star" aria-hidden="true" class="text-warning-400 h-3.5 w-3.5 shrink-0" />
         <span class="text-warning-300 leading-none font-medium">

@@ -92,7 +92,7 @@
             <div class="mb-2.5 flex items-center text-sm font-medium sm:mb-3 sm:text-[15px]">
               <UIcon
                 name="i-mdi-package-variant-closed-check"
-                class="text-success-500 mr-1.5 h-4 w-4 sm:mr-2 sm:h-5 sm:w-5"
+                class="text-success-500 light:text-success-800 mr-1.5 h-4 w-4 sm:mr-2 sm:h-5 sm:w-5"
               />
               {{ nextLevelLabel }}
             </div>
@@ -227,7 +227,10 @@
                 class="text-xs sm:text-sm"
               >
                 <div class="text-error-400 flex items-center gap-1.5 font-semibold sm:gap-2">
-                  <UIcon name="i-mdi-home" class="text-error-500 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <UIcon
+                    name="i-mdi-home"
+                    class="text-error-500 light:text-error-800 h-3.5 w-3.5 sm:h-4 sm:w-4"
+                  />
                   <i18n-t keypath="page.hideout.stationcard.requirements.station" scope="global">
                     <template #level>{{ requirement.level }}</template>
                     <template #stationname>{{ requirement.station.name }}</template>
@@ -244,7 +247,10 @@
                 class="text-xs sm:text-sm"
               >
                 <div class="text-error-400 flex items-center gap-1.5 font-semibold sm:gap-2">
-                  <UIcon name="i-mdi-star" class="text-error-500 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <UIcon
+                    name="i-mdi-star"
+                    class="text-error-500 light:text-error-800 h-3.5 w-3.5 sm:h-4 sm:w-4"
+                  />
                   <i18n-t keypath="page.hideout.stationcard.requirements.skill" scope="global">
                     <template #level>{{ requirement.level }}</template>
                     <template #skillname>{{ requirement.name }}</template>
@@ -263,7 +269,7 @@
                 <div class="text-error-400 flex items-center gap-1.5 font-semibold sm:gap-2">
                   <UIcon
                     name="i-mdi-account-tie"
-                    class="text-error-500 h-3.5 w-3.5 sm:h-4 sm:w-4"
+                    class="text-error-500 light:text-error-800 h-3.5 w-3.5 sm:h-4 sm:w-4"
                   />
                   <i18n-t keypath="page.hideout.stationcard.requirements.trader" scope="global">
                     <template #loyaltylevel>{{ requirement.value }}</template>
@@ -280,7 +286,7 @@
         </div>
         <div v-else class="bg-surface-800 rounded p-2.5 sm:p-3">
           <div
-            class="text-warning-500 flex items-center justify-center text-center text-sm font-medium sm:text-base"
+            class="text-warning-500 light:text-warning-800 flex items-center justify-center text-center text-sm font-medium sm:text-base"
           >
             <UIcon name="i-mdi-star-check" class="mr-1.5 h-5 w-5 sm:mr-2 sm:h-6 sm:w-6" />
             {{ maxedLabel }}

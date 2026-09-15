@@ -1,6 +1,8 @@
 import { useMetadataStore } from '@/stores/useMetadata';
 // Optional details must not prevent task navigation when a request stalls.
-const TASK_DETAIL_WAIT_MS = 3000;
+// Exported so tests track the bounded wait by its actual duration instead of
+// duplicating the number (a silent mismatch would make their assertions vacuous).
+export const TASK_DETAIL_WAIT_MS = 3000;
 /**
  * Request task-card details and edition eligibility before the initial list replaces loading.
  * Release the page after settlement or a bounded wait; ignore obsolete mode/locale loads.

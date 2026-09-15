@@ -96,7 +96,9 @@
     "community_section": "Community",
     "keyboard_shortcuts": "Keyboard shortcuts",
     "report_problem": "Report a problem",
-    "login_aria": "Log in to your account"
+    "login_aria": "Log in to your account",
+    "switch_to_light_theme": "Switch to light theme",
+    "switch_to_dark_theme": "Switch to dark theme"
   },
   "omnibar": {
     "title": "Search",
@@ -1939,6 +1941,13 @@
       "title": "General Preferences",
       "privacy_mode": "Privacy Mode",
       "privacy_mode_hint": "Hides sensitive information while you're streaming."
+    },
+    "appearance": {
+      "title": "Appearance",
+      "theme": "Theme",
+      "theme_hint": "Choose between the dark and light interface. Your choice is remembered on this device.",
+      "theme_dark": "Dark",
+      "theme_light": "Light"
     },
     "interface": {
       "tasks": {

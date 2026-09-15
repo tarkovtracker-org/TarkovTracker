@@ -643,7 +643,7 @@
     },
     dusk: {
       icon: 'text-warning-300/70',
-      label: 'text-warning-300/60',
+      label: 'text-warning-300/60 light:text-warning-900',
       value: 'text-warning-200/80',
     },
     night: {

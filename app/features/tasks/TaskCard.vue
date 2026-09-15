@@ -135,7 +135,9 @@
                       )
                     }}
                   </span>
-                  <span class="inline-flex items-center gap-0.5 text-[10px] text-amber-400/80">
+                  <span
+                    class="light:text-warning-900 inline-flex items-center gap-0.5 text-[10px] text-amber-400/80"
+                  >
                     <UIcon name="i-mdi-information-outline" class="h-3 w-3 shrink-0" />
                     {{
                       t(
@@ -274,7 +276,7 @@
               :text="resetItemCountsDisabledReason"
               :disabled="!resetItemCountsDisabledReason"
             >
-              <span class="inline-flex" @click.stop>
+              <span class="inline-flex">
                 <UButton
                   size="xs"
                   color="neutral"
@@ -678,7 +680,10 @@
   });
   const taskClasses = computed(() => {
     if (isComplete.value && !isFailed.value) return 'border-completed-600/25 bg-surface-900';
-    if (isFailed.value) return 'border-error-600/50 bg-error-950';
+    // Light mode keeps the failure tint but on a pale surface: the shared ink tokens
+    // flip to dark, so a dark error fill would leave the card text at ~1.5:1.
+    if (isFailed.value)
+      return 'border-error-600/50 bg-error-950 light:border-error-700 light:bg-error-100';
     if (isInvalid.value) return 'border-surface-700/40 bg-surface-900 opacity-60';
     if (isLocked.value) return 'border-surface-700/40 bg-surface-900';
     return 'border-surface-700/40 bg-surface-900';

@@ -15,7 +15,7 @@
               class="h-9 w-9 shrink-0"
               loading="lazy"
             />
-            <span class="text-base font-medium text-white">
+            <span class="light:text-surface-50 text-base font-medium text-white">
               {{ t('navigation_drawer.brand_name') }}
             </span>
           </NuxtLink>

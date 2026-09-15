@@ -146,6 +146,19 @@ describe('PromotedTwitchEmbed', () => {
     expect(iframe.attributes('src')).toContain('muted=true');
     wrapper.unmount();
   });
+  it('keeps the header chrome theme-aware in light mode while the video stage stays black', async () => {
+    const wrapper = await mountEmbed();
+    const header = wrapper.find('aside > div');
+    // The header plate must leave the fixed-black video surface in dark mode but adopt
+    // the paper surface in light mode (SYSTEMS.md §16: floating chrome is theme-aware).
+    expect(header.classes()).toContain('light:bg-surface-900');
+    expect(header.classes()).not.toContain('bg-black');
+    // The video stage below the header keeps its fixed black plate in both themes.
+    const stage = wrapper.findAll('aside > div')[1]!;
+    expect(stage.classes()).toContain('bg-black');
+    expect(stage.classes()).not.toContain('light:bg-black');
+    wrapper.unmount();
+  });
   it('stays hidden when the channel is offline', async () => {
     liveResult = { isLive: false };
     const wrapper = await mountEmbed();

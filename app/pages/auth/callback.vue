@@ -5,7 +5,10 @@
       :ui="{ body: 'p-8' }"
     >
       <div class="flex flex-col items-center space-y-3 text-center">
-        <UIcon name="i-heroicons-arrow-path" class="text-primary-500 h-10 w-10 animate-spin" />
+        <UIcon
+          name="i-heroicons-arrow-path"
+          class="text-primary-500 light:text-primary-800 h-10 w-10 animate-spin"
+        />
         <h2 class="text-surface-50 text-lg font-semibold">{{ t('page.login.authenticating') }}</h2>
         <p class="text-surface-300 text-sm">{{ t('page.login.authenticating_description') }}</p>
       </div>

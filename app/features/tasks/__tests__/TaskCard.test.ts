@@ -179,7 +179,7 @@ const mountTaskCard = async (taskOverrides: Partial<Task> = {}) =>
       },
     },
   });
-describe('TaskCard expansion controls', () => {
+describe('TaskCard appearance and expansion controls', () => {
   beforeEach(() => {
     taskState.complete = false;
     taskState.failed = false;
@@ -195,6 +195,20 @@ describe('TaskCard expansion controls', () => {
     vi.clearAllMocks();
     metadataStoreMock.getTaskById.mockReset();
     tarkovStoreMock.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
+  });
+  it('emits the failed-card class contract: dark surface with pale light-mode companions', async () => {
+    // This asserts the emitted class names only; the resolved per-theme rendering is
+    // covered by the browser contrast audit (SYSTEMS.md §16) and the light:+token
+    // wiring is guarded by tailwindTheme.test.ts.
+    taskState.failed = true;
+    const wrapper = await mountTaskCard();
+    const classes = wrapper.get('article').classes();
+    expect(classes).toContain('bg-error-950');
+    // Light mode flips the shared ink tokens to dark, so the failed surface must be pale or the
+    // card text lands near 1.5:1 against the dark red fill.
+    expect(classes).toContain('light:bg-error-100');
+    expect(classes).toContain('light:border-error-700');
+    wrapper.unmount();
   });
   it('keeps a locked card usable before its evaluation snapshot is available', async () => {
     progressStoreMock.unlockedTasks = { 'task-1': { self: false } };

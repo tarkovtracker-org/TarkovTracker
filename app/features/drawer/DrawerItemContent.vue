@@ -8,8 +8,8 @@
     :class="[
       props.isCollapsed ? 'justify-center' : '',
       isActive
-        ? 'border-primary-500 bg-surface-800/50 text-white'
-        : 'text-surface-300 hover:bg-surface-800/30 border-transparent hover:text-white',
+        ? 'border-primary-500 bg-surface-800/50 light:text-surface-50 text-white'
+        : 'text-surface-300 hover:bg-surface-800/30 light:hover:text-surface-50 border-transparent hover:text-white',
     ]"
   >
     <DrawerItemIcon
@@ -34,7 +34,7 @@
     :aria-label="props.labelText ?? ''"
     target="_blank"
     rel="noopener noreferrer"
-    class="group text-surface-300 hover:bg-surface-800/30 flex min-h-10 items-center rounded-sm border-l-2 border-transparent px-3 py-2 text-sm font-medium transition-colors duration-150 hover:text-white"
+    class="group text-surface-300 hover:bg-surface-800/30 light:hover:text-surface-50 flex min-h-10 items-center rounded-sm border-l-2 border-transparent px-3 py-2 text-sm font-medium transition-colors duration-150 hover:text-white"
     :class="[props.isCollapsed ? 'justify-center' : '']"
   >
     <DrawerItemIcon
@@ -52,7 +52,7 @@
   <span
     v-else
     :aria-label="props.labelText ?? ''"
-    class="group flex min-h-12 cursor-not-allowed items-center rounded-sm border-l-2 border-transparent px-3 py-3 text-base font-medium text-white/50 opacity-60 transition-colors duration-200"
+    class="group light:text-surface-400 flex min-h-12 cursor-not-allowed items-center rounded-sm border-l-2 border-transparent px-3 py-3 text-base font-medium text-white/50 opacity-60 transition-colors duration-200"
     :class="[props.isCollapsed ? 'justify-center' : '']"
     aria-disabled="true"
   >

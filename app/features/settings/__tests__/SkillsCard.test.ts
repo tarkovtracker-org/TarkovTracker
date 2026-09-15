@@ -285,4 +285,30 @@ describe('SkillsCard', () => {
     await input.trigger('keydown', event);
     expect(event.preventDefault).not.toHaveBeenCalled();
   });
+  it("makes the card header the level input's native label for click-to-focus", () => {
+    const wrapper = createWrapper();
+    document.body.appendChild(wrapper.element);
+    try {
+      const label = wrapper.find('label[for="skill-input-Strength"]');
+      expect(label.exists()).toBe(true);
+      // The visible header row (icon, name, badges, level) is the label, so a large
+      // click target natively focuses the input — happy-dom does not implement
+      // label->input activation forwarding, so assert the structural contract and
+      // let the real-browser check verify the interaction.
+      expect(label.text()).toContain('Strength');
+      expect(label.classes()).toContain('cursor-pointer');
+    } finally {
+      wrapper.unmount();
+      wrapper.element.remove();
+    }
+  });
+  it('keeps the card container free of role and tabindex attributes', () => {
+    const wrapper = createWrapper();
+    // The native <label for> in the header supplies the click-to-focus convenience, so
+    // the card needs no button role (SonarCloud S6819) and no tab stop of its own.
+    const card = wrapper.find('#settings-skill-Strength');
+    expect(card.attributes('role')).toBeUndefined();
+    expect(card.attributes('tabindex')).toBeUndefined();
+    wrapper.unmount();
+  });
 });

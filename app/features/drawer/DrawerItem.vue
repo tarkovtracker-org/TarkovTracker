@@ -43,7 +43,9 @@
   }>();
   const isActive = computed(() => isNavigationRouteActive(props.to, route.path));
   const iconClasses = computed(() =>
-    isActive.value ? 'text-white' : 'text-surface-300 group-hover:text-white'
+    isActive.value
+      ? 'text-white light:text-surface-50'
+      : 'text-surface-300 group-hover:text-white light:group-hover:text-surface-50'
   );
   const labelText = computed(() => {
     if (props.localeKey) return t(props.localeKey);

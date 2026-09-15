@@ -2,7 +2,9 @@
   <div v-if="!dismissed" class="mb-3" data-testid="dashboard-migration-banner">
     <div class="panel px-3 py-2">
       <div class="flex items-center justify-between gap-2">
-        <div class="flex min-w-0 items-center gap-2 text-sm font-semibold text-white">
+        <div
+          class="light:text-surface-50 flex min-w-0 items-center gap-2 text-sm font-semibold text-white"
+        >
           <UIcon name="i-mdi-archive-arrow-up" class="text-warning-400 h-4 w-4 shrink-0" />
           <span class="truncate">
             {{ t('page.resources.migration_banner.title', 'Moving from TarkovTracker.io?') }}

@@ -2,7 +2,7 @@
   <section class="bg-surface-800/50 rounded-lg border border-white/5 p-3">
     <div class="mb-2 flex items-center gap-2">
       <UIcon name="i-mdi-filter-variant" class="text-success-400 h-4 w-4" />
-      <h3 class="text-xs font-semibold tracking-wide text-white uppercase">
+      <h3 class="light:text-surface-50 text-xs font-semibold tracking-wide text-white uppercase">
         {{ t('page.tasks.settings.tabs.filter_bar') }}
       </h3>
     </div>

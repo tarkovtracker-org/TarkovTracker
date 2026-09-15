@@ -21,7 +21,7 @@
         </span>
       </span>
       <div class="min-w-0">
-        <p class="truncate text-sm font-semibold text-white">{{ member.displayName }}</p>
+        <p class="text-surface-50 truncate text-sm font-semibold">{{ member.displayName }}</p>
         <p class="mt-1.5">
           <span
             class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium"
