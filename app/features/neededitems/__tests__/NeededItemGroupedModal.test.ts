@@ -29,14 +29,22 @@ vi.mock('@/stores/useMetadata', () => ({
     getStationById: () => ({ name: 'Workbench' }),
   }),
 }));
-const mockCounts = {
-  objectiveCount: 1,
-  hideoutCount: 2,
-};
-const mockSetObjectiveCount = vi.fn();
-const mockSetHideoutPartCount = vi.fn();
-const mockSetHideoutPartComplete = vi.fn();
-const mockSetHideoutPartUncomplete = vi.fn();
+const {
+  mockCounts,
+  mockSetObjectiveCount,
+  mockSetHideoutPartCount,
+  mockSetHideoutPartComplete,
+  mockSetHideoutPartUncomplete,
+} = vi.hoisted(() => ({
+  mockCounts: {
+    objectiveCount: 1,
+    hideoutCount: 2,
+  },
+  mockSetObjectiveCount: vi.fn(),
+  mockSetHideoutPartCount: vi.fn(),
+  mockSetHideoutPartComplete: vi.fn(),
+  mockSetHideoutPartUncomplete: vi.fn(),
+}));
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
     getObjectiveCount: () => mockCounts.objectiveCount,

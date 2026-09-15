@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { effectScope, nextTick, reactive } from 'vue';
-import { useTaskDetailReadiness } from '@/composables/useTaskDetailReadiness';
+import { TASK_DETAIL_WAIT_MS, useTaskDetailReadiness } from '@/composables/useTaskDetailReadiness';
 const metadata = reactive({
   hasInitialized: true,
   loading: false,
@@ -40,9 +40,9 @@ const flush = async () => {
  * client schedules a token refresh as soon as it is configured. A global
  * `vi.getTimerCount()` therefore measures the environment rather than the
  * composable, and passes or fails depending on whether Supabase happens to be
- * configured. Track the bounded wait by its duration instead.
+ * configured. Track the bounded wait by its duration instead, derived from the
+ * composable's exported constant so the tracker stays in sync with the source.
  */
-const TASK_DETAIL_WAIT_MS = 3000;
 type SetTimeoutFn = typeof globalThis.setTimeout;
 type ClearTimeoutFn = typeof globalThis.clearTimeout;
 const pendingWaitTimers = new Set<ReturnType<SetTimeoutFn>>();
@@ -243,7 +243,7 @@ describe('useTaskDetailReadiness', () => {
     const ready = start();
     await flush();
     expect(ready.value).toBe(false);
-    await vi.advanceTimersByTimeAsync(3000);
+    await vi.advanceTimersByTimeAsync(TASK_DETAIL_WAIT_MS);
     expect(ready.value).toBe(true);
   });
   it('releases the page on request failure', async () => {

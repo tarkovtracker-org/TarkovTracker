@@ -169,7 +169,9 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useTheme } from '@/composables/useTheme';
   import { isTraderLocked } from '@/features/dashboard/traderLockStatus';
+  import { traderPercentageStyle } from '@/features/dashboard/traderPercentageStyle';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
@@ -194,6 +196,7 @@
   const preferencesStore = usePreferencesStore();
   const tarkovStore = useTarkovStore();
   const metadataStore = useMetadataStore();
+  const { isLightTheme } = useTheme();
   const hasLoyaltyLevels = computed(
     () =>
       !TRADERS_WITHOUT_LOYALTY_LEVELS.includes(
@@ -267,12 +270,16 @@
     if (isComplete.value) return 'success' as const;
     return 'gradient' as const;
   });
-  const percentageTextStyle = computed(() => {
-    if (isLocked.value || isComplete.value) return {};
-    if (props.percentage <= 0) return {};
-    const hue = (props.percentage / 100) * 120;
-    return { color: `hsl(${hue}, 70%, 55%)` };
-  });
+  const percentageTextStyle = computed(() =>
+    traderPercentageStyle(
+      {
+        isLocked: isLocked.value,
+        isComplete: isComplete.value,
+        percentage: props.percentage,
+      },
+      isLightTheme.value ? 'light' : 'dark'
+    )
+  );
   const percentageTextClass = computed(() => {
     if (isLocked.value) return 'text-surface-500';
     if (isComplete.value) return 'text-success-400/70 light:text-success-900';

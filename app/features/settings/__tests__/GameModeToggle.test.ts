@@ -3,7 +3,8 @@ import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import GameModeToggle from '@/features/settings/GameModeToggle.vue';
 import { GAME_MODES } from '@/utils/constants';
-vi.mock('vue-i18n', () => ({
+vi.mock('vue-i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({
     t: (key: string) => key,
   }),

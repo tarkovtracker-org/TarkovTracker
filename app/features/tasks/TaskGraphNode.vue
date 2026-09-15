@@ -92,7 +92,7 @@
     >
       <span
         :title="t('page.tasks.graph.flow_start')"
-        class="text-primary-400/70 text-[9px] leading-none font-semibold tracking-wide whitespace-nowrap uppercase"
+        class="text-primary-400/70 light:text-primary-900 text-[9px] leading-none font-semibold tracking-wide whitespace-nowrap uppercase"
       >
         {{ t('page.tasks.graph.flow_start') }}
       </span>

@@ -33,12 +33,27 @@ vi.mock('@/stores/useTarkov', () => ({
     getTraderReputation: () => 0.5,
     isTaskComplete: () => false,
     setTraderLevel: vi.fn(),
+    // Mirror the interface the component uses: commitReputationInput calls this on
+    // reputation-input blur, so any future test exercising that path has a spy.
+    setTraderReputation: vi.fn(),
+  }),
+}));
+const mockTheme = {
+  themeMode: 'dark',
+};
+vi.mock('@/composables/useTheme', () => ({
+  useTheme: () => ({
+    themeMode: { value: mockTheme.themeMode },
+    isLightTheme: { value: mockTheme.themeMode === 'light' },
+    setThemeMode: vi.fn(),
+    toggleThemeMode: vi.fn(),
   }),
 }));
 describe('DashboardTraderCard', () => {
   beforeEach(() => {
     mockState.isLocked = false;
     mockState.traderLevel = 1;
+    mockTheme.themeMode = 'dark';
     document.documentElement.removeAttribute('data-theme');
     vi.clearAllMocks();
   });
@@ -131,5 +146,30 @@ describe('DashboardTraderCard', () => {
     const wrapper = createWrapper({ percentage: 100 });
     const container = wrapper.find('div');
     expect(container.classes()).toContain('border-success-500/15');
+  });
+  it('keeps the in-progress percentage hue gradient readable in both themes', () => {
+    // Dark keeps the authored bright gradient: inline color wins over classes.
+    const darkWrapper = createWrapper({ percentage: 50 });
+    const darkPct = darkWrapper.find('.tabular-nums');
+    expect(darkPct.attributes('style')).toContain('hsl(60, 70%, 55%)');
+    // Light mode keeps the same hue identity but drops to 22% lightness, which
+    // clears AA across the whole 0-120 degree range including the yellow mid-range
+    // that cannot pass on paper surfaces at the dark lightness.
+    mockTheme.themeMode = 'light';
+    const lightWrapper = createWrapper({ percentage: 50 });
+    const lightPct = lightWrapper.find('.tabular-nums');
+    expect(lightPct.attributes('style')).toContain('hsl(60, 70%, 22%)');
+    darkWrapper.unmount();
+    lightWrapper.unmount();
+  });
+  it('keeps the gradient endpoints deep enough for AA in light mode', () => {
+    mockTheme.themeMode = 'light';
+    // Hue 0 (red, ~0%) and hue 120 (green, ~100%) still encode progress.
+    const low = createWrapper({ percentage: 1 });
+    const high = createWrapper({ percentage: 99 });
+    expect(low.find('.tabular-nums').attributes('style')).toContain('hsl(1.2, 70%, 22%)');
+    expect(high.find('.tabular-nums').attributes('style')).toContain('hsl(118.8, 70%, 22%)');
+    low.unmount();
+    high.unmount();
   });
 });

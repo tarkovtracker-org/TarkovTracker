@@ -8,7 +8,14 @@
       "
       :aria-label="t('promoted_stream.region_label', { streamer: displayName })"
     >
-      <div class="border-surface-700 flex h-9 items-center gap-2 border-b px-2">
+      <!-- Player chrome follows SYSTEMS.md §16: floating chrome is theme-aware in light
+        mode while the video stage below stays black in both themes. The title keeps
+        text-surface-100 and the icon text-primary-400; the light token ladder flips the
+        former to dark ink and remaps the latter to primary-800, so only the plate needs
+        a light override. -->
+      <div
+        class="border-surface-700 light:bg-surface-900 flex h-9 items-center gap-2 border-b px-2"
+      >
         <UIcon name="i-mdi-twitch" class="text-primary-400 size-4 shrink-0" />
         <span class="text-surface-100 min-w-0 flex-1 truncate text-xs font-semibold">
           {{ t('promoted_stream.title', { streamer: displayName }) }}

@@ -285,4 +285,49 @@ describe('SkillsCard', () => {
     await input.trigger('keydown', event);
     expect(event.preventDefault).not.toHaveBeenCalled();
   });
+  it('focuses and selects the level input when the card body is clicked', async () => {
+    const wrapper = createWrapper();
+    // focusSkillInput resolves the input through document.getElementById, so the card
+    // must be attached to the document for the lookup to find it.
+    document.body.appendChild(wrapper.element);
+    try {
+      const card = wrapper.find('#settings-skill-Strength');
+      const input = card.find('input');
+      const focusSpy = vi.spyOn(input.element as HTMLInputElement, 'focus');
+      const selectSpy = vi.spyOn(input.element as HTMLInputElement, 'select');
+      // Click the card container itself (not the input) — the convenience path.
+      await card.trigger('click');
+      expect(focusSpy).toHaveBeenCalled();
+      expect(selectSpy).toHaveBeenCalled();
+    } finally {
+      wrapper.element.remove();
+    }
+    wrapper.unmount();
+  });
+  it('keeps interactive targets inside the card clickable without focusing the input', async () => {
+    const wrapper = createWrapper();
+    const card = wrapper.find('#settings-skill-Strength');
+    const input = card.find('input');
+    const focusSpy = vi.spyOn(input.element as HTMLInputElement, 'focus');
+    // Clicking the input itself must not re-trigger select (it keeps its own caret).
+    await input.trigger('click');
+    expect(focusSpy).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('supports keyboard activation of the click-to-focus convenience', async () => {
+    const wrapper = createWrapper();
+    document.body.appendChild(wrapper.element);
+    try {
+      const card = wrapper.find('#settings-skill-Strength');
+      expect(card.attributes('role')).toBe('button');
+      expect(card.attributes('tabindex')).toBe('0');
+      const input = card.find('input');
+      const focusSpy = vi.spyOn(input.element as HTMLInputElement, 'focus');
+      await card.trigger('keydown', { key: 'Enter' });
+      expect(focusSpy).toHaveBeenCalled();
+    } finally {
+      wrapper.element.remove();
+    }
+    wrapper.unmount();
+  });
 });

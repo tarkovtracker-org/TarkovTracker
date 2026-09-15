@@ -1857,6 +1857,12 @@ App boot
 - Light-mode dimmed `surface-500` copy remains readable on shell chrome. Pale accent steps
   50–100 and translucent accent labels require explicit opaque light-mode ink companions when
   placed on paper surfaces; remapping the opaque accent ladder alone does not fix alpha contrast.
+- Inline `hsl()` colors bypass the token ladder entirely, so any element that computes a color
+  inline (the trader progress-percentage gradient is the example; see
+  `traderPercentageStyle.ts`) must read `useTheme`'s `isLightTheme` and pick a light-safe
+  lightness itself — for the 0–120° hue ramp, 22% lightness clears AA on every light surface
+  (worst case 5.06:1 on the surface-900 card) while dark keeps its authored 55%. Hue gradients
+  encode information; keep the hue, change only the lightness.
 - New components should prefer `surface-*`/semantic tokens over hardcoded `white`/`black` so both
   themes work without `light:` overrides; reserve `light:` for accent-on-accent cases.
 - Light mode must not be measurably worse than dark for text contrast. Both themes are audited

@@ -10,7 +10,10 @@ import { describe, expect, it } from 'vitest';
  */
 const cssPath = `${process.cwd()}/app/assets/css/tailwind.css`;
 const tailwindCss = readFileSync(cssPath, 'utf8');
-const lightBlock = /:root\[data-theme='light'\]\s*\{([^}]+)\}/.exec(tailwindCss)?.[1] ?? '';
+// Strip comments before slicing the light block: a remap commented out while debugging
+// must not satisfy the guard, and declarations inside comments must not match either.
+const withoutComments = tailwindCss.replace(/\/\*[\s\S]*?\*\//g, '');
+const lightBlock = /:root\[data-theme='light'\]\s*\{([^}]+)\}/.exec(withoutComments)?.[1] ?? '';
 const remap = (family: string, step: number) =>
   new RegExp(`--color-${family}-${step}:\\s*var\\(--color-${family}-(\\d+)\\)`).exec(
     lightBlock
