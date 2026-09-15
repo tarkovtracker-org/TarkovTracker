@@ -154,8 +154,14 @@ const setup = async (options: SetupOptions = {}) => {
   vi.doMock('@/composables/usePageSettingsDrawer', () => ({
     usePageSettingsDrawer: () => ({
       isOpen: isDrawerOpenRef,
-      open: vi.fn(),
-      close: vi.fn(),
+      // All three mutators update the shared ref, mirroring the real composable so a
+      // future test wired to open()/close() sees consistent state.
+      open: vi.fn(() => {
+        isDrawerOpenRef.value = true;
+      }),
+      close: vi.fn(() => {
+        isDrawerOpenRef.value = false;
+      }),
       toggle: vi.fn(() => {
         isDrawerOpenRef.value = !isDrawerOpenRef.value;
       }),
@@ -458,7 +464,7 @@ describe('TaskFilterBar', () => {
     expect(preferencesStore.toggleHidden).not.toHaveBeenCalled();
     expect(preferencesStore.setTaskUserView).toHaveBeenCalledWith('teammate-1');
   });
-  it('renders settings drawer button with theme classes when open', async () => {
+  it('renders settings drawer button with theme classes when open, and toggles closed', async () => {
     const { TaskFilterBar } = await setup({
       drawerOpen: true,
     });
@@ -468,6 +474,10 @@ describe('TaskFilterBar', () => {
     expect(settingsButton.attributes('aria-pressed')).toBe('true');
     expect(settingsButton.classes()).toContain('light:text-surface-50');
     expect(settingsButton.classes()).toContain('light:bg-surface-700/70');
+    // Exercise the drawer toggle so the mocked toggle() and the off state are covered
+    // (and so the shared drawer state is left closed for later tests in this file).
+    await settingsButton.trigger('click');
+    expect(settingsButton.attributes('aria-pressed')).toBe('false');
   });
   it('renders neutral badge class when available count is zero', async () => {
     const { TaskFilterBar } = await setup({

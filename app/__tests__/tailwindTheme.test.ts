@@ -33,7 +33,8 @@ const FOREGROUND_FAMILIES = [
 ] as const;
 describe('light theme accent foreground remap', () => {
   it('keeps spawn counts light over fixed-dark map tiles', () => {
-    expect(tailwindCss).toMatch(
+    // Match the comment-stripped CSS so a commented-out rule cannot satisfy the guard.
+    expect(withoutComments).toMatch(
       /:root\[data-theme='light'\] \.leaflet-tooltip\.spawn-cluster-label\s*\{\s*color: var\(--color-white\) !important;/
     );
   });
@@ -44,9 +45,18 @@ describe('light theme accent foreground remap', () => {
     expect(step200, `${family}-200 must be remapped`).toBeDefined();
     expect(step300, `${family}-300 must be remapped`).toBeDefined();
     expect(step400, `${family}-400 must be remapped`).toBeDefined();
+    // Each remap target must be a declared token; a remap onto an undefined step
+    // (e.g. --color-primary-999) would silently resolve to nothing at runtime. The
+    // targets live in the base palette, so check the whole comment-stripped sheet.
+    const declared = (step: string) =>
+      new RegExp(`--color-${family}-${step}:`).test(withoutComments);
     // The remap has to move toward the deep end of the ladder; a remap onto a
     // lighter step would not improve contrast on the light surfaces.
+    expect(step200 && step300 && step400).toBeTruthy();
     const targets = [Number(step200), Number(step300), Number(step400)];
+    expect(declared(step200!), `${family}-${step200} must be declared`).toBe(true);
+    expect(declared(step300!), `${family}-${step300} must be declared`).toBe(true);
+    expect(declared(step400!), `${family}-${step400} must be declared`).toBe(true);
     expect(targets[0]).toBeGreaterThanOrEqual(900);
     expect(targets[1]).toBeGreaterThanOrEqual(900);
     expect(targets[2]).toBeGreaterThanOrEqual(800);

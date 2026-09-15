@@ -285,7 +285,7 @@ describe('SkillsCard', () => {
     await input.trigger('keydown', event);
     expect(event.preventDefault).not.toHaveBeenCalled();
   });
-  it("makes the card header the level input's native label for click-to-focus", async () => {
+  it("makes the card header the level input's native label for click-to-focus", () => {
     const wrapper = createWrapper();
     document.body.appendChild(wrapper.element);
     try {
@@ -298,9 +298,9 @@ describe('SkillsCard', () => {
       expect(label.text()).toContain('Strength');
       expect(label.classes()).toContain('cursor-pointer');
     } finally {
+      wrapper.unmount();
       wrapper.element.remove();
     }
-    wrapper.unmount();
   });
   it('does not place a button role or JS click handler on the card container', () => {
     const wrapper = createWrapper();

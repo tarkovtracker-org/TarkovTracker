@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  progressBarFillStyle,
+  progressGradientColor,
   traderPercentageStyle,
   type TraderPercentageState,
 } from '@/features/dashboard/traderPercentageStyle';
@@ -35,5 +37,14 @@ describe('traderPercentageStyle', () => {
     expect(traderPercentageStyle({ ...inProgress, isLocked: true }, 'light')).toEqual({});
     expect(traderPercentageStyle({ ...inProgress, isComplete: true }, 'light')).toEqual({});
     expect(traderPercentageStyle({ ...inProgress, percentage: 0 }, 'light')).toEqual({});
+  });
+  it('keeps the progress-bar fill one step lighter than the text ink', () => {
+    // The fill is a non-text indicator (3:1 against the track), not body text.
+    expect(progressBarFillStyle(50, 'dark')).toEqual({ backgroundColor: 'hsl(60, 70%, 45%)' });
+    expect(progressBarFillStyle(50, 'light')).toEqual({ backgroundColor: 'hsl(60, 70%, 26%)' });
+  });
+  it('derives both variants from the same hue ramp', () => {
+    expect(progressGradientColor(25, 'light', 'text')).toBe('hsl(30, 70%, 22%)');
+    expect(progressGradientColor(25, 'light', 'fill')).toBe('hsl(30, 70%, 26%)');
   });
 });

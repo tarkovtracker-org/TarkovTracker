@@ -156,7 +156,7 @@ describe('PromotedTwitchEmbed', () => {
     // The video stage below the header keeps its fixed black plate in both themes.
     const stage = wrapper.findAll('aside > div')[1]!;
     expect(stage.classes()).toContain('bg-black');
-    expect(stage.classes()).not.toContain('light:');
+    expect(stage.classes()).not.toContain('light:bg-black');
     wrapper.unmount();
   });
   it('stays hidden when the channel is offline', async () => {

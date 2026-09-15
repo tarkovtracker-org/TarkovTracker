@@ -42,6 +42,9 @@ const createWrapper = () =>
         UBadge: true,
         AppTooltip: { template: '<div><slot /></div>' },
         ObjectiveRequiredItems: true,
+        // The count controls call useToast() in setup, which needs Nuxt composable
+        // context this happy-dom fixture does not provide; they are not under test.
+        ObjectiveCountControls: true,
       },
     },
   });

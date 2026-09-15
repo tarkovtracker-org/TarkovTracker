@@ -59,12 +59,16 @@
             >
               <!-- The header row doubles as the level input's label: clicking anywhere in
                 it natively focuses the input (no JS click handler, no button role), and
-                keyboard users reach the input directly through Tab order. -->
+                keyboard users reach the input directly through Tab order. The label is
+                aria-hidden and the input carries a stable aria-label, so the accessible
+                name stays concise instead of reading the whole changing header. Inner
+                wrappers are spans to respect the label phrasing content model. -->
               <label
                 :for="getSkillInputId(skill.key)"
+                aria-hidden="true"
                 class="mb-2 flex cursor-pointer items-center gap-2"
               >
-                <div class="group relative shrink-0">
+                <span class="group relative block shrink-0">
                   <img
                     v-if="skill.imageLink"
                     :src="skill.imageLink"
@@ -72,15 +76,15 @@
                     class="relative z-10 h-10 w-10 rounded object-contain transition-transform duration-200 ease-out group-hover:z-50 group-hover:scale-[2.5] group-hover:rounded-md group-hover:shadow-xl"
                     loading="lazy"
                   />
-                  <div
+                  <span
                     v-else
                     class="bg-surface-700 flex h-10 w-10 items-center justify-center rounded text-xs"
                   >
                     ?
-                  </div>
-                </div>
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-center gap-1">
+                  </span>
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="flex items-center gap-1">
                     <span class="text-surface-100 truncate text-sm font-semibold">
                       {{ formatSkillName(skill.name) }}
                     </span>
@@ -102,8 +106,8 @@
                         {{ $t('common.lv') }} {{ formatRequiredLevels(skill.requiredLevels) }}
                       </UBadge>
                     </UTooltip>
-                  </div>
-                  <div class="text-surface-400 truncate text-xs">
+                  </span>
+                  <span class="text-surface-400 block truncate text-xs">
                     <span v-if="skill.requiredByTasks.length > 0">
                       {{ $t('settings.skills.req_count') }} {{ skill.requiredByTasks.length }}
                     </span>
@@ -117,8 +121,8 @@
                       {{ $t('settings.skills.reward_count') }}
                       {{ skill.rewardedByTasks.length }}
                     </span>
-                  </div>
-                </div>
+                  </span>
+                </span>
                 <span
                   class="shrink-0 text-lg font-bold"
                   :class="
@@ -174,6 +178,7 @@
                   placeholder="0"
                   size="sm"
                   class="flex-1"
+                  :aria-label="`${formatSkillName(skill.name)} ${$t('common.level')}`"
                   :aria-describedby="getSkillRangeId(skill.key)"
                   @keydown="preventInvalidInput"
                   @paste="(event: ClipboardEvent) => onPaste(event, skill.key)"

@@ -50,7 +50,7 @@ describe('TaskGraphNode light-theme labels', () => {
     wrapper.unmount();
   });
   it('keeps the flow_end indicator label readable in light mode', () => {
-    const wrapper = mountNode(buildData({ isLeaf: true }));
+    const wrapper = mountNode(buildData({ isRoot: false, isLeaf: true }));
     const endLabel = wrapper.find('span[title="page.tasks.graph.flow_end"]');
     expect(endLabel.exists()).toBe(true);
     expect(endLabel.classes()).toContain('light:text-warning-900');

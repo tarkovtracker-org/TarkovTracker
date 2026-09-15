@@ -196,7 +196,10 @@ describe('TaskCard appearance and expansion controls', () => {
     metadataStoreMock.getTaskById.mockReset();
     tarkovStoreMock.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
   });
-  it('keeps the failed card on a dark surface in dark mode and a pale one in light mode', async () => {
+  it('emits the failed-card class contract: dark surface with pale light-mode companions', async () => {
+    // This asserts the emitted class names only; the resolved per-theme rendering is
+    // covered by the browser contrast audit (SYSTEMS.md §16) and the light:+token
+    // wiring is guarded by tailwindTheme.test.ts.
     taskState.failed = true;
     const wrapper = await mountTaskCard();
     const classes = wrapper.get('article').classes();
