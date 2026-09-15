@@ -2245,7 +2245,6 @@
       "limit_exceeded": "Limit Exceeded",
       "max_level": "Maximum skill level is 51.",
       "valid_range": "Valid range: 0-51",
-      "focus_input_aria": "Focus the level input for {name}",
       "sort": {
         "ingame": "In-Game"
       },

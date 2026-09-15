@@ -285,49 +285,31 @@ describe('SkillsCard', () => {
     await input.trigger('keydown', event);
     expect(event.preventDefault).not.toHaveBeenCalled();
   });
-  it('focuses and selects the level input when the card body is clicked', async () => {
+  it("makes the card header the level input's native label for click-to-focus", async () => {
     const wrapper = createWrapper();
-    // focusSkillInput resolves the input through document.getElementById, so the card
-    // must be attached to the document for the lookup to find it.
     document.body.appendChild(wrapper.element);
     try {
-      const card = wrapper.find('#settings-skill-Strength');
-      const input = card.find('input');
-      const focusSpy = vi.spyOn(input.element as HTMLInputElement, 'focus');
-      const selectSpy = vi.spyOn(input.element as HTMLInputElement, 'select');
-      // Click the card container itself (not the input) — the convenience path.
-      await card.trigger('click');
-      expect(focusSpy).toHaveBeenCalled();
-      expect(selectSpy).toHaveBeenCalled();
+      const label = wrapper.find('label[for="skill-input-Strength"]');
+      expect(label.exists()).toBe(true);
+      // The visible header row (icon, name, badges, level) is the label, so a large
+      // click target natively focuses the input — happy-dom does not implement
+      // label->input activation forwarding, so assert the structural contract and
+      // let the real-browser check verify the interaction.
+      expect(label.text()).toContain('Strength');
+      expect(label.classes()).toContain('cursor-pointer');
     } finally {
       wrapper.element.remove();
     }
     wrapper.unmount();
   });
-  it('keeps interactive targets inside the card clickable without focusing the input', async () => {
+  it('does not place a button role or JS click handler on the card container', () => {
     const wrapper = createWrapper();
+    // The card stays a plain container: the native <label for> supplies the
+    // click-to-focus convenience, so SonarCloud S6819 and the mouse-without-keyboard
+    // rule have nothing to flag.
     const card = wrapper.find('#settings-skill-Strength');
-    const input = card.find('input');
-    const focusSpy = vi.spyOn(input.element as HTMLInputElement, 'focus');
-    // Clicking the input itself must not re-trigger select (it keeps its own caret).
-    await input.trigger('click');
-    expect(focusSpy).not.toHaveBeenCalled();
-    wrapper.unmount();
-  });
-  it('supports keyboard activation of the click-to-focus convenience', async () => {
-    const wrapper = createWrapper();
-    document.body.appendChild(wrapper.element);
-    try {
-      const card = wrapper.find('#settings-skill-Strength');
-      expect(card.attributes('role')).toBe('button');
-      expect(card.attributes('tabindex')).toBe('0');
-      const input = card.find('input');
-      const focusSpy = vi.spyOn(input.element as HTMLInputElement, 'focus');
-      await card.trigger('keydown', { key: 'Enter' });
-      expect(focusSpy).toHaveBeenCalled();
-    } finally {
-      wrapper.element.remove();
-    }
+    expect(card.attributes('role')).toBeUndefined();
+    expect(card.attributes('tabindex')).toBeUndefined();
     wrapper.unmount();
   });
 });

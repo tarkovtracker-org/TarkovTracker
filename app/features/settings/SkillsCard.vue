@@ -54,18 +54,16 @@
               v-for="skill in visibleSkills"
               :id="getSkillCardId(skill.key)"
               :key="skill.key"
-              role="button"
-              :tabindex="0"
-              :aria-label="
-                $t('settings.skills.focus_input_aria', { name: formatSkillName(skill.name) })
-              "
               class="rounded-lg border p-3 transition-colors"
               :class="skillCardClasses(skill.key)"
-              @click="handleSkillCardClick(skill.key, $event)"
-              @keydown.enter.self="focusSkillInput(skill.key)"
-              @keydown.space.self.prevent="focusSkillInput(skill.key)"
             >
-              <div class="mb-2 flex items-center gap-2">
+              <!-- The header row doubles as the level input's label: clicking anywhere in
+                it natively focuses the input (no JS click handler, no button role), and
+                keyboard users reach the input directly through Tab order. -->
+              <label
+                :for="getSkillInputId(skill.key)"
+                class="mb-2 flex cursor-pointer items-center gap-2"
+              >
                 <div class="group relative shrink-0">
                   <img
                     v-if="skill.imageLink"
@@ -131,7 +129,7 @@
                 >
                   {{ getDisplayLevel(skill.key) }}
                 </span>
-              </div>
+              </label>
               <div class="mb-2 flex gap-3 text-xs">
                 <UTooltip
                   :text="
@@ -167,9 +165,6 @@
                 </UTooltip>
               </div>
               <div class="flex items-center gap-2">
-                <label :for="getSkillInputId(skill.key)" class="sr-only">
-                  {{ formatSkillName(skill.name) }} {{ $t('common.level') }}
-                </label>
                 <UInput
                   :id="getSkillInputId(skill.key)"
                   :model-value="getSkillLevel(skill.key)"
@@ -309,29 +304,6 @@
     `skill-input-${skillKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
   const getSkillRangeId = (skillKey: string): string =>
     `skill-range-${skillKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-  // Clicking (or keyboard-activating) the card focuses and selects its level input, the
-  // same mouse + keyboard pairing TaskObjective.vue and ExperienceCard.vue use so the
-  // card keeps a keyboard equivalent for its mouse handler. The guard checks for
-  // concrete interactive *tags* rather than [role] selectors so the card's own
-  // role="button" cannot self-match and swallow the very clicks it is meant to
-  // handle; the level input, its label, the reset button and links keep their clicks.
-  const isNestedInteractiveTarget = (target: EventTarget | null) =>
-    target instanceof HTMLElement && target.closest('a,button,input,select,textarea') !== null;
-  const focusSkillInput = (skillKey: string) => {
-    const target = document.getElementById(getSkillInputId(skillKey));
-    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
-      target.focus();
-      target.select();
-      return;
-    }
-    target?.querySelector<HTMLInputElement | HTMLTextAreaElement>('input, textarea')?.focus();
-  };
-  const handleSkillCardClick = (skillKey: string, event: MouseEvent) => {
-    if (isNestedInteractiveTarget(event.target)) {
-      return;
-    }
-    focusSkillInput(skillKey);
-  };
   const getSkillLevel = (skillKey: string) => skillCalculation.getSkillLevel(skillKey);
   const getQuestSkillLevel = (skillKey: string) => skillCalculation.getQuestSkillLevel(skillKey);
   const getSkillOffset = (skillKey: string) => skillCalculation.getSkillOffset(skillKey);
