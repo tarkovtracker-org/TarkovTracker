@@ -1,3 +1,10 @@
+# [1.79.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.78.1...v1.79.0) (2026-09-15)
+
+
+### Features
+
+* **app:** add opt-in light theme with warm paper palette ([#102](https://github.com/tarkovtracker-org/TarkovTracker/issues/102)) ([eaeec13](https://github.com/tarkovtracker-org/TarkovTracker/commit/eaeec136c6a6c393bc2c4503d6bbdb99e6c980ae))
+
 ## [1.78.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.78.0...v1.78.1) (2026-09-10)
 
 # [1.78.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.6...v1.78.0) (2026-09-10)
