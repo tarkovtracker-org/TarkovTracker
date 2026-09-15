@@ -302,11 +302,10 @@ describe('SkillsCard', () => {
       wrapper.element.remove();
     }
   });
-  it('does not place a button role or JS click handler on the card container', () => {
+  it('keeps the card container free of role and tabindex attributes', () => {
     const wrapper = createWrapper();
-    // The card stays a plain container: the native <label for> supplies the
-    // click-to-focus convenience, so SonarCloud S6819 and the mouse-without-keyboard
-    // rule have nothing to flag.
+    // The native <label for> in the header supplies the click-to-focus convenience, so
+    // the card needs no button role (SonarCloud S6819) and no tab stop of its own.
     const card = wrapper.find('#settings-skill-Strength');
     expect(card.attributes('role')).toBeUndefined();
     expect(card.attributes('tabindex')).toBeUndefined();

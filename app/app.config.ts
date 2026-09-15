@@ -260,7 +260,8 @@ const uiConfig = {
       {
         color: 'pve',
         variant: 'outline',
-        class: 'ring ring-inset ring-pve-500 text-pve-400 hover:bg-pve-950 light:hover:bg-pve-100',
+        class:
+          'ring ring-inset ring-pve-500 light:ring-pve-700 text-pve-400 hover:bg-pve-950 light:hover:bg-pve-100',
       },
       {
         color: 'pve',
