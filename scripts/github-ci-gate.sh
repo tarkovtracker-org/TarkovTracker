@@ -40,5 +40,7 @@ wait_for_ci_result() {
 }
 # Explicit dispatch works with the job token and binds CI to the requested branch tip.
 dispatch_ci() {
-  gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$1"
+  local ref="$1"
+  gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$ref"
+  return $?
 }
