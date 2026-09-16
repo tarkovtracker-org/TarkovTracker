@@ -8,7 +8,9 @@ routes = [
   { pattern = "www.tarkovtracker.org/health", zone_name = "tarkovtracker.org" },
   # Tombstone bindings: retain retired apex routes on the gateway so legacy requests
   # return 404 directly at the edge instead of falling through to Pages/Nitro api-protection.
+  { pattern = "tarkovtracker.org/api/v2", zone_name = "tarkovtracker.org" },
   { pattern = "tarkovtracker.org/api/v2/*", zone_name = "tarkovtracker.org" },
+  { pattern = "www.tarkovtracker.org/api/v2", zone_name = "tarkovtracker.org" },
   { pattern = "www.tarkovtracker.org/api/v2/*", zone_name = "tarkovtracker.org" },
   { pattern = "tarkovtracker.org/api/token*", zone_name = "tarkovtracker.org" },
   { pattern = "www.tarkovtracker.org/api/token*", zone_name = "tarkovtracker.org" },

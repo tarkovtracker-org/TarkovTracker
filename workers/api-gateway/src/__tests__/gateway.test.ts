@@ -386,6 +386,14 @@ describe('api-gateway', () => {
       BASE_ENV
     );
     expect(res.status).toBe(404);
+    const withoutSlash = await worker.fetch(
+      new Request('https://tarkovtracker.org/api/v2', {
+        method: 'GET',
+        headers: { 'User-Agent': 'TestClient/1.0 (+https://example.com)' },
+      }),
+      BASE_ENV
+    );
+    expect(withoutSlash.status).toBe(404);
   });
   it('returns 404 for OPTIONS on legacy routes on non-api hosts', async () => {
     const res = await worker.fetch(
