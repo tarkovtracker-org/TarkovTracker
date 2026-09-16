@@ -85,6 +85,17 @@ vi.mock('@vueuse/core', async (importOriginal) => ({
 vi.mock('@/composables/useKeybinds', () => ({
   useKeybinds: vi.fn(),
 }));
+// AppBar loads these through `defineAsyncComponent`. A VTU `stub` replaces what renders but does
+// not stop the async loader, so the real ActivityLogPanel still pulls `@nuxt/ui` Badge and the
+// generated `virtual:nuxt:...ui/badge.ts` theme module. Under parallel workers that import can
+// resolve after this file's environment is torn down, failing the run with
+// `EnvironmentTeardownError`. Mocking the modules keeps the loader short of `@nuxt/ui` entirely.
+vi.mock('@/shell/ActivityLogPanel.vue', () => ({
+  default: { name: 'ActivityLogPanel', template: '<div />' },
+}));
+vi.mock('@/features/omnibar/Omnibar.vue', () => ({
+  default: { name: 'Omnibar', template: '<div />' },
+}));
 const mockThemeModeRef = ref<'dark' | 'light'>('dark');
 const mockIsLightThemeRef = ref(false);
 const mockToggleThemeMode = vi.fn();

@@ -111,7 +111,7 @@
     "supabase:types": "supabase gen types typescript --linked > supabase/functions/_shared/database.types.ts",
     "systems:check": "node scripts/check-systems-drift.mjs",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage --maxWorkers=4",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
     "test:api-gateway": "vitest --config workers/api-gateway/vitest.config.ts",
     "validate:openapi": "pnpm --filter api-gateway run validate:openapi",
