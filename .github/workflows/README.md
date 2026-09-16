@@ -55,9 +55,9 @@ last-moment PR push. A fixed commit body prevents inherited CI-skip markers from
 post-merge run. The gate is copied from trusted main before synchronization and survives checkout.
 If main or the PR changes during validation, rerun Crowdin Sync; do not bypass the guard.
 The candidate must contain captured main. Before merging, the gate awaits successful `CI Result`
-from GitHub Actions on that exact head (up to ten minutes) and verifies the active repository
-ruleset requires that check with strict branch freshness and no bypass actors. The ruleset closes
-the base-advance race at merge time; a missing or weakened policy leaves the PR open. Both trusted
+from GitHub Actions on that exact head (up to thirty minutes) and verifies the effective repository
+rule requires that check with strict branch freshness. The deployed no-bypass ruleset closes
+the base-advance race at merge time; a missing or weakened required check leaves the PR open. Both trusted
 gate scripts are preserved before checkout changes. See `docs/WORKFLOW_AUTOMATION.md` for the
 repository-wide policy and release compatibility.
 

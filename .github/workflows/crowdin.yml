@@ -23,7 +23,7 @@ jobs:
   sync:
     if: github.repository == 'tarkovtracker-org/TarkovTracker' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7

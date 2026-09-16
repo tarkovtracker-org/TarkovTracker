@@ -225,15 +225,17 @@ active `Main CI freshness` repository ruleset. It targets
 all PRs and direct pushes, including administrators and automation. Existing deletion/force-push
 rules remain separate. Behind branches must incorporate current main and pass CI again; do not
 use an administrator bypass. GitHub enforces freshness at merge time, closing the interval after
-automation's last base-SHA check. Both Crowdin and release automation verify the effective rule
-and its active, no-bypass ruleset before writing main.
+automation's last base-SHA check. Both Crowdin and release automation verify the effective strict rule before writing main. The
+administrator must verify the deployed ruleset's empty bypass list during rollout and after policy
+changes. GitHub hides that list from callers without ruleset write access; automation does not
+request administrative permissions merely to inspect it.
 
 **Version-bump commit:** `scripts/release-commit.mjs` prepares the bumped `package.json` and
 `CHANGELOG.md` as `chore(release): <version>` with no skip marker. The plugin supports the
 main-only release workflow. It stages only these generated assets and rejects unrelated staged
 files. `scripts/release-commit.sh` pushes the new commit to
 `wip/release-<version>-<run-id>-<attempt>` using `ACCESS_TOKEN_GITHUB` as `RELEASE_CI_TOKEN`.
-That PAT push starts ordinary push CI on the staging branch. The plugin waits up to ten minutes
+That PAT push starts ordinary push CI on the staging branch. The plugin waits up to thirty minutes
 for successful GitHub Actions `CI Result` on the exact version SHA; absent, failed, cancelled,
 skipped, or timed-out checks cannot promote it.
 

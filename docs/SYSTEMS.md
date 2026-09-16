@@ -1598,9 +1598,10 @@ merge; dependency installation and project checks receive no automation credenti
 - Only an open, non-draft, same-repository `locales` PR targeting `main` is eligible.
 - Candidates contain captured main. Preflight checks reject observed main/head changes and
   non-clean merge states. Only unknown calculations retry.
-- The gate awaits successful GitHub Actions `CI Result` on the exact head, and verifies the active
-  repository rule requires that check with strict freshness and no bypass actors. GitHub enforces
-  the base requirement at merge time; missing/weakened policy fails closed.
+- The gate awaits successful GitHub Actions `CI Result` on the exact head and verifies the effective
+  repository rule requires that check with strict freshness. The administrator verifies the deployed
+  ruleset has no bypass actors; automation does not receive ruleset write access to read that list.
+  GitHub enforces the base requirement at merge time; missing/weakened required checks fail closed.
 - The server-side `--match-head-commit` guard must use the SHA that passed all validation.
 - Merges use `ACCESS_TOKEN_GITHUB`, never a `GITHUB_TOKEN` fallback, so normal push CI runs.
   The fixed squash message must not inherit automation-skip markers from translation commits.

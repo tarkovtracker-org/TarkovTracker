@@ -40,7 +40,7 @@ test('concurrent main advancement is rejected by the actual Git push', (t) => {
   assert.match(result.stderr, /non-fast-forward|fetch first/);
   assert.equal(git(f.repo, '--git-dir', f.remote, 'rev-parse', 'main'), f.head);
 });
-test('release refuses missing CI credentials or a missing no-bypass policy', (t) => {
+test('release refuses missing CI credentials or a missing strict CI policy', (t) => {
   const f = releaseFixture(t);
   assert.equal(f.release({ RELEASE_CI_TOKEN: '' }).status, 1);
   assert.equal(f.release({ RULES: '[]' }).status, 1);

@@ -63,7 +63,7 @@ fs.appendFileSync(p.CALLS, JSON.stringify(args) + '\n');
 if (args[0] === 'api') {
   const endpoint = args[args.indexOf('api') + 1] === '--paginate' ? args[2] : args[1];
   if (endpoint.includes('/rules/branches/')) { console.log(p.RULES); process.exit(0); }
-  if (endpoint.includes('/rulesets/')) { console.log(p.POLICY); process.exit(0); }
+  if (endpoint.includes('/rulesets/')) { console.error('Ruleset details require administrator access'); process.exit(1); }
   if (endpoint.includes('/check-runs?')) {
     const sha = endpoint.split('/commits/')[1].split('/')[0];
     console.log(JSON.stringify({ check_runs: p.CHECK_PRESENT === 'false' ? [] : [{
@@ -146,7 +146,6 @@ process.exit(result.status ?? 1);
         },
       },
     ]),
-    POLICY: JSON.stringify({ enforcement: 'active', bypass_actors: [] }),
     HEAD_SHA: head,
     BASE_SHA: base,
     CURRENT_BASE: base,

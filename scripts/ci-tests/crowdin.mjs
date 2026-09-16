@@ -225,24 +225,12 @@ test('missing or reversed required workflow steps cannot pass ordering checks', 
     assert.throws(() => assertWorkflowBoundaries(reversed), /must precede/);
   }
 });
-test('strict server policy closes the base race and cannot have bypass actors', (t) => {
+test('strict server policy rejects a base race and a missing required check', (t) => {
   const f = fixture(t);
   passed(f.run('prepare'));
   rejected(f.run('merge', { ACTUAL_BASE: 'd'.repeat(40) }), /Base advanced at merge/);
   rejected(f.run('merge', { RULES: '[]' }), /Missing strict main/);
-  rejected(
-    f.run('merge', {
-      POLICY: JSON.stringify({
-        enforcement: 'active',
-        bypass_actors: [{ actor_type: 'OrganizationAdmin' }],
-      }),
-    }),
-    /no bypass/
-  );
-  rejected(
-    f.run('merge', { POLICY: JSON.stringify({ enforcement: 'disabled', bypass_actors: [] }) }),
-    /must be active/
-  );
+  assert.ok(!f.calls().some((args) => args.some((arg) => arg.includes('/rulesets/'))));
 });
 test('Crowdin waits for successful exact-head CI and rejects terminal failures', (t) => {
   const f = fixture(t);
@@ -274,4 +262,30 @@ test('a candidate must contain main even when its full tree only differs in tran
   git(f.repo, 'commit', '--allow-empty', '-m', 'advance main');
   rejected(f.run('prepare'), /must include current main/);
   assert.equal(f.output(), '');
+});
+test('policy checks reject loose freshness, another provider and another required context', (t) => {
+  const f = fixture(t);
+  passed(f.run('prepare'));
+  const policy = JSON.parse(read('.github/main-ci-ruleset.json'));
+  for (const parameters of [
+    { ...policy.rules[0].parameters, strict_required_status_checks_policy: false },
+    {
+      strict_required_status_checks_policy: true,
+      required_status_checks: [{ context: 'CI Result', integration_id: 999 }],
+    },
+    {
+      strict_required_status_checks_policy: true,
+      required_status_checks: [{ context: 'Other check', integration_id: 15368 }],
+    },
+  ]) {
+    const rule = {
+      type: 'required_status_checks',
+      ruleset_source_type: 'Repository',
+      ruleset_source: 'example/repo',
+      ruleset_id: 42,
+      parameters,
+    };
+    rejected(f.run('merge', { RULES: JSON.stringify([rule]) }), /Missing strict main/);
+  }
+  assert.ok(!f.calls().some((args) => args[1] === 'merge'));
 });
