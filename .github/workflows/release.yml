@@ -19,9 +19,10 @@ jobs:
       group: release-main
       cancel-in-progress: false
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     permissions:
       actions: read
+      checks: read
       contents: write
       issues: write
       pull-requests: write
@@ -97,4 +98,5 @@ jobs:
         if: steps.publish.outputs.release == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_CI_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}
         run: pnpm exec semantic-release

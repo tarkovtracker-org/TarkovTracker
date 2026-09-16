@@ -1,126 +1,10 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import {
-  chmodSync,
-  mkdtempSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { chmodSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { join } from 'node:path';
 import { test } from 'node:test';
-// These built-in Node tests do not load Nuxt's app-only @/ alias.
-import { gitExecutable } from '../validation-tools.mjs';
+import { fixture, git } from './helpers/automation-fixture.mjs';
 import { jobBlock, workflowStep } from './helpers/workflow-blocks.mjs';
-const gate = resolve('scripts/crowdin-pr.sh');
 const read = (path) => readFileSync(path, 'utf8');
-/** Run the trusted Git executable and surface fixture setup failures. */
-function git(cwd, ...args) {
-  const result = spawnSync(gitExecutable(), args, { cwd, encoding: 'utf8' });
-  assert.equal(result.status, 0, result.stderr);
-  return result.stdout.trim();
-}
-/** Create an isolated Git history and mocked GitHub CLI for gate integration tests. */
-function fixture(t, changes) {
-  changes ??= { 'app/locales/fr.json': '{"hello":"Salut"}' };
-  const root = mkdtempSync(join(tmpdir(), 'crowdin-gate-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-  const repo = join(root, 'repo');
-  const bin = join(root, 'bin');
-  mkdirSync(repo);
-  mkdirSync(bin);
-  git(repo, 'init', '-b', 'main');
-  git(repo, 'config', 'user.name', 'Workflow Test');
-  git(repo, 'config', 'user.email', 'workflow@example.invalid');
-  const put = (path, content) => {
-    mkdirSync(join(repo, path, '..'), { recursive: true });
-    writeFileSync(join(repo, path), content);
-  };
-  put('app/locales/en.json', '{"hello":"Hello"}');
-  put('app/locales/fr.json', '{"hello":"Bonjour"}');
-  put('package.json', '{"private":true}');
-  git(repo, 'add', '.');
-  git(repo, 'commit', '-m', 'base');
-  const base = git(repo, 'rev-parse', 'HEAD');
-  git(repo, 'checkout', '-b', 'locales');
-  for (const [path, content] of Object.entries(changes)) put(path, content);
-  git(repo, 'add', '.');
-  git(repo, 'commit', '--allow-empty', '-m', 'translations');
-  const head = git(repo, 'rev-parse', 'HEAD');
-  git(repo, 'checkout', 'main');
-  git(repo, 'remote', 'add', 'origin', repo);
-  const pr = {
-    state: 'OPEN',
-    isDraft: false,
-    isCrossRepository: false,
-    headRefName: 'locales',
-    baseRefName: 'main',
-    headRefOid: head,
-    mergeable: 'MERGEABLE',
-    mergeStateStatus: 'CLEAN',
-  };
-  writeFileSync(
-    join(bin, 'gh'),
-    String.raw`#!${process.execPath}
-const fs = require('node:fs');
-const p = process.env;
-const args = process.argv.slice(2);
-fs.appendFileSync(p.CALLS, JSON.stringify(args) + '\n');
-if (args[0] === 'api') { console.log(p.CURRENT_BASE); process.exit(0); }
-if (args[1] === 'view') {
-  const states = JSON.parse(p.PR_STATES);
-  const index = Number(fs.readFileSync(p.COUNTER, 'utf8'));
-  fs.writeFileSync(p.COUNTER, String(index + 1));
-  console.log(JSON.stringify(states[Math.min(index, states.length - 1)]));
-  process.exit(0);
-}
-if (args[1] === 'merge') {
-  const supplied = args[args.indexOf('--match-head-commit') + 1];
-  if (supplied !== p.ACTUAL_HEAD) { console.error('Head changed at merge'); process.exit(1); }
-  process.exit(0);
-}
-process.exit(2);
-`,
-    { mode: 0o755 }
-  );
-  writeFileSync(join(bin, 'sleep'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
-  writeFileSync(join(root, 'counter'), '0');
-  writeFileSync(join(root, 'calls'), '');
-  writeFileSync(join(root, 'output'), '');
-  const env = {
-    ...process.env,
-    PATH: `${bin}:/usr/bin:/bin`,
-    PR_NUMBER: '857',
-    GITHUB_REPOSITORY: 'example/repo',
-    GITHUB_OUTPUT: join(root, 'output'),
-    GH_TOKEN: 'test-only',
-    HEAD_SHA: head,
-    BASE_SHA: base,
-    CURRENT_BASE: base,
-    ACTUAL_HEAD: head,
-    PR_STATES: JSON.stringify([pr]),
-    CALLS: join(root, 'calls'),
-    COUNTER: join(root, 'counter'),
-  };
-  return {
-    repo,
-    head,
-    base,
-    pr,
-    run: (phase, overrides) =>
-      spawnSync('/bin/bash', [gate, phase], {
-        cwd: repo,
-        env: { ...env, ...overrides },
-        encoding: 'utf8',
-        timeout: 10000,
-      }),
-    calls: () => read(env.CALLS).trim().split('\n').filter(Boolean).map(JSON.parse),
-    output: () => read(env.GITHUB_OUTPUT),
-  };
-}
 /** Require a successful gate subprocess with its diagnostic on failure. */
 function passed(result) {
   assert.equal(result.status, 0, result.stderr);
@@ -274,13 +158,6 @@ function assertStepOrder(job, first, second) {
 /** Verify each workflow boundary within its owning job and step. */
 function assertWorkflowBoundaries(workflow) {
   const sync = jobBlock(workflow, 'sync');
-  const mergeStep = workflowStep(sync, 'Merge validated translations');
-  const beforeMerge = sync.slice(0, sync.indexOf('      - name: Merge validated translations'));
-  assert.doesNotMatch(beforeMerge, /ACCESS_TOKEN_GITHUB/);
-  assert.match(mergeStep, /GH_TOKEN: \$\{\{ secrets.ACCESS_TOKEN_GITHUB \}\}/);
-  assert.match(mergeStep, /HEAD_SHA: \$\{\{ steps.candidate.outputs.head_sha \}\}/);
-  assert.match(mergeStep, /BASE_SHA: \$\{\{ steps.candidate.outputs.base_sha \}\}/);
-  assert.match(mergeStep, /run: bash "\$RUNNER_TEMP\/crowdin-pr.sh" merge/);
   assertStepOrder(
     sync,
     '      - name: Preserve trusted merge gate\n',
@@ -291,6 +168,17 @@ function assertWorkflowBoundaries(workflow) {
     '      - name: Prepare immutable translation checkout\n',
     '      - uses: ./.github/actions/setup-project\n'
   );
+  const mergeStep = workflowStep(sync, 'Merge validated translations');
+  const beforeMerge = sync.slice(0, sync.indexOf('      - name: Merge validated translations'));
+  const synchronization = workflowStep(sync, 'Synchronize Crowdin translations');
+  assert.match(synchronization, /GITHUB_TOKEN: \$\{\{ secrets.ACCESS_TOKEN_GITHUB \}\}/);
+  const prepare = workflowStep(sync, 'Prepare immutable translation checkout');
+  assert.doesNotMatch(prepare, /ACCESS_TOKEN_GITHUB/);
+  assert.ok(beforeMerge.includes('setup-project'));
+  assert.match(mergeStep, /GH_TOKEN: \$\{\{ secrets.ACCESS_TOKEN_GITHUB \}\}/);
+  assert.match(mergeStep, /HEAD_SHA: \$\{\{ steps.candidate.outputs.head_sha \}\}/);
+  assert.match(mergeStep, /BASE_SHA: \$\{\{ steps.candidate.outputs.base_sha \}\}/);
+  assert.match(mergeStep, /run: bash "\$RUNNER_TEMP\/crowdin-pr.sh" merge/);
   const validation = workflowStep(sync, 'Validate translations');
   assert.doesNotMatch(validation, /GH_TOKEN|secrets\./);
   for (const check of ['format:check', 'i18n:check', 'systems:check'])
@@ -336,4 +224,54 @@ test('missing or reversed required workflow steps cannot pass ordering checks', 
       .replace('__FIRST_STEP__', second);
     assert.throws(() => assertWorkflowBoundaries(reversed), /must precede/);
   }
+});
+test('strict server policy closes the base race and cannot have bypass actors', (t) => {
+  const f = fixture(t);
+  passed(f.run('prepare'));
+  rejected(f.run('merge', { ACTUAL_BASE: 'd'.repeat(40) }), /Base advanced at merge/);
+  rejected(f.run('merge', { RULES: '[]' }), /Missing strict main/);
+  rejected(
+    f.run('merge', {
+      POLICY: JSON.stringify({
+        enforcement: 'active',
+        bypass_actors: [{ actor_type: 'OrganizationAdmin' }],
+      }),
+    }),
+    /no bypass/
+  );
+  rejected(
+    f.run('merge', { POLICY: JSON.stringify({ enforcement: 'disabled', bypass_actors: [] }) }),
+    /must be active/
+  );
+});
+test('Crowdin waits for successful exact-head CI and rejects terminal failures', (t) => {
+  const f = fixture(t);
+  passed(f.run('prepare'));
+  for (const CHECK_CONCLUSION of ['failure', 'cancelled', 'skipped', 'neutral']) {
+    rejected(f.run('merge', { CHECK_CONCLUSION }), /CI Result did not succeed/);
+  }
+  rejected(f.run('merge', { CHECK_APP: '999' }), /Timed out/);
+  assert.ok(!f.calls().some((args) => args[1] === 'merge'));
+});
+test('main policy configuration enforces GitHub Actions CI and freshness without exceptions', () => {
+  const policy = JSON.parse(read('.github/main-ci-ruleset.json'));
+  assert.equal(policy.enforcement, 'active');
+  assert.equal(policy.target, 'branch');
+  assert.deepEqual(policy.bypass_actors, []);
+  assert.deepEqual(policy.conditions.ref_name, { include: ['refs/heads/main'], exclude: [] });
+  assert.deepEqual(policy.rules, [
+    {
+      type: 'required_status_checks',
+      parameters: {
+        strict_required_status_checks_policy: true,
+        required_status_checks: [{ context: 'CI Result', integration_id: 15368 }],
+      },
+    },
+  ]);
+});
+test('a candidate must contain main even when its full tree only differs in translations', (t) => {
+  const f = fixture(t);
+  git(f.repo, 'commit', '--allow-empty', '-m', 'advance main');
+  rejected(f.run('prepare'), /must include current main/);
+  assert.equal(f.output(), '');
 });

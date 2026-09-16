@@ -1579,7 +1579,11 @@ The checkout stays pinned to the validated SHA. The production build still runs 
 - CI cancellation must not cancel a publisher; only release jobs share `release-main` with
   `cancel-in-progress: false`. Git non-fast-forward protection and semantic-release's upstream
   check remain the final safeguards if main advances after the last eligibility check.
-- Release version commits retain the existing skip marker behavior and Cloudflare rebuild.
+- Release version commits pass ordinary CI on a temporary `wip/release-*` branch before the
+  identical SHA advances main. The main ruleset requires successful GitHub Actions `CI Result`,
+  strict freshness, and no bypass actors. Non-fast-forward promotion fails if main advances.
+- The staging push uses the automation PAT to start CI; main promotion uses `GITHUB_TOKEN` to
+  avoid recursive Actions runs. Version commits have no skip marker; Cloudflare still rebuilds.
 - A green workflow run must continue to mean the test shards and Supabase validation passed;
   making those jobs optional requires reconsidering this release gate.
 
@@ -1588,12 +1592,15 @@ The checkout stays pinned to the validated SHA. The production build still runs 
 `.github/workflows/crowdin.yml` uses `scripts/crowdin-pr.sh`, preserved from trusted main before
 synchronization, to bind translation validation and merging to one immutable PR head. Its full tree
 diff against captured main permits only regular non-English locale JSON files. Dependency setup and
-project checks run after that checkout; the PAT is available only to the final merge gate.
+project checks run after that checkout. The PAT starts synchronization/PR CI and performs the final
+merge; dependency installation and project checks receive no automation credential.
 
 - Only an open, non-draft, same-repository `locales` PR targeting `main` is eligible.
-- Preflight checks reject observed main/head changes and non-clean merge states. Only unknown
-  calculations retry. The base check is not atomic with merging; enforcing an up-to-date base at
-  merge time requires repository branch rules or a merge queue.
+- Candidates contain captured main. Preflight checks reject observed main/head changes and
+  non-clean merge states. Only unknown calculations retry.
+- The gate awaits successful GitHub Actions `CI Result` on the exact head, and verifies the active
+  repository rule requires that check with strict freshness and no bypass actors. GitHub enforces
+  the base requirement at merge time; missing/weakened policy fails closed.
 - The server-side `--match-head-commit` guard must use the SHA that passed all validation.
 - Merges use `ACCESS_TOKEN_GITHUB`, never a `GITHUB_TOKEN` fallback, so normal push CI runs.
   The fixed squash message must not inherit automation-skip markers from translation commits.

@@ -1,0 +1,26 @@
+{
+  "name": "Main CI freshness",
+  "target": "branch",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {
+    "ref_name": {
+      "include": ["refs/heads/main"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "required_status_checks": [
+          {
+            "context": "CI Result",
+            "integration_id": 15368
+          }
+        ]
+      }
+    }
+  ]
+}

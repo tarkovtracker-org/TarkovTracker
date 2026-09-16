@@ -8,6 +8,7 @@ on:
       - 'crowdin.yml'
       - '.github/workflows/crowdin.yml'
       - 'scripts/crowdin-pr.sh'
+      - 'scripts/github-ci-gate.sh'
   schedule:
     - cron: '17 4 * * *'
   workflow_dispatch:
@@ -31,7 +32,11 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Preserve trusted merge gate
-        run: cp scripts/crowdin-pr.sh "$RUNNER_TEMP/crowdin-pr.sh"
+        run: cp scripts/crowdin-pr.sh scripts/github-ci-gate.sh "$RUNNER_TEMP/"
+      - name: Verify automation credential
+        env:
+          AUTOMATION_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}
+        run: test -n "$AUTOMATION_TOKEN"
       - name: Synchronize Crowdin translations
         id: crowdin
         uses: crowdin/github-action@0d5670f539973aea2f01abce61a8989934df0025 # v3
@@ -47,7 +52,8 @@ jobs:
           pull_request_body: 'Automated translation updates from Crowdin.'
           commit_message: 'chore(i18n): update translations from Crowdin'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A PAT creates PR events that start CI without manual workflow approval.
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}
           CROWDIN_PROJECT_ID: ${{ secrets.CROWDIN_PROJECT_ID }}
           CROWDIN_PERSONAL_TOKEN: ${{ secrets.CROWDIN_PERSONAL_TOKEN }}
       - name: Resolve Crowdin PR

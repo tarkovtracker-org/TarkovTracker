@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Copied from trusted main to RUNNER_TEMP before the Crowdin action changes the checkout.
 set -euo pipefail
+# shellcheck source=scripts/github-ci-gate.sh
+source "$(dirname "${BASH_SOURCE[0]}")/github-ci-gate.sh"
 # Stop the workflow with a GitHub Actions error annotation.
 fail() {
   echo "::error::$*" >&2
@@ -51,6 +53,7 @@ prepare() {
   require_sha "$BASE_SHA"
   git fetch origin "$HEAD_SHA"
   [[ "$(git rev-parse FETCH_HEAD)" == "$HEAD_SHA" ]] || fail "Fetched PR head changed."
+  git merge-base --is-ancestor "$BASE_SHA" "$HEAD_SHA" || fail "Crowdin head must include current main."
   check_translation_tree
   git checkout --detach "$HEAD_SHA"
   printf 'head_sha=%s\nbase_sha=%s\n' "$HEAD_SHA" "$BASE_SHA" >> "$GITHUB_OUTPUT"
@@ -88,7 +91,10 @@ merge() {
   require_sha "${HEAD_SHA:-}"
   require_sha "${BASE_SHA:-}"
   [[ "$(git rev-parse HEAD)" == "$HEAD_SHA" ]] || fail "Checkout differs from the validated head."
+  require_main_ci_policy
+  wait_for_ci_result "$HEAD_SHA"
   wait_for_mergeability
+  require_main_ci_policy
   # Server-side guard closes the race between the final read and the merge request.
   gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
     --match-head-commit "$HEAD_SHA" --squash \

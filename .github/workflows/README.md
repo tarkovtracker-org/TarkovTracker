@@ -34,15 +34,12 @@ to `app/locales/%two_letters_code%.json`, preserving the directory hierarchy. It
 local translations. The existing `locales` branch supplies translation PRs targeting `main`.
 
 Repository secrets `CROWDIN_PROJECT_ID` and `CROWDIN_PERSONAL_TOKEN` authenticate to Crowdin only.
-Synchronization uses the automatic `secrets.GITHUB_TOKEN`, with only `contents: write` and
-`pull-requests: write`, so generated PRs and commits are authored by `github-actions[bot]` and use
-`chore(i18n): update translations from Crowdin`. Only the final merge step uses the existing
-`ACCESS_TOKEN_GITHUB` PAT. Its push starts normal main CI and the existing release gate; a merge
-using `GITHUB_TOKEN` would suppress push workflows. There is no fallback to `GITHUB_TOKEN`.
-The PAT must have repository contents and pull-request write access, with any required organization
-SSO authorization. Prefer a repository-scoped fine-grained PAT; rotate it according to repository
-policy. A repository-scoped GitHub App installation token can replace it when App credentials are
-available. No merge credential is passed to dependency installation or project validation.
+Synchronization and the final merge use `ACCESS_TOKEN_GITHUB`, so creating/updating a PR starts
+normal PR CI and merging starts main push CI. There is no `GITHUB_TOKEN` fallback. The PR author
+is the PAT owner. The PAT needs repository contents and pull-request write access, checks read
+access, and any required organization SSO authorization. Prefer a repository-scoped fine-grained
+PAT and rotate it according to repository policy. No automation credential is passed to dependency
+installation or project validation.
 
 When new translations are synchronized, `scripts/crowdin-pr.sh` verifies an open, non-draft,
 same-repository `locales` PR targeting `main`. It captures its head SHA, fetches that exact commit,
@@ -57,10 +54,12 @@ all other states fail closed. `--match-head-commit` atomically guards the squash
 last-moment PR push. A fixed commit body prevents inherited CI-skip markers from suppressing the
 post-merge run. The gate is copied from trusted main before synchronization and survives checkout.
 If main or the PR changes during validation, rerun Crowdin Sync; do not bypass the guard.
-The main SHA check is a preflight check: GitHub's PR merge API atomically guards the head, not the
-base. Main can still advance between that check and the merge. Enforcing an up-to-date branch or
-merge queue requires a separate repository rules decision; this workflow does not change those
-rules. GitHub remains responsible for branch rules and the final merge decision.
+The candidate must contain captured main. Before merging, the gate awaits successful `CI Result`
+from GitHub Actions on that exact head (up to ten minutes) and verifies the active repository
+ruleset requires that check with strict branch freshness and no bypass actors. The ruleset closes
+the base-advance race at merge time; a missing or weakened policy leaves the PR open. Both trusted
+gate scripts are preserved before checkout changes. See `docs/WORKFLOW_AUTOMATION.md` for the
+repository-wide policy and release compatibility.
 
 Cloudflare Git deployments run independently of GitHub Actions. Release eligibility still requires
 successful CI for the current main push, and semantic-release decides whether a version is warranted;
@@ -97,8 +96,8 @@ full validation. The proposed classifier selects formatting, i18n, and systems d
 only a verified follow-up change enables expensive-check skips. Non-English locale formatting
 exclusions remain intact. See the rollout checklist in `docs/WORKFLOW_AUTOMATION.md`.
 
-Crowdin Sync creates PRs using `GITHUB_TOKEN`. In addition to standard PR review paths, `crowdin.yml`
-directly validates and auto-merges safe translation updates upon synchronization.
+Crowdin Sync creates PRs using `ACCESS_TOKEN_GITHUB`. It awaits standard PR CI in addition to
+direct validation before auto-merging safe translation updates.
 
 ### Security (`security.yml`)
 
@@ -153,8 +152,8 @@ introduce a new pinned SHA.
 ## Merge checks
 
 Existing check names and Dependabot's expected-check list are preserved. New classification and
-aggregate jobs supplement them. Keep branch protection and external Codecov/Security gates unchanged
-while shadow mode is validated; `CI Result` does not replace them.
+aggregate jobs supplement them. `Main CI freshness` additionally requires successful `CI Result`
+and an up-to-date branch, with no bypass actors. External Codecov/Security gates remain unchanged.
 
 Successful main CI completion separately triggers the gated `Release` workflow.
 Lighthouse runs only when the PR touches UI paths or already carries `performance`/`ui`.
