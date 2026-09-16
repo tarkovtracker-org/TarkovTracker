@@ -6,13 +6,19 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 
 ### CI (`ci.yml`)
 
-**Trigger:** Push to main/develop/wip branches, PRs
+**Trigger:** Push to `main` and `wip/**` branches, PRs targeting `main`, manual dispatch
 **Concurrency:** Outdated runs are automatically cancelled for the same PR or branch.
 **Jobs:**
 
-- `Validation plan` — proposed scope plus full effective scope during shadow rollout
+- `Validation plan` — classifies the diff. Pull requests that touch only root/`docs/`/`.github/`
+  Markdown or Crowdin-owned `app/locales/*.json` translations run the reduced set (`Lint & Format`
+  formatting, i18n when locales change, `Systems drift check`); anything else — including the
+  source locale `app/locales/en.json` — every push, and every dispatch run the full set. Unreadable
+  diffs fail closed to full validation.
 - `CI Result` — strict aggregate of selected jobs; missing data or unexpected skips fail
-- `Lint & Format` — ESLint + Prettier, i18n, and Node workflow fixtures
+- `Lint & Format` — ESLint + Prettier, i18n, Node workflow fixtures, and (for non-Markdown
+  automation paths and unreadable diffs) checksum-verified `actionlint` plus `zizmor`
+  (`.github/zizmor.yml` records accepted findings)
 - `Fallow audit` — changed-file dead code, duplication, and complexity gate
 - `Type Check` — `vue-tsc` / Nuxt type checking
 - `Test (shard 1/4)` … `Test (shard 4/4)` — Vitest with coverage, sharded across 4 parallel jobs. The `github-actions` reporter annotates failed tests directly on the PR diff so the failing test name and assertion are visible without digging into logs. Shards report imported files only to avoid duplicate zero-filled entries, and Codecov merges the per-shard coverage. Unsharded local coverage retains the full `app/**/*.{ts,vue}` denominator.
@@ -92,23 +98,24 @@ for this workflow: the upstream Action prints its environment in debug mode.
 
 ### Crowdin locale PRs
 
-`CI`, `PR Checks`, and `Security` report for translation-only PRs. During shadow rollout they retain
-full validation. The proposed classifier selects formatting, i18n, and systems drift for locales;
-only a verified follow-up change enables expensive-check skips. Non-English locale formatting
-exclusions remain intact. See the rollout checklist in `docs/WORKFLOW_AUTOMATION.md`.
+`CI`, `PR Checks`, and `Security` report for translation-only PRs. The classifier selects
+formatting, i18n, and systems drift for locale-only pull requests; the aggregate `CI Result` still
+reports and remains the only required check. Non-English locale formatting exclusions remain
+intact. See the rollout record in `docs/WORKFLOW_AUTOMATION.md`.
 
 Crowdin Sync creates PRs using `GITHUB_TOKEN`. It explicitly dispatches and awaits full CI in addition to
 direct validation before auto-merging safe translation updates.
 
 ### Security (`security.yml`)
 
-**Trigger:** Push to main/develop, PRs, weekly schedule
+**Trigger:** Push to `main`, PRs, weekly schedule
 **Jobs:** `Security Scan` (audit + checksum-verified Gitleaks CLI), `CodeQL` (static analysis)
 
 ### Release (`release.yml`)
 
 **Trigger:** Successful completion of `CI` for a same-repository push or explicit dispatch on `main`.
-**Jobs:** `Release` (validate the CI run and current main SHA, build, recheck, semantic-release).
+**Jobs:** `Release` (validate the CI run and current main SHA, install through the shared
+`setup-project` action, build, recheck, semantic-release).
 The workflow reuses CI's test shards and database checks. It rejects stale commits and CI attempts,
 PR/fork events, and automation-skip directives before publishing. Documentation-only pushes can
 reach the gate; conventional commits determine whether a version is warranted. Publication is
@@ -139,8 +146,9 @@ performance/accessibility work instead of treating the current floors as long-te
 ### Dependabot Auto Merge (`dependabot-auto-merge.yml`)
 
 **Trigger:** Dependabot PR opened/updated/reopened/ready for review
-**Jobs:** `Auto-merge safe Dependabot PR` (npm tooling allowlist gate, wait for check runs and
-legacy status contexts, verify and match the validated head SHA, squash merge). Every GitHub Actions
+**Jobs:** `Auto-merge safe Dependabot PR` (Dependabot-authored and Dependabot-triggered only, npm
+tooling allowlist gate, wait for check runs and legacy status contexts, verify and match the
+validated head SHA, squash merge). Every GitHub Actions
 workflow-file change requires manual review, including changes to permissions, triggers, or commands.
 Action updates additionally require repository or organization allowlist verification when they
 introduce a new pinned SHA.
@@ -152,9 +160,11 @@ introduce a new pinned SHA.
 
 ## Merge checks
 
-Existing check names and Dependabot's expected-check list are preserved. New classification and
-aggregate jobs supplement them. `Main CI freshness` additionally requires successful `CI Result`
-and an up-to-date branch, with no bypass actors. External Codecov/Security gates remain unchanged.
+Existing check names and Dependabot's expected-check list are preserved; Dependabot PRs always
+change manifests, so they always receive the full set. `Main CI freshness` requires successful
+`CI Result` and an up-to-date branch, with no bypass actors; it is the only required check, so
+reduced runs (which skip jobs by design) cannot leave a PR blocked on a missing context. External
+Codecov/Security gates remain unchanged; Codecov statuses default to success when no report exists.
 
 Successful main CI completion separately triggers the gated `Release` workflow.
 Lighthouse runs only when the PR touches UI paths or already carries `performance`/`ui`.
