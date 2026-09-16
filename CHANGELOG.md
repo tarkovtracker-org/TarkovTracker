@@ -1,3 +1,10 @@
+## [1.79.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.5...v1.79.6) (2026-09-16)
+
+
+### Performance Improvements
+
+* **test:** run vitest files in parallel ([#852](https://github.com/tarkovtracker-org/TarkovTracker/issues/852)) ([9db1ad2](https://github.com/tarkovtracker-org/TarkovTracker/commit/9db1ad2fe8092d9ebecedf2a7386f35f2744c38b))
+
 ## [1.79.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.4...v1.79.5) (2026-09-16)
 
 
