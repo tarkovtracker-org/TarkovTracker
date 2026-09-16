@@ -70,7 +70,7 @@ flowchart TB
   UI -->|shared profile / team members / client logs| PAGES
   UI -->|team / token / account mutations| EDGE
   UI -->|login / refresh| SA
-  EXT -->|Bearer token /api/v2/*| WG
+  EXT -->|Bearer token /progress*, /team/progress, /token| WG
   WG --> DO
   WG --> PG
   EDGE -->|consume_mutation_rate_limit| MRL
@@ -82,14 +82,14 @@ flowchart TB
 
 ### Ownership matrix
 
-| Traffic class               | Examples                                                 | Primary enforcer                        | Secondary / hard stop                    | Storage / implementation                   |
-| --------------------------- | -------------------------------------------------------- | --------------------------------------- | ---------------------------------------- | ------------------------------------------ |
-| External progress API       | `/api/v2/*` on `api.tarkovtracker.org`                   | Worker DO daily quota + IP abuse gate   | Supporter tier resolution, token auth    | `ApiGatewayRateLimiter`, `api_usage_daily` |
-| Authenticated app mutations | team create/join/leave/kick/disband, token create/revoke | Edge Function mutation limiter          | DB token cap (3 active), RLS             | `mutation_rate_limits` + RPC               |
-| Public / shared app reads   | shared profile, team members, tarkov-dev profile         | Pages/Nitro shared limiter              | CDN/cache TTLs, Cloudflare WAF if needed | `sharedEdgeStore` (+ DO if bound)          |
-| Destructive account ops     | account delete                                           | Edge Function (dedicated table for now) | Deletion jobs queue                      | `account_deletion_attempts`                |
-| Auth platform               | signup, sign-in, refresh, OTP                            | Supabase Auth                           | Captcha (optional)                       | GoTrue `[auth.rate_limit]`                 |
-| Outbound third parties      | Discord API, Stripe                                      | Provider `Retry-After` / SDK rules      | Circuit breakers, job retries            | not user quotas                            |
+| Traffic class               | Examples                                                           | Primary enforcer                        | Secondary / hard stop                    | Storage / implementation                   |
+| --------------------------- | ------------------------------------------------------------------ | --------------------------------------- | ---------------------------------------- | ------------------------------------------ |
+| External progress API       | `api.tarkovtracker.org` (`/progress*`, `/team/progress`, `/token`) | Worker DO daily quota + IP abuse gate   | Supporter tier resolution, token auth    | `ApiGatewayRateLimiter`, `api_usage_daily` |
+| Authenticated app mutations | team create/join/leave/kick/disband, token create/revoke           | Edge Function mutation limiter          | DB token cap (3 active), RLS             | `mutation_rate_limits` + RPC               |
+| Public / shared app reads   | shared profile, team members, tarkov-dev profile                   | Pages/Nitro shared limiter              | CDN/cache TTLs, Cloudflare WAF if needed | `sharedEdgeStore` (+ DO if bound)          |
+| Destructive account ops     | account delete                                                     | Edge Function (dedicated table for now) | Deletion jobs queue                      | `account_deletion_attempts`                |
+| Auth platform               | signup, sign-in, refresh, OTP                                      | Supabase Auth                           | Captcha (optional)                       | GoTrue `[auth.rate_limit]`                 |
+| Outbound third parties      | Discord API, Stripe                                                | Provider `Retry-After` / SDK rules      | Circuit breakers, job retries            | not user quotas                            |
 
 ---
 

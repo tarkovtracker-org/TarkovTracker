@@ -651,9 +651,12 @@ sequenceDiagram
 
 ### Flow
 
-1. **Routing + User-Agent gate.** `workers/api-gateway/src/router.ts` normalizes the path, rejects
-   requests without a 5–200 character `User-Agent`, and (when enabled) 308-redirects legacy
-   `/api/v2` hosts to the api subdomain.
+1. **Routing + User-Agent gate.** `workers/api-gateway/src/router.ts` normalizes the path,
+   enforces the api host boundary (non-api host requests outside `/health` return 404, while
+   loopback hosts such as `localhost` and `127.0.0.1` are admitted for local development), and
+   rejects protected endpoint requests without a 5–200 character `User-Agent`; infrastructure routes
+   are exempt. Retired apex routes are retained as tombstone bindings in `wrangler.toml` so legacy
+   traffic is terminated with 404 at the edge instead of falling through to Pages.
 2. **Pre-auth abuse gate.** A Cloudflare Workers Rate Limiting binding (`API_ABUSE_LIMITER`) keys
    on `CF-Connecting-IP` and shields the `api_tokens` lookup from token-rotation floods. It is
    infrastructure protection, not a customer quota, and fails open on binding errors.
@@ -683,7 +686,7 @@ sequenceDiagram
 ### Files
 
 - `workers/api-gateway/src/index.ts` — Worker entrypoint; delegates to the modules below
-- `workers/api-gateway/src/router.ts` — path normalization, User-Agent gate, host/legacy redirect, route dispatch
+- `workers/api-gateway/src/router.ts` — path normalization, User-Agent gate, API host boundary enforcement, route dispatch
 - `workers/api-gateway/src/authentication.ts` — abuse gate, token auth, daily-quota enforcement
 - `workers/api-gateway/src/rateLimiter.ts` — `ApiGatewayRateLimiter` Durable Object + quota client
 - `workers/api-gateway/src/responses.ts` — CORS, envelopes, conditional response, ETag/compression
