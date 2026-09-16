@@ -7,6 +7,7 @@ import { type ObjectiveWithItems, createItemPicker } from '@/stores/tarkov/itemP
 import {
   getMetadataGameMode,
   migrateMetadataDuplicateObjectiveProgress,
+  migrateMetadataStoryObjectiveIds,
   repairMetadataCompletedTaskObjectives,
   repairMetadataFailedTaskStates,
 } from '@/stores/tarkov/metadataStoreBridge';
@@ -144,6 +145,8 @@ interface MetadataState {
   tasks: Task[];
   editions: GameEdition[];
   storyChapters: StoryChapter[];
+  /** Game mode the loaded story chapters belong to, or null when none are loaded. */
+  storyChaptersGameMode: GameMode | null;
   seasonalPerks: SeasonalPerk[];
   hideoutStations: HideoutStation[];
   maps: TarkovMap[];
@@ -222,7 +225,18 @@ const readCachedEditions = async (mode: string, language: string): Promise<Cache
     return {};
   }
 };
-type ProgressionCatalogState = Pick<MetadataState, 'editions' | 'storyChapters' | 'seasonalPerks'>;
+type ProgressionCatalogState = Pick<
+  MetadataState,
+  'editions' | 'storyChapters' | 'storyChaptersGameMode' | 'seasonalPerks'
+>;
+/**
+ * The game mode an API mode string belongs to. Story reconciliation needs the catalog's own mode, and
+ * `currentGameMode` changes when a switch starts, before the new catalog replaces the old one.
+ */
+const gameModeForApiMode = (apiMode: string): GameMode | null => {
+  const entry = Object.entries(API_GAME_MODES).find(([, value]) => value === apiMode);
+  return (entry?.[0] as GameMode | undefined) ?? null;
+};
 const prepareEditionScope = (
   state: ProgressionCatalogState,
   store: ReturnType<typeof getPromiseStore>,
@@ -233,6 +247,7 @@ const prepareEditionScope = (
     state.seasonalPerks = markRaw([]);
     state.editions = markRaw([]);
     state.storyChapters = markRaw([]);
+    state.storyChaptersGameMode = null;
   }
   store.editionsScope = scope;
 };
@@ -256,6 +271,8 @@ const applyCachedEditions = async (
   state.seasonalPerks = perksForMode(seasonalPerks, mode);
   if (!storyChapters.length) return false;
   state.storyChapters = markRaw(sortedStoryChapters(storyChapters));
+  state.storyChaptersGameMode = gameModeForApiMode(mode);
+  migrateMetadataStoryObjectiveIds();
   logger.debug('[MetadataStore] Editions loaded from cache');
   return true;
 };
@@ -309,7 +326,9 @@ const applyProgressionCatalog = (
   const chapters = sortedStoryChapters([...overlay.storyChapters]);
   state.editions = markRaw([...overlay.editions]);
   state.storyChapters = markRaw(chapters);
+  state.storyChaptersGameMode = gameModeForApiMode(mode);
   state.seasonalPerks = perksForMode(overlay.seasonalPerks ?? [], mode);
+  migrateMetadataStoryObjectiveIds();
 };
 const cacheProgressionCatalog = (
   state: ProgressionCatalogState,
@@ -334,7 +353,10 @@ const cacheProgressionCatalog = (
  * is fenced behind `isCurrent()` so a superseded scope cannot publish its result.
  */
 const loadProgressionCatalog = async (
-  state: Pick<MetadataState, 'editions' | 'editionsError' | 'seasonalPerks' | 'storyChapters'>,
+  state: Pick<
+    MetadataState,
+    'editions' | 'editionsError' | 'seasonalPerks' | 'storyChapters' | 'storyChaptersGameMode'
+  >,
   promiseStore: ReturnType<typeof getPromiseStore>,
   context: {
     forceRefresh: boolean;
@@ -412,6 +434,7 @@ export const useMetadataStore = defineStore('metadata', {
     objectiveModeCountDifferencesHydrated: false,
     languageCode: 'en',
     currentGameMode: GAME_MODES.PVP,
+    storyChaptersGameMode: null,
     lastCachePurgeCheckAt: 0,
   }),
   getters: {
@@ -1649,6 +1672,8 @@ export const useMetadataStore = defineStore('metadata', {
           .map((chapter) => normalizeStoryChapter(chapter))
           .sort((a, b) => a.order - b.order)
       );
+      this.storyChaptersGameMode = gameModeForApiMode(this.getApiGameMode());
+      migrateMetadataStoryObjectiveIds();
       this.seasonalPerks = perksForMode(
         cachedData.editions.seasonalPerks ?? [],
         this.getApiGameMode()

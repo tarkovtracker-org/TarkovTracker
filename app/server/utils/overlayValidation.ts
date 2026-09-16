@@ -118,11 +118,40 @@ const validObjectives = (value: unknown): boolean => {
   if (value === undefined) return true;
   return Array.isArray(value) ? value.every(validTaskReference) : isRecordCollection(value);
 };
+// Identity and coverage are checked strictly so data the storyline view would silently discard is
+// refused at the boundary, where the last-good overlay is still available, rather than reaching a
+// chapter as a blank ending row or an uninterpretable route.
+const nonEmptyString = (value: unknown): boolean =>
+  typeof value === 'string' && value.trim().length > 0;
+const nonNegativeInteger = (value: unknown): boolean =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0;
+const endingIdentity = (ending: Record<string, unknown>): boolean =>
+  [ending.id, ending.systemName, ending.gateQuestId].every(nonEmptyString);
+const endingCoverage = (ending: Record<string, unknown>): boolean =>
+  nonNegativeInteger(ending.objectiveCount) && typeof ending.resolvedInReference === 'boolean';
+const validEnding = (ending: unknown): boolean =>
+  isPlainObject(ending) && endingIdentity(ending) && endingCoverage(ending);
+const validEndings = (value: unknown): boolean =>
+  value === undefined || (Array.isArray(value) && value.every(validEnding));
+// Pairs constrain two sub-quests each. A malformed pair cannot be interpreted, and guessing which
+// half was meant would invent an exclusion, so the overlay is rejected and the last good one kept.
+const distinctQuestIds = (pair: readonly unknown[]): boolean =>
+  pair.every(nonEmptyString) && pair[0] !== pair[1];
+const validQuestPair = (pair: unknown): boolean =>
+  Array.isArray(pair) && pair.length === 2 && distinctQuestIds(pair);
+const validQuestPairs = (value: unknown): boolean =>
+  value === undefined || (Array.isArray(value) && value.every(validQuestPair));
+const validChapterBranches = (chapter: Record<string, unknown>): boolean =>
+  [
+    validObjectives(chapter.objectives),
+    validEndings(chapter.endings),
+    validQuestPairs(chapter.mutuallyExclusiveQuestPairs),
+  ].every(Boolean);
 const validEffectiveSections = (overlay: OverlayData, mode: string): boolean => {
   const perks = overlayEntries(scopedOverlay(overlay, 'seasonalPerks', mode)).every(validPerk);
   const crafts = overlayEntries(scopedOverlay(overlay, 'craftsAdd', mode)).every(validCraft);
-  const chapters = overlayEntries(scopedOverlay(overlay, 'storyChapters', mode)).every((chapter) =>
-    validObjectives(chapter.objectives)
+  const chapters = overlayEntries(scopedOverlay(overlay, 'storyChapters', mode)).every(
+    validChapterBranches
   );
   return [
     perks,

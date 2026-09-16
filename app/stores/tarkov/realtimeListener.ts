@@ -46,6 +46,7 @@ type SyncControllerGetter = () => SyncControllerHandle | null;
 type TarkovStoreLike = {
   $state: UserState;
   $patch(mutator: (state: UserState) => void): void;
+  migrateStoryObjectiveIds(mode?: GameMode): { migrated: number; dropped: number };
 };
 type RealtimeModeProgress = {
   mode: GameMode;
@@ -445,6 +446,9 @@ async function runSetupRealtimeListener(
     tarkovStore.$patch((state) => {
       state[mode] = nextProgress;
     });
+    // The merge is a union of both sides' objective ids, so a device that has not upgraded can
+    // reintroduce ids the overlay retired. Reconcile the merged mode before sync resumes.
+    tarkovStore.migrateStoryObjectiveIds(mode);
     scheduleSyncResume();
     notifyModeConflict(conflicts, apiUpdateHandled, updateTime, toastI18n);
   };

@@ -1,3 +1,24 @@
+## [1.79.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.3...v1.79.4) (2026-09-16)
+
+
+### Bug Fixes
+
+* **deps:** patch image processing and transitive security advisories ([#854](https://github.com/tarkovtracker-org/TarkovTracker/issues/854)) ([b8b781b](https://github.com/tarkovtracker-org/TarkovTracker/commit/b8b781b9882d329be0a18433a5296d3d1d845a35))
+
+## [1.79.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.2...v1.79.3) (2026-09-16)
+
+
+### Bug Fixes
+
+* **app:** reconcile saved story objective ids with the published catalog ([#850](https://github.com/tarkovtracker-org/TarkovTracker/issues/850)) ([2db9a4f](https://github.com/tarkovtracker-org/TarkovTracker/commit/2db9a4fd21aaa43a3bef6f45f6f5d72875f1d5c0))
+
+## [1.79.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.1...v1.79.2) (2026-09-16)
+
+
+### Bug Fixes
+
+* **ui:** consume the overlay story chapter branch contract ([#849](https://github.com/tarkovtracker-org/TarkovTracker/issues/849)) ([9da52e3](https://github.com/tarkovtracker-org/TarkovTracker/commit/9da52e36da3c8048e57eb3f9b8d4583872c75bb6))
+
 ## [1.79.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.0...v1.79.1) (2026-09-16)
 
 

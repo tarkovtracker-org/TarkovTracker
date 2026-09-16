@@ -128,11 +128,13 @@ vi.mock('@/utils/logger', () => ({
     warn: vi.fn(),
   },
 }));
+const migrateStoryObjectiveIdsMock = vi.fn(() => ({ migrated: 0, dropped: 0 }));
 describe('seasonal progress realtime synchronization', () => {
   const state = structuredClone(defaultState);
   const store = {
     $state: state,
     $patch: (mutator: (target: UserState) => void) => mutator(state),
+    migrateStoryObjectiveIds: migrateStoryObjectiveIdsMock,
   };
   beforeEach(() => {
     supabaseContext.client.from.mockReset();
@@ -823,6 +825,9 @@ describe('seasonal progress realtime synchronization', () => {
     expect(state.seasonal.taskCompletions.task?.complete).toBe(true);
     expect(state.pvp).toEqual(defaultState.pvp);
     expect(state.pve).toEqual(defaultState.pve);
+    // The union merge can reintroduce objective ids the overlay retired, so the merged mode is
+    // reconciled before sync resumes.
+    expect(migrateStoryObjectiveIdsMock).toHaveBeenCalledWith('seasonal');
   });
   it('ignores historical Seasonal rows', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');

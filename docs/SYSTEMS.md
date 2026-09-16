@@ -420,15 +420,15 @@ the last-good overlay. Unsupported story statuses/types fail validation. Unknown
 locale sections are logged and retained in `dataOverlay.unconsumedSections`, including cache hits;
 precompute refuses to publish payloads with unconsumed sections.
 
-| Sections                               | Consumer and identity rules                                                                                                                                                                                                                                      |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tasks`, `tasksAdd`, `traders`, `maps` | Task routes; existing task IDs win over synthetic additions; maps support locale patches.                                                                                                                                                                        |
-| `items`, `itemsAdd`                    | Both item routes; adapt additions only when an ID is absent upstream, then apply explicit patches and locales.                                                                                                                                                   |
-| `hideout`, `craftsAdd`                 | Hideout; attach adapted crafts to station ID/level and deduplicate craft IDs globally. Null/absent task unlocks stay `unlockState: unknown`.                                                                                                                     |
-| `prestige`                             | Prestige route; patch/append raw conditions by ID before adaptation resolves tasks from upstream plus missing, enabled `tasksAdd` IDs. Array condition patches replace arrays. Locale task/prestige corrections apply before resolution.                         |
-| `storyChapters`                        | Editions route and task story unlock projection share chapter identities. Chapter/objective locales supply prestige story requirement names. Stored story progress is evaluated from explicit requirements, never chapter order or hardcoded chapter-name lists. |
-| `editions`                             | Editions route and metadata store own the mode-scoped edition catalog.                                                                                                                                                                                           |
-| `seasonalPerks`                        | Editions route exposes metadata only for `pvp-season`; the store's `resolvedSeasonalPerks` hydrates item/category references as items load, retaining missing IDs with null values. No perk selection/progress persistence is introduced.                        |
+| Sections                               | Consumer and identity rules                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `tasks`, `tasksAdd`, `traders`, `maps` | Task routes; existing task IDs win over synthetic additions; maps support locale patches.                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `items`, `itemsAdd`                    | Both item routes; adapt additions only when an ID is absent upstream, then apply explicit patches and locales.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `hideout`, `craftsAdd`                 | Hideout; attach adapted crafts to station ID/level and deduplicate craft IDs globally. Null/absent task unlocks stay `unlockState: unknown`.                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `prestige`                             | Prestige route; patch/append raw conditions by ID before adaptation resolves tasks from upstream plus missing, enabled `tasksAdd` IDs. Array condition patches replace arrays. Locale task/prestige corrections apply before resolution.                                                                                                                                                                                                                                                                                                                     |
+| `storyChapters`                        | Editions route and task story unlock projection share chapter identities. Chapter/objective locales supply prestige story requirement names. Stored story progress is evaluated from explicit requirements, never chapter order or hardcoded chapter-name lists. Chapter `endings`, `mutuallyExclusiveQuestPairs`, `referenceCoverage`, and objective `sourceQuestId`/`endingId` survive projection and normalization; the storyline view reads them when a chapter carries them and falls back to objective-level exclusivity and objective text otherwise. |
+| `editions`                             | Editions route and metadata store own the mode-scoped edition catalog.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `seasonalPerks`                        | Editions route exposes metadata only for `pvp-season`; the store's `resolvedSeasonalPerks` hydrates item/category references as items load, retaining missing IDs with null values. No perk selection/progress persistence is introduced.                                                                                                                                                                                                                                                                                                                    |
 
 Prestige fetches the requested upstream mode; regular corrections cannot leak into PvE or Seasonal.
 An empty upstream prestige collection stays empty. Client prestige and edition catalogs are keyed
@@ -439,6 +439,44 @@ standalone progression deployment: v3 always uses envelope format 2 with overlay
 The superseded progression-only writer must never publish to these keys; rollback uses v2.
 Story references must name own chapter entries, never inherited object properties. Seasonal perk
 exclusion lists may be omitted; when present, every entry must be a string.
+
+Story chapter branches follow the overlay's own evidence. Objective-level `mutuallyExclusiveWith`
+blocks the opposing objective; chapter-level `mutuallyExclusiveQuestPairs` constrains only whole
+sub-quests, so each declared pair becomes one chapter-level route choice and gates chapter bulk
+completion, while individual objective toggles stay enabled. Pairs are never merged: two pairs
+sharing a quest do not make their other members exclusive, and a route the player has not finished
+is never rendered as blocked, because the objective list can be a projection of the overlay capture.
+Both sides of a declared pair always render, a side with no captured objectives reporting pending
+evidence rather than disappearing. A route is called chosen only when chapter coverage is complete and
+exactly one side's steps are all done; under partial coverage a finished side reports known-step
+progress instead, and a conflict between two finished sides is reported only when coverage is complete,
+because unknown steps can otherwise remain on both.
+Declared `endings` replace the text-derived ending labels when a chapter carries them — chapters
+without them keep the text path — an ending with no attributed objectives reports pending evidence
+rather than being hidden, and exclusivity between endings is not inferred. `referenceCoverage.partial`
+surfaces as a chapter badge because a missing objective is not evidence that none exists. Objective
+IDs are upstream-owned: completed marks the reconciliation pass below leaves unresolved are reported
+for re-checking on the viewer's own progress only, never remapped on a guess.
+
+Saved story objective marks are reconciled against the published catalog by
+`app/utils/storyProgressMigration.ts`, on every chapter-catalog load and after a realtime merge,
+which unions both sides' objective IDs and can reintroduce a retired one. Only the mode the loaded
+catalog belongs to is reconciled: chapters are fetched per mode and language and the overlay may scope
+a chapter to one mode, so a catalog is evidence about its own mode only. A merge naming another mode is
+deferred to that mode's own catalog load, which a mode switch or the next start performs. The pass is idempotent and acts
+only on proof: a mark moves when `STORY_OBJECTIVE_ID_ALIASES` records a re-key the published data
+proves (identical unique objective text, or the overlay re-anchoring its own prestige requirement),
+the catalog publishes that successor, and the successor carries no mark of its own; a mark whose
+successor a partial chapter omits is kept until the successor appears, because that objective list is a
+projection, while a complete chapter that omits it settles the question and the mark is dropped; a mark
+is also dropped when no alias names it and its ID cannot satisfy the story schema's client-ID shape, so
+it can never resolve again and would otherwise be re-synced forever, and when the successor already
+carries the player's own mark; an unrecognized client ID is kept for the projection reason. Lookups use own properties, so an
+inherited key such as `constructor` is treated as saved data rather than as a published objective. Nothing is dropped unless the loaded chapter itself proves the client-ID contract, so a
+stale, curated, or failed catalog load cannot delete progress. Ambiguous re-keys are left unmapped
+rather than guessed. Task and hideout IDs have no equivalent pass: the overlay still publishes
+synthetic task IDs (`new_beginning_prestige_5`) as live data, so absence there is not proof of
+retirement, and a future retirement needs the overlay to declare the replacement first.
 
 ### Files
 
