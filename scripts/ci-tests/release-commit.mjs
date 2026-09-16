@@ -89,7 +89,7 @@ function assertReleaseWorkflowBoundaries(ci, releaseWorkflow) {
   const release = jobBlock(releaseWorkflow, 'release');
   const eligibility = release.slice(0, release.indexOf('    steps:'));
   assert.match(eligibility, /head_branch == 'main'/);
-  assert.match(eligibility, /permissions:\n      actions: write\n/);
+  assert.match(eligibility, /permissions:\n {6}actions: write\n/);
   assert.match(
     workflowStep(release, 'Semantic Release'),
     /GITHUB_TOKEN: \$\{\{ secrets.GITHUB_TOKEN \}\}/

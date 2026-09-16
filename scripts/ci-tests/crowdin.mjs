@@ -164,7 +164,7 @@ function assertStepOrder(job, first, second) {
 /** Verify each workflow boundary within its owning job and step. */
 function assertWorkflowBoundaries(workflow) {
   const workflowSettings = workflow.slice(0, workflow.indexOf('\njobs:'));
-  assert.match(workflowSettings, /permissions:\n  actions: write\n/);
+  assert.match(workflowSettings, /permissions:\n {2}actions: write\n/);
   workflowEvent(read('.github/workflows/ci.yml'), 'workflow_dispatch');
   const sync = jobBlock(workflow, 'sync');
   assertStepOrder(
