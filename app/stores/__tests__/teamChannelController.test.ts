@@ -168,6 +168,34 @@ describe('createTeamChannelController', () => {
       }
     }
   );
+  it.each([true, false])(
+    'uses the owning transport after client replacement (owner suspended: %s)',
+    async (ownerSuspended) => {
+      const owner = createHarness();
+      const replacement = createHarness();
+      const transport = { connect: vi.fn(), disconnect: vi.fn(), getChannels: () => [] };
+      Object.assign(ownerSuspended ? owner.client : replacement.client, { realtime: transport });
+      const page = Object.assign(new EventTarget(), { visibilityState: 'hidden' as const });
+      const releaseVisibility = installRealtimeVisibility(transport, page);
+      const controller = createTeamChannelController(owner.deps);
+      try {
+        await controller.refresh();
+        owner.channels[0]!.status!('SUBSCRIBED');
+        owner.deps.getClient = () => replacement.client;
+        await vi.advanceTimersByTimeAsync(60_000);
+        for (let attempt = 0; attempt < 5; attempt++) {
+          owner.channels[0]!.status!('CHANNEL_ERROR', new Error('Transport disconnected'));
+        }
+        await vi.advanceTimersByTimeAsync(0);
+        expect(owner.removeChannel).toHaveBeenCalledTimes(ownerSuspended ? 0 : 1);
+        expect(loggerMock.warn).toHaveBeenCalledTimes(ownerSuspended ? 0 : 5);
+        expect(replacement.removeChannel).not.toHaveBeenCalled();
+      } finally {
+        releaseVisibility();
+        await controller.dispose();
+      }
+    }
+  );
   it('reports a rejected reconnect refresh without dispatching hydration', async () => {
     const harness = createHarness();
     const controller = createTeamChannelController(harness.deps);

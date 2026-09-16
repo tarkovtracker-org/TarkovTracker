@@ -13,7 +13,7 @@
     >
       <template #header>
         <div class="flex flex-col items-center px-8 pt-8 pb-6 text-center">
-          <h1 class="mb-4 text-4xl font-bold tracking-tight text-white">
+          <h1 class="light:text-surface-50 mb-4 text-4xl font-bold tracking-tight text-white">
             {{ $t('common.login') }}
           </h1>
           <p class="text-surface-200 text-lg">
@@ -29,20 +29,22 @@
           <div class="flex items-start gap-3">
             <UIcon
               name="i-heroicons-information-circle"
-              class="mt-0.5 h-5 w-5 shrink-0 text-amber-400"
+              class="light:text-amber-600 mt-0.5 h-5 w-5 shrink-0 text-amber-400"
             />
             <div>
-              <p class="font-medium text-amber-200">
+              <p class="light:text-amber-800 font-medium text-amber-200">
                 {{ $t('page.login.offline_mode_title', 'Running in Offline Mode') }}
               </p>
-              <p class="mt-1 text-sm text-amber-300/80">
+              <p class="light:text-amber-700 mt-1 text-sm text-amber-300/80">
                 {{
                   $t(
                     'page.login.offline_mode_description',
                     'Supabase is not configured. Login and sync features are disabled, but you can still use all tracking features locally. See'
                   )
                 }}
-                <code class="rounded bg-amber-500/20 px-1 text-amber-200">.env.example</code>
+                <code class="light:text-amber-800 rounded bg-amber-500/20 px-1 text-amber-200">
+                  .env.example
+                </code>
                 {{ $t('page.login.offline_mode_suffix', 'to enable login.') }}
               </p>
             </div>
@@ -102,7 +104,7 @@
             block
             size="xl"
             variant="solid"
-            class="ring-surface-600 hover:bg-surface-100 flex h-12 w-full items-center justify-center bg-white ring-1 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/10"
+            class="ring-surface-600 hover:bg-surface-100 light:hover:bg-surface-800 flex h-12 w-full items-center justify-center bg-white ring-1 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/10"
             :loading="loading.google"
             :disabled="
               isOfflineMode || loading.twitch || loading.discord || loading.google || loading.github
@@ -134,7 +136,7 @@
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-            <span class="text-surface-900 font-medium whitespace-nowrap">
+            <span class="text-surface-900 light:text-surface-50 font-medium whitespace-nowrap">
               {{ $t('page.login.continue_google') }}
             </span>
           </UButton>

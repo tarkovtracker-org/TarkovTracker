@@ -99,7 +99,7 @@
           </ul>
           <div
             v-if="showPanelInteractionHint"
-            class="border-primary-500/30 bg-primary-500/10 text-primary-100 mt-4 rounded-2xl border px-3 py-2 text-xs leading-5"
+            class="border-primary-500/30 bg-primary-500/10 text-primary-100 light:text-primary-900 mt-4 rounded-2xl border px-3 py-2 text-xs leading-5"
           >
             {{ currentStep.interactionHint }}
           </div>

@@ -7,6 +7,7 @@ import { type ObjectiveWithItems, createItemPicker } from '@/stores/tarkov/itemP
 import {
   getMetadataGameMode,
   migrateMetadataDuplicateObjectiveProgress,
+  migrateMetadataStoryObjectiveIds,
   repairMetadataCompletedTaskObjectives,
   repairMetadataFailedTaskStates,
 } from '@/stores/tarkov/metadataStoreBridge';
@@ -27,12 +28,16 @@ import {
   sortTradersByGameOrder,
   type GameMode,
 } from '@/utils/constants';
-import { getExcludedTaskIdsForEdition as getExcludedTaskIds } from '@/utils/editionHelpers';
+import {
+  isGameEdition,
+  getExcludedTaskIdsForEdition as getExcludedTaskIds,
+} from '@/utils/editionHelpers';
 import { createGraph, type TaskGraph } from '@/utils/graphHelpers';
 import { queueIdleTask } from '@/utils/idleScheduler';
 import { logger } from '@/utils/logger';
 import { perfEnd, perfStart } from '@/utils/perf';
-import { inferNewBeginningPrestigeLevel } from '@/utils/prestige';
+import { buildPrestigeTaskMap } from '@/utils/prestige';
+import { resolveSeasonalPerks } from '@/utils/seasonalPerks';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import { normalizeStoryChapter } from '@/utils/storylineObjectives';
 import {
@@ -55,6 +60,7 @@ import type {
   ObjectiveMapInfo,
   PlayerLevel,
   PrestigeLevel,
+  SeasonalPerk,
   StaticMapData,
   StoryChapter,
   TarkovBootstrapQueryResult,
@@ -73,14 +79,27 @@ import type {
   Trader,
 } from '@/types/tarkov';
 const BOOTSTRAP_CACHE_VERSION = 'json-v1';
-const TASKS_CORE_CACHE_VERSION = 'json-v2';
+const TASKS_CORE_CACHE_VERSION = 'json-v3';
 const MAP_SPAWNS_CACHE_VERSION = 'json-v1';
-const ITEMS_CACHE_VERSION = 'json-v1';
+const ITEMS_CACHE_VERSION = 'json-v2';
 const TASK_OBJECTIVES_CACHE_VERSION = 'json-v3';
 const TASK_REWARDS_CACHE_VERSION = 'json-v2';
-const HIDEOUT_CACHE_VERSION = 'json-v4';
+const HIDEOUT_CACHE_VERSION = 'json-v5';
 const HIDEOUT_CACHE_TTL_MS = 60 * 60 * 1000;
-const PRESTIGE_CACHE_VERSION = 'json-v2';
+const PRESTIGE_CACHE_VERSION = 'json-v3';
+const EDITIONS_CACHE_VERSION = 'overlay-v2';
+const settledEditionScope = (requested: string, current: string) =>
+  requested === current ? requested : '';
+/**
+ * Resolve the perk list for a mode, always returning a raw array. A plain array
+ * assigned to store state becomes a reactive proxy, and `structuredClone` rejects
+ * a proxy, so leaving the non-Seasonal branch unmarked made every IndexedDB
+ * editions write fail with `DataCloneError`.
+ */
+const perksForMode = (perks: SeasonalPerk[], mode: string) =>
+  markRaw(mode === 'pvp-season' ? perks : []);
+const editionsPromiseForScope = (store: ReturnType<typeof getPromiseStore>, scope: string) =>
+  store.editionsScope === scope ? store.editionsPromise : null;
 const CACHE_PURGE_STORAGE_KEY = STORAGE_KEYS.cachePurgeAt;
 const CACHE_PURGE_CHECK_TTL_MS = 5 * 60 * 1000;
 const CACHE_PURGE_CHECK_TIMEOUT_MS = 2500;
@@ -126,6 +145,9 @@ interface MetadataState {
   tasks: Task[];
   editions: GameEdition[];
   storyChapters: StoryChapter[];
+  /** Game mode the loaded story chapters belong to, or null when none are loaded. */
+  storyChaptersGameMode: GameMode | null;
+  seasonalPerks: SeasonalPerk[];
   hideoutStations: HideoutStation[];
   maps: TarkovMap[];
   traders: Trader[];
@@ -155,13 +177,6 @@ interface MetadataState {
   currentGameMode: string;
   lastCachePurgeCheckAt: number;
 }
-const isNewBeginningTask = (task: Task): boolean => {
-  if (!task?.id) return false;
-  // Only the prestige-ladder New Beginning tasks carry requiredPrestige, and the
-  // field survives localization, unlike the name/wiki-link heuristics below.
-  if (task.requiredPrestige?.id) return true;
-  return inferNewBeginningPrestigeLevel(task) !== null || task.name === 'New Beginning';
-};
 const deriveStaticMapKey = (mapName: string, normalizedName?: string): string => {
   if (normalizedName) {
     return MAP_NORMALIZED_NAME_MAPPING[normalizedName] ?? normalizedName.replace(/-/g, '');
@@ -183,29 +198,189 @@ const finishTaskCoreRefresh = (
   promises.taskCoreRefreshes.delete(token);
   state.tasksCoreRefreshing = promises.taskCoreRefreshes.size > 0;
 };
-type CachedEditions = { editions?: GameEdition[]; storyChapters?: StoryChapter[] };
-const readCachedEditions = async (): Promise<CachedEditions> => {
+type CriticalCacheData = {
+  scope: string;
+  tasksCore: TarkovTasksCoreQueryResult;
+  hideout: TarkovHideoutQueryResult;
+  prestige: TarkovPrestigeQueryResult;
+  editions: CachedEditions;
+};
+type CachedEditions = {
+  editions?: GameEdition[];
+  storyChapters?: StoryChapter[];
+  seasonalPerks?: SeasonalPerk[];
+};
+const readCachedEditions = async (mode: string, language: string): Promise<CachedEditions> => {
   if (typeof window === 'undefined') return {};
   try {
-    return (await getCachedData<CachedEditions>('editions' as CacheType, 'all', 'en')) ?? {};
+    return (
+      (await getCachedData<CachedEditions>(
+        'editions' as CacheType,
+        `${EDITIONS_CACHE_VERSION}-${mode}`,
+        language
+      )) ?? {}
+    );
   } catch (error) {
     logger.warn('[MetadataStore] Editions cache read failed:', error);
     return {};
   }
 };
+type ProgressionCatalogState = Pick<
+  MetadataState,
+  'editions' | 'storyChapters' | 'storyChaptersGameMode' | 'seasonalPerks'
+>;
+/**
+ * The game mode an API mode string belongs to. Story reconciliation needs the catalog's own mode, and
+ * `currentGameMode` changes when a switch starts, before the new catalog replaces the old one.
+ */
+const gameModeForApiMode = (apiMode: string): GameMode | null => {
+  const entry = Object.entries(API_GAME_MODES).find(([, value]) => value === apiMode);
+  return (entry?.[0] as GameMode | undefined) ?? null;
+};
+const prepareEditionScope = (
+  state: ProgressionCatalogState,
+  store: ReturnType<typeof getPromiseStore>,
+  scope: string
+) => {
+  if (store.editionsScope && store.editionsScope !== scope) {
+    store.editionsSettledScope = '';
+    state.seasonalPerks = markRaw([]);
+    state.editions = markRaw([]);
+    state.storyChapters = markRaw([]);
+    state.storyChaptersGameMode = null;
+  }
+  store.editionsScope = scope;
+};
+const hasValidCachedEditions = (editions: GameEdition[]): boolean =>
+  editions.length > 0 && editions.every(isGameEdition);
+const sortedStoryChapters = (chapters: StoryChapter[]): StoryChapter[] =>
+  chapters.map((chapter) => normalizeStoryChapter(chapter)).sort((a, b) => a.order - b.order);
 const applyCachedEditions = async (
-  state: Pick<MetadataState, 'editions' | 'storyChapters'>,
-  isCurrent: () => boolean
+  state: ProgressionCatalogState,
+  isCurrent: () => boolean,
+  mode: string,
+  language: string
 ): Promise<boolean> => {
-  const { editions = [], storyChapters = [] } = await readCachedEditions();
-  if (!isCurrent() || !editions.length) return false;
+  const {
+    editions = [],
+    storyChapters = [],
+    seasonalPerks = [],
+  } = await readCachedEditions(mode, language);
+  if (!isCurrent() || !hasValidCachedEditions(editions)) return false;
   state.editions = markRaw(editions);
+  state.seasonalPerks = perksForMode(seasonalPerks, mode);
   if (!storyChapters.length) return false;
-  state.storyChapters = markRaw(
-    storyChapters.map((chapter) => normalizeStoryChapter(chapter)).sort((a, b) => a.order - b.order)
-  );
+  state.storyChapters = markRaw(sortedStoryChapters(storyChapters));
+  state.storyChaptersGameMode = gameModeForApiMode(mode);
+  migrateMetadataStoryObjectiveIds();
   logger.debug('[MetadataStore] Editions loaded from cache');
   return true;
+};
+/** A cache read must never fail the request that can still fetch live data. */
+const applyCachedEditionsOrIgnore = (
+  state: ProgressionCatalogState,
+  isCurrent: () => boolean,
+  mode: string,
+  language: string
+): Promise<boolean> =>
+  applyCachedEditions(state, isCurrent, mode, language).catch((error) => {
+    logger.warn('[MetadataStore] Editions cache read failed:', error);
+    return false;
+  });
+/** An overlay response that carries a complete, well-formed progression catalog. */
+type ProgressionCatalog = CachedEditions & {
+  editions: GameEdition[];
+  storyChapters: StoryChapter[];
+};
+const isProgressionCatalog = (
+  overlay: CachedEditions | undefined
+): overlay is ProgressionCatalog => {
+  if (!overlay) return false;
+  if (!Array.isArray(overlay.storyChapters)) return false;
+  return Array.isArray(overlay.editions) && overlay.editions.every(isGameEdition);
+};
+const fetchProgressionCatalog = async (
+  mode: string,
+  language: string,
+  forceRefresh: boolean
+): Promise<ProgressionCatalog> => {
+  const response = await $fetch<{ data: CachedEditions }>('/api/tarkov/editions', {
+    query: {
+      lang: language,
+      gameMode: mode,
+      ...(forceRefresh ? { cacheBust: '1' } : {}),
+    },
+  });
+  const overlay = response.data;
+  // Reject the whole payload up front so malformed chapters cannot partially
+  // replace edition eligibility.
+  if (!isProgressionCatalog(overlay)) throw new TypeError('Invalid progression catalog');
+  return overlay;
+};
+const applyProgressionCatalog = (
+  state: ProgressionCatalogState,
+  overlay: ProgressionCatalog,
+  mode: string
+) => {
+  // Normalize before assigning; the guard already proved both lists are present.
+  const chapters = sortedStoryChapters([...overlay.storyChapters]);
+  state.editions = markRaw([...overlay.editions]);
+  state.storyChapters = markRaw(chapters);
+  state.storyChaptersGameMode = gameModeForApiMode(mode);
+  state.seasonalPerks = perksForMode(overlay.seasonalPerks ?? [], mode);
+  migrateMetadataStoryObjectiveIds();
+};
+const cacheProgressionCatalog = (
+  state: ProgressionCatalogState,
+  mode: string,
+  language: string
+) => {
+  if (typeof window === 'undefined') return;
+  setCachedData(
+    'editions' as CacheType,
+    `${EDITIONS_CACHE_VERSION}-${mode}`,
+    language,
+    {
+      editions: state.editions,
+      storyChapters: state.storyChapters,
+      seasonalPerks: state.seasonalPerks,
+    },
+    CACHE_CONFIG.MAX_TTL
+  ).catch((err) => logger.error('[MetadataStore] Error caching editions:', err));
+};
+/**
+ * Fetch, validate, apply, and cache the progression catalog. Every state write
+ * is fenced behind `isCurrent()` so a superseded scope cannot publish its result.
+ */
+const loadProgressionCatalog = async (
+  state: Pick<
+    MetadataState,
+    'editions' | 'editionsError' | 'seasonalPerks' | 'storyChapters' | 'storyChaptersGameMode'
+  >,
+  promiseStore: ReturnType<typeof getPromiseStore>,
+  context: {
+    forceRefresh: boolean;
+    isCurrent: () => boolean;
+    language: string;
+    mode: string;
+    scope: string;
+  }
+): Promise<void> => {
+  try {
+    const overlay = await fetchProgressionCatalog(
+      context.mode,
+      context.language,
+      context.forceRefresh
+    );
+    if (!context.isCurrent()) return;
+    applyProgressionCatalog(state, overlay, context.mode);
+    promiseStore.editionsSettledScope = context.scope;
+    cacheProgressionCatalog(state, context.mode, context.language);
+  } catch (err) {
+    if (!context.isCurrent()) return;
+    logger.error('[MetadataStore] Error fetching editions data:', err);
+    state.editionsError = err as Error;
+  }
 };
 export const useMetadataStore = defineStore('metadata', {
   state: (): MetadataState => ({
@@ -234,6 +409,7 @@ export const useMetadataStore = defineStore('metadata', {
     tasks: markRaw([]),
     editions: markRaw([]),
     storyChapters: markRaw([]),
+    seasonalPerks: markRaw([]),
     hideoutStations: markRaw([]),
     maps: markRaw([]),
     traders: markRaw([]),
@@ -258,9 +434,14 @@ export const useMetadataStore = defineStore('metadata', {
     objectiveModeCountDifferencesHydrated: false,
     languageCode: 'en',
     currentGameMode: GAME_MODES.PVP,
+    storyChaptersGameMode: null,
     lastCachePurgeCheckAt: 0,
   }),
   getters: {
+    resolvedSeasonalPerks: (state) =>
+      state.currentGameMode === GAME_MODES.SEASONAL
+        ? resolveSeasonalPerks(state.seasonalPerks, state.items)
+        : [],
     // Computed properties for tasks
     objectives: (state): TaskObjective[] => {
       if (!state.tasks.length) return [];
@@ -363,73 +544,35 @@ export const useMetadataStore = defineStore('metadata', {
      * Returns: Map<taskId, userPrestigeLevel>
      * Example: { "6761f28a022f60bb320f3e95": 0 } means users at prestige 0 see this task
      */
-    prestigeTaskMap: (state): Map<string, number> => {
-      const map = new Map<string, number>();
-      // Authoritative source: tarkov.dev's Task.requiredPrestige references the
-      // prestige the user must currently be AT to see the task (e.g. the New
-      // Beginning task completed to reach prestige 2 requires prestige 1).
-      const prestigeLevelById = new Map<string, number>();
-      for (const prestige of state.prestigeLevels) {
-        const level = prestige.prestigeLevel ?? prestige.level;
-        if (prestige.id && typeof level === 'number') {
-          prestigeLevelById.set(prestige.id, level);
-        }
-      }
-      for (const task of state.tasks) {
-        const requiredId = task.requiredPrestige?.id;
-        if (!requiredId) continue;
-        const userPrestigeLevel = prestigeLevelById.get(requiredId);
-        if (userPrestigeLevel !== undefined && userPrestigeLevel >= 0) {
-          map.set(task.id, userPrestigeLevel);
-        }
-      }
-      const newBeginningTaskIds = new Set(
-        state.tasks.filter((task) => isNewBeginningTask(task)).map((task) => task.id)
-      );
-      for (const prestige of state.prestigeLevels) {
-        const prestigeLevel = prestige.prestigeLevel ?? 0;
-        if (prestigeLevel <= 0) continue;
-        // Find TaskObjectiveTaskStatus conditions that reference tasks
-        for (const condition of prestige.conditions || []) {
-          const taskId = condition.task?.id;
-          if (!taskId || map.has(taskId)) continue;
-          // Check if this is a task status condition with a task reference
-          if (newBeginningTaskIds.size > 0 && !newBeginningTaskIds.has(taskId)) continue;
-          if (newBeginningTaskIds.size === 0 && condition.task?.name !== 'New Beginning') continue;
-          // User at prestige (N-1) needs to complete this task to reach prestige N
-          map.set(taskId, prestigeLevel - 1);
-        }
-      }
-      for (const task of state.tasks) {
-        if (!isNewBeginningTask(task) || map.has(task.id)) continue;
-        const prestigeLevel = inferNewBeginningPrestigeLevel(task);
-        if (!prestigeLevel) continue;
-        const userPrestigeLevel = prestigeLevel - 1;
-        if (userPrestigeLevel >= 0) {
-          map.set(task.id, userPrestigeLevel);
-        }
-      }
-      return map;
-    },
+    prestigeTaskMap: (state): Map<string, number> =>
+      buildPrestigeTaskMap(state.tasks, state.prestigeLevels),
   },
   actions: {
     async initialize(options?: { forceRefresh?: boolean; gameMode?: GameMode }) {
       const forceRefresh = options?.forceRefresh ?? false;
       const perfTimer = perfStart('[Metadata] initialize');
       const promiseStore = getPromiseStore(this);
-      if (promiseStore.initPromise && !forceRefresh) {
+      this.updateLanguageAndGameMode(undefined, options?.gameMode);
+      const scope = `${this.getApiGameMode()}-${this.languageCode}`;
+      if (promiseStore.initPromise && promiseStore.initScope === scope && !forceRefresh) {
         perfEnd(perfTimer, { reused: true });
         return promiseStore.initPromise;
       }
+      const version = ++promiseStore.initVersion;
+      promiseStore.initScope = scope;
+      const isCurrent = () =>
+        promiseStore.initVersion === version &&
+        `${this.getApiGameMode()}-${this.languageCode}` === scope;
       promiseStore.isInitializing = true;
       promiseStore.initPromise = (async () => {
         const taskCoreRefreshId = beginTaskCoreRefresh(this);
         try {
-          this.updateLanguageAndGameMode(undefined, options?.gameMode);
           await this.loadStaticMapData();
+          if (!isCurrent()) return;
           let cachedData: Awaited<ReturnType<typeof this.loadCriticalCacheData>> = null;
           if (typeof window !== 'undefined' && !forceRefresh) {
             cachedData = await this.loadCriticalCacheData();
+            if (!isCurrent()) return;
             if (cachedData) {
               this.initialized = true;
               logger.debug('[MetadataStore] Critical cache exists, skipping loading screen');
@@ -438,14 +581,17 @@ export const useMetadataStore = defineStore('metadata', {
           const dataRefresh = this.fetchAllData(forceRefresh, {
             deferHeavy: !forceRefresh,
             cachedData,
+            isOwner: isCurrent,
           });
           // fetchAllData registers its core phase synchronously; release setup ownership now.
           finishTaskCoreRefresh(this, taskCoreRefreshId);
           await dataRefresh;
+          if (!isCurrent()) return;
           this.assertCriticalMetadataReady();
           this.initialized = true;
           this.initializationFailed = false;
         } catch (err) {
+          if (!isCurrent()) return;
           logger.error('[MetadataStore] Failed to initialize metadata:', err);
           this.initialized = hasRenderableCriticalMetadata(this);
           this.initializationFailed = true;
@@ -453,8 +599,10 @@ export const useMetadataStore = defineStore('metadata', {
           throw err;
         } finally {
           finishTaskCoreRefresh(this, taskCoreRefreshId);
-          promiseStore.isInitializing = false;
-          promiseStore.initPromise = null;
+          if (promiseStore.initVersion === version) {
+            promiseStore.isInitializing = false;
+            promiseStore.initPromise = null;
+          }
           perfEnd(perfTimer, {
             initialized: this.initialized,
             failed: this.initializationFailed,
@@ -479,6 +627,7 @@ export const useMetadataStore = defineStore('metadata', {
       }
       // Update game mode
       this.currentGameMode = gameModeOverride ?? getMetadataGameMode();
+      this.seasonalPerks = perksForMode(this.seasonalPerks, this.getApiGameMode());
     },
     setLoading(isLoading: boolean) {
       this.loading = isLoading;
@@ -495,42 +644,47 @@ export const useMetadataStore = defineStore('metadata', {
      * Load critical cached data if available.
      * Returns the cached data to avoid redundant fetches, or null if cache is incomplete.
      */
-    async loadCriticalCacheData(): Promise<{
-      tasksCore: TarkovTasksCoreQueryResult;
-      hideout: TarkovHideoutQueryResult;
-      prestige: TarkovPrestigeQueryResult;
-      editions: { editions: GameEdition[]; storyChapters?: StoryChapter[] };
-    } | null> {
+    async loadCriticalCacheData(): Promise<CriticalCacheData | null> {
       try {
         const apiGameMode =
           API_GAME_MODES[this.currentGameMode as keyof typeof API_GAME_MODES] ||
           API_GAME_MODES[GAME_MODES.PVP];
+        const language = this.languageCode;
+        const scope = `${apiGameMode}-${language}`;
         // Load all critical cache entries in parallel
         const [tasksCore, hideout, prestige, editions] = await Promise.all([
           getCachedData<TarkovTasksCoreQueryResult>(
             'tasks-core' as CacheType,
             `${TASKS_CORE_CACHE_VERSION}-${apiGameMode}`,
-            this.languageCode
+            language
           ),
           getCachedData<TarkovHideoutQueryResult>(
             'hideout' as CacheType,
             `${HIDEOUT_CACHE_VERSION}-${apiGameMode}`,
-            this.languageCode
+            language
           ),
           getCachedData<TarkovPrestigeQueryResult>(
             'prestige' as CacheType,
-            `all-${PRESTIGE_CACHE_VERSION}`,
-            this.languageCode
+            `${PRESTIGE_CACHE_VERSION}-${apiGameMode}`,
+            language
           ),
-          getCachedData<{ editions: GameEdition[]; storyChapters?: StoryChapter[] }>(
+          getCachedData<CachedEditions>(
             'editions' as CacheType,
-            'all',
-            'en'
+            `${EDITIONS_CACHE_VERSION}-${apiGameMode}`,
+            language
           ),
         ]);
-        if (tasksCore && hideout && prestige && editions) {
+        if (
+          tasksCore &&
+          hideout &&
+          prestige &&
+          editions &&
+          Array.isArray(editions.editions) &&
+          editions.editions.every(isGameEdition) &&
+          Array.isArray(editions.storyChapters)
+        ) {
           logger.debug('[MetadataStore] Critical cache: ALL PRESENT');
-          return { tasksCore, hideout, prestige, editions };
+          return { scope, tasksCore, hideout, prestige, editions };
         }
         logger.debug('[MetadataStore] Critical cache: MISSING some entries');
         return null;
@@ -671,7 +825,9 @@ export const useMetadataStore = defineStore('metadata', {
         promiseRequestId,
         throwOnError = false,
       } = config;
+      const requestScope = `${this.getApiGameMode()}-${this.languageCode}`;
       const isCurrentRequestContext = (): boolean => {
+        if (`${this.getApiGameMode()}-${this.languageCode}` !== requestScope) return false;
         if (!promiseKey) return true;
         if (promiseRequestId && getPromiseRequestIdStore(this)[promiseKey] !== promiseRequestId) {
           return false;
@@ -865,14 +1021,14 @@ export const useMetadataStore = defineStore('metadata', {
       forceRefresh = false,
       options: {
         deferHeavy?: boolean;
-        cachedData?: {
-          tasksCore: TarkovTasksCoreQueryResult;
-          hideout: TarkovHideoutQueryResult;
-          prestige: TarkovPrestigeQueryResult;
-          editions: { editions: GameEdition[]; storyChapters?: StoryChapter[] };
-        } | null;
+        cachedData?: CriticalCacheData | null;
+        isOwner?: () => boolean;
       } = {}
     ) {
+      const requestScope = `${this.getApiGameMode()}-${this.languageCode}`;
+      const isCurrent = () =>
+        `${this.getApiGameMode()}-${this.languageCode}` === requestScope &&
+        (options.isOwner?.() ?? true);
       const { deferHeavy = false, cachedData = null } = options;
       const perfTimer = perfStart('[Metadata] fetchAllData', { forceRefresh, deferHeavy });
       this.checkCachePurge().catch((err) =>
@@ -891,30 +1047,30 @@ export const useMetadataStore = defineStore('metadata', {
       let editionsPromise: Promise<void> = Promise.resolve();
       let tasksCorePromise: Promise<void>;
       try {
-        if (cachedData && !forceRefresh) {
-          this.applyCriticalCachedData(cachedData);
-        }
+        const cacheApplied =
+          !forceRefresh && cachedData !== null && this.applyCriticalCachedData(cachedData);
         await this.fetchBootstrapData(forceRefresh);
-        if (cachedData && !forceRefresh) {
+        if (!isCurrent()) return;
+        if (cacheApplied) {
           hideoutPromise = Promise.resolve();
-          if (!this.storyChapters.length) {
-            editionsPromise = this.fetchEditionsData(false);
-          }
           tasksCorePromise = Promise.resolve();
         } else {
           hideoutPromise = this.fetchHideoutData(forceRefresh);
           if (deferHeavy) {
             queueIdleTask(
               () =>
-                this.fetchPrestigeData(forceRefresh).catch((err) =>
-                  logger.error('[MetadataStore] Error fetching deferred prestige data:', err)
-                ),
+                isCurrent()
+                  ? this.fetchPrestigeData(forceRefresh).catch((err) =>
+                      logger.error('[MetadataStore] Error fetching deferred prestige data:', err)
+                    )
+                  : undefined,
               { timeout: 3000, minTime: 8, priority: 'normal' }
             );
             const editionsRequestVersion = promiseStore.editionsRequestVersion;
             queueIdleTask(
               () => {
-                if (promiseStore.editionsRequestVersion !== editionsRequestVersion) return;
+                if (!isCurrent() || promiseStore.editionsRequestVersion !== editionsRequestVersion)
+                  return;
                 return this.fetchEditionsData(forceRefresh).catch((err) =>
                   logger.error('[MetadataStore] Error fetching deferred editions data:', err)
                 );
@@ -931,15 +1087,18 @@ export const useMetadataStore = defineStore('metadata', {
       } finally {
         finishTaskCoreRefresh(this, taskCoreRefreshId);
       }
+      if (!isCurrent()) return;
       // Fetch critical data directly (not deferred) - needed for UI to render
       const itemsLitePromise = this.fetchItemsLiteData(forceRefresh);
       let taskObjectivesPromise: Promise<void> = Promise.resolve();
       if (this.tasks.length && deferHeavy) {
         queueIdleTask(
           () =>
-            this.fetchTaskObjectivesData(forceRefresh).catch((err) =>
-              logger.error('[MetadataStore] Error fetching deferred task objectives data:', err)
-            ),
+            isCurrent()
+              ? this.fetchTaskObjectivesData(forceRefresh).catch((err) =>
+                  logger.error('[MetadataStore] Error fetching deferred task objectives data:', err)
+                )
+              : undefined,
           { timeout: 3000, minTime: 8, priority: 'normal' }
         );
       } else {
@@ -950,7 +1109,8 @@ export const useMetadataStore = defineStore('metadata', {
         const rewardsRequestVersion = promiseStore.taskRewardsRequestVersion;
         queueIdleTask(
           () => {
-            if (promiseStore.taskRewardsRequestVersion !== rewardsRequestVersion) return;
+            if (!isCurrent() || promiseStore.taskRewardsRequestVersion !== rewardsRequestVersion)
+              return;
             return this.fetchTaskRewardsData(forceRefresh).catch((err) =>
               logger.error('[MetadataStore] Error fetching deferred data:', err)
             );
@@ -963,6 +1123,7 @@ export const useMetadataStore = defineStore('metadata', {
       // Full items are heavy; load on-demand via ensureItemsFullLoaded.
       await Promise.all([hideoutPromise, itemsLitePromise, taskObjectivesPromise]);
       await Promise.all([prestigePromise, editionsPromise]);
+      if (!isCurrent()) return;
       if (!this.initialized && hasRenderableCriticalMetadata(this)) {
         this.initialized = true;
         this.initializationFailed = false;
@@ -1384,64 +1545,70 @@ export const useMetadataStore = defineStore('metadata', {
       });
     },
     /**
-     * Fetch prestige data (language-specific, not game-mode specific)
+     * Fetch prestige data for the current language and game mode
      */
     async fetchPrestigeData(forceRefresh = false) {
       const requestLanguage = this.languageCode;
+      const requestMode = this.getApiGameMode();
       await this.fetchWithCache<TarkovPrestigeQueryResult>({
         cacheType: 'prestige' as CacheType,
-        cacheKey: `all-${PRESTIGE_CACHE_VERSION}`,
+        cacheKey: `${PRESTIGE_CACHE_VERSION}-${this.getApiGameMode()}`,
         cacheLanguage: requestLanguage,
         endpoint: '/api/tarkov/prestige',
-        queryParams: { lang: requestLanguage },
+        queryParams: { lang: requestLanguage, gameMode: requestMode },
         cacheTTL: CACHE_CONFIG.MAX_TTL,
         loadingKey: 'prestigeLoading',
         errorKey: 'prestigeError',
         processData: (data) => {
+          if (requestMode !== this.getApiGameMode() || requestLanguage !== this.languageCode)
+            return;
           this.prestigeLevels = markRaw(data.prestige || []);
           this.hydratePrestigeItems();
         },
         onEmpty: () => {
+          if (requestMode !== this.getApiGameMode() || requestLanguage !== this.languageCode)
+            return;
           this.prestigeLevels = markRaw([]);
         },
         logName: 'Prestige',
         forceRefresh,
         promiseKey: 'prestigePromise',
-        promiseRequestKey: requestLanguage,
+        promiseRequestKey: `${requestMode}-${requestLanguage}`,
       });
     },
-    /** Join or reuse universal edition data for task readiness. */
+    /** Join or reuse the current mode/language catalog for task readiness. */
     async ensureEditionsData() {
       const promises = getPromiseStore(this);
-      if (!promises.editionsRequestVersion) return this.fetchEditionsData();
-      // Universal editions already requested this session: join or reuse their settlement.
-      // This caller also consumes a queued idle load, even when joining another request.
+      const scope = `${this.getApiGameMode()}-${this.languageCode}`;
       promises.editionsRequestVersion += 1;
-      return promises.editionsPromise;
+      if (promises.editionsScope === scope && promises.editionsPromise)
+        return promises.editionsPromise;
+      // Readiness reuses settled failures too; explicit fetch/refresh retries them.
+      if (promises.editionsSettledScope === scope) return;
+      return this.fetchEditionsData();
     },
-    /**
-     * Fetch game editions data directly from GitHub overlay.
-     * Editions are universal (not language or game-mode specific).
-     * Note: Uses external URL, so cannot use generic fetchWithCache helper.
-     */
     async fetchEditionsData(forceRefresh = false) {
       const promiseStore = getPromiseStore(this);
+      const requestMode = this.getApiGameMode();
+      const requestLanguage = this.languageCode;
+      const scope = `${requestMode}-${requestLanguage}`;
       promiseStore.editionsRequestVersion += 1;
-      const existingPromise = promiseStore.editionsPromise;
+      const existingPromise = editionsPromiseForScope(promiseStore, scope);
       if (existingPromise && !forceRefresh) {
         return existingPromise;
       }
+      prepareEditionScope(this, promiseStore, scope);
+      this.seasonalPerks = perksForMode(this.seasonalPerks, requestMode);
       // Register the promise before requests can settle or throw synchronously.
-      // fallow-ignore-next-line complexity -- CRAP assumes zero coverage; measured coverage and reduced complexity are documented in docs/task-performance-validation.md
       const promise = Promise.resolve().then(async () => {
         this.editionsError = null;
-        const isCurrent = () => promiseStore.editionsPromise === promise;
+        const isCurrent = () =>
+          promiseStore.editionsPromise === promise &&
+          this.getApiGameMode() === requestMode &&
+          this.languageCode === requestLanguage;
         if (
           !forceRefresh &&
-          (await applyCachedEditions(this, isCurrent).catch((error) => {
-            logger.warn('[MetadataStore] Editions cache read failed:', error);
-            return false;
-          }))
+          (await applyCachedEditionsOrIgnore(this, isCurrent, requestMode, requestLanguage))
         ) {
           void this.fetchEditionsData(true).catch((error) =>
             logger.warn('[MetadataStore] Background editions revalidation failed:', error)
@@ -1450,78 +1617,76 @@ export const useMetadataStore = defineStore('metadata', {
         }
         if (!isCurrent()) return;
         this.editionsLoading = true;
-        try {
-          const OVERLAY_URL =
-            'https://raw.githubusercontent.com/tarkovtracker-org/tarkov-data-overlay/main/dist/overlay.json';
-          const overlay = await $fetch<{
-            editions?: Record<string, GameEdition>;
-            storyChapters?: Record<string, StoryChapter>;
-          }>(OVERLAY_URL, {
-            parseResponse: JSON.parse,
-          });
-          if (promiseStore.editionsPromise !== promise) return;
-          // Normalize both before assigning so malformed chapters cannot partially replace eligibility.
-          const editions = Object.values(overlay?.editions ?? {});
-          const chapters = Object.values(overlay?.storyChapters ?? {})
-            .map((chapter) => normalizeStoryChapter(chapter))
-            .sort((a, b) => a.order - b.order);
-          if (!overlay?.editions)
-            logger.warn('[MetadataStore] No editions found in overlay response');
-          this.editions = markRaw(editions);
-          this.storyChapters = markRaw(chapters);
-          if (typeof window !== 'undefined') {
-            setCachedData(
-              'editions' as CacheType,
-              'all',
-              'en',
-              { editions: this.editions, storyChapters: this.storyChapters },
-              CACHE_CONFIG.MAX_TTL
-            ).catch((err) => logger.error('[MetadataStore] Error caching editions:', err));
-          }
-        } catch (err) {
-          if (promiseStore.editionsPromise !== promise) return;
-          logger.error('[MetadataStore] Error fetching editions data:', err);
-          this.editionsError = err as Error;
-        }
+        await loadProgressionCatalog(this, promiseStore, {
+          forceRefresh,
+          isCurrent,
+          language: requestLanguage,
+          mode: requestMode,
+          scope,
+        });
       });
       promiseStore.editionsPromise = promise;
       try {
         await promise;
       } finally {
         if (promiseStore.editionsPromise === promise) {
+          promiseStore.editionsSettledScope = settledEditionScope(
+            scope,
+            `${this.getApiGameMode()}-${this.languageCode}`
+          );
           this.editionsLoading = false;
           promiseStore.editionsPromise = null;
         }
       }
     },
-    applyCriticalCachedData(cachedData: {
-      tasksCore: TarkovTasksCoreQueryResult;
-      hideout: TarkovHideoutQueryResult;
-      prestige: TarkovPrestigeQueryResult;
-      editions: { editions: GameEdition[]; storyChapters?: StoryChapter[] };
-    }) {
-      if (!this.tasks.length) {
-        this.processTasksCoreData(cachedData.tasksCore);
-        this.error = null;
+    applyCriticalCachedData(cachedData: CriticalCacheData): boolean {
+      const scope = `${this.getApiGameMode()}-${this.languageCode}`;
+      if (cachedData.scope !== scope || !cachedData.editions.editions?.every(isGameEdition))
+        return false;
+      // A cache hydration owns these datasets just like a new network request.
+      const promises = getPromiseStore(this);
+      const requestIds = getPromiseRequestIdStore(this);
+      const requestKeys = getPromiseRequestKeyStore(this);
+      for (const key of [
+        'tasksCorePromise',
+        'taskObjectivesPromise',
+        'hideoutPromise',
+        'prestigePromise',
+      ] as const) {
+        requestIds[key] = Symbol(key);
+        requestKeys[key] = undefined;
+        promises[key] = null;
       }
-      if (!this.hideoutStations.length) {
-        this.processHideoutData(cachedData.hideout);
-        this.hydrateHideoutItems();
-        this.hideoutError = null;
-      }
-      if (!this.prestigeLevels.length) {
-        this.prestigeLevels = markRaw(cachedData.prestige.prestige || []);
-        this.hydratePrestigeItems();
-      }
-      if (!this.editions.length) {
-        this.editions = markRaw(cachedData.editions.editions || []);
-      }
-      if (!this.storyChapters.length && cachedData.editions.storyChapters?.length) {
-        const sorted = cachedData.editions.storyChapters
+      promises.editionsPromise = null;
+      promises.editionsRequestVersion += 1;
+      promises.editionsScope = scope;
+      promises.editionsSettledScope = scope;
+      this.processTasksCoreData(cachedData.tasksCore);
+      this.processHideoutData(cachedData.hideout);
+      this.hydrateHideoutItems();
+      this.prestigeLevels = markRaw(cachedData.prestige.prestige || []);
+      this.hydratePrestigeItems();
+      this.editions = markRaw(cachedData.editions.editions ?? []);
+      this.storyChapters = markRaw(
+        (cachedData.editions.storyChapters ?? [])
           .map((chapter) => normalizeStoryChapter(chapter))
-          .sort((a, b) => a.order - b.order);
-        this.storyChapters = markRaw(sorted);
-      }
+          .sort((a, b) => a.order - b.order)
+      );
+      this.storyChaptersGameMode = gameModeForApiMode(this.getApiGameMode());
+      migrateMetadataStoryObjectiveIds();
+      this.seasonalPerks = perksForMode(
+        cachedData.editions.seasonalPerks ?? [],
+        this.getApiGameMode()
+      );
+      this.error = null;
+      this.hideoutError = null;
+      this.prestigeError = null;
+      this.editionsError = null;
+      this.loading = false;
+      this.hideoutLoading = false;
+      this.prestigeLoading = false;
+      this.editionsLoading = false;
+      return true;
     },
     assertCriticalMetadataReady() {
       const missing: string[] = [];

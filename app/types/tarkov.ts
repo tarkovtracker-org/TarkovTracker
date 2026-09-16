@@ -87,24 +87,51 @@ export interface SkillRequirement {
   level: number;
   skill?: Skill;
 }
+export type RequirementComparison = '>=' | '>' | '<=' | '<' | '=' | '==' | '!=';
+export type NormalizedTraderRequirement =
+  | {
+      id: string;
+      requirementType: 'level' | 'reputation';
+      compareMethod: RequirementComparison;
+      value: number;
+      trader: { id: string; name: string };
+    }
+  | {
+      id: string;
+      requirementType: 'unknown';
+      reason: 'shape' | 'type' | 'comparison' | 'value' | 'trader';
+    };
 export interface TraderRequirement {
   id: string;
   trader: { id: string; name: string };
   value: number;
   requirementType?: 'level' | 'reputation';
-  compareMethod?: '>=' | '<' | '<=' | '>';
+  compareMethod?: RequirementComparison;
 }
+/**
+ * A task's declared prestige gate. Adapted upstream references carry `id`; overlay-injected tasks
+ * keep the declared reference verbatim, which names a level instead. Readers must not assume `id`.
+ */
+export interface TaskPrestigeReference {
+  id?: string;
+  name?: string;
+  prestigeLevel?: number;
+}
+/**
+ * A gate the source declared but that could not be interpreted. Absence of an optional gate is
+ * never a diagnostic, so these values keep a malformed explicit gate distinguishable from no gate.
+ */
+export type TaskRequirementDiagnostic = 'prestige_reference' | 'task_requirement';
 export interface TaskTraderLevelRequirement {
   id: string;
   trader: { id: string; name: string };
   level: number;
   requirementType?: 'level' | 'reputation';
-  compareMethod?: '>=' | '<' | '<=' | '>';
-}
-export interface TraderLevelRequirementWithMet extends TaskTraderLevelRequirement {
-  met: boolean;
+  compareMethod?: RequirementComparison;
 }
 export interface Craft {
+  taskUnlock?: { id: string; name?: string } | null;
+  unlockState?: 'unknown' | 'task';
   id: string;
   duration: number;
   requiredItems: ItemRequirement[];
@@ -235,9 +262,16 @@ export interface Task {
   trader?: { id: string; name?: string; normalizedName?: string; imageLink?: string };
   objectives?: TaskObjective[];
   taskRequirements?: TaskRequirement[];
+  storyUnlocks?: Array<{ id: string; name: string }>;
   minPlayerLevel?: number;
-  requiredPrestige?: { id: string };
+  requiredPrestige?: TaskPrestigeReference;
+  /**
+   * Declared gates dropped because they could not be interpreted. The evaluator turns each one
+   * into an unknown blocker so a malformed gate cannot pass as a genuinely absent optional gate.
+   */
+  requirementDiagnostics?: TaskRequirementDiagnostic[];
   failedRequirements?: TaskRequirement[];
+  normalizedTraderRequirements?: NormalizedTraderRequirement[];
   traderLevelRequirements?: TaskTraderLevelRequirement[];
   traderRequirements?: TraderRequirement[];
   factionName?: string;
@@ -345,8 +379,35 @@ export interface PlayerLevel {
   exp: number; // Cumulative XP required to reach this level (transformed from API)
   levelBadgeImageLink: string;
 }
+export interface SeasonalPerk {
+  id: string;
+  type: string;
+  name: string;
+  description: string;
+  points: number | null;
+  mutuallyExclusiveSeasonalPerkIds?: string[];
+  effects: Array<{
+    effectId: string;
+    itemFilter?: {
+      allowedItems: string[];
+      excludedItems: string[];
+      allowedCategories: string[];
+      excludedCategories: string[];
+    };
+    [key: string]: unknown;
+  }>;
+}
+export interface PrestigeStoryRequirement {
+  type: 'storyChapterStatus' | 'storyObjectiveStatus';
+  storyChapter: string;
+  objective?: string;
+  name: string;
+  status: string[];
+  unresolved?: boolean;
+}
 // Prestige System Types
 export interface PrestigeLevel {
+  storyRequirements?: PrestigeStoryRequirement[];
   id: string;
   level: number; // 0-6
   name?: string;
@@ -367,6 +428,35 @@ export interface StoryObjective {
   description: string;
   notes?: string | null;
   mutuallyExclusiveWith?: string[];
+  /**
+   * Client sub-quest the objective belongs to. Overlay releases before v1.93 omit it on curated
+   * chapters, so treat it as optional and never key persisted progress on it.
+   */
+  sourceQuestId?: string;
+  /** `client/ending_list` id of the branch this objective belongs to, when the overlay tags one. */
+  endingId?: string;
+}
+/**
+ * Ending branch a chapter can resolve into, restated by the overlay so the branch set is visible
+ * without scanning objectives. `objectiveCount` is 0 when the pinned capture holds no
+ * objective-level evidence for the branch, which is not proof that the branch has no objectives.
+ */
+export interface StoryChapterEnding {
+  id: string;
+  systemName: string;
+  gateQuestId: string;
+  objectiveCount: number;
+  resolvedInReference: boolean;
+}
+/**
+ * How much of a chapter the overlay's pinned client capture resolved. `partial` means the objective
+ * list is a projection of that capture, so a missing objective is not evidence that none exists.
+ */
+export interface StoryReferenceCoverage {
+  referencedSubquests: number;
+  resolvedSubquests: number;
+  missingObjectiveTexts?: number;
+  partial: boolean;
 }
 export interface StoryRewards {
   description: string;
@@ -381,10 +471,20 @@ export interface StoryChapter {
   chapterRequirements?: Array<{ id: string; name: string }>;
   mapUnlocks?: Array<{ id: string; name: string }>;
   traderUnlocks?: Array<{ id: string; name: string }>;
+  questUnlocks?: Array<{ id: string; name: string }>;
   description?: string | null;
   notes?: string | null;
   objectives?: { [objectiveId: string]: StoryObjective };
   rewards?: StoryRewards | null;
+  /** Story quest the chapter maps to; source traceability only. */
+  chapterQuestId?: string;
+  referenceCoverage?: StoryReferenceCoverage;
+  endings?: StoryChapterEnding[];
+  /**
+   * Unordered pairs of sub-quest IDs that cannot both be *completed*. Partial objective progress on
+   * both quests stays legal, so these must never be expanded into objective exclusions.
+   */
+  mutuallyExclusiveQuestPairs?: Array<[string, string]>;
 }
 export interface MemberProfile {
   displayName: string | null;

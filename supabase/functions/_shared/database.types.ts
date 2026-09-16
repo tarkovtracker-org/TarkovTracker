@@ -366,9 +366,11 @@ export type Database = {
           id: string
           initiated_by: string | null
           target_user: string | null
+          server_verified: boolean;
           team_id: string | null
         }
         Insert: {
+          server_verified?: boolean;
           created_at?: string | null
           event_data?: Json | null
           event_type: string
@@ -378,6 +380,7 @@ export type Database = {
           team_id?: string | null
         }
         Update: {
+          server_verified?: boolean;
           created_at?: string | null
           event_data?: Json | null
           event_type?: string
@@ -1006,6 +1009,10 @@ export type Database = {
       merge_api_update_history: {
         Args: { max_entries?: number; payload: Json; previous_payload: Json }
         Returns: Json
+      }
+      leave_team: {
+        Args: { p_team_id: string; p_user_id: string }
+        Returns: string
       }
       merge_progress_data: {
         Args: {

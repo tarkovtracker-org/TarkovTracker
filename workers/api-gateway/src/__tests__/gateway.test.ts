@@ -292,6 +292,18 @@ describe('api-gateway', () => {
     expect(body.info?.title).toBe('TarkovTracker API Gateway');
     expect(res.headers.get('Vary')).toContain('Origin');
   });
+  it('returns 404 for openapi.json and /api/v2/openapi.json on non-api host', async () => {
+    const apexOpenApi = await worker.fetch(
+      new Request('https://tarkovtracker.org/openapi.json', { method: 'GET' }),
+      BASE_ENV
+    );
+    expect(apexOpenApi.status).toBe(404);
+    const legacyOpenApi = await worker.fetch(
+      new Request('https://tarkovtracker.org/api/v2/openapi.json', { method: 'GET' }),
+      BASE_ENV
+    );
+    expect(legacyOpenApi.status).toBe(404);
+  });
   it('serves Scalar docs at api root', async () => {
     const res = await worker.fetch(buildRequest('/'), BASE_ENV);
     expect(res.status).toBe(200);
@@ -372,42 +384,43 @@ describe('api-gateway', () => {
     expect(body.success).toBe(false);
     expect(body.error).toContain('User-Agent must be 5-200 characters');
   });
-  it('validates User-Agent before issuing a legacy /api/v2 308 redirect', async () => {
-    const env: Env = { ...BASE_ENV, LEGACY_API_REDIRECT: 'true' };
+  it('returns 404 for legacy /api/v2 routes on non-api hosts', async () => {
     const res = await worker.fetch(
-      new Request('https://tarkovtracker.org/api/v2/progress/task/task-1?foo=bar', {
-        method: 'POST',
-        headers: { ...AUTH_HEADERS, 'User-Agent': 'ab' },
-        body: JSON.stringify({ state: 'completed' }),
+      new Request('https://tarkovtracker.org/api/v2/progress', {
+        method: 'GET',
+        headers: { 'User-Agent': 'TestClient/1.0 (+https://example.com)' },
       }),
-      env
+      BASE_ENV
     );
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { success: boolean; error: string };
-    expect(body.error).toContain('User-Agent must be 5-200 characters');
+    expect(res.status).toBe(404);
+    const withoutSlash = await worker.fetch(
+      new Request('https://tarkovtracker.org/api/v2', {
+        method: 'GET',
+        headers: { 'User-Agent': 'TestClient/1.0 (+https://example.com)' },
+      }),
+      BASE_ENV
+    );
+    expect(withoutSlash.status).toBe(404);
   });
-  it('redirects legacy /api/v2 routes with 308 when LEGACY_API_REDIRECT is true', async () => {
-    const env: Env = { ...BASE_ENV, LEGACY_API_REDIRECT: 'true' };
+  it('returns 404 for OPTIONS on legacy routes on non-api hosts', async () => {
     const res = await worker.fetch(
-      new Request('https://tarkovtracker.org/api/v2/progress/task/task-1?foo=bar', {
-        method: 'POST',
-        headers: { ...AUTH_HEADERS, 'User-Agent': 'TestClient/1.0 (+https://example.com)' },
-        body: JSON.stringify({ state: 'completed' }),
+      new Request('https://tarkovtracker.org/api/v2/progress', {
+        method: 'OPTIONS',
       }),
-      env
+      BASE_ENV
     );
-    expect(res.status).toBe(308);
-    expect(res.headers.get('Location')).toBe(
-      'https://api.tarkovtracker.org/progress/task/task-1?foo=bar'
-    );
-    // RFC 9745: Deprecation is a structured-field Date (@<unix-ts>)
-    expect(res.headers.get('Deprecation')).toBe('@1783296000');
-    expect(res.headers.get('Link')).toBe(
-      '<https://api.tarkovtracker.org/progress/task/task-1?foo=bar>; rel="successor-version"'
-    );
+    expect(res.status).toBe(404);
   });
-  it('redirects legacy /api routes without /v2 prefix when LEGACY_API_REDIRECT is true', async () => {
-    const env: Env = { ...BASE_ENV, LEGACY_API_REDIRECT: 'true' };
+  it('returns 204 for OPTIONS on /health on non-api hosts', async () => {
+    const res = await worker.fetch(
+      new Request('https://tarkovtracker.org/health', {
+        method: 'OPTIONS',
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(204);
+  });
+  it('returns 404 for legacy /api routes without /v2 prefix on non-api hosts', async () => {
     const res = await worker.fetch(
       new Request('https://tarkovtracker.org/api/progress', {
         method: 'GET',
@@ -416,20 +429,67 @@ describe('api-gateway', () => {
           'User-Agent': 'TestClient/1.0 (+https://example.com)',
         },
       }),
-      env
+      BASE_ENV
     );
-    expect(res.status).toBe(308);
-    expect(res.headers.get('Location')).toBe('https://api.tarkovtracker.org/progress');
+    expect(res.status).toBe(404);
   });
-  it('serves legacy /api/v2 routes normally when LEGACY_API_REDIRECT is off', async () => {
+  it('serves /api/v2 prefixed routes on api subdomain as path alias', async () => {
     const res = await worker.fetch(
-      new Request('https://tarkovtracker.org/api/v2/progress', {
+      new Request('https://api.tarkovtracker.org/api/v2/progress', {
         method: 'GET',
         headers: { 'User-Agent': 'TestClient/1.0 (+https://example.com)' },
       }),
       BASE_ENV
     );
     await expectErrorResponse(res, 401, 'Unauthorized');
+  });
+  it('serves canonical /health on both hosts but rejects /api/v2/health without auth', async () => {
+    const apexHealth = await worker.fetch(
+      new Request('https://tarkovtracker.org/health', { method: 'GET' }),
+      BASE_ENV
+    );
+    expect(apexHealth.status).toBe(200);
+    const legacyApexHealth = await worker.fetch(
+      new Request('https://tarkovtracker.org/api/v2/health', { method: 'GET' }),
+      BASE_ENV
+    );
+    expect(legacyApexHealth.status).toBe(404);
+  });
+  it('serves api routes and public endpoints on loopback dev hosts (localhost, 127.0.0.1)', async () => {
+    const localHealth = await worker.fetch(
+      new Request('http://localhost:8787/health', { method: 'GET' }),
+      BASE_ENV
+    );
+    expect(localHealth.status).toBe(200);
+    const localOpenApi = await worker.fetch(
+      new Request('http://localhost:8787/openapi.json', { method: 'GET' }),
+      BASE_ENV
+    );
+    expect(localOpenApi.status).toBe(200);
+    const localProgress = await worker.fetch(
+      new Request('http://localhost:8787/progress', {
+        method: 'GET',
+        headers: { 'User-Agent': 'TestClient/1.0 (+https://example.com)' },
+      }),
+      BASE_ENV
+    );
+    await expectErrorResponse(localProgress, 401, 'Unauthorized');
+    const localAliased = await worker.fetch(
+      new Request('http://localhost:8787/api/v2/progress', {
+        method: 'GET',
+        headers: { 'User-Agent': 'TestClient/1.0 (+https://example.com)' },
+      }),
+      BASE_ENV
+    );
+    await expectErrorResponse(localAliased, 401, 'Unauthorized');
+    const ipProgress = await worker.fetch(
+      new Request('http://127.0.0.1:8787/progress', {
+        method: 'GET',
+        headers: { 'User-Agent': 'TestClient/1.0 (+https://example.com)' },
+      }),
+      BASE_ENV
+    );
+    await expectErrorResponse(ipProgress, 401, 'Unauthorized');
   });
   it('returns token info for valid token', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));

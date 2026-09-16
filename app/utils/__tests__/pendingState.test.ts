@@ -77,6 +77,18 @@ describe('pending state reconciliation', () => {
     expect(snapshot).toEqual({ progress: { count: 2 }, empty: undefined });
     expect(snapshotSyncState(null)).toEqual({});
   });
+  it.each([() => undefined, Symbol('transient'), { toJSON: () => undefined }])(
+    'omits non-serializable fields without deleting matching remote values: %s',
+    (transient) => {
+      const base = snapshotSyncState({ transient, empty: undefined, persisted: 1 });
+      const local = snapshotSyncState({ empty: undefined, persisted: 2 });
+      expect(base).toStrictEqual({ empty: undefined, persisted: 1 });
+      expect(preservePendingPaths(base, local, { transient: 'remote', persisted: 3 })).toEqual({
+        transient: 'remote',
+        persisted: 2,
+      });
+    }
+  );
   it('preserves local deletion and array replacement while accepting other remote keys', () => {
     const base = { removed: { count: 5 }, list: ['a'], unchanged: 'old' };
     const local = { list: [], unchanged: 'old' };

@@ -46,6 +46,7 @@ type SetupOptions = {
   displayNames?: Record<string, string>;
   hasSystemInitiallyLoaded?: boolean;
   hasTeam?: boolean;
+  drawerOpen?: boolean;
 };
 const setup = async (options: SetupOptions = {}) => {
   const hiddenTeammates = { ...(options.hiddenTeammates ?? {}) };
@@ -152,12 +153,21 @@ const setup = async (options: SetupOptions = {}) => {
       t: (key: string, fallback?: string) => fallback ?? key.split('.').pop() ?? key,
     }),
   }));
+  const isDrawerOpenRef = ref(options.drawerOpen ?? false);
   vi.doMock('@/composables/usePageSettingsDrawer', () => ({
     usePageSettingsDrawer: () => ({
-      isOpen: ref(false),
-      open: vi.fn(),
-      close: vi.fn(),
-      toggle: vi.fn(),
+      isOpen: isDrawerOpenRef,
+      // All three mutators update the shared ref, mirroring the real composable so a
+      // future test wired to open()/close() sees consistent state.
+      open: vi.fn(() => {
+        isDrawerOpenRef.value = true;
+      }),
+      close: vi.fn(() => {
+        isDrawerOpenRef.value = false;
+      }),
+      toggle: vi.fn(() => {
+        isDrawerOpenRef.value = !isDrawerOpenRef.value;
+      }),
     }),
   }));
   const { default: TaskFilterBar } = await import('@/features/tasks/TaskFilterBar.vue');
@@ -463,5 +473,34 @@ describe('TaskFilterBar', () => {
     await teammateButton!.trigger('click');
     expect(preferencesStore.toggleHidden).not.toHaveBeenCalled();
     expect(preferencesStore.setTaskUserView).toHaveBeenCalledWith('teammate-1');
+  });
+  it('renders settings drawer button with theme classes when open, and toggles closed', async () => {
+    const { TaskFilterBar } = await setup({
+      drawerOpen: true,
+    });
+    const wrapper = mountTaskFilterBar(TaskFilterBar);
+    const settingsButton = wrapper.find('button[data-icon="i-mdi-cog"]');
+    expect(settingsButton.exists()).toBe(true);
+    expect(settingsButton.attributes('aria-pressed')).toBe('true');
+    expect(settingsButton.classes()).toContain('light:text-surface-50');
+    expect(settingsButton.classes()).toContain('light:bg-surface-700/70');
+    // Exercise the drawer toggle so the mocked toggle() and the off state are covered
+    // (and so the shared drawer state is left closed for later tests in this file).
+    await settingsButton.trigger('click');
+    expect(settingsButton.attributes('aria-pressed')).toBe('false');
+  });
+  it('renders neutral badge class when available count is zero', async () => {
+    const { TaskFilterBar } = await setup({
+      statusCounts: { available: 0 },
+    });
+    const wrapper = mountTaskFilterBar(TaskFilterBar);
+    const availableButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('available'));
+    expect(availableButton).toBeTruthy();
+    const badge = availableButton!.find('.rounded-full');
+    expect(badge.exists()).toBe(true);
+    expect(badge.classes()).toContain('bg-surface-600');
+    expect(badge.classes()).toContain('light:text-surface-50');
   });
 });

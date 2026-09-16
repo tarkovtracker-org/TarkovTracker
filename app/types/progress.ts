@@ -33,6 +33,33 @@ export interface TraderProgress {
   level: number;
   reputation: number;
 }
+export const MANUAL_ACTIVITY_TYPES = ['task', 'hideout', 'item', 'system'] as const;
+export type ManualActivityType = (typeof MANUAL_ACTIVITY_TYPES)[number];
+export const MANUAL_ACTIVITY_ACTIONS = [
+  'active',
+  'complete',
+  'uncomplete',
+  'fail',
+  'reset_failed',
+  'upgrade',
+  'needed',
+  'sync',
+  'available',
+] as const;
+export type ManualActivityAction = (typeof MANUAL_ACTIVITY_ACTIONS)[number];
+/**
+ * A user-initiated activity-log entry persisted inside the synced per-mode
+ * progress blob, alongside `apiUpdateHistory`. `title` and `details` hold
+ * already-translated display text captured when the action happened.
+ */
+export interface ManualActivityEntry {
+  id: string;
+  timestamp: number;
+  type: ManualActivityType;
+  action: ManualActivityAction;
+  title: string;
+  details?: string;
+}
 export interface UserProgressData {
   level: number;
   pmcFaction: 'USEC' | 'BEAR';
@@ -56,4 +83,6 @@ export interface UserProgressData {
   };
   lastApiUpdate?: ApiUpdateMeta;
   apiUpdateHistory?: ApiUpdateMeta[];
+  manualActivityHistory?: ManualActivityEntry[];
+  manualActivityEpoch?: number;
 }

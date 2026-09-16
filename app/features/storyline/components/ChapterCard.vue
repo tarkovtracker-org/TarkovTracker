@@ -61,6 +61,15 @@
           <UBadge v-else variant="subtle" color="neutral" size="xs">
             {{ t('page.profile.storyline_discovered') }}
           </UBadge>
+          <UBadge
+            v-if="chapter.coveragePartial"
+            variant="subtle"
+            color="warning"
+            size="xs"
+            :title="t('page.storyline.partial_data_hint')"
+          >
+            {{ t('page.storyline.partial_data') }}
+          </UBadge>
         </div>
       </div>
     </div>
@@ -101,7 +110,9 @@
           :class="getEndingCardClass(ending.routeState)"
         >
           <div class="flex flex-wrap items-center gap-1">
-            <span class="text-xs font-semibold text-white">{{ ending.label }}</span>
+            <span class="light:text-surface-50 text-xs font-semibold text-white">
+              {{ ending.label }}
+            </span>
             <UBadge
               v-if="ending.routeChoiceIndex !== null"
               variant="subtle"
@@ -121,6 +132,23 @@
             {{ ending.objectiveLabel }}
           </div>
           <div
+            v-if="ending.objectiveTotal"
+            class="text-surface-400 mt-0.5 text-[11px] leading-tight"
+          >
+            {{
+              t('page.storyline.ending_progress', {
+                completed: ending.objectiveCompleted ?? 0,
+                total: ending.objectiveTotal,
+              })
+            }}
+          </div>
+          <div
+            v-else-if="ending.evidencePending"
+            class="text-surface-400 mt-0.5 text-[11px] leading-tight"
+          >
+            {{ t('page.storyline.ending_evidence_pending') }}
+          </div>
+          <div
             v-if="ending.routeState === 'blocked' && ending.routeBlockingAlternatives.length"
             class="text-error-300 mt-0.5 text-[11px] leading-tight"
           >
@@ -133,6 +161,62 @@
         </div>
       </div>
     </div>
+    <div
+      v-if="chapter.questRouteChoices.length"
+      class="bg-surface-950/20 mb-2 rounded-md border border-white/5 p-2"
+    >
+      <div class="text-surface-500 mb-0.5 text-[11px] font-medium tracking-wider uppercase">
+        {{ t('page.storyline.route_choice') }}
+      </div>
+      <div
+        v-for="questRoute in chapter.questRouteChoices"
+        :key="questRoute.id"
+        class="mb-1.5 space-y-1 last:mb-0"
+      >
+        <div
+          v-for="branch in questRoute.branches"
+          :key="branch.id"
+          class="flex flex-wrap items-center gap-1 rounded border p-1.5"
+          :class="getQuestBranchClass(branch, questRoute)"
+        >
+          <span class="text-surface-200 min-w-0 flex-1 truncate text-xs">{{ branch.label }}</span>
+          <UBadge v-if="branch.evidencePending" variant="subtle" color="neutral" size="xs">
+            {{ t('page.storyline.quest_route_evidence_pending') }}
+          </UBadge>
+          <UBadge v-else variant="subtle" color="neutral" size="xs">
+            {{
+              t('page.storyline.quest_route_progress', {
+                completed: branch.completedCount,
+                total: branch.totalCount,
+              })
+            }}
+          </UBadge>
+          <UBadge
+            v-if="questRoute.chosenBranchId === branch.id"
+            variant="subtle"
+            color="success"
+            size="xs"
+          >
+            {{ t('page.storyline.route_chosen') }}
+          </UBadge>
+          <UBadge v-else-if="branch.knownStepsComplete" variant="subtle" color="warning" size="xs">
+            {{ t('page.storyline.quest_route_known_steps_done') }}
+          </UBadge>
+        </div>
+        <p class="text-surface-400 text-[11px] leading-tight">
+          {{ t('page.storyline.quest_route_exclusive') }}
+        </p>
+        <p v-if="questRoute.conflicting" class="text-warning-300 text-[11px] leading-tight">
+          {{ t('page.storyline.quest_route_conflict') }}
+        </p>
+      </div>
+    </div>
+    <p
+      v-if="!props.readOnly && chapter.staleObjectiveIds.length"
+      class="text-warning-300 mb-2 text-[11px] leading-tight"
+    >
+      {{ staleProgressLabel }}
+    </p>
     <div
       v-if="chapter.mainObjectives.length || chapter.optionalObjectives.length"
       class="bg-surface-950/20 mb-2 rounded-md border border-white/5 p-2"
@@ -697,6 +781,8 @@
     StorylineNormalizedChapterView,
     StorylineObjectiveProgress,
     StorylineObjectiveUnlockView,
+    StorylineQuestRouteBranchView,
+    StorylineQuestRouteChoiceView,
   } from '@/composables/useStorylineChapters';
   interface Props {
     chapter: StorylineNormalizedChapterView;
@@ -756,6 +842,24 @@
     if (routeState === 'blocked') {
       return 'border-error-700/30 bg-error-950/10 opacity-70';
     }
+    return 'border-white/10 bg-surface-900/40';
+  };
+  // A branch is highlighted from the player's own marks only. The sibling is not styled as blocked:
+  // the objective list can be a projection of the overlay's capture, so a finished known set is not
+  // proof the route is finished, and the overlay only rules out completing both.
+  const staleProgressLabel = computed(() => {
+    const count = chapter.value.staleObjectiveIds.length;
+    return t(
+      count === 1 ? 'page.storyline.stale_progress_one' : 'page.storyline.stale_progress_other',
+      { count }
+    );
+  });
+  const getQuestBranchClass = (
+    branch: StorylineQuestRouteBranchView,
+    questRoute: StorylineQuestRouteChoiceView
+  ) => {
+    if (questRoute.chosenBranchId === branch.id) return 'border-success-700/40 bg-success-950/20';
+    if (branch.knownStepsComplete) return 'border-warning-700/30 bg-warning-950/10';
     return 'border-white/10 bg-surface-900/40';
   };
   const sortObjectivesByOrder = (objectives: StorylineObjectiveProgress[]) => {

@@ -60,7 +60,11 @@
                     data-help-target="hideout-settings-button"
                     :aria-label="t('common.settings')"
                     :aria-pressed="isSettingsOpen"
-                    :class="isSettingsOpen ? 'bg-white/10 text-white' : 'text-surface-400'"
+                    :class="
+                      isSettingsOpen
+                        ? 'light:bg-surface-700/70 light:text-surface-50 bg-white/10 text-white'
+                        : 'text-surface-400'
+                    "
                     @click="toggleSettingsDrawer"
                   >
                     <span class="hidden sm:inline">
@@ -82,7 +86,7 @@
           <template #content>
             <UCard class="w-full max-w-sm">
               <template #header>
-                <div class="px-4 py-3 text-lg font-semibold text-white">
+                <div class="light:text-surface-50 px-4 py-3 text-lg font-semibold text-white">
                   {{ prereqConfirmTitle }}
                 </div>
               </template>
@@ -658,7 +662,7 @@
       icon: 'mdi-lock',
       view: 'locked',
       count: stationCounts.value.locked,
-      badgeColor: 'bg-surface-600',
+      badgeColor: 'bg-surface-600 light:text-surface-50',
     },
     {
       title: t('common.maxed'),

@@ -19,6 +19,10 @@ export const installRealtimeVisibility = (
     if (disposed || suspendedTransports.has(transport) || leaving) return;
     originalConnect.call(transport);
   };
+  // A newer visibility transition, a hidden tab, or teardown invalidates a
+  // resume that was queued behind an in-flight disconnect.
+  const resumeIsStale = (version: number): boolean =>
+    disposed || version !== generation || page.visibilityState === 'hidden';
   transport.connect = connect;
   const suspend = () => {
     timer = undefined;
@@ -44,9 +48,8 @@ export const installRealtimeVisibility = (
     if (!suspendedTransports.has(transport)) return;
     void Promise.resolve(leaving)
       .catch(() => undefined)
-      // fallow-ignore-next-line complexity -- disconnect/visibility races covered with the real SDK in realtimeVisibility.test.ts
       .then(() => {
-        if (disposed || version !== generation || page.visibilityState === 'hidden') return;
+        if (resumeIsStale(version)) return;
         leaving = null;
         suspendedTransports.delete(transport);
         if (transport.getChannels().length > 0) connect();

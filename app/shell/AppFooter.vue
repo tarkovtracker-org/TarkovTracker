@@ -15,7 +15,7 @@
               class="h-9 w-9 shrink-0"
               loading="lazy"
             />
-            <span class="text-base font-medium text-white">
+            <span class="light:text-surface-50 text-base font-medium text-white">
               {{ t('navigation_drawer.brand_name') }}
             </span>
           </NuxtLink>
@@ -78,6 +78,7 @@
     { label: t('common.storyline'), to: '/storyline' },
   ]);
   const projectItems = computed(() => [
+    { label: t('common.about'), to: '/about' },
     { label: t('common.team'), to: '/team' },
     { label: t('common.supporter'), to: '/supporter' },
     { label: t('navigation_drawer.resources'), to: '/resources' },

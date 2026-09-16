@@ -1,7 +1,7 @@
 <template>
   <div class="mb-5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-2.5">
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
-      <span class="text-[13px] font-semibold text-white">
+      <span class="light:text-surface-50 text-[13px] font-semibold text-white">
         {{ label }} {{ t('common.progress') }}
       </span>
       <span class="text-surface-300 text-xs tabular-nums">

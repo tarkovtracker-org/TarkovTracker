@@ -13,7 +13,10 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useTheme } from '@/composables/useTheme';
+  import { progressBarFillStyle } from '@/features/dashboard/traderPercentageStyle';
   import type { ProgressBarColor } from '@/features/dashboard/progressCard';
+  const { isLightTheme } = useTheme();
   const props = withDefaults(
     defineProps<{
       percentage: number;
@@ -42,8 +45,10 @@
   const fillStyle = computed(() => {
     const style: Record<string, string> = { width: `${props.percentage}%` };
     if (props.color === 'gradient') {
-      const hue = (props.percentage / 100) * 120;
-      style.backgroundColor = `hsl(${hue}, 70%, 45%)`;
+      const fill = progressBarFillStyle(props.percentage, isLightTheme.value ? 'light' : 'dark');
+      if (fill.backgroundColor) {
+        style.backgroundColor = fill.backgroundColor;
+      }
     }
     return style;
   });

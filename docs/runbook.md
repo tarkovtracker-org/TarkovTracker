@@ -309,6 +309,15 @@ These show up in Supabase logs / query performance and are expected. Do not trea
   approved read-only observer for supported catalog inspection. If evidence is unavailable, report
   remote synchronization as unverified rather than assuming it from green CI.
 
+- **Deploy migrations only from a revision that is already merged to `main`.** Pushing from an
+  unmerged branch moves remote history ahead of the checkout, and every later `main` build then fails
+  the `Supabase Preview` check with `Remote migration versions not found in local migrations
+directory.` until the deployed file lands. That check runs on `main` pushes and is skipped on pull
+  requests, so the breakage only becomes visible after merge. If an out-of-band apply is unavoidable,
+  merge the exact deployed file immediately afterwards and record the revision, version list, and file
+  hashes; `scripts/prod-db migration-history` shows `missing_locally` for exactly this condition. The
+  fix is always to land the deployed file, never `migration repair --status reverted`, which would
+  falsify applied history and let a later push re-run the SQL.
 - `migration list` compares **timestamps only**. Matching rows do not detect edited SQL or schema
   drift. Preserve the deployed Git revision, compare historical file contents against it, replay
   locally with `pnpm run supabase:check`, and verify affected remote objects, grants, RLS, triggers,
@@ -412,7 +421,7 @@ Afterward, rerun both catalog queries and record that the expected definition is
 result before retrying. Concurrent reindexing can leave temporary `_ccnew` or `_ccold` indexes;
 follow PostgreSQL's failure-state guidance after verifying their identity and dependencies rather
 than deleting objects by suffix alone. Attach before/after evidence and the operation result to
-#646 (or its deployment record). Until that evidence exists, production index validity is
+issue #646 (or its deployment record). Until that evidence exists, production index validity is
 **unverified**, even when repository CI is green.
 
 The failure and repair were reproduced in an isolated PostgreSQL 17 database: cancel a concurrent
@@ -504,6 +513,105 @@ reconnect, and reload. Verify no saved progress is lost or resurrected, retained
 and resumed saves succeed. Frontend rollback remains compatible with these additive migrations;
 preserve applied migrations.
 
+### Manual activity history rollout
+
+Apply `20260910050000_add_manual_activity_history_to_progress` and
+`20260910055448_harden_manual_activity_history_sync` before deploying the client that writes
+`manualActivityHistory` and `manualActivityEpoch`. Cloudflare and Supabase deployment jobs are
+independent: merging them together does not guarantee database-first ordering. Verify both migration
+versions and the affected sanitizer, history-merge helper, row triggers, and sync RPC definitions
+before releasing the client. The forward correction preserves existing migration history and does
+not rewrite stored rows.
+
+Old clients remain compatible after both migrations: omission preserves existing history, and
+full progress resets still discard the prior feed. A frontend rollback must leave the database
+migrations in place. Verify an old-client sync retains new history and a stale device cannot undo a
+history clear; regression coverage is in `manual_activity_history.test.sql`.
+
+### Out-of-band Package A apply and checkout alignment (`20260912085531`)
+
+On 2026-09-12 an authorized operator applied
+`20260912085531_contain_team_event_authority.sql` to production (`knptqelvsodccnoehmbj`) with
+`supabase db push --project-ref … --skip-vault` from the unmerged release revision `08b0cf1e`.
+Remote history moved from 122 to 123 versions while `main` still had 122 files, so every later
+push to `main` failed the `Supabase Preview` check with
+`Remote migration versions not found in local migrations directory.` The first affected commit
+was `87a254d7` (2026-09-14); `15cb054a` (2026-09-10) was the last success. No local migration
+file was edited, renamed, or deleted in that window — the divergence was entirely remote-only.
+
+The correct remediation is to **update the checkout, not remote history**: land the deployed
+migration file on `main` byte-for-byte. Its SHA-256 is
+`a1d23f6a5a29e89ded68895f520240a2e193edb666d6db499e2573441529afff`; verify that against the
+deployment receipt before committing. The CLI suggests
+`supabase migration repair --status reverted <version>` in this situation. **Do not run it.** The
+SQL really is applied, so marking it reverted would falsify history and let a later `db push`
+re-run a migration whose `ADD COLUMN`/`CREATE` statements would then fail.
+
+Reproduce the diagnosis without touching production: reset a local database to the same history,
+then compare `supabase db push --local --dry-run` with the file absent (reproduces the exact error
+and names the version) and present (`Local database is up to date.`).
+
+**Restore the whole deployed unit, not just the migration.** The same deployment also shipped Edge
+Functions `team-leave` (v609) and `team-kick` (v605) from `08b0cf1e`. The Supabase GitHub integration
+deploys migrations **and** every function under `supabase/functions/` on merge, and it is the same
+integration that reports the failing check — so while the check fails, function deployment is blocked
+too, and making the check pass unblocks a function deploy from `main`. Splitting the recovery is
+unsafe in both directions: migration-first lets the integration replace the deployed handlers with the
+older ones on `main`, and functions-first leaves `main` with handlers that read a column no repository
+migration creates, so any database built from the checkout returns 500. Land the migration and the
+deployed function sources in the same change.
+
+The database change alone does not cover the handler behavior: the deployed handlers filter cooldown
+reads on `server_verified = true`, and the preserved pre-containment rows are `server_verified = false`
+with possibly forged timestamps, so the older handlers would trust that history again. See the
+`team_events` invariants in `docs/SYSTEMS.md`.
+
+### Atomic-leave checkout recovery (`20260912085904`)
+
+The earlier Package A recovery is not sufficient for the current hosted state. On 2026-09-16,
+`main` at `d1601dc99dfca900362acc81f8ced03196a8b62d` contained 123 migrations, while the
+linked production project `knptqelvsodccnoehmbj` contained 124. The sole remote-only version was
+`20260912085904_atomic_team_leave`, with eight stored statements. Its deployed `team-leave`
+Edge Function was version 610, not Package A's version 609. The failing `Supabase Preview`
+check and a linked push dry-run both reported missing local migration versions.
+
+Supabase CLI 2.117.0 authenticated using its existing authorized session; `projects list`,
+explicit `link --project-ref knptqelvsodccnoehmbj`, and `migration list --linked` all succeeded.
+A missing observer `PROD_DB_URL` does not mean the CLI cannot inspect the project. Keep the
+observer's restricted credential boundary intact; this recovery uses separately authorized CLI
+access, not broader credentials passed to `scripts/prod-db`.
+
+Recovery procedure and evidence:
+
+1. Fetch remote migration statements with `supabase migration fetch --linked` into a separate
+   linked scratch directory, never over immutable files in the working checkout.
+2. Compare the missing migration with the original release revision
+   `08e34653dc9867dcf716c4845cde0cffcf8b88a6`. The fetched file differs only in blank lines
+   between statements. Restore the original Git bytes; SHA-256:
+   `a73e4b1dccbe70f0f66d208cfdcd248b675a29077571c9ec9b687e2d5003725e`.
+3. Download deployed `team-leave` with `supabase functions download team-leave --use-api` into
+   the scratch directory. Its handler, `leave-team-rpc.ts`, and `team-leave-result.ts` match
+   that same revision byte-for-byte. Restore this deployed unit together, with its public RPC
+   type and regression tests. A migration-only recovery would unblock the integration and
+   overwrite the live atomic handler with the older nontransactional implementation.
+4. Inspect both `leave_team(uuid,uuid)` and `transfer_team_ownership(uuid,uuid,uuid)` through
+   read-only linked catalog queries. The deployed function definitions, security-definer flags,
+   empty search paths, five-second lock timeouts, and execution privileges match a clean local
+   replay exactly. `anon` and `authenticated` cannot execute either; `service_role` can.
+5. Recheck `migration list --linked` and `db push --linked --dry-run` from the restored checkout:
+   all 124 versions match, with no pending SQL. Replay from scratch with `pnpm run supabase:check`
+   in an isolated local project and validate the endpoint and concurrent team operations.
+
+This is missing deployed history/source, not evidence of an incorrect history record. No remote
+repair, push, schema change, or history-writing `db pull` is necessary. Do not mark the version
+reverted: its non-idempotent `CREATE FUNCTION` has already executed. The catalog comparison is
+scoped to the two affected RPCs, not a claim that every production schema object was audited.
+
+After merging the complete recovery, verify the new `main` commit's `Supabase Preview` result
+and repeat linked history/dry-run checks. Pull-request previews intentionally skip deployment,
+so a green PR alone does not establish that the production integration has recovered. Do not
+roll back to the pre-atomic leave handler or apply unrelated account-deletion migrations.
+
 ### Reconcile migration `20260630075121_reconcile_prod_schema_drift`
 
 - Captures schema changes that were previously made directly in the dashboard (teams
@@ -554,11 +662,29 @@ Store `PROD_DB_URL=postgresql://pi_prod_observer:...@...:5432/postgres?sslmode=v
 mode-`0600` `.prod-db.env` file so the password does not enter shell history. An inline environment
 assignment remains supported for non-interactive automation whose secret store masks command input.
 
-Available reports include `health`, `schema`, `db-stats`, `table-stats`, `index-stats`, `traffic`,
-`outliers`, `calls`, `locks`, `blocking`, `long-running`, `vacuum`, `bloat`, `role-stats`, bounded
-`sample`, `distribution`, and `count`. `sample` excludes columns matching the sensitive-column
-policy and is capped at 20 rows; `distribution` is capped at 50 groups. `EXPLAIN ANALYZE`, arbitrary
-SQL, writes, DDL, migration commands, and unbounded row access are not supported.
+Available reports include `health`, `schema`, `migration-history`, `db-stats`, `table-stats`,
+`index-stats`, `traffic`, `outliers`, `calls`, `locks`, `blocking`, `long-running`, `vacuum`,
+`bloat`, `role-stats`, bounded `sample`, `distribution`, and `count`. `sample` excludes columns
+matching the sensitive-column policy and is capped at 20 rows; `distribution` is capped at 50
+groups. `EXPLAIN ANALYZE`, arbitrary SQL, writes, DDL, migration commands, and unbounded row access
+are not supported.
+
+`migration-history` reads applied version identifiers from `supabase_migrations.schema_migrations`
+and compares them with `supabase/migrations` in the current checkout. It reports `missing_locally`
+(applied remotely, absent from the checkout) and `pending_remotely` (in the checkout, not yet
+applied), which is the same distinction `supabase migration list --linked` makes, without needing
+migration or admin credentials. It never returns the stored `statements` column, so migration SQL
+and any literal it contains stay out of the report. Version identifiers alone do not prove the SQL
+matches; use them to locate divergence, then compare file contents against the deployed Git
+revision. If the observer lacks access the command fails and names the required grant.
+
+The report carries `project_ref`, the Supabase project observed through `PROD_DB_URL` (`null` for a
+local target). Confirm it names the intended project before treating the comparison as remote-history
+evidence: a connection string pointing at another project reports a perfectly consistent comparison
+for the wrong database. A primary connection whose host and observer username identify no project
+fails rather than returning a nameless comparison. The command reports the identity it observed and
+deliberately does not infer an expected project from application configuration, which is not
+guaranteed to describe the same environment as the observer credential.
 
 `canary` is the first production validation command. It runs only health and telemetry reports:
 `db-stats`, `role-stats`, `table-stats`, `index-stats`, and `outliers`. It does not sample rows,
@@ -581,7 +707,18 @@ Provision the observer role out of band through the Supabase SQL editor or appro
 operation. Grant only `CONNECT`, required schema/catalog visibility, and `pg_monitor`; Supabase CLI
 inspection reports such as `db-stats` call monitoring functions that `pg_read_all_stats` alone does
 not permit. Grant `USAGE` on `extensions` and only explicit low-risk column-level `SELECT` when
-bounded samples or distributions are required. Set conservative connection defaults for
+bounded samples or distributions are required. For `migration-history`, grant read-only access to
+the version column of the migration ledger:
+
+```sql
+GRANT USAGE ON SCHEMA supabase_migrations TO pi_prod_observer;
+GRANT SELECT (version) ON TABLE supabase_migrations.schema_migrations TO pi_prod_observer;
+```
+
+The column-level grant is deliberate: `schema_migrations` also stores each migration's SQL in
+`statements`, and the observer never needs it. Granting `SELECT` on the whole table would let anyone
+holding the observer credential read stored migration SQL and any literal inside it. Set
+conservative connection defaults for
 `statement_timeout`, `lock_timeout`, `default_transaction_read_only`, and `application_name`;
 database privileges, not `default_transaction_read_only`, are the hard safety boundary.
 
@@ -616,3 +753,29 @@ Pi access. Do not make production role provisioning or the canary an automatic m
    - Cache API-backed shared rate limits are best-effort under concurrent bursts; use Cloudflare or Durable Objects for hard enforcement.
    - Full ownership map (Worker DO vs Edge mutation limits vs Pages vs Auth): [`RATE_LIMITING.md`](./RATE_LIMITING.md).
 3. If API protection blocks valid traffic, update `API_ALLOWED_HOSTS` and redeploy.
+
+### Combined task cache contract rollout (v2 to v3)
+
+The progression and overlay changes ship together through PR #826, which supersedes PR #825.
+Do not merge or dispatch the standalone #825 branch: its envelope-format-1 writer uses the same
+v3 keys as the combined envelope-format-2 contract and would replace incompatible payloads.
+Only the combined revision may publish v3 entries. There is no intermediate application release.
+
+For the `tasks-core-json-v2-*` to `tasks-core-json-v3-*` transition, an authorized operator must dispatch
+`.github/workflows/precompute-tarkov-data.yml` from the approved combined revision before merging
+or promoting the app. Leave both workflow inputs, `lang` and `gameMode`, empty to include all
+48 combinations across `regular`, `pve`, and `pvp-season`. Require `succeeded: 48` and `failed: 0`,
+verify every `tasks-core-json-v3-*` entry uses envelope format 2, and attach the run and approved
+revision to the release. Fetch the published overlay metadata again for each rollout; never reuse
+a SHA from an older rehearsal. If the SHA changed, repeat the rehearsal and approve the new
+identity before dispatch. Set `expectedOverlaySha` to that approved published SHA and verify
+`overlay-precompute-manifest-json-v3` contains all 48 matching identities.
+
+Before rollout, confirm neither original PR revision has a production deployment or an in-flight
+precompute run. After the v3 population is verified, merge the combined PR only and
+close #825 as superseded. The scheduled workflow then refreshes the combined v3 contract.
+Before relying on the previous app for rollback, confirm its existing `tasks-core-json-v2-*`
+entries remain within their seven-day TTL. Roll back to the previous v2 application, never the
+standalone #825 application. The cold fetch/adapt/overlay fallback is not a safe bridge during
+this cache-key rollout. After deployment, run `pnpm run verify:overlay` and retain the served
+fleet verification before closing issue #729.

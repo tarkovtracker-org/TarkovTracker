@@ -108,7 +108,7 @@
             <div class="mb-2.5 flex items-center text-sm font-medium sm:mb-3 sm:text-[15px]">
               <UIcon
                 name="i-mdi-package-variant-closed-check"
-                class="text-success-500 mr-1.5 h-4 w-4 sm:mr-2 sm:h-5 sm:w-5"
+                class="text-success-500 light:text-success-800 mr-1.5 h-4 w-4 sm:mr-2 sm:h-5 sm:w-5"
               />
               {{ $t('page.hideout.stationcard.next_level') }}
             </div>
@@ -152,7 +152,11 @@
                   <UIcon
                     name="i-mdi-home"
                     class="h-3.5 w-3.5 sm:h-4 sm:w-4"
-                    :class="isStationReqMet(requirement) ? 'text-info-500' : 'text-error-500'"
+                    :class="
+                      isStationReqMet(requirement)
+                        ? 'text-info-500 light:text-info-800'
+                        : 'text-error-500 light:text-error-800'
+                    "
                   />
                   <i18n-t keypath="page.hideout.stationcard.requirements.station" scope="global">
                     <template #level>
@@ -184,7 +188,11 @@
                   <UIcon
                     name="i-mdi-star"
                     class="h-3.5 w-3.5 sm:h-4 sm:w-4"
-                    :class="isSkillReqMet(requirement) ? 'text-warning-500' : 'text-error-500'"
+                    :class="
+                      isSkillReqMet(requirement)
+                        ? 'text-warning-500 light:text-warning-800'
+                        : 'text-error-500 light:text-error-800'
+                    "
                   />
                   <i18n-t keypath="page.hideout.stationcard.requirements.skill" scope="global">
                     <template #level>
@@ -218,7 +226,11 @@
                   <UIcon
                     name="i-mdi-account-tie"
                     class="h-3.5 w-3.5 sm:h-4 sm:w-4"
-                    :class="isTraderReqMet(requirement) ? 'text-secondary-500' : 'text-error-500'"
+                    :class="
+                      isTraderReqMet(requirement)
+                        ? 'text-secondary-500 light:text-secondary-800'
+                        : 'text-error-500 light:text-error-800'
+                    "
                   />
                   <i18n-t keypath="page.hideout.stationcard.requirements.trader" scope="global">
                     <template #loyaltylevel>
@@ -240,7 +252,7 @@
         <!-- Max level indicator -->
         <div v-if="!nextLevel" class="bg-surface-800 rounded p-2.5 sm:p-3">
           <div
-            class="text-warning-500 flex items-center justify-center text-center text-sm font-medium sm:text-base"
+            class="text-warning-500 light:text-warning-800 flex items-center justify-center text-center text-sm font-medium sm:text-base"
           >
             <UIcon name="i-mdi-star-check" class="mr-1.5 h-5 w-5 sm:mr-2 sm:h-6 sm:w-6" />
             {{ $t('page.hideout.stationcard.max_level') }}
@@ -382,7 +394,7 @@
     base: 'bg-success-500 hover:bg-success-600 active:bg-success-700 text-white border border-success-700',
   };
   const downgradeButtonUi = {
-    base: 'bg-error-900/40 hover:bg-error-900/60 active:bg-error-900/80 text-error-300 border border-error-700/50',
+    base: 'bg-error-900/40 light:bg-error-50 hover:bg-error-900/60 light:hover:bg-error-100 active:bg-error-900/80 light:active:bg-error-100 text-error-300 border border-error-700/50',
   };
   const highlightColor = computed((): 'success' | 'error' | 'primary' => {
     if (!nextLevel.value) return 'primary';

@@ -22,7 +22,9 @@
           <div class="text-surface-200 text-xs font-semibold tracking-wider uppercase">
             {{ label }}
           </div>
-          <div class="text-xl font-bold text-white">{{ completedDisplay }}/{{ totalDisplay }}</div>
+          <div class="light:text-surface-50 text-xl font-bold text-white">
+            {{ completedDisplay }}/{{ totalDisplay }}
+          </div>
         </div>
       </div>
       <div class="text-3xl font-bold" :class="colorClasses.percentage">

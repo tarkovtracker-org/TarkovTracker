@@ -66,7 +66,7 @@
     "supporter_override_enabled_description": "Enabled {tier} supporter access.",
     "supporter_override_disabled_description": "Disabled active supporter access.",
     "supporter_override_failed_description": "Could not update supporter access.",
-    "twitch_config_title": "Twitch 流",
+    "twitch_config_title": "Twitch直播",
     "twitch_config_description": "在站点的角落设置推广的Twitch频道。游客在几分钟内接听更改消息。",
     "twitch_channel_label": "频道",
     "twitch_channel_placeholder": "Twitch频道名称",
@@ -96,7 +96,9 @@
     "community_section": "社区",
     "keyboard_shortcuts": "键盘快捷键",
     "report_problem": "报告问题",
-    "login_aria": "登入你的账户"
+    "login_aria": "登入你的账户",
+    "switch_to_light_theme": "切换到亮色主题",
+    "switch_to_dark_theme": "切换到暗色主题"
   },
   "omnibar": {
     "title": "搜索",
@@ -255,13 +257,14 @@
     "more": "更多",
     "needed_items": "需要的物品",
     "task": "任务",
-    "lightkeeper": "灯塔看守",
+    "lightkeeper": "Lightkeeper",
     "kappa": "Kappa",
     "storyline": "故事线",
     "mark_complete": "标记已完成",
     "maps": "地图",
     "clear_search": "清除搜索",
     "settings": "设置",
+    "about": "关于",
     "credits": "致谢",
     "support": "支持",
     "privacy_policy": "隐私政策",
@@ -605,6 +608,7 @@
           "filter_hidden_other": "你当前的筛选隐藏了 {count} 个可用任务。",
           "blocked_level_one": "{task} 是你最近的解锁项，但你还差 1 级。",
           "blocked_level_other": "{task} 是你最近的解锁项，但你还差 {count} 级。",
+          "blocked_requirement": "{task} is blocked by its requirements.",
           "blocked_prerequisite": "{task} 已经很接近了，但仍被前置任务限制。",
           "blocked_fence": "{task} 正在等待 Fence 声望。",
           "blocked_trader_unlock": "{task} 被另一个商人解锁任务卡住了。",
@@ -741,6 +745,17 @@
       "no_data": "暂无可用的剧情章节数据。",
       "mark_incomplete": "标记为未完成",
       "endings": "Endings",
+      "ending_progress": "{completed}/{total} known objectives",
+      "ending_evidence_pending": "尚未映射到此结束的目标。",
+      "partial_data": "部分数据",
+      "partial_data_hint": "本章的上游故事数据不完整，因此可能比所列目标更多。",
+      "quest_route_exclusive": "完成这些路由中的另一条路由。",
+      "quest_route_known_steps_done": "所有已知步骤已完成",
+      "quest_route_evidence_pending": "尚未抓取任何步骤",
+      "quest_route_conflict": "多条路读取已完成；游戏中只能有一个。",
+      "quest_route_progress": "{completed}/{total} steps",
+      "stale_progress_one": "1 保存的目标标记不再与当前故事数据匹配，需要重新检查。",
+      "stale_progress_other": "{count} saved objective marks no longer match the current story data and need re-checking.",
       "route_choice": "Route choice",
       "route_chosen": "Route selected",
       "route_blocks": "Blocks: {objectives}",
@@ -898,7 +913,8 @@
         "xp": "经验奖励",
         "ascending": "升序排列",
         "descending": "降序排列",
-        "aria_label": "任务排序"
+        "aria_label": "任务排序",
+        "progression": "进度"
       },
       "settings": {
         "title": "任务设置",
@@ -1076,9 +1092,34 @@
         "next_tasks": "后续任务：",
         "open_item_on_tarkov_dev": "在 tarkov.dev 打开 {name}",
         "previous_tasks": "前置任务：",
-        "progress": "进步 {completed}/{total}",
+        "progress": "进度 {completed}/{total}",
         "rewards": "奖励",
-        "unlocks_count": "{count} 项解锁"
+        "unlocks_count": "{count} 项解锁",
+        "trader_requirement_badge": "{trader} {kind} {comparison} {value}",
+        "loyalty_level": "LL",
+        "reputation": "重写"
+      },
+      "blockers": {
+        "player_level": "Player level {comparison} {required} required (current: {current}).",
+        "trader_level": "{trader} Loyalty Level {comparison} {required} required (current: {current}).",
+        "trader_reputation": "{trader} reputation {comparison} {required} required (current: {current}).",
+        "prerequisite": "Meet the required task statuses for: {tasks}.",
+        "story_route": "Meet the required task statuses for {tasks}, or progress one of these story chapters: {chapters}.",
+        "failed_branch": "Blocked by failed task: {task}.",
+        "faction": "Available to {faction} characters.",
+        "trader_unlock": "Unlock {trader} by completing {task}.",
+        "prestige": "Requires Prestige {required} (current: {current}).",
+        "unknown": "要求数据不可用或不支持。可用性无法确认。",
+        "cycle": "必备链包含一个周期。可用性无法确认。",
+        "complete": "此任务已完成。",
+        "failed": "此任务失败。",
+        "disabled": "此任务已禁用。",
+        "task_status": "{task} ({status})",
+        "status_complete": "已完成",
+        "status_failed": "失败",
+        "status_active": "活动或接受",
+        "status_unknown": "未知状态",
+        "status_or": " 或 "
       }
     },
     "hideout": {
@@ -1320,8 +1361,6 @@
     "credits": {
       "sections": {
         "original_creator": "项目原作者：",
-        "staff": "Tarkov Tracker 运营团队：",
-        "support_members": "支持人员：",
         "beta_testers": "Nuxt封闭测试人员：",
         "contributors": "开源贡献者："
       },
@@ -1336,7 +1375,44 @@
         "contributions": "{count} 次贡献",
         "total": "{count} contributor | {count} contributors"
       },
-      "description": "会见TarkovTracker后面的创建者、工作人员、支持成员、beta测试人员和开源贡献者。"
+      "description": "会见TarkovTracker后面的创建者、工作人员、支持成员、beta测试人员和开源贡献者。",
+      "team_link": "由 TarkovTracker 团队维护——在关于页面上会见他们！"
+    },
+    "about": {
+      "title": "关于 TarkovTracker",
+      "description": "会见维护TarkovTracker.org的团队，其游戏数据背后的合作伙伴，以及如何从社区获得帮助。",
+      "intro": "TarkovTracker是逃离Tarkov的免费开放源码进度跟踪器。 它会使您的任务和故事在线进度，隐藏升级和物品需求在一个地方，并保持社区维护的游戏数据的随时更新。 该项目由一个小型志愿者小组在开放源码捐助者的帮助下管理。",
+      "team": {
+        "heading": "团队",
+        "summary": "TarkovTracker.org由一个小型志愿团队维护。下面的人保持站点运行并支持Discord社区。",
+        "core_heading": "核心团队",
+        "support_heading": "Discord 支持"
+      },
+      "partners": {
+        "heading": "合作伙伴与生态系统协会",
+        "summary": "TarkovTracker基于社区项目。这些维护者管理追踪器所依赖的独立工具和数据源。"
+      },
+      "help": {
+        "heading": "如何获得帮助",
+        "routing": "为了获得最快的答案，请使用我们Discord中的频道支持工作流，而不是直接给团队成员的消息。 可复现的 bug 和功能想法属于GitHub ，安全报告通过我们的私人安全政策。",
+        "discord": "Discord上的社区支持",
+        "github_issues": "在 GitHub 上报告错误或请求功能",
+        "security": "报告一个安全问题(私人)",
+        "credits_link": "Beta测试员和开源贡献者 — 见积分"
+      },
+      "github_profile": "GitHub profile",
+      "roles": {
+        "core_owner": "核心所有者、维护者和开发者",
+        "discord_owner_developer": "Discord 服务器所有者、TrackerBot开发者和维护者",
+        "core_support": "核心支助人员",
+        "discord_support": "Discord 一般支持",
+        "tarkov_dev_maintainer": "Tarkov.dev的维护者",
+        "ratscanner_maintainer": "RatScanner 的所有者和维护者"
+      },
+      "projects": {
+        "tarkov_dev": "Tarkov.dev",
+        "ratscanner": "Ratscanner"
+      }
     },
     "login": {
       "subtitle": "登录账号以访问全部功能",
@@ -1877,6 +1953,13 @@
       "privacy_mode": "隐私模式",
       "privacy_mode_hint": "在你直播时隐藏敏感信息。"
     },
+    "appearance": {
+      "title": "外观",
+      "theme": "主题",
+      "theme_hint": "在暗色界面和亮色界面之间选择。您的选择在此设备上被记住。",
+      "theme_dark": "深色",
+      "theme_light": "亮色的"
+    },
     "interface": {
       "tasks": {
         "title": "任务卡片",
@@ -2214,6 +2297,8 @@
       "confirm_word": "删除账户"
     },
     "log_import": {
+      "reading_logs": "正在读取日志并准备预览…",
+      "large_folder_hint": "大文件夹在区块中本地读取。保持此页面打开；当日志正在读取时，您可以取消。",
       "upload_hint": "选择你的 Escape from Tarkov Logs 文件夹以导入任务进度。",
       "deleted_logs_hint": "如果旧日志会话已删除，就无法导入。",
       "deleted_logs_hint_tooltip": "日志导入只能读取当前 Logs 文件夹中仍存在的任务事件。",
@@ -2263,19 +2348,14 @@
       "cleared_logs_toast_title": "旧日志可能已被清理",
       "cleared_logs_toast_description": "日志导入只能读取 Logs 文件夹里仍保留的任务历史。已删除的会话无法恢复。",
       "errors": {
+        "invalid_archive": "ZIP存档不完整或包含无效的日志条目。未导入进度。",
+        "record_too_large": "An individual log record in {path} is too large to parse safely. No progress was imported. Please report this log format.",
         "apply_import_failed": "无法应用导入的任务完成数据。",
-        "archive_log_file_too_large": "压缩包中的日志文件过大：{path}",
-        "archive_logs_too_large": "压缩包包含的日志内容过多（最大 {max_mb} MB）。",
-        "import_file_too_large": "导入文件过大（最大 {max_mb} MB）。",
-        "log_file_too_large": "日志文件过大（最大 {max_mb} MB）。",
-        "log_file_too_large_path": "日志文件过大：{path}",
         "no_files_selected": "未选择任何文件。",
-        "no_logs_in_archive": "压缩包中未找到 EFT 日志。",
         "no_matching_tasks_found": "已找到任务事件，但与当前 TarkovTracker 任务均不匹配。",
         "no_notification_logs_found": "在所选文件中未找到通知日志。",
         "no_quest_events_found": "在所选日志中未找到任务开始/完成事件。",
         "parse_failed": "解析 EFT 日志失败。",
-        "selected_logs_too_large": "所选日志内容过多（最大 {max_mb} MB）。",
         "task_metadata_not_loaded": "任务元数据尚未加载。请刷新后重试。",
         "invalid_mode": "选择一个有效的目标游戏模式。",
         "outside_active_season": "这些日志包含活动季节以外或没有可用日期的事件。从活动季节选择会话，然后导入季节性PvP。"

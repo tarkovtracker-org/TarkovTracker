@@ -25,7 +25,7 @@
       <div class="flex items-center gap-3">
         <UIcon name="i-mdi-clock-outline" class="text-surface-500 h-5 w-5 shrink-0" />
         <div>
-          <h3 class="text-sm font-semibold text-white">
+          <h3 class="light:text-surface-50 text-sm font-semibold text-white">
             {{ t('page.supporter.alt_payments_title') }}
           </h3>
           <p class="text-surface-500 mt-0.5 text-sm">

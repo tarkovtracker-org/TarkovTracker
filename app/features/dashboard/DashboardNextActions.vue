@@ -56,13 +56,15 @@
                     </span>
                     <span
                       v-if="hiddenAvailableCount > 0"
-                      class="border-warning-400/20 bg-warning-500/10 text-warning-100 inline-flex min-h-6 items-center rounded-full border px-2.5 py-1 text-[11px] leading-none"
+                      class="border-warning-400/20 bg-warning-500/10 text-warning-100 light:text-warning-900 inline-flex min-h-6 items-center rounded-full border px-2.5 py-1 text-[11px] leading-none"
                     >
                       <span class="leading-none">{{ hiddenTasksBadge }}</span>
                     </span>
                   </div>
                   <div class="space-y-2">
-                    <h2 class="max-w-3xl text-2xl font-semibold text-white sm:text-3xl">
+                    <h2
+                      class="light:text-surface-50 max-w-3xl text-2xl font-semibold text-white sm:text-3xl"
+                    >
                       {{ primaryHeading }}
                     </h2>
                     <p class="text-surface-200 max-w-3xl text-sm leading-6 sm:text-base">
@@ -88,7 +90,7 @@
                   <div class="text-surface-200 text-[11px] tracking-[0.2em] uppercase">
                     {{ t('page.dashboard.focus.stat.why') }}
                   </div>
-                  <div class="mt-2 text-sm leading-6 font-medium text-white">
+                  <div class="light:text-surface-50 mt-2 text-sm leading-6 font-medium text-white">
                     {{ primaryWhy }}
                   </div>
                 </div>
@@ -155,7 +157,7 @@
               />
             </div>
             <div class="min-w-0 flex-1">
-              <div class="truncate text-sm font-semibold text-white">
+              <div class="light:text-surface-50 truncate text-sm font-semibold text-white">
                 {{ getSecondaryHeading(recommendation) }}
               </div>
               <div class="text-surface-300 mt-1 text-xs leading-5">
@@ -212,74 +214,81 @@
     }
   > = {
     primary: {
-      badge: 'border-primary-400/20 bg-primary-500/10 text-primary-50',
-      eyebrow: 'text-primary-200',
+      badge:
+        'border-primary-400/20 bg-primary-500/10 text-primary-50 light:text-primary-700 light:border-primary-500/30',
+      eyebrow: 'text-primary-200 light:text-primary-700',
       halo: 'bg-primary-500/18',
-      icon: 'text-primary-200',
+      icon: 'text-primary-200 light:text-primary-600',
       iconBg: 'border-primary-400/20 bg-primary-500/10',
       proofCard: 'border-primary-400/30 bg-surface-900/88 ring-primary-400/10 ring-1',
       shell:
-        'border-primary-500/20 bg-gradient-to-br from-surface-900 via-primary-950/55 to-accent-950/45',
+        'border-primary-500/20 bg-gradient-to-br from-surface-900 via-primary-950/55 to-accent-950/45 light:border-primary-500/30 light:from-primary-100/70 light:via-surface-850 light:to-surface-850',
     },
     accent: {
-      badge: 'border-accent-400/20 bg-accent-500/10 text-accent-50',
-      eyebrow: 'text-accent-200',
+      badge:
+        'border-accent-400/20 bg-accent-500/10 text-accent-50 light:text-accent-700 light:border-accent-500/30',
+      eyebrow: 'text-accent-200 light:text-accent-700',
       halo: 'bg-accent-500/18',
-      icon: 'text-accent-200',
+      icon: 'text-accent-200 light:text-accent-600',
       iconBg: 'border-accent-400/20 bg-accent-500/10',
       proofCard: 'border-accent-400/30 bg-surface-900/88 ring-accent-400/10 ring-1',
       shell:
-        'border-accent-500/20 bg-gradient-to-br from-surface-900 via-accent-950/55 to-secondary-950/45',
+        'border-accent-500/20 bg-gradient-to-br from-surface-900 via-accent-950/55 to-secondary-950/45 light:border-accent-500/30 light:from-accent-100/70 light:via-surface-850 light:to-surface-850',
     },
     info: {
-      badge: 'border-info-400/20 bg-info-500/10 text-info-50',
-      eyebrow: 'text-info-200',
+      badge:
+        'border-info-400/20 bg-info-500/10 text-info-50 light:text-info-700 light:border-info-500/30',
+      eyebrow: 'text-info-200 light:text-info-700',
       halo: 'bg-info-500/18',
-      icon: 'text-info-200',
+      icon: 'text-info-200 light:text-info-600',
       iconBg: 'border-info-400/20 bg-info-500/10',
       proofCard: 'border-info-400/30 bg-surface-900/88 ring-info-400/10 ring-1',
       shell:
-        'border-info-500/20 bg-gradient-to-br from-surface-900 via-info-950/55 to-secondary-950/45',
+        'border-info-500/20 bg-gradient-to-br from-surface-900 via-info-950/55 to-secondary-950/45 light:border-info-500/30 light:from-info-100/70 light:via-surface-850 light:to-surface-850',
     },
     warning: {
-      badge: 'border-warning-400/20 bg-warning-500/10 text-warning-50',
-      eyebrow: 'text-warning-200',
+      badge:
+        'border-warning-400/20 bg-warning-500/10 text-warning-50 light:text-warning-700 light:border-warning-500/30',
+      eyebrow: 'text-warning-200 light:text-warning-700',
       halo: 'bg-warning-500/18',
-      icon: 'text-warning-200',
+      icon: 'text-warning-200 light:text-warning-600',
       iconBg: 'border-warning-400/20 bg-warning-500/10',
       proofCard: 'border-warning-400/30 bg-surface-900/88 ring-warning-400/10 ring-1',
       shell:
-        'border-warning-500/20 bg-gradient-to-br from-surface-900 via-warning-950/55 to-surface-950',
+        'border-warning-500/20 bg-gradient-to-br from-surface-900 via-warning-950/55 to-surface-950 light:border-warning-500/30 light:from-warning-100/70 light:via-surface-850 light:to-surface-850',
     },
     success: {
-      badge: 'border-success-400/20 bg-success-500/10 text-success-50',
-      eyebrow: 'text-success-200',
+      badge:
+        'border-success-400/20 bg-success-500/10 text-success-50 light:text-success-700 light:border-success-500/30',
+      eyebrow: 'text-success-200 light:text-success-700',
       halo: 'bg-success-500/18',
-      icon: 'text-success-200',
+      icon: 'text-success-200 light:text-success-600',
       iconBg: 'border-success-400/20 bg-success-500/10',
       proofCard: 'border-success-400/30 bg-surface-900/88 ring-success-400/10 ring-1',
       shell:
-        'border-success-500/20 bg-gradient-to-br from-surface-900 via-success-950/55 to-accent-950/35',
+        'border-success-500/20 bg-gradient-to-br from-surface-900 via-success-950/55 to-accent-950/35 light:border-success-500/30 light:from-success-100/70 light:via-surface-850 light:to-surface-850',
     },
     kappa: {
-      badge: 'border-kappa-400/20 bg-kappa-500/10 text-kappa-50',
-      eyebrow: 'text-kappa-200',
+      badge:
+        'border-kappa-400/20 bg-kappa-500/10 text-kappa-50 light:text-kappa-700 light:border-kappa-500/30',
+      eyebrow: 'text-kappa-200 light:text-kappa-700',
       halo: 'bg-kappa-500/18',
-      icon: 'text-kappa-200',
+      icon: 'text-kappa-200 light:text-kappa-600',
       iconBg: 'border-kappa-400/20 bg-kappa-500/10',
       proofCard: 'border-kappa-400/30 bg-surface-900/88 ring-kappa-400/10 ring-1',
       shell:
-        'border-kappa-500/20 bg-gradient-to-br from-surface-900 via-kappa-950/55 to-surface-950',
+        'border-kappa-500/20 bg-gradient-to-br from-surface-900 via-kappa-950/55 to-surface-950 light:border-kappa-500/30 light:from-kappa-100/70 light:via-surface-850 light:to-surface-850',
     },
     lightkeeper: {
-      badge: 'border-lightkeeper-400/20 bg-lightkeeper-500/10 text-lightkeeper-50',
-      eyebrow: 'text-lightkeeper-200',
+      badge:
+        'border-lightkeeper-400/20 bg-lightkeeper-500/10 text-lightkeeper-50 light:text-lightkeeper-700 light:border-lightkeeper-500/30',
+      eyebrow: 'text-lightkeeper-200 light:text-lightkeeper-700',
       halo: 'bg-lightkeeper-500/18',
-      icon: 'text-lightkeeper-200',
+      icon: 'text-lightkeeper-200 light:text-lightkeeper-600',
       iconBg: 'border-lightkeeper-400/20 bg-lightkeeper-500/10',
       proofCard: 'border-lightkeeper-400/30 bg-surface-900/88 ring-lightkeeper-400/10 ring-1',
       shell:
-        'border-lightkeeper-500/20 bg-gradient-to-br from-surface-900 via-lightkeeper-950/55 to-surface-950',
+        'border-lightkeeper-500/20 bg-gradient-to-br from-surface-900 via-lightkeeper-950/55 to-surface-950 light:border-lightkeeper-500/30 light:from-lightkeeper-100/70 light:via-surface-850 light:to-surface-850',
     },
   };
   const getToneClasses = (recommendation: DashboardRecommendation) => toneMap[recommendation.tone];
@@ -293,11 +302,6 @@
     values: Record<string, string | number> = {}
   ) => {
     return count === 1 ? t(oneKey, values) : t(otherKey, values);
-  };
-  const formatNumericValue = (value?: number) => {
-    if (typeof value !== 'number' || Number.isNaN(value)) return '';
-    if (Number.isInteger(value)) return String(value);
-    return value.toFixed(2);
   };
   const getPrimaryBlocker = (
     recommendation: DashboardRecommendation
@@ -354,7 +358,6 @@
   };
   const getPrimarySummary = (recommendation: DashboardRecommendation) => {
     const task = recommendation.taskName || '';
-    const blocker = getPrimaryBlocker(recommendation);
     switch (recommendation.reason) {
       case 'unlock-trader':
         return t('page.dashboard.focus.summary.unlock_trader', {
@@ -376,19 +379,8 @@
           'page.dashboard.focus.summary.filter_hidden_other',
           { count: recommendation.hiddenAvailableCount ?? 0 }
         );
-      case 'blocked-level':
-        return getCountLabel(
-          blocker.count ?? 0,
-          'page.dashboard.focus.summary.blocked_level_one',
-          'page.dashboard.focus.summary.blocked_level_other',
-          { count: blocker.count ?? 0, task }
-        );
-      case 'blocked-prerequisite':
-        return t('page.dashboard.focus.summary.blocked_prerequisite', { task });
-      case 'blocked-fence':
-        return t('page.dashboard.focus.summary.blocked_fence', { task });
-      case 'blocked-trader-unlock':
-        return t('page.dashboard.focus.summary.blocked_trader_unlock', { task });
+      case 'blocked-requirement':
+        return t('page.dashboard.focus.summary.blocked_requirement', { task });
       case 'complete':
         return t('page.dashboard.focus.summary.complete');
       default:
@@ -419,19 +411,22 @@
     }
     return t('page.dashboard.focus.reason.default');
   };
-  const getProofText = (recommendation: DashboardRecommendation) => {
-    const blocker = getPrimaryBlocker(recommendation);
+  const getScopeProof = (recommendation: DashboardRecommendation) => {
+    const count = recommendation.hiddenAvailableCount ?? 0;
     if (recommendation.kind === 'filters') {
       return getCountLabel(
-        recommendation.hiddenAvailableCount ?? 0,
+        count,
         'page.dashboard.focus.proof.filters_one',
         'page.dashboard.focus.proof.filters_other',
-        { count: recommendation.hiddenAvailableCount ?? 0 }
+        { count }
       );
     }
     if (recommendation.reason === 'complete') {
       return t('page.dashboard.focus.proof.complete');
     }
+    return undefined;
+  };
+  const getPayoffProof = (recommendation: DashboardRecommendation) => {
     if (recommendation.unlockTraderName) {
       return getCountLabel(
         recommendation.progress.remaining,
@@ -451,33 +446,9 @@
         { count: recommendation.impact }
       );
     }
-    if (blocker.type === 'level') {
-      return getCountLabel(
-        blocker.count ?? 0,
-        'page.dashboard.focus.proof.blocked_level_one',
-        'page.dashboard.focus.proof.blocked_level_other',
-        { count: blocker.count ?? 0 }
-      );
-    }
-    if (blocker.type === 'prerequisite') {
-      return getCountLabel(
-        blocker.count ?? 0,
-        'page.dashboard.focus.proof.blocked_prerequisite_one',
-        'page.dashboard.focus.proof.blocked_prerequisite_other',
-        { count: blocker.count ?? 0 }
-      );
-    }
-    if (blocker.type === 'fence') {
-      return t('page.dashboard.focus.proof.blocked_fence', {
-        count: formatNumericValue(blocker.count),
-      });
-    }
-    if (blocker.type === 'trader-unlock') {
-      return t('page.dashboard.focus.proof.blocked_trader_unlock', {
-        task: blocker.taskName,
-        trader: blocker.traderName,
-      });
-    }
+    return undefined;
+  };
+  const getGoalProof = (recommendation: DashboardRecommendation) => {
     if (recommendation.isLightkeeper) {
       return getCountLabel(
         recommendation.progress.remaining,
@@ -502,6 +473,9 @@
         { count: recommendation.progress.remaining }
       );
     }
+    return undefined;
+  };
+  const getRemainingProof = (recommendation: DashboardRecommendation) => {
     if (recommendation.progress.remaining <= 0) {
       return t('page.dashboard.focus.proof.ready_zero');
     }
@@ -512,6 +486,14 @@
       { count: recommendation.progress.remaining }
     );
   };
+  const getActionProof = (recommendation: DashboardRecommendation) =>
+    getPayoffProof(recommendation) ??
+    getGoalProof(recommendation) ??
+    getRemainingProof(recommendation);
+  const getProofText = (recommendation: DashboardRecommendation) =>
+    getPrimaryBlocker(recommendation).description ??
+    getScopeProof(recommendation) ??
+    getActionProof(recommendation);
   const getStatusText = (recommendation: DashboardRecommendation) => {
     const blocker = getPrimaryBlocker(recommendation);
     switch (blocker.type) {
@@ -527,28 +509,8 @@
         );
       case 'filters':
         return t('page.dashboard.focus.status.filters');
-      case 'level':
-        return getCountLabel(
-          blocker.count ?? 0,
-          'page.dashboard.focus.status.level_one',
-          'page.dashboard.focus.status.level_other',
-          { count: blocker.count ?? 0, required: blocker.required ?? 0 }
-        );
-      case 'prerequisite':
-        return t('page.dashboard.focus.status.prerequisite', {
-          tasks: (blocker.taskNames ?? []).join(', '),
-        });
-      case 'fence':
-        return t(
-          'common.meet_the_fence_reputation_requirement_required',
-          { required: formatNumericValue(blocker.required) },
-          'Meet the Fence reputation requirement ({required}).'
-        );
-      case 'trader-unlock':
-        return t('page.dashboard.focus.status.trader_unlock', {
-          task: blocker.taskName,
-          trader: blocker.traderName,
-        });
+      case 'requirement':
+        return t('page.dashboard.focus.title.blocked');
       case 'complete':
         return t('page.dashboard.focus.status.complete');
       default:

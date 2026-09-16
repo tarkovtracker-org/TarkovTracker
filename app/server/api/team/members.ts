@@ -1,5 +1,6 @@
 import { createError, defineEventHandler, getQuery, getRequestHeader, setResponseHeader } from 'h3';
 import { fetchWithTimeout } from '@/server/utils/fetchWithTimeout';
+import { resolveGameModeSeason } from '@/server/utils/gameModeSeason';
 import { createLogger } from '@/server/utils/logger';
 import { getProxyAwareClientIdentifier } from '@/server/utils/requestIdentity';
 import {
@@ -10,7 +11,7 @@ import {
   writeSharedCache,
   type SharedCacheHandle,
 } from '@/server/utils/sharedEdgeStore';
-import { getGameModeSeasonNumber, isGameMode, type GameMode } from '@/utils/constants';
+import { isGameMode, type GameMode } from '@/utils/constants';
 import {
   getLegacyModeProgressField,
   hasMaterializedProgress,
@@ -305,13 +306,6 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 429, statusMessage: 'Too many requests' });
     }
   }
-  const teamMembersCacheKey = `${teamId}:${userId}`;
-  if (!isTestEnvironment && !forceRefresh) {
-    const cached = await getCachedTeamMembers(sharedCacheHandle, teamMembersCacheKey);
-    if (cached) {
-      return cached;
-    }
-  }
   const restApiKey = supabaseServiceKey || supabaseAnonKey;
   const restAuthorization =
     authHeader || (supabaseServiceKey ? `Bearer ${supabaseServiceKey}` : '');
@@ -372,6 +366,14 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: 'Team has an invalid game mode' });
   }
   const gameMode: GameMode = gameModeValue;
+  const seasonNumber = await resolveGameModeSeason(gameMode, { supabaseUrl, supabaseServiceKey });
+  const teamMembersCacheKey = `${teamId}:${userId}:${seasonNumber}`;
+  if (!isTestEnvironment && !forceRefresh) {
+    const cached = await getCachedTeamMembers(sharedCacheHandle, teamMembersCacheKey);
+    if (cached) {
+      return cached;
+    }
+  }
   const membersResp = await restFetch(
     buildRestPath('team_memberships', {
       select: 'user_id',
@@ -389,7 +391,7 @@ export default defineEventHandler(async (event) => {
     const profilesResp = await restFetch(
       buildRestPath('team_member_mode_summary', {
         game_mode: `eq.${gameMode}`,
-        season_number: `eq.${getGameModeSeasonNumber(gameMode)}`,
+        season_number: `eq.${seasonNumber}`,
         select: 'user_id,display_name,level,tasks_completed',
         user_id: idsParam,
       })
@@ -429,7 +431,7 @@ export default defineEventHandler(async (event) => {
         const resp = await restFetch(
           buildRestPath('team_member_mode_summary', {
             game_mode: `eq.${gameMode}`,
-            season_number: `eq.${getGameModeSeasonNumber(gameMode)}`,
+            season_number: `eq.${seasonNumber}`,
             select: 'user_id,display_name,level,tasks_completed',
             user_id: `eq.${id}`,
           })

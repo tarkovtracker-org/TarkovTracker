@@ -558,13 +558,13 @@
   });
   const requirementSummaryClasses = computed(() => {
     if (requirementSummaryColor.value === 'success') {
-      return 'border-success-500/30 bg-success-950/40 text-success-200';
+      return 'border-success-500/30 bg-success-950/40 light:bg-success-100 text-success-200';
     }
     if (requirementSummaryColor.value === 'warning') {
-      return 'border-warning-500/30 bg-warning-950/40 text-warning-200';
+      return 'border-warning-500/30 bg-warning-950/40 light:bg-warning-100 text-warning-200';
     }
     if (requirementSummaryColor.value === 'info') {
-      return 'border-info-500/30 bg-info-950/40 text-info-200';
+      return 'border-info-500/30 bg-info-950/40 light:bg-info-100 text-info-200';
     }
     return 'border-white/10 bg-surface-900 text-surface-300';
   });
@@ -789,12 +789,12 @@
   };
   const getRequirementStatusClasses = (status: PrestigeRequirementStatus) => {
     if (status === 'met') {
-      return 'border-success-500/25 bg-success-950/40 text-success-200';
+      return 'border-success-500/25 bg-success-950/40 light:bg-success-100 text-success-200';
     }
     if (status === 'manual') {
-      return 'border-info-500/25 bg-info-950/40 text-info-200';
+      return 'border-info-500/25 bg-info-950/40 light:bg-info-100 text-info-200';
     }
-    return 'border-warning-500/25 bg-warning-950/40 text-warning-200';
+    return 'border-warning-500/25 bg-warning-950/40 light:bg-warning-100 text-warning-200';
   };
   const getRequirementIcon = (row: PrestigeRequirementRow) => {
     switch (row.kind) {
@@ -816,12 +816,12 @@
   };
   const getRequirementIconClasses = (row: PrestigeRequirementRow) => {
     if (row.status === 'met') {
-      return 'border-success-500/25 bg-success-950/40 text-success-200';
+      return 'border-success-500/25 bg-success-950/40 light:bg-success-100 text-success-200';
     }
     if (row.status === 'manual') {
-      return 'border-info-500/25 bg-info-950/40 text-info-200';
+      return 'border-info-500/25 bg-info-950/40 light:bg-info-100 text-info-200';
     }
-    return 'border-warning-500/25 bg-warning-950/40 text-warning-200';
+    return 'border-warning-500/25 bg-warning-950/40 light:bg-warning-100 text-warning-200';
   };
   let prestigeHistoryRequestId = 0;
   const clearPrestigeHistory = () => {

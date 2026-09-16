@@ -10,7 +10,7 @@
   />
   <template v-if="showImportTools">
     <GenericCard
-      v-if="!isBlockedByOtherDataFlow && !isBackupOrEftLogsImportPreviewActive"
+      v-if="!isBlockedByOtherDataFlow && !isBackupOrEftLogsImportPreviewActive && !eftLogsIsParsing"
       icon="mdi-account-arrow-up"
       icon-color="info"
       highlight-color="info"
@@ -389,12 +389,13 @@
           <p class="text-surface-500 text-sm">
             {{ $t('settings.data_management.eft_logs_section_description') }}
           </p>
-          <template v-if="!isAnyImportPreviewActive">
+          <template v-if="!isAnyImportPreviewActive && !eftLogsIsParsing">
             <UButton
+              ref="eftLogsFolderButtonRef"
               icon="i-mdi-folder-upload-outline"
               block
               :ui="{
-                base: 'bg-info-900 hover:bg-info-800 active:bg-info-700 text-info-200 focus-visible:ring focus-visible:ring-info-500',
+                base: 'bg-info-900 light:bg-info-50 hover:bg-info-800 light:hover:bg-info-100 active:bg-info-700 light:active:bg-info-100 text-info-200 focus-visible:ring focus-visible:ring-info-500',
               }"
               :disabled="isAnyImportActive"
               @click="showEftLogsFolderInput"
@@ -404,6 +405,7 @@
             <div class="bg-surface-900/80 rounded-md border border-white/10 p-3">
               <p class="text-surface-300 text-xs font-semibold">
                 {{ $t('settings.log_import.upload_hint') }}
+                {{ $t('settings.log_import.large_folder_hint') }}
               </p>
               <ul class="text-surface-400 mt-2 list-disc space-y-1 pl-4 text-xs">
                 <li>{{ $t('settings.log_import.logs_folder_required') }}</li>
@@ -429,6 +431,24 @@
               </ul>
             </div>
           </template>
+          <div class="space-y-2">
+            <output class="block">
+              <span v-if="eftLogsIsParsing" class="text-sm">
+                {{ $t('settings.log_import.reading_logs') }}
+              </span>
+            </output>
+            <template v-if="eftLogsIsParsing">
+              <progress
+                :value="eftLogsParseProgress.bytesRead"
+                :max="eftLogsParseProgress.totalBytes || 1"
+                :aria-label="$t('settings.log_import.reading_logs')"
+                class="w-full"
+              />
+              <UButton color="neutral" variant="soft" @click="cancelEftLogsParsing()">
+                {{ $t('common.cancel') }}
+              </UButton>
+            </template>
+          </div>
           <template v-if="eftLogsImportState === 'preview' && eftLogsPreview">
             <div class="space-y-1">
               <div class="flex items-center gap-1">
@@ -704,7 +724,12 @@
   </template>
   <template v-if="showBackupTools">
     <GenericCard
-      v-if="!isBlockedByOtherDataFlow && !isTarkovDevImportPreviewActive && !isEftLogsPreviewActive"
+      v-if="
+        !isBlockedByOtherDataFlow &&
+        !isTarkovDevImportPreviewActive &&
+        !isEftLogsPreviewActive &&
+        !eftLogsIsParsing
+      "
       icon="mdi-backup-restore"
       icon-color="primary"
       highlight-color="primary"
@@ -724,12 +749,12 @@
           <p class="text-surface-500 text-sm">
             {{ $t('settings.data_management.backup_restore_section_description') }}
           </p>
-          <template v-if="!isAnyImportPreviewActive">
+          <template v-if="!isAnyImportPreviewActive && !eftLogsIsParsing">
             <div class="grid gap-3 md:grid-cols-2">
               <div class="bg-surface-900/80 space-y-4 rounded-md border border-white/10 p-4">
                 <div class="flex items-start gap-3">
                   <div
-                    class="bg-primary-900/70 text-primary-200 border-primary-700/60 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border"
+                    class="bg-primary-900/70 light:bg-primary-100 text-primary-200 border-primary-700/60 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border"
                   >
                     <UIcon name="i-mdi-download" class="h-5 w-5" />
                   </div>
@@ -746,7 +771,7 @@
                   icon="i-mdi-download"
                   block
                   :ui="{
-                    base: 'bg-primary-900 hover:bg-primary-800 active:bg-primary-700 text-primary-200 focus-visible:ring focus-visible:ring-primary-500',
+                    base: 'bg-primary-900 light:bg-primary-50 hover:bg-primary-800 light:hover:bg-primary-100 active:bg-primary-700 light:active:bg-primary-100 text-primary-200 focus-visible:ring focus-visible:ring-primary-500',
                   }"
                   :disabled="isAnyImportActive"
                   @click="handleExportProgress"
@@ -757,7 +782,7 @@
               <div class="bg-surface-900/80 space-y-4 rounded-md border border-white/10 p-4">
                 <div class="flex items-start gap-3">
                   <div
-                    class="bg-primary-900/70 text-primary-200 border-primary-700/60 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border"
+                    class="bg-primary-900/70 light:bg-primary-100 text-primary-200 border-primary-700/60 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border"
                   >
                     <UIcon name="i-mdi-file-upload-outline" class="h-5 w-5" />
                   </div>
@@ -774,7 +799,7 @@
                   icon="i-mdi-file-upload-outline"
                   block
                   :ui="{
-                    base: 'bg-primary-900 hover:bg-primary-800 active:bg-primary-700 text-primary-200 focus-visible:ring focus-visible:ring-primary-500',
+                    base: 'bg-primary-900 light:bg-primary-50 hover:bg-primary-800 light:hover:bg-primary-100 active:bg-primary-700 light:active:bg-primary-100 text-primary-200 focus-visible:ring focus-visible:ring-primary-500',
                   }"
                   :disabled="isAnyImportActive"
                   @click="backupFileInputRef?.click()"
@@ -962,7 +987,7 @@
             icon="i-mdi-bug-outline"
             block
             :ui="{
-              base: 'bg-warning-900 hover:bg-warning-800 active:bg-warning-700 text-warning-200 focus-visible:ring focus-visible:ring-warning-500',
+              base: 'bg-warning-900 light:bg-warning-50 hover:bg-warning-800 light:hover:bg-warning-100 active:bg-warning-700 light:active:bg-warning-100 text-warning-200 focus-visible:ring focus-visible:ring-warning-500',
             }"
             :disabled="isAnyImportActive"
             @click="handleExportDebugSnapshot"
@@ -1155,6 +1180,8 @@
     importState: eftLogsImportState,
     previewData: eftLogsPreview,
     importError: eftLogsImportError,
+    isParsing: eftLogsIsParsing,
+    parseProgress: eftLogsParseProgress,
     parseFiles: parseEftLogsFiles,
     setIncludedVersions: setEftLogsIncludedVersions,
     confirmImport: confirmEftLogsImport,
@@ -1165,6 +1192,7 @@
     t('settings.log_import.session_folder_example_path')
   );
   const eftLogsFolderInputRef = ref<HTMLInputElement | null>(null);
+  const eftLogsFolderButtonRef = ref<{ $el?: HTMLElement } | null>(null);
   const eftLogsTargetMode = ref<GameMode>(currentImportableMode());
   const eftLogsNoQuestEventsError = computed(() =>
     t('settings.log_import.errors.no_quest_events_found')
@@ -1311,6 +1339,11 @@
   );
   function showEftLogsFolderInput() {
     eftLogsFolderInputRef.value?.click();
+  }
+  /** Cancelling unmounts the Cancel button, so return focus to the picker it replaced. */
+  function cancelEftLogsParsing() {
+    resetEftLogsImport();
+    void nextTick(() => eftLogsFolderButtonRef.value?.$el?.focus());
   }
   function updateTarkovDevImportTarget(
     sourceMode: GameMode | null | undefined,
@@ -1565,7 +1598,7 @@
     if (tarkovDevImportState.value === 'loading' || isTarkovDevImportPreviewActive.value) {
       return 'tarkov-dev';
     }
-    if (isEftLogsPreviewActive.value) {
+    if (isEftLogsPreviewActive.value || eftLogsIsParsing.value) {
       return 'eft-logs';
     }
     if (backupImportState.value === 'preview') {
@@ -1601,7 +1634,10 @@
     () => isBackupOrEftLogsImportPreviewActive.value || isTarkovDevImportPreviewActive.value
   );
   const isAnyImportActive = computed(
-    () => isAnyImportPreviewActive.value || tarkovDevImportState.value === 'loading'
+    () =>
+      isAnyImportPreviewActive.value ||
+      tarkovDevImportState.value === 'loading' ||
+      eftLogsIsParsing.value
   );
   function formatDate(ts: number): string {
     return new Date(ts).toLocaleDateString(undefined, {

@@ -2,7 +2,7 @@
   <div class="mb-3">
     <div class="panel px-3 py-2">
       <div class="flex items-center justify-between gap-2">
-        <div class="flex items-center gap-2 text-sm font-semibold text-white">
+        <div class="light:text-surface-50 flex items-center gap-2 text-sm font-semibold text-white">
           <UIcon name="i-mdi-history" class="text-primary-400 h-4 w-4" />
           {{ t('page.dashboard.changelog.title') }}
         </div>

@@ -14,7 +14,7 @@
       </p>
       <div
         v-if="troubleshootingHint"
-        class="bg-warning-500/10 border-warning-500/30 text-warning-100 mt-5 rounded-xl border px-4 py-3 text-left text-sm"
+        class="bg-warning-500/10 border-warning-500/30 text-warning-100 light:text-warning-900 mt-5 rounded-xl border px-4 py-3 text-left text-sm"
       >
         {{ troubleshootingHint }}
       </div>

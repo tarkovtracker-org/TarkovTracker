@@ -45,10 +45,14 @@
     type StorylineNormalizedChapterView,
   } from '@/composables/useStorylineChapters';
   import ChapterCard from '@/features/storyline/components/ChapterCard.vue';
+  import type { StoryChapter } from '@/types/tarkov';
   interface Props {
+    chapters: StoryChapter[];
     storyChapterCompletionState: Record<string, boolean>;
     storyObjectiveCompletionState: Record<string, Record<string, boolean>>;
     readOnly?: boolean;
+    /** Own completed objective IDs, so marks stranded by an upstream re-key stay visible. */
+    completedObjectiveIds?: (chapterId: string) => readonly string[];
   }
   const props = defineProps<Props>();
   const emit = defineEmits<{
@@ -57,9 +61,11 @@
   }>();
   const { t } = useI18n({ useScope: 'global' });
   const { normalizedChapters } = useStorylineChapters({
+    chapters: () => props.chapters,
     isChapterComplete: (chapterId: string) => props.storyChapterCompletionState[chapterId] === true,
     isObjectiveComplete: (chapterId: string, objectiveId: string) =>
       props.storyObjectiveCompletionState[chapterId]?.[objectiveId] === true,
+    completedObjectiveIds: (chapterId: string) => props.completedObjectiveIds?.(chapterId) ?? [],
   });
   interface ChapterProgress extends StorylineNormalizedChapterView {
     mainProgress: number;

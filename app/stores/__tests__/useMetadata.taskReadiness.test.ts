@@ -46,6 +46,19 @@ describe('metadata task readiness ownership', () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
+  it('contains deferred prestige and objective failures without rejecting the scheduler', async () => {
+    vi.mocked(store.fetchPrestigeData).mockRejectedValue(new Error('Prestige offline'));
+    vi.mocked(store.fetchTaskObjectivesData).mockRejectedValue(new Error('Objectives offline'));
+    await store.fetchAllData(false, { deferHeavy: true });
+    const callbacks = vi
+      .mocked(queueIdleTask)
+      .mock.calls.filter(([, options]) => options?.timeout === 3000);
+    expect(callbacks).toHaveLength(2);
+    for (const [callback] of callbacks) await expect(callback()).resolves.toBeUndefined();
+    expect(store.fetchPrestigeData).toHaveBeenCalledTimes(1);
+    expect(store.fetchTaskObjectivesData).toHaveBeenCalledTimes(1);
+    expect(store.tasksCoreRefreshing).toBe(false);
+  });
   it('holds readiness during initialization before cached core loading starts', async () => {
     const setup = createDeferred<undefined>();
     vi.spyOn(store, 'updateLanguageAndGameMode').mockImplementation(() => {

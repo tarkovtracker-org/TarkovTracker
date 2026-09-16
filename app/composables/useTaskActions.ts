@@ -1,4 +1,5 @@
 import { useProductAnalytics } from '@/composables/useProductAnalytics';
+import { hasStoryUnlockProgress } from '@/stores/taskAvailability';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
@@ -88,11 +89,9 @@ export function useTaskActions(
   };
   const ensureTraderRequirements = (currentTask: Task) => {
     if (!preferencesStore.getTasksRequireTraderLevels) return;
-    const fenceId = metadataStore.traders.find((trader) => trader.normalizedName === 'fence')?.id;
     applyTaskTraderRequirements({
       store: tarkovStore,
       task: currentTask,
-      fenceId,
     });
   };
   const isTaskManuallyFailed = (taskId: string) => {
@@ -134,6 +133,7 @@ export function useTaskActions(
     });
     unpinTaskIfPinned(currentTask.id);
     ensureTaskMinPlayerLevel(tarkovStore, currentTask);
+    ensureTraderRequirements(currentTask);
     if (isUndo) {
       emitAction({
         taskId: currentTask.id,
@@ -181,6 +181,12 @@ export function useTaskActions(
     const currentTask = task();
     const taskName = getTaskName(currentTask, () => t('common.task', 'Task'));
     applyTaskAvailabilityRequirements({
+      getCompletion: (id) => tarkovStore.getCurrentProgressData().taskCompletions?.[id],
+      skipTaskRequirements: (currentTask.storyUnlocks ?? []).some((chapter) =>
+        hasStoryUnlockProgress(chapter.id, {
+          storyChapters: tarkovStore.getCurrentProgressData().storyChapters,
+        })
+      ),
       onCompleteRequirement: completeTaskForAvailability,
       onFailRequirement: failTaskForAvailability,
       task: currentTask,

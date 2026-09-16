@@ -96,7 +96,9 @@
     "community_section": "Communauté",
     "keyboard_shortcuts": "Raccourcis clavier",
     "report_problem": "Signaler un problème",
-    "login_aria": "Connectez-vous à votre compte"
+    "login_aria": "Connectez-vous à votre compte",
+    "switch_to_light_theme": "Basculer vers le thème clair",
+    "switch_to_dark_theme": "Basculer vers le thème sombre"
   },
   "omnibar": {
     "title": "Recherche",
@@ -262,6 +264,7 @@
     "maps": "Cartes",
     "clear_search": "Effacer la recherche",
     "settings": "Réglages",
+    "about": "À propos de",
     "credits": "Crédits",
     "support": "Soutien",
     "privacy_policy": "Politique de confidentialité",
@@ -605,6 +608,7 @@
           "filter_hidden_other": "Vos filtres actuels masquent {count} quêtes disponibles.",
           "blocked_level_one": "{task} est votre déblocage le plus proche, mais il vous manque encore 1 niveau.",
           "blocked_level_other": "{task} est votre déblocage le plus proche, mais il vous manque encore {count} niveaux.",
+          "blocked_requirement": "{task} est bloqué par ses exigences.",
           "blocked_prerequisite": "{task} est proche, mais reste bloquée par des quêtes préalables.",
           "blocked_fence": "{task} attend la réputation Fence.",
           "blocked_trader_unlock": "{task} est bloquée derrière une autre quête de déblocage de marchand.",
@@ -741,6 +745,17 @@
       "no_data": "Aucune donnée de chapitre d’histoire disponible.",
       "mark_incomplete": "Marquer comme non terminé",
       "endings": "Fins",
+      "ending_progress": "{completed}/{total} objectifs connus",
+      "ending_evidence_pending": "Aucun objectif associé à cette fin pour le moment.",
+      "partial_data": "Données partielles",
+      "partial_data_hint": "Les données de l'histoire amont de ce chapitre sont incomplètes, donc plus d'objectifs peuvent exister que ce qui est listé.",
+      "quest_route_exclusive": "Terminer une de ces routes régit l’autre.",
+      "quest_route_known_steps_done": "Toutes les étapes connues ont été réalisées",
+      "quest_route_evidence_pending": "Aucune étape capturée pour le moment",
+      "quest_route_conflict": "Plus d'un parcours se lit comme terminé; un seul est possible en jeu.",
+      "quest_route_progress": "Etapes {completed}/{total}",
+      "stale_progress_one": "1 marque d'objectif enregistrée ne correspond plus aux données de l'histoire en cours et nécessite une nouvelle vérification.",
+      "stale_progress_other": "Les marques d'objectifs enregistrées par {count} ne correspondent plus aux données de l'histoire en cours et doivent être revérifiées.",
       "route_choice": "Choix de la route",
       "route_chosen": "Route sélectionnée",
       "route_blocks": "Bloque : {objectives}",
@@ -898,7 +913,8 @@
         "xp": "Récompense XP",
         "ascending": "Ascendant",
         "descending": "Descendant",
-        "aria_label": "Trier les tâches"
+        "aria_label": "Trier les tâches",
+        "progression": "Progression"
       },
       "settings": {
         "title": "Paramètres de tâche",
@@ -1078,7 +1094,32 @@
         "previous_tasks": "Quête(s) précédente(s) :",
         "progress": "Progression {completed}/{total}",
         "rewards": "Récompenses",
-        "unlocks_count": "{count} déblocages"
+        "unlocks_count": "{count} déblocages",
+        "trader_requirement_badge": "{trader} {kind} {comparison} {value}",
+        "loyalty_level": "LG",
+        "reputation": "Représentant"
+      },
+      "blockers": {
+        "player_level": "Niveau de joueur {comparison} {required} requis (courant: {current}).",
+        "trader_level": "{trader} Niveau de Fidélité {comparison} {required} requis (actuel: {current}).",
+        "trader_reputation": "La réputation {trader} {comparison} {required} est requise (courant: {current}).",
+        "prerequisite": "Répondre aux statuts de tâches requis pour : {tasks}.",
+        "story_route": "Rencontrez les statuts de tâches requis pour {tasks}, ou progressez dans l'un de ces chapitres d'histoire : {chapters}.",
+        "failed_branch": "Bloqué par une tâche échouée : {task}.",
+        "faction": "Disponible pour les caractères {faction}.",
+        "trader_unlock": "Débloquez {trader} en complétant {task}.",
+        "prestige": "Nécessite le Prestige {required} (actuel: {current}).",
+        "unknown": "Les données requises sont indisponibles ou non pris en charge. La disponibilité ne peut pas être confirmée.",
+        "cycle": "La chaîne de prérequis contient un cycle. La disponibilité ne peut pas être confirmée.",
+        "complete": "Cette tâche est terminée.",
+        "failed": "Cette tâche a échoué.",
+        "disabled": "Cette tâche est désactivée.",
+        "task_status": "{task} ({status})",
+        "status_complete": "terminée",
+        "status_failed": "échouée",
+        "status_active": "actif ou accepté",
+        "status_unknown": "statut inconnu",
+        "status_or": " ou "
       }
     },
     "hideout": {
@@ -1320,8 +1361,6 @@
     "credits": {
       "sections": {
         "original_creator": "Créateur original du projet :",
-        "staff": "Équipe de TarkovTracker.org :",
-        "support_members": "Membres du support :",
         "beta_testers": "Nuxt - Testeurs de bêta fermée :",
         "contributors": "Contributeurs open source :"
       },
@@ -1336,7 +1375,44 @@
         "contributions": "Contributions {count}",
         "total": "Contributeur {count} | Contributeurs {count}"
       },
-      "description": "Rencontrez les créateurs, le personnel, les membres du support, les bêta-testeurs, et les contributeurs open source derrière Tarkov Tracker."
+      "description": "Rencontrez les créateurs, le personnel, les membres du support, les bêta-testeurs, et les contributeurs open source derrière Tarkov Tracker.",
+      "team_link": "Maintenue par l'équipe de TarkovTracker — retrouvez les sur la page À propos"
+    },
+    "about": {
+      "title": "À propos de TarkovTracker",
+      "description": "Rencontrez l'équipe qui maintient TarkovTracker.org, les partenaires derrière ses données de jeu, et comment obtenir de l'aide de la communauté.",
+      "intro": "TarkovTracker est un tracker de progression libre et open source pour Escape de Tarkov. Il maintient votre progression de quête et de ligne d'histoire, cache les mises à jour et les exigences d'objet en un seul endroit, et reste à jour avec les données de jeu mises à jour par la communauté. Le projet est géré par une petite équipe bénévole avec l'aide de contributeurs open source.",
+      "team": {
+        "heading": "Equipe",
+        "summary": "TarkovTracker.org est maintenu par une petite équipe de volontaires. Les personnes ci-dessous maintiennent le site en fonctionnement et soutiennent la communauté Discord.",
+        "core_heading": "Équipe principale",
+        "support_heading": "Support Discord"
+      },
+      "partners": {
+        "heading": "Partenaires et écosystèmes",
+        "summary": "TarkovTracker s'appuie sur les projets de la communauté. Ces responsables gèrent les outils indépendants et les sources de données sur lesquelles repose le tracker."
+      },
+      "help": {
+        "heading": "Comment obtenir de l'aide",
+        "routing": "Pour la réponse la plus rapide, utilisez les workflows de support spécifiques au canal dans notre Discord au lieu de messages directs aux membres de l'équipe. Les bogues reproductibles et les idées de fonctionnalités appartiennent à GitHub, et les rapports de sécurité passent par notre politique de sécurité privée.",
+        "discord": "Support de la communauté sur Discord",
+        "github_issues": "Signaler un bug ou demander une fonctionnalité sur GitHub",
+        "security": "Signaler un problème de sécurité (privé)",
+        "credits_link": "Testeurs bêta et contributeurs open source — voir Crédits"
+      },
+      "github_profile": "GitHub profile",
+      "roles": {
+        "core_owner": "Propriétaire principal, mainteneur et développeur",
+        "discord_owner_developer": "Propriétaire du serveur Discord, développeur et mainteneur TrackerBot",
+        "core_support": "Équipe de support principale",
+        "discord_support": "Support général Discord",
+        "tarkov_dev_maintainer": "Mainteneur de Tarkov.dev",
+        "ratscanner_maintainer": "Propriétaire et mainteneur de RatScanner"
+      },
+      "projects": {
+        "tarkov_dev": "Tarkov.dev",
+        "ratscanner": "RatScanner"
+      }
     },
     "login": {
       "subtitle": "Connectez-vous pour accéder à votre compte",
@@ -1877,6 +1953,13 @@
       "privacy_mode": "Mode streamer",
       "privacy_mode_hint": "Masque les informations sensibles pendant que vous diffusez."
     },
+    "appearance": {
+      "title": "Apparence",
+      "theme": "Thème",
+      "theme_hint": "Choisissez entre l'interface sombre et la lumière. Votre choix est mémorisé sur cet appareil.",
+      "theme_dark": "Sombre",
+      "theme_light": "Lumière"
+    },
     "interface": {
       "tasks": {
         "title": "Cartes de tâches",
@@ -2214,6 +2297,8 @@
       "confirm_word": "SUPPRIMER"
     },
     "log_import": {
+      "reading_logs": "Lecture des journaux et préparation de l'aperçu…",
+      "large_folder_hint": "Les grands dossiers sont lus localement dans les chunks. Gardez cette page ouverte; vous pouvez annuler pendant que les journaux sont en cours de lecture.",
       "upload_hint": "Sélectionnez votre dossier Logs d'Escape from Tarkov pour importer la progression des quêtes.",
       "deleted_logs_hint": "Si d'anciennes sessions de journaux ont été supprimées, elles ne peuvent pas être importées.",
       "deleted_logs_hint_tooltip": "L'importation des journaux lit uniquement les événements de quêtes encore présents dans votre dossier Logs actuel.",
@@ -2263,19 +2348,14 @@
       "cleared_logs_toast_title": "D’anciens journaux ont probablement été nettoyés",
       "cleared_logs_toast_description": "L'importation des journaux ne peut lire que l'historique des quêtes encore présent dans votre dossier Logs. Les sessions supprimées ne peuvent pas être récupérées.",
       "errors": {
+        "invalid_archive": "L'archive ZIP est incomplète ou contient une entrée de journal invalide. Aucune progression n'a été importée.",
+        "record_too_large": "Un enregistrement individuel dans {path} est trop volumineux pour être analysé en toute sécurité. Aucune progression n'a été importée. Veuillez signaler ce format de journal.",
         "apply_import_failed": "Impossible d'appliquer les données importées de progression des quêtes.",
-        "archive_log_file_too_large": "Le fichier journal dans l'archive est trop volumineux : {path}",
-        "archive_logs_too_large": "L'archive contient trop de données de journaux (max {max_mb} Mo).",
-        "import_file_too_large": "Le fichier d'importation est trop volumineux (max {max_mb} Mo).",
-        "log_file_too_large": "Le fichier journal est trop volumineux (max {max_mb} Mo).",
-        "log_file_too_large_path": "Le fichier journal est trop volumineux : {path}",
         "no_files_selected": "Aucun fichier n'a été sélectionné.",
-        "no_logs_in_archive": "Aucun journal EFT n'a été trouvé dans l'archive.",
         "no_matching_tasks_found": "Des événements de quête ont été trouvés, mais aucun ne correspond aux tâches TarkovTracker actuelles.",
         "no_notification_logs_found": "Aucun journal de notifications n'a été trouvé dans les fichiers sélectionnés.",
         "no_quest_events_found": "Aucun événement de début/fin de quête n'a été trouvé dans les journaux sélectionnés.",
         "parse_failed": "Impossible d'analyser les journaux EFT.",
-        "selected_logs_too_large": "Les journaux sélectionnés contiennent trop de données (max {max_mb} Mo).",
         "task_metadata_not_loaded": "Les métadonnées des tâches ne sont pas encore chargées. Actualisez puis réessayez.",
         "invalid_mode": "Sélectionnez un mode de jeu de destination valide.",
         "outside_active_season": "Ces logs contiennent des événements en dehors de la saison active ou sans date d'utilisation. Sélectionnez les sessions de la saison active avant d'importer dans le JcJ saisonnier."

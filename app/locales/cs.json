@@ -96,7 +96,9 @@
     "community_section": "Community",
     "keyboard_shortcuts": "Keyboard shortcuts",
     "report_problem": "Report a problem",
-    "login_aria": "Log in to your account"
+    "login_aria": "Log in to your account",
+    "switch_to_light_theme": "Přepnout na světlý motiv",
+    "switch_to_dark_theme": "Přepnout na tmavý motiv"
   },
   "omnibar": {
     "title": "Search",
@@ -262,6 +264,7 @@
     "maps": "Mapy",
     "clear_search": "Vymazat hledání",
     "settings": "Nastavení",
+    "about": "O aplikaci",
     "credits": "Kredity",
     "support": "Podpora",
     "privacy_policy": "Ochrana osobních údajů",
@@ -605,6 +608,7 @@
           "filter_hidden_other": "Vaše aktuální filtry skrývají {count} dostupné úkoly.",
           "blocked_level_one": "{task} je vaše nejbližší odemknutí, ale stále potřebujete ještě jednu úroveň.",
           "blocked_level_other": "{task} je vaše nejbližší odemknutí, ale stále potřebujete {count} další úrovně.",
+          "blocked_requirement": "{task} je zablokován svými požadavky.",
           "blocked_prerequisite": "{task} je blízko, ale stále je dán nezbytnými úkoly.",
           "blocked_fence": "{task} čeká na reputaci plotu.",
           "blocked_trader_unlock": "{task} je uzamčen za jiným úkolem pro odemknutí obchodníka.",
@@ -741,6 +745,17 @@
       "no_data": "Nejsou k dispozici žádné údaje kapitoly storylinu.",
       "mark_incomplete": "Označit jako nedokončené",
       "endings": "Koncovky",
+      "ending_progress": "{completed}/{total} známé cíle",
+      "ending_evidence_pending": "Zatím nejsou žádné cíle mapované k tomuto konci.",
+      "partial_data": "Částečné údaje",
+      "partial_data_hint": "Data příběhů na začátku této kapitoly jsou neúplná, takže může existovat více cílů, než je uvedeno v seznamu.",
+      "quest_route_exclusive": "Dokončování jedné z těchto tras je pravidlem druhé.",
+      "quest_route_known_steps_done": "Všechny známé kroky dokončeny",
+      "quest_route_evidence_pending": "Zatím nebyly zachyceny žádné kroky",
+      "quest_route_conflict": "Více než jedna trasa čte jako dokončená; pouze jedna je ve hře možná.",
+      "quest_route_progress": "{completed}/{total} kroky",
+      "stale_progress_one": "1 uložená objektivní známka se již neshoduje s aktuálními daty příběhu a vyžaduje překontrolu.",
+      "stale_progress_other": "{count} Uložené objekty již neodpovídají aktuálním datům příběhu a je třeba je znovu zkontrolovat.",
       "route_choice": "Volba trasy",
       "route_chosen": "Trasa vybrána",
       "route_blocks": "Bloky: {objectives}",
@@ -898,7 +913,8 @@
         "xp": "XP Odměna",
         "ascending": "Vzestupně",
         "descending": "sestupně",
-        "aria_label": "Třídit úkoly"
+        "aria_label": "Třídit úkoly",
+        "progression": "Pokrok"
       },
       "settings": {
         "title": "Nastavení úkolu",
@@ -1078,7 +1094,32 @@
         "previous_tasks": "Předchozí úkol(y):",
         "progress": "Postup {completed}/{total}",
         "rewards": "Odměny",
-        "unlocks_count": "Odemkne {count}"
+        "unlocks_count": "Odemkne {count}",
+        "trader_requirement_badge": "{trader} {kind} {comparison} {value}",
+        "loyalty_level": "LL",
+        "reputation": "Odpověď"
+      },
+      "blockers": {
+        "player_level": "Úroveň hráče {comparison} {required} je vyžadována (aktuální: {current}).",
+        "trader_level": "{trader} Věrnostní úroveň {comparison} {required} vyžadována (aktuální: {current}).",
+        "trader_reputation": "{trader} reputace {comparison} {required} vyžadována (aktuální: {current}).",
+        "prerequisite": "Seznamte se s požadovanými stavy úkolů: {tasks}.",
+        "story_route": "Seznamte se s požadovanými stavy úkolu pro {tasks}nebo postupujte v jedné z kapitol příběhu: {chapters}.",
+        "failed_branch": "Zablokováno selháním úkolu: {task}.",
+        "faction": "K dispozici na {faction} znaků.",
+        "trader_unlock": "Odemknout {trader} dokončením {task}.",
+        "prestige": "Vyžaduje Prestige {required} (aktuální: {current}).",
+        "unknown": "Data požadavků jsou nedostupná nebo nepodporovaná. Dostupnost nemůže být potvrzena.",
+        "cycle": "Předpokladový řetězec obsahuje cyklus. Dostupnost nemůže být potvrzena.",
+        "complete": "Tento úkol je dokončen.",
+        "failed": "Tento úkol se nezdařil.",
+        "disabled": "Tento úkol je zakázán.",
+        "task_status": "{task} ({status})",
+        "status_complete": "dokončeno",
+        "status_failed": "selhalo",
+        "status_active": "aktivní nebo přijaté",
+        "status_unknown": "neznámý stav",
+        "status_or": " nebo "
       }
     },
     "hideout": {
@@ -1320,8 +1361,6 @@
     "credits": {
       "sections": {
         "original_creator": "Původní tvůrce projektu:",
-        "staff": "TarkovTracker.org personál:",
-        "support_members": "Členové podpory:",
         "beta_testers": "Nuxt - Uzavřené Beta Testery:",
         "contributors": "Open source přispěvatelé:"
       },
@@ -1336,7 +1375,44 @@
         "contributions": "{count} příspěvky",
         "total": "{count} přispěvatel | {count} přispěvatelé"
       },
-      "description": "Seznamte se s tvůrci, zaměstnanci, podporovanými členy, beta testery a open source přispěvateli za Tarkov Trackerem."
+      "description": "Seznamte se s tvůrci, zaměstnanci, podporovanými členy, beta testery a open source přispěvateli za Tarkov Trackerem.",
+      "team_link": "Zachováno týmem TarkovTracker – setkejte se s nimi na stránce O"
+    },
+    "about": {
+      "title": "O TarkovTrackeru",
+      "description": "Seznamte se s týmem, který udržuje TarkovTracker.org, partnery za svými herními daty a jak získat pomoc od komunity.",
+      "intro": "TarkovTracker je zdarma, open source sledování pokroku pro útěk z Tarkovu. Udržuje tvůj proces a storyline pokrok, skrývá vylepšení a požadavky na předměty na jednom místě a zůstane aktuální s komunitně udržovanými herními daty. Projekt spravuje malý dobrovolnický tým s pomocí open source přispěvatelů.",
+      "team": {
+        "heading": "Tým",
+        "summary": "TarkovTracker.org je udržován malým dobrovolnickým týmem. Lidé níže udržují stránku běžet a podporují Discord komunitu.",
+        "core_heading": "Hlavní tým",
+        "support_heading": "Discord podpora"
+      },
+      "partners": {
+        "heading": "Partneři a ekosystém",
+        "summary": "TarkovTracker staví na komunitních projektech. Tito správci provozují nezávislé nástroje a zdroje dat, na které tracker spoléhá."
+      },
+      "help": {
+        "heading": "Jak získat pomoc",
+        "routing": "Pro nejrychlejší odpověď použijte workflow specifické podpory kanálu v našem Discordu namísto přímých zpráv pro členy týmu. Reprodukovatelné chyby a nápady patří do GitHubu a bezpečnostní zprávy procházejí naší soukromou bezpečnostní politikou.",
+        "discord": "Komunitní podpora na Discordu",
+        "github_issues": "Nahlásit chybu nebo požádat o funkci na GitHubu",
+        "security": "Nahlásit bezpečnostní problém (soukromý)",
+        "credits_link": "Beta testery a open source přispěvatelé – viz kredity"
+      },
+      "github_profile": "GitHub profile",
+      "roles": {
+        "core_owner": "Hlavní vlastník, správce a vývojář",
+        "discord_owner_developer": "Vlastník Discord serveru, vývojář a správce TrackerBot",
+        "core_support": "Hlavní podpůrný personál",
+        "discord_support": "Discord obecná podpora",
+        "tarkov_dev_maintainer": "Správce Tarkov.dev",
+        "ratscanner_maintainer": "Vlastník a správce RatScanner"
+      },
+      "projects": {
+        "tarkov_dev": "Tarkov.dev",
+        "ratscanner": "Skener hodnocení"
+      }
     },
     "login": {
       "subtitle": "Pro přístup k vašemu účtu se přihlaste",
@@ -1877,6 +1953,13 @@
       "privacy_mode": "Streamovací režim",
       "privacy_mode_hint": "Skryje citlivé informace během vysílání."
     },
+    "appearance": {
+      "title": "Vzhled",
+      "theme": "Téma",
+      "theme_hint": "Vyberte si mezi tmavým a světlým rozhraním. Vaše volba je pamatována na tomto zařízení.",
+      "theme_dark": "Tmavý",
+      "theme_light": "Světlý"
+    },
     "interface": {
       "tasks": {
         "title": "Karty úkolů",
@@ -2214,6 +2297,8 @@
       "confirm_word": "ODSTRANIT"
     },
     "log_import": {
+      "reading_logs": "Čtení protokolů a příprava náhledu…",
+      "large_folder_hint": "Velké složky jsou čteny lokálně v chuncích. Ponechte tuto stránku otevřenou a můžete ji zrušit, zatímco se protokoly čtou.",
       "upload_hint": "Vyberte únik ze složky Tarkov Logs pro import úkolu.",
       "deleted_logs_hint": "Pokud byly staré relace smazány, nelze je importovat.",
       "deleted_logs_hint_tooltip": "Protokol importu pouze pro čtení událostí v úkolu, které jsou stále přítomny ve vaší aktuální složce protokolů.",
@@ -2263,19 +2348,14 @@
       "cleared_logs_toast_title": "Staré logy byly pravděpodobně vymazány",
       "cleared_logs_toast_description": "Import protokolu může číst pouze historii výprav, která je stále ve složce logů. Odstraněné relace nelze obnovit.",
       "errors": {
+        "invalid_archive": "ZIP archiv je neúplný nebo obsahuje neplatný záznam logu. Nebyl importován žádný průběh.",
+        "record_too_large": "Individuální záznam v {path} je příliš velký na bezpečné zpracování. Žádný postup nebyl importován. Nahlaste prosím tento formát logu.",
         "apply_import_failed": "Použití importovaných dat dokončení úkolu se nezdařilo.",
-        "archive_log_file_too_large": "Soubor protokolu je v archivu příliš velký: {path}",
-        "archive_logs_too_large": "Archiv obsahuje příliš mnoho logů (max {max_mb} MB).",
-        "import_file_too_large": "Importovaný soubor je příliš velký (max {max_mb} MB).",
-        "log_file_too_large": "Soubor protokolu je příliš velký (max {max_mb} MB).",
-        "log_file_too_large_path": "Soubor protokolu je příliš velký: {path}",
         "no_files_selected": "Nebyly vybrány žádné soubory.",
-        "no_logs_in_archive": "V archivu nebyly nalezeny žádné protokoly EFT.",
         "no_matching_tasks_found": "Úkolové události byly nalezeny, ale žádný neodpovídá aktuálním úkolům TarkovTrackeru.",
         "no_notification_logs_found": "Ve vybraných souborech nebyly nalezeny žádné protokoly oznámení.",
         "no_quest_events_found": "Ve vybraných záznamech nebyly nalezeny žádné start/dokončovací události.",
         "parse_failed": "Nepodařilo se analyzovat protokoly EFT.",
-        "selected_logs_too_large": "Vybrané protokoly obsahují příliš mnoho obsahu (max {max_mb} MB).",
         "task_metadata_not_loaded": "Metadata úkolů ještě nejsou načtena. Prosím aktualizujte a zkuste to znovu.",
         "invalid_mode": "Vyberte platný cílový herní režim.",
         "outside_active_season": "Tyto protokoly obsahují události mimo aktivní sezónu nebo bez data použitelnosti. Před importem do sezony vyberte relace z aktivní sezóny."

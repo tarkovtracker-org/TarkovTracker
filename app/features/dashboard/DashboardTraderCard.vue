@@ -1,13 +1,12 @@
 <template>
   <div
-    class="flex h-full min-h-44 cursor-pointer flex-col rounded-lg border px-5 py-4 shadow-md transition-all outline-none"
+    class="flex h-full min-h-44 flex-col rounded-lg border px-5 py-4 shadow-md transition-all"
     :class="cardContainerClasses"
-    @click="handleCardClick"
   >
     <div class="mb-3 flex items-center gap-3">
       <button
         type="button"
-        class="flex min-w-0 flex-1 items-center gap-3 text-left transition-opacity hover:opacity-80 focus:outline-none"
+        class="focus-visible:ring-primary-500 light:focus-visible:ring-primary-800 flex min-w-0 flex-1 items-center gap-3 rounded text-left transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:outline-none"
         :aria-label="$t('page.dashboard.traders.view_tasks', { name: trader.name })"
         @click="navigateToTraderTasks"
       >
@@ -31,7 +30,7 @@
           </div>
           <div
             v-else-if="isComplete"
-            class="bg-success-900/80 ring-success-500/50 absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full ring-1"
+            class="bg-success-900/80 light:bg-success-100 ring-success-500/50 absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full ring-1"
             aria-hidden="true"
           >
             <UIcon name="i-mdi-check-bold" class="text-success-400 h-3 w-3" />
@@ -40,7 +39,13 @@
         <div class="min-w-0 flex-1">
           <div
             class="truncate text-sm font-semibold"
-            :class="isLocked ? 'text-surface-400' : isComplete ? 'text-surface-300' : 'text-white'"
+            :class="
+              isLocked
+                ? 'text-surface-400'
+                : isComplete
+                  ? 'text-surface-300'
+                  : 'light:text-surface-50 text-white'
+            "
           >
             {{ trader.name }}
           </div>
@@ -164,7 +169,9 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useTheme } from '@/composables/useTheme';
   import { isTraderLocked } from '@/features/dashboard/traderLockStatus';
+  import { traderPercentageStyle } from '@/features/dashboard/traderPercentageStyle';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
@@ -189,6 +196,7 @@
   const preferencesStore = usePreferencesStore();
   const tarkovStore = useTarkovStore();
   const metadataStore = useMetadataStore();
+  const { isLightTheme } = useTheme();
   const hasLoyaltyLevels = computed(
     () =>
       !TRADERS_WITHOUT_LOYALTY_LEVELS.includes(
@@ -248,14 +256,9 @@
       return [
         'bg-surface-950/50 border-success-500/15',
         'hover:border-success-500/25 hover:shadow-lg',
-        'focus-visible:border-success-500/30 focus-visible:ring-success-700/30 focus-visible:ring-2',
       ];
     }
-    return [
-      'bg-surface-900 border-white/12',
-      'hover:border-surface-600 hover:shadow-lg',
-      'focus-visible:border-surface-500 focus-visible:ring-surface-700/50 focus-visible:ring-2',
-    ];
+    return ['bg-surface-900 border-white/12', 'hover:border-surface-600 hover:shadow-lg'];
   });
   const portraitClasses = computed(() => {
     if (isLocked.value) return 'bg-surface-800 border-surface-700/50 opacity-50 grayscale';
@@ -267,15 +270,19 @@
     if (isComplete.value) return 'success' as const;
     return 'gradient' as const;
   });
-  const percentageTextStyle = computed(() => {
-    if (isLocked.value || isComplete.value) return {};
-    if (props.percentage <= 0) return {};
-    const hue = (props.percentage / 100) * 120;
-    return { color: `hsl(${hue}, 70%, 55%)` };
-  });
+  const percentageTextStyle = computed(() =>
+    traderPercentageStyle(
+      {
+        isLocked: isLocked.value,
+        isComplete: isComplete.value,
+        percentage: props.percentage,
+      },
+      isLightTheme.value ? 'light' : 'dark'
+    )
+  );
   const percentageTextClass = computed(() => {
     if (isLocked.value) return 'text-surface-500';
-    if (isComplete.value) return 'text-success-400/70';
+    if (isComplete.value) return 'text-success-400/70 light:text-success-900';
     if (props.percentage <= 0) return 'text-surface-400';
     return '';
   });
@@ -283,11 +290,11 @@
     const isActive = currentLevel.value === lvl;
     if (isComplete.value) {
       return isActive
-        ? 'bg-success-900/40 text-success-300/70'
+        ? 'bg-success-900/40 light:bg-success-100 text-success-300/70 light:text-success-900'
         : 'text-surface-500 hover:bg-surface-700/40 hover:text-surface-400';
     }
     return isActive
-      ? 'bg-surface-600 text-white'
+      ? 'bg-surface-600 text-white light:text-surface-50'
       : 'text-surface-300 hover:bg-surface-700/70 hover:text-surface-100';
   };
   const nextLevelInfo = computed(() => {
@@ -353,15 +360,6 @@
     if (event.key !== 'Enter') return;
     const target = event.target as HTMLInputElement;
     target.blur();
-  };
-  const isInteractiveTarget = (target: EventTarget | null) =>
-    target instanceof HTMLElement &&
-    Boolean(target.closest('a,button,input,label,select,textarea,[role="button"]'));
-  const handleCardClick = (event: MouseEvent) => {
-    if (isInteractiveTarget(event.target)) {
-      return;
-    }
-    navigateToTraderTasks();
   };
   const navigateToTraderTasks = () => {
     preferencesStore.setTaskPrimaryView('traders');

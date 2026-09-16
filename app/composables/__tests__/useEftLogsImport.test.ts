@@ -1,12 +1,21 @@
 import { strToU8, zipSync } from 'fflate';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ACTIVE_SEASON } from '@/utils/constants';
+import * as logFileReader from '@/utils/eftLogFileReader';
 import type { Task } from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
+const preferences = { getTasksRequireTraderLevels: true };
+vi.mock('@/stores/usePreferences', () => ({ usePreferencesStore: () => preferences }));
 const metadataStore: { tasks: Task[] } = {
   tasks: [{ id: '61604635c725987e815b1a46' }],
 };
 const tarkovStore = {
+  playerLevel: vi.fn(() => 1),
+  setLevel: vi.fn(),
+  getTraderLevel: vi.fn(() => 1),
+  getTraderReputation: vi.fn(() => 0),
+  setTraderLevel: vi.fn(),
+  setTraderReputation: vi.fn(),
   getObjectiveCount: vi.fn(() => 0),
   getCurrentGameMode: vi.fn<() => GameMode>(() => 'pvp'),
   getCurrentProgressData: vi.fn(() => ({ taskCompletions: {} })),
@@ -32,15 +41,7 @@ const i18nMessages: Record<string, string> = {
   'settings.log_import.selected_files_count': '{count} selected files',
   'settings.log_import.errors.apply_import_failed':
     'Import could not finish. Some progress may already have been imported. Select the same logs again to retry; completed progress is preserved.',
-  'settings.log_import.errors.archive_log_file_too_large':
-    'Log file is too large in archive: {path}',
-  'settings.log_import.errors.archive_logs_too_large':
-    'Archive contains too much log content (max {max_mb} MB).',
-  'settings.log_import.errors.import_file_too_large': 'Import file is too large (max {max_mb} MB).',
-  'settings.log_import.errors.log_file_too_large': 'Log file is too large (max {max_mb} MB).',
-  'settings.log_import.errors.log_file_too_large_path': 'Log file is too large: {path}',
   'settings.log_import.errors.no_files_selected': 'No files were selected.',
-  'settings.log_import.errors.no_logs_in_archive': 'No EFT logs were found in the archive.',
   'settings.log_import.errors.no_matching_tasks_found':
     'Quest events were found, but none match current TarkovTracker tasks.',
   'settings.log_import.errors.no_notification_logs_found':
@@ -48,8 +49,6 @@ const i18nMessages: Record<string, string> = {
   'settings.log_import.errors.no_quest_events_found':
     'No quest start/completion events were found in the selected logs.',
   'settings.log_import.errors.parse_failed': 'Failed to parse EFT logs.',
-  'settings.log_import.errors.selected_logs_too_large':
-    'Selected logs contain too much content (max {max_mb} MB).',
   'settings.log_import.errors.task_metadata_not_loaded':
     'Task metadata is not loaded yet. Please refresh and try again.',
 };
@@ -131,25 +130,130 @@ describe('useEftLogsImport', () => {
     tarkovStore.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
     tarkovStore.switchGameMode.mockImplementation(async () => undefined);
   });
-  it('enforces the aggregate byte limit across raw logs and ZIP entries', async () => {
-    const rawFiles = Array.from({ length: 8 }, (_, index) => {
-      const file = new File([completionLog()], `${index} notifications.log`);
-      Object.defineProperty(file, 'size', { value: 32 * 1024 * 1024 });
-      return file;
+  it('reports an oversized individual record without retaining or applying a partial preview', async () => {
+    const importer = await loadComposable();
+    await importer.parseFile(new File(['x'.repeat(9 * 1024 * 1024)], 'notifications.log'));
+    expect(importer.importError.value).toBe('settings.log_import.errors.record_too_large');
+    expect(importer.importState.value).toBe('error');
+    expect(importer.isParsing.value).toBe(false);
+    expect(importer.previewData.value).toBeNull();
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+  });
+  it('translates invalid archive sizes without applying progress', async () => {
+    const importer = await loadComposable();
+    const archive = zipSync({ 'notifications.log': strToU8(completionLog()) });
+    const header = new DataView(archive.buffer);
+    header.setUint32(22, header.getUint32(22, true) + 1, true);
+    await importer.parseFile(new File([new Uint8Array(archive)], 'Logs.zip'));
+    expect(importer.importError.value).toBe('settings.log_import.errors.invalid_archive');
+    expect(importer.previewData.value).toBeNull();
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+  });
+  it('reports file access failures and clears the reading state', async () => {
+    const importer = await loadComposable();
+    const file = new File([completionLog()], 'notifications.log');
+    vi.spyOn(file, 'slice').mockImplementation(() => {
+      throw new Error('The selected file is no longer readable.');
     });
-    const lastRawRead = vi.spyOn(rawFiles[7]!, 'text');
-    const archive = new File(
-      [new Uint8Array(zipSync({ 'notifications.log': strToU8(completionLog()) }))],
-      'Logs.zip'
+    await importer.parseFile(file);
+    expect(importer.importError.value).toBe('The selected file is no longer readable.');
+    expect(importer.isParsing.value).toBe(false);
+    expect(importer.previewData.value).toBeNull();
+  });
+  it.each([new Error('   '), null])(
+    'uses the localized fallback for unreadable errors: %s',
+    async (error) => {
+      const importer = await loadComposable();
+      const file = new File([completionLog()], 'notifications.log');
+      vi.spyOn(file, 'slice').mockImplementation(() => {
+        throw error;
+      });
+      await importer.parseFile(file);
+      expect(importer.importError.value).toBe('Failed to parse EFT logs.');
+      expect(importer.isParsing.value).toBe(false);
+      expect(importer.previewData.value).toBeNull();
+      expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+    }
+  );
+  it('ignores queued progress from a replaced reader', async () => {
+    const importer = await loadComposable();
+    let reportProgress!: Parameters<typeof logFileReader.readEftLogSources>[1]['onProgress'];
+    let finishRead!: (result: Awaited<ReturnType<typeof logFileReader.readEftLogSources>>) => void;
+    vi.spyOn(logFileReader, 'readEftLogSources').mockImplementationOnce((_files, options) => {
+      reportProgress = options.onProgress;
+      return new Promise((resolve) => {
+        finishRead = resolve;
+      });
+    });
+    const pending = importer.parseFile(new File([completionLog()], 'notifications.log'));
+    await importer.parseFile(new File([startedLog()], 'notifications.log'));
+    const progress = { ...importer.parseProgress.value };
+    const preview = importer.previewData.value;
+    reportProgress({ bytesRead: 999, totalBytes: 1000 });
+    finishRead({ sources: [], scanned: 0 });
+    await pending;
+    expect(importer.parseProgress.value).toEqual(progress);
+    expect(importer.previewData.value).toBe(preview);
+    expect(importer.importState.value).toBe('preview');
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+  });
+  it('cancels an in-flight folder read without previewing or applying progress', async () => {
+    const importer = await loadComposable();
+    const file = new File([completionLog()], 'notifications.log');
+    let finishRead!: (bytes: ArrayBuffer) => void;
+    vi.spyOn(file, 'slice').mockImplementation(
+      () =>
+        ({
+          arrayBuffer: () =>
+            new Promise<ArrayBuffer>((resolve) => {
+              finishRead = resolve;
+            }),
+        }) as Blob
     );
-    const composable = await loadComposable();
-    await composable.parseFiles([...rawFiles, archive]);
-    expect(composable.importState.value).toBe('error');
-    expect(composable.importError.value).toBe(
-      'Selected logs contain too much content (max 256 MB).'
+    const pending = importer.parseFile(file);
+    expect(importer.isParsing.value).toBe(true);
+    importer.reset();
+    finishRead(new TextEncoder().encode(completionLog()).buffer);
+    await pending;
+    expect(importer.isParsing.value).toBe(false);
+    expect(importer.importState.value).toBe('idle');
+    expect(importer.previewData.value).toBeNull();
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+  });
+  it('keeps a newer selection when an earlier folder read completes late', async () => {
+    const importer = await loadComposable();
+    const delayed = new File([completionLog()], 'notifications.log');
+    let finishRead!: (bytes: ArrayBuffer) => void;
+    vi.spyOn(delayed, 'slice').mockImplementation(
+      () =>
+        ({
+          arrayBuffer: () =>
+            new Promise<ArrayBuffer>((resolve) => {
+              finishRead = resolve;
+            }),
+        }) as Blob
     );
-    expect(lastRawRead).not.toHaveBeenCalled();
-    expect(tarkovStore.switchGameMode).not.toHaveBeenCalled();
+    const pending = importer.parseFile(delayed);
+    await importer.parseFile(new File([startedLog()], 'new notifications.log'));
+    const preview = importer.previewData.value;
+    finishRead(new TextEncoder().encode(completionLog()).buffer);
+    await pending;
+    expect(importer.previewData.value).toBe(preview);
+    expect(importer.previewData.value?.matchedStartedTaskIds).toEqual(['61604635c725987e815b1a46']);
+    expect(importer.isParsing.value).toBe(false);
+  });
+  it('finishes reading all selected bytes and reuses parsed evidence for version changes', async () => {
+    const importer = await loadComposable();
+    const file = new File([completionLog()], 'notifications.log');
+    const read = vi.spyOn(file, 'slice');
+    const text = vi.spyOn(file, 'text');
+    await importer.parseFile(file);
+    expect(importer.parseProgress.value).toEqual({ bytesRead: file.size, totalBytes: file.size });
+    const reads = read.mock.calls.length;
+    importer.setIncludedVersions(importer.previewData.value!.availableVersions);
+    expect(read).toHaveBeenCalledTimes(reads);
+    expect(text).not.toHaveBeenCalled();
+    expect(importer.importState.value).toBe('preview');
   });
   it('parses a single log file and exposes preview data', async () => {
     const composable = await loadComposable();
@@ -291,6 +395,19 @@ describe('useEftLogsImport', () => {
     expect(tarkovStore.switchGameMode).not.toHaveBeenCalled();
     expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
   });
+  it('imports completions when predecessor metadata is missing', async () => {
+    const taskId = '61604635c725987e815b1a46';
+    metadataStore.tasks = [{ id: taskId, predecessors: ['missing-prerequisite'] }];
+    const composable = await loadComposable();
+    await composable.parseFile(
+      new File([completionLog(taskId)], 'notifications.log', { type: 'text/plain' })
+    );
+    await composable.confirmImport('pvp');
+    expect(composable.importState.value).toBe('success');
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledExactlyOnceWith(taskId);
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalledWith('missing-prerequisite');
+    expect(tarkovStore.setTraderLevel).not.toHaveBeenCalled();
+  });
   it('backfills required prerequisite tasks when importing a later completed task', async () => {
     const prerequisiteTaskId = '5ac2426c86f774138762edfe';
     const completedTaskId = '61604635c725987e815b1a46';
@@ -317,6 +434,24 @@ describe('useEftLogsImport', () => {
     expect(tarkovStore.setTaskObjectiveComplete).toHaveBeenCalledWith('obj-prerequisite');
     expect(tarkovStore.setObjectiveCount).toHaveBeenCalledWith('obj-prerequisite', 2);
     expect(composable.importState.value).toBe('success');
+  });
+  it('does not infer a quest route from missing story progress', async () => {
+    const prerequisiteTaskId = '5ac2426c86f774138762edfe';
+    const completedTaskId = '61604635c725987e815b1a46';
+    metadataStore.tasks = [
+      { id: prerequisiteTaskId },
+      {
+        id: completedTaskId,
+        storyUnlocks: [{ id: 'chapter', name: 'Story route' }],
+        taskRequirements: [{ task: { id: prerequisiteTaskId }, status: ['Complete'] }],
+      },
+    ];
+    const composable = await loadComposable();
+    await composable.parseFile(
+      new File([completionLog(completedTaskId)], 'notifications.log', { type: 'text/plain' })
+    );
+    await composable.confirmImport('pvp');
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledExactlyOnceWith(completedTaskId);
   });
   it('applies failed-only prerequisite requirements when importing completed tasks', async () => {
     const failedPrerequisiteTaskId = '593aa4be86f77457f56379f8';
@@ -631,5 +766,57 @@ describe('restart semantics', () => {
     await importer.parseFile(new File([startedLog(id)], 'notifications.log'));
     await importer.confirmImport('pvp');
     expect(tarkovStore.setTaskActive).toHaveBeenCalledWith(id);
+  });
+});
+describe('trader gating preference during import', () => {
+  it.each([false, true])('respects trader gating = %s in the destination', async (enabled) => {
+    vi.clearAllMocks();
+    preferences.getTasksRequireTraderLevels = enabled;
+    const id = '61604635c725987e815b1a46';
+    metadataStore.tasks = [
+      {
+        id,
+        minPlayerLevel: 5,
+        traderRequirements: [
+          {
+            id: 'll',
+            requirementType: 'level',
+            trader: { id: 'prapor' },
+            compareMethod: '>=',
+            value: 2,
+          },
+          {
+            id: 'rep',
+            requirementType: 'reputation',
+            trader: { id: 'prapor' },
+            compareMethod: '>=',
+            value: 0.2,
+          },
+        ],
+      },
+    ] as Task[];
+    let current: GameMode = 'pvp';
+    const writtenModes: GameMode[] = [];
+    tarkovStore.getCurrentGameMode.mockImplementation(() => current);
+    tarkovStore.switchGameMode.mockImplementation(async (mode) => {
+      current = mode;
+    });
+    tarkovStore.setTraderLevel.mockImplementation(() => {
+      writtenModes.push(current);
+    });
+    tarkovStore.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
+    const importer = await loadComposable();
+    await importer.parseFiles([
+      new File([backendLog('gw-pve-01.escapefromtarkov.com')], 'backend.log'),
+      new File([completionLog(id)], 'notifications.log'),
+    ]);
+    await importer.confirmImport('pvp');
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith(id);
+    expect(tarkovStore.setLevel).toHaveBeenCalledWith(5);
+    expect(tarkovStore.setTraderLevel).toHaveBeenCalledTimes(enabled ? 1 : 0);
+    expect(tarkovStore.setTraderReputation).toHaveBeenCalledTimes(enabled ? 1 : 0);
+    expect(writtenModes).toEqual(enabled ? ['pve'] : []);
+    expect(current).toBe('pvp');
+    preferences.getTasksRequireTraderLevels = true;
   });
 });

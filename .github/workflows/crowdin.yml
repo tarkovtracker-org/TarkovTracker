@@ -7,10 +7,14 @@ on:
       - 'app/locales/en.json'
       - 'crowdin.yml'
       - '.github/workflows/crowdin.yml'
+      - 'scripts/crowdin-pr.sh'
+      - 'scripts/github-ci-gate.sh'
   schedule:
-    - cron: '17 */6 * * *'
+    - cron: '17 4 * * *'
   workflow_dispatch:
 permissions:
+  actions: write
+  checks: read
   contents: write
   pull-requests: write
 # All triggers share the same Crowdin project and localization branch.
@@ -21,16 +25,19 @@ jobs:
   sync:
     if: github.repository == 'tarkovtracker-org/TarkovTracker' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           fetch-depth: 0
           persist-credentials: false
+      - name: Preserve trusted merge gate
+        run: cp scripts/crowdin-pr.sh scripts/github-ci-gate.sh "$RUNNER_TEMP/"
       - name: Synchronize Crowdin translations
-        uses: crowdin/github-action@0d5670f539973aea2f01abce61a8989934df0025 # v3
+        id: crowdin
+        uses: crowdin/github-action@0d5670f539973aea2f01abce61a8989934df0025 # v3.0.2
         with:
           upload_sources: true
           upload_translations: false
@@ -39,9 +46,56 @@ jobs:
           localization_branch_name: locales
           create_pull_request: true
           pull_request_base_branch_name: main
-          pull_request_title: 'New Crowdin updates'
+          pull_request_title: 'chore(i18n): update translations from Crowdin'
           pull_request_body: 'Automated translation updates from Crowdin.'
+          commit_message: 'chore(i18n): update translations from Crowdin'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CROWDIN_PROJECT_ID: ${{ secrets.CROWDIN_PROJECT_ID }}
           CROWDIN_PERSONAL_TOKEN: ${{ secrets.CROWDIN_PERSONAL_TOKEN }}
+      - name: Resolve Crowdin PR
+        id: resolve-pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTION_PR: ${{ steps.crowdin.outputs.pull_request_number }}
+        run: |
+          pr="$ACTION_PR"
+          if [ -z "$pr" ]; then
+            pr="$(gh pr list --repo "$GITHUB_REPOSITORY" --head locales --base main --state open --json number --jq '.[0].number // empty')"
+          fi
+          if [ -n "$pr" ]; then
+            echo "pr_number=$pr" >> "$GITHUB_OUTPUT"
+            echo "Found open Crowdin PR #$pr"
+          else
+            echo "No open Crowdin PR to auto-merge."
+          fi
+      - name: Update translation branch from main
+        if: steps.resolve-pr.outputs.pr_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
+        run: bash "$RUNNER_TEMP/crowdin-pr.sh" update
+      - name: Prepare immutable translation checkout
+        id: candidate
+        if: steps.resolve-pr.outputs.pr_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
+        run: bash "$RUNNER_TEMP/crowdin-pr.sh" prepare
+      - uses: ./.github/actions/setup-project
+        if: steps.resolve-pr.outputs.pr_number != ''
+      - name: Validate translations
+        if: steps.resolve-pr.outputs.pr_number != ''
+        run: |
+          pnpm run format:check
+          pnpm run i18n:check
+          pnpm run systems:check
+      - name: Merge validated translations
+        if: steps.resolve-pr.outputs.pr_number != ''
+        env:
+          # Explicit dispatch starts CI; project checks receive no write token.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
+          HEAD_SHA: ${{ steps.candidate.outputs.head_sha }}
+          BASE_SHA: ${{ steps.candidate.outputs.base_sha }}
+        run: bash "$RUNNER_TEMP/crowdin-pr.sh" merge

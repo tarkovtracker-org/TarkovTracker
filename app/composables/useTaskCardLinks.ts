@@ -2,6 +2,7 @@ import { writeToClipboard } from '@/composables/useCopyToClipboard';
 import { useWikiLink } from '@/composables/useWikiLink';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { openExternalUrl } from '@/utils/redirect';
+import { getTaskTraderRequirements } from '@/utils/taskRequirements';
 import type { Task, TaskObjective } from '@/types/tarkov';
 interface UseTaskCardLinksOptions {
   task: () => Task;
@@ -61,6 +62,11 @@ export function useTaskCardLinks(options: UseTaskCardLinksOptions): UseTaskCardL
       `Task ID: ${currentTask.id}`,
       objectiveIds.length ? `Objective IDs: ${objectiveIds.join(', ')}` : '',
       minLevel > 0 ? `Task Req Level: ${minLevel}` : '',
+      ...getTaskTraderRequirements(currentTask).map((req) =>
+        req.requirementType === 'unknown'
+          ? `Unsupported requirement: ${req.id} (${req.reason})`
+          : `Trader requirement: ${req.trader.name} ${req.requirementType} ${req.compareMethod} ${req.value}`
+      ),
       `Dev Link: https://tarkov.dev/task/${currentTask.id}`,
       playerLevel > 0 ? `\nUSER LEVEL: ${playerLevel}` : '',
       `USER MODE: ${gameMode}`,

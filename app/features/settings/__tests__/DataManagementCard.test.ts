@@ -77,6 +77,8 @@ const {
     setIncludedVersions: vi.fn(),
   },
   eftLogsState: {
+    isParsing: {} as Ref<boolean>,
+    parseProgress: {} as Ref<{ bytesRead: number; totalBytes: number }>,
     isImporting: {} as Ref<boolean>,
     importError: { __v_isRef: true as const, value: null as string | null },
     previewData: { __v_isRef: true as const, value: null as Record<string, unknown> | null },
@@ -143,6 +145,8 @@ vi.mock('@/composables/useTarkovDevImport', () => ({
 }));
 vi.mock('@/composables/useEftLogsImport', () => ({
   useEftLogsImport: () => ({
+    isParsing: eftLogsState.isParsing,
+    parseProgress: eftLogsState.parseProgress,
     importState: eftLogsState.importState,
     isImporting: eftLogsState.isImporting,
     previewData: eftLogsState.previewData,
@@ -245,6 +249,8 @@ describe('DataManagementCard', () => {
     eftLogsState.importError.value = null;
     eftLogsState.importState.value = 'idle';
     eftLogsState.isImporting = ref(false);
+    eftLogsState.isParsing = ref(false);
+    eftLogsState.parseProgress = ref({ bytesRead: 0, totalBytes: 0 });
     eftLogsState.previewData.value = null;
     tarkovStoreState.currentMode = 'pvp';
     tarkovStoreState.tarkovUid = null;
@@ -254,9 +260,13 @@ describe('DataManagementCard', () => {
       tarkovDevState.previewData.value = null;
     });
   });
-  const createWrapper = (props: { view?: 'all' | 'imports' | 'backup' } = {}) =>
+  const createWrapper = (
+    props: { view?: 'all' | 'imports' | 'backup' } = {},
+    options: { attachTo?: HTMLElement } = {}
+  ) =>
     mount(DataManagementCard, {
       props,
+      attachTo: options.attachTo,
       global: {
         mocks: {
           $t: (key: string) => key,
@@ -295,6 +305,61 @@ describe('DataManagementCard', () => {
         },
       },
     });
+  it('keeps a live region mounted and shows cancellable folder-read progress', async () => {
+    const wrapper = createWrapper({ view: 'imports' });
+    const liveRegion = wrapper.find('output');
+    expect(liveRegion.exists()).toBe(true);
+    eftLogsState.isParsing.value = true;
+    eftLogsState.parseProgress.value = { bytesRead: 0, totalBytes: 0 };
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('progress').attributes()).toMatchObject({ value: '0', max: '1' });
+    eftLogsState.parseProgress.value = { bytesRead: 50, totalBytes: 100 };
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('output').element).toBe(liveRegion.element);
+    expect(liveRegion.text()).toContain('settings.log_import.reading_logs');
+    expect(wrapper.find('progress').attributes()).toMatchObject({ value: '50', max: '100' });
+    expect(
+      findButtonByText(wrapper, 'settings.data_management.import_eft_logs_folder_button')
+    ).toBeUndefined();
+    await findButtonByText(wrapper, 'common.cancel')!.trigger('click');
+    expect(eftLogsFns.reset).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
+  it('announces reading status without putting progress or controls in the live region', async () => {
+    const wrapper = createWrapper({ view: 'imports' });
+    eftLogsState.isParsing.value = true;
+    eftLogsState.parseProgress.value = { bytesRead: 25, totalBytes: 100 };
+    await wrapper.vm.$nextTick();
+    // <output> is an implicit polite status region, so no explicit role/aria-live is needed.
+    const liveRegion = wrapper.find('output');
+    expect(liveRegion.text()).toContain('settings.log_import.reading_logs');
+    // Progress updates and the Cancel control must not be re-announced on every slice.
+    expect(liveRegion.find('progress').exists()).toBe(false);
+    expect(liveRegion.find('button').exists()).toBe(false);
+    expect(wrapper.find('progress').exists()).toBe(true);
+    expect(findButtonByText(wrapper, 'common.cancel')).toBeTruthy();
+    wrapper.unmount();
+  });
+  it('returns focus to the folder picker after cancelling a folder read', async () => {
+    const wrapper = createWrapper({ view: 'imports' }, { attachTo: document.body });
+    eftLogsState.isParsing.value = true;
+    await wrapper.vm.$nextTick();
+    const cancelButton = findButtonByText(wrapper, 'common.cancel')!;
+    (cancelButton.element as HTMLButtonElement).focus();
+    expect(document.activeElement).toBe(cancelButton.element);
+    eftLogsFns.reset.mockImplementation(() => {
+      eftLogsState.isParsing.value = false;
+    });
+    await cancelButton.trigger('click');
+    await wrapper.vm.$nextTick();
+    const picker = findButtonByText(
+      wrapper,
+      'settings.data_management.import_eft_logs_folder_button'
+    );
+    expect(picker).toBeTruthy();
+    expect(document.activeElement).toBe(picker!.element);
+    wrapper.unmount();
+  });
   it('limits the imports view to profile and log import actions', () => {
     const wrapper = createWrapper({ view: 'imports' });
     expect(findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profile')).toBeTruthy();

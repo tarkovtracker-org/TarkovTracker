@@ -17,7 +17,7 @@
 | `progressState`         | `progressState.ts`         | Low-level progress mutation primitives (set/toggle task, objective, hideout, skill, trader, story, prestige, game-mode switch/migration).                                              |
 | `taskAvailability`      | `taskAvailability.ts`      | Task prerequisite-aware availability state.                                                                                                                                            |
 | `useActionHistoryStore` | `useActionHistoryStore.ts` | Undo/redo action history tracking.                                                                                                                                                     |
-| `useActivityLogStore`   | `useActivityLogStore.ts`   | User activity log entries.                                                                                                                                                             |
+| `useActivityLogStore`   | `useActivityLogStore.ts`   | Activity log feed over the selected mode's `apiUpdateHistory` and `manualActivityHistory`; only the unread marker is device-local.                                                     |
 
 ### Tarkov store internals (`app/stores/tarkov/`)
 
@@ -141,7 +141,7 @@ Each slice contains its Vue components and slice-local helpers/composables. High
 | Component                                     | Responsibility                                               |
 | --------------------------------------------- | ------------------------------------------------------------ |
 | `index.ts`                                    | Worker entry (thin adapter).                                 |
-| `router.ts`                                   | Routing, User-Agent gate, host/legacy redirect.              |
+| `router.ts`                                   | Routing, User-Agent gate, API host boundary enforcement.     |
 | `authentication.ts`                           | Abuse gate, token auth, daily-quota enforcement.             |
 | `rateLimiter.ts`                              | `ApiGatewayRateLimiter` Durable Object + quota client.       |
 | `responses.ts`                                | CORS, envelopes, conditional response, ETag/compression.     |

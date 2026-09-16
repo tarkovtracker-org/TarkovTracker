@@ -5,7 +5,7 @@
       <!-- Decrease button -->
       <AppTooltip :text="$t('needed_items.aria.decrease_count')">
         <button
-          class="text-surface-200 hover:bg-surface-600 active:bg-surface-500 flex h-5 w-5 items-center justify-center rounded-l-lg transition-colors hover:text-white sm:h-6 sm:w-6 lg:h-8 lg:w-8"
+          class="text-surface-200 hover:bg-surface-600 active:bg-surface-500 light:hover:text-surface-50 flex h-5 w-5 items-center justify-center rounded-l-lg transition-colors hover:text-white sm:h-6 sm:w-6 lg:h-8 lg:w-8"
           :aria-label="$t('needed_items.aria.decrease_count')"
           @click="$emit('decrease')"
         >
@@ -23,7 +23,7 @@
             :min="0"
             :max="neededCount"
             :aria-label="$t('needed_items.aria.enter_count')"
-            class="bg-surface-900 focus:ring-primary-500 h-full w-full px-0.5 text-center text-[10px] font-semibold text-white focus:ring-2 focus:outline-none focus:ring-inset sm:text-xs lg:px-2 lg:text-sm"
+            class="bg-surface-900 focus:ring-primary-500 light:text-surface-50 h-full w-full px-0.5 text-center text-[10px] font-semibold text-white focus:ring-2 focus:outline-none focus:ring-inset sm:text-xs lg:px-2 lg:text-sm"
             @blur="submitEdit"
             @keydown.enter="submitEdit"
             @keydown.escape="cancelEdit"
@@ -32,7 +32,7 @@
         <template v-else>
           <AppTooltip :text="$t('needed_items.aria.click_to_enter_value')">
             <button
-              class="hover:bg-surface-600 h-full w-full px-0.5 text-[10px] font-semibold text-white transition-colors sm:text-xs lg:px-2 lg:text-sm"
+              class="hover:bg-surface-600 light:text-surface-50 h-full w-full px-0.5 text-[10px] font-semibold text-white transition-colors sm:text-xs lg:px-2 lg:text-sm"
               :aria-label="$t('needed_items.aria.click_to_enter_value')"
               @click="startEditing"
             >
@@ -44,7 +44,7 @@
       <!-- Increase button -->
       <AppTooltip :text="$t('needed_items.aria.increase_count')">
         <button
-          class="text-surface-200 hover:bg-surface-600 active:bg-surface-500 flex h-5 w-5 items-center justify-center rounded-r-lg transition-colors hover:text-white sm:h-6 sm:w-6 lg:h-8 lg:w-8"
+          class="text-surface-200 hover:bg-surface-600 active:bg-surface-500 light:hover:text-surface-50 flex h-5 w-5 items-center justify-center rounded-r-lg transition-colors hover:text-white sm:h-6 sm:w-6 lg:h-8 lg:w-8"
           :aria-label="$t('needed_items.aria.increase_count')"
           @click="$emit('increase')"
         >
@@ -70,7 +70,7 @@
         :class="
           currentCount >= neededCount
             ? 'bg-success-600 border-success-500 hover:bg-success-500 text-white'
-            : 'bg-surface-700 text-surface-200 hover:bg-surface-600 border-white/20 hover:text-white'
+            : 'bg-surface-700 text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 border-white/20 hover:text-white'
         "
         @click="$emit('toggle')"
       >

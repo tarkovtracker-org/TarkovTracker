@@ -1,10 +1,10 @@
 <template>
   <UContainer class="px-4 py-8">
-    <div class="prose prose-gray dark:prose-invert mx-auto max-w-4xl">
-      <h1 class="mb-2 text-4xl font-bold">Privacy Policy</h1>
-      <p class="text-surface-500 dark:text-surface-400 mb-12 text-sm">
-        Last Updated: August 10, 2026
-      </p>
+    <div
+      class="prose prose-gray prose-invert light:prose-headings:text-surface-50 mx-auto max-w-4xl"
+    >
+      <h1 class="text-surface-50 mb-2 text-4xl font-bold">Privacy Policy</h1>
+      <p class="text-surface-400 mb-12 text-sm">Last Updated: August 10, 2026</p>
       <div class="space-y-12">
         <!-- INTRODUCTION -->
         <section>
