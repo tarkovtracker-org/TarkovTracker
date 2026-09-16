@@ -683,7 +683,7 @@ sequenceDiagram
 ### Files
 
 - `workers/api-gateway/src/index.ts` — Worker entrypoint; delegates to the modules below
-- `workers/api-gateway/src/router.ts` — path normalization, User-Agent gate, host/legacy redirect, route dispatch
+- `workers/api-gateway/src/router.ts` — path normalization, User-Agent gate, API host boundary enforcement, route dispatch
 - `workers/api-gateway/src/authentication.ts` — abuse gate, token auth, daily-quota enforcement
 - `workers/api-gateway/src/rateLimiter.ts` — `ApiGatewayRateLimiter` Durable Object + quota client
 - `workers/api-gateway/src/responses.ts` — CORS, envelopes, conditional response, ETag/compression
