@@ -1010,6 +1010,10 @@ export type Database = {
         Args: { max_entries?: number; payload: Json; previous_payload: Json }
         Returns: Json
       }
+      leave_team: {
+        Args: { p_team_id: string; p_user_id: string }
+        Returns: string
+      }
       merge_progress_data: {
         Args: {
           p_field: string
