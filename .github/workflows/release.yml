@@ -9,10 +9,10 @@ permissions:
 jobs:
   release:
     name: Release
-    # workflow_run can receive privileged credentials; only trusted main push CI may release.
+    # workflow_run can receive privileged credentials; only trusted main push or dispatched CI may release.
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
+      (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') &&
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.head_repository.id == github.event.repository.id
     concurrency:
@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
-      actions: read
+      actions: write
       checks: read
       contents: write
       issues: write
@@ -112,5 +112,4 @@ jobs:
         if: steps.publish.outputs.release == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_CI_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}
         run: pnpm exec semantic-release

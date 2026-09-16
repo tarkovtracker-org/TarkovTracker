@@ -49,8 +49,8 @@ Only substantial behavioral corrections or unresolved significant findings warra
 
 ### 1. CI Pipeline (`.github/workflows/ci.yml`)
 
-Runs on pushes to `main`, `develop`, and `wip/**`, and PRs targeting `main` or `develop`,
-including translation-only PRs. All eligible push runs retain full validation.
+Runs on pushes to `main`, `develop`, and `wip/**`, PRs targeting `main` or `develop`, and explicit CI dispatch,
+including translation-only PRs. All eligible push and dispatched runs retain full validation.
 
 The lightweight `changes` job emits proposed and effective selections. **Shadow rollout is enabled**:
 the effective selection runs every existing CI job. `CI Result` always evaluates the job outcomes and
@@ -189,14 +189,14 @@ Semantic versioning with automated releases:
 
 **Jobs:**
 
-- Reuses the successful `CI` run for the exact `main` push commit, including all four test shards
+- Reuses the successful `CI` run for the exact `main` commit, including all four test shards
   and the Supabase reset, lint, and pgTAP checks
 - Runs the production build before publishing
 - Generates changelog from conventional commits
 - Creates GitHub releases
 - Updates version in package.json
 
-**Triggers:** Completion of `CI` for a successful same-repository push to `main`. PR runs, failed
+**Triggers:** Completion of `CI` for a successful same-repository push or explicit dispatch on `main`. PR runs, failed
 or cancelled CI, and fork runs cannot publish. Successful CI reruns can retry release eligibility;
 there is no manual bypass of the CI gate. Documentation-only pushes may reach the gate, but
 semantic-release still decides whether the accumulated conventional commits warrant a version.
@@ -235,10 +235,14 @@ request administrative permissions merely to inspect it.
 `CHANGELOG.md` as `chore(release): <version>` with no skip marker. The plugin supports the
 main-only release workflow. It stages only these generated assets and rejects unrelated staged
 files. `scripts/release-commit.sh` pushes the new commit to
-`wip/release-<version>-<run-id>-<attempt>` using `ACCESS_TOKEN_GITHUB` as `RELEASE_CI_TOKEN`.
-That PAT push starts ordinary push CI on the staging branch. The plugin waits up to thirty minutes
+`wip/release-<version>-<run-id>-<attempt>` using the built-in `GITHUB_TOKEN`.
+An explicit `workflow_dispatch` starts full CI on that branch; the job has `actions: write`. The plugin waits up to thirty minutes
 for successful GitHub Actions `CI Result` on the exact version SHA; absent, failed, cancelled,
 skipped, or timed-out checks cannot promote it.
+
+Automation confirms each accepted dispatch creates a new CI run on the requested branch within
+60 seconds, including queued runs, before waiting for exact-SHA checks. Dispatched Fallow audits
+compare the checked-out commit with its parent, so dispatching main does not compare main with itself.
 
 After rechecking main and the policy, an ordinary non-forced push promotes the identical SHA to
 main using `GITHUB_TOKEN`. A concurrent main advance rejects promotion rather than rebasing

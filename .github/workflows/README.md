@@ -34,17 +34,15 @@ to `app/locales/%two_letters_code%.json`, preserving the directory hierarchy. It
 local translations. The existing `locales` branch supplies translation PRs targeting `main`.
 
 Repository secrets `CROWDIN_PROJECT_ID` and `CROWDIN_PERSONAL_TOKEN` authenticate to Crowdin only.
-Synchronization, branch updates, and the final merge use `ACCESS_TOKEN_GITHUB`, so PR changes start
-normal PR CI and merging starts main push CI. There is no `GITHUB_TOKEN` fallback. The PR author
-is the PAT owner. The PAT needs repository contents and pull-request write access, checks read
-access, and any required organization SSO authorization. Prefer a repository-scoped fine-grained
-PAT and rotate it according to repository policy. No automation credential is passed to dependency
-installation or project validation.
+Synchronization, branch updates, CI dispatch, and the final merge use the built-in `GITHUB_TOKEN`.
+The job grants contents/pull-request write, actions write, and checks read permissions. No personal
+GitHub token is required. Explicit `workflow_dispatch` starts CI on `locales` before merging and
+on `main` afterward. No write token is passed to dependency installation or project validation.
 
 When new translations are synchronized, `scripts/crowdin-pr.sh` verifies an open, non-draft,
 same-repository `locales` PR targeting `main`. If the branch is behind, it asks GitHub to merge main
-into it using an expected-head guard and waits for the new head; conflicts fail closed. The PAT
-starts CI for that update. It then captures the candidate head SHA, fetches that exact commit,
+into it using an expected-head guard and waits for the new head; conflicts fail closed. The gate
+explicitly starts CI for the validated candidate. It then captures the candidate head SHA, fetches that exact commit,
 and compares its full tree with a captured main SHA. Only regular non-English JSON files directly
 inside `app/locales/` may differ; empty diffs, deletions, symlinks, renames from other paths, and stale
 executable code are rejected. The checkout and dependency setup use this validated commit before
@@ -56,6 +54,8 @@ all other states fail closed. `--match-head-commit` atomically guards the squash
 last-moment PR push. A fixed commit body prevents inherited CI-skip markers from suppressing the
 post-merge run. The gate is copied from trusted main before synchronization and survives checkout.
 If main or the PR changes during validation, rerun Crowdin Sync; do not bypass the guard.
+If the post-merge dispatch fails, manually dispatch `CI` on `main`; rerunning a no-change sync
+does not recreate the merged PR. Publication still requires successful CI for current main.
 The candidate must contain captured main. Before merging, the gate awaits successful `CI Result`
 from GitHub Actions on that exact head (up to thirty minutes) and verifies the effective repository
 rule requires that check with strict branch freshness. The deployed no-bypass ruleset closes
@@ -64,15 +64,14 @@ gate scripts are preserved before checkout changes. See `docs/WORKFLOW_AUTOMATIO
 repository-wide policy and release compatibility.
 
 Cloudflare Git deployments run independently of GitHub Actions. Release eligibility still requires
-successful CI for the current main push, and semantic-release decides whether a version is warranted;
+successful push or dispatched CI for current main, and semantic-release decides whether a version is warranted;
 translation-only `chore(i18n)` commits do not themselves require a version bump.
 
 Before enabling this workflow on `main`:
 
-- Confirm `ACCESS_TOKEN_GITHUB` is present and authorized for merging this repository. Its existence
-  alone does not prove permissions or expiry. A missing or rejected credential must leave the PR open.
-- After the first successful merge, verify a push-triggered CI run exists for the returned merge SHA
-  and that Release evaluates that CI result. Check Cloudflare deployment separately.
+- Confirm the job token can create/update PRs and dispatch CI. A rejected request fails the workflow.
+- After the first successful merge, verify a dispatched CI run validates current main and that
+  Release evaluates that CI result. Check Cloudflare deployment separately.
 
 1. Confirm the existing Crowdin source is under the Crowdin branch `main` at
    `app/locales/en.json`. Crowdin branches are separate from GitHub branches; if the source lives
@@ -98,7 +97,7 @@ full validation. The proposed classifier selects formatting, i18n, and systems d
 only a verified follow-up change enables expensive-check skips. Non-English locale formatting
 exclusions remain intact. See the rollout checklist in `docs/WORKFLOW_AUTOMATION.md`.
 
-Crowdin Sync creates PRs using `ACCESS_TOKEN_GITHUB`. It awaits standard PR CI in addition to
+Crowdin Sync creates PRs using `GITHUB_TOKEN`. It explicitly dispatches and awaits full CI in addition to
 direct validation before auto-merging safe translation updates.
 
 ### Security (`security.yml`)
@@ -108,7 +107,7 @@ direct validation before auto-merging safe translation updates.
 
 ### Release (`release.yml`)
 
-**Trigger:** Successful completion of `CI` for a same-repository push to `main`.
+**Trigger:** Successful completion of `CI` for a same-repository push or explicit dispatch on `main`.
 **Jobs:** `Release` (validate the CI run and current main SHA, build, recheck, semantic-release).
 The workflow reuses CI's test shards and database checks. It rejects stale commits and CI attempts,
 PR/fork events, and automation-skip directives before publishing. Documentation-only pushes can

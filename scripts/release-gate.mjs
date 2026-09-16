@@ -1,9 +1,9 @@
 import { findReleaseRecovery } from './release-recovery.mjs';
-function successfulMainPush(run) {
-  return run?.event === 'push' && run.head_branch === 'main';
+function successfulMainRun(run) {
+  return ['push', 'workflow_dispatch'].includes(run?.event) && run.head_branch === 'main';
 }
 function trustedRun(run, repositoryId) {
-  if (!successfulMainPush(run)) return false;
+  if (!successfulMainRun(run)) return false;
   return run.head_repository?.id === repositoryId && completedSuccessfully(run);
 }
 function completedSuccessfully(run) {
@@ -33,7 +33,7 @@ export async function releaseEligibility({ github, context, allowRecovery = fals
   const repositoryId = context.payload.repository.id;
   const skip = (reason) => ({ release: false, reason });
   if (!trustedRun(eventRun, repositoryId))
-    return skip('Only successful CI for a main push may release.');
+    return skip('Only successful push or dispatched CI for main may release.');
   const { data: run } = await github.rest.actions.getWorkflowRun({
     ...context.repo,
     run_id: eventRun.id,

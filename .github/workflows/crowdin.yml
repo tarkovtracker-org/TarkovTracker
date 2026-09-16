@@ -13,6 +13,8 @@ on:
     - cron: '17 4 * * *'
   workflow_dispatch:
 permissions:
+  actions: write
+  checks: read
   contents: write
   pull-requests: write
 # All triggers share the same Crowdin project and localization branch.
@@ -33,10 +35,6 @@ jobs:
           persist-credentials: false
       - name: Preserve trusted merge gate
         run: cp scripts/crowdin-pr.sh scripts/github-ci-gate.sh "$RUNNER_TEMP/"
-      - name: Verify automation credential
-        env:
-          AUTOMATION_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}
-        run: test -n "$AUTOMATION_TOKEN"
       - name: Synchronize Crowdin translations
         id: crowdin
         uses: crowdin/github-action@0d5670f539973aea2f01abce61a8989934df0025 # v3
@@ -52,8 +50,7 @@ jobs:
           pull_request_body: 'Automated translation updates from Crowdin.'
           commit_message: 'chore(i18n): update translations from Crowdin'
         env:
-          # A PAT creates PR events that start CI without manual workflow approval.
-          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CROWDIN_PROJECT_ID: ${{ secrets.CROWDIN_PROJECT_ID }}
           CROWDIN_PERSONAL_TOKEN: ${{ secrets.CROWDIN_PERSONAL_TOKEN }}
       - name: Resolve Crowdin PR
@@ -75,7 +72,7 @@ jobs:
       - name: Update translation branch from main
         if: steps.resolve-pr.outputs.pr_number != ''
         env:
-          GH_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
         run: bash "$RUNNER_TEMP/crowdin-pr.sh" update
       - name: Prepare immutable translation checkout
@@ -96,9 +93,8 @@ jobs:
       - name: Merge validated translations
         if: steps.resolve-pr.outputs.pr_number != ''
         env:
-          # A PAT merge emits the main push needed by CI and the existing release gate.
-          # Never expose this token to dependency installation or project scripts.
-          GH_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}
+          # Explicit dispatch starts CI; project checks receive no write token.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
           HEAD_SHA: ${{ steps.candidate.outputs.head_sha }}
           BASE_SHA: ${{ steps.candidate.outputs.base_sha }}

@@ -2,7 +2,6 @@
 set -euo pipefail
 # shellcheck source=scripts/github-ci-gate.sh
 source "$(dirname "${BASH_SOURCE[0]}")/github-ci-gate.sh"
-[[ -n "${RELEASE_CI_TOKEN:-}" ]] || { echo 'RELEASE_CI_TOKEN is required.' >&2; exit 1; }
 [[ "${RELEASE_VERSION:-}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Invalid release version.' >&2; exit 1; }
 [[ "${GITHUB_RUN_ID:-}" =~ ^[0-9]+$ && "${GITHUB_RUN_ATTEMPT:-}" =~ ^[0-9]+$ ]] || exit 1
 export GH_TOKEN="${GITHUB_TOKEN:?GITHUB_TOKEN is required}"
@@ -25,9 +24,10 @@ git -c core.hooksPath=/dev/null -c user.name='github-actions[bot]' \
 release_sha="$(git rev-parse HEAD)"
 staging_ref="refs/heads/wip/release-$RELEASE_VERSION-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
 remote="https://github.com/$GITHUB_REPOSITORY.git"
-# No token enters a URL or git config. Only the staging push uses the PAT to start CI.
-GH_TOKEN="$RELEASE_CI_TOKEN" git -c credential.helper= \
+# The job token pushes the candidate; explicit dispatch starts CI without a personal token.
+git -c credential.helper= \
   -c 'credential.helper=!gh auth git-credential' push "$remote" "$release_sha:$staging_ref"
+dispatch_ci "${staging_ref#refs/heads/}"
 wait_for_ci_result "$release_sha"
 require_main_revision "$base_sha"
 require_main_ci_policy
