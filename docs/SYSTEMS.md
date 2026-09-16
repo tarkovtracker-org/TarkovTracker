@@ -1934,3 +1934,50 @@ App boot
 - `app/features/settings/AppearanceCard.vue` — Settings > Preferences theme selector
 - `app/shell/AppBar.vue` — sun/moon toggle in the utilities group (collapses into More menu on mobile)
 - `nuxt.config.ts` — boot script, light skeleton fallbacks, pinned `colorMode`
+
+## 17. Test suite execution model
+
+Test **files** run in parallel, each in its own forked worker. `vitest.config.ts` sets
+`pool: 'forks'` with `isolate: true`, and Vitest's pool only reuses a runner while `isolate` is
+false, so an isolated file always gets a fresh process and no module state crosses file boundaries.
+The worker count stays bounded (`process.env.CI ? 4 : 8`) because an unbounded count multiplies
+Nuxt environments and worker-teardown pressure. `pnpm run test` and `pnpm run test:coverage`
+inherit that bound instead of passing a worker flag, since a CLI flag would override the config.
+
+CI splits the suite across four coverage shards. The `VITEST_SHARD` variable — not the `--shard`
+argument alone — selects sharded coverage mode, which drops the global and per-file thresholds
+because one shard exercises only part of the suite; the unsharded `test:coverage` run enforces
+them. The `Test (shard N/4)` check names and the shard command are contract: branch protection and
+`dependabot-auto-merge.yml` require those names, and `scripts/ci-tests/workflows.mjs` asserts the
+command.
+
+A component loaded through `defineAsyncComponent` starts its dynamic import when Vue first renders
+it. A test-harness `stub` replaces what renders but does not cancel that loader, so a real module
+can still resolve after the file's environment is torn down and fail the run with
+`EnvironmentTeardownError`. A test that mounts such a component mocks the lazily imported module, so
+the loader never reaches a real import.
+
+**Invariants**
+
+- Every test file gets a fresh worker. `isolate: true` is what guarantees that, so no run may leave
+  runner reuse enabled for isolated files.
+- The worker count stays bounded. Removing the cap trades deterministic teardown for higher peak
+  memory and teardown-error risk.
+- Unhandled errors fail the suite. Do not restore `--dangerouslyIgnoreUnhandledErrors`; fix the
+  lifecycle that produced the error instead.
+- Shard count, shard command, and the `Test (shard N/4)` check names stay stable. Changing them
+  requires updating branch protection and `scripts/ci-tests/workflows.mjs` together.
+- Coverage thresholds apply only to the unsharded run, and `VITEST_SHARD` decides that. A sharded
+  invocation must set it or the run enforces thresholds it cannot satisfy.
+- A test mounting a `defineAsyncComponent` must not let the real module load, or must settle the
+  load before the file ends.
+- Per-test timeouts stay scoped to the test that needs them; suite-wide timeouts are not raised to
+  absorb contention.
+
+### Files
+
+- `vitest.config.ts` — pool, isolation, bounded workers, coverage thresholds, shard mode
+- `package.json` — `test`, `test:coverage`, and `test:api-gateway` scripts
+- `.github/workflows/ci.yml` — the four shard jobs and the Deno test step
+- `scripts/ci-tests/workflows.mjs` — asserts the shard command and required check names
+- `tests/test-setup.ts` — shared fetch stubs, console filtering, auto-unmount
