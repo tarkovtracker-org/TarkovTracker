@@ -1,7 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import {
   chmodSync,
+  copyFileSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -305,15 +307,48 @@ describe('prod-db canary', () => {
       expect(() => history(saturated)).toThrow('reached the 2000-version read limit');
     });
     it('refuses to compare when the checkout has duplicate versions', () => {
-      const first = localVersions[0];
-      const duplicate = join(root, `supabase/migrations/${first}_prod_db_duplicate_probe.sql`);
+      const isolated = mkdtempSync(join(tmpdir(), 'prod-db-duplicate-'));
       try {
-        writeFileSync(duplicate, '-- transient fixture for the duplicate-version guard\n');
-        expect(() => history(localVersions)).toThrow(`duplicate migration versions (${first})`);
+        mkdirSync(join(isolated, 'scripts'));
+        mkdirSync(join(isolated, 'supabase/migrations'), { recursive: true });
+        copyFileSync(join(root, 'scripts/prod-db.mjs'), join(isolated, 'scripts/prod-db.mjs'));
+        for (const suffix of ['first', 'second'])
+          writeFileSync(
+            join(isolated, `supabase/migrations/20260101000000_${suffix}.sql`),
+            '-- isolated fixture for the duplicate-version guard\n'
+          );
+        expect(() =>
+          execFileSync(
+            process.execPath,
+            [join(isolated, 'scripts/prod-db.mjs'), 'migration-history'],
+            {
+              env: {
+                ...process.env,
+                PROD_DB_SUPABASE_BIN: fakeSupabase,
+                PROD_DB_TARGET: 'local',
+                FAKE_SUPABASE_REMOTE_VERSIONS: '20260101000000',
+              },
+              encoding: 'utf8',
+            }
+          )
+        ).toThrow('duplicate migration versions (20260101000000)');
       } finally {
-        rmSync(duplicate, { force: true });
+        rmSync(isolated, { recursive: true, force: true });
       }
-      expect(existsSync(duplicate)).toBe(false);
+    });
+    it('reports no project identity for a local target', () => {
+      expect(history(localVersions).project_ref).toBeNull();
+    });
+    it('reports the observed project identity for a primary target', () => {
+      const result = JSON.parse(
+        run(['migration-history'], {
+          PROD_DB_TARGET: 'primary',
+          PROD_DB_URL:
+            'postgresql://pi_prod_observer:observer%3Asecret@db.knptqelvsodccnoehmbj.supabase.co:5432/postgres?sslmode=verify-full',
+          FAKE_SUPABASE_REMOTE_VERSIONS: localVersions.join(','),
+        })
+      );
+      expect(result.project_ref).toBe('knptqelvsodccnoehmbj');
     });
   });
 });

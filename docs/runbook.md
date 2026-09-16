@@ -594,6 +594,13 @@ and any literal it contains stay out of the report. Version identifiers alone do
 matches; use them to locate divergence, then compare file contents against the deployed Git
 revision. If the observer lacks access the command fails and names the required grant.
 
+The report carries `project_ref`, the Supabase project observed through `PROD_DB_URL` (`null` for a
+local target). Confirm it names the intended project before treating the comparison as remote-history
+evidence: a connection string pointing at another project reports a perfectly consistent comparison
+for the wrong database. The command reports the identity it observed and deliberately does not infer
+an expected project from application configuration, which is not guaranteed to describe the same
+environment as the observer credential.
+
 `canary` is the first production validation command. It runs only health and telemetry reports:
 `db-stats`, `role-stats`, `table-stats`, `index-stats`, and `outliers`. It does not sample rows,
 run distributions, or execute migration preflight. Before collecting telemetry it rejects

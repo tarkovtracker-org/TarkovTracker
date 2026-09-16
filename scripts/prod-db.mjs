@@ -25,6 +25,8 @@ const MIGRATION_HISTORY_GRANT_HINT =
   'the observer role needs read-only history access, granted out of band by an operator: ' +
   'GRANT USAGE ON SCHEMA supabase_migrations TO <observer_role>; ' +
   'GRANT SELECT (version) ON TABLE supabase_migrations.schema_migrations TO <observer_role>;';
+const PROJECT_HOST_PATTERN = /^db\.([a-z0-9]{16,32})\.supabase\.(?:co|com|in)$/;
+const POOLER_USERNAME_PATTERN = /^[^.]+\.([a-z0-9]{16,32})$/;
 const SENSITIVE_COLUMN_PATTERN =
   /^(?:email|phone|full_name|address|token|secret|password|metadata|payload|content|ip|user_agent|token_value|token_hash|progress|data|state|settings|preferences|config|custom_config)$/i;
 const SAFE_SAMPLE_COLUMN_PATTERN =
@@ -533,8 +535,20 @@ async function runMigrationHistory() {
     );
   return {
     ...report,
+    project_ref: getProjectRef(getTarget()),
     data: compareMigrationVersions(remoteVersions, readLocalMigrationVersions()),
   };
+}
+function getProjectRef(target) {
+  const connection = target.connection;
+  if (!connection) return null;
+  return (
+    matchProjectRef(connection.host, PROJECT_HOST_PATTERN) ??
+    matchProjectRef(connection.username, POOLER_USERNAME_PATTERN)
+  );
+}
+function matchProjectRef(value, pattern) {
+  return pattern.exec(value ?? '')?.[1] ?? null;
 }
 async function readRemoteMigrationHistory() {
   try {
