@@ -428,6 +428,35 @@ export interface StoryObjective {
   description: string;
   notes?: string | null;
   mutuallyExclusiveWith?: string[];
+  /**
+   * Client sub-quest the objective belongs to. Overlay releases before v1.93 omit it on curated
+   * chapters, so treat it as optional and never key persisted progress on it.
+   */
+  sourceQuestId?: string;
+  /** `client/ending_list` id of the branch this objective belongs to, when the overlay tags one. */
+  endingId?: string;
+}
+/**
+ * Ending branch a chapter can resolve into, restated by the overlay so the branch set is visible
+ * without scanning objectives. `objectiveCount` is 0 when the pinned capture holds no
+ * objective-level evidence for the branch, which is not proof that the branch has no objectives.
+ */
+export interface StoryChapterEnding {
+  id: string;
+  systemName: string;
+  gateQuestId: string;
+  objectiveCount: number;
+  resolvedInReference: boolean;
+}
+/**
+ * How much of a chapter the overlay's pinned client capture resolved. `partial` means the objective
+ * list is a projection of that capture, so a missing objective is not evidence that none exists.
+ */
+export interface StoryReferenceCoverage {
+  referencedSubquests: number;
+  resolvedSubquests: number;
+  missingObjectiveTexts?: number;
+  partial: boolean;
 }
 export interface StoryRewards {
   description: string;
@@ -447,6 +476,15 @@ export interface StoryChapter {
   notes?: string | null;
   objectives?: { [objectiveId: string]: StoryObjective };
   rewards?: StoryRewards | null;
+  /** Story quest the chapter maps to; source traceability only. */
+  chapterQuestId?: string;
+  referenceCoverage?: StoryReferenceCoverage;
+  endings?: StoryChapterEnding[];
+  /**
+   * Unordered pairs of sub-quest IDs that cannot both be *completed*. Partial objective progress on
+   * both quests stays legal, so these must never be expanded into objective exclusions.
+   */
+  mutuallyExclusiveQuestPairs?: Array<[string, string]>;
 }
 export interface MemberProfile {
   displayName: string | null;

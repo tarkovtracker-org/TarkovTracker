@@ -78,6 +78,11 @@ const TEST_CHAPTERS: StorylineNormalizedChapterView[] = [
         routeState: 'open',
       },
     ],
+    coveragePartial: false,
+    declaredEndings: [],
+    mutuallyExclusiveQuestPairs: [],
+    questRouteChoices: [],
+    staleObjectiveIds: [],
     optionalRouteChoices: [],
     optionalLinearObjectives: [],
     optionalObjectives: [],
@@ -141,6 +146,11 @@ const createOptionalOnlyChapter = (): StorylineNormalizedChapterView => ({
       routeState: 'open',
     },
   ],
+  coveragePartial: false,
+  declaredEndings: [],
+  mutuallyExclusiveQuestPairs: [],
+  questRouteChoices: [],
+  staleObjectiveIds: [],
   optionalObjectives: [
     {
       id: 'objective-optional-1',

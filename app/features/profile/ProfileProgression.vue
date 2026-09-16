@@ -914,8 +914,9 @@
     }
     return state;
   });
+  const canEditStoryProgress = () => !isViewingSharedProfile.value && isViewingCurrentMode.value;
   const handleStoryChapterToggle = (chapterId: string) => {
-    if (isViewingSharedProfile.value || !isViewingCurrentMode.value) {
+    if (!canEditStoryProgress()) {
       return;
     }
     const chapter = profileChapters.value.find((value) => value.id === chapterId);
@@ -923,6 +924,7 @@
       chapterId,
       isChapterComplete: storyChapterCompletionState.value[chapterId] === true,
       objectives: chapter?.objectives,
+      mutuallyExclusiveQuestPairs: chapter?.mutuallyExclusiveQuestPairs,
       isObjectiveComplete: (objectiveId) =>
         storyObjectiveCompletionState.value[chapterId]?.[objectiveId] === true,
       setChapterComplete: (id) => tarkovStore.setStoryChapterComplete(id),
@@ -934,7 +936,7 @@
     });
   };
   const handleStoryObjectiveToggle = (chapterId: string, objectiveId: string) => {
-    if (isViewingSharedProfile.value || !isViewingCurrentMode.value) {
+    if (!canEditStoryProgress()) {
       return;
     }
     const objectiveState = storyObjectiveCompletionState.value[chapterId]?.[objectiveId] === true;

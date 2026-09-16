@@ -1,8 +1,18 @@
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
-import { normalizeStoryObjectives, orderedStoryObjectives } from '@/utils/storylineObjectives';
+import {
+  normalizeStoryObjectives,
+  orderedStoryObjectives,
+  storyQuestExclusionGroups,
+  unknownStoryObjectiveIds,
+} from '@/utils/storylineObjectives';
 import type { ComputedRef } from '#imports';
-import type { StoryChapter, StoryObjective, StoryRewards } from '@/types/tarkov';
+import type {
+  StoryChapter,
+  StoryChapterEnding,
+  StoryObjective,
+  StoryRewards,
+} from '@/types/tarkov';
 export interface StorylineLinkEntry {
   id: string;
   name: string;
@@ -23,6 +33,13 @@ export interface StorylineChapterView {
   traderUnlocks: StorylineLinkEntry[];
   objectives: StoryObjective[];
   objectiveMap: Record<string, StoryObjective>;
+  /** Ending branches the overlay declares for the chapter (empty before overlay v1.93). */
+  declaredEndings: StoryChapterEnding[];
+  mutuallyExclusiveQuestPairs: Array<[string, string]>;
+  /** The overlay resolved only part of this chapter from its pinned client capture. */
+  coveragePartial: boolean;
+  /** Saved objective marks whose IDs the current chapter data no longer defines. */
+  staleObjectiveIds: string[];
 }
 export interface StorylineRequirementView {
   id: string;
@@ -60,6 +77,24 @@ export interface StorylineEndingView {
   routeBlockingAlternatives: StorylineObjectiveRouteView[];
   routeChoiceIndex: number | null;
   routeState: StorylineObjectiveProgress['routeState'];
+  /** Client `systemName`, present when the ending comes from the overlay's declared branch set. */
+  systemName?: string;
+  objectiveCompleted?: number;
+  objectiveTotal?: number;
+  /** The pinned overlay capture holds no objective-level evidence for this branch yet. */
+  evidencePending?: boolean;
+}
+export interface StorylineQuestRouteBranchView {
+  id: string;
+  label: string;
+  complete: boolean;
+  completedCount: number;
+  totalCount: number;
+}
+export interface StorylineQuestRouteChoiceView {
+  id: string;
+  branches: StorylineQuestRouteBranchView[];
+  chosenBranchId: string | null;
 }
 export interface StorylineNormalizedChapterView extends Omit<
   StorylineChapterView,
@@ -76,12 +111,19 @@ export interface StorylineNormalizedChapterView extends Omit<
   optionalObjectives: StorylineObjectiveProgress[];
   optionalLinearObjectives: StorylineObjectiveProgress[];
   optionalRouteChoices: StorylineRouteChoiceGroup[];
+  /** Mutually exclusive sub-quest routes; completing one rules the others out. */
+  questRouteChoices: StorylineQuestRouteChoiceView[];
   requirements: StorylineRequirementView[];
 }
 interface UseStorylineChaptersOptions {
   chapters?: () => StoryChapter[];
   isChapterComplete?: (chapterId: string) => boolean;
   isObjectiveComplete?: (chapterId: string, objectiveId: string) => boolean;
+  /**
+   * Saved objective IDs for a chapter, used to report marks stranded by an upstream re-key. Left
+   * empty by default so a view rendering someone else's profile never reports the viewer's data.
+   */
+  storedObjectiveIds?: (chapterId: string) => readonly string[];
 }
 const normalizeChapterRequirements = (
   chapter: StorylineChapterView
@@ -367,6 +409,81 @@ const buildStoryEndings = (
   });
   return endings;
 };
+const humanizeEndingName = (systemName: string): string =>
+  systemName.replace(/([a-z\d])([A-Z])/g, '$1 $2').trim() || systemName;
+const declaredEndingState = (
+  objectiveTotal: number,
+  objectiveCompleted: number
+): StorylineObjectiveProgress['routeState'] =>
+  objectiveTotal > 0 && objectiveCompleted === objectiveTotal ? 'chosen' : 'open';
+/**
+ * Endings the overlay declares at chapter level. Branch exclusivity is not inferred here: the
+ * overlay proves it only through `mutuallyExclusiveQuestPairs`, so an unchosen branch stays open
+ * rather than being rendered as blocked.
+ */
+const buildDeclaredEndings = (
+  declaredEndings: StoryChapterEnding[],
+  objectives: StorylineObjectiveProgress[]
+): StorylineEndingView[] =>
+  declaredEndings.map((ending) => {
+    const endingObjectives = objectives.filter((objective) => objective.endingId === ending.id);
+    const objectiveCompleted = endingObjectives.filter((objective) => objective.complete).length;
+    return {
+      evidencePending: endingObjectives.length === 0,
+      id: ending.id,
+      label: humanizeEndingName(ending.systemName),
+      objectiveCompleted,
+      objectiveId: '',
+      objectiveLabel: '',
+      objectiveTotal: endingObjectives.length,
+      routeBlockingAlternatives: [],
+      routeChoiceIndex: null,
+      routeState: declaredEndingState(endingObjectives.length, objectiveCompleted),
+      systemName: ending.systemName,
+    };
+  });
+const buildQuestRouteBranch = (
+  questId: string,
+  objectives: StorylineObjectiveProgress[]
+): StorylineQuestRouteBranchView | null => {
+  const questObjectives = objectives.filter((objective) => objective.sourceQuestId === questId);
+  const firstObjective = questObjectives[0];
+  if (!firstObjective) {
+    return null;
+  }
+  const completedCount = questObjectives.filter((objective) => objective.complete).length;
+  return {
+    complete: completedCount === questObjectives.length,
+    completedCount,
+    id: questId,
+    label: firstObjective.description,
+    totalCount: questObjectives.length,
+  };
+};
+const isQuestRouteBranch = (
+  branch: StorylineQuestRouteBranchView | null
+): branch is StorylineQuestRouteBranchView => branch !== null;
+/**
+ * Mutually exclusive sub-quest routes, presented as chapter-level alternatives. Objectives stay
+ * individually checkable because the overlay allows partial progress on both routes; only finishing
+ * one rules the other out.
+ */
+const buildQuestRouteChoices = (
+  chapter: StorylineChapterView,
+  objectives: StorylineObjectiveProgress[]
+): StorylineQuestRouteChoiceView[] =>
+  storyQuestExclusionGroups(chapter.mutuallyExclusiveQuestPairs)
+    .map((questIds) =>
+      questIds
+        .map((questId) => buildQuestRouteBranch(questId, objectives))
+        .filter(isQuestRouteBranch)
+    )
+    .filter((branches) => branches.length > 1)
+    .map((branches) => ({
+      branches,
+      chosenBranchId: branches.find((branch) => branch.complete)?.id ?? null,
+      id: `${chapter.id}-quest-route-${branches[0]!.id}`,
+    }));
 export function useStorylineChapters(options: UseStorylineChaptersOptions = {}): {
   chapters: ComputedRef<StorylineChapterView[]>;
   normalizedChapters: ComputedRef<StorylineNormalizedChapterView[]>;
@@ -375,6 +492,7 @@ export function useStorylineChapters(options: UseStorylineChaptersOptions = {}):
   const tarkovStore = useTarkovStore();
   const isChapterComplete = options.isChapterComplete ?? tarkovStore.isStoryChapterComplete;
   const isObjectiveComplete = options.isObjectiveComplete ?? tarkovStore.isStoryObjectiveComplete;
+  const storedObjectiveIds = options.storedObjectiveIds ?? (() => []);
   const chapters = computed<StorylineChapterView[]>(() => {
     return (options.chapters?.() ?? metadataStore.storyChapters ?? []).map((chapter) => {
       const objectiveMap = normalizeStoryObjectives(chapter.objectives);
@@ -394,6 +512,10 @@ export function useStorylineChapters(options: UseStorylineChaptersOptions = {}):
         traderUnlocks: chapter.traderUnlocks ?? [],
         objectives: orderedStoryObjectives(objectiveMap),
         objectiveMap,
+        declaredEndings: chapter.endings ?? [],
+        mutuallyExclusiveQuestPairs: chapter.mutuallyExclusiveQuestPairs ?? [],
+        coveragePartial: chapter.referenceCoverage?.partial === true,
+        staleObjectiveIds: unknownStoryObjectiveIds(objectiveMap, storedObjectiveIds(chapter.id)),
       };
     });
   });
@@ -465,7 +587,9 @@ export function useStorylineChapters(options: UseStorylineChaptersOptions = {}):
         linearObjectives: optionalLinearObjectives,
         routeChoiceGroups: optionalRouteChoices,
       } = buildRouteChoiceGroups(optionalObjectives);
-      const endings = buildStoryEndings(objectives, [...mainRouteChoices, ...optionalRouteChoices]);
+      const endings = chapter.declaredEndings.length
+        ? buildDeclaredEndings(chapter.declaredEndings, objectives)
+        : buildStoryEndings(objectives, [...mainRouteChoices, ...optionalRouteChoices]);
       return {
         ...chapter,
         endings,
@@ -479,6 +603,7 @@ export function useStorylineChapters(options: UseStorylineChaptersOptions = {}):
         optionalLinearObjectives,
         optionalObjectives,
         optionalRouteChoices,
+        questRouteChoices: buildQuestRouteChoices(chapter, objectives),
         requirements: normalizeChapterRequirements(chapter),
       };
     });
