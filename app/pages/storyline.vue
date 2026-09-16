@@ -68,7 +68,14 @@
     ogDescription: () => t('page.storyline.subtitle'),
   });
   const tarkovStore = useTarkovStore();
-  const { chapters, normalizedChapters: storylineChapters } = useStorylineChapters();
+  const { chapters, normalizedChapters: storylineChapters } = useStorylineChapters({
+    completedObjectiveIds: (chapterId) =>
+      Object.entries(
+        tarkovStore.getCurrentProgressData()?.storyChapters?.[chapterId]?.objectives ?? {}
+      )
+        .filter(([, objective]) => objective?.complete === true)
+        .map(([objectiveId]) => objectiveId),
+  });
   const totalChapters = computed(() => storylineChapters.value.length);
   const completedChapters = computed(() => {
     return storylineChapters.value.filter((chapter) => chapter.complete).length;
@@ -79,6 +86,7 @@
       chapterId,
       isChapterComplete: tarkovStore.isStoryChapterComplete(chapterId),
       objectives: chapter?.objectives,
+      mutuallyExclusiveQuestPairs: chapter?.mutuallyExclusiveQuestPairs,
       isObjectiveComplete: (objectiveId) =>
         tarkovStore.isStoryObjectiveComplete(chapterId, objectiveId),
       setChapterComplete: (id) => tarkovStore.setStoryChapterComplete(id),

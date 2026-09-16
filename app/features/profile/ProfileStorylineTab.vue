@@ -51,6 +51,8 @@
     storyChapterCompletionState: Record<string, boolean>;
     storyObjectiveCompletionState: Record<string, Record<string, boolean>>;
     readOnly?: boolean;
+    /** Own completed objective IDs, so marks stranded by an upstream re-key stay visible. */
+    completedObjectiveIds?: (chapterId: string) => readonly string[];
   }
   const props = defineProps<Props>();
   const emit = defineEmits<{
@@ -63,6 +65,7 @@
     isChapterComplete: (chapterId: string) => props.storyChapterCompletionState[chapterId] === true,
     isObjectiveComplete: (chapterId: string, objectiveId: string) =>
       props.storyObjectiveCompletionState[chapterId]?.[objectiveId] === true,
+    completedObjectiveIds: (chapterId: string) => props.completedObjectiveIds?.(chapterId) ?? [],
   });
   interface ChapterProgress extends StorylineNormalizedChapterView {
     mainProgress: number;

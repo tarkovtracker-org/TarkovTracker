@@ -1,16 +1,12 @@
 import type { StoryChapter, StoryObjective } from '@/types/tarkov';
-const defaultStoryObjectiveLinks: Readonly<Record<string, readonly string[]>> = {
-  'falling-skies-main-19': ['falling-skies-main-20'],
-  'falling-skies-main-20': ['falling-skies-main-19'],
-  'the-ticket-main-12': ['the-ticket-main-13'],
-  'the-ticket-main-13': ['the-ticket-main-12'],
-  'the-ticket-main-22': ['the-ticket-main-23'],
-  'the-ticket-main-23': ['the-ticket-main-22'],
-  'the-ticket-main-25': ['the-ticket-main-26'],
-  'the-ticket-main-26': ['the-ticket-main-25'],
-};
 type StoryObjectiveInput = StoryChapter['objectives'] | StoryObjective[] | null | undefined;
 type StoryObjectiveLike = Partial<StoryObjective> & { id?: string };
+type StoryQuestPairs = NonNullable<StoryChapter['mutuallyExclusiveQuestPairs']>;
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.length > 0;
+const optionalText = (value: unknown): string | undefined =>
+  isNonEmptyString(value) ? value : undefined;
+const compareIds = (left: string, right: string): number => left.localeCompare(right);
 const normalizeObjectiveType = (type: StoryObjectiveLike['type']): StoryObjective['type'] => {
   return type === 'optional' ? 'optional' : 'main';
 };
@@ -21,15 +17,13 @@ const normalizeMutualList = (objectiveId: string, objective: StoryObjectiveLike)
   const provided = Array.isArray(objective.mutuallyExclusiveWith)
     ? objective.mutuallyExclusiveWith
     : [];
-  const defaults = defaultStoryObjectiveLinks[objectiveId] ?? [];
   return Array.from(
     new Set(
-      [...provided, ...defaults].filter(
-        (linkedId): linkedId is string =>
-          typeof linkedId === 'string' && linkedId.length > 0 && linkedId !== objectiveId
+      provided.filter(
+        (linkedId): linkedId is string => isNonEmptyString(linkedId) && linkedId !== objectiveId
       )
     )
-  ).sort();
+  ).sort(compareIds);
 };
 const normalizeObjectiveEntries = (
   objectives: StoryObjectiveInput
@@ -64,6 +58,7 @@ export const normalizeStoryObjectives = (
         typeof entry.objective.description === 'string' && entry.objective.description.length > 0
           ? entry.objective.description
           : objectiveId,
+      endingId: optionalText(entry.objective.endingId),
       id: objectiveId,
       mutuallyExclusiveWith: normalizeMutualList(objectiveId, entry.objective),
       notes:
@@ -71,6 +66,7 @@ export const normalizeStoryObjectives = (
           ? entry.objective.notes
           : undefined,
       order: normalizeObjectiveOrder(entry.objective.order, entry.index + 1),
+      sourceQuestId: optionalText(entry.objective.sourceQuestId),
       type: normalizeObjectiveType(entry.objective.type),
     };
   }
@@ -85,7 +81,7 @@ export const normalizeStoryObjectives = (
       mergedLinkedIds.add(objective.id);
       linkedObjective.mutuallyExclusiveWith = Array.from(mergedLinkedIds)
         .filter((id) => id !== linkedObjective.id)
-        .sort();
+        .sort(compareIds);
     }
     if ((objective.mutuallyExclusiveWith?.length ?? 0) === 0) {
       objective.mutuallyExclusiveWith = undefined;
@@ -101,15 +97,85 @@ export const orderedStoryObjectives = (objectives: StoryObjectiveInput): StoryOb
     return a.id.localeCompare(b.id);
   });
 };
-export const getAutoCompletableObjectiveIds = (objectives: StoryObjectiveInput): string[] => {
+const isDistinctIdPair = (pair: readonly unknown[]): boolean =>
+  isNonEmptyString(pair[0]) && isNonEmptyString(pair[1]) && pair[0] !== pair[1];
+const isQuestPair = (pair: unknown): pair is [string, string] =>
+  Array.isArray(pair) && pair.length === 2 && isDistinctIdPair(pair);
+const normalizedQuestPairs = (pairs?: StoryQuestPairs): Array<[string, string]> =>
+  (pairs ?? []).filter(isQuestPair);
+/**
+ * Sub-quest IDs the overlay declares mutually exclusive for a chapter. Completing every objective
+ * of one such quest rules the paired quest out, but partial progress on both stays legal, so these
+ * IDs gate bulk completion only — never an individual objective toggle.
+ */
+const storyExclusiveQuestIds = (pairs?: StoryQuestPairs): Set<string> => {
+  const questIds = new Set<string>();
+  for (const [questId, otherQuestId] of normalizedQuestPairs(pairs)) {
+    questIds.add(questId);
+    questIds.add(otherQuestId);
+  }
+  return questIds;
+};
+/**
+ * The chapter's declared exclusive sub-quest pairs, deduplicated and ordered. Pairs are kept as
+ * pairs on purpose: two pairs sharing a quest do not make their other members exclusive, so they
+ * must not be merged into one group.
+ */
+export const storyExclusiveQuestPairs = (pairs?: StoryQuestPairs): Array<[string, string]> => {
+  const seen = new Set<string>();
+  const unique: Array<[string, string]> = [];
+  for (const pair of normalizedQuestPairs(pairs)) {
+    const ordered: [string, string] = [...pair].sort(compareIds) as [string, string];
+    const key = ordered.join('|');
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    unique.push(ordered);
+  }
+  return unique.sort((left, right) => compareIds(left.join('|'), right.join('|')));
+};
+const belongsToExclusiveQuest = (
+  objective: StoryObjective,
+  exclusiveQuestIds: ReadonlySet<string>
+): boolean =>
+  isNonEmptyString(objective.sourceQuestId) && exclusiveQuestIds.has(objective.sourceQuestId);
+/**
+ * Objectives a chapter-level "mark complete" may set. Objectives on a mutually exclusive route are
+ * excluded so bulk completion never records both sides of a branch the player has to choose between.
+ */
+export const getAutoCompletableObjectiveIds = (
+  objectives: StoryObjectiveInput,
+  mutuallyExclusiveQuestPairs?: StoryQuestPairs
+): string[] => {
+  const exclusiveQuestIds = storyExclusiveQuestIds(mutuallyExclusiveQuestPairs);
   return orderedStoryObjectives(objectives)
-    .filter((objective) => !objective.mutuallyExclusiveWith?.length)
+    .filter(
+      (objective) =>
+        !objective.mutuallyExclusiveWith?.length &&
+        !belongsToExclusiveQuest(objective, exclusiveQuestIds)
+    )
     .map((objective) => objective.id);
+};
+/**
+ * Persisted objective IDs the current chapter data no longer defines. Upstream re-keys curated
+ * objectives to real client IDs on occasion (overlay v1.93 replaced all of The Ticket's), which
+ * leaves saved marks stranded rather than failing loudly; surfacing the count keeps that visible.
+ */
+export const unknownStoryObjectiveIds = (
+  objectives: StoryObjectiveInput,
+  storedObjectiveIds: Iterable<string>
+): string[] => {
+  const known = normalizeStoryObjectives(objectives);
+  return Array.from(new Set(storedObjectiveIds))
+    .filter((objectiveId) => isNonEmptyString(objectiveId) && !known[objectiveId])
+    .sort(compareIds);
 };
 export interface ToggleStoryChapterWithLinearObjectivesOptions {
   chapterId: string;
   isChapterComplete: boolean;
   objectives?: Exclude<StoryObjectiveInput, undefined>;
+  mutuallyExclusiveQuestPairs?: StoryQuestPairs;
   isObjectiveComplete: (objectiveId: string) => boolean;
   setChapterComplete: (chapterId: string) => void;
   setChapterUncomplete: (chapterId: string) => void;
@@ -119,7 +185,10 @@ export interface ToggleStoryChapterWithLinearObjectivesOptions {
 export const toggleStoryChapterWithLinearObjectives = (
   options: ToggleStoryChapterWithLinearObjectivesOptions
 ): void => {
-  const objectiveIds = getAutoCompletableObjectiveIds(options.objectives);
+  const objectiveIds = getAutoCompletableObjectiveIds(
+    options.objectives,
+    options.mutuallyExclusiveQuestPairs
+  );
   if (options.isChapterComplete) {
     options.setChapterUncomplete(options.chapterId);
     for (const objectiveId of objectiveIds) {
