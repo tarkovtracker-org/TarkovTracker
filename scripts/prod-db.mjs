@@ -549,10 +549,19 @@ async function readRemoteMigrationHistory() {
 function readLocalMigrationVersions() {
   const directory = fileURLToPath(new URL('supabase/migrations/', ROOT));
   if (!existsSync(directory)) return [];
-  return readdirSync(directory)
+  const versions = readdirSync(directory)
     .map((entry) => MIGRATION_FILENAME_PATTERN.exec(entry)?.[1])
     .filter((version) => typeof version === 'string')
     .sort();
+  assertUniqueVersions(versions);
+  return versions;
+}
+function assertUniqueVersions(versions) {
+  const duplicates = versions.filter((version, index) => versions[index - 1] === version);
+  if (duplicates.length === 0) return;
+  throw new Error(
+    `the checkout has duplicate migration versions (${[...new Set(duplicates)].join(', ')}); the remote ledger records one row per version, so the comparison cannot be trusted until the filenames are corrected`
+  );
 }
 function compareMigrationVersions(remoteVersions, localVersions) {
   const remote = new Set(remoteVersions);

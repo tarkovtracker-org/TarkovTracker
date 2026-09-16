@@ -304,5 +304,16 @@ describe('prod-db canary', () => {
       const saturated = Array.from({ length: 2000 }, (_, index) => String(20000101000000 + index));
       expect(() => history(saturated)).toThrow('reached the 2000-version read limit');
     });
+    it('refuses to compare when the checkout has duplicate versions', () => {
+      const first = localVersions[0];
+      const duplicate = join(root, `supabase/migrations/${first}_prod_db_duplicate_probe.sql`);
+      try {
+        writeFileSync(duplicate, '-- transient fixture for the duplicate-version guard\n');
+        expect(() => history(localVersions)).toThrow(`duplicate migration versions (${first})`);
+      } finally {
+        rmSync(duplicate, { force: true });
+      }
+      expect(existsSync(duplicate)).toBe(false);
+    });
   });
 });
