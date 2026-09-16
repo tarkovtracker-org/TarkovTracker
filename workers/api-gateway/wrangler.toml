@@ -4,16 +4,8 @@ compatibility_date = "2026-08-25"
 workers_dev = false
 preview_urls = false
 routes = [
-  { pattern = "tarkovtracker.org/api/v2/*", zone_name = "tarkovtracker.org" },
-  { pattern = "www.tarkovtracker.org/api/v2/*", zone_name = "tarkovtracker.org" },
   { pattern = "tarkovtracker.org/health", zone_name = "tarkovtracker.org" },
   { pattern = "www.tarkovtracker.org/health", zone_name = "tarkovtracker.org" },
-  { pattern = "tarkovtracker.org/api/token*", zone_name = "tarkovtracker.org" },
-  { pattern = "tarkovtracker.org/api/progress*", zone_name = "tarkovtracker.org" },
-  { pattern = "tarkovtracker.org/api/team/progress*", zone_name = "tarkovtracker.org" },
-  { pattern = "www.tarkovtracker.org/api/token*", zone_name = "tarkovtracker.org" },
-  { pattern = "www.tarkovtracker.org/api/progress*", zone_name = "tarkovtracker.org" },
-  { pattern = "www.tarkovtracker.org/api/team/progress*", zone_name = "tarkovtracker.org" },
   { pattern = "api.tarkovtracker.org/health", zone_name = "tarkovtracker.org" },
   { pattern = "api.tarkovtracker.org/token*", zone_name = "tarkovtracker.org" },
   { pattern = "api.tarkovtracker.org/progress*", zone_name = "tarkovtracker.org" },
@@ -57,4 +49,3 @@ new_sqlite_classes = ["ApiGatewayRateLimiter"]
 [vars]
 ALLOWED_ORIGIN = "https://tarkovtracker.org,https://www.tarkovtracker.org,https://tarkov.dev,https://www.tarkov.dev,http://localhost:3000"
 API_HOST = "api.tarkovtracker.org"
-LEGACY_API_REDIRECT = "false"
