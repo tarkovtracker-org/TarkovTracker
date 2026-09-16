@@ -1,3 +1,10 @@
+## [1.79.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.3...v1.79.4) (2026-09-16)
+
+
+### Bug Fixes
+
+* **deps:** patch image processing and transitive security advisories ([#854](https://github.com/tarkovtracker-org/TarkovTracker/issues/854)) ([b8b781b](https://github.com/tarkovtracker-org/TarkovTracker/commit/b8b781b9882d329be0a18433a5296d3d1d845a35))
+
 ## [1.79.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.2...v1.79.3) (2026-09-16)
 
 
