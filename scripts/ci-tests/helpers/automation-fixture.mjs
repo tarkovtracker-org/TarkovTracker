@@ -72,6 +72,7 @@ if (args[0] === 'api') {
   if (endpoint.includes('/rulesets/')) { console.error('Ruleset details require administrator access'); process.exit(1); }
   if (endpoint.startsWith('repos/' + p.GITHUB_REPOSITORY + '/commits/') && /\/commits\/[a-f0-9]{40}\/check-runs\?check_name=CI%20Result&filter=latest&per_page=100$/.test(endpoint)) {
     const sha = endpoint.split('/commits/')[1].split('/')[0];
+    fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'ci-result', sha, status: p.CHECK_STATUS || 'completed', conclusion: p.CHECK_CONCLUSION || 'success' }) + '\n');
     console.log(JSON.stringify({ check_runs: p.CHECK_PRESENT === 'false' ? [] : [{
       id: 1, name: 'CI Result', app: { id: Number(p.CHECK_APP || 15368) },
       head_sha: p.CHECK_HEAD || sha, status: p.CHECK_STATUS || 'completed', conclusion: p.CHECK_CONCLUSION || 'success'
@@ -116,6 +117,7 @@ const args = process.argv.slice(2);
 const remoteIndex = args.findIndex((arg) => arg.startsWith('https://github.com/'));
 if (args.includes('push') && remoteIndex !== -1) {
   fs.appendFileSync(p.PUSHES, JSON.stringify({ args, credential: p.GH_TOKEN === 'test-ci' ? 'ci' : 'main' }) + '\n');
+  fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'push', args }) + '\n');
   if (args.at(-1).endsWith(':refs/heads/main') && p.RACE_MAIN_SHA) {
     const raced = spawnSync(p.REAL_GIT, ['--git-dir', p.REMOTE, 'update-ref', 'refs/heads/main', p.RACE_MAIN_SHA]);
     if (raced.status !== 0) process.exit(raced.status);
@@ -128,6 +130,7 @@ process.exit(result.status ?? 1);
     { mode: 0o755 }
   );
   writeFileSync(join(root, 'pushes'), '');
+  writeFileSync(join(root, 'events'), '');
   const env = {
     ...process.env,
     PATH: `${bin}:/usr/bin:/bin`,
@@ -143,6 +146,7 @@ process.exit(result.status ?? 1);
     REMOTE: remote,
     REAL_GIT: gitExecutable(),
     PUSHES: join(root, 'pushes'),
+    EVENTS: join(root, 'events'),
     RULES: JSON.stringify([
       {
         type: 'required_status_checks',
@@ -184,6 +188,7 @@ process.exit(result.status ?? 1);
         encoding: 'utf8',
         timeout: 20000,
       }),
+    events: () => read(env.EVENTS).trim().split('\n').filter(Boolean).map(JSON.parse),
     pushes: () => read(env.PUSHES).trim().split('\n').filter(Boolean).map(JSON.parse),
     calls: () => read(env.CALLS).trim().split('\n').filter(Boolean).map(JSON.parse),
     output: () => read(env.GITHUB_OUTPUT),

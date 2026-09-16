@@ -26,6 +26,20 @@ test('release validates a staging commit before promoting that identical SHA wit
         )
       )
   );
+  const events = f.events();
+  const ciIndex = events.findIndex((event) => event.type === 'ci-result');
+  const mainIndex = events.findIndex(
+    (event) => event.type === 'push' && event.args.at(-1) === `${sha}:refs/heads/main`
+  );
+  assert.notEqual(ciIndex, -1, 'missing CI result event');
+  assert.notEqual(mainIndex, -1, 'missing main promotion event');
+  assert.deepEqual(events[ciIndex], {
+    type: 'ci-result',
+    sha,
+    status: 'completed',
+    conclusion: 'success',
+  });
+  assert.ok(ciIndex < mainIndex, 'successful exact-head CI must precede main promotion');
   const pushes = f.pushes();
   assert.equal(pushes[0].credential, 'ci');
   assert.equal(pushes[0].args.at(-1), `${sha}:refs/heads/wip/release-1.2.3-123-1`);

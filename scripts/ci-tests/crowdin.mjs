@@ -20,6 +20,12 @@ test('valid translation checkout and merge use the same immutable SHA', (t) => {
   assert.equal(git(f.repo, 'rev-parse', 'HEAD'), f.head);
   assert.equal(f.output(), `head_sha=${f.head}\nbase_sha=${f.base}\n`);
   passed(f.run('merge'));
+  const ciRead = f.calls().find((args) => args.some((arg) => arg.includes('/check-runs?')));
+  assert.ok(
+    ciRead.includes(
+      `repos/example/repo/commits/${f.head}/check-runs?check_name=CI%20Result&filter=latest&per_page=100`
+    )
+  );
   const merge = f.calls().find((args) => args[1] === 'merge');
   assert.equal(merge[merge.indexOf('--match-head-commit') + 1], f.head);
   assert.ok(merge.includes('--squash'));
