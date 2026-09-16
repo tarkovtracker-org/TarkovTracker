@@ -41,9 +41,9 @@ same setup action; its schedule, permissions, command, and environment remain un
   translation-only, mixed, and dependency PR selections before removing shadow mode.
 - Confirm actual Dependabot and Codecov failure handling. Local contract tests verify the names and
   existing status-polling code, not GitHub execution.
-- The initial shadow rollout used `GITHUB_TOKEN` for Crowdin PR creation. The enforced main policy
-  follow-up changes this to `ACCESS_TOKEN_GITHUB` so PR events start CI, then awaits exact-head
-  `CI Result` before merging. See [current automation policy](WORKFLOW_AUTOMATION.md).
+- Crowdin uses `GITHUB_TOKEN` for PR creation and explicit CI dispatch. It awaits exact-head
+  `CI Result` before merging and dispatches main CI afterward. Release staging also uses explicit
+  dispatch, so neither workflow requires a personal GitHub token. See [current automation policy](WORKFLOW_AUTOMATION.md).
 - Establish Codex delivery and reliable exclusions before disabling duplicate automatic reviewers.
   Historical PRs #781 and #748 did not establish Codex delivery or usage exclusions.
   Both fall in the executable baseline category. Manual Codex delivery was subsequently verified

@@ -27,10 +27,13 @@ test('release validates a staging commit before promoting that identical SHA wit
       )
   );
   const events = f.events();
+  const dispatchIndex = events.findIndex((event) => event.type === 'dispatch');
+  assert.equal(events[dispatchIndex]?.ref, 'wip/release-1.2.3-123-1');
   const ciIndex = events.findIndex((event) => event.type === 'ci-result');
   const mainIndex = events.findIndex(
     (event) => event.type === 'push' && event.args.at(-1) === `${sha}:refs/heads/main`
   );
+  assert.ok(dispatchIndex < ciIndex, 'dispatch must precede waiting for CI');
   assert.notEqual(ciIndex, -1, 'missing CI result event');
   assert.notEqual(mainIndex, -1, 'missing main promotion event');
   assert.deepEqual(events[ciIndex], {
@@ -41,7 +44,7 @@ test('release validates a staging commit before promoting that identical SHA wit
   });
   assert.ok(ciIndex < mainIndex, 'successful exact-head CI must precede main promotion');
   const pushes = f.pushes();
-  assert.equal(pushes[0].credential, 'ci');
+  assert.equal(pushes[0].credential, 'main');
   assert.equal(pushes[0].args.at(-1), `${sha}:refs/heads/wip/release-1.2.3-123-1`);
   assert.equal(pushes[1].credential, 'main');
   assert.equal(pushes[1].args.at(-1), `${sha}:refs/heads/main`);
@@ -66,7 +69,7 @@ test('concurrent main advancement is rejected by the actual Git push', (t) => {
 });
 test('release refuses missing CI credentials or a missing strict CI policy', (t) => {
   const f = releaseFixture(t);
-  assert.equal(f.release({ RELEASE_CI_TOKEN: '' }).status, 1);
+  assert.equal(f.release({ GITHUB_TOKEN: '' }).status, 1);
   assert.equal(f.release({ RULES: '[]' }).status, 1);
   assert.equal(f.pushes().length, 0);
 });
@@ -87,7 +90,7 @@ function assertReleaseWorkflowBoundaries(ci, releaseWorkflow) {
   assert.match(eligibility, /head_branch == 'main'/);
   assert.match(
     workflowStep(release, 'Semantic Release'),
-    /RELEASE_CI_TOKEN: \$\{\{ secrets.ACCESS_TOKEN_GITHUB \}\}/
+    /GITHUB_TOKEN: \$\{\{ secrets.GITHUB_TOKEN \}\}/
   );
 }
 test('release staging runs ordinary CI while publication retains its main-only gate', () => {
@@ -115,10 +118,14 @@ test('unrelated triggers, jobs and steps cannot satisfy the release workflow con
     "\n  unrelated:\n    if: head_branch == 'main'\n";
   assert.throws(() => assertReleaseWorkflowBoundaries(ci, wrongJob));
   const wrongStep =
-    release.replace(
-      'RELEASE_CI_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}',
-      'RELEASE_CI_TOKEN: missing'
-    ) +
-    '\n      - name: Unrelated\n        env:\n          RELEASE_CI_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}\n';
+    release.replace('GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}', 'GITHUB_TOKEN: missing') +
+    '\n      - name: Unrelated\n        env:\n          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n';
   assert.throws(() => assertReleaseWorkflowBoundaries(ci, wrongStep));
+});
+test('failed CI dispatch leaves the staged commit unpromoted', (t) => {
+  const f = releaseFixture(t);
+  assert.notEqual(f.release({ DISPATCH_FAIL: 'true' }).status, 0);
+  assert.equal(f.pushes().length, 1);
+  assert.equal(git(f.repo, '--git-dir', f.remote, 'rev-parse', 'main'), f.base);
+  assert.ok(!f.events().some((event) => event.type === 'ci-result'));
 });

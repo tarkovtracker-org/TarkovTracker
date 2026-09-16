@@ -60,6 +60,10 @@ const fs = require('node:fs');
 const p = process.env;
 const args = process.argv.slice(2);
 fs.appendFileSync(p.CALLS, JSON.stringify(args) + '\n');
+if (args[0] === 'workflow' && args[1] === 'run' && args[2] === 'ci.yml') {
+  fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'dispatch', ref: args[args.indexOf('--ref') + 1] }) + '\n');
+  process.exit(p.DISPATCH_FAIL === 'true' ? 1 : 0);
+}
 if (args[0] === 'api') {
   if (args.includes('--method') && args.includes('PUT') && args.includes('repos/' + p.GITHUB_REPOSITORY + '/pulls/' + p.PR_NUMBER + '/update-branch')) {
     if (!args.includes('expected_head_sha=' + p.ACTUAL_HEAD)) {
@@ -139,7 +143,6 @@ process.exit(result.status ?? 1);
     GITHUB_OUTPUT: join(root, 'output'),
     GH_TOKEN: 'test-only',
     GITHUB_TOKEN: 'test-main',
-    RELEASE_CI_TOKEN: 'test-ci',
     RELEASE_VERSION: '1.2.3',
     GITHUB_RUN_ID: '123',
     GITHUB_RUN_ATTEMPT: '1',

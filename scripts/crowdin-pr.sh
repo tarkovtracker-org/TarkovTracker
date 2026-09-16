@@ -44,7 +44,7 @@ check_translation_tree() {
 }
 # Incorporate trusted main before capturing the candidate that project checks will validate.
 update() {
-  [[ -n "${GH_TOKEN:-}" ]] || fail "ACCESS_TOKEN_GITHUB is required to update the translation branch."
+  [[ -n "${GH_TOKEN:-}" ]] || fail "GH_TOKEN is required to update the translation branch."
   local pr head base updated attempt
   pr="$(read_pr)"
   check_identity "$pr"
@@ -113,11 +113,12 @@ wait_for_mergeability() {
 }
 # Recheck the validated candidate and atomically guard the PR head during squash merge.
 merge() {
-  [[ -n "${GH_TOKEN:-}" ]] || fail "ACCESS_TOKEN_GITHUB is required; refusing a GITHUB_TOKEN merge."
+  [[ -n "${GH_TOKEN:-}" ]] || fail "GH_TOKEN is required to merge translations."
   require_sha "${HEAD_SHA:-}"
   require_sha "${BASE_SHA:-}"
   [[ "$(git rev-parse HEAD)" == "$HEAD_SHA" ]] || fail "Checkout differs from the validated head."
   require_main_ci_policy
+  dispatch_ci locales
   wait_for_ci_result "$HEAD_SHA"
   wait_for_mergeability
   require_main_ci_policy
@@ -126,6 +127,8 @@ merge() {
     --match-head-commit "$HEAD_SHA" --squash \
     --subject "chore(i18n): update translations from Crowdin (#$PR_NUMBER)" \
     --body "Automated translation updates from Crowdin."
+  # A job-token merge does not emit push CI; validate current main explicitly for release.
+  dispatch_ci main
 }
 [[ "${PR_NUMBER:-}" =~ ^[1-9][0-9]*$ ]] || fail "Invalid Crowdin PR number."
 case "${1:-}" in

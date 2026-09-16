@@ -1567,7 +1567,7 @@ See [the workflow guide](WORKFLOW_AUTOMATION.md#fallow-changed-file-gate) for us
 
 ## 14. Release validation and publication
 
-Release starts after successful main-push CI, reusing its test shards and database validation.
+Release starts after successful main push or explicitly dispatched CI, reusing its test shards and database validation.
 `scripts/release-gate.mjs` checks live workflow identity, repository, conclusion, attempt, and SHA
 against the triggering event and current main before setup and immediately before publishing.
 The checkout stays pinned to the validated SHA. The production build still runs in Release.
@@ -1586,7 +1586,7 @@ The checkout stays pinned to the validated SHA. The production build still runs 
   version-only child of the original CI revision, with successful exact-head CI and unchanged
   manifest/changelog history. Recovery creates missing tags/releases idempotently, rejects tag
   conflicts, and never advances main or bumps another version.
-- The staging push uses the automation PAT to start CI; main promotion uses `GITHUB_TOKEN` to
+- The staging push uses `GITHUB_TOKEN` and explicitly dispatches CI; main promotion uses it to
   avoid recursive Actions runs. Version commits have no skip marker; Cloudflare still rebuilds.
 - A green workflow run must continue to mean the test shards and Supabase validation passed;
   making those jobs optional requires reconsidering this release gate.
@@ -1596,8 +1596,8 @@ The checkout stays pinned to the validated SHA. The production build still runs 
 `.github/workflows/crowdin.yml` uses `scripts/crowdin-pr.sh`, preserved from trusted main before
 synchronization, to bind translation validation and merging to one immutable PR head. Its full tree
 diff against captured main permits only regular non-English locale JSON files. Dependency setup and
-project checks run after that checkout. The PAT starts synchronization/PR CI, updates a behind branch, and performs the final
-merge; dependency installation and project checks receive no automation credential.
+project checks run after that checkout. The built-in job token synchronizes translations, updates a
+behind branch, explicitly dispatches candidate CI, and performs the final merge; dependency installation and project checks receive no automation credential.
 
 - Only an open, non-draft, same-repository `locales` PR targeting `main` is eligible.
 - Behind translation branches first receive a GitHub branch update guarded by the expected head.
@@ -1609,7 +1609,8 @@ merge; dependency installation and project checks receive no automation credenti
   ruleset has no bypass actors; automation does not receive ruleset write access to read that list.
   GitHub enforces the base requirement at merge time; missing/weakened required checks fail closed.
 - The server-side `--match-head-commit` guard must use the SHA that passed all validation.
-- Merges use `ACCESS_TOKEN_GITHUB`, never a `GITHUB_TOKEN` fallback, so normal push CI runs.
+- Merges use `GITHUB_TOKEN`, then explicitly dispatch main CI for the release gate. No personal
+  GitHub token is needed. CI dispatch failures fail the workflow; candidate failures prevent merging.
   The fixed squash message must not inherit automation-skip markers from translation commits.
 - Existing release provenance checks stay intact; Cloudflare Git deployment remains independent.
 

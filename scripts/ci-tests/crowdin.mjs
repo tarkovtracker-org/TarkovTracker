@@ -143,7 +143,7 @@ test('unknown mergeability retries until clean, and unresolved state times out',
 test('missing merge credential, changed main, changed checkout or PR identity fail closed', (t) => {
   const f = fixture(t);
   passed(f.run('prepare'));
-  rejected(f.run('merge', { GH_TOKEN: '' }), /ACCESS_TOKEN_GITHUB is required/);
+  rejected(f.run('merge', { GH_TOKEN: '' }), /GH_TOKEN is required/);
   rejected(f.run('merge', { CURRENT_BASE: 'c'.repeat(40) }), /Main changed/);
   rejected(
     f.run('merge', { PR_STATES: JSON.stringify([{ ...f.pr, isDraft: true }]) }),
@@ -177,9 +177,9 @@ function assertWorkflowBoundaries(workflow) {
   const mergeStep = workflowStep(sync, 'Merge validated translations');
   const beforeMerge = sync.slice(0, sync.indexOf('      - name: Merge validated translations'));
   const synchronization = workflowStep(sync, 'Synchronize Crowdin translations');
-  assert.match(synchronization, /GITHUB_TOKEN: \$\{\{ secrets.ACCESS_TOKEN_GITHUB \}\}/);
+  assert.match(synchronization, /GITHUB_TOKEN: \$\{\{ secrets.GITHUB_TOKEN \}\}/);
   const update = workflowStep(sync, 'Update translation branch from main');
-  assert.match(update, /GH_TOKEN: \$\{\{ secrets.ACCESS_TOKEN_GITHUB \}\}/);
+  assert.match(update, /GH_TOKEN: \$\{\{ secrets.GITHUB_TOKEN \}\}/);
   assert.match(update, /crowdin-pr.sh" update/);
   assertStepOrder(
     sync,
@@ -189,7 +189,7 @@ function assertWorkflowBoundaries(workflow) {
   const prepare = workflowStep(sync, 'Prepare immutable translation checkout');
   assert.doesNotMatch(prepare, /ACCESS_TOKEN_GITHUB/);
   assert.ok(beforeMerge.includes('setup-project'));
-  assert.match(mergeStep, /GH_TOKEN: \$\{\{ secrets.ACCESS_TOKEN_GITHUB \}\}/);
+  assert.match(mergeStep, /GH_TOKEN: \$\{\{ secrets.GITHUB_TOKEN \}\}/);
   assert.match(mergeStep, /HEAD_SHA: \$\{\{ steps.candidate.outputs.head_sha \}\}/);
   assert.match(mergeStep, /BASE_SHA: \$\{\{ steps.candidate.outputs.base_sha \}\}/);
   assert.match(mergeStep, /run: bash "\$RUNNER_TEMP\/crowdin-pr.sh" merge/);
@@ -198,7 +198,7 @@ function assertWorkflowBoundaries(workflow) {
   for (const check of ['format:check', 'i18n:check', 'systems:check'])
     assert.ok(validation.includes(`pnpm run ${check}`));
 }
-test('workflow separates trusted gate, immutable setup, token-free checks and PAT merge', () => {
+test('workflow separates trusted gate, immutable setup, token-free checks and job-token merge', () => {
   assertWorkflowBoundaries(read('.github/workflows/crowdin.yml'));
   assert.match(read('.github/workflows/ci.yml'), /push:\n {4}branches: \[main,/);
   assert.match(read('.github/workflows/release.yml'), /workflow_run.event == 'push'/);
@@ -206,10 +206,10 @@ test('workflow separates trusted gate, immutable setup, token-free checks and PA
 test('unrelated steps and jobs cannot satisfy the real merge-step contract', () => {
   const workflow = read('.github/workflows/crowdin.yml');
   const broken = workflow.replace(
-    'GH_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}',
-    'GH_TOKEN: missing'
+    'GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}',
+    'GITHUB_TOKEN: missing'
   );
-  const decoy = '        env:\n          GH_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}\n';
+  const decoy = '        env:\n          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n';
   assert.throws(() => assertWorkflowBoundaries(`${broken}      - name: Unrelated step\n${decoy}`));
   assert.throws(() =>
     assertWorkflowBoundaries(
@@ -330,4 +330,25 @@ test('branch updates reject raced heads, wrong PR identity and an update that ne
   );
   rejected(f.run('update'), /Timed out waiting for the translation branch update/);
   assert.equal(f.output(), '');
+});
+test('Crowdin dispatches candidate CI before merge and main CI after merge', (t) => {
+  const f = fixture(t);
+  assert.equal(f.run('prepare').status, 0);
+  const result = f.run('merge');
+  assert.equal(result.status, 0, result.stderr);
+  const calls = f.calls();
+  const dispatches = calls.filter((args) => args[0] === 'workflow');
+  assert.deepEqual(
+    dispatches.map((args) => args.at(-1)),
+    ['locales', 'main']
+  );
+  const merged = calls.findIndex((args) => args[0] === 'pr' && args[1] === 'merge');
+  assert.ok(calls.indexOf(dispatches[0]) < merged);
+  assert.ok(calls.indexOf(dispatches[1]) > merged);
+});
+test('Crowdin refuses to merge when dispatch fails', (t) => {
+  const f = fixture(t);
+  assert.equal(f.run('prepare').status, 0);
+  assert.notEqual(f.run('merge', { DISPATCH_FAIL: 'true' }).status, 0);
+  assert.ok(!f.calls().some((args) => args[1] === 'merge'));
 });

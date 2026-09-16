@@ -7,7 +7,7 @@ vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
 const context = {
   branch: { name: 'main' },
   cwd: '/repo',
-  env: { GITHUB_TOKEN: 'mock-token', RELEASE_CI_TOKEN: 'mock-ci-token' },
+  env: { GITHUB_TOKEN: 'mock-token' },
   nextRelease: { version: '1.2.3' },
 };
 describe('release commit preparation', () => {

@@ -1,5 +1,6 @@
 name: CI
 on:
+  workflow_dispatch:
   push:
     branches: [main, develop, 'wip/**']
   pull_request:
@@ -56,7 +57,7 @@ jobs:
           else
             BASE="${{ github.event.before }}"
           fi
-          if [ "$BASE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
             BASE="origin/main"
           fi
           echo "base=$BASE" >> "$GITHUB_OUTPUT"
@@ -232,7 +233,8 @@ jobs:
   ci-result:
     name: CI Result
     if: always()
-    needs: [changes, fallow, lint-format, typecheck, test, validate, supabase-db, systems-drift, workers]
+    needs:
+      [changes, fallow, lint-format, typecheck, test, validate, supabase-db, systems-drift, workers]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
