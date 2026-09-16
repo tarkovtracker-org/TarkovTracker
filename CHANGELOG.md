@@ -1,3 +1,10 @@
+## [1.79.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.0...v1.79.1) (2026-09-16)
+
+
+### Bug Fixes
+
+* **server:** import hasMaterializedProgress in profile route ([#848](https://github.com/tarkovtracker-org/TarkovTracker/issues/848)) ([cc3666d](https://github.com/tarkovtracker-org/TarkovTracker/commit/cc3666dc4e7e3194c2232434de5a8dc8452006da)), closes [#810](https://github.com/tarkovtracker-org/TarkovTracker/issues/810)
+
 # [1.79.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.78.1...v1.79.0) (2026-09-15)
 
 
