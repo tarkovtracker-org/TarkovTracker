@@ -246,7 +246,8 @@ compare the checked-out commit with its parent, so dispatching main does not com
 
 GitHub excludes dispatch-created job checks from branch-rule evaluation. The final CI job therefore
 publishes its aggregate validator outcome as a `CI Result` commit status for dispatched runs only,
-on the exact checked-out SHA, using the job token with `statuses: write`. Only a successful aggregate
+on the exact workflow-run SHA, using the job token with `statuses: write`. This privileged job
+checks out trusted default-branch code for aggregation and reporting, never candidate code. Only a successful aggregate
 validator yields success; every other outcome reports failure. Publication errors fail the job.
 This is a report of completed validation, not an exemption from the required check or freshness rule.
 

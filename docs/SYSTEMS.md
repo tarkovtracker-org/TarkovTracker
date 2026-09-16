@@ -1615,8 +1615,9 @@ The checkout stays pinned to the validated SHA. The production build still runs 
   `cancel-in-progress: false`. Git non-fast-forward protection and semantic-release's upstream
   check remain the final safeguards if main advances after the last eligibility check.
 - Dispatched CI publishes the aggregate validator outcome as a `CI Result` commit status on the
-  exact checked-out SHA. GitHub excludes dispatch-created job checks from branch rules; the
-  status uses the GitHub Actions job token with job-scoped `statuses: write`. Only aggregate
+  exact workflow-run SHA. GitHub excludes dispatch-created job checks from branch rules; the
+  status uses the GitHub Actions job token with job-scoped `statuses: write`. That job checks out
+  the trusted default branch for aggregation and reporting, never candidate branch code. Only aggregate
   success publishes success; failed, cancelled, skipped, or missing validation publishes failure.
   Status publication errors fail the CI Result job, so automation cannot promote the commit.
 - Release version commits pass ordinary CI on a temporary `wip/release-*` branch before the
