@@ -1,24 +1,29 @@
 #!/usr/bin/env bash
 # Copied from trusted main to RUNNER_TEMP before the Crowdin action changes the checkout.
 set -euo pipefail
+# Stop the workflow with a GitHub Actions error annotation.
 fail() {
   echo "::error::$*" >&2
   exit 1
 }
+# Reject malformed revision values before passing them to Git.
 require_sha() {
   local sha="$1"
   [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || fail "Invalid commit SHA."
 }
+# Read the live PR identity and mergeability from GitHub.
 read_pr() {
   gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
     --json state,isDraft,isCrossRepository,headRefName,baseRefName,headRefOid,mergeable,mergeStateStatus
 }
+# Restrict automation to the open same-repository Crowdin PR.
 check_identity() {
   local pr="$1"
   jq -e '.state == "OPEN" and .isDraft == false and .isCrossRepository == false
     and .headRefName == "locales" and .baseRefName == "main"' <<< "$pr" >/dev/null ||
     fail "Expected an open, non-draft, same-repository locales PR targeting main."
 }
+# Validate pinned tree differences before any candidate project code executes.
 check_translation_tree() {
   local paths file mode
   paths="$(mktemp)"
@@ -34,6 +39,7 @@ check_translation_tree() {
   done < "$paths"
   rm "$paths"
 }
+# Fetch and validate immutable revisions, then publish the detached checkout identity.
 prepare() {
   local pr
   pr="$(read_pr)"
@@ -49,6 +55,7 @@ prepare() {
   git checkout --detach "$HEAD_SHA"
   printf 'head_sha=%s\nbase_sha=%s\n' "$HEAD_SHA" "$BASE_SHA" >> "$GITHUB_OUTPUT"
 }
+# Reject observed head or base changes since the candidate passed validation.
 check_revision() {
   local pr="$1"
   [[ "$(jq -r '.headRefOid' <<< "$pr")" == "$HEAD_SHA" ]] ||
@@ -57,6 +64,7 @@ check_revision() {
   current_base="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
   [[ "$current_base" == "$BASE_SHA" ]] || fail "Main changed after validation; rerun Crowdin Sync."
 }
+# Retry unresolved calculations while rejecting every known ineligible state.
 wait_for_mergeability() {
   local pr mergeable merge_state attempt
   for ((attempt = 1; attempt <= 20; attempt++)); do
@@ -74,6 +82,7 @@ wait_for_mergeability() {
     sleep 3
   done
 }
+# Recheck the validated candidate and atomically guard the PR head during squash merge.
 merge() {
   [[ -n "${GH_TOKEN:-}" ]] || fail "ACCESS_TOKEN_GITHUB is required; refusing a GITHUB_TOKEN merge."
   require_sha "${HEAD_SHA:-}"

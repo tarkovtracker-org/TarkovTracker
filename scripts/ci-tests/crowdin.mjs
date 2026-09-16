@@ -12,15 +12,18 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
+// These built-in Node tests do not load Nuxt's app-only @/ alias.
 import { gitExecutable } from '../validation-tools.mjs';
 import { jobBlock, workflowStep } from './helpers/workflow-blocks.mjs';
 const gate = resolve('scripts/crowdin-pr.sh');
 const read = (path) => readFileSync(path, 'utf8');
+/** Run the trusted Git executable and surface fixture setup failures. */
 function git(cwd, ...args) {
   const result = spawnSync(gitExecutable(), args, { cwd, encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
   return result.stdout.trim();
 }
+/** Create an isolated Git history and mocked GitHub CLI for gate integration tests. */
 function fixture(t, changes) {
   changes ??= { 'app/locales/fr.json': '{"hello":"Salut"}' };
   const root = mkdtempSync(join(tmpdir(), 'crowdin-gate-'));
@@ -118,9 +121,11 @@ process.exit(2);
     output: () => read(env.GITHUB_OUTPUT),
   };
 }
+/** Require a successful gate subprocess with its diagnostic on failure. */
 function passed(result) {
   assert.equal(result.status, 0, result.stderr);
 }
+/** Require a failed gate subprocess with the expected rejection reason. */
 function rejected(result, message) {
   assert.equal(result.status, 1, result.stderr);
   assert.match(result.stderr, message);
@@ -258,6 +263,15 @@ test('missing merge credential, changed main, changed checkout or PR identity fa
   rejected(f.run('merge'), /Checkout differs/);
   assert.ok(!f.calls().some((args) => args[1] === 'merge'));
 });
+/** Require both workflow boundaries before checking their execution order. */
+function assertStepOrder(job, first, second) {
+  const firstIndex = job.indexOf(first);
+  const secondIndex = job.indexOf(second);
+  assert.notEqual(firstIndex, -1, `missing ${first}`);
+  assert.notEqual(secondIndex, -1, `missing ${second}`);
+  assert.ok(firstIndex < secondIndex, `${first} must precede ${second}`);
+}
+/** Verify each workflow boundary within its owning job and step. */
 function assertWorkflowBoundaries(workflow) {
   const sync = jobBlock(workflow, 'sync');
   const mergeStep = workflowStep(sync, 'Merge validated translations');
@@ -267,12 +281,15 @@ function assertWorkflowBoundaries(workflow) {
   assert.match(mergeStep, /HEAD_SHA: \$\{\{ steps.candidate.outputs.head_sha \}\}/);
   assert.match(mergeStep, /BASE_SHA: \$\{\{ steps.candidate.outputs.base_sha \}\}/);
   assert.match(mergeStep, /run: bash "\$RUNNER_TEMP\/crowdin-pr.sh" merge/);
-  assert.ok(
-    sync.indexOf('Preserve trusted merge gate') < sync.indexOf('Synchronize Crowdin translations')
+  assertStepOrder(
+    sync,
+    '      - name: Preserve trusted merge gate\n',
+    '      - name: Synchronize Crowdin translations\n'
   );
-  assert.ok(
-    sync.indexOf('immutable translation checkout') <
-      sync.indexOf('uses: ./.github/actions/setup-project')
+  assertStepOrder(
+    sync,
+    '      - name: Prepare immutable translation checkout\n',
+    '      - uses: ./.github/actions/setup-project\n'
   );
   const validation = workflowStep(sync, 'Validate translations');
   assert.doesNotMatch(validation, /GH_TOKEN|secrets\./);
@@ -297,4 +314,26 @@ test('unrelated steps and jobs cannot satisfy the real merge-step contract', () 
       `${broken}  unrelated:\n    steps:\n      - name: Merge validated translations\n${decoy}`
     )
   );
+});
+test('missing or reversed required workflow steps cannot pass ordering checks', () => {
+  const workflow = read('.github/workflows/crowdin.yml');
+  const pairs = [
+    [
+      '      - name: Preserve trusted merge gate\n',
+      '      - name: Synchronize Crowdin translations\n',
+    ],
+    [
+      '      - name: Prepare immutable translation checkout\n',
+      '      - uses: ./.github/actions/setup-project\n',
+    ],
+  ];
+  for (const [first, second] of pairs) {
+    assert.throws(() => assertWorkflowBoundaries(workflow.replace(first, '')), /missing/);
+    assert.throws(() => assertWorkflowBoundaries(workflow.replace(second, '')), /missing/);
+    const reversed = workflow
+      .replace(first, '__FIRST_STEP__')
+      .replace(second, first)
+      .replace('__FIRST_STEP__', second);
+    assert.throws(() => assertWorkflowBoundaries(reversed), /must precede/);
+  }
 });
