@@ -370,6 +370,56 @@ describe('story overlay validation', () => {
         chapter: { name: 'Chapter', mutuallyExclusiveQuestPairs: [[{ id: 'a' }, 'b']] },
       },
     },
+    { storyChapters: { chapter: { name: 'Chapter', mutuallyExclusiveQuestPairs: [['a', 'a']] } } },
+    { storyChapters: { chapter: { name: 'Chapter', mutuallyExclusiveQuestPairs: [['a', ' ']] } } },
+    {
+      storyChapters: {
+        chapter: {
+          name: 'Chapter',
+          endings: [
+            {
+              id: '',
+              systemName: 'Ending',
+              gateQuestId: 'quest',
+              objectiveCount: 0,
+              resolvedInReference: false,
+            },
+          ],
+        },
+      },
+    },
+    {
+      storyChapters: {
+        chapter: {
+          name: 'Chapter',
+          endings: [
+            {
+              id: 'ending',
+              systemName: 'Ending',
+              gateQuestId: 'quest',
+              objectiveCount: 1.5,
+              resolvedInReference: true,
+            },
+          ],
+        },
+      },
+    },
+    {
+      storyChapters: {
+        chapter: {
+          name: 'Chapter',
+          endings: [
+            {
+              id: 'ending',
+              systemName: 'Ending',
+              gateQuestId: 'quest',
+              objectiveCount: -1,
+              resolvedInReference: true,
+            },
+          ],
+        },
+      },
+    },
   ])('retains the last good payload for malformed chapter records: %j', async (invalid) => {
     const fetchMock = stubOverlayFetch({
       editions: testOverlayEditions,
