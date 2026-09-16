@@ -105,22 +105,31 @@ jobs:
       - name: Lint GitHub Actions workflows
         if: needs.changes.outputs.workflows == 'true'
         # Pinned, checksum-verified actionlint (syntax, expressions, shellcheck) and zizmor
-        # (workflow security). Both stay out of package.json: they are not Node tooling.
+        # (workflow security) release binaries. Both stay out of package.json: they are not Node
+        # tooling. Checksums match the `digest` GitHub records for each release asset.
         env:
           ACTIONLINT_VERSION: 1.7.7
           ACTIONLINT_SHA256: 023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757
           ZIZMOR_VERSION: 1.30.1
+          ZIZMOR_SHA256: e65324f4430c2717591937edcec90ccbefaf14c174f8ec9415e03ca875b46e1a
           # Read-only token enables zizmor's online audits (impostor commits, known-vulnerable actions).
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          archive="$RUNNER_TEMP/actionlint.tar.gz"
-          curl --proto '=https' --proto-redir '=https' -sSfL -o "$archive" \
-            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-          echo "${ACTIONLINT_SHA256}  ${archive}" | sha256sum --check --strict
-          tar -xzf "$archive" -C "$RUNNER_TEMP" actionlint
+          fetch_verified() {
+            local archive="$RUNNER_TEMP/$1.tar.gz"
+            curl --proto '=https' --proto-redir '=https' -sSfL -o "$archive" "$2"
+            echo "$3  ${archive}" | sha256sum --check --strict
+            tar -xzf "$archive" -C "$RUNNER_TEMP" "$1"
+          }
+          fetch_verified actionlint \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
+            "$ACTIONLINT_SHA256"
+          fetch_verified zizmor \
+            "https://github.com/zizmorcore/zizmor/releases/download/v${ZIZMOR_VERSION}/zizmor-x86_64-unknown-linux-gnu.tar.gz" \
+            "$ZIZMOR_SHA256"
           "$RUNNER_TEMP/actionlint" -color
-          pipx run "zizmor==${ZIZMOR_VERSION}" --no-progress --min-severity low .github/
+          "$RUNNER_TEMP/zizmor" --no-progress --min-severity low .github/
   typecheck:
     needs: changes
     if: needs.changes.outputs.full == 'true'

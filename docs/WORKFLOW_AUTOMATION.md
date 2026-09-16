@@ -64,10 +64,11 @@ security checks, and Codecov statuses remain unchanged; the aggregate does not r
 The shared setup action uses `.nvmrc`, the full `packageManager` pin, pnpm caching, and a frozen
 installation. Each caller owns checkout history and credential settings. `Lint & Format` runs lint
 and Prettier once each (lint already includes blank-line validation), plus i18n and workflow fixtures.
-When automation files change it also runs a checksum-verified, pinned `actionlint` (syntax,
-expression, and shellcheck errors) and `zizmor` (workflow security) at `low` severity and above;
-`.github/zizmor.yml` records the accepted findings with their justification. Neither tool is Node
-tooling, so both are pinned in the workflow step rather than `package.json`.
+When automation files change it also runs pinned, checksum-verified release binaries of `actionlint`
+(syntax, expression, and shellcheck errors) and `zizmor` (workflow security) at `low` severity and
+above; `.github/zizmor.yml` records the accepted findings with their justification. Neither tool is
+Node tooling, so both are pinned in the workflow step rather than `package.json`. To update either,
+change the version and the `SHA256` value to the `digest` GitHub records for the release asset.
 The four Vitest shards, dedicated Deno tests, Supabase validation, Worker validation, and production
 build retain their existing commands and environment behavior. Tests in `scripts/ci-tests/` use
 Node's built-in runner via `pnpm run test:workflow`; their filenames deliberately avoid Vitest discovery.
