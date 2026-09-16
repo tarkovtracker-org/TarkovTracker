@@ -1122,6 +1122,19 @@ flowchart LR
 - Legacy activity envelopes with no owner are adoptable guest data. Authenticated startup waits
   until progress sync restores the selected mode before adoption. Another account's envelope is
   retained for its owner. The legacy key is removed only after entries have been added to progress.
+- `public.team_events` is server-authored only. `anon` and `authenticated` hold no table or
+  column-level `INSERT`, a restrictive policy denies client inserts even if a grant is later
+  inherited, and only `service_role` may insert. A `BEFORE INSERT` trigger stamps `server_verified`
+  and overwrites `created_at` with database time, so neither field is caller-supplied. Member reads
+  are unchanged.
+- Rows written before that containment are preserved for history and carry
+  `server_verified = false` with a possibly caller-supplied `created_at`. **Every cooldown or
+  rate-limit consumer of `team_events` must filter on `server_verified = true`, scope the query to
+  events the caller initiated, and bound `created_at` at or below the current time.** Reading the
+  preserved history without those filters lets a caller evade or extend a cooldown using a row
+  forged before containment. `team-leave` and `team-kick` are the current consumers; a new consumer
+  inherits the same requirement, and deleting the untrusted rows is not a substitute because the
+  filter is what makes the contract durable.
 
 ---
 

@@ -61,8 +61,12 @@ Deno.serve(async (req) => {
       .select('created_at, teams!inner(game_mode)')
       .eq('event_type', 'member_left')
       .eq('target_user', user.id)
+      .eq('initiated_by', user.id)
+      .eq('server_verified', true)
       .eq('teams.game_mode', game_mode)
       .gte('created_at', cooldownTimestamp)
+      .lte('created_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
       .limit(1);
     if (cooldownError) {
       console.error('Leave cooldown check failed:', cooldownError, {
