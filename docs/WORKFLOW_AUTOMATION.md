@@ -244,6 +244,12 @@ Automation confirms each accepted dispatch creates a new CI run on the requested
 60 seconds, including queued runs, before waiting for exact-SHA checks. Dispatched Fallow audits
 compare the checked-out commit with its parent, so dispatching main does not compare main with itself.
 
+GitHub excludes dispatch-created job checks from branch-rule evaluation. The final CI job therefore
+publishes its aggregate validator outcome as a `CI Result` commit status for dispatched runs only,
+on the exact checked-out SHA, using the job token with `statuses: write`. Only a successful aggregate
+validator yields success; every other outcome reports failure. Publication errors fail the job.
+This is a report of completed validation, not an exemption from the required check or freshness rule.
+
 After rechecking main and the policy, an ordinary non-forced push promotes the identical SHA to
 main using `GITHUB_TOKEN`. A concurrent main advance rejects promotion rather than rebasing
 unvalidated assets. The required check is already successful on that commit. The token suppresses
