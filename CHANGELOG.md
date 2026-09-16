@@ -1,3 +1,10 @@
+## [1.79.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.4...v1.79.5) (2026-09-16)
+
+
+### Bug Fixes
+
+* **app:** keep recoverable story marks and stop overstating route completion ([#855](https://github.com/tarkovtracker-org/TarkovTracker/issues/855)) ([d26dab8](https://github.com/tarkovtracker-org/TarkovTracker/commit/d26dab8bac1e454980072cf1c6ae690c9b172cf7))
+
 ## [1.79.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.3...v1.79.4) (2026-09-16)
 
 
