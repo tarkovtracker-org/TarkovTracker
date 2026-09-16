@@ -1,3 +1,10 @@
+## [1.79.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.1...v1.79.2) (2026-09-16)
+
+
+### Bug Fixes
+
+* **ui:** consume the overlay story chapter branch contract ([#849](https://github.com/tarkovtracker-org/TarkovTracker/issues/849)) ([9da52e3](https://github.com/tarkovtracker-org/TarkovTracker/commit/9da52e36da3c8048e57eb3f9b8d4583872c75bb6))
+
 ## [1.79.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.0...v1.79.1) (2026-09-16)
 
 
