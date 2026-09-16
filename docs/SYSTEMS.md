@@ -450,9 +450,26 @@ Declared `endings` replace the text-derived ending labels when a chapter carries
 without them keep the text path — an ending with no attributed objectives reports pending evidence
 rather than being hidden, and exclusivity between endings is not inferred. `referenceCoverage.partial`
 surfaces as a chapter badge because a missing objective is not evidence that none exists. Objective
-IDs are upstream-owned: completed marks whose IDs the current chapter no longer defines (overlay
-v1.93 re-keyed all of The Ticket's) are reported for re-checking on the viewer's own progress only,
-never silently remapped or deleted.
+IDs are upstream-owned: completed marks the reconciliation pass below leaves unresolved are reported
+for re-checking on the viewer's own progress only, never remapped on a guess.
+
+Saved story objective marks are reconciled against the published catalog by
+`app/utils/storyProgressMigration.ts`, on every chapter-catalog load and after a realtime merge,
+which unions both sides' objective IDs and can reintroduce a retired one. Chapters are fetched per
+mode and language, so a realtime merge for an inactive mode is reconciled against the catalog that
+did load; that stays sound because every decision is either shape-based, and no chapter in any mode
+scope may publish an objective ID of another shape, or validated against an ID that catalog publishes.
+A chapter another mode scopes differently can therefore cost a mark, never invent one. The pass is idempotent and acts
+only on proof: a mark moves when `STORY_OBJECTIVE_ID_ALIASES` records a re-key the published data
+proves (identical unique objective text, or the overlay re-anchoring its own prestige requirement)
+and the target carries no mark of its own; a mark is dropped when its ID cannot satisfy the story
+schema's client-ID shape, so it can never resolve again and would otherwise be re-synced forever; an
+unrecognized client ID is kept, because `referenceCoverage.partial` means the published list is a
+projection. Nothing is dropped unless the loaded chapter itself proves the client-ID contract, so a
+stale, curated, or failed catalog load cannot delete progress. Ambiguous re-keys are left unmapped
+rather than guessed. Task and hideout IDs have no equivalent pass: the overlay still publishes
+synthetic task IDs (`new_beginning_prestige_5`) as live data, so absence there is not proof of
+retirement, and a future retirement needs the overlay to declare the replacement first.
 
 ### Files
 

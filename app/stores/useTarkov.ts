@@ -89,8 +89,12 @@ import {
   sanitizeTarkovUid,
 } from '@/utils/progressSanitizers';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
+import {
+  type StoryProgressMigrationResult,
+  migrateStoryProgress,
+} from '@/utils/storyProgressMigration';
 import { getCurrentSupabaseUserId, parseUserScopedStorage } from '@/utils/userScopedStorage';
-import type { Task } from '@/types/tarkov';
+import type { StoryChapter, Task } from '@/types/tarkov';
 export type { PrestigeRunRecord } from '@/stores/tarkov/prestige';
 // ============================================================================
 // Constants
@@ -128,6 +132,7 @@ type UserProgressSyncPayload = {
 type TarkovStoreInstance = UserState & {
   $state: UserState;
   $patch(partialOrMutator: Partial<UserState> | ((state: UserState) => void)): void;
+  migrateStoryObjectiveIds(mode?: GameMode): { migrated: number; dropped: number };
   migrateTaskCompletionSchema(): {
     pvpMigrated: number;
     pveMigrated: number;
@@ -150,6 +155,42 @@ type TarkovStoreInstance = UserState & {
     gameModeData: UserProgressData,
     tasksMap: Map<string, Task>
   ): number;
+};
+const asGameMode = (mode: string): GameMode | null =>
+  GAME_MODE_VALUES.includes(mode as GameMode) ? (mode as GameMode) : null;
+/**
+ * Reconcile a mode against the catalog the metadata store loaded for it.
+ *
+ * Story chapters are fetched per mode and language and the overlay may scope a chapter to one mode,
+ * so a loaded catalog is evidence about its own mode only.
+ */
+const NO_STORY_ID_CHANGES = { migrated: 0, dropped: 0 } as const;
+type StoryIdChanges = { migrated: number; dropped: number };
+const applyStoryReconciliation = (
+  modeData: UserProgressData | undefined,
+  result: StoryProgressMigrationResult
+): StoryIdChanges => {
+  if (!modeData || !result.changed) return NO_STORY_ID_CHANGES;
+  modeData.storyChapters = result.storyChapters;
+  return { migrated: result.migrated, dropped: result.dropped };
+};
+const reconcileAgainstCatalog = (
+  modeData: UserProgressData | undefined,
+  chapters: readonly StoryChapter[]
+): StoryIdChanges =>
+  applyStoryReconciliation(modeData, migrateStoryProgress(modeData?.storyChapters, chapters));
+const reconcileStoryMode = (
+  modeData: UserProgressData | undefined,
+  chapters: readonly StoryChapter[]
+): StoryIdChanges => {
+  if (chapters.length === 0) return NO_STORY_ID_CHANGES;
+  return reconcileAgainstCatalog(modeData, chapters);
+};
+const logStoryObjectiveMigration = (totals: StoryIdChanges): void => {
+  if (totals.migrated === 0 && totals.dropped === 0) return;
+  logger.info(
+    `[TarkovStore] Reconciled story objective ids - migrated: ${totals.migrated}, dropped: ${totals.dropped}`
+  );
 };
 const assertPrestigeMode = (mode: GameMode) => {
   if (mode === GAME_MODES.SEASONAL) throw new Error('Prestige is not supported for Seasonal PvP.');
@@ -350,6 +391,22 @@ const tarkovActions = {
         }
       }
     }
+  },
+  /**
+   * Reconcile saved story objective marks with the IDs the overlay publishes now.
+   *
+   * Runs on every chapter-catalog load and is idempotent: a proven re-key moves the mark, an ID the
+   * story contract can no longer accept is dropped so it stops being re-saved and re-synced, and an
+   * unrecognized client ID is left alone because the published objective list can be partial.
+   */
+  migrateStoryObjectiveIds(this: TarkovStoreInstance, mode?: GameMode) {
+    const metadataStore = useMetadataStore();
+    const chapters = metadataStore.storyChapters ?? [];
+    const catalogMode = asGameMode(metadataStore.currentGameMode);
+    const target = mode ?? catalogMode;
+    const totals = reconcileStoryMode(target ? this[target] : undefined, chapters);
+    logStoryObjectiveMigration(totals);
+    return totals;
   },
   migrateTaskCompletionSchema(this: TarkovStoreInstance) {
     const pvpMigrated = normalizeTaskCompletionsMap(this.pvp?.taskCompletions);
@@ -895,6 +952,7 @@ const tarkovActions = {
 } satisfies UserActions & {
   switchGameMode(mode: GameMode): Promise<void>;
   migrateDataIfNeeded(): Promise<void>;
+  migrateStoryObjectiveIds(mode?: GameMode): { migrated: number; dropped: number };
   migrateTaskCompletionSchema(): {
     pvpMigrated: number;
     pveMigrated: number;
@@ -1106,6 +1164,9 @@ registerTarkovMetadataHooks({
   },
   repairFailedTaskStates: () => {
     useTarkovStore().repairFailedTaskStates();
+  },
+  migrateStoryObjectiveIds: () => {
+    useTarkovStore().migrateStoryObjectiveIds();
   },
 });
 const syncMetadataAfterStartup = (tarkovStore: TarkovStore) => {
@@ -1655,12 +1716,15 @@ export async function initializeTarkovSync() {
     // Repair failed task states for existing users (runs once after data load)
     // This reapplies valid branch failures and clears stale failed flags
     const completionSchemaMigration = tarkovStore.migrateTaskCompletionSchema();
+    const storyObjectiveMigration = tarkovStore.migrateStoryObjectiveIds();
     const failedRepairResult = tarkovStore.repairFailedTaskStates();
     const completedObjectivesRepairResult = tarkovStore.repairCompletedTaskObjectives();
     const hasCompletionSchemaMigration =
       completionSchemaMigration.pvpMigrated > 0 ||
       completionSchemaMigration.pveMigrated > 0 ||
-      completionSchemaMigration.seasonalMigrated > 0;
+      completionSchemaMigration.seasonalMigrated > 0 ||
+      storyObjectiveMigration.migrated > 0 ||
+      storyObjectiveMigration.dropped > 0;
     const hasRepairChanges =
       failedRepairResult.pvpRepaired > 0 ||
       failedRepairResult.pveRepaired > 0 ||

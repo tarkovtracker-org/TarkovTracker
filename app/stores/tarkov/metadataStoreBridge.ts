@@ -3,6 +3,7 @@ type TarkovMetadataHooks = {
   getCurrentGameMode: () => GameMode;
   repairCompletedTaskObjectives: () => void;
   repairFailedTaskStates: () => void;
+  migrateStoryObjectiveIds: () => void;
 };
 type ProgressMetadataHooks = {
   migrateDuplicateObjectiveProgress: (duplicateObjectiveIds: Map<string, string[]>) => void;
@@ -11,6 +12,7 @@ let tarkovHooks: TarkovMetadataHooks = {
   getCurrentGameMode: () => GAME_MODES.PVP,
   repairCompletedTaskObjectives: () => undefined,
   repairFailedTaskStates: () => undefined,
+  migrateStoryObjectiveIds: () => undefined,
 };
 let progressHooks: ProgressMetadataHooks | null = null;
 let pendingDuplicateObjectiveIds = new Map<string, string[]>();
@@ -61,6 +63,12 @@ export const getMetadataGameMode = (): GameMode => tarkovHooks.getCurrentGameMod
 export const repairMetadataCompletedTaskObjectives = (): void =>
   tarkovHooks.repairCompletedTaskObjectives();
 export const repairMetadataFailedTaskStates = (): void => tarkovHooks.repairFailedTaskStates();
+/**
+ * Reconcile saved story objective marks with the chapter catalog that just loaded. A no-op until the
+ * progress store registers its hook, and re-run on every catalog load because the overlay can
+ * re-key an objective at any release.
+ */
+export const migrateMetadataStoryObjectiveIds = (): void => tarkovHooks.migrateStoryObjectiveIds();
 export const migrateMetadataDuplicateObjectiveProgress = (
   duplicateObjectiveIds: Map<string, string[]>
 ): void => {
