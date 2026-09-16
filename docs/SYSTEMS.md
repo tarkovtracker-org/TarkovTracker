@@ -454,6 +454,19 @@ IDs are upstream-owned: completed marks whose IDs the current chapter no longer 
 v1.93 re-keyed all of The Ticket's) are reported for re-checking on the viewer's own progress only,
 never silently remapped or deleted.
 
+Saved story objective marks are reconciled against the published catalog on every chapter-catalog
+load, in all three modes, by `app/utils/storyProgressMigration.ts`. The pass is idempotent and acts
+only on proof: a mark moves when `STORY_OBJECTIVE_ID_ALIASES` records a re-key the published data
+proves (identical unique objective text, or the overlay re-anchoring its own prestige requirement)
+and the target carries no mark of its own; a mark is dropped when its ID cannot satisfy the story
+schema's client-ID shape, so it can never resolve again and would otherwise be re-synced forever; an
+unrecognized client ID is kept, because `referenceCoverage.partial` means the published list is a
+projection. Nothing is dropped unless the loaded chapter itself proves the client-ID contract, so a
+stale, curated, or failed catalog load cannot delete progress. Ambiguous re-keys are left unmapped
+rather than guessed. Task and hideout IDs have no equivalent pass: the overlay still publishes
+synthetic task IDs (`new_beginning_prestige_5`) as live data, so absence there is not proof of
+retirement, and a future retirement needs the overlay to declare the replacement first.
+
 ### Files
 
 - `app/server/utils/overlay.ts` — fetch, cache, merge, and deferred refresh coordination.

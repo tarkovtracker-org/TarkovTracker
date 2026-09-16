@@ -7,6 +7,7 @@ import { type ObjectiveWithItems, createItemPicker } from '@/stores/tarkov/itemP
 import {
   getMetadataGameMode,
   migrateMetadataDuplicateObjectiveProgress,
+  migrateMetadataStoryObjectiveIds,
   repairMetadataCompletedTaskObjectives,
   repairMetadataFailedTaskStates,
 } from '@/stores/tarkov/metadataStoreBridge';
@@ -256,6 +257,7 @@ const applyCachedEditions = async (
   state.seasonalPerks = perksForMode(seasonalPerks, mode);
   if (!storyChapters.length) return false;
   state.storyChapters = markRaw(sortedStoryChapters(storyChapters));
+  migrateMetadataStoryObjectiveIds();
   logger.debug('[MetadataStore] Editions loaded from cache');
   return true;
 };
@@ -310,6 +312,7 @@ const applyProgressionCatalog = (
   state.editions = markRaw([...overlay.editions]);
   state.storyChapters = markRaw(chapters);
   state.seasonalPerks = perksForMode(overlay.seasonalPerks ?? [], mode);
+  migrateMetadataStoryObjectiveIds();
 };
 const cacheProgressionCatalog = (
   state: ProgressionCatalogState,
