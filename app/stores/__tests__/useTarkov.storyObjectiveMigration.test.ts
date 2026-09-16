@@ -33,7 +33,7 @@ describe('useTarkovStore story objective id migration', () => {
     const store = useTarkovStore();
     const metadataStore = useMetadataStore();
     metadataStore.storyChapters = [TICKET_CHAPTER];
-    metadataStore.currentGameMode = 'pvp';
+    metadataStore.storyChaptersGameMode = 'pvp';
     store.pvp.storyChapters = storedTicketProgress();
     store.pve.storyChapters = storedTicketProgress();
     store.seasonal.storyChapters = storedTicketProgress();
@@ -49,7 +49,7 @@ describe('useTarkovStore story objective id migration', () => {
     const store = useTarkovStore();
     const metadataStore = useMetadataStore();
     metadataStore.storyChapters = [TICKET_CHAPTER];
-    metadataStore.currentGameMode = 'pve';
+    metadataStore.storyChaptersGameMode = 'pve';
     store.pve.storyChapters = storedTicketProgress();
     expect(store.migrateStoryObjectiveIds()).toEqual({ migrated: 1, dropped: 1 });
     expect(store.pve.storyChapters['the-ticket']?.objectives).toEqual({
@@ -57,13 +57,29 @@ describe('useTarkovStore story objective id migration', () => {
     });
   });
   // The realtime listener passes the merged mode; realtimeListener.seasonal.test.ts covers that call.
-  it('reconciles a requested mode other than the catalog mode', () => {
+  it('defers a requested mode the loaded catalog does not cover', () => {
     setActivePinia(createPinia());
     const store = useTarkovStore();
     const metadataStore = useMetadataStore();
     metadataStore.storyChapters = [TICKET_CHAPTER];
-    metadataStore.currentGameMode = 'pvp';
+    metadataStore.storyChaptersGameMode = 'pvp';
     store.pve.storyChapters = storedTicketProgress();
+    // A PvP catalog is not evidence about PvE, so the merged mode waits for its own catalog.
+    expect(store.migrateStoryObjectiveIds('pve')).toEqual({ migrated: 0, dropped: 0 });
+    expect(store.pve.storyChapters).toEqual(storedTicketProgress());
+  });
+  it('reconciles the deferred mode once its own catalog loads', () => {
+    setActivePinia(createPinia());
+    const store = useTarkovStore();
+    const metadataStore = useMetadataStore();
+    metadataStore.storyChapters = [TICKET_CHAPTER];
+    metadataStore.storyChaptersGameMode = 'pvp';
+    store.pve.storyChapters = storedTicketProgress();
+    // Deferred while the PvP catalog is loaded.
+    expect(store.migrateStoryObjectiveIds('pve')).toEqual({ migrated: 0, dropped: 0 });
+    expect(store.pve.storyChapters).toEqual(storedTicketProgress());
+    // The same store reconciles when the PvE catalog arrives.
+    metadataStore.storyChaptersGameMode = 'pve';
     expect(store.migrateStoryObjectiveIds('pve')).toEqual({ migrated: 1, dropped: 1 });
     expect(store.pve.storyChapters['the-ticket']?.objectives).toEqual({
       [CURRENT_ID]: { complete: true, timestamp: 1000 },
@@ -73,7 +89,7 @@ describe('useTarkovStore story objective id migration', () => {
     setActivePinia(createPinia());
     const store = useTarkovStore();
     const metadataStore = useMetadataStore();
-    metadataStore.currentGameMode = 'pvp';
+    metadataStore.storyChaptersGameMode = 'pvp';
     metadataStore.storyChapters = [
       {
         ...TICKET_CHAPTER,
@@ -96,7 +112,7 @@ describe('useTarkovStore story objective id migration', () => {
     const store = useTarkovStore();
     const metadataStore = useMetadataStore();
     metadataStore.storyChapters = [];
-    metadataStore.currentGameMode = 'pvp';
+    metadataStore.storyChaptersGameMode = 'pvp';
     store.pvp.storyChapters = storedTicketProgress();
     expect(store.migrateStoryObjectiveIds()).toEqual({ migrated: 0, dropped: 0 });
     expect(store.pvp.storyChapters).toEqual(storedTicketProgress());
@@ -105,7 +121,7 @@ describe('useTarkovStore story objective id migration', () => {
     setActivePinia(createPinia());
     const store = useTarkovStore();
     const metadataStore = useMetadataStore();
-    metadataStore.currentGameMode = 'pvp';
+    metadataStore.storyChaptersGameMode = 'pvp';
     metadataStore.storyChapters = [
       {
         ...TICKET_CHAPTER,

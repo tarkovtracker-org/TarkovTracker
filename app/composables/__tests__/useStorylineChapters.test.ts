@@ -308,20 +308,26 @@ describe('useStorylineChapters', () => {
       {
         branches: [
           {
-            complete: false,
             completedCount: 0,
+            evidencePending: false,
             id: 'quest-hand-over',
+            knownStepsComplete: false,
             label: 'Hand the case over',
             totalCount: 1,
           },
           {
-            complete: true,
             completedCount: 1,
+            evidencePending: false,
             id: 'quest-keep',
+            knownStepsComplete: true,
             label: 'Keep the case',
             totalCount: 1,
           },
         ],
+        // The fixture chapter reports partial coverage, so no route is proven finished.
+        chosenBranchId: null,
+        conflicting: false,
+        coveragePartial: true,
         id: 'the-ticket-quest-route-quest-hand-over-quest-keep',
       },
     ]);
@@ -331,6 +337,59 @@ describe('useStorylineChapters', () => {
     );
     expect(handOver.routeState).toBe('open');
     expect(chapter.mainRouteChoices).toEqual([]);
+  });
+  it('keeps a declared route whose objectives the capture does not include', async () => {
+    const chapter = structuredClone(DECLARED_ENDING_CHAPTER);
+    chapter.mutuallyExclusiveQuestPairs = [['quest-keep', 'quest-missing']];
+    const { normalizedChapters } = await loadComposable([chapter]);
+    const normalized = requireDefined(normalizedChapters.value[0], 'Expected the-ticket chapter');
+    expect(normalized.questRouteChoices).toHaveLength(1);
+    expect(normalized.questRouteChoices[0]?.branches.map((branch) => branch.id)).toEqual([
+      'quest-keep',
+      'quest-missing',
+    ]);
+    expect(normalized.questRouteChoices[0]?.branches[1]).toMatchObject({
+      evidencePending: true,
+      knownStepsComplete: false,
+      totalCount: 0,
+    });
+  });
+  it('proves a chosen route only when chapter coverage is complete', async () => {
+    const chapter = structuredClone(DECLARED_ENDING_CHAPTER);
+    chapter.referenceCoverage = {
+      referencedSubquests: 4,
+      resolvedSubquests: 4,
+      partial: false,
+    };
+    objectiveCompletionState.add('the-ticket:obj-keep');
+    const { normalizedChapters } = await loadComposable([chapter]);
+    const normalized = requireDefined(normalizedChapters.value[0], 'Expected the-ticket chapter');
+    expect(normalized.questRouteChoices[0]).toMatchObject({
+      chosenBranchId: 'quest-keep',
+      conflicting: false,
+      coveragePartial: false,
+    });
+  });
+  it('flags a conflict only when complete coverage proves both routes finished', async () => {
+    objectiveCompletionState.add('the-ticket:obj-keep');
+    objectiveCompletionState.add('the-ticket:obj-hand');
+    const partial = await loadComposable([DECLARED_ENDING_CHAPTER]);
+    // Partial coverage cannot prove either route finished, so progress on both is not a conflict.
+    expect(
+      requireDefined(partial.normalizedChapters.value[0], 'chapter').questRouteChoices[0]
+    ).toMatchObject({
+      chosenBranchId: null,
+      conflicting: false,
+    });
+    const chapter = structuredClone(DECLARED_ENDING_CHAPTER);
+    chapter.referenceCoverage = { referencedSubquests: 4, resolvedSubquests: 4, partial: false };
+    const complete = await loadComposable([chapter]);
+    expect(
+      requireDefined(complete.normalizedChapters.value[0], 'chapter').questRouteChoices[0]
+    ).toMatchObject({
+      chosenBranchId: null,
+      conflicting: true,
+    });
   });
   it('never implies exclusivity between quests the overlay did not pair', async () => {
     const chapter = structuredClone(DECLARED_ENDING_CHAPTER);

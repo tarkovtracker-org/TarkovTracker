@@ -446,6 +446,11 @@ sub-quests, so each declared pair becomes one chapter-level route choice and gat
 completion, while individual objective toggles stay enabled. Pairs are never merged: two pairs
 sharing a quest do not make their other members exclusive, and a route the player has not finished
 is never rendered as blocked, because the objective list can be a projection of the overlay capture.
+Both sides of a declared pair always render, a side with no captured objectives reporting pending
+evidence rather than disappearing. A route is called chosen only when chapter coverage is complete and
+exactly one side's steps are all done; under partial coverage a finished side reports known-step
+progress instead, and a conflict between two finished sides is reported only when coverage is complete,
+because unknown steps can otherwise remain on both.
 Declared `endings` replace the text-derived ending labels when a chapter carries them — chapters
 without them keep the text path — an ending with no attributed objectives reports pending evidence
 rather than being hidden, and exclusivity between endings is not inferred. `referenceCoverage.partial`
@@ -455,17 +460,19 @@ for re-checking on the viewer's own progress only, never remapped on a guess.
 
 Saved story objective marks are reconciled against the published catalog by
 `app/utils/storyProgressMigration.ts`, on every chapter-catalog load and after a realtime merge,
-which unions both sides' objective IDs and can reintroduce a retired one. Chapters are fetched per
-mode and language, so a realtime merge for an inactive mode is reconciled against the catalog that
-did load; that stays sound because every decision is either shape-based, and no chapter in any mode
-scope may publish an objective ID of another shape, or validated against an ID that catalog publishes.
-A chapter another mode scopes differently can therefore cost a mark, never invent one. The pass is idempotent and acts
+which unions both sides' objective IDs and can reintroduce a retired one. Only the mode the loaded
+catalog belongs to is reconciled: chapters are fetched per mode and language and the overlay may scope
+a chapter to one mode, so a catalog is evidence about its own mode only. A merge naming another mode is
+deferred to that mode's own catalog load, which a mode switch or the next start performs. The pass is idempotent and acts
 only on proof: a mark moves when `STORY_OBJECTIVE_ID_ALIASES` records a re-key the published data
-proves (identical unique objective text, or the overlay re-anchoring its own prestige requirement)
-and the target carries no mark of its own; a mark is dropped when its ID cannot satisfy the story
-schema's client-ID shape, so it can never resolve again and would otherwise be re-synced forever; an
-unrecognized client ID is kept, because `referenceCoverage.partial` means the published list is a
-projection. Nothing is dropped unless the loaded chapter itself proves the client-ID contract, so a
+proves (identical unique objective text, or the overlay re-anchoring its own prestige requirement),
+the catalog publishes that successor, and the successor carries no mark of its own; a mark whose
+successor a partial chapter omits is kept until the successor appears, because that objective list is a
+projection, while a complete chapter that omits it settles the question and the mark is dropped; a mark
+is also dropped when no alias names it and its ID cannot satisfy the story schema's client-ID shape, so
+it can never resolve again and would otherwise be re-synced forever, and when the successor already
+carries the player's own mark; an unrecognized client ID is kept for the projection reason. Lookups use own properties, so an
+inherited key such as `constructor` is treated as saved data rather than as a published objective. Nothing is dropped unless the loaded chapter itself proves the client-ID contract, so a
 stale, curated, or failed catalog load cannot delete progress. Ambiguous re-keys are left unmapped
 rather than guessed. Task and hideout IDs have no equivalent pass: the overlay still publishes
 synthetic task IDs (`new_beginning_prestige_5`) as live data, so absence there is not proof of

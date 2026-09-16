@@ -177,10 +177,13 @@
           v-for="branch in questRoute.branches"
           :key="branch.id"
           class="flex flex-wrap items-center gap-1 rounded border p-1.5"
-          :class="getQuestBranchClass(branch)"
+          :class="getQuestBranchClass(branch, questRoute)"
         >
           <span class="text-surface-200 min-w-0 flex-1 truncate text-xs">{{ branch.label }}</span>
-          <UBadge variant="subtle" color="neutral" size="xs">
+          <UBadge v-if="branch.evidencePending" variant="subtle" color="neutral" size="xs">
+            {{ t('page.storyline.quest_route_evidence_pending') }}
+          </UBadge>
+          <UBadge v-else variant="subtle" color="neutral" size="xs">
             {{
               t('page.storyline.quest_route_progress', {
                 completed: branch.completedCount,
@@ -188,12 +191,23 @@
               })
             }}
           </UBadge>
-          <UBadge v-if="branch.complete" variant="subtle" color="success" size="xs">
+          <UBadge
+            v-if="questRoute.chosenBranchId === branch.id"
+            variant="subtle"
+            color="success"
+            size="xs"
+          >
             {{ t('page.storyline.route_chosen') }}
+          </UBadge>
+          <UBadge v-else-if="branch.knownStepsComplete" variant="subtle" color="warning" size="xs">
+            {{ t('page.storyline.quest_route_known_steps_done') }}
           </UBadge>
         </div>
         <p class="text-surface-400 text-[11px] leading-tight">
           {{ t('page.storyline.quest_route_exclusive') }}
+        </p>
+        <p v-if="questRoute.conflicting" class="text-warning-300 text-[11px] leading-tight">
+          {{ t('page.storyline.quest_route_conflict') }}
         </p>
       </div>
     </div>
@@ -768,6 +782,7 @@
     StorylineObjectiveProgress,
     StorylineObjectiveUnlockView,
     StorylineQuestRouteBranchView,
+    StorylineQuestRouteChoiceView,
   } from '@/composables/useStorylineChapters';
   interface Props {
     chapter: StorylineNormalizedChapterView;
@@ -839,10 +854,13 @@
       { count }
     );
   });
-  const getQuestBranchClass = (branch: StorylineQuestRouteBranchView) => {
-    return branch.complete
-      ? 'border-success-700/40 bg-success-950/20'
-      : 'border-white/10 bg-surface-900/40';
+  const getQuestBranchClass = (
+    branch: StorylineQuestRouteBranchView,
+    questRoute: StorylineQuestRouteChoiceView
+  ) => {
+    if (questRoute.chosenBranchId === branch.id) return 'border-success-700/40 bg-success-950/20';
+    if (branch.knownStepsComplete) return 'border-warning-700/30 bg-warning-950/10';
+    return 'border-white/10 bg-surface-900/40';
   };
   const sortObjectivesByOrder = (objectives: StorylineObjectiveProgress[]) => {
     return [...objectives].sort((left, right) => {
