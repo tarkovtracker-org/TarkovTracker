@@ -38,9 +38,23 @@ wait_for_ci_result() {
     sleep 10
   done
 }
-# Explicit dispatch works with the job token and binds CI to the requested branch tip.
-dispatch_ci() {
+# Read the newest dispatched CI run on one branch; queued runs count as created.
+latest_dispatched_run() {
   local ref="$1"
-  gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$ref"
+  gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch "$ref" \
+    --event workflow_dispatch --limit 1 --json databaseId --jq '.[0].databaseId // 0'
   return $?
+}
+# Confirm an accepted dispatch creates a run before waiting for exact-SHA checks.
+dispatch_ci() {
+  local ref="$1" previous current attempt
+  previous="$(latest_dispatched_run "$ref")"
+  gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$ref"
+  for ((attempt = 1; attempt <= 12; attempt++)); do
+    current="$(latest_dispatched_run "$ref")"
+    if [[ "$current" -gt "$previous" ]]; then return 0; fi
+    sleep 5
+  done
+  echo "CI dispatch accepted but no new run appeared on $ref within 60 seconds." >&2
+  return 1
 }

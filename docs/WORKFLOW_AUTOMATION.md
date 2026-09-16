@@ -240,6 +240,10 @@ An explicit `workflow_dispatch` starts full CI on that branch; the job has `acti
 for successful GitHub Actions `CI Result` on the exact version SHA; absent, failed, cancelled,
 skipped, or timed-out checks cannot promote it.
 
+Automation confirms each accepted dispatch creates a new CI run on the requested branch within
+60 seconds, including queued runs, before waiting for exact-SHA checks. Dispatched Fallow audits
+compare the checked-out commit with its parent, so dispatching main does not compare main with itself.
+
 After rechecking main and the policy, an ordinary non-forced push promotes the identical SHA to
 main using `GITHUB_TOKEN`. A concurrent main advance rejects promotion rather than rebasing
 unvalidated assets. The required check is already successful on that commit. The token suppresses

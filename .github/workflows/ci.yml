@@ -54,6 +54,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             BASE="${{ github.event.pull_request.base.sha }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            BASE="$(git rev-parse HEAD^ 2>/dev/null || true)"
           else
             BASE="${{ github.event.before }}"
           fi

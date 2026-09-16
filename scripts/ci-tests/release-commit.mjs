@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -140,4 +141,31 @@ test('release requires the CI dispatch trigger and its own actions write permiss
   const readOnly = release.replace('actions: write', 'actions: read');
   const unrelated = '\n  unrelated:\n    permissions:\n      actions: write\n';
   assert.throws(() => assertReleaseWorkflowBoundaries(ci, readOnly + unrelated));
+});
+test('accepted dispatch without a created run fails before waiting for checks or promotion', (t) => {
+  const f = releaseFixture(t);
+  const result = f.release({ DISPATCH_MISSING: 'true' });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /no new run appeared/);
+  assert.equal(f.pushes().length, 1);
+  assert.ok(!f.events().some((event) => event.type === 'ci-result'));
+});
+test('dispatched main Fallow audit compares the real parent instead of main against itself', (t) => {
+  const f = fixture(t);
+  git(f.repo, 'checkout', 'locales');
+  const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const step = workflowStep(jobBlock(ci, 'fallow'), 'Resolve Fallow base');
+  const script = step
+    .slice(step.indexOf('run: |\n') + 'run: |\n'.length)
+    .replaceAll('${{ github.event_name }}', 'workflow_dispatch')
+    .replaceAll('${{ github.event.pull_request.base.sha }}', '')
+    .replaceAll('${{ github.event.before }}', '');
+  const result = spawnSync('/bin/bash', ['-e', '-c', script], {
+    cwd: f.repo,
+    env: f.env,
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(f.output(), `base=${f.base}\n`);
+  assert.notEqual(f.base, git(f.repo, 'rev-parse', 'HEAD'));
 });

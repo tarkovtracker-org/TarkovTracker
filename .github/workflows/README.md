@@ -107,7 +107,7 @@ direct validation before auto-merging safe translation updates.
 
 ### Release (`release.yml`)
 
-**Trigger:** Successful completion of `CI` for a same-repository push to `main`.
+**Trigger:** Successful completion of `CI` for a same-repository push or explicit dispatch on `main`.
 **Jobs:** `Release` (validate the CI run and current main SHA, build, recheck, semantic-release).
 The workflow reuses CI's test shards and database checks. It rejects stale commits and CI attempts,
 PR/fork events, and automation-skip directives before publishing. Documentation-only pushes can
