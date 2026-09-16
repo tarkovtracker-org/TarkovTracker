@@ -21,4 +21,4 @@ export const workflowEvent = (workflow, event) => {
 };
 /** Extract a permissions map at workflow or job scope without depending on key order. */
 export const permissionsBlock = (text, indentation = '') =>
-  blockAfter(text, `${indentation}permissions:\n`, new RegExp(`\\n${indentation}\\S`));
+  blockAfter(text, `${indentation}permissions:\n`, new RegExp(String.raw`\n${indentation}\S`));
