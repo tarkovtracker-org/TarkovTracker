@@ -49,7 +49,7 @@ Authorization: Bearer <supabase_jwt_token>
 > TarkovTracker site itself. It is not a supported integration surface, carries no compatibility
 > guarantee, and its response shape can change in any release. Third-party clients should read game
 > data from `json.tarkov.dev` directly, or use the progress API at `https://api.tarkovtracker.org`
-> (see [Progress API Host Migration](#progress-api-host-migration-apitarkovtrackerorg)).
+> (see [Progress API Host](#progress-api-host-apitarkovtrackerorg)).
 >
 > These routes are public and pass through the API protection middleware; see
 > [`ARCHITECTURE.md#api-protection`](./ARCHITECTURE.md#api-protection) for access-control configuration and
