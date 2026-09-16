@@ -1,6 +1,10 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  reserveProviderInitiation,
+  recordProviderInitiation,
+} from '@/server/utils/providerInitiation';
 import type { H3Event, H3EventContext } from 'h3';
 const runtimeConfig = {
   public: { appUrl: 'https://tarkovtracker.org' },
@@ -53,6 +57,8 @@ function makeEvent(authUser: { id?: string; email?: string } | null): H3Event {
 }
 describe('POST /api/stripe/portal', () => {
   beforeEach(() => {
+    vi.mocked(reserveProviderInitiation).mockReset().mockResolvedValue('synthetic-operation');
+    vi.mocked(recordProviderInitiation).mockReset().mockResolvedValue(undefined);
     mockReadBody.mockReset();
     mockGetSupporterStripeCustomerId.mockReset();
     mockCreatePortalSession.mockReset();
@@ -61,6 +67,36 @@ describe('POST /api/stripe/portal', () => {
   });
   afterEach(() => {
     vi.resetModules();
+  });
+  it('never calls Stripe when the reservation/deletion barrier rejects', async () => {
+    mockGetSupporterStripeCustomerId.mockResolvedValue('cus_synthetic');
+    mockReadBody.mockResolvedValue({});
+    vi.mocked(reserveProviderInitiation).mockRejectedValue(new Error('reservation rejected'));
+    const { default: handler } = await import('@/server/api/stripe/portal.post');
+    await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 502 });
+    expect(mockCreatePortalSession).not.toHaveBeenCalled();
+    expect(recordProviderInitiation).not.toHaveBeenCalled();
+  });
+  it('commits reservation before Stripe and records only the session identifier', async () => {
+    mockGetSupporterStripeCustomerId.mockResolvedValue('cus_synthetic');
+    mockReadBody.mockResolvedValue({});
+    mockCreatePortalSession.mockResolvedValue({
+      id: 'bps_synthetic',
+      url: 'https://billing.stripe.com/test',
+    });
+    const { default: handler } = await import('@/server/api/stripe/portal.post');
+    await handler(makeEvent({ id: 'user-1' }));
+    expect(vi.mocked(reserveProviderInitiation).mock.invocationCallOrder[0]).toBeLessThan(
+      mockCreatePortalSession.mock.invocationCallOrder[0]!
+    );
+    expect(vi.mocked(recordProviderInitiation).mock.invocationCallOrder[0]).toBeGreaterThan(
+      mockCreatePortalSession.mock.invocationCallOrder[0]!
+    );
+    expect(recordProviderInitiation).toHaveBeenCalledWith(
+      expect.anything(),
+      'synthetic-operation',
+      'bps_synthetic'
+    );
   });
   it('throws 500 when Stripe is not configured', async () => {
     runtimeConfig.stripeSecretKey = '';

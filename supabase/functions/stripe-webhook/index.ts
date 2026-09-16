@@ -1,3 +1,7 @@
+import { lifecycleDatabaseFetch } from '../_shared/lifecycle-delivery-context.ts';
+import { verifyStripeSignature } from '../_shared/stripe-signature.ts';
+import { withProviderBudget, providerExecutionFetch } from '../_shared/provider-execution.ts';
+import { withLifecycleDelivery, DeliveryUnavailable } from '../_shared/lifecycle-delivery.ts';
 import {
   chargeCustomer,
   paymentCanActivate,
@@ -48,6 +52,7 @@ if (missingRequiredEnvVars.length > 0) {
   );
 }
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  global: { fetch: lifecycleDatabaseFetch },
   auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
 });
 /**
@@ -65,48 +70,6 @@ class PermanentError extends Error {
 /**
  * Verify Stripe webhook signature using Web Crypto API (no stripe npm dependency).
  */
-async function verifyStripeSignature(
-  payload: string,
-  sigHeader: string,
-  secret: string
-): Promise<boolean> {
-  const parts = sigHeader.split(',').map((part) => part.split('=', 2));
-  const timestamp = parts.find(([key]) => key === 't')?.[1];
-  const signatures = parts.filter(([key]) => key === 'v1').map(([, value]) => value);
-  if (!timestamp || signatures.length === 0) return false;
-  // Reject signatures whose timestamp is older than 5 minutes OR set in the future
-  // (negative age means the signed timestamp is in the future, which Stripe never produces).
-  const age = Math.floor(Date.now() / 1000) - Number(timestamp);
-  if (age > 300 || age < -30) return false;
-  const signedPayload = `${timestamp}.${payload}`;
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signedPayload));
-  const expectedBytes = new Uint8Array(sig);
-  return signatures.some((signature) => {
-    const signatureBytes = hexToBytes(signature);
-    if (!signatureBytes || signatureBytes.length !== expectedBytes.length) return false;
-    let mismatch = 0;
-    for (let i = 0; i < expectedBytes.length; i += 1) {
-      mismatch |= expectedBytes[i] ^ signatureBytes[i];
-    }
-    return mismatch === 0;
-  });
-}
-function hexToBytes(hex: string): Uint8Array | null {
-  if (typeof hex !== 'string' || hex.length === 0 || hex.length % 2 !== 0) return null;
-  if (!/^[0-9a-fA-F]+$/.test(hex)) return null;
-  const out = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < out.length; i += 1) {
-    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-  }
-  return out;
-}
 /**
  * Atomically claim a Stripe event by ID. Returns true if this is the first
  * time we've seen this event (caller should process it), false if it's a
@@ -145,7 +108,10 @@ function createEventProcessor(claim: EventClaim) {
   if (!claim.id || !claim.token) throw new Error('invalid_processing_claim');
   const client = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
-    global: { headers: { 'x-lifecycle-work': claim.id, 'x-lifecycle-claim': claim.token } },
+    global: {
+      fetch: lifecycleDatabaseFetch,
+      headers: { 'x-lifecycle-work': claim.id, 'x-lifecycle-claim': claim.token },
+    },
   });
   const processor: EventProcessor = { claim, supabase: client, boundUserId: null };
   return (event: StripeEvent) => dispatchEvent(processor, event);
@@ -506,9 +472,16 @@ async function handleInvoicePaid(processor: EventProcessor, invoice: any): Promi
  * on HTTP error (caller decides how to fall back).
  */
 async function stripeGet<T>(path: string): Promise<T> {
-  return (await providerJson(`${STRIPE_API_BASE}${path}`, {
-    headers: { Authorization: `Bearer ${STRIPE_SECRET_KEY}`, 'Stripe-Version': STRIPE_API_VERSION },
-  })) as T;
+  return (await providerJson(
+    `${STRIPE_API_BASE}${path}`,
+    {
+      headers: {
+        Authorization: `Bearer ${STRIPE_SECRET_KEY}`,
+        'Stripe-Version': STRIPE_API_VERSION,
+      },
+    },
+    providerExecutionFetch()
+  )) as T;
 }
 /**
  * Count successful charges for a Stripe customer. Returns null on transient
@@ -809,7 +782,25 @@ export async function handleStripeWebhook(req: Request): Promise<Response> {
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405, req);
   const event = await signedEvent(req);
   if (event instanceof Response) return event;
-  return handleVerifiedEvent(req, event);
+  return receiveAndProcess(req, event);
+}
+async function receiveAndProcess(req: Request, event: StripeEvent): Promise<Response> {
+  const receipt = await supabase.rpc('receive_stripe_lifecycle', {
+    p_event_id: event.id,
+    p_type: event.type,
+  });
+  if (receipt.error) return jsonResponse({ error: 'Receipt unavailable' }, 503, req);
+  try {
+    return await withLifecycleDelivery(
+      (name, args) => supabase.rpc(name, args),
+      'provider_processing',
+      () => withProviderBudget(() => handleVerifiedEvent(req, event))
+    );
+  } catch (error) {
+    if (error instanceof DeliveryUnavailable)
+      return jsonResponse({ received: true, completed: false, processingPaused: true }, 202, req);
+    return jsonResponse({ error: 'Processing unavailable' }, 503, req);
+  }
 }
 async function signedEvent(req: Request): Promise<StripeEvent | Response> {
   const body = await req.text();

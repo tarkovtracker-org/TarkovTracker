@@ -12,6 +12,18 @@ CREATE TABLE private.lifecycle_requests (
  created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
  updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 );
+CREATE FUNCTION private.guard_billing_application_horizon() RETURNS trigger
+LANGUAGE plpgsql SET search_path='' AS $$
+BEGIN
+ IF NEW.state IN ('sealed','prepared','auth_authorized') AND NOT private.billing_application_horizon_elapsed() THEN
+  RAISE EXCEPTION 'Application billing cutover horizon unresolved' USING ERRCODE='55000';
+ END IF;
+ RETURN NEW;
+END; $$;
+REVOKE ALL ON FUNCTION private.guard_billing_application_horizon() FROM PUBLIC,anon,authenticated,service_role;
+CREATE TRIGGER guard_billing_application_horizon BEFORE INSERT OR UPDATE OF state ON private.lifecycle_requests
+ FOR EACH ROW EXECUTE FUNCTION private.guard_billing_application_horizon();
+
 CREATE TABLE private.lifecycle_work (
  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
  kind TEXT NOT NULL CHECK(kind IN ('stripe_event','stripe_cleanup','discord_cleanup','operator_review')),
@@ -43,35 +55,12 @@ CREATE INDEX lifecycle_work_parent ON private.lifecycle_work(parent_id);
 CREATE TABLE private.supporter_lifecycle_revision(user_id UUID PRIMARY KEY,revision BIGINT NOT NULL DEFAULT 0);
 ALTER TABLE private.supporter_lifecycle_revision ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON private.supporter_lifecycle_revision FROM PUBLIC,anon,authenticated,service_role;
-CREATE TABLE private.provider_initiations (
- id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
- user_id UUID NOT NULL,
- operation TEXT NOT NULL CHECK(operation IN ('checkout','portal')),
- fingerprint TEXT NOT NULL,
- customer_id TEXT,
- state TEXT NOT NULL DEFAULT 'unresolved' CHECK(state IN ('unresolved','reconciled')),
- resource_id TEXT,
- review_required BOOLEAN NOT NULL DEFAULT FALSE,
- attempts INTEGER NOT NULL DEFAULT 0,
- first_failure_at TIMESTAMPTZ,
- next_check_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
- error_code TEXT,
- created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
-);
-CREATE INDEX provider_initiations_user ON private.provider_initiations(user_id) WHERE state='unresolved';
 ALTER TABLE private.lifecycle_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE private.lifecycle_work ENABLE ROW LEVEL SECURITY;
 ALTER TABLE private.provider_initiations ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON private.lifecycle_requests,private.lifecycle_work,private.provider_initiations FROM PUBLIC,anon,authenticated,service_role;
 
-CREATE TABLE private.provider_assets (
- user_id UUID NOT NULL,provider_id TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
- PRIMARY KEY(user_id,provider_id)
-);
-ALTER TABLE private.provider_assets ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON private.provider_assets FROM PUBLIC,anon,authenticated,service_role;
-
-CREATE FUNCTION private.lifecycle_user_lock(p_user UUID) RETURNS void
+CREATE OR REPLACE FUNCTION private.lifecycle_user_lock(p_user UUID) RETURNS void
 LANGUAGE sql SET search_path='' AS $$ SELECT pg_advisory_xact_lock(784114,hashtext(p_user::text)); $$;
 
 CREATE FUNCTION private.capture_provider_obligation(p_user UUID,p_kind TEXT,p_resource TEXT,p_source TEXT)
@@ -141,7 +130,7 @@ CREATE TRIGGER guard_lifecycle_owner BEFORE INSERT OR UPDATE OF owner_id ON publ
 CREATE TRIGGER guard_lifecycle_member BEFORE INSERT OR UPDATE OF role,user_id,team_id ON public.team_memberships
  FOR EACH ROW EXECUTE FUNCTION private.guard_lifecycle_addition();
 
-CREATE FUNCTION public.reserve_provider_initiation(p_user_id UUID,p_operation TEXT,p_fingerprint TEXT,p_customer_id TEXT DEFAULT NULL) RETURNS UUID
+CREATE OR REPLACE FUNCTION public.reserve_provider_initiation(p_user_id UUID,p_operation TEXT,p_fingerprint TEXT,p_customer_id TEXT DEFAULT NULL) RETURNS UUID
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' SET lock_timeout='5s' AS $$
 DECLARE v UUID; existing private.provider_initiations;
 BEGIN
@@ -162,7 +151,7 @@ BEGIN
  INSERT INTO private.provider_initiations(user_id,operation,fingerprint,customer_id) VALUES(p_user_id,p_operation,p_fingerprint,p_customer_id) RETURNING id INTO v;
  RETURN v;
 END; $$;
-CREATE FUNCTION public.record_provider_initiation(p_id UUID,p_resource TEXT) RETURNS BOOLEAN
+CREATE OR REPLACE FUNCTION public.record_provider_initiation(p_id UUID,p_resource TEXT) RETURNS BOOLEAN
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 BEGIN
  -- A returned Checkout URL is not settled provider work; only reconciliation may close the intent.
@@ -216,6 +205,9 @@ BEGIN
  PERFORM private.lifecycle_user_lock(p_user_id);
  PERFORM public.request_account_lifecycle(p_user_id);
  SELECT state INTO st FROM private.lifecycle_requests WHERE user_id=p_user_id FOR UPDATE;
+ IF NOT private.billing_application_horizon_elapsed() THEN
+   RETURN 'provider_wait';
+ END IF;
  IF st IN ('sealed','prepared','auth_authorized','completed') THEN RETURN 'ready'; END IF;
  IF st='cancelled' THEN RETURN 'cancelled'; END IF;
  IF EXISTS(SELECT 1 FROM private.lifecycle_requests WHERE user_id=p_user_id AND reason='missing_auth_snapshot_unverified') THEN RETURN 'operator_review'; END IF;
@@ -273,6 +265,7 @@ BEGIN
  UPDATE public.account_deletion_jobs SET updated_at=clock_timestamp() WHERE user_id=p_user_id AND claim_token=p_claim_token AND status='in_progress'
  AND updated_at>clock_timestamp()-INTERVAL '15 minutes';
  IF NOT FOUND THEN RETURN FALSE; END IF;
+ IF NOT private.billing_application_horizon_elapsed() THEN RETURN FALSE; END IF;
  PERFORM private.lifecycle_user_lock(p_user_id);
  IF EXISTS(SELECT 1 FROM public.teams WHERE owner_id=p_user_id) OR
  EXISTS(SELECT 1 FROM private.lifecycle_work w WHERE user_id=p_user_id AND state<>'completed' AND (dedupe_key NOT LIKE 'deletion:%' OR generation=(SELECT generation FROM private.lifecycle_requests WHERE user_id=p_user_id))) OR

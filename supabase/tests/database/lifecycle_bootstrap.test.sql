@@ -1,0 +1,18 @@
+BEGIN;
+SELECT plan(11);
+SELECT ok(NOT has_table_privilege('authenticated','private.lifecycle_bootstrap_discord','SELECT'),'bootstrap identifiers private');
+SELECT ok(NOT has_function_privilege('service_role','public.handoff_bootstrap_discord(integer)','EXECUTE'),'handoff is operator only');
+SELECT ok(NOT has_function_privilege('authenticated','public.set_lifecycle_delivery(text,boolean,text)','EXECUTE'),'client cannot reopen controls');
+SELECT private.preserve_bootstrap_discord('b9000000-0000-4000-8000-000000000001','synthetic-late','synthetic-discord');
+SELECT is((SELECT count(*)::INTEGER FROM private.lifecycle_bootstrap_discord WHERE source_key='synthetic-late:synthetic-discord' AND handed_off_at IS NOT NULL),1,'late capture forwards in same transaction');
+SELECT is((SELECT count(*)::INTEGER FROM private.lifecycle_work WHERE user_id='b9000000-0000-4000-8000-000000000001' AND resource_id='synthetic-discord' AND state='received'),1,'forwarded obligation remains pending provider execution');
+SELECT private.preserve_bootstrap_discord('b9000000-0000-4000-8000-000000000001','synthetic-late','synthetic-discord');
+SELECT is((SELECT count(*)::INTEGER FROM private.lifecycle_work WHERE user_id='b9000000-0000-4000-8000-000000000001'),1,'duplicate source is idempotent');
+SELECT private.preserve_bootstrap_discord('b9000000-0000-4000-8000-000000000002','synthetic-missing',NULL);
+SELECT is((SELECT state FROM private.lifecycle_work WHERE user_id='b9000000-0000-4000-8000-000000000002'),'blocked','missing identifier stays blocked');
+SELECT is((SELECT error_code FROM private.lifecycle_work WHERE user_id='b9000000-0000-4000-8000-000000000002'),'missing_identifier','missing evidence remains actionable');
+SELECT throws_ok('SELECT public.handoff_bootstrap_discord(101)','P0001','Invalid handoff batch','unbounded handoff rejected');
+SELECT throws_ok('SELECT public.handoff_bootstrap_discord(NULL)','P0001','Invalid handoff batch','NULL handoff rejected');
+SELECT ok(NOT has_function_privilege('anon','public.begin_lifecycle_delivery(text)','EXECUTE'),'anonymous provider admission denied');
+SELECT * FROM finish();
+ROLLBACK;

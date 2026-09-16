@@ -56,6 +56,9 @@ check(sql(f"SELECT count(*)>0 FROM private.lifecycle_work WHERE user_id='{u}' AN
 u=user();team=json.loads(sql(f"SELECT row_to_json(t) FROM public.create_team_with_owner('synthetic-{uuid.uuid4().hex[:12]}','{uuid.uuid4().hex}',5,'{u}','pvp') t"))
 sql(f"SELECT public.request_account_lifecycle('{u}')")
 claim=json.loads(sql(f"SELECT row_to_json(j) FROM public.claim_account_deletion_job('{u}',true) j"))['claim_token']
+# Explicit synthetic CLEAR for this database-only preparation lock fixture.
+proof=json.loads(sql(f"SELECT public.begin_final_billing_verification('{u}','{claim}')"));assert proof['status']=='checking'
+assert sql(f"SELECT public.finish_final_billing_verification('{u}','{claim}','{proof['token']}','clear')")=='t'
 check(sql(f"SELECT public.seal_account_lifecycle('{u}','{claim}')")=='ready','synthetic deletion sealed before preparation interleaving')
 cycle(u,f"SELECT id FROM public.teams WHERE id='{team['id']}' FOR UPDATE",f"SELECT private.lifecycle_user_lock('{u}'); SELECT public.disband_team('{team['id']}','{u}')",f"SELECT public.prepare_account_deletion('{u}','{claim}')",'deletion preparation versus team mutation')
 check(sql(f"SELECT public.prepare_account_deletion('{u}','{claim}')")=='ready','actual preparation retry reconciles surviving disband')

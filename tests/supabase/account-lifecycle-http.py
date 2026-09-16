@@ -4,12 +4,15 @@ assert BASE=='http://127.0.0.1:59321' and CONFIG['DB_URL']=='postgresql://postgr
 labels=json.loads(subprocess.check_output(['docker','inspect',CONTAINER,'--format','{{json .Config.Labels}}']))
 assert labels['com.supabase.cli.workdir']==str(ROOT) and labels['com.supabase.cli.project']=='tt-b-http-disposable'
 assert not (ROOT/'supabase/functions/.env').exists()
+PROVIDER_INVOCATION=None
 def sql(q):
  return subprocess.check_output(['docker','exec','-i',CONTAINER,'psql','-X','-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1','-At'],input=q.encode()).decode().strip()
 def req(path,token=None,data=None,method=None):
  h={'apikey':CONFIG['ANON_KEY'],'Content-Type':'application/json'}
  if token:h['Authorization']='Bearer '+token
- if token==CONFIG['SERVICE_ROLE_KEY']:h['apikey']=token
+ if token==CONFIG['SERVICE_ROLE_KEY']:
+  h['apikey']=token
+  if PROVIDER_INVOCATION:h['x-lifecycle-delivery']=PROVIDER_INVOCATION
  r=urllib.request.Request(BASE+path,headers=h,data=json.dumps(data).encode() if data is not None else None,method=method)
  try:
   with urllib.request.urlopen(r,timeout=30) as v:return v.status,json.loads(v.read() or b'null')
@@ -55,12 +58,12 @@ for shape in ['stripe_customer','stripe_subscription','discord_supporter','disco
   sql(f"INSERT INTO public.discord_account_links(user_id,discord_user_id,discord_username) VALUES('{u['id']}','{uuid.uuid4().int % 10**18}','synthetic')")
  else:
   column={'stripe_customer':'stripe_customer_id','stripe_subscription':'stripe_subscription_id','discord_supporter':'discord_user_id'}[shape]
-  value={'stripe_customer':'cus_synthetic','stripe_subscription':'sub_synthetic','discord_supporter':'123456789012345678'}[shape]
+  value={'stripe_customer':'cus_synthetic_'+uuid.uuid4().hex,'stripe_subscription':'sub_synthetic_'+uuid.uuid4().hex,'discord_supporter':str(uuid.uuid4().int % 10**18)}[shape]
   sql(f"INSERT INTO public.supporters(user_id,type,{column}) VALUES('{u['id']}','one_time','{value}')")
  code,r=edge('account-delete',u,{})
  if shape.startswith('stripe'):
   ok(code==202 and r.get('status')=='provider_wait',shape+' remains pending, not falsely deleted')
-  ok(sql(f"SELECT state FROM private.lifecycle_requests WHERE user_id='{u['id']}'")=='provider_wait',shape+' reversible request state')
+  ok(sql(f"SELECT state IN ('requested','provider_wait') FROM private.lifecycle_requests WHERE user_id='{u['id']}'")=='t' and sql(f"SELECT public.account_lifecycle_status('{u['id']}')->>'can_cancel'")=='true',shape+' request remains reversible before fresh verification')
   t=team(u,'pvp');ok(bool(t['id']),shape+' pending user can still create/own a team')
   code,status=req('/rest/v1/rpc/account_lifecycle_status',CONFIG['SERVICE_ROLE_KEY'],{'p_user_id':u['id'],'p_cancel':True})
   ok(code==200 and status['state']=='cancelled',shape+' withdrawal before seal succeeds')
@@ -70,6 +73,9 @@ for shape in ['stripe_customer','stripe_subscription','discord_supporter','disco
   code,status=req('/rest/v1/rpc/account_lifecycle_status',CONFIG['SERVICE_ROLE_KEY'],{'p_user_id':u['id'],'p_cancel':True})
   ok(code==200 and status['state']=='prepared' and status['can_cancel'] is False,shape+' cannot withdraw after preparation')
   ok(sql(f"SELECT count(*) FROM auth.users WHERE id='{u['id']}'")=='1',shape+' Auth retained until provider completion')
+sql("SELECT public.set_lifecycle_delivery('provider_processing',true,'synthetic provider transport regression')")
+code,PROVIDER_INVOCATION=req('/rest/v1/rpc/begin_lifecycle_delivery',CONFIG['SERVICE_ROLE_KEY'],{'p_component':'provider_processing'})
+assert code==200 and isinstance(PROVIDER_INVOCATION,str)
 # A Stripe supporter mutation must durably enqueue its Discord effect in the same transaction.
 u=user('atomic-outbox')
 sql(f"INSERT INTO public.supporters(user_id,type,discord_user_id) VALUES('{u['id']}','one_time','987654321012345678')")
@@ -77,7 +83,7 @@ code,claim=req('/rest/v1/rpc/claim_stripe_lifecycle',CONFIG['SERVICE_ROLE_KEY'],
 ok(code==200 and claim['state']=='processing','Stripe inbox obtains real service claim')
 code,bound=req('/rest/v1/rpc/bind_stripe_lifecycle',CONFIG['SERVICE_ROLE_KEY'],{'p_id':claim['id'],'p_token':claim['token'],'p_user_id':u['id']})
 ok(code==200 and bound is True,'Stripe claim bound before provider/effect phase')
-headers=json.dumps({'x-lifecycle-work':claim['id'],'x-lifecycle-claim':claim['token']})
+headers=json.dumps({'x-lifecycle-delivery':PROVIDER_INVOCATION,'x-lifecycle-work':claim['id'],'x-lifecycle-claim':claim['token']})
 sql(f"BEGIN; SELECT set_config('request.headers','{headers}',true); UPDATE public.supporters SET status='expired' WHERE user_id='{u['id']}'; COMMIT;")
 ok(sql(f"SELECT count(*) FROM private.lifecycle_work WHERE parent_id='{claim['id']}'")=='1','entitlement commit atomically preserves Discord obligation')
 code,finished=req('/rest/v1/rpc/finish_lifecycle_work',CONFIG['SERVICE_ROLE_KEY'],{'p_id':claim['id'],'p_token':claim['token'],'p_state':'completed'})
@@ -108,3 +114,7 @@ code,completed=edge('account-delete',u,{})
 ok(code==200 and completed.get('success') is True,'retry after provider completion deletes Auth through actual Edge path')
 ok(sql(f"SELECT count(*) FROM private.lifecycle_work WHERE user_id='{u['id']}' AND state<>'completed'")=='0','expected Auth cascade does not manufacture a new blocked obligation')
 ok(sql(f"SELECT state FROM private.lifecycle_requests WHERE user_id='{u['id']}'")=='completed','provider-backed workflow records completion after Auth absence')
+
+code,released=req('/rest/v1/rpc/finish_lifecycle_delivery',CONFIG['SERVICE_ROLE_KEY'],{'p_invocation':PROVIDER_INVOCATION})
+assert code==200 and released is True
+sql("SELECT public.set_lifecycle_delivery('provider_processing',false,'synthetic provider transport regression finished')")

@@ -2,6 +2,10 @@ BEGIN;
 
 SELECT plan(18);
 
+-- This suite exercises claims with intake admitted; closed admission has separate coverage.
+UPDATE private.lifecycle_delivery_controls SET enabled=TRUE
+WHERE component IN ('deletion_intake','deletion_reconcile');
+
 CREATE TEMP TABLE deletion_test_fixture AS
 SELECT
   '00000000-0000-0000-0000-000000000718'::UUID AS rate_user,

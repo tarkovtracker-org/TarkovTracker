@@ -8,7 +8,7 @@ for mode in ['pvp','pve','seasonal']:
  with c.Session() as joining,c.Session() as sealing:
   joining.run(f"SELECT public.join_team('{team['id']}','{team['join_code']}','{member}')")
   sealing.send(f"SELECT public.seal_account_lifecycle('{member}','{token}');")
-  start=time.monotonic();c.waiting(sealing);joining.finish()
+  start=time.monotonic();c.waiting(sealing,joining);joining.finish()
   c.check(sealing.run('SELECT 1').splitlines()[0]=='ready',mode+' seal waits for committed join',wait_seconds=round(time.monotonic()-start,3));sealing.finish()
  c.check(c.sql(f"SELECT {mode}_team_id FROM public.user_system WHERE user_id='{member}'")==team['id'],mode+' join pointer preserved across seal')
  result=subprocess.run(c.CMD,input=f"SELECT public.transfer_team_ownership('{team['id']}','{owner}','{member}');",text=True,capture_output=True)
@@ -20,7 +20,7 @@ for mode in ['pvp','pve','seasonal']:
  with c.Session() as transfer,c.Session() as prepare:
   transfer.run(f"SELECT public.transfer_team_ownership('{team['id']}','{a}','{b}')")
   prepare.send(f"SELECT public.prepare_account_deletion('{a}','{token}');")
-  c.waiting(prepare);transfer.finish()
+  c.waiting(prepare,transfer);transfer.finish()
   c.check(prepare.run('SELECT 1').splitlines()[0]=='ready',mode+' preparation rechecks concurrent transfer');prepare.finish()
  c.check(c.sql(f"SELECT owner_id FROM public.teams WHERE id='{team['id']}'")==b,mode+' transferred team survives deletion preparation')
  # Owner disband and preparation serialize on the same actual team row.
@@ -28,21 +28,21 @@ for mode in ['pvp','pve','seasonal']:
  with c.Session() as disband,c.Session() as prepare:
   disband.run(f"SELECT public.disband_team('{team['id']}','{a}')")
   prepare.send(f"SELECT public.prepare_account_deletion('{a}','{token}');")
-  c.waiting(prepare);disband.finish()
+  c.waiting(prepare,disband);disband.finish()
   c.check(prepare.run('SELECT 1').splitlines()[0]=='ready',mode+' concurrent disband prepares idempotently');prepare.finish()
  c.check(c.sql(f"SELECT count(*) FROM public.teams WHERE id='{team['id']}'")=='0',mode+' disband leaves no team split state')
 # Reservation commits before sealing: unresolved provider action must block irreversible preparation.
-u=t.user();c.sql(f"SELECT public.request_account_lifecycle('{u}')");token=t.claim(u)
+u=t.user();c.sql(f"SELECT public.request_account_lifecycle('{u}')");token=t.claim(u,verify=False)
 with c.Session() as reserve,c.Session() as seal:
  reserve.run(f"SELECT public.reserve_provider_initiation('{u}','checkout','synthetic-fingerprint')")
- seal.send(f"SELECT public.seal_account_lifecycle('{u}','{token}');");c.waiting(seal);reserve.finish()
+ seal.send(f"SELECT public.seal_account_lifecycle('{u}','{token}');");c.waiting(seal,reserve);reserve.finish()
  c.check(seal.run('SELECT 1').splitlines()[0]=='provider_wait','external initiation reservation blocks racing seal');seal.finish()
 # Clearing a linkage cannot discard its obligation while deletion waits.
 customer='cus_'+uuid.uuid4().hex
 c.sql(f"INSERT INTO public.supporters(user_id,type,stripe_customer_id) VALUES('{u}','one_time','{customer}')")
 with c.Session() as clearing,c.Session() as snapshot:
  clearing.run(f"UPDATE public.supporters SET stripe_customer_id=NULL WHERE user_id='{u}'")
- snapshot.send(f"SELECT public.request_account_lifecycle('{u}');");c.waiting(snapshot);clearing.finish()
+ snapshot.send(f"SELECT public.request_account_lifecycle('{u}');");c.waiting(snapshot,clearing);clearing.finish()
  snapshot.run('SELECT 1');snapshot.finish()
 c.check(c.sql(f"SELECT count(*)>0 FROM private.lifecycle_work WHERE user_id='{u}' AND resource_id='{customer}' AND state<>'completed'")=='t','clearing preserves unresolved provider obligation before snapshot')
 # A bounded team-lock timeout rolls back preparation, and exact retry completes once.
@@ -75,7 +75,7 @@ u=t.user();c.sql(f"SELECT public.request_account_lifecycle('{u}')")
 with c.Session() as first,c.Session() as second:
  initial=json.loads(first.run(f"SELECT row_to_json(j) FROM public.claim_account_deletion_job('{u}',true) j"))
  second.send(f"SELECT row_to_json(j) FROM public.claim_account_deletion_job('{u}',true) j;")
- c.waiting(second);first.finish()
+ c.waiting(second,first);first.finish()
  competing=json.loads(second.run('SELECT 1').splitlines()[0]);second.finish()
  c.check(initial['claimed'] and not competing['claimed'],'concurrent deletion worker cannot take an active claim')
  c.check(c.sql(f"SELECT claim_token FROM public.account_deletion_jobs WHERE user_id='{u}'")==initial['claim_token'],'competing worker leaves claim fence intact')

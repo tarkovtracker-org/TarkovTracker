@@ -1,3 +1,9 @@
+import { lifecycleDeliveryClient } from '../_shared/lifecycle-delivery-client.ts';
+import {
+  withLifecycleDelivery,
+  DeliveryUnavailable,
+  deliveryUnavailableResponse,
+} from '../_shared/lifecycle-delivery.ts';
 import { runAccountDeletion } from '../_shared/account-deletion-workflow.ts';
 import { createErrorResponse, createSuccessResponse } from '../_shared/auth.ts';
 import { authenticateDeletionRequest } from '../_shared/account-deletion-request.ts';
@@ -98,7 +104,12 @@ const handleAdminRequest = async (req: Request, client: AccountDeletionClient, u
   if (!(await verifyAdminStatus(client, userId))) return createErrorResponse('Forbidden', 403, req);
   const body = (await readJsonObject(req)) as ReconcileRequest;
   if (getAction(body) === 'list') return respondWithJobs(req, client, body);
-  const results = await processBody(client, body);
+  const results = await withLifecycleDelivery(
+    (name, args) => client.rpc(name, args),
+    'deletion_reconcile',
+    (invocation) =>
+      processBody(lifecycleDeliveryClient(invocation) as unknown as AccountDeletionClient, body)
+  );
   return createSuccessResponse({ success: true, results }, 200, req);
 };
 Deno.serve(async (req) => {
@@ -110,7 +121,8 @@ Deno.serve(async (req) => {
       auth.supabase as unknown as AccountDeletionClient,
       auth.user.id
     );
-  } catch {
+  } catch (error) {
+    if (error instanceof DeliveryUnavailable) return deliveryUnavailableResponse(req);
     return createErrorResponse('Internal server error', 500, req);
   }
 });

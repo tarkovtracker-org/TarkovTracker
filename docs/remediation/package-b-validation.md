@@ -20,15 +20,20 @@ normal ingress receives and claims atomically, so this is a recoverable-state fi
 that production has a separate receipt commit window. Other crash barriers stop the disposable Edge
 process after claim or after application effects, then resume with the original signed envelope.
 
-`stripe-real-deletion.deno.test.ts` exercises real test-mode cancellation, lost-success response,
-completion-marker interruption, withdrawal, confirmed subscription end and supported local Auth
-deletion. Its transport guard permits only the required provider reads and cancellation-at-period-end
-updates. It does not authorize refunds, credits or customer deletion. Discord transport remains
-mocked; supported local Auth unlink and real PostgreSQL contention are exercised separately.
+`tests/supabase/billing-coherent.py` is the mandatory uninterrupted hosted TEST Checkout,
+subscription-end, fresh Stripe verification and supported local Auth deletion gate.
+`portal-cutover.py` covers real TEST Portal issuance and provider API equivalents of later Portal
+actions. `worker-provider-crash.py` covers provider response/completion loss through the current
+worker and invocation contracts. These current runtime suites replace reliance on older opt-in
+Deno integration fixtures for release evidence. Unexecuted opt-in cases are reported as skipped,
+never as passes. No test authorizes production refunds, credits or customer deletion. Discord
+transport remains synthetic; supported local Auth unlink and real PostgreSQL contention are
+exercised separately.
 
-The migration and Edge runtime were unchanged by this final transport-validation pass. Earlier
-fresh replay, A+C upgrade, timeout rollback/retry, legacy-receipt classification and database lint
-results remain applicable to that exact migration hash. Test-only local control hooks, listener
+Fresh Stripe verification changed both the migration and Edge runtime. The final release evidence
+must include the nine-migration fresh replay, A+C upgrade, B0-first upgrade and bounded rollback/retry
+paths with identical catalog hashes. Earlier freeze and preflight bundles are obsolete. Reuse prior
+test evidence only when the exercised paths and relevant inputs remain unchanged. Test-only local control hooks, listener
 configuration, secrets and captured provider data are not deployment artifacts.
 
 Production observation requires the dedicated read-only observer. Missing observer access does not

@@ -2606,3 +2606,82 @@ than the provisional window; age alone never authorizes removal of unfinished or
 The disabled operational delivery contract and aggregate observer checks are documented in
 `docs/remediation/package-b-operations.md`. This design does not establish a deployed worker,
 heartbeat, alert destination, or operator rotation; those integrations require explicit review.
+
+### Package B delivery controls (candidate, not deployed)
+
+Lifecycle delivery uses component admission controls for deletion intake, reconciliation and provider
+processing. Admission and disable serialize on the same database control row. A disabled control
+rejects new invocations; logical drain counts only valid invocation leases and separately reports
+in-progress deletion claims. Invocation ownership uses a database-clock 30-second renewable lease,
+a 5-second heartbeat, and immutable 60-second deadline. Task leases remain 120 seconds. Expired
+invocations are retained as evidence but no longer block new admission; they cannot renew, finish,
+claim or commit writes. Invocation headers are validated before affected writes and by deferred
+commit fences, and task claims additionally bind their invocation token. Local heartbeat failure
+aborts transport; a provider-accepted request can still complete and must be reconciled. Logical
+lease expiry is not physical external-request drain. No transaction spans provider HTTP. Explicit
+operator-only history retention excludes referenced work/job evidence and is never scheduled.
+
+Deletion controls initially preserve availability; provider processing starts disabled. Only an
+already-authorized SQL operator can change controls, with an evidence reference recorded alongside
+`session_user`. Service clients may inspect/admit/finish but cannot pause or resume components.
+Ordinary clients have neither table access nor executable control RPC privileges.
+
+Verified Stripe ingress persists the event identity before attempting processing admission. While
+processing is disabled it returns accepted-but-incomplete, retaining recoverable inbox work. No
+signature verification is bypassed. Discord identity unlink continues to capture durable obligations
+in the foundation's database trigger regardless of provider processing state.
+
+The new `lifecycle-worker` is unscheduled and accepts only a dedicated server-side
+`LIFECYCLE_WORKER_SECRET`; user/admin JWTs and service-role fallback credentials are not invocation
+authority. One provider task is admitted per invocation, with one provider-processing invocation
+active at a time. Provider tasks retain their existing two-minute leases and fenced transitions.
+The production provider transport caps a task at twelve HTTP calls and fifty seconds; exceeding
+that budget is retryable, never completion. Scheduling and external alert delivery are separate
+operator deployment gates. This candidate's bootstrap/drain sequence is still under validation.
+
+New lifecycle requests receive an explicit private eligibility marker only when no historical job
+already exists. Historical jobs cannot become eligible merely through a new request or deployment;
+no production IDs, age heuristics, backfill or historical-approval endpoint is introduced. Historical
+recovery needs separately reviewed operator evidence/action. No migration creates a schedule.
+
+The foundation must not overlap the A+C Stripe webhook failure/retry path: its retention trigger
+prevents the receipt deletion that the old handler relies upon. Final-state paused ingress is tested;
+Before deletion reopens, candidate Nuxt checkout/portal routes and their durable initiation helper
+must also be verified deployed. Legacy application session creation and previously issued usable
+provider sessions require separate accounting; Supabase Edge drain does not establish Cloudflare
+request completion or Stripe session expiry. Unknown obligations keep deletion quiesced.
+
+B0 now has a retry-only signature-verifying bridge and private unlink capture. A zero registry
+count alone does not prove pre-bootstrap external requests have stopped. Operational B0-first and
+chronological replay now converge through a final canonical capture migration. Both paths produced
+identical 610-object catalog snapshots in disposable validation. The actual crash-before-claim
+regression now self-recovers after natural invocation expiry without manual cleanup. The full
+provider crash and staged runtime bootstrap matrix remains required before freeze. See
+`docs/package-b-delivery-candidate.md`; the candidate remains unfrozen.
+
+### Application billing cutover (Package B candidate, not deployed)
+
+Billing initiation support is independently installable on A+C before the new Nuxt checkout and
+portal routes. Reservations are service-RPC-only and commit before Stripe creation. The bootstrap
+checks irreversible lifecycle state when present; foundation installs the final bound implementation.
+An operator records both verified route hashes only after all legacy session issuance has stopped.
+Database time starts a minimum 24-hour Checkout horizon, and reconfirmation restarts it. No client or
+service role can record the cutover. Missing evidence blocks irreversible lifecycle transitions.
+Elapsed time never constitutes provider clearance. Immediately before each supported Auth deletion
+attempt, current Stripe subscriptions and financial state must be verified outside a database
+transaction. A new verification nonce binds the deletion generation, job claim and billing generation;
+reservation, provider asset, supporter linkage and provider work changes invalidate it. The checking
+lease is 60 seconds; CLEAR lasts at most 30 seconds and authorization consumes it. Failure cannot reuse
+an earlier CLEAR. Unresolved reservations, current-generation or standalone provider work, and
+incomplete or ambiguous Stripe truth fail closed. Revoked deletion tasks from earlier generations
+remain preserved and unclaimable; they do not prevent a restarted request from verifying current
+Stripe truth and completing its own obligations.
+Portal authority is not cleared using the Checkout expiry bound.
+
+A claim-checked resume RPC skips only preparation already persisted as prepared/auth-authorized with
+a captured snapshot. It does not grant provider clearance or Auth authority. This permits forward
+progress when two truth passes exceed the shared 12-call/50-second invocation budget: a later
+invocation starts fresh at Auth verification without repeating completed team preparation. Every Auth
+retry still verifies Stripe and consumes a new proof. Denied Auth authorization parks a current
+claim as `provider_pending`; a stale claim cannot park or overwrite its replacement. These gates
+do not authorize deployment; production cutover still requires operator preflight.

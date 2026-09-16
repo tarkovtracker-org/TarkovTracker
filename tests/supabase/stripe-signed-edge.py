@@ -63,8 +63,6 @@ class Capture(http.server.BaseHTTPRequestHandler):
    self.send_response(400);self.end_headers();return
   signature=self.headers.get('stripe-signature','')
   with condition:events[obj['id']]=(obj,(body,signature));condition.notify_all()
-  if fault=='receipt_only':
-   sql(f"SELECT public.receive_stripe_lifecycle('{obj['id']}','{obj['type']}')");barrier.set();release.wait(timeout=30)
   self.send_response(200);self.end_headers()
 
 def received(subid,kind,after=None):
@@ -87,7 +85,7 @@ def restart_edge():
   except (OSError,UnicodeError):pass
  time.sleep(2)
  log=open(ROOT/'signed-edge-runtime-private.log','a');os.chmod(ROOT/'signed-edge-runtime-private.log',0o600)
- edge=subprocess.Popen([str(pathlib.Path.cwd()/'node_modules/.bin/supabase'),'functions','serve','--workdir','/tmp/tt-b-http','--import-map','/tmp/tt-b-http/supabase/functions/deno.json','--env-file',str(ROOT/'synthetic-edge.env')],stdout=log,stderr=subprocess.STDOUT)
+ edge=subprocess.Popen([str(pathlib.Path.cwd()/'node_modules/.bin/supabase'),'functions','serve','--workdir','/tmp/tt-b-http','--import-map','/tmp/tt-b-http/supabase/functions/deno.json','--env-file','/tmp/tt-b-delivery-final/edge.env'],stdout=log,stderr=subprocess.STDOUT)
  for _ in range(25):
   try:
    status,result=request('/functions/v1/stripe-env-gate',b'{}',{'Authorization':'Bearer '+CFG['SERVICE_ROLE_KEY'],'Content-Type':'application/json'})
@@ -99,16 +97,20 @@ def wait_state(eid,states):
  for _ in range(50):
   row=inbox(eid)
   if row and row['state'] in states:return row
+  if row and row['state']=='received' and eid in events:send(events[eid][1])
   time.sleep(.2)
  raise AssertionError('Expected inbox disposition not reached')
 def wait_completed(eid):
  for _ in range(30):
   row=inbox(eid)
   if row and row['state']=='completed':return
+  if row and row['state']=='received' and eid in events:send(events[eid][1])
   time.sleep(.2)
  raise AssertionError('Genuine event did not reach completed state')
 fixtures={};deferred=None
 try:
+ assert sql("SELECT count(*) FROM private.lifecycle_delivery_invocations WHERE finished_at IS NULL AND expires_at>clock_timestamp()")=='0','Start without uncertain active invocations'
+ sql("SELECT public.set_lifecycle_delivery('provider_processing',true,'synthetic signed F5 validation')")
  # Bounded metadata read verifies CLI account without requesting live-mode resources.
  context=json.loads((ROOT/'stripe-test-context.json').read_text());assert context['livemode'] is False
  account=stripe('get','/v1/account');assert account['id']==context['account_id']
@@ -134,6 +136,7 @@ try:
      if(mode==='malformed') return new Response('not json',{status:200,headers:{'content-type':'application/json'}});
      if(typeof mode==='number') return Response.json({error:{type:'api_error'}},{status:mode,headers:{'retry-after':'1'}});
    }
+   if(url.includes('/rest/v1/rpc/receive_stripe_lifecycle')) {const response=await __realFetch(input,init);await __realFetch('http://host.docker.internal:59421/control/receipt',{headers:{'x-tt-staging-nonce':'__NONCE__'}});return response;}
    if(url.includes('/rest/v1/rpc/finish_lifecycle_work')) await __realFetch('http://host.docker.internal:59421/control/finish',{headers:{'x-tt-staging-nonce':'__NONCE__'}});
    return __realFetch(input,init);
  };
@@ -190,24 +193,39 @@ try:
    sql(f"UPDATE private.lifecycle_work SET available_at=clock_timestamp() WHERE resource_id='{failed['id']}'")
    check(send(failed_envelope)[0]==200,str(injected)+' signed retry reconciles real Stripe truth')
  # Actual process termination at provider-lookup / completion barriers.
- for point in ['receipt_only','crash_stripe','crash_finish']:
+ for point in ['crash_receipt','crash_stripe','crash_finish']:
   fault=point;barrier.clear();release.clear();old=set(events)
   stripe('post','/v1/subscriptions/'+sub['id'],{'metadata[crash_probe]':uuid.uuid4().hex,'metadata[tier]':'timmy'})
   crashed,crashed_envelope=received(sub['id'],'customer.subscription.updated',old)
   check(barrier.wait(timeout=10),point+' explicit interruption barrier reached')
-  expected='received' if point=='receipt_only' else 'processing'
+  expected='received' if point=='crash_receipt' else 'processing'
   check(inbox(crashed['id'])['state']==expected,point+' durable state exists before termination')
   if point=='crash_finish':check(sql(f"SELECT tier FROM public.supporters WHERE user_id='{uid}'")=='timmy','E application effect committed before inbox completion')
   stale=sql(f"SELECT coalesce(claim_token::text,'') FROM private.lifecycle_work WHERE resource_id='{crashed['id']}'")
   check(sql("SELECT count(*) FROM pg_stat_activity WHERE usename='authenticator' AND state='idle in transaction'")=='0',point+' no open PostgREST transaction during network barrier')
+  active=json.loads(sql("SELECT coalesce(json_agg(id),'[]') FROM private.lifecycle_delivery_invocations WHERE component='provider_processing' AND finished_at IS NULL AND expires_at>clock_timestamp()"))
+  # Controlled task-clock shortening while the current invocation is still authoritative.
+  # Invocation expiry itself is natural and never manually cleared.
+  for invocation in active:
+   header=json.dumps({'x-lifecycle-delivery':invocation})
+   sql(f"BEGIN; SET LOCAL request.headers='{header}'; UPDATE private.lifecycle_work SET lease_until=clock_timestamp()+interval '1 second',available_at=(SELECT min(available_at)-interval '1 second' FROM private.lifecycle_work) WHERE resource_id='{crashed['id']}' AND state='processing'; COMMIT;")
   subprocess.run(['docker','kill','supabase_edge_runtime_tt-b-http-disposable'],check=True,stdout=subprocess.DEVNULL)
+  assert subprocess.check_output(['docker','inspect','supabase_edge_runtime_tt-b-http-disposable','--format','{{.State.Running}}'],text=True).strip()=='false'
   fault=None;release.set();restart_edge()
+  for invocation in active:
+   expiry_deadline=time.monotonic()+40
+   while sql(f"SELECT public.lifecycle_delivery_valid('{invocation}')")=='t':
+    assert time.monotonic()<expiry_deadline;time.sleep(.2)
+   check(sql(f"SELECT public.renew_lifecycle_delivery('{invocation}')")=='f',point+' abandoned invocation expires without cleanup')
   if point=='crash_stripe':
    deferred=(crashed,crashed_envelope,stale)
    check(inbox(crashed['id'])['state']=='processing','B unfinished older event retained until provider state changes')
    continue
-  sql(f"UPDATE private.lifecycle_work SET lease_until=clock_timestamp()-interval '1 second' WHERE resource_id='{crashed['id']}' AND state='processing'")
-  check(send(crashed_envelope)[0]==200,point+' new worker resumes genuine signed event')
+  if point=='crash_finish':
+   local_env=dict(x.split('=',1) for x in pathlib.Path('/tmp/tt-b-delivery-final/edge.env').read_text().splitlines() if '=' in x and not x.startswith('#'))
+   status,body=request('/functions/v1/lifecycle-worker?kind=stripe_event',b'',{'apikey':CFG['ANON_KEY'],'Authorization':'Bearer '+local_env['LIFECYCLE_WORKER_SECRET']})
+   check(status==200 and body['result']=={'examined':1,'completed':1},'F actual lifecycle-worker resumes committed application effect before inbox completion')
+  else:check(send(crashed_envelope)[0]==200,point+' new worker resumes genuine signed event')
   check(inbox(crashed['id'])['state']=='completed',point+' final inbox completed')
   if stale:
    workid=sql(f"SELECT id FROM private.lifecycle_work WHERE resource_id='{crashed['id']}'")
@@ -221,7 +239,6 @@ try:
  wait_completed(updated['id'])
  if deferred:
   older,older_envelope,older_token=deferred
-  sql(f"UPDATE private.lifecycle_work SET lease_until=clock_timestamp()-interval '1 second' WHERE resource_id='{older['id']}' AND state='processing'")
   check(send(older_envelope)[0]==200,'B old previously unfinished signed update reconciles after newer ended event')
   check(inbox(older['id'])['state']=='completed','B resumed old event reaches correct completion')
   workid=sql(f"SELECT id FROM private.lifecycle_work WHERE resource_id='{older['id']}'")
@@ -230,6 +247,7 @@ try:
  check(sql(f"SELECT status FROM public.supporters WHERE user_id='{uid}'")=='expired','old signed update cannot restore ended entitlement')
  print(json.dumps({'passed':len(results),'stripe_provider':'real test mode','webhook_signature':'genuine Stripe CLI','secrets_read':False}),flush=True)
 finally:
+ sql("SELECT public.set_lifecycle_delivery('provider_processing',false,'synthetic F5 validation finished')")
  served.write_text(original);served.chmod(original_mode)
  if server is not None:server.shutdown();server.server_close()
  if fixtures:

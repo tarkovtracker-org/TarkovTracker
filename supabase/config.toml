@@ -438,3 +438,7 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # Application-level Auth getUser validation, matching account-delete.
 [functions.account-deletion-state]
 verify_jwt = false
+
+# Explicit dedicated server-secret authentication in the handler. No schedule.
+[functions.lifecycle-worker]
+verify_jwt = false

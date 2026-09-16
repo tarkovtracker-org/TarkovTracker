@@ -1,0 +1,28 @@
+BEGIN;
+SELECT plan(10);
+UPDATE private.lifecycle_delivery_controls SET enabled=TRUE WHERE component IN ('deletion_intake','deletion_reconcile');
+INSERT INTO private.billing_application_cutovers(confirmed_at,checkout_source_hash,portal_source_hash,evidence_reference)
+VALUES(clock_timestamp()-INTERVAL '25 hours',repeat('a',64),repeat('b',64),'synthetic restart proof');
+INSERT INTO private.lifecycle_requests(user_id,state,snapshot_captured) VALUES('be000000-0000-4000-8000-000000000001','requested',TRUE);
+SELECT private.capture_provider_obligation('be000000-0000-4000-8000-000000000001','stripe_cleanup','sub_synthetic_old','deletion:'||(SELECT generation::text FROM private.lifecycle_requests WHERE user_id='be000000-0000-4000-8000-000000000001'));
+UPDATE private.lifecycle_work SET state='waiting' WHERE user_id='be000000-0000-4000-8000-000000000001';
+SELECT public.account_lifecycle_status('be000000-0000-4000-8000-000000000001',TRUE);
+SELECT public.request_account_lifecycle('be000000-0000-4000-8000-000000000001',TRUE);
+INSERT INTO public.account_deletion_jobs(user_id,status,claim_token) VALUES('be000000-0000-4000-8000-000000000001','in_progress','bf000000-0000-4000-8000-000000000001');
+SELECT ok(NOT private.billing_work_pending('be000000-0000-4000-8000-000000000001'),'withdrawal revoked old deletion authority');
+CREATE TEMP TABLE proof AS SELECT public.begin_final_billing_verification('be000000-0000-4000-8000-000000000001','bf000000-0000-4000-8000-000000000001') value;
+SELECT is((SELECT value->>'status' FROM proof),'checking','restart can request fresh Stripe truth');
+SELECT ok((SELECT value->'resources' ? 'sub_synthetic_old' FROM proof),'old provider identifier remains in current Stripe lookup');
+SELECT ok(NOT public.finish_final_billing_verification('be000000-0000-4000-8000-000000000001','bf000000-0000-4000-8000-000000000001',(SELECT (value->>'token')::UUID FROM proof),'provider_wait'),'active provider result still blocks restarted request');
+SELECT ok(NOT public.authorize_account_auth_delete('be000000-0000-4000-8000-000000000001','bf000000-0000-4000-8000-000000000001'),'revoked task is not Auth authorization');
+SELECT private.capture_provider_obligation('be000000-0000-4000-8000-000000000001','stripe_cleanup','sub_synthetic_current','deletion:'||(SELECT generation::text FROM private.lifecycle_requests WHERE user_id='be000000-0000-4000-8000-000000000001'));
+SELECT ok(private.billing_work_pending('be000000-0000-4000-8000-000000000001'),'current-generation unfinished work blocks');
+UPDATE private.lifecycle_work SET state='completed',completed_at=clock_timestamp() WHERE user_id='be000000-0000-4000-8000-000000000001' AND resource_id='sub_synthetic_current';
+SELECT ok(NOT private.billing_work_pending('be000000-0000-4000-8000-000000000001'),'current completed task permits another fresh lookup');
+UPDATE private.lifecycle_work SET generation=NULL WHERE user_id='be000000-0000-4000-8000-000000000001' AND resource_id='sub_synthetic_old';
+SELECT ok(private.billing_work_pending('be000000-0000-4000-8000-000000000001'),'unknown generation fails closed');
+UPDATE private.lifecycle_work SET generation=gen_random_uuid(),dedupe_key='standalone-synthetic' WHERE user_id='be000000-0000-4000-8000-000000000001' AND resource_id='sub_synthetic_old';
+SELECT ok(private.billing_work_pending('be000000-0000-4000-8000-000000000001'),'standalone unfinished work remains blocking regardless generation');
+SELECT is((SELECT state FROM private.lifecycle_work WHERE user_id='be000000-0000-4000-8000-000000000001' AND resource_id='sub_synthetic_old'),'waiting','old evidence was never marked completed or removed');
+SELECT * FROM finish();
+ROLLBACK;

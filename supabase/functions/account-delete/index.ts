@@ -1,3 +1,9 @@
+import { lifecycleDeliveryClient } from '../_shared/lifecycle-delivery-client.ts';
+import {
+  withLifecycleDelivery,
+  DeliveryUnavailable,
+  deliveryUnavailableResponse,
+} from '../_shared/lifecycle-delivery.ts';
 import { createErrorResponse, createSuccessResponse } from '../_shared/auth.ts';
 import { authenticateDeletionRequest } from '../_shared/account-deletion-request.ts';
 import { runAccountDeletion } from '../_shared/account-deletion-workflow.ts';
@@ -56,12 +62,18 @@ Deno.serve(async (req) => {
   try {
     const auth = await authenticateDeletionRequest(req);
     if (auth instanceof Response) return auth;
-    return await processRequest(
-      req,
-      auth.supabase as unknown as AccountDeletionClient,
-      auth.user.id
+    return await withLifecycleDelivery(
+      (name, args) => auth.supabase.rpc(name, args),
+      'deletion_intake',
+      (invocation) =>
+        processRequest(
+          req,
+          lifecycleDeliveryClient(invocation) as unknown as AccountDeletionClient,
+          auth.user.id
+        )
     );
-  } catch {
+  } catch (error) {
+    if (error instanceof DeliveryUnavailable) return deliveryUnavailableResponse(req);
     return createErrorResponse('Internal server error', 500, req);
   }
 });

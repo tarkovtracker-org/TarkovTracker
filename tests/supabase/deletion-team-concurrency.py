@@ -9,8 +9,14 @@ def user():
  with urllib.request.urlopen(r,timeout=10) as response:return json.load(response)['id']
 def team(owner,mode):
  return json.loads(c.sql(f"SELECT row_to_json(t) FROM public.create_team_with_owner('synthetic-{uuid.uuid4().hex[:12]}','{uuid.uuid4().hex}',5,'{owner}','{mode}') t"))
-def claim(uid):
- return json.loads(c.sql(f"SELECT row_to_json(j) FROM public.claim_account_deletion_job('{uid}',true) j"))['claim_token']
+def claim(uid,verify=True):
+ token=json.loads(c.sql(f"SELECT row_to_json(j) FROM public.claim_account_deletion_job('{uid}',true) j"))['claim_token']
+ if verify and token:
+  # Synthetic provider-CLEAR fixture for DB lock tests only. Real Stripe truth
+  # and supported Auth transport are validated in billing-coherent.py.
+  started=json.loads(c.sql(f"SELECT public.begin_final_billing_verification('{uid}','{token}')"));assert started['status']=='checking'
+  assert c.sql(f"SELECT public.finish_final_billing_verification('{uid}','{token}','{started['token']}','clear')")=='t'
+ return token
 for mode in ['pvp','pve','seasonal']:
  owner=user();member=user();t=team(owner,mode)
  c.sql(f"SELECT public.join_team('{t['id']}','{t['join_code']}','{member}'); SELECT public.request_account_lifecycle('{owner}');")
@@ -19,7 +25,7 @@ for mode in ['pvp','pve','seasonal']:
  with c.Session() as leaving,c.Session() as preparing:
   leaving.run(f"SELECT public.leave_team('{t['id']}','{member}')")
   preparing.send(f"SELECT public.prepare_account_deletion('{owner}','{token}');")
-  c.waiting(preparing)
+  c.waiting(preparing,leaving)
   leaving.finish()
   c.check(preparing.run('SELECT 1').splitlines()[0]=='ready',mode+' preparation waits for real leave transaction')
   preparing.finish()
@@ -47,7 +53,7 @@ with c.Session() as barrier,c.Session() as effect,c.Session() as observer:
  headers=json.dumps({'x-lifecycle-work':w['id'],'x-lifecycle-claim':w['token']})
  effect.run(f"SET LOCAL request.headers='{headers}'")
  effect.send(f"UPDATE public.supporters SET status='active' WHERE user_id='{u}';")
- c.waiting(effect)
+ c.waiting(effect,barrier)
  c.check(observer.run(f"SELECT id FROM private.lifecycle_work WHERE id='{w['id']}' FOR UPDATE NOWAIT")==w['id'],'blocked supporter effect has not acquired work lock before user lock')
  observer.finish();barrier.finish()
  c.check(effect.run('SELECT 1')=='1','supporter effect resumes after barrier without deadlock')

@@ -24,7 +24,8 @@
     "scripts/preview/verify-deployment.mjs",
     "scripts/preview/controller.mjs",
     "scripts/preview/smoke/playwright.config.mjs",
-    "scripts/preview/smoke/*.smoke.mjs"
+    "scripts/preview/smoke/*.smoke.mjs",
+    "supabase/functions/_shared/lifecycle-maintenance.ts"
   ],
   "ignoreDependencies": [
     "shared",

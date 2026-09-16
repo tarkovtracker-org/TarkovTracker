@@ -931,6 +931,41 @@ export type Database = {
       }
     }
     Functions: {
+      account_deletion_resume_stage: {
+        Args: { p_claim_token: string; p_user_id: string }
+        Returns: string
+      }
+      begin_final_billing_verification: {
+        Args: { p_claim_token: string; p_user_id: string }
+        Returns: Json
+      }
+      billing_application_cutover_status: { Args: never; Returns: Json }
+      confirm_billing_application_cutover: {
+        Args: {
+          p_checkout_hash: string
+          p_evidence_reference: string
+          p_portal_hash: string
+        }
+        Returns: string
+      }
+      finish_final_billing_verification: {
+        Args: {
+          p_claim_token: string
+          p_outcome: string
+          p_token: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
+      preserve_final_billing_resource: {
+        Args: {
+          p_claim_token: string
+          p_resource: string
+          p_token: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       archive_prestige_run_and_reset_progress: {
         Args: {
           p_archived_progress: Json

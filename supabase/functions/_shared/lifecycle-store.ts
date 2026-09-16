@@ -43,6 +43,17 @@ export function lifecycleStore(rpc: Rpc): LifecycleStore {
         p_retry_seconds: delay,
       });
       if (result.error) throw new Error('Lifecycle completion unavailable');
+      console.info(
+        JSON.stringify({
+          event: 'lifecycle_task_transition',
+          task_id: work.id,
+          kind: work.kind,
+          attempt: work.attempts,
+          state,
+          accepted: result.data === true,
+          error_code: code,
+        })
+      );
       return result.data === true;
     },
   };
