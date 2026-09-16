@@ -1269,7 +1269,12 @@ flowchart LR
    sequentially to avoid a burst of production inspection queries. It returns an evidence-only JSON
    report. Unsupported or ambiguous syntax fails closed with `assessment: incomplete`,
    `risk: unknown`, and `requires_manual_review: true`. It does not execute the migration.
-8. Production credentials are supplied only through `PROD_DB_URL`, which must identify a dedicated
+8. `migration-history` reads applied version identifiers from
+   `supabase_migrations.schema_migrations` and compares them against `supabase/migrations` in the
+   current checkout, reporting `missing_locally` (applied remotely, absent from the checkout) and
+   `pending_remotely` (in the checkout, not applied). It makes remote/local migration divergence
+   observable without migration or Management API credentials.
+9. Production credentials are supplied only through `PROD_DB_URL`, which must identify a dedicated
    observer role. The wrapper removes its password before invoking the Supabase CLI and supplies
    the password through a mode-`0600` temporary `PGPASSFILE`, keeping it out of child-process
    arguments and command errors. The credential file is removed after each CLI invocation.
@@ -1309,6 +1314,20 @@ flowchart LR
 - Migration preflight is evidence-only and fails closed on unsupported or ambiguous syntax;
   production reports run sequentially, and migration execution remains in the reviewed merge and
   Supabase deployment workflow.
+- `migration-history` reads only the `version` column of `supabase_migrations.schema_migrations`.
+  The stored `statements` column is never selected, and the observer's ledger grant is column-level
+  for the same reason, so migration SQL and any literal inside it stay out of both the report and
+  the role's reach.
+- Version identifiers establish _which_ migrations are recorded, never that their SQL matches.
+  Divergence found by `migration-history` is followed by comparing file contents against the
+  deployed Git revision, as `docs/runbook.md` requires.
+- The comparison must be complete or fail. When the ledger read reaches its row limit the command
+  errors instead of reporting `in_sync` or a partial difference.
+- The report names the project it observed (`project_ref`, `null` for a local target), so a
+  comparison run against the wrong project is detectable. A primary target whose host and observer
+  username identify no project fails instead of reporting a nameless comparison. The observer does
+  not infer the expected project from application configuration; confirming the identity is the
+  operator's step.
 
 ## 10. Promoted Twitch configuration
 

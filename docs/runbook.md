@@ -309,6 +309,15 @@ These show up in Supabase logs / query performance and are expected. Do not trea
   approved read-only observer for supported catalog inspection. If evidence is unavailable, report
   remote synchronization as unverified rather than assuming it from green CI.
 
+- **Deploy migrations only from a revision that is already merged to `main`.** Pushing from an
+  unmerged branch moves remote history ahead of the checkout, and every later `main` build then fails
+  the `Supabase Preview` check with `Remote migration versions not found in local migrations
+directory.` until the deployed file lands. That check runs on `main` pushes and is skipped on pull
+  requests, so the breakage only becomes visible after merge. If an out-of-band apply is unavoidable,
+  merge the exact deployed file immediately afterwards and record the revision, version list, and file
+  hashes; `scripts/prod-db migration-history` shows `missing_locally` for exactly this condition. The
+  fix is always to land the deployed file, never `migration repair --status reverted`, which would
+  falsify applied history and let a later push re-run the SQL.
 - `migration list` compares **timestamps only**. Matching rows do not detect edited SQL or schema
   drift. Preserve the deployed Git revision, compare historical file contents against it, replay
   locally with `pnpm run supabase:check`, and verify affected remote objects, grants, RLS, triggers,
@@ -607,11 +616,29 @@ Store `PROD_DB_URL=postgresql://pi_prod_observer:...@...:5432/postgres?sslmode=v
 mode-`0600` `.prod-db.env` file so the password does not enter shell history. An inline environment
 assignment remains supported for non-interactive automation whose secret store masks command input.
 
-Available reports include `health`, `schema`, `db-stats`, `table-stats`, `index-stats`, `traffic`,
-`outliers`, `calls`, `locks`, `blocking`, `long-running`, `vacuum`, `bloat`, `role-stats`, bounded
-`sample`, `distribution`, and `count`. `sample` excludes columns matching the sensitive-column
-policy and is capped at 20 rows; `distribution` is capped at 50 groups. `EXPLAIN ANALYZE`, arbitrary
-SQL, writes, DDL, migration commands, and unbounded row access are not supported.
+Available reports include `health`, `schema`, `migration-history`, `db-stats`, `table-stats`,
+`index-stats`, `traffic`, `outliers`, `calls`, `locks`, `blocking`, `long-running`, `vacuum`,
+`bloat`, `role-stats`, bounded `sample`, `distribution`, and `count`. `sample` excludes columns
+matching the sensitive-column policy and is capped at 20 rows; `distribution` is capped at 50
+groups. `EXPLAIN ANALYZE`, arbitrary SQL, writes, DDL, migration commands, and unbounded row access
+are not supported.
+
+`migration-history` reads applied version identifiers from `supabase_migrations.schema_migrations`
+and compares them with `supabase/migrations` in the current checkout. It reports `missing_locally`
+(applied remotely, absent from the checkout) and `pending_remotely` (in the checkout, not yet
+applied), which is the same distinction `supabase migration list --linked` makes, without needing
+migration or admin credentials. It never returns the stored `statements` column, so migration SQL
+and any literal it contains stay out of the report. Version identifiers alone do not prove the SQL
+matches; use them to locate divergence, then compare file contents against the deployed Git
+revision. If the observer lacks access the command fails and names the required grant.
+
+The report carries `project_ref`, the Supabase project observed through `PROD_DB_URL` (`null` for a
+local target). Confirm it names the intended project before treating the comparison as remote-history
+evidence: a connection string pointing at another project reports a perfectly consistent comparison
+for the wrong database. A primary connection whose host and observer username identify no project
+fails rather than returning a nameless comparison. The command reports the identity it observed and
+deliberately does not infer an expected project from application configuration, which is not
+guaranteed to describe the same environment as the observer credential.
 
 `canary` is the first production validation command. It runs only health and telemetry reports:
 `db-stats`, `role-stats`, `table-stats`, `index-stats`, and `outliers`. It does not sample rows,
@@ -634,7 +661,18 @@ Provision the observer role out of band through the Supabase SQL editor or appro
 operation. Grant only `CONNECT`, required schema/catalog visibility, and `pg_monitor`; Supabase CLI
 inspection reports such as `db-stats` call monitoring functions that `pg_read_all_stats` alone does
 not permit. Grant `USAGE` on `extensions` and only explicit low-risk column-level `SELECT` when
-bounded samples or distributions are required. Set conservative connection defaults for
+bounded samples or distributions are required. For `migration-history`, grant read-only access to
+the version column of the migration ledger:
+
+```sql
+GRANT USAGE ON SCHEMA supabase_migrations TO pi_prod_observer;
+GRANT SELECT (version) ON TABLE supabase_migrations.schema_migrations TO pi_prod_observer;
+```
+
+The column-level grant is deliberate: `schema_migrations` also stores each migration's SQL in
+`statements`, and the observer never needs it. Granting `SELECT` on the whole table would let anyone
+holding the observer credential read stored migration SQL and any literal inside it. Set
+conservative connection defaults for
 `statement_timeout`, `lock_timeout`, `default_transaction_read_only`, and `application_name`;
 database privileges, not `default_transaction_read_only`, are the hard safety boundary.
 
