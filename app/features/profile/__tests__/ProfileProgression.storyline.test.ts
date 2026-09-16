@@ -190,7 +190,7 @@ const createWrapper = async () => {
         ProfileHideoutTab: { template: '<div data-testid="hideout-tab" />' },
         ProfileStorylineTab: {
           name: 'ProfileStorylineTab',
-          props: ['readOnly', 'completedObjectiveIds'],
+          props: ['readOnly', 'completedObjectiveIds', 'storyObjectiveCompletionState'],
           emits: ['toggle-chapter', 'toggle-objective'],
           template:
             '<div data-testid="storyline-tab" :data-read-only="String(readOnly)"><button data-testid="toggle-chapter" @click="$emit(\'toggle-chapter\', \'chapter-1\')" /></div>',
@@ -373,19 +373,21 @@ describe('ProfileProgression storyline chapter toggle', () => {
     expect(completedObjectiveIds('missing-chapter')).toEqual([]);
     wrapper.unmount();
   });
-  it('reports no completed objective marks for a shared profile', async () => {
-    routeState.params = { userId: '11111111-1111-4111-8111-111111111111', mode: 'pvp' };
-    pvpOverrides = {
+  it('reports no completed objective marks when viewing another game mode', async () => {
+    // Local store data still feeds this view, so the gate — not an empty payload — has to withhold it.
+    routeState.query = { mode: 'pve' };
+    pveOverrides = {
       storyChapters: { 'chapter-1': { objectives: { 'obj-1': { complete: true } } } },
     };
     const wrapper = await createWrapper();
-    await vi.waitFor(() => {
-      expect(wrapper.find('[data-testid="tabs"]').exists()).toBe(true);
-    });
     await wrapper.get('[data-testid="select-storyline-tab"]').trigger('click');
-    const completedObjectiveIds = wrapper
-      .findComponent({ name: 'ProfileStorylineTab' })
-      .props('completedObjectiveIds') as (chapterId: string) => string[];
+    const tab = wrapper.findComponent({ name: 'ProfileStorylineTab' });
+    expect(tab.props('storyObjectiveCompletionState')).toMatchObject({
+      'chapter-1': { 'obj-1': true },
+    });
+    const completedObjectiveIds = tab.props('completedObjectiveIds') as (
+      chapterId: string
+    ) => string[];
     expect(completedObjectiveIds('chapter-1')).toEqual([]);
     wrapper.unmount();
   });
