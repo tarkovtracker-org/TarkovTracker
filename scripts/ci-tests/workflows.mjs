@@ -95,10 +95,10 @@ test('workflow linting is selected only for automation changes and fails closed 
     ['../.github/x.yml'],
   ])
     assert.equal(classifyPaths(paths).workflows, false, paths.join());
-  const lintStep = workflowStep(
-    jobBlock(read('.github/workflows/ci.yml'), 'lint-format'),
-    'Lint GitHub Actions workflows'
-  );
+  const ci = read('.github/workflows/ci.yml');
+  // The classifier output must reach the job output, or the lint step silently never runs.
+  assert.match(jobBlock(ci, 'changes'), /workflows: \$\{\{ steps\.plan\.outputs\.workflows \}\}/);
+  const lintStep = workflowStep(jobBlock(ci, 'lint-format'), 'Lint GitHub Actions workflows');
   assert.match(lintStep, /if: needs.changes.outputs.workflows == 'true'/);
   assert.match(lintStep, /curl --proto '=https' --proto-redir '=https'/);
   assert.match(lintStep, /sha256sum --check --strict/);

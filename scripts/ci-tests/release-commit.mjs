@@ -153,6 +153,11 @@ test('accepted dispatch without a created run fails before waiting for checks or
 test('dispatched main Fallow audit compares the real parent instead of main against itself', (t) => {
   const f = fixture(t);
   git(f.repo, 'checkout', 'locales');
+  // Add a second commit so the checked-out parent (f.head) differs from `main` (f.base); a
+  // script that compared against main would then be visibly wrong.
+  git(f.repo, 'commit', '--allow-empty', '-m', 'follow-up');
+  assert.equal(git(f.repo, 'rev-parse', 'HEAD^'), f.head);
+  assert.notEqual(f.head, f.base);
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
   const step = workflowStep(jobBlock(ci, 'fallow'), 'Resolve Fallow base');
   // The step reads event data through `env:` rather than inline template expansion.
@@ -167,6 +172,6 @@ test('dispatched main Fallow audit compares the real parent instead of main agai
     encoding: 'utf8',
   });
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(f.output(), `base=${f.base}\n`);
-  assert.notEqual(f.base, git(f.repo, 'rev-parse', 'HEAD'));
+  assert.equal(f.output(), `base=${f.head}\n`);
+  assert.notEqual(f.head, git(f.repo, 'rev-parse', 'HEAD'));
 });
