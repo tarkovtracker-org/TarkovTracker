@@ -27,15 +27,21 @@ Lighthouse scope detection runs independently of PR metadata installation and co
 
 ### Crowdin Sync (`crowdin.yml`)
 
-**Triggers:** English source, Crowdin config, or sync workflow changes on `main`; every six hours
-at minute 17 UTC; manual dispatch on `main`. Runs are serialized without cancelling an active sync.
+**Triggers:** English source, Crowdin config, or sync workflow changes on `main`; daily at
+04:17 UTC; manual dispatch on `main`. Runs are serialized without cancelling an active sync.
 The workflow uploads `app/locales/en.json` to the Crowdin `main` branch and downloads translations
 to `app/locales/%two_letters_code%.json`, preserving the directory hierarchy. It never uploads
 local translations. The existing `locales` branch supplies translation PRs targeting `main`.
 
 Repository secrets `CROWDIN_PROJECT_ID` and `CROWDIN_PERSONAL_TOKEN` authenticate to Crowdin only.
 GitHub writes use the automatic `secrets.GITHUB_TOKEN`, with only `contents: write` and
-`pull-requests: write`, so newly created PRs are authored by `github-actions[bot]`.
+`pull-requests: write`, so newly created PRs and commits use the conventional commit title
+`chore(i18n): update translations from Crowdin` authored by `github-actions[bot]`.
+
+When new translations are synchronized, the workflow resolves the PR, confirms that only non-English
+translation files (`app/locales/!(en).json`) were touched, validates formatting (`format:check`),
+locale integrity (`i18n:check`), and systems drift (`systems:check`), and automatically squash-merges
+the PR into `main`.
 
 Before enabling this workflow on `main`:
 
@@ -63,10 +69,8 @@ full validation. The proposed classifier selects formatting, i18n, and systems d
 only a verified follow-up change enables expensive-check skips. Non-English locale formatting
 exclusions remain intact. See the rollout checklist in `docs/WORKFLOW_AUTOMATION.md`.
 
-Crowdin Sync now creates PRs using `GITHUB_TOKEN`. GitHub creates their PR workflow runs in an
-approval-required state; a repository writer must approve them before they execute. Removing path
-exclusions does not bypass this platform requirement. See
-[GitHub token event behavior](https://docs.github.com/en/actions/concepts/security/github_token).
+Crowdin Sync creates PRs using `GITHUB_TOKEN`. In addition to standard PR review paths, `crowdin.yml`
+directly validates and auto-merges safe translation updates upon synchronization.
 
 ### Security (`security.yml`)
 
