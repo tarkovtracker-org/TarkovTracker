@@ -201,7 +201,7 @@
       v-if="!props.readOnly && chapter.staleObjectiveIds.length"
       class="text-warning-300 mb-2 text-[11px] leading-tight"
     >
-      {{ t('page.storyline.stale_progress', { count: chapter.staleObjectiveIds.length }) }}
+      {{ staleProgressLabel }}
     </p>
     <div
       v-if="chapter.mainObjectives.length || chapter.optionalObjectives.length"
@@ -832,6 +832,13 @@
   // A branch is highlighted from the player's own marks only. The sibling is not styled as blocked:
   // the objective list can be a projection of the overlay's capture, so a finished known set is not
   // proof the route is finished, and the overlay only rules out completing both.
+  const staleProgressLabel = computed(() => {
+    const count = chapter.value.staleObjectiveIds.length;
+    return t(
+      count === 1 ? 'page.storyline.stale_progress_one' : 'page.storyline.stale_progress_other',
+      { count }
+    );
+  });
   const getQuestBranchClass = (branch: StorylineQuestRouteBranchView) => {
     return branch.complete
       ? 'border-success-700/40 bg-success-950/20'

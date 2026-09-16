@@ -155,12 +155,19 @@ describe('ChapterCard story contract rendering', () => {
       createChapter({ coveragePartial: true, staleObjectiveIds: ['the-ticket-main-10'] })
     );
     expect(wrapper.text()).toContain('page.storyline.partial_data');
-    expect(wrapper.text()).toContain('page.storyline.stale_progress:{"count":1}');
+    expect(wrapper.text()).toContain('page.storyline.stale_progress_one:{"count":1}');
+    wrapper.unmount();
+  });
+  it('uses the plural stale-mark label for more than one mark', () => {
+    const wrapper = mountCard(
+      createChapter({ staleObjectiveIds: ['the-ticket-main-10', 'the-ticket-main-11'] })
+    );
+    expect(wrapper.text()).toContain('page.storyline.stale_progress_other:{"count":2}');
     wrapper.unmount();
   });
   it('hides stale saved marks on a read-only profile', () => {
     const wrapper = mountCard(createChapter({ staleObjectiveIds: ['the-ticket-main-10'] }), true);
-    expect(wrapper.text()).not.toContain('page.storyline.stale_progress');
+    expect(wrapper.text()).not.toContain('page.storyline.stale_progress_one');
     wrapper.unmount();
   });
 });

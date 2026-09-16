@@ -118,11 +118,33 @@ const validObjectives = (value: unknown): boolean => {
   if (value === undefined) return true;
   return Array.isArray(value) ? value.every(validTaskReference) : isRecordCollection(value);
 };
+const endingIdentity = (ending: Record<string, unknown>): boolean =>
+  typeof ending.id === 'string' &&
+  typeof ending.systemName === 'string' &&
+  typeof ending.gateQuestId === 'string';
+const endingCoverage = (ending: Record<string, unknown>): boolean =>
+  typeof ending.objectiveCount === 'number' && typeof ending.resolvedInReference === 'boolean';
+const validEnding = (ending: unknown): boolean =>
+  isPlainObject(ending) && endingIdentity(ending) && endingCoverage(ending);
+const validEndings = (value: unknown): boolean =>
+  value === undefined || (Array.isArray(value) && value.every(validEnding));
+// Pairs constrain two sub-quests each. A malformed pair cannot be interpreted, and guessing which
+// half was meant would invent an exclusion, so the overlay is rejected and the last good one kept.
+const validQuestPair = (pair: unknown): boolean =>
+  Array.isArray(pair) && pair.length === 2 && stringList(pair);
+const validQuestPairs = (value: unknown): boolean =>
+  value === undefined || (Array.isArray(value) && value.every(validQuestPair));
+const validChapterBranches = (chapter: Record<string, unknown>): boolean =>
+  [
+    validObjectives(chapter.objectives),
+    validEndings(chapter.endings),
+    validQuestPairs(chapter.mutuallyExclusiveQuestPairs),
+  ].every(Boolean);
 const validEffectiveSections = (overlay: OverlayData, mode: string): boolean => {
   const perks = overlayEntries(scopedOverlay(overlay, 'seasonalPerks', mode)).every(validPerk);
   const crafts = overlayEntries(scopedOverlay(overlay, 'craftsAdd', mode)).every(validCraft);
-  const chapters = overlayEntries(scopedOverlay(overlay, 'storyChapters', mode)).every((chapter) =>
-    validObjectives(chapter.objectives)
+  const chapters = overlayEntries(scopedOverlay(overlay, 'storyChapters', mode)).every(
+    validChapterBranches
   );
   return [
     perks,

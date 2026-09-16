@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { StoryChapter } from '@/types/tarkov';
+import type { StoryChapter, StoryChapterEnding } from '@/types/tarkov';
 const objectiveCompletionState = new Set<string>();
 const chapterCompletionState = new Set<string>();
 const STORY_CHAPTERS: StoryChapter[] = [
@@ -356,6 +356,42 @@ describe('useStorylineChapters', () => {
     const { normalizedChapters } = await loadComposable([DECLARED_ENDING_CHAPTER]);
     const chapter = requireDefined(normalizedChapters.value[0], 'Expected the-ticket chapter');
     expect(chapter.endings[0]).toMatchObject({ objectiveCompleted: 2, routeState: 'chosen' });
+  });
+  it('treats an explicitly empty ending list as authoritative', async () => {
+    const chapter = structuredClone(STORY_CHAPTERS[0]!);
+    chapter.endings = [];
+    const { normalizedChapters } = await loadComposable([chapter]);
+    const normalized = requireDefined(normalizedChapters.value[0], 'Expected first chapter');
+    expect(normalized.endings).toEqual([]);
+  });
+  it('keeps an unresolved ending open and drops malformed entries', async () => {
+    const chapter = structuredClone(DECLARED_ENDING_CHAPTER);
+    const unresolvedEnding = requireDefined(
+      chapter.endings?.[1],
+      'Expected the unresolved ending fixture'
+    );
+    chapter.endings = [
+      { ...unresolvedEnding, objectiveCount: 1 },
+      null as unknown as StoryChapterEnding,
+    ];
+    chapter.objectives!['obj-pending'] = {
+      description: 'Reach the unresolved branch',
+      endingId: 'ending-pending',
+      id: 'obj-pending',
+      order: 5,
+      sourceQuestId: 'quest-pending',
+      type: 'main',
+    };
+    objectiveCompletionState.add('the-ticket:obj-pending');
+    const { normalizedChapters } = await loadComposable([chapter]);
+    const normalized = requireDefined(normalizedChapters.value[0], 'Expected the-ticket chapter');
+    expect(normalized.endings).toHaveLength(1);
+    expect(normalized.endings[0]).toMatchObject({
+      evidencePending: true,
+      objectiveCompleted: 1,
+      objectiveTotal: 1,
+      routeState: 'open',
+    });
   });
   it('reports completed objective marks that upstream re-keyed', async () => {
     const { normalizedChapters } = await loadComposable([DECLARED_ENDING_CHAPTER], {

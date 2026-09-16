@@ -33,8 +33,11 @@ export interface StorylineChapterView {
   traderUnlocks: StorylineLinkEntry[];
   objectives: StoryObjective[];
   objectiveMap: Record<string, StoryObjective>;
-  /** Ending branches the overlay declares for the chapter (empty before overlay v1.93). */
-  declaredEndings: StoryChapterEnding[];
+  /**
+   * Ending branches the overlay declares for the chapter, or `null` when the overlay omits the
+   * field. An empty declared list is authoritative: it means the chapter branches into nothing.
+   */
+  declaredEndings: StoryChapterEnding[] | null;
   mutuallyExclusiveQuestPairs: Array<[string, string]>;
   /** The overlay resolved only part of this chapter from its pinned client capture. */
   coveragePartial: boolean;
@@ -410,13 +413,42 @@ const buildStoryEndings = (
   });
   return endings;
 };
+/**
+ * Declared endings as the overlay published them, or `null` when the field is absent. Members are
+ * shape-checked because the overlay is fetched at runtime: a malformed entry is dropped rather than
+ * allowed to throw while rendering the chapter.
+ */
+const declaredChapterEndings = (endings: unknown): StoryChapterEnding[] | null => {
+  if (!Array.isArray(endings)) {
+    return null;
+  }
+  return endings.filter((ending): ending is StoryChapterEnding => {
+    const candidate = ending as Partial<StoryChapterEnding> | null;
+    return (
+      typeof candidate?.id === 'string' &&
+      typeof candidate.systemName === 'string' &&
+      typeof candidate.resolvedInReference === 'boolean'
+    );
+  });
+};
 const humanizeEndingName = (systemName: string): string =>
   systemName.replace(/([a-z\d])([A-Z])/g, '$1 $2').trim() || systemName;
 const declaredEndingState = (
+  ending: StoryChapterEnding,
   objectiveTotal: number,
   objectiveCompleted: number
-): StorylineObjectiveProgress['routeState'] =>
-  objectiveTotal > 0 && objectiveCompleted === objectiveTotal ? 'chosen' : 'open';
+): StorylineObjectiveProgress['routeState'] => {
+  // An unresolved gate sub-quest cannot prove the branch is finished, however many of its known
+  // objectives are ticked, so such a branch stays open rather than reading as the chosen ending.
+  if (!ending.resolvedInReference) {
+    return 'open';
+  }
+  return objectiveTotal > 0 && objectiveCompleted === objectiveTotal ? 'chosen' : 'open';
+};
+const declaredObjectiveTotal = (ending: StoryChapterEnding, taggedCount: number): number =>
+  Number.isFinite(ending.objectiveCount) && ending.objectiveCount >= taggedCount
+    ? ending.objectiveCount
+    : taggedCount;
 /**
  * Endings the overlay declares at chapter level. Branch exclusivity is not inferred here: the
  * overlay proves it only through `mutuallyExclusiveQuestPairs`, so an unchosen branch stays open
@@ -429,17 +461,18 @@ const buildDeclaredEndings = (
   declaredEndings.map((ending) => {
     const endingObjectives = objectives.filter((objective) => objective.endingId === ending.id);
     const objectiveCompleted = endingObjectives.filter((objective) => objective.complete).length;
+    const objectiveTotal = declaredObjectiveTotal(ending, endingObjectives.length);
     return {
-      evidencePending: endingObjectives.length === 0,
+      evidencePending: !ending.resolvedInReference || objectiveTotal === 0,
       id: ending.id,
       label: humanizeEndingName(ending.systemName),
       objectiveCompleted,
       objectiveId: '',
       objectiveLabel: '',
-      objectiveTotal: endingObjectives.length,
+      objectiveTotal,
       routeBlockingAlternatives: [],
       routeChoiceIndex: null,
-      routeState: declaredEndingState(endingObjectives.length, objectiveCompleted),
+      routeState: declaredEndingState(ending, objectiveTotal, objectiveCompleted),
       systemName: ending.systemName,
     };
   });
@@ -513,7 +546,7 @@ export function useStorylineChapters(options: UseStorylineChaptersOptions = {}):
         traderUnlocks: chapter.traderUnlocks ?? [],
         objectives: orderedStoryObjectives(objectiveMap),
         objectiveMap,
-        declaredEndings: chapter.endings ?? [],
+        declaredEndings: declaredChapterEndings(chapter.endings),
         mutuallyExclusiveQuestPairs: chapter.mutuallyExclusiveQuestPairs ?? [],
         coveragePartial: chapter.referenceCoverage?.partial === true,
         staleObjectiveIds: unknownStoryObjectiveIds(
@@ -591,7 +624,7 @@ export function useStorylineChapters(options: UseStorylineChaptersOptions = {}):
         linearObjectives: optionalLinearObjectives,
         routeChoiceGroups: optionalRouteChoices,
       } = buildRouteChoiceGroups(optionalObjectives);
-      const endings = chapter.declaredEndings.length
+      const endings = chapter.declaredEndings
         ? buildDeclaredEndings(chapter.declaredEndings, objectives)
         : buildStoryEndings(objectives, [...mainRouteChoices, ...optionalRouteChoices]);
       return {
