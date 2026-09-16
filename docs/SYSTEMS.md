@@ -1591,7 +1591,9 @@ diff against captured main permits only regular non-English locale JSON files. D
 project checks run after that checkout; the PAT is available only to the final merge gate.
 
 - Only an open, non-draft, same-repository `locales` PR targeting `main` is eligible.
-- Changed main/head SHAs and non-clean merge states fail closed. Only unknown calculations retry.
+- Preflight checks reject observed main/head changes and non-clean merge states. Only unknown
+  calculations retry. The base check is not atomic with merging; enforcing an up-to-date base at
+  merge time requires repository branch rules or a merge queue.
 - The server-side `--match-head-commit` guard must use the SHA that passed all validation.
 - Merges use `ACCESS_TOKEN_GITHUB`, never a `GITHUB_TOKEN` fallback, so normal push CI runs.
   The fixed squash message must not inherit automation-skip markers from translation commits.

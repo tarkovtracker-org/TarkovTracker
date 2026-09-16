@@ -57,7 +57,10 @@ all other states fail closed. `--match-head-commit` atomically guards the squash
 last-moment PR push. A fixed commit body prevents inherited CI-skip markers from suppressing the
 post-merge run. The gate is copied from trusted main before synchronization and survives checkout.
 If main or the PR changes during validation, rerun Crowdin Sync; do not bypass the guard.
-GitHub remains responsible for branch rules and the final merge decision.
+The main SHA check is a preflight check: GitHub's PR merge API atomically guards the head, not the
+base. Main can still advance between that check and the merge. Enforcing an up-to-date branch or
+merge queue requires a separate repository rules decision; this workflow does not change those
+rules. GitHub remains responsible for branch rules and the final merge decision.
 
 Cloudflare Git deployments run independently of GitHub Actions. Release eligibility still requires
 successful CI for the current main push, and semantic-release decides whether a version is warranted;
