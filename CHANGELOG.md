@@ -1,3 +1,10 @@
+## [1.79.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.2...v1.79.3) (2026-09-16)
+
+
+### Bug Fixes
+
+* **app:** reconcile saved story objective ids with the published catalog ([#850](https://github.com/tarkovtracker-org/TarkovTracker/issues/850)) ([2db9a4f](https://github.com/tarkovtracker-org/TarkovTracker/commit/2db9a4fd21aaa43a3bef6f45f6f5d72875f1d5c0))
+
 ## [1.79.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.1...v1.79.2) (2026-09-16)
 
 
