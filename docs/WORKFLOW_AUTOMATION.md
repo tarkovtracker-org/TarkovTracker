@@ -204,8 +204,8 @@ semantic-release still decides whether the accumulated conventional commits warr
 `release-gate.mjs` re-reads the triggering run and `refs/heads/main` before dependency setup and
 again immediately before publishing. It verifies the CI workflow path, conclusion, SHA, and run
 attempt. Superseded commits skip; release never substitutes a newer, unvalidated checkout.
-The gate initially loads from the trusted default-branch SHA and is copied to `RUNNER_TEMP` so
-both checks use the same source even after checkout replacement. Only after validation does a
+The gate and its recovery helper initially load from the trusted default-branch SHA and are copied
+to `RUNNER_TEMP` so checks use the same source even after checkout replacement. Only after validation does a
 second checkout pin the triggering CI SHA for building and publishing; it never executes a fork
 candidate.
 
@@ -218,22 +218,51 @@ This removes the duplicate full test suite and database reset from the serialize
 The production build remains a release check. Cloudflare deployments continue independently;
 this workflow controls release/version publication, not when the initial deployment starts.
 
-**Version-bump commit:** `@semantic-release/git` commits the bumped `package.json` and `CHANGELOG.md`
-as `chore(release): <version> [skip actions]`. The marker is deliberately `[skip actions]` rather
-than `[skip ci]`:
+**Required main policy:** `.github/main-ci-ruleset.json` records the desired API configuration for
+the `Main CI freshness` repository ruleset. Rollout must apply it and verify active enforcement and
+an empty bypass list before merging the automation changes. It targets
+`refs/heads/main`, requires `CI Result` from GitHub Actions (integration ID `15368`), enables
+`strict_required_status_checks_policy`, and has an empty `bypass_actors` list. This applies to
+all PRs and direct pushes, including administrators and automation. Existing deletion/force-push
+rules remain separate. Behind branches must incorporate current main and pass CI again; do not
+use an administrator bypass. GitHub enforces freshness at merge time, closing the interval after
+automation's last base-SHA check. Both Crowdin and release automation verify the effective strict rule before writing main. The
+administrator must verify the deployed ruleset's empty bypass list during rollout and after policy
+changes. GitHub hides that list from callers without ruleset write access; automation does not
+request administrative permissions merely to inspect it.
 
-- GitHub Actions treats `[skip actions]` as a skip marker, so this workflow does not re-trigger
-  itself. ([Skipping workflow runs](https://docs.github.com/en/actions/managing-workflow-runs/skipping-workflow-runs))
-- Cloudflare Pages does **not** recognize `[skip actions]`. Its skip markers are `[CI Skip]`,
-  `[CI-Skip]`, `[Skip CI]`, `[Skip-CI]`, and `[CF-Pages-Skip]`.
-  ([GitHub integration](https://developers.cloudflare.com/pages/configuration/git-integration/github-integration/))
+**Version-bump commit:** `scripts/release-commit.mjs` prepares the bumped `package.json` and
+`CHANGELOG.md` as `chore(release): <version>` with no skip marker. The plugin supports the
+main-only release workflow. It stages only these generated assets and rejects unrelated staged
+files. `scripts/release-commit.sh` pushes the new commit to
+`wip/release-<version>-<run-id>-<attempt>` using `ACCESS_TOKEN_GITHUB` as `RELEASE_CI_TOKEN`.
+That PAT push starts ordinary push CI on the staging branch. The plugin waits up to thirty minutes
+for successful GitHub Actions `CI Result` on the exact version SHA; absent, failed, cancelled,
+skipped, or timed-out checks cannot promote it.
 
-That asymmetry is the point. The footer version comes from `packageJson.version` in
-`nuxt.config.ts`, which is baked into the bundle at build time and surfaced through
-`runtimeConfig.public.appVersion`. The merge commit is built _before_ semantic-release bumps
-`package.json`, so if Cloudflare also skipped the bump commit the deployed site would advertise the
-previous version until the next unrelated push to `main`. Letting Pages build the bump commit costs
-one extra deploy per release and keeps the displayed version honest.
+After rechecking main and the policy, an ordinary non-forced push promotes the identical SHA to
+main using `GITHUB_TOKEN`. A concurrent main advance rejects promotion rather than rebasing
+unvalidated assets. The required check is already successful on that commit. The token suppresses
+recursive main Actions runs; semantic-release then tags and publishes the validated version.
+Successful promotion deletes only the staging ref still pointing at that SHA. Failed attempts
+retain the staging branch for diagnosis. A cleanup failure emits a warning without undoing
+publication. No token is written to a Git URL or config.
+
+**Interrupted publication:** If tag pushing or GitHub publication fails after main promotion, rerun
+the original Release workflow. `release-recovery.mjs` is enabled only for reruns and recognizes
+only the direct version-commit child of the original successful main CI revision. It requires
+successful exact-SHA GitHub Actions `CI Result`, exactly the two generated modified assets, a
+manifest whose only change is the matching version, and a changelog that preserves all previous
+content. It reconstructs the original notes and creates the missing tag/release idempotently.
+An existing tag must point to that same commit; an unrelated main successor, unsuccessful CI,
+conflicting tag, draft/prerelease publication, or changed asset content cannot be recovered.
+The recovery step rechecks the evidence before publication and never moves main or creates another
+version commit. Failures before promotion use the ordinary original-workflow retry path.
+
+Cloudflare Git deployments remain independent and build the version commit. The footer version
+comes from `packageJson.version` in `nuxt.config.ts`, so this second production build makes the
+footer match the published release. Staging branches may also receive preview builds according
+to the platform's branch settings.
 
 > [!WARNING]
 > Never write a bracketed skip marker verbatim in a commit message — including when merely
@@ -476,7 +505,7 @@ GitHub Actions itself deploys nothing; items 2-4 are separate Git integrations. 
 section of [`runbook.md`](./runbook.md) for what to verify after each merge.
 
 A releasing merge deploys twice: once for the merge commit, then again for the
-`chore(release): <version> [skip actions]` commit that carries the bumped `package.json`. The second
+`chore(release): <version>` commit that carries the bumped `package.json`. The second
 deploy is what makes the footer version match the release, so treat it as part of the merge rather
 than a stray build.
 
