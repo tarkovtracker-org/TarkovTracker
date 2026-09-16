@@ -204,8 +204,8 @@ semantic-release still decides whether the accumulated conventional commits warr
 `release-gate.mjs` re-reads the triggering run and `refs/heads/main` before dependency setup and
 again immediately before publishing. It verifies the CI workflow path, conclusion, SHA, and run
 attempt. Superseded commits skip; release never substitutes a newer, unvalidated checkout.
-The gate initially loads from the trusted default-branch SHA and is copied to `RUNNER_TEMP` so
-both checks use the same source even after checkout replacement. Only after validation does a
+The gate and its recovery helper initially load from the trusted default-branch SHA and are copied
+to `RUNNER_TEMP` so checks use the same source even after checkout replacement. Only after validation does a
 second checkout pin the triggering CI SHA for building and publishing; it never executes a fork
 candidate.
 
@@ -218,8 +218,9 @@ This removes the duplicate full test suite and database reset from the serialize
 The production build remains a release check. Cloudflare deployments continue independently;
 this workflow controls release/version publication, not when the initial deployment starts.
 
-**Enforced main policy:** `.github/main-ci-ruleset.json` records the API configuration for the
-active `Main CI freshness` repository ruleset. It targets
+**Required main policy:** `.github/main-ci-ruleset.json` records the desired API configuration for
+the `Main CI freshness` repository ruleset. Rollout must apply it and verify active enforcement and
+an empty bypass list before merging the automation changes. It targets
 `refs/heads/main`, requires `CI Result` from GitHub Actions (integration ID `15368`), enables
 `strict_required_status_checks_policy`, and has an empty `bypass_actors` list. This applies to
 all PRs and direct pushes, including administrators and automation. Existing deletion/force-push
@@ -244,8 +245,19 @@ main using `GITHUB_TOKEN`. A concurrent main advance rejects promotion rather th
 unvalidated assets. The required check is already successful on that commit. The token suppresses
 recursive main Actions runs; semantic-release then tags and publishes the validated version.
 Successful promotion deletes only the staging ref still pointing at that SHA. Failed attempts
-retain the staging branch for diagnosis; retry through successful CI on current main. A cleanup
-failure emits a warning without undoing publication. No token is written to a Git URL or config.
+retain the staging branch for diagnosis. A cleanup failure emits a warning without undoing
+publication. No token is written to a Git URL or config.
+
+**Interrupted publication:** If tag pushing or GitHub publication fails after main promotion, rerun
+the original Release workflow. `release-recovery.mjs` is enabled only for reruns and recognizes
+only the direct version-commit child of the original successful main CI revision. It requires
+successful exact-SHA GitHub Actions `CI Result`, exactly the two generated modified assets, a
+manifest whose only change is the matching version, and a changelog that preserves all previous
+content. It reconstructs the original notes and creates the missing tag/release idempotently.
+An existing tag must point to that same commit; an unrelated main successor, unsuccessful CI,
+conflicting tag, draft/prerelease publication, or changed asset content cannot be recovered.
+The recovery step rechecks the evidence before publication and never moves main or creates another
+version commit. Failures before promotion use the ordinary original-workflow retry path.
 
 Cloudflare Git deployments remain independent and build the version commit. The footer version
 comes from `packageJson.version` in `nuxt.config.ts`, so this second production build makes the

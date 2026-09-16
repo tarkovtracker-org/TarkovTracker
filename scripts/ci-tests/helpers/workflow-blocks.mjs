@@ -14,3 +14,8 @@ const blockAfter = (text, header, nextPattern) => {
 export const jobBlock = (workflow, job) => blockAfter(workflow, `\n  ${job}:\n`, /\n {2}\S/);
 /** Extract one named step without including later steps. */
 export const workflowStep = (job, name) => blockAfter(job, `      - name: ${name}\n`, /\n {6}- /);
+/** Extract a trigger only within the workflow's event configuration. */
+export const workflowEvent = (workflow, event) => {
+  const events = blockAfter(workflow, '\non:\n', /\n\S/);
+  return blockAfter(events, `  ${event}:\n`, /\n {2}\S/);
+};

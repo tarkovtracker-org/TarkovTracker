@@ -1582,6 +1582,10 @@ The checkout stays pinned to the validated SHA. The production build still runs 
 - Release version commits pass ordinary CI on a temporary `wip/release-*` branch before the
   identical SHA advances main. The main ruleset requires successful GitHub Actions `CI Result`,
   strict freshness, and no bypass actors. Non-fast-forward promotion fails if main advances.
+- If publication fails after version promotion, an explicit rerun can recover only the direct
+  version-only child of the original CI revision, with successful exact-head CI and unchanged
+  manifest/changelog history. Recovery creates missing tags/releases idempotently, rejects tag
+  conflicts, and never advances main or bumps another version.
 - The staging push uses the automation PAT to start CI; main promotion uses `GITHUB_TOKEN` to
   avoid recursive Actions runs. Version commits have no skip marker; Cloudflare still rebuilds.
 - A green workflow run must continue to mean the test shards and Supabase validation passed;
@@ -1592,10 +1596,12 @@ The checkout stays pinned to the validated SHA. The production build still runs 
 `.github/workflows/crowdin.yml` uses `scripts/crowdin-pr.sh`, preserved from trusted main before
 synchronization, to bind translation validation and merging to one immutable PR head. Its full tree
 diff against captured main permits only regular non-English locale JSON files. Dependency setup and
-project checks run after that checkout. The PAT starts synchronization/PR CI and performs the final
+project checks run after that checkout. The PAT starts synchronization/PR CI, updates a behind branch, and performs the final
 merge; dependency installation and project checks receive no automation credential.
 
 - Only an open, non-draft, same-repository `locales` PR targeting `main` is eligible.
+- Behind translation branches first receive a GitHub branch update guarded by the expected head.
+  Only afterward does the workflow capture and validate a candidate. Conflicts fail closed.
 - Candidates contain captured main. Preflight checks reject observed main/head changes and
   non-clean merge states. Only unknown calculations retry.
 - The gate awaits successful GitHub Actions `CI Result` on the exact head and verifies the effective

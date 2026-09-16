@@ -34,7 +34,7 @@ to `app/locales/%two_letters_code%.json`, preserving the directory hierarchy. It
 local translations. The existing `locales` branch supplies translation PRs targeting `main`.
 
 Repository secrets `CROWDIN_PROJECT_ID` and `CROWDIN_PERSONAL_TOKEN` authenticate to Crowdin only.
-Synchronization and the final merge use `ACCESS_TOKEN_GITHUB`, so creating/updating a PR starts
+Synchronization, branch updates, and the final merge use `ACCESS_TOKEN_GITHUB`, so PR changes start
 normal PR CI and merging starts main push CI. There is no `GITHUB_TOKEN` fallback. The PR author
 is the PAT owner. The PAT needs repository contents and pull-request write access, checks read
 access, and any required organization SSO authorization. Prefer a repository-scoped fine-grained
@@ -42,7 +42,9 @@ PAT and rotate it according to repository policy. No automation credential is pa
 installation or project validation.
 
 When new translations are synchronized, `scripts/crowdin-pr.sh` verifies an open, non-draft,
-same-repository `locales` PR targeting `main`. It captures its head SHA, fetches that exact commit,
+same-repository `locales` PR targeting `main`. If the branch is behind, it asks GitHub to merge main
+into it using an expected-head guard and waits for the new head; conflicts fail closed. The PAT
+starts CI for that update. It then captures the candidate head SHA, fetches that exact commit,
 and compares its full tree with a captured main SHA. Only regular non-English JSON files directly
 inside `app/locales/` may differ; empty diffs, deletions, symlinks, renames from other paths, and stale
 executable code are rejected. The checkout and dependency setup use this validated commit before

@@ -41,6 +41,31 @@ check_translation_tree() {
   done < "$paths"
   rm "$paths"
 }
+# Incorporate trusted main before capturing the candidate that project checks will validate.
+update() {
+  [[ -n "${GH_TOKEN:-}" ]] || fail "ACCESS_TOKEN_GITHUB is required to update the translation branch."
+  local pr head base updated attempt
+  pr="$(read_pr)"
+  check_identity "$pr"
+  head="$(jq -r '.headRefOid' <<< "$pr")"
+  require_sha "$head"
+  git fetch origin main
+  base="$(git rev-parse FETCH_HEAD)"
+  git fetch origin "$head"
+  if git merge-base --is-ancestor "$base" "$head"; then return; fi
+  # GitHub compares the expected head atomically; conflicts or concurrent pushes fail closed.
+  gh api --method PUT "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/update-branch" \
+    -f "expected_head_sha=$head" >/dev/null
+  for ((attempt = 1; attempt <= 20; attempt++)); do
+    pr="$(read_pr)"
+    check_identity "$pr"
+    updated="$(jq -r '.headRefOid' <<< "$pr")"
+    require_sha "$updated"
+    if [[ "$updated" != "$head" ]]; then return; fi
+    (( attempt < 20 )) || fail "Timed out waiting for the translation branch update."
+    sleep 3
+  done
+}
 # Fetch and validate immutable revisions, then publish the detached checkout identity.
 prepare() {
   local pr
@@ -103,7 +128,8 @@ merge() {
 }
 [[ "${PR_NUMBER:-}" =~ ^[1-9][0-9]*$ ]] || fail "Invalid Crowdin PR number."
 case "${1:-}" in
+  update) update ;;
   prepare) prepare ;;
   merge) merge ;;
-  *) fail "Usage: crowdin-pr.sh prepare|merge" ;;
+  *) fail "Usage: crowdin-pr.sh update|prepare|merge" ;;
 esac

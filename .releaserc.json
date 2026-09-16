@@ -1,24 +1,40 @@
 {
-  "branches": [
-    "main",
-    {
-      "name": "develop",
-      "prerelease": "beta"
-    }
-  ],
+  "branches": ["main"],
   "plugins": [
     [
       "@semantic-release/commit-analyzer",
       {
         "preset": "angular",
         "releaseRules": [
-          { "type": "feat", "release": "minor" },
-          { "type": "fix", "release": "patch" },
-          { "type": "perf", "release": "patch" },
-          { "type": "refactor", "release": "patch" },
-          { "type": "revert", "release": "patch" },
-          { "type": "docs", "scope": "README", "release": "patch" },
-          { "scope": "no-release", "release": false }
+          {
+            "type": "feat",
+            "release": "minor"
+          },
+          {
+            "type": "fix",
+            "release": "patch"
+          },
+          {
+            "type": "perf",
+            "release": "patch"
+          },
+          {
+            "type": "refactor",
+            "release": "patch"
+          },
+          {
+            "type": "revert",
+            "release": "patch"
+          },
+          {
+            "type": "docs",
+            "scope": "README",
+            "release": "patch"
+          },
+          {
+            "scope": "no-release",
+            "release": false
+          }
         ]
       }
     ],

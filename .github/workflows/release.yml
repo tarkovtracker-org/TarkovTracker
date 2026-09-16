@@ -42,11 +42,25 @@ jobs:
             const { copyFile } = require('node:fs/promises');
             const gatePath = `${process.env.RUNNER_TEMP}/release-gate.mjs`;
             await copyFile(`${process.env.GITHUB_WORKSPACE}/scripts/release-gate.mjs`, gatePath);
+            await copyFile(`${process.env.GITHUB_WORKSPACE}/scripts/release-recovery.mjs`, `${process.env.RUNNER_TEMP}/release-recovery.mjs`);
             const { releaseEligibility } = await import(pathToFileURL(gatePath));
-            const result = await releaseEligibility({ github, context });
+            const result = await releaseEligibility({ github, context, allowRecovery: Number(process.env.GITHUB_RUN_ATTEMPT) > 1 });
             core.info(result.reason);
             core.setOutput('release', String(result.release));
             core.setOutput('sha', result.sha || '');
+            core.setOutput('recovery', String(Boolean(result.recovery)));
+      - name: Recover interrupted version publication
+        if: steps.eligible.outputs.recovery == 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const { releaseEligibility } = await import(pathToFileURL(`${process.env.RUNNER_TEMP}/release-gate.mjs`));
+            const { publishRecoveredRelease } = await import(pathToFileURL(`${process.env.RUNNER_TEMP}/release-recovery.mjs`));
+            const result = await releaseEligibility({ github, context, allowRecovery: true });
+            if (!result.recovery) throw new Error('Release recovery evidence changed.');
+            await publishRecoveredRelease({ github, context, recovery: result.recovery });
+            core.info(`Recovered publication of v${result.recovery.version} at ${result.recovery.sha}.`);
       - name: Checkout validated release commit
         if: steps.eligible.outputs.release == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1

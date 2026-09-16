@@ -3,6 +3,7 @@ import { writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fixture, git } from './helpers/automation-fixture.mjs';
+import { jobBlock, workflowEvent, workflowStep } from './helpers/workflow-blocks.mjs';
 /** Stage realistic generated assets without modifying application code. */
 function releaseFixture(t) {
   const f = fixture(t);
@@ -16,6 +17,15 @@ test('release validates a staging commit before promoting that identical SHA wit
   assert.equal(result.status, 0, result.stderr);
   const sha = git(f.repo, 'rev-parse', 'HEAD');
   assert.equal(git(f.repo, '--git-dir', f.remote, 'rev-parse', 'main'), sha);
+  assert.ok(
+    f
+      .calls()
+      .some((args) =>
+        args.includes(
+          `repos/example/repo/commits/${sha}/check-runs?check_name=CI%20Result&filter=latest&per_page=100`
+        )
+      )
+  );
   const pushes = f.pushes();
   assert.equal(pushes[0].credential, 'ci');
   assert.equal(pushes[0].args.at(-1), `${sha}:refs/heads/wip/release-1.2.3-123-1`);
@@ -55,13 +65,46 @@ test('release refuses unrelated staged content', (t) => {
   assert.match(result.stderr, /Unexpected staged release asset/);
   assert.equal(f.pushes().length, 0);
 });
-test('release staging runs ordinary CI while release publication retains its main-only gate', () => {
-  const read = (path) => readFileSync(path, 'utf8');
-  assert.match(read('.github/workflows/ci.yml'), /branches: \[main, develop, 'wip\/\*\*'\]/);
-  assert.match(read('.github/workflows/release.yml'), /head_branch == 'main'/);
+/** Keep trigger, job eligibility and publication credentials within their owning blocks. */
+function assertReleaseWorkflowBoundaries(ci, releaseWorkflow) {
+  assert.match(workflowEvent(ci, 'push'), /branches: \[main, develop, 'wip\/\*\*'\]/);
+  const release = jobBlock(releaseWorkflow, 'release');
+  const eligibility = release.slice(0, release.indexOf('    steps:'));
+  assert.match(eligibility, /head_branch == 'main'/);
   assert.match(
-    read('.github/workflows/release.yml'),
+    workflowStep(release, 'Semantic Release'),
     /RELEASE_CI_TOKEN: \$\{\{ secrets.ACCESS_TOKEN_GITHUB \}\}/
   );
-  assert.ok(JSON.parse(read('.releaserc.json')).plugins.includes('./scripts/release-commit.mjs'));
+}
+test('release staging runs ordinary CI while publication retains its main-only gate', () => {
+  const read = (path) => readFileSync(path, 'utf8');
+  assertReleaseWorkflowBoundaries(
+    read('.github/workflows/ci.yml'),
+    read('.github/workflows/release.yml')
+  );
+  const config = JSON.parse(read('.releaserc.json'));
+  assert.ok(config.plugins.includes('./scripts/release-commit.mjs'));
+  assert.deepEqual(config.branches, ['main']);
+});
+test('unrelated triggers, jobs and steps cannot satisfy the release workflow contract', () => {
+  const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const release = readFileSync('.github/workflows/release.yml', 'utf8');
+  const wrongTrigger = ci
+    .replace("branches: [main, develop, 'wip/**']", 'branches: [main, develop]')
+    .replace(
+      'pull_request:\n    branches: [main, develop]',
+      "pull_request:\n    branches: [main, develop, 'wip/**']"
+    );
+  assert.throws(() => assertReleaseWorkflowBoundaries(wrongTrigger, release));
+  const wrongJob =
+    release.replace("head_branch == 'main'", "head_branch == 'develop'") +
+    "\n  unrelated:\n    if: head_branch == 'main'\n";
+  assert.throws(() => assertReleaseWorkflowBoundaries(ci, wrongJob));
+  const wrongStep =
+    release.replace(
+      'RELEASE_CI_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}',
+      'RELEASE_CI_TOKEN: missing'
+    ) +
+    '\n      - name: Unrelated\n        env:\n          RELEASE_CI_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}\n';
+  assert.throws(() => assertReleaseWorkflowBoundaries(ci, wrongStep));
 });

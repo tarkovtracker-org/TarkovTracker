@@ -172,6 +172,14 @@ function assertWorkflowBoundaries(workflow) {
   const beforeMerge = sync.slice(0, sync.indexOf('      - name: Merge validated translations'));
   const synchronization = workflowStep(sync, 'Synchronize Crowdin translations');
   assert.match(synchronization, /GITHUB_TOKEN: \$\{\{ secrets.ACCESS_TOKEN_GITHUB \}\}/);
+  const update = workflowStep(sync, 'Update translation branch from main');
+  assert.match(update, /GH_TOKEN: \$\{\{ secrets.ACCESS_TOKEN_GITHUB \}\}/);
+  assert.match(update, /crowdin-pr.sh" update/);
+  assertStepOrder(
+    sync,
+    '      - name: Update translation branch from main\n',
+    '      - name: Prepare immutable translation checkout\n'
+  );
   const prepare = workflowStep(sync, 'Prepare immutable translation checkout');
   assert.doesNotMatch(prepare, /ACCESS_TOKEN_GITHUB/);
   assert.ok(beforeMerge.includes('setup-project'));
@@ -288,4 +296,32 @@ test('policy checks reject loose freshness, another provider and another require
     rejected(f.run('merge', { RULES: JSON.stringify([rule]) }), /Missing strict main/);
   }
   assert.ok(!f.calls().some((args) => args[1] === 'merge'));
+});
+test('branch update preserves current heads and guards stale heads before validation', (t) => {
+  const current = fixture(t);
+  passed(current.run('update'));
+  assert.ok(!current.calls().some((args) => args.includes('--method')));
+  const f = fixture(t);
+  git(f.repo, 'commit', '--allow-empty', '-m', 'advance main');
+  git(f.repo, 'checkout', 'locales');
+  git(f.repo, 'merge', '--no-ff', 'main', '-m', 'update branch');
+  const headRefOid = git(f.repo, 'rev-parse', 'HEAD');
+  git(f.repo, 'checkout', 'main');
+  const states = JSON.stringify([f.pr, f.pr, { ...f.pr, headRefOid }]);
+  passed(f.run('update', { PR_STATES: states }));
+  const update = f.calls().find((args) => args.includes('--method'));
+  assert.ok(update.includes(`expected_head_sha=${f.head}`));
+  passed(f.run('prepare', { PR_STATES: JSON.stringify([{ ...f.pr, headRefOid }]) }));
+  assert.equal(git(f.repo, 'rev-parse', 'HEAD'), headRefOid);
+});
+test('branch updates reject raced heads, wrong PR identity and an update that never completes', (t) => {
+  const f = fixture(t);
+  git(f.repo, 'commit', '--allow-empty', '-m', 'advance main');
+  rejected(f.run('update', { ACTUAL_HEAD: 'a'.repeat(40) }), /Head changed at branch update/);
+  rejected(
+    f.run('update', { PR_STATES: JSON.stringify([{ ...f.pr, isCrossRepository: true }]) }),
+    /Expected an open/
+  );
+  rejected(f.run('update'), /Timed out waiting for the translation branch update/);
+  assert.equal(f.output(), '');
 });

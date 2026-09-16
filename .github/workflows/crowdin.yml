@@ -72,6 +72,12 @@ jobs:
           else
             echo "No open Crowdin PR to auto-merge."
           fi
+      - name: Update translation branch from main
+        if: steps.resolve-pr.outputs.pr_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}
+          PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
+        run: bash "$RUNNER_TEMP/crowdin-pr.sh" update
       - name: Prepare immutable translation checkout
         id: candidate
         if: steps.resolve-pr.outputs.pr_number != ''

@@ -61,6 +61,12 @@ const p = process.env;
 const args = process.argv.slice(2);
 fs.appendFileSync(p.CALLS, JSON.stringify(args) + '\n');
 if (args[0] === 'api') {
+  if (args.includes('--method')) {
+    if (!args.includes('expected_head_sha=' + p.ACTUAL_HEAD)) {
+      console.error('Head changed at branch update'); process.exit(1);
+    }
+    console.log('{"message":"Updating pull request branch"}'); process.exit(0);
+  }
   const endpoint = args[args.indexOf('api') + 1] === '--paginate' ? args[2] : args[1];
   if (endpoint.includes('/rules/branches/')) { console.log(p.RULES); process.exit(0); }
   if (endpoint.includes('/rulesets/')) { console.error('Ruleset details require administrator access'); process.exit(1); }
@@ -72,7 +78,10 @@ if (args[0] === 'api') {
     }] }));
     process.exit(0);
   }
-  console.log(p.CURRENT_BASE); process.exit(0);
+  if (endpoint === 'repos/' + p.GITHUB_REPOSITORY + '/git/ref/heads/main') {
+    console.log(p.CURRENT_BASE); process.exit(0);
+  }
+  console.error('Unexpected gh api endpoint: ' + endpoint); process.exit(2);
 }
 if (args[1] === 'view') {
   const states = JSON.parse(p.PR_STATES);
@@ -155,6 +164,7 @@ process.exit(result.status ?? 1);
     COUNTER: join(root, 'counter'),
   };
   return {
+    env,
     repo,
     remote,
     head,
