@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Copied from trusted main to RUNNER_TEMP before the Crowdin action changes the checkout.
 set -euo pipefail
+readonly PR_HEAD_QUERY='.headRefOid'
 # shellcheck source=scripts/github-ci-gate.sh
 source "$(dirname "${BASH_SOURCE[0]}")/github-ci-gate.sh"
 # Stop the workflow with a GitHub Actions error annotation.
@@ -47,7 +48,7 @@ update() {
   local pr head base updated attempt
   pr="$(read_pr)"
   check_identity "$pr"
-  head="$(jq -r '.headRefOid' <<< "$pr")"
+  head="$(jq -r "$PR_HEAD_QUERY" <<< "$pr")"
   require_sha "$head"
   git fetch origin main
   base="$(git rev-parse FETCH_HEAD)"
@@ -59,7 +60,7 @@ update() {
   for ((attempt = 1; attempt <= 20; attempt++)); do
     pr="$(read_pr)"
     check_identity "$pr"
-    updated="$(jq -r '.headRefOid' <<< "$pr")"
+    updated="$(jq -r "$PR_HEAD_QUERY" <<< "$pr")"
     require_sha "$updated"
     if [[ "$updated" != "$head" ]]; then return; fi
     (( attempt < 20 )) || fail "Timed out waiting for the translation branch update."
@@ -71,7 +72,7 @@ prepare() {
   local pr
   pr="$(read_pr)"
   check_identity "$pr"
-  HEAD_SHA="$(jq -r '.headRefOid' <<< "$pr")"
+  HEAD_SHA="$(jq -r "$PR_HEAD_QUERY" <<< "$pr")"
   require_sha "$HEAD_SHA"
   git fetch origin main
   BASE_SHA="$(git rev-parse FETCH_HEAD)"
@@ -86,7 +87,7 @@ prepare() {
 # Reject observed head or base changes since the candidate passed validation.
 check_revision() {
   local pr="$1"
-  [[ "$(jq -r '.headRefOid' <<< "$pr")" == "$HEAD_SHA" ]] ||
+  [[ "$(jq -r "$PR_HEAD_QUERY" <<< "$pr")" == "$HEAD_SHA" ]] ||
     fail "Crowdin PR head changed after validation."
   local current_base
   current_base="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"

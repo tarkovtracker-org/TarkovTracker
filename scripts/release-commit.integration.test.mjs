@@ -12,7 +12,6 @@ it('semantic-release core tags the exact version commit prepared and promoted by
   output.resume();
   const result = await semanticRelease(
     {
-      ci: false,
       branches: ['main'],
       repositoryUrl: f.remote,
       plugins: [
@@ -30,8 +29,24 @@ it('semantic-release core tags the exact version commit prepared and promoted by
         fileURLToPath(new URL('./release-commit.mjs', import.meta.url)),
       ],
     },
-    { cwd: f.repo, env: f.env, stdout: output, stderr: output }
+    {
+      cwd: f.repo,
+      // Model this fixture's main push, never the enclosing PR runner's event/checkout.
+      env: {
+        ...f.env,
+        CI: 'true',
+        GITHUB_ACTIONS: 'true',
+        GITHUB_EVENT_NAME: 'push',
+        GITHUB_EVENT_PATH: '',
+        GITHUB_REF: 'refs/heads/main',
+        GITHUB_SHA: f.base,
+        GITHUB_WORKSPACE: f.repo,
+      },
+      stdout: output,
+      stderr: output,
+    }
   );
+  expect(result).toHaveProperty('nextRelease');
   const sha = git(f.repo, 'rev-parse', 'HEAD');
   expect(result.nextRelease.gitHead).toBe(sha);
   expect(git(f.repo, '--git-dir', f.remote, 'rev-parse', 'main')).toBe(sha);

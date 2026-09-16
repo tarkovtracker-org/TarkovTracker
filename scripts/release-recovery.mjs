@@ -13,7 +13,7 @@ function singleParent(commit, baseSha) {
 /** Recognize the one-parent, version-only commit produced by release preparation. */
 function versionCommit(commit, baseSha) {
   if (!singleParent(commit, baseSha)) return null;
-  const match = /^chore\(release\): ([0-9]+\.[0-9]+\.[0-9]+)\s*$/.exec(commit.commit.message);
+  const match = /^chore\(release\): (\d+\.\d+\.\d+)\s*$/.exec(commit.commit.message);
   if (!match) return null;
   const files = commit.files.map((file) => `${file.status}:${file.filename}`).sort();
   return isDeepStrictEqual(files, ['modified:CHANGELOG.md', 'modified:package.json'])
@@ -45,7 +45,8 @@ function releaseNotes(oldLog, newLog, version) {
   const content = newLog.trim();
   if (!content.endsWith(suffix)) throw new Error('Release rewrote existing changelog content.');
   const notes = content.slice(0, -suffix.length).trim();
-  if (!new RegExp(`^#{1,2} \\[${version.replaceAll('.', '\\.')}\\]`).test(notes)) {
+  const versionPattern = version.replaceAll('.', String.raw`\.`);
+  if (!new RegExp(String.raw`^#{1,2} \[${versionPattern}\]`).test(notes)) {
     throw new Error('Release notes do not match the version.');
   }
   return notes;
