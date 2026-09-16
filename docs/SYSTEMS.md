@@ -1583,6 +1583,20 @@ The checkout stays pinned to the validated SHA. The production build still runs 
 - A green workflow run must continue to mean the test shards and Supabase validation passed;
   making those jobs optional requires reconsidering this release gate.
 
+### Crowdin automatic merges
+
+`.github/workflows/crowdin.yml` uses `scripts/crowdin-pr.sh`, preserved from trusted main before
+synchronization, to bind translation validation and merging to one immutable PR head. Its full tree
+diff against captured main permits only regular non-English locale JSON files. Dependency setup and
+project checks run after that checkout; the PAT is available only to the final merge gate.
+
+- Only an open, non-draft, same-repository `locales` PR targeting `main` is eligible.
+- Changed main/head SHAs and non-clean merge states fail closed. Only unknown calculations retry.
+- The server-side `--match-head-commit` guard must use the SHA that passed all validation.
+- Merges use `ACCESS_TOKEN_GITHUB`, never a `GITHUB_TOKEN` fallback, so normal push CI runs.
+  The fixed squash message must not inherit automation-skip markers from translation commits.
+- Existing release provenance checks stay intact; Cloudflare Git deployment remains independent.
+
 See `docs/WORKFLOW_AUTOMATION.md` for triggering, retry, and deployment behavior.
 
 ## When this doc is wrong

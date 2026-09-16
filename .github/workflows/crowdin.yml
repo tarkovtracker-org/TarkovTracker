@@ -7,6 +7,7 @@ on:
       - 'app/locales/en.json'
       - 'crowdin.yml'
       - '.github/workflows/crowdin.yml'
+      - 'scripts/crowdin-pr.sh'
   schedule:
     - cron: '17 4 * * *'
   workflow_dispatch:
@@ -29,6 +30,8 @@ jobs:
           ref: main
           fetch-depth: 0
           persist-credentials: false
+      - name: Preserve trusted merge gate
+        run: cp scripts/crowdin-pr.sh "$RUNNER_TEMP/crowdin-pr.sh"
       - name: Synchronize Crowdin translations
         id: crowdin
         uses: crowdin/github-action@0d5670f539973aea2f01abce61a8989934df0025 # v3
@@ -63,67 +66,28 @@ jobs:
           else
             echo "No open Crowdin PR to auto-merge."
           fi
-      - uses: ./.github/actions/setup-project
-        if: steps.resolve-pr.outputs.pr_number != ''
-      - name: Validate translations and auto-merge
+      - name: Prepare immutable translation checkout
+        id: candidate
         if: steps.resolve-pr.outputs.pr_number != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
+        run: bash "$RUNNER_TEMP/crowdin-pr.sh" prepare
+      - uses: ./.github/actions/setup-project
+        if: steps.resolve-pr.outputs.pr_number != ''
+      - name: Validate translations
+        if: steps.resolve-pr.outputs.pr_number != ''
         run: |
-          set -euo pipefail
-          shopt -s extglob
-          echo "Validating Crowdin PR #$PR_NUMBER..."
-          invalid_files="$(
-            gh pr view "$PR_NUMBER" \
-              --repo "$GITHUB_REPOSITORY" \
-              --json files \
-              --jq '.files[].path' |
-              while IFS= read -r file; do
-                case "$file" in
-                  app/locales/!(en).json)
-                    ;;
-                  *)
-                    printf '%s\n' "$file"
-                    ;;
-                esac
-              done
-          )"
-          if [ -n "$invalid_files" ]; then
-            echo "::error::Crowdin PR modified non-translation files:"
-            printf '%s\n' "$invalid_files"
-            exit 1
-          fi
-
-          git fetch origin locales
-          git checkout locales
-
           pnpm run format:check
           pnpm run i18n:check
           pnpm run systems:check
-
-          echo "Validation passed. Waiting for mergeability state..."
-          merge_state="UNKNOWN"
-          deadline=$((SECONDS + 60))
-          while true; do
-            pr_state="$(
-              gh pr view "$PR_NUMBER" \
-                --repo "$GITHUB_REPOSITORY" \
-                --json mergeStateStatus
-            )"
-            merge_state="$(jq -r '.mergeStateStatus' <<< "$pr_state")"
-            if [ "$merge_state" != "UNKNOWN" ]; then
-              break
-            fi
-            if [ "$SECONDS" -ge "$deadline" ]; then
-              echo "::error::Timed out waiting for merge state to resolve (still UNKNOWN)."
-              exit 1
-            fi
-            sleep 3
-          done
-
-          echo "Auto-merging Crowdin PR #$PR_NUMBER..."
-          gh pr merge "$PR_NUMBER" \
-            --repo "$GITHUB_REPOSITORY" \
-            --squash \
-            --subject "chore(i18n): update translations from Crowdin (#$PR_NUMBER)"
+      - name: Merge validated translations
+        if: steps.resolve-pr.outputs.pr_number != ''
+        env:
+          # A PAT merge emits the main push needed by CI and the existing release gate.
+          # Never expose this token to dependency installation or project scripts.
+          GH_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}
+          PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
+          HEAD_SHA: ${{ steps.candidate.outputs.head_sha }}
+          BASE_SHA: ${{ steps.candidate.outputs.base_sha }}
+        run: bash "$RUNNER_TEMP/crowdin-pr.sh" merge

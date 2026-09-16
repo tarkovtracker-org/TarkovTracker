@@ -34,16 +34,41 @@ to `app/locales/%two_letters_code%.json`, preserving the directory hierarchy. It
 local translations. The existing `locales` branch supplies translation PRs targeting `main`.
 
 Repository secrets `CROWDIN_PROJECT_ID` and `CROWDIN_PERSONAL_TOKEN` authenticate to Crowdin only.
-GitHub writes use the automatic `secrets.GITHUB_TOKEN`, with only `contents: write` and
-`pull-requests: write`, so newly created PRs and commits use the conventional commit title
-`chore(i18n): update translations from Crowdin` authored by `github-actions[bot]`.
+Synchronization uses the automatic `secrets.GITHUB_TOKEN`, with only `contents: write` and
+`pull-requests: write`, so generated PRs and commits are authored by `github-actions[bot]` and use
+`chore(i18n): update translations from Crowdin`. Only the final merge step uses the existing
+`ACCESS_TOKEN_GITHUB` PAT. Its push starts normal main CI and the existing release gate; a merge
+using `GITHUB_TOKEN` would suppress push workflows. There is no fallback to `GITHUB_TOKEN`.
+The PAT must have repository contents and pull-request write access, with any required organization
+SSO authorization. Prefer a repository-scoped fine-grained PAT; rotate it according to repository
+policy. A repository-scoped GitHub App installation token can replace it when App credentials are
+available. No merge credential is passed to dependency installation or project validation.
 
-When new translations are synchronized, the workflow resolves the PR, confirms that only non-English
-translation files (`app/locales/!(en).json`) were touched, validates formatting (`format:check`),
-locale integrity (`i18n:check`), and systems drift (`systems:check`), and automatically squash-merges
-the PR into `main`.
+When new translations are synchronized, `scripts/crowdin-pr.sh` verifies an open, non-draft,
+same-repository `locales` PR targeting `main`. It captures its head SHA, fetches that exact commit,
+and compares its full tree with a captured main SHA. Only regular non-English JSON files directly
+inside `app/locales/` may differ; empty diffs, deletions, symlinks, renames from other paths, and stale
+executable code are rejected. The checkout and dependency setup use this validated commit before
+formatting (`format:check`), locale integrity (`i18n:check`), and systems drift (`systems:check`) run.
+
+The final merge step rechecks PR identity, both commit SHAs, and mergeability. Only `MERGEABLE` /
+`CLEAN` is accepted. Unresolved GitHub calculations are retried up to 20 times, three seconds apart;
+all other states fail closed. `--match-head-commit` atomically guards the squash merge against a
+last-moment PR push. A fixed commit body prevents inherited CI-skip markers from suppressing the
+post-merge run. The gate is copied from trusted main before synchronization and survives checkout.
+If main or the PR changes during validation, rerun Crowdin Sync; do not bypass the guard.
+GitHub remains responsible for branch rules and the final merge decision.
+
+Cloudflare Git deployments run independently of GitHub Actions. Release eligibility still requires
+successful CI for the current main push, and semantic-release decides whether a version is warranted;
+translation-only `chore(i18n)` commits do not themselves require a version bump.
 
 Before enabling this workflow on `main`:
+
+- Confirm `ACCESS_TOKEN_GITHUB` is present and authorized for merging this repository. Its existence
+  alone does not prove permissions or expiry. A missing or rejected credential must leave the PR open.
+- After the first successful merge, verify a push-triggered CI run exists for the returned merge SHA
+  and that Release evaluates that CI result. Check Cloudflare deployment separately.
 
 1. Confirm the existing Crowdin source is under the Crowdin branch `main` at
    `app/locales/en.json`. Crowdin branches are separate from GitHub branches; if the source lives
