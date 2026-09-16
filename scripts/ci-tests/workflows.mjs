@@ -104,11 +104,12 @@ test('workflow linting is selected only for automation changes and fails closed 
   assert.match(lintStep, /sha256sum --check --strict/);
   // Both linters are pinned release binaries verified against a recorded checksum; neither
   // executes an unverified package manager download while the token is in the environment.
-  for (const tool of ['ACTIONLINT', 'ZIZMOR']) {
-    assert.match(lintStep, new RegExp(`${tool}_VERSION: \\d+\\.\\d+\\.\\d+`));
-    assert.match(lintStep, new RegExp(`${tool}_SHA256: [0-9a-f]{64}\\n`));
-    assert.match(lintStep, new RegExp(`"\\$${tool}_SHA256"`));
-  }
+  assert.match(lintStep, /ACTIONLINT_VERSION: \d+\.\d+\.\d+\n/);
+  assert.match(lintStep, /ACTIONLINT_SHA256: [0-9a-f]{64}\n/);
+  assert.match(lintStep, /"\$ACTIONLINT_SHA256"/);
+  assert.match(lintStep, /ZIZMOR_VERSION: \d+\.\d+\.\d+\n/);
+  assert.match(lintStep, /ZIZMOR_SHA256: [0-9a-f]{64}\n/);
+  assert.match(lintStep, /"\$ZIZMOR_SHA256"/);
   assert.match(lintStep, /"\$RUNNER_TEMP\/actionlint" -color/);
   assert.match(lintStep, /"\$RUNNER_TEMP\/zizmor" --no-progress --min-severity low \.github\//);
   assert.doesNotMatch(lintStep, /pipx|pip install|npx /);
