@@ -55,8 +55,8 @@ translation-only PRs. All push and dispatched runs retain full validation.
 The lightweight `changes` job classifies the pull-request diff and selects jobs. **Path selection is
 active**: documentation-only and translation-only pull requests run the reduced set (formatting,
 i18n when locales change, systems drift); every other change set runs every job. The job also emits
-`workflows`, which enables workflow linting in `Lint & Format` when `.github/` changes or when the
-diff cannot be read. `CI Result` evaluates the job outcomes against the plan and fails on missing
+`workflows`, which enables workflow linting in `Lint & Format` for non-Markdown automation paths and
+unreadable diffs. `CI Result` evaluates the job outcomes against the plan and fails on missing
 classifier data, selected failures/cancellations, or unexpected skips. Systems drift runs
 independently on every CI run. Existing check names, Dependabot expectations, fork restrictions,
 security checks, and Codecov statuses remain unchanged; the aggregate does not replace external gates.

@@ -15,8 +15,9 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
   locales change, `Systems drift check`); anything else, every push, and every dispatch run the
   full set. Unreadable diffs fail closed to full validation.
 - `CI Result` — strict aggregate of selected jobs; missing data or unexpected skips fail
-- `Lint & Format` — ESLint + Prettier, i18n, Node workflow fixtures, and (when `.github/` changes)
-  checksum-verified `actionlint` plus `zizmor` (`.github/zizmor.yml` records accepted findings)
+- `Lint & Format` — ESLint + Prettier, i18n, Node workflow fixtures, and (for non-Markdown
+  automation paths and unreadable diffs) checksum-verified `actionlint` plus `zizmor`
+  (`.github/zizmor.yml` records accepted findings)
 - `Fallow audit` — changed-file dead code, duplication, and complexity gate
 - `Type Check` — `vue-tsc` / Nuxt type checking
 - `Test (shard 1/4)` … `Test (shard 4/4)` — Vitest with coverage, sharded across 4 parallel jobs. The `github-actions` reporter annotates failed tests directly on the PR diff so the failing test name and assertion are visible without digging into logs. Shards report imported files only to avoid duplicate zero-filled entries, and Codecov merges the per-shard coverage. Unsharded local coverage retains the full `app/**/*.{ts,vue}` denominator.

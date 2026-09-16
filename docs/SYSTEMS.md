@@ -1765,7 +1765,7 @@ The proposed selection reduces checks only for explicitly recognized documentati
 `DESIGN.md`, unknown inputs, and executable changes select full validation. Local input includes
 committed and dirty paths; CI input is the explicit revision diff. Renames contribute both paths.
 Pull requests receive the selected jobs; the classifier also reports `workflows` so workflow
-linting runs only when `.github/` changes or the diff is unreadable. See
+linting runs only for non-Markdown automation paths and unreadable diffs. See
 `docs/WORKFLOW_AUTOMATION.md` for the recorded rollout evidence and local/full execution profiles.
 
 **Invariants:**
