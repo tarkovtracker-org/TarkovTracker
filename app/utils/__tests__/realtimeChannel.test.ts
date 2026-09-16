@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { logger } from '@/utils/logger';
 import {
   createChannelReleaseLatch,
   subscribeAndWaitForRealtimeChannel,
@@ -134,6 +135,27 @@ describe('subscribeAndWaitForRealtimeChannel', () => {
     } finally {
       suspension.active = false;
     }
+  });
+  it('rejects a CLOSED status before the first join', async () => {
+    const { channel, emit } = createChannel();
+    const ready = subscribeAndWaitForRealtimeChannel(channel, 'test', {}, 1000);
+    emit('CLOSED');
+    await expect(ready).rejects.toThrow('Realtime subscription failed with status CLOSED');
+    expect(logger.warn).toHaveBeenCalled();
+  });
+  it('ignores normal close warnings after joining while retaining rejoin and error handling', async () => {
+    const { channel, emit } = createChannel();
+    const refresh = vi.fn();
+    const ready = subscribeAndWaitForRealtimeChannel(channel, 'test', {}, 1000, refresh);
+    emit('SUBSCRIBED');
+    await ready;
+    vi.mocked(logger.warn).mockClear();
+    emit('CLOSED');
+    expect(logger.warn).not.toHaveBeenCalled();
+    emit('SUBSCRIBED');
+    expect(refresh).toHaveBeenCalledOnce();
+    emit('CHANNEL_ERROR', new Error('Connection lost'));
+    expect(logger.warn).toHaveBeenCalledOnce();
   });
   it('rejects on an explicit subscription failure', async () => {
     const { channel, emit } = createChannel();

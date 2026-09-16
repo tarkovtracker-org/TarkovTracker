@@ -1,3 +1,99 @@
+## [1.79.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.5...v1.79.6) (2026-09-16)
+
+
+### Performance Improvements
+
+* **test:** run vitest files in parallel ([#852](https://github.com/tarkovtracker-org/TarkovTracker/issues/852)) ([9db1ad2](https://github.com/tarkovtracker-org/TarkovTracker/commit/9db1ad2fe8092d9ebecedf2a7386f35f2744c38b))
+
+## [1.79.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.4...v1.79.5) (2026-09-16)
+
+
+### Bug Fixes
+
+* **app:** keep recoverable story marks and stop overstating route completion ([#855](https://github.com/tarkovtracker-org/TarkovTracker/issues/855)) ([d26dab8](https://github.com/tarkovtracker-org/TarkovTracker/commit/d26dab8bac1e454980072cf1c6ae690c9b172cf7))
+
+## [1.79.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.3...v1.79.4) (2026-09-16)
+
+
+### Bug Fixes
+
+* **deps:** patch image processing and transitive security advisories ([#854](https://github.com/tarkovtracker-org/TarkovTracker/issues/854)) ([b8b781b](https://github.com/tarkovtracker-org/TarkovTracker/commit/b8b781b9882d329be0a18433a5296d3d1d845a35))
+
+## [1.79.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.2...v1.79.3) (2026-09-16)
+
+
+### Bug Fixes
+
+* **app:** reconcile saved story objective ids with the published catalog ([#850](https://github.com/tarkovtracker-org/TarkovTracker/issues/850)) ([2db9a4f](https://github.com/tarkovtracker-org/TarkovTracker/commit/2db9a4fd21aaa43a3bef6f45f6f5d72875f1d5c0))
+
+## [1.79.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.1...v1.79.2) (2026-09-16)
+
+
+### Bug Fixes
+
+* **ui:** consume the overlay story chapter branch contract ([#849](https://github.com/tarkovtracker-org/TarkovTracker/issues/849)) ([9da52e3](https://github.com/tarkovtracker-org/TarkovTracker/commit/9da52e36da3c8048e57eb3f9b8d4583872c75bb6))
+
+## [1.79.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.0...v1.79.1) (2026-09-16)
+
+
+### Bug Fixes
+
+* **server:** import hasMaterializedProgress in profile route ([#848](https://github.com/tarkovtracker-org/TarkovTracker/issues/848)) ([cc3666d](https://github.com/tarkovtracker-org/TarkovTracker/commit/cc3666dc4e7e3194c2232434de5a8dc8452006da)), closes [#810](https://github.com/tarkovtracker-org/TarkovTracker/issues/810)
+
+# [1.79.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.78.1...v1.79.0) (2026-09-15)
+
+
+### Features
+
+* **app:** add opt-in light theme with warm paper palette ([#102](https://github.com/tarkovtracker-org/TarkovTracker/issues/102)) ([eaeec13](https://github.com/tarkovtracker-org/TarkovTracker/commit/eaeec136c6a6c393bc2c4503d6bbdb99e6c980ae))
+
+## [1.78.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.78.0...v1.78.1) (2026-09-10)
+
+# [1.78.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.6...v1.78.0) (2026-09-10)
+
+
+### Features
+
+* **about:** split team directory out of credits into /about ([#839](https://github.com/tarkovtracker-org/TarkovTracker/issues/839)) ([0948142](https://github.com/tarkovtracker-org/TarkovTracker/commit/09481428d18cea3831ee19ed055ce1ab3b50a5fd)), closes [#707](https://github.com/tarkovtracker-org/TarkovTracker/issues/707)
+
+## [1.77.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.5...v1.77.6) (2026-09-10)
+
+
+### Bug Fixes
+
+* stream large EFT log folders and archives ([#834](https://github.com/tarkovtracker-org/TarkovTracker/issues/834)) ([9b96d7f](https://github.com/tarkovtracker-org/TarkovTracker/commit/9b96d7ff59d852a167275ac74bdfa2f4487a96ab))
+* **ci:** use valid Codecov comment layout separators ([#836](https://github.com/tarkovtracker-org/TarkovTracker/issues/836)) ([15920d2](https://github.com/tarkovtracker-org/TarkovTracker/commit/15920d2f139fe270ebfa0d2c437a3e3e98c17f4c))
+
+## [1.77.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.4...v1.77.5) (2026-09-10)
+
+
+### Bug Fixes
+
+* **tasks:** block tasks whose declared gate cannot be interpreted ([#835](https://github.com/tarkovtracker-org/TarkovTracker/issues/835)) ([3879e95](https://github.com/tarkovtracker-org/TarkovTracker/commit/3879e952294fdb02c1eee892ef3f3a48b39fcf96)), closes [#727](https://github.com/tarkovtracker-org/TarkovTracker/issues/727)
+
+## [1.77.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.3...v1.77.4) (2026-09-10)
+
+
+### Bug Fixes
+
+* **app:** keep the editions cache payload structured-cloneable ([#833](https://github.com/tarkovtracker-org/TarkovTracker/issues/833)) ([5088485](https://github.com/tarkovtracker-org/TarkovTracker/commit/50884857e215a5ebfd3b407a9529ea8b44c86e04))
+
+## [1.77.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.2...v1.77.3) (2026-09-10)
+
+## [1.77.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.1...v1.77.2) (2026-09-10)
+
+
+### Bug Fixes
+
+* **app:** unify progression and overlay in one v3 release ([#826](https://github.com/tarkovtracker-org/TarkovTracker/issues/826)) ([dbcad5b](https://github.com/tarkovtracker-org/TarkovTracker/commit/dbcad5be38e1f23aa9fbedbed336c821b1f22541))
+
+## [1.77.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.77.0...v1.77.1) (2026-09-10)
+
+
+### Bug Fixes
+
+* **api:** align seasonal profile reads with database season ([#824](https://github.com/tarkovtracker-org/TarkovTracker/issues/824)) ([b8f1530](https://github.com/tarkovtracker-org/TarkovTracker/commit/b8f1530b2b4455787c034a5c76e90d29ff0f50f8))
+
 # [1.77.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.76.7...v1.77.0) (2026-09-07)
 
 

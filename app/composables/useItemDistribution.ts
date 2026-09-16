@@ -1,6 +1,8 @@
 import { useMetadataStore } from '@/stores/useMetadata';
+import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { logger } from '@/utils/logger';
+import { sortTasksByProgression } from '@/utils/taskSorter';
 import type { NeededItemHideoutModule, NeededItemTaskObjective } from '@/types/tarkov';
 export interface ObjectiveUpdate {
   id: string;
@@ -34,6 +36,7 @@ export type UseItemDistributionReturn = {
 export function useItemDistribution(): UseItemDistributionReturn {
   const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
+  const progressStore = useProgressStore();
   function getObjectiveCurrentCount(
     objective: NeededItemTaskObjective | NeededItemHideoutModule
   ): number {
@@ -43,15 +46,32 @@ export function useItemDistribution(): UseItemDistributionReturn {
     return tarkovStore.getHideoutPartCount(objective.id) ?? 0;
   }
   function sortTaskObjectives(objectives: NeededItemTaskObjective[]): NeededItemTaskObjective[] {
+    const taskKey = (objective: NeededItemTaskObjective) =>
+      `${objective.taskId}:${objective.teamId ?? 'self'}`;
+    const evaluations: import('@/stores/taskAvailability').TaskEvaluationMap = {};
+    const objectiveTeamIndex = (objective: NeededItemTaskObjective) =>
+      objective.teamId ? progressStore.getTeamIndex(objective.teamId) : 'self';
+    const tasks = objectives.flatMap((objective) => {
+      const task = metadataStore.getTaskById(objective.taskId);
+      const id = taskKey(objective);
+      const teamIndex = objectiveTeamIndex(objective);
+      const evaluation = progressStore.taskEvaluations[objective.taskId]?.[teamIndex];
+      if (evaluation) evaluations[id] = { self: evaluation };
+      return task ? [{ ...task, id }] : [];
+    });
+    const order = new Map(
+      sortTasksByProgression(tasks, 'asc', evaluations).map((task, index) => [task.id, index])
+    );
     return [...objectives].sort((a, b) => {
       const taskA = metadataStore.getTaskById(a.taskId);
       const taskB = metadataStore.getTaskById(b.taskId);
       const kappaA = taskA?.kappaRequired ? 0 : 1;
       const kappaB = taskB?.kappaRequired ? 0 : 1;
       if (kappaA !== kappaB) return kappaA - kappaB;
-      const levelA = taskA?.minPlayerLevel ?? 999;
-      const levelB = taskB?.minPlayerLevel ?? 999;
-      return levelA - levelB;
+      return (
+        (order.get(taskKey(a)) ?? Number.MAX_SAFE_INTEGER) -
+          (order.get(taskKey(b)) ?? Number.MAX_SAFE_INTEGER) || a.id.localeCompare(b.id)
+      );
     });
   }
   function sortHideoutModules(modules: NeededItemHideoutModule[]): NeededItemHideoutModule[] {

@@ -36,7 +36,7 @@
             </div>
           </div>
           <button
-            class="text-surface-400 hover:text-white"
+            class="text-surface-400 light:hover:text-surface-50 hover:text-white"
             :aria-label="$t('common.close')"
             @click="$emit('update:open', false)"
           >
@@ -113,7 +113,7 @@
                   </span>
                   <div class="bg-surface-700 flex items-center rounded border border-white/20">
                     <button
-                      class="text-surface-200 hover:bg-surface-600 flex h-6 w-6 items-center justify-center rounded-l transition-colors hover:text-white"
+                      class="text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 flex h-6 w-6 items-center justify-center rounded-l transition-colors hover:text-white"
                       :aria-label="
                         t('needed_items.aria.decrease_objective_count', {
                           task_name: getTaskName(obj.taskId),
@@ -126,13 +126,15 @@
                     <span
                       class="bg-surface-800 flex h-6 min-w-10 items-center justify-center border-x border-white/20 px-1 text-xs font-semibold"
                       :class="
-                        getObjectiveCount(obj) >= obj.count ? 'text-success-400' : 'text-white'
+                        getObjectiveCount(obj) >= obj.count
+                          ? 'text-success-400'
+                          : 'light:text-surface-50 text-white'
                       "
                     >
                       {{ getObjectiveCount(obj) }}/{{ obj.count }}
                     </span>
                     <button
-                      class="text-surface-200 hover:bg-surface-600 flex h-6 w-6 items-center justify-center rounded-r transition-colors hover:text-white"
+                      class="text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 flex h-6 w-6 items-center justify-center rounded-r transition-colors hover:text-white"
                       :aria-label="
                         t('needed_items.aria.increase_objective_count', {
                           task_name: getTaskName(obj.taskId),
@@ -191,7 +193,7 @@
                   </span>
                   <div class="bg-surface-700 flex items-center rounded border border-white/20">
                     <button
-                      class="text-surface-200 hover:bg-surface-600 flex h-6 w-6 items-center justify-center rounded-l transition-colors hover:text-white"
+                      class="text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 flex h-6 w-6 items-center justify-center rounded-l transition-colors hover:text-white"
                       :aria-label="
                         t('needed_items.aria.decrease_hideout_count', {
                           station_name: getStationName(mod),
@@ -203,12 +205,16 @@
                     </button>
                     <span
                       class="bg-surface-800 flex h-6 min-w-10 items-center justify-center border-x border-white/20 px-1 text-xs font-semibold"
-                      :class="getHideoutCount(mod) >= mod.count ? 'text-success-400' : 'text-white'"
+                      :class="
+                        getHideoutCount(mod) >= mod.count
+                          ? 'text-success-400'
+                          : 'light:text-surface-50 text-white'
+                      "
                     >
                       {{ getHideoutCount(mod) }}/{{ mod.count }}
                     </span>
                     <button
-                      class="text-surface-200 hover:bg-surface-600 flex h-6 w-6 items-center justify-center rounded-r transition-colors hover:text-white"
+                      class="text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 flex h-6 w-6 items-center justify-center rounded-r transition-colors hover:text-white"
                       :aria-label="
                         t('needed_items.aria.increase_hideout_count', {
                           station_name: getStationName(mod),

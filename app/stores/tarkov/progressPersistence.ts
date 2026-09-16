@@ -104,7 +104,31 @@ export const syncProgressState = async (
     return { error: normalizedError };
   }
 };
-// fallow-ignore-next-line complexity -- active-mode timestamp and legacy fallback branches are covered in progressPersistence.test.ts
+const collectModeProgress = (
+  rows: ModeProgressRow[]
+): Partial<Record<GameMode, UserProgressData>> =>
+  Object.fromEntries(
+    rows.flatMap((row) => {
+      const active = getActiveModeProgress(row);
+      return active ? [[active.mode, active.progress] as const] : [];
+    })
+  ) as Partial<Record<GameMode, UserProgressData>>;
+const collectModeTimestamps = (rows: ModeProgressRow[]): Partial<Record<GameMode, number>> =>
+  Object.fromEntries(
+    rows.flatMap((row) => {
+      const active = getActiveModeProgress(row);
+      const timestamp = Date.parse(row.progress_updated_at ?? '');
+      return active && Number.isFinite(timestamp) ? [[active.mode, timestamp]] : [];
+    })
+  ) as Partial<Record<GameMode, number>>;
+/**
+ * The account-level clock is the newest per-mode clock, so a mode that predates
+ * the freshness column does not make the whole account look stale.
+ */
+const latestModeTimestamp = (byMode: Partial<Record<GameMode, number>>): number | undefined => {
+  const timestamps = Object.values(byMode);
+  return timestamps.length > 0 ? Math.max(...timestamps) : undefined;
+};
 export const loadModeProgress = async (
   client: ModeProgressClient,
   userId: string
@@ -128,24 +152,13 @@ export const loadModeProgress = async (
         .in('season_number', [0, ACTIVE_SEASON_NUMBER])
     );
     if (error) return { data: {}, error };
-    const entries = (rows ?? []).flatMap((row) => {
-      const activeProgress = getActiveModeProgress(row);
-      return activeProgress ? [[activeProgress.mode, activeProgress.progress] as const] : [];
-    });
-    const data = Object.fromEntries(entries) as Partial<Record<GameMode, UserProgressData>>;
-    const updatedAtByMode = Object.fromEntries(
-      (rows ?? []).flatMap((row) => {
-        const active = getActiveModeProgress(row);
-        const timestamp = Date.parse(row.progress_updated_at ?? '');
-        return active && Number.isFinite(timestamp) ? [[active.mode, timestamp]] : [];
-      })
-    ) as Partial<Record<GameMode, number>>;
-    const timestamps = Object.values(updatedAtByMode);
+    const loadedRows = rows ?? [];
+    const updatedAtByMode = collectModeTimestamps(loadedRows);
     return {
-      data,
+      data: collectModeProgress(loadedRows),
       error: null,
       updatedAtByMode,
-      updatedAt: timestamps.length > 0 ? Math.max(...timestamps) : undefined,
+      updatedAt: latestModeTimestamp(updatedAtByMode),
     };
   } catch (error) {
     const normalizedError = normalizePersistenceError(error);

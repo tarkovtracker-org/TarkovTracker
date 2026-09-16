@@ -744,8 +744,13 @@ export const usePreferencesStore = defineStore('preferences', {
       const clamped = Math.min(0.5, Math.max(0.05, opacity));
       this.mapZoneOpacity = clamped;
     },
-    // Fallow cannot follow this action through the typed map-controls composable boundary.
-    // fallow-ignore-next-line unused-store-member -- accessed through typed map-controls composable
+    // Called as `preferences.setMapTooltipDensity(...)` inside
+    // useLeafletMapControls, whose `preferences` parameter is a structural
+    // interface rather than the store type. The action is reached through that
+    // interface, so no reference to this store member exists to detect, and the
+    // composable boundary is deliberate: it keeps the map controls unit-testable
+    // with a plain object instead of a live Pinia store.
+    // fallow-ignore-next-line unused-store-member -- not actionable: invoked through a structural interface parameter, not the store
     setMapTooltipDensity(density: 'default' | 'compact') {
       this.mapTooltipDensity = density;
     },

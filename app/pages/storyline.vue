@@ -3,7 +3,7 @@
     <div class="mx-auto max-w-350 space-y-4">
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="text-xl font-bold text-white sm:text-2xl">
+          <h1 class="light:text-surface-50 text-xl font-bold text-white sm:text-2xl">
             {{ t('common.storyline', 'Storyline') }}
           </h1>
           <p class="text-surface-400 mt-1 text-sm">
@@ -68,7 +68,14 @@
     ogDescription: () => t('page.storyline.subtitle'),
   });
   const tarkovStore = useTarkovStore();
-  const { chapters, normalizedChapters: storylineChapters } = useStorylineChapters();
+  const { chapters, normalizedChapters: storylineChapters } = useStorylineChapters({
+    completedObjectiveIds: (chapterId) =>
+      Object.entries(
+        tarkovStore.getCurrentProgressData()?.storyChapters?.[chapterId]?.objectives ?? {}
+      )
+        .filter(([, objective]) => objective?.complete === true)
+        .map(([objectiveId]) => objectiveId),
+  });
   const totalChapters = computed(() => storylineChapters.value.length);
   const completedChapters = computed(() => {
     return storylineChapters.value.filter((chapter) => chapter.complete).length;
@@ -79,6 +86,7 @@
       chapterId,
       isChapterComplete: tarkovStore.isStoryChapterComplete(chapterId),
       objectives: chapter?.objectives,
+      mutuallyExclusiveQuestPairs: chapter?.mutuallyExclusiveQuestPairs,
       isObjectiveComplete: (objectiveId) =>
         tarkovStore.isStoryObjectiveComplete(chapterId, objectiveId),
       setChapterComplete: (id) => tarkovStore.setStoryChapterComplete(id),

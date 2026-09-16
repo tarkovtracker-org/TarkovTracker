@@ -56,10 +56,19 @@
               :key="skill.key"
               class="rounded-lg border p-3 transition-colors"
               :class="skillCardClasses(skill.key)"
-              @click="handleSkillCardClick(skill.key, $event)"
             >
-              <div class="mb-2 flex items-center gap-2">
-                <div class="group relative shrink-0">
+              <!-- The header row doubles as the level input's label: clicking anywhere in
+                it natively focuses the input (no JS click handler, no button role), and
+                keyboard users reach the input directly through Tab order. The label is
+                aria-hidden and the input carries a stable aria-label, so the accessible
+                name stays concise instead of reading the whole changing header. Inner
+                wrappers are spans to respect the label phrasing content model. -->
+              <label
+                :for="getSkillInputId(skill.key)"
+                aria-hidden="true"
+                class="mb-2 flex cursor-pointer items-center gap-2"
+              >
+                <span class="group relative block shrink-0">
                   <img
                     v-if="skill.imageLink"
                     :src="skill.imageLink"
@@ -67,15 +76,15 @@
                     class="relative z-10 h-10 w-10 rounded object-contain transition-transform duration-200 ease-out group-hover:z-50 group-hover:scale-[2.5] group-hover:rounded-md group-hover:shadow-xl"
                     loading="lazy"
                   />
-                  <div
+                  <span
                     v-else
                     class="bg-surface-700 flex h-10 w-10 items-center justify-center rounded text-xs"
                   >
                     ?
-                  </div>
-                </div>
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-center gap-1">
+                  </span>
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="flex items-center gap-1">
                     <span class="text-surface-100 truncate text-sm font-semibold">
                       {{ formatSkillName(skill.name) }}
                     </span>
@@ -97,8 +106,8 @@
                         {{ $t('common.lv') }} {{ formatRequiredLevels(skill.requiredLevels) }}
                       </UBadge>
                     </UTooltip>
-                  </div>
-                  <div class="text-surface-400 truncate text-xs">
+                  </span>
+                  <span class="text-surface-400 block truncate text-xs">
                     <span v-if="skill.requiredByTasks.length > 0">
                       {{ $t('settings.skills.req_count') }} {{ skill.requiredByTasks.length }}
                     </span>
@@ -112,19 +121,19 @@
                       {{ $t('settings.skills.reward_count') }}
                       {{ skill.rewardedByTasks.length }}
                     </span>
-                  </div>
-                </div>
+                  </span>
+                </span>
                 <span
                   class="shrink-0 text-lg font-bold"
                   :class="
                     getSkillLevel(skill.key) >= MAX_SKILL_LEVEL
-                      ? 'text-warning-500'
+                      ? 'text-warning-500 light:text-warning-800'
                       : 'text-primary-400'
                   "
                 >
                   {{ getDisplayLevel(skill.key) }}
                 </span>
-              </div>
+              </label>
               <div class="mb-2 flex gap-3 text-xs">
                 <UTooltip
                   :text="
@@ -135,7 +144,7 @@
                   "
                   class="flex-1"
                 >
-                  <div class="text-surface-400 cursor-default" @click.stop>
+                  <div class="text-surface-400 cursor-default">
                     {{ $t('settings.skills.quest') }}
                     <span class="text-surface-200 font-medium">
                       {{ getQuestSkillLevel(skill.key) }}
@@ -151,7 +160,7 @@
                   "
                   class="flex-1"
                 >
-                  <div class="text-surface-400 cursor-default" @click.stop>
+                  <div class="text-surface-400 cursor-default">
                     {{ $t('settings.skills.offset') }}
                     <span class="text-surface-200 font-medium">
                       {{ formatSkillOffset(getSkillOffset(skill.key)) }}
@@ -160,9 +169,6 @@
                 </UTooltip>
               </div>
               <div class="flex items-center gap-2">
-                <label :for="getSkillInputId(skill.key)" class="sr-only">
-                  {{ formatSkillName(skill.name) }} {{ $t('common.level') }}
-                </label>
                 <UInput
                   :id="getSkillInputId(skill.key)"
                   :model-value="getSkillLevel(skill.key)"
@@ -172,6 +178,7 @@
                   placeholder="0"
                   size="sm"
                   class="flex-1"
+                  :aria-label="`${formatSkillName(skill.name)} ${$t('common.level')}`"
                   :aria-describedby="getSkillRangeId(skill.key)"
                   @keydown="preventInvalidInput"
                   @paste="(event: ClipboardEvent) => onPaste(event, skill.key)"
@@ -302,24 +309,6 @@
     `skill-input-${skillKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
   const getSkillRangeId = (skillKey: string): string =>
     `skill-range-${skillKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-  const isInteractiveTarget = (target: EventTarget | null) =>
-    target instanceof HTMLElement &&
-    Boolean(target.closest('a,button,input,label,select,textarea,[role="button"]'));
-  const focusSkillInput = (skillKey: string) => {
-    const target = document.getElementById(getSkillInputId(skillKey));
-    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
-      target.focus();
-      target.select();
-      return;
-    }
-    target?.querySelector<HTMLInputElement | HTMLTextAreaElement>('input, textarea')?.focus();
-  };
-  const handleSkillCardClick = (skillKey: string, event: MouseEvent) => {
-    if (isInteractiveTarget(event.target)) {
-      return;
-    }
-    focusSkillInput(skillKey);
-  };
   const getSkillLevel = (skillKey: string) => skillCalculation.getSkillLevel(skillKey);
   const getQuestSkillLevel = (skillKey: string) => skillCalculation.getQuestSkillLevel(skillKey);
   const getSkillOffset = (skillKey: string) => skillCalculation.getSkillOffset(skillKey);

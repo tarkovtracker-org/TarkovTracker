@@ -1,4 +1,5 @@
 import { useDashboardFilters } from '@/composables/useDashboardFilters';
+import { useTaskBlockerText } from '@/composables/useTaskBlockerText';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
@@ -6,8 +7,9 @@ import { useTarkovStore } from '@/stores/useTarkov';
 import { GAME_MODES, resolveTraderUnlockTaskIds } from '@/utils/constants';
 import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
 import type { ComputedRef } from '#imports';
-import type { Task, TaskObjective, TaskRequirement } from '@/types/tarkov';
+import type { Task, TaskObjective } from '@/types/tarkov';
 type DashboardRecommendationReason =
+  | 'blocked-requirement'
   | 'blocked-fence'
   | 'blocked-level'
   | 'blocked-prerequisite'
@@ -28,7 +30,16 @@ export interface DashboardRecommendationRoute {
   query?: Record<string, string>;
 }
 export interface DashboardRecommendationBlocker {
-  type: 'complete' | 'fence' | 'filters' | 'level' | 'prerequisite' | 'ready' | 'trader-unlock';
+  description?: string;
+  type:
+    | 'requirement'
+    | 'complete'
+    | 'fence'
+    | 'filters'
+    | 'level'
+    | 'prerequisite'
+    | 'ready'
+    | 'trader-unlock';
   count?: number;
   required?: number;
   taskName?: string;
@@ -58,6 +69,7 @@ export interface DashboardRecommendation {
   unlockTraderName?: string;
 }
 const DASHBOARD_RECOMMENDATION_BLOCKER_PRIORITY: DashboardRecommendationBlocker['type'][] = [
+  'requirement',
   'trader-unlock',
   'level',
   'fence',
@@ -66,18 +78,11 @@ const DASHBOARD_RECOMMENDATION_BLOCKER_PRIORITY: DashboardRecommendationBlocker[
   'complete',
   'ready',
 ];
-const COMPLETE_STATUSES = ['complete', 'completed'];
-const ACTIVE_STATUSES = ['accept', 'accepted', 'active'];
-const FAILED_STATUSES = ['failed'];
 const getCountedObjectives = (task: Task): TaskObjective[] => {
   const objectives = Array.isArray(task.objectives) ? task.objectives.filter(Boolean) : [];
   const requiredObjectives = objectives.filter((objective) => objective.optional !== true);
   return requiredObjectives.length ? requiredObjectives : objectives;
 };
-const normalizeRequirementStatuses = (statuses?: string[]) =>
-  (statuses ?? []).map((status) => status.toLowerCase());
-const hasRequirementStatus = (statuses: string[], values: string[]) =>
-  values.some((value) => statuses.includes(value));
 const getDashboardRecommendationBlockerPriority = (blocker: DashboardRecommendationBlocker) => {
   const index = DASHBOARD_RECOMMENDATION_BLOCKER_PRIORITY.indexOf(blocker.type);
   return index === -1 ? DASHBOARD_RECOMMENDATION_BLOCKER_PRIORITY.length : index;
@@ -118,13 +123,6 @@ export function useDashboardRecommendations(): {
   const { hasDashboardFiltersActive: filtersActive } = useDashboardFilters(preferencesStore);
   const currentFaction = computed(() => tarkovStore.getPMCFaction());
   const currentMode = computed(() => tarkovStore.getCurrentGameMode?.() ?? GAME_MODES.PVP);
-  const currentLevel = computed(() => progressStore.getLevel('self'));
-  const taskById = computed(
-    () => new Map((metadataStore.tasks ?? []).map((task) => [task.id, task]))
-  );
-  const fenceTrader = computed(() =>
-    metadataStore.traders.find((trader) => trader.normalizedName === 'fence')
-  );
   const baseTasks = computed(() => {
     if (!metadataStore.tasks?.length) return [];
     return metadataStore.tasks.filter(
@@ -200,86 +198,24 @@ export function useDashboardRecommendations(): {
       total,
     };
   };
-  const getTaskRequirementBlockers = (taskRequirements?: TaskRequirement[]) => {
-    if (!taskRequirements?.length) return [];
-    return taskRequirements.filter((requirement) => {
-      const requiredTaskId = requirement?.task?.id;
-      if (!requiredTaskId) return false;
-      const statuses = normalizeRequirementStatuses(requirement.status);
-      const requiresComplete =
-        statuses.length === 0 || hasRequirementStatus(statuses, COMPLETE_STATUSES);
-      const requiresActive = hasRequirementStatus(statuses, ACTIVE_STATUSES);
-      const requiresFailed = hasRequirementStatus(statuses, FAILED_STATUSES);
-      const isComplete = tarkovStore.isTaskComplete(requiredTaskId);
-      const isFailed = tarkovStore.isTaskFailed(requiredTaskId);
-      const isUnlocked = isTaskAvailable(requiredTaskId);
-      if (requiresComplete && isComplete) return false;
-      if (requiresFailed && isFailed) return false;
-      if (requiresActive && (isComplete || isUnlocked)) return false;
-      return true;
-    });
-  };
+  const blockerText = useTaskBlockerText();
+  const numericBlockerCount = (blocker: import('@/stores/taskAvailability').TaskBlocker) =>
+    Math.max(1, Math.abs((blocker.required ?? 1) - (blocker.current ?? 0)));
+  const taskEvaluation = (id: string) => progressStore.taskEvaluations?.[id]?.self;
+  const blockerCount = (blocker: import('@/stores/taskAvailability').TaskBlocker) =>
+    blocker.requirements?.length ?? numericBlockerCount(blocker);
+  const evaluationBlockers = (
+    evaluation?: import('@/stores/taskAvailability').TaskAvailabilityResult
+  ) => evaluation?.blockers ?? [{ type: 'unknown' as const }];
   const getTaskBlockers = (task: Task): DashboardRecommendationBlocker[] => {
-    const blockers: DashboardRecommendationBlocker[] = [];
-    if (task.minPlayerLevel && currentLevel.value < task.minPlayerLevel) {
-      blockers.push({
-        type: 'level',
-        count: task.minPlayerLevel - currentLevel.value,
-        required: task.minPlayerLevel,
-      });
-    }
-    const fenceRequirement = task.traderRequirements?.find(
-      (requirement) => requirement.trader.id === fenceTrader.value?.id
-    );
-    if (fenceRequirement && fenceTrader.value) {
-      const currentReputation = tarkovStore.getTraderReputation(fenceTrader.value.id);
-      const needsHigherReputation =
-        fenceRequirement.value >= 0 && currentReputation < fenceRequirement.value;
-      const needsLowerReputation =
-        fenceRequirement.value < 0 && currentReputation > fenceRequirement.value;
-      if (needsHigherReputation || needsLowerReputation) {
-        blockers.push({
-          type: 'fence',
-          count: Math.abs(fenceRequirement.value - currentReputation),
-          required: fenceRequirement.value,
-        });
-      }
-    }
-    const unmetRequirements = getTaskRequirementBlockers(task.taskRequirements);
-    if (unmetRequirements.length) {
-      blockers.push({
-        type: 'prerequisite',
-        count: unmetRequirements.length,
-        taskNames: unmetRequirements
-          .slice(0, 3)
-          .map(
-            (requirement) =>
-              requirement.task.name ||
-              taskById.value.get(requirement.task.id)?.name ||
-              requirement.task.id
-          ),
-      });
-    }
-    const traderName = task.trader?.normalizedName || task.trader?.name?.toLowerCase();
-    const unlockTaskIds = resolveTraderUnlockTaskIds(traderName, currentMode.value).filter(
-      (unlockTaskId) => unlockTaskId !== task.id && taskById.value.has(unlockTaskId)
-    );
-    if (
-      unlockTaskIds.length &&
-      !unlockTaskIds.some((unlockTaskId) => tarkovStore.isTaskComplete(unlockTaskId))
-    ) {
-      const unlockTaskId = unlockTaskIds[0];
-      const unlockTask = unlockTaskId ? taskById.value.get(unlockTaskId) : null;
-      blockers.push({
-        type: 'trader-unlock',
-        taskName: unlockTask?.name || unlockTaskId,
-        traderName: task.trader?.name,
-      });
-    }
-    if (!blockers.length) {
-      blockers.push({ type: 'ready' });
-    }
-    return blockers.sort(compareDashboardRecommendationBlockers);
+    const evaluation = taskEvaluation(task.id);
+    if (evaluation?.available) return [{ type: 'ready' }];
+    const canonical = evaluationBlockers(evaluation);
+    return canonical.map((blocker) => ({
+      type: 'requirement' as const,
+      description: blockerText(blocker),
+      count: blockerCount(blocker),
+    }));
   };
   const getRecommendationTone = (task: Task | null, reason: DashboardRecommendationReason) => {
     if (reason === 'filter-hidden') return 'info';
@@ -297,6 +233,7 @@ export function useDashboardRecommendations(): {
     unlockTraderName?: string
   ): DashboardRecommendationReason => {
     const primaryBlocker = getPrimaryDashboardRecommendationBlocker(blockers);
+    if (primaryBlocker.type === 'requirement') return 'blocked-requirement';
     if (primaryBlocker.type === 'trader-unlock') return 'blocked-trader-unlock';
     if (primaryBlocker.type === 'level') return 'blocked-level';
     if (primaryBlocker.type === 'fence') return 'blocked-fence';

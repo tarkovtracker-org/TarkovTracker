@@ -19,6 +19,7 @@ export default defineNuxtPlugin((nuxtApp) => {
   const toast = useToast();
   const route = useRoute();
   const SKIP_METADATA_PATH_PREFIXES = [
+    '/about',
     '/auth',
     '/changelog',
     '/credits',
@@ -67,8 +68,10 @@ export default defineNuxtPlugin((nuxtApp) => {
       });
     }
   }
+  const canSkipInitialization = (path: string): boolean =>
+    !shouldInitializeForPath(path) || Boolean(metadataStore.hasInitialized || initPromise);
   const ensureMetadataInitialized = async (path: string): Promise<void> => {
-    if (!shouldInitializeForPath(path) || metadataStore.hasInitialized || initPromise) {
+    if (canSkipInitialization(path)) {
       return initPromise ?? Promise.resolve();
     }
     initPromise = initializeWithRetry().finally(() => {

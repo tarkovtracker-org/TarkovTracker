@@ -96,6 +96,14 @@ export const removeOwnedChannel = async (
 const HEALTHY_CHANNEL_STATUSES = new Set(['SUBSCRIBED', 'CLOSED']);
 const describeChannelError = (error: Error | undefined): string | null => error?.message ?? null;
 /**
+ * `CLOSED` is the expected terminal status while a channel is leaving, but an
+ * initial join that reports it has failed, so the caller decides how to read it.
+ */
+const isHealthyChannelStatus = (status: string, treatClosedAsFailure: boolean): boolean => {
+  if (!HEALTHY_CHANNEL_STATUSES.has(status)) return false;
+  return !(status === 'CLOSED' && treatClosedAsFailure);
+};
+/**
  * Logs any subscribe status that is neither a successful join nor the expected
  * terminal status while leaving.
  *
@@ -104,7 +112,6 @@ const describeChannelError = (error: Error | undefined): string | null => error?
  *
  * @returns `true` when the status indicates a failure.
  */
-// fallow-ignore-next-line complexity -- initial joins treat CLOSED as an explicit failure
 export const logChannelSubscribeFailure = (
   label: string,
   status: string,
@@ -112,12 +119,7 @@ export const logChannelSubscribeFailure = (
   context: Record<string, unknown>,
   options?: { treatClosedAsFailure?: boolean }
 ): boolean => {
-  if (
-    HEALTHY_CHANNEL_STATUSES.has(status) &&
-    !(status === 'CLOSED' && options?.treatClosedAsFailure)
-  ) {
-    return false;
-  }
+  if (isHealthyChannelStatus(status, options?.treatClosedAsFailure === true)) return false;
   logger.warn(`[${label}] Realtime channel is not subscribed:`, {
     ...context,
     error: describeChannelError(error),
@@ -172,26 +174,30 @@ export const subscribeAndWaitForRealtimeChannel = (
       if (error) reject(error);
       else resolve();
     };
+    // A join that follows an earlier join or a suspended socket is a rejoin, so
+    // the caller has to refetch whatever it missed while the channel was down.
+    const handleJoined = (): void => {
+      if (joined || needsRefresh) onRejoined?.();
+      needsRefresh = false;
+      joined = true;
+      settle();
+    };
+    // Any other status leaves the channel unsubscribed. While the socket is
+    // deliberately suspended that is expected, so it is not a failure.
+    const handleNonJoinStatus = (status: string, error?: Error): void => {
+      needsRefresh = true;
+      if (suspended()) return;
+      if (
+        logChannelSubscribeFailure(label, status, error, context, { treatClosedAsFailure: !joined })
+      ) {
+        settle(error ?? new Error(`Realtime subscription failed with status ${status}`));
+      }
+    };
     try {
-      // fallow-ignore-next-line complexity -- tested join/rejoin state machine; inferred coverage misses the SDK callback
       channel.subscribe((status: string, error?: Error) => {
         logger.debug(`[${label}] Realtime subscription status: ${status}`);
-        if (status === 'SUBSCRIBED') {
-          if (joined || needsRefresh) onRejoined?.();
-          needsRefresh = false;
-          joined = true;
-          settle();
-          return;
-        }
-        needsRefresh = true;
-        if (suspended()) return;
-        if (
-          logChannelSubscribeFailure(label, status, error, context, {
-            treatClosedAsFailure: true,
-          })
-        ) {
-          settle(error ?? new Error(`Realtime subscription failed with status ${status}`));
-        }
+        if (status === 'SUBSCRIBED') handleJoined();
+        else handleNonJoinStatus(status, error);
       });
     } catch (error) {
       settle(error instanceof Error ? error : new Error(String(error)));

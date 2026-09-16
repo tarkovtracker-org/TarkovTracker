@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
+import { buildTaskEvaluations } from '@/stores/taskAvailability';
 import type { Task, Trader } from '@/types/tarkov';
+vi.mock('vue-i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-i18n')>()),
+  useI18n: () => ({ t: (key: string) => key }),
+}));
 const createPreferencesStore = (
   overrides: {
     getHideNonKappaTasks?: boolean;
@@ -84,7 +89,38 @@ const setup = async (options: SetupOptions = {}) => {
     usePreferencesStore: () => preferencesStore,
   }));
   vi.doMock('@/stores/useProgress', () => ({
-    useProgressStore: () => progressStore,
+    useProgressStore: () => ({
+      ...progressStore,
+      taskEvaluations: buildTaskEvaluations(
+        tasks,
+        new Map([
+          [
+            'self',
+            {
+              level: progressStore.getLevel('self'),
+              faction: tarkovStore.getPMCFaction(),
+              mode: tarkovStore.getCurrentGameMode(),
+              completions: Object.fromEntries(
+                tasks.map((task) => [
+                  task.id,
+                  {
+                    complete: tarkovStore.isTaskComplete(task.id),
+                    failed: tarkovStore.isTaskFailed(task.id),
+                  },
+                ])
+              ),
+              traders: Object.fromEntries(
+                traders.map((trader) => [
+                  trader.id,
+                  { level: 1, reputation: tarkovStore.getTraderReputation() },
+                ])
+              ),
+            },
+          ],
+        ]),
+        { requireTraderLevels: true }
+      ),
+    }),
   }));
   vi.doMock('@/stores/useTarkov', () => ({
     useTarkovStore: () => tarkovStore,
@@ -275,7 +311,7 @@ describe('useDashboardRecommendations', () => {
     });
     expect(recommendations.mode.value).toBe('blocked');
     expect(recommendations.primaryRecommendation.value?.taskId).toBe('task-level');
-    expect(recommendations.primaryRecommendation.value?.reason).toBe('blocked-level');
+    expect(recommendations.primaryRecommendation.value?.reason).toBe('blocked-requirement');
   });
   it('returns a complete state when every visible task is done', async () => {
     const tasks: Task[] = [

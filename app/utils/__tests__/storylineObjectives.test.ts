@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   getAutoCompletableObjectiveIds,
+  normalizeStoryObjectives,
+  storyExclusiveQuestPairs,
   toggleStoryChapterWithLinearObjectives,
+  unknownStoryObjectiveIds,
 } from '@/utils/storylineObjectives';
 const objectives = [
   {
@@ -21,27 +24,109 @@ const objectives = [
   { id: 'obj-3', order: 3, type: 'main' as const, description: 'Linear' },
   { id: 'obj-4', order: 4, type: 'optional' as const, description: 'Optional linear' },
 ];
+const questRouteObjectives = [
+  {
+    id: 'obj-a1',
+    order: 1,
+    type: 'main' as const,
+    description: 'Keep it',
+    sourceQuestId: 'quest-a',
+  },
+  {
+    id: 'obj-b1',
+    order: 2,
+    type: 'main' as const,
+    description: 'Hand it over',
+    sourceQuestId: 'quest-b',
+  },
+  {
+    id: 'obj-c1',
+    order: 3,
+    type: 'main' as const,
+    description: 'Linear',
+    sourceQuestId: 'quest-c',
+  },
+];
 describe('storylineObjectives', () => {
   it('returns only non-route-choice objective ids', () => {
     expect(getAutoCompletableObjectiveIds(objectives)).toEqual(['obj-3', 'obj-4']);
   });
-  it('applies default route-choice links when source data omits them', () => {
+  it('keeps source quest and ending references from the overlay', () => {
+    const normalized = normalizeStoryObjectives([
+      {
+        id: 'obj-ending',
+        order: 1,
+        type: 'main',
+        description: 'Reach the terminal',
+        sourceQuestId: 'quest-a',
+        endingId: 'ending-1',
+      },
+    ]);
+    expect(normalized['obj-ending']).toMatchObject({
+      endingId: 'ending-1',
+      sourceQuestId: 'quest-a',
+    });
+  });
+  it('excludes objectives on mutually exclusive quests from bulk completion', () => {
+    expect(getAutoCompletableObjectiveIds(questRouteObjectives, [['quest-a', 'quest-b']])).toEqual([
+      'obj-c1',
+    ]);
+  });
+  it('ignores malformed quest pairs', () => {
     expect(
-      getAutoCompletableObjectiveIds([
-        {
-          id: 'falling-skies-main-19',
-          order: 1,
-          type: 'main',
-          description: 'Route A',
-        },
-        {
-          id: 'falling-skies-main-20',
-          order: 2,
-          type: 'main',
-          description: 'Route B',
-        },
+      getAutoCompletableObjectiveIds(questRouteObjectives, [
+        ['quest-a', 'quest-a'],
+        ['quest-b', ''],
+      ] as Array<[string, string]>)
+    ).toEqual(['obj-a1', 'obj-b1', 'obj-c1']);
+  });
+  it('keeps chained quest pairs separate instead of merging them', () => {
+    expect(
+      storyExclusiveQuestPairs([
+        ['quest-b', 'quest-c'],
+        ['quest-a', 'quest-b'],
       ])
-    ).toEqual([]);
+    ).toEqual([
+      ['quest-a', 'quest-b'],
+      ['quest-b', 'quest-c'],
+    ]);
+  });
+  it('deduplicates a pair regardless of member order', () => {
+    expect(
+      storyExclusiveQuestPairs([
+        ['quest-b', 'quest-a'],
+        ['quest-a', 'quest-b'],
+      ])
+    ).toEqual([['quest-a', 'quest-b']]);
+  });
+  it('reports saved objective ids the chapter no longer defines', () => {
+    expect(unknownStoryObjectiveIds(objectives, ['obj-1', 'the-ticket-main-10', 'stale'])).toEqual([
+      'stale',
+      'the-ticket-main-10',
+    ]);
+  });
+  it('reports inherited object keys as unknown saved ids', () => {
+    expect(unknownStoryObjectiveIds(objectives, ['constructor', 'toString', 'obj-1'])).toEqual([
+      'constructor',
+      'toString',
+    ]);
+  });
+  it('does not bulk complete either side of a mutually exclusive quest pair', () => {
+    const setObjectiveComplete = vi.fn();
+    toggleStoryChapterWithLinearObjectives({
+      chapterId: 'the-ticket',
+      isChapterComplete: false,
+      objectives: questRouteObjectives,
+      mutuallyExclusiveQuestPairs: [['quest-a', 'quest-b']],
+      isObjectiveComplete: () => false,
+      setChapterComplete: vi.fn(),
+      setChapterUncomplete: vi.fn(),
+      setObjectiveComplete,
+      setObjectiveUncomplete: vi.fn(),
+    });
+    expect(setObjectiveComplete).toHaveBeenCalledWith('the-ticket', 'obj-c1');
+    expect(setObjectiveComplete).not.toHaveBeenCalledWith('the-ticket', 'obj-a1');
+    expect(setObjectiveComplete).not.toHaveBeenCalledWith('the-ticket', 'obj-b1');
   });
   it('completes chapter and only incomplete linear objectives', () => {
     const setChapterComplete = vi.fn();

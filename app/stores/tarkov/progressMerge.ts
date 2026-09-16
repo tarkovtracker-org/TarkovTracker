@@ -7,7 +7,12 @@ import {
 } from '@/stores/progressState';
 import { GAME_MODES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
-import { sanitizeOwnedProgressData } from '@/utils/progressSanitizers';
+import {
+  sanitizeManualActivityEpoch,
+  sanitizeManualActivityHistory,
+  sanitizeOwnedProgressData,
+} from '@/utils/progressSanitizers';
+import type { ManualActivityEntry } from '@/types/progress';
 import type { RawTaskCompletion } from '@/utils/taskStatus';
 const API_UPDATE_HISTORY_LIMIT = 50;
 type CountableEntry = { count?: number; complete?: boolean; timestamp?: number };
@@ -26,6 +31,8 @@ export const hasProgress = (data: unknown): boolean => {
     (mode.level > 1 ||
       (mode.prestigeLevel ?? 0) > 0 ||
       (mode.progressEpoch ?? 0) > 0 ||
+      (mode.manualActivityHistory?.length ?? 0) > 0 ||
+      sanitizeManualActivityEpoch(mode.manualActivityEpoch) > 0 ||
       Object.keys(mode.taskCompletions || {}).length > 0 ||
       Object.keys(mode.taskObjectives || {}).length > 0 ||
       Object.keys(mode.hideoutParts || {}).length > 0 ||
@@ -289,6 +296,26 @@ const mergeApiUpdateHistory = (
     ...buildApiUpdateHistory(remote),
   ]);
 };
+const manualActivityEntries = (data: UserProgressData | undefined): ManualActivityEntry[] =>
+  Array.isArray(data?.manualActivityHistory) ? data.manualActivityHistory : [];
+const manualActivityEpoch = (data: UserProgressData | undefined): number =>
+  sanitizeManualActivityEpoch(data?.manualActivityEpoch);
+/** A clear advances only the history epoch; stale devices cannot restore cleared rows. */
+export const mergeManualActivityHistory = (
+  local: UserProgressData | undefined,
+  remote: UserProgressData | undefined
+): Pick<UserProgressData, 'manualActivityHistory' | 'manualActivityEpoch'> => {
+  const localEpoch = manualActivityEpoch(local);
+  const remoteEpoch = manualActivityEpoch(remote);
+  const epoch = Math.max(localEpoch, remoteEpoch);
+  return {
+    manualActivityEpoch: epoch,
+    manualActivityHistory: sanitizeManualActivityHistory([
+      ...(localEpoch === epoch ? manualActivityEntries(local) : []),
+      ...(remoteEpoch === epoch ? manualActivityEntries(remote) : []),
+    ]),
+  };
+};
 export function mergeProgressData(
   local: UserProgressData | undefined,
   remote: UserProgressData | undefined,
@@ -361,6 +388,7 @@ export function mergeProgressData(
     xpOffset: remote.xpOffset !== undefined ? remote.xpOffset : local.xpOffset,
     lastApiUpdate: resolveApiUpdate(local.lastApiUpdate, remote.lastApiUpdate),
     apiUpdateHistory: mergeApiUpdateHistory(local, remote),
+    ...mergeManualActivityHistory(local, remote),
     taskCompletions: (() => {
       const allKeys = new Set([
         ...Object.keys(local.taskCompletions || {}),

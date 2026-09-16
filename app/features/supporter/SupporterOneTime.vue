@@ -2,7 +2,7 @@
   <div class="border-surface-700/50 bg-surface-900/60 rounded-2xl border p-6">
     <div class="flex flex-col gap-6 sm:flex-row sm:items-stretch sm:justify-between">
       <div class="flex flex-col sm:flex-1">
-        <h3 class="text-base font-bold text-white">
+        <h3 class="light:text-surface-50 text-base font-bold text-white">
           {{ t('page.supporter.one_time_title') }}
         </h3>
         <p class="text-surface-400 mt-1 text-sm">
@@ -17,7 +17,10 @@
             :key="perk.label"
             class="text-surface-300 flex items-start gap-2 text-sm"
           >
-            <UIcon :name="perk.icon" class="text-success-500 mt-0.5 h-4 w-4 shrink-0" />
+            <UIcon
+              :name="perk.icon"
+              class="text-success-500 light:text-success-800 mt-0.5 h-4 w-4 shrink-0"
+            />
             {{ perk.label }}
           </li>
         </ul>
@@ -58,7 +61,11 @@
               <span class="text-surface-400 text-sm font-medium">$</span>
             </template>
           </UInput>
-          <p v-if="amountError" :id="amountErrorId" class="text-error-500 text-xs">
+          <p
+            v-if="amountError"
+            :id="amountErrorId"
+            class="text-error-500 light:text-error-800 text-xs"
+          >
             {{ amountError }}
           </p>
         </div>

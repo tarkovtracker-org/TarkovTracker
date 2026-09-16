@@ -6,6 +6,7 @@ import {
   getLegacyModeProgressField,
   hasMaterializedProgress,
   resolveModeProgressData,
+  type LegacyModeProgressField,
   type LegacyModeProgressRow,
 } from '../../../../app/utils/modeProgressFallback';
 import { getTasks, getHideoutStations } from '../services/tarkov';
@@ -107,17 +108,27 @@ const getServiceHeaders = (env: Env) => ({
   Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
   apikey: env.SUPABASE_SERVICE_ROLE_KEY,
 });
-// fallow-ignore-next-line complexity -- normalized/legacy fallback branches are exercised by gateway.test.ts; inferred coverage misses indirect route calls
-async function fetchUserProgressMode(
+/** Row shape selected from the materialized per-mode progress table. */
+interface ProgressModeRowFragment {
+  progress_data: UserProgressModeRow['progress_data'];
+  user_id: string;
+}
+/** Row shape selected from `user_progress`, which still carries legacy columns. */
+interface ProgressMetadataRow {
+  game_edition: number | null;
+  pve_data: UserProgressModeRow['progress_data'];
+  pvp_data: UserProgressModeRow['progress_data'];
+  user_id: string;
+}
+const DEFAULT_GAME_EDITION = 1;
+async function fetchProgressRowPair(
   env: Env,
   userId: string,
-  gameMode: GameMode
-): Promise<UserProgressModeRow | null> {
-  const seasonNumber = await getGameModeSeasonNumber(env, gameMode);
-  const legacyProgressField = getLegacyModeProgressField(gameMode);
-  const metadataSelect = 'user_id,game_edition';
+  gameMode: GameMode,
+  seasonNumber: number
+): Promise<{ metadataRows: ProgressMetadataRow[]; modeRows: ProgressModeRowFragment[] }> {
   const modeUrl = `${env.SUPABASE_URL}/rest/v1/user_game_mode_progress?user_id=eq.${userId}&game_mode=eq.${gameMode}&season_number=eq.${seasonNumber}&select=user_id,progress_data&limit=1`;
-  const metadataUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${userId}&select=${metadataSelect}&limit=1`;
+  const metadataUrl = `${env.SUPABASE_URL}/rest/v1/user_progress?user_id=eq.${userId}&select=user_id,game_edition&limit=1`;
   const [modeResponse, metadataResponse] = await Promise.all([
     fetch(modeUrl, { headers: getServiceHeaders(env) }),
     fetch(metadataUrl, { headers: getServiceHeaders(env) }),
@@ -125,36 +136,73 @@ async function fetchUserProgressMode(
   if (!modeResponse.ok || !metadataResponse.ok) {
     throw new Error('Failed to fetch user progress');
   }
-  const modeRows = (await modeResponse.json()) as Array<{
-    progress_data: UserProgressModeRow['progress_data'];
-    user_id: string;
-  }>;
-  const metadataRows = (await metadataResponse.json()) as Array<{
-    game_edition: number | null;
-    pve_data: UserProgressModeRow['progress_data'];
-    pvp_data: UserProgressModeRow['progress_data'];
-    user_id: string;
-  }>;
-  const modeRow = modeRows[0];
+  const modeRows = (await modeResponse.json()) as ProgressModeRowFragment[];
+  const metadataRows = (await metadataResponse.json()) as ProgressMetadataRow[];
+  return { metadataRows, modeRows };
+}
+const readLegacyModeField = (
+  legacy: LegacyProgressRecordRow | null,
+  field: LegacyModeProgressField
+): UserProgressModeRow['progress_data'] => legacy?.[field] as UserProgressModeRow['progress_data'];
+/**
+ * Until a mode row is materialized, the legacy per-mode column on
+ * `user_progress` still holds the only copy of that progress. Graft it onto the
+ * metadata rows so assembly can resolve it through the shared fallback helper.
+ * Seasonal has no legacy column, so it is a no-op there.
+ */
+async function applyLegacyProgressFallback(
+  env: Env,
+  userId: string,
+  gameMode: GameMode,
+  metadataRows: ProgressMetadataRow[]
+): Promise<void> {
+  const legacyProgressField = getLegacyModeProgressField(gameMode);
+  if (!legacyProgressField) return;
+  const legacy = await fetchLegacyProgressRow(env, userId, gameMode);
   const metadataRow = metadataRows[0];
-  if (legacyProgressField && !hasMaterializedProgress(modeRow?.progress_data)) {
-    const legacy = await fetchLegacyProgressRow(env, userId, gameMode);
-    if (metadataRow)
-      metadataRow[legacyProgressField] = legacy?.[
-        legacyProgressField
-      ] as typeof metadataRow.pvp_data;
-    else if (legacy)
-      metadataRows.push({
-        ...legacy,
-        user_id: userId,
-        game_edition: null,
-      } as (typeof metadataRows)[number]);
+  if (metadataRow) {
+    metadataRow[legacyProgressField] = readLegacyModeField(legacy, legacyProgressField);
+  } else if (legacy) {
+    metadataRows.push({ ...legacy, user_id: userId, game_edition: null } as ProgressMetadataRow);
   }
+}
+const readModeUserId = (modeRow: ProgressModeRowFragment | undefined, userId: string): string =>
+  modeRow?.user_id ?? userId;
+const readGameEdition = (metadataRow: ProgressMetadataRow | undefined): number =>
+  metadataRow?.game_edition ?? DEFAULT_GAME_EDITION;
+/**
+ * Assemble the response row. A user may be missing the materialized mode row,
+ * the `user_progress` metadata row, or both; each absence resolves to a
+ * documented default rather than failing the read.
+ */
+function buildProgressModeRow(
+  userId: string,
+  gameMode: GameMode,
+  modeRow: ProgressModeRowFragment | undefined,
+  metadataRow: ProgressMetadataRow | undefined
+): UserProgressModeRow {
   return {
-    user_id: modeRow?.user_id ?? userId,
-    game_edition: metadataRow?.game_edition ?? 1,
-    progress_data: resolveModeProgressData(gameMode, modeRow?.progress_data, metadataRows[0]),
+    user_id: readModeUserId(modeRow, userId),
+    game_edition: readGameEdition(metadataRow),
+    progress_data: resolveModeProgressData(gameMode, modeRow?.progress_data, metadataRow),
   };
+}
+async function fetchUserProgressMode(
+  env: Env,
+  userId: string,
+  gameMode: GameMode
+): Promise<UserProgressModeRow | null> {
+  const seasonNumber = await getGameModeSeasonNumber(env, gameMode);
+  const { metadataRows, modeRows } = await fetchProgressRowPair(
+    env,
+    userId,
+    gameMode,
+    seasonNumber
+  );
+  if (!hasMaterializedProgress(modeRows[0]?.progress_data)) {
+    await applyLegacyProgressFallback(env, userId, gameMode, metadataRows);
+  }
+  return buildProgressModeRow(userId, gameMode, modeRows[0], metadataRows[0]);
 }
 const asProgressRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value)

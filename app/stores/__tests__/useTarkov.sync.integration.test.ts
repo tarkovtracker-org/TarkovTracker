@@ -18,6 +18,7 @@ import type { Task } from '@/types/tarkov';
 const {
   channel,
   cleanupSync,
+  syncInitialState,
   createRemoteRow,
   getModeProgressCallback,
   getRealtimeCallback,
@@ -86,10 +87,12 @@ const {
   const showLocalIgnored = vi.fn();
   const showProgressMerged = vi.fn();
   const cleanupSync = vi.fn();
+  const syncInitialState = vi.fn(async (): Promise<Record<string, unknown> | null> => ({}));
   const pauseSync = vi.fn();
   const resumeSync = vi.fn();
   const useSupabaseSyncMock = vi.fn((_options?: unknown) => ({
     cleanup: cleanupSync,
+    syncToSupabase: syncInitialState,
     pause: pauseSync,
     resume: resumeSync,
   }));
@@ -223,6 +226,7 @@ const {
   return {
     channel,
     cleanupSync,
+    syncInitialState,
     createRemoteRow,
     getModeProgressCallback: () => realtimeState.modeProgressCallback,
     getRealtimeCallback: () => realtimeState.callback,
@@ -395,6 +399,7 @@ describe('useTarkov sync integration', () => {
     modeProgressResult.error = null;
     modeProgressResult.errorSequence = [];
     single.mockResolvedValue({ data: createRemoteRow(), error: null });
+    syncInitialState.mockReset().mockResolvedValue({});
     rpc.mockResolvedValue({ error: null });
     update.mockResolvedValue({ error: null });
     channel.on.mockImplementation((_: string, config: Record<string, unknown>, callback) => {
@@ -412,6 +417,7 @@ describe('useTarkov sync integration', () => {
     });
     useSupabaseSyncMock.mockReturnValue({
       cleanup: cleanupSync,
+      syncToSupabase: syncInitialState,
       pause: pauseSync,
       resume: resumeSync,
     });
@@ -1446,6 +1452,51 @@ describe('useTarkov sync integration', () => {
     await Promise.resolve();
     expect(useSupabaseSyncMock).toHaveBeenCalledTimes(1);
   });
+  it('persists manual-only progress that starts a deferred subscription', async () => {
+    single.mockResolvedValue({ data: null, error: { code: 'PGRST116', message: 'No rows found' } });
+    await initializeTarkovSync();
+    const store = useTarkovStore();
+    store.addManualActivityEntries([
+      { id: 'legacy-only', timestamp: 1000, type: 'task', action: 'complete', title: 'Legacy' },
+    ]);
+    await nextTick();
+    expect(useSupabaseSyncMock).toHaveBeenCalledTimes(1);
+    expect(syncInitialState).toHaveBeenCalledTimes(1);
+    const options = useSupabaseSyncMock.mock.calls.at(-1)?.[0] as {
+      transform: (state: typeof store.$state) => { pvp_data: UserProgressData } | null;
+    };
+    expect(options.transform(store.$state)?.pvp_data.manualActivityHistory?.[0]?.id).toBe(
+      'legacy-only'
+    );
+    store.clearManualActivityHistory();
+    expect(options.transform(store.$state)?.pvp_data.manualActivityEpoch).toBe(1);
+  });
+  it.each(['failure', 'rejection', 'session-reset', 'persistent-failure'])(
+    'bounds the initial progress retry and respects session changes: %s',
+    async (outcome) => {
+      single.mockResolvedValue({
+        data: null,
+        error: { code: 'PGRST116', message: 'No rows found' },
+      });
+      await initializeTarkovSync();
+      vi.useFakeTimers();
+      try {
+        if (outcome === 'rejection') syncInitialState.mockRejectedValueOnce(new Error('offline'));
+        else syncInitialState.mockResolvedValueOnce(null);
+        if (outcome === 'persistent-failure') syncInitialState.mockResolvedValue(null);
+        useTarkovStore().addManualActivityEntries([
+          { id: 'initial', timestamp: 1000, type: 'task', action: 'complete', title: 'Initial' },
+        ]);
+        await nextTick();
+        expect(syncInitialState).toHaveBeenCalledTimes(1);
+        if (outcome === 'session-reset') resetTarkovSync('session changed');
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(syncInitialState).toHaveBeenCalledTimes(outcome === 'session-reset' ? 1 : 2);
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
   it('shows merge toast for realtime conflicts when no API update metadata is present', async () => {
     single.mockResolvedValue({
       data: createRemoteRow({

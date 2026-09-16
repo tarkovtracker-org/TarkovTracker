@@ -8,6 +8,7 @@ const CACHE_META_HEADERS = {
   Vary: 'Origin',
 };
 const {
+  mockFetchOverlay,
   mockApplyOverlay,
   mockCreateTarkovJsonBootstrapFetcher,
   mockCreateTarkovJsonHideoutFetcher,
@@ -19,15 +20,18 @@ const {
   mockCreateTarkovJsonTasksCoreFetcher,
   mockEdgeCache,
   mockFetch,
+  mockGetPrecomputedStore,
   mockGetQuery,
   mockGetValidatedLanguage,
   mockSanitizeTaskRewards,
   mockScheduleBackgroundTask,
+  mockSetHeader,
   mockSetOverlayResponseHeaders,
   mockSetResponseHeaders,
   mockShouldBypassCache,
   mockValidateGameMode,
 } = vi.hoisted(() => ({
+  mockFetchOverlay: vi.fn(async () => ({ overlay: {}, meta: { status: 'fresh' } })),
   mockApplyOverlay: vi.fn(),
   mockCreateTarkovJsonBootstrapFetcher: vi.fn(),
   mockCreateTarkovJsonHideoutFetcher: vi.fn(),
@@ -39,10 +43,12 @@ const {
   mockCreateTarkovJsonTasksCoreFetcher: vi.fn(),
   mockEdgeCache: vi.fn(),
   mockFetch: vi.fn(),
+  mockGetPrecomputedStore: vi.fn(),
   mockGetQuery: vi.fn(),
   mockGetValidatedLanguage: vi.fn(),
   mockSanitizeTaskRewards: vi.fn(),
   mockScheduleBackgroundTask: vi.fn(),
+  mockSetHeader: vi.fn(),
   mockSetOverlayResponseHeaders: vi.fn(),
   mockSetResponseHeaders: vi.fn(),
   mockShouldBypassCache: vi.fn(),
@@ -80,10 +86,17 @@ vi.mock('~/server/utils/logger', () => ({
 }));
 vi.mock('~/server/utils/overlay', () => ({
   applyOverlay: mockApplyOverlay,
+  fetchOverlay: mockFetchOverlay,
 }));
 vi.mock('~/server/utils/overlayResponseHeaders', () => ({
   setOverlayResponseHeaders: mockSetOverlayResponseHeaders,
 }));
+vi.mock('~/server/utils/precomputedTarkov', async () => {
+  const actual = await vi.importActual<typeof import('~/server/utils/precomputedTarkov')>(
+    '~/server/utils/precomputedTarkov'
+  );
+  return { ...actual, getPrecomputedStore: mockGetPrecomputedStore };
+});
 vi.mock('~/server/utils/tarkov-cache-config', () => ({
   CACHE_TTL_DEFAULT: 111,
   CACHE_TTL_EXTENDED: 222,
@@ -127,8 +140,10 @@ describe('Tarkov API handlers', () => {
     mockEdgeCache.mockImplementation(async (_eventArg, _key, fetcher: () => Promise<unknown>) => {
       return await fetcher();
     });
+    mockGetPrecomputedStore.mockReturnValue(null);
     vi.stubGlobal('defineEventHandler', (handler: unknown) => handler);
     vi.stubGlobal('getQuery', mockGetQuery);
+    vi.stubGlobal('setHeader', mockSetHeader);
     vi.stubGlobal('useRuntimeConfig', () => runtimeConfig);
     vi.stubGlobal('fetch', mockFetch as typeof fetch);
   });
@@ -171,7 +186,7 @@ describe('Tarkov API handlers', () => {
     expect(mockScheduleBackgroundTask).toHaveBeenCalledWith(event, refreshTask);
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
-      'hideout-json-v4-en-regular',
+      'hideout-json-v5-en-regular',
       baseFetcher,
       111,
       { cacheKeyPrefix: 'tarkov' }
@@ -201,7 +216,7 @@ describe('Tarkov API handlers', () => {
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
-      'items-lite-json-v1-en-regular',
+      'items-lite-json-v2-en-regular',
       expect.any(Function),
       222,
       { cacheKeyPrefix: 'tarkov' }
@@ -221,7 +236,7 @@ describe('Tarkov API handlers', () => {
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
-      'items-json-v1-en-regular',
+      'items-json-v2-en-regular',
       expect.any(Function),
       222,
       { cacheKeyPrefix: 'tarkov' }
@@ -241,15 +256,98 @@ describe('Tarkov API handlers', () => {
     const { default: handler } = await import('@/server/api/tarkov/items.get');
     await expect(handler(event)).rejects.toThrow('Invalid json.tarkov.dev response');
   });
+  it.each(['regular', 'pve', 'pvp-season'])(
+    'serves scoped progression catalogs for %s',
+    async (gameMode) => {
+      mockValidateGameMode.mockReturnValue(gameMode);
+      mockFetchOverlay.mockResolvedValueOnce({
+        overlay: {
+          editions: { standard: { title: 'Standard', value: 1 } },
+          storyChapters: { shared: { name: 'Shared', order: 1 } },
+          modes: { pve: { storyChapters: { added: { name: 'PvE chapter', order: 2 } } } },
+          seasonalPerks: { perk: { name: 'Perk', effects: [] } },
+        },
+        meta: { status: 'fresh' },
+      });
+      const { default: handler } = await import('@/server/api/tarkov/editions.get');
+      const response = await handler(event);
+      expect(response.data.editions[0]?.id).toBe('standard');
+      expect(mockFetchOverlay).toHaveBeenCalledWith(false);
+      expect(response.data.storyChapters).toHaveLength(gameMode === 'pve' ? 2 : 1);
+      expect(response.data.seasonalPerks).toHaveLength(gameMode === 'pvp-season' ? 1 : 0);
+      expect(mockSetOverlayResponseHeaders).toHaveBeenCalledWith(event, response);
+    }
+  );
+  it.each(['editions', 'prestige'] as const)(
+    'fails closed when the %s overlay is unavailable',
+    async (catalog) => {
+      mockFetchOverlay.mockResolvedValueOnce({
+        overlay: null as unknown as object,
+        meta: { status: 'unavailable' },
+      });
+      const { default: handler } =
+        catalog === 'editions'
+          ? await import('@/server/api/tarkov/editions.get')
+          : await import('@/server/api/tarkov/prestige.get');
+      await expect(handler(event)).rejects.toMatchObject({ statusCode: 503 });
+      expect(mockCreateTarkovJsonPrestigeFetcher).not.toHaveBeenCalled();
+    }
+  );
+  describe('overlay-status', () => {
+    const loadHandler = async () =>
+      (await import('@/server/api/tarkov/overlay-status.get')).default;
+    it('serves the precompute manifest without storing it', async () => {
+      const manifest = { entries: [{ key: 'tasks-core-json-v3-en-regular', overlay: 'sha-1' }] };
+      const get = vi.fn(async () => manifest);
+      mockGetPrecomputedStore.mockReturnValue({ get });
+      const handler = await loadHandler();
+      await expect(handler(event)).resolves.toEqual(manifest);
+      expect(get).toHaveBeenCalledWith('overlay-precompute-manifest-json-v3', 'json');
+      expect(mockSetHeader).toHaveBeenCalledWith(event, 'Cache-Control', 'no-store');
+    });
+    it.each([
+      ['the binding is missing', () => null],
+      ['the manifest is absent', () => ({ get: vi.fn(async () => null) })],
+    ])('answers 503 when %s', async (_case, store) => {
+      mockGetPrecomputedStore.mockReturnValue(store());
+      const handler = await loadHandler();
+      await expect(handler(event)).rejects.toMatchObject({ statusCode: 503 });
+      expect(mockSetHeader).not.toHaveBeenCalled();
+    });
+    it('answers 503 instead of surfacing a store read failure', async () => {
+      mockGetPrecomputedStore.mockReturnValue({
+        get: vi.fn(async () => {
+          throw new Error('KV unavailable');
+        }),
+      });
+      const handler = await loadHandler();
+      await expect(handler(event)).rejects.toMatchObject({ statusCode: 503 });
+    });
+  });
+  it('passes raw prestige payloads through the scoped overlay projector', async () => {
+    const { default: handler } = await import('@/server/api/tarkov/prestige.get');
+    mockFetchOverlay.mockResolvedValueOnce({
+      overlay: { prestige: { level: { level: 2 } } },
+      meta: { status: 'fresh' },
+    });
+    await handler(event);
+    const project = mockCreateTarkovJsonPrestigeFetcher.mock.calls[0]![0].project;
+    expect(project({ prestige: [{ id: 'level', level: 1 }] }).prestige).toEqual([
+      expect.objectContaining({ id: 'level', level: 2 }),
+    ]);
+  });
   it('builds expected cache key for prestige', async () => {
     const { default: handler } = await import('@/server/api/tarkov/prestige.get');
     await handler(event);
+    expect(mockFetchOverlay).toHaveBeenCalledWith(false);
     expect(mockCreateTarkovJsonPrestigeFetcher).toHaveBeenCalledWith({
       lang: 'en',
+      gameMode: 'regular',
+      project: expect.any(Function),
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
-      'prestige-json-v2-en',
+      'prestige-json-v3-en-regular',
       expect.any(Function),
       222,
       {
@@ -287,7 +385,7 @@ describe('Tarkov API handlers', () => {
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
-      'tasks-core-json-v2-en-regular',
+      'tasks-core-json-v3-en-regular',
       expect.any(Function),
       111,
       { cacheKeyPrefix: 'tarkov', precomputed: true }

@@ -1,6 +1,7 @@
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { sortTasksByProgression } from '@/utils/taskSorter';
 import { isTaskCounted, isTaskRelevant } from '@/utils/taskStatus';
 import type { Task, Trader } from '@/types/tarkov';
 export type KappaTaskStatus = 'available' | 'complete' | 'failed' | 'locked';
@@ -40,6 +41,30 @@ function parseChainKey(name: string | undefined): ChainKey | null {
   if (!Number.isFinite(part)) return null;
   return { chain: prefix.toLocaleLowerCase(), part };
 }
+/** Sort rows against a possibly partial progression index without mutating the input. */
+export const sortKappaRowsByProgression = (
+  rows: readonly KappaRowEntry[],
+  taskOrderIndex: ReadonlyMap<string, number>
+): KappaRowEntry[] => {
+  const chainAnchors = new Map<string, { rank: number }>();
+  const rankedRows = rows.map((row) => {
+    const rank = taskOrderIndex.get(row.task.id) ?? Number.MAX_SAFE_INTEGER;
+    const chain = parseChainKey(row.task.name);
+    if (!chain) return { row, anchor: { rank }, isChain: 0, part: 0 };
+    let anchor = chainAnchors.get(chain.chain);
+    if (!anchor) {
+      anchor = { rank };
+      chainAnchors.set(chain.chain, anchor);
+    } else {
+      anchor.rank = Math.min(anchor.rank, rank);
+    }
+    return { row, anchor, isChain: 1, part: chain.part };
+  });
+  rankedRows.sort(
+    (a, b) => a.anchor.rank - b.anchor.rank || a.isChain - b.isChain || a.part - b.part
+  );
+  return rankedRows.map(({ row }) => row);
+};
 const taskFilterFor = (tab: KappaTabKey) =>
   tab === 'kappa'
     ? (task: Task) => task.kappaRequired === true
@@ -163,61 +188,14 @@ export function useKappaOverview(tab: () => KappaTabKey) {
         completedCount: row.status === 'complete' ? 1 : 0,
       });
     }
-    /**
-     * Sort each trader column by required player level, but keep multi-part
-     * quest chains adjacent and ordered by part number. The reference
-     * spreadsheet groups chains like 'Healthcare Privacy - Part 1/2/3'
-     * together anchored at the first part's level, even when later parts have
-     * higher level requirements that would otherwise scatter them across the
-     * column. Tasks outside a chain sort by their own level then name.
-     */
-    type SortMeta = { anchorLevel: number; isChain: number; anchorIndex: number; part: number };
-    const sortGroupRows = (rows: KappaRowEntry[]): KappaRowEntry[] => {
-      const taskOrderIndex = new Map<string, number>();
-      metadataStore.tasks.forEach((task, index) => {
+    const taskOrderIndex = new Map<string, number>();
+    sortTasksByProgression(metadataStore.tasks, 'asc', progressStore.taskEvaluations).forEach(
+      (task, index) => {
         taskOrderIndex.set(task.id, index);
-      });
-      const chainAnchors = new Map<string, { level: number; index: number }>();
-      for (const row of rows) {
-        const chainKey = parseChainKey(row.task.name);
-        if (!chainKey) continue;
-        const level = row.task.minPlayerLevel ?? 0;
-        const taskIndex = taskOrderIndex.get(row.task.id) ?? Number.MAX_SAFE_INTEGER;
-        const existing = chainAnchors.get(chainKey.chain);
-        if (
-          existing === undefined ||
-          level < existing.level ||
-          (level === existing.level && taskIndex < existing.index)
-        ) {
-          chainAnchors.set(chainKey.chain, { level, index: taskIndex });
-        }
       }
-      const metaFor = (row: KappaRowEntry): SortMeta => {
-        const ownLevel = row.task.minPlayerLevel ?? 0;
-        const ownIndex = taskOrderIndex.get(row.task.id) ?? Number.MAX_SAFE_INTEGER;
-        const chainKey = parseChainKey(row.task.name);
-        if (chainKey) {
-          const anchor = chainAnchors.get(chainKey.chain) ?? { level: ownLevel, index: ownIndex };
-          return {
-            anchorLevel: anchor.level,
-            isChain: 1,
-            anchorIndex: anchor.index,
-            part: chainKey.part,
-          };
-        }
-        return { anchorLevel: ownLevel, isChain: 0, anchorIndex: ownIndex, part: 0 };
-      };
-      return [...rows].sort((a, b) => {
-        const metaA = metaFor(a);
-        const metaB = metaFor(b);
-        if (metaA.anchorLevel !== metaB.anchorLevel) return metaA.anchorLevel - metaB.anchorLevel;
-        if (metaA.isChain !== metaB.isChain) return metaA.isChain - metaB.isChain;
-        if (metaA.anchorIndex !== metaB.anchorIndex) return metaA.anchorIndex - metaB.anchorIndex;
-        return metaA.part - metaB.part;
-      });
-    };
+    );
     return Array.from(groups.values())
-      .map((group) => ({ ...group, rows: sortGroupRows(group.rows) }))
+      .map((group) => ({ ...group, rows: sortKappaRowsByProgression(group.rows, taskOrderIndex) }))
       .sort((a, b) => {
         const indexA = traderOrder.get(a.trader.id) ?? Number.MAX_SAFE_INTEGER;
         const indexB = traderOrder.get(b.trader.id) ?? Number.MAX_SAFE_INTEGER;

@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { H3Event, H3EventContext } from 'h3';
-type SiteConfigStackEntry = Record<string, unknown>;
+import { BASE_SITE_CONTEXT, createRouterStub } from '@/server/utils/__tests__/eventStubs';
+import type { H3Event } from 'h3';
 const { mockGetQuery, mockGetRouterParam, mockSetHeader, mockSetResponseHeader } = vi.hoisted(
   () => ({
     mockGetQuery: vi.fn(),
@@ -21,22 +21,9 @@ vi.mock('h3', async () => {
     setResponseHeader: mockSetResponseHeader,
   };
 });
-mockNuxtImport('useRouter', () => () => ({
-  afterEach: vi.fn(),
-  beforeEach: vi.fn(),
-  beforeResolve: vi.fn(),
-  onError: vi.fn(),
-}));
+mockNuxtImport('useRouter', () => () => createRouterStub());
 describe('Overlay Kappa Route', () => {
   let mockEvent: Partial<H3Event>;
-  const BASE_SITE_CONTEXT: Pick<H3EventContext, 'siteConfig' | 'siteConfigNitroOrigin'> = {
-    siteConfig: {
-      stack: [] as Partial<SiteConfigStackEntry>[],
-      push: vi.fn(() => () => {}),
-      get: vi.fn(() => ({})),
-    },
-    siteConfigNitroOrigin: '',
-  };
   beforeEach(() => {
     vi.clearAllMocks();
     mockEvent = {

@@ -105,7 +105,7 @@ describe('useMetadataStore promise tracking', () => {
     expect(store.prestigeError).toBeNull();
     expect(cacheUtils.setCachedData).toHaveBeenCalledWith(
       'hideout',
-      'json-v4-regular',
+      'json-v5-regular',
       'en',
       expect.anything(),
       60 * 60 * 1000

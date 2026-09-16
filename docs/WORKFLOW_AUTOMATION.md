@@ -49,18 +49,26 @@ Only substantial behavioral corrections or unresolved significant findings warra
 
 ### 1. CI Pipeline (`.github/workflows/ci.yml`)
 
-Runs on pushes to `main`, `develop`, and `wip/**`, and PRs targeting `main` or `develop`,
-including translation-only PRs. All eligible push runs retain full validation.
+Runs on pushes to `main` and `wip/**`, PRs targeting `main`, and explicit CI dispatch, including
+translation-only PRs. All push and dispatched runs retain full validation.
 
-The lightweight `changes` job emits proposed and effective selections. **Shadow rollout is enabled**:
-the effective selection runs every existing CI job. `CI Result` always evaluates the job outcomes and
-fails on missing classifier data, selected failures/cancellations, or unexpected skips. Systems drift
-runs independently on every CI run. Existing check names, Dependabot expectations, fork restrictions,
+The lightweight `changes` job classifies the pull-request diff and selects jobs. **Path selection is
+active**: documentation-only and translation-only pull requests run the reduced set (formatting,
+i18n when locales change, systems drift); every other change set runs every job. The job also emits
+`workflows`, which enables workflow linting in `Lint & Format` for non-Markdown automation paths and
+unreadable diffs. `CI Result` evaluates the job outcomes against the plan and fails on missing
+classifier data, selected failures/cancellations, or unexpected skips. Systems drift runs
+independently on every CI run. Existing check names, Dependabot expectations, fork restrictions,
 security checks, and Codecov statuses remain unchanged; the aggregate does not replace external gates.
 
 The shared setup action uses `.nvmrc`, the full `packageManager` pin, pnpm caching, and a frozen
 installation. Each caller owns checkout history and credential settings. `Lint & Format` runs lint
 and Prettier once each (lint already includes blank-line validation), plus i18n and workflow fixtures.
+When automation files change it also runs pinned, checksum-verified release binaries of `actionlint`
+(syntax, expression, and shellcheck errors) and `zizmor` (workflow security) at `low` severity and
+above; `.github/zizmor.yml` records the accepted findings with their justification. Neither tool is
+Node tooling, so both are pinned in the workflow step rather than `package.json`. To update either,
+change the version and the `SHA256` value to the `digest` GitHub records for the release asset.
 The four Vitest shards, dedicated Deno tests, Supabase validation, Worker validation, and production
 build retain their existing commands and environment behavior. Tests in `scripts/ci-tests/` use
 Node's built-in runner via `pnpm run test:workflow`; their filenames deliberately avoid Vitest discovery.
@@ -87,12 +95,15 @@ Fallow, build, database and Worker checks, and Deno tests, requiring their usual
 environment. CI itself retains sharding, secrets/fork rules, and report uploads in workflow jobs.
 Link validation remains in the existing Link Check workflow for applicable documentation paths.
 
-The proposed reduced selection covers only root `.md` files, Markdown under `docs/` and `.github/`,
-and `app/locales/*.json`. `DESIGN.md`, generated code, scripts, dependencies, configuration, public
-assets, and unknown paths select full validation. Renames include both paths and deletions remain
-visible. Empty diffs, missing refs, malformed arguments, and Git errors conservatively select full
-validation. The i18n check rejects missing supported locale files, including deletions and
-renames, while missing translation keys still use the non-fatal English fallback.
+The reduced selection covers only root `.md` files, Markdown under `docs/` and `.github/`, and
+Crowdin-owned `app/locales/*.json` translations. The source locale `app/locales/en.json` selects
+full validation: application code and Vitest fixtures consume it, and `scripts/crowdin-pr.sh` draws
+the same translation-only boundary. `DESIGN.md`, generated code, scripts, dependencies,
+configuration, public assets, and unknown paths select full validation. Renames include both paths
+and deletions remain visible. Empty diffs, missing refs, malformed arguments, and Git errors
+conservatively select full validation. The i18n check rejects missing supported locale files,
+including deletions and renames, while missing translation keys still use the non-fatal English
+fallback.
 Non-English formatting exclusions and Crowdin ownership remain intact.
 
 #### CI rollout and measurements
@@ -100,11 +111,19 @@ Non-English formatting exclusions and Crowdin ownership remain intact.
 1. Merge policy/setup, then the shadow classifier and aggregate. Capture a successful and failing
    executable PR, a documentation-only PR, a translation-only PR, and a mixed PR. Confirm the proposed
    selections and aggregate conclusions, including the existing Dependabot and coverage behavior.
-2. Only after that evidence, remove `--shadow` from the classifier invocation in a follow-up change.
-   Retain `--full` for push events. Check required-check settings before enabling skips; do not change
-   those settings in this rollout. Roll back selection by restoring `--shadow`.
+   **Recorded 2026-09-16** from the `Validation plan` job logs of pull-request CI runs:
+   documentation-only #831 (`proposed.full=false`, run succeeded), translation-only #818 and #853
+   (`proposed.full=false`, runs succeeded), executable #855 and mixed docs/workflow #862/#863
+   (`proposed.full=true`), and failing executable runs on #848/#852/#862 where a failed shard, Fallow,
+   or lint job made `CI Result` fail. The only required check on `main` is `CI Result`
+   (`Main CI freshness` ruleset), so skipped jobs cannot leave a pull request blocked.
+2. Done: the classifier invocation no longer passes `--shadow`; pull requests receive path selection
+   while push and dispatch events retain `--full`. Required-check settings were not changed. Roll
+   back by restoring `--shadow` in the `Classify changes` step and inverting the `--shadow`
+   assertion in `scripts/ci-tests/workflows.mjs` in the same change (workflow edits select full
+   validation, so `test:workflow` runs on the rollback itself); the flag remains supported.
 3. Release deduplication is handled separately in [PR #805](https://github.com/tarkovtracker-org/TarkovTracker/pull/805).
-   This shadow rollout does not change release triggers, validation, or main-run cancellation.
+   Path selection does not change release triggers, validation, or main-run cancellation.
    Do not treat local fixtures as evidence of GitHub App or branch-protection behavior.
 
 The initial observations are recorded in [the baseline report](ci-turnaround-baseline.md).
@@ -149,6 +168,29 @@ are printed on stderr. Invalid refs and setup/analyzer failures exit nonzero ins
 Regression checks live in `scripts/fallow-audit.test.mjs` and run with the regular test suite or
 `pnpm exec vitest run scripts/fallow-audit.test.mjs`.
 
+##### Resolving findings instead of suppressing them
+
+Fix findings at the source. `// fallow-ignore-next-line` hides a finding without resolving it, and
+because no baseline is maintained, a hidden finding is never revisited — the debt simply stops being
+reported. Resolve dead code by deleting it or narrowing the export; resolve complexity by
+decomposition (extract helpers, split validation from assembly, share an algorithm rather than
+duplicating it).
+
+Complexity findings usually report `exceeded: crap`. CRAP is `complexity² × (1 − coverage)³ +
+complexity` and the audit runs without coverage data, so it assumes zero coverage: a function at
+cyclomatic 5 scores exactly the threshold of 30 and breaches. "It is covered by tests" is therefore
+not a resolution — the analyzer cannot see that coverage, and the finding will recur on every run.
+Treat cyclomatic 4 as the practical ceiling for new functions.
+
+Suppress only when the finding is provably not actionable, such as an external contract or framework
+indirection the analyzer cannot model (store state hydrated through `$state` is the recurring
+example). Put `// fallow-ignore-next-line` directly above the flagged declaration and explain why
+the finding cannot be fixed. Explanatory `//` lines may precede the directive; the directive must be
+the final comment line. Placing more comment lines between the directive and declaration targets the
+wrong line and leaves the finding unsuppressed. A suppression is a reviewable decision, not a
+formality. Existing suppressions are grandfathered; remove them opportunistically when already
+editing that function rather than as unrelated cleanup in someone else's change.
+
 ### 2. Security Scanning (`.github/workflows/security.yml`)
 
 Weekly security audits:
@@ -158,7 +200,7 @@ Weekly security audits:
 - `security-scan` - pnpm audit (prod and all deps), schedule-only informational outdated check, checksum-verified Gitleaks secret detection
 - `codeql` - CodeQL static analysis
 
-**Triggers:** Push to main/develop, all PRs, weekly (Sunday 00:00 UTC)
+**Triggers:** Push to main, all PRs, weekly (Sunday 00:00 UTC)
 
 ### 3. Release Automation (`.github/workflows/release.yml`)
 
@@ -166,14 +208,14 @@ Semantic versioning with automated releases:
 
 **Jobs:**
 
-- Reuses the successful `CI` run for the exact `main` push commit, including all four test shards
+- Reuses the successful `CI` run for the exact `main` commit, including all four test shards
   and the Supabase reset, lint, and pgTAP checks
 - Runs the production build before publishing
 - Generates changelog from conventional commits
 - Creates GitHub releases
 - Updates version in package.json
 
-**Triggers:** Completion of `CI` for a successful same-repository push to `main`. PR runs, failed
+**Triggers:** Completion of `CI` for a successful same-repository push or explicit dispatch on `main`. PR runs, failed
 or cancelled CI, and fork runs cannot publish. Successful CI reruns can retry release eligibility;
 there is no manual bypass of the CI gate. Documentation-only pushes may reach the gate, but
 semantic-release still decides whether the accumulated conventional commits warrant a version.
@@ -181,8 +223,8 @@ semantic-release still decides whether the accumulated conventional commits warr
 `release-gate.mjs` re-reads the triggering run and `refs/heads/main` before dependency setup and
 again immediately before publishing. It verifies the CI workflow path, conclusion, SHA, and run
 attempt. Superseded commits skip; release never substitutes a newer, unvalidated checkout.
-The gate initially loads from the trusted default-branch SHA and is copied to `RUNNER_TEMP` so
-both checks use the same source even after checkout replacement. Only after validation does a
+The gate and its recovery helper initially load from the trusted default-branch SHA and are copied
+to `RUNNER_TEMP` so checks use the same source even after checkout replacement. Only after validation does a
 second checkout pin the triggering CI SHA for building and publishing; it never executes a fork
 candidate.
 
@@ -195,22 +237,55 @@ This removes the duplicate full test suite and database reset from the serialize
 The production build remains a release check. Cloudflare deployments continue independently;
 this workflow controls release/version publication, not when the initial deployment starts.
 
-**Version-bump commit:** `@semantic-release/git` commits the bumped `package.json` and `CHANGELOG.md`
-as `chore(release): <version> [skip actions]`. The marker is deliberately `[skip actions]` rather
-than `[skip ci]`:
+**Required main policy:** `.github/main-ci-ruleset.json` records the desired API configuration for
+the `Main CI freshness` repository ruleset. Rollout must apply it and verify active enforcement and
+an empty bypass list before merging the automation changes. It targets
+`refs/heads/main`, requires `CI Result` from GitHub Actions (integration ID `15368`), enables
+`strict_required_status_checks_policy`, and has an empty `bypass_actors` list. This applies to
+all PRs and direct pushes, including administrators and automation. Existing deletion/force-push
+rules remain separate. Behind branches must incorporate current main and pass CI again; do not
+use an administrator bypass. GitHub enforces freshness at merge time, closing the interval after
+automation's last base-SHA check. Both Crowdin and release automation verify the effective strict rule before writing main. The
+administrator must verify the deployed ruleset's empty bypass list during rollout and after policy
+changes. GitHub hides that list from callers without ruleset write access; automation does not
+request administrative permissions merely to inspect it.
 
-- GitHub Actions treats `[skip actions]` as a skip marker, so this workflow does not re-trigger
-  itself. ([Skipping workflow runs](https://docs.github.com/en/actions/managing-workflow-runs/skipping-workflow-runs))
-- Cloudflare Pages does **not** recognize `[skip actions]`. Its skip markers are `[CI Skip]`,
-  `[CI-Skip]`, `[Skip CI]`, `[Skip-CI]`, and `[CF-Pages-Skip]`.
-  ([GitHub integration](https://developers.cloudflare.com/pages/configuration/git-integration/github-integration/))
+**Version-bump commit:** `scripts/release-commit.mjs` prepares the bumped `package.json` and
+`CHANGELOG.md` as `chore(release): <version>` with no skip marker. The plugin supports the
+main-only release workflow. It stages only these generated assets and rejects unrelated staged
+files. `scripts/release-commit.sh` pushes the new commit to
+`wip/release-<version>-<run-id>-<attempt>` using the built-in `GITHUB_TOKEN`.
+An explicit `workflow_dispatch` starts full CI on that branch; the job has `actions: write`. The plugin waits up to thirty minutes
+for successful GitHub Actions `CI Result` on the exact version SHA; absent, failed, cancelled,
+skipped, or timed-out checks cannot promote it.
 
-That asymmetry is the point. The footer version comes from `packageJson.version` in
-`nuxt.config.ts`, which is baked into the bundle at build time and surfaced through
-`runtimeConfig.public.appVersion`. The merge commit is built _before_ semantic-release bumps
-`package.json`, so if Cloudflare also skipped the bump commit the deployed site would advertise the
-previous version until the next unrelated push to `main`. Letting Pages build the bump commit costs
-one extra deploy per release and keeps the displayed version honest.
+Automation confirms each accepted dispatch creates a new CI run on the requested branch within
+60 seconds, including queued runs, before waiting for exact-SHA checks. Dispatched Fallow audits
+compare the checked-out commit with its parent, so dispatching main does not compare main with itself.
+
+After rechecking main and the policy, an ordinary non-forced push promotes the identical SHA to
+main using `GITHUB_TOKEN`. A concurrent main advance rejects promotion rather than rebasing
+unvalidated assets. The required check is already successful on that commit. The token suppresses
+recursive main Actions runs; semantic-release then tags and publishes the validated version.
+Successful promotion deletes only the staging ref still pointing at that SHA. Failed attempts
+retain the staging branch for diagnosis. A cleanup failure emits a warning without undoing
+publication. No token is written to a Git URL or config.
+
+**Interrupted publication:** If tag pushing or GitHub publication fails after main promotion, rerun
+the original Release workflow. `release-recovery.mjs` is enabled only for reruns and recognizes
+only the direct version-commit child of the original successful main CI revision. It requires
+successful exact-SHA GitHub Actions `CI Result`, exactly the two generated modified assets, a
+manifest whose only change is the matching version, and a changelog that preserves all previous
+content. It reconstructs the original notes and creates the missing tag/release idempotently.
+An existing tag must point to that same commit; an unrelated main successor, unsuccessful CI,
+conflicting tag, draft/prerelease publication, or changed asset content cannot be recovered.
+The recovery step rechecks the evidence before publication and never moves main or creates another
+version commit. Failures before promotion use the ordinary original-workflow retry path.
+
+Cloudflare Git deployments remain independent and build the version commit. The footer version
+comes from `packageJson.version` in `nuxt.config.ts`, so this second production build makes the
+footer match the published release. Staging branches may also receive preview builds according
+to the platform's branch settings.
 
 > [!WARNING]
 > Never write a bracketed skip marker verbatim in a commit message — including when merely
@@ -240,10 +315,10 @@ Enhanced PR validation:
 
 **Jobs:**
 
-- `labeler` - Auto-label based on file changes
-- `size` - PR size classification (S/M/L/XL/XXL)
-- `conventional-commits` - Commit message validation
-- `lighthouse` - Performance checks (runs when the PR touches `app/components/`, `app/features/`,
+- `PR Meta` - auto-label based on file changes, PR size classification (S/M/L/XL/XXL), and
+  commit message validation
+- `Lighthouse scope` - decides whether the Lighthouse audit is relevant
+- `Lighthouse` - Performance checks (runs when the PR touches `app/components/`, `app/features/`,
   `lighthouserc.json`, or the PR Checks workflow, or carries the `performance` or `ui` label)
 
 **Lighthouse collection (`lighthouserc.json`):** each selected URL is audited once per Lighthouse
@@ -269,7 +344,9 @@ Merges known low-risk Dependabot PRs after the normal PR checks complete:
 
 **Safety rules:**
 
-- Dependabot-only, `main`-targeted PRs only
+- Dependabot-authored, Dependabot-triggered, `main`-targeted PRs only; both author and event actor
+  must match GitHub.com's immutable Dependabot account ID (`49699333`), not a mutable login.
+  A human push, reopen, or ready-for-review on the branch disables auto-merge for that event
 - No repository checkout in the privileged `pull_request_target` workflow
 - Only package lockfiles, package manifests, and `pnpm-workspace.yaml` are allowed; any workflow
   change stays manual
@@ -453,7 +530,7 @@ GitHub Actions itself deploys nothing; items 2-4 are separate Git integrations. 
 section of [`runbook.md`](./runbook.md) for what to verify after each merge.
 
 A releasing merge deploys twice: once for the merge commit, then again for the
-`chore(release): <version> [skip actions]` commit that carries the bumped `package.json`. The second
+`chore(release): <version>` commit that carries the bumped `package.json`. The second
 deploy is what makes the footer version match the release, so treat it as part of the merge rather
 than a stray build.
 
@@ -476,7 +553,8 @@ pnpm --filter api-gateway exec wrangler deploy
 ### Coverage Reports
 
 - Coverage is uploaded to Codecov by the CI `test` job. Repo-level config is in `codecov.yml`. Uses the org-level `CODECOV_TOKEN` secret for token-authenticated uploads (required on protected branches).
-- Bundle analysis is uploaded by the CI `validate` job during `pnpm run build` via `@codecov/nuxt-plugin` (configured in `nuxt.config.ts`). The plugin only activates when `CODECOV_TOKEN` is set, so local builds are unaffected.
+- Bundle analysis is uploaded by the CI `validate` job during `pnpm run build` via `@codecov/nuxt-plugin` (configured in `nuxt.config.ts`). The plugin only activates when `CODECOV_TOKEN` holds a non-empty value, so local builds without that variable and fork pull requests are unaffected. A fork pull request receives no org secrets, so the secret expression expands to an empty string rather than being absent; the emptiness check is what keeps the plugin from loading without a usable upload token.
+- The `validate` job's production build runs on fork pull requests too. It needs no secrets: `SUPABASE_URL` and `SUPABASE_ANON_KEY` expand to empty strings and the app builds in its offline configuration, which still exercises the same TypeScript, bundling, and Nitro output. Coverage and bundle uploads stay fork-skipped because those do require the org token.
 - Test results (JUnit XML) are uploaded via `codecov/codecov-action` with `report_type: test_results`. Vitest outputs `test-report.junit.xml` when `CI=true` (configured in `vitest.config.ts`). The upload step is `!cancelled()`-gated so failing shards' reports still reach Codecov.
 - The CI `test` job runs as a 4-way shard matrix (`Test (shard 1/4)` through `Test (shard 4/4)`). Each shard sets `VITEST_SHARD=N/4`, which enables the `github-actions` reporter (annotates failed tests on the PR diff), disables per-shard coverage thresholds, and reports only files imported by that shard. Codecov merges the per-shard lcov uploads and enforces an absolute floor via the `absolute-floor` project status in `codecov.yml`.
 - Local `pnpm run test` / `pnpm run test:coverage` remain unsharded. Coverage runs retain the full `app/**/*.{ts,vue}` denominator and enforce the Vitest thresholds.

@@ -19,14 +19,6 @@ import type {
 } from '@/types/tarkov';
 const MAX_PRESTIGE_LEVEL = 6;
 const PRESTIGE_PLAYER_LEVEL_REQUIREMENT = 47;
-const PRESTIGE_STORY_CHAPTER_RULES: Record<number, string[]> = {
-  1: ['Tour'],
-  2: ['Tour', 'Falling Skies'],
-  3: ['Tour'],
-  4: ['Tour', 'Blue Fire'],
-  5: ['Tour', 'They Are Already Here'],
-  6: ['The Ticket'],
-};
 const PRESTIGE_MANUAL_ITEM_RULES: Partial<Record<number, string[]>> = {
   3: ['Ticket from Tarkov'],
   4: ['Ticket from Tarkov'],
@@ -175,13 +167,6 @@ const buildItemLabel = (count: number | undefined, name: string): string => {
     return name;
   }
   return `${new Intl.NumberFormat('en-US').format(Math.trunc(count))} ${name}`;
-};
-const findStoryChapterByName = (
-  chapters: StoryChapter[],
-  chapterName: string
-): StoryChapter | undefined => {
-  const normalizedTarget = chapterName.trim().toLowerCase();
-  return chapters.find((chapter) => chapter.name.trim().toLowerCase() === normalizedTarget);
 };
 const findNewBeginningTaskForPrestige = (
   tasks: Task[],
@@ -507,25 +492,31 @@ export const buildPrestigeRequirementRows = (
       });
     }
   }
-  for (const chapterName of PRESTIGE_STORY_CHAPTER_RULES[targetPrestigeLevel] || []) {
-    const storyChapter = findStoryChapterByName(options.storyChapters, chapterName);
-    const chapterId = storyChapter?.id || chapterName.toLowerCase().replace(/\s+/g, '-');
-    const isComplete = storyChapter
-      ? options.modeProgress.storyChapters?.[storyChapter.id]?.complete === true
-      : false;
+  for (const requirement of prestige?.storyRequirements ?? []) {
+    const chapter = options.storyChapters.find(
+      (chapter) => chapter.id === requirement.storyChapter
+    );
+    const chapterProgress = options.modeProgress.storyChapters?.[requirement.storyChapter];
+    const progress =
+      requirement.type === 'storyObjectiveStatus'
+        ? chapterProgress?.objectives?.[requirement.objective ?? '']
+        : chapterProgress;
+    const isComplete = requirement.unresolved !== true && progress?.complete === true;
     pushRow({
       currentValue: isComplete ? 'complete' : 'incomplete',
-      href: storyChapter?.wikiLink,
-      id: `story:${chapterId}`,
+      href: chapter?.wikiLink,
+      id: `story:${requirement.storyChapter}:${requirement.objective ?? 'chapter'}`,
       kind: 'storyChapter',
-      name: storyChapter?.name || chapterName,
-      source: storyChapter ? 'overlay' : 'wiki',
+      name: requirement.name || chapter?.name || requirement.storyChapter,
+      source: 'overlay',
       status: isComplete ? 'met' : 'unmet',
       targetPrestige: targetPrestigeLevel,
       tracked: true,
     });
   }
-  for (const itemName of PRESTIGE_MANUAL_ITEM_RULES[targetPrestigeLevel] || []) {
+  for (const itemName of (prestige?.storyRequirements === undefined
+    ? PRESTIGE_MANUAL_ITEM_RULES[targetPrestigeLevel]
+    : []) || []) {
     pushRow({
       currentValue: null,
       id: `manual-item:${targetPrestigeLevel}:${itemName}`,

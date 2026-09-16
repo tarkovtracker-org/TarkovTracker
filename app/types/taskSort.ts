@@ -3,6 +3,7 @@ export const TASK_SORT_MODES = [
   'impact',
   'alphabetical',
   'level',
+  'progression',
   'trader',
   'teammates',
   'xp',

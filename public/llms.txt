@@ -4,7 +4,7 @@
 
 This site is primarily a client app plus JSON APIs. Public game data is available under `/api/tarkov/*` and is proxied from tarkov.dev with overlay fixes and edge caching. API endpoints are intended for direct programmatic access, not crawling.
 
-For API requests, use `lang` and `gameMode` where supported. Common `gameMode` values are `regular` (PvP) and `pve`. Supported `lang` values: `cs`, `de`, `en`, `es`, `fr`, `hu`, `it`, `ja`, `ko`, `pl`, `pt`, `ro`, `ru`, `sk`, `tr`, `zh`. Unsupported values fall back to `en`.
+For API requests, use `lang` and `gameMode` where supported. Supported `gameMode` values are `regular` (PvP), `pve`, and `pvp-season` (Seasonal). Supported `lang` values: `cs`, `de`, `en`, `es`, `fr`, `hu`, `it`, `ja`, `ko`, `pl`, `pt`, `ro`, `ru`, `sk`, `tr`, `zh`. Unsupported `lang` values fall back to `en`. Missing or unsupported `gameMode` values fall back to `regular`.
 
 UI locales (separate from the API `lang` set): `cs`, `de`, `en`, `es`, `fr`, `it`, `ko`, `pl`, `pt`, `ru`, `uk`, `zh`.
 
@@ -36,7 +36,9 @@ Crawl and discovery directives live at `/robots.txt` and `/sitemap.xml`; see tho
 - [Items Lite](https://tarkovtracker.org/api/tarkov/items-lite): Lightweight item index. Accepts `lang`, `gameMode`.
 - [Items Full](https://tarkovtracker.org/api/tarkov/items): Full item data. Accepts `lang`, `gameMode`.
 - [Map Spawns](https://tarkovtracker.org/api/tarkov/map-spawns): Spawn/location data. Accepts `lang`, `gameMode`.
-- [Prestige](https://tarkovtracker.org/api/tarkov/prestige): Prestige requirement data. Accepts `lang`.
+- [Prestige](https://tarkovtracker.org/api/tarkov/prestige): Prestige requirement data. Accepts `lang`, `gameMode`.
+- [Editions and Story Catalog](https://tarkovtracker.org/api/tarkov/editions): Game editions, story chapters, and seasonal perks. Accepts `lang`, `gameMode`.
+- [Overlay Status](https://tarkovtracker.org/api/tarkov/overlay-status): Precompute fleet manifest with per-entry overlay identities.
 - [Cache Metadata](https://tarkovtracker.org/api/tarkov/cache-meta): Cache purge timestamp metadata.
 - [Contributors](https://tarkovtracker.org/api/contributors): Contributor listing.
 - [Changelog API](https://tarkovtracker.org/api/changelog): Changelog data feed. Accepts `limit` (1-50, default 10) and `releases` (1-10, default 3).

@@ -17,6 +17,13 @@
       class="relative z-10 flex h-full flex-col"
       :class="{ 'opacity-80': isComplete && !isFailed }"
     >
+      <ul
+        v-if="isLocked && taskBlockerTexts.length"
+        class="text-surface-300 px-3 pt-2 text-xs"
+        data-testid="task-blockers"
+      >
+        <li v-for="(text, index) in taskBlockerTexts" :key="`${index}-${text}`">{{ text }}</li>
+      </ul>
       <!-- 1) Identity + Header (Padded) -->
       <div data-testid="task-card-header" class="flex flex-col" :class="compactClasses.header">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
@@ -43,9 +50,7 @@
               :task="task"
               :is-pinned="isPinned"
               :is-our-faction="isOurFaction"
-              :fence-rep-requirement="fenceRepRequirement"
-              :meets-fence-rep-requirement="meetsFenceRepRequirement"
-              :trader-level-reqs="traderLevelReqs"
+              :trader-requirements="traderRequirements"
               :location-tooltip="locationTooltip"
               :is-failed="isFailed"
               :is-invalid="isInvalid"
@@ -130,7 +135,9 @@
                       )
                     }}
                   </span>
-                  <span class="inline-flex items-center gap-0.5 text-[10px] text-amber-400/80">
+                  <span
+                    class="light:text-warning-900 inline-flex items-center gap-0.5 text-[10px] text-amber-400/80"
+                  >
                     <UIcon name="i-mdi-information-outline" class="h-3 w-3 shrink-0" />
                     {{
                       t(
@@ -269,7 +276,7 @@
               :text="resetItemCountsDisabledReason"
               :disabled="!resetItemCountsDisabledReason"
             >
-              <span class="inline-flex" @click.stop>
+              <span class="inline-flex">
                 <UButton
                   size="xs"
                   color="neutral"
@@ -392,6 +399,7 @@
   import ContextMenuItem from '@/components/ui/ContextMenuItem.vue';
   import { useSharedBreakpoints } from '@/composables/useSharedBreakpoints';
   import { useTaskActions, type TaskActionPayload } from '@/composables/useTaskActions';
+  import { useTaskBlockerText } from '@/composables/useTaskBlockerText';
   import { useTaskCardLinks } from '@/composables/useTaskCardLinks';
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
   import { isTaskSuccessful, useTaskState } from '@/composables/useTaskState';
@@ -416,6 +424,7 @@
     resolveTaskObjectives,
   } from '@/features/tasks/taskCardHelpers';
   import TaskCardRewards from '@/features/tasks/TaskCardRewards.vue';
+  import { hasStoryUnlockProgress } from '@/stores/taskAvailability';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
@@ -425,6 +434,7 @@
   import { getQueryString } from '@/utils/routeHelpers';
   import { countIncompleteSuccessors, resolveImpactTeamIds } from '@/utils/taskImpact';
   import { isFailedOnlyRequirement } from '@/utils/taskProgress';
+  import { compareRequirement, getTaskTraderRequirements } from '@/utils/taskRequirements';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
   import type { ActionButtonState } from '@/features/tasks/types';
   import type { GameEdition, Task } from '@/types/tarkov';
@@ -630,36 +640,22 @@
     const minLevel = props.task.minPlayerLevel ?? 0;
     return minLevel <= 0 || tarkovStore.playerLevel() >= minLevel;
   });
-  const fenceTrader = computed(() =>
-    metadataStore.traders.find((t) => t.normalizedName === 'fence')
+  const blockerText = useTaskBlockerText();
+  const taskBlockerTexts = computed(() =>
+    (progressStore.taskEvaluations?.[props.task.id]?.self?.blockers ?? [])
+      .filter((blocker) => blocker.type !== 'complete' && blocker.type !== 'failed')
+      .map(blockerText)
   );
-  const fenceRepRequirement = computed(() => {
-    if (!props.task.traderRequirements?.length || !fenceTrader.value) return null;
-    const fenceReq = props.task.traderRequirements.find(
-      (req) => req.trader.id === fenceTrader.value!.id
-    );
-    return fenceReq ?? null;
-  });
-  const meetsFenceRepRequirement = computed(() => {
-    if (!fenceRepRequirement.value || !fenceTrader.value) return true;
-    const userRep = tarkovStore.getTraderReputation(fenceTrader.value.id);
-    const reqValue = fenceRepRequirement.value.value;
-    if (reqValue >= 0) {
-      return userRep >= reqValue;
-    } else {
-      return userRep <= reqValue;
-    }
-  });
-  const traderLevelReqs = computed(() => {
-    if (!props.task.traderLevelRequirements?.length) return [];
-    return props.task.traderLevelRequirements.map((req) => {
-      const userLevel = tarkovStore.getTraderLevel(req.trader.id);
-      return {
-        ...req,
-        met: userLevel >= req.level,
-      };
-    });
-  });
+  const traderRequirements = computed(() =>
+    getTaskTraderRequirements(props.task).flatMap((req) => {
+      if (req.requirementType === 'unknown') return [];
+      const current =
+        req.requirementType === 'level'
+          ? tarkovStore.getTraderLevel(req.trader.id)
+          : tarkovStore.getTraderReputation(req.trader.id);
+      return [{ ...req, met: compareRequirement(current, req.compareMethod, req.value) }];
+    })
+  );
   const locationTooltip = computed(() => {
     if (isGlobalTask.value) {
       return t('page.tasks.questcard.global_task_tooltip');
@@ -684,7 +680,10 @@
   });
   const taskClasses = computed(() => {
     if (isComplete.value && !isFailed.value) return 'border-completed-600/25 bg-surface-900';
-    if (isFailed.value) return 'border-error-600/50 bg-error-950';
+    // Light mode keeps the failure tint but on a pale surface: the shared ink tokens
+    // flip to dark, so a dark error fill would leave the card text at ~1.5:1.
+    if (isFailed.value)
+      return 'border-error-600/50 bg-error-950 light:border-error-700 light:bg-error-100';
     if (isInvalid.value) return 'border-surface-700/40 bg-surface-900 opacity-60';
     if (isLocked.value) return 'border-surface-700/40 bg-surface-900';
     return 'border-surface-700/40 bg-surface-900';
@@ -833,6 +832,11 @@
     isFailed.value ? failureSources.value : blockedSources.value
   );
   const pendingParentTasks = computed<PendingParentTask[]>(() => {
+    const modeProgress = tarkovStore.getCurrentProgressData();
+    if (
+      props.task.storyUnlocks?.some((chapter) => hasStoryUnlockProgress(chapter.id, modeProgress))
+    )
+      return [];
     return parentTasks.value
       .map((parent) => {
         const completion = taskCompletions.value[parent.id];

@@ -1,14 +1,22 @@
 import { useStorage } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { useTarkovStore } from '@/stores/useTarkov';
-import { STORAGE_KEYS } from '@/utils/storageKeys';
+import { GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
+import { logger } from '@/utils/logger';
+import { sanitizeManualActivityHistory } from '@/utils/progressSanitizers';
+import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
 import {
   getCurrentSupabaseUserId,
   parseUserScopedStorage,
   serializeUserScopedStorage,
 } from '@/utils/userScopedStorage';
-import type { ApiUpdateMeta } from '@/types/progress';
-export interface ActivityLogEntry {
+import type { ApiUpdateMeta, ManualActivityEntry } from '@/types/progress';
+/**
+ * Display row for the activity feed: a manual entry from the synced progress
+ * blob or a synthesized API sync row. Internal to this store — consumers read
+ * the inferred type off `allEntries`.
+ */
+interface ActivityLogEntry {
   id: string;
   timestamp: number;
   source: 'api' | 'manual';
@@ -26,6 +34,7 @@ export interface ActivityLogEntry {
   details?: string;
   metadata?: unknown;
 }
+const ACTIVITY_LOG_DISPLAY_LIMIT = 50;
 const parseLegacyJson = <T>(raw: string, fallback: T): T => {
   try {
     return JSON.parse(raw) as T;
@@ -33,43 +42,105 @@ const parseLegacyJson = <T>(raw: string, fallback: T): T => {
     return fallback;
   }
 };
-const activityLogEntriesSerializer = {
-  read: (raw: string): ActivityLogEntry[] => {
-    const currentUserId = getCurrentSupabaseUserId();
-    const wrapped = parseUserScopedStorage<ActivityLogEntry[]>(raw);
-    if (wrapped) {
-      return wrapped._userId === currentUserId && Array.isArray(wrapped.data) ? wrapped.data : [];
-    }
-    const legacyEntries = parseLegacyJson<unknown>(raw, []);
-    return Array.isArray(legacyEntries) ? (legacyEntries as ActivityLogEntry[]) : [];
+type ReadTimestamps = Partial<Record<GameMode, number>>;
+const activityLogTimestampSerializer = {
+  read: (raw: string): ReadTimestamps => {
+    const wrapped = parseUserScopedStorage<ReadTimestamps>(raw);
+    if (wrapped?._userId !== getCurrentSupabaseUserId()) return {};
+    const data = wrapped?.data;
+    // The old global timestamp cannot establish which mode was viewed.
+    if (!data || typeof data !== 'object') return {};
+    return Object.fromEntries(
+      GAME_MODE_VALUES.map((mode) => [mode, validReadTimestamp(data[mode])])
+    );
   },
-  write: (value: ActivityLogEntry[]): string =>
+  write: (value: ReadTimestamps): string =>
     serializeUserScopedStorage(value, getCurrentSupabaseUserId()),
 };
-const activityLogTimestampSerializer = {
-  read: (raw: string): number => {
-    const currentUserId = getCurrentSupabaseUserId();
-    const wrapped = parseUserScopedStorage<number>(raw);
-    if (wrapped) {
-      return wrapped._userId === currentUserId && typeof wrapped.data === 'number'
-        ? wrapped.data
-        : 0;
-    }
-    const legacyTimestamp = parseLegacyJson<unknown>(raw, 0);
-    return typeof legacyTimestamp === 'number' ? legacyTimestamp : 0;
-  },
-  write: (value: number): string => serializeUserScopedStorage(value, getCurrentSupabaseUserId()),
+const validReadTimestamp = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0;
+const toActivityLogEntry = (entry: ManualActivityEntry): ActivityLogEntry => ({
+  id: entry.id,
+  timestamp: entry.timestamp,
+  source: 'manual',
+  type: entry.type,
+  action: entry.action,
+  title: entry.title,
+  ...(entry.details ? { details: entry.details } : {}),
+});
+/**
+ * Read manual activity entries left behind by the pre-#445 standalone
+ * `useStorage` ref. Returns `null` when the payload belongs to another user, so
+ * the caller leaves the key in place until the matching session loads instead of
+ * discarding another account's entries.
+ */
+const readLegacyManualEntries = (raw: string): ManualActivityEntry[] | null => {
+  const wrapped = parseUserScopedStorage<unknown>(raw);
+  if (wrapped) {
+    return wrapped._userId === null || wrapped._userId === getCurrentSupabaseUserId()
+      ? sanitizeManualActivityHistory(wrapped.data)
+      : null;
+  }
+  return sanitizeManualActivityHistory(parseLegacyJson<unknown>(raw, []));
+};
+const LEGACY_MANUAL_ENTRY_KEYS = [
+  STORAGE_KEYS.activityLogManual,
+  LEGACY_STORAGE_KEYS.activityLogManual,
+] as const;
+const readLocalStorageItem = (key: string): string | null => {
+  try {
+    return localStorage.getItem(key);
+  } catch (error) {
+    logger.warn('[useActivityLogStore] Could not read legacy manual activity log', error);
+    return null;
+  }
+};
+const removeLocalStorageItem = (key: string): void => {
+  try {
+    localStorage.removeItem(key);
+  } catch (error) {
+    logger.warn('[useActivityLogStore] Could not clear legacy manual activity log', error);
+  }
+};
+/**
+ * Adopt one legacy storage key into the selected mode's progress blob. Returns
+ * whether any entry was adopted. A payload owned by another user is left in
+ * place; anything owned by this session is removed even when it held no usable
+ * entries, so the migration does not run again for that key.
+ */
+const adoptLegacyManualEntries = (key: string): boolean => {
+  const raw = readLocalStorageItem(key);
+  if (raw === null) {
+    return false;
+  }
+  const entries = readLegacyManualEntries(raw);
+  if (entries === null) {
+    return false;
+  }
+  if (entries.length === 0) {
+    removeLocalStorageItem(key);
+    return false;
+  }
+  useTarkovStore().addManualActivityEntries(entries);
+  removeLocalStorageItem(key);
+  return true;
 };
 export const useActivityLogStore = defineStore('activityLog', {
   state: () => ({
-    manualEntries: useStorage<ActivityLogEntry[]>(STORAGE_KEYS.activityLogManual, [], undefined, {
-      serializer: activityLogEntriesSerializer,
-    }),
-    lastReadTimestamp: useStorage<number>(STORAGE_KEYS.activityLogLastRead, 0, undefined, {
+    // Read state is intentionally device-local: the unread badge tracks what
+    // this browser has seen, not what the account has seen. Manual entries
+    // themselves live in the synced per-mode progress blob (issue #445).
+    lastReadByMode: useStorage<ReadTimestamps>(STORAGE_KEYS.activityLogLastRead, {}, undefined, {
       serializer: activityLogTimestampSerializer,
     }),
   }),
   getters: {
+    lastReadTimestamp(): number {
+      return this.lastReadByMode[useTarkovStore().getCurrentGameMode()] ?? 0;
+    },
+    manualEntries(): ActivityLogEntry[] {
+      return useTarkovStore().getManualActivityHistory().map(toActivityLogEntry);
+    },
     allEntries(): ActivityLogEntry[] {
       const tarkovStore = useTarkovStore();
       const currentData = tarkovStore.getCurrentProgressData();
@@ -85,7 +156,8 @@ export const useActivityLogStore = defineStore('activityLog', {
         })
       );
       const combined = [...apiEntries, ...this.manualEntries];
-      return combined.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
+      combined.sort((a, b) => b.timestamp - a.timestamp);
+      return combined.slice(0, ACTIVITY_LOG_DISPLAY_LIMIT);
     },
     unreadCount(): number {
       const tarkovStore = useTarkovStore();
@@ -95,10 +167,12 @@ export const useActivityLogStore = defineStore('activityLog', {
           entry.at > this.lastReadTimestamp ? count + 1 : count,
         0
       );
-      const manualUnreadCount = this.manualEntries.reduce(
-        (count, entry) => (entry.timestamp > this.lastReadTimestamp ? count + 1 : count),
-        0
-      );
+      const manualUnreadCount = tarkovStore
+        .getManualActivityHistory()
+        .reduce(
+          (count, entry) => (entry.timestamp > this.lastReadTimestamp ? count + 1 : count),
+          0
+        );
       return apiUnreadCount + manualUnreadCount;
     },
     hasUnread(): boolean {
@@ -107,21 +181,25 @@ export const useActivityLogStore = defineStore('activityLog', {
       return (
         (currentData?.apiUpdateHistory || []).some(
           (entry: ApiUpdateMeta) => entry.at > this.lastReadTimestamp
-        ) || this.manualEntries.some((entry) => entry.timestamp > this.lastReadTimestamp)
+        ) ||
+        tarkovStore
+          .getManualActivityHistory()
+          .some((entry) => entry.timestamp > this.lastReadTimestamp)
       );
     },
   },
   actions: {
     addManualEntry(entry: Omit<ActivityLogEntry, 'timestamp' | 'source'>) {
-      this.manualEntries.unshift({
-        ...entry,
-        timestamp: Date.now(),
-        source: 'manual',
-      });
-      // Cap manual entries to prevent memory leak
-      if (this.manualEntries.length > 50) {
-        this.manualEntries = this.manualEntries.slice(0, 50);
-      }
+      useTarkovStore().addManualActivityEntries([
+        {
+          id: entry.id,
+          timestamp: Date.now(),
+          type: entry.type,
+          action: entry.action,
+          title: entry.title,
+          ...(entry.details ? { details: entry.details } : {}),
+        },
+      ]);
     },
     markAllAsRead() {
       const tarkovStore = useTarkovStore();
@@ -130,19 +208,40 @@ export const useActivityLogStore = defineStore('activityLog', {
         (latest: number, entry: ApiUpdateMeta) => Math.max(latest, entry.at),
         0
       );
-      const latestManualTimestamp = this.manualEntries.reduce(
-        (latest, entry) => Math.max(latest, entry.timestamp),
-        0
+      const latestManualTimestamp = tarkovStore
+        .getManualActivityHistory()
+        .reduce((latest, entry) => Math.max(latest, entry.timestamp), 0);
+      this.lastReadByMode[tarkovStore.getCurrentGameMode()] = Math.max(
+        latestApiTimestamp,
+        latestManualTimestamp,
+        Date.now()
       );
-      this.lastReadTimestamp = Math.max(latestApiTimestamp, latestManualTimestamp, Date.now());
     },
     clearLog() {
-      this.manualEntries = [];
-      this.lastReadTimestamp = Date.now();
+      useTarkovStore().clearManualActivityHistory();
+      this.markAllAsRead();
     },
+    /**
+     * Reset only the device-local read marker. Manual entries now follow the
+     * progress store's own session lifecycle, so this no longer writes an empty
+     * list to localStorage — the write that used to destroy entries whenever
+     * auth state changed before the scoped read resolved.
+     */
     resetForSession() {
-      this.manualEntries = [];
-      this.lastReadTimestamp = 0;
+      this.lastReadByMode = {};
+    },
+    /**
+     * One-time move of pre-#445 manual entries into the selected mode's synced
+     * progress blob. Idempotent: the legacy keys are removed once their entries
+     * have been adopted, and a payload owned by another user is left untouched
+     * for that user's session to claim.
+     */
+    migrateLegacyManualEntries(): boolean {
+      if (!import.meta.client) return false;
+      // Both keys are adopted before reducing, so a hit on the first key cannot
+      // short-circuit adoption of the second.
+      const adopted = LEGACY_MANUAL_ENTRY_KEYS.map((key) => adoptLegacyManualEntries(key));
+      return adopted.includes(true);
     },
   },
 });

@@ -1,6 +1,7 @@
 <template>
   <div class="min-h-[calc(100vh-250px)] px-3 py-6 sm:px-6">
     <div class="mx-auto max-w-350 space-y-4 sm:space-y-6">
+      <UAlert v-if="profileMetadataError" color="error" :title="t('app_bar.error_loading')" />
       <section
         class="bg-surface-900 relative overflow-hidden rounded-xl border border-white/10 p-4 shadow-md sm:p-6"
       >
@@ -15,7 +16,9 @@
             </div>
             <div class="space-y-1">
               <div class="flex flex-wrap items-center gap-2">
-                <h1 class="text-xl font-bold text-white sm:text-2xl">{{ displayName }}</h1>
+                <h1 class="light:text-surface-50 text-xl font-bold text-white sm:text-2xl">
+                  {{ displayName }}
+                </h1>
                 <UBadge variant="soft" size="sm" :class="modeTheme.modeBadgeClass">
                   {{ modeLabel }}
                 </UBadge>
@@ -31,7 +34,7 @@
                   external
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="bg-info-700/25 text-info-200 border-info-500/30 hover:bg-info-700/40 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium transition-colors"
+                  class="bg-info-700/25 text-info-200 border-info-500/30 hover:bg-info-700/40 light:border-info-600/40 light:text-info-800 light:hover:bg-info-100/70 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium transition-colors"
                 >
                   <UIcon name="i-mdi-open-in-new" class="h-3 w-3" />
                   {{ t('common.view_on_tarkov_dev', 'View on Tarkov.dev') }}
@@ -115,7 +118,7 @@
                 }}
                 <NuxtLink
                   to="/account"
-                  class="text-primary-300 hover:text-primary-200 underline underline-offset-2"
+                  class="text-primary-300 hover:text-primary-200 light:text-primary-700 light:hover:text-primary-800 underline underline-offset-2"
                 >
                   {{ t('page.profile.account_settings_link', 'Account Settings') }}
                 </NuxtLink>
@@ -171,7 +174,7 @@
                 />
               </div>
             </div>
-            <div class="text-xl font-bold text-white">{{ card.value }}</div>
+            <div class="light:text-surface-50 text-xl font-bold text-white">{{ card.value }}</div>
             <div class="text-surface-400 mt-0.5 text-xs">{{ card.meta }}</div>
             <div class="bg-surface-800/60 mt-3 h-1.5 overflow-hidden rounded-full">
               <div
@@ -184,7 +187,7 @@
         </section>
         <UTabs
           :items="profileTabItems"
-          :model-value="selectedTabIndex"
+          :model-value="String(selectedTabIndex)"
           class="w-full"
           @update:model-value="onTabChange"
         />
@@ -223,9 +226,11 @@
         />
         <ProfileStorylineTab
           v-else-if="selectedTabIndex === 3"
+          :chapters="profileChapters"
           :story-chapter-completion-state="storyChapterCompletionState"
           :story-objective-completion-state="storyObjectiveCompletionState"
           :read-only="isViewingSharedProfile || !isViewingCurrentMode"
+          :completed-objective-ids="storyCompletedObjectiveIds"
           @toggle-chapter="handleStoryChapterToggle"
           @toggle-objective="handleStoryObjectiveToggle"
         />
@@ -234,6 +239,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useProfileTaskMetadata } from '@/composables/useProfileTaskMetadata';
   import {
     computeConfidence,
     computeCriticalPathFloor,
@@ -255,6 +261,7 @@
   } from '@/features/profile/profileStats';
   import ProfileStorylineTab from '@/features/profile/ProfileStorylineTab.vue';
   import ProfileTasksTab from '@/features/profile/ProfileTasksTab.vue';
+  import { buildTaskEvaluations } from '@/stores/taskAvailability';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
@@ -263,6 +270,7 @@
   import { isTaskAvailableForEdition as checkTaskEdition } from '@/utils/editionHelpers';
   import { calculatePercentageNum, useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
+  import { buildPrestigeTaskMap } from '@/utils/prestige';
   import {
     createProfileVisibility,
     fetchProfileVisibilityRows,
@@ -275,6 +283,7 @@
     toggleStoryChapterWithLinearObjectives,
   } from '@/utils/storylineObjectives';
   import { buildTarkovDevProfileUrl } from '@/utils/tarkovDevProfileUrl';
+  import { projectDuplicateObjectiveProgress } from '@/utils/taskNormalization';
   import { getCompletionFlags, type RawTaskCompletion } from '@/utils/taskStatus';
   import { filterTasksByTypeSettings, type TaskTypeFilterOptions } from '@/utils/taskTypeFilters';
   import type {
@@ -330,26 +339,32 @@
   }
   const MODE_THEMES: Record<GameMode, ModeTheme> = {
     pvp: {
-      heroBackdrop: 'bg-gradient-to-r from-pvp-900 via-primary-900/35 to-surface-900',
+      heroBackdrop:
+        'bg-gradient-to-r from-pvp-900 via-primary-900/35 to-surface-900 light:from-pvp-100/80 light:via-primary-100/40 light:to-surface-850',
       icon: 'i-mdi-sword-cross',
-      iconTint: 'text-pvp-300',
-      modeBadgeClass: 'border border-pvp-500/30 bg-pvp-700/25 text-pvp-200',
+      iconTint: 'text-pvp-300 light:text-pvp-700',
+      modeBadgeClass:
+        'border border-pvp-500/30 bg-pvp-700/25 text-pvp-200 light:border-pvp-600/40 light:text-pvp-900',
       storyHighlight: 'pvp',
       timelineHighlight: 'pvp',
     },
     pve: {
-      heroBackdrop: 'bg-gradient-to-r from-pve-900 via-secondary-900/35 to-surface-900',
+      heroBackdrop:
+        'bg-gradient-to-r from-pve-900 via-secondary-900/35 to-surface-900 light:from-pve-100/80 light:via-secondary-100/40 light:to-surface-850',
       icon: 'i-mdi-account-group',
-      iconTint: 'text-pve-300',
-      modeBadgeClass: 'border border-pve-500/30 bg-pve-700/25 text-pve-200',
+      iconTint: 'text-pve-300 light:text-pve-700',
+      modeBadgeClass:
+        'border border-pve-500/30 bg-pve-700/25 text-pve-200 light:border-pve-600/40 light:text-pve-900',
       storyHighlight: 'pve',
       timelineHighlight: 'pve',
     },
     seasonal: {
-      heroBackdrop: 'bg-gradient-to-r from-warning-950 via-warning-900/25 to-surface-900',
+      heroBackdrop:
+        'bg-gradient-to-r from-warning-950 via-warning-900/25 to-surface-900 light:from-warning-100/80 light:via-warning-100/40 light:to-surface-850',
       icon: 'i-mdi-calendar-star',
-      iconTint: 'text-warning-300',
-      modeBadgeClass: 'border border-warning-500/30 bg-warning-700/20 text-warning-200',
+      iconTint: 'text-warning-300 light:text-warning-700',
+      modeBadgeClass:
+        'border border-warning-500/30 bg-warning-700/20 text-warning-200 light:border-warning-600/40 light:text-warning-800',
       storyHighlight: 'pvp',
       timelineHighlight: 'pvp',
     },
@@ -424,6 +439,29 @@
     normalizeMode(route.params.mode) ??
       normalizeMode(route.query.mode) ??
       tarkovStore.getCurrentGameMode()
+  );
+  const {
+    tasks: profileTasks,
+    duplicateObjectiveIds: profileDuplicateObjectiveIds,
+    chapters: profileChapters,
+    editions: profileEditions,
+    prestige: profilePrestige,
+    error: profileMetadataError,
+    loading: profileMetadataLoading,
+  } = useProfileTaskMetadata(
+    selectedMode,
+    computed(() => metadataStore.languageCode)
+  );
+  // Prefer the selected mode's catalog and fall back to the active mode's while
+  // the mode-scoped request is pending or has failed. An empty catalog would
+  // otherwise remove every edition restriction and drop edition-granted hideout
+  // levels. The published overlay carries no mode-scoped editions today, so the
+  // two agree in practice.
+  const effectiveEditions = computed(() =>
+    profileEditions.value.length > 0 ? profileEditions.value : metadataStore.editions
+  );
+  const profilePrestigeTaskMap = computed(() =>
+    buildPrestigeTaskMap(profileTasks.value, profilePrestige.value)
   );
   const profileVisibility = reactive(createProfileVisibility());
   let profileVisibilityLoadId = 0;
@@ -611,17 +649,17 @@
   const pvpToggleClass = computed(() =>
     selectedMode.value === GAME_MODES.PVP
       ? 'bg-pvp-800 text-pvp-100 shadow-inner'
-      : 'bg-transparent text-pvp-500 hover:bg-pvp-950/50 hover:text-pvp-300'
+      : 'bg-transparent text-pvp-500 hover:bg-pvp-950/50 hover:text-pvp-300 light:text-pvp-700 light:hover:bg-pvp-100/70 light:hover:text-pvp-800'
   );
   const pveToggleClass = computed(() =>
     selectedMode.value === GAME_MODES.PVE
       ? 'bg-pve-600 text-white shadow-inner'
-      : 'bg-transparent text-pve-500 hover:bg-pve-950/50 hover:text-pve-300'
+      : 'bg-transparent text-pve-500 hover:bg-pve-950/50 hover:text-pve-300 light:text-pve-700 light:hover:bg-pve-100/70 light:hover:text-pve-800'
   );
   const seasonalToggleClass = computed(() =>
     selectedMode.value === GAME_MODES.SEASONAL
       ? 'bg-warning-700 text-warning-50 shadow-inner'
-      : 'bg-transparent text-warning-500 hover:bg-warning-950/50 hover:text-warning-300'
+      : 'bg-transparent text-warning-500 hover:bg-warning-950/50 hover:text-warning-300 light:text-warning-700 light:hover:bg-warning-100/70 light:hover:text-warning-800'
   );
   const modeData = computed<UserProgressData>(() => {
     if (isViewingSharedProfile.value) {
@@ -665,7 +703,7 @@
   });
   const relevantTasks = computed<Task[]>(() => {
     const faction = modeFaction.value;
-    const factionFiltered = (metadataStore.tasks ?? []).filter((task) => {
+    const factionFiltered = profileTasks.value.filter((task) => {
       if (!task?.id) {
         return false;
       }
@@ -673,21 +711,21 @@
       if (taskFaction !== 'Any' && taskFaction !== faction) {
         return false;
       }
-      return checkTaskEdition(task.id, profileGameEdition.value, metadataStore.editions);
+      return checkTaskEdition(task.id, profileGameEdition.value, effectiveEditions.value);
     });
     const options: TaskTypeFilterOptions = {
       showKappa: true,
       showLightkeeper: true,
       showNonSpecial: true,
       userPrestigeLevel: modeData.value.prestigeLevel ?? 0,
-      prestigeTaskMap: metadataStore.prestigeTaskMap,
+      prestigeTaskMap: profilePrestigeTaskMap.value,
       excludedTaskIds: new Set(),
     };
     return filterTasksByTypeSettings(factionFiltered, options);
   });
   const allTasksById = computed(() => {
     const lookup = new Map<string, Task>();
-    for (const task of metadataStore.tasks ?? []) {
+    for (const task of profileTasks.value) {
       if (task?.id) {
         lookup.set(task.id, task);
       }
@@ -695,7 +733,12 @@
     return lookup;
   });
   const taskCompletions = computed(() => modeData.value.taskCompletions ?? {});
-  const objectiveCompletions = computed(() => modeData.value.taskObjectives ?? {});
+  const objectiveCompletions = computed(() =>
+    projectDuplicateObjectiveProgress(
+      modeData.value.taskObjectives ?? {},
+      profileDuplicateObjectiveIds.value
+    )
+  );
   const hideoutModuleCompletions = computed(() => modeData.value.hideoutModules ?? {});
   const hideoutPartCompletions = computed(() => modeData.value.hideoutParts ?? {});
   const getTaskTimestamp = (taskId: string): number | null => {
@@ -714,42 +757,32 @@
     const completion = taskCompletions.value[taskId] as RawTaskCompletion;
     return getCompletionFlags(completion).failed;
   };
+  const profileTaskEvaluations = computed(() =>
+    buildTaskEvaluations(
+      profileTasks.value,
+      new Map([
+        [
+          'profile',
+          {
+            mode: selectedMode.value,
+            level: profileLevel.value,
+            faction: modeFaction.value,
+            completions: taskCompletions.value,
+            traders: modeData.value.traders ?? {},
+            prestigeLevel: modeData.value.prestigeLevel,
+            storyChapters: modeData.value.storyChapters,
+          },
+        ],
+      ]),
+      {
+        requireTraderLevels: preferencesStore.getTasksRequireTraderLevels,
+        prestigeTaskMap: profilePrestigeTaskMap.value,
+      }
+    )
+  );
   const isTaskLocked = (taskId: string): boolean => {
     if (isTaskSuccessful(taskId) || isTaskFailed(taskId)) return false;
-    if (isViewingCurrentMode.value) {
-      return progressStore.unlockedTasks[taskId]?.self !== true;
-    }
-    const task = relevantTasks.value.find((t) => t.id === taskId);
-    if (!task) return true;
-    if (task.minPlayerLevel && profileLevel.value < task.minPlayerLevel) return true;
-    if (task.taskRequirements) {
-      const allMet = task.taskRequirements.every((req) => {
-        const reqStatuses = (req.status ?? []).map((s) => s.toLowerCase());
-        const requiresComplete =
-          reqStatuses.length === 0 ||
-          reqStatuses.some((s) => s === 'complete' || s === 'completed');
-        const requiresFailed = reqStatuses.some((s) => s === 'failed');
-        const requiresActive = reqStatuses.some(
-          (s) => s === 'active' || s === 'accept' || s === 'accepted'
-        );
-        const reqFlags = getCompletionFlags(
-          taskCompletions.value[req.task.id] as RawTaskCompletion
-        );
-        if (requiresComplete && reqFlags.complete) return true;
-        if (requiresFailed && reqFlags.failed) return true;
-        if (requiresActive) return true;
-        return false;
-      });
-      if (!allMet) return true;
-    }
-    if (task.failedRequirements) {
-      const hasFailed = task.failedRequirements.some((req) => {
-        if (!req?.task?.id) return false;
-        return getCompletionFlags(taskCompletions.value[req.task.id] as RawTaskCompletion).failed;
-      });
-      if (hasFailed) return true;
-    }
-    return false;
+    return profileTaskEvaluations.value[taskId]?.profile?.available !== true;
   };
   const normalizedTaskCompletions = computed<
     Record<string, { complete?: boolean; failed?: boolean }>
@@ -766,7 +799,7 @@
   });
   const invalidProgress = computed(() =>
     computeInvalidProgress({
-      tasks: metadataStore.tasks ?? [],
+      tasks: profileTasks.value,
       taskCompletions: normalizedTaskCompletions.value,
       pmcFaction: modeFaction.value,
     })
@@ -843,7 +876,7 @@
   });
   const totalHideoutModules = computed(() => hideoutModuleLabelById.value.size);
   const hideoutModuleCompletionState = computed<Record<string, boolean>>(() => {
-    const editionData = metadataStore.editions.find(
+    const editionData = effectiveEditions.value.find(
       (edition) => edition.value === profileGameEdition.value
     );
     return buildHideoutModuleCompletionState(
@@ -864,7 +897,7 @@
   const storyChapterCompletionState = computed<Record<string, boolean>>(() => {
     const storyProgress = modeData.value.storyChapters ?? {};
     const state: Record<string, boolean> = {};
-    for (const chapter of metadataStore.storyChapters ?? []) {
+    for (const chapter of profileChapters.value) {
       state[chapter.id] = storyProgress[chapter.id]?.complete === true;
     }
     return state;
@@ -872,7 +905,7 @@
   const storyObjectiveCompletionState = computed<Record<string, Record<string, boolean>>>(() => {
     const storyProgress = modeData.value.storyChapters ?? {};
     const state: Record<string, Record<string, boolean>> = {};
-    for (const chapter of metadataStore.storyChapters ?? []) {
+    for (const chapter of profileChapters.value) {
       const chapterProgress = storyProgress[chapter.id];
       const objState: Record<string, boolean> = {};
       for (const obj of orderedStoryObjectives(chapter.objectives)) {
@@ -882,15 +915,27 @@
     }
     return state;
   });
+  const canEditStoryProgress = () => !isViewingSharedProfile.value && isViewingCurrentMode.value;
+  // Own progress only: a shared profile's stranded marks are not the viewer's to act on.
+  const storyCompletedObjectiveIds = (chapterId: string): string[] => {
+    if (!canEditStoryProgress()) {
+      return [];
+    }
+    const stored = modeData.value.storyChapters?.[chapterId]?.objectives ?? {};
+    return Object.entries(stored)
+      .filter(([, objective]) => objective?.complete === true)
+      .map(([objectiveId]) => objectiveId);
+  };
   const handleStoryChapterToggle = (chapterId: string) => {
-    if (isViewingSharedProfile.value || !isViewingCurrentMode.value) {
+    if (!canEditStoryProgress()) {
       return;
     }
-    const chapter = metadataStore.storyChapters.find((value) => value.id === chapterId);
+    const chapter = profileChapters.value.find((value) => value.id === chapterId);
     toggleStoryChapterWithLinearObjectives({
       chapterId,
       isChapterComplete: storyChapterCompletionState.value[chapterId] === true,
       objectives: chapter?.objectives,
+      mutuallyExclusiveQuestPairs: chapter?.mutuallyExclusiveQuestPairs,
       isObjectiveComplete: (objectiveId) =>
         storyObjectiveCompletionState.value[chapterId]?.[objectiveId] === true,
       setChapterComplete: (id) => tarkovStore.setStoryChapterComplete(id),
@@ -902,7 +947,7 @@
     });
   };
   const handleStoryObjectiveToggle = (chapterId: string, objectiveId: string) => {
-    if (isViewingSharedProfile.value || !isViewingCurrentMode.value) {
+    if (!canEditStoryProgress()) {
       return;
     }
     const objectiveState = storyObjectiveCompletionState.value[chapterId]?.[objectiveId] === true;
@@ -910,7 +955,7 @@
       tarkovStore.setStoryObjectiveUncomplete(chapterId, objectiveId);
       return;
     }
-    const chapter = metadataStore.storyChapters.find((value) => value.id === chapterId);
+    const chapter = profileChapters.value.find((value) => value.id === chapterId);
     if (chapter) {
       const objective = orderedStoryObjectives(chapter.objectives).find(
         (value) => value.id === objectiveId
@@ -924,7 +969,7 @@
     }
     tarkovStore.setStoryObjectiveComplete(chapterId, objectiveId);
   };
-  const totalStoryChapters = computed(() => metadataStore.storyChapters?.length ?? 0);
+  const totalStoryChapters = computed(() => profileChapters.value.length);
   const completedStoryChapters = computed(() => {
     let count = 0;
     for (const chapterId of Object.keys(storyChapterCompletionState.value)) {
@@ -936,7 +981,7 @@
   });
   const totalStoryMainObjectives = computed(() => {
     let count = 0;
-    for (const chapter of metadataStore.storyChapters ?? []) {
+    for (const chapter of profileChapters.value) {
       count += orderedStoryObjectives(chapter.objectives).filter(
         (objective) => objective.type === 'main'
       ).length;
@@ -946,7 +991,7 @@
   const completedStoryMainObjectives = computed(() => {
     const storyProgress = modeData.value.storyChapters ?? {};
     let count = 0;
-    for (const chapter of metadataStore.storyChapters ?? []) {
+    for (const chapter of profileChapters.value) {
       const chapterProgress = storyProgress[chapter.id];
       for (const obj of orderedStoryObjectives(chapter.objectives).filter(
         (o) => o.type === 'main'
@@ -1563,7 +1608,7 @@
     },
   ]);
   const showMetadataHint = computed(
-    () => canRenderProfileContent.value && metadataStore.loading && metadataStore.tasks.length === 0
+    () => canRenderProfileContent.value && profileMetadataLoading.value
   );
   const selectedTabIndex = ref(0);
   const profileTabItems = computed(() => [

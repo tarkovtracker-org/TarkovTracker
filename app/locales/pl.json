@@ -96,7 +96,9 @@
     "community_section": "Community",
     "keyboard_shortcuts": "Keyboard shortcuts",
     "report_problem": "Report a problem",
-    "login_aria": "Log in to your account"
+    "login_aria": "Log in to your account",
+    "switch_to_light_theme": "Przełącz na jasny motyw",
+    "switch_to_dark_theme": "Przełącz na ciemny motyw"
   },
   "omnibar": {
     "title": "Search",
@@ -262,6 +264,7 @@
     "maps": "Mapy",
     "clear_search": "Wyczyść wyszukiwanie",
     "settings": "Ustawienia",
+    "about": "O programie",
     "credits": "Kredyty",
     "support": "Wsparcie",
     "privacy_policy": "Polityka prywatności",
@@ -605,6 +608,7 @@
           "filter_hidden_other": "Your current filters hide {count} available tasks.",
           "blocked_level_one": "{task} is your closest unlock, but you still need 1 more level.",
           "blocked_level_other": "{task} is your closest unlock, but you still need {count} more levels.",
+          "blocked_requirement": "{task} jest zablokowany przez jego wymagania.",
           "blocked_prerequisite": "{task} is close, but it is still gated by prerequisite tasks.",
           "blocked_fence": "{task} is waiting on Fence reputation.",
           "blocked_trader_unlock": "{task} is locked behind another trader unlock task.",
@@ -741,6 +745,17 @@
       "no_data": "No storyline chapter data available.",
       "mark_incomplete": "Mark incomplete",
       "endings": "Endings",
+      "ending_progress": "Znane cele {completed}/{total}",
+      "ending_evidence_pending": "Brak celów do tego zakończenia.",
+      "partial_data": "Dane częściowe",
+      "partial_data_hint": "Dane historyczne dla tego rozdziału są niekompletne, więc może istnieć więcej celów niż są wymienione.",
+      "quest_route_exclusive": "Kończenie jednej z tych tras powoduje reguły drugiej.",
+      "quest_route_known_steps_done": "Wszystkie znane kroki wykonane",
+      "quest_route_evidence_pending": "Nie wykonano jeszcze żadnych kroków",
+      "quest_route_conflict": "Więcej niż jedna trasa odczytu zakończona; tylko jedna jest możliwa w grze.",
+      "quest_route_progress": "{completed}/{total} kroki",
+      "stale_progress_one": "1 zapisana ocena celu nie pasuje już do aktualnych danych opowieści i wymaga ponownego sprawdzania.",
+      "stale_progress_other": "{count} zapisanych ocen celu nie pasuje już do aktualnych danych opowieści i wymaga ponownego sprawdzenia.",
       "route_choice": "Route choice",
       "route_chosen": "Route selected",
       "route_blocks": "Blocks: {objectives}",
@@ -892,13 +907,14 @@
         "none": "Default order",
         "impact": "Impact",
         "alphabetical": "Alphabetical",
-        "level": "Level Required",
+        "level": "Player level",
         "trader": "Trader Order",
         "teammates": "Available to Teammates",
         "xp": "XP Reward",
         "ascending": "Ascending",
         "descending": "Descending",
-        "aria_label": "Sort tasks"
+        "aria_label": "Sort tasks",
+        "progression": "Progresja"
       },
       "settings": {
         "title": "Task Settings",
@@ -1078,7 +1094,32 @@
         "previous_tasks": "Previous Task(s):",
         "progress": "Progress {completed}/{total}",
         "rewards": "Rewards",
-        "unlocks_count": "{count} unlocks"
+        "unlocks_count": "{count} unlocks",
+        "trader_requirement_badge": "{trader} {kind} {comparison} {value}",
+        "loyalty_level": "LL",
+        "reputation": "Przedstawiciel"
+      },
+      "blockers": {
+        "player_level": "Wymagany poziom {comparison} {required} (obecny: {current}).",
+        "trader_level": "{trader} poziom lojalności {comparison} {required} wymagany (obecnie: {current}).",
+        "trader_reputation": "{trader} reputacja {comparison} {required} jest wymagana (obecna: {current}).",
+        "prerequisite": "Poznaj wymagane statusy zadań dla: {tasks}.",
+        "story_route": "Poznaj wymagane statusy zadań dla {tasks}lub postępuj o jeden z tych rozdziałów opowieści: {chapters}.",
+        "failed_branch": "Zablokowane przez nieudane zadanie: {task}.",
+        "faction": "Dostępne dla {faction} znaków.",
+        "trader_unlock": "Odblokuj {trader} poprzez ukończenie {task}.",
+        "prestige": "Wymaga Prestiżu {required} (obecnie: {current}).",
+        "unknown": "Dane wymagane są niedostępne lub nieobsługiwane. Dostępność nie może być potwierdzona.",
+        "cycle": "Wymagany łańcuch zawiera cykl. Dostępność nie może być potwierdzona.",
+        "complete": "To zadanie zostało zakończone.",
+        "failed": "To zadanie nie powiodło się.",
+        "disabled": "To zadanie jest wyłączone.",
+        "task_status": "{task} ({status})",
+        "status_complete": "ukończone",
+        "status_failed": "nie powiodło się",
+        "status_active": "aktywne lub zaakceptowane",
+        "status_unknown": "nieznany status",
+        "status_or": " lub "
       }
     },
     "hideout": {
@@ -1320,8 +1361,6 @@
     "credits": {
       "sections": {
         "original_creator": "Original Creator",
-        "staff": "TarkovTracker.org Staff",
-        "support_members": "Support Members",
         "beta_testers": "Nuxt - Closed Beta Testers",
         "contributors": "Open Source Contributors"
       },
@@ -1336,7 +1375,44 @@
         "contributions": "{count} contribution | {count} contributions",
         "total": "{count} współtwórca | {count} współtwórcy"
       },
-      "description": "Spotkaj się z twórcami, personelem, wsparciem członków, beta testerami i współtwórcami open source za Tarkov Tracker."
+      "description": "Spotkaj się z twórcami, personelem, wsparciem członków, beta testerami i współtwórcami open source za Tarkov Tracker.",
+      "team_link": "Prowadzony przez zespół TarkovTracker - spotykaj się z nimi na stronie O"
+    },
+    "about": {
+      "title": "O TarkovTracker",
+      "description": "Poznaj zespół, który utrzymuje TarkovTracker.org, partnerów, za którymi stoją dane gry, oraz jak uzyskać pomoc od społeczności.",
+      "intro": "TarkovTracker jest darmowym, otwartym źródłowym trackerem postępu dla Escape z Tarkov. Utrzymuje postępy w twoim zadaniu i historii, ukrywa ulepszenia oraz wymagania dotyczące przedmiotów w jednym miejscu, a także utrzymuje aktualność z danymi gry utrzymywanymi przez społeczność. Projekt jest prowadzony przez mały zespół wolontariuszy z pomocą współtwórców open source.",
+      "team": {
+        "heading": "Drużyna",
+        "summary": "TarkovTracker.org jest utrzymywany przez mały zespół wolontariuszy. Poniżej ludzie nadal działają i wspierają społeczność Discorda.",
+        "core_heading": "Zespół rdzenia",
+        "support_heading": "Wsparcie Discorda"
+      },
+      "partners": {
+        "heading": "Partnerzy i ekosystem",
+        "summary": "TarkovTracker opiera się na projektach społecznościowych. Ci opiekunowie obsługują niezależne narzędzia i źródła danych, na których bazuje tropiciel."
+      },
+      "help": {
+        "heading": "Jak uzyskać pomoc",
+        "routing": "Aby uzyskać najszybszą odpowiedź, użyj przepływu pracy wsparcia dla konkretnego kanału w naszym Discordzie zamiast bezpośrednich wiadomości dla członków zespołu. Powtarzalne błędy i pomysły należą do GitHub, a raporty bezpieczeństwa przechodzą przez naszą prywatną politykę bezpieczeństwa.",
+        "discord": "Wsparcie społeczności na Discordzie",
+        "github_issues": "Zgłoś błąd lub poproś o funkcję na GitHub",
+        "security": "Zgłoś problem bezpieczeństwa (prywatny)",
+        "credits_link": "Beta testers i współtwórcy open source - zobacz Kredyty"
+      },
+      "github_profile": "GitHub profile",
+      "roles": {
+        "core_owner": "Główny właściciel, opiekun i programista",
+        "discord_owner_developer": "Właściciel serwera Discord, programista i opiekun TrackerBot",
+        "core_support": "Główny personel pomocniczy",
+        "discord_support": "Ogólne wsparcie Discorda",
+        "tarkov_dev_maintainer": "Opiekun Tarkov.dev",
+        "ratscanner_maintainer": "Właściciel i opiekun skanera RatScanner"
+      },
+      "projects": {
+        "tarkov_dev": "Tarkov.dev",
+        "ratscanner": "Skaner RatSkaner"
+      }
     },
     "login": {
       "subtitle": "Sign in to access your account",
@@ -1877,6 +1953,13 @@
       "privacy_mode": "Privacy Mode",
       "privacy_mode_hint": "Hides sensitive information while you're streaming."
     },
+    "appearance": {
+      "title": "Wygląd",
+      "theme": "Motyw",
+      "theme_hint": "Wybierz pomiędzy ciemnym i jasnym interfejsem. Twój wybór jest zapamiętany na tym urządzeniu.",
+      "theme_dark": "Ciemny",
+      "theme_light": "Światło"
+    },
     "interface": {
       "tasks": {
         "title": "Task Cards",
@@ -2214,6 +2297,8 @@
       "confirm_word": "DELETE"
     },
     "log_import": {
+      "reading_logs": "Czytanie dzienników i przygotowanie podglądu…",
+      "large_folder_hint": "Duże foldery są odczytywane lokalnie w chunkach. Pozostaw tę stronę otwartą; możesz anulować podczas czytania wpisów.",
       "upload_hint": "Select your Escape from Tarkov Logs folder or a selection of session folders to import quest starts, completions, and failures.",
       "deleted_logs_hint": "If old log sessions were deleted, they cannot be imported.",
       "deleted_logs_hint_tooltip": "Log import only reads quest events still present in your current Logs folder.",
@@ -2263,19 +2348,14 @@
       "cleared_logs_toast_title": "Old logs were likely cleared",
       "cleared_logs_toast_description": "Log import can only read quest history still in your Logs folder. Deleted sessions cannot be recovered.",
       "errors": {
+        "invalid_archive": "Archiwum ZIP jest niekompletne lub zawiera nieprawidłowy wpis dziennika. Żaden postęp nie został zaimportowany.",
+        "record_too_large": "Pojedynczy wpis w {path} jest zbyt duży, aby bezpiecznie analizować. Żaden postęp nie został zaimportowany. Zgłoś ten format dziennika.",
         "apply_import_failed": "Import could not finish. Some progress may already have been imported. Select the same logs again to retry; completed progress is preserved.",
-        "archive_log_file_too_large": "Log file is too large in archive: {path}",
-        "archive_logs_too_large": "Archive contains too much log content (max {max_mb} MB).",
-        "import_file_too_large": "Import file is too large (max {max_mb} MB).",
-        "log_file_too_large": "Log file is too large (max {max_mb} MB).",
-        "log_file_too_large_path": "Log file is too large: {path}",
         "no_files_selected": "No files were selected.",
-        "no_logs_in_archive": "No EFT logs were found in the archive.",
         "no_matching_tasks_found": "Quest events were found, but none match current TarkovTracker tasks.",
         "no_notification_logs_found": "No notification logs were found in the selected files.",
         "no_quest_events_found": "No quest start, completion, or failure events were found in the selected logs.",
         "parse_failed": "Failed to parse EFT logs.",
-        "selected_logs_too_large": "Selected logs contain too much content (max {max_mb} MB).",
         "task_metadata_not_loaded": "Task metadata is not loaded yet. Please refresh and try again.",
         "invalid_mode": "Wybierz prawidłowy tryb gry.",
         "outside_active_season": "Te dzienniki zawierają zdarzenia poza aktywnym sezonem lub bez użytecznej daty. Wybierz sesje z aktywnego sezonu przed importem do Sezonowego PvP."

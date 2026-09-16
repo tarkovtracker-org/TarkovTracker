@@ -54,7 +54,7 @@ describe('DrawerItem', () => {
       const wrapper = mountSettingsDrawerItem();
       expect(wrapper.get('a').classes()).toContain('border-primary-500');
       expect(wrapper.getComponent({ name: 'DrawerItemIcon' }).props('colorClass')).toBe(
-        'text-white'
+        'text-white light:text-surface-50'
       );
     }
   );
@@ -63,7 +63,7 @@ describe('DrawerItem', () => {
     const wrapper = mountSettingsDrawerItem();
     expect(wrapper.get('a').classes()).not.toContain('border-primary-500');
     expect(wrapper.getComponent({ name: 'DrawerItemIcon' }).props('colorClass')).toBe(
-      'text-surface-300 group-hover:text-white'
+      'text-surface-300 group-hover:text-white light:group-hover:text-surface-50'
     );
   });
   it('translates the full locale key passed by the caller', () => {

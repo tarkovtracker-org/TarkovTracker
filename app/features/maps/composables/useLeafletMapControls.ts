@@ -29,7 +29,7 @@ export const PAN_SPEED_MAX = 3;
 export const ZONE_OPACITY_MIN = 0.05;
 export const ZONE_OPACITY_MAX = 0.5;
 export const MAP_BUTTON_ACTIVE_CLASS =
-  'border border-primary-400/60 bg-primary-500/15 text-primary-100';
+  'border border-primary-400/60 bg-primary-500/15 text-primary-100 light:text-primary-900';
 export const MAP_BUTTON_INACTIVE_CLASS =
   'border border-transparent text-surface-300/60 hover:bg-white/5 hover:text-surface-100';
 export const isCoopExtract = (extract: MapExtract): boolean =>

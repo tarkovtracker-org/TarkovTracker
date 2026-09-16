@@ -17,7 +17,11 @@
         <p class="text-primary-300/90 text-xs font-semibold tracking-[0.25em] uppercase">
           {{ guideLabel }}
         </p>
-        <h1 class="mt-1 text-2xl font-bold tracking-wide text-white sm:text-3xl">{{ title }}</h1>
+        <h1
+          class="light:text-surface-50 mt-1 text-2xl font-bold tracking-wide text-white sm:text-3xl"
+        >
+          {{ title }}
+        </h1>
       </div>
       <p class="text-surface-200 max-w-3xl text-base leading-relaxed">{{ description }}</p>
       <p class="text-surface-400 text-sm">{{ metaLine }}</p>

@@ -1,8 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import {
   chmodSync,
+  copyFileSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   statSync,
@@ -69,6 +72,16 @@ let data = [{
 if (process.env.FAKE_SUPABASE_INCOMPLETE === 'true') delete data[0].lock_timeout;
 if (sql.includes('pg_catalog.pg_attribute')) {
   data = [{ column_name: 'id' }, { column_name: 'email' }];
+}
+if (sql.includes('supabase_migrations.schema_migrations')) {
+  if (process.env.FAKE_SUPABASE_DENY_HISTORY === 'true') {
+    console.error('failed to execute query: error: permission denied for schema supabase_migrations');
+    process.exit(1);
+  }
+  data = (process.env.FAKE_SUPABASE_REMOTE_VERSIONS ?? '')
+    .split(',')
+    .filter(Boolean)
+    .map((version) => ({ version }));
 }
 if (process.env.FAKE_SUPABASE_NOISE === 'true') process.stdout.write('[warn] diagnostic\\n');
 process.stdout.write(JSON.stringify({ rows: data }));
@@ -250,5 +263,102 @@ describe('prod-db canary', () => {
     expect(() => run(['canary'], { FAKE_SUPABASE_INCOMPLETE: 'true' })).toThrow(
       'incomplete observer health report; missing: lock_timeout'
     );
+  });
+  describe('migration-history', () => {
+    const localVersions = readdirSync(join(root, 'supabase/migrations'))
+      .map((entry) => /^(\d+)_.+\.sql$/.exec(entry)?.[1])
+      .filter((version) => typeof version === 'string')
+      .sort();
+    function history(remoteVersions) {
+      return JSON.parse(
+        run(['migration-history'], { FAKE_SUPABASE_REMOTE_VERSIONS: remoteVersions.join(',') })
+      );
+    }
+    it('reads the checkout so a full local history reports in sync', () => {
+      expect(localVersions.length).toBeGreaterThan(0);
+      const result = history(localVersions);
+      expect(result.operation).toBe('migration-history');
+      expect(result.data.in_sync).toBe(true);
+      expect(result.data.remote_total).toBe(localVersions.length);
+      expect(result.data.local_total).toBe(localVersions.length);
+      expect(result.data.missing_locally).toEqual([]);
+      expect(result.data.pending_remotely).toEqual([]);
+    });
+    it('names a version applied remotely but absent from the checkout', () => {
+      const result = history([...localVersions, '29991231235959']);
+      expect(result.data.in_sync).toBe(false);
+      expect(result.data.missing_locally).toEqual(['29991231235959']);
+      expect(result.data.pending_remotely).toEqual([]);
+    });
+    it('names a checkout version that has not been applied remotely', () => {
+      const [pending, ...applied] = localVersions;
+      const result = history(applied);
+      expect(result.data.in_sync).toBe(false);
+      expect(result.data.pending_remotely).toEqual([pending]);
+      expect(result.data.missing_locally).toEqual([]);
+    });
+    it('explains the read-only grant when history access is denied', () => {
+      expect(() => run(['migration-history'], { FAKE_SUPABASE_DENY_HISTORY: 'true' })).toThrow(
+        'GRANT SELECT (version) ON TABLE supabase_migrations.schema_migrations'
+      );
+    });
+    it('refuses to compare a history that reached the read limit', () => {
+      const saturated = Array.from({ length: 2000 }, (_, index) => String(20000101000000 + index));
+      expect(() => history(saturated)).toThrow('reached the 2000-version read limit');
+    });
+    it('refuses to compare when the checkout has duplicate versions', () => {
+      const isolated = mkdtempSync(join(tmpdir(), 'prod-db-duplicate-'));
+      try {
+        mkdirSync(join(isolated, 'scripts'));
+        mkdirSync(join(isolated, 'supabase/migrations'), { recursive: true });
+        copyFileSync(join(root, 'scripts/prod-db.mjs'), join(isolated, 'scripts/prod-db.mjs'));
+        for (const suffix of ['first', 'second'])
+          writeFileSync(
+            join(isolated, `supabase/migrations/20260101000000_${suffix}.sql`),
+            '-- isolated fixture for the duplicate-version guard\n'
+          );
+        expect(() =>
+          execFileSync(
+            process.execPath,
+            [join(isolated, 'scripts/prod-db.mjs'), 'migration-history'],
+            {
+              env: {
+                ...process.env,
+                PROD_DB_SUPABASE_BIN: fakeSupabase,
+                PROD_DB_TARGET: 'local',
+                FAKE_SUPABASE_REMOTE_VERSIONS: '20260101000000',
+              },
+              encoding: 'utf8',
+            }
+          )
+        ).toThrow('duplicate migration versions (20260101000000)');
+      } finally {
+        rmSync(isolated, { recursive: true, force: true });
+      }
+    });
+    it('reports no project identity for a local target', () => {
+      expect(history(localVersions).project_ref).toBeNull();
+    });
+    it('reports the observed project identity for a primary target', () => {
+      const result = JSON.parse(
+        run(['migration-history'], {
+          PROD_DB_TARGET: 'primary',
+          PROD_DB_URL:
+            'postgresql://pi_prod_observer:observer%3Asecret@db.knptqelvsodccnoehmbj.supabase.co:5432/postgres?sslmode=verify-full',
+          FAKE_SUPABASE_REMOTE_VERSIONS: localVersions.join(','),
+        })
+      );
+      expect(result.project_ref).toBe('knptqelvsodccnoehmbj');
+    });
+    it('refuses to report history for an unidentifiable primary target', () => {
+      expect(() =>
+        run(['migration-history'], {
+          PROD_DB_TARGET: 'primary',
+          PROD_DB_URL:
+            'postgresql://pi_prod_observer:observer%3Asecret@example.test:5432/postgres?sslmode=verify-full',
+          FAKE_SUPABASE_REMOTE_VERSIONS: localVersions.join(','),
+        })
+      ).toThrow('cannot identify the Supabase project from PROD_DB_URL');
+    });
   });
 });

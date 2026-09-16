@@ -148,8 +148,6 @@ describe('credits member presentation', () => {
   it('keeps the static credit groups ordered and uniquely keyed', () => {
     expect(staticCreditSections.map((section) => section.key)).toEqual([
       'original_creator',
-      'staff',
-      'support_members',
       'beta_testers',
     ]);
     expect(new Set(staticCreditSections.map((section) => section.key)).size).toBe(

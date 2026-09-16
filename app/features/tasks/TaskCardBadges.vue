@@ -18,33 +18,17 @@
       />
     </AppTooltip>
     <AppTooltip
-      v-if="props.fenceRepRequirement"
-      :text="
-        t(
-          'page.tasks.questcard.fence_rep_tooltip',
-          { rep: formattedFenceRep },
-          `Requires Fence reputation of ${props.fenceRepRequirement.value >= 0 ? 'at least' : 'at most'} ${props.fenceRepRequirement.value}`
-        )
-      "
-    >
-      <UBadge
-        size="xs"
-        :color="meetsFenceRepRequirement ? 'success' : 'error'"
-        variant="soft"
-        class="shrink-0 cursor-help text-[11px]"
-      >
-        {{ t('page.tasks.questcard.fence_rep_badge', { rep: formattedFenceRep }) }}
-      </UBadge>
-    </AppTooltip>
-    <AppTooltip
-      v-for="req in traderLevelReqs"
+      v-for="req in traderRequirements"
       :key="req.id"
       :text="
-        t(
-          'page.tasks.questcard.trader_level_tooltip',
-          { trader: req.trader.name, level: req.level },
-          `Requires ${req.trader.name} Loyalty Level ${req.level}`
-        )
+        t('page.tasks.questcard.trader_requirement_badge', {
+          trader: req.trader.name,
+          kind: t(
+            `page.tasks.questcard.${req.requirementType === 'level' ? 'loyalty_level' : 'reputation'}`
+          ),
+          comparison: req.compareMethod,
+          value: req.value,
+        })
       "
     >
       <UBadge
@@ -54,9 +38,13 @@
         class="shrink-0 cursor-help text-[11px]"
       >
         {{
-          t('page.tasks.questcard.trader_level_badge', {
+          t('page.tasks.questcard.trader_requirement_badge', {
             trader: req.trader.name,
-            level: req.level,
+            kind: t(
+              `page.tasks.questcard.${req.requirementType === 'level' ? 'loyalty_level' : 'reputation'}`
+            ),
+            comparison: req.compareMethod,
+            value: req.value,
           })
         }}
       </UBadge>
@@ -172,14 +160,14 @@
   </div>
 </template>
 <script setup lang="ts">
-  import type { Task, TraderRequirement, TraderLevelRequirementWithMet } from '@/types/tarkov';
+  import type { Task, NormalizedTraderRequirement } from '@/types/tarkov';
   const props = defineProps<{
     task: Task;
     isPinned: boolean;
     isOurFaction: boolean;
-    fenceRepRequirement: TraderRequirement | null;
-    meetsFenceRepRequirement: boolean;
-    traderLevelReqs: TraderLevelRequirementWithMet[];
+    traderRequirements: Array<
+      Exclude<NormalizedTraderRequirement, { requirementType: 'unknown' }> & { met: boolean }
+    >;
     locationTooltip: string;
     isFailed: boolean;
     isInvalid: boolean;
@@ -194,10 +182,4 @@
   }>();
   const { t } = useI18n({ useScope: 'global' });
   const hasProgress = computed(() => props.progressTotal > 0);
-  const formattedFenceRep = computed(() => {
-    if (!props.fenceRepRequirement) return '';
-    return props.fenceRepRequirement.value >= 0
-      ? `+${props.fenceRepRequirement.value}`
-      : String(props.fenceRepRequirement.value);
-  });
 </script>

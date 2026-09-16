@@ -11,7 +11,7 @@
       :class="
         modelValue === group.trader.id
           ? activePillClasses
-          : 'bg-surface-900/40 hover:bg-surface-800/60 text-surface-300 border-white/8 hover:text-white'
+          : 'bg-surface-900/40 hover:bg-surface-800/60 text-surface-300 light:hover:text-surface-50 border-white/8 hover:text-white'
       "
       :aria-pressed="modelValue === group.trader.id"
       @click="$emit('update:modelValue', group.trader.id)"
@@ -53,8 +53,8 @@
   const { t } = useI18n({ useScope: 'global' });
   const activePillClasses = computed(() =>
     props.accent === 'kappa'
-      ? 'border-warning-500/40 bg-warning-500/10 text-white'
-      : 'border-info-500/40 bg-info-500/10 text-white'
+      ? 'border-warning-500/40 bg-warning-500/10 text-white light:text-surface-50'
+      : 'border-info-500/40 bg-info-500/10 text-white light:text-surface-50'
   );
   const activeBadgeClasses = computed(() =>
     props.accent === 'kappa' ? 'bg-warning-500/20 text-warning-300' : 'bg-info-500/20 text-info-300'

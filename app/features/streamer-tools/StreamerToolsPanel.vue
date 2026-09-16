@@ -97,7 +97,7 @@
                   :class="
                     selectedMode === GAME_MODES.PVP
                       ? 'bg-pvp-800 text-pvp-100'
-                      : 'text-pvp-300 hover:bg-pvp-950/60'
+                      : 'text-pvp-300 hover:bg-pvp-950/60 light:text-pvp-700 light:hover:bg-pvp-100/70'
                   "
                   @click="selectedMode = GAME_MODES.PVP"
                 >
@@ -111,7 +111,7 @@
                   :class="
                     selectedMode === GAME_MODES.PVE
                       ? 'bg-pve-700 text-pve-100'
-                      : 'text-pve-300 hover:bg-pve-950/60'
+                      : 'text-pve-300 hover:bg-pve-950/60 light:text-pve-700 light:hover:bg-pve-100/70'
                   "
                   @click="selectedMode = GAME_MODES.PVE"
                 >
@@ -125,7 +125,7 @@
                   :class="
                     selectedMode === GAME_MODES.SEASONAL
                       ? 'bg-warning-700 text-warning-50'
-                      : 'text-warning-300 hover:bg-warning-950/60'
+                      : 'text-warning-300 hover:bg-warning-950/60 light:text-warning-700 light:hover:bg-warning-100/70'
                   "
                   @click="selectedMode = GAME_MODES.SEASONAL"
                 >
@@ -154,7 +154,7 @@
                   class="rounded-md border px-3 py-2 text-left transition-colors"
                   :class="
                     selectedMetric === option.value
-                      ? 'border-primary-400 bg-primary-800/30 text-primary-100'
+                      ? 'border-primary-400 bg-primary-800/30 light:bg-primary-100 text-primary-100 light:text-primary-800'
                       : 'text-surface-200 hover:bg-surface-800/80 border-white/10'
                   "
                   @click="selectedMetric = option.value"
@@ -795,11 +795,16 @@
                 </li>
               </ol>
             </details>
-            <div class="rounded-md border border-amber-500/30 bg-amber-950/30 px-3 py-2">
+            <div
+              class="light:bg-warning-100 rounded-md border border-amber-500/30 bg-amber-950/30 px-3 py-2"
+            >
               <div class="flex gap-2">
-                <UIcon name="i-mdi-alert-outline" class="mt-0.5 shrink-0 text-amber-400" />
+                <UIcon
+                  name="i-mdi-alert-outline"
+                  class="light:text-warning-900 mt-0.5 shrink-0 text-amber-400"
+                />
                 <div class="space-y-1">
-                  <p class="text-xs font-semibold text-amber-300">
+                  <p class="light:text-warning-900 text-xs font-semibold text-amber-300">
                     {{
                       t(
                         'streamer_tools.setup_scaling_warning_title',
@@ -807,7 +812,7 @@
                       )
                     }}
                   </p>
-                  <p class="text-xs text-amber-400/80">
+                  <p class="light:text-warning-900 text-xs text-amber-400/80">
                     {{
                       t(
                         'streamer_tools.setup_scaling_warning',

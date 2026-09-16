@@ -14,7 +14,10 @@
     @keydown="handleKeydown"
   >
     <div class="mb-3 flex items-center justify-between">
-      <h2 id="task-settings-drawer-title" class="text-sm font-semibold text-white">
+      <h2
+        id="task-settings-drawer-title"
+        class="light:text-surface-50 text-sm font-semibold text-white"
+      >
         {{ t('page.tasks.settings.title') }}
       </h2>
       <UButton

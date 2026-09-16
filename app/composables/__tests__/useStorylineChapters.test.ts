@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { StoryChapter } from '@/types/tarkov';
+import type { StoryChapter, StoryChapterEnding } from '@/types/tarkov';
 const objectiveCompletionState = new Set<string>();
 const chapterCompletionState = new Set<string>();
 const STORY_CHAPTERS: StoryChapter[] = [
@@ -52,7 +52,75 @@ const STORY_CHAPTERS: StoryChapter[] = [
     },
   },
 ];
-const loadComposable = async (storyChapters: StoryChapter[] = STORY_CHAPTERS) => {
+const DECLARED_ENDING_CHAPTER: StoryChapter = {
+  id: 'the-ticket',
+  name: 'The Ticket',
+  normalizedName: 'the-ticket',
+  wikiLink: 'https://example.com/the-ticket',
+  order: 2,
+  chapterQuestId: '67bc646c6e34475fea09d2a5',
+  referenceCoverage: {
+    referencedSubquests: 88,
+    resolvedSubquests: 35,
+    missingObjectiveTexts: 2,
+    partial: true,
+  },
+  endings: [
+    {
+      id: 'ending-resolved',
+      systemName: 'EscapedFromTarkovForHumanity',
+      gateQuestId: 'quest-gate',
+      objectiveCount: 2,
+      resolvedInReference: true,
+    },
+    {
+      id: 'ending-pending',
+      systemName: 'YouDidntEscapeFromYourself',
+      gateQuestId: 'quest-pending',
+      objectiveCount: 0,
+      resolvedInReference: false,
+    },
+  ],
+  mutuallyExclusiveQuestPairs: [['quest-keep', 'quest-hand-over']],
+  objectives: {
+    'obj-gate-1': {
+      id: 'obj-gate-1',
+      order: 1,
+      type: 'main',
+      description: 'Arrive at the terminal',
+      sourceQuestId: 'quest-gate',
+      endingId: 'ending-resolved',
+    },
+    'obj-gate-2': {
+      id: 'obj-gate-2',
+      order: 2,
+      type: 'optional',
+      description: 'Bring the secure case',
+      sourceQuestId: 'quest-gate',
+      endingId: 'ending-resolved',
+    },
+    'obj-keep': {
+      id: 'obj-keep',
+      order: 3,
+      type: 'main',
+      description: 'Keep the case',
+      sourceQuestId: 'quest-keep',
+    },
+    'obj-hand': {
+      id: 'obj-hand',
+      order: 4,
+      type: 'main',
+      description: 'Hand the case over',
+      sourceQuestId: 'quest-hand-over',
+    },
+  },
+};
+const loadComposable = async (
+  storyChapters: StoryChapter[] = STORY_CHAPTERS,
+  options: Parameters<
+    typeof import('@/composables/useStorylineChapters').useStorylineChapters
+  >[0] = {}
+) => {
   vi.resetModules();
   vi.doMock('@/stores/useMetadata', () => ({
     useMetadataStore: () => ({
@@ -67,7 +135,7 @@ const loadComposable = async (storyChapters: StoryChapter[] = STORY_CHAPTERS) =>
     }),
   }));
   const { useStorylineChapters } = await import('@/composables/useStorylineChapters');
-  return useStorylineChapters();
+  return useStorylineChapters(options);
 };
 const requireDefined = <T>(value: T | null | undefined, message: string): T => {
   expect(value, message).toBeDefined();
@@ -201,5 +269,198 @@ describe('useStorylineChapters', () => {
       'obj-a',
       'obj-b',
     ]);
+  });
+  it('reads endings, quest routes, and coverage from overlay-declared chapter data', async () => {
+    objectiveCompletionState.add('the-ticket:obj-gate-1');
+    objectiveCompletionState.add('the-ticket:obj-keep');
+    const { normalizedChapters } = await loadComposable([DECLARED_ENDING_CHAPTER]);
+    const chapter = requireDefined(normalizedChapters.value[0], 'Expected the-ticket chapter');
+    expect(chapter.coveragePartial).toBe(true);
+    expect(chapter.endings).toEqual([
+      {
+        evidencePending: false,
+        id: 'ending-resolved',
+        label: 'Escaped From Tarkov For Humanity',
+        objectiveCompleted: 1,
+        objectiveId: '',
+        objectiveLabel: '',
+        objectiveTotal: 2,
+        routeBlockingAlternatives: [],
+        routeChoiceIndex: null,
+        routeState: 'open',
+        systemName: 'EscapedFromTarkovForHumanity',
+      },
+      {
+        evidencePending: true,
+        id: 'ending-pending',
+        label: 'You Didnt Escape From Yourself',
+        objectiveCompleted: 0,
+        objectiveId: '',
+        objectiveLabel: '',
+        objectiveTotal: 0,
+        routeBlockingAlternatives: [],
+        routeChoiceIndex: null,
+        routeState: 'open',
+        systemName: 'YouDidntEscapeFromYourself',
+      },
+    ]);
+    expect(chapter.questRouteChoices).toEqual([
+      {
+        branches: [
+          {
+            completedCount: 0,
+            evidencePending: false,
+            id: 'quest-hand-over',
+            knownStepsComplete: false,
+            label: 'Hand the case over',
+            totalCount: 1,
+          },
+          {
+            completedCount: 1,
+            evidencePending: false,
+            id: 'quest-keep',
+            knownStepsComplete: true,
+            label: 'Keep the case',
+            totalCount: 1,
+          },
+        ],
+        // The fixture chapter reports partial coverage, so no route is proven finished.
+        chosenBranchId: null,
+        conflicting: false,
+        coveragePartial: true,
+        id: 'the-ticket-quest-route-quest-hand-over-quest-keep',
+      },
+    ]);
+    const handOver = requireDefined(
+      chapter.objectives.find((objective) => objective.id === 'obj-hand'),
+      'Expected obj-hand objective'
+    );
+    expect(handOver.routeState).toBe('open');
+    expect(chapter.mainRouteChoices).toEqual([]);
+  });
+  it('keeps a declared route whose objectives the capture does not include', async () => {
+    const chapter = structuredClone(DECLARED_ENDING_CHAPTER);
+    chapter.mutuallyExclusiveQuestPairs = [['quest-keep', 'quest-missing']];
+    const { normalizedChapters } = await loadComposable([chapter]);
+    const normalized = requireDefined(normalizedChapters.value[0], 'Expected the-ticket chapter');
+    expect(normalized.questRouteChoices).toHaveLength(1);
+    expect(normalized.questRouteChoices[0]?.branches.map((branch) => branch.id)).toEqual([
+      'quest-keep',
+      'quest-missing',
+    ]);
+    expect(normalized.questRouteChoices[0]?.branches[1]).toMatchObject({
+      evidencePending: true,
+      knownStepsComplete: false,
+      totalCount: 0,
+    });
+  });
+  it('proves a chosen route only when chapter coverage is complete', async () => {
+    const chapter = structuredClone(DECLARED_ENDING_CHAPTER);
+    chapter.referenceCoverage = {
+      referencedSubquests: 4,
+      resolvedSubquests: 4,
+      partial: false,
+    };
+    objectiveCompletionState.add('the-ticket:obj-keep');
+    const { normalizedChapters } = await loadComposable([chapter]);
+    const normalized = requireDefined(normalizedChapters.value[0], 'Expected the-ticket chapter');
+    expect(normalized.questRouteChoices[0]).toMatchObject({
+      chosenBranchId: 'quest-keep',
+      conflicting: false,
+      coveragePartial: false,
+    });
+  });
+  it('flags a conflict only when complete coverage proves both routes finished', async () => {
+    objectiveCompletionState.add('the-ticket:obj-keep');
+    objectiveCompletionState.add('the-ticket:obj-hand');
+    const partial = await loadComposable([DECLARED_ENDING_CHAPTER]);
+    // Partial coverage cannot prove either route finished, so progress on both is not a conflict.
+    expect(
+      requireDefined(partial.normalizedChapters.value[0], 'chapter').questRouteChoices[0]
+    ).toMatchObject({
+      chosenBranchId: null,
+      conflicting: false,
+    });
+    const chapter = structuredClone(DECLARED_ENDING_CHAPTER);
+    chapter.referenceCoverage = { referencedSubquests: 4, resolvedSubquests: 4, partial: false };
+    const complete = await loadComposable([chapter]);
+    expect(
+      requireDefined(complete.normalizedChapters.value[0], 'chapter').questRouteChoices[0]
+    ).toMatchObject({
+      chosenBranchId: null,
+      conflicting: true,
+    });
+  });
+  it('never implies exclusivity between quests the overlay did not pair', async () => {
+    const chapter = structuredClone(DECLARED_ENDING_CHAPTER);
+    chapter.mutuallyExclusiveQuestPairs = [
+      ['quest-keep', 'quest-hand-over'],
+      ['quest-keep', 'quest-gate'],
+    ];
+    const { normalizedChapters } = await loadComposable([chapter]);
+    const normalized = requireDefined(normalizedChapters.value[0], 'Expected the-ticket chapter');
+    expect(
+      normalized.questRouteChoices.map((routeChoice) =>
+        routeChoice.branches.map((branch) => branch.id)
+      )
+    ).toEqual([
+      ['quest-gate', 'quest-keep'],
+      ['quest-hand-over', 'quest-keep'],
+    ]);
+  });
+  it('marks an ending chosen once every objective it declares is complete', async () => {
+    objectiveCompletionState.add('the-ticket:obj-gate-1');
+    objectiveCompletionState.add('the-ticket:obj-gate-2');
+    const { normalizedChapters } = await loadComposable([DECLARED_ENDING_CHAPTER]);
+    const chapter = requireDefined(normalizedChapters.value[0], 'Expected the-ticket chapter');
+    expect(chapter.endings[0]).toMatchObject({ objectiveCompleted: 2, routeState: 'chosen' });
+  });
+  it('treats an explicitly empty ending list as authoritative', async () => {
+    const chapter = structuredClone(STORY_CHAPTERS[0]!);
+    chapter.endings = [];
+    const { normalizedChapters } = await loadComposable([chapter]);
+    const normalized = requireDefined(normalizedChapters.value[0], 'Expected first chapter');
+    expect(normalized.endings).toEqual([]);
+  });
+  it('keeps an unresolved ending open and drops malformed entries', async () => {
+    const chapter = structuredClone(DECLARED_ENDING_CHAPTER);
+    const unresolvedEnding = requireDefined(
+      chapter.endings?.[1],
+      'Expected the unresolved ending fixture'
+    );
+    chapter.endings = [
+      { ...unresolvedEnding, objectiveCount: 1 },
+      null as unknown as StoryChapterEnding,
+    ];
+    chapter.objectives!['obj-pending'] = {
+      description: 'Reach the unresolved branch',
+      endingId: 'ending-pending',
+      id: 'obj-pending',
+      order: 5,
+      sourceQuestId: 'quest-pending',
+      type: 'main',
+    };
+    objectiveCompletionState.add('the-ticket:obj-pending');
+    const { normalizedChapters } = await loadComposable([chapter]);
+    const normalized = requireDefined(normalizedChapters.value[0], 'Expected the-ticket chapter');
+    expect(normalized.endings).toHaveLength(1);
+    expect(normalized.endings[0]).toMatchObject({
+      evidencePending: true,
+      objectiveCompleted: 1,
+      objectiveTotal: 1,
+      routeState: 'open',
+    });
+  });
+  it('reports completed objective marks that upstream re-keyed', async () => {
+    const { normalizedChapters } = await loadComposable([DECLARED_ENDING_CHAPTER], {
+      completedObjectiveIds: () => ['obj-gate-1', 'the-ticket-main-10'],
+    });
+    const chapter = requireDefined(normalizedChapters.value[0], 'Expected the-ticket chapter');
+    expect(chapter.staleObjectiveIds).toEqual(['the-ticket-main-10']);
+  });
+  it('reports no stale marks without a completed objective source', async () => {
+    const { normalizedChapters } = await loadComposable([DECLARED_ENDING_CHAPTER]);
+    const chapter = requireDefined(normalizedChapters.value[0], 'Expected the-ticket chapter');
+    expect(chapter.staleObjectiveIds).toEqual([]);
   });
 });

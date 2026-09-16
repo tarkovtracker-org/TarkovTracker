@@ -11,6 +11,7 @@ const createTarkovStore = (options: {
   isTaskComplete?: boolean | ((taskId: string) => boolean);
   isTaskFailed?: boolean;
   taskCompletions?: Record<string, unknown>;
+  storyChapters?: Record<string, { complete: boolean }>;
   traderLevels?: Record<string, number>;
   traderReputations?: Record<string, number>;
   traders?: Array<{ id: string; name: string; normalizedName: string }>;
@@ -52,6 +53,7 @@ const createTarkovStore = (options: {
     isTaskFailed: vi.fn(() => options.isTaskFailed ?? false),
     getCurrentProgressData: vi.fn(() => ({
       taskCompletions: options.taskCompletions ?? {},
+      storyChapters: options.storyChapters,
     })),
   };
 };
@@ -240,6 +242,8 @@ describe('useTaskActions', () => {
           id: '66dace4d03b34844877a50fc',
           trader: { id: fenceId, name: 'Fence' },
           value: 1,
+          requirementType: 'reputation',
+          compareMethod: '>=',
         },
       ],
     };
@@ -261,8 +265,20 @@ describe('useTaskActions', () => {
         { id: 'level-skier', trader: { id: skierId, name: 'Skier' }, level: 2 },
       ],
       traderRequirements: [
-        { id: 'rep-prapor', trader: { id: praporId, name: 'Prapor' }, value: 0.5 },
-        { id: 'rep-skier', trader: { id: skierId, name: 'Skier' }, value: 0.2 },
+        {
+          id: 'rep-prapor',
+          trader: { id: praporId, name: 'Prapor' },
+          value: 0.5,
+          requirementType: 'reputation',
+          compareMethod: '>=',
+        },
+        {
+          id: 'rep-skier',
+          trader: { id: skierId, name: 'Skier' },
+          value: 0.2,
+          requirementType: 'reputation',
+          compareMethod: '>=',
+        },
       ],
     };
     const { actions, tarkovStore } = await setup(task, [task], {
@@ -275,14 +291,26 @@ describe('useTaskActions', () => {
     expect(tarkovStore.setTraderReputation).toHaveBeenCalledWith(praporId, 0.5);
     expect(tarkovStore.setTraderReputation).not.toHaveBeenCalledWith(skierId, expect.any(Number));
   });
-  it('backfills Fence negative reputation requirements only', async () => {
+  it('does not lower earned reputation to satisfy upper bounds', async () => {
     const fenceId = '579dc571d53a0658a154fbec';
     const praporId = '54cb50c76803fa8b248b4571';
     const task: Task = {
       id: 'low-karma-task',
       traderRequirements: [
-        { id: 'rep-fence', trader: { id: fenceId, name: 'Fence' }, value: -2 },
-        { id: 'rep-prapor', trader: { id: praporId, name: 'Prapor' }, value: -1 },
+        {
+          id: 'rep-fence',
+          trader: { id: fenceId, name: 'Fence' },
+          value: -2,
+          requirementType: 'reputation',
+          compareMethod: '<=',
+        },
+        {
+          id: 'rep-prapor',
+          trader: { id: praporId, name: 'Prapor' },
+          value: -1,
+          requirementType: 'reputation',
+          compareMethod: '<=',
+        },
       ],
     };
     const { actions, tarkovStore } = await setup(task, [task], {
@@ -290,7 +318,7 @@ describe('useTaskActions', () => {
       traders: [{ id: fenceId, name: 'Fence', normalizedName: 'fence' }],
     });
     actions.markTaskAvailable();
-    expect(tarkovStore.setTraderReputation).toHaveBeenCalledWith(fenceId, -2);
+    expect(tarkovStore.setTraderReputation).not.toHaveBeenCalled();
     expect(tarkovStore.setTraderReputation).not.toHaveBeenCalledWith(praporId, expect.any(Number));
   });
   it('does not backfill trader requirements when gating is disabled', async () => {
@@ -300,7 +328,15 @@ describe('useTaskActions', () => {
       traderLevelRequirements: [
         { id: 'level-fence', trader: { id: fenceId, name: 'Fence' }, level: 2 },
       ],
-      traderRequirements: [{ id: 'rep-fence', trader: { id: fenceId, name: 'Fence' }, value: 1 }],
+      traderRequirements: [
+        {
+          id: 'rep-fence',
+          trader: { id: fenceId, name: 'Fence' },
+          value: 1,
+          requirementType: 'reputation',
+          compareMethod: '>=',
+        },
+      ],
     };
     const { actions, tarkovStore } = await setup(
       task,
@@ -535,4 +571,17 @@ describe('useTaskActions', () => {
       expect.objectContaining({ action: 'available', taskId: 'task-simple' })
     );
   });
+});
+it('does not backfill prerequisites already bypassed by storyline progress', async () => {
+  const prerequisite: Task = { id: 'prior' };
+  const task: Task = {
+    id: 'target',
+    storyUnlocks: [{ id: 'chapter', name: 'Chapter' }],
+    taskRequirements: [{ task: { id: 'prior' }, status: ['complete'] }],
+  };
+  const { actions, tarkovStore } = await setup(task, [task, prerequisite], {
+    storyChapters: { chapter: { complete: true } },
+  });
+  actions.markTaskAvailable();
+  expect(tarkovStore.setTaskComplete).not.toHaveBeenCalledWith('prior');
 });

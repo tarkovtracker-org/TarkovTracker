@@ -199,4 +199,18 @@ describe('useHideoutStationStatus', () => {
     mockState.requireStationLevels = false;
     expect(isStationReqMet(stationRequirement)).toBe(true);
   });
+  it.each([
+    ['>', false],
+    ['>=', true],
+    ['<', false],
+    ['<=', true],
+    ['=', true],
+    ['!=', false],
+  ] as const)('honors trader comparison %s at the threshold', (compareMethod, expected) => {
+    const { traderRequirement } = createRequirements();
+    mockState.traderLevels = { 'trader-1': traderRequirement.value };
+    expect(useHideoutStationStatus().isTraderReqMet({ ...traderRequirement, compareMethod })).toBe(
+      expected
+    );
+  });
 });

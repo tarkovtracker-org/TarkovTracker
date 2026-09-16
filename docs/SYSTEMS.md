@@ -42,7 +42,10 @@ and have an agent verify the answer against the code.
 
 13. [Fallow audit snapshots](#13-fallow-audit-snapshots) — consistent generated context and local source attribution
 14. [CI validation selection](#14-ci-validation-selection) — conservative classification and strict aggregation
-15. [Season planner](#15-season-planner) — Kord Breach personal modifiers, point budget, and
+15. [Canonical task progression](#15-canonical-task-progression) — declared trader gates and import semantics
+16. [Light/dark theme system](#16-lightdark-theme-system) — token flip, boot script, and theme controls
+17. [Test suite execution model](#17-test-suite-execution-model) — pool, isolation, sharding, and coverage gates
+18. [Season planner](#18-season-planner) — Kord Breach personal modifiers, point budget, and
     user-scoped persistence
 
 ---
@@ -71,29 +74,31 @@ before returning it.
 
 ### Endpoints
 
-| Endpoint                       | Purpose              | Cache TTL | Precomputed? | Overlay? |
-| ------------------------------ | -------------------- | --------- | ------------ | -------- |
-| `/api/tarkov/bootstrap`        | Player levels        | 12h       | no           | no       |
-| `/api/tarkov/tasks-core`       | Tasks, maps, traders | 12h       | **yes**      | yes      |
-| `/api/tarkov/tasks-objectives` | Task objectives      | 12h       | no           | yes      |
-| `/api/tarkov/tasks-rewards`    | Task rewards         | 12h       | no           | yes      |
-| `/api/tarkov/hideout`          | Hideout stations     | 12h       | no           | yes      |
-| `/api/tarkov/items-lite`       | Items (minimal)      | 24h       | no           | yes      |
-| `/api/tarkov/items`            | Items (full)         | 24h       | no           | yes      |
-| `/api/tarkov/prestige`         | Prestige levels      | 24h       | no           | no       |
-| `/api/tarkov/map-spawns`       | Map spawn points     | 12h       | no           | no       |
-| `/api/tarkov/cache-meta`       | Cache purge status   | 5m edge   | no           | no       |
+| Endpoint                       | Purpose                      | Cache TTL  | Precomputed? | Overlay? |
+| ------------------------------ | ---------------------------- | ---------- | ------------ | -------- |
+| `/api/tarkov/bootstrap`        | Player levels                | 12h        | no           | no       |
+| `/api/tarkov/tasks-core`       | Tasks, maps, traders         | 12h        | **yes**      | yes      |
+| `/api/tarkov/tasks-objectives` | Task objectives              | 12h        | no           | yes      |
+| `/api/tarkov/tasks-rewards`    | Task rewards                 | 12h        | no           | yes      |
+| `/api/tarkov/hideout`          | Hideout stations             | 12h        | no           | yes      |
+| `/api/tarkov/items-lite`       | Items (minimal)              | 24h        | no           | yes      |
+| `/api/tarkov/items`            | Items (full)                 | 24h        | no           | yes      |
+| `/api/tarkov/prestige`         | Prestige levels              | 24h        | no           | yes      |
+| `/api/tarkov/editions`         | Editions, chapters, perks    | 1h overlay | no           | yes      |
+| `/api/tarkov/overlay-status`   | Last complete fleet manifest | no-store   | no           | metadata |
+| `/api/tarkov/map-spawns`       | Map spawn points             | 12h        | no           | no       |
+| `/api/tarkov/cache-meta`       | Cache purge status           | 5m edge    | no           | no       |
 
-Overlay is applied by the six task/hideout/item endpoints. `bootstrap`, `prestige`,
-`map-spawns`, and `cache-meta` fetch directly into `edgeCache` without the overlay step —
-their upstream data does not currently need corrections.
+Task, hideout, item and prestige endpoints consume overlays. The editions endpoint projects
+editions, story chapters and Seasonal perks from the same validated loader. Bootstrap and
+map-spawns remain upstream-only; cache-meta and overlay-status expose operational metadata.
 
 Only `tasks-core` is precomputed today (it is the largest, hottest, and most expensive payload).
 See [Precompute](#5-precompute-workflow).
 
-The hideout route is the cache-order exception: its `json-v4` edge entry stores the adapted base
+The hideout route is the cache-order exception: its `json-v5` edge entry stores the adapted base
 payload, then the handler applies the current module-cached overlay after every edge-cache read. Its
-browser IndexedDB entry also uses `json-v4`, with a one-hour TTL matching overlay freshness. This
+browser IndexedDB entry also uses `json-v5`, with a one-hour TTL matching overlay freshness. This
 keeps the 12-hour edge cache and the browser cache from pinning an old overlay correction. The other
 overlay-enabled routes cache their final overlay-applied payload.
 
@@ -105,16 +110,21 @@ flowchart LR
     Route --> Cache["edgeCache()<br/>app/server/utils/edgeCache.ts"]
     Cache -->|miss| Fetch["tarkov-json.ts<br/>fetch + adapt"]
     Fetch -->|HTTPS| Upstream["json.tarkov.dev"]
-    Fetch --> Overlay{"Overlay?<br/>(6 of 10 endpoints)"}
+    Fetch -->|hideout: adapted base| Cache
+    Fetch -->|other routes| Overlay{"Overlay?"}
     Overlay -->|yes| ApplyOverlay["applyOverlay()<br/>app/server/utils/overlay.ts"]
     Overlay -->|no| Cache
     ApplyOverlay --> Cache
-    Cache --> Browser
+    Cache -->|other routes: final response| Browser
+    Cache -->|hideout: cached or fetched base| HideoutOverlay["applyOverlay()<br/>current overlay on every read"]
+    HideoutOverlay --> Browser
 ```
 
 ### Files
 
-- `app/server/api/tarkov/*.get.ts` — one handler per endpoint; thin wrappers around `edgeCache`.
+- `app/server/api/tarkov/*.get.ts` — one handler per endpoint. Most are thin wrappers around
+  `edgeCache`; `editions.get.ts` projects the overlay directly and `overlay-status.get.ts` reads the
+  precompute manifest, so neither goes through the cache layers.
 - `app/server/utils/tarkov-json.ts` — upstream fetch + adapt into client types.
 - `app/server/utils/tarkov-cache-config.ts` — TTL constants and game-mode validation.
 - `app/types/tarkov.ts` — the adapted shapes the client stores.
@@ -135,6 +145,12 @@ flowchart LR
 - Language is validated with `getValidatedLanguage()` and defaults to `en`.
 
 ---
+
+Prestige and progression-catalog responses await overlay refresh before creating downstream cache entries. Story chapters normalize missing/nonfinite order to zero, and prestige rows fall back to chapter names/IDs when requirement labels are absent.
+
+Overlay fleet verification requires `X-Cache-Status: PRECOMPUTE` and matching nonempty version/SHA identities in the published overlay, full-fleet manifest, and served response. Invalid timestamps or malformed provenance remain unverified. Filtered busts do not certify a complete release: rerun the unfiltered precompute before promotion. The production verifier uses the configured HTTPS `OVERLAY_URL` (defaulting to the published main overlay).
+
+Critical cache bundles carry mode/language scope and replace every matching collection, including empty arrays. Cached hydration owns the request tokens and clears stale errors/loading; superseded initializers and background callbacks cannot overwrite the new scope.
 
 ## 2. Data fetching pipeline
 
@@ -228,7 +244,10 @@ replaces the key with the translated string.
    caching entirely and always fetch. Sets `X-Cache-Status: DEV`.
 
 On top of these, the **client** has its own IndexedDB cache in `useMetadataStore` so the browser
-does not re-fetch on every navigation. That layer is documented in `ARCHITECTURE.md`.
+does not re-fetch on every navigation. That layer is documented in `ARCHITECTURE.md`. Anything passed
+to `setCachedData` must be structured-cloneable, so store-held catalogs stay `markRaw` on every
+assignment including empty fallbacks: a plain array assigned to store state becomes a reactive proxy,
+and IndexedDB rejects a proxy with `DataCloneError`, disabling that cache entry for every visit.
 
 ### Stale-while-revalidate
 
@@ -304,9 +323,10 @@ flowchart TD
   layer or reorder them.
 - A `STALE` response must always trigger exactly one background refresh (guarded by
   `inFlightRevalidations`).
-- `X-Cache-Status` must be set on every successful response. Error responses from the
-  catch block (502 on upstream failure) do not set it — the invariant covers the success
-  paths only.
+- `X-Cache-Status` must be set on every successful response served through `edgeCache`. Responses
+  from its catch block do not set it (`503` when the failure already carried `503`, otherwise `502`),
+  and the routes that deliberately bypass the cache layers (`editions`, `overlay-status`) do not set
+  it either — the invariant covers the `edgeCache` success paths only.
 - The cache key must include language and game mode so two locales or modes never share an entry.
 - Hideout edge-cache entries must contain the adapted base payload, not the overlay-applied response;
   `hideout.get.ts` applies the overlay after `edgeCache()` and restores the overlay metadata headers.
@@ -359,12 +379,22 @@ sequenceDiagram
   `traderRequirements` list discriminated by `requirementType` (`level` gates
   trader loyalty level, `reputation` gates standing). `applyOverlay` re-splits
   a patched task's merged list into `traderLevelRequirements` and
-  `traderRequirements` (reputation-only) so availability and progress checks
-  evaluate the right metric; a patch's `traderRequirements` replaces the whole
-  requirement set.
+  `traderRequirements` (reputation-only) for compatibility, and regenerates the canonical
+  `normalizedTraderRequirements` consumed by availability, badges and progress implications
+  (section 15). A patch's `traderRequirements` replaces the whole requirement set.
+- Overlay corrections and `tasksAdd` entries merge into already-adapted tasks, so `applyOverlay`
+  re-normalizes the declared prerequisite and prestige gates it can reach. A corrected task is
+  re-normalized only when the patch touches `taskRequirements` or `requiredPrestige`, and a
+  recomputation clears only the diagnostic for the field that patch rewrote: the adapter already
+  dropped the other malformed value, so its diagnostic is retained rather than recomputed away. Every
+  injected task is re-normalized because additions never pass through the adapter. `taskRequirements`
+  stays a list and a resolvable `requiredPrestige` becomes a normalized `{ id }` reference. The
+  overlay keeps an id-less `{ name, prestigeLevel }` reference verbatim, so it is not a loss and gets
+  no diagnostic; only a declared gate the normalization had to drop becomes a
+  `requirementDiagnostics` entry (section 15).
 - On fetch failure, serves the last good overlay (stale) rather than failing the request.
 - Overlay supports mode-specific corrections under `modes[gameMode]` plus global corrections.
-- Per-locale corrections under `locales[locale]` patch `tasks`, `items`, and `traders`
+- Per-locale corrections under `locales[locale]` patch `tasks`, `items`, `traders` and `maps`
   (locale-sensitive fields such as name, wikiLink, and objective descriptions) and are applied last
   so they take precedence over global and mode-specific corrections. The locale defaults to `en`
   when a handler does not pass one.
@@ -384,6 +414,73 @@ sequenceDiagram
   overlay-enabled routes cache their final corrected payload; publishing new overlay data requires
   a Tarkov data cache purge so those entries and the browser cache-purge marker are invalidated.
 
+### Endpoint ownership and precedence
+
+Every collection merges shared records by ID, then the matching upstream mode (`regular`, `pve`,
+`pvp-season`), then supported locale patches. `overlayValidation.ts` validates known collection
+shapes, perk filters, craft additions and prestige chapter/objective references before replacing
+the last-good overlay. Unsupported story statuses/types fail validation. Unknown root, mode or
+locale sections are logged and retained in `dataOverlay.unconsumedSections`, including cache hits;
+precompute refuses to publish payloads with unconsumed sections.
+
+| Sections                               | Consumer and identity rules                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `tasks`, `tasksAdd`, `traders`, `maps` | Task routes; existing task IDs win over synthetic additions; maps support locale patches.                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `items`, `itemsAdd`                    | Both item routes; adapt additions only when an ID is absent upstream, then apply explicit patches and locales.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `hideout`, `craftsAdd`                 | Hideout; attach adapted crafts to station ID/level and deduplicate craft IDs globally. Null/absent task unlocks stay `unlockState: unknown`.                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `prestige`                             | Prestige route; patch/append raw conditions by ID before adaptation resolves tasks from upstream plus missing, enabled `tasksAdd` IDs. Array condition patches replace arrays. Locale task/prestige corrections apply before resolution.                                                                                                                                                                                                                                                                                                                     |
+| `storyChapters`                        | Editions route and task story unlock projection share chapter identities. Chapter/objective locales supply prestige story requirement names. Stored story progress is evaluated from explicit requirements, never chapter order or hardcoded chapter-name lists. Chapter `endings`, `mutuallyExclusiveQuestPairs`, `referenceCoverage`, and objective `sourceQuestId`/`endingId` survive projection and normalization; the storyline view reads them when a chapter carries them and falls back to objective-level exclusivity and objective text otherwise. |
+| `editions`                             | Editions route and metadata store own the mode-scoped edition catalog.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `seasonalPerks`                        | Editions route exposes metadata only for `pvp-season`; the store's `resolvedSeasonalPerks` hydrates item/category references as items load, retaining missing IDs with null values. No perk selection/progress persistence is introduced.                                                                                                                                                                                                                                                                                                                    |
+
+Prestige fetches the requested upstream mode; regular corrections cannot leak into PvE or Seasonal.
+An empty upstream prestige collection stays empty. Client prestige and edition catalogs are keyed
+by mode and language (`json-v3` and `overlay-v2`), and stale responses cannot replace another scope.
+The item contract advances to `json-v2`, hideout to `json-v5`, tasks-core to `json-v3`, and IndexedDB
+schema 8 clears incompatible browser payloads. The combined progression/overlay release skips the
+standalone progression deployment: v3 always uses envelope format 2 with overlay provenance.
+The superseded progression-only writer must never publish to these keys; rollback uses v2.
+Story references must name own chapter entries, never inherited object properties. Seasonal perk
+exclusion lists may be omitted; when present, every entry must be a string.
+
+Story chapter branches follow the overlay's own evidence. Objective-level `mutuallyExclusiveWith`
+blocks the opposing objective; chapter-level `mutuallyExclusiveQuestPairs` constrains only whole
+sub-quests, so each declared pair becomes one chapter-level route choice and gates chapter bulk
+completion, while individual objective toggles stay enabled. Pairs are never merged: two pairs
+sharing a quest do not make their other members exclusive, and a route the player has not finished
+is never rendered as blocked, because the objective list can be a projection of the overlay capture.
+Both sides of a declared pair always render, a side with no captured objectives reporting pending
+evidence rather than disappearing. A route is called chosen only when chapter coverage is complete and
+exactly one side's steps are all done; under partial coverage a finished side reports known-step
+progress instead, and a conflict between two finished sides is reported only when coverage is complete,
+because unknown steps can otherwise remain on both.
+Declared `endings` replace the text-derived ending labels when a chapter carries them — chapters
+without them keep the text path — an ending with no attributed objectives reports pending evidence
+rather than being hidden, and exclusivity between endings is not inferred. `referenceCoverage.partial`
+surfaces as a chapter badge because a missing objective is not evidence that none exists. Objective
+IDs are upstream-owned: completed marks the reconciliation pass below leaves unresolved are reported
+for re-checking on the viewer's own progress only, never remapped on a guess.
+
+Saved story objective marks are reconciled against the published catalog by
+`app/utils/storyProgressMigration.ts`, on every chapter-catalog load and after a realtime merge,
+which unions both sides' objective IDs and can reintroduce a retired one. Only the mode the loaded
+catalog belongs to is reconciled: chapters are fetched per mode and language and the overlay may scope
+a chapter to one mode, so a catalog is evidence about its own mode only. A merge naming another mode is
+deferred to that mode's own catalog load, which a mode switch or the next start performs. The pass is idempotent and acts
+only on proof: a mark moves when `STORY_OBJECTIVE_ID_ALIASES` records a re-key the published data
+proves (identical unique objective text, or the overlay re-anchoring its own prestige requirement),
+the catalog publishes that successor, and the successor carries no mark of its own; a mark whose
+successor a partial chapter omits is kept until the successor appears, because that objective list is a
+projection, while a complete chapter that omits it settles the question and the mark is dropped; a mark
+is also dropped when no alias names it and its ID cannot satisfy the story schema's client-ID shape, so
+it can never resolve again and would otherwise be re-synced forever, and when the successor already
+carries the player's own mark; an unrecognized client ID is kept for the projection reason. Lookups use own properties, so an
+inherited key such as `constructor` is treated as saved data rather than as a published objective. Nothing is dropped unless the loaded chapter itself proves the client-ID contract, so a
+stale, curated, or failed catalog load cannot delete progress. Ambiguous re-keys are left unmapped
+rather than guessed. Task and hideout IDs have no equivalent pass: the overlay still publishes
+synthetic task IDs (`new_beginning_prestige_5`) as live data, so absence there is not proof of
+retirement, and a future retirement needs the overlay to declare the replacement first.
+
 ### Files
 
 - `app/server/utils/overlay.ts` — fetch, cache, merge, and deferred refresh coordination.
@@ -398,8 +495,10 @@ sequenceDiagram
 
 - The overlay must never block the request path on a fresh fetch for more than
   `FETCH_TIMEOUT_MS = 5000`. On timeout, fall back to the cached overlay.
-- A missing or malformed overlay must never cause a 5xx; the base payload is returned with
-  `X-Overlay-Status: missing`.
+- Generic task/item/hideout consumers return the base payload with `X-Overlay-Status: missing`
+  when no valid overlay is available. Prestige and edition/story/perk catalogs require an overlay
+  and fail when no last-good overlay exists, preserving client caches rather than publishing
+  incomplete authoritative eligibility data.
 - Overlay data must only be fetched over HTTPS on every server path. A non-HTTPS `OVERLAY_URL` must
   resolve to the trusted default, and no redirect hop may downgrade the transport — the fetch must
   fail rather than read a payload served over plaintext. `applyOverlay` follows HTTPS redirects
@@ -444,14 +543,45 @@ flowchart LR
 ### Key contract
 
 - The KV binding name is `TARKOV_DATA` (`PRECOMPUTED_KV_BINDING`).
-- The envelope shape is `{ payload, storedAt, version }` with
-  `PRECOMPUTED_ENVELOPE_VERSION = 1`.
+- The envelope shape is `{ payload, overlay: { version, sha256 }, storedAt, version }` with
+  `PRECOMPUTED_ENVELOPE_VERSION = 2`.
 - The cache key for `tasks-core` is built by `buildTasksCorePrecomputedKey(lang, gameMode)` and is
-  `tasks-core-json-v2-<lang>-<gameMode>`. Both the precompute script and the request handler import
+  `tasks-core-json-v3-<lang>-<gameMode>`. Both the precompute script and the request handler import
   this function from `precomputedTarkov.ts`, so the keys can never drift.
 - Writes go through the Cloudflare REST API (one PUT per key) because the bulk endpoint's request
   size ceiling cannot hold all ~4.2MB envelopes in one call, and per-key writes isolate failures per
   `(lang, gameMode)` combo.
+
+### Release verification
+
+A run pins the first validated overlay SHA, or `EXPECTED_OVERLAY_SHA` supplied by a manual dispatch.
+Missing provenance, a different SHA, invalid task payloads or unconsumed sections fail that
+combination before its KV write. Previous entries survive failed combinations. Each successful
+entry records language, mode, storage time and overlay identity; envelope validation requires its
+identity to agree with `payload.dataOverlay`. Writes remain per-key, not atomic across the fleet. A verifier exit code of zero can include `propagating` rows within the 14-hour window; post-deployment confirmation requires all 48 rows to be `current`, while pre-deployment approval requires the complete matching precompute manifest.
+The root `progressionCounters: {}` registry published by the overlay is an explicit no-op.
+A populated, malformed or mode-scoped counter registry remains unconsumed and blocks precompute;
+no counter derivation or global-variable unlock is inferred from this compatibility allowance.
+Only a complete, unfiltered, failure-free run updates `overlay-precompute-manifest-json-v3`.
+The workflow uploads `precompute-manifest.json` even for partial failures, so operators can see
+which entries changed. `/api/tarkov/overlay-status` returns the last complete manifest without caching.
+
+Release order: publish the overlay, dispatch precompute with its expected SHA for all 48 supported
+language/mode combinations, check the manifest, then advance the existing browser cache-purge marker
+and purge corrected edge entries through the established operator workflow. When changing the
+consumer contract, precompute the new versioned keys from the reviewed consumer revision before
+promoting that app revision; old app revisions keep reading their old keys. Missing new keys still
+have the existing live fallback, but that is not proof of production readiness for cold colos.
+
+Run `pnpm run verify:overlay` after promotion. It targets the fixed production origin and prints the path to a report in a
+new private temporary directory. The command writes
+an artifact comparing the published SHA, last complete precompute and served tasks-core for all
+48 language/mode combinations. Missing evidence is `unverified`; a mismatch is `propagating` for
+at most 14 hours from the producer generation timestamp (12-hour schedule plus a 2-hour operational
+target), then `drift`. Drift/unverified exits nonzero. This is a detection target, not a guarantee
+that caches expire within 14 hours. Browser IndexedDB has a separate maximum 24-hour TTL and must
+be invalidated through the purge marker for prompt client convergence. Retained seven-day KV
+fallbacks are intentionally reported as drift after a failed release, never as a current fleet.
 
 ### Files
 
@@ -473,6 +603,8 @@ flowchart LR
   logic or the outputs will diverge from what the request handler would produce.
 
 ---
+
+If the complete-fleet manifest write fails after payload writes succeed, precompute returns those 48 identities alongside the manifest failure. The CLI writes the diagnostic artifact and exits unsuccessfully so the release remains blocked without losing the record of changed entries.
 
 ## 6. Progress API data flow
 
@@ -522,9 +654,12 @@ sequenceDiagram
 
 ### Flow
 
-1. **Routing + User-Agent gate.** `workers/api-gateway/src/router.ts` normalizes the path, rejects
-   requests without a 5–200 character `User-Agent`, and (when enabled) 308-redirects legacy
-   `/api/v2` hosts to the api subdomain.
+1. **Routing + User-Agent gate.** `workers/api-gateway/src/router.ts` normalizes the path,
+   enforces the api host boundary (non-api host requests outside `/health` return 404, while
+   loopback hosts such as `localhost` and `127.0.0.1` are admitted for local development), and
+   rejects protected endpoint requests without a 5–200 character `User-Agent`; infrastructure routes
+   are exempt. Retired apex routes are retained as tombstone bindings in `wrangler.toml` so legacy
+   traffic is terminated with 404 at the edge instead of falling through to Pages.
 2. **Pre-auth abuse gate.** A Cloudflare Workers Rate Limiting binding (`API_ABUSE_LIMITER`) keys
    on `CF-Connecting-IP` and shields the `api_tokens` lookup from token-rotation floods. It is
    infrastructure protection, not a customer quota, and fails open on binding errors.
@@ -554,7 +689,7 @@ sequenceDiagram
 ### Files
 
 - `workers/api-gateway/src/index.ts` — Worker entrypoint; delegates to the modules below
-- `workers/api-gateway/src/router.ts` — path normalization, User-Agent gate, host/legacy redirect, route dispatch
+- `workers/api-gateway/src/router.ts` — path normalization, User-Agent gate, API host boundary enforcement, route dispatch
 - `workers/api-gateway/src/authentication.ts` — abuse gate, token auth, daily-quota enforcement
 - `workers/api-gateway/src/rateLimiter.ts` — `ApiGatewayRateLimiter` Durable Object + quota client
 - `workers/api-gateway/src/responses.ts` — CORS, envelopes, conditional response, ETag/compression
@@ -676,10 +811,25 @@ flowchart LR
    `docs/eft-log-reference/` for the audited format inventory (through `1.1.0.1.46911`) and
    [TarkovMonitor's message type contract](https://github.com/the-hideout/TarkovMonitor/blob/master/TarkovMonitor/GameWatcher.cs).
    The importer accepts legacy/rotated notification and backend filenames, and application/output
-   context, in folders, individual files, and ZIPs. Inputs are limited to 512 MiB per selected file,
-   32 MiB per log, and 256 MiB of combined log bytes across raw files and ZIPs. Readers count
-   bytes against the remaining combined budget before decoding raw files or decompressing ZIP
-   entries; preview assembly reuses those totals without re-encoding log text.
+   context, in folders, individual files, and ZIPs. Folder files and ZIP members are read incrementally without fixed file-count,
+   file-size, archive-size, or combined-byte limits. Raw reads use 256 KiB slices; compressed ZIP
+   input uses 16 KiB slices to bound each inflation step. These are buffer sizes, not import limits.
+   Supported members are consumed immediately; unsupported members use a discard decoder so
+   fflate cannot retain deferred compressed contents. Declared ZIP sizes never drive allocation;
+   synchronous decoders reject incomplete streams on final input; supported entries must match
+   their declared expanded size when present. A bounded
+   ZIP-tail read validates the end record and comment length before streaming, rejecting empty or
+   truncated input while accepting valid empty archives.
+   UTF-8 decoding and timestamp-delimited record framing preserve split characters, headers,
+   multiline JSON, and final records without a trailing newline. An individual unfinished record
+   is limited to 8 Mi characters to reject malformed/unbounded records; this fails the selection
+   explicitly instead of silently skipping history. No progress is applied on reading errors.
+   Completed text is discarded after extracting quest events and mode signals. Version selection
+   rebuilds previews from that evidence without rereading files. Memory still scales with meaningful
+   events, mode evidence, and selected-file metadata, not total source bytes; browser resources and
+   processing time remain practical limits. Progress reports selected source bytes (compressed bytes
+   for ZIPs). Cancel or reselection aborts between slices and invalidates pending catalog/preview
+   work; stale requests cannot update progress or restore cancelled results.
    Arena is excluded. Multiline JSON is bounded
    by log records so a truncated event cannot consume the next notification.
    Mode routing uses preceding explicit session declarations or gateway/WebSocket connections;
@@ -697,7 +847,8 @@ flowchart LR
    then reconciled per mode and quest after unresolved-mode routing; tied timestamps prefer completed, failed, then started.
    Explicit failure notifications use the persistent manual-failure flag so automatic repair cannot
    discard them when a triggering quest is missing from the logs. Existing completed tracker tasks
-   are preserved. Catalogs share metadata hydration's task-qualified duplicate-objective IDs.
+   are preserved. Inferred prerequisite completions only write task IDs present in the destination
+   catalog; explicit imported completion states remain authoritative. Catalogs share metadata hydration's task-qualified duplicate-objective IDs.
    All destination task/objective catalogs are
    loaded before mutations, without changing the active metadata store. Destination catalogs
    determine task eligibility and objective counts, and the original progress mode is restored. Application is not transactional across modes:
@@ -729,6 +880,8 @@ flowchart LR
   depend on running it; see the Database Migrations section of `docs/runbook.md`
 - `supabase/migrations/20260806160000_seed_unmaterialized_mode_progress_on_merge.sql` — seeds an
   unmaterialized persistent row from its legacy column inside `merge_progress_data`'s row lock
+- `supabase/migrations/20260910050000_add_manual_activity_history_to_progress.sql` — adds
+  `manualActivityHistory` to the persisted progress allowlist and its entry/history sanitizers
 - `app/stores/tarkov/progressPersistence.ts`, `app/stores/tarkov/realtimeListener.ts`,
   `app/stores/useTarkov.ts` — load, merge, write, and realtime flow
 - `app/stores/useSystemStore.ts`, `app/stores/useTeamStore.ts` — mode-specific teams and teammate
@@ -756,6 +909,12 @@ flowchart LR
 - Team actions and invite links are unavailable until the active team row has loaded and its ID
   matches the mode-specific system-store team ID; stale owner or join-code state is never combined
   with another team's ID.
+- Nitro shared-profile and team-member reads resolve Seasonal through the service-role-only
+  `get_active_season_number` RPC on each request before cache lookup. Cache keys include the resolved
+  season; missing credentials, failed lookups and invalid responses return 503 rather than falling
+  back to the bundled season. Persistent modes use season 0 without an RPC. The resolver is
+  `app/server/utils/gameModeSeason.ts`. A request uses one resolved season for its reads; a rollover
+  during that request is observed by the next request.
 - App `ACTIVE_SEASON` metadata must match the database's `private.active_season_*()` functions;
   the Worker resolves the active Seasonal number through the database instead of carrying a
   second runtime constant.
@@ -808,7 +967,9 @@ flowchart LR
   cleanup, so their channel lifetime is independent of the route that first created them.
 - Every channel is stored with the client that created it and removed through that client, because
   `$supabase.client` starts as an offline stub and is replaced once background initialization
-  completes. Removal is awaited before the same topic is rejoined: `RealtimeClient.channel()` returns
+  completes. Team subscription callbacks also check suspension on that owning client’s transport,
+  so replacing the current client cannot hide failures or tear down a deliberately suspended channel.
+  Removal is awaited before the same topic is rejoined: `RealtimeClient.channel()` returns
   the existing channel until its `phx_leave` settles and `subscribe()` only rejoins a closed channel,
   so rejoining early yields a channel that never joins and never reports an error. An unclean leave
   skips the rejoin rather than binding to an occupied topic.
@@ -817,10 +978,14 @@ flowchart LR
   invalidates older work at each asynchronous boundary and rejects progress and metadata callbacks
   from the superseded listener, including while its channel is leaving. A different user's topic may
   proceed while the previous user's topic is leaving, while a same-topic rejoin still waits for its leave.
+  Publishing channel ownership and starting the subscription share one synchronous segment: an
+  asynchronous boundary between them would let a teardown remove the published channel before it
+  joined, and the resulting subscription could no longer be attributed to this setup for cleanup.
 - The team channel records itself as bound only after `SUBSCRIBED`, so a silently failed join is never
   mistaken for a live one. Membership events rebuild it only when the topic or teammate-progress
   filter changed, and any non-subscribed status drops the binding so the next event rebuilds.
-- Subscribe callbacks log every status that is not `SUBSCRIBED` or `CLOSED`. Five consecutive failures
+- Subscribe callbacks log every status that is not `SUBSCRIBED` or `CLOSED`; an own-progress
+  `CLOSED` before the first join still fails that join. Five consecutive failures
   tear the team channel down and schedule one rebuild a minute later, replacing Realtime's unbounded
   rejoin loop with a bounded retry cycle.
 - `user_system` is included in `supabase_realtime`, and sign-out tears down all client channels.
@@ -829,6 +994,8 @@ flowchart LR
   an outstanding disconnect before reconnecting once. Auth, local persistence, and outbound saves
   remain active. Rejoined consumers refresh authoritative snapshots; owner progress uses existing
   merge/epoch rules, and snapshot responses cannot overwrite newer live events or another session.
+  Pending snapshots omit non-serializable fields, including functions and symbols, while retaining
+  explicit `undefined` fields. Removing transient state must not become a persisted field deletion.
   A three-way merge compares each field with its acknowledged baseline, retaining only locally
   changed paths while accepting unrelated remote changes, including changes in other modes.
   Live mode rows and startup snapshots resolve counts by entry timestamp rather than maximum,
@@ -914,6 +1081,79 @@ flowchart LR
 - Tarkov.dev profile imports can target Seasonal through the verified `pvp-season` source. EFT-log
   imports can target Seasonal using the verified notification formats and active-season guards
   specified in section 7; unresolved-mode events require an explicit destination choice.
+- Manual activity-log entries live in the selected mode's progress blob as `manualActivityHistory`,
+  next to `apiUpdateHistory`, and never in a standalone browser store. They share the progress
+  lifecycle: the client and persisted sanitizers accept them, `mergeProgressData` unions them by
+  stable id in the equal-epoch branch, a reset/prestige epoch win discards the losing side's feed
+  with the rest of that side's data, and a session transition clears them through the progress store
+  rather than through a second storage adapter. Both sanitizers require a non-empty id and title, a
+  numeric millisecond `timestamp`, and a known `type`/`action`; ids, titles, and details are clamped
+  and each mode keeps at most 50 entries so three full feeds stay far below the sync RPC's 512 KiB
+  ceiling. Adding a progress field requires a forward migration recreating
+  `sanitize_user_progress_mode_data`, because that allowlist is the single gate on every write and
+  silently drops keys it does not name. Read state (`lastReadByMode`) stays device-local and is
+  isolated by mode. Backups strip the feed and its clear generation alongside `apiUpdateHistory`,
+  and teammate/public API projections never include them.
+- Manual histories merge during preferred-snapshot startup as well as realtime reconciliation.
+  History-only state starts sync and passes the empty-state guard. Deferred startup explicitly
+  persists the mutation that created the subscription, including post-load legacy adoption. Initial
+  saves retry once after a failure, retain pending state, and stop retrying after a session change.
+  A failed authenticated initial sync retries within the same session on a bounded 30-second cycle
+  (five attempts, first failure and exhaustion toast, intermediate failures log a warning) so the
+  deferred legacy adoption is not stranded until the next login. Each failed attempt first tears
+  down the partially initialized sync controller and realtime listener (`resetTarkovSync`) so the
+  retry rebuilds from a clean slate instead of skipping listener setup; stale-session failures
+  skip both teardown and retry. Identity changes cancel the pending retry and reset the attempt
+  budget, and success cancels the cycle.
+  Clearing advances
+  `manualActivityEpoch` without changing gameplay or `progressEpoch`; only histories from the
+  highest history generation participate in the union. Full progress reset epochs take precedence.
+  The sync RPC merges histories under its existing account lock before unchanged-write comparisons,
+  and row triggers preserve that contract for legacy/API writers. Omitted fields from older clients
+  preserve existing server history; a higher full reset epoch intentionally discards it.
+- Equal-timestamp manual entries sort by ID; conflicting same-ID entries use type, action, title,
+  then details as ascending Unicode code-point tie-breakers. Client and database use the same order
+  before the 50-entry cap, so device argument order cannot change the retained feed. The cap applies
+  to the merged feed, not per device: when two devices at the same history generation together hold
+  more than 50 entries, the union keeps the 50 newest and drops the rest by design. Ids, titles, and
+  details clamp by Unicode code point on both sides, matching SQL `left()`, so neither side can
+  produce a different id for the same entry. The client additionally strips lone surrogates before
+  clamping: `jsonb` rejects the whole `p_modes` document at parameter binding, before the SQL
+  sanitizer can run, so no client-sanitized string can carry one.
+- The sync RPC merges each mode against the persisted payload for that mode, and seeds from the
+  account row's locked legacy column when the normalized row is an unmaterialized placeholder. Row
+  triggers re-merge against each table's own stored row, so the seeding is what keeps the RPC's
+  unchanged-write comparison accurate: without it a placeholder makes every sync rewrite an
+  otherwise unchanged account row.
+- Legacy activity envelopes with no owner are adoptable guest data. Authenticated startup waits
+  until progress sync restores the selected mode before adoption. Another account's envelope is
+  retained for its owner. The legacy key is removed only after entries have been added to progress.
+- `public.team_events` is server-authored only. `anon` and `authenticated` hold no table or
+  column-level `INSERT`, a restrictive policy denies client inserts even if a grant is later
+  inherited, and only `service_role` may insert. A `BEFORE INSERT` trigger stamps `server_verified`
+  and overwrites `created_at` with database time, so neither field is caller-supplied. Member reads
+  are unchanged.
+- Rows written before that containment are preserved for history and carry
+  `server_verified = false` with a possibly caller-supplied `created_at`. **Every cooldown or
+  rate-limit consumer of `team_events` must filter on `server_verified = true`, scope the query to
+  events the caller initiated, and bound `created_at` at or below the current time.** Reading the
+  preserved history without those filters lets a caller evade or extend a cooldown using a row
+  forged before containment. `team-leave` and `team-kick` are the current consumers; a new consumer
+  inherits the same requirement, and deleting the untrusted rows is not a substitute because the
+  filter is what makes the contract durable.
+
+- `team-leave` calls the service-only `public.leave_team` RPC with the authenticated user ID,
+  never an identity from the request body. Membership removal, conditional pointer maintenance,
+  and trusted event insertion commit together. The handler performs no later table write, so a
+  newer join cannot be overwritten by an old leave response.
+- Leave takes a per-user advisory lock, then the team row and membership row. Ownership transfer
+  locks the team before validating owner and successor membership, preventing promotion of a
+  departed member. Both RPCs have a five-second lock timeout and service-only execution grants.
+  The handler retries the whole leave transaction at most three times, with 50/100 ms delays,
+  only for confirmed `40P01`, `40001`, or `55P03` aborts. Exhaustion returns `503` with
+  `Retry-After: 1`; business results and ambiguous transport failures are not retried.
+- Cooldowns are user/mode-wide across teams but retain the existing event lifetime: disband
+  deletes the associated events. They are not durable cooldown evidence after team deletion.
 
 ---
 
@@ -1048,7 +1288,12 @@ flowchart LR
    sequentially to avoid a burst of production inspection queries. It returns an evidence-only JSON
    report. Unsupported or ambiguous syntax fails closed with `assessment: incomplete`,
    `risk: unknown`, and `requires_manual_review: true`. It does not execute the migration.
-8. Production credentials are supplied only through `PROD_DB_URL`, which must identify a dedicated
+8. `migration-history` reads applied version identifiers from
+   `supabase_migrations.schema_migrations` and compares them against `supabase/migrations` in the
+   current checkout, reporting `missing_locally` (applied remotely, absent from the checkout) and
+   `pending_remotely` (in the checkout, not applied). It makes remote/local migration divergence
+   observable without migration or Management API credentials.
+9. Production credentials are supplied only through `PROD_DB_URL`, which must identify a dedicated
    observer role. The wrapper removes its password before invoking the Supabase CLI and supplies
    the password through a mode-`0600` temporary `PGPASSFILE`, keeping it out of child-process
    arguments and command errors. The credential file is removed after each CLI invocation.
@@ -1088,6 +1333,20 @@ flowchart LR
 - Migration preflight is evidence-only and fails closed on unsupported or ambiguous syntax;
   production reports run sequentially, and migration execution remains in the reviewed merge and
   Supabase deployment workflow.
+- `migration-history` reads only the `version` column of `supabase_migrations.schema_migrations`.
+  The stored `statements` column is never selected, and the observer's ledger grant is column-level
+  for the same reason, so migration SQL and any literal inside it stay out of both the report and
+  the role's reach.
+- Version identifiers establish _which_ migrations are recorded, never that their SQL matches.
+  Divergence found by `migration-history` is followed by comparing file contents against the
+  deployed Git revision, as `docs/runbook.md` requires.
+- The comparison must be complete or fail. When the ledger read reaches its row limit the command
+  errors instead of reporting `in_sync` or a partial difference.
+- The report names the project it observed (`project_ref`, `null` for a local target), so a
+  comparison run against the wrong project is detectable. A primary target whose host and observer
+  username identify no project fails instead of reporting a nameless comparison. The observer does
+  not infer the expected project from application configuration; confirming the identity is the
+  operator's step.
 
 ## 10. Promoted Twitch configuration
 
@@ -1230,9 +1489,9 @@ share one retry budget: a pre-boot inline script for entry-module failures (the 
 boots, so in-bundle code cannot run) and the in-app ChunkRecovery for lazy-chunk failures after
 boot.
 
-**Flow**
+### Flow
 
-```
+```text
 Page load
   → inline recovery script registers in <head> (before the entry module)
   → entry module fails? (error event on same-origin <script type="module">)
@@ -1244,7 +1503,7 @@ Page load
         errors.network_access_denied)
 ```
 
-**Step-by-step**
+### Step-by-step
 
 1. `nuxt.config.ts` emits the inline recovery script from `app/utils/entryRecoveryScript.ts` via
    `app.head.script`, so it lands in `<head>` before the entry module script in the built
@@ -1348,7 +1607,7 @@ exclusions, and includes force-tracked ignored files. A separate temporary index
 analysis head. Native new-only attribution and configured severities determine the exit status.
 See [the workflow guide](WORKFLOW_AUTOMATION.md#fallow-changed-file-gate) for usage and report IDs.
 
-**Invariants**
+### Invariants
 
 - Source files, the source index, branches, and worktree registrations remain unchanged.
 - Both analysis commits contain the same physical generated context; no persistent finding
@@ -1359,7 +1618,7 @@ See [the workflow guide](WORKFLOW_AUTOMATION.md#fallow-changed-file-gate) for us
 
 ## 14. Release validation and publication
 
-Release starts after successful main-push CI, reusing its test shards and database validation.
+Release starts after successful main push or explicitly dispatched CI, reusing its test shards and database validation.
 `scripts/release-gate.mjs` checks live workflow identity, repository, conclusion, attempt, and SHA
 against the triggering event and current main before setup and immediately before publishing.
 The checkout stays pinned to the validated SHA. The production build still runs in Release.
@@ -1371,9 +1630,40 @@ The checkout stays pinned to the validated SHA. The production build still runs 
 - CI cancellation must not cancel a publisher; only release jobs share `release-main` with
   `cancel-in-progress: false`. Git non-fast-forward protection and semantic-release's upstream
   check remain the final safeguards if main advances after the last eligibility check.
-- Release version commits retain the existing skip marker behavior and Cloudflare rebuild.
+- Release version commits pass ordinary CI on a temporary `wip/release-*` branch before the
+  identical SHA advances main. The main ruleset requires successful GitHub Actions `CI Result`,
+  strict freshness, and no bypass actors. Non-fast-forward promotion fails if main advances.
+- If publication fails after version promotion, an explicit rerun can recover only the direct
+  version-only child of the original CI revision, with successful exact-head CI and unchanged
+  manifest/changelog history. Recovery creates missing tags/releases idempotently, rejects tag
+  conflicts, and never advances main or bumps another version.
+- The staging push uses `GITHUB_TOKEN` and explicitly dispatches CI; main promotion uses it to
+  avoid recursive Actions runs. Version commits have no skip marker; Cloudflare still rebuilds.
 - A green workflow run must continue to mean the test shards and Supabase validation passed;
   making those jobs optional requires reconsidering this release gate.
+
+### Crowdin automatic merges
+
+`.github/workflows/crowdin.yml` uses `scripts/crowdin-pr.sh`, preserved from trusted main before
+synchronization, to bind translation validation and merging to one immutable PR head. Its full tree
+diff against captured main permits only regular non-English locale JSON files. Dependency setup and
+project checks run after that checkout. The built-in job token synchronizes translations, updates a
+behind branch, explicitly dispatches candidate CI, and performs the final merge; dependency installation and project checks receive no automation credential.
+
+- Only an open, non-draft, same-repository `locales` PR targeting `main` is eligible.
+- Behind translation branches first receive a GitHub branch update guarded by the expected head.
+  Only afterward does the workflow capture and validate a candidate. Conflicts fail closed.
+- Candidates contain captured main. Preflight checks reject observed main/head changes and
+  non-clean merge states. Only unknown calculations retry.
+- The gate awaits successful GitHub Actions `CI Result` on the exact head and verifies the effective
+  repository rule requires that check with strict freshness. The administrator verifies the deployed
+  ruleset has no bypass actors; automation does not receive ruleset write access to read that list.
+  GitHub enforces the base requirement at merge time; missing/weakened required checks fail closed.
+- The server-side `--match-head-commit` guard must use the SHA that passed all validation.
+- Merges use `GITHUB_TOKEN`, then explicitly dispatch main CI for the release gate. No personal
+  GitHub token is needed. CI dispatch failures fail the workflow; candidate failures prevent merging.
+  The fixed squash message must not inherit automation-skip markers from translation commits.
+- Existing release provenance checks stay intact; Cloudflare Git deployment remains independent.
 
 See `docs/WORKFLOW_AUTOMATION.md` for triggering, retry, and deployment behavior.
 
@@ -1404,8 +1694,10 @@ network requests cannot overwrite current eligibility, cache payloads, or loadin
 Normalize edition and chapter network payloads before applying either, preserving existing
 data if normalization fails. Empty cached editions do not replace loaded eligibility.
 
-Task readiness uses `ensureEditionsData` to join or reuse the session's universal edition request,
-including a request settled during bootstrap/core loading. Explicit `fetchEditionsData` calls keep
+Task readiness uses `ensureEditionsData` to join or reuse the current mode/language edition request,
+including a request settled during bootstrap/core loading. Settled failures are also reused to avoid
+repeated readiness requests; they retain the error, and explicit fetch/refresh calls retry. Scope
+changes invalidate that settlement and clear the visible catalog. Explicit `fetchEditionsData` calls keep
 their cache revalidation behavior. Queued reward work, like editions, is consumed by a later eager
 request; other routes retain their idle load when no caller takes ownership.
 
@@ -1485,21 +1777,300 @@ identity.
 `scripts/validate-changes.mjs` exposes local execution and CI outputs;
 `scripts/check-ci-result.mjs` enforces outcomes in `.github/workflows/ci.yml`.
 
-The proposed selection reduces checks only for explicitly recognized documentation and locale paths.
-`DESIGN.md`, unknown inputs, and executable changes select full validation. Local input includes
+The selection reduces checks only for explicitly recognized documentation paths and Crowdin-owned
+translation files. `DESIGN.md`, the source locale `app/locales/en.json`, unknown inputs, and
+executable changes select full validation. Local input includes
 committed and dirty paths; CI input is the explicit revision diff. Renames contribute both paths.
-Shadow rollout forces every check while printing the proposed selection. See
-`docs/WORKFLOW_AUTOMATION.md` for rollout evidence and local/full execution profiles.
+Pull requests receive the selected jobs; the classifier also reports `workflows` so workflow
+linting runs only for non-Markdown automation paths and unreadable diffs. See
+`docs/WORKFLOW_AUTOMATION.md` for the recorded rollout evidence and local/full execution profiles.
 
-**Invariants:**
+### Invariants
 
-- Pushes retain full validation; shadow mode retains full validation on PRs too.
+- Pushes and dispatches retain full validation; only pull requests receive reduced selection.
+- Reduced selection never applies to `app/locales/en.json`; only non-English translations qualify.
+- Empty, unreadable, or malformed diffs select full validation and workflow linting.
 - Missing classifier output or selected jobs that fail, cancel, or unexpectedly skip fail CI Result.
 - Only deliberately unselected jobs may report skipped; systems drift always runs.
 - Existing shard discovery, coverage enforcement, secret restrictions, and merge governance remain.
+- Dependabot auto-merge requires the immutable Dependabot account ID for both the PR author and
+  event actor; the actor restriction alone never establishes trust.
 - The aggregate covers repository CI jobs, not independently reported Security or Codecov statuses.
 
-## 15. Season planner
+## 15. Canonical task progression
+
+Hideout cards evaluate the declared trader comparison against current loyalty (legacy default `>=`). Completed-module enforcement retains a build if the current stored loyalty satisfies the comparison (including legacy values above the normal range), or if any valid loyalty level at or below it satisfies that comparison, so advancing past an upper-bound or equality requirement cannot erase built modules or their parts. Lower-bound loyalty downgrades still revoke dependent builds. Disabled trader gating bypasses both checks. Optional profile chapter and prestige normalization run inside their optional request boundaries: malformed catalogs show a partial failure without discarding successful task catalogs. Overlay promotion requires a nonempty editions catalog as well as complete provenance, and forced edition refreshes forward `cacheBust=1` to bypass the worker overlay cache.
+
+Isolated profile catalogs normalize and qualify duplicate objective IDs and build the same task predecessor graph as active metadata, without mutating active progress. EFT completion imports apply trader implications only when the trader-gating preference captured at confirmation is enabled; task completion and player-level implications remain authoritative. Shared profiles project legacy objective keys through the duplicate-ID mapping without modifying stored progress; explicit task-qualified values take precedence.
+
+`app/utils/taskRequirements.ts` normalizes the discriminated trader collection at the server
+boundary. `tarkov-json.ts` builds `normalizedTraderRequirements` after reference adaptation;
+`overlay.ts` rebuilds it when an overlay replaces trader requirements. Legacy split lists remain
+compatibility projections. Missing types, malformed references/values and unsupported comparisons
+become diagnostic unknown requirements, not reputation guesses. A missing comparison on a known
+legacy requirement defaults to `>=`. Declared `>=`, `>`, `<=`, `<`, `=`, `==` and `!=` are evaluated
+literally. Neither trader identity nor the sign of a value selects its meaning.
+
+Declared prerequisite collections and prestige references follow the same rule. `null` and
+`undefined` mean the optional gate is absent; every other value is a gate the source declared, so it
+either survives normalization or is recorded in `Task.requirementDiagnostics` as `task_requirement`
+or `prestige_reference`. `tarkov-json.ts` models `requiredPrestige` as an id reference only, so it
+drops anything else and records the diagnostic; `overlay.ts` reports exactly the gates its own
+normalization dropped; `taskAvailability.ts` turns each diagnostic into an unknown blocker. Supported
+source shapes are unaffected: a bare prerequisite task id, a bare prestige id string, and a prestige
+object reference all still resolve, an absent or empty collection still leaves the task available,
+and the overlay keeps the id-less `{ name, prestigeLevel }` gate of an injected New Beginning task
+verbatim (its level comes from `buildPrestigeTaskMap`'s task id/wikiLink inference, not from the
+reference). A satisfied story route continues to unlock a task whose quest group is uninterpretable,
+because that route is an alternative to the group rather than a bypass of an independent gate. The
+evaluator additionally treats a non-list `taskRequirements` as the same diagnostic rather than as an
+empty list, so an older payload cannot make availability read a broken collection as no collection.
+That guard covers the evaluator only: other task consumers still assume a list, and a pre-fix payload
+that dropped a gate without recording a diagnostic stays unlocked until the refresh below replaces it.
+
+A `prestige_reference` diagnostic blocks independently of `prestigeTaskMap`, including entries
+inferred from a New Beginning task id or wikiLink: inference cannot repair a malformed declared gate.
+Without a diagnostic, the map continues to govern supported prestige references and inferred tasks.
+The overlay's supported id-less prestige shape is retained without a diagnostic. Two adjacent paths keep
+the diagnostic intact rather than losing it: task patches are normalized using their original id,
+and retain pre-merge diagnostics rather than accepting a patch-supplied diagnostic array,
+including locale patches after they merge,
+because locale corrections are applied last, and `useProfileTaskMetadata.mergeProfileTasks` takes only
+objective data from the objectives catalog, so a stray gate field an overlay patch merged into that
+response cannot replace the core catalog's gates.
+
+`app/stores/taskAvailability.ts` evaluates each task/user with memoization and cycle protection.
+The result carries availability and blockers for levels, loyalty, reputation, quest statuses,
+failed branches, faction, trader unlocks, prestige and unsupported data. `useProgress.taskEvaluations`
+is the source for explanations and sorting; `unlockedTasks` is its boolean projection. The task
+card and dashboard use `useTaskBlockerText` for the same explanations. Shared/non-current profile
+views call the same evaluator with their own mode progress. Profile task/objective, prestige and
+story catalogs load for the selected mode without mutating the active metadata store; obsolete
+mode/language requests are aborted on scope change or unmount and late responses are ignored.
+Requests time out after 60 seconds to accommodate the server retry budget. Edition and story
+catalogs share one request but validate independently; story, edition or prestige failures retain
+successful task and objective data with an error indicator. Profiles prefer the selected mode's
+editions, falling back to the active catalog while unavailable. Missing core/objective catalogs
+remain fatal.
+Completed and failed tasks are terminal.
+The existing acceptance-unknown interpretation is retained; this does not introduce #715's
+explicit Accept workflow.
+
+Shared story chapters followed by matching mode corrections produce `Task.storyUnlocks` from
+`questUnlocks`. Availability requires all independent gates AND (all quest requirements OR any
+wired chapter with recorded completion/objective progress). Chapter ordering is never an unlock
+condition. Client chapters merge the same mode patches (including partial objectives), and
+edition/chapter caches and in-flight requests are mode-scoped. A satisfied story route also
+suppresses the task card's otherwise-unmet quest prerequisite strip. `complete|failed` accepts either terminal outcome. A story route cannot bypass trader,
+faction or prestige gates. Required prestige uses the existing authoritative prestige task map;
+unresolved references remain blocked until metadata is available.
+
+Sorting lives in `app/utils/taskSorter.ts`. Progression sorts available tasks first, then a single
+numeric gate by relative distance, a quest-chain gate, multiple gates, completed tasks, terminal
+blocked tasks, and unknown data. All-users views use the best visible user's rank. Trader sort
+uses trader order, that trader's required loyalty, readiness, and stable name/ID ties. Pinned
+partitions and map/status grouping remain intact. Item distribution retains Kappa priority and
+uses progression within it; Kappa chain groups use progression while keeping parts adjacent.
+The row sorter accepts a partial progression index: chains inherit their best known rank, and
+wholly unranked groups sort last. Catalog changes recompute the overview reactively; removed
+tasks are not retained as stale rows.
+The existing impact default remains. Saved `level` values retain player-level sorting, now labelled
+Player level; `progression` is additive and invalid saved/query values retain the `none` fallback.
+Genuine level badges, graph levels and XP/level projections remain player-level values.
+
+Completion/availability actions and EFT completion imports share `taskProgress.ts` implications:
+raise known loyalty/reputation lower bounds without reducing earned values. Integer strict loyalty
+bounds advance to the next level; strict reputation bounds remain unchanged because no exact
+standing increment is known. Upper bounds and `!=` do not infer a new minimum. Existing terminal
+prerequisite outcomes are preserved. EFT completion logs do not identify which OR route was used,
+so tasks with wired story alternatives do not imply completion or failure of legacy prerequisites.
+Explicit prerequisite events still apply. Missing recorded story progress is not proof of the quest
+route. Imports load and mutate only their selected destination mode;
+Seasonal log eligibility and restoration guards are unchanged. Tarkov.dev profile import does
+not import quest completions and therefore has no trader/task backfill path.
+
+### Invariants
+
+- Canonical requirements, blockers, status comparisons and story alternatives are shared by UI and
+  recommendations; no new dependency on the removed upstream task `alternatives` is introduced.
+- Known trader gates may be disabled by preference; unknown data never silently unlocks a task.
+- A declared gate that cannot be interpreted never reads as an absent gate. An absent optional gate
+  leaves the task available; a malformed explicit prerequisite collection or prestige reference keeps
+  it blocked behind an unknown blocker.
+- `requirementDiagnostics` is additive to the `tasks-core-json-v3` contract, so recording it does not
+  bump the precompute or browser cache versions and adds no new rollout requirement. The
+  `tasks-core-json-v3` operator rollout in the next invariant is unchanged and still applies on its
+  own terms. A payload without the field behaves exactly as it did before, the evaluator
+  independently blocks a non-list `taskRequirements` from any payload vintage. Successful precompute
+  refreshes run every 12 hours, after which edge and browser caches must also refresh. This is not
+  a strict 12-hour recovery bound: failed runs can leave older KV entries serving for their seven-day
+  TTL. Verify a successful precompute from the deployed fix before claiming production diagnostics
+  are active; already-discarded gates cannot be recovered by the evaluator alone.
+- PvP, PvE and Seasonal evaluate only their own progress and mode-specific task metadata.
+- `tasks-core-json-v3` keys invalidate incompatible edge/precompute payloads together. Browser
+  IndexedDB schema 8 clears the old task contract. Missing new KV entries fall back to the normal
+  fetch/adapt/overlay pipeline, which exceeds the free-tier CPU budget on a cold request. Before
+  merging or promoting the app, an authorized operator must run the precompute workflow from the
+  approved branch revision with no language/mode filters, verify all 48 new-key writes succeeded,
+  and record that evidence. Do not rely on cold fallback to bridge this cache-contract rollout.
+
+## 16. Light/dark theme system
+
+**Summary**: Dark is the default and only mandatory theme; light mode is an opt-in user
+preference (issue #102). The light theme never edits component markup globally: it flips the
+neutral `surface` ladder plus companion text/state/border tokens under `[data-theme='light']` on
+`<html>`, so every `surface-*` utility, Nuxt UI `neutral` alias, and the semantic
+`--color-bg/-text/-link` tokens re-render on a warm paper scale. Gameplay accent palettes keep
+their identity: accent _backgrounds_, rings, borders and gradient stops (steps 500-950) and the
+pale tint steps (50-100) are byte-identical in both themes. Only the accent _foreground_ range
+(steps 200-400, plus the bare Nuxt UI accent aliases) is re-pointed at the deep end of the same
+hue under light, because those steps are authored as foregrounds for dark surfaces and would
+otherwise land at 1.0-3.6:1 on paper. The preference
+is device-local: a dedicated `tt_theme` localStorage key (not the user-scoped preferences store)
+so the pre-paint boot script and the in-app `useTheme` composable read the same source.
+
+### Flow
+
+```text
+First paint
+  → THEME_BOOT_SCRIPT (inline <head> script in nuxt.config)
+      reads tt_theme → validates value (mirrors normalizeThemeMode) → sets <html data-theme> + colorScheme
+      → pre-hydration skeleton style block matches the light canvas (no dark flash)
+App boot
+  → useTheme() restores the client-persisted mode and re-applies it idempotently
+  → toggle (AppBar sun/moon button or Settings > Appearance card)
+      → setThemeMode persists tt_theme + sets data-theme + colorScheme atomically
+```
+
+### Step-by-step
+
+1. `app/assets/css/tailwind.css` ends with `:root[data-theme='light'] { ... }`, which overrides
+   only the neutral tokens (surface ladder role-mapped to parchment canvas → snow cards → dark
+   ink; `--color-text*`, `--state-*`, `--border-*`, `--color-link`, `--color-failed`,
+   `--color-checker-*`, three hardcoded Nuxt UI `--ui-*` aliases, and light-tinted `.vue-flow`
+   `--vf-*` text vars) plus the accent foreground range described above: for every accent family
+   `200 → 950`, `300 → 900`, `400 → 800` (pvp/pve take one extra step because their ladders sit
+   near the neutral end, and `accent` follows primary's steps), and the bare `--ui-<accent>`
+   aliases resolve to step 800/900 so
+   `text-primary`, `bg-primary/10` and `ring-primary/25` stay legible together.
+   `@custom-variant light` enables per-spot `light:` utilities where a specific component needs a
+   different accent treatment (tone gradients, badges, brand buttons).
+   Two consequences follow from the split and are load-bearing:
+   - `text-<accent>-500` cannot be remapped at the token level (step 500 is the primary accent
+     _background_), so those foregrounds carry explicit `light:text-<accent>-800/900` companions.
+   - A dark accent plate paired with a light accent label (`bg-success-900` + `text-success-300`)
+     would collapse to one colour once the label deepens, so those surfaces carry
+     `light:bg-<accent>-100` companions that turn the plate pale instead.
+2. `app/utils/theme.ts` owns `ThemeMode`, `normalizeThemeMode` (invalid/missing → dark), storage
+   helpers, `applyThemeMode`, and `THEME_BOOT_SCRIPT`. Keeping the boot script next to the
+   normalization it mirrors is deliberate; nuxt.config imports the same constant.
+3. `nuxt.config.ts` inlines the boot script as the first `app.head.script` and extends the
+   pre-hydration skeleton `<style>` with light surface fallbacks scoped to `[data-theme='light']`.
+   It also pins `colorMode.preference/fallback` to `dark` so Nuxt UI's `.dark` alias block stays
+   deterministic; those aliases resolve through the flipped `surface` palette.
+4. `app/composables/useTheme.ts` exposes the singleton `themeMode` state and
+   `setThemeMode`/`toggleThemeMode` used by the AppBar toggle and the Settings AppearanceCard.
+
+### Invariants
+
+- Dark is the default and is pixel-identical to before: the `:root[data-theme='light']` overrides
+  are inert in dark mode and every component `light:` utility requires `data-theme='light'`.
+- Theme state lives in `tt_theme` only; keep it out of the user-scoped preferences store so the
+  boot script never depends on auth state. Account-level sync is a separate follow-up.
+- `normalizeThemeMode` is the runtime validator (unknown values become dark). The synchronous
+  inline `THEME_BOOT_SCRIPT` mirrors this accepted-value validation check identically before runtime
+  modules load.
+- Light-mode dimmed `surface-500` copy remains readable on shell chrome. Pale accent steps
+  50–100 and translucent accent labels require explicit opaque light-mode ink companions when
+  placed on paper surfaces; remapping the opaque accent ladder alone does not fix alpha contrast.
+- Inline `hsl()` colors bypass the token ladder entirely, so any element that computes a color
+  inline (the trader progress-percentage text and the progress-bar gradient fill are the
+  examples; both resolve through `traderPercentageStyle.ts`) must read `useTheme`'s
+  `isLightTheme` and pick a light-safe lightness itself — for the 0–120° hue ramp, 22% lightness
+  clears AA for text (worst case 5.06:1 on the surface-900 card) and 26% keeps the progress-bar
+  fill above the 3:1 non-text threshold against its track, while dark keeps the authored 55%/45%.
+  Hue gradients encode information; keep the hue, change only the lightness.
+- New components should prefer `surface-*`/semantic tokens over hardcoded `white`/`black` so both
+  themes work without `light:` overrides; reserve `light:` for accent-on-accent cases.
+- Light mode must not be measurably worse than dark for text contrast. Both themes are audited
+  per route by resolving computed colours (including `oklch()` and composited alpha) against the
+  effective background and checking WCAG AA: 4.5:1 for body text, 3:1 for large text and non-text
+  indicators such as the checkbox tick and focus ring. A change that leaves any route with more
+  failures in light than in dark is a regression, even when the failing element is theme-agnostic.
+- Fixed-dark item action overlays and map tiles retain light foregrounds in light mode instead
+  of inheriting inverted neutral ink. Floating map toolbars use theme-aware surfaces, not the tile
+  palette: enabled visibility toggles and open popover buttons share `MAP_BUTTON_ACTIVE_CLASS`
+  with a dark light-mode foreground. The selected Appearance option has a contrasting inset ring;
+  keyboard focus uses a separate offset outline so focusing never replaces the selection boundary.
+- Interactive card content uses native controls: trader navigation lives on the named header
+  button and skill editing on its labelled input, not redundant clickable containers. Objective
+  rows ignore events from their nested controls, and their Space handler checks `.self` before
+  preventing default so nested buttons retain keyboard activation.
+- Checkbox light-mode plate and tick overrides stay paired by color: success uses a pale
+  `success-100` plate with a dark `surface-50` tick; other colors retain their own plates and
+  inherit Nuxt UI's inverted foreground. Never apply the dark tick globally to dark accent plates.
+- Accent steps 500-950 and 50-100 are the stable contract. Deepening a light foreground by editing
+  those steps would move accent backgrounds and pale tints (`light:hover:bg-pvp-100/70` and the
+  `bg-<accent>-100` chip plates depend on 100 staying pale), so foreground fixes belong in the
+  200-400 remap or in an explicit `light:text-*` companion.
+
+### Files
+
+- `app/assets/css/tailwind.css` — `@custom-variant light` and the `[data-theme='light']` token block
+- `app/utils/theme.ts` — ThemeMode, normalization, storage, apply, `THEME_BOOT_SCRIPT`
+- `app/composables/useTheme.ts` — singleton state + set/toggle
+- `app/features/settings/AppearanceCard.vue` — Settings > Preferences theme selector
+- `app/shell/AppBar.vue` — sun/moon toggle in the utilities group (collapses into More menu on mobile)
+- `nuxt.config.ts` — boot script, light skeleton fallbacks, pinned `colorMode`
+
+## 17. Test suite execution model
+
+Test **files** run in parallel, each in its own forked worker. `vitest.config.ts` sets
+`pool: 'forks'` with `isolate: true`, and Vitest's pool only reuses a runner while `isolate` is
+false, so an isolated file always gets a fresh process and no module state crosses file boundaries.
+The worker count stays bounded (`process.env.CI ? 4 : 8`) because an unbounded count multiplies
+Nuxt environments and worker-teardown pressure. `pnpm run test` and `pnpm run test:coverage`
+inherit that bound instead of passing a worker flag, since a CLI flag would override the config.
+
+CI splits the suite across four coverage shards. The `VITEST_SHARD` variable — not the `--shard`
+argument alone — selects sharded coverage mode, which drops the global and per-file thresholds
+because one shard exercises only part of the suite; the unsharded `test:coverage` run enforces
+them. The `Test (shard N/4)` check names and the shard command are contract: branch protection and
+`dependabot-auto-merge.yml` require those names, and `scripts/ci-tests/workflows.mjs` asserts the
+command.
+
+A component loaded through `defineAsyncComponent` starts its dynamic import when Vue first renders
+it. A test-harness `stub` replaces what renders but does not cancel that loader, so a real module
+can still resolve after the file's environment is torn down and fail the run with
+`EnvironmentTeardownError`. A test that mounts such a component mocks the lazily imported module, so
+the loader never reaches a real import.
+
+### Invariants
+
+- Every test file gets a fresh worker. `isolate: true` is what guarantees that, so no run may leave
+  runner reuse enabled for isolated files.
+- The worker count stays bounded. Removing the cap trades deterministic teardown for higher peak
+  memory and teardown-error risk.
+- Unhandled errors fail the suite. Do not restore `--dangerouslyIgnoreUnhandledErrors`; fix the
+  lifecycle that produced the error instead.
+- Shard count, shard command, and the `Test (shard N/4)` check names stay stable. Changing them
+  requires updating branch protection and `scripts/ci-tests/workflows.mjs` together.
+- Coverage thresholds apply only to the unsharded run, and `VITEST_SHARD` decides that. A sharded
+  invocation must set it or the run enforces thresholds it cannot satisfy.
+- A test mounting a `defineAsyncComponent` must not let the real module load, or must settle the
+  load before the file ends.
+- Per-test timeouts stay scoped to the test that needs them; suite-wide timeouts are not raised to
+  absorb contention.
+
+### Files
+
+- `vitest.config.ts` — pool, isolation, bounded workers, coverage thresholds, shard mode
+- `package.json` — `test`, `test:coverage`, and `test:api-gateway` scripts
+- `.github/workflows/ci.yml` — the four shard jobs and the Deno test step
+- `scripts/ci-tests/workflows.mjs` — asserts the shard command and required check names
+- `tests/test-setup.ts` — shared fetch stubs, console filtering, auto-unmount
+
+## 18. Season planner
 
 **Summary.** The Season Planner lets a user choose Kord Breach personal modifiers while enforcing
 the season's point budget and incompatibility rules. The plan is local-only and persisted in a
