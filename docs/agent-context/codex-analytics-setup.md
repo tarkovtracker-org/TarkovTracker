@@ -100,9 +100,9 @@ Why:
 3. Create a service account for Codex.
 4. Create a service account JSON key and store it outside the repo at:
 
-```bash
-${XDG_CONFIG_HOME:-$HOME/.config}/codex/google-analytics-service-account.json
-```
+   ```bash
+   ${XDG_CONFIG_HOME:-$HOME/.config}/codex/google-analytics-service-account.json
+   ```
 
 5. Add the service account email to the GA4 property with read access.
 6. If using BigQuery export, grant that same service account read access to the exported dataset.

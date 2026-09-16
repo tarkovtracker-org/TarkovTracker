@@ -421,7 +421,7 @@ Afterward, rerun both catalog queries and record that the expected definition is
 result before retrying. Concurrent reindexing can leave temporary `_ccnew` or `_ccold` indexes;
 follow PostgreSQL's failure-state guidance after verifying their identity and dependencies rather
 than deleting objects by suffix alone. Attach before/after evidence and the operation result to
-#646 (or its deployment record). Until that evidence exists, production index validity is
+PR #646 (or its deployment record). Until that evidence exists, production index validity is
 **unverified**, even when repository CI is green.
 
 The failure and repair were reproduced in an isolated PostgreSQL 17 database: cancel a concurrent
