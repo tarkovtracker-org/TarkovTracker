@@ -34,11 +34,11 @@ function defaultReason(full) {
 }
 // Workflow linting is selected by path rather than by the full/reduced split: it is only useful
 // when automation files change, and an unreadable diff (no paths) must select it conservatively.
+function isAutomationPath(path) {
+  return typeof path === 'string' && path.startsWith('.github/') && pathCategory(path) === 'full';
+}
 function touchesWorkflows(paths) {
-  return (
-    paths.length === 0 ||
-    paths.some((path) => pathCategory(path) === 'full' && /^\.github\//.test(path))
-  );
+  return paths.length === 0 || paths.some(isAutomationPath);
 }
 export function classifyPaths(paths, { forceFull = false, reason } = {}) {
   const categories = new Set(paths.map(pathCategory));
