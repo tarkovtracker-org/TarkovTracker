@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { gitExecutable } from '../validation-tools.mjs';
+import { jobBlock, workflowStep } from './helpers/workflow-blocks.mjs';
 const gate = resolve('scripts/crowdin-pr.sh');
 const read = (path) => readFileSync(path, 'utf8');
 function git(cwd, ...args) {
@@ -134,7 +135,7 @@ test('valid translation checkout and merge use the same immutable SHA', (t) => {
   assert.equal(merge[merge.indexOf('--match-head-commit') + 1], f.head);
   assert.ok(merge.includes('--squash'));
   assert.ok(!merge.includes('--admin'));
-  assert.ok(merge.includes('--body'), 'Do not inherit skip-actions markers from PR commits');
+  assert.equal(merge[merge.indexOf('--body') + 1], 'Automated translation updates from Crowdin.');
 });
 test('allowlist checks immutable git trees before checking out or running project code', (t) => {
   for (const path of ['app/locales/en.json', 'package.json', 'app/locales/nested/fr.json']) {
@@ -257,30 +258,43 @@ test('missing merge credential, changed main, changed checkout or PR identity fa
   rejected(f.run('merge'), /Checkout differs/);
   assert.ok(!f.calls().some((args) => args[1] === 'merge'));
 });
-test('workflow separates trusted gate, immutable setup, token-free checks and PAT merge', () => {
-  const workflow = read('.github/workflows/crowdin.yml');
-  const mergeStep = workflow.slice(workflow.indexOf('      - name: Merge validated translations'));
-  const beforeMerge = workflow.slice(0, workflow.indexOf(mergeStep));
+function assertWorkflowBoundaries(workflow) {
+  const sync = jobBlock(workflow, 'sync');
+  const mergeStep = workflowStep(sync, 'Merge validated translations');
+  const beforeMerge = sync.slice(0, sync.indexOf('      - name: Merge validated translations'));
   assert.doesNotMatch(beforeMerge, /ACCESS_TOKEN_GITHUB/);
   assert.match(mergeStep, /GH_TOKEN: \$\{\{ secrets.ACCESS_TOKEN_GITHUB \}\}/);
   assert.match(mergeStep, /HEAD_SHA: \$\{\{ steps.candidate.outputs.head_sha \}\}/);
   assert.match(mergeStep, /BASE_SHA: \$\{\{ steps.candidate.outputs.base_sha \}\}/);
   assert.match(mergeStep, /run: bash "\$RUNNER_TEMP\/crowdin-pr.sh" merge/);
   assert.ok(
-    workflow.indexOf('Preserve trusted merge gate') <
-      workflow.indexOf('Synchronize Crowdin translations')
+    sync.indexOf('Preserve trusted merge gate') < sync.indexOf('Synchronize Crowdin translations')
   );
   assert.ok(
-    workflow.indexOf('immutable translation checkout') <
-      workflow.indexOf('uses: ./.github/actions/setup-project')
+    sync.indexOf('immutable translation checkout') <
+      sync.indexOf('uses: ./.github/actions/setup-project')
   );
-  const validation = workflow.slice(
-    workflow.indexOf('      - name: Validate translations'),
-    workflow.indexOf(mergeStep)
-  );
+  const validation = workflowStep(sync, 'Validate translations');
   assert.doesNotMatch(validation, /GH_TOKEN|secrets\./);
   for (const check of ['format:check', 'i18n:check', 'systems:check'])
     assert.ok(validation.includes(`pnpm run ${check}`));
+}
+test('workflow separates trusted gate, immutable setup, token-free checks and PAT merge', () => {
+  assertWorkflowBoundaries(read('.github/workflows/crowdin.yml'));
   assert.match(read('.github/workflows/ci.yml'), /push:\n {4}branches: \[main,/);
   assert.match(read('.github/workflows/release.yml'), /workflow_run.event == 'push'/);
+});
+test('unrelated steps and jobs cannot satisfy the real merge-step contract', () => {
+  const workflow = read('.github/workflows/crowdin.yml');
+  const broken = workflow.replace(
+    'GH_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}',
+    'GH_TOKEN: missing'
+  );
+  const decoy = '        env:\n          GH_TOKEN: ${{ secrets.ACCESS_TOKEN_GITHUB }}\n';
+  assert.throws(() => assertWorkflowBoundaries(`${broken}      - name: Unrelated step\n${decoy}`));
+  assert.throws(() =>
+    assertWorkflowBoundaries(
+      `${broken}  unrelated:\n    steps:\n      - name: Merge validated translations\n${decoy}`
+    )
+  );
 });
