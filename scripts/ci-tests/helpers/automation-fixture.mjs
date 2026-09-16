@@ -61,16 +61,16 @@ const p = process.env;
 const args = process.argv.slice(2);
 fs.appendFileSync(p.CALLS, JSON.stringify(args) + '\n');
 if (args[0] === 'api') {
-  if (args.includes('--method')) {
+  if (args.includes('--method') && args.includes('PUT') && args.includes('repos/' + p.GITHUB_REPOSITORY + '/pulls/' + p.PR_NUMBER + '/update-branch')) {
     if (!args.includes('expected_head_sha=' + p.ACTUAL_HEAD)) {
       console.error('Head changed at branch update'); process.exit(1);
     }
     console.log('{"message":"Updating pull request branch"}'); process.exit(0);
   }
   const endpoint = args[args.indexOf('api') + 1] === '--paginate' ? args[2] : args[1];
-  if (endpoint.includes('/rules/branches/')) { console.log(p.RULES); process.exit(0); }
+  if (endpoint === 'repos/' + p.GITHUB_REPOSITORY + '/rules/branches/main?per_page=100') { console.log(p.RULES); process.exit(0); }
   if (endpoint.includes('/rulesets/')) { console.error('Ruleset details require administrator access'); process.exit(1); }
-  if (endpoint.includes('/check-runs?')) {
+  if (endpoint.startsWith('repos/' + p.GITHUB_REPOSITORY + '/commits/') && /\/commits\/[a-f0-9]{40}\/check-runs\?check_name=CI%20Result&filter=latest&per_page=100$/.test(endpoint)) {
     const sha = endpoint.split('/commits/')[1].split('/')[0];
     console.log(JSON.stringify({ check_runs: p.CHECK_PRESENT === 'false' ? [] : [{
       id: 1, name: 'CI Result', app: { id: Number(p.CHECK_APP || 15368) },
