@@ -53,7 +53,7 @@ sequenceDiagram
     participant RL as RateLimiter (Durable Object)
     participant DB as Supabase (RPC)
 
-    Client->>GW: GET /api/v2/progress (Bearer token)
+    Client->>GW: GET /progress (Bearer token)
     GW->>GW: extract + sha256(token)
     GW->>RL: check/increment quota
     RL-->>GW: allowed (+ headers)

@@ -45,11 +45,7 @@ export const OPENAPI_SPEC = {
   servers: [
     {
       url: 'https://api.tarkovtracker.org',
-      description: 'API subdomain (recommended)',
-    },
-    {
-      url: 'https://tarkovtracker.org/api/v2',
-      description: 'Legacy path-based API',
+      description: 'Production API',
     },
     {
       url: 'http://localhost:8787',
