@@ -387,6 +387,24 @@ describe('api-gateway', () => {
     );
     expect(res.status).toBe(404);
   });
+  it('returns 404 for OPTIONS on legacy routes on non-api hosts', async () => {
+    const res = await worker.fetch(
+      new Request('https://tarkovtracker.org/api/v2/progress', {
+        method: 'OPTIONS',
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(404);
+  });
+  it('returns 204 for OPTIONS on /health on non-api hosts', async () => {
+    const res = await worker.fetch(
+      new Request('https://tarkovtracker.org/health', {
+        method: 'OPTIONS',
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(204);
+  });
   it('returns 404 for legacy /api routes without /v2 prefix on non-api hosts', async () => {
     const res = await worker.fetch(
       new Request('https://tarkovtracker.org/api/progress', {
@@ -421,6 +439,42 @@ describe('api-gateway', () => {
       BASE_ENV
     );
     expect(legacyApexHealth.status).toBe(404);
+  });
+  it('serves api routes and public endpoints on loopback dev hosts (localhost, 127.0.0.1)', async () => {
+    const localHealth = await worker.fetch(
+      new Request('http://localhost:8787/health', { method: 'GET' }),
+      BASE_ENV
+    );
+    expect(localHealth.status).toBe(200);
+    const localOpenApi = await worker.fetch(
+      new Request('http://localhost:8787/openapi.json', { method: 'GET' }),
+      BASE_ENV
+    );
+    expect(localOpenApi.status).toBe(200);
+    const localProgress = await worker.fetch(
+      new Request('http://localhost:8787/progress', {
+        method: 'GET',
+        headers: { 'User-Agent': 'TestClient/1.0 (+https://example.com)' },
+      }),
+      BASE_ENV
+    );
+    await expectErrorResponse(localProgress, 401, 'Unauthorized');
+    const localAliased = await worker.fetch(
+      new Request('http://localhost:8787/api/v2/progress', {
+        method: 'GET',
+        headers: { 'User-Agent': 'TestClient/1.0 (+https://example.com)' },
+      }),
+      BASE_ENV
+    );
+    await expectErrorResponse(localAliased, 401, 'Unauthorized');
+    const ipProgress = await worker.fetch(
+      new Request('http://127.0.0.1:8787/progress', {
+        method: 'GET',
+        headers: { 'User-Agent': 'TestClient/1.0 (+https://example.com)' },
+      }),
+      BASE_ENV
+    );
+    await expectErrorResponse(ipProgress, 401, 'Unauthorized');
   });
   it('returns token info for valid token', async () => {
     vi.stubGlobal('fetch', createBaseFetchMock({ permissions: ['GP'] }));

@@ -24,6 +24,15 @@ import { INBOUND_USER_AGENT_MIN_LENGTH, normalizeInboundUserAgent } from './util
 import type { BatchTaskUpdate, Env, Permission, TaskState } from './types';
 const TASK_STATES = new Set<TaskState>(['completed', 'uncompleted', 'failed']);
 const API_HOST_PREFIXES = ['/api/v2', '/api', '/v2'] as const;
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+function isLoopbackHost(hostname: string): boolean {
+  return LOOPBACK_HOSTS.has(hostname);
+}
+function isConfiguredApiHost(hostname: string, configuredHost?: string): boolean {
+  const host = hostname.toLowerCase();
+  const expected = (configuredHost || 'api.tarkovtracker.org').trim().toLowerCase();
+  return host === expected || isLoopbackHost(host);
+}
 type Action = 'progress-read' | 'progress-write' | 'token-info';
 type RouteContext = {
   apiPath: string;
@@ -88,11 +97,16 @@ function publicResponse(
   origin?: string,
   reqOrigin?: string
 ): Response | null {
+  if (path === '/health') {
+    return request.method === 'OPTIONS'
+      ? new Response(null, { status: 204, headers: corsHeaders(origin, reqOrigin) })
+      : healthResponse(origin, reqOrigin);
+  }
+  if (!isApiHost) return null;
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders(origin, reqOrigin) });
   }
-  if (path === '/health') return healthResponse(origin, reqOrigin);
-  return isApiHost ? apiHostPublicResponse(path, origin, reqOrigin) : null;
+  return apiHostPublicResponse(path, origin, reqOrigin);
 }
 function authorize(
   context: RouteContext,
@@ -372,8 +386,7 @@ export async function handleGatewayRequest(
   const path = normalizePath(url.pathname);
   const origin = env.ALLOWED_ORIGIN;
   const reqOrigin = request.headers.get('Origin') || undefined;
-  const apiHost = (env.API_HOST || 'api.tarkovtracker.org').trim().toLowerCase();
-  const isApiHost = url.hostname.toLowerCase() === apiHost;
+  const isApiHost = isConfiguredApiHost(url.hostname, env.API_HOST);
   const response = publicResponse(request, path, isApiHost, origin, reqOrigin);
   if (response) return response;
   const apiPath = resolveApiPath(path, isApiHost);

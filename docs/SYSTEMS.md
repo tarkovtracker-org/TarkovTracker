@@ -652,8 +652,11 @@ sequenceDiagram
 ### Flow
 
 1. **Routing + User-Agent gate.** `workers/api-gateway/src/router.ts` normalizes the path,
-   enforces the api host boundary (non-api host requests outside `/health` return 404), and
-   rejects requests without a 5–200 character `User-Agent`.
+   enforces the api host boundary (non-api host requests outside `/health` return 404, while
+   loopback hosts such as `localhost` and `127.0.0.1` are admitted for local development), and
+   rejects requests without a 5–200 character `User-Agent`. Retired apex routes are retained as
+   tombstone bindings in `wrangler.toml` so legacy traffic is terminated with 404 at the edge
+   instead of falling through to Pages.
 2. **Pre-auth abuse gate.** A Cloudflare Workers Rate Limiting binding (`API_ABUSE_LIMITER`) keys
    on `CF-Connecting-IP` and shields the `api_tokens` lookup from token-rotation floods. It is
    infrastructure protection, not a customer quota, and fails open on binding errors.
