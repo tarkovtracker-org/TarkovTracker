@@ -28,25 +28,50 @@ const storedTicketProgress = () => ({
   },
 });
 describe('useTarkovStore story objective id migration', () => {
-  it('reconciles saved marks in every game mode', () => {
+  it('reconciles only the mode the loaded catalog belongs to', () => {
     setActivePinia(createPinia());
     const store = useTarkovStore();
     const metadataStore = useMetadataStore();
     metadataStore.storyChapters = [TICKET_CHAPTER];
+    metadataStore.currentGameMode = 'pvp';
     store.pvp.storyChapters = storedTicketProgress();
     store.pve.storyChapters = storedTicketProgress();
     store.seasonal.storyChapters = storedTicketProgress();
-    expect(store.migrateStoryObjectiveIds()).toEqual({ migrated: 3, dropped: 3 });
-    for (const mode of ['pvp', 'pve', 'seasonal'] as const) {
-      expect(store[mode].storyChapters['the-ticket']?.objectives).toEqual({
-        [CURRENT_ID]: { complete: true, timestamp: 1000 },
-      });
-    }
+    expect(store.migrateStoryObjectiveIds()).toEqual({ migrated: 1, dropped: 1 });
+    expect(store.pvp.storyChapters['the-ticket']?.objectives).toEqual({
+      [CURRENT_ID]: { complete: true, timestamp: 1000 },
+    });
+    expect(store.pve.storyChapters).toEqual(storedTicketProgress());
+    expect(store.seasonal.storyChapters).toEqual(storedTicketProgress());
+  });
+  it('reconciles another mode once that catalog is the loaded one', () => {
+    setActivePinia(createPinia());
+    const store = useTarkovStore();
+    const metadataStore = useMetadataStore();
+    metadataStore.storyChapters = [TICKET_CHAPTER];
+    metadataStore.currentGameMode = 'pve';
+    store.pve.storyChapters = storedTicketProgress();
+    expect(store.migrateStoryObjectiveIds()).toEqual({ migrated: 1, dropped: 1 });
+    expect(store.pve.storyChapters['the-ticket']?.objectives).toEqual({
+      [CURRENT_ID]: { complete: true, timestamp: 1000 },
+    });
+  });
+  it('ignores a requested mode the loaded catalog cannot speak for', () => {
+    setActivePinia(createPinia());
+    const store = useTarkovStore();
+    const metadataStore = useMetadataStore();
+    metadataStore.storyChapters = [TICKET_CHAPTER];
+    metadataStore.currentGameMode = 'pvp';
+    store.pve.storyChapters = storedTicketProgress();
+    expect(store.migrateStoryObjectiveIds('pve')).toEqual({ migrated: 0, dropped: 0 });
+    expect(store.pve.storyChapters).toEqual(storedTicketProgress());
   });
   it('is a no-op without a chapter catalog', () => {
     setActivePinia(createPinia());
     const store = useTarkovStore();
-    useMetadataStore().storyChapters = [];
+    const metadataStore = useMetadataStore();
+    metadataStore.storyChapters = [];
+    metadataStore.currentGameMode = 'pvp';
     store.pvp.storyChapters = storedTicketProgress();
     expect(store.migrateStoryObjectiveIds()).toEqual({ migrated: 0, dropped: 0 });
     expect(store.pvp.storyChapters).toEqual(storedTicketProgress());
@@ -54,7 +79,9 @@ describe('useTarkovStore story objective id migration', () => {
   it('is a no-op while the catalog still publishes curated ids', () => {
     setActivePinia(createPinia());
     const store = useTarkovStore();
-    useMetadataStore().storyChapters = [
+    const metadataStore = useMetadataStore();
+    metadataStore.currentGameMode = 'pvp';
+    metadataStore.storyChapters = [
       {
         ...TICKET_CHAPTER,
         objectives: {

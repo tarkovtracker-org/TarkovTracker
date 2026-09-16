@@ -1652,6 +1652,7 @@ export const useMetadataStore = defineStore('metadata', {
           .map((chapter) => normalizeStoryChapter(chapter))
           .sort((a, b) => a.order - b.order)
       );
+      migrateMetadataStoryObjectiveIds();
       this.seasonalPerks = perksForMode(
         cachedData.editions.seasonalPerks ?? [],
         this.getApiGameMode()

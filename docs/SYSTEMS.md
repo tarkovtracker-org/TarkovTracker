@@ -450,12 +450,14 @@ Declared `endings` replace the text-derived ending labels when a chapter carries
 without them keep the text path — an ending with no attributed objectives reports pending evidence
 rather than being hidden, and exclusivity between endings is not inferred. `referenceCoverage.partial`
 surfaces as a chapter badge because a missing objective is not evidence that none exists. Objective
-IDs are upstream-owned: completed marks whose IDs the current chapter no longer defines (overlay
-v1.93 re-keyed all of The Ticket's) are reported for re-checking on the viewer's own progress only,
-never silently remapped or deleted.
+IDs are upstream-owned: completed marks the reconciliation pass below leaves unresolved are reported
+for re-checking on the viewer's own progress only, never remapped on a guess.
 
-Saved story objective marks are reconciled against the published catalog on every chapter-catalog
-load, in all three modes, by `app/utils/storyProgressMigration.ts`. The pass is idempotent and acts
+Saved story objective marks are reconciled against the published catalog by
+`app/utils/storyProgressMigration.ts`, on every chapter-catalog load and after a realtime merge,
+which unions both sides' objective IDs and can reintroduce a retired one. Only the mode the loaded
+catalog belongs to is reconciled, because chapters are fetched per mode and language and the overlay
+may scope a chapter to one mode; other modes are reconciled when their own catalog loads. The pass is idempotent and acts
 only on proof: a mark moves when `STORY_OBJECTIVE_ID_ALIASES` records a re-key the published data
 proves (identical unique objective text, or the overlay re-anchoring its own prestige requirement)
 and the target carries no mark of its own; a mark is dropped when its ID cannot satisfy the story

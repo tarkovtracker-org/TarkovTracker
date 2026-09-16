@@ -129,7 +129,7 @@ type UserProgressSyncPayload = {
 type TarkovStoreInstance = UserState & {
   $state: UserState;
   $patch(partialOrMutator: Partial<UserState> | ((state: UserState) => void)): void;
-  migrateStoryObjectiveIds(): { migrated: number; dropped: number };
+  migrateStoryObjectiveIds(mode?: GameMode): { migrated: number; dropped: number };
   migrateTaskCompletionSchema(): {
     pvpMigrated: number;
     pveMigrated: number;
@@ -161,6 +161,21 @@ const migrateModeStoryProgress = (
   if (!modeData || !result.changed) return { migrated: 0, dropped: 0 };
   modeData.storyChapters = result.storyChapters;
   return { migrated: result.migrated, dropped: result.dropped };
+};
+/**
+ * The mode whose saved story progress the loaded catalog may reconcile.
+ *
+ * Story chapters are fetched per mode and language, and the overlay may scope a chapter to one mode,
+ * so the loaded catalog is evidence about its own mode only. `requested` narrows it further for a
+ * caller that knows which mode changed, such as a realtime merge.
+ */
+const reconcilableStoryMode = (
+  catalogMode: string,
+  requested: GameMode | undefined
+): GameMode | null => {
+  if (!GAME_MODE_VALUES.includes(catalogMode as GameMode)) return null;
+  if (requested && requested !== catalogMode) return null;
+  return catalogMode as GameMode;
 };
 const logStoryObjectiveMigration = (totals: { migrated: number; dropped: number }): void => {
   if (totals.migrated === 0 && totals.dropped === 0) return;
@@ -375,15 +390,12 @@ const tarkovActions = {
    * story contract can no longer accept is dropped so it stops being re-saved and re-synced, and an
    * unrecognized client ID is left alone because the published objective list can be partial.
    */
-  migrateStoryObjectiveIds(this: TarkovStoreInstance) {
-    const chapters = useMetadataStore().storyChapters;
-    if (!chapters?.length) return { migrated: 0, dropped: 0 };
-    const totals = { migrated: 0, dropped: 0 };
-    for (const mode of GAME_MODE_VALUES) {
-      const result = migrateModeStoryProgress(this[mode], chapters);
-      totals.migrated += result.migrated;
-      totals.dropped += result.dropped;
-    }
+  migrateStoryObjectiveIds(this: TarkovStoreInstance, mode?: GameMode) {
+    const metadataStore = useMetadataStore();
+    const chapters = metadataStore.storyChapters;
+    const catalogMode = reconcilableStoryMode(metadataStore.currentGameMode, mode);
+    if (!catalogMode || !chapters?.length) return { migrated: 0, dropped: 0 };
+    const totals = migrateModeStoryProgress(this[catalogMode], chapters);
     logStoryObjectiveMigration(totals);
     return totals;
   },
@@ -931,7 +943,7 @@ const tarkovActions = {
 } satisfies UserActions & {
   switchGameMode(mode: GameMode): Promise<void>;
   migrateDataIfNeeded(): Promise<void>;
-  migrateStoryObjectiveIds(): { migrated: number; dropped: number };
+  migrateStoryObjectiveIds(mode?: GameMode): { migrated: number; dropped: number };
   migrateTaskCompletionSchema(): {
     pvpMigrated: number;
     pveMigrated: number;

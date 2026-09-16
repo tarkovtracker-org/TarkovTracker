@@ -133,6 +133,7 @@ describe('seasonal progress realtime synchronization', () => {
   const store = {
     $state: state,
     $patch: (mutator: (target: UserState) => void) => mutator(state),
+    migrateStoryObjectiveIds: () => ({ migrated: 0, dropped: 0 }),
   };
   beforeEach(() => {
     supabaseContext.client.from.mockReset();
