@@ -542,10 +542,14 @@ async function runMigrationHistory() {
 function getProjectRef(target) {
   const connection = target.connection;
   if (!connection) return null;
-  return (
+  const projectRef =
     matchProjectRef(connection.host, PROJECT_HOST_PATTERN) ??
-    matchProjectRef(connection.username, POOLER_USERNAME_PATTERN)
-  );
+    matchProjectRef(connection.username, POOLER_USERNAME_PATTERN);
+  if (!projectRef)
+    throw new Error(
+      'migration-history cannot identify the Supabase project from PROD_DB_URL; the report has to name the database it compared, so correct the connection host or the observer username before using it as remote-history evidence'
+    );
+  return projectRef;
 }
 function matchProjectRef(value, pattern) {
   return pattern.exec(value ?? '')?.[1] ?? null;

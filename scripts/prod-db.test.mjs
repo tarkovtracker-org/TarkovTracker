@@ -350,5 +350,15 @@ describe('prod-db canary', () => {
       );
       expect(result.project_ref).toBe('knptqelvsodccnoehmbj');
     });
+    it('refuses to report history for an unidentifiable primary target', () => {
+      expect(() =>
+        run(['migration-history'], {
+          PROD_DB_TARGET: 'primary',
+          PROD_DB_URL:
+            'postgresql://pi_prod_observer:observer%3Asecret@example.test:5432/postgres?sslmode=verify-full',
+          FAKE_SUPABASE_REMOTE_VERSIONS: localVersions.join(','),
+        })
+      ).toThrow('cannot identify the Supabase project from PROD_DB_URL');
+    });
   });
 });

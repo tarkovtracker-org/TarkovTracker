@@ -1311,8 +1311,10 @@ flowchart LR
 - The comparison must be complete or fail. When the ledger read reaches its row limit the command
   errors instead of reporting `in_sync` or a partial difference.
 - The report names the project it observed (`project_ref`, `null` for a local target), so a
-  comparison run against the wrong project is detectable. The observer does not infer the expected
-  project from application configuration; confirming the identity is the operator's step.
+  comparison run against the wrong project is detectable. A primary target whose host and observer
+  username identify no project fails instead of reporting a nameless comparison. The observer does
+  not infer the expected project from application configuration; confirming the identity is the
+  operator's step.
 
 ## 10. Promoted Twitch configuration
 

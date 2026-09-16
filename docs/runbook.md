@@ -597,9 +597,10 @@ revision. If the observer lacks access the command fails and names the required 
 The report carries `project_ref`, the Supabase project observed through `PROD_DB_URL` (`null` for a
 local target). Confirm it names the intended project before treating the comparison as remote-history
 evidence: a connection string pointing at another project reports a perfectly consistent comparison
-for the wrong database. The command reports the identity it observed and deliberately does not infer
-an expected project from application configuration, which is not guaranteed to describe the same
-environment as the observer credential.
+for the wrong database. A primary connection whose host and observer username identify no project
+fails rather than returning a nameless comparison. The command reports the identity it observed and
+deliberately does not infer an expected project from application configuration, which is not
+guaranteed to describe the same environment as the observer credential.
 
 `canary` is the first production validation command. It runs only health and telemetry reports:
 `db-stats`, `role-stats`, `table-stats`, `index-stats`, and `outliers`. It does not sample rows,
