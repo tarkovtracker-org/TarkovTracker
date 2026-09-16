@@ -455,9 +455,11 @@ for re-checking on the viewer's own progress only, never remapped on a guess.
 
 Saved story objective marks are reconciled against the published catalog by
 `app/utils/storyProgressMigration.ts`, on every chapter-catalog load and after a realtime merge,
-which unions both sides' objective IDs and can reintroduce a retired one. Only the mode the loaded
-catalog belongs to is reconciled, because chapters are fetched per mode and language and the overlay
-may scope a chapter to one mode; other modes are reconciled when their own catalog loads. The pass is idempotent and acts
+which unions both sides' objective IDs and can reintroduce a retired one. Chapters are fetched per
+mode and language, so a realtime merge for an inactive mode is reconciled against the catalog that
+did load; that stays sound because every decision is either shape-based, and no chapter in any mode
+scope may publish an objective ID of another shape, or validated against an ID that catalog publishes.
+A chapter another mode scopes differently can therefore cost a mark, never invent one. The pass is idempotent and acts
 only on proof: a mark moves when `STORY_OBJECTIVE_ID_ALIASES` records a re-key the published data
 proves (identical unique objective text, or the overlay re-anchoring its own prestige requirement)
 and the target carries no mark of its own; a mark is dropped when its ID cannot satisfy the story

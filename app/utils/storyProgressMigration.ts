@@ -135,6 +135,16 @@ const migrationContext = (chapter: StoryChapter, stored: StoredObjectives): Migr
   published: new Set(publishedObjectiveIds(chapter)),
   stored,
 });
+const reconcileObjectives = (
+  stored: StoredObjectives,
+  context: MigrationContext
+): StoryObjectiveMigrationResult => {
+  const result = { objectives: {} as StoredObjectives, migrated: 0, dropped: 0 };
+  for (const entry of Object.entries(stored)) {
+    collectObjective(result, entry, context);
+  }
+  return withObjectiveTotals(result);
+};
 /** Reconcile one chapter's saved objective marks against the chapter the overlay publishes. */
 export const migrateStoryChapterObjectives = (
   stored: StoredObjectives | undefined,
@@ -142,12 +152,7 @@ export const migrateStoryChapterObjectives = (
 ): StoryObjectiveMigrationResult => {
   if (!stored) return unchangedObjectives({});
   if (!publishesClientObjectiveIds(chapter)) return unchangedObjectives(stored);
-  const context = migrationContext(chapter, stored);
-  const result = { objectives: {} as StoredObjectives, migrated: 0, dropped: 0 };
-  for (const entry of Object.entries(stored)) {
-    collectObjective(result, entry, context);
-  }
-  return withObjectiveTotals(result);
+  return reconcileObjectives(stored, migrationContext(chapter, stored));
 };
 /** A chapter's reconciliation, or nothing when it is unknown or already consistent. */
 const changedChapterObjectives = (
@@ -157,6 +162,25 @@ const changedChapterObjectives = (
   if (!chapter) return undefined;
   const result = migrateStoryChapterObjectives(chapterProgress?.objectives, chapter);
   return result.changed ? result : undefined;
+};
+/** The same reconciliation without a catalog: alias what is proven, drop what the schema forbids. */
+const reconcileChapters = (
+  stored: StoredChapters | undefined,
+  reconcile: (
+    chapterProgress: StoredChapter | undefined,
+    chapterId: string
+  ) => StoryObjectiveMigrationResult | undefined
+): StoryProgressMigrationResult => {
+  const storyChapters: StoredChapters = { ...(stored ?? {}) };
+  const totals = { migrated: 0, dropped: 0 };
+  for (const [chapterId, chapterProgress] of Object.entries(storyChapters)) {
+    const result = reconcile(chapterProgress, chapterId);
+    if (!result) continue;
+    storyChapters[chapterId] = { ...chapterProgress, objectives: result.objectives };
+    totals.migrated += result.migrated;
+    totals.dropped += result.dropped;
+  }
+  return withProgressTotals(storyChapters, totals);
 };
 const withProgressTotals = (
   storyChapters: StoredChapters,
@@ -169,20 +193,19 @@ const withProgressTotals = (
 /**
  * Reconcile one game mode's story progress. Chapters the overlay does not publish are left alone:
  * absence there means the catalog is incomplete, not that the player's progress is stale.
+ *
+ * `chapters` may be the catalog loaded for a different mode, which a realtime merge for an inactive
+ * mode produces. That stays sound because every decision is either mode-independent or validated
+ * against a published ID: the drop rule rests on the schema's objective-ID shape, which no chapter in
+ * any mode scope may publish otherwise, and an alias only moves onto an ID this catalog publishes.
+ * A chapter the other mode scopes differently therefore loses a mark at worst, never gains one.
  */
 export const migrateStoryProgress = (
   stored: StoredChapters | undefined,
   chapters: readonly StoryChapter[]
 ): StoryProgressMigrationResult => {
   const chapterById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
-  const storyChapters: StoredChapters = { ...(stored ?? {}) };
-  const totals = { migrated: 0, dropped: 0 };
-  for (const [chapterId, chapterProgress] of Object.entries(storyChapters)) {
-    const result = changedChapterObjectives(chapterProgress, chapterById.get(chapterId));
-    if (!result) continue;
-    storyChapters[chapterId] = { ...chapterProgress, objectives: result.objectives };
-    totals.migrated += result.migrated;
-    totals.dropped += result.dropped;
-  }
-  return withProgressTotals(storyChapters, totals);
+  return reconcileChapters(stored, (chapterProgress, chapterId) =>
+    changedChapterObjectives(chapterProgress, chapterById.get(chapterId))
+  );
 };

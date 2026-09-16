@@ -89,7 +89,10 @@ import {
   sanitizeTarkovUid,
 } from '@/utils/progressSanitizers';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
-import { migrateStoryProgress } from '@/utils/storyProgressMigration';
+import {
+  type StoryProgressMigrationResult,
+  migrateStoryProgress,
+} from '@/utils/storyProgressMigration';
 import { getCurrentSupabaseUserId, parseUserScopedStorage } from '@/utils/userScopedStorage';
 import type { StoryChapter, Task } from '@/types/tarkov';
 export type { PrestigeRunRecord } from '@/stores/tarkov/prestige';
@@ -153,31 +156,37 @@ type TarkovStoreInstance = UserState & {
     tasksMap: Map<string, Task>
   ): number;
 };
-const migrateModeStoryProgress = (
+const asGameMode = (mode: string): GameMode | null =>
+  GAME_MODE_VALUES.includes(mode as GameMode) ? (mode as GameMode) : null;
+/**
+ * Reconcile a mode against the catalog the metadata store loaded for it.
+ *
+ * Story chapters are fetched per mode and language and the overlay may scope a chapter to one mode,
+ * so a loaded catalog is evidence about its own mode only.
+ */
+const NO_STORY_ID_CHANGES = { migrated: 0, dropped: 0 } as const;
+type StoryIdChanges = { migrated: number; dropped: number };
+const applyStoryReconciliation = (
   modeData: UserProgressData | undefined,
-  chapters: readonly StoryChapter[]
-): { migrated: number; dropped: number } => {
-  const result = migrateStoryProgress(modeData?.storyChapters, chapters);
-  if (!modeData || !result.changed) return { migrated: 0, dropped: 0 };
+  result: StoryProgressMigrationResult
+): StoryIdChanges => {
+  if (!modeData || !result.changed) return NO_STORY_ID_CHANGES;
   modeData.storyChapters = result.storyChapters;
   return { migrated: result.migrated, dropped: result.dropped };
 };
-/**
- * The mode whose saved story progress the loaded catalog may reconcile.
- *
- * Story chapters are fetched per mode and language, and the overlay may scope a chapter to one mode,
- * so the loaded catalog is evidence about its own mode only. `requested` narrows it further for a
- * caller that knows which mode changed, such as a realtime merge.
- */
-const reconcilableStoryMode = (
-  catalogMode: string,
-  requested: GameMode | undefined
-): GameMode | null => {
-  if (!GAME_MODE_VALUES.includes(catalogMode as GameMode)) return null;
-  if (requested && requested !== catalogMode) return null;
-  return catalogMode as GameMode;
+const reconcileAgainstCatalog = (
+  modeData: UserProgressData | undefined,
+  chapters: readonly StoryChapter[]
+): StoryIdChanges =>
+  applyStoryReconciliation(modeData, migrateStoryProgress(modeData?.storyChapters, chapters));
+const reconcileStoryMode = (
+  modeData: UserProgressData | undefined,
+  chapters: readonly StoryChapter[]
+): StoryIdChanges => {
+  if (chapters.length === 0) return NO_STORY_ID_CHANGES;
+  return reconcileAgainstCatalog(modeData, chapters);
 };
-const logStoryObjectiveMigration = (totals: { migrated: number; dropped: number }): void => {
+const logStoryObjectiveMigration = (totals: StoryIdChanges): void => {
   if (totals.migrated === 0 && totals.dropped === 0) return;
   logger.info(
     `[TarkovStore] Reconciled story objective ids - migrated: ${totals.migrated}, dropped: ${totals.dropped}`
@@ -392,10 +401,10 @@ const tarkovActions = {
    */
   migrateStoryObjectiveIds(this: TarkovStoreInstance, mode?: GameMode) {
     const metadataStore = useMetadataStore();
-    const chapters = metadataStore.storyChapters;
-    const catalogMode = reconcilableStoryMode(metadataStore.currentGameMode, mode);
-    if (!catalogMode || !chapters?.length) return { migrated: 0, dropped: 0 };
-    const totals = migrateModeStoryProgress(this[catalogMode], chapters);
+    const chapters = metadataStore.storyChapters ?? [];
+    const catalogMode = asGameMode(metadataStore.currentGameMode);
+    const target = mode ?? catalogMode;
+    const totals = reconcileStoryMode(target ? this[target] : undefined, chapters);
     logStoryObjectiveMigration(totals);
     return totals;
   },
