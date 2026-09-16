@@ -53,7 +53,11 @@ describe('readEftLogSources', () => {
     });
     expect(result.sources[1]).not.toHaveProperty('text');
     expect(result.sources[1]?.timeline).toHaveLength(1);
-  }, 30000);
+    // 513 MiB is the smallest size that still exceeds every former byte cap, and 256 KiB
+    // RAW_CHUNK_BYTES makes it 2052 streaming reads. That is ~9s alone on a fast runner and
+    // several times that under coverage on a shared one, so keep a bounded but generous cap
+    // rather than the default 30s. The streaming assertions above are what guard behaviour.
+  }, 120000);
   it('imports a ZIP log expanded beyond 32 MiB with notifications from a raw file', async () => {
     const content = noise.repeat(Math.ceil((33 * 1024 * 1024) / noise.length)) + mode;
     const zip = new File(
