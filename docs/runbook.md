@@ -519,6 +519,35 @@ full progress resets still discard the prior feed. A frontend rollback must leav
 migrations in place. Verify an old-client sync retains new history and a stale device cannot undo a
 history clear; regression coverage is in `manual_activity_history.test.sql`.
 
+### Out-of-band Package A apply and checkout alignment (`20260912085531`)
+
+On 2026-09-12 an authorized operator applied
+`20260912085531_contain_team_event_authority.sql` to production (`knptqelvsodccnoehmbj`) with
+`supabase db push --project-ref … --skip-vault` from the unmerged release revision `08b0cf1e`.
+Remote history moved from 122 to 123 versions while `main` still had 122 files, so every later
+push to `main` failed the `Supabase Preview` check with
+`Remote migration versions not found in local migrations directory.` The first affected commit
+was `87a254d7` (2026-09-14); `15cb054a` (2026-09-10) was the last success. No local migration
+file was edited, renamed, or deleted in that window — the divergence was entirely remote-only.
+
+The correct remediation is to **update the checkout, not remote history**: land the deployed
+migration file on `main` byte-for-byte. Its SHA-256 is
+`a1d23f6a5a29e89ded68895f520240a2e193edb666d6db499e2573441529afff`; verify that against the
+deployment receipt before committing. The CLI suggests
+`supabase migration repair --status reverted <version>` in this situation. **Do not run it.** The
+SQL really is applied, so marking it reverted would falsify history and let a later `db push`
+re-run a migration whose `ADD COLUMN`/`CREATE` statements would then fail.
+
+Reproduce the diagnosis without touching production: reset a local database to the same history,
+then compare `supabase db push --local --dry-run` with the file absent (reproduces the exact error
+and names the version) and present (`Local database is up to date.`).
+
+**Still outstanding:** the same deployment also shipped Edge Functions `team-leave` (v609) and
+`team-kick` (v605) from `08b0cf1e`, whose source is not on `main`. Nothing in CI deploys
+`supabase/functions`, so production is not auto-reverted, but a future `functions deploy` from
+`main` would silently undo the deployed containment. Landing the remaining Package A application
+code is a separate, review-gated release decision.
+
 ### Reconcile migration `20260630075121_reconcile_prod_schema_drift`
 
 - Captures schema changes that were previously made directly in the dashboard (teams
