@@ -18,7 +18,6 @@ test('only explicit documentation and translation paths receive reduced validati
     ['README.md'],
     ['docs/topic.markdown'],
     ['.github/CONTRIBUTING.md'],
-    ['app/locales/en.json'],
     ['app/locales/fr.json'],
     ['README.md', 'app/locales/cs.json'],
   ]) {
@@ -27,6 +26,8 @@ test('only explicit documentation and translation paths receive reduced validati
   }
   for (const path of [
     'DESIGN.md',
+    'app/locales/en.json',
+    'app/locales/nested/fr.json',
     'app/test.ts',
     'workers/a.ts',
     'supabase/migrations/a.sql',
@@ -57,6 +58,10 @@ test('only explicit documentation and translation paths receive reduced validati
   assert.equal(classifyPaths(['README.md', 'app/a.ts']).full, true);
   assert.equal(classifyPaths(['README.md']).i18n, false);
   assert.equal(classifyPaths(['app/locales/de.json']).i18n, true);
+  // The source locale is not a translation: full validation, including i18n, with no reduction.
+  assert.equal(classifyPaths(['app/locales/en.json']).i18n, true);
+  assert.equal(classifyPaths(['app/locales/en.json']).locales, false);
+  assert.equal(classifyPaths(['app/locales/english.json']).locales, true);
   assert.equal(classifyPaths(['README.md'], { forceFull: true }).full, true);
 });
 test('name-status parser includes both rename paths and deletions without splitting filenames', () => {

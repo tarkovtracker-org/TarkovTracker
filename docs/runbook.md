@@ -421,7 +421,7 @@ Afterward, rerun both catalog queries and record that the expected definition is
 result before retrying. Concurrent reindexing can leave temporary `_ccnew` or `_ccold` indexes;
 follow PostgreSQL's failure-state guidance after verifying their identity and dependencies rather
 than deleting objects by suffix alone. Attach before/after evidence and the operation result to
-#646 (or its deployment record). Until that evidence exists, production index validity is
+issue #646 (or its deployment record). Until that evidence exists, production index validity is
 **unverified**, even when repository CI is green.
 
 The failure and repair were reproduced in an isolated PostgreSQL 17 database: cancel a concurrent
@@ -565,6 +565,52 @@ The database change alone does not cover the handler behavior: the deployed hand
 reads on `server_verified = true`, and the preserved pre-containment rows are `server_verified = false`
 with possibly forged timestamps, so the older handlers would trust that history again. See the
 `team_events` invariants in `docs/SYSTEMS.md`.
+
+### Atomic-leave checkout recovery (`20260912085904`)
+
+The earlier Package A recovery is not sufficient for the current hosted state. On 2026-09-16,
+`main` at `d1601dc99dfca900362acc81f8ced03196a8b62d` contained 123 migrations, while the
+linked production project `knptqelvsodccnoehmbj` contained 124. The sole remote-only version was
+`20260912085904_atomic_team_leave`, with eight stored statements. Its deployed `team-leave`
+Edge Function was version 610, not Package A's version 609. The failing `Supabase Preview`
+check and a linked push dry-run both reported missing local migration versions.
+
+Supabase CLI 2.117.0 authenticated using its existing authorized session; `projects list`,
+explicit `link --project-ref knptqelvsodccnoehmbj`, and `migration list --linked` all succeeded.
+A missing observer `PROD_DB_URL` does not mean the CLI cannot inspect the project. Keep the
+observer's restricted credential boundary intact; this recovery uses separately authorized CLI
+access, not broader credentials passed to `scripts/prod-db`.
+
+Recovery procedure and evidence:
+
+1. Fetch remote migration statements with `supabase migration fetch --linked` into a separate
+   linked scratch directory, never over immutable files in the working checkout.
+2. Compare the missing migration with the original release revision
+   `08e34653dc9867dcf716c4845cde0cffcf8b88a6`. The fetched file differs only in blank lines
+   between statements. Restore the original Git bytes; SHA-256:
+   `a73e4b1dccbe70f0f66d208cfdcd248b675a29077571c9ec9b687e2d5003725e`.
+3. Download deployed `team-leave` with `supabase functions download team-leave --use-api` into
+   the scratch directory. Its handler, `leave-team-rpc.ts`, and `team-leave-result.ts` match
+   that same revision byte-for-byte. Restore this deployed unit together, with its public RPC
+   type and regression tests. A migration-only recovery would unblock the integration and
+   overwrite the live atomic handler with the older nontransactional implementation.
+4. Inspect both `leave_team(uuid,uuid)` and `transfer_team_ownership(uuid,uuid,uuid)` through
+   read-only linked catalog queries. The deployed function definitions, security-definer flags,
+   empty search paths, five-second lock timeouts, and execution privileges match a clean local
+   replay exactly. `anon` and `authenticated` cannot execute either; `service_role` can.
+5. Recheck `migration list --linked` and `db push --linked --dry-run` from the restored checkout:
+   all 124 versions match, with no pending SQL. Replay from scratch with `pnpm run supabase:check`
+   in an isolated local project and validate the endpoint and concurrent team operations.
+
+This is missing deployed history/source, not evidence of an incorrect history record. No remote
+repair, push, schema change, or history-writing `db pull` is necessary. Do not mark the version
+reverted: its non-idempotent `CREATE FUNCTION` has already executed. The catalog comparison is
+scoped to the two affected RPCs, not a claim that every production schema object was audited.
+
+After merging the complete recovery, verify the new `main` commit's `Supabase Preview` result
+and repeat linked history/dry-run checks. Pull-request previews intentionally skip deployment,
+so a green PR alone does not establish that the production integration has recovered. Do not
+roll back to the pre-atomic leave handler or apply unrelated account-deletion migrations.
 
 ### Reconcile migration `20260630075121_reconcile_prod_schema_drift`
 

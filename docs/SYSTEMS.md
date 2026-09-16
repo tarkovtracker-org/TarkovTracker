@@ -1139,6 +1139,19 @@ flowchart LR
   inherits the same requirement, and deleting the untrusted rows is not a substitute because the
   filter is what makes the contract durable.
 
+- `team-leave` calls the service-only `public.leave_team` RPC with the authenticated user ID,
+  never an identity from the request body. Membership removal, conditional pointer maintenance,
+  and trusted event insertion commit together. The handler performs no later table write, so a
+  newer join cannot be overwritten by an old leave response.
+- Leave takes a per-user advisory lock, then the team row and membership row. Ownership transfer
+  locks the team before validating owner and successor membership, preventing promotion of a
+  departed member. Both RPCs have a five-second lock timeout and service-only execution grants.
+  The handler retries the whole leave transaction at most three times, with 50/100 ms delays,
+  only for confirmed `40P01`, `40001`, or `55P03` aborts. Exhaustion returns `503` with
+  `Retry-After: 1`; business results and ambiguous transport failures are not retried.
+- Cooldowns are user/mode-wide across teams but retain the existing event lifetime: disband
+  deletes the associated events. They are not durable cooldown evidence after team deletion.
+
 ---
 
 ## 8. Tarkov.dev profile import
@@ -1473,9 +1486,9 @@ share one retry budget: a pre-boot inline script for entry-module failures (the 
 boots, so in-bundle code cannot run) and the in-app ChunkRecovery for lazy-chunk failures after
 boot.
 
-**Flow**
+### Flow
 
-```
+```text
 Page load
   → inline recovery script registers in <head> (before the entry module)
   → entry module fails? (error event on same-origin <script type="module">)
@@ -1487,7 +1500,7 @@ Page load
         errors.network_access_denied)
 ```
 
-**Step-by-step**
+### Step-by-step
 
 1. `nuxt.config.ts` emits the inline recovery script from `app/utils/entryRecoveryScript.ts` via
    `app.head.script`, so it lands in `<head>` before the entry module script in the built
@@ -1591,7 +1604,7 @@ exclusions, and includes force-tracked ignored files. A separate temporary index
 analysis head. Native new-only attribution and configured severities determine the exit status.
 See [the workflow guide](WORKFLOW_AUTOMATION.md#fallow-changed-file-gate) for usage and report IDs.
 
-**Invariants**
+### Invariants
 
 - Source files, the source index, branches, and worktree registrations remain unchanged.
 - Both analysis commits contain the same physical generated context; no persistent finding
@@ -1767,18 +1780,24 @@ identity.
 `scripts/validate-changes.mjs` exposes local execution and CI outputs;
 `scripts/check-ci-result.mjs` enforces outcomes in `.github/workflows/ci.yml`.
 
-The proposed selection reduces checks only for explicitly recognized documentation and locale paths.
-`DESIGN.md`, unknown inputs, and executable changes select full validation. Local input includes
+The selection reduces checks only for explicitly recognized documentation paths and Crowdin-owned
+translation files. `DESIGN.md`, the source locale `app/locales/en.json`, unknown inputs, and
+executable changes select full validation. Local input includes
 committed and dirty paths; CI input is the explicit revision diff. Renames contribute both paths.
-Shadow rollout forces every check while printing the proposed selection. See
-`docs/WORKFLOW_AUTOMATION.md` for rollout evidence and local/full execution profiles.
+Pull requests receive the selected jobs; the classifier also reports `workflows` so workflow
+linting runs only for non-Markdown automation paths and unreadable diffs. See
+`docs/WORKFLOW_AUTOMATION.md` for the recorded rollout evidence and local/full execution profiles.
 
-**Invariants:**
+### Invariants
 
-- Pushes retain full validation; shadow mode retains full validation on PRs too.
+- Pushes and dispatches retain full validation; only pull requests receive reduced selection.
+- Reduced selection never applies to `app/locales/en.json`; only non-English translations qualify.
+- Empty, unreadable, or malformed diffs select full validation and workflow linting.
 - Missing classifier output or selected jobs that fail, cancel, or unexpectedly skip fail CI Result.
 - Only deliberately unselected jobs may report skipped; systems drift always runs.
 - Existing shard discovery, coverage enforcement, secret restrictions, and merge governance remain.
+- Dependabot auto-merge requires the immutable Dependabot account ID for both the PR author and
+  event actor; the actor restriction alone never establishes trust.
 - The aggregate covers repository CI jobs, not independently reported Security or Codecov statuses.
 
 ## 15. Canonical task progression
@@ -1873,7 +1892,7 @@ route. Imports load and mutate only their selected destination mode;
 Seasonal log eligibility and restoration guards are unchanged. Tarkov.dev profile import does
 not import quest completions and therefore has no trader/task backfill path.
 
-**Invariants**
+### Invariants
 
 - Canonical requirements, blockers, status comparisons and story alternatives are shared by UI and
   recommendations; no new dependency on the removed upstream task `alternatives` is introduced.
@@ -1913,9 +1932,9 @@ otherwise land at 1.0-3.6:1 on paper. The preference
 is device-local: a dedicated `tt_theme` localStorage key (not the user-scoped preferences store)
 so the pre-paint boot script and the in-app `useTheme` composable read the same source.
 
-**Flow**
+### Flow
 
-```
+```text
 First paint
   → THEME_BOOT_SCRIPT (inline <head> script in nuxt.config)
       reads tt_theme → validates value (mirrors normalizeThemeMode) → sets <html data-theme> + colorScheme
@@ -1926,7 +1945,7 @@ App boot
       → setThemeMode persists tt_theme + sets data-theme + colorScheme atomically
 ```
 
-**Step-by-step**
+### Step-by-step
 
 1. `app/assets/css/tailwind.css` ends with `:root[data-theme='light'] { ... }`, which overrides
    only the neutral tokens (surface ladder role-mapped to parchment canvas → snow cards → dark
@@ -1955,7 +1974,7 @@ App boot
 4. `app/composables/useTheme.ts` exposes the singleton `themeMode` state and
    `setThemeMode`/`toggleThemeMode` used by the AppBar toggle and the Settings AppearanceCard.
 
-**Invariants:**
+### Invariants
 
 - Dark is the default and is pixel-identical to before: the `:root[data-theme='light']` overrides
   are inert in dark mode and every component `light:` utility requires `data-theme='light'`.
@@ -2029,7 +2048,7 @@ can still resolve after the file's environment is torn down and fail the run wit
 `EnvironmentTeardownError`. A test that mounts such a component mocks the lazily imported module, so
 the loader never reaches a real import.
 
-**Invariants**
+### Invariants
 
 - Every test file gets a fresh worker. `isolate: true` is what guarantees that, so no run may leave
   runner reuse enabled for isolated files.

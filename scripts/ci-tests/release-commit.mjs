@@ -91,7 +91,7 @@ test('release refuses unrelated staged content', (t) => {
 /** Keep trigger, job eligibility and publication credentials within their owning blocks. */
 function assertReleaseWorkflowBoundaries(ci, releaseWorkflow) {
   workflowEvent(ci, 'workflow_dispatch');
-  assert.match(workflowEvent(ci, 'push'), /branches: \[main, develop, 'wip\/\*\*'\]/);
+  assert.match(workflowEvent(ci, 'push'), /branches: \[main, 'wip\/\*\*'\]/);
   const release = jobBlock(releaseWorkflow, 'release');
   const eligibility = release.slice(0, release.indexOf('    steps:'));
   assert.match(eligibility, /head_branch == 'main'/);
@@ -115,10 +115,10 @@ test('unrelated triggers, jobs and steps cannot satisfy the release workflow con
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
   const release = readFileSync('.github/workflows/release.yml', 'utf8');
   const wrongTrigger = ci
-    .replace("branches: [main, develop, 'wip/**']", 'branches: [main, develop]')
+    .replace("branches: [main, 'wip/**']", 'branches: [main]')
     .replace(
-      'pull_request:\n    branches: [main, develop]',
-      "pull_request:\n    branches: [main, develop, 'wip/**']"
+      'pull_request:\n    branches: [main]',
+      "pull_request:\n    branches: [main, 'wip/**']"
     );
   assert.throws(() => assertReleaseWorkflowBoundaries(wrongTrigger, release));
   const wrongJob =
@@ -158,21 +158,27 @@ test('accepted dispatch without a created run fails before waiting for checks or
 test('dispatched main Fallow audit compares the real parent instead of main against itself', (t) => {
   const f = fixture(t);
   git(f.repo, 'checkout', 'locales');
+  // Add a second commit so the checked-out parent (f.head) differs from `main` (f.base); a
+  // script that compared against main would then be visibly wrong.
+  git(f.repo, 'commit', '--allow-empty', '-m', 'follow-up');
+  assert.equal(git(f.repo, 'rev-parse', 'HEAD^'), f.head);
+  assert.notEqual(f.head, f.base);
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
   const step = workflowStep(jobBlock(ci, 'fallow'), 'Resolve Fallow base');
-  const script = step
-    .slice(step.indexOf('run: |\n') + 'run: |\n'.length)
-    .replaceAll('${{ github.event_name }}', 'workflow_dispatch')
-    .replaceAll('${{ github.event.pull_request.base.sha }}', '')
-    .replaceAll('${{ github.event.before }}', '');
+  // The step reads event data through `env:` rather than inline template expansion.
+  assert.match(step, /EVENT_NAME: \$\{\{ github.event_name \}\}/);
+  assert.match(step, /PR_BASE_SHA: \$\{\{ github.event.pull_request.base.sha \}\}/);
+  assert.match(step, /PUSH_BEFORE_SHA: \$\{\{ github.event.before \}\}/);
+  const script = step.slice(step.indexOf('run: |\n') + 'run: |\n'.length);
+  assert.doesNotMatch(script, /\$\{\{/);
   const result = spawnSync('/bin/bash', ['-e', '-c', script], {
     cwd: f.repo,
-    env: f.env,
+    env: { ...f.env, EVENT_NAME: 'workflow_dispatch', PR_BASE_SHA: '', PUSH_BEFORE_SHA: '' },
     encoding: 'utf8',
   });
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(f.output(), `base=${f.base}\n`);
-  assert.notEqual(f.base, git(f.repo, 'rev-parse', 'HEAD'));
+  assert.equal(f.output(), `base=${f.head}\n`);
+  assert.notEqual(f.head, git(f.repo, 'rev-parse', 'HEAD'));
 });
 test('release permission key order does not change dispatch authorization', () => {
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8');

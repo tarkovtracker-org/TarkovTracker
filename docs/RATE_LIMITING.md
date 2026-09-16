@@ -122,12 +122,12 @@ sequenceDiagram
   end
 ```
 
-**Frontend entrypoints**
+#### Frontend entrypoints
 
 - Teams: `app/features/team/*` via `app/composables/api/useEdgeFunctions.ts`
 - Tokens: `app/features/settings/ApiTokens.vue` via the same composable
 
-**Edge Functions (enforced today)**
+#### Edge Functions (enforced today)
 
 | Function       | Scope key      | Limit | Window |
 | -------------- | -------------- | ----: | ------ |
@@ -142,7 +142,7 @@ sequenceDiagram
 Source of truth for limits: `supabase/functions/_shared/rate-limit.ts`  
 RPC + table: migration `supabase/migrations/20260404120000_add_mutation_rate_limit_rpc.sql`
 
-**How the counter works**
+#### How the counter works
 
 1. Key = `(scope, subject)` where `subject` is the authenticated user id.
 2. Fixed window of `window_seconds`.
@@ -151,13 +151,13 @@ RPC + table: migration `supabase/migrations/20260404120000_add_mutation_rate_lim
 5. Else increment and allow.
 6. Uses a transaction advisory lock so concurrent requests for the same subject cannot stampede.
 
-**Security posture**
+#### Security posture
 
 - RLS enabled; deny-all policy for clients
 - `anon` / `authenticated` have no table grants
 - only `service_role` / SECURITY DEFINER RPC can mutate counters
 
-**Known bypass gaps**
+#### Known bypass gaps
 
 - **Token create** is Edge-only by default. A direct insert into `api_tokens` is used only when
   `NUXT_PUBLIC_ALLOW_DIRECT_TOKEN_CREATE_FALLBACK=true` (default **false** in `nuxt.config.ts` /
@@ -170,7 +170,7 @@ RPC + table: migration `supabase/migrations/20260404120000_add_mutation_rate_lim
 - Prefer keeping create/revoke behind Edge Functions in production and avoid enabling create
   fallbacks.
 
-**Hygiene**
+#### Hygiene
 
 Expired rows are harmless but accumulate. The `mutation-rate-limits-cleanup` pg_cron job
 (`supabase/migrations/20260807130000_add_usage_and_rate_limit_retention.sql`) runs this nightly at
