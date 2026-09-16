@@ -1761,8 +1761,9 @@ identity.
 `scripts/validate-changes.mjs` exposes local execution and CI outputs;
 `scripts/check-ci-result.mjs` enforces outcomes in `.github/workflows/ci.yml`.
 
-The proposed selection reduces checks only for explicitly recognized documentation and locale paths.
-`DESIGN.md`, unknown inputs, and executable changes select full validation. Local input includes
+The selection reduces checks only for explicitly recognized documentation paths and Crowdin-owned
+translation files. `DESIGN.md`, the source locale `app/locales/en.json`, unknown inputs, and
+executable changes select full validation. Local input includes
 committed and dirty paths; CI input is the explicit revision diff. Renames contribute both paths.
 Pull requests receive the selected jobs; the classifier also reports `workflows` so workflow
 linting runs only for non-Markdown automation paths and unreadable diffs. See
@@ -1771,6 +1772,7 @@ linting runs only for non-Markdown automation paths and unreadable diffs. See
 ### Invariants
 
 - Pushes and dispatches retain full validation; only pull requests receive reduced selection.
+- Reduced selection never applies to `app/locales/en.json`; only non-English translations qualify.
 - Empty, unreadable, or malformed diffs select full validation and workflow linting.
 - Missing classifier output or selected jobs that fail, cancel, or unexpectedly skip fail CI Result.
 - Only deliberately unselected jobs may report skipped; systems drift always runs.

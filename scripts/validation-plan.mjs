@@ -11,8 +11,11 @@ export const fullJobs = [
   'workers',
 ];
 const reducedJobs = ['lint-format', 'systems-drift'];
+// Only Crowdin-owned translations are reduced. app/locales/en.json is the source locale that
+// application code and Vitest fixtures consume, so it selects full validation like other inputs
+// (scripts/crowdin-pr.sh draws the same boundary for translation-only PRs).
 function knownPathCategory(path) {
-  if (/^app\/locales\/[^/]+\.json$/.test(path)) return 'locales';
+  if (/^app\/locales\/(?!en\.json$)[^/]+\.json$/.test(path)) return 'locales';
   return /^(?:[^/]+\.md|(?:docs|\.github)\/.+\.(?:md|markdown))$/.test(path) ? 'docs' : 'full';
 }
 function unsafePath(path) {

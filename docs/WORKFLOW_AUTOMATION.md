@@ -94,12 +94,15 @@ Fallow, build, database and Worker checks, and Deno tests, requiring their usual
 environment. CI itself retains sharding, secrets/fork rules, and report uploads in workflow jobs.
 Link validation remains in the existing Link Check workflow for applicable documentation paths.
 
-The proposed reduced selection covers only root `.md` files, Markdown under `docs/` and `.github/`,
-and `app/locales/*.json`. `DESIGN.md`, generated code, scripts, dependencies, configuration, public
-assets, and unknown paths select full validation. Renames include both paths and deletions remain
-visible. Empty diffs, missing refs, malformed arguments, and Git errors conservatively select full
-validation. The i18n check rejects missing supported locale files, including deletions and
-renames, while missing translation keys still use the non-fatal English fallback.
+The reduced selection covers only root `.md` files, Markdown under `docs/` and `.github/`, and
+Crowdin-owned `app/locales/*.json` translations. The source locale `app/locales/en.json` selects
+full validation: application code and Vitest fixtures consume it, and `scripts/crowdin-pr.sh` draws
+the same translation-only boundary. `DESIGN.md`, generated code, scripts, dependencies,
+configuration, public assets, and unknown paths select full validation. Renames include both paths
+and deletions remain visible. Empty diffs, missing refs, malformed arguments, and Git errors
+conservatively select full validation. The i18n check rejects missing supported locale files,
+including deletions and renames, while missing translation keys still use the non-fatal English
+fallback.
 Non-English formatting exclusions and Crowdin ownership remain intact.
 
 #### CI rollout and measurements

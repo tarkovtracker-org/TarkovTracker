@@ -11,9 +11,10 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 **Jobs:**
 
 - `Validation plan` — classifies the diff. Pull requests that touch only root/`docs/`/`.github/`
-  Markdown or `app/locales/*.json` run the reduced set (`Lint & Format` formatting, i18n when
-  locales change, `Systems drift check`); anything else, every push, and every dispatch run the
-  full set. Unreadable diffs fail closed to full validation.
+  Markdown or Crowdin-owned `app/locales/*.json` translations run the reduced set (`Lint & Format`
+  formatting, i18n when locales change, `Systems drift check`); anything else — including the
+  source locale `app/locales/en.json` — every push, and every dispatch run the full set. Unreadable
+  diffs fail closed to full validation.
 - `CI Result` — strict aggregate of selected jobs; missing data or unexpected skips fail
 - `Lint & Format` — ESLint + Prettier, i18n, Node workflow fixtures, and (for non-Markdown
   automation paths and unreadable diffs) checksum-verified `actionlint` plus `zizmor`
