@@ -449,7 +449,8 @@ is never rendered as blocked, because the objective list can be a projection of 
 Both sides of a declared pair always render, a side with no captured objectives reporting pending
 evidence rather than disappearing. A route is called chosen only when chapter coverage is complete and
 exactly one side's steps are all done; under partial coverage a finished side reports known-step
-progress instead, and two finished sides report a conflict rather than two selected routes.
+progress instead, and a conflict between two finished sides is reported only when coverage is complete,
+because unknown steps can otherwise remain on both.
 Declared `endings` replace the text-derived ending labels when a chapter carries them — chapters
 without them keep the text path — an ending with no attributed objectives reports pending evidence
 rather than being hidden, and exclusivity between endings is not inferred. `referenceCoverage.partial`
@@ -466,10 +467,11 @@ deferred to that mode's own catalog load, which a mode switch or the next start 
 only on proof: a mark moves when `STORY_OBJECTIVE_ID_ALIASES` records a re-key the published data
 proves (identical unique objective text, or the overlay re-anchoring its own prestige requirement),
 the catalog publishes that successor, and the successor carries no mark of its own; a mark whose
-successor the catalog omits is kept until the successor appears, because the objective list is a
-projection; a mark is dropped only when no alias names it and its ID cannot satisfy the story schema's
-client-ID shape, so it can never resolve again and would otherwise be re-synced forever; an
-unrecognized client ID is kept for the same projection reason. Lookups use own properties, so an
+successor a partial chapter omits is kept until the successor appears, because that objective list is a
+projection, while a complete chapter that omits it settles the question and the mark is dropped; a mark
+is also dropped when no alias names it and its ID cannot satisfy the story schema's client-ID shape, so
+it can never resolve again and would otherwise be re-synced forever, and when the successor already
+carries the player's own mark; an unrecognized client ID is kept for the projection reason. Lookups use own properties, so an
 inherited key such as `constructor` is treated as saved data rather than as a published objective. Nothing is dropped unless the loaded chapter itself proves the client-ID contract, so a
 stale, curated, or failed catalog load cannot delete progress. Ambiguous re-keys are left unmapped
 rather than guessed. Task and hideout IDs have no equivalent pass: the overlay still publishes

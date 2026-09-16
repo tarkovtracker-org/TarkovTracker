@@ -66,6 +66,8 @@ export interface StoryProgressMigrationResult {
 }
 interface MigrationContext {
   aliases: Readonly<Record<string, string>>;
+  /** The chapter's objective list is a projection, so an absent ID may still exist. */
+  coveragePartial: boolean;
   published: ReadonlySet<string>;
   stored: StoredObjectives;
 }
@@ -85,13 +87,15 @@ export const publishesClientObjectiveIds = (chapter: StoryChapter): boolean => {
 /**
  * What to do with a saved ID the catalog no longer publishes but a proven re-key names.
  *
- * The successor may be absent from this catalog: `referenceCoverage.partial` means the published
- * objective list is a projection, so the mark is kept until the successor appears rather than
- * deleted. When the successor is published and already carries a mark, that mark is the player's
- * current intent and the retired record is dropped.
+ * A successor missing from a partial chapter may still exist, so the mark waits for it instead of
+ * being deleted. A complete chapter that omits the successor settles the question, and the mark is
+ * dropped rather than re-synced forever. When the successor is published and already carries a mark,
+ * that mark is the player's current intent and the retired record is dropped.
  */
 const classifyAliasedObjective = (alias: string, context: MigrationContext): Disposition => {
-  if (!context.published.has(alias)) return { kind: 'keep' };
+  if (!context.published.has(alias)) {
+    return context.coveragePartial ? { kind: 'keep' } : { kind: 'drop' };
+  }
   if (Object.hasOwn(context.stored, alias)) return { kind: 'drop' };
   return { kind: 'move', to: alias };
 };
@@ -147,6 +151,7 @@ const chapterAliases = (chapterId: string): Readonly<Record<string, string>> =>
     : {};
 const migrationContext = (chapter: StoryChapter, stored: StoredObjectives): MigrationContext => ({
   aliases: chapterAliases(chapter.id),
+  coveragePartial: chapter.referenceCoverage?.partial === true,
   published: new Set(publishedObjectiveIds(chapter)),
   stored,
 });

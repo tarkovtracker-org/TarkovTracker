@@ -156,8 +156,6 @@ type TarkovStoreInstance = UserState & {
     tasksMap: Map<string, Task>
   ): number;
 };
-const asGameMode = (mode: string): GameMode | null =>
-  GAME_MODE_VALUES.includes(mode as GameMode) ? (mode as GameMode) : null;
 /**
  * Reconcile a mode against the catalog the metadata store loaded for it.
  *
@@ -411,7 +409,9 @@ const tarkovActions = {
   migrateStoryObjectiveIds(this: TarkovStoreInstance, mode?: GameMode) {
     const metadataStore = useMetadataStore();
     const chapters = metadataStore.storyChapters ?? [];
-    const target = reconcilableStoryMode(asGameMode(metadataStore.currentGameMode), mode);
+    // The catalog records its own mode. `currentGameMode` changes when a switch starts, before the
+    // new catalog replaces the old one, so reading it here could label stale chapters as the new mode.
+    const target = reconcilableStoryMode(metadataStore.storyChaptersGameMode, mode);
     if (!target || chapters.length === 0) return NO_STORY_ID_CHANGES;
     const totals = reconcileAgainstCatalog(this[target], chapters);
     logStoryObjectiveMigration(totals);

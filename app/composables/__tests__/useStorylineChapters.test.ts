@@ -370,12 +370,23 @@ describe('useStorylineChapters', () => {
       coveragePartial: false,
     });
   });
-  it('flags a conflict when both declared routes read as finished', async () => {
+  it('flags a conflict only when complete coverage proves both routes finished', async () => {
     objectiveCompletionState.add('the-ticket:obj-keep');
     objectiveCompletionState.add('the-ticket:obj-hand');
-    const { normalizedChapters } = await loadComposable([DECLARED_ENDING_CHAPTER]);
-    const normalized = requireDefined(normalizedChapters.value[0], 'Expected the-ticket chapter');
-    expect(normalized.questRouteChoices[0]).toMatchObject({
+    const partial = await loadComposable([DECLARED_ENDING_CHAPTER]);
+    // Partial coverage cannot prove either route finished, so progress on both is not a conflict.
+    expect(
+      requireDefined(partial.normalizedChapters.value[0], 'chapter').questRouteChoices[0]
+    ).toMatchObject({
+      chosenBranchId: null,
+      conflicting: false,
+    });
+    const chapter = structuredClone(DECLARED_ENDING_CHAPTER);
+    chapter.referenceCoverage = { referencedSubquests: 4, resolvedSubquests: 4, partial: false };
+    const complete = await loadComposable([chapter]);
+    expect(
+      requireDefined(complete.normalizedChapters.value[0], 'chapter').questRouteChoices[0]
+    ).toMatchObject({
       chosenBranchId: null,
       conflicting: true,
     });

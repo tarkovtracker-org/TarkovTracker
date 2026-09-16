@@ -20,9 +20,15 @@ const chapter = (ids: string[], id = 'the-ticket'): StoryChapter => ({
   normalizedName: id,
   order: 9,
   wikiLink: 'https://example.com/the-ticket',
+  // Partial by default: the overlay reports partial coverage for nine of its ten chapters.
+  referenceCoverage: { referencedSubquests: 4, resolvedSubquests: 2, partial: true },
   objectives: Object.fromEntries(
     ids.map((objectiveId, index) => [objectiveId, objective(objectiveId, index + 1)])
   ),
+});
+const completeChapter = (ids: string[]): StoryChapter => ({
+  ...chapter(ids),
+  referenceCoverage: { referencedSubquests: 4, resolvedSubquests: 4, partial: false },
 });
 describe('storyProgressMigration', () => {
   it('recognizes a chapter that publishes client objective ids', () => {
@@ -66,6 +72,14 @@ describe('storyProgressMigration', () => {
     expect(result.objectives).toEqual({
       'the-ticket-main-10': { complete: true, timestamp: 1000 },
     });
+  });
+  it('drops a retired mark when a complete catalog omits its successor', () => {
+    const result = migrateStoryChapterObjectives(
+      { 'the-ticket-main-10': { complete: true, timestamp: 1000 } },
+      completeChapter([OTHER_ID])
+    );
+    expect(result).toMatchObject({ migrated: 0, dropped: 1, changed: true });
+    expect(result.objectives).toEqual({});
   });
   it('migrates that mark once the successor appears in the catalog', () => {
     const stored = { 'the-ticket-main-10': { complete: true, timestamp: 1000 } };

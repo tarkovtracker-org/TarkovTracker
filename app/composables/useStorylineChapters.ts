@@ -535,7 +535,10 @@ const buildQuestRouteChoice = (
   return {
     branches,
     chosenBranchId: chosenQuestRoute(branches, chapter.coveragePartial),
-    conflicting: branches.filter((branch) => branch.knownStepsComplete).length > 1,
+    // A conflict is a claim about finished routes, which partial coverage cannot support: unknown
+    // steps may remain on both sides, and progress on both is legal.
+    conflicting:
+      !chapter.coveragePartial && branches.filter((branch) => branch.knownStepsComplete).length > 1,
     coveragePartial: chapter.coveragePartial,
     id: `${chapter.id}-quest-route-${questIds.join('-')}`,
   };
