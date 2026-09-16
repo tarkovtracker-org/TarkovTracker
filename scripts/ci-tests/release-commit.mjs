@@ -177,11 +177,10 @@ test('dispatched main Fallow audit compares the real parent instead of main agai
 test('release permission key order does not change dispatch authorization', () => {
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
   const workflow = readFileSync('.github/workflows/release.yml', 'utf8');
-  assertReleaseWorkflowBoundaries(
-    ci,
-    workflow.replace(
-      '      actions: write\n      checks: read',
-      '      checks: read\n      actions: write'
-    )
+  const reordered = workflow.replace(
+    '      actions: write\n      checks: read',
+    '      checks: read\n      actions: write'
   );
+  assert.notEqual(reordered, workflow, 'permission reordering must apply');
+  assertReleaseWorkflowBoundaries(ci, reordered);
 });

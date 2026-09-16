@@ -368,7 +368,10 @@ test('Crowdin dispatch permission cannot come from an unrelated job', () => {
 });
 test('Crowdin permission key order does not change dispatch authorization', () => {
   const workflow = read('.github/workflows/crowdin.yml');
-  assertWorkflowBoundaries(
-    workflow.replace('  actions: write\n  checks: read', '  checks: read\n  actions: write')
+  const reordered = workflow.replace(
+    '  actions: write\n  checks: read',
+    '  checks: read\n  actions: write'
   );
+  assert.notEqual(reordered, workflow, 'permission reordering must apply');
+  assertWorkflowBoundaries(reordered);
 });
