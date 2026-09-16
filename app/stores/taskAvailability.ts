@@ -109,6 +109,12 @@ const acceptsActive = (statuses: string[]) =>
  */
 const hasExplicitActiveState = (completion: RawTaskCompletion): boolean =>
   typeof completion === 'object' && completion !== null && Object.hasOwn(completion, 'active');
+/** An accepted task satisfies an active requirement outright. */
+const acceptedTaskState = (completion: RawTaskCompletion) =>
+  isTaskActive(completion) || isTaskComplete(completion);
+/** A failed row or an authoritative `active: false` row can never satisfy an active requirement. */
+const rejectsActiveRequirement = (completion: RawTaskCompletion) =>
+  isTaskFailed(completion) || hasExplicitActiveState(completion);
 const terminalStatusMet = (statuses: string[], completion: RawTaskCompletion) =>
   (acceptsCompleted(statuses) && isTaskComplete(completion)) ||
   (statuses.includes('failed') && isTaskFailed(completion));
@@ -188,9 +194,8 @@ const createTeamEvaluator = (
     taskId: string,
     completion: RawTaskCompletion
   ): TaskAvailabilityResult => {
-    if (isTaskFailed(completion)) return result([{ type: 'prerequisite' }]);
-    if (isTaskActive(completion) || isTaskComplete(completion)) return result([]);
-    if (hasExplicitActiveState(completion)) return result([{ type: 'prerequisite' }]);
+    if (acceptedTaskState(completion)) return result([]);
+    if (rejectsActiveRequirement(completion)) return result([{ type: 'prerequisite' }]);
     return evaluate(taskId, true);
   };
   const requiredTaskResult = (requirement: TaskRequirement): TaskAvailabilityResult => {
