@@ -100,8 +100,7 @@ export const useSeasonPlannerStore = defineStore('seasonPlanner', {
     },
     toggleModifier(id: string) {
       this.prepareForCurrentUser();
-      const modifier = this.personalModifiers.find((candidate) => candidate.id === id);
-      if (!modifier) {
+      if (!this.personalModifiers.some((candidate) => candidate.id === id)) {
         return;
       }
       const selectedIds = this.selectedModifierIds;
