@@ -24,8 +24,14 @@ export default defineVitestConfig({
     isolate: true,
     logHeapUsage: false,
     pool: 'forks',
-    maxWorkers: 1,
-    fileParallelism: false,
+    // Test files run in parallel. `isolate: true` gives every file its own fork, so no module
+    // state crosses file boundaries. This was serialized on 2026-01-25 (single fork +
+    // `fileParallelism: false`) in the same change that added
+    // `--dangerouslyIgnoreUnhandledErrors` to the test script, which existed to swallow worker
+    // teardown/unhandled errors. That flag was removed on 2026-02-17, so the serialization
+    // outlived the failure it worked around. The worker count stays bounded rather than
+    // unbounded to keep teardown pressure and peak memory predictable.
+    maxWorkers: process.env.CI ? 4 : 8,
     maxConcurrency: 1,
     testTimeout: 30000,
     hookTimeout: 60000,
