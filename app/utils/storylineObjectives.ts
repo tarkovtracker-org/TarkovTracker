@@ -1,11 +1,12 @@
 import type { StoryChapter, StoryObjective } from '@/types/tarkov';
 type StoryObjectiveInput = StoryChapter['objectives'] | StoryObjective[] | null | undefined;
 type StoryObjectiveLike = Partial<StoryObjective> & { id?: string };
-type StoryQuestPairs = StoryChapter['mutuallyExclusiveQuestPairs'];
+type StoryQuestPairs = NonNullable<StoryChapter['mutuallyExclusiveQuestPairs']>;
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0;
 const optionalText = (value: unknown): string | undefined =>
   isNonEmptyString(value) ? value : undefined;
+const compareIds = (left: string, right: string): number => left.localeCompare(right);
 const normalizeObjectiveType = (type: StoryObjectiveLike['type']): StoryObjective['type'] => {
   return type === 'optional' ? 'optional' : 'main';
 };
@@ -22,7 +23,7 @@ const normalizeMutualList = (objectiveId: string, objective: StoryObjectiveLike)
         (linkedId): linkedId is string => isNonEmptyString(linkedId) && linkedId !== objectiveId
       )
     )
-  ).sort();
+  ).sort(compareIds);
 };
 const normalizeObjectiveEntries = (
   objectives: StoryObjectiveInput
@@ -80,7 +81,7 @@ export const normalizeStoryObjectives = (
       mergedLinkedIds.add(objective.id);
       linkedObjective.mutuallyExclusiveWith = Array.from(mergedLinkedIds)
         .filter((id) => id !== linkedObjective.id)
-        .sort();
+        .sort(compareIds);
     }
     if ((objective.mutuallyExclusiveWith?.length ?? 0) === 0) {
       objective.mutuallyExclusiveWith = undefined;
@@ -100,14 +101,14 @@ const isDistinctIdPair = (pair: readonly unknown[]): boolean =>
   isNonEmptyString(pair[0]) && isNonEmptyString(pair[1]) && pair[0] !== pair[1];
 const isQuestPair = (pair: unknown): pair is [string, string] =>
   Array.isArray(pair) && pair.length === 2 && isDistinctIdPair(pair);
-const normalizedQuestPairs = (pairs: StoryQuestPairs): Array<[string, string]> =>
+const normalizedQuestPairs = (pairs?: StoryQuestPairs): Array<[string, string]> =>
   (pairs ?? []).filter(isQuestPair);
 /**
  * Sub-quest IDs the overlay declares mutually exclusive for a chapter. Completing every objective
  * of one such quest rules the paired quest out, but partial progress on both stays legal, so these
  * IDs gate bulk completion only — never an individual objective toggle.
  */
-export const storyExclusiveQuestIds = (pairs: StoryQuestPairs): Set<string> => {
+export const storyExclusiveQuestIds = (pairs?: StoryQuestPairs): Set<string> => {
   const questIds = new Set<string>();
   for (const [questId, otherQuestId] of normalizedQuestPairs(pairs)) {
     questIds.add(questId);
@@ -115,12 +116,12 @@ export const storyExclusiveQuestIds = (pairs: StoryQuestPairs): Set<string> => {
   }
   return questIds;
 };
-const buildQuestAdjacency = (pairs: StoryQuestPairs): Map<string, Set<string>> => {
+const buildQuestAdjacency = (pairs?: StoryQuestPairs): Map<string, Set<string>> => {
   const adjacency = new Map<string, Set<string>>();
-  const link = (questId: string, otherQuestId: string) => {
-    const linked = adjacency.get(questId) ?? new Set<string>();
-    linked.add(otherQuestId);
-    adjacency.set(questId, linked);
+  const link = (fromQuestId: string, toQuestId: string) => {
+    const linked = adjacency.get(fromQuestId) ?? new Set<string>();
+    linked.add(toQuestId);
+    adjacency.set(fromQuestId, linked);
   };
   for (const [questId, otherQuestId] of normalizedQuestPairs(pairs)) {
     link(questId, otherQuestId);
@@ -144,10 +145,10 @@ const collectQuestGroup = (
     group.push(questId);
     pending.push(...(adjacency.get(questId) ?? []));
   }
-  return group.sort();
+  return group.sort(compareIds);
 };
 /** Connected groups of mutually exclusive sub-quests, so a quest paired with several appears once. */
-export const storyQuestExclusionGroups = (pairs: StoryQuestPairs): string[][] => {
+export const storyQuestExclusionGroups = (pairs?: StoryQuestPairs): string[][] => {
   const adjacency = buildQuestAdjacency(pairs);
   const visited = new Set<string>();
   const groups: string[][] = [];
@@ -193,7 +194,7 @@ export const unknownStoryObjectiveIds = (
   const known = normalizeStoryObjectives(objectives);
   return Array.from(new Set(storedObjectiveIds))
     .filter((objectiveId) => isNonEmptyString(objectiveId) && !known[objectiveId])
-    .sort();
+    .sort(compareIds);
 };
 export interface ToggleStoryChapterWithLinearObjectivesOptions {
   chapterId: string;
