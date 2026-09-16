@@ -105,7 +105,8 @@ Deno.serve(async (req) => {
     const auth = await authenticateMutation(req, 'team-kick');
     if (auth.response) return auth.response;
     return await readKick(req, auth);
-  } catch {
+  } catch (error) {
+    console.error('Team kick error:', error);
     return createErrorResponse('Internal server error', 500, req);
   }
 });

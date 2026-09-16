@@ -1,5 +1,5 @@
 BEGIN;
-SELECT no_plan();
+SELECT plan(9);
 INSERT INTO auth.users(id,email) VALUES
  ('00000000-0000-0000-0000-000000000901','event-owner@example.invalid'),
  ('00000000-0000-0000-0000-000000000902','event-victim@example.invalid'),
