@@ -168,7 +168,7 @@ export const unknownStoryObjectiveIds = (
 ): string[] => {
   const known = normalizeStoryObjectives(objectives);
   return Array.from(new Set(storedObjectiveIds))
-    .filter((objectiveId) => isNonEmptyString(objectiveId) && !known[objectiveId])
+    .filter((objectiveId) => isNonEmptyString(objectiveId) && !Object.hasOwn(known, objectiveId))
     .sort(compareIds);
 };
 export interface ToggleStoryChapterWithLinearObjectivesOptions {

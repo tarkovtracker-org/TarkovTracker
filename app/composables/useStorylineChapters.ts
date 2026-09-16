@@ -90,13 +90,25 @@ export interface StorylineEndingView {
 export interface StorylineQuestRouteBranchView {
   id: string;
   label: string;
-  complete: boolean;
+  /** Every objective this chapter publishes for the route is marked complete. */
+  knownStepsComplete: boolean;
   completedCount: number;
   totalCount: number;
+  /** The chapter publishes no objective for this route, so there is nothing to track yet. */
+  evidencePending: boolean;
 }
 export interface StorylineQuestRouteChoiceView {
   id: string;
   branches: StorylineQuestRouteBranchView[];
+  /**
+   * The chapter's objective list is a projection of the overlay capture, so finishing every known
+   * step of a route is not proof the route itself is finished.
+   */
+  coveragePartial: boolean;
+  /** The route whose completion is proven, which partial coverage can never establish. */
+  chosenBranchId: string | null;
+  /** More than one route reads as finished, which the game does not allow. */
+  conflicting: boolean;
 }
 export interface StorylineNormalizedChapterView extends Omit<
   StorylineChapterView,
@@ -475,27 +487,59 @@ const buildDeclaredEndings = (
       systemName: ending.systemName,
     };
   });
+/**
+ * One side of a declared exclusive pair.
+ *
+ * A route the chapter publishes no objective for still appears: the pair is declared data, and
+ * hiding half of it would present the remaining route as unopposed. Such a branch reports pending
+ * evidence instead of progress.
+ */
 const buildQuestRouteBranch = (
   questId: string,
   objectives: StorylineObjectiveProgress[]
-): StorylineQuestRouteBranchView | null => {
+): StorylineQuestRouteBranchView => {
   const questObjectives = objectives.filter((objective) => objective.sourceQuestId === questId);
-  const firstObjective = questObjectives[0];
-  if (!firstObjective) {
-    return null;
-  }
   const completedCount = questObjectives.filter((objective) => objective.complete).length;
   return {
-    complete: completedCount === questObjectives.length,
     completedCount,
+    evidencePending: questObjectives.length === 0,
     id: questId,
-    label: firstObjective.description,
+    knownStepsComplete: questObjectives.length > 0 && completedCount === questObjectives.length,
+    label: questObjectives[0]?.description ?? questId,
     totalCount: questObjectives.length,
   };
 };
-const isQuestRouteBranch = (
-  branch: StorylineQuestRouteBranchView | null
-): branch is StorylineQuestRouteBranchView => branch !== null;
+/**
+ * Which route is proven finished. Partial coverage proves nothing: the published objective list is a
+ * projection of the overlay's capture, so finishing every known step leaves unknown steps possible.
+ */
+const soleCompleteBranch = (
+  branches: StorylineQuestRouteBranchView[]
+): StorylineQuestRouteBranchView | null => {
+  const complete = branches.filter((branch) => branch.knownStepsComplete);
+  return complete.length === 1 ? (complete[0] ?? null) : null;
+};
+const chosenQuestRoute = (
+  branches: StorylineQuestRouteBranchView[],
+  coveragePartial: boolean
+): string | null => {
+  if (coveragePartial) return null;
+  return soleCompleteBranch(branches)?.id ?? null;
+};
+const buildQuestRouteChoice = (
+  chapter: StorylineChapterView,
+  objectives: StorylineObjectiveProgress[],
+  questIds: readonly [string, string]
+): StorylineQuestRouteChoiceView => {
+  const branches = questIds.map((questId) => buildQuestRouteBranch(questId, objectives));
+  return {
+    branches,
+    chosenBranchId: chosenQuestRoute(branches, chapter.coveragePartial),
+    conflicting: branches.filter((branch) => branch.knownStepsComplete).length > 1,
+    coveragePartial: chapter.coveragePartial,
+    id: `${chapter.id}-quest-route-${questIds.join('-')}`,
+  };
+};
 /**
  * Mutually exclusive sub-quest routes, presented as chapter-level alternatives. One entry per pair
  * the overlay declares: two pairs sharing a quest do not make their other members exclusive.
@@ -505,14 +549,9 @@ const buildQuestRouteChoices = (
   chapter: StorylineChapterView,
   objectives: StorylineObjectiveProgress[]
 ): StorylineQuestRouteChoiceView[] =>
-  storyExclusiveQuestPairs(chapter.mutuallyExclusiveQuestPairs)
-    .map((questIds) => ({
-      branches: questIds
-        .map((questId) => buildQuestRouteBranch(questId, objectives))
-        .filter(isQuestRouteBranch),
-      id: `${chapter.id}-quest-route-${questIds.join('-')}`,
-    }))
-    .filter((routeChoice) => routeChoice.branches.length === 2);
+  storyExclusiveQuestPairs(chapter.mutuallyExclusiveQuestPairs).map((questIds) =>
+    buildQuestRouteChoice(chapter, objectives, questIds)
+  );
 export function useStorylineChapters(options: UseStorylineChaptersOptions = {}): {
   chapters: ComputedRef<StorylineChapterView[]>;
   normalizedChapters: ComputedRef<StorylineNormalizedChapterView[]>;
@@ -565,7 +604,9 @@ export function useStorylineChapters(options: UseStorylineChaptersOptions = {}):
           objective.mutuallyExclusiveWith ?? []
         )
           .map((linkedId) => {
-            const linkedObjective = chapter.objectiveMap[linkedId];
+            const linkedObjective = Object.hasOwn(chapter.objectiveMap, linkedId)
+              ? chapter.objectiveMap[linkedId]
+              : undefined;
             if (!linkedObjective) {
               return null;
             }

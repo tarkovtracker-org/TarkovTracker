@@ -179,12 +179,21 @@ const reconcileAgainstCatalog = (
   chapters: readonly StoryChapter[]
 ): StoryIdChanges =>
   applyStoryReconciliation(modeData, migrateStoryProgress(modeData?.storyChapters, chapters));
-const reconcileStoryMode = (
-  modeData: UserProgressData | undefined,
-  chapters: readonly StoryChapter[]
-): StoryIdChanges => {
-  if (chapters.length === 0) return NO_STORY_ID_CHANGES;
-  return reconcileAgainstCatalog(modeData, chapters);
+/**
+ * The mode a loaded catalog may reconcile.
+ *
+ * Chapters are fetched per mode and language and the overlay may scope a chapter to one mode, so a
+ * catalog is evidence about its own mode only. A caller naming another mode — a realtime merge for
+ * inactive progress — is deferred rather than reconciled against the wrong catalog; that mode is
+ * reconciled when its own catalog loads, which a mode switch or the next start does.
+ */
+const reconcilableStoryMode = (
+  catalogMode: GameMode | null,
+  requested: GameMode | undefined
+): GameMode | null => {
+  if (!catalogMode) return null;
+  if (requested && requested !== catalogMode) return null;
+  return catalogMode;
 };
 const logStoryObjectiveMigration = (totals: StoryIdChanges): void => {
   if (totals.migrated === 0 && totals.dropped === 0) return;
@@ -402,9 +411,9 @@ const tarkovActions = {
   migrateStoryObjectiveIds(this: TarkovStoreInstance, mode?: GameMode) {
     const metadataStore = useMetadataStore();
     const chapters = metadataStore.storyChapters ?? [];
-    const catalogMode = asGameMode(metadataStore.currentGameMode);
-    const target = mode ?? catalogMode;
-    const totals = reconcileStoryMode(target ? this[target] : undefined, chapters);
+    const target = reconcilableStoryMode(asGameMode(metadataStore.currentGameMode), mode);
+    if (!target || chapters.length === 0) return NO_STORY_ID_CHANGES;
+    const totals = reconcileAgainstCatalog(this[target], chapters);
     logStoryObjectiveMigration(totals);
     return totals;
   },

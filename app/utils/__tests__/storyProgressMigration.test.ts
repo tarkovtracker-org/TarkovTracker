@@ -57,6 +57,31 @@ describe('storyProgressMigration', () => {
     expect(result.objectives).toEqual({ [CURRENT_ID]: { complete: false, timestamp: 2000 } });
     expect(result).toMatchObject({ migrated: 0, dropped: 1 });
   });
+  it('keeps a retired mark whose proven successor the partial catalog omits', () => {
+    const result = migrateStoryChapterObjectives(
+      { 'the-ticket-main-10': { complete: true, timestamp: 1000 } },
+      chapter([OTHER_ID])
+    );
+    expect(result).toMatchObject({ migrated: 0, dropped: 0, changed: false });
+    expect(result.objectives).toEqual({
+      'the-ticket-main-10': { complete: true, timestamp: 1000 },
+    });
+  });
+  it('migrates that mark once the successor appears in the catalog', () => {
+    const stored = { 'the-ticket-main-10': { complete: true, timestamp: 1000 } };
+    expect(migrateStoryChapterObjectives(stored, chapter([OTHER_ID])).objectives).toEqual(stored);
+    expect(migrateStoryChapterObjectives(stored, chapter([CURRENT_ID])).objectives).toEqual({
+      [CURRENT_ID]: { complete: true, timestamp: 1000 },
+    });
+  });
+  it('does not treat inherited object keys as published objectives', () => {
+    const result = migrateStoryChapterObjectives(
+      { constructor: { complete: true }, toString: { complete: true } },
+      chapter([CURRENT_ID])
+    );
+    expect(result).toMatchObject({ migrated: 0, dropped: 2, changed: true });
+    expect(result.objectives).toEqual({});
+  });
   it('keeps an unrecognized client id, because the published list can be partial', () => {
     const unknownClientId = '6912345678901234567890ab';
     const result = migrateStoryChapterObjectives(

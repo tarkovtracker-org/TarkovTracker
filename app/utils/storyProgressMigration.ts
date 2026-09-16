@@ -82,9 +82,19 @@ export const publishesClientObjectiveIds = (chapter: StoryChapter): boolean => {
   const objectiveIds = publishedObjectiveIds(chapter);
   return objectiveIds.length > 0 && objectiveIds.every((id) => CLIENT_OBJECTIVE_ID.test(id));
 };
-/** A retired ID may only move onto a published ID that holds no mark of its own. */
-const isMovable = (alias: string | undefined, context: MigrationContext): alias is string =>
-  typeof alias === 'string' && context.published.has(alias) && !(alias in context.stored);
+/**
+ * What to do with a saved ID the catalog no longer publishes but a proven re-key names.
+ *
+ * The successor may be absent from this catalog: `referenceCoverage.partial` means the published
+ * objective list is a projection, so the mark is kept until the successor appears rather than
+ * deleted. When the successor is published and already carries a mark, that mark is the player's
+ * current intent and the retired record is dropped.
+ */
+const classifyAliasedObjective = (alias: string, context: MigrationContext): Disposition => {
+  if (!context.published.has(alias)) return { kind: 'keep' };
+  if (Object.hasOwn(context.stored, alias)) return { kind: 'drop' };
+  return { kind: 'move', to: alias };
+};
 /**
  * What to do with one saved objective ID.
  *
@@ -92,12 +102,13 @@ const isMovable = (alias: string | undefined, context: MigrationContext): alias 
  * published objective list is a projection of the overlay's capture, so a real objective can be
  * absent from it today and present tomorrow. Only an ID the contract can never accept is dropped.
  */
+const aliasFor = (objectiveId: string, context: MigrationContext): string | undefined =>
+  Object.hasOwn(context.aliases, objectiveId) ? context.aliases[objectiveId] : undefined;
 const classifyStoredObjective = (objectiveId: string, context: MigrationContext): Disposition => {
   if (context.published.has(objectiveId)) return { kind: 'keep' };
-  const alias = context.aliases[objectiveId];
-  if (isMovable(alias, context)) return { kind: 'move', to: alias };
-  if (CLIENT_OBJECTIVE_ID.test(objectiveId)) return { kind: 'keep' };
-  return { kind: 'drop' };
+  const alias = aliasFor(objectiveId, context);
+  if (alias) return classifyAliasedObjective(alias, context);
+  return CLIENT_OBJECTIVE_ID.test(objectiveId) ? { kind: 'keep' } : { kind: 'drop' };
 };
 const collectObjective = (
   result: { objectives: StoredObjectives; migrated: number; dropped: number },
@@ -130,8 +141,12 @@ const withObjectiveTotals = (result: {
   ...result,
   changed: result.migrated > 0 || result.dropped > 0,
 });
+const chapterAliases = (chapterId: string): Readonly<Record<string, string>> =>
+  Object.hasOwn(STORY_OBJECTIVE_ID_ALIASES, chapterId)
+    ? (STORY_OBJECTIVE_ID_ALIASES[chapterId] ?? {})
+    : {};
 const migrationContext = (chapter: StoryChapter, stored: StoredObjectives): MigrationContext => ({
-  aliases: STORY_OBJECTIVE_ID_ALIASES[chapter.id] ?? {},
+  aliases: chapterAliases(chapter.id),
   published: new Set(publishedObjectiveIds(chapter)),
   stored,
 });

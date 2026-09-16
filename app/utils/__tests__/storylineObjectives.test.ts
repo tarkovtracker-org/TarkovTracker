@@ -105,6 +105,12 @@ describe('storylineObjectives', () => {
       'the-ticket-main-10',
     ]);
   });
+  it('reports inherited object keys as unknown saved ids', () => {
+    expect(unknownStoryObjectiveIds(objectives, ['constructor', 'toString', 'obj-1'])).toEqual([
+      'constructor',
+      'toString',
+    ]);
+  });
   it('does not bulk complete either side of a mutually exclusive quest pair', () => {
     const setObjectiveComplete = vi.fn();
     toggleStoryChapterWithLinearObjectives({

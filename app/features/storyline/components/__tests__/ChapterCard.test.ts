@@ -122,20 +122,25 @@ describe('ChapterCard story contract rendering', () => {
         {
           branches: [
             {
-              complete: true,
               completedCount: 1,
+              evidencePending: false,
               id: 'quest-keep',
+              knownStepsComplete: true,
               label: 'Keep the case',
               totalCount: 1,
             },
             {
-              complete: false,
               completedCount: 0,
+              evidencePending: false,
               id: 'quest-hand-over',
+              knownStepsComplete: false,
               label: 'Hand the case over',
               totalCount: 1,
             },
           ],
+          chosenBranchId: 'quest-keep',
+          conflicting: false,
+          coveragePartial: false,
           id: 'the-ticket-quest-route-quest-hand-over-quest-keep',
         },
       ],
@@ -147,6 +152,70 @@ describe('ChapterCard story contract rendering', () => {
       'page.storyline.quest_route_progress:{"completed":1,"total":1}'
     );
     expect(wrapper.get('input[type="checkbox"]').attributes('disabled')).toBeUndefined();
+    wrapper.unmount();
+  });
+  it('reports known-step progress rather than a chosen route under partial coverage', () => {
+    const wrapper = mountCard(
+      createChapter({
+        coveragePartial: true,
+        questRouteChoices: [
+          {
+            branches: [
+              {
+                completedCount: 1,
+                evidencePending: false,
+                id: 'quest-keep',
+                knownStepsComplete: true,
+                label: 'Keep the case',
+                totalCount: 1,
+              },
+              {
+                completedCount: 0,
+                evidencePending: true,
+                id: 'quest-hand-over',
+                knownStepsComplete: false,
+                label: 'quest-hand-over',
+                totalCount: 0,
+              },
+            ],
+            chosenBranchId: null,
+            conflicting: false,
+            coveragePartial: true,
+            id: 'the-ticket-quest-route-quest-hand-over-quest-keep',
+          },
+        ],
+      })
+    );
+    const text = wrapper.text();
+    expect(text).toContain('page.storyline.quest_route_known_steps_done');
+    expect(text).toContain('page.storyline.quest_route_evidence_pending');
+    expect(text).not.toContain('page.storyline.route_chosen');
+    wrapper.unmount();
+  });
+  it('warns when more than one route reads as finished', () => {
+    const branch = (id: string) => ({
+      completedCount: 1,
+      evidencePending: false,
+      id,
+      knownStepsComplete: true,
+      label: id,
+      totalCount: 1,
+    });
+    const wrapper = mountCard(
+      createChapter({
+        coveragePartial: true,
+        questRouteChoices: [
+          {
+            branches: [branch('quest-keep'), branch('quest-hand-over')],
+            chosenBranchId: null,
+            conflicting: true,
+            coveragePartial: true,
+            id: 'the-ticket-quest-route-quest-hand-over-quest-keep',
+          },
+        ],
+      })
+    );
+    expect(wrapper.text()).toContain('page.storyline.quest_route_conflict');
     wrapper.unmount();
   });
   it('flags partial upstream coverage and stale saved marks', () => {
