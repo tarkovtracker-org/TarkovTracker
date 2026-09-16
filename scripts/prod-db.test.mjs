@@ -3,6 +3,7 @@ import {
   chmodSync,
   existsSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   statSync,
@@ -69,6 +70,16 @@ let data = [{
 if (process.env.FAKE_SUPABASE_INCOMPLETE === 'true') delete data[0].lock_timeout;
 if (sql.includes('pg_catalog.pg_attribute')) {
   data = [{ column_name: 'id' }, { column_name: 'email' }];
+}
+if (sql.includes('supabase_migrations.schema_migrations')) {
+  if (process.env.FAKE_SUPABASE_DENY_HISTORY === 'true') {
+    console.error('failed to execute query: error: permission denied for schema supabase_migrations');
+    process.exit(1);
+  }
+  data = (process.env.FAKE_SUPABASE_REMOTE_VERSIONS ?? '')
+    .split(',')
+    .filter(Boolean)
+    .map((version) => ({ version }));
 }
 if (process.env.FAKE_SUPABASE_NOISE === 'true') process.stdout.write('[warn] diagnostic\\n');
 process.stdout.write(JSON.stringify({ rows: data }));
@@ -250,5 +261,44 @@ describe('prod-db canary', () => {
     expect(() => run(['canary'], { FAKE_SUPABASE_INCOMPLETE: 'true' })).toThrow(
       'incomplete observer health report; missing: lock_timeout'
     );
+  });
+  describe('migration-history', () => {
+    const localVersions = readdirSync(join(root, 'supabase/migrations'))
+      .map((entry) => /^(\d+)_.+\.sql$/.exec(entry)?.[1])
+      .filter((version) => typeof version === 'string')
+      .sort();
+    function history(remoteVersions) {
+      return JSON.parse(
+        run(['migration-history'], { FAKE_SUPABASE_REMOTE_VERSIONS: remoteVersions.join(',') })
+      );
+    }
+    it('reads the checkout so a full local history reports in sync', () => {
+      expect(localVersions.length).toBeGreaterThan(0);
+      const result = history(localVersions);
+      expect(result.operation).toBe('migration-history');
+      expect(result.data.in_sync).toBe(true);
+      expect(result.data.remote_total).toBe(localVersions.length);
+      expect(result.data.local_total).toBe(localVersions.length);
+      expect(result.data.missing_locally).toEqual([]);
+      expect(result.data.pending_remotely).toEqual([]);
+    });
+    it('names a version applied remotely but absent from the checkout', () => {
+      const result = history([...localVersions, '29991231235959']);
+      expect(result.data.in_sync).toBe(false);
+      expect(result.data.missing_locally).toEqual(['29991231235959']);
+      expect(result.data.pending_remotely).toEqual([]);
+    });
+    it('names a checkout version that has not been applied remotely', () => {
+      const [pending, ...applied] = localVersions;
+      const result = history(applied);
+      expect(result.data.in_sync).toBe(false);
+      expect(result.data.pending_remotely).toEqual([pending]);
+      expect(result.data.missing_locally).toEqual([]);
+    });
+    it('explains the read-only grant when history access is denied', () => {
+      expect(() => run(['migration-history'], { FAKE_SUPABASE_DENY_HISTORY: 'true' })).toThrow(
+        'GRANT SELECT ON TABLE supabase_migrations.schema_migrations'
+      );
+    });
   });
 });
