@@ -84,10 +84,12 @@ test('release refuses unrelated staged content', (t) => {
 });
 /** Keep trigger, job eligibility and publication credentials within their owning blocks. */
 function assertReleaseWorkflowBoundaries(ci, releaseWorkflow) {
+  workflowEvent(ci, 'workflow_dispatch');
   assert.match(workflowEvent(ci, 'push'), /branches: \[main, develop, 'wip\/\*\*'\]/);
   const release = jobBlock(releaseWorkflow, 'release');
   const eligibility = release.slice(0, release.indexOf('    steps:'));
   assert.match(eligibility, /head_branch == 'main'/);
+  assert.match(eligibility, /permissions:\n      actions: write\n/);
   assert.match(
     workflowStep(release, 'Semantic Release'),
     /GITHUB_TOKEN: \$\{\{ secrets.GITHUB_TOKEN \}\}/
@@ -128,4 +130,14 @@ test('failed CI dispatch leaves the staged commit unpromoted', (t) => {
   assert.equal(f.pushes().length, 1);
   assert.equal(git(f.repo, '--git-dir', f.remote, 'rev-parse', 'main'), f.base);
   assert.ok(!f.events().some((event) => event.type === 'ci-result'));
+});
+test('release requires the CI dispatch trigger and its own actions write permission', () => {
+  const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const release = readFileSync('.github/workflows/release.yml', 'utf8');
+  assert.throws(() =>
+    assertReleaseWorkflowBoundaries(ci.replace('  workflow_dispatch:\n', ''), release)
+  );
+  const readOnly = release.replace('actions: write', 'actions: read');
+  const unrelated = '\n  unrelated:\n    permissions:\n      actions: write\n';
+  assert.throws(() => assertReleaseWorkflowBoundaries(ci, readOnly + unrelated));
 });

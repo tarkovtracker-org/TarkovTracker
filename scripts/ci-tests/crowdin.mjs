@@ -3,7 +3,7 @@ import { chmodSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fixture, git } from './helpers/automation-fixture.mjs';
-import { jobBlock, workflowStep } from './helpers/workflow-blocks.mjs';
+import { jobBlock, workflowEvent, workflowStep } from './helpers/workflow-blocks.mjs';
 const read = (path) => readFileSync(path, 'utf8');
 /** Require a successful gate subprocess with its diagnostic on failure. */
 function passed(result) {
@@ -163,6 +163,9 @@ function assertStepOrder(job, first, second) {
 }
 /** Verify each workflow boundary within its owning job and step. */
 function assertWorkflowBoundaries(workflow) {
+  const workflowSettings = workflow.slice(0, workflow.indexOf('\njobs:'));
+  assert.match(workflowSettings, /permissions:\n  actions: write\n/);
+  workflowEvent(read('.github/workflows/ci.yml'), 'workflow_dispatch');
   const sync = jobBlock(workflow, 'sync');
   assertStepOrder(
     sync,
@@ -351,4 +354,10 @@ test('Crowdin refuses to merge when dispatch fails', (t) => {
   assert.equal(f.run('prepare').status, 0);
   assert.notEqual(f.run('merge', { DISPATCH_FAIL: 'true' }).status, 0);
   assert.ok(!f.calls().some((args) => args[1] === 'merge'));
+});
+test('Crowdin dispatch permission cannot come from an unrelated job', () => {
+  const workflow = read('.github/workflows/crowdin.yml');
+  const readOnly = workflow.replace('actions: write', 'actions: read');
+  const unrelated = '\n  unrelated:\n    permissions:\n      actions: write\n';
+  assert.throws(() => assertWorkflowBoundaries(readOnly + unrelated));
 });
