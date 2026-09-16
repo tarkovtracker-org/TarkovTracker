@@ -1139,6 +1139,19 @@ flowchart LR
   inherits the same requirement, and deleting the untrusted rows is not a substitute because the
   filter is what makes the contract durable.
 
+- `team-leave` calls the service-only `public.leave_team` RPC with the authenticated user ID,
+  never an identity from the request body. Membership removal, conditional pointer maintenance,
+  and trusted event insertion commit together. The handler performs no later table write, so a
+  newer join cannot be overwritten by an old leave response.
+- Leave takes a per-user advisory lock, then the team row and membership row. Ownership transfer
+  locks the team before validating owner and successor membership, preventing promotion of a
+  departed member. Both RPCs have a five-second lock timeout and service-only execution grants.
+  The handler retries the whole leave transaction at most three times, with 50/100 ms delays,
+  only for confirmed `40P01`, `40001`, or `55P03` aborts. Exhaustion returns `503` with
+  `Retry-After: 1`; business results and ambiguous transport failures are not retried.
+- Cooldowns are user/mode-wide across teams but retain the existing event lifetime: disband
+  deletes the associated events. They are not durable cooldown evidence after team deletion.
+
 ---
 
 ## 8. Tarkov.dev profile import
