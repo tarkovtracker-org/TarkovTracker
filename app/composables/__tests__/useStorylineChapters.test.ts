@@ -322,7 +322,6 @@ describe('useStorylineChapters', () => {
             totalCount: 1,
           },
         ],
-        chosenBranchId: 'quest-keep',
         id: 'the-ticket-quest-route-quest-hand-over-quest-keep',
       },
     ]);

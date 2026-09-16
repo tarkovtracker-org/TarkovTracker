@@ -16,50 +16,66 @@ const isStoryChapterCompleteMock = vi.fn((chapterId: string) => {
 const isStoryObjectiveCompleteMock = vi.fn((chapterId: string, objectiveId: string) => {
   return objectiveCompletionState[`${chapterId}:${objectiveId}`] === true;
 });
+const getCurrentProgressDataMock = vi.fn(() => ({
+  storyChapters: {
+    'chapter-1': {
+      objectives: {
+        'obj-3': { complete: true },
+        'obj-4': { complete: false },
+        'the-ticket-main-10': { complete: true },
+      },
+    },
+  },
+}));
 mockNuxtImport('definePageMeta', () => () => {});
 mockNuxtImport('useSeoMeta', () => () => {});
+const storylineOptions = vi.fn();
 vi.mock('@/composables/useStorylineChapters', () => ({
-  useStorylineChapters: () => ({
-    chapters: ref([
-      {
-        id: 'chapter-1',
-        objectives: [
-          {
-            id: 'obj-1',
-            order: 1,
-            type: 'main',
-            description: 'Route A',
-            mutuallyExclusiveWith: ['obj-2'],
+  useStorylineChapters: (options: { completedObjectiveIds?: (chapterId: string) => string[] }) => {
+    storylineOptions(options);
+    return {
+      chapters: ref([
+        {
+          id: 'chapter-1',
+          objectives: [
+            {
+              id: 'obj-1',
+              order: 1,
+              type: 'main',
+              description: 'Route A',
+              mutuallyExclusiveWith: ['obj-2'],
+            },
+            {
+              id: 'obj-2',
+              order: 2,
+              type: 'main',
+              description: 'Route B',
+              mutuallyExclusiveWith: ['obj-1'],
+            },
+            { id: 'obj-3', order: 3, type: 'main', description: 'Linear objective' },
+            { id: 'obj-4', order: 4, type: 'optional', description: 'Optional linear' },
+          ],
+          objectiveMap: {
+            'obj-1': { mutuallyExclusiveWith: ['obj-2'] },
+            'obj-2': { mutuallyExclusiveWith: ['obj-1'] },
+            'obj-3': {},
+            'obj-4': {},
           },
-          {
-            id: 'obj-2',
-            order: 2,
-            type: 'main',
-            description: 'Route B',
-            mutuallyExclusiveWith: ['obj-1'],
-          },
-          { id: 'obj-3', order: 3, type: 'main', description: 'Linear objective' },
-          { id: 'obj-4', order: 4, type: 'optional', description: 'Optional linear' },
-        ],
-        objectiveMap: {
-          'obj-1': { mutuallyExclusiveWith: ['obj-2'] },
-          'obj-2': { mutuallyExclusiveWith: ['obj-1'] },
-          'obj-3': {},
-          'obj-4': {},
         },
-      },
-    ]),
-    normalizedChapters: ref([
-      {
-        complete: false,
-        id: 'chapter-1',
-        title: 'Chapter 1',
-      },
-    ]),
-  }),
+      ]),
+      normalizedChapters: ref([
+        {
+          complete: false,
+          id: 'chapter-1',
+          title: 'Chapter 1',
+        },
+      ]),
+    };
+  },
 }));
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
+    getCurrentProgressData: getCurrentProgressDataMock,
     isStoryChapterComplete: isStoryChapterCompleteMock,
     isStoryObjectiveComplete: isStoryObjectiveCompleteMock,
     setStoryChapterComplete: setStoryChapterCompleteMock,
@@ -100,6 +116,15 @@ describe('storyline page', () => {
         },
       },
     });
+  it('reports only completed objective marks to the storyline view', () => {
+    const wrapper = createWrapper();
+    const options = storylineOptions.mock.calls.at(-1)?.[0] as {
+      completedObjectiveIds?: (chapterId: string) => string[];
+    };
+    expect(options?.completedObjectiveIds?.('chapter-1')).toEqual(['obj-3', 'the-ticket-main-10']);
+    expect(options?.completedObjectiveIds?.('missing-chapter')).toEqual([]);
+    wrapper.unmount();
+  });
   it('marks chapter complete and auto-completes non-route-choice objectives', async () => {
     const wrapper = createWrapper();
     const chapterCard = wrapper.find('[data-testid="chapter-card"]');

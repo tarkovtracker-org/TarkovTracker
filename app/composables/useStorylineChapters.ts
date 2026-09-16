@@ -97,7 +97,6 @@ export interface StorylineQuestRouteBranchView {
 export interface StorylineQuestRouteChoiceView {
   id: string;
   branches: StorylineQuestRouteBranchView[];
-  chosenBranchId: string | null;
 }
 export interface StorylineNormalizedChapterView extends Omit<
   StorylineChapterView,
@@ -513,11 +512,7 @@ const buildQuestRouteChoices = (
         .filter(isQuestRouteBranch),
       id: `${chapter.id}-quest-route-${questIds.join('-')}`,
     }))
-    .filter((routeChoice) => routeChoice.branches.length === 2)
-    .map((routeChoice) => ({
-      ...routeChoice,
-      chosenBranchId: routeChoice.branches.find((branch) => branch.complete)?.id ?? null,
-    }));
+    .filter((routeChoice) => routeChoice.branches.length === 2);
 export function useStorylineChapters(options: UseStorylineChaptersOptions = {}): {
   chapters: ComputedRef<StorylineChapterView[]>;
   normalizedChapters: ComputedRef<StorylineNormalizedChapterView[]>;

@@ -108,7 +108,7 @@ const normalizedQuestPairs = (pairs?: StoryQuestPairs): Array<[string, string]> 
  * of one such quest rules the paired quest out, but partial progress on both stays legal, so these
  * IDs gate bulk completion only — never an individual objective toggle.
  */
-export const storyExclusiveQuestIds = (pairs?: StoryQuestPairs): Set<string> => {
+const storyExclusiveQuestIds = (pairs?: StoryQuestPairs): Set<string> => {
   const questIds = new Set<string>();
   for (const [questId, otherQuestId] of normalizedQuestPairs(pairs)) {
     questIds.add(questId);

@@ -190,7 +190,7 @@ const createWrapper = async () => {
         ProfileHideoutTab: { template: '<div data-testid="hideout-tab" />' },
         ProfileStorylineTab: {
           name: 'ProfileStorylineTab',
-          props: ['readOnly'],
+          props: ['readOnly', 'completedObjectiveIds'],
           emits: ['toggle-chapter', 'toggle-objective'],
           template:
             '<div data-testid="storyline-tab" :data-read-only="String(readOnly)"><button data-testid="toggle-chapter" @click="$emit(\'toggle-chapter\', \'chapter-1\')" /></div>',
@@ -350,6 +350,43 @@ describe('ProfileProgression storyline chapter toggle', () => {
     await wrapper.get('[data-testid="toggle-chapter"]').trigger('click');
     expect(setStoryChapterUncompleteMock).toHaveBeenCalledWith('chapter-1');
     expect(setStoryObjectiveUncompleteMock).toHaveBeenCalledWith('chapter-1', 'obj-1');
+    wrapper.unmount();
+  });
+  it('reports only own completed objective marks to the storyline tab', async () => {
+    pvpOverrides = {
+      storyChapters: {
+        'chapter-1': {
+          objectives: {
+            'obj-1': { complete: true, timestamp: 1000 },
+            'obj-2': { complete: false, timestamp: 1000 },
+            'the-ticket-main-10': { complete: true, timestamp: 1000 },
+          },
+        },
+      },
+    };
+    const wrapper = await createWrapper();
+    await wrapper.get('[data-testid="select-storyline-tab"]').trigger('click');
+    const completedObjectiveIds = wrapper
+      .findComponent({ name: 'ProfileStorylineTab' })
+      .props('completedObjectiveIds') as (chapterId: string) => string[];
+    expect(completedObjectiveIds('chapter-1')).toEqual(['obj-1', 'the-ticket-main-10']);
+    expect(completedObjectiveIds('missing-chapter')).toEqual([]);
+    wrapper.unmount();
+  });
+  it('reports no completed objective marks for a shared profile', async () => {
+    routeState.params = { userId: '11111111-1111-4111-8111-111111111111', mode: 'pvp' };
+    pvpOverrides = {
+      storyChapters: { 'chapter-1': { objectives: { 'obj-1': { complete: true } } } },
+    };
+    const wrapper = await createWrapper();
+    await vi.waitFor(() => {
+      expect(wrapper.find('[data-testid="tabs"]').exists()).toBe(true);
+    });
+    await wrapper.get('[data-testid="select-storyline-tab"]').trigger('click');
+    const completedObjectiveIds = wrapper
+      .findComponent({ name: 'ProfileStorylineTab' })
+      .props('completedObjectiveIds') as (chapterId: string) => string[];
+    expect(completedObjectiveIds('chapter-1')).toEqual([]);
     wrapper.unmount();
   });
   it('does not mutate store when viewing a shared profile', async () => {
