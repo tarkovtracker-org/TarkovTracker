@@ -177,7 +177,7 @@
           v-for="branch in questRoute.branches"
           :key="branch.id"
           class="flex flex-wrap items-center gap-1 rounded border p-1.5"
-          :class="getQuestBranchClass(branch, questRoute.chosenBranchId)"
+          :class="getQuestBranchClass(branch)"
         >
           <span class="text-surface-200 min-w-0 flex-1 truncate text-xs">{{ branch.label }}</span>
           <UBadge variant="subtle" color="neutral" size="xs">
@@ -190,9 +190,6 @@
           </UBadge>
           <UBadge v-if="branch.complete" variant="subtle" color="success" size="xs">
             {{ t('page.storyline.route_chosen') }}
-          </UBadge>
-          <UBadge v-else-if="questRoute.chosenBranchId" variant="subtle" color="error" size="xs">
-            {{ t('common.blocked', 'Blocked') }}
           </UBadge>
         </div>
         <p class="text-surface-400 text-[11px] leading-tight">
@@ -832,17 +829,13 @@
     }
     return 'border-white/10 bg-surface-900/40';
   };
-  const getQuestBranchClass = (
-    branch: StorylineQuestRouteBranchView,
-    chosenBranchId: string | null
-  ) => {
-    if (branch.complete) {
-      return 'border-success-700/40 bg-success-950/20';
-    }
-    if (chosenBranchId) {
-      return 'border-error-700/30 bg-error-950/10 opacity-70';
-    }
-    return 'border-white/10 bg-surface-900/40';
+  // A branch is highlighted from the player's own marks only. The sibling is not styled as blocked:
+  // the objective list can be a projection of the overlay's capture, so a finished known set is not
+  // proof the route is finished, and the overlay only rules out completing both.
+  const getQuestBranchClass = (branch: StorylineQuestRouteBranchView) => {
+    return branch.complete
+      ? 'border-success-700/40 bg-success-950/20'
+      : 'border-white/10 bg-surface-900/40';
   };
   const sortObjectivesByOrder = (objectives: StorylineObjectiveProgress[]) => {
     return [...objectives].sort((left, right) => {

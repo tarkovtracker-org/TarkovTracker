@@ -323,7 +323,7 @@ describe('useStorylineChapters', () => {
           },
         ],
         chosenBranchId: 'quest-keep',
-        id: 'the-ticket-quest-route-quest-hand-over',
+        id: 'the-ticket-quest-route-quest-hand-over-quest-keep',
       },
     ]);
     const handOver = requireDefined(
@@ -333,6 +333,23 @@ describe('useStorylineChapters', () => {
     expect(handOver.routeState).toBe('open');
     expect(chapter.mainRouteChoices).toEqual([]);
   });
+  it('never implies exclusivity between quests the overlay did not pair', async () => {
+    const chapter = structuredClone(DECLARED_ENDING_CHAPTER);
+    chapter.mutuallyExclusiveQuestPairs = [
+      ['quest-keep', 'quest-hand-over'],
+      ['quest-keep', 'quest-gate'],
+    ];
+    const { normalizedChapters } = await loadComposable([chapter]);
+    const normalized = requireDefined(normalizedChapters.value[0], 'Expected the-ticket chapter');
+    expect(
+      normalized.questRouteChoices.map((routeChoice) =>
+        routeChoice.branches.map((branch) => branch.id)
+      )
+    ).toEqual([
+      ['quest-gate', 'quest-keep'],
+      ['quest-hand-over', 'quest-keep'],
+    ]);
+  });
   it('marks an ending chosen once every objective it declares is complete', async () => {
     objectiveCompletionState.add('the-ticket:obj-gate-1');
     objectiveCompletionState.add('the-ticket:obj-gate-2');
@@ -340,14 +357,14 @@ describe('useStorylineChapters', () => {
     const chapter = requireDefined(normalizedChapters.value[0], 'Expected the-ticket chapter');
     expect(chapter.endings[0]).toMatchObject({ objectiveCompleted: 2, routeState: 'chosen' });
   });
-  it('reports saved objective marks that upstream re-keyed', async () => {
+  it('reports completed objective marks that upstream re-keyed', async () => {
     const { normalizedChapters } = await loadComposable([DECLARED_ENDING_CHAPTER], {
-      storedObjectiveIds: () => ['obj-gate-1', 'the-ticket-main-10'],
+      completedObjectiveIds: () => ['obj-gate-1', 'the-ticket-main-10'],
     });
     const chapter = requireDefined(normalizedChapters.value[0], 'Expected the-ticket chapter');
     expect(chapter.staleObjectiveIds).toEqual(['the-ticket-main-10']);
   });
-  it('reports no stale marks without a stored objective source', async () => {
+  it('reports no stale marks without a completed objective source', async () => {
     const { normalizedChapters } = await loadComposable([DECLARED_ENDING_CHAPTER]);
     const chapter = requireDefined(normalizedChapters.value[0], 'Expected the-ticket chapter');
     expect(chapter.staleObjectiveIds).toEqual([]);

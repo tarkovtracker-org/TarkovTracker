@@ -230,6 +230,7 @@
           :story-chapter-completion-state="storyChapterCompletionState"
           :story-objective-completion-state="storyObjectiveCompletionState"
           :read-only="isViewingSharedProfile || !isViewingCurrentMode"
+          :completed-objective-ids="storyCompletedObjectiveIds"
           @toggle-chapter="handleStoryChapterToggle"
           @toggle-objective="handleStoryObjectiveToggle"
         />
@@ -915,6 +916,16 @@
     return state;
   });
   const canEditStoryProgress = () => !isViewingSharedProfile.value && isViewingCurrentMode.value;
+  // Own progress only: a shared profile's stranded marks are not the viewer's to act on.
+  const storyCompletedObjectiveIds = (chapterId: string): string[] => {
+    if (!canEditStoryProgress()) {
+      return [];
+    }
+    const stored = modeData.value.storyChapters?.[chapterId]?.objectives ?? {};
+    return Object.entries(stored)
+      .filter(([, objective]) => objective?.complete === true)
+      .map(([objectiveId]) => objectiveId);
+  };
   const handleStoryChapterToggle = (chapterId: string) => {
     if (!canEditStoryProgress()) {
       return;

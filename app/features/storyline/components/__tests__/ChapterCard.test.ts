@@ -137,12 +137,13 @@ describe('ChapterCard story contract rendering', () => {
             },
           ],
           chosenBranchId: 'quest-keep',
-          id: 'the-ticket-quest-route-quest-hand-over',
+          id: 'the-ticket-quest-route-quest-hand-over-quest-keep',
         },
       ],
     });
     const wrapper = mountCard(chapter);
     expect(wrapper.text()).toContain('page.storyline.quest_route_exclusive');
+    expect(wrapper.text()).not.toContain('common.blocked');
     expect(wrapper.text()).toContain(
       'page.storyline.quest_route_progress:{"completed":1,"total":1}'
     );

@@ -116,49 +116,24 @@ export const storyExclusiveQuestIds = (pairs?: StoryQuestPairs): Set<string> => 
   }
   return questIds;
 };
-const buildQuestAdjacency = (pairs?: StoryQuestPairs): Map<string, Set<string>> => {
-  const adjacency = new Map<string, Set<string>>();
-  const link = (fromQuestId: string, toQuestId: string) => {
-    const linked = adjacency.get(fromQuestId) ?? new Set<string>();
-    linked.add(toQuestId);
-    adjacency.set(fromQuestId, linked);
-  };
-  for (const [questId, otherQuestId] of normalizedQuestPairs(pairs)) {
-    link(questId, otherQuestId);
-    link(otherQuestId, questId);
-  }
-  return adjacency;
-};
-const collectQuestGroup = (
-  startQuestId: string,
-  adjacency: Map<string, Set<string>>,
-  visited: Set<string>
-): string[] => {
-  const pending = [startQuestId];
-  const group: string[] = [];
-  while (pending.length > 0) {
-    const questId = pending.pop()!;
-    if (visited.has(questId)) {
+/**
+ * The chapter's declared exclusive sub-quest pairs, deduplicated and ordered. Pairs are kept as
+ * pairs on purpose: two pairs sharing a quest do not make their other members exclusive, so they
+ * must not be merged into one group.
+ */
+export const storyExclusiveQuestPairs = (pairs?: StoryQuestPairs): Array<[string, string]> => {
+  const seen = new Set<string>();
+  const unique: Array<[string, string]> = [];
+  for (const pair of normalizedQuestPairs(pairs)) {
+    const ordered: [string, string] = [...pair].sort(compareIds) as [string, string];
+    const key = ordered.join('|');
+    if (seen.has(key)) {
       continue;
     }
-    visited.add(questId);
-    group.push(questId);
-    pending.push(...(adjacency.get(questId) ?? []));
+    seen.add(key);
+    unique.push(ordered);
   }
-  return group.sort(compareIds);
-};
-/** Connected groups of mutually exclusive sub-quests, so a quest paired with several appears once. */
-export const storyQuestExclusionGroups = (pairs?: StoryQuestPairs): string[][] => {
-  const adjacency = buildQuestAdjacency(pairs);
-  const visited = new Set<string>();
-  const groups: string[][] = [];
-  for (const questId of adjacency.keys()) {
-    if (visited.has(questId)) {
-      continue;
-    }
-    groups.push(collectQuestGroup(questId, adjacency, visited));
-  }
-  return groups.sort((left, right) => (left[0] ?? '').localeCompare(right[0] ?? ''));
+  return unique.sort((left, right) => compareIds(left.join('|'), right.join('|')));
 };
 const belongsToExclusiveQuest = (
   objective: StoryObjective,

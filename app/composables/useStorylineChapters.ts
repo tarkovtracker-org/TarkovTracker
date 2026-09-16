@@ -3,7 +3,7 @@ import { useTarkovStore } from '@/stores/useTarkov';
 import {
   normalizeStoryObjectives,
   orderedStoryObjectives,
-  storyQuestExclusionGroups,
+  storyExclusiveQuestPairs,
   unknownStoryObjectiveIds,
 } from '@/utils/storylineObjectives';
 import type { ComputedRef } from '#imports';
@@ -38,7 +38,7 @@ export interface StorylineChapterView {
   mutuallyExclusiveQuestPairs: Array<[string, string]>;
   /** The overlay resolved only part of this chapter from its pinned client capture. */
   coveragePartial: boolean;
-  /** Saved objective marks whose IDs the current chapter data no longer defines. */
+  /** Completed objective marks whose IDs the current chapter data no longer defines. */
   staleObjectiveIds: string[];
 }
 export interface StorylineRequirementView {
@@ -120,10 +120,11 @@ interface UseStorylineChaptersOptions {
   isChapterComplete?: (chapterId: string) => boolean;
   isObjectiveComplete?: (chapterId: string, objectiveId: string) => boolean;
   /**
-   * Saved objective IDs for a chapter, used to report marks stranded by an upstream re-key. Left
-   * empty by default so a view rendering someone else's profile never reports the viewer's data.
+   * Objective IDs the viewer has marked complete in a chapter, used to report marks stranded by an
+   * upstream re-key. Left empty by default so a view rendering someone else's profile never reports
+   * the viewer's data, and restricted to completed marks so a cleared mark is not reported as lost.
    */
-  storedObjectiveIds?: (chapterId: string) => readonly string[];
+  completedObjectiveIds?: (chapterId: string) => readonly string[];
 }
 const normalizeChapterRequirements = (
   chapter: StorylineChapterView
@@ -464,25 +465,25 @@ const isQuestRouteBranch = (
   branch: StorylineQuestRouteBranchView | null
 ): branch is StorylineQuestRouteBranchView => branch !== null;
 /**
- * Mutually exclusive sub-quest routes, presented as chapter-level alternatives. Objectives stay
- * individually checkable because the overlay allows partial progress on both routes; only finishing
- * one rules the other out.
+ * Mutually exclusive sub-quest routes, presented as chapter-level alternatives. One entry per pair
+ * the overlay declares: two pairs sharing a quest do not make their other members exclusive.
+ * Objectives stay individually checkable because the overlay allows partial progress on both routes.
  */
 const buildQuestRouteChoices = (
   chapter: StorylineChapterView,
   objectives: StorylineObjectiveProgress[]
 ): StorylineQuestRouteChoiceView[] =>
-  storyQuestExclusionGroups(chapter.mutuallyExclusiveQuestPairs)
-    .map((questIds) =>
-      questIds
+  storyExclusiveQuestPairs(chapter.mutuallyExclusiveQuestPairs)
+    .map((questIds) => ({
+      branches: questIds
         .map((questId) => buildQuestRouteBranch(questId, objectives))
-        .filter(isQuestRouteBranch)
-    )
-    .filter((branches) => branches.length > 1)
-    .map((branches) => ({
-      branches,
-      chosenBranchId: branches.find((branch) => branch.complete)?.id ?? null,
-      id: `${chapter.id}-quest-route-${branches[0]!.id}`,
+        .filter(isQuestRouteBranch),
+      id: `${chapter.id}-quest-route-${questIds.join('-')}`,
+    }))
+    .filter((routeChoice) => routeChoice.branches.length === 2)
+    .map((routeChoice) => ({
+      ...routeChoice,
+      chosenBranchId: routeChoice.branches.find((branch) => branch.complete)?.id ?? null,
     }));
 export function useStorylineChapters(options: UseStorylineChaptersOptions = {}): {
   chapters: ComputedRef<StorylineChapterView[]>;
@@ -492,7 +493,7 @@ export function useStorylineChapters(options: UseStorylineChaptersOptions = {}):
   const tarkovStore = useTarkovStore();
   const isChapterComplete = options.isChapterComplete ?? tarkovStore.isStoryChapterComplete;
   const isObjectiveComplete = options.isObjectiveComplete ?? tarkovStore.isStoryObjectiveComplete;
-  const storedObjectiveIds = options.storedObjectiveIds ?? (() => []);
+  const completedObjectiveIds = options.completedObjectiveIds ?? (() => []);
   const chapters = computed<StorylineChapterView[]>(() => {
     return (options.chapters?.() ?? metadataStore.storyChapters ?? []).map((chapter) => {
       const objectiveMap = normalizeStoryObjectives(chapter.objectives);
@@ -515,7 +516,10 @@ export function useStorylineChapters(options: UseStorylineChaptersOptions = {}):
         declaredEndings: chapter.endings ?? [],
         mutuallyExclusiveQuestPairs: chapter.mutuallyExclusiveQuestPairs ?? [],
         coveragePartial: chapter.referenceCoverage?.partial === true,
-        staleObjectiveIds: unknownStoryObjectiveIds(objectiveMap, storedObjectiveIds(chapter.id)),
+        staleObjectiveIds: unknownStoryObjectiveIds(
+          objectiveMap,
+          completedObjectiveIds(chapter.id)
+        ),
       };
     });
   });

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   getAutoCompletableObjectiveIds,
   normalizeStoryObjectives,
-  storyQuestExclusionGroups,
+  storyExclusiveQuestPairs,
   toggleStoryChapterWithLinearObjectives,
   unknownStoryObjectiveIds,
 } from '@/utils/storylineObjectives';
@@ -80,13 +80,24 @@ describe('storylineObjectives', () => {
       ] as Array<[string, string]>)
     ).toEqual(['obj-a1', 'obj-b1', 'obj-c1']);
   });
-  it('merges chained quest pairs into one exclusion group', () => {
+  it('keeps chained quest pairs separate instead of merging them', () => {
     expect(
-      storyQuestExclusionGroups([
+      storyExclusiveQuestPairs([
         ['quest-b', 'quest-c'],
         ['quest-a', 'quest-b'],
       ])
-    ).toEqual([['quest-a', 'quest-b', 'quest-c']]);
+    ).toEqual([
+      ['quest-a', 'quest-b'],
+      ['quest-b', 'quest-c'],
+    ]);
+  });
+  it('deduplicates a pair regardless of member order', () => {
+    expect(
+      storyExclusiveQuestPairs([
+        ['quest-b', 'quest-a'],
+        ['quest-a', 'quest-b'],
+      ])
+    ).toEqual([['quest-a', 'quest-b']]);
   });
   it('reports saved objective ids the chapter no longer defines', () => {
     expect(unknownStoryObjectiveIds(objectives, ['obj-1', 'the-ticket-main-10', 'stale'])).toEqual([

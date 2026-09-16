@@ -69,10 +69,12 @@
   });
   const tarkovStore = useTarkovStore();
   const { chapters, normalizedChapters: storylineChapters } = useStorylineChapters({
-    storedObjectiveIds: (chapterId) =>
-      Object.keys(
+    completedObjectiveIds: (chapterId) =>
+      Object.entries(
         tarkovStore.getCurrentProgressData()?.storyChapters?.[chapterId]?.objectives ?? {}
-      ),
+      )
+        .filter(([, objective]) => objective?.complete === true)
+        .map(([objectiveId]) => objectiveId),
   });
   const totalChapters = computed(() => storylineChapters.value.length);
   const completedChapters = computed(() => {
