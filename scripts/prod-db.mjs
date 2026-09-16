@@ -24,7 +24,7 @@ limit ${MIGRATION_HISTORY_LIMIT}`;
 const MIGRATION_HISTORY_GRANT_HINT =
   'the observer role needs read-only history access, granted out of band by an operator: ' +
   'GRANT USAGE ON SCHEMA supabase_migrations TO <observer_role>; ' +
-  'GRANT SELECT ON TABLE supabase_migrations.schema_migrations TO <observer_role>;';
+  'GRANT SELECT (version) ON TABLE supabase_migrations.schema_migrations TO <observer_role>;';
 const SENSITIVE_COLUMN_PATTERN =
   /^(?:email|phone|full_name|address|token|secret|password|metadata|payload|content|ip|user_agent|token_value|token_hash|progress|data|state|settings|preferences|config|custom_config)$/i;
 const SAFE_SAMPLE_COLUMN_PATTERN =
@@ -527,6 +527,10 @@ async function runMigrationHistory() {
     .map((row) => row.version)
     .filter((version) => typeof version === 'string')
     .sort();
+  if (remoteVersions.length >= MIGRATION_HISTORY_LIMIT)
+    throw new Error(
+      `migration-history reached the ${MIGRATION_HISTORY_LIMIT}-version read limit, so the comparison would be incomplete; raise MIGRATION_HISTORY_LIMIT before relying on this report`
+    );
   return {
     ...report,
     data: compareMigrationVersions(remoteVersions, readLocalMigrationVersions()),

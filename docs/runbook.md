@@ -616,16 +616,16 @@ operation. Grant only `CONNECT`, required schema/catalog visibility, and `pg_mon
 inspection reports such as `db-stats` call monitoring functions that `pg_read_all_stats` alone does
 not permit. Grant `USAGE` on `extensions` and only explicit low-risk column-level `SELECT` when
 bounded samples or distributions are required. For `migration-history`, grant read-only access to
-the migration ledger as well:
+the version column of the migration ledger:
 
 ```sql
 GRANT USAGE ON SCHEMA supabase_migrations TO pi_prod_observer;
-GRANT SELECT ON TABLE supabase_migrations.schema_migrations TO pi_prod_observer;
+GRANT SELECT (version) ON TABLE supabase_migrations.schema_migrations TO pi_prod_observer;
 ```
 
-`schema_migrations` stores each migration's SQL in `statements`; the observer needs `SELECT` on the
-table because PostgreSQL column-level grants cannot be expressed per report, so treat the ledger as
-readable by the observer and keep secrets out of migration SQL as the runbook already requires. Set
+The column-level grant is deliberate: `schema_migrations` also stores each migration's SQL in
+`statements`, and the observer never needs it. Granting `SELECT` on the whole table would let anyone
+holding the observer credential read stored migration SQL and any literal inside it. Set
 conservative connection defaults for
 `statement_timeout`, `lock_timeout`, `default_transaction_read_only`, and `application_name`;
 database privileges, not `default_transaction_read_only`, are the hard safety boundary.

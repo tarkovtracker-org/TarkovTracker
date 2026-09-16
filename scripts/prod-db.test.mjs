@@ -297,8 +297,12 @@ describe('prod-db canary', () => {
     });
     it('explains the read-only grant when history access is denied', () => {
       expect(() => run(['migration-history'], { FAKE_SUPABASE_DENY_HISTORY: 'true' })).toThrow(
-        'GRANT SELECT ON TABLE supabase_migrations.schema_migrations'
+        'GRANT SELECT (version) ON TABLE supabase_migrations.schema_migrations'
       );
+    });
+    it('refuses to compare a history that reached the read limit', () => {
+      const saturated = Array.from({ length: 2000 }, (_, index) => String(20000101000000 + index));
+      expect(() => history(saturated)).toThrow('reached the 2000-version read limit');
     });
   });
 });
