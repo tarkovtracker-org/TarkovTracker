@@ -137,8 +137,9 @@ updates:
           - major
           - minor
           - patch
-      # Every non-official action lands in one PR so the single open slot is not consumed by
-      # one action at a time (codecov, setup-deno, crowdin, lychee, lighthouse-ci, ...).
+      # Minor and patch updates for every non-official action land in one PR so the single open
+      # slot is not consumed by one action at a time (codecov, setup-deno, crowdin, lychee,
+      # lighthouse-ci, ...). Major updates stay individual so each gets its own review.
       third-party-actions:
         patterns:
           - '*'

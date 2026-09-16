@@ -119,7 +119,9 @@ Non-English formatting exclusions and Crowdin ownership remain intact.
    (`Main CI freshness` ruleset), so skipped jobs cannot leave a pull request blocked.
 2. Done: the classifier invocation no longer passes `--shadow`; pull requests receive path selection
    while push and dispatch events retain `--full`. Required-check settings were not changed. Roll
-   back by restoring `--shadow` in the `Classify changes` step; the flag remains supported.
+   back by restoring `--shadow` in the `Classify changes` step and inverting the `--shadow`
+   assertion in `scripts/ci-tests/workflows.mjs` in the same change (workflow edits select full
+   validation, so `test:workflow` runs on the rollback itself); the flag remains supported.
 3. Release deduplication is handled separately in [PR #805](https://github.com/tarkovtracker-org/TarkovTracker/pull/805).
    Path selection does not change release triggers, validation, or main-run cancellation.
    Do not treat local fixtures as evidence of GitHub App or branch-protection behavior.

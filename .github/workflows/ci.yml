@@ -35,7 +35,8 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           EVENT_NAME: ${{ github.event_name }}
         # Pull requests receive path-based selection; pushes and dispatches always validate fully.
-        # Rollback: re-add the shadow flag of scripts/validate-changes.mjs to force every job.
+        # Rollback: re-add the shadow flag of scripts/validate-changes.mjs to force every job and
+        # invert the shadow-flag assertion in scripts/ci-tests/workflows.mjs in the same change.
         run: |
           args=(--mode ci --explain --base "$BASE_SHA" --head "$HEAD_SHA")
           if [ "$EVENT_NAME" != "pull_request" ]; then args+=(--full); fi
