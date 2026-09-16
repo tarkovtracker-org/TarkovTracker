@@ -542,16 +542,20 @@ Reproduce the diagnosis without touching production: reset a local database to t
 then compare `supabase db push --local --dry-run` with the file absent (reproduces the exact error
 and names the version) and present (`Local database is up to date.`).
 
-**Merge ordering matters.** The same deployment also shipped Edge Functions `team-leave` (v609) and
-`team-kick` (v605) from `08b0cf1e`, whose source is not on `main`. The Supabase GitHub integration
+**Restore the whole deployed unit, not just the migration.** The same deployment also shipped Edge
+Functions `team-leave` (v609) and `team-kick` (v605) from `08b0cf1e`. The Supabase GitHub integration
 deploys migrations **and** every function under `supabase/functions/` on merge, and it is the same
 integration that reports the failing check — so while the check fails, function deployment is blocked
-too. Making the check pass therefore also unblocks a function deploy from `main`. Land the deployed
-function sources **before** the migration file, or the first green integration run replaces the
-deployed handlers with the older ones on `main`. The database change alone does not cover this: the
-deployed handlers filter cooldown reads on `server_verified = true`, and the preserved pre-containment
-rows are `server_verified = false` with possibly forged timestamps, so the older handlers would trust
-that history again. See the `team_events` invariants in `docs/SYSTEMS.md`.
+too, and making the check pass unblocks a function deploy from `main`. Splitting the recovery is
+unsafe in both directions: migration-first lets the integration replace the deployed handlers with the
+older ones on `main`, and functions-first leaves `main` with handlers that read a column no repository
+migration creates, so any database built from the checkout returns 500. Land the migration and the
+deployed function sources in the same change.
+
+The database change alone does not cover the handler behavior: the deployed handlers filter cooldown
+reads on `server_verified = true`, and the preserved pre-containment rows are `server_verified = false`
+with possibly forged timestamps, so the older handlers would trust that history again. See the
+`team_events` invariants in `docs/SYSTEMS.md`.
 
 ### Reconcile migration `20260630075121_reconcile_prod_schema_drift`
 
