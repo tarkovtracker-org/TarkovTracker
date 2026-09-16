@@ -1,5 +1,5 @@
 BEGIN;
-SELECT no_plan();
+SELECT plan(21);
 INSERT INTO auth.users(id,email) VALUES
  ('00000000-0000-0000-0000-000000000921','leave-owner@example.invalid'),
  ('00000000-0000-0000-0000-000000000922','leave-member@example.invalid');

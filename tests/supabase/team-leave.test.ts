@@ -2,7 +2,8 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({
   result: 'left',
   errors: [] as string[],
-  pointer: 'old-team',
+  pointer: 'old-team' as string | null,
+  tableCalls: [] as string[],
   calls: [] as unknown[],
   handler: null as null | ((req: Request) => Promise<Response>),
 }));
@@ -19,13 +20,21 @@ vi.mock('../../supabase/functions/_shared/authenticated-mutation.ts', () => ({
     supabase: {
       rpc: async (name: string, args: unknown) => {
         fixture.calls.push([name, args]);
-        // A newer join happens after the database leave transaction and before its response.
-        fixture.pointer = 'new-team';
         const code = fixture.errors.shift();
+        // Only a committed leave permits the simulated newer join before the RPC response.
+        if (!code && fixture.result === 'left') fixture.pointer = 'new-team';
         return { data: code ? null : fixture.result, error: code ? { code } : null };
       },
-      from: () => {
-        throw new Error('Unexpected nontransactional write after leave');
+      from: (table: string) => {
+        fixture.tableCalls.push(table);
+        if (table !== 'user_system') throw new Error('Unexpected nontransactional table access');
+        return {
+          // Model the old handler's late upsert instead of throwing before it can clear state.
+          upsert: async (row: { pvp_team_id: string | null }) => {
+            fixture.pointer = row.pvp_team_id;
+            return { error: null };
+          },
+        };
       },
     },
   }),
@@ -40,6 +49,7 @@ beforeAll(async () => {
 });
 beforeEach(() => {
   fixture.calls = [];
+  fixture.tableCalls = [];
   fixture.pointer = 'old-team';
   fixture.result = 'left';
   fixture.errors = [];
@@ -62,6 +72,7 @@ describe('atomic leave endpoint', () => {
       ['leave_team', { p_team_id: 'old-team', p_user_id: 'validated-user' }],
     ]);
     expect(fixture.pointer).toBe('new-team');
+    expect(fixture.tableCalls).toEqual([]);
   });
   for (const [result, status] of [
     ['cooldown', 429],
