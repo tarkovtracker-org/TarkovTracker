@@ -27,7 +27,7 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Load the gate from trusted default-branch code, not the event's candidate.
           ref: ${{ github.sha }}
@@ -35,7 +35,7 @@ jobs:
           persist-credentials: false
       - name: Check validated commit before setup
         id: eligible
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const { pathToFileURL } = require('node:url');
@@ -51,7 +51,7 @@ jobs:
             core.setOutput('recovery', String(Boolean(result.recovery)));
       - name: Recover interrupted version publication
         if: steps.eligible.outputs.recovery == 'true'
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const { pathToFileURL } = require('node:url');
@@ -63,30 +63,15 @@ jobs:
             core.info(`Recovered publication of v${result.recovery.version} at ${result.recovery.sha}.`);
       - name: Checkout validated release commit
         if: steps.eligible.outputs.release == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.eligible.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Setup Node.js
+      # The validated commit is current main and already passed CI, so its shared setup action is
+      # trusted here. This keeps the pnpm pin in package.json as the single source of truth.
+      - uses: ./.github/actions/setup-project
         if: steps.eligible.outputs.release == 'true'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .nvmrc
-      - name: Install pnpm
-        if: steps.eligible.outputs.release == 'true'
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.14.0 --activate
-      - name: Setup pnpm cache
-        if: steps.eligible.outputs.release == 'true'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .nvmrc
-          cache: 'pnpm'
-      - name: Install dependencies
-        if: steps.eligible.outputs.release == 'true'
-        run: pnpm install --frozen-lockfile
       - name: Build
         if: steps.eligible.outputs.release == 'true'
         run: pnpm run build
@@ -100,7 +85,7 @@ jobs:
       - name: Recheck validated commit before publishing
         id: publish
         if: steps.eligible.outputs.release == 'true'
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const { pathToFileURL } = require('node:url');

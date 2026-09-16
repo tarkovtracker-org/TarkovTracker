@@ -25,9 +25,12 @@ test('Dependabot expected check names remain supplied by repository workflows', 
   assert.match(gate, /failing_status_count.*-gt 0/);
   assert.match(read('codecov.yml'), /absolute-floor:/);
 });
-test('shadow rollout and fork restrictions retain existing CI coverage and Deno checks', () => {
+test('path selection applies to pull requests only; pushes, forks and Deno checks stay covered', () => {
   const ci = read('.github/workflows/ci.yml');
-  assert.match(ci, /--shadow/);
+  const classify = workflowStep(jobBlock(ci, 'changes'), 'Classify changes');
+  // Shadow mode ended once the rollout evidence in docs/WORKFLOW_AUTOMATION.md was captured.
+  assert.doesNotMatch(classify, /--shadow/);
+  assert.match(classify, /if \[ "\$EVENT_NAME" != "pull_request" \]; then args\+=\(--full\); fi/);
   assert.match(ci, /args\+=\(--full\)/);
   assert.match(ci, /vitest run --coverage --shard=/);
   assert.match(ci, /deno test supabase\/functions\/_shared\/\*\.deno\.test\.ts/);
@@ -76,6 +79,30 @@ test('empty classifier output produces the missing-plan diagnostic and fails CI'
   });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /Missing or invalid validation plan/);
+});
+test('workflow linting is selected only for automation changes and fails closed without paths', () => {
+  for (const paths of [
+    ['.github/workflows/ci.yml'],
+    ['.github/zizmor.yml'],
+    ['.github/actions/setup-project/action.yml'],
+    [],
+  ])
+    assert.equal(classifyPaths(paths).workflows, true, paths.join());
+  for (const paths of [
+    ['README.md'],
+    ['.github/workflows/README.md'],
+    ['app/a.ts'],
+    ['../.github/x.yml'],
+  ])
+    assert.equal(classifyPaths(paths).workflows, false, paths.join());
+  const lintStep = workflowStep(
+    jobBlock(read('.github/workflows/ci.yml'), 'lint-format'),
+    'Lint GitHub Actions workflows'
+  );
+  assert.match(lintStep, /if: needs.changes.outputs.workflows == 'true'/);
+  assert.match(lintStep, /sha256sum --check --strict/);
+  assert.match(lintStep, /zizmor==\$\{ZIZMOR_VERSION\}/);
+  assert.match(read('scripts/validate-changes.mjs'), /workflows=\$\{plan.workflows\}/);
 });
 test('CI job-level full gates match the classifier manifest', () => {
   const jobs = [

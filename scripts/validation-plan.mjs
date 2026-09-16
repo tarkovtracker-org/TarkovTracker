@@ -29,6 +29,14 @@ function requiresFullValidation(paths, categories, forceFull) {
 function defaultReason(full) {
   return full ? 'Full validation required' : 'Documentation/translation-only change set';
 }
+// Workflow linting is selected by path rather than by the full/reduced split: it is only useful
+// when automation files change, and an unreadable diff (no paths) must select it conservatively.
+function touchesWorkflows(paths) {
+  return (
+    paths.length === 0 ||
+    paths.some((path) => pathCategory(path) === 'full' && /^\.github\//.test(path))
+  );
+}
 export function classifyPaths(paths, { forceFull = false, reason } = {}) {
   const categories = new Set(paths.map(pathCategory));
   const full = requiresFullValidation(paths, categories, forceFull);
@@ -37,6 +45,7 @@ export function classifyPaths(paths, { forceFull = false, reason } = {}) {
     docs: categories.has('docs'),
     locales: categories.has('locales'),
     i18n: full || categories.has('locales'),
+    workflows: touchesWorkflows(paths),
     jobs: [...(full ? fullJobs : reducedJobs)],
     reason: reason || defaultReason(full),
     paths,

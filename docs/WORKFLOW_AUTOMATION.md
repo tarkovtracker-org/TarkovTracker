@@ -49,18 +49,25 @@ Only substantial behavioral corrections or unresolved significant findings warra
 
 ### 1. CI Pipeline (`.github/workflows/ci.yml`)
 
-Runs on pushes to `main`, `develop`, and `wip/**`, PRs targeting `main` or `develop`, and explicit CI dispatch,
-including translation-only PRs. All eligible push and dispatched runs retain full validation.
+Runs on pushes to `main` and `wip/**`, PRs targeting `main`, and explicit CI dispatch, including
+translation-only PRs. All push and dispatched runs retain full validation.
 
-The lightweight `changes` job emits proposed and effective selections. **Shadow rollout is enabled**:
-the effective selection runs every existing CI job. `CI Result` always evaluates the job outcomes and
-fails on missing classifier data, selected failures/cancellations, or unexpected skips. Systems drift
-runs independently on every CI run. Existing check names, Dependabot expectations, fork restrictions,
+The lightweight `changes` job classifies the pull-request diff and selects jobs. **Path selection is
+active**: documentation-only and translation-only pull requests run the reduced set (formatting,
+i18n when locales change, systems drift); every other change set runs every job. The job also emits
+`workflows`, which enables workflow linting in `Lint & Format` when `.github/` changes or when the
+diff cannot be read. `CI Result` evaluates the job outcomes against the plan and fails on missing
+classifier data, selected failures/cancellations, or unexpected skips. Systems drift runs
+independently on every CI run. Existing check names, Dependabot expectations, fork restrictions,
 security checks, and Codecov statuses remain unchanged; the aggregate does not replace external gates.
 
 The shared setup action uses `.nvmrc`, the full `packageManager` pin, pnpm caching, and a frozen
 installation. Each caller owns checkout history and credential settings. `Lint & Format` runs lint
 and Prettier once each (lint already includes blank-line validation), plus i18n and workflow fixtures.
+When automation files change it also runs a checksum-verified, pinned `actionlint` (syntax,
+expression, and shellcheck errors) and `zizmor` (workflow security) at `low` severity and above;
+`.github/zizmor.yml` records the accepted findings with their justification. Neither tool is Node
+tooling, so both are pinned in the workflow step rather than `package.json`.
 The four Vitest shards, dedicated Deno tests, Supabase validation, Worker validation, and production
 build retain their existing commands and environment behavior. Tests in `scripts/ci-tests/` use
 Node's built-in runner via `pnpm run test:workflow`; their filenames deliberately avoid Vitest discovery.
@@ -100,11 +107,17 @@ Non-English formatting exclusions and Crowdin ownership remain intact.
 1. Merge policy/setup, then the shadow classifier and aggregate. Capture a successful and failing
    executable PR, a documentation-only PR, a translation-only PR, and a mixed PR. Confirm the proposed
    selections and aggregate conclusions, including the existing Dependabot and coverage behavior.
-2. Only after that evidence, remove `--shadow` from the classifier invocation in a follow-up change.
-   Retain `--full` for push events. Check required-check settings before enabling skips; do not change
-   those settings in this rollout. Roll back selection by restoring `--shadow`.
+   **Recorded 2026-09-16** from the `Validation plan` job logs of pull-request CI runs:
+   documentation-only #831 (`proposed.full=false`, run succeeded), translation-only #818 and #853
+   (`proposed.full=false`, runs succeeded), executable #855 and mixed docs/workflow #862/#863
+   (`proposed.full=true`), and failing executable runs on #848/#852/#862 where a failed shard, Fallow,
+   or lint job made `CI Result` fail. The only required check on `main` is `CI Result`
+   (`Main CI freshness` ruleset), so skipped jobs cannot leave a pull request blocked.
+2. Done: the classifier invocation no longer passes `--shadow`; pull requests receive path selection
+   while push and dispatch events retain `--full`. Required-check settings were not changed. Roll
+   back by restoring `--shadow` in the `Classify changes` step; the flag remains supported.
 3. Release deduplication is handled separately in [PR #805](https://github.com/tarkovtracker-org/TarkovTracker/pull/805).
-   This shadow rollout does not change release triggers, validation, or main-run cancellation.
+   Path selection does not change release triggers, validation, or main-run cancellation.
    Do not treat local fixtures as evidence of GitHub App or branch-protection behavior.
 
 The initial observations are recorded in [the baseline report](ci-turnaround-baseline.md).
@@ -181,7 +194,7 @@ Weekly security audits:
 - `security-scan` - pnpm audit (prod and all deps), schedule-only informational outdated check, checksum-verified Gitleaks secret detection
 - `codeql` - CodeQL static analysis
 
-**Triggers:** Push to main/develop, all PRs, weekly (Sunday 00:00 UTC)
+**Triggers:** Push to main, all PRs, weekly (Sunday 00:00 UTC)
 
 ### 3. Release Automation (`.github/workflows/release.yml`)
 
@@ -296,10 +309,10 @@ Enhanced PR validation:
 
 **Jobs:**
 
-- `labeler` - Auto-label based on file changes
-- `size` - PR size classification (S/M/L/XL/XXL)
-- `conventional-commits` - Commit message validation
-- `lighthouse` - Performance checks (runs when the PR touches `app/components/`, `app/features/`,
+- `PR Meta` - auto-label based on file changes, PR size classification (S/M/L/XL/XXL), and
+  commit message validation
+- `Lighthouse scope` - decides whether the Lighthouse audit is relevant
+- `Lighthouse` - Performance checks (runs when the PR touches `app/components/`, `app/features/`,
   `lighthouserc.json`, or the PR Checks workflow, or carries the `performance` or `ui` label)
 
 **Lighthouse collection (`lighthouserc.json`):** each selected URL is audited once per Lighthouse
@@ -325,7 +338,8 @@ Merges known low-risk Dependabot PRs after the normal PR checks complete:
 
 **Safety rules:**
 
-- Dependabot-only, `main`-targeted PRs only
+- Dependabot-authored, Dependabot-triggered, `main`-targeted PRs only; a human push, reopen, or
+  ready-for-review on the branch disables auto-merge for that event
 - No repository checkout in the privileged `pull_request_target` workflow
 - Only package lockfiles, package manifests, and `pnpm-workspace.yaml` are allowed; any workflow
   change stays manual

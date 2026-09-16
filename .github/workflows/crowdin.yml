@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           fetch-depth: 0
@@ -37,7 +37,7 @@ jobs:
         run: cp scripts/crowdin-pr.sh scripts/github-ci-gate.sh "$RUNNER_TEMP/"
       - name: Synchronize Crowdin translations
         id: crowdin
-        uses: crowdin/github-action@0d5670f539973aea2f01abce61a8989934df0025 # v3
+        uses: crowdin/github-action@0d5670f539973aea2f01abce61a8989934df0025 # v3.0.2
         with:
           upload_sources: true
           upload_translations: false

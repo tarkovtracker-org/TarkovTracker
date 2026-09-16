@@ -1764,12 +1764,14 @@ identity.
 The proposed selection reduces checks only for explicitly recognized documentation and locale paths.
 `DESIGN.md`, unknown inputs, and executable changes select full validation. Local input includes
 committed and dirty paths; CI input is the explicit revision diff. Renames contribute both paths.
-Shadow rollout forces every check while printing the proposed selection. See
-`docs/WORKFLOW_AUTOMATION.md` for rollout evidence and local/full execution profiles.
+Pull requests receive the selected jobs; the classifier also reports `workflows` so workflow
+linting runs only when `.github/` changes or the diff is unreadable. See
+`docs/WORKFLOW_AUTOMATION.md` for the recorded rollout evidence and local/full execution profiles.
 
 **Invariants:**
 
-- Pushes retain full validation; shadow mode retains full validation on PRs too.
+- Pushes and dispatches retain full validation; only pull requests receive reduced selection.
+- Empty, unreadable, or malformed diffs select full validation and workflow linting.
 - Missing classifier output or selected jobs that fail, cancel, or unexpectedly skip fail CI Result.
 - Only deliberately unselected jobs may report skipped; systems drift always runs.
 - Existing shard discovery, coverage enforcement, secret restrictions, and merge governance remain.
