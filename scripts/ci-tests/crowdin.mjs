@@ -3,7 +3,12 @@ import { chmodSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fixture, git } from './helpers/automation-fixture.mjs';
-import { jobBlock, workflowEvent, workflowStep } from './helpers/workflow-blocks.mjs';
+import {
+  jobBlock,
+  permissionsBlock,
+  workflowEvent,
+  workflowStep,
+} from './helpers/workflow-blocks.mjs';
 const read = (path) => readFileSync(path, 'utf8');
 /** Require a successful gate subprocess with its diagnostic on failure. */
 function passed(result) {
@@ -164,7 +169,7 @@ function assertStepOrder(job, first, second) {
 /** Verify each workflow boundary within its owning job and step. */
 function assertWorkflowBoundaries(workflow) {
   const workflowSettings = workflow.slice(0, workflow.indexOf('\njobs:'));
-  assert.match(workflowSettings, /permissions:\n {2}actions: write\n/);
+  assert.match(permissionsBlock(workflowSettings), /^ {2}actions: write$/m);
   workflowEvent(read('.github/workflows/ci.yml'), 'workflow_dispatch');
   const sync = jobBlock(workflow, 'sync');
   assertStepOrder(
@@ -360,4 +365,10 @@ test('Crowdin dispatch permission cannot come from an unrelated job', () => {
   const readOnly = workflow.replace('actions: write', 'actions: read');
   const unrelated = '\n  unrelated:\n    permissions:\n      actions: write\n';
   assert.throws(() => assertWorkflowBoundaries(readOnly + unrelated));
+});
+test('Crowdin permission key order does not change dispatch authorization', () => {
+  const workflow = read('.github/workflows/crowdin.yml');
+  assertWorkflowBoundaries(
+    workflow.replace('  actions: write\n  checks: read', '  checks: read\n  actions: write')
+  );
 });
