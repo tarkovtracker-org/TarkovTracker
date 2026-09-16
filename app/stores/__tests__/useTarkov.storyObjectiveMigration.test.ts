@@ -56,7 +56,8 @@ describe('useTarkovStore story objective id migration', () => {
       [CURRENT_ID]: { complete: true, timestamp: 1000 },
     });
   });
-  it('reconciles a mode a realtime merge changed, using the loaded catalog as evidence', () => {
+  // The realtime listener passes the merged mode; realtimeListener.seasonal.test.ts covers that call.
+  it('reconciles a requested mode other than the catalog mode', () => {
     setActivePinia(createPinia());
     const store = useTarkovStore();
     const metadataStore = useMetadataStore();
