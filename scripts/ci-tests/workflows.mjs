@@ -100,9 +100,19 @@ test('workflow linting is selected only for automation changes and fails closed 
     'Lint GitHub Actions workflows'
   );
   assert.match(lintStep, /if: needs.changes.outputs.workflows == 'true'/);
+  assert.match(lintStep, /curl --proto '=https' --proto-redir '=https'/);
   assert.match(lintStep, /sha256sum --check --strict/);
   assert.match(lintStep, /zizmor==\$\{ZIZMOR_VERSION\}/);
   assert.match(read('scripts/validate-changes.mjs'), /workflows=\$\{plan.workflows\}/);
+});
+test('Dependabot auto-merge requires immutable author and event actor identities', () => {
+  const job = jobBlock(read('.github/workflows/dependabot-auto-merge.yml'), 'auto-merge');
+  const eligibility = job.slice(0, job.indexOf('    steps:'));
+  assert.match(
+    eligibility,
+    /if: github\.event\.pull_request\.user\.id == 49699333 && github\.actor_id == '49699333'/
+  );
+  assert.doesNotMatch(eligibility, /github\.actor\s*==|user\.login\s*==/);
 });
 test('CI job-level full gates match the classifier manifest', () => {
   const jobs = [

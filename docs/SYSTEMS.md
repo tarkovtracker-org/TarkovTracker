@@ -1775,6 +1775,8 @@ linting runs only for non-Markdown automation paths and unreadable diffs. See
 - Missing classifier output or selected jobs that fail, cancel, or unexpectedly skip fail CI Result.
 - Only deliberately unselected jobs may report skipped; systems drift always runs.
 - Existing shard discovery, coverage enforcement, secret restrictions, and merge governance remain.
+- Dependabot auto-merge requires the immutable Dependabot account ID for both the PR author and
+  event actor; the actor restriction alone never establishes trust.
 - The aggregate covers repository CI jobs, not independently reported Security or Codecov statuses.
 
 ## 15. Canonical task progression

@@ -338,8 +338,9 @@ Merges known low-risk Dependabot PRs after the normal PR checks complete:
 
 **Safety rules:**
 
-- Dependabot-authored, Dependabot-triggered, `main`-targeted PRs only; a human push, reopen, or
-  ready-for-review on the branch disables auto-merge for that event
+- Dependabot-authored, Dependabot-triggered, `main`-targeted PRs only; both author and event actor
+  must match GitHub.com's immutable Dependabot account ID (`49699333`), not a mutable login.
+  A human push, reopen, or ready-for-review on the branch disables auto-merge for that event
 - No repository checkout in the privileged `pull_request_target` workflow
 - Only package lockfiles, package manifests, and `pnpm-workspace.yaml` are allowed; any workflow
   change stays manual
