@@ -6,15 +6,17 @@ fail() {
   exit 1
 }
 require_sha() {
-  [[ "$1" =~ ^[0-9a-f]{40}$ ]] || fail "Invalid commit SHA."
+  local sha="$1"
+  [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || fail "Invalid commit SHA."
 }
 read_pr() {
   gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
     --json state,isDraft,isCrossRepository,headRefName,baseRefName,headRefOid,mergeable,mergeStateStatus
 }
 check_identity() {
+  local pr="$1"
   jq -e '.state == "OPEN" and .isDraft == false and .isCrossRepository == false
-    and .headRefName == "locales" and .baseRefName == "main"' <<< "$1" >/dev/null ||
+    and .headRefName == "locales" and .baseRefName == "main"' <<< "$pr" >/dev/null ||
     fail "Expected an open, non-draft, same-repository locales PR targeting main."
 }
 check_translation_tree() {
@@ -48,7 +50,8 @@ prepare() {
   printf 'head_sha=%s\nbase_sha=%s\n' "$HEAD_SHA" "$BASE_SHA" >> "$GITHUB_OUTPUT"
 }
 check_revision() {
-  [[ "$(jq -r '.headRefOid' <<< "$1")" == "$HEAD_SHA" ]] ||
+  local pr="$1"
+  [[ "$(jq -r '.headRefOid' <<< "$pr")" == "$HEAD_SHA" ]] ||
     fail "Crowdin PR head changed after validation."
   local current_base
   current_base="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"

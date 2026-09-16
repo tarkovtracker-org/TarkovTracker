@@ -12,14 +12,16 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
+import { gitExecutable } from '../validation-tools.mjs';
 const gate = resolve('scripts/crowdin-pr.sh');
 const read = (path) => readFileSync(path, 'utf8');
 function git(cwd, ...args) {
-  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  const result = spawnSync(gitExecutable(), args, { cwd, encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
   return result.stdout.trim();
 }
-function fixture(t, changes = { 'app/locales/fr.json': '{"hello":"Salut"}' }) {
+function fixture(t, changes) {
+  changes ??= { 'app/locales/fr.json': '{"hello":"Salut"}' };
   const root = mkdtempSync(join(tmpdir(), 'crowdin-gate-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const repo = join(root, 'repo');
@@ -58,11 +60,11 @@ function fixture(t, changes = { 'app/locales/fr.json': '{"hello":"Salut"}' }) {
   };
   writeFileSync(
     join(bin, 'gh'),
-    `#!/usr/bin/env node
+    String.raw`#!${process.execPath}
 const fs = require('node:fs');
 const p = process.env;
 const args = process.argv.slice(2);
-fs.appendFileSync(p.CALLS, JSON.stringify(args) + '\\n');
+fs.appendFileSync(p.CALLS, JSON.stringify(args) + '\n');
 if (args[0] === 'api') { console.log(p.CURRENT_BASE); process.exit(0); }
 if (args[1] === 'view') {
   const states = JSON.parse(p.PR_STATES);
@@ -86,7 +88,7 @@ process.exit(2);
   writeFileSync(join(root, 'output'), '');
   const env = {
     ...process.env,
-    PATH: `${bin}:${process.env.PATH}`,
+    PATH: `${bin}:/usr/bin:/bin`,
     PR_NUMBER: '857',
     GITHUB_REPOSITORY: 'example/repo',
     GITHUB_OUTPUT: join(root, 'output'),
@@ -104,8 +106,8 @@ process.exit(2);
     head,
     base,
     pr,
-    run: (phase, overrides = {}) =>
-      spawnSync('bash', [gate, phase], {
+    run: (phase, overrides) =>
+      spawnSync('/bin/bash', [gate, phase], {
         cwd: repo,
         env: { ...env, ...overrides },
         encoding: 'utf8',
@@ -279,6 +281,6 @@ test('workflow separates trusted gate, immutable setup, token-free checks and PA
   assert.doesNotMatch(validation, /GH_TOKEN|secrets\./);
   for (const check of ['format:check', 'i18n:check', 'systems:check'])
     assert.ok(validation.includes(`pnpm run ${check}`));
-  assert.match(read('.github/workflows/ci.yml'), /push:\n    branches: \[main,/);
+  assert.match(read('.github/workflows/ci.yml'), /push:\n {4}branches: \[main,/);
   assert.match(read('.github/workflows/release.yml'), /workflow_run.event == 'push'/);
 });
