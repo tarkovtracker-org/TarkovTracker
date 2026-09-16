@@ -88,6 +88,11 @@
         <UIcon v-if="collector.status === 'complete'" name="i-mdi-check-bold" class="h-3 w-3" />
         <UIcon v-else-if="collector.status === 'failed'" name="i-mdi-close-thick" class="h-3 w-3" />
         <UIcon v-else-if="collector.status === 'locked'" name="i-mdi-lock" class="h-3 w-3" />
+        <UIcon
+          v-else-if="collector.status === 'active'"
+          name="i-mdi-play-circle-outline"
+          class="h-3 w-3"
+        />
         <UIcon v-else name="i-mdi-flag-checkered" class="h-3 w-3" />
       </button>
     </div>
@@ -114,8 +119,7 @@
   function getCollectorTask(): Task {
     return props.collector!.task;
   }
-  const { markTaskComplete, markTaskUncomplete, markTaskAvailable } =
-    useTaskActions(getCollectorTask);
+  const { markTaskActive, markTaskComplete, markTaskUncomplete } = useTaskActions(getCollectorTask);
   const taskHref = computed(() =>
     props.collector ? `/tasks?task=${props.collector.task.id}` : ''
   );
@@ -171,6 +175,10 @@
         return t('page.kappa.row.action_uncomplete', 'Mark uncomplete') + `: ${name}`;
       case 'failed':
         return t('page.kappa.row.action_reset_failed', 'Reset failed') + `: ${name}`;
+      case 'active':
+        return t('common.mark_complete', 'Mark complete') + `: ${name}`;
+      case 'available':
+        return t('common.accept', 'Accept') + `: ${name}`;
       case 'locked':
         return t('common.locked', 'Locked') + `: ${name}`;
       default:
@@ -185,9 +193,9 @@
       return;
     }
     if (props.collector.status === 'available') {
-      markTaskComplete();
+      markTaskActive();
       return;
     }
-    markTaskAvailable();
+    markTaskComplete();
   }
 </script>

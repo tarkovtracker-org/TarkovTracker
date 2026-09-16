@@ -78,8 +78,14 @@ describe('taskStatus', () => {
     it('returns false for failed tasks', () => {
       expect(isTaskActive({ failed: true })).toBe(false);
     });
-    it('returns true for active tasks (started but not completed/failed)', () => {
-      expect(isTaskActive({ complete: false, failed: false })).toBe(true);
+    it('returns true only for explicitly active tasks that are not completed or failed', () => {
+      expect(isTaskActive({ active: true, complete: false, failed: false })).toBe(true);
+      expect(isTaskActive({ active: true, complete: true, failed: false })).toBe(false);
+      expect(isTaskActive({ active: true, complete: false, failed: true })).toBe(false);
+    });
+    it('treats legacy incomplete records without active as unknown', () => {
+      expect(isTaskActive({ complete: false, failed: false })).toBe(false);
+      expect(isTaskActive({ active: false, complete: false, failed: false })).toBe(false);
     });
     it('returns false for boolean false (treated as no completion record)', () => {
       expect(isTaskActive(false)).toBe(false);

@@ -9,7 +9,7 @@ interface TaskNotificationReturn {
   taskStatus: Ref<string>;
   showUndoButton: Ref<boolean>;
   onTaskAction: (event: TaskActionPayload) => void;
-  undoLastAction: () => void;
+  undoLastAction: () => Promise<void>;
   closeNotification: () => void;
   cleanup: () => void;
 }
@@ -50,6 +50,7 @@ export function useTaskNotification(): TaskNotificationReturn {
     const action = event.action;
     const wasManualFail = event.wasManualFail;
     const entryTitleKeys: Partial<Record<TaskActionPayload['action'], string>> = {
+      active: 'activity_log.entry.active',
       complete: 'activity_log.entry.completed',
       uncomplete: 'activity_log.entry.uncompleted',
       fail: 'activity_log.entry.failed',
@@ -73,7 +74,16 @@ export function useTaskNotification(): TaskNotificationReturn {
           id: `task-${taskId}-${Date.now()}`,
           description: title,
           undo: () => {
-            if (action === 'complete') {
+            if (action === 'active') {
+              tarkovStore.setTaskUncompleted(taskId);
+              activityLogStore.addManualEntry({
+                id: `manual-task-undo-${taskId}-${Date.now()}`,
+                type: 'task',
+                action: 'uncomplete',
+                title: t('activity_log.entry.undo_active', { name: taskName }),
+              });
+              updateTaskStatus('page.tasks.questcard.undo_active', taskName);
+            } else if (action === 'complete') {
               tarkovStore.setTaskUncompleted(taskId);
               if (taskToUndo?.objectives) {
                 handleTaskObjectives(taskToUndo.objectives, 'setTaskObjectiveUncomplete');
@@ -207,9 +217,7 @@ export function useTaskNotification(): TaskNotificationReturn {
       }
     });
   };
-  const undoLastAction = () => {
-    void actionHistoryStore.undoLastAction();
-  };
+  const undoLastAction = () => actionHistoryStore.undoLastAction();
   const cleanup = () => {
     if (notificationTimeout.value !== null) {
       clearTimeout(notificationTimeout.value);

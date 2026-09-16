@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { collectAncestorTaskIds } from '@/composables/useTaskGraphData';
+import { collectAncestorTaskIds, resolveTaskNodeStatus } from '@/composables/useTaskGraphData';
+import { TASK_STATE } from '@/utils/constants';
 import type { Task } from '@/types/tarkov';
 const createTask = ({ id, ...task }: Partial<Task> & { id: string }): Task => ({
   ...task,
@@ -34,5 +35,21 @@ describe('collectAncestorTaskIds', () => {
     expect(Array.from(withCycle).sort((a, b) => a.localeCompare(b))).toEqual(['task-a', 'task-b']);
     const missingParent = collectAncestorTaskIds(['task-c'], tasksById);
     expect(Array.from(missingParent)).toEqual(['task-c']);
+  });
+});
+describe('resolveTaskNodeStatus', () => {
+  it('keeps active distinct from available', () => {
+    expect(
+      resolveTaskNodeStatus('active-task', {
+        'active-task': TASK_STATE.ACTIVE,
+        'available-task': TASK_STATE.AVAILABLE,
+      })
+    ).toBe('active');
+    expect(
+      resolveTaskNodeStatus('available-task', {
+        'active-task': TASK_STATE.ACTIVE,
+        'available-task': TASK_STATE.AVAILABLE,
+      })
+    ).toBe('available');
   });
 });

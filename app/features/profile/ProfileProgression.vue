@@ -217,6 +217,7 @@
           :counted-tasks="countedTasks"
           :is-task-successful="isTaskSuccessful"
           :is-task-failed="isTaskFailed"
+          :is-task-active="isProfileTaskActive"
           :is-task-locked="isTaskLocked"
           :objective-completions="objectiveCompletions"
         />
@@ -284,7 +285,7 @@
   } from '@/utils/storylineObjectives';
   import { buildTarkovDevProfileUrl } from '@/utils/tarkovDevProfileUrl';
   import { projectDuplicateObjectiveProgress } from '@/utils/taskNormalization';
-  import { getCompletionFlags, type RawTaskCompletion } from '@/utils/taskStatus';
+  import { getCompletionFlags, isTaskActive, type RawTaskCompletion } from '@/utils/taskStatus';
   import { filterTasksByTypeSettings, type TaskTypeFilterOptions } from '@/utils/taskTypeFilters';
   import type {
     AchievementRow,
@@ -780,10 +781,14 @@
       }
     )
   );
-  const isTaskLocked = (taskId: string): boolean => {
-    if (isTaskSuccessful(taskId) || isTaskFailed(taskId)) return false;
-    return profileTaskEvaluations.value[taskId]?.profile?.available !== true;
-  };
+  const isProfileTaskActive = (taskId: string): boolean =>
+    isTaskActive(taskCompletions.value[taskId] as RawTaskCompletion);
+  /** Accepted or settled tasks are never shown as locked, whatever their prerequisites say. */
+  const hasResolvedTaskState = (taskId: string): boolean =>
+    isTaskSuccessful(taskId) || isTaskFailed(taskId) || isProfileTaskActive(taskId);
+  const isTaskLocked = (taskId: string): boolean =>
+    !hasResolvedTaskState(taskId) &&
+    profileTaskEvaluations.value[taskId]?.profile?.available !== true;
   const normalizedTaskCompletions = computed<
     Record<string, { complete?: boolean; failed?: boolean }>
   >(() => {

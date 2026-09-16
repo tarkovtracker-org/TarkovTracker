@@ -102,6 +102,19 @@ const acceptsCompleted = (statuses: string[]) =>
   !statuses.length || statuses.some((status) => ['complete', 'completed'].includes(status));
 const acceptsActive = (statuses: string[]) =>
   statuses.some((status) => ['active', 'accept', 'accepted'].includes(status));
+/**
+ * A completion that carries an explicit `active` key was written by a client that tracks
+ * acceptance, so a false value is a real "not accepted" and must not be inferred as accepted.
+ * Legacy rows without the key keep the unlockable fallback so older trees do not lock up.
+ */
+const hasExplicitActiveState = (completion: RawTaskCompletion): boolean =>
+  typeof completion === 'object' && completion !== null && Object.hasOwn(completion, 'active');
+/** An accepted task satisfies an active requirement outright. */
+const acceptedTaskState = (completion: RawTaskCompletion) =>
+  isTaskActive(completion) || isTaskComplete(completion);
+/** A failed row or an authoritative `active: false` row can never satisfy an active requirement. */
+const rejectsActiveRequirement = (completion: RawTaskCompletion) =>
+  isTaskFailed(completion) || hasExplicitActiveState(completion);
 const terminalStatusMet = (statuses: string[], completion: RawTaskCompletion) =>
   (acceptsCompleted(statuses) && isTaskComplete(completion)) ||
   (statuses.includes('failed') && isTaskFailed(completion));
@@ -181,8 +194,8 @@ const createTeamEvaluator = (
     taskId: string,
     completion: RawTaskCompletion
   ): TaskAvailabilityResult => {
-    if (isTaskFailed(completion)) return result([{ type: 'prerequisite' }]);
-    if (isTaskActive(completion) || isTaskComplete(completion)) return result([]);
+    if (acceptedTaskState(completion)) return result([]);
+    if (rejectsActiveRequirement(completion)) return result([{ type: 'prerequisite' }]);
     return evaluate(taskId, true);
   };
   const requiredTaskResult = (requirement: TaskRequirement): TaskAvailabilityResult => {
