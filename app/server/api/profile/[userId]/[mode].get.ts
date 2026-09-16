@@ -20,7 +20,11 @@ import {
 } from '@/server/utils/sharedEdgeStore';
 import { fetchTarkovJsonEndpoint, type JsonTasksPayload } from '@/server/utils/tarkov-json';
 import { API_GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
-import { getLegacyModeProgressField, resolveModeProgressData } from '@/utils/modeProgressFallback';
+import {
+  getLegacyModeProgressField,
+  hasMaterializedProgress,
+  resolveModeProgressData,
+} from '@/utils/modeProgressFallback';
 import {
   isRecord,
   sanitizeDisplayName,
