@@ -6,7 +6,7 @@
     title: 'Terms of Service',
     description: 'TarkovTracker terms of service and usage guidelines.',
   });
-  const lastUpdated = 'June 30, 2026';
+  const lastUpdated = 'September 16, 2026';
   const ACTIVE_SECTION_OFFSET = 160;
   const toc = [
     { id: 'acceptance', title: '1. Acceptance of Terms' },
