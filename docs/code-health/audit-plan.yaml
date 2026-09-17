@@ -98,7 +98,8 @@ queue:
       parameter removed. The existing `alternatives` cascade is preserved unchanged (see CH-028).
       Regression test: workers/api-gateway/src/__tests__/transform.test.ts (verified to fail against
       the old worker copy). Local coverage scope left unchanged (see CH-049). Validation run: shared + consumer vitest (72 files / 1257 tests), full
-      api-gateway suite (190), lint, format:check, typecheck, worker typecheck + types:check +
+      api-gateway suite (190 at 2bdd0e41, before e34815fd added 3 transform cases; 193 on the
+      final head), lint, format:check, typecheck, worker typecheck + types:check +
       wrangler dry-run, lint:fallow, systems:check, CI-mode build, git diff --check.
       REVIEW HAND-OFF (2026-09-17): resumed PR #876 from 2bdd0e4161823e25aa96a48db9b801641eb6e50e
       in the clean dedicated .wt/code-health worktree; unrelated root worktree changes untouched.

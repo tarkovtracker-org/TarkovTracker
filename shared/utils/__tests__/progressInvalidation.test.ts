@@ -29,6 +29,10 @@ describe('computeInvalidProgress', () => {
     { state: 'failed', completion: { complete: false, failed: true }, cascades: true },
     { state: 'legacy failed', completion: { complete: true, failed: true }, cascades: true },
   ])('$state tasks remain terminal', ({ completion, cascades }) => {
+    // `cascades` describes the failed-prerequisite pass, not the invalidation cause under test:
+    // a failed `terminal` makes `strict` (requires complete) unreachable regardless of why
+    // `terminal` was targeted. Faction invalidation itself never cascades; that is covered by
+    // 'invalidates other-faction tasks without cascading to their dependents'.
     it.each([
       { cause: 'faction', target: task('terminal', undefined, { factionName: 'BEAR' }) },
       { cause: 'failed prerequisite', target: task('terminal', { on: 'failed', status: [] }) },
