@@ -117,9 +117,38 @@ queue:
       ledger_branch: duo/docs/ch-001-post-merge-ledger
       ledger_pr: 878
       ledger_url: https://github.com/tarkovtracker-org/TarkovTracker/pull/878
-      ledger_status: awaiting_pr_checks_and_merge
+      ledger_status: merged_awaiting_main_checks
+      ledger_merge: a62ba5a33b72222eadc89a5537117d56ab05ea44
+      ledger_merged_at: '2026-09-17T04:13:39Z'
+      ledger_validated_head: a0744702ca8113561f94abc7feb7e9c61ffa6847
+      ledger_ci: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35180642171
+      ledger_review_threads: { inspected: 0, unresolved: 0 }
+      ledger_main_ci: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35181125592
+      ledger_main_security: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35181125490
+      completion_branch: duo/docs/ch-001-completion-handoff
     notes: >-
-      CURRENT HANDOFF (2026-09-17): implementation #876 is merged and its post-merge CI,
+      CURRENT HANDOFF (2026-09-17, ledger merge): PR #878 was promoted from the program's
+      draft after successful exact-head checks, no requested changes and zero review threads.
+      Authorized squash merge succeeded at a62ba5a3; strict CI Result policy was not bypassed.
+      The merge tree exactly matches tested head a0744702. Re-ran 52 shared/app tests and all
+      193 gateway tests, Fallow new-only audit (zero introduced findings), and duplication analysis
+      (3 repository groups / 93 lines, no invalidation clones). Implementation merge and prior
+      main checks were independently re-read: all 22+2 and 20+3 checks/statuses succeeded.
+      No production files changed, no new slice or queue item was started. Existing CH-028,
+      CH-049 and CH-050 remain deferred. Full-suite/build/typecheck results below are historical.
+      Ledger-merge main CI 35181125592 is in progress; Security 35181125490 is queued, with
+      Pages and Supabase also in progress. These newly dispatched checks are UNVERIFIED;
+      do not confuse the successful PR checks with successful post-merge main checks.
+      Keep pr_open pending this gate. Local durable completion handoff is on
+      duo/docs/ch-001-completion-handoff in .wt/code-health, based on the ledger merge.
+      NEXT RUN: fetch main; verify exact ledger-merge checks and current-main checks, inspect
+      any newly posted actionable feedback on #878, and address failures before proceeding.
+      Once those checks succeed, record completed through the README ledger-only transition
+      using this handoff branch, normal CI/review, and no direct main push. Do not regenerate
+      the audit inventory or re-audit unchanged production code. CH-002 remains the next slice
+      only after the completion handoff is resolved; split its loading responsibility when selected.
+      The following handoffs are historical and do not supersede this CURRENT HANDOFF.
+      PREVIOUS HANDOFF (2026-09-17): implementation #876 is merged and its post-merge CI,
       Security, release, Pages, API gateway build, Supabase and status contexts all succeeded.
       Current main e38cb247 also has successful CI and all returned checks/statuses; only
       CHANGELOG.md and package.json version changed after the implementation merge.
