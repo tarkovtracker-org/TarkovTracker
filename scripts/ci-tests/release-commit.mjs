@@ -4,7 +4,12 @@ import { writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fixture, git } from './helpers/automation-fixture.mjs';
-import { jobBlock, workflowEvent, workflowStep } from './helpers/workflow-blocks.mjs';
+import {
+  jobBlock,
+  permissionsBlock,
+  workflowEvent,
+  workflowStep,
+} from './helpers/workflow-blocks.mjs';
 /** Stage realistic generated assets without modifying application code. */
 function releaseFixture(t) {
   const f = fixture(t);
@@ -90,7 +95,7 @@ function assertReleaseWorkflowBoundaries(ci, releaseWorkflow) {
   const release = jobBlock(releaseWorkflow, 'release');
   const eligibility = release.slice(0, release.indexOf('    steps:'));
   assert.match(eligibility, /head_branch == 'main'/);
-  assert.match(eligibility, /permissions:\n {6}actions: write\n/);
+  assert.match(permissionsBlock(eligibility, '    '), /^ {6}actions: write$/m);
   assert.match(
     workflowStep(release, 'Semantic Release'),
     /GITHUB_TOKEN: \$\{\{ secrets.GITHUB_TOKEN \}\}/
@@ -174,4 +179,14 @@ test('dispatched main Fallow audit compares the real parent instead of main agai
   assert.equal(result.status, 0, result.stderr);
   assert.equal(f.output(), `base=${f.head}\n`);
   assert.notEqual(f.head, git(f.repo, 'rev-parse', 'HEAD'));
+});
+test('release permission key order does not change dispatch authorization', () => {
+  const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const workflow = readFileSync('.github/workflows/release.yml', 'utf8');
+  const reordered = workflow.replace(
+    '      actions: write\n      checks: read',
+    '      checks: read\n      actions: write'
+  );
+  assert.notEqual(reordered, workflow, 'permission reordering must apply');
+  assertReleaseWorkflowBoundaries(ci, reordered);
 });

@@ -95,6 +95,8 @@ test('aggregate fails closed on selected failures, cancellations, unexpected ski
     assert.deepEqual(aggregateResults(plan, needs), []);
     assertSelectedJobFailures(plan, needs);
     assert.ok(aggregateResults(plan, { ...needs, changes: { result: 'failure' } }).length);
+    // A job unknown to the trusted aggregator fails closed even when it reports success.
+    assert.ok(aggregateResults(plan, { ...needs, unknown: { result: 'success' } }).length);
     assert.ok(aggregateResults(undefined, needs).length);
     assert.ok(aggregateResults({ ...plan, jobs: [] }, needs).length);
     if (!plan.full)
