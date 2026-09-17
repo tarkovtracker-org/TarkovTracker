@@ -53,7 +53,7 @@ queue:
     status: pr_open
     priority: P0
     dependencies: []
-    last_reviewed_commit: ade5cf112ef5a23a604fd5f3cd01575ad727e70f
+    last_reviewed_commit: 0daf56cc6d84bdfa121efc52bf528ae58f68abcf
     findings_summary: >-
       Review follow-up confirmed terminal tasks could be marked invalid: the recursive entry point
       protected only successful completions, while faction invalidation bypassed that guard entirely.
@@ -90,7 +90,54 @@ queue:
         old copies reported invalidateTaskRecursive at CRAP 132 (app) / 31.6 (worker); the shared
         function has no Fallow complexity finding. Repo duplicate clone groups 7 -> 3.
     pr: 876
+    post_merge_verification:
+      date: '2026-09-17'
+      implementation_merge: 0daf56cc6d84bdfa121efc52bf528ae58f68abcf
+      current_main: e38cb2473f6792fcc47a6a48564ac8c36da0b5be
+      audited_paths_changed_since_merge: false
+      implementation_checks: { successful_check_runs: 22, successful_status_contexts: 2 }
+      current_main_checks: { successful_check_runs: 20, successful_status_contexts: 3 }
+      implementation_ci: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35175683566
+      implementation_security: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35175683473
+      release: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35175897242
+      current_main_ci: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35175972972
+      review_threads: { inspected: 12, unresolved: 0 }
+      local_reverification:
+        shared_tests: 21
+        app_consumer_tests: 31
+        api_gateway_tests: 193
+        api_gateway_test_files: 12
+        repository_duplicate_clone_groups: 3
+        repository_duplicated_lines: 93
+        invalidation_duplicate_clone_groups: 0
+        shared_complexity_findings: 0
+        shared_large_function_lines: 100
+        fallow_new_only_gate: pass
+        systems_check: pass
+      ledger_branch: duo/docs/ch-001-post-merge-ledger
+      ledger_status: awaiting_pr_checks_and_merge
     notes: >-
+      CURRENT HANDOFF (2026-09-17): implementation #876 is merged and its post-merge CI,
+      Security, release, Pages, API gateway build, Supabase and status contexts all succeeded.
+      Current main e38cb247 also has successful CI and all returned checks/statuses; only
+      CHANGELOG.md and package.json version changed after the implementation merge.
+      Re-verified 52 shared/app tests (4 files) and all 193 API gateway tests (12 files), including
+      5 transform cases. Fallow new-only audit against origin/main passes with zero introduced
+      findings; this ledger-only diff is not a fresh whole-repository audit. Separate full Fallow
+      dupes measurement confirms 3 groups / 93 duplicated lines, none in invalidation; health
+      complexity has no finding on the shared module, but separately lists computeInvalidProgress
+      as a 100-line large function. Keep that explicit size signal rather than claiming every
+      metric is clean: its nested passes share per-call graph/visited/output state, and arbitrary
+      file splitting would not improve that boundary. Deferred semantics remain CH-028/CH-050.
+      Reviewed all 12 implementation PR threads: none unresolved; no requested changes.
+      Local systems:check passed. Earlier full-suite/build/typecheck results below are historical,
+      not rerun in this documentation-only session; exact merge/current-main CI was verified now.
+      Resume this ledger-only branch/PR before selecting any new slice. Retain pr_open until this
+      completion handoff passes normal review/CI and is merged; the verified merge SHA above
+      records actual reviewed code, not a claim that the ledger PR has passed. On the next run,
+      resolve its feedback, finalize completed status only with the required evidence, merge
+      without bypass and verify resulting main. CH-002 remains next, not started this run.
+      The following handoffs are historical; this CURRENT HANDOFF supersedes pending-main notes.
       Consolidated into shared/utils/progressInvalidation.ts typed against a minimal structural task
       shape (InvalidationTask); both copies deleted; worker adopts the app's (correct) behavior —
       intentional behavior change for the public /progress API: tasks whose requirement status
