@@ -5,26 +5,30 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
+# Jobs opt into the write scopes they need; the workflow default stays read-only.
+permissions:
+  contents: read
 jobs:
   pr-meta:
     name: PR Meta
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
       - name: Auto-label PR
         if: github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13
+        uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Calculate and apply size label
         if: github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const files = await github.paginate(github.rest.pulls.listFiles, {
@@ -73,10 +77,14 @@ jobs:
             });
       - uses: ./.github/actions/setup-project
       - name: Validate commit messages
-        run: pnpm exec commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
   lighthouse-scope:
     name: Lighthouse scope
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       pull-requests: read
     outputs:
@@ -84,7 +92,7 @@ jobs:
     steps:
       - name: Detect Lighthouse scope
         id: lighthouse-gate
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const labels = context.payload.pull_request.labels.map(({ name }) => name);
@@ -107,6 +115,7 @@ jobs:
   lighthouse:
     name: Lighthouse
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: lighthouse-scope
     if: |
       github.event.pull_request.head.repo.full_name == github.repository &&
@@ -114,7 +123,7 @@ jobs:
     env:
       API_ALLOWED_HOSTS: localhost,127.0.0.1
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
@@ -148,7 +157,7 @@ jobs:
             --timeout 120000 \
             --httpTimeout 20000
       - name: Lighthouse CI
-        uses: treosh/lighthouse-ci-action@3e7e23fb74242897f95c0ba9cabad3d0227b9b18
+        uses: treosh/lighthouse-ci-action@3e7e23fb74242897f95c0ba9cabad3d0227b9b18 # 12.6.2
         with:
           configPath: lighthouserc.json
           urls: |

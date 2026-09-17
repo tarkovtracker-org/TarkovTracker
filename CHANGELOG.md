@@ -1,3 +1,28 @@
+# [1.80.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.6...v1.80.0) (2026-09-17)
+
+
+### Bug Fixes
+
+* **supporter:** align advertised perks with current entitlements ([#873](https://github.com/tarkovtracker-org/TarkovTracker/issues/873)) ([dc8c3c6](https://github.com/tarkovtracker-org/TarkovTracker/commit/dc8c3c60436147b6e70f03186df76e80619e0566))
+* **ci:** dispatch automation checks with the job token ([#863](https://github.com/tarkovtracker-org/TarkovTracker/issues/863)) ([8b2aa22](https://github.com/tarkovtracker-org/TarkovTracker/commit/8b2aa22e466a0a9a32e5c108ed24ead67c2fd356))
+* **ci:** enforce validated automation and main freshness ([#862](https://github.com/tarkovtracker-org/TarkovTracker/issues/862)) ([48c2c82](https://github.com/tarkovtracker-org/TarkovTracker/commit/48c2c82fe1b946edb4c6f3e90b3a2619cfdf50b0))
+* **ci:** report dispatched validation to branch rules ([#865](https://github.com/tarkovtracker-org/TarkovTracker/issues/865)) ([a8826b0](https://github.com/tarkovtracker-org/TarkovTracker/commit/a8826b0b0992f96f6255d2f531f1f74b1a92fb58))
+* **team:** restore deployed atomic leave migration and handler ([#874](https://github.com/tarkovtracker-org/TarkovTracker/issues/874)) ([4d8128f](https://github.com/tarkovtracker-org/TarkovTracker/commit/4d8128f892b81c6d1b4ad9750283806387443c5c))
+* **supabase:** restore the deployed team event authority migration ([#858](https://github.com/tarkovtracker-org/TarkovTracker/issues/858)) ([836e002](https://github.com/tarkovtracker-org/TarkovTracker/commit/836e002c9023bdb709fe8c551b5a08dd6696b937)), closes [#855](https://github.com/tarkovtracker-org/TarkovTracker/issues/855)
+
+
+### Features
+
+* **config:** report remote migration history through the prod-db observer ([#860](https://github.com/tarkovtracker-org/TarkovTracker/issues/860)) ([6944f71](https://github.com/tarkovtracker-org/TarkovTracker/commit/6944f71c72685b6eb15840cc8469c8ffe6e3d4ed))
+* **api:** retire legacy /api/v2 routes from production ([#720](https://github.com/tarkovtracker-org/TarkovTracker/issues/720)) ([#859](https://github.com/tarkovtracker-org/TarkovTracker/issues/859)) ([461b1ea](https://github.com/tarkovtracker-org/TarkovTracker/commit/461b1eaf934ca3611470f4cbc6bbedab91f419a7))
+
+## [1.79.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.5...v1.79.6) (2026-09-16)
+
+
+### Performance Improvements
+
+* **test:** run vitest files in parallel ([#852](https://github.com/tarkovtracker-org/TarkovTracker/issues/852)) ([9db1ad2](https://github.com/tarkovtracker-org/TarkovTracker/commit/9db1ad2fe8092d9ebecedf2a7386f35f2744c38b))
+
 ## [1.79.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.4...v1.79.5) (2026-09-16)
 
 

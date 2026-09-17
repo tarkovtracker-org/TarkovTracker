@@ -22,9 +22,17 @@ import {
 } from './responses';
 import { INBOUND_USER_AGENT_MIN_LENGTH, normalizeInboundUserAgent } from './utils/userAgent';
 import type { BatchTaskUpdate, Env, Permission, TaskState } from './types';
-const LEGACY_API_DEPRECATION_DATE = '@1783296000';
 const TASK_STATES = new Set<TaskState>(['completed', 'uncompleted', 'failed']);
 const API_HOST_PREFIXES = ['/api/v2', '/api', '/v2'] as const;
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+function isLoopbackHost(hostname: string): boolean {
+  return LOOPBACK_HOSTS.has(hostname);
+}
+function isConfiguredApiHost(hostname: string, configuredHost?: string): boolean {
+  const host = hostname.toLowerCase();
+  const expected = (configuredHost || 'api.tarkovtracker.org').trim().toLowerCase();
+  return host === expected || isLoopbackHost(host);
+}
 type Action = 'progress-read' | 'progress-write' | 'token-info';
 type RouteContext = {
   apiPath: string;
@@ -49,9 +57,8 @@ function stripApiPrefix(path: string, prefixes: readonly string[]): string | nul
   return prefix ? path.slice(prefix.length) || '/' : null;
 }
 function resolveApiPath(path: string, isApiHost: boolean): string | null {
-  if (isApiHost) return stripApiPrefix(path, API_HOST_PREFIXES) ?? path;
-  const apiMatch = path.match(/^\/api(?:\/v2)?(.*)$/);
-  return apiMatch ? apiMatch[1] || '/' : null;
+  if (!isApiHost) return null;
+  return stripApiPrefix(path, API_HOST_PREFIXES) ?? path;
 }
 function healthResponse(origin?: string, reqOrigin?: string): Response {
   return successResponse(
@@ -90,29 +97,16 @@ function publicResponse(
   origin?: string,
   reqOrigin?: string
 ): Response | null {
+  if (path === '/health') {
+    return request.method === 'OPTIONS'
+      ? new Response(null, { status: 204, headers: corsHeaders(origin, reqOrigin) })
+      : healthResponse(origin, reqOrigin);
+  }
+  if (!isApiHost) return null;
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders(origin, reqOrigin) });
   }
-  if (path === '/health') return healthResponse(origin, reqOrigin);
-  return isApiHost ? apiHostPublicResponse(path, origin, reqOrigin) : null;
-}
-function legacyRedirectResponse(
-  context: Pick<RouteContext, 'apiPath' | 'env' | 'origin' | 'reqOrigin' | 'request'>,
-  apiHost: string,
-  isApiHost: boolean
-): Response | null {
-  if (isApiHost || context.env.LEGACY_API_REDIRECT?.trim().toLowerCase() !== 'true') return null;
-  const target = 'https://' + apiHost + context.apiPath + new URL(context.request.url).search;
-  return new Response(null, {
-    status: 308,
-    headers: {
-      ...corsHeaders(context.origin, context.reqOrigin),
-      Location: target,
-      Deprecation: LEGACY_API_DEPRECATION_DATE,
-      Link: '<' + target + '>; rel="successor-version"',
-      'Cache-Control': 'no-store',
-    },
-  });
+  return apiHostPublicResponse(path, origin, reqOrigin);
 }
 function authorize(
   context: RouteContext,
@@ -392,8 +386,7 @@ export async function handleGatewayRequest(
   const path = normalizePath(url.pathname);
   const origin = env.ALLOWED_ORIGIN;
   const reqOrigin = request.headers.get('Origin') || undefined;
-  const apiHost = (env.API_HOST || 'api.tarkovtracker.org').trim().toLowerCase();
-  const isApiHost = url.hostname.toLowerCase() === apiHost;
+  const isApiHost = isConfiguredApiHost(url.hostname, env.API_HOST);
   const response = publicResponse(request, path, isApiHost, origin, reqOrigin);
   if (response) return response;
   const apiPath = resolveApiPath(path, isApiHost);
@@ -408,12 +401,6 @@ export async function handleGatewayRequest(
       reqOrigin
     );
   }
-  const redirect = legacyRedirectResponse(
-    { apiPath, env, origin, reqOrigin, request },
-    apiHost,
-    isApiHost
-  );
-  if (redirect) return redirect;
   const rawToken = extractBearerToken(request.headers.get('Authorization'));
   if (!rawToken) return errorResponse('Unauthorized', 401, origin, reqOrigin);
   try {

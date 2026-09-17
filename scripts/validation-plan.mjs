@@ -11,8 +11,11 @@ export const fullJobs = [
   'workers',
 ];
 const reducedJobs = ['lint-format', 'systems-drift'];
+// Only Crowdin-owned translations are reduced. app/locales/en.json is the source locale that
+// application code and Vitest fixtures consume, so it selects full validation like other inputs
+// (scripts/crowdin-pr.sh draws the same boundary for translation-only PRs).
 function knownPathCategory(path) {
-  if (/^app\/locales\/[^/]+\.json$/.test(path)) return 'locales';
+  if (/^app\/locales\/(?!en\.json$)[^/]+\.json$/.test(path)) return 'locales';
   return /^(?:[^/]+\.md|(?:docs|\.github)\/.+\.(?:md|markdown))$/.test(path) ? 'docs' : 'full';
 }
 function unsafePath(path) {
@@ -29,6 +32,14 @@ function requiresFullValidation(paths, categories, forceFull) {
 function defaultReason(full) {
   return full ? 'Full validation required' : 'Documentation/translation-only change set';
 }
+// Workflow linting is selected by path rather than by the full/reduced split: it is only useful
+// when automation files change, and an unreadable diff (no paths) must select it conservatively.
+function isAutomationPath(path) {
+  return typeof path === 'string' && path.startsWith('.github/') && pathCategory(path) === 'full';
+}
+function touchesWorkflows(paths) {
+  return paths.length === 0 || paths.some(isAutomationPath);
+}
 export function classifyPaths(paths, { forceFull = false, reason } = {}) {
   const categories = new Set(paths.map(pathCategory));
   const full = requiresFullValidation(paths, categories, forceFull);
@@ -37,6 +48,7 @@ export function classifyPaths(paths, { forceFull = false, reason } = {}) {
     docs: categories.has('docs'),
     locales: categories.has('locales'),
     i18n: full || categories.has('locales'),
+    workflows: touchesWorkflows(paths),
     jobs: [...(full ? fullJobs : reducedJobs)],
     reason: reason || defaultReason(full),
     paths,
@@ -112,9 +124,22 @@ function jobOutcomeError(plan, needs, job) {
   const result = needs[job]?.result;
   return result === expected ? null : `${job}: expected ${expected}, received ${String(result)}`;
 }
+// The trusted default-branch aggregator must not silently ignore validation jobs it does not know;
+// an unexpected dependency fails closed until the trusted contract is updated first.
+function unexpectedJobsError(needs) {
+  const unexpected = Object.keys(needs).filter(
+    (job) => job !== 'changes' && !fullJobs.includes(job)
+  );
+  return unexpected.length ? `Unexpected CI jobs: ${unexpected.join(', ')}` : null;
+}
+function classifierError(needs) {
+  return needs.changes?.result === 'success' ? null : 'Classifier did not succeed';
+}
 export function aggregateResults(plan, needs) {
   if (!isValidPlan(plan)) return ['Missing or invalid validation plan'];
-  const errors = fullJobs.map((job) => jobOutcomeError(plan, needs, job)).filter(Boolean);
-  if (needs.changes?.result !== 'success') errors.push('Classifier did not succeed');
-  return errors;
+  return [
+    ...fullJobs.map((job) => jobOutcomeError(plan, needs, job)),
+    classifierError(needs),
+    unexpectedJobsError(needs),
+  ].filter(Boolean);
 }

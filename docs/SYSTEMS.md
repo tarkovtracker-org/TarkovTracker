@@ -651,9 +651,12 @@ sequenceDiagram
 
 ### Flow
 
-1. **Routing + User-Agent gate.** `workers/api-gateway/src/router.ts` normalizes the path, rejects
-   requests without a 5–200 character `User-Agent`, and (when enabled) 308-redirects legacy
-   `/api/v2` hosts to the api subdomain.
+1. **Routing + User-Agent gate.** `workers/api-gateway/src/router.ts` normalizes the path,
+   enforces the api host boundary (non-api host requests outside `/health` return 404, while
+   loopback hosts such as `localhost` and `127.0.0.1` are admitted for local development), and
+   rejects protected endpoint requests without a 5–200 character `User-Agent`; infrastructure routes
+   are exempt. Retired apex routes are retained as tombstone bindings in `wrangler.toml` so legacy
+   traffic is terminated with 404 at the edge instead of falling through to Pages.
 2. **Pre-auth abuse gate.** A Cloudflare Workers Rate Limiting binding (`API_ABUSE_LIMITER`) keys
    on `CF-Connecting-IP` and shields the `api_tokens` lookup from token-rotation floods. It is
    infrastructure protection, not a customer quota, and fails open on binding errors.
@@ -669,8 +672,8 @@ sequenceDiagram
    Auth (24h cache), and loads matching tasks/hideout metadata from `json.tarkov.dev` via
    `workers/api-gateway/src/services/tarkov.ts` (1h memory cache).
 6. **Transform.** `workers/api-gateway/src/utils/transform.ts` converts the JSONB objects into the
-   public array format, applies invalidation (`workers/api-gateway/src/utils/invalidation.ts`) and
-   game-edition hideout auto-completes.
+   public array format, applies invalidation (`shared/utils/progressInvalidation.ts`, the same
+   algorithm the app uses) and game-edition hideout auto-completes.
 7. **Conditional response.** `conditionalReadResponse` in `workers/api-gateway/src/responses.ts`
    serializes once, derives a weak `ETag` from the payload, answers `304` on a matching
    `If-None-Match`, and sets `Cache-Control: private, max-age=15` plus
@@ -683,7 +686,7 @@ sequenceDiagram
 ### Files
 
 - `workers/api-gateway/src/index.ts` — Worker entrypoint; delegates to the modules below
-- `workers/api-gateway/src/router.ts` — path normalization, User-Agent gate, host/legacy redirect, route dispatch
+- `workers/api-gateway/src/router.ts` — path normalization, User-Agent gate, API host boundary enforcement, route dispatch
 - `workers/api-gateway/src/authentication.ts` — abuse gate, token auth, daily-quota enforcement
 - `workers/api-gateway/src/rateLimiter.ts` — `ApiGatewayRateLimiter` Durable Object + quota client
 - `workers/api-gateway/src/responses.ts` — CORS, envelopes, conditional response, ETag/compression
@@ -692,15 +695,25 @@ sequenceDiagram
   progress reads/writes
 - `workers/api-gateway/src/services/supporter.ts`, `workers/api-gateway/src/services/usage.ts`,
   `workers/api-gateway/src/services/tarkov.ts`
-- `workers/api-gateway/src/utils/transform.ts`, `workers/api-gateway/src/utils/invalidation.ts`
+- `workers/api-gateway/src/utils/transform.ts`
+- `shared/utils/progressInvalidation.ts` — runtime-independent task/objective invalidation
+  (faction, failed-only and failed prerequisites, `failed`-tolerant requirements), shared by the
+  app progress store, public profile/streamer views, and the Worker transform
 - `shared/utils/userMetadata.ts` — runtime-independent provider metadata parsing, shared with app
   user hydration through the `@shared` alias in Nuxt and the Worker build/test configuration
 - `docs/RATE_LIMITING.md`, `docs/API.md` — ownership map and client-facing docs
 
 ### Invariants
 
-- App user hydration and API progress responses share provider metadata fallback ordering. Shared
-  utilities must not import Nuxt or Worker runtime modules.
+- App user hydration and API progress responses share provider metadata fallback ordering, and the
+  app and API share one invalidation algorithm: a requirement whose `status` includes `failed`
+  never invalidates its task when the prerequisite is failed. Shared utilities must not import
+  Nuxt or Worker runtime modules; invalidation logic must not be re-implemented per runtime.
+- Completed and failed tasks (including legacy records with both flags set) and their objectives
+  are never marked invalid. This terminal-state guard applies to faction, prerequisite, and legacy
+  alternative entry points. Completed tasks stop propagation; failed tasks still invalidate strict
+  dependents, but not dependents whose requirements accept failure. Faction mismatch alone does
+  not cascade.
 - A request makes at most one Durable Object call (the daily quota). There is no burst bucket, no
   IP backstop bucket, and no refund reconciliation; reintroducing any of those is a regression.
 - The daily quota fails open on DO unavailability (logs `daily_quota_unavailable`); the pre-auth
@@ -1122,6 +1135,32 @@ flowchart LR
 - Legacy activity envelopes with no owner are adoptable guest data. Authenticated startup waits
   until progress sync restores the selected mode before adoption. Another account's envelope is
   retained for its owner. The legacy key is removed only after entries have been added to progress.
+- `public.team_events` is server-authored only. `anon` and `authenticated` hold no table or
+  column-level `INSERT`, a restrictive policy denies client inserts even if a grant is later
+  inherited, and only `service_role` may insert. A `BEFORE INSERT` trigger stamps `server_verified`
+  and overwrites `created_at` with database time, so neither field is caller-supplied. Member reads
+  are unchanged.
+- Rows written before that containment are preserved for history and carry
+  `server_verified = false` with a possibly caller-supplied `created_at`. **Every cooldown or
+  rate-limit consumer of `team_events` must filter on `server_verified = true`, scope the query to
+  events the caller initiated, and bound `created_at` at or below the current time.** Reading the
+  preserved history without those filters lets a caller evade or extend a cooldown using a row
+  forged before containment. `team-leave` and `team-kick` are the current consumers; a new consumer
+  inherits the same requirement, and deleting the untrusted rows is not a substitute because the
+  filter is what makes the contract durable.
+
+- `team-leave` calls the service-only `public.leave_team` RPC with the authenticated user ID,
+  never an identity from the request body. Membership removal, conditional pointer maintenance,
+  and trusted event insertion commit together. The handler performs no later table write, so a
+  newer join cannot be overwritten by an old leave response.
+- Leave takes a per-user advisory lock, then the team row and membership row. Ownership transfer
+  locks the team before validating owner and successor membership, preventing promotion of a
+  departed member. Both RPCs have a five-second lock timeout and service-only execution grants.
+  The handler retries the whole leave transaction at most three times, with 50/100 ms delays,
+  only for confirmed `40P01`, `40001`, or `55P03` aborts. Exhaustion returns `503` with
+  `Retry-After: 1`; business results and ambiguous transport failures are not retried.
+- Cooldowns are user/mode-wide across teams but retain the existing event lifetime: disband
+  deletes the associated events. They are not durable cooldown evidence after team deletion.
 
 ---
 
@@ -1256,7 +1295,12 @@ flowchart LR
    sequentially to avoid a burst of production inspection queries. It returns an evidence-only JSON
    report. Unsupported or ambiguous syntax fails closed with `assessment: incomplete`,
    `risk: unknown`, and `requires_manual_review: true`. It does not execute the migration.
-8. Production credentials are supplied only through `PROD_DB_URL`, which must identify a dedicated
+8. `migration-history` reads applied version identifiers from
+   `supabase_migrations.schema_migrations` and compares them against `supabase/migrations` in the
+   current checkout, reporting `missing_locally` (applied remotely, absent from the checkout) and
+   `pending_remotely` (in the checkout, not applied). It makes remote/local migration divergence
+   observable without migration or Management API credentials.
+9. Production credentials are supplied only through `PROD_DB_URL`, which must identify a dedicated
    observer role. The wrapper removes its password before invoking the Supabase CLI and supplies
    the password through a mode-`0600` temporary `PGPASSFILE`, keeping it out of child-process
    arguments and command errors. The credential file is removed after each CLI invocation.
@@ -1296,6 +1340,20 @@ flowchart LR
 - Migration preflight is evidence-only and fails closed on unsupported or ambiguous syntax;
   production reports run sequentially, and migration execution remains in the reviewed merge and
   Supabase deployment workflow.
+- `migration-history` reads only the `version` column of `supabase_migrations.schema_migrations`.
+  The stored `statements` column is never selected, and the observer's ledger grant is column-level
+  for the same reason, so migration SQL and any literal inside it stay out of both the report and
+  the role's reach.
+- Version identifiers establish _which_ migrations are recorded, never that their SQL matches.
+  Divergence found by `migration-history` is followed by comparing file contents against the
+  deployed Git revision, as `docs/runbook.md` requires.
+- The comparison must be complete or fail. When the ledger read reaches its row limit the command
+  errors instead of reporting `in_sync` or a partial difference.
+- The report names the project it observed (`project_ref`, `null` for a local target), so a
+  comparison run against the wrong project is detectable. A primary target whose host and observer
+  username identify no project fails instead of reporting a nameless comparison. The observer does
+  not infer the expected project from application configuration; confirming the identity is the
+  operator's step.
 
 ## 10. Promoted Twitch configuration
 
@@ -1438,9 +1496,9 @@ share one retry budget: a pre-boot inline script for entry-module failures (the 
 boots, so in-bundle code cannot run) and the in-app ChunkRecovery for lazy-chunk failures after
 boot.
 
-**Flow**
+### Flow
 
-```
+```text
 Page load
   → inline recovery script registers in <head> (before the entry module)
   → entry module fails? (error event on same-origin <script type="module">)
@@ -1452,7 +1510,7 @@ Page load
         errors.network_access_denied)
 ```
 
-**Step-by-step**
+### Step-by-step
 
 1. `nuxt.config.ts` emits the inline recovery script from `app/utils/entryRecoveryScript.ts` via
    `app.head.script`, so it lands in `<head>` before the entry module script in the built
@@ -1556,7 +1614,7 @@ exclusions, and includes force-tracked ignored files. A separate temporary index
 analysis head. Native new-only attribution and configured severities determine the exit status.
 See [the workflow guide](WORKFLOW_AUTOMATION.md#fallow-changed-file-gate) for usage and report IDs.
 
-**Invariants**
+### Invariants
 
 - Source files, the source index, branches, and worktree registrations remain unchanged.
 - Both analysis commits contain the same physical generated context; no persistent finding
@@ -1567,7 +1625,7 @@ See [the workflow guide](WORKFLOW_AUTOMATION.md#fallow-changed-file-gate) for us
 
 ## 14. Release validation and publication
 
-Release starts after successful main-push CI, reusing its test shards and database validation.
+Release starts after successful main push or explicitly dispatched CI, reusing its test shards and database validation.
 `scripts/release-gate.mjs` checks live workflow identity, repository, conclusion, attempt, and SHA
 against the triggering event and current main before setup and immediately before publishing.
 The checkout stays pinned to the validated SHA. The production build still runs in Release.
@@ -1579,9 +1637,48 @@ The checkout stays pinned to the validated SHA. The production build still runs 
 - CI cancellation must not cancel a publisher; only release jobs share `release-main` with
   `cancel-in-progress: false`. Git non-fast-forward protection and semantic-release's upstream
   check remain the final safeguards if main advances after the last eligibility check.
-- Release version commits retain the existing skip marker behavior and Cloudflare rebuild.
+- Dispatched CI publishes the aggregate validator outcome as a `CI Result` commit status on the
+  exact workflow-run SHA. GitHub excludes dispatch-created job checks from branch rules; the
+  status uses the GitHub Actions job token with job-scoped `statuses: write`. That job checks out
+  the trusted default branch for aggregation and reporting, never candidate branch code. Only aggregate
+  success publishes success; failed, cancelled, skipped, or missing validation publishes failure.
+  Validation jobs unknown to the trusted aggregator also fail the result, so a new job must land in
+  the trusted contract before it can gate. Status publication errors fail the CI Result job, so
+  automation cannot promote the commit.
+- Release version commits pass ordinary CI on a temporary `wip/release-*` branch before the
+  identical SHA advances main. The main ruleset requires successful GitHub Actions `CI Result`,
+  strict freshness, and no bypass actors. Non-fast-forward promotion fails if main advances.
+- If publication fails after version promotion, an explicit rerun can recover only the direct
+  version-only child of the original CI revision, with successful exact-head CI and unchanged
+  manifest/changelog history. Recovery creates missing tags/releases idempotently, rejects tag
+  conflicts, and never advances main or bumps another version.
+- The staging push uses `GITHUB_TOKEN` and explicitly dispatches CI; main promotion uses it to
+  avoid recursive Actions runs. Version commits have no skip marker; Cloudflare still rebuilds.
 - A green workflow run must continue to mean the test shards and Supabase validation passed;
   making those jobs optional requires reconsidering this release gate.
+
+### Crowdin automatic merges
+
+`.github/workflows/crowdin.yml` uses `scripts/crowdin-pr.sh`, preserved from trusted main before
+synchronization, to bind translation validation and merging to one immutable PR head. Its full tree
+diff against captured main permits only regular non-English locale JSON files. Dependency setup and
+project checks run after that checkout. The built-in job token synchronizes translations, updates a
+behind branch, explicitly dispatches candidate CI, and performs the final merge; dependency installation and project checks receive no automation credential.
+
+- Only an open, non-draft, same-repository `locales` PR targeting `main` is eligible.
+- Behind translation branches first receive a GitHub branch update guarded by the expected head.
+  Only afterward does the workflow capture and validate a candidate. Conflicts fail closed.
+- Candidates contain captured main. Preflight checks reject observed main/head changes and
+  non-clean merge states. Only unknown calculations retry.
+- The gate awaits successful GitHub Actions `CI Result` on the exact head and verifies the effective
+  repository rule requires that check with strict freshness. The administrator verifies the deployed
+  ruleset has no bypass actors; automation does not receive ruleset write access to read that list.
+  GitHub enforces the base requirement at merge time; missing/weakened required checks fail closed.
+- The server-side `--match-head-commit` guard must use the SHA that passed all validation.
+- Merges use `GITHUB_TOKEN`, then explicitly dispatch main CI for the release gate. No personal
+  GitHub token is needed. CI dispatch failures fail the workflow; candidate failures prevent merging.
+  The fixed squash message must not inherit automation-skip markers from translation commits.
+- Existing release provenance checks stay intact; Cloudflare Git deployment remains independent.
 
 See `docs/WORKFLOW_AUTOMATION.md` for triggering, retry, and deployment behavior.
 
@@ -1695,18 +1792,24 @@ identity.
 `scripts/validate-changes.mjs` exposes local execution and CI outputs;
 `scripts/check-ci-result.mjs` enforces outcomes in `.github/workflows/ci.yml`.
 
-The proposed selection reduces checks only for explicitly recognized documentation and locale paths.
-`DESIGN.md`, unknown inputs, and executable changes select full validation. Local input includes
+The selection reduces checks only for explicitly recognized documentation paths and Crowdin-owned
+translation files. `DESIGN.md`, the source locale `app/locales/en.json`, unknown inputs, and
+executable changes select full validation. Local input includes
 committed and dirty paths; CI input is the explicit revision diff. Renames contribute both paths.
-Shadow rollout forces every check while printing the proposed selection. See
-`docs/WORKFLOW_AUTOMATION.md` for rollout evidence and local/full execution profiles.
+Pull requests receive the selected jobs; the classifier also reports `workflows` so workflow
+linting runs only for non-Markdown automation paths and unreadable diffs. See
+`docs/WORKFLOW_AUTOMATION.md` for the recorded rollout evidence and local/full execution profiles.
 
-**Invariants:**
+### Invariants
 
-- Pushes retain full validation; shadow mode retains full validation on PRs too.
+- Pushes and dispatches retain full validation; only pull requests receive reduced selection.
+- Reduced selection never applies to `app/locales/en.json`; only non-English translations qualify.
+- Empty, unreadable, or malformed diffs select full validation and workflow linting.
 - Missing classifier output or selected jobs that fail, cancel, or unexpectedly skip fail CI Result.
 - Only deliberately unselected jobs may report skipped; systems drift always runs.
 - Existing shard discovery, coverage enforcement, secret restrictions, and merge governance remain.
+- Dependabot auto-merge requires the immutable Dependabot account ID for both the PR author and
+  event actor; the actor restriction alone never establishes trust.
 - The aggregate covers repository CI jobs, not independently reported Security or Codecov statuses.
 
 ## 15. Canonical task progression
@@ -1801,7 +1904,7 @@ route. Imports load and mutate only their selected destination mode;
 Seasonal log eligibility and restoration guards are unchanged. Tarkov.dev profile import does
 not import quest completions and therefore has no trader/task backfill path.
 
-**Invariants**
+### Invariants
 
 - Canonical requirements, blockers, status comparisons and story alternatives are shared by UI and
   recommendations; no new dependency on the removed upstream task `alternatives` is introduced.
@@ -1841,9 +1944,9 @@ otherwise land at 1.0-3.6:1 on paper. The preference
 is device-local: a dedicated `tt_theme` localStorage key (not the user-scoped preferences store)
 so the pre-paint boot script and the in-app `useTheme` composable read the same source.
 
-**Flow**
+### Flow
 
-```
+```text
 First paint
   → THEME_BOOT_SCRIPT (inline <head> script in nuxt.config)
       reads tt_theme → validates value (mirrors normalizeThemeMode) → sets <html data-theme> + colorScheme
@@ -1854,7 +1957,7 @@ App boot
       → setThemeMode persists tt_theme + sets data-theme + colorScheme atomically
 ```
 
-**Step-by-step**
+### Step-by-step
 
 1. `app/assets/css/tailwind.css` ends with `:root[data-theme='light'] { ... }`, which overrides
    only the neutral tokens (surface ladder role-mapped to parchment canvas → snow cards → dark
@@ -1883,7 +1986,7 @@ App boot
 4. `app/composables/useTheme.ts` exposes the singleton `themeMode` state and
    `setThemeMode`/`toggleThemeMode` used by the AppBar toggle and the Settings AppearanceCard.
 
-**Invariants:**
+### Invariants
 
 - Dark is the default and is pixel-identical to before: the `:root[data-theme='light']` overrides
   are inert in dark mode and every component `light:` utility requires `data-theme='light'`.
@@ -1934,3 +2037,50 @@ App boot
 - `app/features/settings/AppearanceCard.vue` — Settings > Preferences theme selector
 - `app/shell/AppBar.vue` — sun/moon toggle in the utilities group (collapses into More menu on mobile)
 - `nuxt.config.ts` — boot script, light skeleton fallbacks, pinned `colorMode`
+
+## 17. Test suite execution model
+
+Test **files** run in parallel, each in its own forked worker. `vitest.config.ts` sets
+`pool: 'forks'` with `isolate: true`, and Vitest's pool only reuses a runner while `isolate` is
+false, so an isolated file always gets a fresh process and no module state crosses file boundaries.
+The worker count stays bounded (`process.env.CI ? 4 : 8`) because an unbounded count multiplies
+Nuxt environments and worker-teardown pressure. `pnpm run test` and `pnpm run test:coverage`
+inherit that bound instead of passing a worker flag, since a CLI flag would override the config.
+
+CI splits the suite across four coverage shards. The `VITEST_SHARD` variable — not the `--shard`
+argument alone — selects sharded coverage mode, which drops the global and per-file thresholds
+because one shard exercises only part of the suite; the unsharded `test:coverage` run enforces
+them. The `Test (shard N/4)` check names and the shard command are contract: branch protection and
+`dependabot-auto-merge.yml` require those names, and `scripts/ci-tests/workflows.mjs` asserts the
+command.
+
+A component loaded through `defineAsyncComponent` starts its dynamic import when Vue first renders
+it. A test-harness `stub` replaces what renders but does not cancel that loader, so a real module
+can still resolve after the file's environment is torn down and fail the run with
+`EnvironmentTeardownError`. A test that mounts such a component mocks the lazily imported module, so
+the loader never reaches a real import.
+
+### Invariants
+
+- Every test file gets a fresh worker. `isolate: true` is what guarantees that, so no run may leave
+  runner reuse enabled for isolated files.
+- The worker count stays bounded. Removing the cap trades deterministic teardown for higher peak
+  memory and teardown-error risk.
+- Unhandled errors fail the suite. Do not restore `--dangerouslyIgnoreUnhandledErrors`; fix the
+  lifecycle that produced the error instead.
+- Shard count, shard command, and the `Test (shard N/4)` check names stay stable. Changing them
+  requires updating branch protection and `scripts/ci-tests/workflows.mjs` together.
+- Coverage thresholds apply only to the unsharded run, and `VITEST_SHARD` decides that. A sharded
+  invocation must set it or the run enforces thresholds it cannot satisfy.
+- A test mounting a `defineAsyncComponent` must not let the real module load, or must settle the
+  load before the file ends.
+- Per-test timeouts stay scoped to the test that needs them; suite-wide timeouts are not raised to
+  absorb contention.
+
+### Files
+
+- `vitest.config.ts` — pool, isolation, bounded workers, coverage thresholds, shard mode
+- `package.json` — `test`, `test:coverage`, and `test:api-gateway` scripts
+- `.github/workflows/ci.yml` — the four shard jobs and the Deno test step
+- `scripts/ci-tests/workflows.mjs` — asserts the shard command and required check names
+- `tests/test-setup.ts` — shared fetch stubs, console filtering, auto-unmount

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFile } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,6 +15,18 @@ const DEFAULT_MAX_OUTPUT_BYTES = 1_000_000;
 const MAX_SAMPLE_LIMIT = 20;
 const MAX_DISTRIBUTION_LIMIT = 50;
 const MAX_COMMAND_ARGS = 8;
+const MIGRATION_HISTORY_LIMIT = 2000;
+const MIGRATION_FILENAME_PATTERN = /^(\d+)_.+\.sql$/;
+const MIGRATION_HISTORY_SQL = `select version
+from supabase_migrations.schema_migrations
+order by version
+limit ${MIGRATION_HISTORY_LIMIT}`;
+const MIGRATION_HISTORY_GRANT_HINT =
+  'the observer role needs read-only history access, granted out of band by an operator: ' +
+  'GRANT USAGE ON SCHEMA supabase_migrations TO <observer_role>; ' +
+  'GRANT SELECT (version) ON TABLE supabase_migrations.schema_migrations TO <observer_role>;';
+const PROJECT_HOST_PATTERN = /^db\.([a-z0-9]{16,32})\.supabase\.(?:co|com|in)$/;
+const POOLER_USERNAME_PATTERN = /^[^.]+\.([a-z0-9]{16,32})$/;
 const SENSITIVE_COLUMN_PATTERN =
   /^(?:email|phone|full_name|address|token|secret|password|metadata|payload|content|ip|user_agent|token_value|token_hash|progress|data|state|settings|preferences|config|custom_config)$/i;
 const SAFE_SAMPLE_COLUMN_PATTERN =
@@ -97,6 +109,7 @@ function usage(message) {
   scripts/prod-db health
   scripts/prod-db canary
   scripts/prod-db <db-stats|schema|table-stats|index-stats|traffic|outliers|calls|locks|blocking|long-running|vacuum|bloat|role-stats>
+  scripts/prod-db migration-history
   scripts/prod-db sample --table <table> [--limit <1-20>]
   scripts/prod-db distribution --table <table> --column <column> [--limit <1-50>]
   scripts/prod-db count --table <table>
@@ -509,6 +522,79 @@ order by pg_total_relation_size(c.oid) desc
 limit 500`,
     'schema'
   );
+}
+async function runMigrationHistory() {
+  const report = await readRemoteMigrationHistory();
+  const remoteVersions = rowsOf(report.data)
+    .map((row) => row.version)
+    .filter((version) => typeof version === 'string')
+    .sort();
+  if (remoteVersions.length >= MIGRATION_HISTORY_LIMIT)
+    throw new Error(
+      `migration-history reached the ${MIGRATION_HISTORY_LIMIT}-version read limit, so the comparison would be incomplete; raise MIGRATION_HISTORY_LIMIT before relying on this report`
+    );
+  return {
+    ...report,
+    project_ref: getProjectRef(getTarget()),
+    data: compareMigrationVersions(remoteVersions, readLocalMigrationVersions()),
+  };
+}
+function getProjectRef(target) {
+  const connection = target.connection;
+  if (!connection) return null;
+  const projectRef =
+    matchProjectRef(connection.host, PROJECT_HOST_PATTERN) ??
+    matchProjectRef(connection.username, POOLER_USERNAME_PATTERN);
+  if (!projectRef)
+    throw new Error(
+      'migration-history cannot identify the Supabase project from PROD_DB_URL; the report has to name the database it compared, so correct the connection host or the observer username before using it as remote-history evidence'
+    );
+  return projectRef;
+}
+function matchProjectRef(value, pattern) {
+  return pattern.exec(value ?? '')?.[1] ?? null;
+}
+async function readRemoteMigrationHistory() {
+  try {
+    return await runQuery(MIGRATION_HISTORY_SQL, 'migration-history');
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    if (/permission denied/i.test(detail))
+      throw new Error(`${detail} -- ${MIGRATION_HISTORY_GRANT_HINT}`);
+    throw error;
+  }
+}
+function readLocalMigrationVersions() {
+  const directory = fileURLToPath(new URL('supabase/migrations/', ROOT));
+  if (!existsSync(directory)) return [];
+  const versions = readdirSync(directory)
+    .map((entry) => MIGRATION_FILENAME_PATTERN.exec(entry)?.[1])
+    .filter((version) => typeof version === 'string')
+    .sort();
+  assertUniqueVersions(versions);
+  return versions;
+}
+function assertUniqueVersions(versions) {
+  const duplicates = versions.filter((version, index) => versions[index - 1] === version);
+  if (duplicates.length === 0) return;
+  throw new Error(
+    `the checkout has duplicate migration versions (${[...new Set(duplicates)].join(', ')}); the remote ledger records one row per version, so the comparison cannot be trusted until the filenames are corrected`
+  );
+}
+function compareMigrationVersions(remoteVersions, localVersions) {
+  const remote = new Set(remoteVersions);
+  const local = new Set(localVersions);
+  const remoteOnly = remoteVersions.filter((version) => !local.has(version));
+  const localOnly = localVersions.filter((version) => !remote.has(version));
+  return {
+    in_sync: remoteOnly.length === 0 && localOnly.length === 0,
+    remote_total: remote.size,
+    local_total: local.size,
+    missing_locally: remoteOnly,
+    pending_remotely: localOnly,
+    remote_versions: remoteVersions,
+    local_versions: localVersions,
+  };
 }
 async function runTableData(operation, table, column, limit) {
   const qualified = validateIdentifier(table, 'table');
@@ -940,6 +1026,7 @@ const COMMAND_HANDLERS = new Map([
   ['canary', runCanaryCommand],
   ['health', () => runQuery(HEALTH_SQL, 'health')],
   ['schema', runSchema],
+  ['migration-history', runMigrationHistory],
   ['preflight', runPreflightCommand],
   ['sample', runSampleCommand],
   ['distribution', runDistributionCommand],

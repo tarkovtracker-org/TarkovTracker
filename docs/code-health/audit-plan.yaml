@@ -1,0 +1,916 @@
+# Code Health Program — audit inventory and work queue.
+# See docs/code-health/README.md for methodology, statuses, and completion criteria.
+#
+# Field contract (every item):
+#   id                    stable identifier, CH-NNN
+#   area                  human-readable subsystem name
+#   paths                 globs/files that define the slice (used for re-audit checks)
+#   status                queued | in_progress | blocked | pr_open | completed
+#   priority              P0 (highest) .. P3
+#   dependencies          list of CH ids that must be `completed` first
+#   last_reviewed_commit  origin/main SHA the audit was performed against (null until reviewed)
+#   findings_summary      concrete evidence / findings (why this is on the queue)
+#   metrics_before        relevant measurements at selection time
+#   metrics_after         measurements on the stabilized slice branch (recorded at PR open;
+#                         re-verified by the run that marks the item completed)
+#   pr                    PR number (null until opened)
+#   notes                 decisions, constraints, hand-off context for future agents
+#
+# Evidence sources (repository-configured; do not invent thresholds):
+#   pnpm exec fallow health --hotspots --targets      (churn x complexity x fan-in)
+#   pnpm exec fallow health --complexity --sort severity
+#   pnpm exec fallow dupes / dead-code
+#   wc -l on production files; git log churn; AGENTS.md + docs/SYSTEMS.md invariants
+program:
+  baseline_commit: ade5cf11
+  baseline_date: '2026-09-17'
+  baseline_metrics:
+    loc: 129861
+    dead_files_pct: 0.0
+    dead_exports_pct: 1.1
+    avg_cyclomatic: 3.0
+    p90_cyclomatic: 5
+    maintainability_index: 89.1
+    duplicated_lines: 281
+    duplicate_clone_groups: 7
+    high_complexity_functions: 1020
+    functions_over_60_loc: 299
+  merge_policy: squash; required check `CI Result`; maintainers may merge when green
+  pr_naming: 'refactor(<scope>): <summary> [CH-NNN]'
+queue:
+  - id: CH-001
+    area: Progress invalidation (shared algorithm for app + public API)
+    paths:
+      - shared/utils/progressInvalidation.ts
+      - app/utils/progressInvalidation.ts
+      - workers/api-gateway/src/utils/invalidation.ts
+      - workers/api-gateway/src/utils/transform.ts
+      - app/stores/useProgress.ts
+      - app/features/profile/ProfileProgression.vue
+      - app/server/utils/streamerKappa.ts
+      - shared/utils/__tests__/progressInvalidation.test.ts
+      - workers/api-gateway/src/__tests__/transform.test.ts
+    status: pr_open
+    priority: P0
+    dependencies: []
+    last_reviewed_commit: ade5cf112ef5a23a604fd5f3cd01575ad727e70f
+    findings_summary: >-
+      Review follow-up confirmed terminal tasks could be marked invalid: the recursive entry point
+      protected only successful completions, while faction invalidation bypassed that guard entirely.
+      The shared marker now protects completed/failed tasks and objectives across all entry points
+      without stopping propagation from failed tasks to strict dependents.
+      Original finding: two independent implementations of computeInvalidProgress (app + api-gateway worker):
+      fallow dupes reports 4 clone groups / 106 duplicated lines between them. They have
+      DIVERGED: commit 3787dc65 ("honor failed prereqs in invalidation") added acceptsFailedStatus
+      handling only to the app copy, so the public /progress API still marks tasks invalid when a
+      requirement explicitly accepts `failed` (e.g. Dragnet, Safe Corridor). The app copy also
+      carries a dead `childOnly` parameter (never true). A `@shared` alias already exists and is
+      wired for Nuxt, the worker tsconfig, and the worker vitest config (shared/utils/userMetadata.ts
+      precedent).
+    metrics_before:
+      duplicated_lines_between_copies: 106
+      clone_groups: 4
+      implementations: 2
+    metrics_after:
+      duplicated_lines_between_copies: 0
+      clone_groups: 0
+      implementations: 1
+      fallow_audit_new_only_gate: pass
+      reviewed_implementation_commit: e34815fd
+      shared_unit_tests: 21
+      worker_transform_tests: 5
+      full_suite_tests: 3908
+      api_gateway_suite_tests: 193
+      introduced_complexity_findings: 0
+      introduced_dead_code_findings: 0
+      introduced_duplication_findings: 0
+      repository_duplicate_clone_groups: 3
+      repository_duplicated_lines: 93
+      note: >-
+        old copies reported invalidateTaskRecursive at CRAP 132 (app) / 31.6 (worker); the shared
+        function has no Fallow complexity finding. Repo duplicate clone groups 7 -> 3.
+    pr: 876
+    notes: >-
+      Consolidated into shared/utils/progressInvalidation.ts typed against a minimal structural task
+      shape (InvalidationTask); both copies deleted; worker adopts the app's (correct) behavior —
+      intentional behavior change for the public /progress API: tasks whose requirement status
+      includes `failed` are no longer reported invalid when the prerequisite failed. Dead `childOnly`
+      parameter removed. The existing `alternatives` cascade is preserved unchanged (see CH-028).
+      Regression test: workers/api-gateway/src/__tests__/transform.test.ts (verified to fail against
+      the old worker copy). Local coverage scope left unchanged (see CH-049). Validation run: shared + consumer vitest (72 files / 1257 tests), full
+      api-gateway suite (190 at 2bdd0e41, before e34815fd added 3 transform cases; 193 on the
+      final head), lint, format:check, typecheck, worker typecheck + types:check +
+      wrangler dry-run, lint:fallow, systems:check, CI-mode build, git diff --check.
+      REVIEW HAND-OFF (2026-09-17): resumed PR #876 from 2bdd0e4161823e25aa96a48db9b801641eb6e50e
+      in the clean dedicated .wt/code-health worktree; unrelated root worktree changes untouched.
+      Fetched origin/main at ade5cf112ef5a23a604fd5f3cd01575ad727e70f; it is already an ancestor.
+      Fix commit e34815fd centralizes terminal-state protection for completed, failed, and legacy
+      dual-flag tasks/objectives across faction, prerequisite, and alternative entry points.
+      Completed tasks still stop propagation; failed tasks still block strict dependents; tolerant
+      dependents remain reachable. This intentionally changes invalid flags in both app and API,
+      not the recorded completion/failure state. docs/SYSTEMS.md documents the invariant.
+      Negative reproduction: 10 shared cases and 3 transform cases fail before the guard; afterward
+      all 21 shared and 5 transform cases pass, including cycles and empty catalogs. Original focused
+      shared suite had 7 cases; worker transform suite had 2. Full pnpm run test passed 332 files /
+      3908 tests; pnpm run test:api-gateway --run passed 12 files / 193 tests. Also passed lint,
+      typecheck, format:check, systems:check, worker typecheck, types:check, wrangler dry-run,
+      CI=true NODE_ENV=production pnpm run build, and git diff --check. All observed this run.
+      pnpm run lint:fallow --base origin/main --format json passed with 0 introduced complexity,
+      dead-code, or duplication findings (33 inherited complexity findings in consumer files remain
+      outside this slice). Shared algorithm has no complexity finding; pnpm exec fallow dupes
+      --format json confirms 3 repository clone groups / 93 duplicated lines, none in this slice.
+      The first Fallow invocation incorrectly inserted an extra --; the documented command above
+      was corrected and rerun successfully. A post-build pre-commit attempt lacked generated Nuxt
+      ESLint context; NODE_ENV=development pnpm exec nuxt prepare restored it, then the unmodified
+      hooks passed on commit. No hooks or gates were bypassed.
+      README now requires baseline and final measurements and defines the post-merge ledger-only
+      completion PR. metrics_after is measured evidence, not a completion claim. The existing
+      metrics-contract review concern is addressed by that explicit distinction; no measurements
+      were discarded. Legacy alternatives and coverage-denominator decisions remain CH-028/CH-049.
+      REVIEW HAND-OFF 2 (2026-09-17, later run): resumed #876 at dbfbef35 with 2 unresolved cubic
+      threads. (1) Faction test expectation: verified the suggestion was wrong — in the faction case
+      `terminal` is also failed, so `strict` is unreachable through the failed-prerequisite pass,
+      independent of faction; faction never cascades (separate test covers it). Added an explanatory
+      comment (b212d7f6), no assertion changed. (2) 190 vs 193 api-gateway count reconciled
+      (b212d7f6). CodeRabbit then raised objective-level invalidation (completed objectives on an
+      unreachable task emitted `{ complete: true, invalid: true }`): verified real but pre-existing
+      in both old copies and unread by the app; queued as CH-050 rather than expanding this slice
+      (c1a30320, paths widened in d37cee53 after a cubic thread). All threads resolved with
+      evidence replies. CI Result SUCCESS on b212d7f6
+      (https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35174320499) and c1a30320
+      (https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35174942408); both contain
+      the full implementation (e34815fd). Final head d37cee53 (ledger-only diff) run
+      https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35175172516 was in progress
+      at hand-off. Merge authorization: repo admin, squash allowed, ruleset requires `CI Result`
+      (strict); auto-merge disabled.
+      PR: https://github.com/tarkovtracker-org/TarkovTracker/pull/876
+      NEXT RUN: confirm `CI Result` SUCCESS on the final head of #876 and 0 unresolved threads,
+      then `gh pr merge 876 --squash` (no bypass). Then follow the README post-merge ledger
+      transition: verify main checks at the merge SHA, re-verify metrics_after, and open the
+      ledger-only completion PR marking CH-001 completed. Only after that select the next slice
+      (CH-002 is the highest queued P1; split its loading responsibility into bounded dependent
+      slices at selection).
+  - id: CH-002
+    area: Tarkov store data loading (useTarkov.loadData)
+    paths: [app/stores/useTarkov.ts]
+    status: queued
+    priority: P1
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: >-
+      loadData: cyclomatic 93, cognitive 103, 345 lines, CRAP 8742 (highest in repo).
+      repairGameModeFailedTasks: cyclomatic 33, 168 lines. File is 1858 LOC with fan-in 120.
+    metrics_before: { file_loc: 1858, loadData_cyclomatic: 93, fan_in: 120 }
+    metrics_after: null
+    pr: null
+    notes: >-
+      High fan-in: split by responsibility (fetch orchestration vs. mode/season selection vs.
+      repair) behind the existing store API; likely 2 dependent slices. Read docs/SYSTEMS.md
+      store sections first.
+  - id: CH-003
+    area: Metadata store fetch/cache pipeline
+    paths: [app/stores/useMetadata.ts, app/stores/tarkov/metadataStoreBridge.ts]
+    status: queued
+    priority: P1
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: >-
+      Largest production file (2305 LOC), hotspot score 38.0 (31 commits, fan-in 118).
+      _doFetchWithCache: cyclomatic 34, cognitive 69, 189 lines.
+    metrics_before: { file_loc: 2305, hotspot: 38.0, fan_in: 118 }
+    metrics_after: null
+    pr: null
+    notes: Decompose fetch/cache/ETag handling from derived-state getters; avoid moving complexity.
+  - id: CH-004
+    area: Prestige requirement rows
+    paths: [app/stores/tarkov/prestige.ts]
+    status: queued
+    priority: P1
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: buildPrestigeRequirementRows cyclomatic 72 / cognitive 91 / 221 lines; file 606 LOC, 581 churn.
+    metrics_before: { function_cyclomatic: 72, function_lines: 221 }
+    metrics_after: null
+    pr: null
+    notes: Likely a per-requirement-type dispatch table; verify with existing prestige tests.
+  - id: CH-005
+    area: Task counts (trader/status aggregation)
+    paths: [app/composables/useTaskCounts.ts]
+    status: queued
+    priority: P1
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: >-
+      calculateTraderCounts cyclomatic 53 / 119 lines; calculateStatusCounts cyclomatic 37 / 93
+      lines. Pure functions, single file, well bounded.
+    metrics_before: { calculateTraderCounts_cyclomatic: 53, calculateStatusCounts_cyclomatic: 37 }
+    metrics_after: null
+    pr: null
+    notes: Good small slice; expect shared bucket-classification helper.
+  - id: CH-006
+    area: Public profile server endpoint
+    paths: ['app/server/api/profile/[userId]/[mode].get.ts']
+    status: queued
+    priority: P1
+    dependencies: [CH-001]
+    last_reviewed_commit: null
+    findings_summary: >-
+      default handler cyclomatic 53 / 208 lines; file 744 LOC; hotspot accelerating. Visibility /
+      authorization boundary for public profiles — correctness matters.
+    metrics_before: { handler_cyclomatic: 53, file_loc: 744 }
+    metrics_after: null
+    pr: null
+    notes: Auth/visibility surface — review profileVisibility semantics before refactor.
+  - id: CH-007
+    area: Team members server endpoint
+    paths: [app/server/api/team/members.ts]
+    status: queued
+    priority: P1
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: default handler cyclomatic 48 / cognitive 59 / 252 lines; authorization boundary.
+    metrics_before: { handler_cyclomatic: 48, handler_lines: 252 }
+    metrics_after: null
+    pr: null
+    notes: Auth boundary — independent review required per AGENTS.md.
+  - id: CH-008
+    area: Kappa overlay route
+    paths:
+      ['app/server/routes/overlay/kappa/[userId]/[mode].get.ts', app/server/utils/streamerKappa.ts]
+    status: queued
+    priority: P1
+    dependencies: [CH-001]
+    last_reviewed_commit: null
+    findings_summary: File 1495 LOC; default handler is a single 1226-line function (HTML/CSS rendering + data).
+    metrics_before: { file_loc: 1495, handler_lines: 1226 }
+    metrics_after: null
+    pr: null
+    notes: Separate data assembly from template rendering; HTTPS/cache invariants in docs/SYSTEMS.md.
+  - id: CH-009
+    area: Server overlay pipeline
+    paths:
+      [
+        app/server/utils/overlay.ts,
+        app/server/utils/overlayAdditions.ts,
+        app/server/utils/overlayProjectors.ts,
+        app/server/utils/overlayValidation.ts,
+        app/server/utils/overlayTypes.ts,
+        app/server/utils/overlayResponseHeaders.ts,
+      ]
+    status: queued
+    priority: P1
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: overlay.ts is the #1 hotspot (39.4, 18 commits, 790 churn, fan-in 16, accelerating); 702 LOC.
+    metrics_before: { hotspot: 39.4, file_loc: 702 }
+    metrics_after: null
+    pr: null
+    notes: Preserve cache/adaptation/overlay ordering invariant (docs/SYSTEMS.md).
+  - id: CH-010
+    area: Tarkov JSON adaptation (tarkov-json.ts)
+    paths: [app/server/utils/tarkov-json.ts, app/server/utils/tarkov-sanitization.ts]
+    status: queued
+    priority: P1
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: >-
+      immutableUpdate cyclomatic 35 / cognitive 139 / 140 lines; file 1264 LOC; hotspot 34.9
+      (20 commits, 1622 churn). sanitizeTaskData is an unused export.
+    metrics_before: { file_loc: 1264, immutableUpdate_cognitive: 139 }
+    metrics_after: null
+    pr: null
+    notes: Keep raw upstream trader requirement shape before adaptation (invariant).
+  - id: CH-011
+    area: Progress conflict detection
+    paths: [app/stores/tarkov/conflictDetection.ts]
+    status: queued
+    priority: P2
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: detectDataConflicts cyclomatic 42 in 54 lines — repeated per-field comparisons.
+    metrics_before: { function_cyclomatic: 42 }
+    metrics_after: null
+    pr: null
+    notes: Small slice; table-driven comparison likely.
+  - id: CH-012
+    area: Preferences store + sync plugin
+    paths:
+      [
+        app/stores/usePreferences.ts,
+        app/stores/preferences/sanitizers.ts,
+        app/plugins/zz.preferences-sync.client.ts,
+      ]
+    status: queued
+    priority: P2
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: >-
+      usePreferences 1102 LOC (fan-in 95, accelerating); sync plugin arrow fn cyclomatic 49 / 92
+      lines. Fallow dead-code: unused store members getProfileSharePvpPublic/getProfileSharePvePublic,
+      unused type PreferencesStore.
+    metrics_before: { file_loc: 1102, sync_arrow_cyclomatic: 49 }
+    metrics_after: null
+    pr: null
+    notes: Persisted state — behavior preserving; sanitizer tests exist.
+  - id: CH-013
+    area: Stripe webhook edge function
+    paths:
+      [
+        supabase/functions/stripe-webhook/index.ts,
+        supabase/functions/_shared/stripeBilling.ts,
+        supabase/functions/_shared/stripeTier.ts,
+      ]
+    status: queued
+    priority: P1
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: reconcileSubscription cyclomatic 43 / 100 lines; activateSupporterFromSession cyclomatic 30; file 859 LOC. SUPPORTER_TIERS unused export.
+    metrics_before: { file_loc: 859, reconcileSubscription_cyclomatic: 43 }
+    metrics_after: null
+    pr: null
+    notes: Billing — requires independent review per AGENTS.md. Deno tests exist in _shared.
+  - id: CH-014
+    area: Admin cache purge edge function
+    paths: [supabase/functions/admin-cache-purge/index.ts]
+    status: queued
+    priority: P2
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: Hotspot 24.7 accelerating (16 commits); anonymous handler cyclomatic 30 / 119 lines.
+    metrics_before: { hotspot: 24.7 }
+    metrics_after: null
+    pr: null
+    notes: Admin auth boundary.
+  - id: CH-015
+    area: Leaflet map component + composable
+    paths: [app/features/maps/LeafletMap.vue, app/composables/useLeafletMap.ts]
+    status: queued
+    priority: P2
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: LeafletMap.vue 1970 LOC (largest component, hotspot 29.3 accelerating); updateFloorVisibility cyclomatic 32.
+    metrics_before: { component_loc: 1970 }
+    metrics_after: null
+    pr: null
+    notes: UI-heavy; consider ui-visual-validation for verification.
+  - id: CH-016
+    area: Data management / backup
+    paths: [app/features/settings/DataManagementCard.vue, app/composables/useDataBackup.ts]
+    status: queued
+    priority: P2
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: DataManagementCard.vue 1651 LOC (3486 churn); useDataBackup 897 LOC.
+    metrics_before: { component_loc: 1651 }
+    metrics_after: null
+    pr: null
+    notes: Touches persisted user data import/export — behavior preserving with fixture tests.
+  - id: CH-017
+    area: Profile progression component
+    paths: [app/features/profile/ProfileProgression.vue]
+    status: queued
+    priority: P2
+    dependencies: [CH-001]
+    last_reviewed_commit: null
+    findings_summary: 1649 LOC single component; hotspot 20.2 accelerating.
+    metrics_before: { component_loc: 1649 }
+    metrics_after: null
+    pr: null
+    notes: null
+  - id: CH-018
+    area: Tasks page + card + filter bar + filtering composable
+    paths:
+      [
+        app/pages/tasks.vue,
+        app/features/tasks/TaskCard.vue,
+        app/features/tasks/TaskFilterBar.vue,
+        app/composables/useTaskFiltering.ts,
+      ]
+    status: queued
+    priority: P2
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: tasks.vue 1129 LOC (hotspot 25.8 accelerating); TaskCard 1049; TaskFilterBar 750; useTaskFiltering 764.
+    metrics_before: { tasks_page_loc: 1129 }
+    metrics_after: null
+    pr: null
+    notes: Probably 2 slices (page/filter state vs. card rendering).
+  - id: CH-019
+    area: Needed items aggregation
+    paths: [app/composables/useNeededItems.ts, app/composables/useNeededItemsSorting.ts]
+    status: queued
+    priority: P2
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: allItems computed cyclomatic 30 / cognitive 45 / 76 lines; file 710 LOC.
+    metrics_before: { allItems_cyclomatic: 30 }
+    metrics_after: null
+    pr: null
+    notes: null
+  - id: CH-020
+    area: Infinite scroll composable
+    paths: [app/composables/useInfiniteScroll.ts]
+    status: queued
+    priority: P2
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: checkAndLoadMoreInternal cyclomatic 32 / 100 lines.
+    metrics_before: { function_cyclomatic: 32 }
+    metrics_after: null
+    pr: null
+    notes: null
+  - id: CH-021
+    area: Progress store hideout levels
+    paths: [app/stores/useProgress.ts]
+    status: queued
+    priority: P2
+    dependencies: [CH-001]
+    last_reviewed_commit: null
+    findings_summary: hideoutLevels cyclomatic 29 / cognitive 43 / 80 lines; file 608 LOC.
+    metrics_before: { hideoutLevels_cyclomatic: 29 }
+    metrics_after: null
+    pr: null
+    notes: null
+  - id: CH-022
+    area: Tarkov.dev profile import endpoint
+    paths: [app/server/api/tarkov-dev/profile.get.ts, app/utils/tarkovDevProfileParser.ts]
+    status: queued
+    priority: P2
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: default handler cyclomatic 30 / 192 lines.
+    metrics_before: { handler_cyclomatic: 30 }
+    metrics_after: null
+    pr: null
+    notes: null
+  - id: CH-023
+    area: Dead exports sweep
+    paths:
+      [
+        app/server/utils/language-helpers.ts,
+        app/server/utils/precomputedTarkov.ts,
+        app/server/utils/stripeCheckoutValidation.ts,
+        app/types/taskFilter.ts,
+        app/types/taskSort.ts,
+        app/stores/useActionHistoryStore.ts,
+      ]
+    status: queued
+    priority: P2
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: >-
+      fallow dead-code at baseline: 14 unused exports, 2 unused types, 2 unused store members,
+      duplicate-export HideoutModule and TaskObjective. Resolve by deleting or narrowing exports
+      (never suppress).
+    metrics_before: { unused_exports: 14, unused_types: 2 }
+    metrics_after: null
+    pr: null
+    notes: Verify each with `fallow dead-code --trace`; some may be Nuxt auto-import false positives.
+  - id: CH-024
+    area: Discord + account-deletion edge function duplication
+    paths:
+      [
+        supabase/functions/discord-role-sync/index.ts,
+        supabase/functions/discord-unlink/index.ts,
+        supabase/functions/_shared/discord.ts,
+        supabase/functions/account-delete/index.ts,
+        supabase/functions/account-delete-reconcile/index.ts,
+      ]
+    status: queued
+    priority: P2
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: Clone groups (16 + 14 lines) across function entrypoints; unused exports DiscordNotInGuildError, getDiscordRoleConfig, getTierRoleId.
+    metrics_before: { duplicated_lines: 30 }
+    metrics_after: null
+    pr: null
+    notes: Account deletion uses documented claim/fencing transactions — preserve.
+  - id: CH-025
+    area: Filter bar duplication (tasks vs needed items)
+    paths: [app/features/neededitems/NeededItemsFilterBar.vue, app/features/tasks/TaskFilterBar.vue]
+    status: queued
+    priority: P3
+    dependencies: [CH-018]
+    last_reviewed_commit: null
+    findings_summary: 17-line clone group; NeededItemsFilterBar has a grandfathered unused-component-emits Fallow override.
+    metrics_before: { duplicated_lines: 17 }
+    metrics_after: null
+    pr: null
+    notes: null
+  - id: CH-026
+    area: Blank-line lint tooling
+    paths: [scripts/lint-blank-lines.mjs, scripts/lint-blank-lines.test.mjs]
+    status: queued
+    priority: P2
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: >-
+      getProtectedRanges cyclomatic 83 / cognitive 152 / 260 lines; stripBlankLines 49; getShellHeredocs 41;
+      getYamlPlainScalarLines 40; test runFixtures 63 / 464 lines. Dev tooling, but it gates every commit.
+    metrics_before: { getProtectedRanges_cyclomatic: 83 }
+    metrics_after: null
+    pr: null
+    notes: Fixture-driven tests exist; decompose per language scanner.
+  - id: CH-027
+    area: API gateway handlers + router
+    paths:
+      [
+        workers/api-gateway/src/handlers/progress.ts,
+        workers/api-gateway/src/router.ts,
+        workers/api-gateway/src/handlers/team.ts,
+      ]
+    status: queued
+    priority: P2
+    dependencies: [CH-001]
+    last_reviewed_commit: null
+    findings_summary: progress.ts 577 LOC (hotspot 16.1); router.ts hotspot 15.3. Public API contract.
+    metrics_before: { progress_handler_loc: 577 }
+    metrics_after: null
+    pr: null
+    notes: Auth/quota-before-validation invariant; validation errors keep rate-limit headers.
+  - id: CH-028
+    area: Obsolete task `alternatives` compatibility path
+    paths:
+      [
+        shared/utils/progressInvalidation.ts,
+        app/utils/taskProgress.ts,
+        app/features/tasks/TaskCardBadges.vue,
+        app/types/tarkov.ts,
+      ]
+    status: queued
+    priority: P2
+    dependencies: [CH-001]
+    last_reviewed_commit: null
+    findings_summary: >-
+      Upstream removed the task `alternatives` field (AGENTS.md invariant forbids new dependencies).
+      No server/precompute code populates it, yet invalidation cascades on it, taskProgress fails
+      alternatives, and TaskCardBadges renders a badge for it. Likely dead runtime paths.
+    metrics_before: null
+    metrics_after: null
+    pr: null
+    notes: >-
+      Verify with a data probe (tasks-core payload) that `alternatives` is never present before
+      deleting; update docs/SYSTEMS.md sections that mention the invariant; intentional behavior
+      change must be documented.
+  - id: CH-029
+    area: Team store
+    paths: [app/stores/useTeamStore.ts, app/utils/teamMemberships.ts]
+    status: queued
+    priority: P2
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: 960 LOC, 1328 churn, hotspot accelerating, fan-in 20.
+    metrics_before: { file_loc: 960 }
+    metrics_after: null
+    pr: null
+    notes: Team disband via confirmed owner function (invariant).
+  - id: CH-030
+    area: Realtime + Supabase client plugin
+    paths:
+      [
+        app/stores/tarkov/realtimeListener.ts,
+        app/plugins/supabase.client.ts,
+        app/utils/realtimeChannel.ts,
+        app/utils/realtimeVisibility.ts,
+      ]
+    status: queued
+    priority: P2
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: realtimeListener 586 LOC; supabase.client.ts hotspot 22.8 accelerating (775 churn). Concurrency/state consistency surface.
+    metrics_before: { realtimeListener_loc: 586 }
+    metrics_after: null
+    pr: null
+    notes: Concurrency — independent review required per AGENTS.md.
+  - id: CH-031
+    area: Task graph layout
+    paths:
+      [
+        app/utils/taskGraphLayout.ts,
+        app/composables/useTaskGraphData.ts,
+        app/composables/useGraphBuilder.ts,
+      ]
+    status: queued
+    priority: P3
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: layoutTaskGraph flagged CRITICAL by Fallow complexity.
+    metrics_before: null
+    metrics_after: null
+    pr: null
+    notes: null
+  - id: CH-032
+    area: Objective equipment items
+    paths: [app/features/tasks/task-objective-equipment.ts]
+    status: queued
+    priority: P3
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: getObjectiveEquipmentItems cyclomatic 30 in 37 lines.
+    metrics_before: { function_cyclomatic: 30 }
+    metrics_after: null
+    pr: null
+    notes: null
+  - id: CH-033
+    area: CI / build configuration
+    paths:
+      [
+        .github/workflows/,
+        nuxt.config.ts,
+        scripts/validation-plan.mjs,
+        scripts/validation-tools.mjs,
+        scripts/check-ci-result.mjs,
+      ]
+    status: blocked
+    priority: P3
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: nuxt.config.ts hotspot 35.6 (42 commits). Workflow tooling recently under active human development.
+    metrics_before: null
+    metrics_after: null
+    pr: null
+    notes: Blocked to avoid conflicts with the in-flight CI efficiency work; re-evaluate once that lands.
+  - id: CH-034
+    area: Supabase schema functions + RLS (read-only review)
+    paths:
+      [
+        supabase/migrations/,
+        supabase/functions/_shared/auth.ts,
+        supabase/functions/_shared/authenticated-mutation.ts,
+      ]
+    status: queued
+    priority: P2
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: 124 migrations. Review security-definer EXECUTE revocations and service-role grants against the AGENTS.md invariant.
+    metrics_before: { migrations: 124 }
+    metrics_after: null
+    pr: null
+    notes: Applied migrations are immutable — findings become forward migrations only, with operator evidence.
+  - id: CH-035
+    area: Task/hideout type boundaries (app vs worker)
+    paths: [app/types/tarkov.ts, app/types/progress.ts, workers/api-gateway/src/types.ts]
+    status: queued
+    priority: P2
+    dependencies: [CH-001]
+    last_reviewed_commit: null
+    findings_summary: app/types/tarkov.ts 647 LOC; duplicate-export HideoutModule and TaskObjective; worker re-declares task shapes.
+    metrics_before: null
+    metrics_after: null
+    pr: null
+    notes: Consider shared/ structural types only where both runtimes truly agree.
+  - id: CH-036
+    area: Test infrastructure
+    paths: [tests/test-setup.ts, tests/test-helpers/, app/utils/test-helpers.ts, vitest.config.ts]
+    status: queued
+    priority: P3
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: Not yet measured; assess brittle global mocks and duplicated fixtures.
+    metrics_before: null
+    metrics_after: null
+    pr: null
+    notes: null
+  - id: CH-037
+    area: Precompute KV pipeline
+    paths: [scripts/precompute/, app/server/utils/precomputedTarkov.ts]
+    status: queued
+    priority: P3
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: Unused exports PRECOMPUTED_KV_BINDING / PRECOMPUTED_ENVELOPE_VERSION / TASKS_CORE_PRECOMPUTED_VERSION (may be drift-check inputs — verify).
+    metrics_before: null
+    metrics_after: null
+    pr: null
+    notes: scripts/check-systems-drift.mjs reads PRECOMPUTED_KV_BINDING by regex — do not remove blindly.
+  - id: CH-038
+    area: Storyline feature
+    paths:
+      [
+        app/features/storyline/,
+        app/composables/useStorylineChapters.ts,
+        app/utils/storylineObjectives.ts,
+        app/pages/storyline.vue,
+      ]
+    status: queued
+    priority: P2
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: ChapterCard.vue 903 LOC; useStorylineChapters 691; storylineObjectives hotspot 15.7.
+    metrics_before: null
+    metrics_after: null
+    pr: null
+    notes: null
+  - id: CH-039
+    area: Streamer tools
+    paths: [app/features/streamer-tools/]
+    status: queued
+    priority: P3
+    dependencies: [CH-008]
+    last_reviewed_commit: null
+    findings_summary: StreamerToolsPanel.vue 953 LOC; useStreamerToolsOverlay 552.
+    metrics_before: null
+    metrics_after: null
+    pr: null
+    notes: null
+  - id: CH-040
+    area: Settings cards (prestige, tokens, deletion, skills)
+    paths:
+      [
+        app/features/settings/PrestigeCard.vue,
+        app/features/settings/ApiTokens.vue,
+        app/features/settings/AccountDeletionCard.vue,
+        app/features/settings/SkillsCard.vue,
+      ]
+    status: queued
+    priority: P2
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: PrestigeCard 992; ApiTokens 851; AccountDeletionCard 615; SkillsCard hotspot 17.1 accelerating.
+    metrics_before: null
+    metrics_after: null
+    pr: null
+    notes: API token renames update only the owner-scoped note (invariant).
+  - id: CH-041
+    area: Hideout feature
+    paths:
+      [
+        app/pages/hideout.vue,
+        app/features/hideout/,
+        app/composables/useHideoutFiltering.ts,
+        app/composables/useHideoutStationStatus.ts,
+      ]
+    status: queued
+    priority: P3
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: hideout.vue 762; HideoutCard 574; HideoutHelpDemoCard 582.
+    metrics_before: null
+    metrics_after: null
+    pr: null
+    notes: null
+  - id: CH-042
+    area: Dashboard feature
+    paths:
+      [
+        app/features/dashboard/,
+        app/composables/useDashboardRecommendations.ts,
+        app/composables/useDashboardStats.ts,
+        app/composables/useDashboardFilters.ts,
+      ]
+    status: queued
+    priority: P3
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: DashboardNextActions.vue 623 LOC.
+    metrics_before: null
+    metrics_after: null
+    pr: null
+    notes: null
+  - id: CH-043
+    area: App shell
+    paths: [app/shell/]
+    status: queued
+    priority: P3
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: AppBar.vue 646 LOC, hotspot 25.1 (20 commits).
+    metrics_before: null
+    metrics_after: null
+    pr: null
+    notes: null
+  - id: CH-044
+    area: Page help / spotlight UI
+    paths:
+      [
+        app/components/ui/PageHelpSpotlight.vue,
+        app/components/ui/GlobalHelpLauncher.vue,
+        app/composables/usePageHelpContent.ts,
+        app/composables/usePageHelpState.ts,
+      ]
+    status: queued
+    priority: P3
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: PageHelpSpotlight 691; GlobalHelpLauncher 587.
+    metrics_before: null
+    metrics_after: null
+    pr: null
+    notes: null
+  - id: CH-045
+    area: EFT log import
+    paths:
+      [
+        app/utils/eftLogQuestParser.ts,
+        app/utils/eftLogRecordReader.ts,
+        app/utils/eftLogFileReader.ts,
+        app/utils/eftLogImportCatalog.ts,
+        app/composables/useEftLogsImport.ts,
+      ]
+    status: queued
+    priority: P2
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: eftLogQuestParser 818 LOC; parsing pipeline with many branches.
+    metrics_before: null
+    metrics_after: null
+    pr: null
+    notes: null
+  - id: CH-046
+    area: Server API protection + edge cache
+    paths:
+      [
+        app/server/middleware/api-protection.ts,
+        app/server/utils/edgeCache.ts,
+        app/server/utils/edgeCacheKey.ts,
+        app/server/utils/edgeCacheSanitizers.ts,
+        app/utils/apiProtectionConfig.ts,
+      ]
+    status: queued
+    priority: P1
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: Security boundary for all Nuxt server routes; not yet measured for complexity.
+    metrics_before: null
+    metrics_after: null
+    pr: null
+    notes: Use security-diff-scan skill on the resulting PR.
+  - id: CH-047
+    area: API gateway OpenAPI document
+    paths: [workers/api-gateway/src/openapi.ts]
+    status: queued
+    priority: P3
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: 968 LOC hand-written spec object; validate:openapi guards it.
+    metrics_before: null
+    metrics_after: null
+    pr: null
+    notes: Low risk; likely no action beyond consistency check.
+  - id: CH-048
+    area: Legal content pages
+    paths: [app/pages/terms-of-service.vue, app/pages/privacy.vue]
+    status: queued
+    priority: P3
+    dependencies: []
+    last_reviewed_commit: null
+    findings_summary: 1039 / 878 LOC content-only templates; inflate size metrics but carry little logic.
+    metrics_before: null
+    metrics_after: null
+    pr: null
+    notes: Expected outcome is likely "no action"; record and close.
+  - id: CH-049
+    area: Coverage contract for shared/ runtime code
+    paths: [vitest.config.ts, docs/testing-coverage.md, shared/utils/]
+    status: queued
+    priority: P3
+    dependencies: [CH-001]
+    last_reviewed_commit: null
+    findings_summary: >-
+      Local unsharded coverage includes only app/**/*.{ts,vue} (documented denominator in
+      docs/testing-coverage.md), so runtime code under shared/ (userMetadata.ts,
+      progressInvalidation.ts) is measured only via CI shards/Codecov. Widening the include was
+      raised and reverted in PR #876 review because it changes the documented denominator.
+    metrics_before: { shared_runtime_modules_outside_local_denominator: 2 }
+    metrics_after: null
+    pr: null
+    notes: >-
+      Decide the contract explicitly: add shared/**/*.ts (+ exclude shared/**/__tests__/**) to the
+      local include and update docs/testing-coverage.md baseline in the same change, or document
+      why shared/ stays CI-only.
+  - id: CH-050
+    area: Objective-level invalidation semantics in the public /progress API
+    paths:
+      [
+        shared/utils/progressInvalidation.ts,
+        workers/api-gateway/src/utils/transform.ts,
+        workers/api-gateway/src/openapi.ts,
+        app/stores/useProgress.ts,
+        docs/API.md,
+        docs/SYSTEMS.md,
+        shared/utils/__tests__/progressInvalidation.test.ts,
+        workers/api-gateway/src/__tests__/transform.test.ts,
+      ]
+    status: queued
+    priority: P2
+    dependencies: [CH-001]
+    last_reviewed_commit: null
+    findings_summary: >-
+      Raised by CodeRabbit on PR #876 (shared/utils/progressInvalidation.ts markInvalid): the helper
+      receives only task completions, so every objective of an invalid non-terminal task is marked
+      invalid even when that objective is recorded complete. transformProgress therefore can emit
+      `{ complete: true, invalid: true }` for an objective. Pre-existing in BOTH pre-consolidation
+      copies (neither read objective state); the Nuxt app never consumes invalidObjectives, so only
+      the public API surface is affected. Probe: task T (objectives TObj1, TObj2) requiring P
+      complete, P failed -> invalidObjectives == { TObj1: true, TObj2: true } regardless of objective
+      completion input (none exists).
+    metrics_before: null
+    metrics_after: null
+    pr: null
+    notes: >-
+      This is a contract decision, not a regression: decide whether objective `invalid` means
+      "belongs to an unreachable task" (current; keep and document in openapi.ts + docs/API.md) or
+      "cannot be completed" (then add objective completion state to InvalidationInput, skip
+      completed objectives in markInvalid, thread taskObjectives through transformProgress and
+      useProgress.invalidProgressByTeam, add a regression case, and document the intentional public
+      API behavior change). Either way update docs/SYSTEMS.md invariants for the shared helper.

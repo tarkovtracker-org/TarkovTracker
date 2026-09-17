@@ -105,3 +105,16 @@ describe('release freshness and failures', () => {
     await expect(releaseEligibility(f)).rejects.toThrow('GitHub unavailable');
   });
 });
+describe('explicitly dispatched CI release gate', () => {
+  it('accepts successful dispatched CI still at main', async () => {
+    const f = fixture();
+    f.run.event = f.context.payload.workflow_run.event = 'workflow_dispatch';
+    expect(await releaseEligibility(f)).toMatchObject({ release: true, sha: f.run.head_sha });
+  });
+  it('rejects dispatched staging CI even when successful', async () => {
+    const f = fixture();
+    f.run.event = f.context.payload.workflow_run.event = 'workflow_dispatch';
+    f.run.head_branch = f.context.payload.workflow_run.head_branch = 'wip/release-1.2.3';
+    expect((await releaseEligibility(f)).release).toBe(false);
+  });
+});

@@ -11,6 +11,7 @@ updates:
     open-pull-requests-limit: 3
     rebase-strategy: auto
     cooldown:
+      default-days: 7
       semver-major-days: 30
       semver-minor-days: 7
       semver-patch-days: 1
@@ -119,6 +120,9 @@ updates:
       timezone: America/New_York
     open-pull-requests-limit: 1
     rebase-strategy: auto
+    # Let newly published action releases settle before adopting them (supply-chain hygiene).
+    cooldown:
+      default-days: 7
     labels:
       - dependencies
       - ci
@@ -133,10 +137,15 @@ updates:
           - major
           - minor
           - patch
+      # Minor and patch updates for every non-official action land in one PR so the single open
+      # slot is not consumed by one action at a time (codecov, setup-deno, crowdin, lychee,
+      # lighthouse-ci, ...). Major updates stay individual so each gets its own review.
       third-party-actions:
         patterns:
-          - lycheeverse/lychee-action
-          - treosh/lighthouse-ci-action
+          - '*'
+        exclude-patterns:
+          - actions/*
+          - github/codeql-action
         update-types:
           - minor
           - patch

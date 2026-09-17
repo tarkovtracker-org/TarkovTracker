@@ -4,7 +4,7 @@
     "@vueuse/core": "Previously pinned to 13.9.0 due to Nuxt/@nuxt/ui/reka-ui compatibility; updated to ^14.1.0 after upgrading Nuxt/@nuxt/ui.",
     "fast-xml-parser": "Pinned fast-xml-parser to the patched v5 line on 2026-02-18 to avoid potential v6 API regressions in @nuxtjs/sitemap dependency paths; remediation: remove this override after @nuxtjs/sitemap officially supports fast-xml-parser v6 and confirm sitemap generation in CI."
   },
-  "version": "1.79.5",
+  "version": "1.80.0",
   "dependencies": {
     "@iconify-json/heroicons": "^1.2.3",
     "@iconify-json/lucide": "^1.2.122",
@@ -42,7 +42,6 @@
     "@nuxt/eslint": "^1.15.2",
     "@nuxt/test-utils": "^4.1.0",
     "@semantic-release/changelog": "^6.0.3",
-    "@semantic-release/git": "^11.0.1",
     "@semantic-release/npm": "^13.1.5",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/leaflet": "^1.9.21",
@@ -110,8 +109,8 @@
     "supabase:check": "bash scripts/check-supabase-db.sh",
     "supabase:types": "supabase gen types typescript --linked > supabase/functions/_shared/database.types.ts",
     "systems:check": "node scripts/check-systems-drift.mjs",
-    "test": "vitest run --maxWorkers=2",
-    "test:coverage": "vitest run --coverage --maxWorkers=2",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
     "test:api-gateway": "vitest --config workers/api-gateway/vitest.config.ts",
     "validate:openapi": "pnpm --filter api-gateway run validate:openapi",

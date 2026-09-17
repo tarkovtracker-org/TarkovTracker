@@ -41,16 +41,17 @@ same setup action; its schedule, permissions, command, and environment remain un
   translation-only, mixed, and dependency PR selections before removing shadow mode.
 - Confirm actual Dependabot and Codecov failure handling. Local contract tests verify the names and
   existing status-polling code, not GitHub execution.
-- Crowdin Sync uses `GITHUB_TOKEN`; its generated PR workflow runs require a repository writer's
-  approval under [GitHub's token event behavior](https://docs.github.com/en/actions/concepts/security/github_token).
-  Removing translation path exclusions does not remove that platform approval requirement.
+- Crowdin uses `GITHUB_TOKEN` for PR creation and explicit CI dispatch. It awaits exact-head
+  `CI Result` before merging and dispatches main CI afterward. Release staging also uses explicit
+  dispatch, so neither workflow requires a personal GitHub token. See [current automation policy](WORKFLOW_AUTOMATION.md).
 - Establish Codex delivery and reliable exclusions before disabling duplicate automatic reviewers.
   Historical PRs #781 and #748 did not establish Codex delivery or usage exclusions.
   Both fall in the executable baseline category. Manual Codex delivery was subsequently verified
   on [PR #806](https://github.com/tarkovtracker-org/TarkovTracker/pull/806#pullrequestreview-5125446025).
   Translation exclusions remain unverified, so existing provider settings remain unchanged.
 - Read-only inspection returned no classic main-branch protection and only deletion/non-fast-forward
-  applied rules. Existing governance is preserved; `CI Result` does not become required automatically.
+  applied rules during the initial rollout. The separately authorized main-policy follow-up adds
+  strict required `CI Result` with no bypass; classification remains in shadow mode.
 - Record the actual rollout timestamp, then collect the first 20 subsequent merges. See
   [the historical baseline](ci-turnaround-baseline.md) and
   [the rollout instructions](WORKFLOW_AUTOMATION.md#ci-rollout-and-measurements).
