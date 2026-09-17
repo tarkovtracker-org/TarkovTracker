@@ -30,7 +30,7 @@ function setProdDbDefault([key, value]) {
 }
 function loadProdDbEnvironment() {
   const envFile = process.env.PROD_DB_ENV_FILE ?? DEFAULT_ENV_FILE;
-  if (!process.env.PROD_DB_ENV_FILE && !existsSync(envFile)) return;
+  if (process.env.PROD_DB_ENV_FILE === undefined && !existsSync(envFile)) return;
   Object.entries(readProdDbEnvironment(envFile)).forEach(setProdDbDefault);
 }
 const DEFAULT_TIMEOUT_MS = 15_000;

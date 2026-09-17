@@ -651,6 +651,7 @@ and redacts the password from command failures.
 
 ```bash
 PROD_DB_TARGET=local scripts/prod-db health
+chmod 600 "${PROD_DB_ENV_FILE:-.env}"
 scripts/prod-db canary
 scripts/prod-db table-stats
 scripts/prod-db preflight --migration supabase/migrations/20260807_example.sql

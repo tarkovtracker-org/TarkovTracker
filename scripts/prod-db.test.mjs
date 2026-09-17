@@ -404,6 +404,9 @@ describe('prod-db environment file', () => {
     );
     expect(row.arguments.join(' ')).not.toContain('literal$HOME');
   });
+  it('fails when an explicitly selected env file is empty', () => {
+    expect(() => run(['health'], { PROD_DB_ENV_FILE: '' })).toThrow('failed to read');
+  });
   it('fails when an explicitly selected env file is missing', () => {
     expect(() => run(['health'], { PROD_DB_ENV_FILE: join(directory, 'missing.env') })).toThrow(
       'failed to read'
