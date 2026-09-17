@@ -98,7 +98,10 @@ describe('useMetadataStore story chapter catalog ownership', () => {
     // but it must never claim PvE while PvE chapters have not arrived.
     expect(store.storyChaptersGameMode).not.toBe('pve');
     if (store.storyChaptersGameMode !== null) {
+      expect(store.storyChaptersGameMode).toBe('pvp');
       expect(chapterIds(store)).toEqual(['pvp-chapter']);
+    } else {
+      expect(chapterIds(store)).toEqual([]);
     }
     pending.resolve(catalogResponse('pve-chapter'));
     await switching;
