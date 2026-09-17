@@ -50,7 +50,7 @@ queue:
       - app/server/utils/streamerKappa.ts
       - shared/utils/__tests__/progressInvalidation.test.ts
       - workers/api-gateway/src/__tests__/transform.test.ts
-    status: pr_open
+    status: completed
     priority: P0
     dependencies: []
     last_reviewed_commit: 0daf56cc6d84bdfa121efc52bf528ae58f68abcf
@@ -93,14 +93,14 @@ queue:
     post_merge_verification:
       date: '2026-09-17'
       implementation_merge: 0daf56cc6d84bdfa121efc52bf528ae58f68abcf
-      current_main: e38cb2473f6792fcc47a6a48564ac8c36da0b5be
+      current_main: a62ba5a33b72222eadc89a5537117d56ab05ea44
       audited_paths_changed_since_merge: false
       implementation_checks: { successful_check_runs: 22, successful_status_contexts: 2 }
-      current_main_checks: { successful_check_runs: 20, successful_status_contexts: 3 }
+      current_main_checks: { successful_check_runs: 20, successful_status_contexts: 2 }
       implementation_ci: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35175683566
       implementation_security: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35175683473
       release: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35175897242
-      current_main_ci: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35175972972
+      current_main_ci: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35181125592
       review_threads: { inspected: 12, unresolved: 0 }
       local_reverification:
         shared_tests: 21
@@ -117,17 +117,38 @@ queue:
       ledger_branch: duo/docs/ch-001-post-merge-ledger
       ledger_pr: 878
       ledger_url: https://github.com/tarkovtracker-org/TarkovTracker/pull/878
-      ledger_status: merged_awaiting_main_checks
+      ledger_status: merged
       ledger_merge: a62ba5a33b72222eadc89a5537117d56ab05ea44
       ledger_merged_at: '2026-09-17T04:13:39Z'
       ledger_validated_head: a0744702ca8113561f94abc7feb7e9c61ffa6847
       ledger_ci: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35180642171
-      ledger_review_threads: { inspected: 0, unresolved: 0 }
+      ledger_review: https://github.com/tarkovtracker-org/TarkovTracker/pull/878#discussion_r4033036063
       ledger_main_ci: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35181125592
       ledger_main_security: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35181125490
-      completion_branch: duo/docs/ch-001-completion-handoff
+      ledger_main_release: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35181328497
     notes: >-
-      CURRENT HANDOFF (2026-09-17, ledger merge): PR #878 was promoted from the program's
+      CURRENT HANDOFF (2026-09-17, completion repair): implementation #876 and ledger #878
+      are merged. Re-verified current main a62ba5a3 (also the #878 merge): all 20 check runs
+      and both status contexts succeeded, including CI, Security, release, Pages and Supabase.
+      None of the 9 audited paths changed from implementation merge 0daf56cc to current main.
+      Existing metrics_after and local_reverification measurements are preserved historical
+      evidence, not new measurements from this documentation-only repair. pr and
+      last_reviewed_commit continue to identify implementation #876, not its bookkeeping PRs.
+      The proposed completed status records verified implementation completion; it does not
+      assert that this correction has passed PR gates or authorize another slice.
+      Codex's linked P2 on #878 arrived after merge and correctly identified the stale ledger.
+      This repair corrects that record and the README lifecycle. Check the live linked review
+      for resolution rather than relying on the historical pre-review snapshot below.
+      NEXT RUN: finish the focused completion correction through normal review/CI and authorized
+      merge, address and resolve the linked ledger feedback, then verify the completion record
+      on main and resulting checks. Keep this correction's live branch/PR/check state in the
+      session handoff and GitHub; do not add another pending-merge field to this ledger.
+      No next slice until that gate passes and no outstanding ledger PR or actionable feedback
+      remains. Finish that run without starting CH-002; CH-028, CH-049 and CH-050 stay deferred.
+      Do not regenerate the inventory or re-audit unchanged implementation paths.
+      ALL FOLLOWING HANDOFFS ARE HISTORICAL, including pending checks and zero-thread snapshots;
+      they do not supersede this CURRENT HANDOFF or constitute current blockers.
+      HISTORICAL HANDOFF (2026-09-17, ledger merge): PR #878 was promoted from the program's
       draft after successful exact-head checks, no requested changes and zero review threads.
       Authorized squash merge succeeded at a62ba5a3; strict CI Result policy was not bypassed.
       The merge tree exactly matches tested head a0744702. Re-ran 52 shared/app tests and all
