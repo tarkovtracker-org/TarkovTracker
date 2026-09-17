@@ -873,6 +873,9 @@ queue:
         workers/api-gateway/src/openapi.ts,
         app/stores/useProgress.ts,
         docs/API.md,
+        docs/SYSTEMS.md,
+        shared/utils/__tests__/progressInvalidation.test.ts,
+        workers/api-gateway/src/__tests__/transform.test.ts,
       ]
     status: queued
     priority: P2
