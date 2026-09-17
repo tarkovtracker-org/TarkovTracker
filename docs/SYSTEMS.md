@@ -672,8 +672,8 @@ sequenceDiagram
    Auth (24h cache), and loads matching tasks/hideout metadata from `json.tarkov.dev` via
    `workers/api-gateway/src/services/tarkov.ts` (1h memory cache).
 6. **Transform.** `workers/api-gateway/src/utils/transform.ts` converts the JSONB objects into the
-   public array format, applies invalidation (`workers/api-gateway/src/utils/invalidation.ts`) and
-   game-edition hideout auto-completes.
+   public array format, applies invalidation (`shared/utils/progressInvalidation.ts`, the same
+   algorithm the app uses) and game-edition hideout auto-completes.
 7. **Conditional response.** `conditionalReadResponse` in `workers/api-gateway/src/responses.ts`
    serializes once, derives a weak `ETag` from the payload, answers `304` on a matching
    `If-None-Match`, and sets `Cache-Control: private, max-age=15` plus
@@ -695,15 +695,25 @@ sequenceDiagram
   progress reads/writes
 - `workers/api-gateway/src/services/supporter.ts`, `workers/api-gateway/src/services/usage.ts`,
   `workers/api-gateway/src/services/tarkov.ts`
-- `workers/api-gateway/src/utils/transform.ts`, `workers/api-gateway/src/utils/invalidation.ts`
+- `workers/api-gateway/src/utils/transform.ts`
+- `shared/utils/progressInvalidation.ts` — runtime-independent task/objective invalidation
+  (faction, failed-only and failed prerequisites, `failed`-tolerant requirements), shared by the
+  app progress store, public profile/streamer views, and the Worker transform
 - `shared/utils/userMetadata.ts` — runtime-independent provider metadata parsing, shared with app
   user hydration through the `@shared` alias in Nuxt and the Worker build/test configuration
 - `docs/RATE_LIMITING.md`, `docs/API.md` — ownership map and client-facing docs
 
 ### Invariants
 
-- App user hydration and API progress responses share provider metadata fallback ordering. Shared
-  utilities must not import Nuxt or Worker runtime modules.
+- App user hydration and API progress responses share provider metadata fallback ordering, and the
+  app and API share one invalidation algorithm: a requirement whose `status` includes `failed`
+  never invalidates its task when the prerequisite is failed. Shared utilities must not import
+  Nuxt or Worker runtime modules; invalidation logic must not be re-implemented per runtime.
+- Completed and failed tasks (including legacy records with both flags set) and their objectives
+  are never marked invalid. This terminal-state guard applies to faction, prerequisite, and legacy
+  alternative entry points. Completed tasks stop propagation; failed tasks still invalidate strict
+  dependents, but not dependents whose requirements accept failure. Faction mismatch alone does
+  not cascade.
 - A request makes at most one Durable Object call (the daily quota). There is no burst bucket, no
   IP backstop bucket, and no refund reconciliation; reintroducing any of those is a regression.
 - The daily quota fails open on DO unavailability (logs `daily_quota_unavailable`); the pre-auth
@@ -1291,7 +1301,14 @@ flowchart LR
    `pending_remotely` (in the checkout, not applied). It makes remote/local migration divergence
    observable without migration or Management API credentials.
 9. Production credentials are supplied only through `PROD_DB_URL`, which must identify a dedicated
-   observer role. The wrapper removes its password before invoking the Supabase CLI and supplies
+   observer role. The wrapper reads only `PROD_DB_*` keys from the repository-root `.env` when they
+   are not already exported; explicit environment variables take precedence and other keys in that
+   file are ignored. Values remain literal, including passwords; certificate paths must be absolute.
+   `PROD_DB_ENV_FILE`, exported by the invoking shell, overrides the file path; setting it inside
+   `.env` is unsupported. An explicitly selected file must be readable; an absent
+   default `.env` is allowed. Other exported variables remain inherited, so callers must keep
+   privileged credentials out of the invoking environment. The wrapper removes its password before
+   invoking the Supabase CLI and supplies
    the password through a mode-`0600` temporary `PGPASSFILE`, keeping it out of child-process
    arguments and command errors. The credential file is removed after each CLI invocation.
    The role's actual database privileges are the hard safety boundary; connection defaults such as

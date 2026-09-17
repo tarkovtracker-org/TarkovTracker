@@ -5,11 +5,34 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
+import { parseEnv, promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 const ROOT = new URL('..', import.meta.url);
-const SUPABASE_BIN = process.env.PROD_DB_SUPABASE_BIN ?? 'supabase';
-const OBSERVER_APPLICATION_NAME = process.env.PROD_DB_APPLICATION_NAME ?? 'pi-prod-observer';
+const DEFAULT_ENV_FILE = fileURLToPath(new URL('../.env', import.meta.url));
+function getSupabaseBin() {
+  return process.env.PROD_DB_SUPABASE_BIN ?? 'supabase';
+}
+function getObserverApplicationName() {
+  return process.env.PROD_DB_APPLICATION_NAME ?? 'pi-prod-observer';
+}
+function readProdDbEnvironment(envFile) {
+  try {
+    return parseEnv(readFileSync(envFile, 'utf8'));
+  } catch (error) {
+    throw new Error(
+      `failed to read ${envFile}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+function setProdDbDefault([key, value]) {
+  if (!key.startsWith('PROD_DB_') || process.env[key] !== undefined) return;
+  process.env[key] = value;
+}
+function loadProdDbEnvironment() {
+  const envFile = process.env.PROD_DB_ENV_FILE ?? DEFAULT_ENV_FILE;
+  if (process.env.PROD_DB_ENV_FILE === undefined && !existsSync(envFile)) return;
+  Object.entries(readProdDbEnvironment(envFile)).forEach(setProdDbDefault);
+}
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_MAX_OUTPUT_BYTES = 1_000_000;
 const MAX_SAMPLE_LIMIT = 20;
@@ -122,7 +145,8 @@ Environment:
   PROD_DB_URL                 Direct observer connection string; required for production.
   PROD_DB_TARGET              primary (default) or local.
   PROD_DB_TIMEOUT_MS          Command timeout in milliseconds (default: ${DEFAULT_TIMEOUT_MS}).
-  PROD_DB_MAX_OUTPUT_BYTES    Maximum normalized output size (default: ${DEFAULT_MAX_OUTPUT_BYTES}).`);
+  PROD_DB_MAX_OUTPUT_BYTES    Maximum normalized output size (default: ${DEFAULT_MAX_OUTPUT_BYTES}).
+  PROD_DB_ENV_FILE            Env file providing PROD_DB_* values (default: repo-root .env).`);
   process.exitCode = 2;
 }
 function fail(message) {
@@ -281,7 +305,8 @@ function redactObject(value) {
   );
 }
 function getCommandEnvironment() {
-  if (!/^[a-zA-Z][a-zA-Z0-9_.-]{0,62}$/.test(OBSERVER_APPLICATION_NAME)) {
+  const applicationName = getObserverApplicationName();
+  if (!/^[a-zA-Z][a-zA-Z0-9_.-]{0,62}$/.test(applicationName)) {
     throw new Error(
       'PROD_DB_APPLICATION_NAME must be 1-63 characters using letters, digits, _, ., or -'
     );
@@ -291,7 +316,7 @@ function getCommandEnvironment() {
   delete environment.PGPASSWORD;
   delete environment.PGPASSFILE;
   delete environment.SUPABASE_DB_PASSWORD;
-  return { ...environment, PGAPPNAME: OBSERVER_APPLICATION_NAME };
+  return { ...environment, PGAPPNAME: applicationName };
 }
 function escapePgpass(value) {
   return value.replaceAll('\\', String.raw`\\`).replaceAll(':', String.raw`\:`);
@@ -353,7 +378,7 @@ async function runRawQuery(sql, label) {
   args.push('--output', 'json', sql);
   const command = await getCommandContext(target);
   try {
-    const { stdout } = await execFileAsync(SUPABASE_BIN, args, {
+    const { stdout } = await execFileAsync(getSupabaseBin(), args, {
       cwd: fileURLToPath(ROOT),
       env: command.environment,
       timeout,
@@ -405,7 +430,7 @@ async function runSupabase(args, label, sharedObservation) {
   const command = await getCommandContext(target);
   try {
     const observation = await resolveObservation(sharedObservation);
-    const { stdout } = await execFileAsync(SUPABASE_BIN, commandArgs, {
+    const { stdout } = await execFileAsync(getSupabaseBin(), commandArgs, {
       cwd: fileURLToPath(ROOT),
       env: command.environment,
       timeout,
@@ -1037,6 +1062,7 @@ const COMMAND_HANDLERS = new Map([
   ]),
 ]);
 async function main() {
+  loadProdDbEnvironment();
   const [operation, ...rest] = process.argv.slice(2);
   if (isHelpOperation(operation)) return usage();
   const handler = COMMAND_HANDLERS.get(operation);
