@@ -141,7 +141,7 @@ Each slice contains its Vue components and slice-local helpers/composables. High
 | Component                                     | Responsibility                                               |
 | --------------------------------------------- | ------------------------------------------------------------ |
 | `index.ts`                                    | Worker entry (thin adapter).                                 |
-| `router.ts`                                   | Routing, User-Agent gate, host/legacy redirect.              |
+| `router.ts`                                   | Routing, User-Agent gate, API host boundary enforcement.     |
 | `authentication.ts`                           | Abuse gate, token auth, daily-quota enforcement.             |
 | `rateLimiter.ts`                              | `ApiGatewayRateLimiter` Durable Object + quota client.       |
 | `responses.ts`                                | CORS, envelopes, conditional response, ETag/compression.     |

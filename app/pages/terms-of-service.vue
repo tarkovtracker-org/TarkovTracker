@@ -6,7 +6,7 @@
     title: 'Terms of Service',
     description: 'TarkovTracker terms of service and usage guidelines.',
   });
-  const lastUpdated = 'June 30, 2026';
+  const lastUpdated = 'September 16, 2026';
   const ACTIVE_SECTION_OFFSET = 160;
   const toc = [
     { id: 'acceptance', title: '1. Acceptance of Terms' },
@@ -830,11 +830,10 @@
                 <li class="leading-relaxed">
                   For recurring supporter subscriptions, an additional tier-specific Discord role
                   reflecting your tier (for example, "Scav Tier," "Timmy Tier," or "Chad Tier").
-                  This feature is under development and may not yet be available
                 </li>
                 <li class="leading-relaxed">
-                  Higher API rate limits than standard accounts (recurring supporter subscriptions
-                  only)
+                  Higher daily API read and write quotas than standard accounts while supporter
+                  status is active, including one-time contributors
                 </li>
                 <li class="leading-relaxed">
                   If and when we delete inactive accounts, a longer data-retention window than

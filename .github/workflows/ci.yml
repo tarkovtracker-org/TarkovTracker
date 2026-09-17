@@ -1,9 +1,10 @@
 name: CI
 on:
+  workflow_dispatch:
   push:
-    branches: [main, develop, 'wip/**']
+    branches: [main, 'wip/**']
   pull_request:
-    branches: [main, develop]
+    branches: [main]
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -18,22 +19,26 @@ jobs:
       plan: ${{ steps.plan.outputs.plan }}
       full: ${{ steps.plan.outputs.full }}
       i18n: ${{ steps.plan.outputs.i18n }}
+      workflows: ${{ steps.plan.outputs.workflows }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
-      - name: Classify changes (shadow rollout)
+      - name: Classify changes
         id: plan
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           EVENT_NAME: ${{ github.event_name }}
+        # Pull requests receive path-based selection; pushes and dispatches always validate fully.
+        # Rollback: re-add the shadow flag of scripts/validate-changes.mjs to force every job and
+        # invert the shadow-flag assertion in scripts/ci-tests/workflows.mjs in the same change.
         run: |
-          args=(--mode ci --explain --base "$BASE_SHA" --head "$HEAD_SHA" --shadow)
+          args=(--mode ci --explain --base "$BASE_SHA" --head "$HEAD_SHA")
           if [ "$EVENT_NAME" != "pull_request" ]; then args+=(--full); fi
           node scripts/validate-changes.mjs "${args[@]}"
   fallow:
@@ -43,32 +48,40 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/setup-project
       - name: Resolve Fallow base
         id: fallow-base
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE="${{ github.event.pull_request.base.sha }}"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            BASE="$PR_BASE_SHA"
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            BASE="$(git rev-parse HEAD^ 2>/dev/null || true)"
           else
-            BASE="${{ github.event.before }}"
+            BASE="$PUSH_BEFORE_SHA"
           fi
-          if [ "$BASE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
             BASE="origin/main"
           fi
           echo "base=$BASE" >> "$GITHUB_OUTPUT"
       - name: Audit changed files
-        run: pnpm run lint:fallow --base "${{ steps.fallow-base.outputs.base }}"
+        env:
+          FALLOW_BASE: ${{ steps.fallow-base.outputs.base }}
+        run: pnpm run lint:fallow --base "$FALLOW_BASE"
   lint-format:
     needs: changes
     name: Lint & Format
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
@@ -90,6 +103,34 @@ jobs:
       - name: Test workflow tooling
         if: needs.changes.outputs.full == 'true'
         run: pnpm run test:workflow
+      - name: Lint GitHub Actions workflows
+        if: needs.changes.outputs.workflows == 'true'
+        # Pinned, checksum-verified actionlint (syntax, expressions, shellcheck) and zizmor
+        # (workflow security) release binaries. Both stay out of package.json: they are not Node
+        # tooling. Checksums match the `digest` GitHub records for each release asset.
+        env:
+          ACTIONLINT_VERSION: 1.7.7
+          ACTIONLINT_SHA256: 023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757
+          ZIZMOR_VERSION: 1.30.1
+          ZIZMOR_SHA256: e65324f4430c2717591937edcec90ccbefaf14c174f8ec9415e03ca875b46e1a
+          # Read-only token enables zizmor's online audits (impostor commits, known-vulnerable actions).
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          fetch_verified() {
+            local archive="$RUNNER_TEMP/$1.tar.gz"
+            curl --proto '=https' --proto-redir '=https' -sSfL -o "$archive" "$2"
+            echo "$3  ${archive}" | sha256sum --check --strict
+            tar -xzf "$archive" -C "$RUNNER_TEMP" "$1"
+          }
+          fetch_verified actionlint \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
+            "$ACTIONLINT_SHA256"
+          fetch_verified zizmor \
+            "https://github.com/zizmorcore/zizmor/releases/download/v${ZIZMOR_VERSION}/zizmor-x86_64-unknown-linux-gnu.tar.gz" \
+            "$ZIZMOR_SHA256"
+          "$RUNNER_TEMP/actionlint" -color
+          "$RUNNER_TEMP/zizmor" --no-progress --min-severity low .github/
   typecheck:
     needs: changes
     if: needs.changes.outputs.full == 'true'
@@ -97,7 +138,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
@@ -118,24 +159,24 @@ jobs:
       CI: 'true'
       VITEST_SHARD: ${{ matrix.shard }}/${{ matrix.total }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
           persist-credentials: false
       - uses: ./.github/actions/setup-project
       - name: Setup Deno
         if: matrix.shard == 1
-        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: v2.9.4
       - name: Run Deno tests
         if: matrix.shard == 1
         run: deno test supabase/functions/_shared/*.deno.test.ts
       - name: Run shard ${{ matrix.shard }}/${{ matrix.total }}
-        run: pnpm exec vitest run --coverage --shard=${{ matrix.shard }}/${{ matrix.total }}
+        run: pnpm exec vitest run --coverage --shard="$VITEST_SHARD"
       - name: Upload coverage to Codecov
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
@@ -144,7 +185,7 @@ jobs:
           fail_ci_if_error: false
       - name: Upload test results to Codecov
         if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true) && !cancelled()
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
@@ -159,7 +200,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
           persist-credentials: false
@@ -176,7 +217,7 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       - name: Upload build artifacts
         if: github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: build-${{ github.sha }}
           path: dist
@@ -188,7 +229,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
@@ -199,11 +240,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
       - name: Systems drift check
@@ -215,7 +256,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
@@ -230,20 +271,37 @@ jobs:
         if: hashFiles('workers/api-gateway/package.json') != ''
         run: pnpm run test:api-gateway
   ci-result:
+    permissions:
+      contents: read
+      statuses: write
     name: CI Result
     if: always()
-    needs: [changes, fallow, lint-format, typecheck, test, validate, supabase-db, systems-drift, workers]
+    needs:
+      [changes, fallow, lint-format, typecheck, test, validate, supabase-db, systems-drift, workers]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Checkout trusted CI aggregation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          # Never execute candidate-branch code in the status-writing job.
+          ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
       - name: Require all selected jobs to succeed
+        id: validation
         env:
           VALIDATION_PLAN: ${{ needs.changes.outputs.plan }}
           CI_NEEDS: ${{ toJSON(needs) }}
         run: node scripts/check-ci-result.mjs
+      - name: Report dispatched CI to branch rules
+        if: always() && github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        env:
+          VALIDATION_OUTCOME: ${{ steps.validation.outcome }}
+        with:
+          script: |
+            const { reportDispatchedCi } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/report-dispatched-ci.mjs`);
+            await reportDispatchedCi({ github, context, outcome: process.env.VALIDATION_OUTCOME });

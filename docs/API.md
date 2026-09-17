@@ -20,20 +20,15 @@ Set `NUXT_TARKOV_JSON_BASE_URL` to point static game-data requests at a compatib
 
 ## Base URL
 
-- **Development:** `http://localhost:3000/api`
-- **Production:** `https://tarkovtracker.org/api`
+- **Internal Site API (dev):** `http://localhost:3000/api`
+- **Internal Site API (prod):** `https://tarkovtracker.org/api`
+- **Progress API Gateway:** `https://api.tarkovtracker.org`
 
-## Progress API Host Migration (api.tarkovtracker.org)
+## Progress API Host (api.tarkovtracker.org)
 
-The progress API gateway (token, progress, team progress) is served on `https://api.tarkovtracker.org` (clean paths, `/api/v2/*` also accepted). The legacy `https://tarkovtracker.org/api/v2/*` routes remain served during the deprecation window.
+The progress API gateway (token, progress, team progress) is served exclusively on `https://api.tarkovtracker.org` (clean paths, with `/api/v2/*` accepted as a path alias on the subdomain). Legacy `/api/` and `/api/v2/` routes on `tarkovtracker.org` have been retired and removed from production.
 
-Migration plan:
-
-1. TarkovMonitor >= the release containing tarkovtracker-org/TarkovMonitor#3 calls `api.tarkovtracker.org` directly.
-2. Once that release has propagated, ops flip the gateway var `LEGACY_API_REDIRECT` to `"true"` (see `workers/api-gateway/wrangler.toml`); legacy `/api` and `/api/v2` requests then receive a `308` redirect to the subdomain with `Deprecation` and `Link: rel="successor-version"` headers.
-3. Clients should migrate proactively rather than relying on the redirect: .NET `HttpClient` (and several other HTTP stacks) drop the `Authorization` header on cross-host redirects, so authenticated calls through the redirect will fail with `401`.
-
-Migration example:
+Third-party integrations call `api.tarkovtracker.org` directly:
 
 ```diff
 -POST https://tarkovtracker.org/api/v2/progress/task/{taskId}
@@ -54,7 +49,7 @@ Authorization: Bearer <supabase_jwt_token>
 > TarkovTracker site itself. It is not a supported integration surface, carries no compatibility
 > guarantee, and its response shape can change in any release. Third-party clients should read game
 > data from `json.tarkov.dev` directly, or use the progress API at `https://api.tarkovtracker.org`
-> (see [Progress API Host Migration](#progress-api-host-migration-apitarkovtrackerorg)).
+> (see [Progress API Host](#progress-api-host-apitarkovtrackerorg)).
 >
 > These routes are public and pass through the API protection middleware; see
 > [`ARCHITECTURE.md#api-protection`](./ARCHITECTURE.md#api-protection) for access-control configuration and
@@ -430,7 +425,7 @@ This section covers **external progress API quotas only** (Worker + Durable Obje
 limits, shared profile limits, Auth limits, and DB hard caps live in a separate ownership map:
 [`RATE_LIMITING.md`](./RATE_LIMITING.md).
 
-Progress API requests (`api.tarkovtracker.org`, `/api/v2/*`) are subject to tiered daily quotas keyed by user account (not per token). Daily quotas reset at 00:00 UTC and count authenticated requests admitted for processing.
+Progress API requests (`api.tarkovtracker.org`) are subject to tiered daily quotas keyed by user account (not per token). Daily quotas reset at 00:00 UTC and count authenticated requests admitted for processing.
 
 | Tier      | Reads/day | Writes/day |
 | --------- | --------- | ---------- |

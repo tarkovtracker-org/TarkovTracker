@@ -25,7 +25,10 @@ concurrency:
 jobs:
   auto-merge:
     name: Auto-merge safe Dependabot PR
-    if: github.actor == 'dependabot[bot]'
+    # The PR must be authored by Dependabot and the triggering event must also come from it, so
+    # a human push, reopen, or ready-for-review on a Dependabot branch never auto-merges.
+    # GitHub.com Dependabot's immutable account ID (users/dependabot[bot]).
+    if: github.event.pull_request.user.id == 49699333 && github.actor_id == '49699333'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
