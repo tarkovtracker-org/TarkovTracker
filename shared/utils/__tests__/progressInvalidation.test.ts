@@ -24,6 +24,56 @@ const run = (
   pmcFaction = 'USEC'
 ) => computeInvalidProgress({ tasks, taskCompletions, pmcFaction });
 describe('computeInvalidProgress', () => {
+  describe.each([
+    { state: 'completed', completion: { complete: true, failed: false }, cascades: false },
+    { state: 'failed', completion: { complete: false, failed: true }, cascades: true },
+    { state: 'legacy failed', completion: { complete: true, failed: true }, cascades: true },
+  ])('$state tasks remain terminal', ({ completion, cascades }) => {
+    it.each([
+      { cause: 'faction', target: task('terminal', undefined, { factionName: 'BEAR' }) },
+      { cause: 'failed prerequisite', target: task('terminal', { on: 'failed', status: [] }) },
+      {
+        cause: 'failed-only prerequisite',
+        target: task('terminal', { on: 'completed', status: ['failed'] }),
+      },
+      { cause: 'alternative branch', target: task('terminal') },
+    ])('does not invalidate through $cause', ({ cause, target }) => {
+      const result = run(
+        [
+          task('failed'),
+          task('completed'),
+          task('choice', undefined, {
+            alternatives: cause === 'alternative branch' ? ['terminal'] : [],
+          }),
+          target,
+          task('strict', { on: 'terminal', status: ['complete'] }),
+          task('tolerant', { on: 'terminal', status: ['complete', 'failed'] }),
+        ],
+        {
+          failed: { failed: true },
+          completed: { complete: true },
+          choice: { complete: true },
+          terminal: completion,
+        }
+      );
+      expect(result.invalidTasks.terminal).toBeUndefined();
+      expect(result.invalidObjectives.terminalObj).toBeUndefined();
+      expect(Boolean(result.invalidTasks.strict)).toBe(cascades);
+      expect(Boolean(result.invalidObjectives.strictObj)).toBe(cascades);
+      expect(result.invalidTasks.tolerant).toBeUndefined();
+      expect(result.invalidObjectives.tolerantObj).toBeUndefined();
+    });
+  });
+  it('terminates cyclic invalidation without changing terminal outcomes', () => {
+    const result = run([task('A', { on: 'B', status: [] }), task('B', { on: 'A', status: [] })], {
+      A: { failed: true },
+    });
+    expect(result.invalidTasks).toEqual({ B: true });
+    expect(result.invalidObjectives).toEqual({ BObj: true });
+  });
+  it('returns empty invalidation maps for an empty catalog', () => {
+    expect(run([], {})).toEqual({ invalidTasks: {}, invalidObjectives: {} });
+  });
   it('treats empty requirement status as completion-required', () => {
     const result = run([task('A'), task('B', { on: 'A', status: [] })], {
       A: { complete: true, failed: true },

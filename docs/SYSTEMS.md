@@ -709,6 +709,11 @@ sequenceDiagram
   app and API share one invalidation algorithm: a requirement whose `status` includes `failed`
   never invalidates its task when the prerequisite is failed. Shared utilities must not import
   Nuxt or Worker runtime modules; invalidation logic must not be re-implemented per runtime.
+- Completed and failed tasks (including legacy records with both flags set) and their objectives
+  are never marked invalid. This terminal-state guard applies to faction, prerequisite, and legacy
+  alternative entry points. Completed tasks stop propagation; failed tasks still invalidate strict
+  dependents, but not dependents whose requirements accept failure. Faction mismatch alone does
+  not cascade.
 - A request makes at most one Durable Object call (the daily quota). There is no burst bucket, no
   IP backstop bucket, and no refund reconciliation; reintroducing any of those is a regression.
 - The daily quota fails open on DO unavailability (logs `daily_quota_unavailable`); the pre-auth

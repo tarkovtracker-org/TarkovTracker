@@ -24,12 +24,14 @@ sync with `main`, and resume correctly.
    / `CH-` ids.
 3. **Finish before starting.** If the previous slice's PR has failing CI, unresolved actionable
    review threads, requested changes, or conflicts — fix that first. If it is clean and merge is
-   authorized, merge it, verify `main`, mark it `completed`. If merge is not authorized, leave it
+   authorized, merge it and follow the post-merge ledger transition below. Do not start another
+   slice in that run. If merge is not authorized, leave it
    `pr_open` with `notes: ready_to_merge` and do **not** open overlapping work.
 4. **Refresh evidence.** Run the repository-supported analysis and record notable deltas in the
    queue. Do not invent new thresholds; use `.fallowrc.json` as configured.
 
    ```bash
+   pnpm run lint:fallow --base origin/main --format json
    pnpm exec fallow health --hotspots --targets
    pnpm exec fallow health --complexity --sort severity
    pnpm exec fallow dupes
@@ -46,13 +48,30 @@ sync with `main`, and resume correctly.
 8. **Validate.** Narrow tests first, then the full required set for the touched surfaces (see
    `AGENTS.md` → Required validation). Never weaken tests, gates, thresholds, or Fallow config to
    pass.
-9. **PR lifecycle.** Open a focused PR (`docs/code-health` changes ride along in the same PR so
-   ledger and code stay atomic). Monitor CI and automated reviewers, fix legitimate findings, and
-   resolve threads only after the concern is addressed.
-10. **Hand off.** Update `audit-plan.yaml` with the current status, PR number,
-    `last_reviewed_commit` (the `origin/main` SHA the audit was performed against), `metrics_after`
-    measured on the stabilized branch, findings, and any new queue items discovered. Stop; do not
-    begin the next slice. The next run re-verifies `metrics_after` before marking `completed`.
+9. **PR lifecycle.** Keep implementation changes and their audit evidence atomic in the same PR.
+   Monitor CI and automated reviewers, fix legitimate findings, and resolve threads only after the
+   concern is addressed. Completion evidence necessarily follows the merge and uses the separate
+   ledger-only transition below; never predict a successful merge or check.
+10. **Hand off.** Update `audit-plan.yaml` with the actual status, PR number, `last_reviewed_commit`
+    (the audited base SHA while open), `metrics_before` from selection time, `metrics_after` measured
+    on the stabilized branch, findings, and any new queue items discovered. Measurements are not
+    completion evidence: `pr_open` stays open until every completion criterion passes. Record
+    outstanding checks/reviews and their URLs when blocked. Stop; do not begin the next slice.
+
+## Post-merge ledger transition
+
+The implementation PR keeps `status: pr_open` through merge. A later **ledger-only run** resumes
+that same slice, fetches `origin/main`, confirms the merge SHA, verifies successful post-merge
+checks for that SHA and checks on current `main`, and re-verifies the relevant `metrics_after`.
+If main has materially changed the audited paths, investigate that change before claiming the
+measurements still apply. Pending or failed checks keep the item `pr_open` with a precise blocker.
+
+Only after that evidence exists, open a focused ledger-only follow-up PR setting `status: completed`,
+`last_reviewed_commit` to the verified merge SHA, and recording the implementation PR, check URLs,
+and measured outcomes. This exception to same-PR atomicity records an already-verified outcome; it
+must not carry another implementation slice. Validate and merge the ledger follow-up through normal
+CI/review gates, leaving its URL in the handoff if it cannot finish. Future runs finish any outstanding
+ledger PR before selecting more work. Do not push ledger updates directly to `main` or bypass checks.
 
 ## Scope rules
 
@@ -96,8 +115,9 @@ A slice is `completed` only when **all** of the following hold:
 - Actionable human/automated review feedback is resolved by addressing the concern.
 - `audit-plan.yaml` records the outcome, `pr`, `last_reviewed_commit`, before/after metrics, and
   any deferred findings as new queue items.
-- The PR is merged (squash, matching repository convention) and `main` checks verified — or, if
-  merge authorization is unavailable, the item is left `pr_open` with `notes: ready_to_merge`.
+- The implementation PR is merged (squash, matching repository convention), post-merge checks are
+  verified, and the ledger-only completion update has passed its normal PR gates. If merge is not
+  authorized, leave the item `pr_open` with `notes: ready_to_merge`; that is not `completed`.
 
 ## Re-audit rule
 

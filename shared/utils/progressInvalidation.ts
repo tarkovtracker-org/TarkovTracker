@@ -73,6 +73,9 @@ export const computeInvalidProgress = ({
     });
   });
   const markInvalid = (task: InvalidationTask) => {
+    // Terminal outcomes take precedence over every invalidation entry point.
+    const completion = taskCompletions[task.id];
+    if (isCompleted(completion) || completion?.failed === true) return;
     invalidTasks[task.id] = true;
     task.objectives?.forEach((objective) => {
       if (objective?.id) {
@@ -84,9 +87,9 @@ export const computeInvalidProgress = ({
   const invalidateTaskRecursive = (taskId: string) => {
     const task = tasksById.get(taskId);
     if (!task) return;
-    // Never mark completed tasks as invalid - they're already done.
+    // Completed tasks stop propagation; failed tasks still block strict dependents.
     const completed = isCompleted(taskCompletions[taskId]);
-    if (!invalidTasks[taskId] && !completed) {
+    if (!invalidTasks[taskId]) {
       markInvalid(task);
     }
     if (visited.has(taskId)) return;
