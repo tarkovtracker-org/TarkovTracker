@@ -17,6 +17,8 @@ import { afterAll, describe, expect, it } from 'vitest';
 const root = process.cwd();
 const script = join(root, 'scripts/prod-db');
 const directory = mkdtempSync(join(tmpdir(), 'prod-db-'));
+const emptyEnvFile = join(directory, 'empty.env');
+writeFileSync(emptyEnvFile, '');
 const migration = join(directory, 'migration.sql');
 const unsafeMigration = join(directory, 'unsafe-migration.sql');
 const literalMigration = join(directory, 'literal-migration.sql');
@@ -68,6 +70,7 @@ let data = [{
   pgpass_file_received: Boolean(process.env.PGPASSFILE),
   pgpass_path: process.env.PGPASSFILE,
   prod_db_url_received: Boolean(process.env.PROD_DB_URL),
+  literal_password_received: password.includes('literal$HOME'),
 }];
 if (process.env.FAKE_SUPABASE_INCOMPLETE === 'true') delete data[0].lock_timeout;
 if (sql.includes('pg_catalog.pg_attribute')) {
@@ -91,11 +94,12 @@ chmodSync(fakeSupabase, 0o755);
 afterAll(() => {
   rmSync(directory, { recursive: true, force: true });
 });
-function run(args, extraEnv = {}) {
-  return execFileSync(script, args, {
+function run(args, extraEnv = {}, executable = script) {
+  return execFileSync(executable, args, {
     cwd: root,
     env: {
       ...process.env,
+      PROD_DB_ENV_FILE: emptyEnvFile,
       PROD_DB_SUPABASE_BIN: fakeSupabase,
       PROD_DB_TARGET: 'local',
       ...extraEnv,
@@ -360,5 +364,64 @@ describe('prod-db canary', () => {
         })
       ).toThrow('cannot identify the Supabase project from PROD_DB_URL');
     });
+  });
+});
+describe('prod-db environment file', () => {
+  const observerEnvFile = join(directory, 'observer.env');
+  it('loads the default env relative to the script, independent of working directory', () => {
+    const fixtureRoot = join(directory, 'default-env');
+    const fixtureScripts = join(fixtureRoot, 'scripts');
+    mkdirSync(fixtureScripts, { recursive: true });
+    const executable = join(fixtureScripts, 'prod-db');
+    copyFileSync(script, executable);
+    copyFileSync(join(root, 'scripts/prod-db.mjs'), join(fixtureScripts, 'prod-db.mjs'));
+    chmodSync(executable, 0o755);
+    const env = { PROD_DB_ENV_FILE: undefined, PROD_DB_APPLICATION_NAME: undefined };
+    expect(JSON.parse(run(['health'], env, executable)).ok).toBe(true);
+    writeFileSync(join(fixtureRoot, '.env'), 'PROD_DB_APPLICATION_NAME=default-file-observer\n');
+    const result = JSON.parse(run(['health'], env, executable));
+    expect(result.observation.observer_application_name).toBe('default-file-observer');
+  });
+  it('loads PROD_DB_* values from the configured env file', () => {
+    writeFileSync(observerEnvFile, 'PROD_DB_APPLICATION_NAME=env-loaded-observer\n');
+    const result = JSON.parse(run(['health'], { PROD_DB_ENV_FILE: observerEnvFile }));
+    expect(result.ok).toBe(true);
+    expect(result.observation.observer_application_name).toBe('env-loaded-observer');
+  });
+  it('preserves literal passwords and absolute certificate paths', () => {
+    writeFileSync(
+      observerEnvFile,
+      'PROD_DB_URL="postgresql://pi_prod_observer:literal$HOME@example.test:5432/postgres?sslmode=verify-full&sslrootcert=/certs/observer.crt"\n'
+    );
+    const result = JSON.parse(
+      run(['health'], { PROD_DB_ENV_FILE: observerEnvFile, PROD_DB_TARGET: 'primary' })
+    );
+    const row = result.data.rows[0];
+    expect(row.literal_password_received).toBe(true);
+    expect(row.prod_db_url_received).toBe(false);
+    expect(row.arguments[row.arguments.indexOf('--db-url') + 1]).toContain(
+      'sslrootcert=/certs/observer.crt'
+    );
+    expect(row.arguments.join(' ')).not.toContain('literal$HOME');
+  });
+  it('fails when an explicitly selected env file is missing', () => {
+    expect(() => run(['health'], { PROD_DB_ENV_FILE: join(directory, 'missing.env') })).toThrow(
+      'failed to read'
+    );
+  });
+  it('ignores non-PROD_DB keys in the env file', () => {
+    writeFileSync(observerEnvFile, 'FAKE_SUPABASE_FAIL=true\n');
+    const result = JSON.parse(run(['health'], { PROD_DB_ENV_FILE: observerEnvFile }));
+    expect(result.ok).toBe(true);
+  });
+  it('lets explicit environment variables override the env file', () => {
+    writeFileSync(observerEnvFile, 'PROD_DB_APPLICATION_NAME=env-loaded-observer\n');
+    const result = JSON.parse(
+      run(['health'], {
+        PROD_DB_ENV_FILE: observerEnvFile,
+        PROD_DB_APPLICATION_NAME: 'explicit-observer',
+      })
+    );
+    expect(result.observation.observer_application_name).toBe('explicit-observer');
   });
 });
