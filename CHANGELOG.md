@@ -1,3 +1,10 @@
+## [1.80.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.80.0...v1.80.1) (2026-09-17)
+
+
+### Bug Fixes
+
+* **api:** share progress invalidation between app and gateway [CH-001] ([#876](https://github.com/tarkovtracker-org/TarkovTracker/issues/876)) ([0daf56c](https://github.com/tarkovtracker-org/TarkovTracker/commit/0daf56cc6d84bdfa121efc52bf528ae58f68abcf))
+
 # [1.80.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.6...v1.80.0) (2026-09-17)
 
 
