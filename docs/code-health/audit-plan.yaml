@@ -81,6 +81,14 @@ queue:
       in the denominator. Validation run: shared + consumer vitest (72 files / 1257 tests), full
       api-gateway suite (190), lint, format:check, typecheck, worker typecheck + types:check +
       wrangler dry-run, lint:fallow, systems:check, CI-mode build, git diff --check.
+      HAND-OFF (2026-09-17): PR #876 open, ready for review. On 567198bf the required `CI Result`
+      check passed, Codex review completed with no findings, Codecov patch 100%, Cloudflare Pages
+      preview deployed after one retry (first attempt failed inside Cloudflare's build image:
+      `node-build: definition not found: 24.19.0` — infra, not code). SonarCloud quality gate
+      failed on 7.9% duplicated new code in the shared test fixtures; fixed in 31e652fc with a
+      fixture builder. NEXT RUN: confirm `CI Result`, SonarCloud, CodeRabbit and cubic are green on
+      the head commit, address any actionable review threads, squash-merge #876, verify `main`
+      CI, then set status=completed, last_reviewed_commit=<merge sha>.
   - id: CH-002
     area: Tarkov store data loading (useTarkov.loadData)
     paths: [app/stores/useTarkov.ts]
