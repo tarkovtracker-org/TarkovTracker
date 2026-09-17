@@ -672,8 +672,8 @@ sequenceDiagram
    Auth (24h cache), and loads matching tasks/hideout metadata from `json.tarkov.dev` via
    `workers/api-gateway/src/services/tarkov.ts` (1h memory cache).
 6. **Transform.** `workers/api-gateway/src/utils/transform.ts` converts the JSONB objects into the
-   public array format, applies invalidation (`workers/api-gateway/src/utils/invalidation.ts`) and
-   game-edition hideout auto-completes.
+   public array format, applies invalidation (`shared/utils/progressInvalidation.ts`, the same
+   algorithm the app uses) and game-edition hideout auto-completes.
 7. **Conditional response.** `conditionalReadResponse` in `workers/api-gateway/src/responses.ts`
    serializes once, derives a weak `ETag` from the payload, answers `304` on a matching
    `If-None-Match`, and sets `Cache-Control: private, max-age=15` plus
@@ -695,15 +695,20 @@ sequenceDiagram
   progress reads/writes
 - `workers/api-gateway/src/services/supporter.ts`, `workers/api-gateway/src/services/usage.ts`,
   `workers/api-gateway/src/services/tarkov.ts`
-- `workers/api-gateway/src/utils/transform.ts`, `workers/api-gateway/src/utils/invalidation.ts`
+- `workers/api-gateway/src/utils/transform.ts`
+- `shared/utils/progressInvalidation.ts` — runtime-independent task/objective invalidation
+  (faction, failed-only and failed prerequisites, `failed`-tolerant requirements), shared by the
+  app progress store, public profile/streamer views, and the Worker transform
 - `shared/utils/userMetadata.ts` — runtime-independent provider metadata parsing, shared with app
   user hydration through the `@shared` alias in Nuxt and the Worker build/test configuration
 - `docs/RATE_LIMITING.md`, `docs/API.md` — ownership map and client-facing docs
 
 ### Invariants
 
-- App user hydration and API progress responses share provider metadata fallback ordering. Shared
-  utilities must not import Nuxt or Worker runtime modules.
+- App user hydration and API progress responses share provider metadata fallback ordering, and the
+  app and API share one invalidation algorithm: a requirement whose `status` includes `failed`
+  never invalidates its task when the prerequisite is failed. Shared utilities must not import
+  Nuxt or Worker runtime modules; invalidation logic must not be re-implemented per runtime.
 - A request makes at most one Durable Object call (the daily quota). There is no burst bucket, no
   IP backstop bucket, and no refund reconciliation; reintroducing any of those is a regression.
 - The daily quota fails open on DO unavailability (logs `daily_quota_unavailable`); the pre-auth

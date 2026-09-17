@@ -43,10 +43,11 @@ export default defineVitestConfig({
       provider: 'v8',
       reportsDirectory: './coverage',
       reporter: ['text', 'json-summary', 'lcov', 'cobertura'],
-      include: isSharded ? undefined : ['app/**/*.{ts,vue}'],
+      include: isSharded ? undefined : ['app/**/*.{ts,vue}', 'shared/**/*.ts'],
       exclude: [
         'app/**/*.d.ts',
         'app/**/__tests__/**',
+        'shared/**/__tests__/**',
         'docs/**',
         'public/**',
         'scripts/**',
