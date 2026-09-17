@@ -144,12 +144,36 @@ queue:
       at hand-off. Merge authorization: repo admin, squash allowed, ruleset requires `CI Result`
       (strict); auto-merge disabled.
       PR: https://github.com/tarkovtracker-org/TarkovTracker/pull/876
-      NEXT RUN: confirm `CI Result` SUCCESS on the final head of #876 and 0 unresolved threads,
-      then `gh pr merge 876 --squash` (no bypass). Then follow the README post-merge ledger
-      transition: verify main checks at the merge SHA, re-verify metrics_after, and open the
-      ledger-only completion PR marking CH-001 completed. Only after that select the next slice
-      (CH-002 is the highest queued P1; split its loading responsibility into bounded dependent
-      slices at selection).
+      MERGE HAND-OFF (2026-09-17): PR #876 merged by authorized squash without bypass at
+      2026-09-17T02:46:28Z, merge SHA 0daf56cc6d84bdfa121efc52bf528ae58f68abcf.
+      Final head 7d827fa15925d06e56448a0a3dab47bead2d0b0c had all 31 checks successful or
+      intentionally skipped, CI Result SUCCESS in run 35175269747, and zero unresolved threads
+      (all review-thread pages inspected). No requested changes or human hold. Strict CI Result
+      freshness was verified from the effective main rules; admin/maintain permission and squash
+      availability were verified. No production code changed in this run.
+      Re-verified locally on final head: shared tests 21, app consumer tests 31 across progress store,
+      profile and streamer, API gateway 193 tests across 12 files. Root Vitest excludes worker tests;
+      those were verified separately with the gateway configuration. Fallow new-only gate passed:
+      zero introduced dead-code, complexity, duplication or styling findings; 33 inherited complexity
+      findings and 2 inherited styling findings remain outside scope. Fallow dupes: 3 groups / 93
+      duplicated lines repository-wide, no invalidation clones. git diff --check passed.
+      Fetched main at the merge SHA and verified its entire tree equals the tested PR head.
+      Post-merge checks observed: CI in progress
+      https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35175683566;
+      Security in progress https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35175683473;
+      Link Check succeeded https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35175683637.
+      Cloudflare Pages, Workers Builds api-gateway, and Supabase Preview were also in progress.
+      No waiting or polling loop: the multi-stage main pipeline had just started.
+      Post-merge main CI/release/deployment checks are NOT yet verified; retain pr_open and the
+      audited base last_reviewed_commit until the completion gate is satisfied.
+      Local durable handoff branch: duo/docs/ch-001-post-merge-ledger in .wt/code-health, based on
+      the merge SHA. This ledger-only handoff is not a new audit slice. No follow-up PR is opened
+      until post-merge evidence exists, per README; resume this local branch without discarding it.
+      NEXT RUN: fetch main, inspect exact-merge-SHA checks and current main checks plus release
+      outcomes, resolve any failures before proceeding. Reconcile any material changes to audited
+      paths, then complete the README ledger-only transition in a focused PR through normal gates.
+      Only after that is merged and verified may a later run select CH-002, the highest queued P1;
+      split its loading responsibility into bounded dependent slices at selection.
   - id: CH-002
     area: Tarkov store data loading (useTarkov.loadData)
     paths: [app/stores/useTarkov.ts]
