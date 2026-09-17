@@ -26,10 +26,16 @@ sync with `main`, and resume correctly.
    review threads, requested changes, or conflicts — fix that first. If it is clean and merge is
    authorized, merge it, verify `main`, mark it `completed`. If merge is not authorized, leave it
    `pr_open` with `notes: ready_to_merge` and do **not** open overlapping work.
-4. **Refresh evidence.** Run the repository-supported analysis (`pnpm exec fallow health
---hotspots --targets`, `pnpm exec fallow health --complexity --sort severity`, `pnpm exec fallow
-dupes`, `pnpm exec fallow dead-code`). Record notable deltas in the queue. Do not invent new
-   thresholds; use `.fallowrc.json` as configured.
+4. **Refresh evidence.** Run the repository-supported analysis and record notable deltas in the
+   queue. Do not invent new thresholds; use `.fallowrc.json` as configured.
+
+   ```bash
+   pnpm exec fallow health --hotspots --targets
+   pnpm exec fallow health --complexity --sort severity
+   pnpm exec fallow dupes
+   pnpm exec fallow dead-code
+   ```
+
 5. **Select one slice.** Highest-priority `queued` item whose `dependencies` are all `completed`.
    Set `status: in_progress` before substantial work.
 6. **Deep review.** Trace callers, data flow, tests, lifecycle, and constraints in `AGENTS.md` and
@@ -43,8 +49,10 @@ dupes`, `pnpm exec fallow dead-code`). Record notable deltas in the queue. Do no
 9. **PR lifecycle.** Open a focused PR (`docs/code-health` changes ride along in the same PR so
    ledger and code stay atomic). Monitor CI and automated reviewers, fix legitimate findings, and
    resolve threads only after the concern is addressed.
-10. **Hand off.** Update `audit-plan.yaml` with final status, PR number, `last_reviewed_commit`,
-    metrics, findings, and any new queue items discovered. Stop; do not begin the next slice.
+10. **Hand off.** Update `audit-plan.yaml` with the current status, PR number,
+    `last_reviewed_commit` (the `origin/main` SHA the audit was performed against), `metrics_after`
+    measured on the stabilized branch, findings, and any new queue items discovered. Stop; do not
+    begin the next slice. The next run re-verifies `metrics_after` before marking `completed`.
 
 ## Scope rules
 

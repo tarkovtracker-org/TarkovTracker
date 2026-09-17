@@ -11,7 +11,8 @@
 #   last_reviewed_commit  origin/main SHA the audit was performed against (null until reviewed)
 #   findings_summary      concrete evidence / findings (why this is on the queue)
 #   metrics_before        relevant measurements at selection time
-#   metrics_after         relevant measurements after the slice landed (null until completed)
+#   metrics_after         measurements on the stabilized slice branch (recorded at PR open;
+#                         re-verified by the run that marks the item completed)
 #   pr                    PR number (null until opened)
 #   notes                 decisions, constraints, hand-off context for future agents
 #
@@ -47,7 +48,7 @@ queue:
     status: pr_open
     priority: P0
     dependencies: []
-    last_reviewed_commit: null
+    last_reviewed_commit: ade5cf11
     findings_summary: >-
       Two independent implementations of computeInvalidProgress (app + api-gateway worker):
       fallow dupes reports 4 clone groups / 106 duplicated lines between them. They have
@@ -77,8 +78,7 @@ queue:
       includes `failed` are no longer reported invalid when the prerequisite failed. Dead `childOnly`
       parameter removed. The existing `alternatives` cascade is preserved unchanged (see CH-028).
       Regression test: workers/api-gateway/src/__tests__/transform.test.ts (verified to fail against
-      the old worker copy). Local coverage include now lists shared/**/*.ts so the moved module stays
-      in the denominator. Validation run: shared + consumer vitest (72 files / 1257 tests), full
+      the old worker copy). Local coverage scope left unchanged (see CH-049). Validation run: shared + consumer vitest (72 files / 1257 tests), full
       api-gateway suite (190), lint, format:check, typecheck, worker typecheck + types:check +
       wrangler dry-run, lint:fallow, systems:check, CI-mode build, git diff --check.
       HAND-OFF (2026-09-17): PR #876 open, ready for review. On 567198bf the required `CI Result`
@@ -798,3 +798,22 @@ queue:
     metrics_after: null
     pr: null
     notes: Expected outcome is likely "no action"; record and close.
+  - id: CH-049
+    area: Coverage contract for shared/ runtime code
+    paths: [vitest.config.ts, docs/testing-coverage.md, shared/utils/]
+    status: queued
+    priority: P3
+    dependencies: [CH-001]
+    last_reviewed_commit: null
+    findings_summary: >-
+      Local unsharded coverage includes only app/**/*.{ts,vue} (documented denominator in
+      docs/testing-coverage.md), so runtime code under shared/ (userMetadata.ts,
+      progressInvalidation.ts) is measured only via CI shards/Codecov. Widening the include was
+      raised and reverted in PR #876 review because it changes the documented denominator.
+    metrics_before: { shared_runtime_modules_outside_local_denominator: 2 }
+    metrics_after: null
+    pr: null
+    notes: >-
+      Decide the contract explicitly: add shared/**/*.ts (+ exclude shared/**/__tests__/**) to the
+      local include and update docs/testing-coverage.md baseline in the same change, or document
+      why shared/ stays CI-only.
