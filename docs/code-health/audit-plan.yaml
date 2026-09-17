@@ -115,6 +115,8 @@ queue:
         fallow_new_only_gate: pass
         systems_check: pass
       ledger_branch: duo/docs/ch-001-post-merge-ledger
+      ledger_pr: 878
+      ledger_url: https://github.com/tarkovtracker-org/TarkovTracker/pull/878
       ledger_status: awaiting_pr_checks_and_merge
     notes: >-
       CURRENT HANDOFF (2026-09-17): implementation #876 is merged and its post-merge CI,
