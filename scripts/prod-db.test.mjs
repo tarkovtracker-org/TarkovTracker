@@ -94,16 +94,22 @@ chmodSync(fakeSupabase, 0o755);
 afterAll(() => {
   rmSync(directory, { recursive: true, force: true });
 });
+function testEnvironment(extraEnv = {}) {
+  const inherited = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith('PROD_DB_'))
+  );
+  return {
+    ...inherited,
+    PROD_DB_ENV_FILE: emptyEnvFile,
+    PROD_DB_SUPABASE_BIN: fakeSupabase,
+    PROD_DB_TARGET: 'local',
+    ...extraEnv,
+  };
+}
 function run(args, extraEnv = {}, executable = script) {
   return execFileSync(executable, args, {
     cwd: root,
-    env: {
-      ...process.env,
-      PROD_DB_ENV_FILE: emptyEnvFile,
-      PROD_DB_SUPABASE_BIN: fakeSupabase,
-      PROD_DB_TARGET: 'local',
-      ...extraEnv,
-    },
+    env: testEnvironment(extraEnv),
     encoding: 'utf8',
   });
 }
@@ -326,12 +332,7 @@ describe('prod-db canary', () => {
             process.execPath,
             [join(isolated, 'scripts/prod-db.mjs'), 'migration-history'],
             {
-              env: {
-                ...process.env,
-                PROD_DB_SUPABASE_BIN: fakeSupabase,
-                PROD_DB_TARGET: 'local',
-                FAKE_SUPABASE_REMOTE_VERSIONS: '20260101000000',
-              },
+              env: testEnvironment({ FAKE_SUPABASE_REMOTE_VERSIONS: '20260101000000' }),
               encoding: 'utf8',
             }
           )

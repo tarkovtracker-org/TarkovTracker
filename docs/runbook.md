@@ -662,8 +662,10 @@ mode-`0600`, gitignored repository-root `.env` alongside the other local develop
 password does not enter shell history. `scripts/prod-db` loads only `PROD_DB_*` keys from `.env`;
 unrelated file keys are ignored. Already-exported environment variables take precedence and remain
 inherited by the observer child process, apart from the credential variables stripped by the wrapper.
-Keep the invoking environment free of privileged credentials. `PROD_DB_ENV_FILE` selects a different
-file and fails if that file cannot be read; an absent default `.env` is allowed. Values are literal:
+Keep the invoking environment free of privileged credentials. Export `PROD_DB_ENV_FILE` in the
+invoking shell to select a different file (for example, `export PROD_DB_ENV_FILE=/path/to/observer.env`);
+setting this selector inside `.env` is unsupported. The command fails if the selected file cannot be
+read; an absent default `.env` is allowed. Values are literal:
 no shell or variable expansion occurs. Use absolute certificate paths in `sslrootcert`, not `$HOME`
 or `${HOME}`. An inline environment
 assignment remains supported for non-interactive automation whose secret store masks command input.
