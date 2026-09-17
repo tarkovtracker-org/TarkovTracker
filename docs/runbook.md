@@ -651,17 +651,23 @@ and redacts the password from command failures.
 
 ```bash
 PROD_DB_TARGET=local scripts/prod-db health
-chmod 600 .prod-db.env
-set -a
-. ./.prod-db.env
-set +a
+chmod 600 "${PROD_DB_ENV_FILE:-.env}"
 scripts/prod-db canary
 scripts/prod-db table-stats
 scripts/prod-db preflight --migration supabase/migrations/20260807_example.sql
 ```
 
 Store `PROD_DB_URL=postgresql://pi_prod_observer:...@...:5432/postgres?sslmode=verify-full` in the
-mode-`0600` `.prod-db.env` file so the password does not enter shell history. An inline environment
+mode-`0600`, gitignored repository-root `.env` alongside the other local development secrets, so the
+password does not enter shell history. `scripts/prod-db` loads only `PROD_DB_*` keys from `.env`;
+unrelated file keys are ignored. Already-exported environment variables take precedence and remain
+inherited by the observer child process, apart from the credential variables stripped by the wrapper.
+Keep the invoking environment free of privileged credentials. Export `PROD_DB_ENV_FILE` in the
+invoking shell to select a different file (for example, `export PROD_DB_ENV_FILE=/path/to/observer.env`);
+setting this selector inside `.env` is unsupported. The command fails if the selected file cannot be
+read; an absent default `.env` is allowed. Values are literal:
+no shell or variable expansion occurs. Use absolute certificate paths in `sslrootcert`, not `$HOME`
+or `${HOME}`. An inline environment
 assignment remains supported for non-interactive automation whose secret store masks command input.
 
 Available reports include `health`, `schema`, `migration-history`, `db-stats`, `table-stats`,
