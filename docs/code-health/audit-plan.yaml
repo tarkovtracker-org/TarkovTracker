@@ -44,7 +44,7 @@ queue:
       - app/utils/progressInvalidation.ts
       - workers/api-gateway/src/utils/invalidation.ts
       - workers/api-gateway/src/utils/transform.ts
-    status: in_progress
+    status: pr_open
     priority: P0
     dependencies: []
     last_reviewed_commit: null
@@ -69,7 +69,7 @@ queue:
       note: >-
         old copies reported invalidateTaskRecursive at CRAP 132 (app) / 31.6 (worker); the shared
         function has no Fallow complexity finding. Repo duplicate clone groups 7 -> 3.
-    pr: null
+    pr: 876
     notes: >-
       Consolidated into shared/utils/progressInvalidation.ts typed against a minimal structural task
       shape (InvalidationTask); both copies deleted; worker adopts the app's (correct) behavior —
