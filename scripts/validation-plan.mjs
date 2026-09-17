@@ -124,9 +124,22 @@ function jobOutcomeError(plan, needs, job) {
   const result = needs[job]?.result;
   return result === expected ? null : `${job}: expected ${expected}, received ${String(result)}`;
 }
+// The trusted default-branch aggregator must not silently ignore validation jobs it does not know;
+// an unexpected dependency fails closed until the trusted contract is updated first.
+function unexpectedJobsError(needs) {
+  const unexpected = Object.keys(needs).filter(
+    (job) => job !== 'changes' && !fullJobs.includes(job)
+  );
+  return unexpected.length ? `Unexpected CI jobs: ${unexpected.join(', ')}` : null;
+}
+function classifierError(needs) {
+  return needs.changes?.result === 'success' ? null : 'Classifier did not succeed';
+}
 export function aggregateResults(plan, needs) {
   if (!isValidPlan(plan)) return ['Missing or invalid validation plan'];
-  const errors = fullJobs.map((job) => jobOutcomeError(plan, needs, job)).filter(Boolean);
-  if (needs.changes?.result !== 'success') errors.push('Classifier did not succeed');
-  return errors;
+  return [
+    ...fullJobs.map((job) => jobOutcomeError(plan, needs, job)),
+    classifierError(needs),
+    unexpectedJobsError(needs),
+  ].filter(Boolean);
 }
