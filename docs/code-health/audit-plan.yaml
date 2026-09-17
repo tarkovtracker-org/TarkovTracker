@@ -93,14 +93,16 @@ queue:
     post_merge_verification:
       date: '2026-09-17'
       implementation_merge: 0daf56cc6d84bdfa121efc52bf528ae58f68abcf
-      current_main: a62ba5a33b72222eadc89a5537117d56ab05ea44
+      current_main: 8a37e1b407b25da1d4c2b5cdc61c47e8d411504c
       audited_paths_changed_since_merge: false
       implementation_checks: { successful_check_runs: 22, successful_status_contexts: 2 }
       current_main_checks: { successful_check_runs: 20, successful_status_contexts: 2 }
       implementation_ci: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35175683566
       implementation_security: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35175683473
       release: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35175897242
-      current_main_ci: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35181125592
+      current_main_ci: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35189385311
+      current_main_security: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35189385365
+      current_main_release: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35189622270
       review_threads: { inspected: 12, unresolved: 0 }
       local_reverification:
         shared_tests: 21
@@ -126,10 +128,18 @@ queue:
       ledger_main_ci: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35181125592
       ledger_main_security: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35181125490
       ledger_main_release: https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35181328497
+      ledger_main_checks_reread: '2026-09-17T06:26Z'
+      ledger_main_checks:
+        { ci: success, security: success, release: success, check_runs: 20, status_contexts: 2 }
     notes: >-
       CURRENT HANDOFF (2026-09-17, completion repair): implementation #876 and ledger #878
-      are merged. Re-verified current main a62ba5a3 (also the #878 merge): all 20 check runs
-      and both status contexts succeeded, including CI, Security, release, Pages and Supabase.
+      are merged. The #878 merge checks on a62ba5a3 that the historical ledger-merge handoff
+      below recorded as queued/in-progress/UNVERIFIED (CI 35181125592, Security 35181125490,
+      Release 35181328497) were re-read after completion at 2026-09-17T06:26Z: each concluded
+      success, and all 20 check runs plus both status contexts on a62ba5a3 succeeded. Current
+      main 8a37e1b4 (the #875 merge) was verified separately: 20/20 check runs and both status
+      contexts succeeded (CI 35189385311, Security 35189385365, Release 35189622270). These are
+      revision-specific check observations, not a live production smoke test.
       None of the 9 audited paths changed from implementation merge 0daf56cc to current main.
       Existing metrics_after and local_reverification measurements are preserved historical
       evidence, not new measurements from this documentation-only repair. pr and
