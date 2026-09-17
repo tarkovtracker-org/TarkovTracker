@@ -263,6 +263,9 @@ Automation confirms each accepted dispatch creates a new CI run on the requested
 60 seconds, including queued runs, before waiting for exact-SHA checks. Dispatched Fallow audits
 compare the checked-out commit with its parent, so dispatching main does not compare main with itself.
 
+The dispatched CI status-reporting invariant and trusted-code boundary are defined in
+[SYSTEMS.md §14](SYSTEMS.md#14-release-validation-and-publication).
+
 After rechecking main and the policy, an ordinary non-forced push promotes the identical SHA to
 main using `GITHUB_TOKEN`. A concurrent main advance rejects promotion rather than rebasing
 unvalidated assets. The required check is already successful on that commit. The token suppresses
