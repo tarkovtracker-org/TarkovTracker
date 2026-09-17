@@ -35,9 +35,11 @@ Set these in Supabase Dashboard → Project Settings → Edge Functions:
 - `STRIPE_PRICE_CHAD_MONTHLY`, `STRIPE_PRICE_CHAD_6MONTH`, `STRIPE_PRICE_CHAD_YEARLY`; the
   webhook uses these IDs as the source of truth when a customer changes plans in Stripe's portal.
 - `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_URL` (auto-injected in hosted Supabase)
-- `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_SUPPORTER_ROLE_ID` for role sync
-  (per-tier role IDs `DISCORD_SCAV_ROLE_ID` / `DISCORD_TIMMY_ROLE_ID` / `DISCORD_CHAD_ROLE_ID`
-  are optional)
+- `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_SUPPORTER_ROLE_ID` for role sync. The
+  per-tier role IDs `DISCORD_SCAV_ROLE_ID` / `DISCORD_TIMMY_ROLE_ID` / `DISCORD_CHAD_ROLE_ID` are
+  optional for local and preview deployments (role sync skips the tier role when one is unset), but
+  production must set all three because the supporter page and Terms advertise tier roles for
+  recurring supporter subscriptions as a live perk (no "coming soon" qualifier).
 - `DISCORD_LINKED_ROLE_ID` for the role applied after a user links Discord from Settings.
 - `APP_URL` for `admin-cache-purge` cache-key construction.
 

@@ -284,8 +284,8 @@
       t('page.supporter.perk_badge'),
       t('page.supporter.perk_discord'),
       t('page.supporter.perk_tier_role', { tier: t(`page.supporter.tier_${props.tier.id}_name`) }),
-      t('page.supporter.perk_api_rate_limit', 'Higher API rate limits'),
-      t('page.supporter.perk_data_retention', 'Extended inactive account retention'),
+      t('page.supporter.perk_api_rate_limit'),
+      t('page.supporter.perk_data_retention'),
       t('page.supporter.perk_early_access'),
     ];
     if (props.tier.id === 'timmy' || props.tier.id === 'chad') {
