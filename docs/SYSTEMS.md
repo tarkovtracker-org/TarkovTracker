@@ -1301,7 +1301,14 @@ flowchart LR
    `pending_remotely` (in the checkout, not applied). It makes remote/local migration divergence
    observable without migration or Management API credentials.
 9. Production credentials are supplied only through `PROD_DB_URL`, which must identify a dedicated
-   observer role. The wrapper removes its password before invoking the Supabase CLI and supplies
+   observer role. The wrapper reads only `PROD_DB_*` keys from the repository-root `.env` when they
+   are not already exported; explicit environment variables take precedence and other keys in that
+   file are ignored. Values remain literal, including passwords; certificate paths must be absolute.
+   `PROD_DB_ENV_FILE`, exported by the invoking shell, overrides the file path; setting it inside
+   `.env` is unsupported. An explicitly selected file must be readable; an absent
+   default `.env` is allowed. Other exported variables remain inherited, so callers must keep
+   privileged credentials out of the invoking environment. The wrapper removes its password before
+   invoking the Supabase CLI and supplies
    the password through a mode-`0600` temporary `PGPASSFILE`, keeping it out of child-process
    arguments and command errors. The credential file is removed after each CLI invocation.
    The role's actual database privileges are the hard safety boundary; connection defaults such as

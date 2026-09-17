@@ -1,3 +1,10 @@
+## [1.80.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.80.1...v1.80.2) (2026-09-17)
+
+
+### Bug Fixes
+
+* **config:** load production observer environment safely ([#880](https://github.com/tarkovtracker-org/TarkovTracker/issues/880)) ([b667f16](https://github.com/tarkovtracker-org/TarkovTracker/commit/b667f1692ec8da029873d68b4c2a110782b510af))
+
 ## [1.80.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.80.0...v1.80.1) (2026-09-17)
 
 
