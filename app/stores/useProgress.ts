@@ -1,3 +1,4 @@
+import { computeInvalidProgress } from '@shared/utils/progressInvalidation';
 import { defineStore } from 'pinia';
 import { registerProgressMetadataHooks } from '@/stores/tarkov/metadataStoreBridge';
 import {
@@ -12,7 +13,6 @@ import { useTeammateStores, useTeamStore } from '@/stores/useTeamStore';
 import { GAME_MODES, SPECIAL_STATIONS, TASK_STATE, type TaskState } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { perfEnd, perfStart } from '@/utils/perf';
-import { computeInvalidProgress } from '@/utils/progressInvalidation';
 import { createDefaultOwnedProgressData } from '@/utils/progressSanitizers';
 import {
   getCompletionFlags,

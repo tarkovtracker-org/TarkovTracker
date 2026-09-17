@@ -1,5 +1,5 @@
+import { computeInvalidProgress } from '@shared/utils/progressInvalidation';
 import { isTaskAvailableForEdition as checkTaskEdition } from '@/utils/editionHelpers';
-import { computeInvalidProgress } from '@/utils/progressInvalidation';
 import { getCompletionFlags, type RawTaskCompletion } from '@/utils/taskStatus';
 import type { GameEdition, NeededItemTaskObjective, Task } from '@/types/tarkov';
 type TaskObjectiveProgress = {
