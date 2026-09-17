@@ -45,12 +45,21 @@ queue:
       - app/utils/progressInvalidation.ts
       - workers/api-gateway/src/utils/invalidation.ts
       - workers/api-gateway/src/utils/transform.ts
+      - app/stores/useProgress.ts
+      - app/features/profile/ProfileProgression.vue
+      - app/server/utils/streamerKappa.ts
+      - shared/utils/__tests__/progressInvalidation.test.ts
+      - workers/api-gateway/src/__tests__/transform.test.ts
     status: pr_open
     priority: P0
     dependencies: []
-    last_reviewed_commit: ade5cf11
+    last_reviewed_commit: ade5cf112ef5a23a604fd5f3cd01575ad727e70f
     findings_summary: >-
-      Two independent implementations of computeInvalidProgress (app + api-gateway worker):
+      Review follow-up confirmed terminal tasks could be marked invalid: the recursive entry point
+      protected only successful completions, while faction invalidation bypassed that guard entirely.
+      The shared marker now protects completed/failed tasks and objectives across all entry points
+      without stopping propagation from failed tasks to strict dependents.
+      Original finding: two independent implementations of computeInvalidProgress (app + api-gateway worker):
       fallow dupes reports 4 clone groups / 106 duplicated lines between them. They have
       DIVERGED: commit 3787dc65 ("honor failed prereqs in invalidation") added acceptsFailedStatus
       handling only to the app copy, so the public /progress API still marks tasks invalid when a
@@ -67,6 +76,16 @@ queue:
       clone_groups: 0
       implementations: 1
       fallow_audit_new_only_gate: pass
+      reviewed_implementation_commit: e34815fd
+      shared_unit_tests: 21
+      worker_transform_tests: 5
+      full_suite_tests: 3908
+      api_gateway_suite_tests: 193
+      introduced_complexity_findings: 0
+      introduced_dead_code_findings: 0
+      introduced_duplication_findings: 0
+      repository_duplicate_clone_groups: 3
+      repository_duplicated_lines: 93
       note: >-
         old copies reported invalidateTaskRecursive at CRAP 132 (app) / 31.6 (worker); the shared
         function has no Fallow complexity finding. Repo duplicate clone groups 7 -> 3.
@@ -81,14 +100,41 @@ queue:
       the old worker copy). Local coverage scope left unchanged (see CH-049). Validation run: shared + consumer vitest (72 files / 1257 tests), full
       api-gateway suite (190), lint, format:check, typecheck, worker typecheck + types:check +
       wrangler dry-run, lint:fallow, systems:check, CI-mode build, git diff --check.
-      HAND-OFF (2026-09-17): PR #876 open, ready for review. On 567198bf the required `CI Result`
-      check passed, Codex review completed with no findings, Codecov patch 100%, Cloudflare Pages
-      preview deployed after one retry (first attempt failed inside Cloudflare's build image:
-      `node-build: definition not found: 24.19.0` — infra, not code). SonarCloud quality gate
-      failed on 7.9% duplicated new code in the shared test fixtures; fixed in 31e652fc with a
-      fixture builder. NEXT RUN: confirm `CI Result`, SonarCloud, CodeRabbit and cubic are green on
-      the head commit, address any actionable review threads, squash-merge #876, verify `main`
-      CI, then set status=completed, last_reviewed_commit=<merge sha>.
+      REVIEW HAND-OFF (2026-09-17): resumed PR #876 from 2bdd0e4161823e25aa96a48db9b801641eb6e50e
+      in the clean dedicated .wt/code-health worktree; unrelated root worktree changes untouched.
+      Fetched origin/main at ade5cf112ef5a23a604fd5f3cd01575ad727e70f; it is already an ancestor.
+      Fix commit e34815fd centralizes terminal-state protection for completed, failed, and legacy
+      dual-flag tasks/objectives across faction, prerequisite, and alternative entry points.
+      Completed tasks still stop propagation; failed tasks still block strict dependents; tolerant
+      dependents remain reachable. This intentionally changes invalid flags in both app and API,
+      not the recorded completion/failure state. docs/SYSTEMS.md documents the invariant.
+      Negative reproduction: 10 shared cases and 3 transform cases fail before the guard; afterward
+      all 21 shared and 5 transform cases pass, including cycles and empty catalogs. Original focused
+      shared suite had 7 cases; worker transform suite had 2. Full pnpm run test passed 332 files /
+      3908 tests; pnpm run test:api-gateway --run passed 12 files / 193 tests. Also passed lint,
+      typecheck, format:check, systems:check, worker typecheck, types:check, wrangler dry-run,
+      CI=true NODE_ENV=production pnpm run build, and git diff --check. All observed this run.
+      pnpm run lint:fallow --base origin/main --format json passed with 0 introduced complexity,
+      dead-code, or duplication findings (33 inherited complexity findings in consumer files remain
+      outside this slice). Shared algorithm has no complexity finding; pnpm exec fallow dupes
+      --format json confirms 3 repository clone groups / 93 duplicated lines, none in this slice.
+      The first Fallow invocation incorrectly inserted an extra --; the documented command above
+      was corrected and rerun successfully. A post-build pre-commit attempt lacked generated Nuxt
+      ESLint context; NODE_ENV=development pnpm exec nuxt prepare restored it, then the unmodified
+      hooks passed on commit. No hooks or gates were bypassed.
+      README now requires baseline and final measurements and defines the post-merge ledger-only
+      completion PR. metrics_after is measured evidence, not a completion claim. The existing
+      metrics-contract review concern is addressed by that explicit distinction; no measurements
+      were discarded. Legacy alternatives and coverage-denominator decisions remain CH-028/CH-049.
+      Previous-head CI Result and existing Codex review were successful on 2bdd0e41 (CI run
+      https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35172283793); these do NOT
+      validate e34815fd. No merge until final-head CI, preview, and review gates are satisfied.
+      PR: https://github.com/tarkovtracker-org/TarkovTracker/pull/876
+      NEXT RUN: inspect final-head checks and review threads on #876, handle any actionable new
+      feedback, then squash-merge only without bypass once green. Verify post-merge main checks in
+      a later ledger-only run and record the merge SHA before marking CH-001 completed. Finish the
+      completion-ledger PR before selecting CH-002 (highest queued P1; split its oversized loading
+      responsibility into bounded dependent slices at selection). No new audit slice started here.
   - id: CH-002
     area: Tarkov store data loading (useTarkov.loadData)
     paths: [app/stores/useTarkov.ts]
