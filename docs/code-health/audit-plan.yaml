@@ -864,3 +864,36 @@ queue:
       Decide the contract explicitly: add shared/**/*.ts (+ exclude shared/**/__tests__/**) to the
       local include and update docs/testing-coverage.md baseline in the same change, or document
       why shared/ stays CI-only.
+  - id: CH-050
+    area: Objective-level invalidation semantics in the public /progress API
+    paths:
+      [
+        shared/utils/progressInvalidation.ts,
+        workers/api-gateway/src/utils/transform.ts,
+        workers/api-gateway/src/openapi.ts,
+        app/stores/useProgress.ts,
+        docs/API.md,
+      ]
+    status: queued
+    priority: P2
+    dependencies: [CH-001]
+    last_reviewed_commit: null
+    findings_summary: >-
+      Raised by CodeRabbit on PR #876 (shared/utils/progressInvalidation.ts markInvalid): the helper
+      receives only task completions, so every objective of an invalid non-terminal task is marked
+      invalid even when that objective is recorded complete. transformProgress therefore can emit
+      `{ complete: true, invalid: true }` for an objective. Pre-existing in BOTH pre-consolidation
+      copies (neither read objective state); the Nuxt app never consumes invalidObjectives, so only
+      the public API surface is affected. Probe: task T (objectives TObj1, TObj2) requiring P
+      complete, P failed -> invalidObjectives == { TObj1: true, TObj2: true } regardless of objective
+      completion input (none exists).
+    metrics_before: null
+    metrics_after: null
+    pr: null
+    notes: >-
+      This is a contract decision, not a regression: decide whether objective `invalid` means
+      "belongs to an unreachable task" (current; keep and document in openapi.ts + docs/API.md) or
+      "cannot be completed" (then add objective completion state to InvalidationInput, skip
+      completed objectives in markInvalid, thread taskObjectives through transformProgress and
+      useProgress.invalidProgressByTeam, add a regression case, and document the intentional public
+      API behavior change). Either way update docs/SYSTEMS.md invariants for the shared helper.
