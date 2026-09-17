@@ -127,15 +127,29 @@ queue:
       completion PR. metrics_after is measured evidence, not a completion claim. The existing
       metrics-contract review concern is addressed by that explicit distinction; no measurements
       were discarded. Legacy alternatives and coverage-denominator decisions remain CH-028/CH-049.
-      Previous-head CI Result and existing Codex review were successful on 2bdd0e41 (CI run
-      https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35172283793); these do NOT
-      validate e34815fd. No merge until final-head CI, preview, and review gates are satisfied.
+      REVIEW HAND-OFF 2 (2026-09-17, later run): resumed #876 at dbfbef35 with 2 unresolved cubic
+      threads. (1) Faction test expectation: verified the suggestion was wrong — in the faction case
+      `terminal` is also failed, so `strict` is unreachable through the failed-prerequisite pass,
+      independent of faction; faction never cascades (separate test covers it). Added an explanatory
+      comment (b212d7f6), no assertion changed. (2) 190 vs 193 api-gateway count reconciled
+      (b212d7f6). CodeRabbit then raised objective-level invalidation (completed objectives on an
+      unreachable task emitted `{ complete: true, invalid: true }`): verified real but pre-existing
+      in both old copies and unread by the app; queued as CH-050 rather than expanding this slice
+      (c1a30320, paths widened in d37cee53 after a cubic thread). All threads resolved with
+      evidence replies. CI Result SUCCESS on b212d7f6
+      (https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35174320499) and c1a30320
+      (https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35174942408); both contain
+      the full implementation (e34815fd). Final head d37cee53 (ledger-only diff) run
+      https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/35175172516 was in progress
+      at hand-off. Merge authorization: repo admin, squash allowed, ruleset requires `CI Result`
+      (strict); auto-merge disabled.
       PR: https://github.com/tarkovtracker-org/TarkovTracker/pull/876
-      NEXT RUN: inspect final-head checks and review threads on #876, handle any actionable new
-      feedback, then squash-merge only without bypass once green. Verify post-merge main checks in
-      a later ledger-only run and record the merge SHA before marking CH-001 completed. Finish the
-      completion-ledger PR before selecting CH-002 (highest queued P1; split its oversized loading
-      responsibility into bounded dependent slices at selection). No new audit slice started here.
+      NEXT RUN: confirm `CI Result` SUCCESS on the final head of #876 and 0 unresolved threads,
+      then `gh pr merge 876 --squash` (no bypass). Then follow the README post-merge ledger
+      transition: verify main checks at the merge SHA, re-verify metrics_after, and open the
+      ledger-only completion PR marking CH-001 completed. Only after that select the next slice
+      (CH-002 is the highest queued P1; split its loading responsibility into bounded dependent
+      slices at selection).
   - id: CH-002
     area: Tarkov store data loading (useTarkov.loadData)
     paths: [app/stores/useTarkov.ts]
