@@ -145,9 +145,10 @@ jobs:
             *) echo "::error::Refusing to deploy branch '$PREVIEW_BRANCH'."; exit 1 ;;
           esac
           [ "$PREVIEW_BRANCH" != "main" ]
-          # Trusted explicit configuration from the default branch, never the candidate's.
+          # Trusted explicit configuration from the default branch, never the candidate's: the
+          # deploy job checks out the default branch into the workspace and Wrangler discovers
+          # the repo-root wrangler.toml from there (Pages commands reject explicit config paths).
           pnpm exec wrangler pages deploy "$RUNNER_TEMP/preview-dist" \
-            --config wrangler.toml \
             --project-name tarkovtracker \
             --branch "$PREVIEW_BRANCH" \
             --commit-hash "$HEAD_SHA" \
