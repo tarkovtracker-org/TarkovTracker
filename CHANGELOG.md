@@ -1,3 +1,20 @@
+# [1.81.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.80.2...v1.81.0) (2026-09-21)
+
+
+### Bug Fixes
+
+* **release:** bind recovery preview evidence to the controller run behind the status ([b2ad626](https://github.com/tarkovtracker-org/TarkovTracker/commit/b2ad626da4c20ed6d774c4ac09f9cd98bb40001b))
+* **preview:** bind staged-gate evidence to run-owned deployment artifacts ([3445986](https://github.com/tarkovtracker-org/TarkovTracker/commit/3445986b3865ff109e822881dfe8afe5d989b606))
+* **preview:** read the run tree from head_commit.tree_id ([1ef4c0d](https://github.com/tarkovtracker-org/TarkovTracker/commit/1ef4c0db9d249dd5cbdfda7ec46a9417718b8faf))
+* **ci:** stop echoing external deployment evidence into job logs ([8c2ecbd](https://github.com/tarkovtracker-org/TarkovTracker/commit/8c2ecbd7e452840a1a29f155696cba1c1978a89e))
+* **preview:** verify dispatch-identity and tree claims; validate preview-required plans ([9c14255](https://github.com/tarkovtracker-org/TarkovTracker/commit/9c14255bfd2a4ba0e909bc52d5851c9f08e02c30))
+* **release:** verify the controller result job behind recovery preview evidence ([8d8333a](https://github.com/tarkovtracker-org/TarkovTracker/commit/8d8333a053fd175b5af170596d52d56259fef9a9)), closes [#890](https://github.com/tarkovtracker-org/TarkovTracker/issues/890)
+
+
+### Features
+
+* **ci:** replace Cloudflare Git previews with an Actions-owned trusted controller ([44a3f0a](https://github.com/tarkovtracker-org/TarkovTracker/commit/44a3f0af3cdd272fc8509895558fe2b6ff0a848d))
+
 ## [1.80.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.80.1...v1.80.2) (2026-09-17)
 
 
