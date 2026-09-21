@@ -38,7 +38,11 @@ function assertTrustedBoundary(workflow) {
   assert.match(upload, /--branch "\$PREVIEW_BRANCH"/);
   assert.match(upload, /preview-\*\) ;;/);
   assert.match(upload, /\[ "\$PREVIEW_BRANCH" != "main" \]/);
-  assert.match(upload, /CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_API_TOKEN \}\}/);
+  assert.match(
+    upload,
+    /CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_PAGES_API_TOKEN \|\| secrets\.CLOUDFLARE_API_TOKEN \}\}/
+  );
+  // The Pages-scoped token must win when present; the legacy Workers token is only a fallback.
   assert.doesNotMatch(upload, /pnpm run|node scripts\/preview\/build/);
   // Smoke tests run without Cloudflare credentials, against the unique deployment URL.
   const smoke = jobBlock(workflow, 'smoke');
