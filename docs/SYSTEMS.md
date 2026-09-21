@@ -1666,7 +1666,12 @@ The checkout stays pinned to the validated SHA. The production build still runs 
   `CI Result`, strict freshness, and no bypass actors. Non-fast-forward promotion fails if main advances.
 - If publication fails after version promotion, an explicit rerun can recover only the direct
   version-only child of the original CI revision, with successful exact-head `CI Result` **and**
-  `Preview Result` and unchanged manifest/changelog history. Recovery creates missing tags/releases
+  `Preview Result` and unchanged manifest/changelog history. The `Preview Result` evidence is
+  authenticated, not merely present: the newest status on the SHA must be a success reported on
+  that exact SHA and its `target_url` must resolve to a run of `.github/workflows/preview.yml`
+  whose `Publish preview result` job concluded successfully, proving a candidate was planned,
+  deployed, smoke-tested, and authoritatively reported (never an `ignore` no-op run).
+  Recovery creates missing tags/releases
   idempotently, rejects tag conflicts, and never advances main or bumps another version.
 - The staging push uses `GITHUB_TOKEN` and explicitly dispatches CI; main promotion uses it to
   avoid recursive Actions runs. Version commits have no skip marker; Cloudflare still rebuilds.
@@ -2127,7 +2132,10 @@ digest, uploads the verified output with pinned Wrangler to the existing `tarkov
 project's preview environment under a generated `preview-*` branch, verifies the deployment record
 (`scripts/preview/deployment.mjs`, `scripts/preview/verify-deployment.mjs`), runs the Playwright
 smoke suite (`scripts/preview/smoke/preview.smoke.mjs`) without Cloudflare credentials, and
-publishes the authoritative `Preview Result` commit status.
+publishes the authoritative `Preview Result` commit status. Downstream consumers (the release
+gate and interrupted-release recovery) must not trust the status in isolation: commit statuses
+are forgeable by write collaborators, so the evidence binds to the controller run behind its
+`target_url` with a successful `Publish preview result` job on the exact SHA.
 
 ### Flow
 
