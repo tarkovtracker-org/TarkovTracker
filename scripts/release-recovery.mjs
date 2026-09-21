@@ -65,39 +65,61 @@ async function validatedCi(github, repo, sha) {
     .sort((left, right) => right.id - left.id)[0];
   return check?.status === 'completed' && check.conclusion === 'success';
 }
-/** The controller path only the trusted preview workflow may report from. */
+/** The controller path only the trusted preview workflow may report from (path may carry @ref). */
 const PREVIEW_CONTROLLER_PATH = '.github/workflows/preview.yml';
+/** The controller job that publishes authoritative `Preview Result` statuses. */
+const PREVIEW_RESULT_JOB = 'Publish preview result';
 /** Extract the controller run id from a `Preview Result` target; null when it points elsewhere. */
 function controllerRunId(status) {
   const match = /\/actions\/runs\/(\d+)(?:\?|$)/.exec(status.target_url ?? '');
   return match ? Number(match[1]) : null;
 }
-/** A run counts only when the completed preview controller succeeded on the exact SHA. */
-function controllerRunSuccess(run, sha) {
-  return (
-    run.path === PREVIEW_CONTROLLER_PATH && run.head_sha === sha && run.conclusion === 'success'
-  );
+/** The newest `Preview Result` on the SHA; later reports supersede earlier ones. */
+function newestPreviewStatus(statuses) {
+  return statuses
+    .filter((item) => item.context === 'Preview Result')
+    .sort((left, right) => right.id - left.id)[0];
+}
+/** The evidence is a success reported on the exact version SHA. */
+function previewSuccessOnSha(status, sha) {
+  return status.state === 'success' && status.sha === sha;
 }
 /** Fetch the run behind the status target; unresolvable runs fail closed like any other gate. */
-async function controllerRun(github, repo, sha, runId) {
+async function controllerRun(github, repo, runId) {
   if (!runId) return null;
   const run = await optionalResource(() =>
     github.rest.actions.getWorkflowRun({ ...repo, run_id: runId })
   );
-  return run && controllerRunSuccess(run, sha) ? run : null;
+  if (!run || run.path?.split('@')[0] !== PREVIEW_CONTROLLER_PATH) return null;
+  return run;
 }
-/** Require the newest `Preview Result` to bind to a successful controller run on the same SHA. */
+/** The controller must have finished its authoritative result publication for this evidence. */
+async function resultJobCompleted(github, repo, run) {
+  if (run.conclusion !== 'success') return false;
+  const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+    ...repo,
+    run_id: run.id,
+    per_page: 100,
+  });
+  const result = jobs.find((job) => job.name === PREVIEW_RESULT_JOB);
+  return result?.conclusion === 'success';
+}
+/**
+ * Require the newest `Preview Result` to bind to a successful controller result publication:
+ * the status must succeed on the exact SHA and point at a run of the trusted preview workflow
+ * whose result job completed successfully for a candidate (never an `ignore` no-op).
+ */
 async function validatedPreview(github, repo, sha) {
   const statuses = await github.paginate(github.rest.repos.listCommitStatusesForRef, {
     ...repo,
     ref: sha,
     per_page: 100,
   });
-  const status = statuses
-    .filter((item) => item.context === 'Preview Result')
-    .sort((left, right) => right.id - left.id)[0];
-  if (!status || status.state !== 'success' || status.head_sha !== sha) return false;
-  return Boolean(await controllerRun(github, repo, sha, controllerRunId(status)));
+  const status = newestPreviewStatus(statuses);
+  if (!status || !previewSuccessOnSha(status, sha)) return false;
+  const run = await controllerRun(github, repo, controllerRunId(status));
+  if (!run) return false;
+  return resultJobCompleted(github, repo, run);
 }
 /** Interrupted recovery requires both gates on the exact version commit, like staging did. */
 async function validatedVersion(github, repo, sha) {

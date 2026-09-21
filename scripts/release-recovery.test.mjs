@@ -31,30 +31,38 @@ function fixture() {
     conclusion: 'success',
   };
   const previewRun = {
-    path: '.github/workflows/preview.yml',
-    head_sha: sha,
+    id: 555,
+    path: '.github/workflows/preview.yml@main',
     conclusion: 'success',
   };
   const previewStatus = {
     id: 10,
     context: 'Preview Result',
     state: 'success',
-    head_sha: sha,
+    sha,
     target_url: 'https://github.com/owner/repo/actions/runs/555',
   };
+  const previewJobs = [{ id: 1, name: 'Publish preview result', conclusion: 'success' }];
   const missing = () => Promise.reject(Object.assign(new Error('Not found'), { status: 404 }));
   const rest = {
     checks: { listForRef: vi.fn() },
-    actions: { getWorkflowRun: vi.fn().mockResolvedValue({ data: previewRun }) },
+    actions: {
+      getWorkflowRun: vi.fn().mockResolvedValue({ data: previewRun }),
+      listJobsForWorkflowRun: vi.fn(),
+    },
     repos: {
       listCommitStatusesForRef: vi.fn(),
     },
   };
-  const evidence = { checks: [check], statuses: [previewStatus] };
+  const evidence = { checks: [check], statuses: [previewStatus], jobs: previewJobs };
   const github = {
     paginate: vi.fn((endpoint) =>
       Promise.resolve(
-        endpoint === rest.repos.listCommitStatusesForRef ? evidence.statuses : evidence.checks
+        endpoint === rest.repos.listCommitStatusesForRef
+          ? evidence.statuses
+          : endpoint === rest.actions.listJobsForWorkflowRun
+            ? evidence.jobs
+            : evidence.checks
       )
     ),
     rest: {
@@ -90,6 +98,7 @@ function fixture() {
     evidence,
     previewStatus,
     previewRun,
+    previewJobs,
     notes,
     recovery: { sha, version: '1.2.3', notes },
   };
@@ -189,8 +198,13 @@ describe('interrupted release recovery', () => {
       f.github.rest.repos.listCommitStatusesForRef,
       expect.objectContaining({ ref: f.sha })
     );
-    // The status alone is not trusted: recovery verifies the bound controller run.
+    // The status alone is not trusted: recovery verifies the bound controller run and that its
+    // authoritative result job (not just the workflow conclusion) published the evidence.
     expect(f.github.rest.actions.getWorkflowRun).toHaveBeenCalledWith(
+      expect.objectContaining({ run_id: 555 })
+    );
+    expect(f.github.paginate).toHaveBeenCalledWith(
+      f.github.rest.actions.listJobsForWorkflowRun,
       expect.objectContaining({ run_id: 555 })
     );
   });
@@ -199,7 +213,7 @@ describe('interrupted release recovery', () => {
     ['pending', (f) => (f.previewStatus.state = 'pending')],
     ['missing', (f) => (f.evidence.statuses = [])],
     ['other context', (f) => (f.previewStatus.context = 'CI Result')],
-    ['wrong sha', (f) => (f.previewStatus.head_sha = f.baseSha)],
+    ['wrong sha', (f) => (f.previewStatus.sha = f.baseSha)],
     ['foreign target', (f) => (f.previewStatus.target_url = 'https://evil.example/run/555')],
     ['non-run target', (f) => (f.previewStatus.target_url = 'https://github.com/owner/repo')],
     ['targetless', (f) => (f.previewStatus.target_url = null)],
@@ -215,9 +229,8 @@ describe('interrupted release recovery', () => {
     expect(await findReleaseRecovery(f)).toBeNull();
   });
   it.each([
-    ['other workflow', (f) => (f.previewRun.path = '.github/workflows/ci.yml')],
+    ['other workflow', (f) => (f.previewRun.path = '.github/workflows/ci.yml@main')],
     ['unsuccessful run', (f) => (f.previewRun.conclusion = 'failure')],
-    ['run for another head', (f) => (f.previewRun.head_sha = f.baseSha)],
     [
       'run missing',
       (f) =>
@@ -225,6 +238,9 @@ describe('interrupted release recovery', () => {
           Object.assign(new Error('Not found'), { status: 404 })
         ),
     ],
+    ['result job skipped', (f) => (f.previewJobs[0].conclusion = 'skipped')],
+    ['result job failed', (f) => (f.previewJobs[0].conclusion = 'failure')],
+    ['result job absent', (f) => (f.evidence.jobs = [])],
   ])('rejects %s behind the status', async (_name, mutate) => {
     const f = fixture();
     mutate(f);
@@ -336,6 +352,7 @@ describe('interrupted release recovery', () => {
     };
     f.context.payload = { workflow_run: run, repository: { id: 42 } };
     f.github.rest.actions = {
+      ...f.github.rest.actions,
       getWorkflowRun: vi.fn(({ run_id }) =>
         Promise.resolve({ data: run_id === 12 ? run : f.previewRun })
       ),
