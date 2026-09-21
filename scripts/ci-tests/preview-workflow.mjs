@@ -87,6 +87,9 @@ test('preview controller runs trusted code only and isolates credentials per job
     /if: always\(\) && needs\.plan\.outputs\.action != 'ignore'/
   );
   assert.match(jobBlock(workflow, 'result'), /publishControllerFailure/);
+  // A cancelled plan means this run was superseded by a newer run in the same concurrency
+  // group; the successor owns reporting, so no failure status may be published here.
+  assert.match(jobBlock(workflow, 'result'), /PLAN_RESULT === 'cancelled'/);
   assert.doesNotMatch(workflow, /name: Preview Result/);
 });
 test('tampering with the controller boundary is detected', () => {

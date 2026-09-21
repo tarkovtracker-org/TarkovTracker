@@ -238,6 +238,13 @@ jobs:
           script: |
             const { publishResult, publishControllerFailure } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/controller.mjs`);
             const decision = process.env.DECISION ? JSON.parse(process.env.DECISION) : null;
+            if (process.env.PLAN_RESULT === 'cancelled') {
+              // Superseded by a newer run in this preview's concurrency group: the successor
+              // owns reporting for this candidate, and the runner already marked this run
+              // cancelled — publishing would be a false failure on a superseded attempt.
+              core.notice('Preview run superseded by a newer run for the same candidate.');
+              return;
+            }
             if (process.env.PLAN_RESULT !== 'success' || !decision) {
               await publishControllerFailure({ github, context, core, decision });
               core.setFailed('Preview planning did not succeed.');
