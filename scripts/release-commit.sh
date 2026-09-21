@@ -28,7 +28,8 @@ remote="https://github.com/$GITHUB_REPOSITORY.git"
 git -c credential.helper= \
   -c 'credential.helper=!gh auth git-credential' push "$remote" "$release_sha:$staging_ref"
 dispatch_ci "${staging_ref#refs/heads/}"
-wait_for_ci_result "$release_sha"
+# The version commit is a deployable change; it needs a successful preview before promotion.
+wait_for_validated_head "$release_sha"
 require_main_revision "$base_sha"
 require_main_ci_policy
 # A non-fast-forward push rejects a concurrently advanced main; required checks cannot be bypassed.

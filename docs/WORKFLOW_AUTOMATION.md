@@ -49,17 +49,39 @@ Only substantial behavioral corrections or unresolved significant findings warra
 
 ### 1. CI Pipeline (`.github/workflows/ci.yml`)
 
-Runs on pushes to `main` and `wip/**`, PRs targeting `main`, and explicit CI dispatch, including
-translation-only PRs. All push and dispatched runs retain full validation.
+Runs on pushes to `main`, PRs targeting `main`, and explicit CI dispatch (release staging on
+`wip/release-*`, Crowdin on `locales`, and `main` revalidation), including translation-only PRs.
+All push and dispatched runs retain full validation. Ordinary `wip/**` push CI was removed;
+staging branches receive CI only through the explicit dispatch their automation performs.
 
 The lightweight `changes` job classifies the pull-request diff and selects jobs. **Path selection is
 active**: documentation-only and translation-only pull requests run the reduced set (formatting,
 i18n when locales change, systems drift); every other change set runs every job. The job also emits
 `workflows`, which enables workflow linting in `Lint & Format` for non-Markdown automation paths and
-unreadable diffs. `CI Result` evaluates the job outcomes against the plan and fails on missing
-classifier data, selected failures/cancellations, or unexpected skips. Systems drift runs
-independently on every CI run. Existing check names, Dependabot expectations, fork restrictions,
-security checks, and Codecov statuses remain unchanged; the aggregate does not replace external gates.
+unreadable diffs. The classifier additionally emits an independent `preview` decision (`previewRequired`): only
+known documentation-only change sets need no deployable preview; translations, configuration,
+dependencies, executable changes, and unknown or unreadable paths require one, so a
+translation-only PR keeps the reduced test selection but still runs `Validate`. `CI Result`
+evaluates the job outcomes against the plan and fails on missing
+classifier data, selected failures/cancellations, or unexpected skips. Systems drift and the
+integrated `Security` call (see §2) run on every CI run. Fork restrictions and Codecov statuses
+remain unchanged; Dependabot now waits for the aggregates (`CI Result`, `Preview Result`) rather
+than individual job names.
+
+#### Preview build artifact
+
+`Validate` builds the actual Cloudflare Pages output once. `scripts/preview/build-profile.mjs`
+chooses the profile before the single `pnpm run build` step: `main` pushes and `main` dispatches
+keep the production configuration; pull requests and non-main dispatches build the anonymous
+preview profile from `scripts/preview/profile.mjs` (explicit `APP_URL` on the controlled
+`preview-*` branch alias of `tarkovtrackernuxt.pages.dev`; empty Supabase, analytics, Turnstile,
+Stripe, and log-forwarding values). For preview builds, `scripts/preview/write-manifest.mjs`
+records `dist/preview-manifest.json` — repository, PR number, head SHA, base SHA, checked-out
+test-merge SHA, tree SHA, run id/attempt, build-profile version, and a content digest — and the
+job uploads `dist` as the `pages-preview` artifact with seven-day retention. Deployment never
+rebuilds and never reuses Lighthouse output. Missing or expired artifacts require a new CI run.
+Candidate builds receive no deployment credentials; the manifest is a set of claims that the
+trusted preview controller verifies (see §8).
 
 The shared setup action uses `.nvmrc`, the full `packageManager` pin, pnpm caching, and a frozen
 installation. Each caller owns checkout history and credential settings. `Lint & Format` runs lint
@@ -193,14 +215,22 @@ editing that function rather than as unrelated cleanup in someone else's change.
 
 ### 2. Security Scanning (`.github/workflows/security.yml`)
 
-Weekly security audits:
+Reusable security gate called by CI, plus the weekly standalone audit:
 
 **Jobs:**
 
-- `security-scan` - pnpm audit (prod and all deps), schedule-only informational outdated check, checksum-verified Gitleaks secret detection
-- `codeql` - CodeQL static analysis
+- `security-scan` - `pnpm audit --prod --audit-level=critical` (blocking), informational
+  all-dependency audit at `high` (a notice, never a failure), schedule-only outdated check,
+  checksum-verified Gitleaks secret detection (blocking)
+- `codeql` - CodeQL static analysis; the analysis must succeed, findings are triaged in code scanning
 
-**Triggers:** Push to main, all PRs, weekly (Sunday 00:00 UTC)
+**Triggers:** `workflow_call` from CI (pull requests, main pushes, explicit dispatches including
+Crowdin and release staging) and the weekly schedule (Sunday 00:00 UTC). The former push and
+pull_request triggers were removed so each revision is scanned once, inside the gated run.
+`CI Result` requires the call's success: scanner errors, cancellation, or a missing result fail the
+aggregate. The trusted aggregate contract (`scripts/validation-plan.mjs`) landed in a compatibility
+change first (an absent `security` job was tolerated, a reported non-success failed); the
+activation change made the job mandatory.
 
 ### 3. Release Automation (`.github/workflows/release.yml`)
 
@@ -255,9 +285,12 @@ request administrative permissions merely to inspect it.
 main-only release workflow. It stages only these generated assets and rejects unrelated staged
 files. `scripts/release-commit.sh` pushes the new commit to
 `wip/release-<version>-<run-id>-<attempt>` using the built-in `GITHUB_TOKEN`.
-An explicit `workflow_dispatch` starts full CI on that branch; the job has `actions: write`. The plugin waits up to thirty minutes
-for successful GitHub Actions `CI Result` on the exact version SHA; absent, failed, cancelled,
-skipped, or timed-out checks cannot promote it.
+An explicit `workflow_dispatch` starts full CI on that branch; the job has `actions: write`. The
+plugin waits up to sixty minutes for successful GitHub Actions `CI Result` on the exact version SHA
+and then up to sixty minutes for the authoritative `Preview Result` commit status on the same SHA
+(`wait_for_validated_head` in `scripts/github-ci-gate.sh`); the version commit is a deployable
+change and receives an Actions-owned preview before promotion. Absent, failed, cancelled, skipped,
+or timed-out gates cannot promote it. The Release job is bounded to 90 minutes.
 
 Automation confirms each accepted dispatch creates a new CI run on the requested branch within
 60 seconds, including queued runs, before waiting for exact-SHA checks. Dispatched Fallow audits
@@ -277,7 +310,7 @@ publication. No token is written to a Git URL or config.
 **Interrupted publication:** If tag pushing or GitHub publication fails after main promotion, rerun
 the original Release workflow. `release-recovery.mjs` is enabled only for reruns and recognizes
 only the direct version-commit child of the original successful main CI revision. It requires
-successful exact-SHA GitHub Actions `CI Result`, exactly the two generated modified assets, a
+successful exact-SHA GitHub Actions `CI Result` and `Preview Result`, exactly the two generated modified assets, a
 manifest whose only change is the matching version, and a changelog that preserves all previous
 content. It reconstructs the original notes and creates the missing tag/release idempotently.
 An existing tag must point to that same commit; an unrelated main successor, unsuccessful CI,
@@ -357,9 +390,11 @@ Merges known low-risk Dependabot PRs after the normal PR checks complete:
   updates stay manual
 - GitHub Actions updates may require a repository or organization Actions allowlist change for the
   new pinned SHA, which CI on the Dependabot branch cannot validate reliably
-- PR must stay on the validated head SHA and finish all check runs and the latest result for each
-  legacy status context without failures or pending results; the merge command also matches the
-  validated head commit to close the final race
+- PR must stay on the validated head SHA, the GitHub Actions `CI Result` and `PR Meta` check runs
+  must complete, the latest `Preview Result` status must be `success`, and no check run or latest
+  status context may fail or remain pending; the merge command also matches the validated head
+  commit to close the final race. Individual CI/security job names are no longer listed; the wait
+  is bounded to 60 minutes inside a 90-minute job
 
 ### 6. Stale Management (`.github/workflows/stale.yml`)
 
@@ -384,6 +419,110 @@ Validates external links in documentation:
 **Triggers:** PRs/pushes affecting markdown files, weekly (Sunday 00:00 UTC), manual dispatch
 
 **On failure:** Uploads report artifact with broken links
+
+### 8. Preview Controller (`.github/workflows/preview.yml`)
+
+GitHub Actions controls when pull-request previews deploy to the existing Cloudflare Pages project
+(`tarkovtracker`, `tarkovtrackernuxt.pages.dev`), and merging requires both `CI Result` and
+`Preview Result`. The design, result contract, and invariants are specified in
+[SYSTEMS.md §18](SYSTEMS.md#18-actions-owned-cloudflare-previews); this section covers operation.
+
+**Triggers:** `workflow_run` for CI (`requested`, `completed`), metadata-only
+`pull_request_target` events (`opened`, `synchronize`, `reopened`, `ready_for_review`,
+`converted_to_draft`, `closed`), and a maintainer `workflow_dispatch` rerun accepting a CI run id
+(from `main` only). Every job checks out the default branch; both privileged triggers are accepted
+in `.github/zizmor.yml` because the controller is the intended trusted boundary.
+
+**Jobs:** `Plan preview` resolves the candidate through the API, requires successful CI evidence,
+verifies the artifact's manifest and digest, publishes the interim status, and emits a decision.
+`Deploy preview` runs in the `preview` environment (same-repository candidates, automatic) or
+`preview-fork` (maintainer approval per revision), repeats every freshness check, re-verifies the
+artifact, uploads it with pinned Wrangler from the default-branch lockfile using
+`--config wrangler.toml --branch preview-*`, and verifies the Cloudflare deployment record.
+`Preview smoke tests` runs the Playwright suite without Cloudflare credentials against the unique
+deployment URL with a five-minute startup window. `Publish preview result` rechecks freshness and
+publishes success only for a still-current candidate; any failed stage publishes failure, and a
+controller crash publishes failure on the candidate revision.
+
+**Defaults:** ready PRs deploy automatically after validation; drafts keep validating without a
+deployment (status `pending`); documentation-only PRs receive `success: not applicable`; fork PRs
+wait for approval with the exact revision shown in the run summary; deployments are deduplicated by
+revision, digest, and profile version (`[preview <digest12> v1]` marker), and `ready_for_review`
+reuses matching evidence.
+
+**Manual rerun:** `gh workflow run preview.yml --ref main -f run_id=<ci-run-id>`. The controller
+repeats every eligibility check; it cannot be used to bypass a failed or stale revision.
+
+**Metrics:** each controller run summary records the action (deploy/reuse/skip/wait/fail),
+revision, digest, deployment URL, whether the result was published, and the validation-to-preview
+duration. Deployment (`preview-deployment-<sha>`) and smoke (`preview-smoke-<sha>`) evidence
+artifacts are retained for 30 days. Count deployments, skipped drafts, reused artifacts, and
+failures from these summaries during observation.
+
+#### External settings (operator, staged rollout)
+
+Captured on 2026-09-17 (read-only): Pages project `tarkovtracker` with domains
+`tarkovtrackernuxt.pages.dev` and `tarkovtracker.org`, Git provider connected; the downloaded
+project configuration showed the preview environment carrying production `SUPABASE_*`,
+`STRIPE_PRICE_*`, `NUXT_PUBLIC_TURNSTILE_SITE_KEY` values plus the `TARKOV_DATA` KV and
+`API_GATEWAY_LIMITER` Durable Object bindings; production branch inferred as `main`. GitHub rulesets:
+`Main` (deletion, non-fast-forward) and `Main CI freshness` (`CI Result`, strict, no bypass); the
+only existing deployment environment was `copilot`. Secret values were not read.
+
+Ordered rollout (stop and keep the existing gate if any step fails):
+
+1. Capture settings (done above). Readback commands, run with a scoped `CLOUDFLARE_API_TOKEN`:
+
+   ```bash
+   pnpm exec wrangler pages project list
+   curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+     "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/tarkovtracker" |
+     jq '{production_branch, preview: (.deployment_configs.preview | {env_vars: (.env_vars | keys), kv_namespaces, durable_object_namespaces}), build_config, source}'
+   gh api repos/tarkovtracker-org/TarkovTracker/rules/branches/main
+   gh api repos/tarkovtracker-org/TarkovTracker/environments --jq '.environments[] | {name, protection_rules}'
+   ```
+
+2. Land the trusted aggregate compatibility change (`optionalJobs` tolerance in
+   `scripts/validation-plan.mjs`).
+3. Land the activation change: security integration, preview artifacts, controller, automation
+   updates, tests, and documentation. Keep `Preview Result` non-required.
+4. Configure the isolated preview environment and approval environments:
+   - Pages dashboard → `tarkovtracker` → Settings → Environment variables (Preview): remove every
+     preview variable and secret (`NUXT_SUPABASE_SERVICE_KEY`, `STRIPE_SECRET_KEY`,
+     `NUXT_TURNSTILE_SECRET_KEY`, `NUXT_LOG_SINK_URL`, and any other backend credential); the
+     checked-in `[env.preview.vars]` supplies the anonymous values and no bindings. Remove the
+     preview KV and Durable Object bindings if the dashboard still shows them.
+   - Create a Cloudflare API token scoped to Account → Cloudflare Pages: Edit for this account only.
+   - GitHub → Settings → Environments: create `preview` (no reviewers) and `preview-fork`
+     (required reviewers = maintainers, "Allow administrators to bypass" disabled, wait timer 0);
+     add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as environment secrets to both.
+   - Rehearse: dispatch `preview.yml` with `run_id` of a completed CI run for an open PR and confirm
+     the deployment URL, the smoke suite, and the published status.
+   - Readback: rerun the `curl` above and confirm `env_vars` for `preview` lists only the
+     checked-in keys and no `kv_namespaces`/`durable_object_namespaces`;
+     `gh api .../environments` lists `preview` and `preview-fork` with the expected reviewers.
+5. Pages dashboard → Settings → Builds & deployments → Branch control: disable automatic preview
+   deployments (keep production deployments for `main` unchanged). Readback: the `source`
+   object above shows `preview_deployment_setting: "none"` (or the branch include list empty).
+6. Complete the live acceptance scenarios (application PR success and failure, documentation-only
+   PR, translation PR, draft transition, approved fork, superseded revision, release-staging
+   candidate; confirm GitHub blocks merging when the preview fails or is missing). Then add
+   `Preview Result` (GitHub Actions, integration id `15368`) to `.github/main-ci-ruleset.json` and
+   the deployed `Main CI freshness` ruleset alongside `CI Result`, preserving strict freshness and the
+   empty bypass list:
+
+   ```bash
+   gh api -X PUT repos/tarkovtracker-org/TarkovTracker/rulesets/23539975 --input .github/main-ci-ruleset.json
+   gh api repos/tarkovtracker-org/TarkovTracker/rules/branches/main
+   ```
+
+7. Remove temporary compatibility behavior after the new paths are verified.
+
+**Rollback:** before enforcement, disable the `Preview` workflow and re-enable automatic Cloudflare
+preview builds. After enforcement, an operator must first remove `Preview Result` from the ruleset
+(explicit ruleset change) before disabling the controller; never manufacture a successful preview
+status. Worker deployment, authenticated backend behavior, and production rollout keep their
+existing separate verification.
 
 ## Pre-commit Hooks
 
@@ -529,8 +668,11 @@ Push to `main` triggers:
    (surfaces as the `Supabase Preview` check on the merge commit)
 5. Smoke tests in production
 
-GitHub Actions itself deploys nothing; items 2-4 are separate Git integrations. See the Deployment
-section of [`runbook.md`](./runbook.md) for what to verify after each merge.
+GitHub Actions deploys nothing to production; items 2-4 are separate Git integrations. Pull-request
+previews are the exception: the trusted preview controller (§8) uploads validated CI builds to the
+Pages preview environment, and Cloudflare's automatic preview builds are disabled once the rollout
+reaches step 5. See the Deployment section of [`runbook.md`](./runbook.md) for what to verify after
+each merge.
 
 A releasing merge deploys twice: once for the merge commit, then again for the
 `chore(release): <version>` commit that carries the bumped `package.json`. The second

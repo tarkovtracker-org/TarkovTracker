@@ -41,6 +41,7 @@
     "@google/design.md": "^0.4.0",
     "@nuxt/eslint": "^1.15.2",
     "@nuxt/test-utils": "^4.1.0",
+    "@playwright/test": "1.63.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/npm": "^13.1.5",
     "@tailwindcss/postcss": "^4.2.2",

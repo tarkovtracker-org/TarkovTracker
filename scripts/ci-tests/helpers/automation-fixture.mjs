@@ -90,6 +90,17 @@ if (args[0] === 'api') {
     }] }));
     process.exit(0);
   }
+  if (/\/commits\/[a-f0-9]{40}\/statuses\?per_page=100$/.test(endpoint)) {
+    const sha = endpoint.split('/commits/')[1].split('/')[0];
+    fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'preview-result', sha, state: p.PREVIEW_STATE || 'success' }) + '\n');
+    const statuses = p.PREVIEW_PRESENT === 'false' ? [] : [
+      { id: 1, context: 'Preview Result', state: 'failure' },
+      { id: 2, context: 'CI Result', state: 'success' },
+      { id: 3, context: 'Preview Result', state: p.PREVIEW_STATE || 'success' },
+    ];
+    console.log(JSON.stringify(statuses));
+    process.exit(0);
+  }
   if (endpoint === 'repos/' + p.GITHUB_REPOSITORY + '/git/ref/heads/main') {
     console.log(p.CURRENT_BASE); process.exit(0);
   }

@@ -12,7 +12,8 @@ mode = "smart"
 # workers/api-gateway; Pages binds to it by script_name (Pages cannot define a
 # DO class itself). When this binding is absent the rate limiter degrades to a
 # best-effort Cache API + in-memory path. durable_objects is a non-inheritable
-# key, so it must also be repeated under [env.preview].
+# key; it is deliberately not repeated under [env.preview] so anonymous previews
+# never bind to the production limiter.
 [[durable_objects.bindings]]
 name = "API_GATEWAY_LIMITER"
 class_name = "ApiGatewayRateLimiter"
@@ -24,8 +25,8 @@ script_name = "api-gateway"
 # by the Nitro request handlers via edgeCache's `precomputed` option. When this
 # binding is absent the handlers fall back to the per-colo Cache API path, so a
 # misconfigured deploy degrades instead of breaking.
-# kv_namespaces is non-inheritable, so it must also be repeated under
-# [env.preview].
+# kv_namespaces is non-inheritable; it is deliberately not repeated under
+# [env.preview] so previews cannot read or depend on the production namespace.
 # The same ID must be set as the TARKOV_DATA_KV_NAMESPACE_ID repository
 # variable so the Actions precompute writes where Pages reads.
 [[kv_namespaces]]
@@ -53,42 +54,23 @@ STRIPE_PRICE_CHAD_MONTHLY = "price_1Ta2nnLaRBke56G2H3t2r2rz"
 STRIPE_PRICE_CHAD_6MONTH = "price_1Ta2noLaRBke56G2s7nB9U7Z"
 STRIPE_PRICE_CHAD_YEARLY = "price_1Ta2npLaRBke56G2I0UqI1HD"
 
-# Preview deployments: vars is non-inheritable, so keys are repeated here.
-# APP_URL is present but empty so CF_PAGES_URL is used for per-preview URLs,
-# edge cache namespaces, API host trust, and Stripe redirects.
-# Analytics IDs are present but empty so preview builds never instrument
-# production GA/Clarity (defense in depth beyond hostname checks).
-# Empty string values also silence Wrangler's "missing env.preview.vars" warnings
-# without copying production values into preview.
+# Preview deployments are isolated and anonymous. GitHub Actions (the trusted preview controller
+# in .github/workflows/preview.yml) uploads validated builds here with this configuration.
+# vars is non-inheritable, so keys are repeated. APP_URL is present but empty: the Actions build
+# sets the controlled preview branch alias explicitly, and the application derives per-deployment
+# host trust from it. Supabase, analytics, Turnstile, Stripe prices, and log forwarding are
+# deliberately empty so previews never carry production identifiers; the application's offline
+# Supabase fallback activates on `pages.dev` hostnames. Production KV and Durable Object bindings
+# are intentionally absent: the precomputed-payload readers and the rate limiter degrade to their
+# Cache API paths, so previews still serve public game data through /api/tarkov/*. Preview
+# environment secrets (service-role, Stripe, Turnstile, log sinks) are managed in the Pages
+# dashboard and must remain unset; see docs/runbook.md "Preview environment isolation".
 [env.preview.vars]
 NODE_ENV = "production"
 APP_URL = ""
 GA_MEASUREMENT_ID = ""
 CLARITY_PROJECT_ID = ""
 NUXT_PUBLIC_CLIENT_LOG_SINK_URL = ""
-NUXT_PUBLIC_TURNSTILE_SITE_KEY = "0x4AAAAAAEDQJTvapp0PUVaO"
-SUPABASE_URL = "https://knptqelvsodccnoehmbj.supabase.co"
-SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtucHRxZWx2c29kY2Nub2VobWJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NTQ2OTMsImV4cCI6MjA3OTAzMDY5M30.jnlspZYu4J7i7bKfJ0p7j5R_r0YmvJj0ph5uw3XUPeY"
-STRIPE_PRICE_SCAV_MONTHLY = "price_1TaNKuLaRBke56G21GOVCUbK"
-STRIPE_PRICE_SCAV_6MONTH = "price_1TaNKvLaRBke56G2Te1l3X6l"
-STRIPE_PRICE_SCAV_YEARLY = "price_1TaNKvLaRBke56G2gK2AUCWT"
-STRIPE_PRICE_TIMMY_MONTHLY = "price_1TaNKvLaRBke56G2uKs8iWJP"
-STRIPE_PRICE_TIMMY_6MONTH = "price_1TaNKvLaRBke56G2qdn1uHJc"
-STRIPE_PRICE_TIMMY_YEARLY = "price_1TaNKwLaRBke56G2ySrDQVcC"
-STRIPE_PRICE_CHAD_MONTHLY = "price_1TaNKwLaRBke56G2NzMWPZUT"
-STRIPE_PRICE_CHAD_6MONTH = "price_1TaNKwLaRBke56G2v0oqXYeA"
-STRIPE_PRICE_CHAD_YEARLY = "price_1TaNKwLaRBke56G2IXA28xmv"
-
-# durable_objects is non-inheritable, so the binding is repeated for preview.
-[[env.preview.durable_objects.bindings]]
-name = "API_GATEWAY_LIMITER"
-class_name = "ApiGatewayRateLimiter"
-script_name = "api-gateway"
-
-# kv_namespaces is non-inheritable, so the binding is repeated for preview.
-# Previews read the same precomputed data as production; the payload is
-# identical upstream data, so sharing the namespace is safe and keeps preview
-# deploys warm too.
-[[env.preview.kv_namespaces]]
-binding = "TARKOV_DATA"
-id = "6034d8d7b7534946bf04110c33ac3b88"
+NUXT_PUBLIC_TURNSTILE_SITE_KEY = ""
+SUPABASE_URL = ""
+SUPABASE_ANON_KEY = ""

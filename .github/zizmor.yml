@@ -12,6 +12,12 @@ rules:
       # executes PR code; it only inspects metadata through the GitHub API and merges an
       # allowlisted lockfile-only change set; see docs/WORKFLOW_AUTOMATION.md "Dependabot Auto Merge".
       - dependabot-auto-merge.yml
+      # The preview controller is the intended trusted boundary for `workflow_run` and
+      # `pull_request_target`: every job checks out the default branch only, treats CI artifacts
+      # and manifests as claims verified against live GitHub state, never installs or executes
+      # candidate code, and holds the Cloudflare token in protected deployment environments; see
+      # docs/SYSTEMS.md "Actions-owned Cloudflare previews" and scripts/ci-tests/preview-workflow.mjs.
+      - preview.yml
   bot-conditions:
     ignore:
       # The immutable PR author ID establishes trust; actor_id is an additional restriction,

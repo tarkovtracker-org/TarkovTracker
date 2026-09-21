@@ -30,7 +30,7 @@ jobs:
     # GitHub.com Dependabot's immutable account ID (users/dependabot[bot]).
     if: github.event.pull_request.user.id == 49699333 && github.actor_id == '49699333'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
     env:
       BASE_REF: ${{ github.event.pull_request.base.ref }}
       GH_TOKEN: ${{ github.token }}
@@ -97,23 +97,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Aggregates only: `CI Result` (GitHub Actions check run, covers validation and the
+          # integrated security scans) and `Preview Result` (commit status from the trusted preview
+          # controller). Individual job names are no longer a dependency of this gate.
           expected_checks=(
-            "Fallow audit"
-            "Lint & Format"
-            "Type Check"
-            "Test (shard 1/4)"
-            "Test (shard 2/4)"
-            "Test (shard 3/4)"
-            "Test (shard 4/4)"
-            "Validate"
-            "Supabase DB"
-            "Systems drift check"
-            "Workers"
+            "CI Result"
             "PR Meta"
-            "Security Scan"
-            "CodeQL"
           )
-          deadline=$((SECONDS + 1500))
+          expected_statuses=(
+            "Preview Result"
+          )
+          # Gate waits are bounded to 60 minutes.
+          deadline=$((SECONDS + 3600))
           while true; do
             check_runs="$(
               gh api \
@@ -146,7 +141,7 @@ jobs:
             )"
             for check_name in "${expected_checks[@]}"; do
               matching_check="$(
-                jq --arg name "$check_name" '[.[] | select(.name == $name)]' <<< "$check_runs"
+                jq --arg name "$check_name" '[.[] | select(.name == $name and .app.id == 15368)]' <<< "$check_runs"
               )"
               if [ "$(jq 'length' <<< "$matching_check")" -eq 0 ]; then
                 missing_checks+=("$check_name")
@@ -158,6 +153,16 @@ jobs:
               if [ "$incomplete_count" -gt 0 ]; then
                 incomplete_checks+=("$check_name")
               fi
+            done
+            for status_context in "${expected_statuses[@]}"; do
+              latest_state="$(
+                jq -r --arg name "$status_context" '[.[] | select(.context == $name)] | last | .state // "missing"' <<< "$status_contexts"
+              )"
+              case "$latest_state" in
+                success) ;;
+                missing) missing_checks+=("$status_context") ;;
+                *) incomplete_checks+=("$status_context") ;;
+              esac
             done
             if [ "${#missing_checks[@]}" -eq 0 ] && [ "${#incomplete_checks[@]}" -eq 0 ] && [ "$pending_count" -eq 0 ] && [ "$pending_status_count" -eq 0 ]; then
               echo "All checks completed."
