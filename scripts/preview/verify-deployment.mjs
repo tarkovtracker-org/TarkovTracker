@@ -39,7 +39,8 @@ const evidence = {
   controllerRunId: env.GITHUB_RUN_ID,
 };
 writeFileSync(env.EVIDENCE_PATH, `${JSON.stringify(evidence, null, 2)}\n`);
-console.log(JSON.stringify(evidence, null, 2));
+// Evidence is consumed from the retained artifact file, not from logs: record fields are
+// external strings (Cloudflare API, Wrangler output) and must not be echoed unsanitized.
 if (env.GITHUB_OUTPUT) {
   appendFileSync(env.GITHUB_OUTPUT, `url=${record.url}\ndeployment_id=${record.id}\n`);
 }
