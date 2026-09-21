@@ -1668,8 +1668,9 @@ The checkout stays pinned to the validated SHA. The production build still runs 
   version-only child of the original CI revision, with successful exact-head `CI Result` **and**
   `Preview Result` and unchanged manifest/changelog history. The `Preview Result` evidence is
   authenticated, not merely present: the newest status on the SHA must be a success reported on
-  that exact SHA and its `target_url` must resolve to a run of `.github/workflows/preview.yml`
-  whose `Publish preview result` job concluded successfully, proving a candidate was planned,
+  that exact SHA and its `target_url` must resolve to a run of `.github/workflows/preview.yml@main`
+  (the trusted workflow definition on the default branch — a dispatch of the workflow from any
+  other ref is rejected) whose `Publish preview result` job concluded successfully, proving a candidate was planned,
   deployed, smoke-tested, and authoritatively reported (never an `ignore` no-op run).
   Recovery creates missing tags/releases
   idempotently, rejects tag conflicts, and never advances main or bumps another version.
@@ -2135,7 +2136,8 @@ smoke suite (`scripts/preview/smoke/preview.smoke.mjs`) without Cloudflare crede
 publishes the authoritative `Preview Result` commit status. Downstream consumers (the release
 gate and interrupted-release recovery) must not trust the status in isolation: commit statuses
 are forgeable by write collaborators, so the evidence binds to the controller run behind its
-`target_url` with a successful `Publish preview result` job on the exact SHA.
+`target_url` with a successful `Publish preview result` job on the exact SHA, and the bound run
+must execute the `.github/workflows/preview.yml@main` definition (default-branch ref only).
 
 ### Flow
 
