@@ -78,9 +78,8 @@ preview_result_binding() {
     | (.target_url // "" | capture("/actions/runs/(?<id>[0-9]+)") | .id)? // ""')"
   [[ "$run_id" =~ ^[0-9]+$ ]] || { echo 'Preview Result is not bound to a controller run.' >&2; return 1; }
   run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id")"
-  jq -re 'select(.path | startswith(".github/workflows/preview.yml@"))
-          | select(.path | endswith("@main"))
-          | select(.conclusion == "success")' >/dev/null <<< "$run" \
+  # Exact comparison: a branch named like 'foo@main' would otherwise satisfy prefix/suffix checks.
+  jq -re 'select(.path == ".github/workflows/preview.yml@main" and .conclusion == "success")' >/dev/null <<< "$run" \
     || { echo "Controller run $run_id is not a trusted preview result publication." >&2; return 1; }
   jobs="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")"
   # --paginate emits each page as a bare {total_count, jobs} document.

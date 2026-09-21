@@ -87,9 +87,19 @@ test('preview controller runs trusted code only and isolates credentials per job
     /if: always\(\) && needs\.plan\.outputs\.action != 'ignore'/
   );
   assert.match(jobBlock(workflow, 'result'), /publishControllerFailure/);
-  // A cancelled plan means this run was superseded by a newer run in the same concurrency
-  // group; the successor owns reporting, so no failure status may be published here.
-  assert.match(jobBlock(workflow, 'result'), /PLAN_RESULT === 'cancelled'/);
+  // The cancelled branch must emit the supersession notice and return before the failure and
+  // result publisher paths, so a superseded run can never publish a status.
+  const resultScript = workflowStep(jobBlock(workflow, 'result'), 'Publish Preview Result');
+  const cancelledAt = resultScript.indexOf("PLAN_RESULT === 'cancelled'");
+  const noticeAt = resultScript.indexOf('superseded by a newer run');
+  const returnAt = resultScript.indexOf('return;', cancelledAt);
+  const failAt = resultScript.indexOf("core.setFailed('Preview planning did not succeed.')");
+  const publishAt = resultScript.indexOf('await publishResult');
+  assert.ok(cancelledAt !== -1, 'cancellation branch missing');
+  assert.ok(noticeAt > cancelledAt, 'supersession notice must follow the cancelled check');
+  assert.ok(returnAt > noticeAt, 'cancelled branch must return before any publication');
+  assert.ok(failAt > returnAt, 'planning failure path must come after the cancelled branch');
+  assert.ok(publishAt > failAt, 'result publication must follow the guard clauses');
   assert.doesNotMatch(workflow, /name: Preview Result/);
 });
 test('tampering with the controller boundary is detected', () => {
@@ -177,7 +187,11 @@ test('shared gate scripts wait for both authoritative gates with a 60-minute bou
   // status bound to a trusted-revision controller run with a successful result publication
   // and the deployment evidence artifact for the exact previewed SHA.
   assert.match(gate, /preview_result_binding\(\)/);
-  assert.match(gate, /endswith\("@main"\)/);
+  // The staged gate authorizes the bound controller run by exact path@ref equality.
+  assert.match(
+    gate,
+    /select\(\.path == "\.github\/workflows\/preview\.yml@main" and \.conclusion == "success"\)/
+  );
   assert.match(gate, /Publish preview result" and \.conclusion == "success"/);
   assert.match(gate, /preview-deployment-\\\(\$sha\)/);
   assert.match(
