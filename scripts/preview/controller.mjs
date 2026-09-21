@@ -201,9 +201,9 @@ function claimSha(candidate, pull) {
   if (candidate.runEvent !== 'pull_request' || !pull) return null;
   return pull.base.sha;
 }
-function runTreeSha(context, candidate, run) {
-  if (run.head_sha !== candidate.headSha) return null;
-  const tree = run.head_tree_id ?? run.tree_sha;
+/** Tree of the commit GitHub triggered the run for; binds the build to the run's commit. */
+function runTreeSha(run) {
+  const tree = run.head_commit?.tree_id;
   return SHA_PATTERN.test(String(tree)) ? tree : null;
 }
 function claimCheckedOutSha(candidate, pull) {
@@ -217,7 +217,7 @@ function expectedManifest(context, candidate, pull, run) {
     headSha: candidate.headSha,
     baseSha: claimSha(candidate, pull),
     checkedOutSha: claimCheckedOutSha(candidate, pull),
-    treeSha: runTreeSha(context, candidate, run),
+    treeSha: runTreeSha(run),
     runId: run.id,
     runAttempt: run.run_attempt,
     previewBranch,

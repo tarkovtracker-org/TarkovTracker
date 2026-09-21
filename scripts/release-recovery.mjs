@@ -65,7 +65,28 @@ async function validatedCi(github, repo, sha) {
     .sort((left, right) => right.id - left.id)[0];
   return check?.status === 'completed' && check.conclusion === 'success';
 }
-/** Require the newest authoritative `Preview Result` status on the version SHA to be success. */
+/** The controller path only the trusted preview workflow may report from. */
+const PREVIEW_CONTROLLER_PATH = '.github/workflows/preview.yml';
+/** Extract the controller run id from a `Preview Result` target; null when it points elsewhere. */
+function controllerRunId(status) {
+  const match = /\/actions\/runs\/(\d+)(?:\?|$)/.exec(status.target_url ?? '');
+  return match ? Number(match[1]) : null;
+}
+/** A run counts only when the completed preview controller succeeded on the exact SHA. */
+function controllerRunSuccess(run, sha) {
+  return (
+    run.path === PREVIEW_CONTROLLER_PATH && run.head_sha === sha && run.conclusion === 'success'
+  );
+}
+/** Fetch the run behind the status target; unresolvable runs fail closed like any other gate. */
+async function controllerRun(github, repo, sha, runId) {
+  if (!runId) return null;
+  const run = await optionalResource(() =>
+    github.rest.actions.getWorkflowRun({ ...repo, run_id: runId })
+  );
+  return run && controllerRunSuccess(run, sha) ? run : null;
+}
+/** Require the newest `Preview Result` to bind to a successful controller run on the same SHA. */
 async function validatedPreview(github, repo, sha) {
   const statuses = await github.paginate(github.rest.repos.listCommitStatusesForRef, {
     ...repo,
@@ -75,7 +96,8 @@ async function validatedPreview(github, repo, sha) {
   const status = statuses
     .filter((item) => item.context === 'Preview Result')
     .sort((left, right) => right.id - left.id)[0];
-  return status?.state === 'success';
+  if (!status || status.state !== 'success' || status.head_sha !== sha) return false;
+  return Boolean(await controllerRun(github, repo, sha, controllerRunId(status)));
 }
 /** Interrupted recovery requires both gates on the exact version commit, like staging did. */
 async function validatedVersion(github, repo, sha) {

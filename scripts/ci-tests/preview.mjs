@@ -245,7 +245,7 @@ function runFixture(overrides = {}) {
     head_sha: HEAD,
     head_branch: 'feature',
     head_repository: { full_name: REPO_NAME },
-    head_tree_id: TREE,
+    head_commit: { tree_id: TREE },
     run_attempt: 1,
     updated_at: new Date(Date.now() - 120000).toISOString(),
     pull_requests: [{ number: 42 }],
@@ -527,6 +527,7 @@ test('tampered manifests, missing or expired artifacts and malicious archives fa
     ['repository', { repository: FORK_NAME }, /repository/],
     ['pull request', { pullRequest: 43 }, /pullRequest/],
     ['run id', { runId: 901 }, /runId/],
+    ['tree', { treeSha: sha('9') }, /treeSha/],
     [
       'branch',
       { previewBranch: 'preview-pr-43', appUrl: previewAppUrl('preview-pr-43') },
@@ -578,6 +579,12 @@ test('tampered manifests, missing or expired artifacts and malicious archives fa
 test('a matching earlier success is reused instead of redeploying', async (t) => {
   const first = await plan(t, workflowRunContext());
   const marker = successMarker(first.manifest.digest);
+  // Pull-request and dispatch runs carry their commit's tree on run.head_commit.tree_id; the
+  // manifest's treeSha claim verifies against it. A degraded API response without a usable tree
+  // yields a null expectation that no real manifest can match, so verification fails closed.
+  const treeless = await plan(t, workflowRunContext(), { run: { head_commit: {} }, manifest: {} });
+  assert.equal(treeless.decision.action, 'fail');
+  assert.match(treeless.decision.description, /treeSha/);
   const reused = await plan(t, workflowRunContext(), {
     previewStatuses: [
       {
