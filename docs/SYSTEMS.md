@@ -1653,10 +1653,12 @@ The checkout stays pinned to the validated SHA. The production build still runs 
   the trusted default branch for aggregation and reporting, never candidate branch code. Only aggregate
   success publishes success; failed, cancelled, skipped, or missing validation publishes failure.
   Validation jobs unknown to the trusted aggregator also fail the result, so a new job must land in
-  the trusted contract before it can gate. A job listed in `optionalJobs` (`security`) may be absent
-  from an older candidate workflow during its compatibility window, but a reported outcome other
-  than success fails the result. Status publication errors fail the CI Result job, so
-  automation cannot promote the commit.
+  the trusted contract before it can gate. The `security` gate is selected by every plan; every
+  selected job must report `success`, every known but unselected job must report `skipped`, and a
+  missing result fails the aggregate — so an older candidate workflow that omits a required job
+  can never pass. (The former `optionalJobs` compatibility window expired when all active
+  candidate workflows had landed the `security` job.) Status publication errors fail the
+  CI Result job, so automation cannot promote the commit.
 - Release version commits pass explicitly dispatched CI on a temporary `wip/release-*` branch and
   receive an Actions-owned preview (§18) before the identical SHA advances main; the embedded
   version makes them deployable changes. `scripts/github-ci-gate.sh` waits for both `CI Result`
