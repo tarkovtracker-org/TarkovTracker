@@ -94,11 +94,25 @@ if (args[0] === 'api') {
     const sha = endpoint.split('/commits/')[1].split('/')[0];
     fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'preview-result', sha, state: p.PREVIEW_STATE || 'success' }) + '\n');
     const statuses = p.PREVIEW_PRESENT === 'false' ? [] : [
-      { id: 1, context: 'Preview Result', state: 'failure' },
-      { id: 2, context: 'CI Result', state: 'success' },
-      { id: 3, context: 'Preview Result', state: p.PREVIEW_STATE || 'success' },
+      { id: 1, context: 'Preview Result', state: 'failure', sha },
+      { id: 2, context: 'CI Result', state: 'success', sha },
+      { id: 3, context: 'Preview Result', state: p.PREVIEW_STATE || 'success', sha, target_url: 'https://github.com/o/r/actions/runs/555' },
     ];
     console.log(JSON.stringify(statuses));
+    process.exit(0);
+  }
+  if (/^repos\/[^/]+\/[^/]+\/actions\/runs\/[0-9]+$/.test(endpoint)) {
+    console.log(JSON.stringify({ id: 555, path: '.github/workflows/preview.yml@main', conclusion: 'success' }));
+    process.exit(0);
+  }
+  if (/^repos\/[^/]+\/[^/]+\/actions\/runs\/[0-9]+\/jobs\?per_page=100$/.test(endpoint)) {
+    console.log(JSON.stringify([[{ name: 'Publish preview result', conclusion: 'success' }]]));
+    process.exit(0);
+  }
+  if (/^repos\/[^/]+\/[^/]+\/actions\/runs\/[0-9]+\/artifacts\?per_page=100$/.test(endpoint)) {
+    const events = fs.readFileSync(p.EVENTS, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
+    const sha = ([...events].reverse().find((event) => event.type === 'preview-result') || {}).sha || p.PREVIEW_SHA || '';
+    console.log(JSON.stringify({ artifacts: [{ name: 'preview-deployment-' + sha, expired: false }] }));
     process.exit(0);
   }
   if (endpoint === 'repos/' + p.GITHUB_REPOSITORY + '/git/ref/heads/main') {
@@ -184,6 +198,7 @@ process.exit(result.status ?? 1);
     BASE_SHA: base,
     CURRENT_BASE: base,
     ACTUAL_HEAD: head,
+    PREVIEW_SHA: head,
     PR_STATES: JSON.stringify([pr]),
     CALLS: join(root, 'calls'),
     COUNTER: join(root, 'counter'),

@@ -31,7 +31,9 @@ function assertTrustedBoundary(workflow) {
     /pnpm install --frozen-lockfile --ignore-scripts/
   );
   const upload = workflowStep(deploy, 'Upload verified output to the Pages preview environment');
-  assert.match(upload, /--config wrangler\.toml/);
+  // Pages commands reject --config paths; the trusted default-branch config is discovered
+  // from the repo root of the checked-out workspace instead.
+  assert.doesNotMatch(upload, /--config/);
   assert.match(upload, /--project-name tarkovtracker/);
   assert.match(upload, /--branch "\$PREVIEW_BRANCH"/);
   assert.match(upload, /preview-\*\) ;;/);
@@ -46,6 +48,11 @@ function assertTrustedBoundary(workflow) {
   assert.match(smoke, /playwright test --config scripts\/preview\/smoke\/playwright\.config\.mjs/);
   assert.match(workflowStep(smoke, 'Retain smoke evidence'), /retention-days: 30/);
   assert.match(workflowStep(deploy, 'Retain deployment evidence'), /retention-days: 30/);
+  assert.match(
+    workflowStep(deploy, 'Retain deployment evidence'),
+    /name: preview-deployment-\$\{\{ steps\.verify\.outputs\.head_sha/,
+    'run-owned deployment evidence must be keyed by the previewed SHA'
+  );
 }
 test('preview controller runs trusted code only and isolates credentials per job', () => {
   const workflow = read('.github/workflows/preview.yml');
@@ -86,7 +93,10 @@ test('tampering with the controller boundary is detected', () => {
   const workflow = read('.github/workflows/preview.yml');
   const mutations = [
     [TRUSTED_REF, 'ref: ${{ github.event.workflow_run.head_sha }}'],
-    ['--config wrangler.toml', '--config "$RUNNER_TEMP/preview-dist/wrangler.toml"'],
+    [
+      '--project-name tarkovtracker',
+      '--project-name tarkovtracker --config "$RUNNER_TEMP/preview-dist/wrangler.toml"',
+    ],
     ['pnpm install --frozen-lockfile --ignore-scripts', 'pnpm install --frozen-lockfile'],
     ['[ "$PREVIEW_BRANCH" != "main" ]', 'true'],
     ['name: ${{ needs.plan.outputs.environment }}', 'name: preview'],
@@ -160,6 +170,13 @@ test('shared gate scripts wait for both authoritative gates with a 60-minute bou
   assert.match(gate, /readonly GATE_WAIT_ATTEMPTS=360/);
   assert.match(gate, /wait_for_preview_result\(\)/);
   assert.match(gate, /select\(\.context == "Preview Result"\)/);
+  // The staged gate authenticates the reported success against run-owned state: exact-SHA
+  // status bound to a trusted-revision controller run with a successful result publication
+  // and the deployment evidence artifact for the exact previewed SHA.
+  assert.match(gate, /preview_result_binding\(\)/);
+  assert.match(gate, /endswith\("@main"\)/);
+  assert.match(gate, /Publish preview result" and \.conclusion == "success"/);
+  assert.match(gate, /preview-deployment-\\\(\$sha\)/);
   assert.match(
     gate,
     /wait_for_validated_head\(\) \{\n[^}]*wait_for_ci_result "\$sha"\n[^}]*wait_for_preview_result "\$sha"/

@@ -47,18 +47,49 @@ wait_for_preview_result() {
   local sha="$1" attempt statuses result
   for ((attempt = 1; attempt <= GATE_WAIT_ATTEMPTS; attempt++)); do
     statuses="$(gh api --paginate "repos/$GITHUB_REPOSITORY/commits/$sha/statuses?per_page=100")"
-    result="$(jq -rs '
+    result="$(jq -rs --arg sha "$sha" '
       [ .[][] | select(.context == "Preview Result") ]
       | sort_by(.id) | last
-      | if . == null then "pending" else .state end' <<< "$statuses")"
+      | if . == null then "pending"
+        elif .state != "success" then .state
+        elif .sha != $sha then "foreign"
+        elif ((.target_url // "" | capture("/actions/runs/(?<id>[0-9]+)") | .id)?) == ""
+        then "unbound"
+        else "bound" end' <<< "$statuses")"
     case "$result" in
-      success) return ;;
+      bound) preview_result_binding "$sha" && return ;;
       pending) ;;
       *) echo "Preview Result did not succeed: $result" >&2; return 1 ;;
     esac
     (( attempt < GATE_WAIT_ATTEMPTS )) || { echo 'Timed out waiting for Preview Result.' >&2; return 1; }
     sleep 10
   done
+}
+# Statuses are forgeable by write collaborators: authenticate the reported success against
+# run-owned state before the gate may pass. The bound run must be the trusted controller
+# revision (default-branch workflow ref), completed with a successful result publication, and
+# must carry the deployment evidence artifact named for the exact previewed SHA.
+preview_result_binding() {
+  local sha="$1" run_id run jobs evidence
+  run_id="$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/statuses?per_page=100" | jq -r --arg sha "$sha" '
+    [ .[] | select(.context == "Preview Result") ]
+    | sort_by(.id) | last
+    | select(.state == "success" and .sha == $sha)
+    | (.target_url // "" | capture("/actions/runs/(?<id>[0-9]+)") | .id)? // ""')"
+  [[ "$run_id" =~ ^[0-9]+$ ]] || { echo 'Preview Result is not bound to a controller run.' >&2; return 1; }
+  run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id")"
+  jq -re 'select(.path | startswith(".github/workflows/preview.yml@"))
+          | select(.path | endswith("@main"))
+          | select(.conclusion == "success")' >/dev/null <<< "$run" \
+    || { echo "Controller run $run_id is not a trusted preview result publication." >&2; return 1; }
+  jobs="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")"
+  jq -re '[ .[][] | select(.name == "Publish preview result" and .conclusion == "success") ] | length > 0' \
+    >/dev/null <<< "$jobs" || { echo 'Controller result job did not succeed.' >&2; return 1; }
+  evidence="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/artifacts?per_page=100")"
+  jq -re --arg sha "$sha" '
+    [ .artifacts[] | select(.name == "preview-deployment-\($sha)" and .expired == false) ]
+    | length > 0' >/dev/null <<< "$evidence" \
+    || { echo "Controller run $run_id lacks deployment evidence for $sha." >&2; return 1; }
 }
 # Both authoritative gates must succeed on the same validated head before promotion.
 wait_for_validated_head() {
