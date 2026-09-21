@@ -106,7 +106,7 @@ if (args[0] === 'api') {
     process.exit(0);
   }
   if (/^repos\/[^/]+\/[^/]+\/actions\/runs\/[0-9]+\/jobs\?per_page=100$/.test(endpoint)) {
-    console.log(JSON.stringify([[{ name: 'Publish preview result', conclusion: 'success' }]]));
+    console.log(JSON.stringify({ total_count: 1, jobs: [{ name: 'Publish preview result', conclusion: 'success' }] }));
     process.exit(0);
   }
   if (/^repos\/[^/]+\/[^/]+\/actions\/runs\/[0-9]+\/artifacts\?per_page=100$/.test(endpoint)) {

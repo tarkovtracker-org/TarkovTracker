@@ -230,6 +230,11 @@ describe('interrupted release recovery', () => {
   });
   it.each([
     ['other workflow', (f) => (f.previewRun.path = '.github/workflows/ci.yml@main')],
+    [
+      'untrusted workflow ref',
+      (f) => (f.previewRun.path = '.github/workflows/preview.yml@attacker-branch'),
+    ],
+    ['missing workflow ref', (f) => (f.previewRun.path = '.github/workflows/preview.yml')],
     ['unsuccessful run', (f) => (f.previewRun.conclusion = 'failure')],
     [
       'run missing',

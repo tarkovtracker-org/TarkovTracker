@@ -65,8 +65,19 @@ async function validatedCi(github, repo, sha) {
     .sort((left, right) => right.id - left.id)[0];
   return check?.status === 'completed' && check.conclusion === 'success';
 }
-/** The controller path only the trusted preview workflow may report from (path may carry @ref). */
+/** The controller path only the trusted preview workflow may report from. */
 const PREVIEW_CONTROLLER_PATH = '.github/workflows/preview.yml';
+/** Controller runs are only trusted when executed from the default-branch workflow revision. */
+const TRUSTED_CONTROLLER_REF = 'main';
+/** Authorize a run as the trusted controller: exact path and the default-branch workflow ref. */
+function trustedControllerRun(run) {
+  if (typeof run.path !== 'string') return false;
+  const at = run.path.indexOf('@');
+  return (
+    run.path.slice(0, at) === PREVIEW_CONTROLLER_PATH &&
+    run.path.slice(at + 1) === TRUSTED_CONTROLLER_REF
+  );
+}
 /** The controller job that publishes authoritative `Preview Result` statuses. */
 const PREVIEW_RESULT_JOB = 'Publish preview result';
 /** Extract the controller run id from a `Preview Result` target; null when it points elsewhere. */
@@ -90,7 +101,7 @@ async function controllerRun(github, repo, runId) {
   const run = await optionalResource(() =>
     github.rest.actions.getWorkflowRun({ ...repo, run_id: runId })
   );
-  if (!run || run.path?.split('@')[0] !== PREVIEW_CONTROLLER_PATH) return null;
+  if (!run || !trustedControllerRun(run)) return null;
   return run;
 }
 /** The controller must have finished its authoritative result publication for this evidence. */

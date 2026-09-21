@@ -83,7 +83,8 @@ preview_result_binding() {
           | select(.conclusion == "success")' >/dev/null <<< "$run" \
     || { echo "Controller run $run_id is not a trusted preview result publication." >&2; return 1; }
   jobs="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")"
-  jq -re '[ .[][] | select(.name == "Publish preview result" and .conclusion == "success") ] | length > 0' \
+  # --paginate emits each page as a bare {total_count, jobs} document.
+  jq -s -e '[.[] | .jobs[]? | select(.name == "Publish preview result" and .conclusion == "success")] | length > 0' \
     >/dev/null <<< "$jobs" || { echo 'Controller result job did not succeed.' >&2; return 1; }
   evidence="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/artifacts?per_page=100")"
   jq -re --arg sha "$sha" '
