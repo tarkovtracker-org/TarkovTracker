@@ -1,13 +1,12 @@
 name: Security
+# Reusable security gate. CI calls it for pull requests, main pushes, and explicit dispatches
+# (including Crowdin and release staging) and requires its success in `CI Result`. The weekly
+# schedule keeps the standalone audit; ordinary push and pull_request triggers were removed so the
+# scans run exactly once per revision, inside the gated CI run.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_call:
   schedule:
     - cron: '0 0 * * 0'
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -32,10 +31,15 @@ jobs:
           echo "audit_dir=$audit_dir" >> "$GITHUB_OUTPUT"
       - name: Audit production dependencies
         working-directory: ${{ steps.prepare-audit.outputs.audit_dir }}
+        # Blocking threshold: critical vulnerabilities in production dependencies fail CI.
         run: pnpm audit --prod --audit-level=critical
       - name: Audit all dependencies (informational)
         working-directory: ${{ steps.prepare-audit.outputs.audit_dir }}
-        run: pnpm audit --audit-level=high || true
+        # Advisory only: development-dependency findings are reported, never gated.
+        run: |
+          if ! pnpm audit --audit-level=high; then
+            echo "::notice title=Informational dependency audit::High-severity findings exist in development dependencies. This audit is advisory and does not gate CI."
+          fi
       - name: Check for outdated dependencies
         if: github.event_name == 'schedule'
         run: pnpm outdated || true
@@ -105,5 +109,6 @@ jobs:
         with:
           languages: javascript-typescript
           queries: security-extended
+      # The analysis must complete; individual alerts are triaged in code scanning, not here.
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0

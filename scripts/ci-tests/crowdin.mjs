@@ -208,7 +208,7 @@ function assertWorkflowBoundaries(workflow) {
 }
 test('workflow separates trusted gate, immutable setup, token-free checks and job-token merge', () => {
   assertWorkflowBoundaries(read('.github/workflows/crowdin.yml'));
-  assert.match(read('.github/workflows/ci.yml'), /push:\n {4}branches: \[main,/);
+  assert.match(read('.github/workflows/ci.yml'), /push:\n {4}branches: \[main\]/);
   assert.match(read('.github/workflows/release.yml'), /workflow_run.event == 'push'/);
 });
 test('unrelated steps and jobs cannot satisfy the real merge-step contract', () => {
@@ -262,6 +262,22 @@ test('Crowdin waits for successful exact-head CI and rejects terminal failures',
   }
   rejected(f.run('merge', { CHECK_APP: '999' }), /Timed out/);
   assert.ok(!f.calls().some((args) => args[1] === 'merge'));
+});
+test('Crowdin also waits for the authoritative Preview Result and rejects a failed or missing preview', (t) => {
+  const f = fixture(t);
+  passed(f.run('prepare'));
+  for (const PREVIEW_STATE of ['failure', 'error']) {
+    rejected(f.run('merge', { PREVIEW_STATE }), /Preview Result did not succeed/);
+  }
+  rejected(f.run('merge', { PREVIEW_PRESENT: 'false' }), /Timed out waiting for Preview Result/);
+  rejected(f.run('merge', { PREVIEW_STATE: 'pending' }), /Timed out waiting for Preview Result/);
+  assert.ok(!f.calls().some((args) => args[1] === 'merge'));
+  // The preview gate is consulted only after CI Result succeeded on the same head.
+  const events = f.events();
+  const ci = events.findIndex((event) => event.type === 'ci-result');
+  const preview = events.findIndex((event) => event.type === 'preview-result');
+  assert.ok(ci !== -1 && preview > ci);
+  assert.equal(events[preview].sha, f.head);
 });
 test('main policy configuration enforces GitHub Actions CI and freshness without exceptions', () => {
   const policy = JSON.parse(read('.github/main-ci-ruleset.json'));

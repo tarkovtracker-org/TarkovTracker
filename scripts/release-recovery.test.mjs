@@ -30,12 +30,25 @@ function fixture() {
     status: 'completed',
     conclusion: 'success',
   };
+  const previewStatus = { id: 10, context: 'Preview Result', state: 'success' };
   const missing = () => Promise.reject(Object.assign(new Error('Not found'), { status: 404 }));
+  const rest = {
+    checks: { listForRef: vi.fn() },
+    repos: {
+      listCommitStatusesForRef: vi.fn(),
+    },
+  };
+  const evidence = { checks: [check], statuses: [previewStatus] };
   const github = {
-    paginate: vi.fn().mockResolvedValue([check]),
+    paginate: vi.fn((endpoint) =>
+      Promise.resolve(
+        endpoint === rest.repos.listCommitStatusesForRef ? evidence.statuses : evidence.checks
+      )
+    ),
     rest: {
-      checks: { listForRef: vi.fn() },
+      checks: rest.checks,
       repos: {
+        listCommitStatusesForRef: rest.repos.listCommitStatusesForRef,
         getCommit: vi.fn().mockResolvedValue({ data: commit }),
         getContent: vi.fn(({ ref, path }) =>
           Promise.resolve({
@@ -61,6 +74,8 @@ function fixture() {
     assets,
     commit,
     check,
+    evidence,
+    previewStatus,
     notes,
     recovery: { sha, version: '1.2.3', notes },
   };
@@ -139,19 +154,40 @@ describe('interrupted release recovery', () => {
     [
       'missing',
       (f) => {
-        f.github.paginate.mockResolvedValue([]);
+        f.evidence.checks = [];
       },
     ],
     [
       'newer failure',
       (f) => {
-        f.github.paginate.mockResolvedValue([
-          f.check,
-          { ...f.check, id: 2, conclusion: 'failure' },
-        ]);
+        f.evidence.checks = [f.check, { ...f.check, id: 2, conclusion: 'failure' }];
       },
     ],
   ])('rejects %s CI evidence', async (_name, mutate) => {
+    const f = fixture();
+    mutate(f);
+    expect(await findReleaseRecovery(f)).toBeNull();
+  });
+  it('requires the Preview Result gate alongside CI on the version commit', async () => {
+    const f = fixture();
+    expect(await findReleaseRecovery(f)).toEqual(f.recovery);
+    expect(f.github.paginate).toHaveBeenCalledWith(
+      f.github.rest.repos.listCommitStatusesForRef,
+      expect.objectContaining({ ref: f.sha })
+    );
+  });
+  it.each([
+    ['failed', (f) => (f.previewStatus.state = 'failure')],
+    ['pending', (f) => (f.previewStatus.state = 'pending')],
+    ['missing', (f) => (f.evidence.statuses = [])],
+    ['other context', (f) => (f.previewStatus.context = 'CI Result')],
+    [
+      'newer failure',
+      (f) => {
+        f.evidence.statuses = [f.previewStatus, { ...f.previewStatus, id: 11, state: 'failure' }];
+      },
+    ],
+  ])('rejects %s preview evidence', async (_name, mutate) => {
     const f = fixture();
     mutate(f);
     expect(await findReleaseRecovery(f)).toBeNull();

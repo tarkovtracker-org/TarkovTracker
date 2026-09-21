@@ -18,7 +18,13 @@
     "scripts/**/*.test.mjs",
     "scripts/ci-tests/*.mjs",
     "scripts/workflow-metrics.mjs",
-    "scripts/check-ci-result.mjs"
+    "scripts/check-ci-result.mjs",
+    "scripts/preview/build-profile.mjs",
+    "scripts/preview/write-manifest.mjs",
+    "scripts/preview/verify-deployment.mjs",
+    "scripts/preview/controller.mjs",
+    "scripts/preview/smoke/playwright.config.mjs",
+    "scripts/preview/smoke/*.smoke.mjs"
   ],
   "ignoreDependencies": [
     "shared",

@@ -66,6 +66,20 @@ test('failed staging CI leaves main unchanged and never attempts promotion', (t)
   assert.equal(git(f.repo, '--git-dir', f.remote, 'rev-parse', 'main'), f.base);
   assert.equal(f.pushes().length, 1);
 });
+test('a version commit without a successful preview is never promoted', (t) => {
+  const f = releaseFixture(t);
+  const result = f.release({ PREVIEW_STATE: 'failure' });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Preview Result did not succeed/);
+  assert.equal(git(f.repo, '--git-dir', f.remote, 'rev-parse', 'main'), f.base);
+  assert.equal(f.pushes().length, 1);
+  const events = f.events();
+  const preview = events.find((event) => event.type === 'preview-result');
+  assert.ok(preview && preview.sha !== f.base);
+  const missing = releaseFixture(t).release({ PREVIEW_PRESENT: 'false' });
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /Timed out waiting for Preview Result/);
+});
 test('concurrent main advancement is rejected by the actual Git push', (t) => {
   const f = releaseFixture(t);
   const result = f.release({ RACE_MAIN_SHA: f.head });
@@ -91,7 +105,9 @@ test('release refuses unrelated staged content', (t) => {
 /** Keep trigger, job eligibility and publication credentials within their owning blocks. */
 function assertReleaseWorkflowBoundaries(ci, releaseWorkflow) {
   workflowEvent(ci, 'workflow_dispatch');
-  assert.match(workflowEvent(ci, 'push'), /branches: \[main, 'wip\/\*\*'\]/);
+  // Staging branches receive CI only through explicit dispatch; ordinary wip/** push CI is gone.
+  assert.match(workflowEvent(ci, 'push'), /^ {4}branches: \[main\]$/m);
+  assert.doesNotMatch(workflowEvent(ci, 'push'), /wip/);
   const release = jobBlock(releaseWorkflow, 'release');
   const eligibility = release.slice(0, release.indexOf('    steps:'));
   assert.match(eligibility, /head_branch == 'main'/);
@@ -114,12 +130,11 @@ test('release staging runs ordinary CI while publication retains its main-only g
 test('unrelated triggers, jobs and steps cannot satisfy the release workflow contract', () => {
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
   const release = readFileSync('.github/workflows/release.yml', 'utf8');
-  const wrongTrigger = ci
-    .replace("branches: [main, 'wip/**']", 'branches: [main]')
-    .replace(
-      'pull_request:\n    branches: [main]',
-      "pull_request:\n    branches: [main, 'wip/**']"
-    );
+  const wrongTrigger = ci.replace(
+    'push:\n    branches: [main]',
+    "push:\n    branches: [main, 'wip/**']"
+  );
+  assert.notEqual(wrongTrigger, ci);
   assert.throws(() => assertReleaseWorkflowBoundaries(wrongTrigger, release));
   const wrongJob =
     release.replace("head_branch == 'main'", "head_branch == 'develop'") +

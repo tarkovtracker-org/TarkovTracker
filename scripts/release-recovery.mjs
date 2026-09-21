@@ -52,7 +52,7 @@ function releaseNotes(oldLog, newLog, version) {
   return notes;
 }
 /** Require successful latest CI from the configured provider on the promoted version SHA. */
-async function validatedVersion(github, repo, sha) {
+async function validatedCi(github, repo, sha) {
   const checks = await github.paginate(github.rest.checks.listForRef, {
     ...repo,
     ref: sha,
@@ -64,6 +64,22 @@ async function validatedVersion(github, repo, sha) {
     .filter((item) => item.app.id === 15368 && item.head_sha === sha)
     .sort((left, right) => right.id - left.id)[0];
   return check?.status === 'completed' && check.conclusion === 'success';
+}
+/** Require the newest authoritative `Preview Result` status on the version SHA to be success. */
+async function validatedPreview(github, repo, sha) {
+  const statuses = await github.paginate(github.rest.repos.listCommitStatusesForRef, {
+    ...repo,
+    ref: sha,
+    per_page: 100,
+  });
+  const status = statuses
+    .filter((item) => item.context === 'Preview Result')
+    .sort((left, right) => right.id - left.id)[0];
+  return status?.state === 'success';
+}
+/** Interrupted recovery requires both gates on the exact version commit, like staging did. */
+async function validatedVersion(github, repo, sha) {
+  return (await validatedCi(github, repo, sha)) && (await validatedPreview(github, repo, sha));
 }
 /** On explicit reruns, recover only a validated version child of the original main CI commit. */
 export async function findReleaseRecovery({ github, context, baseSha, sha }) {

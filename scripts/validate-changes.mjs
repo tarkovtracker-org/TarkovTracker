@@ -37,7 +37,7 @@ console.log(
 if (process.env.GITHUB_OUTPUT) {
   appendFileSync(
     process.env.GITHUB_OUTPUT,
-    `plan=${JSON.stringify(plan)}\nfull=${plan.full}\ni18n=${plan.i18n}\nworkflows=${plan.workflows}\n`
+    `plan=${JSON.stringify(plan)}\nfull=${plan.full}\ni18n=${plan.i18n}\nworkflows=${plan.workflows}\npreview=${plan.previewRequired}\n`
   );
 }
 if (options.explain) process.exit(0);

@@ -10,20 +10,20 @@ import {
   collectChanges,
   aggregateResults,
   fullJobs,
-  optionalJobs,
 } from '../validation-plan.mjs';
 import { gitExecutable } from '../validation-tools.mjs';
 const cli = resolve('scripts/validate-changes.mjs');
+const reducedDocsJobs = ['lint-format', 'systems-drift', 'security'];
+const reducedPreviewJobs = ['lint-format', 'systems-drift', 'security', 'validate'];
 test('only explicit documentation and translation paths receive reduced validation', () => {
-  for (const paths of [
-    ['README.md'],
-    ['docs/topic.markdown'],
-    ['.github/CONTRIBUTING.md'],
-    ['app/locales/fr.json'],
-    ['README.md', 'app/locales/cs.json'],
-  ]) {
+  for (const paths of [['README.md'], ['docs/topic.markdown'], ['.github/CONTRIBUTING.md']]) {
     assert.equal(classifyPaths(paths).full, false, paths.join());
-    assert.deepEqual(classifyPaths(paths).jobs, ['lint-format', 'systems-drift']);
+    assert.deepEqual(classifyPaths(paths).jobs, reducedDocsJobs);
+  }
+  // Translations keep the reduced test selection but gain the preview build.
+  for (const paths of [['app/locales/fr.json'], ['README.md', 'app/locales/cs.json']]) {
+    assert.equal(classifyPaths(paths).full, false, paths.join());
+    assert.deepEqual(classifyPaths(paths).jobs, reducedPreviewJobs);
   }
   for (const path of [
     'DESIGN.md',
@@ -53,6 +53,7 @@ test('only explicit documentation and translation paths receive reduced validati
       'supabase-db',
       'systems-drift',
       'workers',
+      'security',
     ]);
   }
   assert.equal(classifyPaths([]).full, true);
@@ -64,6 +65,38 @@ test('only explicit documentation and translation paths receive reduced validati
   assert.equal(classifyPaths(['app/locales/en.json']).locales, false);
   assert.equal(classifyPaths(['app/locales/english.json']).locales, true);
   assert.equal(classifyPaths(['README.md'], { forceFull: true }).full, true);
+});
+test('only known documentation-only change sets need no preview; everything else requires one', () => {
+  for (const paths of [
+    ['README.md'],
+    ['docs/a.md', '.github/CONTRIBUTING.md'],
+    ['docs/renamed-from.md', 'docs/renamed-to.md'],
+    ['docs/deleted.md'],
+  ]) {
+    assert.equal(classifyPaths(paths).previewRequired, false, paths.join());
+    assert.ok(!classifyPaths(paths).jobs.includes('validate'), paths.join());
+  }
+  for (const paths of [
+    ['app/locales/fr.json'],
+    ['README.md', 'app/locales/fr.json'],
+    ['app/locales/en.json'],
+    ['nuxt.config.ts'],
+    ['wrangler.toml'],
+    ['package.json'],
+    ['pnpm-lock.yaml'],
+    ['app/a.ts'],
+    ['README.md', 'app/a.ts'],
+    ['docs/script.sh'],
+    ['DESIGN.md'],
+    ['unknown'],
+    ['../docs/a.md'],
+    [],
+  ]) {
+    assert.equal(classifyPaths(paths).previewRequired, true, paths.join());
+    assert.ok(classifyPaths(paths).jobs.includes('validate'), paths.join());
+  }
+  // Forced full runs (pushes, dispatches, unreadable diffs) always build the deployable output.
+  assert.equal(classifyPaths(['README.md'], { forceFull: true }).previewRequired, true);
 });
 test('name-status parser includes both rename paths and deletions without splitting filenames', () => {
   assert.deepEqual(parseNameStatus('R100\0app/a.ts\0docs/a.md\0D\0file with\nnewline.md\0'), [
@@ -98,47 +131,22 @@ test('aggregate fails closed on selected failures, cancellations, unexpected ski
     assert.ok(aggregateResults(plan, { ...needs, changes: { result: 'failure' } }).length);
     // A job unknown to the trusted aggregator fails closed even when it reports success.
     assert.ok(aggregateResults(plan, { ...needs, unknown: { result: 'success' } }).length);
+    // The integrated security gate is always selected: scanner errors, cancellation, an
+    // unexpected skip, or a missing result fail the aggregate for reduced and full plans alike.
+    assert.ok(plan.jobs.includes('security'));
+    for (const result of ['failure', 'cancelled', 'skipped', undefined]) {
+      const errors = aggregateResults(plan, { ...needs, security: { result } });
+      assert.ok(
+        errors.some((error) => error.startsWith('security: expected success')),
+        result
+      );
+    }
+    const { security: _omitted, ...withoutSecurity } = needs;
+    assert.ok(aggregateResults(plan, withoutSecurity).some((error) => /^security:/.test(error)));
     assert.ok(aggregateResults(undefined, needs).length);
     assert.ok(aggregateResults({ ...plan, jobs: [] }, needs).length);
     if (!plan.full)
       assert.ok(aggregateResults(plan, { ...needs, test: { result: 'success' } }).length);
-  }
-});
-test('compatibility window: the security gate may be absent, but a reported outcome must succeed', () => {
-  assert.deepEqual(optionalJobs, ['security']);
-  for (const paths of [['app/a.ts'], ['README.md']]) {
-    const plan = classifyPaths(paths);
-    const needs = {
-      changes: { result: 'success' },
-      ...Object.fromEntries(
-        fullJobs.map((job) => [job, { result: plan.jobs.includes(job) ? 'success' : 'skipped' }])
-      ),
-    };
-    // Older candidate workflows without the job keep passing during the compatibility window.
-    assert.deepEqual(aggregateResults(plan, needs), []);
-    assert.deepEqual(aggregateResults(plan, { ...needs, security: { result: 'success' } }), []);
-    // A newer candidate plan may already list the job; the trusted aggregate accepts it.
-    assert.deepEqual(
-      aggregateResults(
-        { ...plan, jobs: [...plan.jobs, 'security'] },
-        { ...needs, security: { result: 'success' } }
-      ),
-      []
-    );
-    for (const result of ['failure', 'cancelled', 'skipped', undefined]) {
-      const errors = aggregateResults(plan, { ...needs, security: { result } });
-      assert.equal(errors.length, 1, `${paths}: ${result}`);
-      assert.match(errors[0], /^security: expected success/);
-    }
-    // Reduced plans may add the preview build without switching to full validation.
-    if (!plan.full) {
-      const withPreview = { ...plan, jobs: [...plan.jobs, 'validate'] };
-      assert.deepEqual(
-        aggregateResults(withPreview, { ...needs, validate: { result: 'success' } }),
-        []
-      );
-      assert.ok(aggregateResults(withPreview, needs).length);
-    }
   }
 });
 test('local classifier includes committed, staged, unstaged and untracked paths; CI ignores dirt', (t) => {
