@@ -2187,6 +2187,13 @@ records action, revision, digest, deployment URL, and validation-to-preview dura
   `Preview Result` on the intended revision (§14). Production deployment remains Cloudflare's Git
   integration for `main` and is unchanged.
 
+Gates consume only results that the trusted workflows publish: `CI Result` and `Preview Result`
+are GitHub Actions commit statuses and check runs (app id 15368) on the exact validated revision,
+and waiting automation re-reads them from the API rather than trusting `target_url` or any payload
+snapshot. When an aggregate accepts a job during a documented compatibility window, the window
+applies only to that job's absence; a reported non-success outcome still fails the aggregate, and
+the accepting aggregator version ships in the same change that activates the job.
+
 ### Files
 
 - `.github/workflows/preview.yml` — trusted controller: plan, deploy, smoke, result jobs

@@ -117,6 +117,14 @@ function assertSelectedJobFailures(plan, needs) {
     }
   }
 }
+function assertPreviewPlanShape(plan, needs) {
+  assert.ok(aggregateResults({ ...plan, previewRequired: undefined }, needs).length);
+  assert.ok(aggregateResults({ ...plan, previewRequired: 'true' }, needs).length);
+  if (plan.previewRequired && !plan.full) {
+    const stripped = { ...plan, jobs: plan.jobs.filter((job) => job !== 'validate') };
+    assert.ok(aggregateResults(stripped, needs).length);
+  }
+}
 test('aggregate fails closed on selected failures, cancellations, unexpected skips and missing data', () => {
   for (const paths of [['app/a.ts'], ['README.md']]) {
     const plan = classifyPaths(paths);
@@ -145,6 +153,9 @@ test('aggregate fails closed on selected failures, cancellations, unexpected ski
     assert.ok(aggregateResults(plan, withoutSecurity).some((error) => /^security:/.test(error)));
     assert.ok(aggregateResults(undefined, needs).length);
     assert.ok(aggregateResults({ ...plan, jobs: [] }, needs).length);
+    // A plan must carry a boolean previewRequired and exactly the jobs that decision selects:
+    // a preview-required plan without the validate job can never publish a deployable preview.
+    assertPreviewPlanShape(plan, needs);
     if (!plan.full)
       assert.ok(aggregateResults(plan, { ...needs, test: { result: 'success' } }).length);
   }

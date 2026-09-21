@@ -193,18 +193,31 @@ async function requiresPreview(github, context, pull) {
 /* ------------------------------------------------------------------------------------------ */
 function manifestPreviewBranch(candidate, pull) {
   return previewBranchName({
-    pullRequest: pullRequestNumber(pull),
+    pullRequest: candidate.runEvent === 'pull_request' ? pullRequestNumber(pull) : null,
     branch: candidate.headBranch,
   });
+}
+function claimSha(candidate, pull) {
+  if (candidate.runEvent !== 'pull_request' || !pull) return null;
+  return pull.base.sha;
+}
+function runTreeSha(context, candidate, run) {
+  if (run.head_sha !== candidate.headSha) return null;
+  const tree = run.head_tree_id ?? run.tree_sha;
+  return SHA_PATTERN.test(String(tree)) ? tree : null;
+}
+function claimCheckedOutSha(candidate, pull) {
+  return candidate.runEvent === 'pull_request' && pull ? pull.merge_commit_sha : candidate.headSha;
 }
 function expectedManifest(context, candidate, pull, run) {
   const previewBranch = manifestPreviewBranch(candidate, pull);
   return {
     repository: repoName(context),
-    pullRequest: pullRequestNumber(pull),
+    pullRequest: candidate.runEvent === 'pull_request' ? pullRequestNumber(pull) : null,
     headSha: candidate.headSha,
-    baseSha: pull ? pull.base.sha : null,
-    checkedOutSha: pull ? pull.merge_commit_sha : candidate.headSha,
+    baseSha: claimSha(candidate, pull),
+    checkedOutSha: claimCheckedOutSha(candidate, pull),
+    treeSha: runTreeSha(context, candidate, run),
     runId: run.id,
     runAttempt: run.run_attempt,
     previewBranch,
@@ -279,10 +292,16 @@ function decisionRun({ candidate, run }) {
     runCompletedAt: optional(run, 'updated_at'),
   };
 }
+/** Rebuild the phase-1 candidate for phase-2 re-verification; runEvent picks the claim shape. */
+function decisionRunEvent(candidate, pull) {
+  const dispatch = !candidate || candidate.runEvent !== 'pull_request' || !pull;
+  return dispatch ? 'workflow_dispatch' : 'pull_request';
+}
 function decisionBase({ candidate, pull, run, fork }) {
   return {
     ...decisionIdentity({ candidate, pull }),
     fork: Boolean(fork),
+    runEvent: decisionRunEvent(candidate, pull),
     ...decisionRun({ candidate, run }),
   };
 }
@@ -429,7 +448,7 @@ async function freshnessErrors(github, context, decision) {
 function candidateFromDecision(decision) {
   return {
     runId: decision.runId,
-    runEvent: decision.pullRequest ? 'pull_request' : 'workflow_dispatch',
+    runEvent: decision.runEvent,
     headSha: decision.headSha,
     headBranch: decision.headBranch,
     headRepo: decision.headRepo,

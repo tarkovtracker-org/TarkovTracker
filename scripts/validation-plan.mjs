@@ -50,10 +50,6 @@ function requiresPreview(paths, categories, forceFull) {
   if (forceFull || paths.length === 0) return true;
   return [...categories].some((category) => category !== 'docs');
 }
-function selectJobs(full, previewRequired) {
-  if (full) return [...fullJobs];
-  return previewRequired ? [...reducedJobs, 'validate'] : [...reducedJobs];
-}
 export function classifyPaths(paths, { forceFull = false, reason } = {}) {
   const categories = new Set(paths.map(pathCategory));
   const full = requiresFullValidation(paths, categories, forceFull);
@@ -65,7 +61,7 @@ export function classifyPaths(paths, { forceFull = false, reason } = {}) {
     i18n: full || categories.has('locales'),
     workflows: touchesWorkflows(paths),
     previewRequired,
-    jobs: selectJobs(full, previewRequired),
+    jobs: selectExpectedJobs(full, previewRequired),
     reason: reason || defaultReason(full),
     paths,
   };
@@ -127,11 +123,17 @@ export function collectChanges({
 function hasPlanShape(plan) {
   return Boolean(plan) && Array.isArray(plan.jobs) && typeof plan.full === 'boolean';
 }
+function selectExpectedJobs(full, previewRequired) {
+  if (full) return [...fullJobs];
+  const withPreview = previewRequired ? ['validate'] : [];
+  return [...reducedJobs, ...withPreview];
+}
 function isValidPlan(plan) {
   if (!hasPlanShape(plan)) return false;
-  const required = plan.full ? fullJobs : reducedJobs;
+  if (typeof plan.previewRequired !== 'boolean') return false;
+  const expected = selectExpectedJobs(plan.full, plan.previewRequired);
   return (
-    required.every((job) => plan.jobs.includes(job)) &&
+    expected.every((job) => plan.jobs.includes(job)) &&
     plan.jobs.every((job) => fullJobs.includes(job))
   );
 }

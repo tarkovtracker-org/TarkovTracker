@@ -245,6 +245,7 @@ function runFixture(overrides = {}) {
     head_sha: HEAD,
     head_branch: 'feature',
     head_repository: { full_name: REPO_NAME },
+    head_tree_id: TREE,
     run_attempt: 1,
     updated_at: new Date(Date.now() - 120000).toISOString(),
     pull_requests: [{ number: 42 }],
@@ -659,7 +660,8 @@ test('branch dispatches deploy without a pull request and reject the production 
   assert.equal(staged.decision.pullRequest, null);
   assert.equal(staged.decision.previewBranch, previewBranch);
   assert.deepEqual(statusStates(staged.state.statuses), ['a:pending']);
-  // The Crowdin `locales` dispatch resolves its open pull request through the validated head.
+  // The Crowdin `locales` dispatch resolves its open pull request through the validated head, but
+  // the dispatch build itself carries branch-derived manifest claims (no PR, head checkout).
   const locales = runFixture({
     event: 'workflow_dispatch',
     head_branch: 'locales',
@@ -668,13 +670,23 @@ test('branch dispatches deploy without a pull request and reject the production 
   const localesPull = pullFixture({
     head: { sha: HEAD, ref: 'locales', repo: { full_name: REPO_NAME } },
   });
+  const localesBranch = previewBranchName({ branch: 'locales' });
   const crowdin = await plan(t, workflowRunContext(locales), {
     pull: localesPull,
     associated: [localesPull],
     run: { event: 'workflow_dispatch', head_branch: 'locales', pull_requests: [] },
+    manifest: {
+      pullRequest: null,
+      baseSha: null,
+      checkedOutSha: HEAD,
+      previewBranch: localesBranch,
+      appUrl: previewAppUrl(localesBranch),
+    },
   });
   assert.equal(crowdin.decision.action, 'deploy');
   assert.equal(crowdin.decision.pullRequest, 42);
+  assert.equal(crowdin.decision.runEvent, 'workflow_dispatch');
+  assert.equal(crowdin.decision.previewBranch, localesBranch);
   const production = await plan(
     t,
     workflowRunContext(runFixture({ event: 'workflow_dispatch', head_branch: 'main' }))
