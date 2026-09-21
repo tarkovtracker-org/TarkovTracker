@@ -11,6 +11,10 @@ export const fullJobs = [
   'workers',
 ];
 const reducedJobs = ['lint-format', 'systems-drift'];
+// Compatibility window for the integrated security gate: the trusted default-branch aggregate
+// accepts a candidate workflow with or without the `security` job. When the job reports, it must
+// succeed. The follow-up activation change moves it into the always-selected job set.
+export const optionalJobs = ['security'];
 // Only Crowdin-owned translations are reduced. app/locales/en.json is the source locale that
 // application code and Vitest fixtures consume, so it selects full validation like other inputs
 // (scripts/crowdin-pr.sh draws the same boundary for translation-only PRs).
@@ -111,25 +115,30 @@ export function collectChanges({
 function hasPlanShape(plan) {
   return Boolean(plan) && Array.isArray(plan.jobs) && typeof plan.full === 'boolean';
 }
+function isKnownJob(job) {
+  return fullJobs.includes(job) || optionalJobs.includes(job);
+}
 function isValidPlan(plan) {
   if (!hasPlanShape(plan)) return false;
   const required = plan.full ? fullJobs : reducedJobs;
-  return (
-    required.every((job) => plan.jobs.includes(job)) &&
-    plan.jobs.every((job) => fullJobs.includes(job))
-  );
+  return required.every((job) => plan.jobs.includes(job)) && plan.jobs.every(isKnownJob);
 }
 function jobOutcomeError(plan, needs, job) {
   const expected = plan.jobs.includes(job) ? 'success' : 'skipped';
   const result = needs[job]?.result;
   return result === expected ? null : `${job}: expected ${expected}, received ${String(result)}`;
 }
+// An optional job may be absent from an older candidate workflow, but a reported outcome other
+// than success (failure, cancellation, or a skip) fails the aggregate.
+function optionalJobError(needs, job) {
+  if (!Object.hasOwn(needs, job)) return null;
+  const result = needs[job]?.result;
+  return result === 'success' ? null : `${job}: expected success, received ${String(result)}`;
+}
 // The trusted default-branch aggregator must not silently ignore validation jobs it does not know;
 // an unexpected dependency fails closed until the trusted contract is updated first.
 function unexpectedJobsError(needs) {
-  const unexpected = Object.keys(needs).filter(
-    (job) => job !== 'changes' && !fullJobs.includes(job)
-  );
+  const unexpected = Object.keys(needs).filter((job) => job !== 'changes' && !isKnownJob(job));
   return unexpected.length ? `Unexpected CI jobs: ${unexpected.join(', ')}` : null;
 }
 function classifierError(needs) {
@@ -139,6 +148,7 @@ export function aggregateResults(plan, needs) {
   if (!isValidPlan(plan)) return ['Missing or invalid validation plan'];
   return [
     ...fullJobs.map((job) => jobOutcomeError(plan, needs, job)),
+    ...optionalJobs.map((job) => optionalJobError(needs, job)),
     classifierError(needs),
     unexpectedJobsError(needs),
   ].filter(Boolean);

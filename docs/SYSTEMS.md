@@ -1650,7 +1650,9 @@ The checkout stays pinned to the validated SHA. The production build still runs 
   the trusted default branch for aggregation and reporting, never candidate branch code. Only aggregate
   success publishes success; failed, cancelled, skipped, or missing validation publishes failure.
   Validation jobs unknown to the trusted aggregator also fail the result, so a new job must land in
-  the trusted contract before it can gate. Status publication errors fail the CI Result job, so
+  the trusted contract before it can gate. A job listed in `optionalJobs` (`security`) may be absent
+  from an older candidate workflow during its compatibility window, but a reported outcome other
+  than success fails the result. Status publication errors fail the CI Result job, so
   automation cannot promote the commit.
 - Release version commits pass ordinary CI on a temporary `wip/release-*` branch before the
   identical SHA advances main. The main ruleset requires successful GitHub Actions `CI Result`,

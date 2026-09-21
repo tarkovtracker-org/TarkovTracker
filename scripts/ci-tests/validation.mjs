@@ -10,6 +10,7 @@ import {
   collectChanges,
   aggregateResults,
   fullJobs,
+  optionalJobs,
 } from '../validation-plan.mjs';
 import { gitExecutable } from '../validation-tools.mjs';
 const cli = resolve('scripts/validate-changes.mjs');
@@ -101,6 +102,43 @@ test('aggregate fails closed on selected failures, cancellations, unexpected ski
     assert.ok(aggregateResults({ ...plan, jobs: [] }, needs).length);
     if (!plan.full)
       assert.ok(aggregateResults(plan, { ...needs, test: { result: 'success' } }).length);
+  }
+});
+test('compatibility window: the security gate may be absent, but a reported outcome must succeed', () => {
+  assert.deepEqual(optionalJobs, ['security']);
+  for (const paths of [['app/a.ts'], ['README.md']]) {
+    const plan = classifyPaths(paths);
+    const needs = {
+      changes: { result: 'success' },
+      ...Object.fromEntries(
+        fullJobs.map((job) => [job, { result: plan.jobs.includes(job) ? 'success' : 'skipped' }])
+      ),
+    };
+    // Older candidate workflows without the job keep passing during the compatibility window.
+    assert.deepEqual(aggregateResults(plan, needs), []);
+    assert.deepEqual(aggregateResults(plan, { ...needs, security: { result: 'success' } }), []);
+    // A newer candidate plan may already list the job; the trusted aggregate accepts it.
+    assert.deepEqual(
+      aggregateResults(
+        { ...plan, jobs: [...plan.jobs, 'security'] },
+        { ...needs, security: { result: 'success' } }
+      ),
+      []
+    );
+    for (const result of ['failure', 'cancelled', 'skipped', undefined]) {
+      const errors = aggregateResults(plan, { ...needs, security: { result } });
+      assert.equal(errors.length, 1, `${paths}: ${result}`);
+      assert.match(errors[0], /^security: expected success/);
+    }
+    // Reduced plans may add the preview build without switching to full validation.
+    if (!plan.full) {
+      const withPreview = { ...plan, jobs: [...plan.jobs, 'validate'] };
+      assert.deepEqual(
+        aggregateResults(withPreview, { ...needs, validate: { result: 'success' } }),
+        []
+      );
+      assert.ok(aggregateResults(withPreview, needs).length);
+    }
   }
 });
 test('local classifier includes committed, staged, unstaged and untracked paths; CI ignores dirt', (t) => {
