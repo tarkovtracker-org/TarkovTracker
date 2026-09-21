@@ -1,3 +1,16 @@
+# [1.81.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.80.2...v1.81.0) (2026-09-21)
+
+
+### Bug Fixes
+
+* **ci:** stop echoing external deployment evidence into job logs ([8c2ecbd](https://github.com/tarkovtracker-org/TarkovTracker/commit/8c2ecbd7e452840a1a29f155696cba1c1978a89e))
+* **preview:** verify dispatch-identity and tree claims; validate preview-required plans ([9c14255](https://github.com/tarkovtracker-org/TarkovTracker/commit/9c14255bfd2a4ba0e909bc52d5851c9f08e02c30))
+
+
+### Features
+
+* **ci:** replace Cloudflare Git previews with an Actions-owned trusted controller ([44a3f0a](https://github.com/tarkovtracker-org/TarkovTracker/commit/44a3f0af3cdd272fc8509895558fe2b6ff0a848d))
+
 ## [1.80.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.80.1...v1.80.2) (2026-09-17)
 
 
