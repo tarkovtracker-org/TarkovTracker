@@ -93,7 +93,8 @@ check_revision() {
   current_base="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
   [[ "$current_base" == "$BASE_SHA" ]] || fail "Main changed after validation; rerun Crowdin Sync."
 }
-# Retry unresolved calculations while rejecting every known ineligible state.
+# GitHub may report BLOCKED briefly after Preview Result succeeds while branch rules recalculate.
+# Retry that state, but merge only after GitHub reports CLEAN on the unchanged head and base.
 wait_for_mergeability() {
   local pr mergeable merge_state attempt
   for ((attempt = 1; attempt <= 20; attempt++)); do
@@ -104,7 +105,7 @@ wait_for_mergeability() {
     merge_state="$(jq -r '.mergeStateStatus' <<< "$pr")"
     case "$mergeable/$merge_state" in
       MERGEABLE/CLEAN) return ;;
-      UNKNOWN/UNKNOWN|UNKNOWN/CLEAN|MERGEABLE/UNKNOWN) ;;
+      UNKNOWN/UNKNOWN|UNKNOWN/CLEAN|MERGEABLE/UNKNOWN|MERGEABLE/BLOCKED) ;;
       *) fail "Crowdin PR is ineligible: $mergeable / $merge_state" ;;
     esac
     (( attempt < 20 )) || fail "Timed out waiting for Crowdin PR mergeability."

@@ -120,7 +120,6 @@ test('merge rejects every non-CLEAN state and conflicting or malformed mergeabil
   passed(f.run('prepare'));
   for (const mergeStateStatus of [
     'DIRTY',
-    'BLOCKED',
     'BEHIND',
     'UNSTABLE',
     'DRAFT',
@@ -137,13 +136,16 @@ test('merge rejects every non-CLEAN state and conflicting or malformed mergeabil
   }
   assert.ok(!f.calls().some((args) => args[1] === 'merge'));
 });
-test('unknown mergeability retries until clean, and unresolved state times out', (t) => {
+test('unknown or temporarily blocked mergeability retries until clean, then times out', (t) => {
   const f = fixture(t);
   passed(f.run('prepare'));
   const unknown = { ...f.pr, mergeable: 'UNKNOWN', mergeStateStatus: 'UNKNOWN' };
+  const blocked = { ...f.pr, mergeStateStatus: 'BLOCKED' };
   passed(f.run('merge', { PR_STATES: JSON.stringify([unknown, unknown, f.pr]) }));
+  passed(f.run('merge', { PR_STATES: JSON.stringify([blocked, blocked, f.pr]) }));
   rejected(f.run('merge', { PR_STATES: JSON.stringify([unknown]) }), /Timed out/);
-  assert.equal(f.calls().filter((args) => args[1] === 'merge').length, 1);
+  rejected(f.run('merge', { PR_STATES: JSON.stringify([blocked]) }), /Timed out/);
+  assert.equal(f.calls().filter((args) => args[1] === 'merge').length, 2);
 });
 test('missing merge credential, changed main, changed checkout or PR identity fail closed', (t) => {
   const f = fixture(t);
