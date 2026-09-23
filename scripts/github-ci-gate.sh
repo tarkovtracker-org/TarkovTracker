@@ -46,15 +46,16 @@ wait_for_ci_result() {
 # GitHub's /commits/{sha}/statuses endpoint binds the response to the requested SHA; individual
 # status objects do not contain a sha field.
 wait_for_preview_result() {
-  local sha="$1" attempt statuses result
+  local sha="$1" attempt statuses result prefix="https://github.com/$GITHUB_REPOSITORY/actions/runs/"
   for ((attempt = 1; attempt <= GATE_WAIT_ATTEMPTS; attempt++)); do
     statuses="$(gh api --paginate "repos/$GITHUB_REPOSITORY/commits/$sha/statuses?per_page=100")"
-    result="$(jq -rs '
+    result="$(jq -rs --arg prefix "$prefix" '
       [ .[][] | select(.context == "Preview Result") ]
       | sort_by(.id) | last
       | if . == null then "pending"
         elif .state != "success" then .state
-        elif ((.target_url // "" | capture("/actions/runs/(?<id>[0-9]+)") | .id)?) == ""
+        elif ((.target_url // "") | startswith($prefix) | not) then "unbound"
+        elif ((.target_url // "") | ltrimstr($prefix) | test("^[0-9]+$") | not)
         then "unbound"
         else "bound" end' <<< "$statuses")"
     case "$result" in
@@ -71,12 +72,13 @@ wait_for_preview_result() {
 # workflow on main, complete with a successful result publication, and
 # must carry the deployment evidence artifact named for the exact previewed SHA.
 preview_result_binding() {
-  local sha="$1" run_id run jobs evidence
-  run_id="$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/statuses?per_page=100" | jq -r '
+  local sha="$1" run_id run jobs evidence prefix="https://github.com/$GITHUB_REPOSITORY/actions/runs/"
+  run_id="$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/statuses?per_page=100" | jq -r --arg prefix "$prefix" '
     [ .[] | select(.context == "Preview Result") ]
     | sort_by(.id) | last
     | select(.state == "success")
-    | (.target_url // "" | capture("/actions/runs/(?<id>[0-9]+)") | .id)? // ""')"
+    | (.target_url // "") | select(startswith($prefix)) | ltrimstr($prefix)
+    | select(test("^[0-9]+$"))')"
   [[ "$run_id" =~ ^[0-9]+$ ]] || { echo 'Preview Result is not bound to a controller run.' >&2; return 1; }
   run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id")"
   # GitHub reports path and branch separately; path has no @main suffix for workflow_dispatch.

@@ -109,7 +109,7 @@ if (args[0] === 'api') {
     const statuses = p.PREVIEW_PRESENT === 'false' ? [] : [
       { id: 1, context: 'Preview Result', state: 'failure' },
       { id: 2, context: 'CI Result', state: 'success' },
-      { id: 3, context: 'Preview Result', state: p.PREVIEW_STATE || 'success', target_url: 'https://github.com/o/r/actions/runs/555' },
+      { id: 3, context: 'Preview Result', state: p.PREVIEW_STATE || 'success', target_url: p.PREVIEW_TARGET_URL || 'https://github.com/' + p.GITHUB_REPOSITORY + '/actions/runs/555' },
     ];
     console.log(JSON.stringify(statuses));
     process.exit(0);
