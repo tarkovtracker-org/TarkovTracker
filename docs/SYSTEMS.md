@@ -1697,7 +1697,8 @@ behind branch, explicitly dispatches candidate CI, and performs the final merge;
 - Behind translation branches first receive a GitHub branch update guarded by the expected head.
   Only afterward does the workflow capture and validate a candidate. Conflicts fail closed.
 - Candidates contain captured main. Preflight checks reject observed main/head changes and
-  non-clean merge states. Only unknown calculations retry.
+  non-clean merge states. Unknown calculations and a temporary `BLOCKED` state after preview
+  success retry for up to 60 seconds; only `MERGEABLE / CLEAN` may merge.
 - The gate awaits successful GitHub Actions `CI Result` and then the `Preview Result` commit status
   on the exact head (the explicit `locales` dispatch produces the preview even though job-token
   actions suppress ordinary pull-request events) and verifies the effective
