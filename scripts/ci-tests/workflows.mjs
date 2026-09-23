@@ -141,8 +141,10 @@ test('Dependabot auto-merge requires immutable author and event actor identities
   assert.match(workflow, /workflow_run:\n {4}workflows: \[CI\]\n {4}types: \[completed\]/);
   assert.doesNotMatch(workflow, /pull_request_target:/);
   assert.doesNotMatch(eligibility, /workflow_run\.(actor|triggering_actor)\.id/);
+  assert.doesNotMatch(eligibility, /workflow_run\.head_repository/);
   const gate = workflowStep(job, 'Gate Dependabot PR');
   assert.match(gate, /\.actor\.id == 49699333 and \.triggering_actor\.id == 49699333/);
+  assert.match(gate, /\.head_repository\.full_name == \$repo/);
   assert.match(gate, /\.user\.id == 49699333/);
   assert.doesNotMatch(eligibility, /github\.actor\s*==|user\.login\s*==/);
 });

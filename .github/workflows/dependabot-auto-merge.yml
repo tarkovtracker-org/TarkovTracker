@@ -19,8 +19,7 @@ jobs:
     # runs are read-only even if the workflow requests write permissions.
     if: >-
       github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_repository.id == github.event.repository.id
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
@@ -42,9 +41,10 @@ jobs:
             exit 0
           fi
           ci_run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CI_RUN_ID")"
-          if ! jq -e --arg sha "$HEAD_SHA" --argjson number "$PR_NUMBER" '
+          if ! jq -e --arg sha "$HEAD_SHA" --arg repo "$GITHUB_REPOSITORY" --argjson number "$PR_NUMBER" '
             .path == ".github/workflows/ci.yml" and .event == "pull_request" and
             .status == "completed" and .conclusion == "success" and .head_sha == $sha and
+            .head_repository.full_name == $repo and
             .actor.id == 49699333 and .triggering_actor.id == 49699333 and
             ([.pull_requests[]? | select(.number == $number and .head.sha == $sha)] | length) == 1
           ' >/dev/null <<< "$ci_run"; then
