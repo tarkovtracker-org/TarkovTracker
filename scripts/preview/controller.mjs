@@ -324,7 +324,7 @@ function draftDecision() {
   return {
     action: 'skip',
     state: 'pending',
-    description: 'Draft pull request: the preview deploys after it is marked ready for review.',
+    description: 'Draft pull request: mark ready, then request a preview after successful CI.',
   };
 }
 function notApplicable() {

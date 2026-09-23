@@ -472,11 +472,10 @@ bindings and production secrets are absent. Production deployment configuration 
 GitHub CLI readback: the existing `Main CI freshness` ruleset still requires only `CI Result`.
 `preview` and `preview-fork` are restricted to `main`; fork previews require approval from
 `DysektAI` or `Chica999`, with self-approval and administrator bypass disabled. Both environments
-have `CLOUDFLARE_ACCOUNT_ID`. `CLOUDFLARE_PAGES_API_TOKEN` is still repository-scoped, so the
-trusted controller is not ready to merge or enable manual dispatch. Create a replacement Pages-only
-token, set it as an environment secret in both environments, and delete the repository secret first.
-GitHub does not reveal existing secret values for copying, and the connected Cloudflare API
-credential cannot create API tokens.
+have `CLOUDFLARE_ACCOUNT_ID`. `CLOUDFLARE_PAGES_API_TOKEN` now exists as a secret in both
+environments, and the repository-scoped copy was removed. GitHub confirms secret presence but does
+not reveal its value or scope; the first manual deployment checks that the token works. The connected
+Cloudflare API credential cannot create API tokens.
 
 Ordered rollout (keep `Preview Result` non-required until acceptance passes):
 
@@ -494,9 +493,9 @@ Ordered rollout (keep `Preview Result` non-required until acceptance passes):
 2. The trusted aggregate compatibility change (`optionalJobs` tolerance in
    `scripts/validation-plan.mjs`) and the preview controller/manifest pipeline are already on
    `main`.
-3. Replace the repository-scoped Pages token with a Pages-only token stored in both protected GitHub
-   environments, then delete the repository secret. This must happen before the bootstrap change is
-   merged because a manual dispatch can select another ref's workflow file.
+3. The operator created a Pages-only token and stored it in both protected GitHub environments;
+   the repository secret was removed on 2026-09-23. This had to precede the bootstrap merge because
+   a manual dispatch can select another ref's workflow file.
 4. Merge the trusted-controller bootstrap change that fixes the default-branch credential mapping
    and makes automatic controller events wait instead of uploading. A PR's edits to
    `preview.yml` cannot exercise themselves because `workflow_run` loads that workflow from `main`.
