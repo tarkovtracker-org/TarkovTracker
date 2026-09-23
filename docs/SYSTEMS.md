@@ -1666,7 +1666,8 @@ The checkout stays pinned to the validated SHA. The production build still runs 
   on the same SHA; gate waits are bounded to 60 minutes, and the containing Release and Crowdin
   workflows are bounded to 90 minutes. Ordinary
   `wip/**` push CI no longer exists. The main ruleset requires successful GitHub Actions
-  `CI Result`, strict freshness, and no bypass actors. Non-fast-forward promotion fails if main advances.
+  `CI Result` and `Preview Result`, strict freshness, and no bypass actors. Non-fast-forward
+  promotion fails if main advances.
 - If publication fails after version promotion, an explicit rerun can recover only the direct
   version-only child of the original CI revision, with successful exact-head `CI Result` **and**
   `Preview Result` and unchanged manifest/changelog history. The `Preview Result` evidence is

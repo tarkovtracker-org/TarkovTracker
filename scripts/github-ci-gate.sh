@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Shared by trusted Crowdin and release automation; callers enable errexit/pipefail.
-# Reject a missing, non-strict, or foreign-provider main CI rule.
+# Reject a missing, non-strict, or foreign-provider main validation rule.
 # The rollout administrator verifies bypass actors; reading them requires ruleset write access.
 require_main_ci_policy() {
   local rules rule_id
@@ -9,9 +9,10 @@ require_main_ci_policy() {
     [ .[][] | select(.type == "required_status_checks"
       and .ruleset_source_type == "Repository" and .ruleset_source == $repo
       and .parameters.strict_required_status_checks_policy == true
-      and any(.parameters.required_status_checks[]; .context == "CI Result" and .integration_id == 15368))
+      and any(.parameters.required_status_checks[]; .context == "CI Result" and .integration_id == 15368)
+      and any(.parameters.required_status_checks[]; .context == "Preview Result" and .integration_id == 15368))
       | .ruleset_id ][0] // empty' <<< "$rules")"
-  [[ "$rule_id" =~ ^[0-9]+$ ]] || { echo 'Missing strict main CI Result rule.' >&2; return 1; }
+  [[ "$rule_id" =~ ^[0-9]+$ ]] || { echo 'Missing strict main CI and Preview Result rule.' >&2; return 1; }
 
 }
 # Observe the captured main revision before promoting an already validated commit.

@@ -138,7 +138,7 @@ Non-English formatting exclusions and Crowdin ownership remain intact.
    (`proposed.full=false`, runs succeeded), executable #855 and mixed docs/workflow #862/#863
    (`proposed.full=true`), and failing executable runs on #848/#852/#862 where a failed shard, Fallow,
    or lint job made `CI Result` fail. The only required check on `main` is `CI Result`
-   (`Main CI freshness` ruleset), so skipped jobs cannot leave a pull request blocked.
+   (`Main CI freshness` ruleset at that rollout stage), so skipped jobs could not leave a pull request blocked.
 2. Done: the classifier invocation no longer passes `--shadow`; pull requests receive path selection
    while push and dispatch events retain `--full`. Required-check settings were not changed. Roll
    back by restoring `--shadow` in the `Classify changes` step and inverting the `--shadow`
@@ -270,7 +270,7 @@ this workflow controls release/version publication, not when the initial deploym
 **Required main policy:** `.github/main-ci-ruleset.json` records the desired API configuration for
 the `Main CI freshness` repository ruleset. Rollout must apply it and verify active enforcement and
 an empty bypass list before merging the automation changes. It targets
-`refs/heads/main`, requires `CI Result` from GitHub Actions (integration ID `15368`), enables
+`refs/heads/main`, requires both `CI Result` and `Preview Result` from GitHub Actions (integration ID `15368`), enables
 `strict_required_status_checks_policy`, and has an empty `bypass_actors` list. This applies to
 all PRs and direct pushes, including administrators and automation. Existing deletion/force-push
 rules remain separate. Behind branches must incorporate current main and pass CI again; do not
@@ -430,8 +430,8 @@ GitHub Actions controls when pull-request previews deploy to the existing Cloudf
 (`tarkovtracker`, `tarkovtrackernuxt.pages.dev`). The controller publishes a current-SHA `Preview
 Result` for eligible PR revisions; an explicit maintainer request or trusted merge automation
 dispatch uploads the validated artifact. Cloudflare-managed preview builds are disabled while automatic production deployments
-for `main` remain enabled. `Preview Result` becomes a required merge check after the staged rollout
-and acceptance scenarios below pass. The design, result contract, and invariants are specified in
+for `main` remain enabled. The two-check ruleset is applied after the live preview acceptance
+scenarios below pass. The design, result contract, and invariants are specified in
 [SYSTEMS.md §18](SYSTEMS.md#18-actions-owned-cloudflare-previews).
 
 **Triggers:** `workflow_run` for completed CI, metadata-only `pull_request_target` events (`opened`,
@@ -514,17 +514,21 @@ Ordered rollout (keep `Preview Result` non-required until acceptance passes):
 6. After the bootstrap change is on `main`, dispatch `preview.yml` with the successful `run_id` for
    PR #896's current head. Confirm upload, deployment record, smoke suite, and current-SHA status.
    Dispatch from `main`; do not test candidate-controlled workflow code with deployment secrets.
-7. Complete the live acceptance scenarios (application PR success and failure, documentation-only
-   PR, translation PR, draft transition, approved fork, superseded revision, release-staging
-   candidate; confirm GitHub blocks merging when the preview fails or is missing). Then add
-   `Preview Result` (GitHub Actions, integration id `15368`) to `.github/main-ci-ruleset.json` and
-   the deployed `Main CI freshness` ruleset alongside `CI Result`, preserving strict freshness and the
-   empty bypass list:
+7. Before enforcement, verify one current-head application PR uploads, passes smoke tests, and
+   publishes `Preview Result: success`; confirm its prior automatic result stayed pending without a
+   Pages build. Review the controller's failure and stale-revision fixtures and the existing failed
+   PR evidence. Then apply `.github/main-ci-ruleset.json` to require `Preview Result` alongside
+   `CI Result`, preserving strict freshness and the empty bypass list. Verify the effective rule and
+   that a preview-required PR with a missing or pending result is blocked:
 
    ```bash
    gh api -X PUT repos/tarkovtracker-org/TarkovTracker/rulesets/23539975 --input .github/main-ci-ruleset.json
    gh api repos/tarkovtracker-org/TarkovTracker/rules/branches/main
    ```
+
+   Check documentation-only, translation, draft transition, approved fork, superseded revision,
+   and release-staging behavior on the next matching live candidates. Keep fixture coverage for
+   these cases; do not create extra Pages builds solely to exercise the rollout matrix.
 
 8. Remove temporary compatibility behavior after the new paths are verified.
 
