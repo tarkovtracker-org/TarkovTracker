@@ -119,8 +119,8 @@ merge() {
   [[ "$(git rev-parse HEAD)" == "$HEAD_SHA" ]] || fail "Checkout differs from the validated head."
   require_main_ci_policy
   dispatch_ci locales
-  # Dispatched CI produces the preview even though job-token actions suppress PR events.
-  wait_for_validated_head "$HEAD_SHA"
+  request_preview_after_dispatched_ci "$HEAD_SHA"
+  wait_for_preview_result "$HEAD_SHA"
   wait_for_mergeability
   require_main_ci_policy
   # Server-side guard closes the race between the final read and the merge request.

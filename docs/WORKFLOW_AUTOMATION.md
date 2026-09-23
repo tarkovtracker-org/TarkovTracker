@@ -285,12 +285,12 @@ request administrative permissions merely to inspect it.
 main-only release workflow. It stages only these generated assets and rejects unrelated staged
 files. `scripts/release-commit.sh` pushes the new commit to
 `wip/release-<version>-<run-id>-<attempt>` using the built-in `GITHUB_TOKEN`.
-An explicit `workflow_dispatch` starts full CI on that branch; the job has `actions: write`. The
-plugin waits up to sixty minutes for successful GitHub Actions `CI Result` on the exact version SHA
-and then up to sixty minutes for the authoritative `Preview Result` commit status on the same SHA
-(`wait_for_validated_head` in `scripts/github-ci-gate.sh`); the version commit is a deployable
-change and receives an Actions-owned preview before promotion. Absent, failed, cancelled, skipped,
-or timed-out gates cannot promote it. The Release job is bounded to 90 minutes.
+An explicit `workflow_dispatch` starts full CI on that branch; the job has `actions: write`. After
+that exact CI run and its `CI Result` pass, the trusted Release job dispatches one preview from
+`main` with the CI run id and waits for the authoritative `Preview Result` on the same SHA. The
+version commit is a deployable change and receives an Actions-owned preview before promotion.
+Absent, failed, cancelled, skipped, or timed-out gates cannot promote it. The Release job is
+bounded to 90 minutes.
 
 Automation confirms each accepted dispatch creates a new CI run on the requested branch within
 60 seconds, including queued runs, before waiting for exact-SHA checks. Dispatched Fallow audits
@@ -395,6 +395,9 @@ Merges known low-risk Dependabot PRs after the normal PR checks complete:
   status context may fail or remain pending; the merge command also matches the validated head
   commit to close the final race. Individual CI/security job names are no longer listed; the wait
   is bounded to 60 minutes inside a 90-minute job
+- An allowlisted candidate requests one preview from the trusted `main` controller only after its
+  current-head CI and other checks pass. This retains unattended auto-merge without running a Pages
+  deployment for unrelated PR pushes
 
 ### 6. Stale Management (`.github/workflows/stale.yml`)
 
@@ -424,21 +427,21 @@ Validates external links in documentation:
 
 GitHub Actions controls when pull-request previews deploy to the existing Cloudflare Pages project
 (`tarkovtracker`, `tarkovtrackernuxt.pages.dev`). The controller publishes a current-SHA `Preview
-Result` for eligible PR revisions, but only an explicit maintainer dispatch uploads the validated
-artifact. Cloudflare-managed preview builds are disabled while automatic production deployments
+Result` for eligible PR revisions; an explicit maintainer request or trusted merge automation
+dispatch uploads the validated artifact. Cloudflare-managed preview builds are disabled while automatic production deployments
 for `main` remain enabled. `Preview Result` becomes a required merge check after the staged rollout
 and acceptance scenarios below pass. The design, result contract, and invariants are specified in
 [SYSTEMS.md §18](SYSTEMS.md#18-actions-owned-cloudflare-previews).
 
 **Triggers:** `workflow_run` for completed CI, metadata-only `pull_request_target` events (`opened`,
-`synchronize`, `reopened`, `ready_for_review`, `converted_to_draft`, `closed`), and a maintainer
+`synchronize`, `reopened`, `ready_for_review`, `converted_to_draft`, `closed`), and an explicit
 `workflow_dispatch` accepting a CI run id from `main` only. Automatic events refresh the status;
 they never upload to Pages. Every job checks out the default branch; both privileged triggers are
 accepted in `.github/zizmor.yml` because the controller is the intended trusted boundary.
 
 **Jobs:** `Plan preview` resolves the candidate through the API, requires successful CI evidence,
 verifies the artifact's manifest and digest, and publishes the interim status. Application,
-configuration, and dependency changes stay `pending` until a maintainer requests their preview.
+configuration, and dependency changes stay `pending` until preview is requested.
 `Deploy preview` runs only for that dispatch in the `preview` environment (same-repository
 candidates) or `preview-fork` (required maintainer approval, self-approval and administrator bypass
 disabled), repeats every freshness check, re-verifies the artifact, uploads it with pinned Wrangler
@@ -456,6 +459,10 @@ and profile version (`[preview <digest12> v1]` marker).
 **Manual preview:** `gh workflow run preview.yml --ref main -f run_id=<ci-run-id>`. Use the
 successful CI run for the PR's current head. The controller repeats every eligibility and freshness
 check; it cannot bypass failed CI or deploy a stale revision.
+
+**Trusted automation:** Crowdin translation merges and release staging request one preview after
+their dispatched CI run succeeds on the exact candidate SHA. Allowlisted Dependabot auto-merge
+requests one after all candidate checks pass. Ordinary PR revisions do not deploy automatically.
 
 **Metrics:** each controller run summary records the action (deploy/reuse/skip/wait/fail),
 revision, digest, deployment URL, whether the result was published, and the validation-to-preview

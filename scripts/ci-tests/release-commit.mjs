@@ -36,6 +36,8 @@ test('release validates a staging commit before promoting that identical SHA wit
   const dispatchIndex = events.findIndex((event) => event.type === 'dispatch');
   assert.equal(events[dispatchIndex]?.ref, 'wip/release-1.2.3-123-1');
   const ciIndex = events.findIndex((event) => event.type === 'ci-result');
+  const requestIndex = events.findIndex((event) => event.type === 'preview-dispatch');
+  const previewIndex = events.findIndex((event) => event.type === 'preview-result');
   const mainIndex = events.findIndex(
     (event) => event.type === 'push' && event.args.at(-1) === `${sha}:refs/heads/main`
   );
@@ -49,6 +51,12 @@ test('release validates a staging commit before promoting that identical SHA wit
     conclusion: 'success',
   });
   assert.ok(ciIndex < mainIndex, 'successful exact-head CI must precede main promotion');
+  assert.ok(ciIndex < requestIndex && requestIndex < previewIndex && previewIndex < mainIndex);
+  assert.deepEqual(events[requestIndex], {
+    type: 'preview-dispatch',
+    runId: 'run_id=1',
+    ref: 'main',
+  });
   const pushes = f.pushes();
   assert.equal(pushes[0].credential, 'main');
   assert.equal(pushes[0].args.at(-1), `${sha}:refs/heads/wip/release-1.2.3-123-1`);
@@ -65,6 +73,20 @@ test('failed staging CI leaves main unchanged and never attempts promotion', (t)
   assert.match(result.stderr, /CI Result did not succeed/);
   assert.equal(git(f.repo, '--git-dir', f.remote, 'rev-parse', 'main'), f.base);
   assert.equal(f.pushes().length, 1);
+  assert.ok(!f.events().some((event) => event.type === 'preview-dispatch'));
+});
+test('release refuses a stale CI run or failed preview dispatch before promotion', (t) => {
+  for (const overrides of [
+    { CI_RUN_HEAD: 'a'.repeat(40) },
+    { CI_WATCH_FAIL: 'true' },
+    { PREVIEW_DISPATCH_FAIL: 'true' },
+  ]) {
+    const f = releaseFixture(t);
+    const result = f.release(overrides);
+    assert.equal(result.status, 1);
+    assert.equal(git(f.repo, '--git-dir', f.remote, 'rev-parse', 'main'), f.base);
+    assert.equal(f.pushes().length, 1);
+  }
 });
 test('a version commit without a successful preview is never promoted', (t) => {
   const f = releaseFixture(t);

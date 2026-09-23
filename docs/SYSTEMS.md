@@ -1661,9 +1661,10 @@ The checkout stays pinned to the validated SHA. The production build still runs 
   CI Result job, so automation cannot promote the commit.
 - Release version commits pass explicitly dispatched CI on a temporary `wip/release-*` branch and
   receive an Actions-owned preview (§18) before the identical SHA advances main; the embedded
-  version makes them deployable changes. `scripts/github-ci-gate.sh` waits for both `CI Result`
-  and the authoritative `Preview Result` on the exact SHA (`wait_for_validated_head`), each bounded
-  to 60 minutes; the containing Release and Crowdin workflows are bounded to 90 minutes. Ordinary
+  version makes them deployable changes. `scripts/github-ci-gate.sh` waits for the exact dispatched
+  CI run and its `CI Result`, requests one preview, then waits for the authoritative `Preview Result`
+  on the same SHA; gate waits are bounded to 60 minutes, and the containing Release and Crowdin
+  workflows are bounded to 90 minutes. Ordinary
   `wip/**` push CI no longer exists. The main ruleset requires successful GitHub Actions
   `CI Result`, strict freshness, and no bypass actors. Non-fast-forward promotion fails if main advances.
 - If publication fails after version promotion, an explicit rerun can recover only the direct
@@ -2147,7 +2148,7 @@ must execute the `.github/workflows/preview.yml@main` definition (default-branch
 PR update → CI (selected validation + security + preview build + manifest + artifact)
           → CI Result succeeds
           → controller (workflow_run / pull_request_target) resolves candidate and publishes pending
-          → maintainer dispatches Preview for the successful CI run on the current revision
+          → maintainer (or trusted merge automation) dispatches Preview for the successful CI run
           → ready PR + current head/base/test-merge + attempt + artifact claims verified
           → environment `preview` or `preview-fork` (maintainer approval for forks)
           → recheck → wrangler pages deploy --branch preview-* → deployment record verified
@@ -2188,7 +2189,9 @@ records action, revision, digest, deployment URL, and validation-to-preview dura
   the status marker; `ready_for_review` reuses matching evidence instead of redeploying.
 - Pull-request and CI-completion events never upload to Cloudflare. Only a trusted
   `workflow_dispatch` from `main` can deploy, and it repeats the exact-SHA, CI, artifact, and
-  freshness checks. Cloudflare automatic preview builds are disabled while production Git
+  freshness checks. Crowdin and release staging dispatch once after their own exact-SHA CI passes;
+  allowlisted Dependabot auto-merge candidates dispatch after all checks pass. Ordinary PR pushes
+  never request deployment. Cloudflare automatic preview builds are disabled while production Git
   deployments for `main` remain enabled.
 - The Pages-only deployment token is stored only in the protected `preview` and `preview-fork`
   environments, whose branch policy allows `main`; remove the repository-scoped copy. This prevents

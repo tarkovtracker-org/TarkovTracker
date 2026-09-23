@@ -1,7 +1,7 @@
 name: Preview
 # Trusted preview controller. Every job checks out the default branch; candidate code is never
 # executed, installed, or used as Wrangler configuration. The controller verifies CI evidence and
-# the preview artifact's claims against live GitHub state, uploads only after an explicit maintainer
+# the preview artifact's claims against live GitHub state, uploads only after an explicit trusted
 # dispatch, smoke-tests the unique deployment URL, and publishes the authoritative `Preview Result`
 # status. Automatic events only maintain the current-SHA gate. See docs/SYSTEMS.md §18.
 on:

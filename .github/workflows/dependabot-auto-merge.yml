@@ -15,6 +15,7 @@ on:
       - 'app/locales/uk.json'
       - 'app/locales/zh.json'
 permissions:
+  actions: write
   checks: read
   contents: write
   pull-requests: write
@@ -109,6 +110,7 @@ jobs:
           )
           # Gate waits are bounded to 60 minutes.
           deadline=$((SECONDS + 3600))
+          preview_requested=false
           while true; do
             check_runs="$(
               gh api \
@@ -139,6 +141,9 @@ jobs:
             pending_status_count="$(
               jq '[.[] | select(.state == "pending")] | length' <<< "$status_contexts"
             )"
+            other_pending_status_count="$(
+              jq '[.[] | select(.context != "Preview Result" and .state == "pending")] | length' <<< "$status_contexts"
+            )"
             for check_name in "${expected_checks[@]}"; do
               matching_check="$(
                 jq --arg name "$check_name" '[.[] | select(.name == $name and .app.id == 15368)]' <<< "$check_runs"
@@ -148,12 +153,16 @@ jobs:
                 continue
               fi
               incomplete_count="$(
-                jq '[.[] | select(.status != "completed")] | length' <<< "$matching_check"
+                jq '[.[] | select(.status != "completed" or .conclusion != "success")] | length' <<< "$matching_check"
               )"
               if [ "$incomplete_count" -gt 0 ]; then
                 incomplete_checks+=("$check_name")
               fi
             done
+            checks_ready=false
+            if [ "${#missing_checks[@]}" -eq 0 ] && [ "${#incomplete_checks[@]}" -eq 0 ] && [ "$pending_count" -eq 0 ]; then
+              checks_ready=true
+            fi
             for status_context in "${expected_statuses[@]}"; do
               latest_state="$(
                 jq -r --arg name "$status_context" '[.[] | select(.context == $name)] | last | .state // "missing"' <<< "$status_contexts"
@@ -164,6 +173,24 @@ jobs:
                 *) incomplete_checks+=("$status_context") ;;
               esac
             done
+            if [ "$preview_requested" = false ] && [ "$checks_ready" = true ] && [ "$other_pending_status_count" -eq 0 ] && { [ "$latest_state" = missing ] || [ "$latest_state" = pending ]; }; then
+              ci_details_url="$(
+                jq -r '[.[] | select(.name == "CI Result" and .app.id == 15368)] | sort_by(.id) | last | .details_url // ""' <<< "$check_runs"
+              )"
+              if [[ ! "$ci_details_url" =~ ^https://github.com/${GITHUB_REPOSITORY}/actions/runs/([0-9]+)/job/[0-9]+$ ]]; then
+                echo "::error::CI Result is not bound to a GitHub Actions run."
+                exit 1
+              fi
+              ci_run_id="${BASH_REMATCH[1]}"
+              ci_run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ci_run_id")"
+              if ! jq -e --arg sha "$HEAD_SHA" '.path == ".github/workflows/ci.yml" and .event == "pull_request" and .head_sha == $sha and .status == "completed" and .conclusion == "success"' >/dev/null <<< "$ci_run"; then
+                echo "::error::CI run $ci_run_id is not successful on the validated head."
+                exit 1
+              fi
+              gh workflow run preview.yml --repo "$GITHUB_REPOSITORY" --ref main -f "run_id=$ci_run_id"
+              preview_requested=true
+              echo "Requested one preview for validated Dependabot candidate $HEAD_SHA."
+            fi
             if [ "${#missing_checks[@]}" -eq 0 ] && [ "${#incomplete_checks[@]}" -eq 0 ] && [ "$pending_count" -eq 0 ] && [ "$pending_status_count" -eq 0 ]; then
               echo "All checks completed."
               break

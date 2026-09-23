@@ -203,12 +203,18 @@ test('shared gate scripts wait for both authoritative gates with a 60-minute bou
   );
   assert.match(gate, /Publish preview result" and \.conclusion == "success"/);
   assert.match(gate, /preview-deployment-\\\(\$sha\)/);
+  assert.match(gate, /request_preview_after_dispatched_ci\(\)/);
+  assert.match(gate, /timeout 60m gh run watch "\$run_id".*--exit-status/);
+  assert.match(gate, /wait_for_ci_result "\$sha"/);
+  assert.match(gate, /gh workflow run preview\.yml.*--ref main.*"run_id=\$run_id"/);
   assert.match(
-    gate,
-    /wait_for_validated_head\(\) \{\n[^}]*wait_for_ci_result "\$sha"\n[^}]*wait_for_preview_result "\$sha"/
+    read('scripts/crowdin-pr.sh'),
+    /dispatch_ci locales\n\s+request_preview_after_dispatched_ci "\$HEAD_SHA"\n\s+wait_for_preview_result "\$HEAD_SHA"/
   );
-  assert.match(read('scripts/crowdin-pr.sh'), /wait_for_validated_head "\$HEAD_SHA"/);
-  assert.match(read('scripts/release-commit.sh'), /wait_for_validated_head "\$release_sha"/);
+  assert.match(
+    read('scripts/release-commit.sh'),
+    /request_preview_after_dispatched_ci "\$release_sha"\nwait_for_preview_result "\$release_sha"/
+  );
   assert.doesNotMatch(read('scripts/crowdin-pr.sh'), /^\s*wait_for_ci_result /m);
   assert.doesNotMatch(read('scripts/release-commit.sh'), /^wait_for_ci_result /m);
   for (const name of ['crowdin', 'release'])
