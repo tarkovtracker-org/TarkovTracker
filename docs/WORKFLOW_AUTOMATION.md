@@ -447,8 +447,9 @@ completions skip planning), metadata-only `pull_request_target` events (`ready_f
 `converted_to_draft`, `auto_merge_enabled`, `closed`), and an explicit `workflow_dispatch`
 accepting a CI run id from `main` only. Pushes are evaluated once, when their CI completes, so each
 revision starts one controller run. Automatic events refresh the status or, with auto-merge
-enabled, dispatch the controller; they never upload to Pages. Every job checks out the default branch; both privileged triggers are
-accepted in `.github/zizmor.yml` because the controller is the intended trusted boundary.
+enabled, dispatch the controller; they never upload to Pages. Every job checks out the default
+branch; both privileged triggers are accepted in `.github/zizmor.yml` because the controller is
+the intended trusted boundary.
 
 **Jobs:** `Plan preview` resolves the candidate through the API, requires successful CI evidence,
 verifies the artifact's manifest and digest, and publishes the interim status. Application,
@@ -468,8 +469,8 @@ GitHub merges once `CI Result` and `Preview Result` pass. If `main` moves, updat
 revision's CI completion requests a fresh preview while auto-merge stays enabled.
 
 **Defaults:** preview-required changes stay pending until explicitly previewed; drafts stay pending;
-documentation-only PRs receive `success: not applicable`; fork PRs need both an explicit dispatch
-and environment approval. A previous success is reused only for the same revision, artifact digest,
+documentation-only PRs receive `success: not applicable`; fork PRs need both a request (dispatch
+or maintainer-enabled auto-merge) and environment approval. A previous success is reused only for the same revision, artifact digest,
 and profile version (`[preview <digest12> v1]` marker).
 
 **Manual preview:** `gh workflow run preview.yml --ref main -f run_id=<ci-run-id>`. Use the
