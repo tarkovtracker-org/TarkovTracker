@@ -1,5 +1,6 @@
 <template>
   <!-- Disposable hosted CI finalization probe; this PR is never intended to merge. -->
+  <!-- Revision B intentionally supersedes an in-flight shadow build. -->
   <div
     class="bg-surface-850 overflow-hidden rounded-lg border border-white/10 shadow-md"
     :class="{ 'h-full': props.fillHeight, [props.cardClass]: true }"
