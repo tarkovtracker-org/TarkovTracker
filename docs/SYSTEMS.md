@@ -2227,16 +2227,34 @@ records action, revision, digest, deployment URL, and validation-to-preview dura
   `Preview Result` on the intended revision (§14). Production deployment remains Cloudflare's Git
   integration for `main` and is unchanged.
 
-Gates consume only results that the trusted workflows publish: `CI Result` and `Preview Result`
-are GitHub Actions commit statuses and check runs (app id 15368) on the exact validated revision,
-and waiting automation re-reads them from the API rather than trusting `target_url` or any payload
-snapshot. When an aggregate accepts a job during a documented compatibility window, the window
+Current gates consume `CI Result` and `Preview Result` from GitHub Actions (app id 15368) on the
+exact validated revision, and waiting automation re-reads them from the API rather than trusting
+`target_url` or a payload snapshot. The app id does not authenticate a workflow definition: a
+same-repository PR can edit its `pull_request` workflow and request `statuses: write`. The opt-in
+shadow below never publishes a merge result; a separate trusted publisher boundary is required
+before moving the ordinary preview build out of CI. When an aggregate accepts a job during a
+documented compatibility window, the window
 applies only to that job's absence; a reported non-success outcome still fails the aggregate, and
 the accepting aggregator version ships in the same change that activates the job.
+
+### Opt-in finalization shadow
+
+`.github/workflows/finalization-shadow.yml` is a non-authoritative rehearsal of a late build.
+A maintain/admin actor dispatches it from `main` with an open non-draft PR number and its successful
+exact-head CI run id. The trusted planner checks the live head/base/test-merge parents and tree,
+the CI run's PR snapshot, and the attempt-specific `CI Result` job. Docs-only changes skip build.
+Deployable changes build the test merge in a digest-pinned Node container without repository
+write credentials, Actions runtime/cache token, OIDC, deployment secrets, or Docker socket. A
+separate clean runner treats the candidate build artifact as hostile, safely extracts it, rechecks
+the live revision, and seals `pages-preview-shadow` with a digest and versioned manifest. Competing
+same-PR dispatches cancel; pushes and base changes invalidate the old request. The shadow neither
+deploys nor publishes required statuses. Ordinary CI still builds/uploads `pages-preview`.
 
 ### Files
 
 - `.github/workflows/preview.yml` — trusted controller: plan, deploy, smoke, result jobs
+- `.github/workflows/finalization-shadow.yml`, `scripts/preview/finalization-shadow.mjs`,
+  `scripts/preview/shadow-container.sh` — opt-in late-build rehearsal, no deployment or required result
 - `.github/workflows/ci.yml` — `Validate` build profile, manifest, `pages-preview` artifact; `security` call
 - `.github/workflows/security.yml` — reusable audit/Gitleaks/CodeQL workflow plus weekly schedule
 - `scripts/preview/profile.mjs` — project identity, branch alias derivation, anonymous build env

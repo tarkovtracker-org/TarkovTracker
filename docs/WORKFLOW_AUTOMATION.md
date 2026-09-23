@@ -469,6 +469,14 @@ and profile version (`[preview <digest12> v1]` marker).
 successful CI run for the PR's current head. The controller repeats every eligibility and freshness
 check; it cannot bypass failed CI or deploy a stale revision.
 
+**Late-build shadow:** `gh workflow run finalization-shadow.yml --ref main -f pull_request=<pr-number> -f ci_run_id=<ci-run-id>`.
+Only a maintain/admin actor can request this non-authoritative rehearsal. It checks the current
+PR, base, test merge, CI run and attempt, then builds a deployable candidate in an isolated
+credential-free container unless the PR is docs-only. A fresh trusted runner seals the output as
+`pages-preview-shadow`. The shadow does not deploy, publish `CI Result`/`Preview Result`, or change
+merge behavior. Ordinary PR CI continues to build and upload `pages-preview`. Re-dispatch after a
+push or base change; dispatch from `main` so the trusted default-branch workflow definition runs.
+
 **Trusted automation:** Crowdin translation merges and release staging request one preview after
 their dispatched CI run succeeds on the exact candidate SHA. Allowlisted Dependabot auto-merge
 requests one after all candidate checks pass. Ordinary PR revisions do not deploy automatically.
@@ -485,7 +493,8 @@ Cloudflare MCP readback: Pages project `tarkovtracker` keeps `main` as its produ
 keeps production Git deployments enabled. `preview_deployment_setting` is `none`; preview runtime
 variables match the anonymous checked-in configuration, and production KV and Durable Object
 bindings and production secrets are absent. Production deployment configuration was unchanged.
-GitHub CLI readback: the existing `Main CI freshness` ruleset still requires only `CI Result`.
+GitHub CLI readback: the active `Main CI freshness` ruleset requires `CI Result` and
+`Preview Result` from GitHub Actions with strict freshness and no bypass actors.
 `preview` and `preview-fork` are restricted to `main`; fork previews require approval from
 `DysektAI` or `Chica999`, with self-approval and administrator bypass disabled. Both environments
 have `CLOUDFLARE_ACCOUNT_ID`. `CLOUDFLARE_PAGES_API_TOKEN` now exists as a secret in both
