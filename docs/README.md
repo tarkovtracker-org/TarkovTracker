@@ -60,3 +60,5 @@ canonical agent contract and project conventions live in the root [`AGENTS.md`](
 ## Maintainer notes
 
 Roadmap and personal working notes live in [`ROADMAP.md`](./ROADMAP.md).
+
+<!-- Disposable hosted CI documentation N/A probe; do not merge. -->
