@@ -1661,9 +1661,10 @@ The checkout stays pinned to the validated SHA. The production build still runs 
   CI Result job, so automation cannot promote the commit.
 - Release version commits pass explicitly dispatched CI on a temporary `wip/release-*` branch and
   receive an Actions-owned preview (§18) before the identical SHA advances main; the embedded
-  version makes them deployable changes. `scripts/github-ci-gate.sh` waits for both `CI Result`
-  and the authoritative `Preview Result` on the exact SHA (`wait_for_validated_head`), each bounded
-  to 60 minutes; the containing Release and Crowdin workflows are bounded to 90 minutes. Ordinary
+  version makes them deployable changes. `scripts/github-ci-gate.sh` waits for the exact dispatched
+  CI run and its `CI Result`, requests one preview, then waits for the authoritative `Preview Result`
+  on the same SHA; gate waits are bounded to 60 minutes, and the containing Release and Crowdin
+  workflows are bounded to 90 minutes. Ordinary
   `wip/**` push CI no longer exists. The main ruleset requires successful GitHub Actions
   `CI Result`, strict freshness, and no bypass actors. Non-fast-forward promotion fails if main advances.
 - If publication fails after version promotion, an explicit rerun can recover only the direct
@@ -2122,7 +2123,7 @@ the loader never reaches a real import.
 
 ## 18. Actions-owned Cloudflare previews
 
-**Summary.** Pull requests and eligible non-main dispatches no longer rely on Cloudflare's
+**Summary.** Pull requests and eligible non-main dispatches do not rely on Cloudflare's
 automatic Git previews. The candidate `Validate` job builds the actual Pages output once with the
 anonymous preview profile (`scripts/preview/profile.mjs`), records a versioned manifest
 (`scripts/preview/manifest.mjs`, `scripts/preview/write-manifest.mjs`) inside the output, and
@@ -2146,9 +2147,10 @@ must execute the `.github/workflows/preview.yml@main` definition (default-branch
 ```text
 PR update → CI (selected validation + security + preview build + manifest + artifact)
           → CI Result succeeds
-          → controller (workflow_run / pull_request_target / manual rerun) resolves candidate
+          → controller (workflow_run / pull_request_target) resolves candidate and publishes pending
+          → maintainer (or trusted merge automation) dispatches Preview for the successful CI run
           → ready PR + current head/base/test-merge + attempt + artifact claims verified
-          → environment `preview` (auto) or `preview-fork` (maintainer approval per revision)
+          → environment `preview` or `preview-fork` (maintainer approval for forks)
           → recheck → wrangler pages deploy --branch preview-* → deployment record verified
           → smoke tests on the unique deployment URL (5-minute startup window)
           → freshness recheck → Preview Result success [preview <digest12> v<profile>]
@@ -2159,6 +2161,7 @@ PR update → CI (selected validation + security + preview build + manifest + ar
 | Situation                                                          | `Preview Result`                           |
 | ------------------------------------------------------------------ | ------------------------------------------ |
 | Validation running, deployable draft, fork awaiting approval       | pending, with reason                       |
+| Preview-required PR has successful CI but no dispatch yet          | pending, waiting for a maintainer request  |
 | Successful CI and verified documentation-only scope                | success: not applicable                    |
 | Current deployment and smoke tests succeed                         | success, with digest/profile marker        |
 | Validation, artifact verification, deployment, or smoke tests fail | failure                                    |
@@ -2172,8 +2175,9 @@ records action, revision, digest, deployment URL, and validation-to-preview dura
 
 - Candidate builds receive no deployment credentials. The controller never checks out, installs,
   or executes candidate code and never consumes candidate Wrangler configuration; the uploader
-  passes `--config wrangler.toml` from the default branch, a fixed project name, and a generated
-  `preview-*` branch. The configured production branch is rejected at every layer.
+  discovers `wrangler.toml` from the default-branch checkout at the repository root, uses a fixed
+  project name and generated `preview-*` branch, and rejects the configured production branch at
+  every layer.
 - Every manifest field is a claim: repository, pull request, head SHA, base SHA, checked-out
   test-merge SHA, tree SHA, run id, run attempt, build-profile version, preview branch, app URL,
   and digest are compared with live GitHub state and the recomputed digest before planning and
@@ -2183,6 +2187,16 @@ records action, revision, digest, deployment URL, and validation-to-preview dura
   files, traversal, absolute paths, duplicates, encryption, and checksum mismatches are rejected.
 - Successful deployments are deduplicated by revision, artifact digest, and profile version through
   the status marker; `ready_for_review` reuses matching evidence instead of redeploying.
+- Pull-request and CI-completion events never upload to Cloudflare. Only a trusted
+  `workflow_dispatch` from `main` can deploy, and it repeats the exact-SHA, CI, artifact, and
+  freshness checks. Crowdin and release staging dispatch once after their own exact-SHA CI passes;
+  allowlisted Dependabot auto-merge candidates dispatch from a trusted post-CI `workflow_run` after
+  all checks pass. Ordinary PR pushes
+  never request deployment. Cloudflare automatic preview builds are disabled while production Git
+  deployments for `main` remain enabled.
+- The Pages-only deployment token is stored only in the protected `preview` and `preview-fork`
+  environments, whose branch policy allows `main`; remove the repository-scoped copy. This prevents
+  a manually dispatched workflow selected from another ref from reading the deployment credential.
 - Fork candidates deploy only through the protected `preview-fork` environment; the exact revision
   is shown before approval and rechecked afterward, so approval never carries to another head.
 - The Pages preview environment has no production KV or Durable Object bindings and empty Supabase,

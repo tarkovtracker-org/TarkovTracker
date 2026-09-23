@@ -8,9 +8,9 @@ rules:
       # executes candidate code before `release-gate.mjs` validates the exact SHA; see
       # docs/WORKFLOW_AUTOMATION.md "Release Automation".
       - release.yml
-      # Auto-merge needs a write token for Dependabot PRs. The workflow never checks out or
-      # executes PR code; it only inspects metadata through the GitHub API and merges an
-      # allowlisted lockfile-only change set; see docs/WORKFLOW_AUTOMATION.md "Dependabot Auto Merge".
+      # Auto-merge uses a trusted post-CI workflow_run because Dependabot PR events get read-only
+      # tokens. It never checks out or executes PR code; it checks live metadata and merges only
+      # allowlisted lockfile-only changes; see docs/WORKFLOW_AUTOMATION.md "Dependabot Auto Merge".
       - dependabot-auto-merge.yml
       # The preview controller is the intended trusted boundary for `workflow_run` and
       # `pull_request_target`: every job checks out the default branch only, treats CI artifacts
@@ -18,11 +18,6 @@ rules:
       # candidate code, and holds the Cloudflare token in protected deployment environments; see
       # docs/SYSTEMS.md "Actions-owned Cloudflare previews" and scripts/ci-tests/preview-workflow.mjs.
       - preview.yml
-  bot-conditions:
-    ignore:
-      # The immutable PR author ID establishes trust; actor_id is an additional restriction,
-      # never the sole identity check. Human-triggered events must not enable auto-merge.
-      - dependabot-auto-merge.yml
   # `./.github/actions/...` is the form the workflow fixtures in scripts/ci-tests assert on; the
   # `$/` alias is equivalent for a same-repository composite action and offers no security gain.
   self-repository:

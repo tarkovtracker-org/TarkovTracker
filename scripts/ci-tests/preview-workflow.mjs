@@ -46,6 +46,7 @@ function assertTrustedBoundary(workflow) {
     /CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_PAGES_API_TOKEN \}\}/
   );
   assert.match(verifyDeployment, /CLOUDFLARE_ACCOUNT_ID: \$\{\{ vars\.CLOUDFLARE_ACCOUNT_ID \}\}/);
+  assert.doesNotMatch(deploy, /secrets\.CLOUDFLARE_API_TOKEN/);
   assert.doesNotMatch(upload, /pnpm run|node scripts\/preview\/build/);
   // Smoke tests run without Cloudflare credentials, against the unique deployment URL.
   const smoke = jobBlock(workflow, 'smoke');
@@ -84,8 +85,9 @@ test('preview controller runs trusted code only and isolates credentials per job
   );
   assert.match(
     workflowEvent(workflow, 'workflow_run'),
-    /workflows: \[CI\]\n\s+types: \[requested, completed\]/
+    /workflows: \[CI\]\n\s+types: \[completed\]/
   );
+  assert.doesNotMatch(workflowEvent(workflow, 'workflow_run'), /requested/);
   assert.match(workflowEvent(workflow, 'workflow_dispatch'), /run_id:/);
   assert.match(workflow, /cancel-in-progress: true/);
   assert.match(jobBlock(workflow, 'deploy'), /if: needs\.plan\.outputs\.action == 'deploy'/);
@@ -201,12 +203,18 @@ test('shared gate scripts wait for both authoritative gates with a 60-minute bou
   );
   assert.match(gate, /Publish preview result" and \.conclusion == "success"/);
   assert.match(gate, /preview-deployment-\\\(\$sha\)/);
+  assert.match(gate, /request_preview_after_dispatched_ci\(\)/);
+  assert.match(gate, /timeout 60m gh run watch "\$run_id".*--exit-status/);
+  assert.match(gate, /wait_for_ci_result "\$sha"/);
+  assert.match(gate, /gh workflow run preview\.yml.*--ref main.*"run_id=\$run_id"/);
   assert.match(
-    gate,
-    /wait_for_validated_head\(\) \{\n[^}]*wait_for_ci_result "\$sha"\n[^}]*wait_for_preview_result "\$sha"/
+    read('scripts/crowdin-pr.sh'),
+    /dispatch_ci locales\n\s+request_preview_after_dispatched_ci "\$HEAD_SHA"\n\s+wait_for_preview_result "\$HEAD_SHA"/
   );
-  assert.match(read('scripts/crowdin-pr.sh'), /wait_for_validated_head "\$HEAD_SHA"/);
-  assert.match(read('scripts/release-commit.sh'), /wait_for_validated_head "\$release_sha"/);
+  assert.match(
+    read('scripts/release-commit.sh'),
+    /request_preview_after_dispatched_ci "\$release_sha"\nwait_for_preview_result "\$release_sha"/
+  );
   assert.doesNotMatch(read('scripts/crowdin-pr.sh'), /^\s*wait_for_ci_result /m);
   assert.doesNotMatch(read('scripts/release-commit.sh'), /^wait_for_ci_result /m);
   for (const name of ['crowdin', 'release'])

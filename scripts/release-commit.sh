@@ -29,7 +29,8 @@ git -c credential.helper= \
   -c 'credential.helper=!gh auth git-credential' push "$remote" "$release_sha:$staging_ref"
 dispatch_ci "${staging_ref#refs/heads/}"
 # The version commit is a deployable change; it needs a successful preview before promotion.
-wait_for_validated_head "$release_sha"
+request_preview_after_dispatched_ci "$release_sha"
+wait_for_preview_result "$release_sha"
 require_main_revision "$base_sha"
 require_main_ci_policy
 # A non-fast-forward push rejects a concurrently advanced main; required checks cannot be bypassed.
