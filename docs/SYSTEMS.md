@@ -1670,11 +1670,13 @@ The checkout stays pinned to the validated SHA. The production build still runs 
 - If publication fails after version promotion, an explicit rerun can recover only the direct
   version-only child of the original CI revision, with successful exact-head `CI Result` **and**
   `Preview Result` and unchanged manifest/changelog history. The `Preview Result` evidence is
-  authenticated, not merely present: the newest status on the SHA must be a success reported on
-  that exact SHA and its `target_url` must resolve to a run of `.github/workflows/preview.yml@main`
-  (the trusted workflow definition on the default branch — a dispatch of the workflow from any
-  other ref is rejected) whose `Publish preview result` job concluded successfully, proving a candidate was planned,
-  deployed, smoke-tested, and authoritatively reported (never an `ignore` no-op run).
+  authenticated, not merely present: the newest status returned by the exact-SHA commit endpoint
+  must be a success, and its `target_url` must resolve to a completed `workflow_dispatch` run of
+  `.github/workflows/preview.yml` whose branch is `main` and whose head repository matches this
+  repository (GitHub reports path and branch separately). Its `Publish preview result` job must
+  conclude successfully, and the run must retain `preview-deployment-<sha>` evidence for the exact
+  version commit. These checks prove a candidate was deployed, smoke-tested, and authoritatively
+  reported (never an `ignore` no-op run).
   Recovery creates missing tags/releases
   idempotently, rejects tag conflicts, and never advances main or bumps another version.
 - The staging push uses `GITHUB_TOKEN` and explicitly dispatches CI; main promotion uses it to
