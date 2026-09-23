@@ -1,0 +1,37 @@
+name: Merge queue lab
+on:
+  pull_request:
+    branches: [ci/merge-queue-lab]
+  merge_group:
+    types: [checks_requested]
+    branches: [ci/merge-queue-lab]
+permissions:
+  contents: read
+jobs:
+  lab-check:
+    name: Lab Queue Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Record candidate identity
+        env:
+          EVENT_JSON: ${{ toJSON(github.event) }}
+        run: |
+          printf '%s\n' "$EVENT_JSON" > merge-queue-event.json
+          git show -s --format='sha=%H%nparents=%P%nsubject=%s' HEAD > merge-queue-commit.txt
+          cat merge-queue-commit.txt
+          jq '{action,merge_group,pull_request:{number:.pull_request.number,head:.pull_request.head.sha,base:.pull_request.base.sha}}' merge-queue-event.json
+      - name: Leave time to form later queue groups
+        if: github.event_name == 'merge_group'
+        run: sleep 75
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: merge-queue-event
+          path: |
+            merge-queue-event.json
+            merge-queue-commit.txt
+          retention-days: 3
