@@ -88,6 +88,7 @@ describe('Crowdin merge tree attestation', () => {
     });
     expect(f.github.rest.git.getCommit).toHaveBeenCalledTimes(2);
     expect(f.github.rest.git.getRef).toHaveBeenCalledTimes(2);
+    expect(f.github.rest.pulls.get).toHaveBeenCalledTimes(2);
     expect(f.github.rest.repos.createCommitStatus).toHaveBeenCalledTimes(2);
     expect(f.github.rest.repos.createCommitStatus).toHaveBeenLastCalledWith({
       ...f.context.repo,
@@ -104,7 +105,7 @@ describe('Crowdin merge tree attestation', () => {
       .mockResolvedValueOnce({ data: { tree: { sha: 'd'.repeat(40) } } })
       .mockResolvedValueOnce({ data: { tree: { sha: 'e'.repeat(40) } } });
     await expect(reportDispatchedCi(f)).rejects.toThrow('Cannot attest');
-    expect(f.github.rest.pulls.get).not.toHaveBeenCalled();
+    expect(f.github.rest.pulls.get).toHaveBeenCalledTimes(1);
     expect(f.github.rest.repos.createCommitStatus).not.toHaveBeenCalled();
   });
   it.each([
@@ -113,9 +114,50 @@ describe('Crowdin merge tree attestation', () => {
     ['merge commit', (pull) => ({ ...pull, merge_commit_sha: 'e'.repeat(40) })],
   ])('does not attest a changed %s after the tree comparison', async (_, change) => {
     const f = localesFixture();
-    f.github.rest.pulls.get.mockResolvedValue({ data: change(f.pull) });
+    f.github.rest.pulls.get
+      .mockResolvedValueOnce({ data: f.pull })
+      .mockResolvedValueOnce({ data: change(f.pull) });
     await expect(reportDispatchedCi(f)).rejects.toThrow('Cannot attest');
     expect(f.github.rest.repos.createCommitStatus).not.toHaveBeenCalled();
+  });
+  it('fetches a test merge SHA missing from the pull request list', async () => {
+    const f = localesFixture();
+    f.github.rest.pulls.list.mockResolvedValue({
+      data: [{ ...f.pull, merge_commit_sha: null }],
+    });
+    await reportDispatchedCi(f);
+    expect(f.github.rest.repos.createCommitStatus).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sha: f.pull.merge_commit_sha, state: 'success' })
+    );
+  });
+  it('retries while GitHub calculates the test merge SHA', async () => {
+    vi.useFakeTimers();
+    try {
+      const f = localesFixture();
+      f.github.rest.pulls.get
+        .mockResolvedValueOnce({ data: { ...f.pull, merge_commit_sha: null } })
+        .mockResolvedValue({ data: f.pull });
+      const result = reportDispatchedCi(f);
+      await vi.runAllTimersAsync();
+      await result;
+      expect(f.github.rest.pulls.get).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('fails closed when the test merge SHA never becomes available', async () => {
+    vi.useFakeTimers();
+    try {
+      const f = localesFixture();
+      f.github.rest.pulls.get.mockResolvedValue({ data: { ...f.pull, merge_commit_sha: null } });
+      const result = expect(reportDispatchedCi(f)).rejects.toThrow('Cannot attest');
+      await vi.runAllTimersAsync();
+      await result;
+      expect(f.github.rest.pulls.get).toHaveBeenCalledTimes(12);
+      expect(f.github.rest.repos.createCommitStatus).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 describe('Crowdin merge attestation guards', () => {
@@ -157,10 +199,20 @@ describe('Crowdin merge attestation guards', () => {
     await expect(reportDispatchedCi(f)).rejects.toThrow('Cannot attest');
     expect(f.github.rest.repos.createCommitStatus).not.toHaveBeenCalled();
   });
-  it('does not attest failed CI or non-Crowdin dispatches', async () => {
+  it('replaces a passing test-merge status when a later dispatch fails', async () => {
     const failed = localesFixture();
+    await reportDispatchedCi(failed);
     await reportDispatchedCi({ ...failed, outcome: 'failure' });
-    expect(failed.github.rest.pulls.list).not.toHaveBeenCalled();
+    expect(failed.github.rest.repos.createCommitStatus).toHaveBeenCalledTimes(4);
+    expect(failed.github.rest.repos.createCommitStatus).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ sha: failed.context.sha, state: 'failure' })
+    );
+    expect(failed.github.rest.repos.createCommitStatus).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sha: failed.pull.merge_commit_sha, state: 'failure' })
+    );
+  });
+  it('does not look up a pull request for non-Crowdin dispatches', async () => {
     const other = localesFixture();
     other.context.ref = 'refs/heads/wip/release-1';
     await reportDispatchedCi(other);

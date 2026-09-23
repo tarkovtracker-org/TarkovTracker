@@ -2,6 +2,8 @@
 // Publish the aggregate validator outcome as a commit status on the same immutable SHA.
 const LOCALES_REF = 'refs/heads/locales';
 const SHA = /^[0-9a-f]{40}$/;
+const MERGE_LOOKUP_ATTEMPTS = 12;
+const MERGE_LOOKUP_INTERVAL_MS = 5000;
 function eligibleLocalesPull(pull, context) {
   const { head, base } = pull;
   if (!head || !base) return false;
@@ -16,7 +18,6 @@ function eligibleLocalesPull(pull, context) {
     head.sha === context.sha,
     SHA.test(context.sha),
     SHA.test(String(base.sha)),
-    SHA.test(String(pull.merge_commit_sha)),
   ].every(Boolean);
 }
 function sameRepository(branch, name) {
@@ -54,24 +55,63 @@ async function matchingTree(github, context, pull) {
 }
 function unchangedPull(first, current, context) {
   return [
+    samePullIdentity(first, current, context),
+    current.merge_commit_sha === first.merge_commit_sha,
+  ].every(Boolean);
+}
+function samePullIdentity(first, current, context) {
+  return [
     eligibleLocalesPull(current, context),
     current.number === first.number,
     current.base?.sha === first.base.sha,
-    current.merge_commit_sha === first.merge_commit_sha,
   ].every(Boolean);
+}
+async function matchingCurrentPull(github, context, first) {
+  const { data: current } = await github.rest.pulls.get({
+    ...context.repo,
+    pull_number: first.number,
+  });
+  return samePullIdentity(first, current, context) ? current : null;
+}
+async function pauseForMergeRetry(attempt) {
+  if (attempt + 1 < MERGE_LOOKUP_ATTEMPTS)
+    await new Promise((resolve) => setTimeout(resolve, MERGE_LOOKUP_INTERVAL_MS));
+}
+async function readyMergePull(github, context, first) {
+  for (let attempt = 0; attempt < MERGE_LOOKUP_ATTEMPTS; attempt += 1) {
+    const current = await matchingCurrentPull(github, context, first);
+    if (!current) return null;
+    if (SHA.test(String(current.merge_commit_sha))) return current;
+    await pauseForMergeRetry(attempt);
+  }
+  return null;
 }
 function currentRevision(first, current, context, main) {
   return [unchangedPull(first, current, context), current.base?.sha === main].every(Boolean);
 }
-async function exactTreeMergeSha(github, context) {
+async function matchingReadyPull(github, context) {
   const pull = await currentBasePull(github, context);
-  if (!pull || !(await matchingTree(github, context, pull))) return null;
+  if (!pull) return null;
+  const ready = await readyMergePull(github, context, pull);
+  if (!ready) return null;
+  if (!(await matchingTree(github, context, ready))) return null;
+  return ready;
+}
+async function exactTreeMergeSha(github, context) {
+  const ready = await matchingReadyPull(github, context);
+  if (!ready) return null;
   const { data: current } = await github.rest.pulls.get({
     ...context.repo,
-    pull_number: pull.number,
+    pull_number: ready.number,
   });
   const baseSha = await mainSha(github, context);
-  return currentRevision(pull, current, context, baseSha) ? pull.merge_commit_sha : null;
+  return currentRevision(ready, current, context, baseSha) ? ready.merge_commit_sha : null;
+}
+async function failedMergeSha(github, context) {
+  const pull = await localesPull(github, context);
+  if (!pull) return null;
+  const ready = await readyMergePull(github, context, pull);
+  return ready?.merge_commit_sha ?? null;
 }
 async function requiredMergeSha(github, context, state) {
   if (![state === 'success', context.ref === LOCALES_REF].every(Boolean)) return null;
@@ -79,13 +119,16 @@ async function requiredMergeSha(github, context, state) {
   if (!mergeSha) throw new Error('Cannot attest an unchanged exact-tree locales merge commit.');
   return mergeSha;
 }
-async function reportLocalesMergeCi(github, context, targetUrl, mergeSha) {
+async function reportLocalesMergeCi(github, context, targetUrl, mergeSha, state) {
   await github.rest.repos.createCommitStatus({
     ...context.repo,
     sha: mergeSha,
     context: 'CI Result',
-    state: 'success',
-    description: `Validated identical tree on locales head ${context.sha.slice(0, 12)}.`,
+    state,
+    description:
+      state === 'success'
+        ? `Validated identical tree on locales head ${context.sha.slice(0, 12)}.`
+        : `Dispatched CI failed on locales head ${context.sha.slice(0, 12)}.`,
     target_url: targetUrl,
   });
 }
@@ -93,6 +136,12 @@ function validationStatus(outcome) {
   return outcome === 'success'
     ? { state: 'success', description: 'All selected CI jobs passed.' }
     : { state: 'failure', description: 'CI validation did not succeed.' };
+}
+async function reportMergeStatus(github, context, targetUrl, mergeSha, state) {
+  if (context.ref !== LOCALES_REF) return;
+  const reportedMergeSha = state === 'success' ? mergeSha : await failedMergeSha(github, context);
+  if (reportedMergeSha)
+    await reportLocalesMergeCi(github, context, targetUrl, reportedMergeSha, state);
 }
 export async function reportDispatchedCi({ github, context, outcome }) {
   if (context.eventName !== 'workflow_dispatch') return;
@@ -107,5 +156,5 @@ export async function reportDispatchedCi({ github, context, outcome }) {
     description,
     target_url: targetUrl,
   });
-  if (mergeSha) await reportLocalesMergeCi(github, context, targetUrl, mergeSha);
+  await reportMergeStatus(github, context, targetUrl, mergeSha, state);
 }
