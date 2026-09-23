@@ -1,19 +1,8 @@
 name: Dependabot Auto Merge
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths-ignore:
-      - 'app/locales/cs.json'
-      - 'app/locales/de.json'
-      - 'app/locales/es.json'
-      - 'app/locales/fr.json'
-      - 'app/locales/it.json'
-      - 'app/locales/ko.json'
-      - 'app/locales/pl.json'
-      - 'app/locales/pt.json'
-      - 'app/locales/ru.json'
-      - 'app/locales/uk.json'
-      - 'app/locales/zh.json'
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
 permissions:
   actions: write
   checks: read
@@ -21,23 +10,27 @@ permissions:
   pull-requests: write
   statuses: read
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
   cancel-in-progress: true
 jobs:
   auto-merge:
     name: Auto-merge safe Dependabot PR
-    # The PR must be authored by Dependabot and the triggering event must also come from it, so
-    # a human push, reopen, or ready-for-review on a Dependabot branch never auto-merges.
-    # GitHub.com Dependabot's immutable account ID (users/dependabot[bot]).
-    if: github.event.pull_request.user.id == 49699333 && github.actor_id == '49699333'
+    # workflow_run uses trusted main code and a write token. Dependabot's own pull_request_target
+    # runs are read-only even if the workflow requests write permissions.
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.actor.id == 49699333 &&
+      github.event.workflow_run.triggering_actor.id == 49699333 &&
+      github.event.workflow_run.head_repository.id == github.event.repository.id
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      BASE_REF: ${{ github.event.pull_request.base.ref }}
+      CI_RUN_ID: ${{ github.event.workflow_run.id }}
       GH_TOKEN: ${{ github.token }}
-      HEAD_REF: ${{ github.event.pull_request.head.ref }}
-      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-      PR_NUMBER: ${{ github.event.pull_request.number }}
+      HEAD_REF: ${{ github.event.workflow_run.head_branch }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
     steps:
       - name: Gate Dependabot PR
         id: gate
@@ -45,14 +38,30 @@ jobs:
         run: |
           set -euo pipefail
           eligible=false
-          if [ "$BASE_REF" != "main" ]; then
+          if [[ ! "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
             echo "eligible=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Dependabot auto-merge only targets main."
+            echo "::notice::CI run has no single Dependabot PR."
             exit 0
           fi
-          if jq -e '.pull_request.draft' "$GITHUB_EVENT_PATH" >/dev/null; then
+          ci_run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CI_RUN_ID")"
+          if ! jq -e --arg sha "$HEAD_SHA" --argjson number "$PR_NUMBER" '
+            .path == ".github/workflows/ci.yml" and .event == "pull_request" and
+            .status == "completed" and .conclusion == "success" and .head_sha == $sha and
+            .actor.id == 49699333 and .triggering_actor.id == 49699333 and
+            ([.pull_requests[]? | select(.number == $number and .head.sha == $sha)] | length) == 1
+          ' >/dev/null <<< "$ci_run"; then
             echo "eligible=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Draft PRs are not auto-merged."
+            echo "::notice::CI run no longer matches the Dependabot candidate."
+            exit 0
+          fi
+          pr="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          if ! jq -e --arg sha "$HEAD_SHA" --arg repo "$GITHUB_REPOSITORY" --arg branch "$HEAD_REF" '
+            .state == "open" and .draft == false and .user.id == 49699333 and
+            .base.ref == "main" and .head.sha == $sha and .head.ref == $branch and
+            .head.repo.full_name == $repo
+          ' >/dev/null <<< "$pr"; then
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Dependabot PR is closed, draft, stale, forked, or no longer targets main."
             exit 0
           fi
           case "$HEAD_REF" in
@@ -112,15 +121,17 @@ jobs:
           deadline=$((SECONDS + 3600))
           preview_requested=false
           while true; do
+            # Preview Result is the authoritative gate; controller job checks may be cancelled by
+            # a newer event on the same head and are not independent merge requirements.
             check_runs="$(
               gh api \
                 "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs?per_page=100" \
-                --jq '.check_runs | map(select(.name != "Auto-merge safe Dependabot PR"))'
+                --jq '.check_runs | map(select(.name != "Auto-merge safe Dependabot PR" and .name != "Plan preview" and .name != "Deploy preview" and .name != "Preview smoke tests" and .name != "Publish preview result"))'
             )"
             status_contexts="$(
               gh api \
                 "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/status" \
-                --jq '.statuses | sort_by(.context, .updated_at) | group_by(.context) | map(last)'
+                --jq '.statuses | sort_by(.context, .id) | group_by(.context) | map(last)'
             )"
             failing_count="$(
               jq '[.[] | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out" or .conclusion == "action_required")] | length' <<< "$check_runs"
@@ -181,13 +192,17 @@ jobs:
                 echo "::error::CI Result is not bound to a GitHub Actions run."
                 exit 1
               fi
-              ci_run_id="${BASH_REMATCH[1]}"
-              ci_run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ci_run_id")"
-              if ! jq -e --arg sha "$HEAD_SHA" '.path == ".github/workflows/ci.yml" and .event == "pull_request" and .head_sha == $sha and .status == "completed" and .conclusion == "success"' >/dev/null <<< "$ci_run"; then
-                echo "::error::CI run $ci_run_id is not successful on the validated head."
+              bound_run_id="${BASH_REMATCH[1]}"
+              if [ "$bound_run_id" != "$CI_RUN_ID" ]; then
+                echo "::error::A newer CI Result superseded the triggering run."
                 exit 1
               fi
-              gh workflow run preview.yml --repo "$GITHUB_REPOSITORY" --ref main -f "run_id=$ci_run_id"
+              ci_run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$bound_run_id")"
+              if ! jq -e --arg sha "$HEAD_SHA" '.path == ".github/workflows/ci.yml" and .event == "pull_request" and .head_sha == $sha and .status == "completed" and .conclusion == "success"' >/dev/null <<< "$ci_run"; then
+                echo "::error::CI run $bound_run_id is not successful on the validated head."
+                exit 1
+              fi
+              gh workflow run preview.yml --repo "$GITHUB_REPOSITORY" --ref main -f "run_id=$bound_run_id"
               preview_requested=true
               echo "Requested one preview for validated Dependabot candidate $HEAD_SHA."
             fi
@@ -224,12 +239,16 @@ jobs:
             pr_state="$(
               gh pr view "$PR_NUMBER" \
                 --repo "$GITHUB_REPOSITORY" \
-                --json headRefOid,mergeStateStatus
+                --json headRefOid,mergeStateStatus,baseRefName,state,isDraft,isCrossRepository
             )"
             current_head_sha="$(jq -r '.headRefOid' <<< "$pr_state")"
             merge_state="$(jq -r '.mergeStateStatus' <<< "$pr_state")"
             if [ "$current_head_sha" != "$HEAD_SHA" ]; then
               echo "::error::PR head changed from $HEAD_SHA to $current_head_sha after validation."
+              exit 1
+            fi
+            if ! jq -e '.baseRefName == "main" and .state == "OPEN" and .isDraft == false and .isCrossRepository == false' >/dev/null <<< "$pr_state"; then
+              echo "::error::Dependabot PR is no longer eligible for main."
               exit 1
             fi
             if [ "$merge_state" != "UNKNOWN" ]; then

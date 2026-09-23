@@ -2190,7 +2190,8 @@ records action, revision, digest, deployment URL, and validation-to-preview dura
 - Pull-request and CI-completion events never upload to Cloudflare. Only a trusted
   `workflow_dispatch` from `main` can deploy, and it repeats the exact-SHA, CI, artifact, and
   freshness checks. Crowdin and release staging dispatch once after their own exact-SHA CI passes;
-  allowlisted Dependabot auto-merge candidates dispatch after all checks pass. Ordinary PR pushes
+  allowlisted Dependabot auto-merge candidates dispatch from a trusted post-CI `workflow_run` after
+  all checks pass. Ordinary PR pushes
   never request deployment. Cloudflare automatic preview builds are disabled while production Git
   deployments for `main` remain enabled.
 - The Pages-only deployment token is stored only in the protected `preview` and `preview-fork`

@@ -380,10 +380,11 @@ Merges known low-risk Dependabot PRs after the normal PR checks complete:
 
 **Safety rules:**
 
-- Dependabot-authored, Dependabot-triggered, `main`-targeted PRs only; both author and event actor
-  must match GitHub.com's immutable Dependabot account ID (`49699333`), not a mutable login.
-  A human push, reopen, or ready-for-review on the branch disables auto-merge for that event
-- No repository checkout in the privileged `pull_request_target` workflow
+- The trusted `workflow_run` follows completed PR CI. The CI run actor and triggering actor, plus
+  the live PR author, must match GitHub.com's immutable Dependabot account ID (`49699333`), not a
+  mutable login. A human-triggered rerun or changed PR head cannot auto-merge
+- No repository checkout or candidate code execution in the privileged workflow. Dependabot's
+  `pull_request_target` token is read-only, so the post-CI workflow owns preview dispatch and merge
 - Only package lockfiles, package manifests, and `pnpm-workspace.yaml` are allowed; any workflow
   change stays manual
 - Runtime Nuxt, Cloudflare, TypeScript compiler, catch-all dependencies, and all GitHub Actions
