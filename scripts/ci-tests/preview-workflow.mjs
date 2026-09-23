@@ -71,14 +71,8 @@ test('preview controller runs trusted code only and isolates credentials per job
   for (const job of ['deploy', 'smoke'])
     assert.doesNotMatch(permissionsBlock(jobBlock(workflow, job), '    '), /statuses: write/);
   assert.doesNotMatch(workflow, /contents: write|pull-requests: write|id-token: write/);
-  const events = [
-    'opened',
-    'synchronize',
-    'reopened',
-    'ready_for_review',
-    'converted_to_draft',
-    'closed',
-  ];
+  // Pushes are handled once, when CI completes; metadata events cover changes without a CI rerun.
+  const events = ['ready_for_review', 'converted_to_draft', 'auto_merge_enabled', 'closed'];
   assert.match(
     workflowEvent(workflow, 'pull_request_target'),
     new RegExp(`types: \\[${events.join(', ')}\\]`)
@@ -91,9 +85,18 @@ test('preview controller runs trusted code only and isolates credentials per job
   assert.match(workflowEvent(workflow, 'workflow_dispatch'), /run_id:/);
   assert.match(workflow, /cancel-in-progress: true/);
   assert.match(jobBlock(workflow, 'deploy'), /if: needs\.plan\.outputs\.action == 'deploy'/);
+  assert.doesNotMatch(workflowEvent(workflow, 'pull_request_target'), /synchronize|opened/);
+  // Non-candidate CI completions (main pushes) skip planning, and a skipped plan reports nothing.
+  const planJob = jobBlock(workflow, 'plan');
+  assert.match(planJob, /github\.event_name != 'workflow_run' \|\|/);
+  assert.match(planJob, /github\.event\.workflow_run\.event == 'pull_request' \|\|/);
+  assert.match(planJob, /github\.event\.workflow_run\.event == 'workflow_dispatch'/);
+  assert.match(permissionsBlock(planJob, '    '), /^ {6}actions: write$/m);
+  for (const job of ['deploy', 'smoke', 'result'])
+    assert.doesNotMatch(permissionsBlock(jobBlock(workflow, job), '    '), /actions: write/);
   assert.match(
     jobBlock(workflow, 'result'),
-    /if: always\(\) && needs\.plan\.outputs\.action != 'ignore'/
+    /if: always\(\) && needs\.plan\.result != 'skipped' && needs\.plan\.outputs\.action != 'ignore'/
   );
   assert.match(jobBlock(workflow, 'result'), /publishControllerFailure/);
   // The cancelled branch must emit the supersession notice and return before the failure and

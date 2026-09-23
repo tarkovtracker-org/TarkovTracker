@@ -2160,8 +2160,9 @@ succeed and it must retain a `preview-deployment-<sha>` artifact for the exact c
 ```text
 PR update → CI (selected validation + security + preview build + manifest + artifact)
           → CI Result succeeds
-          → controller (workflow_run / pull_request_target) resolves candidate and publishes pending
-          → maintainer (or trusted merge automation) dispatches Preview for the successful CI run
+          → controller (CI workflow_run) resolves candidate and publishes pending
+          → merge intent: maintainer enables auto-merge (controller dispatches Preview for the run),
+            maintainer dispatches manually, or trusted merge automation dispatches
           → ready PR + current head/base/test-merge + attempt + artifact claims verified
           → environment `preview` or `preview-fork` (maintainer approval for forks)
           → recheck → wrangler pages deploy --branch preview-* → deployment record verified
@@ -2173,8 +2174,10 @@ PR update → CI (selected validation + security + preview build + manifest + ar
 
 | Situation                                                          | `Preview Result`                           |
 | ------------------------------------------------------------------ | ------------------------------------------ |
-| Validation running, deployable draft, fork awaiting approval       | pending, with reason                       |
+| New revision whose CI has not completed                            | absent (required check shows expected)     |
+| Deployable draft, fork awaiting approval                           | pending, with reason                       |
 | Preview-required PR has successful CI but no dispatch yet          | pending, waiting for a maintainer request  |
+| Auto-merge enabled on a validated revision                         | pending, preview requested (dispatched)    |
 | Successful CI and verified documentation-only scope                | success: not applicable                    |
 | Current deployment and smoke tests succeed                         | success, with digest/profile marker        |
 | Validation, artifact verification, deployment, or smoke tests fail | failure                                    |
@@ -2205,9 +2208,13 @@ records action, revision, digest, deployment URL, and validation-to-preview dura
   `workflow_dispatch` from `main` can deploy, and it repeats the exact-SHA, CI, artifact, and
   freshness checks. Crowdin and release staging dispatch once after their own exact-SHA CI passes;
   allowlisted Dependabot auto-merge candidates dispatch from a trusted post-CI `workflow_run` after
-  all checks pass. Ordinary PR pushes
-  never request deployment. Cloudflare automatic preview builds are disabled while production Git
-  deployments for `main` remain enabled.
+  all checks pass. For ordinary pull requests, enabling GitHub auto-merge (write access only) is the
+  merge-intent request: the controller dispatches itself once for the validated pull-request CI run,
+  on the `auto_merge_enabled` event or on the next CI completion, after publishing its pending
+  status. Pushes without auto-merge never request deployment, and automation CI runs never trigger
+  this path. Pushes do not start the controller directly; it runs once when their CI completes, and
+  main-push CI completions skip planning. Cloudflare automatic preview builds are disabled while
+  production Git deployments for `main` remain enabled.
 - The Pages-only deployment token is stored only in the protected `preview` and `preview-fork`
   environments, whose branch policy allows `main`; remove the repository-scoped copy. This prevents
   a manually dispatched workflow selected from another ref from reading the deployment credential.

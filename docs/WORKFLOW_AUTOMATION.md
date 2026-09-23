@@ -442,10 +442,12 @@ for `main` remain enabled. `Preview Result` becomes a required merge check after
 and acceptance scenarios below pass. The design, result contract, and invariants are specified in
 [SYSTEMS.md §18](SYSTEMS.md#18-actions-owned-cloudflare-previews).
 
-**Triggers:** `workflow_run` for completed CI, metadata-only `pull_request_target` events (`opened`,
-`synchronize`, `reopened`, `ready_for_review`, `converted_to_draft`, `closed`), and an explicit
-`workflow_dispatch` accepting a CI run id from `main` only. Automatic events refresh the status;
-they never upload to Pages. Every job checks out the default branch; both privileged triggers are
+**Triggers:** `workflow_run` for completed CI (pull-request and dispatched runs only; main-push
+completions skip planning), metadata-only `pull_request_target` events (`ready_for_review`,
+`converted_to_draft`, `auto_merge_enabled`, `closed`), and an explicit `workflow_dispatch`
+accepting a CI run id from `main` only. Pushes are evaluated once, when their CI completes, so each
+revision starts one controller run. Automatic events refresh the status or, with auto-merge
+enabled, dispatch the controller; they never upload to Pages. Every job checks out the default branch; both privileged triggers are
 accepted in `.github/zizmor.yml` because the controller is the intended trusted boundary.
 
 **Jobs:** `Plan preview` resolves the candidate through the API, requires successful CI evidence,
@@ -460,6 +462,11 @@ deployment URL. `Publish preview result` rechecks freshness and publishes succes
 still-current candidate; any failed stage publishes failure, and a controller crash publishes
 failure on the candidate revision.
 
+**Merge flow:** open the PR and iterate freely; pushes run CI only. When ready, enable auto-merge
+(`gh pr merge <n> --auto --squash`). The controller requests the preview for the validated head, and
+GitHub merges once `CI Result` and `Preview Result` pass. If `main` moves, update the branch: the new
+revision's CI completion requests a fresh preview while auto-merge stays enabled.
+
 **Defaults:** preview-required changes stay pending until explicitly previewed; drafts stay pending;
 documentation-only PRs receive `success: not applicable`; fork PRs need both an explicit dispatch
 and environment approval. A previous success is reused only for the same revision, artifact digest,
@@ -471,9 +478,10 @@ check; it cannot bypass failed CI or deploy a stale revision.
 
 **Trusted automation:** Crowdin translation merges and release staging request one preview after
 their dispatched CI run succeeds on the exact candidate SHA. Allowlisted Dependabot auto-merge
-requests one after all candidate checks pass. Ordinary PR revisions do not deploy automatically.
+requests one after all candidate checks pass. Ordinary PR revisions deploy only after auto-merge is
+enabled or a maintainer dispatches.
 
-**Metrics:** each controller run summary records the action (deploy/reuse/skip/wait/fail),
+**Metrics:** each controller run summary records the action (deploy/reuse/skip/wait/request/fail),
 revision, digest, deployment URL, whether the result was published, and the validation-to-preview
 duration. Deployment (`preview-deployment-<sha>`) and smoke (`preview-smoke-<sha>`) evidence
 artifacts are retained for 30 days. Count deployments, skipped drafts, reused artifacts, and
@@ -486,6 +494,7 @@ keeps production Git deployments enabled. `preview_deployment_setting` is `none`
 variables match the anonymous checked-in configuration, and production KV and Durable Object
 bindings and production secrets are absent. Production deployment configuration was unchanged.
 GitHub CLI readback: the existing `Main CI freshness` ruleset still requires only `CI Result`.
+Repository auto-merge (`allow_auto_merge`) must be enabled for the merge-intent preview request.
 `preview` and `preview-fork` are restricted to `main`; fork previews require approval from
 `DysektAI` or `Chica999`, with self-approval and administrator bypass disabled. Both environments
 have `CLOUDFLARE_ACCOUNT_ID`. `CLOUDFLARE_PAGES_API_TOKEN` now exists as a secret in both

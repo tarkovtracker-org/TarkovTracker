@@ -1,7 +1,8 @@
-import { ARTIFACT_NAME, CI_WORKFLOW_PATH, STATUS_CONTEXT } from './profile.mjs';
+import { ARTIFACT_NAME, CI_WORKFLOW_PATH, PRODUCTION_BRANCH, STATUS_CONTEXT } from './profile.mjs';
 // GitHub Actions app id: only check runs and statuses created by Actions count as CI evidence.
 const ACTIONS_APP_ID = 15368;
 const CI_WORKFLOW_FILE = 'ci.yml';
+const PREVIEW_WORKFLOW_FILE = 'preview.yml';
 /** Live pull request state; the controller never trusts payload snapshots for freshness checks. */
 export async function getPull(github, repo, number) {
   const { data } = await github.rest.pulls.get({ ...repo, pull_number: number });
@@ -109,6 +110,15 @@ export async function listPullPaths(github, repo, number) {
   const paths = files.flatMap((file) => [file.filename, file.previous_filename].filter(Boolean));
   // GitHub caps the file listing; an incomplete listing must select the conservative decision.
   return files.length >= 3000 ? [] : paths;
+}
+/** Dispatch the trusted controller from the default branch for one validated CI run. */
+export async function requestPreviewDispatch(github, repo, runId) {
+  await github.rest.actions.createWorkflowDispatch({
+    ...repo,
+    workflow_id: PREVIEW_WORKFLOW_FILE,
+    ref: PRODUCTION_BRANCH,
+    inputs: { run_id: String(runId) },
+  });
 }
 function truncateDescription(description) {
   return description.length > 140 ? `${description.slice(0, 137)}...` : description;

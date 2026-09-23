@@ -16,6 +16,7 @@ import {
   listPullPaths,
   allStatuses,
   publishStatus,
+  requestPreviewDispatch,
 } from './github-api.mjs';
 import {
   MANIFEST_FILE,
@@ -483,13 +484,46 @@ function awaitExplicitPreview(decision) {
     ...decision,
     action: 'wait',
     state: 'pending',
-    description: `Preview pending: ${decision.headSha.slice(0, 12)}. Run Preview with run_id=${decision.runId}.${decision.fork ? ' Fork needs maintainer approval.' : ''}`,
+    description: `Preview pending: ${decision.headSha.slice(0, 12)}. Enable auto-merge, or run Preview with run_id=${decision.runId}.${decision.fork ? ' Fork needs maintainer approval.' : ''}`,
   };
 }
-function deferAutomaticPreview(context, decision) {
-  return context.eventName !== 'workflow_dispatch' && decision.action === 'deploy'
-    ? awaitExplicitPreview(decision)
-    : decision;
+function isAutomaticDeploy(context, decision) {
+  return context.eventName !== 'workflow_dispatch' && decision.action === 'deploy';
+}
+/**
+ * Enabling auto-merge is the maintainer's merge-intent signal (GitHub restricts it to users with
+ * write access). Only pull-request CI candidates qualify; release and Crowdin automation dispatch
+ * their own previews. The upload itself still happens only in the dispatched run.
+ */
+function hasMergeIntent(state) {
+  return Boolean(state.candidate?.runEvent === 'pull_request' && state.pull?.auto_merge);
+}
+function requestedPreview(decision) {
+  return {
+    ...decision,
+    action: 'request',
+    state: 'pending',
+    description: `Auto-merge enabled: preview requested for ${decision.headSha.slice(0, 12)} (run_id=${decision.runId}).`,
+  };
+}
+/** Automatic events never upload: they either request a trusted dispatch or wait for one. */
+function deferAutomaticPreview(context, state, decision) {
+  if (!isAutomaticDeploy(context, decision)) return decision;
+  return hasMergeIntent(state) ? requestedPreview(decision) : awaitExplicitPreview(decision);
+}
+/** Publish the interim status first so the dispatched run's newer statuses always supersede it. */
+async function publishAndRequest(github, context, core, decision) {
+  await publishDecision(github, context, decision);
+  if (decision.action !== 'request') return decision;
+  try {
+    await requestPreviewDispatch(github, context.repo, decision.runId);
+    return decision;
+  } catch (error) {
+    core.warning(`Automatic preview request failed: ${error.message}`);
+    const manual = awaitExplicitPreview(decision);
+    await publishDecision(github, context, manual);
+    return manual;
+  }
 }
 /** Phase 1: resolve the candidate, verify evidence, publish the interim status, emit the plan. */
 export async function planPreview({ github, context, core, inputs, workspace }) {
@@ -500,8 +534,9 @@ export async function planPreview({ github, context, core, inputs, workspace }) 
   } catch (error) {
     decision = outcomeDecision(error, state);
   }
-  decision = deferAutomaticPreview(context, decision);
-  if (decision.action !== 'ignore') await publishDecision(github, context, decision);
+  decision = deferAutomaticPreview(context, state, decision);
+  if (decision.action !== 'ignore')
+    decision = await publishAndRequest(github, context, core, decision);
   core.info(`${decision.action}: ${decision.description}`);
   return decision;
 }

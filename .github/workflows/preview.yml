@@ -3,13 +3,16 @@ name: Preview
 # executed, installed, or used as Wrangler configuration. The controller verifies CI evidence and
 # the preview artifact's claims against live GitHub state, uploads only after an explicit trusted
 # dispatch, smoke-tests the unique deployment URL, and publishes the authoritative `Preview Result`
-# status. Automatic events only maintain the current-SHA gate. See docs/SYSTEMS.md §18.
+# status. Automatic events only maintain the current-SHA gate; when auto-merge is enabled they
+# request that dispatch for the validated run instead of waiting. See docs/SYSTEMS.md §18.
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
+  # Pushes are handled when their CI completes (workflow_run); these metadata events cover state
+  # changes that do not rerun CI. `auto_merge_enabled` is the merge-intent preview request.
   pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
+    types: [ready_for_review, converted_to_draft, auto_merge_enabled, closed]
   workflow_dispatch:
     inputs:
       run_id:
@@ -26,10 +29,16 @@ permissions:
 jobs:
   plan:
     name: Plan preview
+    # Main pushes and other non-candidate CI completions are ignored without spending a runner.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.event == 'pull_request' ||
+      github.event.workflow_run.event == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      actions: read
+      # `actions: write` only dispatches this trusted workflow from main for auto-merge requests.
+      actions: write
       checks: read
       contents: read
       pull-requests: read
@@ -208,7 +217,7 @@ jobs:
   result:
     name: Publish preview result
     needs: [plan, deploy, smoke]
-    if: always() && needs.plan.outputs.action != 'ignore'
+    if: always() && needs.plan.result != 'skipped' && needs.plan.outputs.action != 'ignore'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
