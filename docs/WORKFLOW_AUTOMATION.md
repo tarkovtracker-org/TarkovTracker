@@ -477,6 +477,8 @@ files before upload; a fresh trusted runner seals the output as
 `pages-preview-shadow`. The shadow does not deploy, publish `CI Result`/`Preview Result`, or change
 merge behavior. Ordinary PR CI continues to build and upload `pages-preview`. Re-dispatch after a
 push or base change; dispatch from `main` so the trusted default-branch workflow definition runs.
+Docs-only requests recheck the revision before finishing. Fork runs without a CI API base snapshot
+fail closed in the shadow; the existing protected `preview-fork` deployment path is unaffected.
 
 **Trusted automation:** Crowdin translation merges and release staging request one preview after
 their dispatched CI run succeeds on the exact candidate SHA. Allowlisted Dependabot auto-merge
@@ -494,8 +496,9 @@ Cloudflare MCP readback: Pages project `tarkovtracker` keeps `main` as its produ
 keeps production Git deployments enabled. `preview_deployment_setting` is `none`; preview runtime
 variables match the anonymous checked-in configuration, and production KV and Durable Object
 bindings and production secrets are absent. Production deployment configuration was unchanged.
-GitHub CLI readback: the active `Main CI freshness` ruleset requires `CI Result` and
-`Preview Result` from GitHub Actions with strict freshness and no bypass actors.
+The initial rollout readback found only `CI Result`. The live September 23 ruleset requires both
+`CI Result` and `Preview Result`; the checked-in ruleset template and the historical rollout steps
+below are being reconciled separately from this shadow workflow.
 `preview` and `preview-fork` are restricted to `main`; fork previews require approval from
 `DysektAI` or `Chica999`, with self-approval and administrator bypass disabled. Both environments
 have `CLOUDFLARE_ACCOUNT_ID`. `CLOUDFLARE_PAGES_API_TOKEN` now exists as a secret in both

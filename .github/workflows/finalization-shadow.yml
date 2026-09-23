@@ -107,7 +107,10 @@ jobs:
   verify:
     name: Verify finalization shadow
     needs: [plan, build]
-    if: needs.build.result == 'success'
+    if: >-
+      always() && needs.plan.result == 'success' &&
+      (needs.build.result == 'success' ||
+      (needs.build.result == 'skipped' && !fromJSON(needs.plan.outputs.decision).previewRequired))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -123,7 +126,20 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
+      - name: Recheck documentation-only result
+        if: ${{ !fromJSON(needs.plan.outputs.decision).previewRequired }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DECISION: ${{ needs.plan.outputs.decision }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        with:
+          script: |
+            const { recheckShadow } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/finalization-shadow.mjs`);
+            const decision = JSON.parse(process.env.DECISION);
+            await recheckShadow({ github, context: { ...context, triggeringActor: process.env.TRIGGERING_ACTOR }, expected: decision });
+            core.notice(`Documentation-only shadow N/A remains current for PR #${decision.pullRequest}`);
       - name: Recheck revision and seal artifact in a separate trusted runner
+        if: ${{ fromJSON(needs.plan.outputs.decision).previewRequired }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           DECISION: ${{ needs.plan.outputs.decision }}
@@ -160,6 +176,7 @@ jobs:
             sealShadowArtifact(process.env.ARTIFACT_DIR, expected);
             core.notice(`Shadow artifact sealed for PR #${decision.pullRequest} at ${decision.headSha}`);
       - name: Retain sealed shadow artifact
+        if: ${{ fromJSON(needs.plan.outputs.decision).previewRequired }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: pages-preview-shadow

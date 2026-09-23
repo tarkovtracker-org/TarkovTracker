@@ -2243,6 +2243,9 @@ the accepting aggregator version ships in the same change that activates the job
 A maintain/admin actor dispatches it from `main` with an open non-draft PR number and its successful
 exact-head CI run id. The trusted planner checks the live head/base/test-merge parents and tree,
 the CI run's PR snapshot, and the attempt-specific `CI Result` job. Docs-only changes skip build.
+Docs-only runs still receive a terminal revision recheck. GitHub's workflow-run API may omit the
+PR/base snapshot for fork runs; the shadow rejects those runs until an authenticated historical
+base source is available. This does not change the existing approved fork-preview path.
 Deployable changes build the test merge in a digest-pinned Node container without repository
 write credentials, Actions runtime/cache token, OIDC, deployment secrets, or Docker socket. A
 trusted host step rejects links, special files, and oversized output before the artifact uploader

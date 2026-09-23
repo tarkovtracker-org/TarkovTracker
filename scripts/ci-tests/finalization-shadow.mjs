@@ -145,11 +145,14 @@ test('draft, stale head/base/merge, rerun, and newer CI attempt fail closed', ()
     assert.throws(() => validateShadowEvidence(state), /Finalization shadow refused/);
   }
 });
-test('fork identities are accepted without changing the build credential boundary', () => {
+test('fork runs without an API base snapshot fail closed', () => {
   const state = evidence(['app/locales/fr.json']);
   state.pull.head.repo.full_name = 'contributor/TarkovTracker';
   state.run.head_repository.full_name = 'contributor/TarkovTracker';
   assert.equal(validateShadowEvidence(state).fork, true);
+  state.run.pull_requests = [];
+  assert.throws(() => validateShadowEvidence(state), /no pull request base snapshot/);
+  state.run.pull_requests = evidence().run.pull_requests;
   state.run.head_repository.full_name = 'other/TarkovTracker';
   assert.throws(() => validateShadowEvidence(state), /current head/);
 });
@@ -280,7 +283,7 @@ test('shadow workflow cannot deploy, publish statuses, or pass secrets to candid
   assert.match(workflow, /cancel-in-progress: true/);
   assert.equal(
     (workflow.match(/TRIGGERING_ACTOR: \$\{\{ github\.triggering_actor \}\}/g) ?? []).length,
-    2
+    3
   );
   assert.match(
     workflow,
@@ -321,6 +324,12 @@ test('shadow workflow cannot deploy, publish statuses, or pass secrets to candid
   assert.doesNotMatch(workflow, /name: pages-preview\n/);
   assert.doesNotMatch(jobBlock(workflow, 'build'), /write-manifest|buildManifest/);
   assert.match(jobBlock(workflow, 'verify'), /sealShadowArtifact/);
+  assert.match(jobBlock(workflow, 'verify'), /always\(\) && needs\.plan\.result == 'success'/);
+  assert.match(jobBlock(workflow, 'verify'), /Recheck documentation-only result/);
+  assert.match(
+    workflowStep(jobBlock(workflow, 'verify'), 'Recheck documentation-only result'),
+    /recheckShadow/
+  );
   assert.match(jobBlock(workflow, 'verify'), /extractZip\(await downloadArtifact/);
   assert.match(jobBlock(workflow, 'verify'), /raw\.length !== 1 \|\| raw\[0\]\.expired/);
 });
