@@ -144,6 +144,11 @@ async function deploymentEvidence(github, repo, run, sha) {
     (artifact) => artifact.name === `preview-deployment-${sha}` && !artifact.expired
   );
 }
+/** Both the authoritative result job and the retained upload proof must belong to this run. */
+async function previewRunEvidence(github, repo, run, sha) {
+  if (!(await resultJobCompleted(github, repo, run))) return false;
+  return deploymentEvidence(github, repo, run, sha);
+}
 /**
  * Require the newest `Preview Result` to bind to a successful controller result publication:
  * the newest status from the exact-SHA endpoint must succeed and point at a run of the trusted
@@ -159,10 +164,7 @@ async function validatedPreview(github, repo, sha) {
   if (!status || !previewSuccess(status)) return false;
   const run = await controllerRun(github, repo, controllerRunId(status, repo));
   if (!run) return false;
-  return (
-    (await resultJobCompleted(github, repo, run)) &&
-    (await deploymentEvidence(github, repo, run, sha))
-  );
+  return previewRunEvidence(github, repo, run, sha);
 }
 /** Interrupted recovery requires both gates on the exact version commit, like staging did. */
 async function validatedVersion(github, repo, sha) {
