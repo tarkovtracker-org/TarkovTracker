@@ -32,29 +32,40 @@ function fixture() {
   };
   const previewRun = {
     id: 555,
-    path: '.github/workflows/preview.yml@main',
+    path: '.github/workflows/preview.yml',
+    event: 'workflow_dispatch',
+    head_branch: 'main',
+    head_repository: { full_name: 'owner/repo' },
+    repository: { full_name: 'owner/repo' },
+    status: 'completed',
     conclusion: 'success',
   };
   const previewStatus = {
     id: 10,
     context: 'Preview Result',
     state: 'success',
-    sha,
     target_url: 'https://github.com/owner/repo/actions/runs/555',
   };
   const previewJobs = [{ id: 1, name: 'Publish preview result', conclusion: 'success' }];
+  const previewArtifacts = [{ name: `preview-deployment-${sha}`, expired: false }];
   const missing = () => Promise.reject(Object.assign(new Error('Not found'), { status: 404 }));
   const rest = {
     checks: { listForRef: vi.fn() },
     actions: {
       getWorkflowRun: vi.fn().mockResolvedValue({ data: previewRun }),
       listJobsForWorkflowRun: vi.fn(),
+      listWorkflowRunArtifacts: vi.fn(),
     },
     repos: {
       listCommitStatusesForRef: vi.fn(),
     },
   };
-  const evidence = { checks: [check], statuses: [previewStatus], jobs: previewJobs };
+  const evidence = {
+    checks: [check],
+    statuses: [previewStatus],
+    jobs: previewJobs,
+    artifacts: previewArtifacts,
+  };
   const github = {
     paginate: vi.fn((endpoint) =>
       Promise.resolve(
@@ -62,7 +73,9 @@ function fixture() {
           ? evidence.statuses
           : endpoint === rest.actions.listJobsForWorkflowRun
             ? evidence.jobs
-            : evidence.checks
+            : endpoint === rest.actions.listWorkflowRunArtifacts
+              ? evidence.artifacts
+              : evidence.checks
       )
     ),
     rest: {
@@ -99,6 +112,7 @@ function fixture() {
     previewStatus,
     previewRun,
     previewJobs,
+    previewArtifacts,
     notes,
     recovery: { sha, version: '1.2.3', notes },
   };
@@ -207,14 +221,21 @@ describe('interrupted release recovery', () => {
       f.github.rest.actions.listJobsForWorkflowRun,
       expect.objectContaining({ run_id: 555 })
     );
+    expect(f.github.paginate).toHaveBeenCalledWith(
+      f.github.rest.actions.listWorkflowRunArtifacts,
+      expect.objectContaining({ run_id: 555 })
+    );
   });
   it.each([
     ['failed', (f) => (f.previewStatus.state = 'failure')],
     ['pending', (f) => (f.previewStatus.state = 'pending')],
     ['missing', (f) => (f.evidence.statuses = [])],
     ['other context', (f) => (f.previewStatus.context = 'CI Result')],
-    ['wrong sha', (f) => (f.previewStatus.sha = f.baseSha)],
     ['foreign target', (f) => (f.previewStatus.target_url = 'https://evil.example/run/555')],
+    [
+      'foreign repository',
+      (f) => (f.previewStatus.target_url = 'https://github.com/other/repo/actions/runs/555'),
+    ],
     ['non-run target', (f) => (f.previewStatus.target_url = 'https://github.com/owner/repo')],
     ['targetless', (f) => (f.previewStatus.target_url = null)],
     [
@@ -229,12 +250,12 @@ describe('interrupted release recovery', () => {
     expect(await findReleaseRecovery(f)).toBeNull();
   });
   it.each([
-    ['other workflow', (f) => (f.previewRun.path = '.github/workflows/ci.yml@main')],
-    [
-      'untrusted workflow ref',
-      (f) => (f.previewRun.path = '.github/workflows/preview.yml@attacker-branch'),
-    ],
-    ['missing workflow ref', (f) => (f.previewRun.path = '.github/workflows/preview.yml')],
+    ['other workflow', (f) => (f.previewRun.path = '.github/workflows/ci.yml')],
+    ['untrusted workflow ref', (f) => (f.previewRun.head_branch = 'attacker-branch')],
+    ['foreign head repository', (f) => (f.previewRun.head_repository.full_name = 'other/repo')],
+    ['foreign repository', (f) => (f.previewRun.repository.full_name = 'other/repo')],
+    ['other trigger', (f) => (f.previewRun.event = 'pull_request_target')],
+    ['incomplete run', (f) => (f.previewRun.status = 'in_progress')],
     ['unsuccessful run', (f) => (f.previewRun.conclusion = 'failure')],
     [
       'run missing',
@@ -246,6 +267,12 @@ describe('interrupted release recovery', () => {
     ['result job skipped', (f) => (f.previewJobs[0].conclusion = 'skipped')],
     ['result job failed', (f) => (f.previewJobs[0].conclusion = 'failure')],
     ['result job absent', (f) => (f.evidence.jobs = [])],
+    ['deployment evidence absent', (f) => (f.evidence.artifacts = [])],
+    ['deployment evidence expired', (f) => (f.previewArtifacts[0].expired = true)],
+    [
+      'deployment evidence for another commit',
+      (f) => (f.previewArtifacts[0].name = `preview-deployment-${f.baseSha}`),
+    ],
   ])('rejects %s behind the status', async (_name, mutate) => {
     const f = fixture();
     mutate(f);
