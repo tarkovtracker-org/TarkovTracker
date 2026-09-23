@@ -667,11 +667,6 @@ test('metadata events keep previews pending; ready-for-review reuses CI and clos
   assert.equal(duplicate.decision.action, 'wait');
 });
 test('manual branch previews deploy without a pull request and reject the production branch', async (t) => {
-  const run = runFixture({
-    event: 'workflow_dispatch',
-    head_branch: 'wip/release-1.2.3-1-1',
-    pull_requests: [],
-  });
   const previewBranch = previewBranchName({ branch: 'wip/release-1.2.3-1-1' });
   const staged = await plan(t, workflowDispatchContext(), {
     inputs: { run_id: '900' },
@@ -691,11 +686,6 @@ test('manual branch previews deploy without a pull request and reject the produc
   assert.deepEqual(statusStates(staged.state.statuses), ['a:pending']);
   // The Crowdin `locales` dispatch resolves its open pull request through the validated head, but
   // the dispatch build itself carries branch-derived manifest claims (no PR, head checkout).
-  const locales = runFixture({
-    event: 'workflow_dispatch',
-    head_branch: 'locales',
-    pull_requests: [],
-  });
   const localesPull = pullFixture({
     head: { sha: HEAD, ref: 'locales', repo: { full_name: REPO_NAME } },
   });
