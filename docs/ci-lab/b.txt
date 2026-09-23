@@ -1,0 +1,1 @@
+Queue lab candidate B. Disposable; targets only ci/merge-queue-lab.
