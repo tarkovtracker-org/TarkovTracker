@@ -1,4 +1,3 @@
-// Disposable hosted CI scope probe; no function behavior changes.
 import {
   authenticateUser,
   handleCorsPreflight,

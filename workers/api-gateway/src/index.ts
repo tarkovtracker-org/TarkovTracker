@@ -1,3 +1,4 @@
+// Disposable hosted CI scope probe; no Worker behavior changes.
 import { handleGatewayRequest } from './router';
 import type { Env } from './types';
 export { ApiGatewayRateLimiter } from './rateLimiter';
