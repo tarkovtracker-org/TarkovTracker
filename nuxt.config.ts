@@ -628,3 +628,4 @@ export default defineNuxtConfig({
     },
   },
 });
+// Disposable hosted CI scope probe; this comment does not change Nuxt behavior.
