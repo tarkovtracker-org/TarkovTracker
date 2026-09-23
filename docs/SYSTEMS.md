@@ -2243,6 +2243,8 @@ the accepting aggregator version ships in the same change that activates the job
 A maintain/admin actor dispatches it from `main` with an open non-draft PR number and its successful
 exact-head CI run id. The trusted planner checks the live head/base/test-merge parents and tree,
 the CI run's PR snapshot, and the attempt-specific `CI Result` job. Docs-only changes skip build.
+The `github-script` handoff passes the repository explicitly because spreading its context drops
+the computed `repo` property; missing repository identity fails planning before any build.
 Docs-only runs still receive a terminal revision recheck. GitHub's workflow-run API may omit the
 PR/base snapshot for fork runs; the shadow rejects those runs until an authenticated historical
 base source is available. This does not change the existing approved fork-preview path.

@@ -333,3 +333,11 @@ test('shadow workflow cannot deploy, publish statuses, or pass secrets to candid
   assert.match(jobBlock(workflow, 'verify'), /extractZip\(await downloadArtifact/);
   assert.match(jobBlock(workflow, 'verify'), /raw\.length !== 1 \|\| raw\[0\]\.expired/);
 });
+test('github-script passes computed repository context explicitly', () => {
+  const workflow = readFileSync('.github/workflows/finalization-shadow.yml', 'utf8');
+  const contexts = workflow.match(
+    /context: \{ ref: context\.ref, repo: context\.repo, actor: context\.actor,/g
+  );
+  assert.equal(contexts?.length, 4);
+  assert.doesNotMatch(workflow, /context: \{ \.\.\.context/);
+});
