@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -8,6 +8,7 @@ import {
   planShadow,
   recheckShadow,
   sealShadowArtifact,
+  validateShadowOutput,
   validateShadowEvidence,
 } from '../preview/finalization-shadow.mjs';
 import { digestDirectory } from '../preview/manifest.mjs';
@@ -248,6 +249,20 @@ test('a clean runner seals the exact shadow artifact and detects later content c
     rmSync(directory, { recursive: true, force: true });
   }
 });
+test('the host rejects hostile output before the upload action can read it', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'tt-shadow-raw-'));
+  try {
+    writeFileSync(join(directory, 'index.html'), '<html>preview</html>');
+    assert.deepEqual(validateShadowOutput(directory), { entries: 1, bytes: 20 });
+    symlinkSync('/etc/passwd', join(directory, 'leak'));
+    assert.throws(() => validateShadowOutput(directory), /unsupported Pages output entry/);
+    rmSync(join(directory, 'leak'));
+    symlinkSync(directory, join(directory, 'dist-link'));
+    assert.throws(() => validateShadowOutput(join(directory, 'dist-link')), /not a directory/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 function assertAnonymousBuildProfile(build, container) {
   for (const [key, value] of Object.entries(previewBuildEnv('preview-pr-42'))) {
     if (value === '') assert.match(container, new RegExp(`--env ${key}=`), key);
@@ -275,6 +290,9 @@ test('shadow workflow cannot deploy, publish statuses, or pass secrets to candid
   assert.equal((workflow.match(/ref: \$\{\{ github\.sha \}\}/g) ?? []).length, 3);
   const build = workflowStep(jobBlock(workflow, 'build'), 'Build candidate in isolated container');
   assert.match(build, /shadow-container\.sh/);
+  assert.match(build, /run: \|\n\s+bash .+\\\n\s+"\$GITHUB_WORKSPACE\/candidate"/);
+  assert.match(jobBlock(workflow, 'build'), /Reject unsafe candidate output before host upload/);
+  assert.match(jobBlock(workflow, 'build'), /validateShadowOutput\(process\.env\.DIST_DIR\)/);
   assertAnonymousBuildProfile(build, container);
   assert.match(container, /--mount "type=bind,source=\$candidate_dir,target=\/workspace"/);
   assert.match(container, /--read-only --tmpfs \/tmp/);

@@ -472,7 +472,8 @@ check; it cannot bypass failed CI or deploy a stale revision.
 **Late-build shadow:** `gh workflow run finalization-shadow.yml --ref main -f pull_request=<pr-number> -f ci_run_id=<ci-run-id>`.
 Only a maintain/admin actor can request this non-authoritative rehearsal. It checks the current
 PR, base, test merge, CI run and attempt, then builds a deployable candidate in an isolated
-credential-free container unless the PR is docs-only. A fresh trusted runner seals the output as
+credential-free container unless the PR is docs-only. A trusted host step rejects links and special
+files before upload; a fresh trusted runner seals the output as
 `pages-preview-shadow`. The shadow does not deploy, publish `CI Result`/`Preview Result`, or change
 merge behavior. Ordinary PR CI continues to build and upload `pages-preview`. Re-dispatch after a
 push or base change; dispatch from `main` so the trusted default-branch workflow definition runs.

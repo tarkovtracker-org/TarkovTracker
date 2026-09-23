@@ -1,7 +1,7 @@
 // Default-branch, read-only planner for an opt-in final build rehearsal. This does not publish a
 // merge result: candidate-controlled CI jobs are useful evidence, but not an authenticated gate.
 import { classifyPaths } from '../validation-plan.mjs';
-import { lstatSync, writeFileSync } from 'node:fs';
+import { lstatSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildManifest, digestDirectory } from './manifest.mjs';
 import { verifyManifest } from './controller.mjs';
@@ -231,6 +231,38 @@ function isRegularFile(path) {
   } catch {
     return false;
   }
+}
+// The artifact uploader runs on the host before the separate verifier sees its archive. Reject
+// links and special files first so candidate output cannot make that uploader read host files.
+function requireShadowRoot(root) {
+  if (!lstatSync(root).isDirectory()) fail('Pages output root is not a directory');
+}
+function scanShadowEntry(path, pending) {
+  const stat = lstatSync(path);
+  if (stat.isDirectory()) {
+    pending.push(path);
+    return 0;
+  }
+  if (stat.isFile()) return stat.size;
+  return fail(`unsupported Pages output entry: ${path}`);
+}
+function requireArtifactLimits(entries, bytes) {
+  if (entries > 50_000 || bytes > 1024 * 1024 * 1024) fail('Pages output exceeds artifact limits');
+}
+export function validateShadowOutput(root) {
+  requireShadowRoot(root);
+  const pending = [root];
+  let entries = 0;
+  let bytes = 0;
+  while (pending.length) {
+    const directory = pending.pop();
+    for (const name of readdirSync(directory)) {
+      entries += 1;
+      bytes += scanShadowEntry(join(directory, name), pending);
+      requireArtifactLimits(entries, bytes);
+    }
+  }
+  return { entries, bytes };
 }
 export function sealShadowArtifact(directory, expected) {
   for (const path of ['index.html', '_worker.js/index.js']) {

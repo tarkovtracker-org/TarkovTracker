@@ -2245,7 +2245,8 @@ exact-head CI run id. The trusted planner checks the live head/base/test-merge p
 the CI run's PR snapshot, and the attempt-specific `CI Result` job. Docs-only changes skip build.
 Deployable changes build the test merge in a digest-pinned Node container without repository
 write credentials, Actions runtime/cache token, OIDC, deployment secrets, or Docker socket. A
-separate clean runner treats the candidate build artifact as hostile, safely extracts it, rechecks
+trusted host step rejects links, special files, and oversized output before the artifact uploader
+can read it. A separate clean runner treats the candidate build artifact as hostile, safely extracts it, rechecks
 the live revision, and seals `pages-preview-shadow` with a digest and versioned manifest. Competing
 same-PR dispatches cancel; pushes and base changes invalidate the old request. The shadow neither
 deploys nor publishes required statuses. Ordinary CI still builds/uploads `pages-preview`.
