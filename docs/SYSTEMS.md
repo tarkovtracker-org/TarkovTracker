@@ -2190,6 +2190,9 @@ records action, revision, digest, deployment URL, and validation-to-preview dura
   `workflow_dispatch` from `main` can deploy, and it repeats the exact-SHA, CI, artifact, and
   freshness checks. Cloudflare automatic preview builds are disabled while production Git
   deployments for `main` remain enabled.
+- The Pages-only deployment token is stored only in the protected `preview` and `preview-fork`
+  environments, whose branch policy allows `main`; remove the repository-scoped copy. This prevents
+  a manually dispatched workflow selected from another ref from reading the deployment credential.
 - Fork candidates deploy only through the protected `preview-fork` environment; the exact revision
   is shown before approval and rechecked afterward, so approval never carries to another head.
 - The Pages preview environment has no production KV or Durable Object bindings and empty Supabase,

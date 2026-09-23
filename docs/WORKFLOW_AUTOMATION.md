@@ -472,9 +472,11 @@ bindings and production secrets are absent. Production deployment configuration 
 GitHub CLI readback: the existing `Main CI freshness` ruleset still requires only `CI Result`.
 `preview` and `preview-fork` are restricted to `main`; fork previews require approval from
 `DysektAI` or `Chica999`, with self-approval and administrator bypass disabled. Both environments
-have `CLOUDFLARE_ACCOUNT_ID`. `CLOUDFLARE_PAGES_API_TOKEN` remains repository-scoped because
-GitHub does not reveal existing secret values for copying; scoping it to environments requires a
-replacement Pages-only token set directly as an environment secret.
+have `CLOUDFLARE_ACCOUNT_ID`. `CLOUDFLARE_PAGES_API_TOKEN` is still repository-scoped, so the
+trusted controller is not ready to merge or enable manual dispatch. Create a replacement Pages-only
+token, set it as an environment secret in both environments, and delete the repository secret first.
+GitHub does not reveal existing secret values for copying, and the connected Cloudflare API
+credential cannot create API tokens.
 
 Ordered rollout (keep `Preview Result` non-required until acceptance passes):
 
@@ -492,18 +494,20 @@ Ordered rollout (keep `Preview Result` non-required until acceptance passes):
 2. The trusted aggregate compatibility change (`optionalJobs` tolerance in
    `scripts/validation-plan.mjs`) and the preview controller/manifest pipeline are already on
    `main`.
-3. Merge the trusted-controller bootstrap change that fixes the default-branch credential mapping
+3. Replace the repository-scoped Pages token with a Pages-only token stored in both protected GitHub
+   environments, then delete the repository secret. This must happen before the bootstrap change is
+   merged because a manual dispatch can select another ref's workflow file.
+4. Merge the trusted-controller bootstrap change that fixes the default-branch credential mapping
    and makes automatic controller events wait instead of uploading. A PR's edits to
    `preview.yml` cannot exercise themselves because `workflow_run` loads that workflow from `main`.
-4. The live isolation and cost controls are complete: Cloudflare automatic preview builds are off,
+5. The live isolation and cost controls are complete: Cloudflare automatic preview builds are off,
    production deployments remain on, and the Pages preview runtime has no production secrets or
-   bindings. GitHub environments are created and protected as described above. Optionally replace
-   the repository-scoped Pages token with an environment-scoped token before tightening secret
-   scope; do not reuse the KV-only `CLOUDFLARE_API_TOKEN`.
-5. After the bootstrap change is on `main`, dispatch `preview.yml` with the successful `run_id` for
+   bindings. GitHub environments are created and protected as described above. Do not reuse the
+   KV-only `CLOUDFLARE_API_TOKEN`.
+6. After the bootstrap change is on `main`, dispatch `preview.yml` with the successful `run_id` for
    PR #896's current head. Confirm upload, deployment record, smoke suite, and current-SHA status.
    Dispatch from `main`; do not test candidate-controlled workflow code with deployment secrets.
-6. Complete the live acceptance scenarios (application PR success and failure, documentation-only
+7. Complete the live acceptance scenarios (application PR success and failure, documentation-only
    PR, translation PR, draft transition, approved fork, superseded revision, release-staging
    candidate; confirm GitHub blocks merging when the preview fails or is missing). Then add
    `Preview Result` (GitHub Actions, integration id `15368`) to `.github/main-ci-ruleset.json` and
@@ -515,7 +519,7 @@ Ordered rollout (keep `Preview Result` non-required until acceptance passes):
    gh api repos/tarkovtracker-org/TarkovTracker/rules/branches/main
    ```
 
-7. Remove temporary compatibility behavior after the new paths are verified.
+8. Remove temporary compatibility behavior after the new paths are verified.
 
 **Rollback:** before enforcement, disable the `Preview` workflow and re-enable automatic Cloudflare
 preview builds. After enforcement, an operator must first remove `Preview Result` from the ruleset
