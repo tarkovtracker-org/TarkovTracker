@@ -29,7 +29,7 @@ test('Dependabot waits only for the authoritative aggregates supplied by reposit
   // Check runs must come from GitHub Actions; a foreign app cannot satisfy the aggregate name.
   assert.match(wait, /select\(\.name == \$name and \.app\.id == 15368\)/);
   assert.match(wait, /failing_status_count.*-gt 0/);
-  assert.match(gate, /^  actions: write$/m);
+  assert.match(gate, /^ {2}actions: write$/m);
   assert.match(wait, /preview_requested=false/);
   assert.match(wait, /gh workflow run preview\.yml.*--ref main -f "run_id=\$ci_run_id"/);
   assert.match(wait, /\.path == "\.github\/workflows\/ci\.yml"/);
