@@ -1,1 +1,2 @@
 Queue lab candidate D. Disposable; dequeue experiment.
+Revision B pushed while queued.
