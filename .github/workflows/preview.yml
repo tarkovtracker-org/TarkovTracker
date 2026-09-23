@@ -1,19 +1,19 @@
 name: Preview
 # Trusted preview controller. Every job checks out the default branch; candidate code is never
 # executed, installed, or used as Wrangler configuration. The controller verifies CI evidence and
-# the preview artifact's claims against live GitHub state, uploads the already-built output to the
-# existing Cloudflare Pages preview environment, smoke-tests the unique deployment URL, and
-# publishes the authoritative `Preview Result` commit status. See docs/SYSTEMS.md §18.
+# the preview artifact's claims against live GitHub state, uploads only after an explicit maintainer
+# dispatch, smoke-tests the unique deployment URL, and publishes the authoritative `Preview Result`
+# status. Automatic events only maintain the current-SHA gate. See docs/SYSTEMS.md §18.
 on:
   workflow_run:
     workflows: [CI]
-    types: [requested, completed]
+    types: [completed]
   pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
   workflow_dispatch:
     inputs:
       run_id:
-        description: CI run id to re-evaluate; every eligibility check is repeated.
+        description: Successful CI run id for the exact PR revision to preview.
         required: true
         type: string
 # One controller per pull request (or per fork branch for runs without PR metadata); newer events
@@ -77,8 +77,8 @@ jobs:
     if: needs.plan.outputs.action == 'deploy'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # `preview` approves same-repository candidates automatically; `preview-fork` requires
-    # maintainer review with bypass disabled. Both hold the Cloudflare token.
+    # Explicit dispatches use `preview` for same-repository candidates. Forks use `preview-fork`,
+    # which requires maintainer review with administrator bypass disabled. Both hold the token.
     environment:
       name: ${{ needs.plan.outputs.environment }}
       url: ${{ steps.verify-deployment.outputs.url }}
@@ -132,8 +132,8 @@ jobs:
             core.setOutput('preview_branch', manifest.previewBranch);
       - name: Upload verified output to the Pages preview environment
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.ndjson
           WRANGLER_SEND_METRICS: 'false'
           PREVIEW_BRANCH: ${{ steps.verify.outputs.preview_branch }}
@@ -157,8 +157,8 @@ jobs:
       - name: Verify deployment record
         id: verify-deployment
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.ndjson
           EXPECTED_PREVIEW_BRANCH: ${{ steps.verify.outputs.preview_branch }}
           EXPECTED_HEAD_SHA: ${{ steps.verify.outputs.head_sha }}

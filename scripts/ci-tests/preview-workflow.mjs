@@ -38,11 +38,15 @@ function assertTrustedBoundary(workflow) {
   assert.match(upload, /--branch "\$PREVIEW_BRANCH"/);
   assert.match(upload, /preview-\*\) ;;/);
   assert.match(upload, /\[ "\$PREVIEW_BRANCH" != "main" \]/);
+  assert.match(upload, /CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_PAGES_API_TOKEN \}\}/);
+  assert.match(upload, /CLOUDFLARE_ACCOUNT_ID: \$\{\{ vars\.CLOUDFLARE_ACCOUNT_ID \}\}/);
+  const verifyDeployment = workflowStep(deploy, 'Verify deployment record');
   assert.match(
-    upload,
-    /CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_PAGES_API_TOKEN \|\| secrets\.CLOUDFLARE_API_TOKEN \}\}/
+    verifyDeployment,
+    /CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_PAGES_API_TOKEN \}\}/
   );
-  // The Pages-scoped token must win when present; the legacy Workers token is only a fallback.
+  assert.match(verifyDeployment, /CLOUDFLARE_ACCOUNT_ID: \$\{\{ vars\.CLOUDFLARE_ACCOUNT_ID \}\}/);
+  assert.doesNotMatch(deploy, /secrets\.CLOUDFLARE_API_TOKEN/);
   assert.doesNotMatch(upload, /pnpm run|node scripts\/preview\/build/);
   // Smoke tests run without Cloudflare credentials, against the unique deployment URL.
   const smoke = jobBlock(workflow, 'smoke');
@@ -81,8 +85,9 @@ test('preview controller runs trusted code only and isolates credentials per job
   );
   assert.match(
     workflowEvent(workflow, 'workflow_run'),
-    /workflows: \[CI\]\n\s+types: \[requested, completed\]/
+    /workflows: \[CI\]\n\s+types: \[completed\]/
   );
+  assert.doesNotMatch(workflowEvent(workflow, 'workflow_run'), /requested/);
   assert.match(workflowEvent(workflow, 'workflow_dispatch'), /run_id:/);
   assert.match(workflow, /cancel-in-progress: true/);
   assert.match(jobBlock(workflow, 'deploy'), /if: needs\.plan\.outputs\.action == 'deploy'/);

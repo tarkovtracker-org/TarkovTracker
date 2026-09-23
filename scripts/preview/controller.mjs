@@ -409,6 +409,19 @@ async function publishDecision(github, context, decision) {
     });
   }
 }
+function awaitExplicitPreview(decision) {
+  return {
+    ...decision,
+    action: 'wait',
+    state: 'pending',
+    description: `Preview pending: ${decision.headSha.slice(0, 12)}. Run Preview with run_id=${decision.runId}.${decision.fork ? ' Fork needs maintainer approval.' : ''}`,
+  };
+}
+function deferAutomaticPreview(context, decision) {
+  return context.eventName !== 'workflow_dispatch' && decision.action === 'deploy'
+    ? awaitExplicitPreview(decision)
+    : decision;
+}
 /** Phase 1: resolve the candidate, verify evidence, publish the interim status, emit the plan. */
 export async function planPreview({ github, context, core, inputs, workspace }) {
   const state = {};
@@ -418,6 +431,7 @@ export async function planPreview({ github, context, core, inputs, workspace }) 
   } catch (error) {
     decision = outcomeDecision(error, state);
   }
+  decision = deferAutomaticPreview(context, decision);
   if (decision.action !== 'ignore') await publishDecision(github, context, decision);
   core.info(`${decision.action}: ${decision.description}`);
   return decision;

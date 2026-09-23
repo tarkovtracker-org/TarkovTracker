@@ -423,35 +423,39 @@ Validates external links in documentation:
 ### 8. Preview Controller (`.github/workflows/preview.yml`)
 
 GitHub Actions controls when pull-request previews deploy to the existing Cloudflare Pages project
-(`tarkovtracker`, `tarkovtrackernuxt.pages.dev`), and merging requires both `CI Result` and
-`Preview Result`. The design, result contract, and invariants are specified in
-[SYSTEMS.md §18](SYSTEMS.md#18-actions-owned-cloudflare-previews); this section covers operation.
+(`tarkovtracker`, `tarkovtrackernuxt.pages.dev`). The controller publishes a current-SHA `Preview
+Result` for eligible PR revisions, but only an explicit maintainer dispatch uploads the validated
+artifact. Cloudflare-managed preview builds are disabled while automatic production deployments
+for `main` remain enabled. `Preview Result` becomes a required merge check after the staged rollout
+and acceptance scenarios below pass. The design, result contract, and invariants are specified in
+[SYSTEMS.md §18](SYSTEMS.md#18-actions-owned-cloudflare-previews).
 
-**Triggers:** `workflow_run` for CI (`requested`, `completed`), metadata-only
-`pull_request_target` events (`opened`, `synchronize`, `reopened`, `ready_for_review`,
-`converted_to_draft`, `closed`), and a maintainer `workflow_dispatch` rerun accepting a CI run id
-(from `main` only). Every job checks out the default branch; both privileged triggers are accepted
-in `.github/zizmor.yml` because the controller is the intended trusted boundary.
+**Triggers:** `workflow_run` for completed CI, metadata-only `pull_request_target` events (`opened`,
+`synchronize`, `reopened`, `ready_for_review`, `converted_to_draft`, `closed`), and a maintainer
+`workflow_dispatch` accepting a CI run id from `main` only. Automatic events refresh the status;
+they never upload to Pages. Every job checks out the default branch; both privileged triggers are
+accepted in `.github/zizmor.yml` because the controller is the intended trusted boundary.
 
 **Jobs:** `Plan preview` resolves the candidate through the API, requires successful CI evidence,
-verifies the artifact's manifest and digest, publishes the interim status, and emits a decision.
-`Deploy preview` runs in the `preview` environment (same-repository candidates, automatic) or
-`preview-fork` (maintainer approval per revision), repeats every freshness check, re-verifies the
-artifact, uploads it with pinned Wrangler from the default-branch lockfile using
-`--config wrangler.toml --branch preview-*`, and verifies the Cloudflare deployment record.
-`Preview smoke tests` runs the Playwright suite without Cloudflare credentials against the unique
-deployment URL with a five-minute startup window. `Publish preview result` rechecks freshness and
-publishes success only for a still-current candidate; any failed stage publishes failure, and a
-controller crash publishes failure on the candidate revision.
+verifies the artifact's manifest and digest, and publishes the interim status. Application,
+configuration, and dependency changes stay `pending` until a maintainer requests their preview.
+`Deploy preview` runs only for that dispatch in the `preview` environment (same-repository
+candidates) or `preview-fork` (required maintainer approval, self-approval and administrator bypass
+disabled), repeats every freshness check, re-verifies the artifact, uploads it with pinned Wrangler
+from the default-branch lockfile using `--branch preview-*`, and verifies the Cloudflare deployment
+record. `Preview smoke tests` runs Playwright without Cloudflare credentials against the unique
+deployment URL. `Publish preview result` rechecks freshness and publishes success only for a
+still-current candidate; any failed stage publishes failure, and a controller crash publishes
+failure on the candidate revision.
 
-**Defaults:** ready PRs deploy automatically after validation; drafts keep validating without a
-deployment (status `pending`); documentation-only PRs receive `success: not applicable`; fork PRs
-wait for approval with the exact revision shown in the run summary; deployments are deduplicated by
-revision, digest, and profile version (`[preview <digest12> v1]` marker), and `ready_for_review`
-reuses matching evidence.
+**Defaults:** preview-required changes stay pending until explicitly previewed; drafts stay pending;
+documentation-only PRs receive `success: not applicable`; fork PRs need both an explicit dispatch
+and environment approval. A previous success is reused only for the same revision, artifact digest,
+and profile version (`[preview <digest12> v1]` marker).
 
-**Manual rerun:** `gh workflow run preview.yml --ref main -f run_id=<ci-run-id>`. The controller
-repeats every eligibility check; it cannot be used to bypass a failed or stale revision.
+**Manual preview:** `gh workflow run preview.yml --ref main -f run_id=<ci-run-id>`. Use the
+successful CI run for the PR's current head. The controller repeats every eligibility and freshness
+check; it cannot bypass failed CI or deploy a stale revision.
 
 **Metrics:** each controller run summary records the action (deploy/reuse/skip/wait/fail),
 revision, digest, deployment URL, whether the result was published, and the validation-to-preview
@@ -459,17 +463,20 @@ duration. Deployment (`preview-deployment-<sha>`) and smoke (`preview-smoke-<sha
 artifacts are retained for 30 days. Count deployments, skipped drafts, reused artifacts, and
 failures from these summaries during observation.
 
-#### External settings (operator, staged rollout)
+#### External settings (verified 2026-09-23)
 
-Captured on 2026-09-17 (read-only): Pages project `tarkovtracker` with domains
-`tarkovtrackernuxt.pages.dev` and `tarkovtracker.org`, Git provider connected; the downloaded
-project configuration showed the preview environment carrying production `SUPABASE_*`,
-`STRIPE_PRICE_*`, `NUXT_PUBLIC_TURNSTILE_SITE_KEY` values plus the `TARKOV_DATA` KV and
-`API_GATEWAY_LIMITER` Durable Object bindings; production branch inferred as `main`. GitHub rulesets:
-`Main` (deletion, non-fast-forward) and `Main CI freshness` (`CI Result`, strict, no bypass); the
-only existing deployment environment was `copilot`. Secret values were not read.
+Cloudflare MCP readback: Pages project `tarkovtracker` keeps `main` as its production branch and
+keeps production Git deployments enabled. `preview_deployment_setting` is `none`; preview runtime
+variables match the anonymous checked-in configuration, and production KV and Durable Object
+bindings and production secrets are absent. Production deployment configuration was unchanged.
+GitHub CLI readback: the existing `Main CI freshness` ruleset still requires only `CI Result`.
+`preview` and `preview-fork` are restricted to `main`; fork previews require approval from
+`DysektAI` or `Chica999`, with self-approval and administrator bypass disabled. Both environments
+have `CLOUDFLARE_ACCOUNT_ID`. `CLOUDFLARE_PAGES_API_TOKEN` remains repository-scoped because
+GitHub does not reveal existing secret values for copying; scoping it to environments requires a
+replacement Pages-only token set directly as an environment secret.
 
-Ordered rollout (stop and keep the existing gate if any step fails):
+Ordered rollout (keep `Preview Result` non-required until acceptance passes):
 
 1. Capture settings (done above). Readback commands, run with a scoped `CLOUDFLARE_API_TOKEN`:
 
@@ -482,28 +489,20 @@ Ordered rollout (stop and keep the existing gate if any step fails):
    gh api repos/tarkovtracker-org/TarkovTracker/environments --jq '.environments[] | {name, protection_rules}'
    ```
 
-2. Land the trusted aggregate compatibility change (`optionalJobs` tolerance in
-   `scripts/validation-plan.mjs`).
-3. Land the activation change: security integration, preview artifacts, controller, automation
-   updates, tests, and documentation. Keep `Preview Result` non-required.
-4. Configure the isolated preview environment and approval environments:
-   - Pages dashboard → `tarkovtracker` → Settings → Environment variables (Preview): remove every
-     preview variable and secret (`NUXT_SUPABASE_SERVICE_KEY`, `STRIPE_SECRET_KEY`,
-     `NUXT_TURNSTILE_SECRET_KEY`, `NUXT_LOG_SINK_URL`, and any other backend credential); the
-     checked-in `[env.preview.vars]` supplies the anonymous values and no bindings. Remove the
-     preview KV and Durable Object bindings if the dashboard still shows them.
-   - Create a Cloudflare API token scoped to Account → Cloudflare Pages: Edit for this account only.
-   - GitHub → Settings → Environments: create `preview` (no reviewers) and `preview-fork`
-     (required reviewers = maintainers, "Allow administrators to bypass" disabled, wait timer 0);
-     add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as environment secrets to both.
-   - Rehearse: dispatch `preview.yml` with `run_id` of a completed CI run for an open PR and confirm
-     the deployment URL, the smoke suite, and the published status.
-   - Readback: rerun the `curl` above and confirm `env_vars` for `preview` lists only the
-     checked-in keys and no `kv_namespaces`/`durable_object_namespaces`;
-     `gh api .../environments` lists `preview` and `preview-fork` with the expected reviewers.
-5. Pages dashboard → Settings → Builds & deployments → Branch control: disable automatic preview
-   deployments (keep production deployments for `main` unchanged). Readback: the `source`
-   object above shows `preview_deployment_setting: "none"` (or the branch include list empty).
+2. The trusted aggregate compatibility change (`optionalJobs` tolerance in
+   `scripts/validation-plan.mjs`) and the preview controller/manifest pipeline are already on
+   `main`.
+3. Merge the trusted-controller bootstrap change that fixes the default-branch credential mapping
+   and makes automatic controller events wait instead of uploading. A PR's edits to
+   `preview.yml` cannot exercise themselves because `workflow_run` loads that workflow from `main`.
+4. The live isolation and cost controls are complete: Cloudflare automatic preview builds are off,
+   production deployments remain on, and the Pages preview runtime has no production secrets or
+   bindings. GitHub environments are created and protected as described above. Optionally replace
+   the repository-scoped Pages token with an environment-scoped token before tightening secret
+   scope; do not reuse the KV-only `CLOUDFLARE_API_TOKEN`.
+5. After the bootstrap change is on `main`, dispatch `preview.yml` with the successful `run_id` for
+   PR #896's current head. Confirm upload, deployment record, smoke suite, and current-SHA status.
+   Dispatch from `main`; do not test candidate-controlled workflow code with deployment secrets.
 6. Complete the live acceptance scenarios (application PR success and failure, documentation-only
    PR, translation PR, draft transition, approved fork, superseded revision, release-staging
    candidate; confirm GitHub blocks merging when the preview fails or is missing). Then add
@@ -669,10 +668,10 @@ Push to `main` triggers:
 5. Smoke tests in production
 
 GitHub Actions deploys nothing to production; items 2-4 are separate Git integrations. Pull-request
-previews are the exception: the trusted preview controller (§8) uploads validated CI builds to the
-Pages preview environment, and Cloudflare's automatic preview builds are disabled once the rollout
-reaches step 5. See the Deployment section of [`runbook.md`](./runbook.md) for what to verify after
-each merge.
+previews use the trusted controller (§8) to upload validated CI builds only after an explicit
+maintainer dispatch. Cloudflare automatic preview builds are disabled; production Git deploys remain
+enabled. See the Deployment section of [`runbook.md`](./runbook.md) for what to verify after each
+merge.
 
 A releasing merge deploys twice: once for the merge commit, then again for the
 `chore(release): <version>` commit that carries the bumped `package.json`. The second

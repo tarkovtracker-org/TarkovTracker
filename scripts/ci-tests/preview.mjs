@@ -392,6 +392,16 @@ function pullTargetContext(pull, action) {
     runId: 555,
   };
 }
+function workflowDispatchContext() {
+  return {
+    eventName: 'workflow_dispatch',
+    ref: 'refs/heads/main',
+    repo: REPO,
+    payload: { repository: { id: 1, full_name: REPO_NAME } },
+    serverUrl: 'https://github.com',
+    runId: 556,
+  };
+}
 async function plan(t, context, options = {}) {
   const fake = fakeGithub(t, options);
   const core = fakeCore();
@@ -409,9 +419,11 @@ const statusStates = (statuses) =>
 /* ------------------------------------------------------------------------------------------ */
 /* Controller: planning                                                                        */
 /* ------------------------------------------------------------------------------------------ */
-test('a validated same-repository pull request plans an automatic deployment', async (t) => {
+test('a validated same-repository pull request waits for an explicit preview request', async (t) => {
   const { decision, state, manifest } = await plan(t, workflowRunContext());
-  assert.equal(decision.action, 'deploy');
+  assert.equal(decision.action, 'wait');
+  assert.equal(decision.state, 'pending');
+  assert.match(decision.description, /run_id=900/);
   assert.equal(decision.environment, ENVIRONMENTS.internal);
   assert.equal(decision.fork, false);
   assert.equal(decision.digest, manifest.digest);
@@ -423,7 +435,16 @@ test('a validated same-repository pull request plans an automatic deployment', a
   assert.ok(state.statuses.every((status) => status.context === 'Preview Result'));
   assert.match(state.statuses[0].target_url, /actions\/runs\/555$/);
 });
-test('fork candidates route to the protected environment and show the exact revision', async (t) => {
+test('an explicit dispatch deploys only after rechecking the validated CI run', async (t) => {
+  const { decision, state, manifest } = await plan(t, workflowDispatchContext(), {
+    inputs: { run_id: '900' },
+  });
+  assert.equal(decision.action, 'deploy');
+  assert.equal(decision.environment, ENVIRONMENTS.internal);
+  assert.equal(decision.digest, manifest.digest);
+  assert.deepEqual(statusStates(state.statuses), ['a:pending', 'c:pending']);
+});
+test('fork candidates wait for a manual request and route through the protected environment', async (t) => {
   const run = runFixture({ head_repository: { full_name: FORK_NAME }, pull_requests: [] });
   const pull = pullFixture({ head: { sha: HEAD, ref: 'feature', repo: { full_name: FORK_NAME } } });
   const { decision, state } = await plan(t, workflowRunContext(run), {
@@ -431,7 +452,7 @@ test('fork candidates route to the protected environment and show the exact revi
     associated: [pull],
     run: { head_repository: { full_name: FORK_NAME }, pull_requests: [] },
   });
-  assert.equal(decision.action, 'deploy', decision.description);
+  assert.equal(decision.action, 'wait', decision.description);
   assert.equal(decision.environment, ENVIRONMENTS.fork);
   assert.equal(decision.fork, true);
   assert.match(state.statuses[0].description, /maintainer approval/);
@@ -453,7 +474,7 @@ test('drafts, documentation-only scope and production runs never deploy', async 
   const renamed = await plan(t, workflowRunContext(), {
     files: [{ filename: 'docs/a.md', previous_filename: 'app/a.ts' }],
   });
-  assert.equal(renamed.decision.action, 'deploy');
+  assert.equal(renamed.decision.action, 'wait');
   const main = await plan(
     t,
     workflowRunContext(runFixture({ head_branch: 'main', event: 'push' }))
@@ -608,7 +629,7 @@ test('a matching earlier success is reused instead of redeploying', async (t) =>
       },
     ],
   });
-  assert.equal(otherProfile.decision.action, 'deploy');
+  assert.equal(otherProfile.decision.action, 'wait');
   const otherDigest = await plan(t, workflowRunContext(), {
     previewStatuses: [
       {
@@ -619,11 +640,11 @@ test('a matching earlier success is reused instead of redeploying', async (t) =>
       },
     ],
   });
-  assert.equal(otherDigest.decision.action, 'deploy');
+  assert.equal(otherDigest.decision.action, 'wait');
 });
-test('metadata events: ready-for-review reuses CI, draft conversion pends, close is ignored', async (t) => {
+test('metadata events keep previews pending; ready-for-review reuses CI and close is ignored', async (t) => {
   const ready = await plan(t, pullTargetContext(pullFixture(), 'ready_for_review'));
-  assert.equal(ready.decision.action, 'deploy');
+  assert.equal(ready.decision.action, 'wait');
   assert.equal(ready.decision.runId, 900);
   const noRun = await plan(t, pullTargetContext(pullFixture(), 'opened'), { noRuns: true });
   assert.equal(noRun.decision.action, 'wait');
@@ -643,16 +664,17 @@ test('metadata events: ready-for-review reuses CI, draft conversion pends, close
   assert.equal(closed.decision.action, 'ignore');
   assert.deepEqual(closed.state.statuses, []);
   const duplicate = await plan(t, pullTargetContext(pullFixture(), 'synchronize'));
-  assert.equal(duplicate.decision.action, 'deploy');
+  assert.equal(duplicate.decision.action, 'wait');
 });
-test('branch dispatches deploy without a pull request and reject the production branch', async (t) => {
+test('manual branch previews deploy without a pull request and reject the production branch', async (t) => {
   const run = runFixture({
     event: 'workflow_dispatch',
     head_branch: 'wip/release-1.2.3-1-1',
     pull_requests: [],
   });
   const previewBranch = previewBranchName({ branch: 'wip/release-1.2.3-1-1' });
-  const staged = await plan(t, workflowRunContext(run), {
+  const staged = await plan(t, workflowDispatchContext(), {
+    inputs: { run_id: '900' },
     associated: [],
     run: { event: 'workflow_dispatch', head_branch: 'wip/release-1.2.3-1-1', pull_requests: [] },
     manifest: {
@@ -678,7 +700,8 @@ test('branch dispatches deploy without a pull request and reject the production 
     head: { sha: HEAD, ref: 'locales', repo: { full_name: REPO_NAME } },
   });
   const localesBranch = previewBranchName({ branch: 'locales' });
-  const crowdin = await plan(t, workflowRunContext(locales), {
+  const crowdin = await plan(t, workflowDispatchContext(), {
+    inputs: { run_id: '900' },
     pull: localesPull,
     associated: [localesPull],
     run: { event: 'workflow_dispatch', head_branch: 'locales', pull_requests: [] },
@@ -701,11 +724,7 @@ test('branch dispatches deploy without a pull request and reject the production 
   assert.equal(production.decision.action, 'ignore');
 });
 test('the maintainer rerun path repeats every check and only runs from the default branch', async (t) => {
-  const context = {
-    ...workflowRunContext(),
-    eventName: 'workflow_dispatch',
-    payload: { repository: { id: 1, full_name: REPO_NAME } },
-  };
+  const context = workflowDispatchContext();
   const rerun = await plan(t, context, { inputs: { run_id: '900' } });
   assert.equal(rerun.decision.action, 'deploy');
   const badInput = await plan(t, context, { inputs: { run_id: 'abc' } });
@@ -739,12 +758,13 @@ test('status publication failures propagate so the gate cannot pass silently', a
 /* Controller: deployment verification and results                                            */
 /* ------------------------------------------------------------------------------------------ */
 test('deployment verification repeats freshness checks and re-verifies the artifact', async (t) => {
-  const { decision, github, state } = await plan(t, workflowRunContext());
+  const context = workflowDispatchContext();
+  const { decision, github, state } = await plan(t, context, { inputs: { run_id: '900' } });
   const core = fakeCore();
   const destination = join(tempDir(t), 'dist');
   const manifest = await verifyForDeploy({
     github,
-    context: workflowRunContext(),
+    context,
     core,
     decision,
     destination,
@@ -754,7 +774,7 @@ test('deployment verification repeats freshness checks and re-verifies the artif
   await assert.rejects(
     verifyForDeploy({
       github,
-      context: workflowRunContext(),
+      context,
       core,
       decision: { ...decision, action: 'skip' },
       destination,
@@ -765,7 +785,7 @@ test('deployment verification repeats freshness checks and re-verifies the artif
     await assert.rejects(
       verifyForDeploy({
         github,
-        context: workflowRunContext(),
+        context,
         core,
         decision: { ...decision, previewBranch },
         destination,
@@ -778,7 +798,7 @@ test('deployment verification repeats freshness checks and re-verifies the artif
   await assert.rejects(
     verifyForDeploy({
       github,
-      context: workflowRunContext(),
+      context,
       core,
       decision,
       destination: join(tempDir(t), 'x'),
@@ -789,7 +809,7 @@ test('deployment verification repeats freshness checks and re-verifies the artif
   await assert.rejects(
     verifyForDeploy({
       github,
-      context: workflowRunContext(),
+      context,
       core,
       decision,
       destination: join(tempDir(t), 'y'),
@@ -801,7 +821,7 @@ test('deployment verification repeats freshness checks and re-verifies the artif
   await assert.rejects(
     verifyForDeploy({
       github,
-      context: workflowRunContext(),
+      context,
       core,
       decision,
       destination: join(tempDir(t), 'z'),
@@ -816,7 +836,7 @@ test('deployment verification repeats freshness checks and re-verifies the artif
   await assert.rejects(
     verifyForDeploy({
       github,
-      context: workflowRunContext(),
+      context,
       core,
       decision: { ...decision, fork: true, environment: ENVIRONMENTS.fork },
       destination: join(tempDir(t), 'w'),
@@ -825,12 +845,13 @@ test('deployment verification repeats freshness checks and re-verifies the artif
   );
 });
 test('results publish success only for a current candidate and failure for failed stages', async (t) => {
-  const { decision, github, state } = await plan(t, workflowRunContext());
+  const context = workflowDispatchContext();
+  const { decision, github, state } = await plan(t, context, { inputs: { run_id: '900' } });
   state.statuses.length = 0;
   const core = fakeCore();
   const outcome = await publishResult({
     github,
-    context: workflowRunContext(),
+    context,
     core,
     decision,
     outcomes: { deploy: 'success', smoke: 'success' },
@@ -849,7 +870,7 @@ test('results publish success only for a current candidate and failure for faile
     const failedCore = fakeCore();
     const result = await publishResult({
       github,
-      context: workflowRunContext(),
+      context,
       core: failedCore,
       decision,
       outcomes,
@@ -866,7 +887,7 @@ test('results publish success only for a current candidate and failure for faile
   });
   const late = await publishResult({
     github,
-    context: workflowRunContext(),
+    context,
     core,
     decision,
     outcomes: { deploy: 'success', smoke: 'success' },
@@ -879,7 +900,7 @@ test('results publish success only for a current candidate and failure for faile
   state.run = runFixture({ run_attempt: 2 });
   const superseded = await publishResult({
     github,
-    context: workflowRunContext(),
+    context,
     core,
     decision,
     outcomes: { deploy: 'success', smoke: 'success' },
@@ -891,13 +912,23 @@ test('results publish success only for a current candidate and failure for faile
   const skipCore = fakeCore();
   const skip = await publishResult({
     github,
-    context: workflowRunContext(),
+    context,
     core: skipCore,
     decision: { ...decision, action: 'skip', state: 'success' },
     outcomes: {},
     evidence: {},
   });
   assert.equal(skip, 'success');
+  assert.deepEqual(state.statuses, []);
+  const waiting = await publishResult({
+    github,
+    context,
+    core: fakeCore(),
+    decision: { ...decision, action: 'wait', state: 'pending' },
+    outcomes: { deploy: 'skipped', smoke: 'skipped' },
+    evidence: {},
+  });
+  assert.equal(waiting, 'pending');
   assert.deepEqual(state.statuses, []);
   // Reporting failures propagate.
   state.run = runFixture();
