@@ -91,13 +91,8 @@ preview_result_binding() {
     | length > 0' >/dev/null <<< "$evidence" \
     || { echo "Controller run $run_id lacks deployment evidence for $sha." >&2; return 1; }
 }
-# Both authoritative gates must succeed on the same validated head before promotion.
-wait_for_validated_head() {
-  local sha="$1"
-  wait_for_ci_result "$sha"
-  wait_for_preview_result "$sha"
-}
 # Read the newest dispatched CI run on one branch; queued runs count as created.
+DISPATCHED_CI_RUN_ID=''
 latest_dispatched_run() {
   local ref="$1"
   gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch "$ref" \
@@ -107,13 +102,33 @@ latest_dispatched_run() {
 # Confirm an accepted dispatch creates a run before waiting for exact-SHA checks.
 dispatch_ci() {
   local ref="$1" previous current attempt
+  DISPATCHED_CI_RUN_ID=''
   previous="$(latest_dispatched_run "$ref")"
   gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$ref"
   for ((attempt = 1; attempt <= 12; attempt++)); do
     current="$(latest_dispatched_run "$ref")"
-    if [[ "$current" -gt "$previous" ]]; then return 0; fi
+    if [[ "$current" -gt "$previous" ]]; then
+      DISPATCHED_CI_RUN_ID="$current"
+      return 0
+    fi
     sleep 5
   done
   echo "CI dispatch accepted but no new run appeared on $ref within 60 seconds." >&2
   return 1
+}
+# Release staging and Crowdin are explicit merge candidates. Request one preview only after the
+# CI run started by this job finishes successfully on the expected revision.
+request_preview_after_dispatched_ci() {
+  local sha="$1" run_id="$DISPATCHED_CI_RUN_ID" run
+  [[ "$run_id" =~ ^[1-9][0-9]*$ ]] || { echo 'No dispatched CI run to preview.' >&2; return 1; }
+  timeout 60m gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status
+  run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id")"
+  jq -e --arg sha "$sha" '
+    .event == "workflow_dispatch" and .head_sha == $sha and
+    .status == "completed" and .conclusion == "success"' >/dev/null <<< "$run" || {
+    echo "Dispatched CI run $run_id did not succeed on $sha." >&2
+    return 1
+  }
+  wait_for_ci_result "$sha"
+  gh workflow run preview.yml --repo "$GITHUB_REPOSITORY" --ref main -f "run_id=$run_id"
 }

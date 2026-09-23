@@ -57,6 +57,7 @@ export function fixture(t, changes) {
     join(bin, 'gh'),
     String.raw`#!${process.execPath}
 const fs = require('node:fs');
+const { execFileSync } = require('node:child_process');
 const p = process.env;
 const args = process.argv.slice(2);
 fs.appendFileSync(p.CALLS, JSON.stringify(args) + '\n');
@@ -68,8 +69,20 @@ if (args[0] === 'run' && args[1] === 'list') {
   process.exit(0);
 }
 if (args[0] === 'workflow' && args[1] === 'run' && args[2] === 'ci.yml') {
-  fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'dispatch', ref: args[args.indexOf('--ref') + 1] }) + '\n');
+  const sha = execFileSync(p.REAL_GIT, ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'dispatch', ref: args[args.indexOf('--ref') + 1], sha }) + '\n');
   process.exit(p.DISPATCH_FAIL === 'true' ? 1 : 0);
+}
+if (args[0] === 'run' && args[1] === 'watch') {
+  fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'ci-watch', runId: args[2] }) + '\n');
+  process.exit(p.CI_WATCH_FAIL === 'true' ? 1 : 0);
+}
+if (args[0] === 'workflow' && args[1] === 'run' && args[2] === 'preview.yml') {
+  fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'preview-dispatch', runId: args[args.indexOf('-f') + 1], ref: args[args.indexOf('--ref') + 1] }) + '\n');
+  if (p.PREVIEW_DISPATCH_FAIL === 'true') {
+    console.error('Preview dispatch rejected'); process.exit(1);
+  }
+  process.exit(0);
 }
 if (args[0] === 'api') {
   if (args.includes('--method') && args.includes('PUT') && args.includes('repos/' + p.GITHUB_REPOSITORY + '/pulls/' + p.PR_NUMBER + '/update-branch')) {
@@ -102,7 +115,15 @@ if (args[0] === 'api') {
     process.exit(0);
   }
   if (/^repos\/[^/]+\/[^/]+\/actions\/runs\/[0-9]+$/.test(endpoint)) {
-    console.log(JSON.stringify({ id: 555, path: '.github/workflows/preview.yml@main', conclusion: 'success' }));
+    const id = Number(endpoint.split('/').at(-1));
+    if (id === 555) {
+      console.log(JSON.stringify({ id, path: '.github/workflows/preview.yml@main', conclusion: 'success' }));
+      process.exit(0);
+    }
+    const events = fs.readFileSync(p.EVENTS, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
+    const dispatch = events.filter((event) => event.type === 'dispatch')[id - 1];
+    if (!dispatch) { console.error('Unknown CI run: ' + id); process.exit(1); }
+    console.log(JSON.stringify({ id, event: 'workflow_dispatch', head_sha: p.CI_RUN_HEAD || dispatch.sha, status: 'completed', conclusion: p.CI_RUN_CONCLUSION || 'success' }));
     process.exit(0);
   }
   if (/^repos\/[^/]+\/[^/]+\/actions\/runs\/[0-9]+\/jobs\?per_page=100$/.test(endpoint)) {

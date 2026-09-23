@@ -29,6 +29,17 @@ test('Dependabot waits only for the authoritative aggregates supplied by reposit
   // Check runs must come from GitHub Actions; a foreign app cannot satisfy the aggregate name.
   assert.match(wait, /select\(\.name == \$name and \.app\.id == 15368\)/);
   assert.match(wait, /failing_status_count.*-gt 0/);
+  for (const job of [
+    'Plan preview',
+    'Deploy preview',
+    'Preview smoke tests',
+    'Publish preview result',
+  ])
+    assert.ok(wait.includes(`.name != "${job}"`));
+  assert.match(gate, /^ {2}actions: write$/m);
+  assert.match(wait, /preview_requested=false/);
+  assert.match(wait, /gh workflow run preview\.yml.*--ref main -f "run_id=\$bound_run_id"/);
+  assert.match(wait, /\.path == "\.github\/workflows\/ci\.yml"/);
   assert.match(wait, /deadline=\$\(\(SECONDS \+ 3600\)\)/);
   assert.match(jobBlock(gate, 'auto-merge'), /timeout-minutes: 90/);
   assert.match(read('codecov.yml'), /absolute-floor:/);
@@ -124,12 +135,17 @@ test('workflow linting is selected only for automation changes and fails closed 
   assert.match(read('scripts/validate-changes.mjs'), /workflows=\$\{plan.workflows\}/);
 });
 test('Dependabot auto-merge requires immutable author and event actor identities', () => {
-  const job = jobBlock(read('.github/workflows/dependabot-auto-merge.yml'), 'auto-merge');
+  const workflow = read('.github/workflows/dependabot-auto-merge.yml');
+  const job = jobBlock(workflow, 'auto-merge');
   const eligibility = job.slice(0, job.indexOf('    steps:'));
-  assert.match(
-    eligibility,
-    /if: github\.event\.pull_request\.user\.id == 49699333 && github\.actor_id == '49699333'/
-  );
+  assert.match(workflow, /workflow_run:\n {4}workflows: \[CI\]\n {4}types: \[completed\]/);
+  assert.doesNotMatch(workflow, /pull_request_target:/);
+  assert.doesNotMatch(eligibility, /workflow_run\.(actor|triggering_actor)\.id/);
+  assert.doesNotMatch(eligibility, /workflow_run\.head_repository/);
+  const gate = workflowStep(job, 'Gate Dependabot PR');
+  assert.match(gate, /\.actor\.id == 49699333 and \.triggering_actor\.id == 49699333/);
+  assert.match(gate, /\.head_repository\.full_name == \$repo/);
+  assert.match(gate, /\.user\.id == 49699333/);
   assert.doesNotMatch(eligibility, /github\.actor\s*==|user\.login\s*==/);
 });
 test('CI job-level full gates match the classifier manifest', () => {
