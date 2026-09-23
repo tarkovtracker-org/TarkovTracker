@@ -3,7 +3,7 @@
     "verifying_access": "Vérification de l'accès administrateur...",
     "error_title": "Erreur de Connexion",
     "load_error_description": "Impossible de charger les données admin. Veuillez actualiser ou contacter le support. Référence : {reference}",
-    "no_reference": "N/A",
+    "no_reference": "S/O",
     "error": {
       "cache_purge_failed": "Impossible de purger le cache. Veuillez réessayer.",
       "invalid_purge_type": "Sélectionnez un type de purge de cache valide.",

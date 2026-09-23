@@ -1,4 +1,3 @@
-// Disposable hosted CI scope probe; no preview behavior changes.
 import { createHash } from 'node:crypto';
 // Fixed identity of the Cloudflare Pages project that receives Actions-owned previews. The trusted
 // controller never reads these values from candidate manifests; it recomputes them and compares.
