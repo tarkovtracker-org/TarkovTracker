@@ -1,3 +1,24 @@
+# [1.81.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.80.2...v1.81.0) (2026-09-23)
+
+
+### Bug Fixes
+
+* **ci:** bind preview gates to GitHub response fields ([#897](https://github.com/tarkovtracker-org/TarkovTracker/issues/897)) ([e33246c](https://github.com/tarkovtracker-org/TarkovTracker/commit/e33246c7c28a47d504441c4861e8ee3c4820481b))
+* **release:** bind recovery preview evidence to the controller run behind the status ([b2ad626](https://github.com/tarkovtracker-org/TarkovTracker/commit/b2ad626da4c20ed6d774c4ac09f9cd98bb40001b))
+* **preview:** bind staged-gate evidence to run-owned deployment artifacts ([3445986](https://github.com/tarkovtracker-org/TarkovTracker/commit/3445986b3865ff109e822881dfe8afe5d989b606))
+* **preview:** exact ref match in the staged gate; assert cancellation ordering ([ca6c3cf](https://github.com/tarkovtracker-org/TarkovTracker/commit/ca6c3cf4db34b8228b04850d19c3eb9bf258fe3a))
+* **preview:** read the run tree from head_commit.tree_id ([1ef4c0d](https://github.com/tarkovtracker-org/TarkovTracker/commit/1ef4c0db9d249dd5cbdfda7ec46a9417718b8faf))
+* **preview:** report nothing when a superseded run is cancelled ([15fdb5f](https://github.com/tarkovtracker-org/TarkovTracker/commit/15fdb5f6db2b677dd416344579c3f21ddc3e9904))
+* **release:** require the trusted workflow ref and correct job stream shape ([2a723ef](https://github.com/tarkovtracker-org/TarkovTracker/commit/2a723ef16482edbe89892ed2ae02c137314f1064)), closes [#891](https://github.com/tarkovtracker-org/TarkovTracker/issues/891)
+* **ci:** stop echoing external deployment evidence into job logs ([8c2ecbd](https://github.com/tarkovtracker-org/TarkovTracker/commit/8c2ecbd7e452840a1a29f155696cba1c1978a89e))
+* **preview:** verify dispatch-identity and tree claims; validate preview-required plans ([9c14255](https://github.com/tarkovtracker-org/TarkovTracker/commit/9c14255bfd2a4ba0e909bc52d5851c9f08e02c30))
+* **release:** verify the controller result job behind recovery preview evidence ([8d8333a](https://github.com/tarkovtracker-org/TarkovTracker/commit/8d8333a053fd175b5af170596d52d56259fef9a9)), closes [#890](https://github.com/tarkovtracker-org/TarkovTracker/issues/890)
+
+
+### Features
+
+* **ci:** replace Cloudflare Git previews with an Actions-owned trusted controller ([44a3f0a](https://github.com/tarkovtracker-org/TarkovTracker/commit/44a3f0af3cdd272fc8509895558fe2b6ff0a848d))
+
 ## [1.80.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.80.1...v1.80.2) (2026-09-17)
 
 
