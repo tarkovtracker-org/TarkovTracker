@@ -495,7 +495,9 @@ Ordered rollout (stop and keep the existing gate if any step fails):
    - Create a Cloudflare API token scoped to Account → Cloudflare Pages: Edit for this account only.
    - GitHub → Settings → Environments: create `preview` (no reviewers) and `preview-fork`
      (required reviewers = maintainers, "Allow administrators to bypass" disabled, wait timer 0);
-     add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as environment secrets to both.
+     add `CLOUDFLARE_PAGES_API_TOKEN` as an environment secret and `CLOUDFLARE_ACCOUNT_ID` as an
+     environment variable to both. The workflow maps the Pages-scoped token to Wrangler's
+     `CLOUDFLARE_API_TOKEN`; account IDs are non-secret and may also be set at repository scope.
    - Rehearse: dispatch `preview.yml` with `run_id` of a completed CI run for an open PR and confirm
      the deployment URL, the smoke suite, and the published status.
    - Readback: rerun the `curl` above and confirm `env_vars` for `preview` lists only the

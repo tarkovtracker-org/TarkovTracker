@@ -2189,6 +2189,8 @@ records action, revision, digest, deployment URL, and validation-to-preview dura
   analytics, Turnstile, Stripe, and log-forwarding values; the anonymous build sets `APP_URL` to the
   controlled branch alias so host trust covers the unique deployment URL, and the app's offline
   Supabase fallback activates on `pages.dev`. Public game data still flows through `/api/tarkov/*`.
+- Nuxt's Turnstile key-pair validation runs only for production `build`/`generate` commands, not for
+  `pnpm install`'s `nuxt prepare`; deployable builds still reject a one-sided key configuration.
 - Smoke tests run in a separate credential-free job against the unique deployment URL and require
   the served manifest, usable `/` and `/tasks` content, loaded assets, the anonymous
   `/api/tarkov/cache-meta` shape, nonempty `/api/tarkov/bootstrap?lang=en` data, and no browser

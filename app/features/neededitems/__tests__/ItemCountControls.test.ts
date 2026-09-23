@@ -65,46 +65,20 @@ describe('ItemCountControls inline edit', () => {
     expect(document.activeElement).toBe(input.element);
     expect((input.element as HTMLInputElement).value).toBe('3');
   });
-  it('commits decimal input as an integer', async () => {
-    const wrapper = mountComponent({ currentCount: 0, neededCount: 10 });
-    await editAndCommit(wrapper, '2.5');
-    expect(emittedCounts(wrapper)).toEqual([2]);
+  it.each([
+    { description: 'decimal input', currentCount: 0, value: '2.5', expected: 2 },
+    { description: 'negative input', currentCount: 4, value: '-3', expected: 0 },
+    { description: 'negative fractional input', currentCount: 4, value: '-0.5', expected: 0 },
+    { description: 'input above neededCount', currentCount: 4, value: '25', expected: 10 },
+    { description: 'zero', currentCount: 4, value: '0', expected: 0 },
+    { description: 'maximum allowed value', currentCount: 4, value: '10', expected: 10 },
+    { description: 'fractional value below maximum', currentCount: 4, value: '9.9', expected: 9 },
+    { description: 'empty input', currentCount: 4, value: '', expected: 0 },
+  ])('normalizes $description to $expected', async ({ currentCount, value, expected }) => {
+    const wrapper = mountComponent({ currentCount, neededCount: 10 });
+    await editAndCommit(wrapper, value);
+    expect(emittedCounts(wrapper)).toEqual([expected]);
     expect(Number.isInteger(emittedCounts(wrapper)[0])).toBe(true);
-  });
-  it('clamps negative input to zero', async () => {
-    const wrapper = mountComponent({ currentCount: 4, neededCount: 10 });
-    await editAndCommit(wrapper, '-3');
-    expect(emittedCounts(wrapper)).toEqual([0]);
-  });
-  it('clamps negative fractional input to zero', async () => {
-    const wrapper = mountComponent({ currentCount: 4, neededCount: 10 });
-    await editAndCommit(wrapper, '-0.5');
-    expect(emittedCounts(wrapper)).toEqual([0]);
-  });
-  it('clamps input above neededCount to neededCount', async () => {
-    const wrapper = mountComponent({ currentCount: 4, neededCount: 10 });
-    await editAndCommit(wrapper, '25');
-    expect(emittedCounts(wrapper)).toEqual([10]);
-  });
-  it('commits zero', async () => {
-    const wrapper = mountComponent({ currentCount: 4, neededCount: 10 });
-    await editAndCommit(wrapper, '0');
-    expect(emittedCounts(wrapper)).toEqual([0]);
-  });
-  it('commits the maximum allowed value', async () => {
-    const wrapper = mountComponent({ currentCount: 4, neededCount: 10 });
-    await editAndCommit(wrapper, '10');
-    expect(emittedCounts(wrapper)).toEqual([10]);
-  });
-  it('commits a fractional value just below the maximum as an in-range integer', async () => {
-    const wrapper = mountComponent({ currentCount: 4, neededCount: 10 });
-    await editAndCommit(wrapper, '9.9');
-    expect(emittedCounts(wrapper)).toEqual([9]);
-  });
-  it('treats empty input as zero', async () => {
-    const wrapper = mountComponent({ currentCount: 4, neededCount: 10 });
-    await editAndCommit(wrapper, '');
-    expect(emittedCounts(wrapper)).toEqual([0]);
   });
   it('commits on Enter and leaves edit mode', async () => {
     const wrapper = mountComponent({ currentCount: 1, neededCount: 10 });
