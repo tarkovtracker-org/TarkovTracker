@@ -20,8 +20,6 @@ jobs:
     if: >-
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.actor.id == 49699333 &&
-      github.event.workflow_run.triggering_actor.id == 49699333 &&
       github.event.workflow_run.head_repository.id == github.event.repository.id
     runs-on: ubuntu-latest
     timeout-minutes: 90

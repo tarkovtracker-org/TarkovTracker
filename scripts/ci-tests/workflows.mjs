@@ -140,11 +140,10 @@ test('Dependabot auto-merge requires immutable author and event actor identities
   const eligibility = job.slice(0, job.indexOf('    steps:'));
   assert.match(workflow, /workflow_run:\n {4}workflows: \[CI\]\n {4}types: \[completed\]/);
   assert.doesNotMatch(workflow, /pull_request_target:/);
-  assert.match(
-    eligibility,
-    /github\.event\.workflow_run\.actor\.id == 49699333 &&\n\s+github\.event\.workflow_run\.triggering_actor\.id == 49699333/
-  );
-  assert.match(workflowStep(job, 'Gate Dependabot PR'), /\.user\.id == 49699333/);
+  assert.doesNotMatch(eligibility, /workflow_run\.(actor|triggering_actor)\.id/);
+  const gate = workflowStep(job, 'Gate Dependabot PR');
+  assert.match(gate, /\.actor\.id == 49699333 and \.triggering_actor\.id == 49699333/);
+  assert.match(gate, /\.user\.id == 49699333/);
   assert.doesNotMatch(eligibility, /github\.actor\s*==|user\.login\s*==/);
 });
 test('CI job-level full gates match the classifier manifest', () => {
