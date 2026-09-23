@@ -271,6 +271,16 @@ test('Crowdin also waits for the authoritative Preview Result and rejects a fail
   }
   rejected(f.run('merge', { PREVIEW_PRESENT: 'false' }), /Timed out waiting for Preview Result/);
   rejected(f.run('merge', { PREVIEW_STATE: 'pending' }), /Timed out waiting for Preview Result/);
+  rejected(
+    f.run('merge', { PREVIEW_TARGET_URL: 'https://github.com/other/repo/actions/runs/555' }),
+    /Preview Result did not succeed: unbound/
+  );
+  rejected(
+    f.run('merge', {
+      PREVIEW_TARGET_URL: 'https://github.com/example/repo/actions/runs/555/extra',
+    }),
+    /Preview Result did not succeed: unbound/
+  );
   assert.ok(!f.calls().some((args) => args[1] === 'merge'));
   // The preview gate is consulted only after CI Result succeeded on the same head.
   const events = f.events();

@@ -44,17 +44,19 @@ wait_for_ci_result() {
 # Await the authoritative `Preview Result` commit status published by the trusted preview
 # controller (.github/workflows/preview.yml) on one exact head. Only the newest status for the
 # context counts; failure and error are terminal, and a missing status keeps waiting until the bound.
+# GitHub's /commits/{sha}/statuses endpoint binds the response to the requested SHA; individual
+# status objects do not contain a sha field.
 wait_for_preview_result() {
-  local sha="$1" attempt statuses result
+  local sha="$1" attempt statuses result prefix="https://github.com/$GITHUB_REPOSITORY/actions/runs/"
   for ((attempt = 1; attempt <= GATE_WAIT_ATTEMPTS; attempt++)); do
     statuses="$(gh api --paginate "repos/$GITHUB_REPOSITORY/commits/$sha/statuses?per_page=100")"
-    result="$(jq -rs --arg sha "$sha" '
+    result="$(jq -rs --arg prefix "$prefix" '
       [ .[][] | select(.context == "Preview Result") ]
       | sort_by(.id) | last
       | if . == null then "pending"
         elif .state != "success" then .state
-        elif .sha != $sha then "foreign"
-        elif ((.target_url // "" | capture("/actions/runs/(?<id>[0-9]+)") | .id)?) == ""
+        elif ((.target_url // "") | startswith($prefix) | not) then "unbound"
+        elif ((.target_url // "") | ltrimstr($prefix) | test("^[0-9]+$") | not)
         then "unbound"
         else "bound" end' <<< "$statuses")"
     case "$result" in
@@ -67,20 +69,25 @@ wait_for_preview_result() {
   done
 }
 # Statuses are forgeable by write collaborators: authenticate the reported success against
-# run-owned state before the gate may pass. The bound run must be the trusted controller
-# revision (default-branch workflow ref), completed with a successful result publication, and
+# run-owned state before the gate may pass. The bound run must use the trusted controller
+# workflow on main, complete with a successful result publication, and
 # must carry the deployment evidence artifact named for the exact previewed SHA.
 preview_result_binding() {
-  local sha="$1" run_id run jobs evidence
-  run_id="$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/statuses?per_page=100" | jq -r --arg sha "$sha" '
+  local sha="$1" run_id run jobs evidence prefix="https://github.com/$GITHUB_REPOSITORY/actions/runs/"
+  run_id="$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/statuses?per_page=100" | jq -r --arg prefix "$prefix" '
     [ .[] | select(.context == "Preview Result") ]
     | sort_by(.id) | last
-    | select(.state == "success" and .sha == $sha)
-    | (.target_url // "" | capture("/actions/runs/(?<id>[0-9]+)") | .id)? // ""')"
+    | select(.state == "success")
+    | (.target_url // "") | select(startswith($prefix)) | ltrimstr($prefix)
+    | select(test("^[0-9]+$"))')"
   [[ "$run_id" =~ ^[0-9]+$ ]] || { echo 'Preview Result is not bound to a controller run.' >&2; return 1; }
   run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id")"
-  # Exact comparison: a branch named like 'foo@main' would otherwise satisfy prefix/suffix checks.
-  jq -re 'select(.path == ".github/workflows/preview.yml@main" and .conclusion == "success")' >/dev/null <<< "$run" \
+  # GitHub reports path and branch separately; path has no @main suffix for workflow_dispatch.
+  jq -re --arg repo "$GITHUB_REPOSITORY" 'select(
+    .path == ".github/workflows/preview.yml" and .event == "workflow_dispatch" and
+    .head_branch == "main" and .head_repository.full_name == $repo and
+    .repository.full_name == $repo and .status == "completed" and .conclusion == "success"
+  )' >/dev/null <<< "$run" \
     || { echo "Controller run $run_id is not a trusted preview result publication." >&2; return 1; }
   jobs="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")"
   # --paginate emits each page as a bare {total_count, jobs} document.

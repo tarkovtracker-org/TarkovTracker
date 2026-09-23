@@ -196,11 +196,13 @@ test('shared gate scripts wait for both authoritative gates with a 60-minute bou
   // status bound to a trusted-revision controller run with a successful result publication
   // and the deployment evidence artifact for the exact previewed SHA.
   assert.match(gate, /preview_result_binding\(\)/);
-  // The staged gate authorizes the bound controller run by exact path@ref equality.
+  // GitHub reports the controller path and main branch separately.
   assert.match(
     gate,
-    /select\(\.path == "\.github\/workflows\/preview\.yml@main" and \.conclusion == "success"\)/
+    /\.path == "\.github\/workflows\/preview\.yml" and \.event == "workflow_dispatch"/
   );
+  assert.match(gate, /\.head_branch == "main" and \.head_repository\.full_name == \$repo/);
+  assert.match(gate, /prefix="https:\/\/github\.com\/\$GITHUB_REPOSITORY\/actions\/runs\/"/);
   assert.match(gate, /Publish preview result" and \.conclusion == "success"/);
   assert.match(gate, /preview-deployment-\\\(\$sha\)/);
   assert.match(gate, /request_preview_after_dispatched_ci\(\)/);

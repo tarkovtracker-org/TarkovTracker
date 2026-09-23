@@ -107,9 +107,9 @@ if (args[0] === 'api') {
     const sha = endpoint.split('/commits/')[1].split('/')[0];
     fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'preview-result', sha, state: p.PREVIEW_STATE || 'success' }) + '\n');
     const statuses = p.PREVIEW_PRESENT === 'false' ? [] : [
-      { id: 1, context: 'Preview Result', state: 'failure', sha },
-      { id: 2, context: 'CI Result', state: 'success', sha },
-      { id: 3, context: 'Preview Result', state: p.PREVIEW_STATE || 'success', sha, target_url: 'https://github.com/o/r/actions/runs/555' },
+      { id: 1, context: 'Preview Result', state: 'failure' },
+      { id: 2, context: 'CI Result', state: 'success' },
+      { id: 3, context: 'Preview Result', state: p.PREVIEW_STATE || 'success', target_url: p.PREVIEW_TARGET_URL || 'https://github.com/' + p.GITHUB_REPOSITORY + '/actions/runs/555' },
     ];
     console.log(JSON.stringify(statuses));
     process.exit(0);
@@ -117,7 +117,16 @@ if (args[0] === 'api') {
   if (/^repos\/[^/]+\/[^/]+\/actions\/runs\/[0-9]+$/.test(endpoint)) {
     const id = Number(endpoint.split('/').at(-1));
     if (id === 555) {
-      console.log(JSON.stringify({ id, path: '.github/workflows/preview.yml@main', conclusion: 'success' }));
+      console.log(JSON.stringify({
+        id,
+        path: p.CONTROLLER_PATH || '.github/workflows/preview.yml',
+        event: p.CONTROLLER_EVENT || 'workflow_dispatch',
+        head_branch: p.CONTROLLER_BRANCH || 'main',
+        head_repository: { full_name: p.CONTROLLER_REPO || p.GITHUB_REPOSITORY },
+        repository: { full_name: p.GITHUB_REPOSITORY },
+        status: 'completed',
+        conclusion: p.CONTROLLER_CONCLUSION || 'success',
+      }));
       process.exit(0);
     }
     const events = fs.readFileSync(p.EVENTS, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
