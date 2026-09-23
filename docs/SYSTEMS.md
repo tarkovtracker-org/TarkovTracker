@@ -2141,8 +2141,9 @@ smoke suite (`scripts/preview/smoke/preview.smoke.mjs`) without Cloudflare crede
 publishes the authoritative `Preview Result` commit status. Downstream consumers (the release
 gate and interrupted-release recovery) must not trust the status in isolation: commit statuses
 are forgeable by write collaborators, so the evidence binds to the controller run behind its
-`target_url` with a successful `Publish preview result` job on the exact SHA, and the bound run
-must execute the `.github/workflows/preview.yml@main` definition (default-branch ref only).
+`target_url`. That run must report path `.github/workflows/preview.yml`, event
+`workflow_dispatch`, branch `main`, and this repository; its `Publish preview result` job must
+succeed and it must retain a `preview-deployment-<sha>` artifact for the exact candidate.
 
 ### Flow
 
@@ -2188,7 +2189,8 @@ records action, revision, digest, deployment URL, and validation-to-preview dura
 - Archives are parsed from the central directory before extraction; symbolic links, special
   files, traversal, absolute paths, duplicates, encryption, and checksum mismatches are rejected.
 - Successful deployments are deduplicated by revision, artifact digest, and profile version through
-  the status marker; `ready_for_review` reuses matching evidence instead of redeploying.
+  the status marker. Before `ready_for_review` reuses a result, the controller authenticates the
+  original run and its exact-SHA deployment artifact, then keeps that run URL on the new success.
 - Pull-request and CI-completion events never upload to Cloudflare. Only a trusted
   `workflow_dispatch` from `main` can deploy, and it repeats the exact-SHA, CI, artifact, and
   freshness checks. Crowdin and release staging dispatch once after their own exact-SHA CI passes;

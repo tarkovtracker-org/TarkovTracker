@@ -38,6 +38,8 @@ const TREE = sha('d');
 const REPO = { owner: 'tarkovtracker-org', repo: 'TarkovTracker' };
 const REPO_NAME = 'tarkovtracker-org/TarkovTracker';
 const FORK_NAME = 'someone/TarkovTracker';
+const PREVIOUS_PREVIEW_RUN_ID = 444;
+const PREVIOUS_PREVIEW_URL = `https://github.com/${REPO_NAME}/actions/runs/${PREVIOUS_PREVIEW_RUN_ID}`;
 function tempDir(t) {
   const dir = mkdtempSync(join(tmpdir(), 'preview-test-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -252,6 +254,19 @@ function runFixture(overrides = {}) {
     ...overrides,
   };
 }
+function previousPreviewRun(overrides = {}) {
+  return {
+    id: PREVIOUS_PREVIEW_RUN_ID,
+    path: '.github/workflows/preview.yml',
+    event: 'workflow_dispatch',
+    head_branch: 'main',
+    head_repository: { full_name: REPO_NAME },
+    repository: { full_name: REPO_NAME },
+    status: 'completed',
+    conclusion: 'success',
+    ...overrides,
+  };
+}
 function fakeCheck() {
   return {
     id: 1,
@@ -279,6 +294,13 @@ function fakeMutableState(options) {
     previewStatuses: firstOption(options.previewStatuses, []),
     files: firstOption(options.files, [{ filename: 'app/a.ts' }]),
     artifacts: firstOption(options.artifacts, [{ id: 77, name: ARTIFACT_NAME, expired: false }]),
+    previousRun: previousPreviewRun(options.previousRun),
+    previousJobs: firstOption(options.previousJobs, [
+      { name: 'Publish preview result', conclusion: 'success' },
+    ]),
+    previousArtifacts: firstOption(options.previousArtifacts, [
+      { name: `preview-deployment-${HEAD}`, expired: false },
+    ]),
     failPublish: firstOption(options.failPublish, false),
   };
 }
@@ -325,13 +347,15 @@ function actionEndpoints(state, zipEntries, options) {
   return {
     actions: {
       getWorkflowRun: async ({ run_id }) => {
-        if (run_id !== state.run.id) throw Object.assign(new Error('Not found'), { status: 404 });
-        return { data: state.run };
+        if (run_id === state.run.id) return { data: state.run };
+        if (run_id === state.previousRun.id) return { data: state.previousRun };
+        throw Object.assign(new Error('Not found'), { status: 404 });
       },
       listWorkflowRuns: async () => ({
         data: { workflow_runs: options.noRuns ? [] : [state.run] },
       }),
       listWorkflowRunArtifacts: 'artifacts',
+      listJobsForWorkflowRun: 'jobs',
       downloadArtifact: async () => {
         const zip = state.archive ?? buildZip(zipEntries());
         // Octokit returns an exact ArrayBuffer, not Node's pooled backing store.
@@ -349,7 +373,9 @@ async function paginatedEndpoints(state, endpoint, params, options) {
     associated: () => options.associated ?? [state.pull],
     checks: () => [state.check],
     statuses: () => [...dispatchStatuses(state, params), ...state.previewStatuses],
-    artifacts: () => state.artifacts,
+    artifacts: () =>
+      params.run_id === state.previousRun.id ? state.previousArtifacts : state.artifacts,
+    jobs: () => state.previousJobs,
     listFiles: () => state.files,
   };
   if (!paged[endpoint]) throw new Error(`unexpected endpoint ${endpoint}`);
@@ -613,12 +639,36 @@ test('a matching earlier success is reused instead of redeploying', async (t) =>
         context: 'Preview Result',
         state: 'success',
         description: `Preview deployed ${marker}`,
+        target_url: PREVIOUS_PREVIEW_URL,
       },
       { id: 10, context: 'Preview Result', state: 'pending', description: 'Draft' },
     ],
   });
   assert.equal(reused.decision.action, 'reuse');
+  assert.equal(reused.decision.reuseTargetUrl, PREVIOUS_PREVIEW_URL);
   assert.deepEqual(statusStates(reused.state.statuses), ['a:success', 'c:success']);
+  assert.ok(reused.state.statuses.every((status) => status.target_url === PREVIOUS_PREVIEW_URL));
+  for (const options of [
+    { previousArtifacts: [] },
+    { previousJobs: [] },
+    { previousRun: { head_branch: 'other' } },
+    { previousTarget: 'https://github.com/other/repo/actions/runs/444' },
+    { previousTarget: `https://github.com/${REPO_NAME}/actions/runs/999` },
+  ]) {
+    const untrusted = await plan(t, workflowRunContext(), {
+      ...options,
+      previewStatuses: [
+        {
+          id: 9,
+          context: 'Preview Result',
+          state: 'success',
+          description: `Preview deployed ${marker}`,
+          target_url: options.previousTarget ?? PREVIOUS_PREVIEW_URL,
+        },
+      ],
+    });
+    assert.equal(untrusted.decision.action, 'wait');
+  }
   const otherProfile = await plan(t, workflowRunContext(), {
     previewStatuses: [
       {

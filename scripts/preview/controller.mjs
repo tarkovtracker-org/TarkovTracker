@@ -266,12 +266,76 @@ async function verifiedArtifact({ github, context, candidate, pull, run, destina
 /* ------------------------------------------------------------------------------------------ */
 /* Decisions                                                                                   */
 /* ------------------------------------------------------------------------------------------ */
+function previousRunId(context, status) {
+  const prefix = `${context.serverUrl}/${repoName(context)}/actions/runs/`;
+  const target = status.target_url ?? '';
+  if (!target.startsWith(prefix)) return null;
+  const id = target.slice(prefix.length);
+  return /^[1-9][0-9]*$/.test(id) ? Number(id) : null;
+}
+function trustedPreviousRun(context, run) {
+  const repository = repoName(context);
+  return [
+    run.path === '.github/workflows/preview.yml',
+    run.event === 'workflow_dispatch',
+    run.head_branch === PRODUCTION_BRANCH,
+    run.head_repository?.full_name === repository,
+    run.repository?.full_name === repository,
+    run.status === 'completed',
+    run.conclusion === 'success',
+  ].every(Boolean);
+}
+async function successfulResultJob(github, context, runId) {
+  const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+    ...context.repo,
+    run_id: runId,
+    per_page: 100,
+  });
+  return jobs.some((job) => job.name === 'Publish preview result' && job.conclusion === 'success');
+}
+async function retainedDeployment(github, context, runId, sha) {
+  const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+    ...context.repo,
+    run_id: runId,
+    per_page: 100,
+  });
+  return artifacts.some(
+    (artifact) => artifact.name === `preview-deployment-${sha}` && !artifact.expired
+  );
+}
+async function previousRun(github, context, runId) {
+  try {
+    return await getRun(github, context.repo, runId);
+  } catch (error) {
+    if (error.status === 404) return null;
+    throw error;
+  }
+}
+async function validatedPreviousRun(github, context, status) {
+  const runId = previousRunId(context, status);
+  if (!runId) return null;
+  const run = await previousRun(github, context, runId);
+  if (!run) return null;
+  if (!trustedPreviousRun(context, run)) return null;
+  return runId;
+}
+async function authenticatedPreviousSuccess(github, context, status, sha) {
+  const runId = await validatedPreviousRun(github, context, status);
+  if (!runId) return false;
+  if (!(await successfulResultJob(github, context, runId))) return false;
+  return retainedDeployment(github, context, runId, sha);
+}
+function matchesSuccessMarker(status, marker) {
+  return status.state === 'success' && status.description?.includes(marker);
+}
 async function previousSuccess(github, context, sha, digest) {
   const statuses = await allStatuses(github, context.repo, sha, 'Preview Result');
   const marker = successMarker(digest);
-  return statuses.find(
-    (status) => status.state === 'success' && status.description?.includes(marker)
-  );
+  for (const status of statuses.toSorted((left, right) => right.id - left.id)) {
+    if (!matchesSuccessMarker(status, marker)) continue;
+    if (await authenticatedPreviousSuccess(github, context, status, sha)) return status;
+  }
+  return null;
 }
 function firstString(value) {
   return value?.[0]?.full_name ?? null;
@@ -354,12 +418,14 @@ async function deployDecision({ github, context, state, workspace }) {
     appUrl: manifest.appUrl,
     environment: fork ? ENVIRONMENTS.fork : ENVIRONMENTS.internal,
   };
-  if (await previousSuccess(github, context, candidate.headSha, manifest.digest)) {
+  const earlier = await previousSuccess(github, context, candidate.headSha, manifest.digest);
+  if (earlier) {
     return {
       ...common,
       action: 'reuse',
       state: 'success',
       description: `Preview already deployed for this revision ${successMarker(manifest.digest)}`,
+      reuseTargetUrl: earlier.target_url,
     };
   }
   return {
@@ -395,6 +461,9 @@ export function fallbackHead(context) {
 /* ------------------------------------------------------------------------------------------ */
 /* Public phases                                                                               */
 /* ------------------------------------------------------------------------------------------ */
+function statusTargetUrl(context, decision) {
+  return decision.reuseTargetUrl ?? runUrl(context);
+}
 async function publishDecision(github, context, decision) {
   if (!decision.state || !decision.headSha) return;
   const targets = [decision.headSha, decision.mergeSha].filter(
@@ -405,7 +474,7 @@ async function publishDecision(github, context, decision) {
       sha,
       state: decision.state,
       description: decision.description,
-      targetUrl: runUrl(context),
+      targetUrl: statusTargetUrl(context, decision),
     });
   }
 }
