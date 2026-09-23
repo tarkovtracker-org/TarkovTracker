@@ -1649,7 +1649,8 @@ The checkout stays pinned to the validated SHA. The production build still runs 
   check remain the final safeguards if main advances after the last eligibility check.
 - Dispatched CI publishes the aggregate validator outcome as a `CI Result` commit status on the
   exact workflow-run SHA. GitHub excludes dispatch-created job checks from branch rules; the
-  status uses the GitHub Actions job token with job-scoped `statuses: write`. That job checks out
+  status uses the GitHub Actions job token with job-scoped `statuses: write` and
+  `pull-requests: read` for Crowdin merge attestation. That job checks out
   the trusted default branch for aggregation and reporting, never candidate branch code. Only aggregate
   success publishes success; failed, cancelled, skipped, or missing validation publishes failure.
   Validation jobs unknown to the trusted aggregator also fail the result, so a new job must land in
@@ -1701,10 +1702,18 @@ behind branch, explicitly dispatches candidate CI, and performs the final merge;
   success retry for up to 60 seconds; only `MERGEABLE / CLEAN` may merge.
 - The gate awaits successful GitHub Actions `CI Result` and then the `Preview Result` commit status
   on the exact head (the explicit `locales` dispatch produces the preview even though job-token
-  actions suppress ordinary pull-request events) and verifies the effective
+  PR updates leave ordinary `pull_request` runs approval-required) and verifies the effective
   repository rule requires the CI check with strict freshness. The administrator verifies the deployed
   ruleset has no bypass actors; automation does not receive ruleset write access to read that list.
   GitHub enforces the base requirement at merge time; missing/weakened required checks fail closed.
+- The trusted dispatched CI result job also reports `CI Result` on GitHub's test-merge commit only
+  when exactly one eligible same-repository `locales` PR has the validated head, its base equals
+  current main on both reads, its merge SHA stays unchanged, and the head and test-merge Git trees
+  are identical. This attests the same fully tested files without running candidate code in the
+  status-writing job. A missing test-merge SHA is fetched from the selected PR with a bounded retry.
+  A changed revision or different tree fails the result job before preview and leaves the merge
+  status absent. A later failed dispatch publishes failure to the same PR's current test-merge SHA
+  as well as the head, superseding any earlier success on that merge commit.
 - The server-side `--match-head-commit` guard must use the SHA that passed all validation.
 - Merges use `GITHUB_TOKEN`, then explicitly dispatch main CI for the release gate. No personal
   GitHub token is needed. CI dispatch failures fail the workflow; candidate failures prevent merging.

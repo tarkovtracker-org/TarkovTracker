@@ -547,7 +547,7 @@
       "pan": "{keys} ou faites glisser vers la poêle",
       "zoom": "{keys} pour zoomer",
       "reset": "{key} pour réinitialiser la vue",
-      "cycle_floors": "{keys} to cycle floors",
+      "cycle_floors": "{keys} pour changer d'étage ",
       "floor_panel": "Ou utilisez le panneau de plancher.",
       "click_at_cursor": "{key} pour cliquer au curseur",
       "click_marker": "Cliquez sur un marqueur pour plus de détails.",
