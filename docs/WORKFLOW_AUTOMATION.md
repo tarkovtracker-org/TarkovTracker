@@ -68,6 +68,14 @@ integrated `Security` call (see §2) run on every CI run. Fork restrictions and 
 remain unchanged; Dependabot now waits for the aggregates (`CI Result`, `Preview Result`) rather
 than individual job names.
 
+GitHub makes `pull_request` runs from PRs updated with `GITHUB_TOKEN` approval-required. The
+trusted `locales` dispatch runs full CI on the captured head, then reports its result to the
+test-merge commit only if both Git trees match, the base is still current main, and the PR revision
+remains unchanged. It retries briefly while GitHub calculates the test merge, and a later failed
+dispatch supersedes an earlier merge-commit success. Other dispatched runs report only on their
+own exact SHA. See the Crowdin invariant in
+[SYSTEMS.md §14](SYSTEMS.md#14-release-validation-and-publication).
+
 #### Preview build artifact
 
 `Validate` builds the actual Cloudflare Pages output once. `scripts/preview/build-profile.mjs`
