@@ -50,7 +50,8 @@ jobs:
           script: |
             const { planShadow } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/finalization-shadow.mjs`);
             const decision = await planShadow({
-              github, context: { ...context, triggeringActor: process.env.TRIGGERING_ACTOR },
+              github, context: { ref: context.ref, repo: context.repo, actor: context.actor,
+                triggeringActor: process.env.TRIGGERING_ACTOR },
               inputs: { pull_request: process.env.PR_INPUT, ci_run_id: process.env.CI_RUN_INPUT },
             });
             core.setOutput('decision', JSON.stringify(decision));
@@ -136,7 +137,8 @@ jobs:
           script: |
             const { recheckShadow } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/finalization-shadow.mjs`);
             const decision = JSON.parse(process.env.DECISION);
-            await recheckShadow({ github, context: { ...context, triggeringActor: process.env.TRIGGERING_ACTOR }, expected: decision });
+            await recheckShadow({ github, context: { ref: context.ref, repo: context.repo, actor: context.actor,
+              triggeringActor: process.env.TRIGGERING_ACTOR }, expected: decision });
             core.notice(`Documentation-only shadow N/A remains current for PR #${decision.pullRequest}`);
       - name: Recheck revision and seal artifact in a separate trusted runner
         if: ${{ fromJSON(needs.plan.outputs.decision).previewRequired }}
@@ -152,7 +154,8 @@ jobs:
             const { extractZip } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/archive.mjs`);
             const { downloadArtifact } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/github-api.mjs`);
             const decision = JSON.parse(process.env.DECISION);
-            await recheckShadow({ github, context: { ...context, triggeringActor: process.env.TRIGGERING_ACTOR }, expected: decision });
+            await recheckShadow({ github, context: { ref: context.ref, repo: context.repo, actor: context.actor,
+              triggeringActor: process.env.TRIGGERING_ACTOR }, expected: decision });
             const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
               ...context.repo, run_id: context.runId, per_page: 100,
             });
@@ -160,7 +163,8 @@ jobs:
             if (raw.length !== 1 || raw[0].expired) throw new Error('Expected one unexpired raw shadow artifact from this run');
             mkdirSync(process.env.ARTIFACT_DIR, { recursive: true });
             extractZip(await downloadArtifact(github, context.repo, raw[0].id), process.env.ARTIFACT_DIR);
-            await recheckShadow({ github, context: { ...context, triggeringActor: process.env.TRIGGERING_ACTOR }, expected: decision });
+            await recheckShadow({ github, context: { ref: context.ref, repo: context.repo, actor: context.actor,
+              triggeringActor: process.env.TRIGGERING_ACTOR }, expected: decision });
             const expected = {
               repository: `${context.repo.owner}/${context.repo.repo}`,
               pullRequest: decision.pullRequest,
