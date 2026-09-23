@@ -9,7 +9,7 @@ function assertStatusBoundary(workflow) {
     .split('\n')
     .map((line) => line.trim())
     .sort();
-  assert.deepEqual(permissions, ['contents: read', 'statuses: write']);
+  assert.deepEqual(permissions, ['contents: read', 'pull-requests: read', 'statuses: write']);
   assert.doesNotMatch(workflow.replace(job, ''), /statuses: write/);
   assert.match(job, /steps:\n {6}- name: Checkout trusted CI aggregation\n/);
   assert.equal(job.match(/uses: actions\/checkout@/g)?.length, 1);

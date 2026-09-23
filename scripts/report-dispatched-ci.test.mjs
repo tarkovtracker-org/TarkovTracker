@@ -32,6 +32,7 @@ function localesFixture() {
   };
   f.github.rest.git = {
     getCommit: vi.fn().mockResolvedValue({ data: { tree: { sha: 'd'.repeat(40) } } }),
+    getRef: vi.fn().mockResolvedValue({ data: { object: { sha: f.pull.base.sha } } }),
   };
   return f;
 }
@@ -86,6 +87,7 @@ describe('Crowdin merge tree attestation', () => {
       per_page: 100,
     });
     expect(f.github.rest.git.getCommit).toHaveBeenCalledTimes(2);
+    expect(f.github.rest.git.getRef).toHaveBeenCalledTimes(2);
     expect(f.github.rest.repos.createCommitStatus).toHaveBeenCalledTimes(2);
     expect(f.github.rest.repos.createCommitStatus).toHaveBeenLastCalledWith({
       ...f.context.repo,
@@ -117,6 +119,21 @@ describe('Crowdin merge tree attestation', () => {
   });
 });
 describe('Crowdin merge attestation guards', () => {
+  it('does not attest a pull request whose captured base is behind main', async () => {
+    const f = localesFixture();
+    f.github.rest.git.getRef.mockResolvedValue({ data: { object: { sha: 'e'.repeat(40) } } });
+    await expect(reportDispatchedCi(f)).rejects.toThrow('Cannot attest');
+    expect(f.github.rest.git.getCommit).not.toHaveBeenCalled();
+    expect(f.github.rest.repos.createCommitStatus).not.toHaveBeenCalled();
+  });
+  it('does not attest when main advances after the tree comparison', async () => {
+    const f = localesFixture();
+    f.github.rest.git.getRef
+      .mockResolvedValueOnce({ data: { object: { sha: f.pull.base.sha } } })
+      .mockResolvedValueOnce({ data: { object: { sha: 'e'.repeat(40) } } });
+    await expect(reportDispatchedCi(f)).rejects.toThrow('Cannot attest');
+    expect(f.github.rest.repos.createCommitStatus).not.toHaveBeenCalled();
+  });
   it.each([
     ['draft', (pull) => ({ ...pull, draft: true })],
     [
