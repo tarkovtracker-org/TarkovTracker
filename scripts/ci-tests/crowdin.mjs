@@ -118,14 +118,7 @@ test('server-side head guard rejects a race after the last metadata read', (t) =
 test('merge rejects every non-CLEAN state and conflicting or malformed mergeability', (t) => {
   const f = fixture(t);
   passed(f.run('prepare'));
-  for (const mergeStateStatus of [
-    'DIRTY',
-    'BEHIND',
-    'UNSTABLE',
-    'DRAFT',
-    'HAS_HOOKS',
-    null,
-  ]) {
+  for (const mergeStateStatus of ['DIRTY', 'BEHIND', 'UNSTABLE', 'DRAFT', 'HAS_HOOKS', null]) {
     rejected(
       f.run('merge', { PR_STATES: JSON.stringify([{ ...f.pr, mergeStateStatus }]) }),
       /ineligible/
