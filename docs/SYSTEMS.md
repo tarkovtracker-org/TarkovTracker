@@ -2160,8 +2160,9 @@ succeed and it must retain a `preview-deployment-<sha>` artifact for the exact c
 ```text
 PR update → CI (selected validation + security + preview build + manifest + artifact)
           → CI Result succeeds
-          → controller (workflow_run / pull_request_target) resolves candidate and publishes pending
-          → maintainer (or trusted merge automation) dispatches Preview for the successful CI run
+          → status-only Preview State (workflow_run / pull_request_target) publishes pending
+          → maintainer comments `/preview` on a same-repository PR, or trusted merge automation
+            dispatches Preview for the successful CI run
           → ready PR + current head/base/test-merge + attempt + artifact claims verified
           → environment `preview` or `preview-fork` (maintainer approval for forks)
           → recheck → wrangler pages deploy --branch preview-* → deployment record verified
@@ -2180,8 +2181,9 @@ PR update → CI (selected validation + security + preview build + manifest + ar
 | Validation, artifact verification, deployment, or smoke tests fail | failure                                    |
 | Revision or attempt becomes obsolete                               | no success is published for that candidate |
 
-Statuses target the candidate head and, for pull requests, the verified current test-merge SHA;
-never the controller's default-branch SHA. The status links to the controller run summary, which
+Pull-request statuses target only the verified current test-merge SHA so GitHub shows one required
+result; standalone branch previews target their head SHA. They never target the controller's
+default-branch SHA. The status links to the controller run summary, which
 records action, revision, digest, deployment URL, and validation-to-preview duration.
 
 ### Invariants
@@ -2201,7 +2203,12 @@ records action, revision, digest, deployment URL, and validation-to-preview dura
 - Successful deployments are deduplicated by revision, artifact digest, and profile version through
   the status marker. Before `ready_for_review` reuses a result, the controller authenticates the
   original run and its exact-SHA deployment artifact, then keeps that run URL on the new success.
-- Pull-request and CI-completion events never upload to Cloudflare. Only a trusted
+- Pull-request and CI-completion events run only the status-only `preview-state.yml` workflow, so
+  ordinary PRs do not instantiate skipped deployment or smoke-test jobs. These events and comment
+  events never upload to Cloudflare. An exact `/preview` comment from a repository maintainer or
+  administrator on a same-repository PR resolves the
+  current successful CI run and dispatches the trusted controller; forks retain the separate
+  request and protected-environment approval path. Only a trusted
   `workflow_dispatch` from `main` can deploy, and it repeats the exact-SHA, CI, artifact, and
   freshness checks. Crowdin and release staging dispatch once after their own exact-SHA CI passes;
   allowlisted Dependabot auto-merge candidates dispatch from a trusted post-CI `workflow_run` after
@@ -2223,12 +2230,14 @@ records action, revision, digest, deployment URL, and validation-to-preview dura
   requests to Supabase, Stripe, or analytics hosts. Persistent failure blocks merging.
 - Reporting failures fail the controller so automation cannot promote the commit. Deployment and
   smoke evidence artifacts are retained for 30 days.
-- Release staging, Crowdin, Dependabot, and release recovery wait for both `CI Result` and
-  `Preview Result` on the intended revision (§14). Production deployment remains Cloudflare's Git
+- Release staging and recovery read `Preview Result` on the standalone version commit; Crowdin and
+  Dependabot read it on their PR's current test-merge commit. All still bind deployment evidence
+  to the intended head revision (§14). Production deployment remains Cloudflare's Git
   integration for `main` and is unchanged.
 
-Current gates consume `CI Result` and `Preview Result` from GitHub Actions (app id 15368) on the
-exact validated revision, and waiting automation re-reads them from the API rather than trusting
+Current gates consume `CI Result` on the validated head and `Preview Result` on the test-merge
+commit for PRs; standalone branch candidates use their head for both. Both come from GitHub
+Actions (app id 15368), and waiting automation re-reads them from the API rather than trusting
 `target_url` or a payload snapshot. The app id does not authenticate a workflow definition: a
 same-repository PR can edit its `pull_request` workflow and request `statuses: write`. The opt-in
 shadow below never publishes a merge result; a separate trusted publisher boundary is required
@@ -2258,7 +2267,10 @@ deploys nor publishes required statuses. Ordinary CI still builds/uploads `pages
 
 ### Files
 
-- `.github/workflows/preview.yml` — trusted controller: plan, deploy, smoke, result jobs
+- `.github/workflows/preview-state.yml` — automatic, status-only preview state refresh
+- `.github/workflows/preview.yml` — explicit trusted controller: plan, deploy, smoke, result jobs
+- `.github/workflows/preview-request.yml`, `scripts/preview/comment-request.mjs` — trusted
+  maintainer comment request, current CI selection, and dispatch
 - `.github/workflows/finalization-shadow.yml`, `scripts/preview/finalization-shadow.mjs`,
   `scripts/preview/shadow-container.sh` — opt-in late-build rehearsal, no deployment or required result
 - `.github/workflows/ci.yml` — `Validate` build profile, manifest, `pages-preview` artifact; `security` call

@@ -328,12 +328,12 @@ async function authenticatedPreviousSuccess(github, context, status, sha) {
 function matchesSuccessMarker(status, marker) {
   return status.state === 'success' && status.description?.includes(marker);
 }
-async function previousSuccess(github, context, sha, digest) {
-  const statuses = await allStatuses(github, context.repo, sha, 'Preview Result');
+async function previousSuccess(github, context, statusSha, headSha, digest) {
+  const statuses = await allStatuses(github, context.repo, statusSha, 'Preview Result');
   const marker = successMarker(digest);
   for (const status of statuses.toSorted((left, right) => right.id - left.id)) {
     if (!matchesSuccessMarker(status, marker)) continue;
-    if (await authenticatedPreviousSuccess(github, context, status, sha)) return status;
+    if (await authenticatedPreviousSuccess(github, context, status, headSha)) return status;
   }
   return null;
 }
@@ -398,6 +398,25 @@ function notApplicable() {
     description: 'Not applicable: documentation-only change set with successful CI.',
   };
 }
+function deploymentDecision(common, earlier, manifest, fork, headSha) {
+  if (earlier) {
+    return {
+      ...common,
+      action: 'reuse',
+      state: 'success',
+      description: `Preview already deployed for this revision ${successMarker(manifest.digest)}`,
+      reuseTargetUrl: earlier.target_url,
+    };
+  }
+  return {
+    ...common,
+    action: 'deploy',
+    state: 'pending',
+    description: fork
+      ? `Fork preview awaits maintainer approval for ${headSha.slice(0, 12)}.`
+      : 'Deploying the validated preview.',
+  };
+}
 async function deployDecision({ github, context, state, workspace }) {
   const { candidate, pull, run, fork } = state;
   const destination = join(workspace, 'plan-artifact');
@@ -418,24 +437,15 @@ async function deployDecision({ github, context, state, workspace }) {
     appUrl: manifest.appUrl,
     environment: fork ? ENVIRONMENTS.fork : ENVIRONMENTS.internal,
   };
-  const earlier = await previousSuccess(github, context, candidate.headSha, manifest.digest);
-  if (earlier) {
-    return {
-      ...common,
-      action: 'reuse',
-      state: 'success',
-      description: `Preview already deployed for this revision ${successMarker(manifest.digest)}`,
-      reuseTargetUrl: earlier.target_url,
-    };
-  }
-  return {
-    ...common,
-    action: 'deploy',
-    state: 'pending',
-    description: fork
-      ? `Fork preview awaits maintainer approval for ${candidate.headSha.slice(0, 12)}.`
-      : 'Deploying the validated preview.',
-  };
+  const statusSha = pull?.merge_commit_sha ?? candidate.headSha;
+  const earlier = await previousSuccess(
+    github,
+    context,
+    statusSha,
+    candidate.headSha,
+    manifest.digest
+  );
+  return deploymentDecision(common, earlier, manifest, fork, candidate.headSha);
 }
 function outcomeDecision(error, state) {
   if (!(error instanceof Outcome)) throw error;
@@ -466,24 +476,24 @@ function statusTargetUrl(context, decision) {
 }
 async function publishDecision(github, context, decision) {
   if (!decision.state || !decision.headSha) return;
-  const targets = [decision.headSha, decision.mergeSha].filter(
-    (sha, index, all) => sha && all.indexOf(sha) === index
-  );
-  for (const sha of targets) {
-    await publishStatus(github, context.repo, {
-      sha,
-      state: decision.state,
-      description: decision.description,
-      targetUrl: statusTargetUrl(context, decision),
-    });
-  }
+  // GitHub evaluates a PR's current test-merge commit when it has status checks. Reporting
+  // the same required context on both commits creates duplicate rows in the PR checks UI.
+  await publishStatus(github, context.repo, {
+    sha: decision.mergeSha ?? decision.headSha,
+    state: decision.state,
+    description: decision.description,
+    targetUrl: statusTargetUrl(context, decision),
+  });
 }
 function awaitExplicitPreview(decision) {
+  const request = decision.fork
+    ? `Run Preview with run_id=${decision.runId}. Fork needs maintainer approval.`
+    : 'Comment /preview on this PR after CI succeeds.';
   return {
     ...decision,
     action: 'wait',
     state: 'pending',
-    description: `Preview pending: ${decision.headSha.slice(0, 12)}. Run Preview with run_id=${decision.runId}.${decision.fork ? ' Fork needs maintainer approval.' : ''}`,
+    description: `Preview pending: ${decision.headSha.slice(0, 12)}. ${request}`,
   };
 }
 function deferAutomaticPreview(context, decision) {

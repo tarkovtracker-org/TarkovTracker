@@ -372,7 +372,10 @@ async function paginatedEndpoints(state, endpoint, params, options) {
   const paged = {
     associated: () => options.associated ?? [state.pull],
     checks: () => [state.check],
-    statuses: () => [...dispatchStatuses(state, params), ...state.previewStatuses],
+    statuses: () => [
+      ...dispatchStatuses(state, params),
+      ...(params.ref === (state.pull.merge_commit_sha ?? HEAD) ? state.previewStatuses : []),
+    ],
     artifacts: () =>
       params.run_id === state.previousRun.id ? state.previousArtifacts : state.artifacts,
     jobs: () => state.previousJobs,
@@ -449,15 +452,15 @@ test('a validated same-repository pull request waits for an explicit preview req
   const { decision, state, manifest } = await plan(t, workflowRunContext());
   assert.equal(decision.action, 'wait');
   assert.equal(decision.state, 'pending');
-  assert.match(decision.description, /run_id=900/);
+  assert.match(decision.description, /Comment \/preview/);
   assert.equal(decision.environment, ENVIRONMENTS.internal);
   assert.equal(decision.fork, false);
   assert.equal(decision.digest, manifest.digest);
   assert.equal(decision.previewBranch, 'preview-pr-42');
   assert.equal(decision.runAttempt, 1);
   assert.equal(decision.mergeSha, MERGE);
-  // Pending is reported on the candidate head and the verified test-merge commit.
-  assert.deepEqual(statusStates(state.statuses), ['a:pending', 'c:pending']);
+  // The PR reports one required status on its current test-merge commit.
+  assert.deepEqual(statusStates(state.statuses), ['c:pending']);
   assert.ok(state.statuses.every((status) => status.context === 'Preview Result'));
   assert.match(state.statuses[0].target_url, /actions\/runs\/555$/);
 });
@@ -468,7 +471,7 @@ test('an explicit dispatch deploys only after rechecking the validated CI run', 
   assert.equal(decision.action, 'deploy');
   assert.equal(decision.environment, ENVIRONMENTS.internal);
   assert.equal(decision.digest, manifest.digest);
-  assert.deepEqual(statusStates(state.statuses), ['a:pending', 'c:pending']);
+  assert.deepEqual(statusStates(state.statuses), ['c:pending']);
 });
 test('fork candidates wait for a manual request and route through the protected environment', async (t) => {
   const run = runFixture({ head_repository: { full_name: FORK_NAME }, pull_requests: [] });
@@ -489,7 +492,7 @@ test('drafts, documentation-only scope and production runs never deploy', async 
   assert.equal(draft.decision.action, 'skip');
   assert.equal(draft.decision.state, 'pending');
   assert.match(draft.decision.description, /Draft/);
-  assert.deepEqual(statusStates(draft.state.statuses), ['a:pending', 'c:pending']);
+  assert.deepEqual(statusStates(draft.state.statuses), ['c:pending']);
   const docs = await plan(t, workflowRunContext(), {
     files: [{ filename: 'docs/a.md', previous_filename: 'docs/b.md' }, { filename: 'README.md' }],
   });
@@ -519,10 +522,10 @@ test('running, failed and unsuccessful CI evidence map to pending or failure', a
     }
   );
   assert.equal(running.decision.action, 'wait');
-  assert.deepEqual(statusStates(running.state.statuses), ['a:pending', 'c:pending']);
+  assert.deepEqual(statusStates(running.state.statuses), ['c:pending']);
   const failed = await plan(t, workflowRunContext(), { run: { conclusion: 'failure' } });
   assert.equal(failed.decision.action, 'fail');
-  assert.deepEqual(statusStates(failed.state.statuses), ['a:failure', 'c:failure']);
+  assert.deepEqual(statusStates(failed.state.statuses), ['c:failure']);
   const cancelled = await plan(t, workflowRunContext(), { run: { conclusion: 'cancelled' } });
   assert.equal(cancelled.decision.state, 'failure');
   const fake = fakeGithub(t);
@@ -646,7 +649,7 @@ test('a matching earlier success is reused instead of redeploying', async (t) =>
   });
   assert.equal(reused.decision.action, 'reuse');
   assert.equal(reused.decision.reuseTargetUrl, PREVIOUS_PREVIEW_URL);
-  assert.deepEqual(statusStates(reused.state.statuses), ['a:success', 'c:success']);
+  assert.deepEqual(statusStates(reused.state.statuses), ['c:success']);
   assert.ok(reused.state.statuses.every((status) => status.target_url === PREVIOUS_PREVIEW_URL));
   for (const options of [
     { previousArtifacts: [] },
@@ -898,7 +901,7 @@ test('results publish success only for a current candidate and failure for faile
     evidence: { url: `https://abc.${PAGES_DOMAIN}` },
   });
   assert.equal(outcome, 'success');
-  assert.deepEqual(statusStates(state.statuses), ['a:success', 'c:success']);
+  assert.deepEqual(statusStates(state.statuses), ['c:success']);
   assert.ok(state.statuses[0].description.includes(successMarker(decision.digest)));
   state.statuses.length = 0;
   for (const outcomes of [
@@ -1014,7 +1017,7 @@ test('controller crashes report failure on the candidate revision and never on m
     core,
     decision: { headSha: HEAD, mergeSha: MERGE },
   });
-  assert.deepEqual(statusStates(fake.state.statuses), ['a:failure', 'c:failure']);
+  assert.deepEqual(statusStates(fake.state.statuses), ['c:failure']);
 });
 test('verifyManifest reports every mismatched claim', (t) => {
   const dir = tempDir(t);
