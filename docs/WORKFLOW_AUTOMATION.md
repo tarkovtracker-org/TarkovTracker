@@ -474,7 +474,8 @@ check; it cannot bypass failed CI or deploy a stale revision.
 For a same-repository PR, a maintainer or administrator can instead post the exact comment
 `/preview`. The default-branch `preview-request.yml` workflow checks the comment actor's current
 repository role, resolves the successful CI run for the PR's current head and base, and dispatches
-the same trusted Preview workflow. It replies on the PR with the request outcome. It does not
+the same trusted Preview workflow. It replies to authorized requests with the outcome; denied
+requests do not receive a bot reply. It does not
 accept edited comments or fork PRs. The comment does not bypass the controller's artifact and
 freshness checks. A repeat request for the same
 validated deployment reuses its existing evidence; fork previews keep the explicit dispatch and

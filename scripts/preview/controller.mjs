@@ -151,11 +151,28 @@ async function runById(github, context, candidate) {
     throw failure('CI run identity does not match the candidate revision.');
   return run;
 }
+function sameCandidateBranch(run, candidate) {
+  return [
+    run.head_repository?.full_name === candidate.headRepo,
+    run.head_branch === candidate.headBranch,
+  ].every(Boolean);
+}
+function assertLatestPullRun(candidate, latest) {
+  if (!latest) throw pending('Waiting for CI to start for this revision.');
+  if (candidate.runId && candidate.runId !== latest.id) {
+    throw ignore('A newer CI run superseded this preview state event.');
+  }
+}
+async function resolvePullRun(github, context, candidate) {
+  const latest = await findLatestPullRun(github, context.repo, candidate.headSha, (run) =>
+    sameCandidateBranch(run, candidate)
+  );
+  assertLatestPullRun(candidate, latest);
+  return candidate.runId ? runById(github, context, candidate) : latest;
+}
 async function resolveRun(github, context, candidate) {
-  if (candidate.runId) return runById(github, context, candidate);
-  const run = await findLatestPullRun(github, context.repo, candidate.headSha);
-  if (!run) throw pending('Waiting for CI to start for this revision.');
-  return run;
+  if (candidate.runEvent === 'pull_request') return resolvePullRun(github, context, candidate);
+  return runById(github, context, candidate);
 }
 function assertRunRepository(run, candidate) {
   if (run.head_repository?.full_name !== candidate.headRepo)

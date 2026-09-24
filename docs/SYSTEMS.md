@@ -2198,6 +2198,8 @@ records action, revision, digest, deployment URL, and validation-to-preview dura
   and digest are compared with live GitHub state and the recomputed digest before planning and
   again immediately before upload. A superseded attempt, moved head, moved base, or changed test
   merge cannot deploy, and a late success is not published for an obsolete candidate.
+- Automatic state refresh uses the latest CI run for the candidate head and branch. A delayed
+  completion from an older run does not overwrite the current preview status, including for forks.
 - Archives are parsed from the central directory before extraction; symbolic links, special
   files, traversal, absolute paths, duplicates, encryption, and checksum mismatches are rejected.
 - Successful deployments are deduplicated by revision, artifact digest, and profile version through
@@ -2206,8 +2208,8 @@ records action, revision, digest, deployment URL, and validation-to-preview dura
 - Pull-request and CI-completion events run only the status-only `preview-state.yml` workflow, so
   ordinary PRs do not instantiate skipped deployment or smoke-test jobs. These events and comment
   events never upload to Cloudflare. An exact `/preview` comment from a repository maintainer or
-  administrator on a same-repository PR resolves the
-  current successful CI run and dispatches the trusted controller; forks retain the separate
+  administrator on a same-repository PR resolves the successful CI run matching that PR's number,
+  head, and base before dispatching the trusted controller; forks retain the separate
   request and protected-environment approval path. Only a trusted
   `workflow_dispatch` from `main` can deploy, and it repeats the exact-SHA, CI, artifact, and
   freshness checks. Crowdin and release staging dispatch once after their own exact-SHA CI passes;

@@ -352,7 +352,7 @@ function actionEndpoints(state, zipEntries, options) {
         throw Object.assign(new Error('Not found'), { status: 404 });
       },
       listWorkflowRuns: async () => ({
-        data: { workflow_runs: options.noRuns ? [] : [state.run] },
+        data: { workflow_runs: options.noRuns ? [] : (options.latestRuns ?? [state.run]) },
       }),
       listWorkflowRunArtifacts: 'artifacts',
       listJobsForWorkflowRun: 'jobs',
@@ -463,6 +463,34 @@ test('a validated same-repository pull request waits for an explicit preview req
   assert.deepEqual(statusStates(state.statuses), ['c:pending']);
   assert.ok(state.statuses.every((status) => status.context === 'Preview Result'));
   assert.match(state.statuses[0].target_url, /actions\/runs\/555$/);
+});
+test('delayed same-repo and fork CI completions cannot overwrite newer preview state', async (t) => {
+  for (const fork of [false, true]) {
+    const headRepo = fork ? FORK_NAME : REPO_NAME;
+    const run = runFixture({
+      id: 899,
+      head_repository: { full_name: headRepo },
+      pull_requests: fork ? [] : [{ number: 42 }],
+    });
+    const pull = pullFixture({
+      head: { sha: HEAD, ref: 'feature', repo: { full_name: headRepo } },
+    });
+    const { decision, state } = await plan(t, workflowRunContext(run), {
+      run,
+      pull,
+      associated: [pull],
+      latestRuns: [runFixture({ id: 900, head_repository: { full_name: headRepo } })],
+    });
+    assert.equal(decision.action, 'ignore');
+    assert.deepEqual(state.statuses, []);
+  }
+});
+test('an unrelated branch sharing the head SHA does not supersede this PR', async (t) => {
+  const { decision, state } = await plan(t, pullTargetContext(pullFixture(), 'synchronize'), {
+    latestRuns: [runFixture({ id: 901, head_branch: 'another-branch' }), runFixture()],
+  });
+  assert.equal(decision.action, 'wait');
+  assert.deepEqual(statusStates(state.statuses), ['c:pending']);
 });
 test('an explicit dispatch deploys only after rechecking the validated CI run', async (t) => {
   const { decision, state, manifest } = await plan(t, workflowDispatchContext(), {

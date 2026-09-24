@@ -29,7 +29,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const { requestPreviewFromComment } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/comment-request.mjs`);
+            const { PreviewRequestDenied, requestPreviewFromComment } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/comment-request.mjs`);
             const reply = async (body) => github.rest.issues.createComment({
               ...context.repo,
               issue_number: context.payload.issue.number,
@@ -42,6 +42,7 @@ jobs:
                 .catch((replyError) => core.warning(`Could not post preview request feedback: ${replyError.message}`));
               core.notice(`Requested preview for PR #${request.pullRequest} at ${request.headSha} using CI run ${request.ciRunId}.`);
             } catch (error) {
+              if (error instanceof PreviewRequestDenied) throw error;
               const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
               await reply(`Preview request could not be accepted. [See the request run](${run}) for the reason.`)
                 .catch((replyError) => core.warning(`Could not post preview request feedback: ${replyError.message}`));

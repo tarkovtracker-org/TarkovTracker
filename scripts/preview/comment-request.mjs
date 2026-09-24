@@ -3,6 +3,7 @@ import { ciResultCheck, findLatestPullRun, getPull, listPullPaths } from './gith
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const userLogin = (user) => user?.login;
 const repositoryName = (repo) => repo?.full_name;
+export class PreviewRequestDenied extends Error {}
 function isPreviewComment(context) {
   const { payload } = context;
   return [
@@ -20,13 +21,25 @@ async function requireMaintainer(github, context) {
     userLogin(payload.sender) === actor,
     userLogin(payload.comment.user) === actor,
   ].every(Boolean);
-  if (!sameActor) throw new Error('Preview request actor could not be authenticated.');
-  const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
-    ...repo,
-    username: actor,
-  });
+  if (!sameActor)
+    throw new PreviewRequestDenied('Preview request actor could not be authenticated.');
+  const { data: permission } = await github.rest.repos
+    .getCollaboratorPermissionLevel({
+      ...repo,
+      username: actor,
+    })
+    .catch((error) => {
+      if ([403, 404].includes(error.status)) {
+        throw new PreviewRequestDenied(
+          'Only repository maintainers and administrators may request a preview.'
+        );
+      }
+      throw error;
+    });
   if (!['maintain', 'admin'].includes(permission.role_name)) {
-    throw new Error('Only repository maintainers and administrators may request a preview.');
+    throw new PreviewRequestDenied(
+      'Only repository maintainers and administrators may request a preview.'
+    );
   }
 }
 function requireReadyPull(pull) {
@@ -107,7 +120,9 @@ export async function requestPreviewFromComment({ github, context }) {
   const pull = await getPull(github, repo, payload.issue.number);
   requireCurrentPull(pull, repo);
   await requireDeployablePaths(github, repo, pull);
-  const run = await findLatestPullRun(github, repo, pull.head.sha);
+  const run = await findLatestPullRun(github, repo, pull.head.sha, (item) =>
+    matchesPullSnapshot(item, pull)
+  );
   const check = await ciResultCheck(github, repo, pull.head.sha);
   requireMatchingCi(run, check, pull, repo);
   // The trusted default-branch controller repeats every revision, CI, and artifact check.
