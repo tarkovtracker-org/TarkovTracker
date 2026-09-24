@@ -1,0 +1,50 @@
+name: Request Preview
+# Commands execute trusted main-branch code. No pull request code or artifacts are loaded here.
+on:
+  issue_comment:
+    types: [created]
+permissions: {}
+jobs:
+  request:
+    name: Request preview
+    if: github.event.issue.pull_request && github.event.comment.body == '/preview'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      checks: read
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Checkout trusted request handler
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Dispatch current validated preview
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { PreviewRequestDenied, requestPreviewFromComment } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/comment-request.mjs`);
+            const reply = async (body) => github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.payload.issue.number,
+              body,
+            });
+            try {
+              const request = await requestPreviewFromComment({ github, context });
+              const runs = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/workflows/preview.yml`;
+              await reply(`Preview requested for commit \`${request.headSha.slice(0, 12)}\`. [View Preview runs](${runs}); this PR's **Preview Result** will update after deployment and smoke tests.`)
+                .catch((replyError) => core.warning(`Could not post preview request feedback: ${replyError.message}`));
+              core.notice(`Requested preview for PR #${request.pullRequest} at ${request.headSha} using CI run ${request.ciRunId}.`);
+            } catch (error) {
+              if (error instanceof PreviewRequestDenied) throw error;
+              const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+              await reply(`Preview request could not be accepted. [See the request run](${run}) for the reason.`)
+                .catch((replyError) => core.warning(`Could not post preview request feedback: ${replyError.message}`));
+              throw error;
+            }

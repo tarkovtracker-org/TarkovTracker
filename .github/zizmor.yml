@@ -12,12 +12,11 @@ rules:
       # tokens. It never checks out or executes PR code; it checks live metadata and merges only
       # allowlisted lockfile-only changes; see docs/WORKFLOW_AUTOMATION.md "Dependabot Auto Merge".
       - dependabot-auto-merge.yml
-      # The preview controller is the intended trusted boundary for `workflow_run` and
-      # `pull_request_target`: every job checks out the default branch only, treats CI artifacts
-      # and manifests as claims verified against live GitHub state, never installs or executes
-      # candidate code, and holds the Cloudflare token in protected deployment environments; see
-      # docs/SYSTEMS.md "Actions-owned Cloudflare previews" and scripts/ci-tests/preview-workflow.mjs.
-      - preview.yml
+      # The status-only preview controller is the intended trusted boundary for `workflow_run`
+      # and `pull_request_target`: it checks out default-branch code, verifies candidate claims
+      # against live GitHub state, and never installs or executes candidate code. Deployment lives
+      # in the explicit-dispatch workflow; see docs/SYSTEMS.md §18.
+      - preview-state.yml
   # `./.github/actions/...` is the form the workflow fixtures in scripts/ci-tests assert on; the
   # `$/` alias is equivalent for a same-repository composite action and offers no security gain.
   self-repository:

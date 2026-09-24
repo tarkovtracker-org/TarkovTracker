@@ -3,23 +3,19 @@ name: Preview
 # executed, installed, or used as Wrangler configuration. The controller verifies CI evidence and
 # the preview artifact's claims against live GitHub state, uploads only after an explicit trusted
 # dispatch, smoke-tests the unique deployment URL, and publishes the authoritative `Preview Result`
-# status. Automatic events only maintain the current-SHA gate. See docs/SYSTEMS.md §18.
+# status. See docs/SYSTEMS.md §18. Automatic status refresh lives in preview-state.yml so
+# ordinary pull requests never instantiate skipped deployment or smoke-test jobs.
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-  pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
   workflow_dispatch:
     inputs:
       run_id:
         description: Successful CI run id for the exact PR revision to preview.
         required: true
         type: string
-# One controller per pull request (or per fork branch for runs without PR metadata); newer events
-# cancel obsolete preview work. Late results are additionally rejected by revision checks.
+# Repeated requests for the same CI run replace an older attempt. Late results are also rejected
+# by revision checks.
 concurrency:
-  group: preview-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || format('{0}@{1}', github.event.workflow_run.head_repository.full_name, github.event.workflow_run.head_branch) }}-${{ inputs.run_id }}
+  group: preview-${{ inputs.run_id }}
   cancel-in-progress: true
 permissions:
   contents: read
@@ -229,6 +225,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           PLAN_RESULT: ${{ needs.plan.result }}
+          RUN_ID_INPUT: ${{ inputs.run_id }}
           DECISION: ${{ needs.plan.outputs.decision }}
           DEPLOY_RESULT: ${{ needs.deploy.result }}
           SMOKE_RESULT: ${{ needs.smoke.result }}
@@ -246,15 +243,20 @@ jobs:
               return;
             }
             if (process.env.PLAN_RESULT !== 'success' || !decision) {
-              await publishControllerFailure({ github, context, core, decision });
+              await publishControllerFailure({ github, context, core, decision, inputs: { run_id: process.env.RUN_ID_INPUT } });
               core.setFailed('Preview planning did not succeed.');
               return;
             }
-            await publishResult({
-              github,
-              context,
-              core,
-              decision,
-              outcomes: { deploy: process.env.DEPLOY_RESULT, smoke: process.env.SMOKE_RESULT },
-              evidence: { url: process.env.DEPLOYMENT_URL, deploymentId: process.env.DEPLOYMENT_ID },
-            });
+            try {
+              await publishResult({
+                github,
+                context,
+                core,
+                decision,
+                outcomes: { deploy: process.env.DEPLOY_RESULT, smoke: process.env.SMOKE_RESULT },
+                evidence: { url: process.env.DEPLOYMENT_URL, deploymentId: process.env.DEPLOYMENT_ID },
+              });
+            } catch (error) {
+              await publishControllerFailure({ github, context, core, decision });
+              throw error;
+            }

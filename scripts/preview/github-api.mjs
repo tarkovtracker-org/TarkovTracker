@@ -30,16 +30,18 @@ export async function getRun(github, repo, runId) {
   const { data } = await github.rest.actions.getWorkflowRun({ ...repo, run_id: runId });
   return data;
 }
-/** Newest CI run for one pull request head; used when a metadata event carries no run. */
-export async function findLatestPullRun(github, repo, headSha) {
+/** Newest matching PR CI run for a head; callers bind it to the requested PR or branch. */
+export async function findLatestPullRun(github, repo, headSha, matches = () => true) {
   const { data } = await github.rest.actions.listWorkflowRuns({
     ...repo,
     workflow_id: CI_WORKFLOW_FILE,
     event: 'pull_request',
     head_sha: headSha,
-    per_page: 20,
+    per_page: 100,
   });
-  return data.workflow_runs.toSorted((left, right) => right.id - left.id)[0] ?? null;
+  return (
+    data.workflow_runs.filter(matches).toSorted((left, right) => right.id - left.id)[0] ?? null
+  );
 }
 export function isCiRun(run) {
   return (
