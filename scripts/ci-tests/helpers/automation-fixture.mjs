@@ -174,6 +174,7 @@ process.exit(2);
     { mode: 0o755 }
   );
   writeFileSync(join(bin, 'sleep'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  writeFileSync(join(bin, 'timeout'), '#!/bin/sh\nshift\nexec "$@"\n', { mode: 0o755 });
   writeFileSync(join(root, 'counter'), '0');
   writeFileSync(join(root, 'calls'), '');
   writeFileSync(join(root, 'output'), '');
