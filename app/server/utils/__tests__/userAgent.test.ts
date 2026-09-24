@@ -46,6 +46,38 @@ describe('resolveTarkovTrackerUserAgent', () => {
       UPSTREAM_USER_AGENT
     );
   });
+  it.each([
+    ['IPv6 loopback', 'http://[::1]:3000'],
+    ['long-form IPv6 loopback', 'http://[0:0:0:0:0:0:0:1]:3000'],
+    ['fully qualified localhost with trailing dot', 'http://localhost.:3000'],
+    ['a *.localhost name', 'http://app.localhost:3000'],
+    ['a *.localhost name with trailing dot', 'http://app.localhost.:3000'],
+    ['another address in 127.0.0.0/8', 'http://127.0.0.2:3000'],
+    ['IPv4 shorthand for loopback', 'http://127.1:3000'],
+    ['the IPv4 unspecified address', 'http://0.0.0.0:3000'],
+    ['the IPv6 unspecified address', 'http://[::]:3000'],
+  ])('falls back to the upstream value for %s', (_label, appUrl) => {
+    expect(resolveTarkovTrackerUserAgent({ APP_URL: appUrl })).toBe(
+      'TarkovTracker/1.0 (+https://tarkovtracker.org)'
+    );
+  });
+  it.each([
+    [
+      'a public name that merely contains localhost',
+      'https://localhost-tracker.example.com',
+      'https://localhost-tracker.example.com',
+    ],
+    [
+      'a public name ending in localhost without a dot boundary',
+      'https://mylocalhost.example',
+      'https://mylocalhost.example',
+    ],
+    ['an address with 127 only in a later octet', 'https://10.127.0.1', 'https://10.127.0.1'],
+  ])('keeps its own origin for %s', (_label, appUrl, origin) => {
+    expect(resolveTarkovTrackerUserAgent({ APP_URL: appUrl })).toBe(
+      `TarkovTracker/1.0 (+${origin})`
+    );
+  });
   it('is not vulnerable to header-injection via whitespace/CRLF in the app url', () => {
     const result = resolveTarkovTrackerUserAgent({
       APP_URL: 'https://tracker.example.com\r\nX-Injected: 1',

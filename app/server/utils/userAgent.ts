@@ -5,7 +5,20 @@ import { resolvePublicAppUrl } from '@/utils/runtimeConfig';
  * an instance they are not.
  */
 const UPSTREAM_TARKOVTRACKER_USER_AGENT = 'TarkovTracker/1.0 (+https://tarkovtracker.org)';
-const LOCAL_APP_URL_HOSTNAMES = new Set(['localhost', '127.0.0.1']);
+/**
+ * Whether a URL hostname points at the local machine rather than a public deployment:
+ * `localhost` and any `*.localhost` name (reserved for loopback by RFC 6761), the whole
+ * 127.0.0.0/8 loopback range, the IPv6 loopback `[::1]`, and the unspecified addresses
+ * `0.0.0.0` / `[::]`. A trailing dot (the fully qualified `localhost.` form) is ignored.
+ * `URL` has already lowercased the hostname and normalized IPv4 shorthand (`127.1`) and
+ * long IPv6 forms, so only the canonical spellings need matching here.
+ */
+const isLocalHostname = (hostname: string): boolean => {
+  const host = hostname.replace(/\.$/, '');
+  if (host === 'localhost' || host.endsWith('.localhost')) return true;
+  if (host === '[::1]' || host === '[::]' || host === '0.0.0.0') return true;
+  return /^127(?:\.\d{1,3}){3}$/.test(host);
+};
 /**
  * Derive this deployment's outbound User-Agent from its configured public app URL
  * (`resolvePublicAppUrl`, the same APP_URL/CF_PAGES_URL resolution used for the site's own
@@ -21,7 +34,7 @@ export const resolveTarkovTrackerUserAgent = (env: NodeJS.ProcessEnv): string =>
     // resolvePublicAppUrl always normalizes into an http(s) URL today, so this branch is
     // defense-in-depth against a future change to that normalization rather than a reachable
     // path with the current implementation.
-    if (!/^https?:$/.test(protocol) || LOCAL_APP_URL_HOSTNAMES.has(hostname.toLowerCase())) {
+    if (!/^https?:$/.test(protocol) || isLocalHostname(hostname)) {
       return UPSTREAM_TARKOVTRACKER_USER_AGENT;
     }
     return `TarkovTracker/1.0 (+${origin})`;
