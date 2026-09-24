@@ -225,6 +225,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           PLAN_RESULT: ${{ needs.plan.result }}
+          RUN_ID_INPUT: ${{ inputs.run_id }}
           DECISION: ${{ needs.plan.outputs.decision }}
           DEPLOY_RESULT: ${{ needs.deploy.result }}
           SMOKE_RESULT: ${{ needs.smoke.result }}
@@ -242,15 +243,20 @@ jobs:
               return;
             }
             if (process.env.PLAN_RESULT !== 'success' || !decision) {
-              await publishControllerFailure({ github, context, core, decision });
+              await publishControllerFailure({ github, context, core, decision, inputs: { run_id: process.env.RUN_ID_INPUT } });
               core.setFailed('Preview planning did not succeed.');
               return;
             }
-            await publishResult({
-              github,
-              context,
-              core,
-              decision,
-              outcomes: { deploy: process.env.DEPLOY_RESULT, smoke: process.env.SMOKE_RESULT },
-              evidence: { url: process.env.DEPLOYMENT_URL, deploymentId: process.env.DEPLOYMENT_ID },
-            });
+            try {
+              await publishResult({
+                github,
+                context,
+                core,
+                decision,
+                outcomes: { deploy: process.env.DEPLOY_RESULT, smoke: process.env.SMOKE_RESULT },
+                evidence: { url: process.env.DEPLOYMENT_URL, deploymentId: process.env.DEPLOYMENT_ID },
+              });
+            } catch (error) {
+              await publishControllerFailure({ github, context, core, decision });
+              throw error;
+            }

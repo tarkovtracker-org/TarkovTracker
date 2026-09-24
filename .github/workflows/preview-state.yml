@@ -2,6 +2,8 @@ name: Preview State
 # Trusted, status-only controller for automatic PR and CI events. Deployment jobs exist only in
 # the explicitly dispatched Preview workflow.
 on:
+  schedule:
+    - cron: '17 * * * *'
   workflow_run:
     workflows: [CI]
     types: [completed]
@@ -35,5 +37,14 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const { planPreview } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/controller.mjs`);
-            await planPreview({ github, context, core, workspace: process.env.RUNNER_TEMP });
+            const { planPreview, publishControllerFailure, reconcileMissingPreviewStatuses } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/controller.mjs`);
+            if (context.eventName === 'schedule') {
+              await reconcileMissingPreviewStatuses({ github, context, core, workspace: process.env.RUNNER_TEMP });
+              return;
+            }
+            try {
+              await planPreview({ github, context, core, workspace: process.env.RUNNER_TEMP });
+            } catch (error) {
+              await publishControllerFailure({ github, context, core });
+              throw error;
+            }

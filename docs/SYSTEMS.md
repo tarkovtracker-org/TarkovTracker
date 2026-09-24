@@ -2185,6 +2185,12 @@ Pull-request statuses target only the verified current test-merge SHA so GitHub 
 result; standalone branch previews target their head SHA. They never target the controller's
 default-branch SHA. The status links to the controller run summary, which
 records action, revision, digest, deployment URL, and validation-to-preview duration.
+When GitHub has not computed a PR test merge yet, the controller retries and leaves the required
+result pending instead of publishing a duplicate status on the branch head. A dispatched branch
+build associated with a PR can satisfy that PR only if its Git tree matches the test-merge tree
+and its base is current main, including when the change is documentation-only. The comparison is
+repeated before deployment and final success. An hourly state-only reconciliation fills any
+required status that was missing when GitHub finished computing the test merge after the last event.
 
 ### Invariants
 
@@ -2231,7 +2237,9 @@ records action, revision, digest, deployment URL, and validation-to-preview dura
   `/api/tarkov/cache-meta` shape, nonempty `/api/tarkov/bootstrap?lang=en` data, and no browser
   requests to Supabase, Stripe, or analytics hosts. Persistent failure blocks merging.
 - Reporting failures fail the controller so automation cannot promote the commit. Deployment and
-  smoke evidence artifacts are retained for 30 days.
+  smoke evidence artifacts are retained for 30 days. An unexpected controller error re-identifies
+  the current PR or standalone branch before publishing failure; the CI run's PR base snapshot must
+  still match, so an obsolete event cannot turn a newer PR revision red.
 - Release staging and recovery read `Preview Result` on the standalone version commit; Crowdin and
   Dependabot read it on their PR's current test-merge commit. All still bind deployment evidence
   to the intended head revision (§14). Production deployment remains Cloudflare's Git

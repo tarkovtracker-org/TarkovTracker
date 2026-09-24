@@ -88,6 +88,8 @@ test('preview controller runs trusted code only and isolates credentials per job
     workflowEvent(stateWorkflow, 'workflow_run'),
     /workflows: \[CI\]\n\s+types: \[completed\]/
   );
+  assert.match(workflowEvent(stateWorkflow, 'schedule'), /cron: '17 \* \* \* \*'/);
+  assert.match(stateWorkflow, /reconcileMissingPreviewStatuses/);
   assert.doesNotMatch(workflow, /pull_request_target:|workflow_run:/);
   assert.doesNotMatch(stateWorkflow, /workflow_dispatch:|secrets\.|\bdeploy:|\bsmoke:/);
   assert.match(stateWorkflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}\}/);
@@ -100,6 +102,10 @@ test('preview controller runs trusted code only and isolates credentials per job
     workflowStep(jobBlock(stateWorkflow, 'state'), 'Refresh Preview Result'),
     /planPreview/
   );
+  assert.match(
+    workflowStep(jobBlock(stateWorkflow, 'state'), 'Refresh Preview Result'),
+    /catch \(error\) \{\s+await publishControllerFailure\(\{ github, context, core \}\);\s+throw error;/
+  );
   assert.match(workflowEvent(workflow, 'workflow_dispatch'), /run_id:/);
   assert.match(workflow, /cancel-in-progress: true/);
   assert.match(jobBlock(workflow, 'deploy'), /if: needs\.plan\.outputs\.action == 'deploy'/);
@@ -108,6 +114,10 @@ test('preview controller runs trusted code only and isolates credentials per job
     /if: always\(\) && needs\.plan\.outputs\.action != 'ignore'/
   );
   assert.match(jobBlock(workflow, 'result'), /publishControllerFailure/);
+  assert.match(
+    workflowStep(jobBlock(workflow, 'result'), 'Publish Preview Result'),
+    /catch \(error\) \{\s+await publishControllerFailure\(\{ github, context, core, decision \}\);\s+throw error;/
+  );
   // The cancelled branch must emit the supersession notice and return before the failure and
   // result publisher paths, so a superseded run can never publish a status.
   const resultScript = workflowStep(jobBlock(workflow, 'result'), 'Publish Preview Result');
