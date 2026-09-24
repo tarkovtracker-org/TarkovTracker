@@ -2239,7 +2239,8 @@ required status that was missing when GitHub finished computing the test merge a
 - Reporting failures fail the controller so automation cannot promote the commit. Deployment and
   smoke evidence artifacts are retained for 30 days. An unexpected controller error re-identifies
   the current PR or standalone branch before publishing failure; the CI run's PR base snapshot must
-  still match, so an obsolete event cannot turn a newer PR revision red.
+  still match, so an obsolete event cannot turn a newer PR revision red. PR CI runs without
+  snapshots, notably forks, require an identical current test-merge tree and current main base.
 - Release staging and recovery read `Preview Result` on the standalone version commit; Crowdin and
   Dependabot read it on their PR's current test-merge commit. All still bind deployment evidence
   to the intended head revision (§14). Production deployment remains Cloudflare's Git

@@ -777,9 +777,16 @@ function sameFailureSnapshot(snapshot, pull) {
     snapshot.base?.sha === pull.base.sha,
   ].every(Boolean);
 }
-function currentFailureRun(candidate, pull, run) {
-  if (!pull || candidate.runEvent !== 'pull_request') return true;
-  return run.pull_requests?.some((snapshot) => sameFailureSnapshot(snapshot, pull)) ?? false;
+function needsFailureRunProof(candidate, pull) {
+  return pull && candidate.runEvent === 'pull_request';
+}
+async function currentFailureRun(github, context, candidate, pull, run) {
+  if (!needsFailureRunProof(candidate, pull)) return true;
+  const snapshots = run.pull_requests ?? [];
+  if (snapshots.length) return snapshots.some((snapshot) => sameFailureSnapshot(snapshot, pull));
+  // GitHub omits PR snapshots from some fork runs. A tree equal to the current test merge
+  // and a current main base provide equivalent evidence without trusting the stale head alone.
+  return !(await dispatchMergeMismatch(github, context, pull, run));
 }
 async function liveFailureIdentity(github, context, inputs) {
   const candidate = await resolveCandidate({ github, context, inputs });
@@ -787,7 +794,7 @@ async function liveFailureIdentity(github, context, inputs) {
   checkPullFreshness(pull, candidate);
   if (pull && !unchangedFailureEvent(context, pull)) return null;
   const run = await resolveRun(github, context, candidate);
-  if (!currentFailureRun(candidate, pull, run)) return null;
+  if (!(await currentFailureRun(github, context, candidate, pull, run))) return null;
   await requireDispatchMergeProof(github, context, candidate, pull, run);
   return decisionBase({ candidate, pull });
 }
