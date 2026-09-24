@@ -1,3 +1,10 @@
+## [1.81.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.81.0...v1.81.1) (2026-09-23)
+
+
+### Bug Fixes
+
+* **ci:** pass computed GitHub repository context to shadow planner ([#905](https://github.com/tarkovtracker-org/TarkovTracker/issues/905)) ([715266a](https://github.com/tarkovtracker-org/TarkovTracker/commit/715266a649f9b1691bc8b06f942fa55f4b9fda5c))
+
 # [1.81.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.80.2...v1.81.0) (2026-09-23)
 
 
