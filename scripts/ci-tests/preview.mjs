@@ -1174,14 +1174,14 @@ test('controller crashes report failure on the candidate revision and never on m
     context: workflowRunContext(forkRun),
     core,
   });
-  assert.deepEqual(statusStates(fork.state.statuses), ['c:failure']);
-  const staleFork = fakeGithub(t, { pull: forkPull, run: forkRun, mergeTree: sha('e') });
+  assert.deepEqual(fork.state.statuses, []);
+  const differentMergeTree = fakeGithub(t, { pull: forkPull, run: forkRun, mergeTree: sha('e') });
   await publishControllerFailure({
-    github: staleFork.github,
+    github: differentMergeTree.github,
     context: workflowRunContext(forkRun),
     core,
   });
-  assert.deepEqual(staleFork.state.statuses, []);
+  assert.deepEqual(differentMergeTree.state.statuses, []);
   const staleForkBase = fakeGithub(t, { pull: forkPull, run: forkRun, mainSha: sha('e') });
   await publishControllerFailure({
     github: staleForkBase.github,

@@ -253,15 +253,26 @@ function dispatchMergePrerequisite(pull, run) {
   if (!runTreeSha(run)) return 'Dispatched CI run has no verifiable Git tree.';
   return null;
 }
+async function currentPullBaseMismatch(github, context, pull) {
+  if (!SHA_PATTERN.test(String(pull.merge_commit_sha)))
+    return 'GitHub has not finished computing the PR test merge; retry after it is ready.';
+  const { data: main } = await github.rest.git.getRef({
+    ...context.repo,
+    ref: `heads/${PRODUCTION_BRANCH}`,
+  });
+  return pull.base.sha === main.object.sha
+    ? null
+    : 'PR base is no longer current main; rerun PR CI before requesting a preview.';
+}
 async function dispatchMergeMismatch(github, context, pull, run) {
   const prerequisite = dispatchMergePrerequisite(pull, run);
   if (prerequisite) return prerequisite;
-  const [{ data: merge }, { data: main }] = await Promise.all([
-    github.rest.git.getCommit({ ...context.repo, commit_sha: pull.merge_commit_sha }),
-    github.rest.git.getRef({ ...context.repo, ref: `heads/${PRODUCTION_BRANCH}` }),
-  ]);
-  if (pull.base.sha !== main.object.sha)
-    return 'PR base is no longer current main; rerun PR CI before requesting a preview.';
+  const baseMismatch = await currentPullBaseMismatch(github, context, pull);
+  if (baseMismatch) return baseMismatch;
+  const { data: merge } = await github.rest.git.getCommit({
+    ...context.repo,
+    commit_sha: pull.merge_commit_sha,
+  });
   return merge.tree.sha === runTreeSha(run)
     ? null
     : 'Dispatched branch build differs from the PR test merge; request a preview from PR CI.';
@@ -777,16 +788,12 @@ function sameFailureSnapshot(snapshot, pull) {
     snapshot.base?.sha === pull.base.sha,
   ].every(Boolean);
 }
-function needsFailureRunProof(candidate, pull) {
-  return pull && candidate.runEvent === 'pull_request';
-}
-async function currentFailureRun(github, context, candidate, pull, run) {
-  if (!needsFailureRunProof(candidate, pull)) return true;
+function currentFailureRun(candidate, pull, run) {
+  if (!pull || candidate.runEvent !== 'pull_request') return true;
   const snapshots = run.pull_requests ?? [];
-  if (snapshots.length) return snapshots.some((snapshot) => sameFailureSnapshot(snapshot, pull));
-  // GitHub omits PR snapshots from some fork runs. A tree equal to the current test merge
-  // and a current main base provide equivalent evidence without trusting the stale head alone.
-  return !(await dispatchMergeMismatch(github, context, pull, run));
+  // Fork runs may omit PR/base snapshots. An old run with the same head cannot be attributed
+  // to today's test merge, so leave its required status pending instead of failing the wrong SHA.
+  return snapshots.some((snapshot) => sameFailureSnapshot(snapshot, pull));
 }
 async function liveFailureIdentity(github, context, inputs) {
   const candidate = await resolveCandidate({ github, context, inputs });
@@ -794,7 +801,7 @@ async function liveFailureIdentity(github, context, inputs) {
   checkPullFreshness(pull, candidate);
   if (pull && !unchangedFailureEvent(context, pull)) return null;
   const run = await resolveRun(github, context, candidate);
-  if (!(await currentFailureRun(github, context, candidate, pull, run))) return null;
+  if (!currentFailureRun(candidate, pull, run)) return null;
   await requireDispatchMergeProof(github, context, candidate, pull, run);
   return decisionBase({ candidate, pull });
 }
