@@ -2239,10 +2239,12 @@ required status that was missing when GitHub finished computing the test merge a
 - Reporting failures fail the controller so automation cannot promote the commit. Deployment and
   smoke evidence artifacts are retained for 30 days. An unexpected controller error re-identifies
   the current PR or standalone branch before publishing failure; the CI run's PR base snapshot must
-  still match, so an obsolete event cannot turn a newer PR revision red. PR CI runs without
-  snapshots, notably forks, have no trustworthy run-scoped base: an unexpected refresh error fails
-  the state workflow and leaves the required result pending. Tree equality remains required for a
-  dispatched branch build claiming preview success.
+  still match, so an obsolete event cannot turn a newer PR revision red. A `pull_request` CI run
+  must carry matching PR, head, and base snapshots to be attributed to the current revision; runs
+  without them, notably forks, have no trustworthy run-scoped base, so an unexpected refresh error
+  leaves the required result pending rather than falling back to the head SHA (a PR identity always
+  requires `mergeSha`). Tree equality remains required for a dispatched branch build claiming
+  preview success.
 - Release staging and recovery read `Preview Result` on the standalone version commit; Crowdin and
   Dependabot read it on their PR's current test-merge commit. All still bind deployment evidence
   to the intended head revision (§14). Production deployment remains Cloudflare's Git
