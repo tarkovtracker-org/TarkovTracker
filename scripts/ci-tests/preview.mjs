@@ -486,8 +486,10 @@ test('delayed same-repo and fork CI completions cannot overwrite newer preview s
   }
 });
 test('an unrelated branch sharing the head SHA does not supersede this PR', async (t) => {
-  const { decision, state } = await plan(t, pullTargetContext(pullFixture(), 'synchronize'), {
-    latestRuns: [runFixture({ id: 901, head_branch: 'another-branch' }), runFixture()],
+  const run = runFixture();
+  const { decision, state } = await plan(t, workflowRunContext(run), {
+    run,
+    latestRuns: [runFixture({ id: 901, head_branch: 'another-branch' }), run],
   });
   assert.equal(decision.action, 'wait');
   assert.deepEqual(statusStates(state.statuses), ['c:pending']);
