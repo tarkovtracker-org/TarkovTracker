@@ -233,8 +233,8 @@ test('shared gate scripts wait for both authoritative gates with a 60-minute bou
   assert.match(gate, /gh workflow run preview\.yml.*--ref main.*"run_id=\$run_id"/);
   const crowdin = read('scripts/crowdin-pr.sh');
   assert.match(crowdin, /dispatch_ci locales\n\s+request_preview_after_dispatched_ci "\$HEAD_SHA"/);
-  assert.match(crowdin, /status_sha="\$\(gh api .*pulls\/\$PR_NUMBER.*merge_commit_sha/);
-  assert.match(crowdin, /wait_for_preview_result "\$HEAD_SHA" "\$status_sha"/);
+  assert.match(crowdin, /wait_for_preview_result "\$HEAD_SHA"\n/);
+  assert.doesNotMatch(crowdin, /merge_commit_sha/);
   assert.match(
     read('scripts/release-commit.sh'),
     /request_preview_after_dispatched_ci "\$release_sha"\nwait_for_preview_result "\$release_sha"/

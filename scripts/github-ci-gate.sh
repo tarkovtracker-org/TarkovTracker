@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Shared by trusted Crowdin and release automation; callers enable errexit/pipefail.
-# Reject a missing, non-strict, or foreign-provider main CI rule.
+# Reject a missing, non-strict, or foreign-provider main validation rule.
 # The rollout administrator verifies bypass actors; reading them requires ruleset write access.
 require_main_ci_policy() {
   local rules rule_id
@@ -9,9 +9,10 @@ require_main_ci_policy() {
     [ .[][] | select(.type == "required_status_checks"
       and .ruleset_source_type == "Repository" and .ruleset_source == $repo
       and .parameters.strict_required_status_checks_policy == true
-      and any(.parameters.required_status_checks[]; .context == "CI Result" and .integration_id == 15368))
+      and any(.parameters.required_status_checks[]; .context == "CI Result" and .integration_id == 15368)
+      and any(.parameters.required_status_checks[]; .context == "Preview Result" and .integration_id == 15368))
       | .ruleset_id ][0] // empty' <<< "$rules")"
-  [[ "$rule_id" =~ ^[0-9]+$ ]] || { echo 'Missing strict main CI Result rule.' >&2; return 1; }
+  [[ "$rule_id" =~ ^[0-9]+$ ]] || { echo 'Missing strict main CI and Preview Result rule.' >&2; return 1; }
 
 }
 # Observe the captured main revision before promoting an already validated commit.
@@ -41,15 +42,16 @@ wait_for_ci_result() {
   done
 }
 # Await the authoritative `Preview Result` commit status published by the trusted preview
-# controller (.github/workflows/preview.yml). Pull requests report on the current test-merge
-# commit; standalone release candidates report on their head. Only the newest status for the
+# controller (.github/workflows/preview.yml) on the exact head. Pull requests and standalone release
+# candidates both report on their head: GitHub regenerates a PR's test-merge commit when a merge is
+# attempted, so a status there would not survive. Only the newest status for the
 # context counts; failure and error are terminal, and a missing status keeps waiting until the bound.
 # GitHub's /commits/{sha}/statuses endpoint binds the response to the requested SHA; individual
 # status objects do not contain a sha field.
 wait_for_preview_result() {
-  local sha="$1" status_sha="${2:-$1}" attempt statuses result prefix="https://github.com/$GITHUB_REPOSITORY/actions/runs/"
+  local sha="$1" attempt statuses result prefix="https://github.com/$GITHUB_REPOSITORY/actions/runs/"
   for ((attempt = 1; attempt <= GATE_WAIT_ATTEMPTS; attempt++)); do
-    statuses="$(gh api --paginate "repos/$GITHUB_REPOSITORY/commits/$status_sha/statuses?per_page=100")"
+    statuses="$(gh api --paginate "repos/$GITHUB_REPOSITORY/commits/$sha/statuses?per_page=100")"
     result="$(jq -rs --arg prefix "$prefix" '
       [ .[][] | select(.context == "Preview Result") ]
       | sort_by(.id) | last
@@ -60,7 +62,7 @@ wait_for_preview_result() {
         then "unbound"
         else "bound" end' <<< "$statuses")"
     case "$result" in
-      bound) preview_result_binding "$sha" "$status_sha" && return ;;
+      bound) preview_result_binding "$sha" && return ;;
       pending) ;;
       *) echo "Preview Result did not succeed: $result" >&2; return 1 ;;
     esac
@@ -73,8 +75,8 @@ wait_for_preview_result() {
 # workflow on main, complete with a successful result publication, and
 # must carry the deployment evidence artifact named for the exact previewed SHA.
 preview_result_binding() {
-  local sha="$1" status_sha="${2:-$1}" run_id run jobs evidence prefix="https://github.com/$GITHUB_REPOSITORY/actions/runs/"
-  run_id="$(gh api "repos/$GITHUB_REPOSITORY/commits/$status_sha/statuses?per_page=100" | jq -r --arg prefix "$prefix" '
+  local sha="$1" run_id run jobs evidence prefix="https://github.com/$GITHUB_REPOSITORY/actions/runs/"
+  run_id="$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/statuses?per_page=100" | jq -r --arg prefix "$prefix" '
     [ .[] | select(.context == "Preview Result") ]
     | sort_by(.id) | last
     | select(.state == "success")
