@@ -55,7 +55,9 @@ Hard rules the reviewer must verify for every diff:
 
 ### Cloudflare Workers / Durable Objects
 
-- **Where:** `workers/api-gateway/src/rateLimiter.ts` (rate limiter DO), `workers/tarkov-precompute/`
+- **Where:** `workers/api-gateway/` (`src/rateLimiter.ts` rate-limiter DO) — it is the only
+  Cloudflare Worker in this repo; precompute runs from the scheduled Actions workflow
+  (`scripts/precompute/`), not from a Worker.
 - **Check:** DO alarm lifecycle — no orphaned alarms, no double-fire without
   idempotency, no alarm leaks on cleanup. Verify that lazy expiration does not leave stale
   rate-limit state. DO storage transactions are single-writer; no
@@ -84,7 +86,7 @@ Hard rules the reviewer must verify for every diff:
 ### Auth And Realtime (Supabase)
 
 - **Where:** `app/plugins/supabase.client.ts`, stores using auth state
-  (`useTarkovStore`, `useProgressStore`)
+  (`useTarkov`, `useProgress`)
 - **Check:** Session lifecycle — token refresh, session restore on reload.
   Realtime subscription cleanup on component unmount (no subscription leaks).
   RLS policy changes in migrations. No client-side service-role keys. Auth state
@@ -111,8 +113,8 @@ Hard rules the reviewer must verify for every diff:
 ### Pinia Store State
 
 - **Where:** `app/stores/`
-- **Check:** `useTarkovStore` is the core state. Changes to its shape must not
-  break `useMetadataStore`, `useProgressStore`, or `usePreferencesStore`.
+- **Check:** `useTarkov` is the core state. Changes to its shape must not
+  break `useMetadata`, `useProgress`, or `usePreferences`.
   Persisted state (`pinia-plugin-persistedstate`) must remain backward-compatible
   — a stored shape change can corrupt existing user sessions. Avoid adding new
   global state unless necessary.
@@ -135,8 +137,8 @@ Hard rules the reviewer must verify for every diff:
 
 ## Deployment And Rollback
 
-- **Platform:** Cloudflare Pages (frontend), Cloudflare Workers (api-gateway,
-  precompute), Supabase (database, auth, realtime, edge functions).
+- **Platform:** Cloudflare Pages (frontend), Cloudflare Workers (api-gateway),
+  Supabase (database, auth, realtime, edge functions).
 - **Frontend rollback:** Pages deployments can be rolled back via the Cloudflare
   dashboard (Pages project → Deployments → target production deployment →
   Rollback to this deployment). Wrangler does not provide a CLI rollback for

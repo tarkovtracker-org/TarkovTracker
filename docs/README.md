@@ -59,4 +59,4 @@ canonical agent contract and project conventions live in the root [`AGENTS.md`](
 
 ## Maintainer notes
 
-Roadmap and personal working notes live in [`ROADMAP.md`](./ROADMAP.md).
+Historical roadmap and personal working notes are archived in git history; no maintainer notes file remains in-tree.
