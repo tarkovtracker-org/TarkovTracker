@@ -439,8 +439,8 @@ GitHub Actions controls when pull-request previews deploy to the existing Cloudf
 current PR test-merge SHA, or on the branch head for standalone release candidates; an explicit
 maintainer request or trusted merge automation
 dispatch uploads the validated artifact. Cloudflare-managed preview builds are disabled while automatic production deployments
-for `main` remain enabled. The two-check ruleset is applied after the live preview acceptance
-scenarios below pass. The design, result contract, and invariants are specified in
+for `main` remain enabled. The live ruleset requires both `CI Result` and `Preview Result`;
+rollout verifies that enforcement. The design, result contract, and invariants are specified in
 [SYSTEMS.md §18](SYSTEMS.md#18-actions-owned-cloudflare-previews).
 
 **Triggers:** `preview-state.yml` receives `workflow_run` for completed CI and metadata-only
@@ -529,7 +529,7 @@ environments, and the repository-scoped copy was removed. GitHub confirms secret
 not reveal its value or scope; the first manual deployment checks that the token works. The connected
 Cloudflare API credential cannot create API tokens.
 
-Ordered rollout (keep `Preview Result` non-required until acceptance passes):
+Ordered rollout (verify `Preview Result` enforcement; apply the ruleset only if it is absent):
 
 1. Capture settings (done above). Readback commands, run with a scoped `CLOUDFLARE_API_TOKEN`:
 
@@ -558,16 +558,18 @@ Ordered rollout (keep `Preview Result` non-required until acceptance passes):
 6. After the bootstrap change is on `main`, dispatch `preview.yml` with the successful `run_id` for
    PR #896's current head. Confirm upload, deployment record, smoke suite, and test-merge-SHA status.
    Dispatch from `main`; do not test candidate-controlled workflow code with deployment secrets.
-7. Before enforcement, verify one current-head application PR uploads, passes smoke tests, and
-   publishes `Preview Result: success`; confirm its prior automatic result stayed pending without a
-   Pages build. Review the controller's failure and stale-revision fixtures and the existing failed
-   PR evidence. Then apply `.github/main-ci-ruleset.json` to require `Preview Result` alongside
-   `CI Result`, preserving strict freshness and the empty bypass list. Verify the effective rule and
-   that a preview-required PR with a missing or pending result is blocked:
+7. Verify that the deployed ruleset already requires `Preview Result` alongside `CI Result`, with
+   strict freshness and the empty bypass list, and that a preview-required PR with a missing or
+   pending `Preview Result` is blocked. Apply `.github/main-ci-ruleset.json` only if that
+   requirement is absent, then repeat the verification. Confirm one current-head application PR
+   uploads, passes smoke tests, and publishes `Preview Result: success`, and that its prior
+   automatic result stayed pending without a Pages build. Review the controller's failure and
+   stale-revision fixtures and the existing failed PR evidence:
 
    ```bash
-   gh api -X PUT repos/tarkovtracker-org/TarkovTracker/rulesets/23539975 --input .github/main-ci-ruleset.json
    gh api repos/tarkovtracker-org/TarkovTracker/rules/branches/main
+   # Only if Preview Result is not already required:
+   gh api -X PUT repos/tarkovtracker-org/TarkovTracker/rulesets/23539975 --input .github/main-ci-ruleset.json
    ```
 
    Check documentation-only, translation, draft transition, approved fork, superseded revision,
