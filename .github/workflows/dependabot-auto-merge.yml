@@ -118,7 +118,6 @@ jobs:
           # Gate waits are bounded to 60 minutes.
           deadline=$((SECONDS + 3600))
           preview_requested=false
-          bound_merge_sha=''
           while true; do
             # Preview Result is the authoritative gate; controller job checks may be cancelled by
             # a newer event on the same head and are not independent merge requirements.
@@ -137,19 +136,11 @@ jobs:
               echo "::error::Dependabot pull request changed while waiting for preview."
               exit 1
             fi
-            merge_sha="$(jq -r '.merge_commit_sha // empty' <<< "$current_pr")"
-            if [[ ! "$merge_sha" =~ ^[0-9a-f]{40}$ ]]; then
-              echo "::error::GitHub has not prepared the current test-merge commit."
-              exit 1
-            fi
-            if [ -n "$bound_merge_sha" ] && [ "$bound_merge_sha" != "$merge_sha" ]; then
-              echo "::error::Test-merge commit changed while waiting for preview."
-              exit 1
-            fi
-            bound_merge_sha="$merge_sha"
+            # Preview Result targets the validated head: GitHub regenerates the test-merge
+            # commit when a merge is attempted, so a status there would not survive.
             preview_status_contexts="$(
               gh api \
-                "repos/$GITHUB_REPOSITORY/commits/$merge_sha/status" \
+                "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/status" \
                 --jq '[.statuses[] | select(.context == "Preview Result")] | sort_by(.id) | if length > 0 then [last] else [] end'
             )"
             failing_count="$(

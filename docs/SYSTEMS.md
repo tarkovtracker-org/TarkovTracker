@@ -1667,7 +1667,8 @@ The checkout stays pinned to the validated SHA. The production build still runs 
   on the same SHA; gate waits are bounded to 60 minutes, and the containing Release and Crowdin
   workflows are bounded to 90 minutes. Ordinary
   `wip/**` push CI no longer exists. The main ruleset requires successful GitHub Actions
-  `CI Result`, strict freshness, and no bypass actors. Non-fast-forward promotion fails if main advances.
+  `CI Result` and `Preview Result`, strict freshness, and no bypass actors. Non-fast-forward
+  promotion fails if main advances.
 - If publication fails after version promotion, an explicit rerun can recover only the direct
   version-only child of the original CI revision, with successful exact-head `CI Result` **and**
   `Preview Result` and unchanged manifest/changelog history. The `Preview Result` evidence is
@@ -2181,16 +2182,21 @@ PR update → CI (selected validation + security + preview build + manifest + ar
 | Validation, artifact verification, deployment, or smoke tests fail | failure                                    |
 | Revision or attempt becomes obsolete                               | no success is published for that candidate |
 
-Pull-request statuses target only the verified current test-merge SHA so GitHub shows one required
-result; standalone branch previews target their head SHA. They never target the controller's
-default-branch SHA. The status links to the controller run summary, which
+Statuses target only the validated head SHA, for pull requests and standalone branch previews
+alike, so GitHub shows one required result. They never target the controller's default-branch SHA
+or the test-merge commit: GitHub regenerates a PR's test-merge commit (new SHA, same parents and
+tree) when a merge is attempted, which dropped test-merge statuses and blocked every merge. The
+ruleset's strict freshness requires the head to contain current main at merge time, so a
+head-bound result cannot merge against a stale base. The status links to the controller run summary, which
 records action, revision, digest, deployment URL, and validation-to-preview duration.
-When GitHub has not computed a PR test merge yet, the controller retries and leaves the required
-result pending instead of publishing a duplicate status on the branch head. A dispatched branch
+Artifact claims still bind to the test merge. When GitHub has not computed it yet, the controller
+retries and leaves the required result pending. A regenerated test merge is the same candidate only
+when both commits have the current base and head as parents and identical trees. A dispatched branch
 build associated with a PR can satisfy that PR only if its Git tree matches the test-merge tree
 and its base is current main, including when the change is documentation-only. The comparison is
-repeated before deployment and final success. An hourly state-only reconciliation fills any
-required status that was missing when GitHub finished computing the test merge after the last event.
+repeated before deployment and final success. An hourly state-only reconciliation re-evaluates a head
+with no result, or whose latest result is pending only because the test merge was not ready, once
+GitHub has computed the test merge; other pending reasons are left alone.
 
 ### Invariants
 
@@ -2202,8 +2208,9 @@ required status that was missing when GitHub finished computing the test merge a
 - Every manifest field is a claim: repository, pull request, head SHA, base SHA, checked-out
   test-merge SHA, tree SHA, run id, run attempt, build-profile version, preview branch, app URL,
   and digest are compared with live GitHub state and the recomputed digest before planning and
-  again immediately before upload. A superseded attempt, moved head, moved base, or changed test
-  merge cannot deploy, and a late success is not published for an obsolete candidate.
+  again immediately before upload. A superseded attempt, moved head, moved base, or test merge
+  with different parents or tree cannot deploy, and a late success is not published for an obsolete
+  candidate. A regenerated test merge with the same parents and tree is the same candidate.
 - Automatic state refresh uses the latest CI run for the candidate head and branch. A delayed
   completion from an older run does not overwrite the current preview status, including for forks.
 - Archives are parsed from the central directory before extraction; symbolic links, special
@@ -2232,6 +2239,8 @@ required status that was missing when GitHub finished computing the test merge a
   analytics, Turnstile, Stripe, and log-forwarding values; the anonymous build sets `APP_URL` to the
   controlled branch alias so host trust covers the unique deployment URL, and the app's offline
   Supabase fallback activates on `pages.dev`. Public game data still flows through `/api/tarkov/*`.
+- Nuxt's Turnstile key-pair validation runs only for production `build`/`generate` commands, not for
+  `pnpm install`'s `nuxt prepare`; deployable builds still reject a one-sided key configuration.
 - Smoke tests run in a separate credential-free job against the unique deployment URL and require
   the served manifest, usable `/` and `/tasks` content, loaded assets, the anonymous
   `/api/tarkov/cache-meta` shape, nonempty `/api/tarkov/bootstrap?lang=en` data, and no browser
@@ -2242,16 +2251,16 @@ required status that was missing when GitHub finished computing the test merge a
   still match, so an obsolete event cannot turn a newer PR revision red. A `pull_request` CI run
   must carry matching PR, head, and base snapshots to be attributed to the current revision; runs
   without them, notably forks, have no trustworthy run-scoped base, so an unexpected refresh error
-  leaves the required result pending rather than falling back to the head SHA (a PR identity always
-  requires `mergeSha`). Tree equality remains required for a dispatched branch build claiming
+  leaves the existing result unchanged. A failure for a planned decision targets that decision's head
+  and does not require a computed test merge. Tree equality remains required for a dispatched branch build claiming
   preview success.
 - Release staging and recovery read `Preview Result` on the standalone version commit; Crowdin and
-  Dependabot read it on their PR's current test-merge commit. All still bind deployment evidence
+  Dependabot read it on their PR's validated head. All still bind deployment evidence
   to the intended head revision (§14). Production deployment remains Cloudflare's Git
   integration for `main` and is unchanged.
 
-Current gates consume `CI Result` on the validated head and `Preview Result` on the test-merge
-commit for PRs; standalone branch candidates use their head for both. Both come from GitHub
+Current gates consume `CI Result` and `Preview Result` on the validated head for PRs and
+standalone branch candidates. Both come from GitHub
 Actions (app id 15368), and waiting automation re-reads them from the API rather than trusting
 `target_url` or a payload snapshot. The app id does not authenticate a workflow definition: a
 same-repository PR can edit its `pull_request` workflow and request `statuses: write`. The opt-in

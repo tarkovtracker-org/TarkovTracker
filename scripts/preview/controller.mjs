@@ -28,6 +28,9 @@ import {
 // artifacts, workflow payloads, and manifests as claims to verify against live GitHub state.
 export const ENVIRONMENTS = { internal: 'preview', fork: 'preview-fork' };
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
+// Every "test merge not ready" pending reason starts with this prefix so the hourly fallback can
+// re-evaluate it once GitHub computes the merge; other pending reasons are left alone.
+const MERGE_PENDING = 'GitHub has not finished computing';
 class Outcome extends Error {
   constructor(action, state, description) {
     super(description);
@@ -143,7 +146,7 @@ function pullRevisionChanged(current, candidate) {
 }
 async function waitForMerge(github, context, candidate, pull) {
   // GitHub briefly returns a null test merge after a PR is opened or synchronized. Retry
-  // before publishing; a required PR status must never silently fall back to the branch head.
+  // before verifying; artifact claims bind to the test merge even though the status targets the head.
   for (let attempt = 0; attempt < 5; attempt += 1) {
     await new Promise((resolve) => setTimeout(resolve, 2000));
     const current = await getPull(github, context.repo, pull.number);
@@ -249,13 +252,13 @@ function runTreeSha(run) {
 }
 function dispatchMergePrerequisite(pull, run) {
   if (!SHA_PATTERN.test(String(pull.merge_commit_sha)))
-    return 'GitHub has not finished computing the PR test merge; retry after it is ready.';
+    return `${MERGE_PENDING} the PR test merge; retry after it is ready.`;
   if (!runTreeSha(run)) return 'Dispatched CI run has no verifiable Git tree.';
   return null;
 }
 async function currentPullBaseMismatch(github, context, pull) {
   if (!SHA_PATTERN.test(String(pull.merge_commit_sha)))
-    return 'GitHub has not finished computing the PR test merge; retry after it is ready.';
+    return `${MERGE_PENDING} the PR test merge; retry after it is ready.`;
   const { data: main } = await github.rest.git.getRef({
     ...context.repo,
     ref: `heads/${PRODUCTION_BRANCH}`,
@@ -276,6 +279,50 @@ async function dispatchMergeMismatch(github, context, pull, run) {
   return merge.tree.sha === runTreeSha(run)
     ? null
     : 'Dispatched branch build differs from the PR test merge; request a preview from PR CI.';
+}
+/* GitHub can regenerate a PR's test-merge commit (observed when a merge is attempted) with the
+   same parents and tree but a new SHA. A test merge is identified by that content, not its SHA. */
+function shapeOf(data) {
+  return { tree: data.tree?.sha, parents: (data.parents ?? []).map((parent) => parent.sha) };
+}
+function missingCommit(error) {
+  return [404, 422].includes(error.status);
+}
+async function commitShape(github, context, sha) {
+  try {
+    const { data } = await github.rest.git.getCommit({ ...context.repo, commit_sha: sha });
+    return shapeOf(data);
+  } catch (error) {
+    if (missingCommit(error)) return null;
+    throw error;
+  }
+}
+function representsPull(shape, pull) {
+  return [
+    shape.parents.length === 2,
+    shape.parents[0] === pull.base.sha,
+    shape.parents[1] === pull.head.sha,
+    SHA_PATTERN.test(String(shape.tree)),
+  ].every(Boolean);
+}
+function comparableMerges(pull, sha) {
+  return [sha, pull.merge_commit_sha].every((value) => SHA_PATTERN.test(String(value)));
+}
+function sameMergeContent(claimed, current, pull) {
+  if (!claimed || !current) return false;
+  return [
+    representsPull(claimed, pull),
+    representsPull(current, pull),
+    claimed.tree === current.tree,
+  ].every(Boolean);
+}
+/** True when `sha` is the PR's current test merge or a regenerated equivalent of it. */
+async function equivalentTestMerge(github, context, pull, sha) {
+  if (!comparableMerges(pull, sha)) return false;
+  if (sha === pull.merge_commit_sha) return true;
+  const claimed = await commitShape(github, context, sha);
+  const current = await commitShape(github, context, pull.merge_commit_sha);
+  return sameMergeContent(claimed, current, pull);
 }
 async function requireDispatchMergeProof(github, context, candidate, pull, run) {
   if (!pull || candidate.runEvent !== 'workflow_dispatch') return;
@@ -310,7 +357,7 @@ export function verifyManifest(manifest, expected, digest) {
   const errors = manifestShapeErrors(manifest);
   if (errors.length) return errors;
   if (!SHA_PATTERN.test(String(expected.checkedOutSha)))
-    return ['GitHub has not finished computing the test merge for this revision.'];
+    return [`${MERGE_PENDING} the test merge for this revision.`];
   const mismatches = claimErrors(manifest, expected);
   if (manifest.digest !== digest) mismatches.push('digest: build output does not match manifest');
   return mismatches;
@@ -329,13 +376,24 @@ function readManifest(destination) {
     throw failure('Preview artifact has no readable manifest.');
   }
 }
+async function mergeBoundExpectation({ github, context, candidate, pull, manifest, expected }) {
+  if (candidate.runEvent !== 'pull_request' || !pull) return expected;
+  const equivalent = await equivalentTestMerge(github, context, pull, manifest.checkedOutSha);
+  return equivalent ? { ...expected, checkedOutSha: manifest.checkedOutSha } : expected;
+}
 async function verifiedArtifact({ github, context, candidate, pull, run, destination }) {
   const artifact = await fetchArtifact(github, context, run, destination);
   const manifest = readManifest(destination);
-  const expected = expectedManifest(context, candidate, pull, run);
+  const expected = await mergeBoundExpectation({
+    github,
+    context,
+    candidate,
+    pull,
+    manifest,
+    expected: expectedManifest(context, candidate, pull, run),
+  });
   const errors = verifyManifest(manifest, expected, digestDirectory(destination));
-  if (errors.length === 1 && errors[0].startsWith('GitHub has not finished'))
-    throw pending(errors[0]);
+  if (errors.length === 1 && errors[0].startsWith(MERGE_PENDING)) throw pending(errors[0]);
   if (errors.length) throw failure(`Preview artifact verification failed: ${errors.join('; ')}`);
   return { artifact, manifest };
 }
@@ -404,8 +462,8 @@ async function authenticatedPreviousSuccess(github, context, status, sha) {
 function matchesSuccessMarker(status, marker) {
   return status.state === 'success' && status.description?.includes(marker);
 }
-async function previousSuccess(github, context, statusSha, headSha, digest) {
-  const statuses = await allStatuses(github, context.repo, statusSha, 'Preview Result');
+async function previousSuccess(github, context, headSha, digest) {
+  const statuses = await allStatuses(github, context.repo, headSha, 'Preview Result');
   const marker = successMarker(digest);
   for (const status of statuses.toSorted((left, right) => right.id - left.id)) {
     if (!matchesSuccessMarker(status, marker)) continue;
@@ -514,14 +572,7 @@ async function deployDecision({ github, context, state, workspace }) {
     appUrl: manifest.appUrl,
     environment: fork ? ENVIRONMENTS.fork : ENVIRONMENTS.internal,
   };
-  const statusSha = pull ? pull.merge_commit_sha : candidate.headSha;
-  const earlier = await previousSuccess(
-    github,
-    context,
-    statusSha,
-    candidate.headSha,
-    manifest.digest
-  );
+  const earlier = await previousSuccess(github, context, candidate.headSha, manifest.digest);
   return deploymentDecision(common, earlier, manifest, fork, candidate.headSha);
 }
 function outcomeDecision(error, state) {
@@ -539,17 +590,12 @@ function outcomeDecision(error, state) {
 function statusTargetUrl(context, decision) {
   return decision.reuseTargetUrl ?? runUrl(context);
 }
-function statusShaForDecision(decision) {
-  if (!decision.pullRequest) return decision.headSha;
-  return SHA_PATTERN.test(String(decision.mergeSha)) ? decision.mergeSha : null;
-}
 async function publishDecision(github, context, decision) {
-  const sha = statusShaForDecision(decision);
-  if (!decision.state || !sha) return false;
-  // GitHub evaluates a PR's current test-merge commit when it has status checks. Reporting
-  // the same required context on both commits creates duplicate rows in the PR checks UI.
+  if (!decision.state || !decision.headSha) return false;
+  // Always report on the validated head. GitHub regenerates the test-merge commit when a merge is
+  // attempted, dropping any status on it; strict ruleset freshness binds the head to current main.
   await publishStatus(github, context.repo, {
-    sha,
+    sha: decision.headSha,
     state: decision.state,
     description: decision.description,
     targetUrl: statusTargetUrl(context, decision),
@@ -575,9 +621,7 @@ function deferAutomaticPreview(context, decision) {
 async function publishPlannedDecision(github, context, core, decision) {
   if (decision.action === 'ignore') return false;
   if (decision.pullRequest && !decision.mergeSha)
-    core.warning(
-      'PR test merge is not ready; Preview Result remains pending until a later refresh.'
-    );
+    core.warning('PR test merge is not ready; Preview Result stays pending until a later refresh.');
   return publishDecision(github, context, decision);
 }
 /** Phase 1: resolve the candidate, verify evidence, publish the interim status, emit the plan. */
@@ -601,14 +645,19 @@ function refreshContext(context, pull) {
     payload: { ...context.payload, action: 'synchronize', pull_request: pull },
   };
 }
-async function missingPreviewStatus(github, context, pull) {
+function awaitingTestMerge(status) {
+  return status.state === 'pending' && String(status.description).startsWith(MERGE_PENDING);
+}
+/** Refresh a head with no result, or one left pending only because the test merge was not ready. */
+async function needsPreviewRefresh(github, context, pull) {
   if (!SHA_PATTERN.test(String(pull.merge_commit_sha))) return false;
-  const statuses = await allStatuses(github, context.repo, pull.merge_commit_sha, 'Preview Result');
-  return statuses.length === 0;
+  const statuses = await allStatuses(github, context.repo, pull.head.sha, 'Preview Result');
+  const latest = statuses.toSorted((left, right) => right.id - left.id)[0];
+  return !latest || awaitingTestMerge(latest);
 }
 async function refreshMissingPull(github, context, core, workspace, item) {
   const pull = await getPull(github, context.repo, item.number);
-  if (!(await missingPreviewStatus(github, context, pull))) return;
+  if (!(await needsPreviewRefresh(github, context, pull))) return;
   const current = refreshContext(context, pull);
   try {
     await planPreview({
@@ -647,7 +696,9 @@ function pullReadinessError(pull) {
 async function pullFreshnessErrors(github, context, decision) {
   const pull = await getPull(github, context.repo, decision.pullRequest);
   const headMoved = pull.head.sha !== decision.headSha ? 'pull request head moved' : null;
-  const mergeChanged = pull.merge_commit_sha !== decision.mergeSha ? 'test merge changed' : null;
+  const mergeChanged = (await equivalentTestMerge(github, context, pull, decision.mergeSha))
+    ? null
+    : 'test merge changed';
   return [pullReadinessError(pull), headMoved, mergeChanged].filter(Boolean);
 }
 function runFreshnessErrors(run, decision) {
@@ -823,5 +874,5 @@ export async function publishControllerFailure({ github, context, core, inputs, 
     state: 'failure',
     description: 'Preview controller failed; inspect the workflow run.',
   });
-  if (!published) core.warning('PR test merge is not ready; no failure status was published.');
+  if (!published) core.warning('No failure status was published.');
 }
