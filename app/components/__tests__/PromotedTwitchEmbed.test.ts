@@ -150,7 +150,7 @@ describe('PromotedTwitchEmbed', () => {
     const wrapper = await mountEmbed();
     const header = wrapper.find('aside > div');
     // The header plate must leave the fixed-black video surface in dark mode but adopt
-    // the paper surface in light mode (SYSTEMS.md §16: floating chrome is theme-aware).
+    // the paper surface in light mode (SYSTEMS.md §17: floating chrome is theme-aware).
     expect(header.classes()).toContain('light:bg-surface-900');
     expect(header.classes()).not.toContain('bg-black');
     // The video stage below the header keeps its fixed black plate in both themes.
