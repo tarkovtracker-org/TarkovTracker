@@ -100,7 +100,8 @@ for this workflow: the upstream Action prints its environment in debug mode.
 
 `CI`, `PR Checks`, and `Security` report for translation-only PRs. The classifier selects
 formatting, i18n, and systems drift for locale-only pull requests; the aggregate `CI Result` still
-reports and remains the only required check. Non-English locale formatting exclusions remain
+reports, and Crowdin dispatches a preview so `Preview Result` reports on the PR head; both are
+required. Non-English locale formatting exclusions remain
 intact. See the rollout record in `docs/WORKFLOW_AUTOMATION.md`.
 
 Crowdin Sync creates PRs using `GITHUB_TOKEN`. It explicitly dispatches and awaits full CI in addition to

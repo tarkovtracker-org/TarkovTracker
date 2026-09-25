@@ -121,13 +121,12 @@ merge() {
   require_main_ci_policy
   dispatch_ci locales
   request_preview_after_dispatched_ci "$HEAD_SHA"
-  local pr status_sha
+  local pr
   pr="$(read_pr)"
   check_identity "$pr"
   check_revision "$pr"
-  status_sha="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '.merge_commit_sha // empty')"
-  require_sha "$status_sha"
-  wait_for_preview_result "$HEAD_SHA" "$status_sha"
+  # Preview Result targets the validated head; GitHub may regenerate the test merge at merge time.
+  wait_for_preview_result "$HEAD_SHA"
   wait_for_mergeability
   require_main_ci_policy
   # Server-side guard closes the race between the final read and the merge request.

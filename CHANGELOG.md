@@ -1,3 +1,10 @@
+## [1.81.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.81.1...v1.81.2) (2026-09-25)
+
+
+### Bug Fixes
+
+* **ci:** bind Preview Result to the PR head, not the regenerable test merge ([#924](https://github.com/tarkovtracker-org/TarkovTracker/issues/924)) ([74cc542](https://github.com/tarkovtracker-org/TarkovTracker/commit/74cc5420db6ea34bb912abef05a4dfd8fbb845e0)), closes [#916](https://github.com/tarkovtracker-org/TarkovTracker/issues/916)
+
 ## [1.81.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.81.0...v1.81.1) (2026-09-23)
 
 
