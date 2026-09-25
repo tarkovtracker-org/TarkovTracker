@@ -435,22 +435,27 @@ Validates external links in documentation:
 ### 8. Preview Controller (`.github/workflows/preview.yml`)
 
 GitHub Actions controls when pull-request previews deploy to the existing Cloudflare Pages project
-(`tarkovtracker`, `tarkovtrackernuxt.pages.dev`). The controller publishes a current-SHA `Preview
-Result` for eligible PR revisions; an explicit maintainer request or trusted merge automation
+(`tarkovtracker`, `tarkovtrackernuxt.pages.dev`). The controller publishes `Preview Result` on the
+current PR test-merge SHA, or on the branch head for standalone release candidates; an explicit
+maintainer request or trusted merge automation
 dispatch uploads the validated artifact. Cloudflare-managed preview builds are disabled while automatic production deployments
 for `main` remain enabled. `Preview Result` becomes a required merge check after the staged rollout
 and acceptance scenarios below pass. The design, result contract, and invariants are specified in
 [SYSTEMS.md §18](SYSTEMS.md#18-actions-owned-cloudflare-previews).
 
-**Triggers:** `workflow_run` for completed CI, metadata-only `pull_request_target` events (`opened`,
-`synchronize`, `reopened`, `ready_for_review`, `converted_to_draft`, `closed`), and an explicit
-`workflow_dispatch` accepting a CI run id from `main` only. Automatic events refresh the status;
-they never upload to Pages. Every job checks out the default branch; both privileged triggers are
-accepted in `.github/zizmor.yml` because the controller is the intended trusted boundary.
+**Triggers:** `preview-state.yml` receives `workflow_run` for completed CI and metadata-only
+`pull_request_target` events (`opened`, `synchronize`, `reopened`, `ready_for_review`,
+`converted_to_draft`, `closed`). An hourly fallback refreshes only open PRs missing the required
+status after GitHub finishes computing a test merge. It refreshes status without creating deployment
+jobs.
+`preview.yml` accepts only explicit `workflow_dispatch` with a CI run id from `main`.
+Every job checks out the default branch; the privileged automatic triggers are accepted in
+`.github/zizmor.yml` because the state controller is the intended trusted boundary.
 
-**Jobs:** `Plan preview` resolves the candidate through the API, requires successful CI evidence,
-verifies the artifact's manifest and digest, and publishes the interim status. Application,
-configuration, and dependency changes stay `pending` until preview is requested.
+**Jobs:** `Refresh preview state` handles automatic events with a single status-only job.
+`Plan preview` runs only on explicit dispatch, resolves the candidate through the API, requires
+successful CI evidence, verifies the artifact's manifest and digest, and publishes the interim
+status. Application, configuration, and dependency changes stay `pending` until preview is requested.
 `Deploy preview` runs only for that dispatch in the `preview` environment (same-repository
 candidates) or `preview-fork` (required maintainer approval, self-approval and administrator bypass
 disabled), repeats every freshness check, re-verifies the artifact, uploads it with pinned Wrangler
@@ -468,6 +473,24 @@ and profile version (`[preview <digest12> v1]` marker).
 **Manual preview:** `gh workflow run preview.yml --ref main -f run_id=<ci-run-id>`. Use the
 successful CI run for the PR's current head. The controller repeats every eligibility and freshness
 check; it cannot bypass failed CI or deploy a stale revision.
+
+For a same-repository PR, a maintainer or administrator can instead post the exact comment
+`/preview`. The default-branch `preview-request.yml` workflow checks the comment actor's current
+repository role, resolves the successful CI run for the PR's current head and base, and dispatches
+the same trusted Preview workflow. It replies to authorized requests with the outcome; denied
+requests do not receive a bot reply. It does not
+accept edited comments or fork PRs. The comment does not bypass the controller's artifact and
+freshness checks. A repeat request for the same
+validated deployment reuses its existing evidence; fork previews keep the explicit dispatch and
+`preview-fork` environment approval. A new head or base revision needs fresh CI and a new request.
+
+For pull requests, `Preview Result` is published on the current test-merge commit only. A dispatched
+branch build associated with a PR can satisfy it only when the build tree matches that test merge
+and the PR base is current main; otherwise the result stays pending. Crowdin and Dependabot read
+the test-merge status; standalone release candidates continue to use their head commit. A briefly
+missing test-merge SHA is retried and never replaced with a branch-head status.
+The hourly fallback fills a status if the test merge becomes available after the event retry. This
+avoids showing the same required context twice on an ordinary PR.
 
 **Late-build shadow:** `gh workflow run finalization-shadow.yml --ref main -f pull_request=<pr-number> -f ci_run_id=<ci-run-id>`.
 Only a maintain/admin actor can request this non-authoritative rehearsal. It checks the current
@@ -527,13 +550,13 @@ Ordered rollout (keep `Preview Result` non-required until acceptance passes):
    a manual dispatch can select another ref's workflow file.
 4. Merge the trusted-controller bootstrap change that fixes the default-branch credential mapping
    and makes automatic controller events wait instead of uploading. A PR's edits to
-   `preview.yml` cannot exercise themselves because `workflow_run` loads that workflow from `main`.
+   `preview-state.yml` cannot exercise itself because `workflow_run` loads that workflow from `main`.
 5. The live isolation and cost controls are complete: Cloudflare automatic preview builds are off,
    production deployments remain on, and the Pages preview runtime has no production secrets or
    bindings. GitHub environments are created and protected as described above. Do not reuse the
    KV-only `CLOUDFLARE_API_TOKEN`.
 6. After the bootstrap change is on `main`, dispatch `preview.yml` with the successful `run_id` for
-   PR #896's current head. Confirm upload, deployment record, smoke suite, and current-SHA status.
+   PR #896's current head. Confirm upload, deployment record, smoke suite, and test-merge-SHA status.
    Dispatch from `main`; do not test candidate-controlled workflow code with deployment secrets.
 7. Complete the live acceptance scenarios (application PR success and failure, documentation-only
    PR, translation PR, draft transition, approved fork, superseded revision, release-staging

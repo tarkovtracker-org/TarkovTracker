@@ -64,6 +64,7 @@ function assertTrustedBoundary(workflow) {
 }
 test('preview controller runs trusted code only and isolates credentials per job', () => {
   const workflow = read('.github/workflows/preview.yml');
+  const stateWorkflow = read('.github/workflows/preview-state.yml');
   assertTrustedBoundary(workflow);
   // Only the two reporting jobs may write statuses; the deploy and smoke jobs cannot.
   for (const job of ['plan', 'result'])
@@ -80,14 +81,31 @@ test('preview controller runs trusted code only and isolates credentials per job
     'closed',
   ];
   assert.match(
-    workflowEvent(workflow, 'pull_request_target'),
+    workflowEvent(stateWorkflow, 'pull_request_target'),
     new RegExp(`types: \\[${events.join(', ')}\\]`)
   );
   assert.match(
-    workflowEvent(workflow, 'workflow_run'),
+    workflowEvent(stateWorkflow, 'workflow_run'),
     /workflows: \[CI\]\n\s+types: \[completed\]/
   );
-  assert.doesNotMatch(workflowEvent(workflow, 'workflow_run'), /requested/);
+  assert.match(workflowEvent(stateWorkflow, 'schedule'), /cron: '17 \* \* \* \*'/);
+  assert.match(stateWorkflow, /reconcileMissingPreviewStatuses/);
+  assert.doesNotMatch(workflow, /pull_request_target:|workflow_run:/);
+  assert.doesNotMatch(stateWorkflow, /workflow_dispatch:|secrets\.|\bdeploy:|\bsmoke:/);
+  assert.match(stateWorkflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}\}/);
+  assert.match(stateWorkflow, /persist-credentials: false/);
+  assert.match(
+    permissionsBlock(jobBlock(stateWorkflow, 'state'), '    '),
+    /^ {6}statuses: write$/m
+  );
+  assert.match(
+    workflowStep(jobBlock(stateWorkflow, 'state'), 'Refresh Preview Result'),
+    /planPreview/
+  );
+  assert.match(
+    workflowStep(jobBlock(stateWorkflow, 'state'), 'Refresh Preview Result'),
+    /catch \(error\) \{\s+await publishControllerFailure\(\{ github, context, core \}\);\s+throw error;/
+  );
   assert.match(workflowEvent(workflow, 'workflow_dispatch'), /run_id:/);
   assert.match(workflow, /cancel-in-progress: true/);
   assert.match(jobBlock(workflow, 'deploy'), /if: needs\.plan\.outputs\.action == 'deploy'/);
@@ -96,6 +114,10 @@ test('preview controller runs trusted code only and isolates credentials per job
     /if: always\(\) && needs\.plan\.outputs\.action != 'ignore'/
   );
   assert.match(jobBlock(workflow, 'result'), /publishControllerFailure/);
+  assert.match(
+    workflowStep(jobBlock(workflow, 'result'), 'Publish Preview Result'),
+    /catch \(error\) \{\s+await publishControllerFailure\(\{ github, context, core, decision \}\);\s+throw error;/
+  );
   // The cancelled branch must emit the supersession notice and return before the failure and
   // result publisher paths, so a superseded run can never publish a status.
   const resultScript = workflowStep(jobBlock(workflow, 'result'), 'Publish Preview Result');
@@ -209,15 +231,15 @@ test('shared gate scripts wait for both authoritative gates with a 60-minute bou
   assert.match(gate, /timeout 60m gh run watch "\$run_id".*--exit-status/);
   assert.match(gate, /wait_for_ci_result "\$sha"/);
   assert.match(gate, /gh workflow run preview\.yml.*--ref main.*"run_id=\$run_id"/);
-  assert.match(
-    read('scripts/crowdin-pr.sh'),
-    /dispatch_ci locales\n\s+request_preview_after_dispatched_ci "\$HEAD_SHA"\n\s+wait_for_preview_result "\$HEAD_SHA"/
-  );
+  const crowdin = read('scripts/crowdin-pr.sh');
+  assert.match(crowdin, /dispatch_ci locales\n\s+request_preview_after_dispatched_ci "\$HEAD_SHA"/);
+  assert.match(crowdin, /status_sha="\$\(gh api .*pulls\/\$PR_NUMBER.*merge_commit_sha/);
+  assert.match(crowdin, /wait_for_preview_result "\$HEAD_SHA" "\$status_sha"/);
   assert.match(
     read('scripts/release-commit.sh'),
     /request_preview_after_dispatched_ci "\$release_sha"\nwait_for_preview_result "\$release_sha"/
   );
-  assert.doesNotMatch(read('scripts/crowdin-pr.sh'), /^\s*wait_for_ci_result /m);
+  assert.doesNotMatch(crowdin, /^\s*wait_for_ci_result /m);
   assert.doesNotMatch(read('scripts/release-commit.sh'), /^wait_for_ci_result /m);
   for (const name of ['crowdin', 'release'])
     assert.match(
