@@ -284,7 +284,8 @@ test('Crowdin also waits for the authoritative Preview Result and rejects a fail
   const preview = events.findIndex((event) => event.type === 'preview-result');
   assert.ok(ci !== -1 && request > ci && preview > request);
   assert.deepEqual(events[request], { type: 'preview-dispatch', runId: 'run_id=1', ref: 'main' });
-  assert.equal(events[preview].sha, f.env.MERGE_SHA);
+  // Preview Result is read on the validated head, never on the regenerable test merge.
+  assert.equal(events[preview].sha, f.env.HEAD_SHA);
 });
 test('main policy configuration enforces GitHub Actions CI and freshness without exceptions', () => {
   const policy = JSON.parse(read('.github/main-ci-ruleset.json'));
