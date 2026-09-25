@@ -436,7 +436,7 @@ Validates external links in documentation:
 
 GitHub Actions controls when pull-request previews deploy to the existing Cloudflare Pages project
 (`tarkovtracker`, `tarkovtrackernuxt.pages.dev`). The controller publishes `Preview Result` on the
-current PR test-merge SHA, or on the branch head for standalone release candidates; an explicit
+validated head SHA for PRs and standalone release candidates; an explicit
 maintainer request or trusted merge automation
 dispatch uploads the validated artifact. Cloudflare-managed preview builds are disabled while automatic production deployments
 for `main` remain enabled. `Preview Result` becomes a required merge check after the staged rollout
@@ -445,8 +445,8 @@ and acceptance scenarios below pass. The design, result contract, and invariants
 
 **Triggers:** `preview-state.yml` receives `workflow_run` for completed CI and metadata-only
 `pull_request_target` events (`opened`, `synchronize`, `reopened`, `ready_for_review`,
-`converted_to_draft`, `closed`). An hourly fallback refreshes only open PRs missing the required
-status after GitHub finishes computing a test merge. It refreshes status without creating deployment
+`converted_to_draft`, `closed`). An hourly fallback refreshes only open PRs whose head lacks the required
+status, or is pending only on an unready test merge, after GitHub finishes computing it. It refreshes status without creating deployment
 jobs.
 `preview.yml` accepts only explicit `workflow_dispatch` with a CI run id from `main`.
 Every job checks out the default branch; the privileged automatic triggers are accepted in
@@ -484,13 +484,16 @@ freshness checks. A repeat request for the same
 validated deployment reuses its existing evidence; fork previews keep the explicit dispatch and
 `preview-fork` environment approval. A new head or base revision needs fresh CI and a new request.
 
-For pull requests, `Preview Result` is published on the current test-merge commit only. A dispatched
+For pull requests, `Preview Result` is published on the validated head commit only. GitHub
+regenerates the test-merge commit (new SHA, same parents and tree) when a merge is attempted, so a
+status there disappears and blocks the merge; strict ruleset freshness keeps a head-bound result
+tied to current main. Artifact verification still binds to the test merge and accepts a
+regenerated commit only with the same base/head parents and tree. A dispatched
 branch build associated with a PR can satisfy it only when the build tree matches that test merge
-and the PR base is current main; otherwise the result stays pending. Crowdin and Dependabot read
-the test-merge status; standalone release candidates continue to use their head commit. A briefly
-missing test-merge SHA is retried and never replaced with a branch-head status.
-The hourly fallback fills a status if the test merge becomes available after the event retry. This
-avoids showing the same required context twice on an ordinary PR.
+and the PR base is current main; otherwise the result stays pending. Crowdin, Dependabot, and
+standalone release candidates read the head status. A briefly missing test merge is retried and
+the result stays pending. The hourly fallback re-evaluates that head once the test merge
+becomes available after the event retry. One required context appears per PR.
 
 **Late-build shadow:** `gh workflow run finalization-shadow.yml --ref main -f pull_request=<pr-number> -f ci_run_id=<ci-run-id>`.
 Only a maintain/admin actor can request this non-authoritative rehearsal. It checks the current
