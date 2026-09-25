@@ -145,7 +145,7 @@ Non-English formatting exclusions and Crowdin ownership remain intact.
    documentation-only #831 (`proposed.full=false`, run succeeded), translation-only #818 and #853
    (`proposed.full=false`, runs succeeded), executable #855 and mixed docs/workflow #862/#863
    (`proposed.full=true`), and failing executable runs on #848/#852/#862 where a failed shard, Fallow,
-   or lint job made `CI Result` fail. The only required check on `main` is `CI Result`
+   or lint job made `CI Result` fail. At that time the only required check on `main` was `CI Result`
    (`Main CI freshness` ruleset), so skipped jobs cannot leave a pull request blocked.
 2. Done: the classifier invocation no longer passes `--shadow`; pull requests receive path selection
    while push and dispatch events retain `--full`. Required-check settings were not changed. Roll
