@@ -41,11 +41,13 @@ and have an agent verify the answer against the code.
     map marker categories and split pinned/active requirements
 
 13. [Fallow audit snapshots](#13-fallow-audit-snapshots) — consistent generated context and local source attribution
-14. [CI validation selection](#14-ci-validation-selection) — conservative classification and strict aggregation
-15. [Canonical task progression](#15-canonical-task-progression) — declared trader gates and import semantics
-16. [Light/dark theme system](#16-lightdark-theme-system) — token flip, boot script, and theme controls
-17. [Test suite execution model](#17-test-suite-execution-model) — isolated workers and sharded coverage
-18. [Actions-owned Cloudflare previews](#18-actions-owned-cloudflare-previews) — validated CI builds,
+14. [Release validation and publication](#14-release-validation-and-publication) — validated-SHA
+    publication gate, recovery, and Crowdin merges
+15. [CI validation selection](#15-ci-validation-selection) — conservative classification and strict aggregation
+16. [Canonical task progression](#16-canonical-task-progression) — declared trader gates and import semantics
+17. [Light/dark theme system](#17-lightdark-theme-system) — token flip, boot script, and theme controls
+18. [Test suite execution model](#18-test-suite-execution-model) — isolated workers and sharded coverage
+19. [Actions-owned Cloudflare previews](#19-actions-owned-cloudflare-previews) — validated CI builds,
     trusted controller, isolated preview environment, and the `Preview Result` gate
 
 ---
@@ -144,13 +146,15 @@ flowchart LR
   respectively. The upstream endpoint catalog is the authority for supported slugs.
 - Language is validated with `getValidatedLanguage()` and defaults to `en`.
 
----
+### Prestige, editions, fleet verification, and cache bundle scope
 
 Prestige and progression-catalog responses await overlay refresh before creating downstream cache entries. Story chapters normalize missing/nonfinite order to zero, and prestige rows fall back to chapter names/IDs when requirement labels are absent.
 
 Overlay fleet verification requires `X-Cache-Status: PRECOMPUTE` and matching nonempty version/SHA identities in the published overlay, full-fleet manifest, and served response. Invalid timestamps or malformed provenance remain unverified. Filtered busts do not certify a complete release: rerun the unfiltered precompute before promotion. The production verifier uses the configured HTTPS `OVERLAY_URL` (defaulting to the published main overlay).
 
 Critical cache bundles carry mode/language scope and replace every matching collection, including empty arrays. Cached hydration owns the request tokens and clears stale errors/loading; superseded initializers and background callbacks cannot overwrite the new scope.
+
+---
 
 ## 2. Data fetching pipeline
 
@@ -381,7 +385,7 @@ sequenceDiagram
   a patched task's merged list into `traderLevelRequirements` and
   `traderRequirements` (reputation-only) for compatibility, and regenerates the canonical
   `normalizedTraderRequirements` consumed by availability, badges and progress implications
-  (section 15). A patch's `traderRequirements` replaces the whole requirement set.
+  (section 16). A patch's `traderRequirements` replaces the whole requirement set.
 - Overlay corrections and `tasksAdd` entries merge into already-adapted tasks, so `applyOverlay`
   re-normalizes the declared prerequisite and prestige gates it can reach. A corrected task is
   re-normalized only when the patch touches `taskRequirements` or `requiredPrestige`, and a
@@ -391,7 +395,7 @@ sequenceDiagram
   stays a list and a resolvable `requiredPrestige` becomes a normalized `{ id }` reference. The
   overlay keeps an id-less `{ name, prestigeLevel }` reference verbatim, so it is not a loss and gets
   no diagnostic; only a declared gate the normalization had to drop becomes a
-  `requirementDiagnostics` entry (section 15).
+  `requirementDiagnostics` entry (section 16).
 - On fetch failure, serves the last good overlay (stale) rather than failing the request.
 - Overlay supports mode-specific corrections under `modes[gameMode]` plus global corrections.
 - Per-locale corrections under `locales[locale]` patch `tasks`, `items`, `traders` and `maps`
@@ -1661,7 +1665,7 @@ The checkout stays pinned to the validated SHA. The production build still runs 
   candidate workflows had landed the `security` job.) Status publication errors fail the
   CI Result job, so automation cannot promote the commit.
 - Release version commits pass explicitly dispatched CI on a temporary `wip/release-*` branch and
-  receive an Actions-owned preview (§18) before the identical SHA advances main; the embedded
+  receive an Actions-owned preview (§19) before the identical SHA advances main; the embedded
   version makes them deployable changes. `scripts/github-ci-gate.sh` waits for the exact dispatched
   CI run and its `CI Result`, requests one preview, then waits for the authoritative `Preview Result`
   on the same SHA; gate waits are bounded to 60 minutes, and the containing Release and Crowdin
@@ -1787,8 +1791,8 @@ clears even when the filtered task IDs have not changed.
 
 Keep the tasks page's eight-card batches, preload margin, and auto-load caps. Do not defer
 critical metadata or change task filters, progress state, or card expansion to mask mounting
-cost. Performance validation and the issue #444 baseline are documented in
-`docs/task-performance-validation.md`.
+cost. The #808/#444 performance validation is historical and archived in git history; keep the
+behavioral invariants above (eight-card batches, preload margin, and auto-load caps) unchanged.
 
 ### Task card layout and legacy density preferences
 
@@ -1826,7 +1830,7 @@ match aligned: if one matches by name-or-short-name and the other does not, the 
 a pooled objective under a different item than the list pins, which contradicts the searched
 identity.
 
-## 14. CI validation selection
+## 15. CI validation selection
 
 `scripts/validation-plan.mjs` classifies Git paths and validates aggregate outcomes;
 `scripts/validate-changes.mjs` exposes local execution and CI outputs;
@@ -1861,7 +1865,7 @@ CodeQL) is selected on every CI run. See
   event actor; the actor restriction alone never establishes trust.
 - The aggregate covers repository CI jobs, not independently reported Security or Codecov statuses.
 
-## 15. Canonical task progression
+## 16. Canonical task progression
 
 Hideout cards evaluate the declared trader comparison against current loyalty (legacy default `>=`). Completed-module enforcement retains a build if the current stored loyalty satisfies the comparison (including legacy values above the normal range), or if any valid loyalty level at or below it satisfies that comparison, so advancing past an upper-bound or equality requirement cannot erase built modules or their parts. Lower-bound loyalty downgrades still revoke dependent builds. Disabled trader gating bypasses both checks. Optional profile chapter and prestige normalization run inside their optional request boundaries: malformed catalogs show a partial failure without discarding successful task catalogs. Overlay promotion requires a nonempty editions catalog as well as complete provenance, and forced edition refreshes forward `cacheBust=1` to bypass the worker overlay cache.
 
@@ -1978,7 +1982,7 @@ not import quest completions and therefore has no trader/task backfill path.
   approved branch revision with no language/mode filters, verify all 48 new-key writes succeeded,
   and record that evidence. Do not rely on cold fallback to bridge this cache-contract rollout.
 
-## 16. Light/dark theme system
+## 17. Light/dark theme system
 
 **Summary**: Dark is the default and only mandatory theme; light mode is an opt-in user
 preference (issue #102). The light theme never edits component markup globally: it flips the
@@ -2087,7 +2091,7 @@ App boot
 - `app/shell/AppBar.vue` — sun/moon toggle in the utilities group (collapses into More menu on mobile)
 - `nuxt.config.ts` — boot script, light skeleton fallbacks, pinned `colorMode`
 
-## 17. Test suite execution model
+## 18. Test suite execution model
 
 Test **files** run in parallel, each in its own forked worker. `vitest.config.ts` sets
 `pool: 'forks'` with `isolate: true`, and Vitest's pool only reuses a runner while `isolate` is
@@ -2134,7 +2138,7 @@ the loader never reaches a real import.
 - `scripts/ci-tests/workflows.mjs` — asserts the shard command and required check names
 - `tests/test-setup.ts` — shared fetch stubs, console filtering, auto-unmount
 
-## 18. Actions-owned Cloudflare previews
+## 19. Actions-owned Cloudflare previews
 
 **Summary.** Pull requests and eligible non-main dispatches do not rely on Cloudflare's
 automatic Git previews. The candidate `Validate` job builds the actual Pages output once with the

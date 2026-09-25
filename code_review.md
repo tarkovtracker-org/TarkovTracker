@@ -55,7 +55,9 @@ Hard rules the reviewer must verify for every diff:
 
 ### Cloudflare Workers / Durable Objects
 
-- **Where:** `workers/api-gateway/src/rateLimiter.ts` (rate limiter DO), `workers/tarkov-precompute/`
+- **Where:** `workers/api-gateway/` (`src/rateLimiter.ts` rate-limiter DO) — it is the only
+  Cloudflare Worker in this repo; precompute runs from the scheduled Actions workflow
+  (`scripts/precompute/`), not from a Worker.
 - **Check:** DO alarm lifecycle — no orphaned alarms, no double-fire without
   idempotency, no alarm leaks on cleanup. Verify that lazy expiration does not leave stale
   rate-limit state. DO storage transactions are single-writer; no
@@ -135,8 +137,8 @@ Hard rules the reviewer must verify for every diff:
 
 ## Deployment And Rollback
 
-- **Platform:** Cloudflare Pages (frontend), Cloudflare Workers (api-gateway,
-  precompute), Supabase (database, auth, realtime, edge functions).
+- **Platform:** Cloudflare Pages (frontend), Cloudflare Workers (api-gateway),
+  Supabase (database, auth, realtime, edge functions).
 - **Frontend rollback:** Pages deployments can be rolled back via the Cloudflare
   dashboard (Pages project → Deployments → target production deployment →
   Rollback to this deployment). Wrangler does not provide a CLI rollback for
