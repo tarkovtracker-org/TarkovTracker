@@ -100,7 +100,8 @@ for this workflow: the upstream Action prints its environment in debug mode.
 
 `CI`, `PR Checks`, and `Security` report for translation-only PRs. The classifier selects
 formatting, i18n, and systems drift for locale-only pull requests; the aggregate `CI Result` still
-reports and remains the only required check. Non-English locale formatting exclusions remain
+reports, and Crowdin dispatches a preview so `Preview Result` reports on the PR head; both are
+required. Non-English locale formatting exclusions remain
 intact. See the rollout record in `docs/WORKFLOW_AUTOMATION.md`.
 
 Crowdin Sync creates PRs using `GITHUB_TOKEN`. It explicitly dispatches and awaits full CI in addition to
@@ -162,8 +163,10 @@ introduce a new pinned SHA.
 
 Existing check names and Dependabot's expected-check list are preserved; Dependabot PRs always
 change manifests, so they always receive the full set. `Main CI freshness` requires successful
-`CI Result` and an up-to-date branch, with no bypass actors; it is the only required check, so
-reduced runs (which skip jobs by design) cannot leave a PR blocked on a missing context. External
+`CI Result` and `Preview Result` plus an up-to-date branch, with no bypass actors. These aggregates
+are the only required checks, so reduced runs (which skip jobs by design) cannot leave a PR blocked
+on a missing job context. `Preview Result` stays pending on preview-required PRs until a maintainer
+comments `/preview`; verified documentation-only scope reports success as not applicable. External
 Codecov/Security gates remain unchanged; Codecov statuses default to success when no report exists.
 
 Successful main CI completion separately triggers the gated `Release` workflow.
