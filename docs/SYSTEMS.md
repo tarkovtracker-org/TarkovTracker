@@ -1729,7 +1729,7 @@ See `docs/WORKFLOW_AUTOMATION.md` for triggering, retry, and deployment behavior
 ## When this doc is wrong
 
 If you read something here that does not match the code, the disagreement is a bug — either in the
-code (fix the code) or in this doc (fix the doc in the same PR). `AGENTS.md`'s Maintenance Contract
+code (fix the code) or in this doc (fix the doc in the same PR). `AGENTS.md` (Scoped rules)
 requires updating this file whenever one of these systems changes. When in doubt, the code is the
 source of truth and this doc is the explanation of it.
 
