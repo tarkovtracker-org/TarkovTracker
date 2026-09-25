@@ -16,11 +16,13 @@ function matchesCandidate(pull, candidate) {
   ];
   return checks.every(Boolean);
 }
+function isForkCandidate(repo, candidate) {
+  return Boolean(candidate.headRepo) && candidate.headRepo !== `${repo.owner}/${repo.repo}`;
+}
 /** `owner:branch` filter for a fork candidate; null for same-repository candidates. */
 function forkHeadFilter(repo, candidate) {
-  const [owner] = String(candidate.headRepo ?? '').split('/');
-  const fork = candidate.headRepo !== `${repo.owner}/${repo.repo}`;
-  return fork && owner && candidate.headBranch ? `${owner}:${candidate.headBranch}` : null;
+  if (!isForkCandidate(repo, candidate) || !candidate.headBranch) return null;
+  return `${candidate.headRepo.split('/')[0]}:${candidate.headBranch}`;
 }
 /**
  * Candidate PRs for a validated head. The base repository's commit-association lookup never
