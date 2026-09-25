@@ -17,14 +17,16 @@ Complete workflow automation setup for TarkovTracker with CI/CD pipelines, quali
 
 ## Agent validation and review
 
-`package.json` defines commands; `AGENTS.md` defines required validation and review.
+`package.json` defines commands; the root `AGENTS.md` defines required validation and review, and
+path-scoped `supabase/AGENTS.md` and `workers/api-gateway/AGENTS.md` add area-specific rules.
 `code_review.md` supplements that contract with risk areas, without requiring the full suite for
 unrelated changes. Worktree setup and the shared CI setup action use `scripts/ensure-pnpm.sh` to
 verify pnpm against `packageManager`, preparing its complete integrity-qualified pin even when the installed version matches.
 
 Run focused checks while implementing, then required checks after the diff stabilizes. Record the
 commit, dirty worktree state, commands, and results in the PR summary. Invalidate affected results
-when their inputs change. Batch substantiated corrections; defer unrelated cleanup.
+when their inputs change. Batch substantiated corrections; defer unrelated cleanup and optional
+style suggestions.
 
 Documentation, translation, and mechanical formatting changes need deterministic checks and
 self-review. Routine executable changes also receive Codex PR review. Substantial behavior changes
