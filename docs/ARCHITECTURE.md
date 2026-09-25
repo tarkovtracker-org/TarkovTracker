@@ -514,6 +514,7 @@ Placement is enabled for both environments through the top-level `[placement]` b
 | `SUPABASE_URL`                                   | Shared Supabase project URL for auth and sync            | Yes¹     |
 | `SUPABASE_ANON_KEY`                              | Shared Supabase anon key for auth and sync               | Yes¹     |
 | `NUXT_PUBLIC_CLIENT_LOG_SINK_URL`                | Optional browser log collector URL (disabled by default) | No       |
+| `NUXT_PUBLIC_LOG_LEVEL`                          | Client log level (debug, info, warn, error)              | No       |
 | `NUXT_PUBLIC_TURNSTILE_SITE_KEY`                 | Turnstile widget sitekey for Tarkov.dev profile imports  | No²      |
 | `NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES` | Browser cooldown after a confirmed profile import        | No       |
 
@@ -561,6 +562,10 @@ builds. This is a Vite build-time variable, not Nuxt runtime configuration.
 | `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_MINUTE` | Per-IP profile-import requests per minute           | No         |
 | `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_HOUR`   | Per-IP profile-import requests per hour             | No         |
 | `NUXT_TARKOV_DEV_PROFILE_MAX_UPDATED_AGE_DAYS`  | Reject older profile snapshots; `0` disables        | No         |
+| `NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE`       | Per-IP team-members requests per minute             | No         |
+| `NUXT_TEAM_MEMBERS_CACHE_TTL_MS`                | Team-members shared-cache TTL in milliseconds       | No         |
+| `NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE`     | Per-IP shared-profile requests per minute           | No         |
+| `NUXT_SHARED_PROFILE_CACHE_TTL_MS`              | Shared-profile shared-cache TTL in milliseconds     | No         |
 | `NUXT_TURNSTILE_SECRET_KEY`                     | Server-side Turnstile secret for profile imports    | No²        |
 
 **Build-time / platform:**
@@ -580,7 +585,9 @@ Edge Function values. Nuxt uses `NUXT_SUPABASE_SERVICE_KEY` for the privileged k
 canonical application URL used by `admin-cache-purge`; it has no alias fallback.
 `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are shared canonical names used by both Nuxt and
 Edge Functions. `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_SUPPORTER_ROLE_ID`,
-`DISCORD_LINKED_ROLE_ID`, `CLOUDFLARE_ZONE_ID`, and `CLOUDFLARE_API_TOKEN` are Edge-only. See
+`DISCORD_LINKED_ROLE_ID`, `CLOUDFLARE_ZONE_ID`, and `CLOUDFLARE_API_TOKEN` are Edge-only.
+`DISCORD_SCAV_ROLE_ID`, `DISCORD_TIMMY_ROLE_ID`, and `DISCORD_CHAD_ROLE_ID` are optional
+Edge-only tier roles for supporter sync (role sync skips the tier role when one is unset). See
 `supabase/functions/.env.example`.
 
 **Cloudflare Workers** (`workers/api-gateway`, set via `wrangler secret put`):
