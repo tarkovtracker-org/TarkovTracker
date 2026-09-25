@@ -86,7 +86,7 @@ Hard rules the reviewer must verify for every diff:
 ### Auth And Realtime (Supabase)
 
 - **Where:** `app/plugins/supabase.client.ts`, stores using auth state
-  (`useTarkov`, `useProgress`)
+  (`useTarkovStore`, `useProgressStore`)
 - **Check:** Session lifecycle — token refresh, session restore on reload.
   Realtime subscription cleanup on component unmount (no subscription leaks).
   RLS policy changes in migrations. No client-side service-role keys. Auth state
@@ -113,8 +113,8 @@ Hard rules the reviewer must verify for every diff:
 ### Pinia Store State
 
 - **Where:** `app/stores/`
-- **Check:** `useTarkov` is the core state. Changes to its shape must not
-  break `useMetadata`, `useProgress`, or `usePreferences`.
+- **Check:** `useTarkovStore` is the core state. Changes to its shape must not
+  break `useMetadataStore`, `useProgressStore`, or `usePreferencesStore`.
   Persisted state (`pinia-plugin-persistedstate`) must remain backward-compatible
   — a stored shape change can corrupt existing user sessions. Avoid adding new
   global state unless necessary.

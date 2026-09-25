@@ -359,8 +359,10 @@ reads the precompute manifest and is always `no-store`.
 
 ### Caching Strategy
 
-Layer 1 of the server cache is the precomputed `TARKOV_DATA` KV (populated off the request path by
-the scheduled precompute workflow); the full four-layer fall-through is specified in
+Layer 1 of the server cache is the optional precomputed `TARKOV_DATA` KV (populated off the request path by
+the scheduled precompute workflow; currently only `/api/tarkov/tasks-core` reads it via
+`precomputed: true` — other game-data routes start at the per-colo Cache API); the full four-layer
+fall-through is specified in
 [`SYSTEMS.md` §3](./SYSTEMS.md#3-multi-layer-caching). The diagram below shows the
 client → edge → upstream path.
 

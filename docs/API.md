@@ -270,7 +270,8 @@ Fetches cache purge timestamp to detect server-side cache clears.
 ```
 
 **Cache-Control:** `public, max-age=0, must-revalidate` for clients; the Cloudflare CDN may serve
-the purge timestamp for up to 300s with stale-while-revalidate 60s
+the purge timestamp for up to 360s total (300s fresh plus up to 60s stale while revalidating
+in the background), so clients relying on `lastPurgeAt` can detect a purge up to ~6 minutes late
 (`Cloudflare-CDN-Cache-Control: public, max-age=300, stale-while-revalidate=60`).
 
 ---
@@ -537,10 +538,11 @@ Cloudflare edge caching with `Cache-Control` headers:
 Cache-Control: public, max-age=43200, s-maxage=43200
 ```
 
-Note: 43200 seconds = 12 hours (default), 86400 seconds = 24 hours (extended). Handlers also set
-`s-maxage` on every served response (`app/server/utils/edgeCache.ts`); on stored entries it equals
-`ttl + staleTtl` so the Cloudflare CDN keeps the entry past max-age while a background refresh
-runs (stale-while-revalidate).
+Note: 43200 seconds = 12 hours (default), 86400 seconds = 24 hours (extended). Only fresh
+cacheable responses (`HIT`, `MISS`, `PRECOMPUTE` in `app/server/utils/edgeCache.ts`) carry
+`s-maxage`; bypass, local `DEV`, and stale-hit responses are `Cache-Control: no-cache`. On stored
+`MISS` entries `s-maxage` equals `ttl + staleTtl` so the Cloudflare CDN keeps the entry past max-age
+while a background refresh runs (stale-while-revalidate).
 
 ### Cache Busting
 
