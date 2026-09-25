@@ -1854,6 +1854,8 @@ CodeQL) is selected on every CI run. See
 
 - Pushes and dispatches retain full validation; only pull requests receive reduced selection.
 - Reduced selection never applies to `app/locales/en.json`; only non-English translations qualify.
+- Nested `AGENTS.md`/`CLAUDE.md` instruction files count as documentation, except under `public/`,
+  where they would ship as site assets. `format:check` covers them at every depth.
 - Empty, unreadable, or malformed diffs select full validation, workflow linting, and a preview.
 - Missing classifier output or selected jobs that fail, cancel, or unexpectedly skip fail CI Result.
 - Only deliberately unselected jobs may report skipped; systems drift and security always run.

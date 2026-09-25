@@ -127,7 +127,8 @@ Fallow, build, database and Worker checks, and Deno tests, requiring their usual
 environment. CI itself retains sharding, secrets/fork rules, and report uploads in workflow jobs.
 Link validation remains in the existing Link Check workflow for applicable documentation paths.
 
-The reduced selection covers only root `.md` files, Markdown under `docs/` and `.github/`, and
+The reduced selection covers only root `.md` files, Markdown under `docs/` and `.github/`, agent
+instruction files named `AGENTS.md` or `CLAUDE.md` at any depth outside `public/`, and
 Crowdin-owned `app/locales/*.json` translations. The source locale `app/locales/en.json` selects
 full validation: application code and Vitest fixtures consume it, and `scripts/crowdin-pr.sh` draws
 the same translation-only boundary. `DESIGN.md`, generated code, scripts, dependencies,
