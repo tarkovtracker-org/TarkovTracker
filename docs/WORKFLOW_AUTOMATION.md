@@ -156,7 +156,9 @@ Non-English formatting exclusions and Crowdin ownership remain intact.
    Path selection does not change release triggers, validation, or main-run cancellation.
    Do not treat local fixtures as evidence of GitHub App or branch-protection behavior.
 
-The initial observations are recorded in [the baseline report](ci-turnaround-baseline.md).
+The initial observations come from the pre-rollout baseline collected on 2026-09-06, which was
+archived in git history once the rollout completed (recorded 2026-09-16; no report file remains
+in-tree).
 The read-only `scripts/workflow-metrics.mjs` collector samples the preceding 20 merged PRs and emits
 per-PR CI and release timings as JSON. Run it with authenticated `gh` and save stdout to a report:
 
@@ -443,7 +445,7 @@ maintainer request or trusted merge automation
 dispatch uploads the validated artifact. Cloudflare-managed preview builds are disabled while automatic production deployments
 for `main` remain enabled. The live ruleset requires both `CI Result` and `Preview Result`;
 rollout verifies that enforcement. The design, result contract, and invariants are specified in
-[SYSTEMS.md §18](SYSTEMS.md#18-actions-owned-cloudflare-previews).
+[SYSTEMS.md §19](SYSTEMS.md#19-actions-owned-cloudflare-previews).
 
 **Triggers:** `preview-state.yml` receives `workflow_run` for completed CI and metadata-only
 `pull_request_target` events (`opened`, `synchronize`, `reopened`, `ready_for_review`,
