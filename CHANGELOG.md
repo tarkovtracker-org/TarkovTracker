@@ -1,3 +1,10 @@
+## [1.81.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.81.3...v1.81.4) (2026-09-25)
+
+
+### Bug Fixes
+
+* **preview:** resolve fork pull requests by owner:branch head ([#928](https://github.com/tarkovtracker-org/TarkovTracker/issues/928)) ([55e0d0f](https://github.com/tarkovtracker-org/TarkovTracker/commit/55e0d0fcb3355708971eeacf98629435557f0f53))
+
 ## [1.81.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.81.2...v1.81.3) (2026-09-25)
 
 
