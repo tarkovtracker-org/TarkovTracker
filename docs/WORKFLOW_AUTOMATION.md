@@ -559,7 +559,7 @@ Ordered rollout (keep `Preview Result` non-required until acceptance passes):
    bindings. GitHub environments are created and protected as described above. Do not reuse the
    KV-only `CLOUDFLARE_API_TOKEN`.
 6. After the bootstrap change is on `main`, dispatch `preview.yml` with the successful `run_id` for
-   PR #896's current head. Confirm upload, deployment record, smoke suite, and test-merge-SHA status.
+   PR #896's current head. Confirm upload, deployment record, smoke suite, and head-SHA status.
    Dispatch from `main`; do not test candidate-controlled workflow code with deployment secrets.
 7. Complete the live acceptance scenarios (application PR success and failure, documentation-only
    PR, translation PR, draft transition, approved fork, superseded revision, release-staging
