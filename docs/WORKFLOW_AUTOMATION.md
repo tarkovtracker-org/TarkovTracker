@@ -278,7 +278,8 @@ this workflow controls release/version publication, not when the initial deploym
 **Required main policy:** `.github/main-ci-ruleset.json` records the desired API configuration for
 the `Main CI freshness` repository ruleset. Rollout must apply it and verify active enforcement and
 an empty bypass list before merging the automation changes. It targets
-`refs/heads/main`, requires `CI Result` from GitHub Actions (integration ID `15368`), enables
+`refs/heads/main`, requires `CI Result` and `Preview Result` from GitHub Actions (integration ID
+`15368`), enables
 `strict_required_status_checks_policy`, and has an empty `bypass_actors` list. This applies to
 all PRs and direct pushes, including administrators and automation. Existing deletion/force-push
 rules remain separate. Behind branches must incorporate current main and pass CI again; do not
@@ -439,8 +440,8 @@ GitHub Actions controls when pull-request previews deploy to the existing Cloudf
 validated head SHA for PRs and standalone release candidates; an explicit
 maintainer request or trusted merge automation
 dispatch uploads the validated artifact. Cloudflare-managed preview builds are disabled while automatic production deployments
-for `main` remain enabled. `Preview Result` becomes a required merge check after the staged rollout
-and acceptance scenarios below pass. The design, result contract, and invariants are specified in
+for `main` remain enabled. `Preview Result` is a required merge check in the live ruleset and in
+`.github/main-ci-ruleset.json`. The design, result contract, and invariants are specified in
 [SYSTEMS.md §18](SYSTEMS.md#18-actions-owned-cloudflare-previews).
 
 **Triggers:** `preview-state.yml` receives `workflow_run` for completed CI and metadata-only
@@ -523,8 +524,8 @@ keeps production Git deployments enabled. `preview_deployment_setting` is `none`
 variables match the anonymous checked-in configuration, and production KV and Durable Object
 bindings and production secrets are absent. Production deployment configuration was unchanged.
 The initial rollout readback found only `CI Result`. The live September 23 ruleset requires both
-`CI Result` and `Preview Result`; the checked-in ruleset template and the historical rollout steps
-below are being reconciled separately from this shadow workflow.
+`CI Result` and `Preview Result`, and `.github/main-ci-ruleset.json` matches it. Restoring the
+ruleset from that file preserves both required checks.
 `preview` and `preview-fork` are restricted to `main`; fork previews require approval from
 `DysektAI` or `Chica999`, with self-approval and administrator bypass disabled. Both environments
 have `CLOUDFLARE_ACCOUNT_ID`. `CLOUDFLARE_PAGES_API_TOKEN` now exists as a secret in both
@@ -563,10 +564,10 @@ Ordered rollout (keep `Preview Result` non-required until acceptance passes):
    Dispatch from `main`; do not test candidate-controlled workflow code with deployment secrets.
 7. Complete the live acceptance scenarios (application PR success and failure, documentation-only
    PR, translation PR, draft transition, approved fork, superseded revision, release-staging
-   candidate; confirm GitHub blocks merging when the preview fails or is missing). Then add
-   `Preview Result` (GitHub Actions, integration id `15368`) to `.github/main-ci-ruleset.json` and
-   the deployed `Main CI freshness` ruleset alongside `CI Result`, preserving strict freshness and the
-   empty bypass list:
+   candidate; confirm GitHub blocks merging when the preview fails or is missing). Applied on
+   September 23: `Preview Result` (GitHub Actions, integration id `15368`) is required alongside `CI Result` in
+   `.github/main-ci-ruleset.json` and the deployed `Main CI freshness` ruleset, preserving strict
+   freshness and the empty bypass list. Apply or restore the file and verify with:
 
    ```bash
    gh api -X PUT repos/tarkovtracker-org/TarkovTracker/rulesets/23539975 --input .github/main-ci-ruleset.json

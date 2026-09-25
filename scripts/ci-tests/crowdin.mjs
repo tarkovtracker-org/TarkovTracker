@@ -287,7 +287,7 @@ test('Crowdin also waits for the authoritative Preview Result and rejects a fail
   // Preview Result is read on the validated head, never on the regenerable test merge.
   assert.equal(events[preview].sha, f.env.HEAD_SHA);
 });
-test('main policy configuration enforces GitHub Actions CI and freshness without exceptions', () => {
+test('main policy configuration enforces GitHub Actions CI, preview and freshness without exceptions', () => {
   const policy = JSON.parse(read('.github/main-ci-ruleset.json'));
   assert.equal(policy.enforcement, 'active');
   assert.equal(policy.target, 'branch');
@@ -298,7 +298,10 @@ test('main policy configuration enforces GitHub Actions CI and freshness without
       type: 'required_status_checks',
       parameters: {
         strict_required_status_checks_policy: true,
-        required_status_checks: [{ context: 'CI Result', integration_id: 15368 }],
+        required_status_checks: [
+          { context: 'CI Result', integration_id: 15368 },
+          { context: 'Preview Result', integration_id: 15368 },
+        ],
       },
     },
   ]);

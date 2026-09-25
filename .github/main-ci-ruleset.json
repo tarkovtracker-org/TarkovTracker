@@ -18,6 +18,10 @@
           {
             "context": "CI Result",
             "integration_id": 15368
+          },
+          {
+            "context": "Preview Result",
+            "integration_id": 15368
           }
         ]
       }
