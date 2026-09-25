@@ -2262,6 +2262,11 @@ GitHub has computed the test merge; other pending reasons are left alone.
   Dependabot read it on their PR's validated head. All still bind deployment evidence
   to the intended head revision (§14). Production deployment remains Cloudflare's Git
   integration for `main` and is unchanged.
+- The public repository's `pull_request_target` use is confined to `preview-state.yml` by a
+  repository-level Actions policy whose event allowlist is exactly `pull_request_target`,
+  `workflow_run`, and `schedule` for that workflow path. GitHub enforces its default
+  public-repository block of `pull_request_target` from 2026-11-02, so the policy is required
+  external state; `docs/WORKFLOW_AUTOMATION.md` records how to recreate it.
 
 Current gates consume `CI Result` and `Preview Result` on the validated head for PRs and
 standalone branch candidates. Both come from GitHub

@@ -1,6 +1,12 @@
 name: Preview State
 # Trusted, status-only controller for automatic PR and CI events. Deployment jobs exist only in
 # the explicitly dispatched Preview workflow.
+#
+# `pull_request_target` is deliberate: fork PRs need a write token to receive a status. It is safe
+# here because the job only checks out the default branch and never installs or runs candidate code.
+# This public repository therefore carries a repository-level Actions policy that scopes the event
+# to this workflow (GitHub blocks it by default from 2026-11-02); see "Preview Controller" in
+# docs/WORKFLOW_AUTOMATION.md. Removing that policy silently disables automatic preview state.
 on:
   schedule:
     - cron: '17 * * * *'
