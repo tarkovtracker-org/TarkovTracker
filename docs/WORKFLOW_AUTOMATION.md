@@ -457,6 +457,41 @@ jobs.
 Every job checks out the default branch; the privileged automatic triggers are accepted in
 `.github/zizmor.yml` because the state controller is the intended trusted boundary.
 
+**Required Actions policy:** `preview-state.yml` is the only workflow in this public repository
+that uses `pull_request_target`. GitHub blocks that event by default in public repositories from
+2026-11-02 unless an applicable Actions event policy allows it, so the repository carries one policy
+scoped to this workflow. It is external state that no checked-in file describes; recreate it with:
+
+```bash
+gh api --method POST \
+  -H "X-GitHub-Api-Version: 2026-03-10" \
+  repos/tarkovtracker-org/TarkovTracker/actions/policies \
+  --input - <<'JSON'
+{
+  "name": "Allow pull_request_target for preview-state",
+  "enforcement": "active",
+  "conditions": {
+    "workflow_path": {
+      "include": [".github/workflows/preview-state.yml"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "restrict_action_events",
+      "parameters": {
+        "allowed_events": ["pull_request_target", "workflow_run", "schedule"]
+      }
+    }
+  ]
+}
+JSON
+```
+
+The `restrict_action_events` allowlist is exhaustive for this workflow and does not permit
+`pull_request_target` anywhere else in the repository; the default public-repository block still
+applies to every other workflow.
+
 **Jobs:** `Refresh preview state` handles automatic events with a single status-only job.
 `Plan preview` runs only on explicit dispatch, resolves the candidate through the API, requires
 successful CI evidence, verifies the artifact's manifest and digest, and publishes the interim
