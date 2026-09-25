@@ -52,7 +52,7 @@ canonical agent contract and project conventions live in the root [`AGENTS.md`](
   knowledge base; start at [`agent-context/summary/index.md`](./agent-context/summary/index.md).
 
 > To avoid drift, each fact has a single owner: code style and commit scopes live in `AGENTS.md`;
-> the environment-variable map lives in `ARCHITECTURE.md` and `runbook.md`; API details live in
+> the environment-variable map lives in `ARCHITECTURE.md` (`runbook.md` links to it for ops); API details live in
 > `API.md`; rate-limit ownership lives in `RATE_LIMITING.md`; plain-language system specs (caching,
 > data fetching, overlay, precompute) live in `SYSTEMS.md`. Other documents link to those owners
 > instead of restating them.
