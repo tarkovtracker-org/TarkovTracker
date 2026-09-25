@@ -312,7 +312,7 @@ test('a candidate must contain main even when its full tree only differs in tran
   rejected(f.run('prepare'), /must include current main/);
   assert.equal(f.output(), '');
 });
-test('policy checks reject loose freshness, another provider and another required context', (t) => {
+test('policy checks reject loose freshness, missing preview and foreign providers', (t) => {
   const f = fixture(t);
   passed(f.run('prepare'));
   const policy = JSON.parse(read('.github/main-ci-ruleset.json'));
@@ -321,6 +321,17 @@ test('policy checks reject loose freshness, another provider and another require
     {
       strict_required_status_checks_policy: true,
       required_status_checks: [{ context: 'CI Result', integration_id: 999 }],
+    },
+    {
+      strict_required_status_checks_policy: true,
+      required_status_checks: [{ context: 'CI Result', integration_id: 15368 }],
+    },
+    {
+      strict_required_status_checks_policy: true,
+      required_status_checks: [
+        { context: 'CI Result', integration_id: 15368 },
+        { context: 'Preview Result', integration_id: 999 },
+      ],
     },
     {
       strict_required_status_checks_policy: true,

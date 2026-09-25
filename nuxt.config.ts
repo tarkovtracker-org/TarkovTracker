@@ -72,9 +72,10 @@ if (IS_PRODUCTION_BUILD && IS_BUILD_COMMAND && !IS_CF_PREVIEW && !IS_CI) {
     throw new Error(`[Config] Missing required Stripe env vars: ${missingKeys.join(', ')}`);
   }
 }
-// Sitekeys are public identifiers; the secret stays in the Pages project env.
-// Production and preview builds require explicit configuration so a secret can never
-// be deployed without the matching client widget. Local builds use Cloudflare test keys.
+// Sitekeys are public identifiers; the secret stays in the Pages project env. Production and
+// preview builds require explicit configuration so a secret can never be deployed without the
+// matching client widget. Local builds use Cloudflare test keys. Validate only actual build
+// commands: pnpm install runs `nuxt prepare` as postinstall, which is not a deployable build.
 const TURNSTILE_SITE_KEY = (
   process.env.NUXT_PUBLIC_TURNSTILE_SITE_KEY ??
   (!IS_PRODUCTION_BUILD ? TURNSTILE_TEST_SITE_KEY : '')
@@ -82,7 +83,11 @@ const TURNSTILE_SITE_KEY = (
 const TURNSTILE_SECRET_KEY = (
   process.env.NUXT_TURNSTILE_SECRET_KEY ?? (IS_PRODUCTION_BUILD ? '' : TURNSTILE_TEST_SECRET_KEY)
 ).trim();
-if (IS_PRODUCTION_BUILD && Boolean(TURNSTILE_SITE_KEY) !== Boolean(TURNSTILE_SECRET_KEY)) {
+if (
+  IS_PRODUCTION_BUILD &&
+  IS_BUILD_COMMAND &&
+  Boolean(TURNSTILE_SITE_KEY) !== Boolean(TURNSTILE_SECRET_KEY)
+) {
   throw new Error(
     '[Config] NUXT_PUBLIC_TURNSTILE_SITE_KEY and NUXT_TURNSTILE_SECRET_KEY must be configured together'
   );

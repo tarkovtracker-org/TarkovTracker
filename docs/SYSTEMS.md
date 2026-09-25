@@ -1667,7 +1667,8 @@ The checkout stays pinned to the validated SHA. The production build still runs 
   on the same SHA; gate waits are bounded to 60 minutes, and the containing Release and Crowdin
   workflows are bounded to 90 minutes. Ordinary
   `wip/**` push CI no longer exists. The main ruleset requires successful GitHub Actions
-  `CI Result`, strict freshness, and no bypass actors. Non-fast-forward promotion fails if main advances.
+  `CI Result` and `Preview Result`, strict freshness, and no bypass actors. Non-fast-forward
+  promotion fails if main advances.
 - If publication fails after version promotion, an explicit rerun can recover only the direct
   version-only child of the original CI revision, with successful exact-head `CI Result` **and**
   `Preview Result` and unchanged manifest/changelog history. The `Preview Result` evidence is
@@ -2238,6 +2239,8 @@ GitHub has computed the test merge; other pending reasons are left alone.
   analytics, Turnstile, Stripe, and log-forwarding values; the anonymous build sets `APP_URL` to the
   controlled branch alias so host trust covers the unique deployment URL, and the app's offline
   Supabase fallback activates on `pages.dev`. Public game data still flows through `/api/tarkov/*`.
+- Nuxt's Turnstile key-pair validation runs only for production `build`/`generate` commands, not for
+  `pnpm install`'s `nuxt prepare`; deployable builds still reject a one-sided key configuration.
 - Smoke tests run in a separate credential-free job against the unique deployment URL and require
   the served manifest, usable `/` and `/tasks` content, loaded assets, the anonymous
   `/api/tarkov/cache-meta` shape, nonempty `/api/tarkov/bootstrap?lang=en` data, and no browser

@@ -221,7 +221,10 @@ process.exit(result.status ?? 1);
         ruleset_id: 42,
         parameters: {
           strict_required_status_checks_policy: true,
-          required_status_checks: [{ context: 'CI Result', integration_id: 15368 }],
+          required_status_checks: [
+            { context: 'CI Result', integration_id: 15368 },
+            { context: 'Preview Result', integration_id: 15368 },
+          ],
         },
       },
     ]),
