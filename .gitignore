@@ -1,4 +1,4 @@
-# Co-located git worktrees for parallel PR work (see AGENTS.md worktree policy)
+# Co-located git worktrees for parallel PR work (see docs/WORKFLOW_AUTOMATION.md#setup-git-worktree)
 .wt/
 
 # Nuxt dev/build outputs

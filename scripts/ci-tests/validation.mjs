@@ -16,7 +16,14 @@ const cli = resolve('scripts/validate-changes.mjs');
 const reducedDocsJobs = ['lint-format', 'systems-drift', 'security'];
 const reducedPreviewJobs = ['lint-format', 'systems-drift', 'security', 'validate'];
 test('only explicit documentation and translation paths receive reduced validation', () => {
-  for (const paths of [['README.md'], ['docs/topic.markdown'], ['.github/CONTRIBUTING.md']]) {
+  for (const paths of [
+    ['README.md'],
+    ['docs/topic.markdown'],
+    ['.github/CONTRIBUTING.md'],
+    ['.claude/CLAUDE.md'],
+    ['supabase/AGENTS.md', 'supabase/CLAUDE.md'],
+    ['workers/api-gateway/AGENTS.md'],
+  ]) {
     assert.equal(classifyPaths(paths).full, false, paths.join());
     assert.deepEqual(classifyPaths(paths).jobs, reducedDocsJobs);
   }
@@ -38,6 +45,10 @@ test('only explicit documentation and translation paths receive reduced validati
     'vitest.config.ts',
     '.github/workflows/ci.yml',
     'public/llms.txt',
+    'public/AGENTS.md',
+    'supabase/README.md',
+    'workers/api-gateway/NOTAGENTS.md',
+    'supabase/AGENTS.md.orig',
     'app/types/generated.d.ts',
     'unknown',
     '../docs/a.md',

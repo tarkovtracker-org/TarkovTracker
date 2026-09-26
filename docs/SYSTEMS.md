@@ -1729,7 +1729,7 @@ See `docs/WORKFLOW_AUTOMATION.md` for triggering, retry, and deployment behavior
 ## When this doc is wrong
 
 If you read something here that does not match the code, the disagreement is a bug — either in the
-code (fix the code) or in this doc (fix the doc in the same PR). `AGENTS.md`'s Maintenance Contract
+code (fix the code) or in this doc (fix the doc in the same PR). `AGENTS.md` (Scoped rules)
 requires updating this file whenever one of these systems changes. When in doubt, the code is the
 source of truth and this doc is the explanation of it.
 
@@ -1854,6 +1854,8 @@ CodeQL) is selected on every CI run. See
 
 - Pushes and dispatches retain full validation; only pull requests receive reduced selection.
 - Reduced selection never applies to `app/locales/en.json`; only non-English translations qualify.
+- Nested `AGENTS.md`/`CLAUDE.md` instruction files count as documentation, except under `public/`,
+  where they would ship as site assets. `format:check` covers them at every depth.
 - Empty, unreadable, or malformed diffs select full validation, workflow linting, and a preview.
 - Missing classifier output or selected jobs that fail, cancel, or unexpectedly skip fail CI Result.
 - Only deliberately unselected jobs may report skipped; systems drift and security always run.
@@ -2274,6 +2276,11 @@ GitHub has computed the test merge; other pending reasons are left alone.
   Dependabot read it on their PR's validated head. All still bind deployment evidence
   to the intended head revision (§14). Production deployment remains Cloudflare's Git
   integration for `main` and is unchanged.
+- The public repository's `pull_request_target` use is confined to `preview-state.yml` by a
+  repository-level Actions policy whose event allowlist is exactly `pull_request_target`,
+  `workflow_run`, and `schedule` for that workflow path. GitHub enforces its default
+  public-repository block of `pull_request_target` from 2026-11-02, so the policy is required
+  external state; `docs/WORKFLOW_AUTOMATION.md` records how to recreate it.
 
 Current gates consume `CI Result` and `Preview Result` on the validated head for PRs and
 standalone branch candidates. Both come from GitHub

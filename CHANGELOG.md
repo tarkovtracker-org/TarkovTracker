@@ -1,3 +1,10 @@
+## [1.81.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.81.4...v1.81.5) (2026-09-26)
+
+
+### Bug Fixes
+
+* **preview:** keep repository identity through hourly reconciliation ([#931](https://github.com/tarkovtracker-org/TarkovTracker/issues/931)) ([f5d1f74](https://github.com/tarkovtracker-org/TarkovTracker/commit/f5d1f74cd19efd89c5070aa84c068aaa77ab8229))
+
 ## [1.81.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.81.3...v1.81.4) (2026-09-25)
 
 
