@@ -151,14 +151,23 @@ function matchesPreviewRequest(run, decision) {
 }
 /** Active dispatches include queued runs and fork runs awaiting environment approval. */
 async function previewRequestInFlight(github, repo, decision) {
-  const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
-    ...repo,
-    workflow_id: PREVIEW_WORKFLOW_FILE,
-    event: 'workflow_dispatch',
-    branch: PRODUCTION_BRANCH,
-    per_page: 100,
-  });
-  return runs.some((run) => matchesPreviewRequest(run, decision));
+  const statuses = ['queued', 'in_progress', 'waiting', 'pending', 'requested'];
+  const batches = await Promise.all(
+    statuses.map((status) =>
+      github.paginate(github.rest.actions.listWorkflowRuns, {
+        ...repo,
+        workflow_id: PREVIEW_WORKFLOW_FILE,
+        event: 'workflow_dispatch',
+        branch: PRODUCTION_BRANCH,
+        status,
+        per_page: 100,
+      })
+    )
+  );
+  // Filtered GitHub searches stop at 1,000 results. Never dispatch on incomplete evidence.
+  if (batches.some((runs) => runs.length >= 1000))
+    throw new Error('Active preview lookup exceeded GitHub search limit.');
+  return batches.flat().some((run) => matchesPreviewRequest(run, decision));
 }
 /** Sequential state events must not replace an active deployment for the same CI attempt. */
 export async function requestPreviewDispatch(github, repo, decision) {

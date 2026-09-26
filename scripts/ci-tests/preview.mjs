@@ -420,7 +420,10 @@ function dispatchStatuses(state, params) {
   return active ? [state.dispatchStatus] : [];
 }
 async function paginatedEndpoints(state, endpoint, params, options) {
-  if (params.workflow_id === 'preview.yml') return options.previewRuns ?? [];
+  if (params.workflow_id === 'preview.yml') {
+    assert.ok(['queued', 'in_progress', 'waiting', 'pending', 'requested'].includes(params.status));
+    return (options.previewRuns ?? []).filter((run) => run.status === params.status);
+  }
   const paged = {
     associated: () => options.associated ?? [state.pull],
     checks: () => [state.check],
@@ -599,6 +602,15 @@ test('auto-merge preserves active previews and retries completed attempts', asyn
     });
     assert.equal(result.state.dispatches.length, 1, JSON.stringify(override));
   }
+});
+test('automatic requests fail closed when active-run lookup is truncated', async (t) => {
+  const result = await plan(t, workflowRunContext(), {
+    pull: { auto_merge: { enabled_by: { login: 'maintainer' } } },
+    previewRuns: Array.from({ length: 1000 }, () => ({ status: 'waiting' })),
+  });
+  assert.deepEqual(result.state.dispatches, []);
+  assert.equal(result.decision.action, 'wait');
+  assert.match(result.core.warnings.join(' '), /search limit/);
 });
 test('automatic requests leave Dependabot and hourly reconciliation to their owners', async (t) => {
   const pull = { auto_merge: { enabled_by: { login: 'maintainer' } }, user: { id: 49699333 } };
