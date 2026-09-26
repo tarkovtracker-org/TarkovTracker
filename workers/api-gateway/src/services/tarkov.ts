@@ -1,9 +1,29 @@
+import { waitUntil } from 'cloudflare:workers';
 import { getMemoryCache, setMemoryCache } from '../utils/memory-cache';
+import { prepareTaskCatalog } from '../utils/task-catalog';
 import { TARKOVTRACKER_USER_AGENT } from '../utils/userAgent';
 import type { GameMode, TarkovHideoutStation, TarkovTask } from '../types';
 const CACHE_TTL = 3600; // 1 hour
 const FETCH_TIMEOUT_MS = 30_000;
 const JSON_BASE_URL = 'https://json.tarkov.dev';
+const inFlightTasks = new Map<string, Promise<TarkovTask[]>>();
+const inFlightHideout = new Map<string, Promise<TarkovHideoutStation[]>>();
+function loadCatalog<T>(
+  key: string,
+  inFlight: Map<string, Promise<T[]>>,
+  load: () => Promise<T[]>
+): Promise<T[]> {
+  const cached = getMemoryCache<T[]>(key);
+  if (cached) return Promise.resolve(cached);
+  const existing = inFlight.get(key);
+  if (existing) return existing;
+  const pending = load().finally(() => inFlight.delete(key));
+  inFlight.set(key, pending);
+  // Keep the originating request alive if its client disconnects while other requests wait.
+  // Only parsed public data is shared; response streams remain owned by that request.
+  waitUntil(pending);
+  return pending;
+}
 const getApiGameMode = (gameMode: GameMode): 'regular' | 'pve' | 'pvp-season' => {
   if (gameMode === 'pve') return 'pve';
   if (gameMode === 'seasonal') return 'pvp-season';
@@ -51,11 +71,12 @@ const asString = (value: unknown): string | undefined =>
   typeof value === 'string' && value.length > 0 ? value : undefined;
 const asFiniteNumber = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-export async function getTasks(gameMode: GameMode): Promise<TarkovTask[]> {
+export function getTasks(gameMode: GameMode): Promise<TarkovTask[]> {
   const apiGameMode = getApiGameMode(gameMode);
   const cacheKey = `tarkov:tasks:${apiGameMode}`;
-  const cached = getMemoryCache<TarkovTask[]>(cacheKey);
-  if (cached) return cached;
+  return loadCatalog(cacheKey, inFlightTasks, () => fetchTasks(apiGameMode, cacheKey));
+}
+async function fetchTasks(apiGameMode: string, cacheKey: string): Promise<TarkovTask[]> {
   const data = await fetchJson<JsonTasksPayload>(`${apiGameMode}/tasks`);
   if (!data || !isRecord(data.tasks)) return [];
   const tasks: TarkovTask[] = Object.values(data.tasks)
@@ -87,7 +108,9 @@ export async function getTasks(gameMode: GameMode): Promise<TarkovTask[]> {
               {
                 task: { id: requiredTaskId },
                 status: Array.isArray(requirement.status)
-                  ? requirement.status.filter((status): status is string => typeof status === 'string')
+                  ? requirement.status.filter(
+                      (status): status is string => typeof status === 'string'
+                    )
                   : undefined,
               },
             ];
@@ -95,14 +118,19 @@ export async function getTasks(gameMode: GameMode): Promise<TarkovTask[]> {
         },
       ];
     });
+  prepareTaskCatalog(tasks);
   setMemoryCache(cacheKey, tasks, CACHE_TTL);
   return tasks;
 }
-export async function getHideoutStations(gameMode: GameMode): Promise<TarkovHideoutStation[]> {
+export function getHideoutStations(gameMode: GameMode): Promise<TarkovHideoutStation[]> {
   const apiGameMode = getApiGameMode(gameMode);
   const cacheKey = `tarkov:hideout:${apiGameMode}`;
-  const cached = getMemoryCache<TarkovHideoutStation[]>(cacheKey);
-  if (cached) return cached;
+  return loadCatalog(cacheKey, inFlightHideout, () => fetchHideoutStations(apiGameMode, cacheKey));
+}
+async function fetchHideoutStations(
+  apiGameMode: string,
+  cacheKey: string
+): Promise<TarkovHideoutStation[]> {
   const data = await fetchJson<JsonHideoutPayload>(`${apiGameMode}/hideout`);
   if (!data || !isRecord(data)) return [];
   const stations: TarkovHideoutStation[] = Object.values(data)
