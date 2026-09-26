@@ -282,6 +282,7 @@ function fakeState(options) {
   state.dispatchStatus = { id: 5, context: 'CI Result', state: 'success' };
   state.archive = null;
   state.statuses = [];
+  state.pullListQueries = [];
   return state;
 }
 function firstOption(value, fallback) {
@@ -400,6 +401,13 @@ function actionEndpoints(state, zipEntries, options) {
     },
   };
 }
+/** `pulls.list` honours the `owner:branch` head filter the way GitHub does. */
+function listPulls(state, params) {
+  state.pullListQueries.push(params);
+  if (!params.head) return [state.pull];
+  const owner = state.pull.head.repo?.full_name.split('/')[0];
+  return params.head === `${owner}:${state.pull.head.ref}` ? [state.pull] : [];
+}
 function dispatchStatuses(state, params) {
   const active = params.ref === HEAD && state.run.event === 'workflow_dispatch';
   return active ? [state.dispatchStatus] : [];
@@ -416,7 +424,7 @@ async function paginatedEndpoints(state, endpoint, params, options) {
       params.run_id === state.previousRun.id ? state.previousArtifacts : state.artifacts,
     jobs: () => state.previousJobs,
     listFiles: () => state.files,
-    pulls: () => [state.pull],
+    pulls: () => listPulls(state, params),
   };
   if (!paged[endpoint]) throw new Error(`unexpected endpoint ${endpoint}`);
   return paged[endpoint]();
@@ -546,12 +554,18 @@ test('an explicit dispatch deploys only after rechecking the validated CI run', 
 test('fork candidates wait for a manual request and route through the protected environment', async (t) => {
   const run = runFixture({ head_repository: { full_name: FORK_NAME }, pull_requests: [] });
   const pull = pullFixture({ head: { sha: HEAD, ref: 'feature', repo: { full_name: FORK_NAME } } });
+  // GitHub's base-repository commit association never returns PRs for fork-only commits.
   const { decision, state } = await plan(t, workflowRunContext(run), {
     pull,
-    associated: [pull],
+    associated: [],
     run: { head_repository: { full_name: FORK_NAME }, pull_requests: [] },
   });
   assert.equal(decision.action, 'wait', decision.description);
+  assert.equal(decision.pullRequest, pull.number);
+  assert.deepEqual(
+    state.pullListQueries.map(({ head, base, state: pullState }) => ({ head, base, pullState })),
+    [{ head: 'someone:feature', base: 'main', pullState: 'open' }]
+  );
   assert.equal(decision.environment, ENVIRONMENTS.fork);
   assert.equal(decision.fork, true);
   assert.match(state.statuses[0].description, /maintainer approval/);
