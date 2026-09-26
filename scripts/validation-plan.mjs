@@ -1,5 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { gitExecutable } from './validation-tools.mjs';
+// `security` (dependency audit, Gitleaks, CodeQL through the reusable workflow) reports on every
+// CI run: pull requests, main pushes, and explicit dispatches all gate on it.
 export const fullJobs = [
   'fallow',
   'lint-format',
@@ -9,8 +11,9 @@ export const fullJobs = [
   'supabase-db',
   'systems-drift',
   'workers',
+  'security',
 ];
-const reducedJobs = ['lint-format', 'systems-drift'];
+const reducedJobs = ['lint-format', 'systems-drift', 'security'];
 // Only Crowdin-owned translations are reduced. app/locales/en.json is the source locale that
 // application code and Vitest fixtures consume, so it selects full validation like other inputs
 // (scripts/crowdin-pr.sh draws the same boundary for translation-only PRs).
@@ -40,16 +43,25 @@ function isAutomationPath(path) {
 function touchesWorkflows(paths) {
   return paths.length === 0 || paths.some(isAutomationPath);
 }
+// The preview decision is independent of the full/reduced test split: only a change set made of
+// known documentation paths needs no deployable preview. Translations, configuration, dependencies,
+// executable code, forced full runs, and unknown or unreadable diffs all require one.
+function requiresPreview(paths, categories, forceFull) {
+  if (forceFull || paths.length === 0) return true;
+  return [...categories].some((category) => category !== 'docs');
+}
 export function classifyPaths(paths, { forceFull = false, reason } = {}) {
   const categories = new Set(paths.map(pathCategory));
   const full = requiresFullValidation(paths, categories, forceFull);
+  const previewRequired = requiresPreview(paths, categories, forceFull);
   return {
     full,
     docs: categories.has('docs'),
     locales: categories.has('locales'),
     i18n: full || categories.has('locales'),
     workflows: touchesWorkflows(paths),
-    jobs: [...(full ? fullJobs : reducedJobs)],
+    previewRequired,
+    jobs: selectExpectedJobs(full, previewRequired),
     reason: reason || defaultReason(full),
     paths,
   };
@@ -111,11 +123,17 @@ export function collectChanges({
 function hasPlanShape(plan) {
   return Boolean(plan) && Array.isArray(plan.jobs) && typeof plan.full === 'boolean';
 }
+function selectExpectedJobs(full, previewRequired) {
+  if (full) return [...fullJobs];
+  const withPreview = previewRequired ? ['validate'] : [];
+  return [...reducedJobs, ...withPreview];
+}
 function isValidPlan(plan) {
   if (!hasPlanShape(plan)) return false;
-  const required = plan.full ? fullJobs : reducedJobs;
+  if (typeof plan.previewRequired !== 'boolean') return false;
+  const expected = selectExpectedJobs(plan.full, plan.previewRequired);
   return (
-    required.every((job) => plan.jobs.includes(job)) &&
+    expected.every((job) => plan.jobs.includes(job)) &&
     plan.jobs.every((job) => fullJobs.includes(job))
   );
 }
@@ -124,9 +142,22 @@ function jobOutcomeError(plan, needs, job) {
   const result = needs[job]?.result;
   return result === expected ? null : `${job}: expected ${expected}, received ${String(result)}`;
 }
+// The trusted default-branch aggregator must not silently ignore validation jobs it does not know;
+// an unexpected dependency fails closed until the trusted contract is updated first.
+function unexpectedJobsError(needs) {
+  const unexpected = Object.keys(needs).filter(
+    (job) => job !== 'changes' && !fullJobs.includes(job)
+  );
+  return unexpected.length ? `Unexpected CI jobs: ${unexpected.join(', ')}` : null;
+}
+function classifierError(needs) {
+  return needs.changes?.result === 'success' ? null : 'Classifier did not succeed';
+}
 export function aggregateResults(plan, needs) {
   if (!isValidPlan(plan)) return ['Missing or invalid validation plan'];
-  const errors = fullJobs.map((job) => jobOutcomeError(plan, needs, job)).filter(Boolean);
-  if (needs.changes?.result !== 'success') errors.push('Classifier did not succeed');
-  return errors;
+  return [
+    ...fullJobs.map((job) => jobOutcomeError(plan, needs, job)),
+    classifierError(needs),
+    unexpectedJobsError(needs),
+  ].filter(Boolean);
 }

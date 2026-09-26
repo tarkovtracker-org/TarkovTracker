@@ -81,21 +81,25 @@ classDiagram
 
 ### Key game-data types
 
-| Type                                                                       | Purpose                     | Notable fields                                                                                                                                                    |
-| -------------------------------------------------------------------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Task`                                                                     | A quest                     | `kappaRequired`, `lightkeeperRequired`, `minPlayerLevel`, `taskRequirements`, `predecessors`/`successors`/`parents`/`children`, `alternatives`, `disabled`        |
-| `TaskObjective`                                                            | One objective within a task | `type`, `count`, `foundInRaid`, `optional`, `items`/`markerItem`/`questItem`, `zones`/`possibleLocations`, `requiredKeys`                                         |
-| `TaskRequirement`                                                          | Prereq link to another task | `task.id`, `status[]`                                                                                                                                             |
-| `RequiredKeyGroup`                                                         | Keys needed for a task      | `keys[]`, `maps[]`, `optional`, `anyOf`                                                                                                                           |
-| `FinishRewards`                                                            | Quest rewards               | `traderStanding`, `items`, `offerUnlock`, `skillLevelReward`, `traderUnlock`                                                                                      |
-| `HideoutStation` / `HideoutLevel` / `HideoutModule`                        | Hideout data + graph nodes  | `itemRequirements`, `stationLevelRequirements`, `skillRequirements`, `traderRequirements`, `crafts`; module adds `predecessors`/`successors`/`parents`/`children` |
-| `TarkovItem` / `ItemRequirement`                                           | Items + quantities          | `shortName`, `category`, `containsItems`; requirement adds `count`, `quantity`, `foundInRaid`                                                                     |
-| `Trader` / `TraderLoyaltyLevel`                                            | Traders + loyalty           | `requiredPlayerLevel`, `requiredReputation`, `requiredCommerce`                                                                                                   |
-| `TarkovMap` / `MapSpawn` / `MapExtract` / `MapSvgConfig` / `MapTileConfig` | Maps + geometry             | spawn `position`, extract `faction`, SVG/tile `bounds`, `coordinateRotation`, `floors`                                                                            |
-| `PlayerLevel`                                                              | Level XP thresholds         | `exp` stored as **cumulative** (transformed from API increments)                                                                                                  |
-| `PrestigeLevel`                                                            | Prestige tiers (0–6)        | `conditions`, `rewards`, `transferSettings`                                                                                                                       |
-| `StoryChapter` / `StoryObjective`                                          | Storyline progression       | `order`, `mutuallyExclusiveWith`, `mapUnlocks`, `traderUnlocks`                                                                                                   |
-| `GameEdition`                                                              | Game edition bonuses        | `defaultStashLevel`, `traderRepBonus`, `exclusiveTaskIds`, `excludedTaskIds`                                                                                      |
+| Type                                                                       | Purpose                     | Notable fields                                                                                                                                                                             |
+| -------------------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Task`                                                                     | A quest                     | `kappaRequired`, `lightkeeperRequired`, `minPlayerLevel`, `taskRequirements`, `predecessors`/`successors`/`parents`/`children`, `alternatives` (deprecated legacy, do not use), `disabled` |
+| `TaskObjective`                                                            | One objective within a task | `type`, `count`, `foundInRaid`, `optional`, `items`/`markerItem`/`questItem`, `zones`/`possibleLocations`, `requiredKeys`                                                                  |
+| `TaskRequirement`                                                          | Prereq link to another task | `task.id`, `status[]`                                                                                                                                                                      |
+| `RequiredKeyGroup`                                                         | Keys needed for a task      | `keys[]`, `maps[]`, `optional`, `anyOf`                                                                                                                                                    |
+| `FinishRewards`                                                            | Quest rewards               | `traderStanding`, `items`, `offerUnlock`, `skillLevelReward`, `traderUnlock`                                                                                                               |
+| `HideoutStation` / `HideoutLevel` / `HideoutModule`                        | Hideout data + graph nodes  | `itemRequirements`, `stationLevelRequirements`, `skillRequirements`, `traderRequirements`, `crafts`; module adds `predecessors`/`successors`/`parents`/`children`                          |
+| `TarkovItem` / `ItemRequirement`                                           | Items + quantities          | `shortName`, `category`, `containsItems`; requirement adds `count`, `quantity`, `foundInRaid`                                                                                              |
+| `Trader` / `TraderLoyaltyLevel`                                            | Traders + loyalty           | `requiredPlayerLevel`, `requiredReputation`, `requiredCommerce`                                                                                                                            |
+| `TarkovMap` / `MapSpawn` / `MapExtract` / `MapSvgConfig` / `MapTileConfig` | Maps + geometry             | spawn `position`, extract `faction`, SVG/tile `bounds`, `coordinateRotation`, `floors`                                                                                                     |
+| `PlayerLevel`                                                              | Level XP thresholds         | `exp` stored as **cumulative** (transformed from API increments)                                                                                                                           |
+| `PrestigeLevel`                                                            | Prestige tiers (0–6)        | `conditions`, `rewards`, `transferSettings`                                                                                                                                                |
+| `StoryChapter` / `StoryObjective`                                          | Storyline progression       | `order`, `mutuallyExclusiveWith`, `mapUnlocks`, `traderUnlocks`                                                                                                                            |
+| `GameEdition`                                                              | Game edition bonuses        | `defaultStashLevel`, `traderRepBonus`, `exclusiveTaskIds`, `excludedTaskIds`                                                                                                               |
+
+`Task.alternatives` (`alternatives?: string[]` in `app/types/tarkov.ts`) is deprecated legacy:
+upstream no longer ships the field and `AGENTS.md` forbids new runtime dependencies on it.
+Branch relationships are represented by `failConditions`/`failureOutcome` edges instead.
 
 ### Query result types
 
@@ -164,6 +168,10 @@ per mode.
 
 ## Store State Types
 
+Pinia store files `app/stores/useTarkov.ts`, `app/stores/useProgress.ts`,
+`app/stores/useMetadata.ts`, and `app/stores/usePreferences.ts` export the symbols
+`useTarkovStore`, `useProgressStore`, `useMetadataStore`, and `usePreferencesStore` respectively.
+
 Defined in `app/types/tarkov.ts`:
 
 - `SystemState` / `SystemGetters` — `user_id`, `tokens`, `team`, `pvp_team_id`, `pve_team_id`,
@@ -192,9 +200,13 @@ erDiagram
 
     user_progress {
         uuid user_id
-        jsonb progress
-        text game_mode
-        int progress_epoch
+        text current_game_mode
+        int game_edition
+        jsonb pvp_data
+        jsonb pve_data
+        bigint tarkov_uid
+        timestamptz created_at
+        timestamptz updated_at
     }
     user_game_mode_progress {
         uuid user_id

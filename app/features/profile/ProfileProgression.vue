@@ -239,6 +239,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { computeInvalidProgress } from '@shared/utils/progressInvalidation';
   import { useProfileTaskMetadata } from '@/composables/useProfileTaskMetadata';
   import {
     computeConfidence,
@@ -277,7 +278,6 @@
     isCurrentProfileVisibilityRequest,
     loadCurrentProfileVisibility,
   } from '@/utils/profileVisibility';
-  import { computeInvalidProgress } from '@/utils/progressInvalidation';
   import {
     orderedStoryObjectives,
     toggleStoryChapterWithLinearObjectives,

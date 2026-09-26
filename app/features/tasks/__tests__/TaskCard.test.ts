@@ -198,7 +198,7 @@ describe('TaskCard appearance and expansion controls', () => {
   });
   it('emits the failed-card class contract: dark surface with pale light-mode companions', async () => {
     // This asserts the emitted class names only; the resolved per-theme rendering is
-    // covered by the browser contrast audit (SYSTEMS.md §16) and the light:+token
+    // covered by the browser contrast audit (SYSTEMS.md §17) and the light:+token
     // wiring is guarded by tailwindTheme.test.ts.
     taskState.failed = true;
     const wrapper = await mountTaskCard();

@@ -52,7 +52,7 @@ function releaseNotes(oldLog, newLog, version) {
   return notes;
 }
 /** Require successful latest CI from the configured provider on the promoted version SHA. */
-async function validatedVersion(github, repo, sha) {
+async function validatedCi(github, repo, sha) {
   const checks = await github.paginate(github.rest.checks.listForRef, {
     ...repo,
     ref: sha,
@@ -64,6 +64,111 @@ async function validatedVersion(github, repo, sha) {
     .filter((item) => item.app.id === 15368 && item.head_sha === sha)
     .sort((left, right) => right.id - left.id)[0];
   return check?.status === 'completed' && check.conclusion === 'success';
+}
+/** The controller path only the trusted preview workflow may report from. */
+const PREVIEW_CONTROLLER_PATH = '.github/workflows/preview.yml';
+/** Controller runs are only trusted when dispatched from the default branch. */
+const TRUSTED_CONTROLLER_REF = 'main';
+/** GitHub returns workflow path and branch as separate fields for workflow_dispatch runs. */
+function trustedControllerRun(run, repo) {
+  const name = `${repo.owner}/${repo.repo}`;
+  return isDeepStrictEqual(
+    [
+      run.path,
+      run.event,
+      run.head_branch,
+      run.head_repository?.full_name,
+      run.repository?.full_name,
+      run.status,
+      run.conclusion,
+    ],
+    [
+      PREVIEW_CONTROLLER_PATH,
+      'workflow_dispatch',
+      TRUSTED_CONTROLLER_REF,
+      name,
+      name,
+      'completed',
+      'success',
+    ]
+  );
+}
+/** The controller job that publishes authoritative `Preview Result` statuses. */
+const PREVIEW_RESULT_JOB = 'Publish preview result';
+/** Extract the controller run id from a `Preview Result` target; null when it points elsewhere. */
+function controllerRunId(status, repo) {
+  const prefix = `https://github.com/${repo.owner}/${repo.repo}/actions/runs/`;
+  const url = status.target_url ?? '';
+  if (!url.startsWith(prefix)) return null;
+  const match = /^(\d+)(?:\?|$)/.exec(url.slice(prefix.length));
+  return match ? Number(match[1]) : null;
+}
+/** The newest `Preview Result` on the SHA; later reports supersede earlier ones. */
+function newestPreviewStatus(statuses) {
+  return statuses
+    .filter((item) => item.context === 'Preview Result')
+    .sort((left, right) => right.id - left.id)[0];
+}
+/** The statuses endpoint already binds the response to the requested exact version SHA. */
+function previewSuccess(status) {
+  return status.state === 'success';
+}
+/** Fetch the run behind the status target; unresolvable runs fail closed like any other gate. */
+async function controllerRun(github, repo, runId) {
+  if (!runId) return null;
+  const run = await optionalResource(() =>
+    github.rest.actions.getWorkflowRun({ ...repo, run_id: runId })
+  );
+  if (!run || !trustedControllerRun(run, repo)) return null;
+  return run;
+}
+/** The controller must have finished its authoritative result publication for this evidence. */
+async function resultJobCompleted(github, repo, run) {
+  if (run.conclusion !== 'success') return false;
+  const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+    ...repo,
+    run_id: run.id,
+    per_page: 100,
+  });
+  const result = jobs.find((job) => job.name === PREVIEW_RESULT_JOB);
+  return result?.conclusion === 'success';
+}
+/** A successful deploy must have retained evidence for this exact version commit. */
+async function deploymentEvidence(github, repo, run, sha) {
+  const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+    ...repo,
+    run_id: run.id,
+    per_page: 100,
+  });
+  return artifacts.some(
+    (artifact) => artifact.name === `preview-deployment-${sha}` && !artifact.expired
+  );
+}
+/** Both the authoritative result job and the retained upload proof must belong to this run. */
+async function previewRunEvidence(github, repo, run, sha) {
+  if (!(await resultJobCompleted(github, repo, run))) return false;
+  return deploymentEvidence(github, repo, run, sha);
+}
+/**
+ * Require the newest `Preview Result` to bind to a successful controller result publication:
+ * the newest status from the exact-SHA endpoint must succeed and point at a run of the trusted
+ * preview workflow whose result job and deployment evidence match this commit.
+ */
+async function validatedPreview(github, repo, sha) {
+  const statuses = await github.paginate(github.rest.repos.listCommitStatusesForRef, {
+    ...repo,
+    ref: sha,
+    per_page: 100,
+  });
+  const status = newestPreviewStatus(statuses);
+  if (!status || !previewSuccess(status)) return false;
+  const run = await controllerRun(github, repo, controllerRunId(status, repo));
+  if (!run) return false;
+  return previewRunEvidence(github, repo, run, sha);
+}
+/** Interrupted recovery requires both gates on the exact version commit, like staging did. */
+async function validatedVersion(github, repo, sha) {
+  return (await validatedCi(github, repo, sha)) && (await validatedPreview(github, repo, sha));
 }
 /** On explicit reruns, recover only a validated version child of the original main CI commit. */
 export async function findReleaseRecovery({ github, context, baseSha, sha }) {

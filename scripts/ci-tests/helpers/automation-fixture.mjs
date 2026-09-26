@@ -57,6 +57,7 @@ export function fixture(t, changes) {
     join(bin, 'gh'),
     String.raw`#!${process.execPath}
 const fs = require('node:fs');
+const { execFileSync } = require('node:child_process');
 const p = process.env;
 const args = process.argv.slice(2);
 fs.appendFileSync(p.CALLS, JSON.stringify(args) + '\n');
@@ -68,8 +69,20 @@ if (args[0] === 'run' && args[1] === 'list') {
   process.exit(0);
 }
 if (args[0] === 'workflow' && args[1] === 'run' && args[2] === 'ci.yml') {
-  fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'dispatch', ref: args[args.indexOf('--ref') + 1] }) + '\n');
+  const sha = execFileSync(p.REAL_GIT, ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'dispatch', ref: args[args.indexOf('--ref') + 1], sha }) + '\n');
   process.exit(p.DISPATCH_FAIL === 'true' ? 1 : 0);
+}
+if (args[0] === 'run' && args[1] === 'watch') {
+  fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'ci-watch', runId: args[2] }) + '\n');
+  process.exit(p.CI_WATCH_FAIL === 'true' ? 1 : 0);
+}
+if (args[0] === 'workflow' && args[1] === 'run' && args[2] === 'preview.yml') {
+  fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'preview-dispatch', runId: args[args.indexOf('-f') + 1], ref: args[args.indexOf('--ref') + 1] }) + '\n');
+  if (p.PREVIEW_DISPATCH_FAIL === 'true') {
+    console.error('Preview dispatch rejected'); process.exit(1);
+  }
+  process.exit(0);
 }
 if (args[0] === 'api') {
   if (args.includes('--method') && args.includes('PUT') && args.includes('repos/' + p.GITHUB_REPOSITORY + '/pulls/' + p.PR_NUMBER + '/update-branch')) {
@@ -88,6 +101,49 @@ if (args[0] === 'api') {
       id: 1, name: 'CI Result', app: { id: Number(p.CHECK_APP || 15368) },
       head_sha: p.CHECK_HEAD || sha, status: p.CHECK_STATUS || 'completed', conclusion: p.CHECK_CONCLUSION || 'success'
     }] }));
+    process.exit(0);
+  }
+  if (/\/commits\/[a-f0-9]{40}\/statuses\?per_page=100$/.test(endpoint)) {
+    const sha = endpoint.split('/commits/')[1].split('/')[0];
+    fs.appendFileSync(p.EVENTS, JSON.stringify({ type: 'preview-result', sha, state: p.PREVIEW_STATE || 'success' }) + '\n');
+    const statuses = p.PREVIEW_PRESENT === 'false' ? [] : [
+      { id: 1, context: 'Preview Result', state: 'failure' },
+      { id: 2, context: 'CI Result', state: 'success' },
+      { id: 3, context: 'Preview Result', state: p.PREVIEW_STATE || 'success', target_url: p.PREVIEW_TARGET_URL || 'https://github.com/' + p.GITHUB_REPOSITORY + '/actions/runs/555' },
+    ];
+    console.log(JSON.stringify(statuses));
+    process.exit(0);
+  }
+  if (/^repos\/[^/]+\/[^/]+\/actions\/runs\/[0-9]+$/.test(endpoint)) {
+    const id = Number(endpoint.split('/').at(-1));
+    if (id === 555) {
+      console.log(JSON.stringify({
+        id,
+        path: p.CONTROLLER_PATH || '.github/workflows/preview.yml',
+        event: p.CONTROLLER_EVENT || 'workflow_dispatch',
+        head_branch: p.CONTROLLER_BRANCH || 'main',
+        head_repository: { full_name: p.CONTROLLER_REPO || p.GITHUB_REPOSITORY },
+        repository: { full_name: p.GITHUB_REPOSITORY },
+        status: 'completed',
+        conclusion: p.CONTROLLER_CONCLUSION || 'success',
+      }));
+      process.exit(0);
+    }
+    const events = fs.readFileSync(p.EVENTS, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
+    const dispatch = events.filter((event) => event.type === 'dispatch')[id - 1];
+    if (!dispatch) { console.error('Unknown CI run: ' + id); process.exit(1); }
+    console.log(JSON.stringify({ id, event: 'workflow_dispatch', head_sha: p.CI_RUN_HEAD || dispatch.sha, status: 'completed', conclusion: p.CI_RUN_CONCLUSION || 'success' }));
+    process.exit(0);
+  }
+  if (/^repos\/[^/]+\/[^/]+\/actions\/runs\/[0-9]+\/jobs\?per_page=100$/.test(endpoint)) {
+    console.log(JSON.stringify({ total_count: 1, jobs: [{ name: 'Publish preview result', conclusion: 'success' }] }));
+    process.exit(0);
+  }
+  if (/^repos\/[^/]+\/[^/]+\/actions\/runs\/[0-9]+\/artifacts\?per_page=100$/.test(endpoint)) {
+    const events = fs.readFileSync(p.EVENTS, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
+    const statusSha = ([...events].reverse().find((event) => event.type === 'preview-result') || {}).sha || '';
+    const sha = statusSha || p.PREVIEW_SHA || '';
+    console.log(JSON.stringify({ artifacts: [{ name: 'preview-deployment-' + sha, expired: false }] }));
     process.exit(0);
   }
   if (endpoint === 'repos/' + p.GITHUB_REPOSITORY + '/git/ref/heads/main') {
@@ -165,7 +221,10 @@ process.exit(result.status ?? 1);
         ruleset_id: 42,
         parameters: {
           strict_required_status_checks_policy: true,
-          required_status_checks: [{ context: 'CI Result', integration_id: 15368 }],
+          required_status_checks: [
+            { context: 'CI Result', integration_id: 15368 },
+            { context: 'Preview Result', integration_id: 15368 },
+          ],
         },
       },
     ]),
@@ -173,6 +232,7 @@ process.exit(result.status ?? 1);
     BASE_SHA: base,
     CURRENT_BASE: base,
     ACTUAL_HEAD: head,
+    PREVIEW_SHA: head,
     PR_STATES: JSON.stringify([pr]),
     CALLS: join(root, 'calls'),
     COUNTER: join(root, 'counter'),
