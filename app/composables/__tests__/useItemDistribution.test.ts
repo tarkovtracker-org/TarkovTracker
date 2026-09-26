@@ -6,6 +6,14 @@ const mockStoreState = {
   tasks: new Map<string, { kappaRequired?: boolean; minPlayerLevel?: number }>(),
   objectiveCounts: {} as Record<string, number>,
   hideoutPartCounts: {} as Record<string, number>,
+  taskObjectiveEntries: {} as Record<
+    string,
+    { count?: number; complete?: boolean; timestamp?: number }
+  >,
+  hideoutPartEntries: {} as Record<
+    string,
+    { count?: number; complete?: boolean; timestamp?: number }
+  >,
   patchedState: null as unknown,
 };
 vi.mock('@/stores/useProgress', () => ({
@@ -29,6 +37,8 @@ vi.mock('@/stores/useTarkov', () => ({
         pvp: { taskObjectives: {}, hideoutParts: {} },
         pve: { taskObjectives: {}, hideoutParts: {} },
       };
+      state.pvp.taskObjectives = { ...mockStoreState.taskObjectiveEntries };
+      state.pvp.hideoutParts = { ...mockStoreState.hideoutPartEntries };
       fn(state);
       mockStoreState.patchedState = state;
     },
@@ -102,6 +112,8 @@ describe('useItemDistribution', () => {
     mockStoreState.tasks.clear();
     mockStoreState.objectiveCounts = {};
     mockStoreState.hideoutPartCounts = {};
+    mockStoreState.taskObjectiveEntries = {};
+    mockStoreState.hideoutPartEntries = {};
     mockStoreState.patchedState = null;
     vi.clearAllMocks();
   });
@@ -345,11 +357,9 @@ describe('useItemDistribution', () => {
         remainingNonFir: 0,
       });
       const state = mockStoreState.patchedState as {
-        pvp: { taskObjectives: Record<string, { count: number }> };
+        pvp: { taskObjectives: Record<string, { count: number; complete: boolean }> };
       };
-      expect(state.pvp.taskObjectives['obj-1']).toEqual({
-        count: 3,
-      });
+      expect(state.pvp.taskObjectives['obj-1']).toEqual({ count: 3, complete: false });
     });
     it('updates hideout parts in store', async () => {
       const { useItemDistribution } = await import('@/composables/useItemDistribution');
@@ -365,6 +375,28 @@ describe('useItemDistribution', () => {
       const part = expectDefined(state.pvp.hideoutParts['mod-1']);
       expect(part.count).toBe(5);
       expect(part.complete).toBe(true);
+    });
+    it('uncompletes task objectives when Smart Fill lowers their count', async () => {
+      mockStoreState.objectiveCounts = { 'obj-1': 5 };
+      mockStoreState.taskObjectiveEntries = {
+        'obj-1': { count: 5, complete: true, timestamp: 123 },
+      };
+      const { useItemDistribution } = await import('@/composables/useItemDistribution');
+      const { applyDistribution } = useItemDistribution();
+      applyDistribution({
+        updates: [{ id: 'obj-1', type: 'task', count: 3, needed: 5 }],
+        remainingFir: 0,
+        remainingNonFir: 0,
+      });
+      const state = mockStoreState.patchedState as {
+        pvp: {
+          taskObjectives: Record<string, { count: number; complete: boolean; timestamp?: number }>;
+        };
+      };
+      const objective = expectDefined(state.pvp.taskObjectives['obj-1']);
+      expect(objective.count).toBe(3);
+      expect(objective.complete).toBe(false);
+      expect(objective.timestamp).toBe(123);
     });
     it('does not set complete flag for task objectives when count reaches needed', async () => {
       const { useItemDistribution } = await import('@/composables/useItemDistribution');

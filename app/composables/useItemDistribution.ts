@@ -126,7 +126,7 @@ export function useItemDistribution(): UseItemDistributionReturn {
   }
   function applyDistribution(result: DistributionResult): void {
     if (result.updates.length === 0) return;
-    const taskObjectiveUpdates: Record<string, { count: number }> = {};
+    const taskObjectiveUpdates: Record<string, { count: number; complete?: boolean }> = {};
     const hideoutPartUpdates: Record<
       string,
       { count: number; complete: boolean; timestamp?: number }
@@ -140,7 +140,10 @@ export function useItemDistribution(): UseItemDistributionReturn {
         ...(isComplete && { timestamp: now }),
       };
       if (update.type === 'task') {
-        taskObjectiveUpdates[update.id] = { count: Math.max(0, update.count) };
+        taskObjectiveUpdates[update.id] = {
+          count: Math.max(0, update.count),
+          ...(update.count < update.needed && { complete: false }),
+        };
       } else {
         hideoutPartUpdates[update.id] = entry;
       }
