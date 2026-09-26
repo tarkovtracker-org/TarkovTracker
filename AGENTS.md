@@ -1,134 +1,94 @@
 # TarkovTracker — Agent Instructions
 
-This file is the repository contract for coding agents. Keep it compact: executable configuration
-is authoritative for commands and style, while the system docs hold detailed behavior.
+Repository contract for coding agents. Executable config (`package.json`, `nuxt.config.ts`,
+`tsconfig`, ESLint, Prettier) outranks this file; tool bridge files defer to it. Verify current
+files and worktree state before claims or edits; keep changes narrow and preserve workflow
+boundaries and user changes.
 
-## Source of truth and scope
+## Project map
 
-- Verify the current files, configuration, and worktree before making claims or edits.
-- Keep changes narrow and durable; preserve existing workflow boundaries and user changes.
-- If code changes a non-obvious system, update the matching section and invariants in
-  `docs/SYSTEMS.md` in the same change.
-- Trust executable config first (`package.json`, `nuxt.config.ts`, `tsconfig`, ESLint, Prettier), then
-  this file, then tool-specific bridge files.
-
-## Project shape
-
-- Stack: Nuxt 4, Vue 3 Composition API, TypeScript strict, Pinia, Supabase, Tailwind CSS v4,
-  Vitest, and Cloudflare Pages/Workers.
-- SPA only: `ssr: false`; do not add SSR-only data fetching or middleware.
-- `app/` contains the Nuxt application, features, stores, composables, shell, and server routes.
-  Tarkov.dev proxy routes live under `app/server/api/tarkov/`.
-- `supabase/` contains migrations and Edge Functions. `workers/` contains Cloudflare Workers,
-  including the focused `api-gateway` modules. `scripts/precompute/` is the scheduled KV pipeline.
-- `app/locales/en.json` is the translation source. Non-English locale files are Crowdin-owned.
+- Nuxt 4 SPA (`ssr: false`; no SSR-only fetching or middleware), Vue 3 Composition API, strict
+  TypeScript, Pinia, Supabase, Tailwind CSS v4, Vitest, Cloudflare Pages/Workers.
+- `app/`: application, features, stores, composables, shell, server routes; Tarkov.dev proxy in
+  `app/server/api/tarkov/`. `supabase/`: migrations, Edge Functions. `workers/api-gateway/`: public
+  API Worker. `scripts/precompute/`: scheduled KV pipeline.
+- `app/locales/en.json` is the translation source; other locale files are Crowdin-owned.
 
 ## Commands
 
-Install: `pnpm install` | Dev: `pnpm run dev` | Build: `pnpm run build` | Static: `pnpm run generate`
+- Install `pnpm install` | Dev `pnpm run dev` | Build `pnpm run build` | Static `pnpm run generate`
+- Test `pnpm run test` | Gateway `pnpm run test:api-gateway` | Supabase `pnpm run supabase:check`
+- Lint `pnpm run lint` | Blank lines `pnpm run lint:blank-lines` | Typecheck `pnpm run typecheck`
+- Fallow `pnpm run lint:fallow` (`--base <ref>`, `--format json`; same command locally and in CI)
+- i18n `pnpm run i18n:check` | OpenAPI `pnpm run validate:openapi` | Deps `pnpm run deps`
 
-Test: `pnpm run test` | API gateway: `pnpm run test:api-gateway` | Supabase: `pnpm run supabase:check`
+Prefer the single-file Vitest command from `package.json`; run the full suite only when executable
+or test logic changes make it relevant.
 
-Lint: `pnpm run lint` | Blank lines: `pnpm run lint:blank-lines` | Typecheck: `pnpm run typecheck`
+## Validation
 
-Fallow: `pnpm run lint:fallow` (optional `--base <ref>` and `--format json`). Use this command
-locally and in CI so generated Nuxt context is materialized consistently in both audit snapshots.
-It preserves Fallow's native new-only gate; see `docs/WORKFLOW_AUTOMATION.md`.
-
-i18n: `pnpm run i18n:check` | OpenAPI: `pnpm run validate:openapi` | Dependencies: `pnpm run deps`
-
-Use the single-file Vitest command from `package.json` for focused tests. Do not run the full suite
-unless executable or test logic changes make it relevant.
-
-## Agent and review workflow
-
-- Load this contract and relevant system docs first. Search generated files, translations,
-  migration history, and reference archives only when relevant to the task.
-- Run focused checks during implementation, then required validation once the diff stabilizes.
-  Record the commit, dirty worktree state, commands, and results in the PR summary. Changes to
-  validated inputs invalidate the affected results; do not reuse results across those changes.
-- Batch substantiated review corrections; defer unrelated cleanup and optional style suggestions.
-- Documentation, translations, and mechanical formatting need self-review and deterministic checks.
-  Routine executable changes also receive Codex PR review, requested selectively until automatic
-  exclusions are verified. Substantial behavior changes also receive one best-effort local
-  CodeRabbit review of the complete branch diff after it stabilizes, alongside relevant checks.
-- Substantial means public contracts, persisted state, cross-module behavior, auth, billing,
-  migrations, or concurrency. The last four require independent review; another provider or human
-  substitutes if necessary. Record unavailable/rate-limited review as incomplete, without retries.
-  Rerun local review only for substantial behavioral corrections or unresolved significant findings.
-- Verify Codex review delivery before disabling duplicate automatic providers. See
-  `docs/WORKFLOW_AUTOMATION.md` for the staged rollout and external verification checklist.
-
-## Required validation
-
-- Run the smallest relevant check before finishing and report what passed or failed.
-- TypeScript changes require typecheck; code changes require lint; locale changes require
-  `pnpm run i18n:check`.
-- API gateway changes also require `pnpm --filter api-gateway run types:check` and
-  `pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run`.
-- Formatting is enforced by the repository hook and CI `format:check`; do not run the broad format
-  command unless the hook is bypassed.
-- Fix Fallow findings; do not suppress them. `// fallow-ignore-next-line` hides a finding without
-  resolving it, and a hidden finding is never revisited. Resolve dead code by deleting it or
-  narrowing the export, and resolve complexity by decomposition: extract helpers, split validation
-  from assembly, and share an algorithm instead of duplicating it. Note that CRAP assumes zero
-  coverage, so a new function at cyclomatic 5 already breaches; treat cyclomatic 4 as the practical
-  ceiling for new functions. Suppress only when the finding is provably not actionable — an external
-  contract or framework indirection the analyzer cannot see, such as store state hydrated through
-  `$state`. A suppression must state why the finding cannot be fixed, not merely that tests cover the
-  code, and it is a reviewable decision rather than a formality. Existing suppressions are
-  grandfathered; remove them opportunistically when already editing that function, not as unrelated
-  cleanup in someone else's change.
-- Mock Supabase and network calls in tests so they stay deterministic.
+- Run the smallest relevant check before finishing and report what passed or failed. TypeScript
+  changes: typecheck. Code changes: lint. Locale changes: `pnpm run i18n:check`. API gateway
+  changes: also the checks in `workers/api-gateway/AGENTS.md`.
+- Formatting is enforced by the hook and CI `format:check`; do not run the broad format command
+  unless the hook was bypassed.
+- Fix Fallow findings instead of suppressing them; keep new functions at cyclomatic 4 or less.
+  Suppression rules: `docs/WORKFLOW_AUTOMATION.md#resolving-findings-instead-of-suppressing-them`.
+- Mock Supabase and network calls in tests.
 
 ## Invariants
 
-- Use Tailwind v4 utilities and theme tokens; components do not add `<style>`, SCSS, or scoped CSS.
-  Use `@/` aliases rather than parent-relative imports.
-- Add user-facing copy to `en.json` only, with snake_case keys and the existing `common.*` keys
-  where appropriate. Missing translations use the English fallback.
-- Game data comes from `json.tarkov.dev` through `/api/tarkov/*`; do not add the `api.tarkov.dev`
-  GraphQL API. Preserve upstream `type` discriminators and do not restore synthetic `__typename`.
-  Do not add new runtime dependencies on the removed task `alternatives` field.
-- Internal modes are `pvp`, `pve`, and `seasonal`; Seasonal maps to upstream `pvp-season`. Keep
-  `ACTIVE_SEASON` synchronized with the database functions and preserve Seasonal history.
-- Ordinary task acceptance is stored as the optional `active` flag. New writes are canonical:
-  active is `{complete:false, failed:false, active:true}`; completed, failed, and neutral writes set
-  `active:false`. A missing `active` means unknown — never infer it from incomplete flags or
-  backfill ambiguous rows, and keep auto-unlocked successors neutral rather than active.
-- Keep secrets in runtime environment or platform secret stores. Use canonical environment names;
-  never commit credentials, service-role keys, or generated secret-bearing files.
-- API gateway routes authenticate and enforce quota before decoding or validating input. Validation
-  errors retain rate-limit headers. Public progress clients send a 5–200 character `User-Agent`.
-- Security-definer and service-role-only Supabase functions revoke `EXECUTE` from `PUBLIC`, `anon`,
-  and `authenticated`, granting `service_role` explicitly where required.
-- Never put bulk data rewrites in migrations. Ship schema separately and make reads tolerate missing
-  rows. Production database inspection uses the read-only `scripts/prod-db` observer workflow.
-- Applied/shared migrations are immutable: do not edit, rename, delete, or squash them, even for
-  formatting or static-analysis findings. Treat migrations on `main` as applied unless proven otherwise.
-  Use a new forward migration for behavior changes; disposition historical lint findings individually.
-- Before migration work, compare the PR migration diff with `origin/main` and obtain operator evidence
-  of remote history and pending migrations. Matching timestamps do not prove matching SQL or schema.
-  Consolidate only unmerged migrations proven unapplied to every shared environment. Never run remote
-  history repair, reset, or squash as routine cleanup. Follow `docs/runbook.md#database-migrations`.
-- Overlay consumers enforce HTTPS and preserve the cache/adaptation/overlay ordering documented in
-  `docs/SYSTEMS.md`. Task patches keep the raw upstream trader requirement shape before adaptation.
-- API token renames update only the owner-scoped note; team owners disband through the confirmed
-  owner function; account deletion jobs use the documented claim/fencing transactions.
+- Tailwind v4 utilities and theme tokens only; no `<style>`, SCSS, or scoped CSS. Use `@/` imports,
+  not parent-relative paths.
+- User-facing copy goes in `en.json` only, snake_case keys, reusing `common.*` where appropriate;
+  missing translations use the English fallback.
+- Game data comes only from `json.tarkov.dev` via `/api/tarkov/*`; never add the `api.tarkov.dev`
+  GraphQL API. Keep upstream `type` discriminators; no synthetic `__typename`; no new runtime use
+  of the removed task `alternatives` field.
+- Modes are `pvp`, `pve`, `seasonal` (upstream `pvp-season`). Keep `ACTIVE_SEASON` synchronized
+  with the database functions and preserve Seasonal history.
+- Ordinary task acceptance uses the optional `active` flag. Active writes set
+  `{complete:false, failed:false, active:true}`; completed, failed, and neutral writes set
+  `active:false`. Missing `active` remains unknown: do not backfill ambiguous rows or mark
+  automatically unlocked successors active. Legacy prerequisite fallback is documented in
+  `docs/SYSTEMS.md` §2.
+- Secrets stay in runtime env or platform secret stores under canonical names; never commit
+  credentials, service-role keys, or generated secret-bearing files.
+- Overlay consumers enforce HTTPS and preserve the cache/adaptation/overlay ordering in
+  `docs/SYSTEMS.md` §1, §3–§4; task patches keep the raw upstream trader requirement shape
+  before adaptation.
+- Applied/shared migrations are immutable. Never run remote migration repair, reset, or squash as
+  routine cleanup. Inspect production only through the read-only `scripts/prod-db` observer.
 
-## Documentation pointers
+## Scoped rules — read before editing
 
-- Architecture and environment map: `docs/ARCHITECTURE.md`
-- System specifications and invariants: `docs/SYSTEMS.md`
-- API and rate limits: `docs/API.md`, `docs/RATE_LIMITING.md`
-- Deployment and incidents: `docs/runbook.md`
-- CI, hooks, releases, and review workflow: `docs/WORKFLOW_AUTOMATION.md`, `.github/CONTRIBUTING.md`
-- Security, support, and conduct: `SECURITY.md`, `SUPPORT.md`, `CODE_OF_CONDUCT.md`
-- Deeper agent context: `docs/agent-context/summary/index.md`
+- `supabase/**`, SQL functions, account/team/token lifecycle, or production DB work:
+  `supabase/AGENTS.md`.
+- `workers/api-gateway/**`: `workers/api-gateway/AGENTS.md`.
+- When code changes a non-obvious system, update its section and invariants in `docs/SYSTEMS.md`
+  in the same change.
 
-## Review and release tasks
+## Review
 
-For production-readiness or security review requests, use the dedicated review/security workflow
-when available and keep the review read-only. Before merging a reviewed change, resolve all
-in-scope human and automated feedback and verify the final checks; do not mix unrelated fixes into
-the requested change.
+- Docs, translations, mechanical formatting: self-review plus deterministic checks. Routine
+  executable changes: Codex PR review. Substantial changes (public contracts, persisted state,
+  cross-module behavior, auth, billing, migrations, concurrency): also one local CodeRabbit review
+  of the stabilized branch diff. Auth, billing, migrations, and concurrency require independent
+  review; another provider or a human substitutes if needed. Unavailable or rate-limited review is
+  recorded as incomplete, without retry loops.
+- Record the commit, dirty worktree state, commands, and results in the PR summary. Rerun,
+  batching, and reviewer-rollout rules: `docs/WORKFLOW_AUTOMATION.md#agent-validation-and-review`.
+- Production-readiness and security review requests use the dedicated review/security workflow
+  when available and stay read-only. Before merging, resolve all in-scope human and automated
+  feedback and verify final checks; do not mix in unrelated fixes.
+
+## Docs — open only the section the task needs
+
+Find the relevant heading first (`grep -n '^#' <file>`; `docs/SYSTEMS.md` alone is ~2,300 lines)
+and read only that section. Search generated files, translations, migration history, `.cubic/`, and
+archives only when the task requires it.
+`docs/ARCHITECTURE.md` (environment map), `docs/SYSTEMS.md` (systems and invariants),
+`docs/API.md`, `docs/RATE_LIMITING.md`, `docs/runbook.md` (deploys, migrations, incidents),
+`docs/WORKFLOW_AUTOMATION.md` and `.github/CONTRIBUTING.md` (CI, hooks, releases, review),
+`SECURITY.md`, `SUPPORT.md`, `CODE_OF_CONDUCT.md`, optional orientation in
+`docs/agent-context/summary/index.md`.

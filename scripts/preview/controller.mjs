@@ -16,6 +16,7 @@ import {
   listPullPaths,
   allStatuses,
   publishStatus,
+  requestPreviewDispatch,
 } from './github-api.mjs';
 import {
   MANIFEST_FILE,
@@ -613,10 +614,53 @@ function awaitExplicitPreview(decision) {
     description: `Preview pending: ${decision.headSha.slice(0, 12)}. ${request}`,
   };
 }
-function deferAutomaticPreview(context, decision) {
-  return context.eventName !== 'workflow_dispatch' && decision.action === 'deploy'
-    ? awaitExplicitPreview(decision)
-    : decision;
+function isAutomaticDeploy(context, decision) {
+  return context.eventName !== 'workflow_dispatch' && decision.action === 'deploy';
+}
+/**
+ * Enabling auto-merge is the maintainer's merge-intent signal (GitHub restricts it to users with
+ * write access). Only pull-request CI candidates qualify; release and Crowdin automation dispatch
+ * their own previews. The upload itself still happens only in the dispatched run.
+ */
+function isMergeRequestEvent(context) {
+  return context.eventName === 'workflow_run' || context.payload.action === 'auto_merge_enabled';
+}
+function hasMergeIntent(context, state) {
+  return [
+    optional(state.candidate, 'runEvent') === 'pull_request',
+    Boolean(state.pull?.auto_merge),
+    state.pull?.user?.id !== 49699333, // Dependabot owns its request through its merge workflow.
+    isMergeRequestEvent(context),
+  ].every(Boolean);
+}
+function requestedPreview(decision) {
+  return {
+    ...decision,
+    action: 'request',
+    state: 'pending',
+    description: `Auto-merge enabled: preview requested for ${decision.headSha.slice(0, 12)} (run_id=${decision.runId}).`,
+  };
+}
+/** Automatic events never upload: they either request a trusted dispatch or wait for one. */
+function deferAutomaticPreview(context, state, decision) {
+  if (!isAutomaticDeploy(context, decision)) return decision;
+  return hasMergeIntent(context, state)
+    ? requestedPreview(decision)
+    : awaitExplicitPreview(decision);
+}
+/** Publish the interim status first so the dispatched run's newer statuses always supersede it. */
+async function publishAndRequest(github, context, core, decision) {
+  decision.statusPublished = await publishPlannedDecision(github, context, core, decision);
+  if (decision.action !== 'request') return decision;
+  try {
+    await requestPreviewDispatch(github, context.repo, decision);
+    return decision;
+  } catch (error) {
+    core.warning(`Automatic preview request failed: ${error.message}`);
+    const manual = awaitExplicitPreview(decision);
+    await publishDecision(github, context, manual);
+    return manual;
+  }
 }
 async function publishPlannedDecision(github, context, core, decision) {
   if (decision.action === 'ignore') return false;
@@ -633,14 +677,19 @@ export async function planPreview({ github, context, core, inputs, workspace }) 
   } catch (error) {
     decision = outcomeDecision(error, state);
   }
-  decision = deferAutomaticPreview(context, decision);
-  decision.statusPublished = await publishPlannedDecision(github, context, core, decision);
+  decision = deferAutomaticPreview(context, state, decision);
+  decision = await publishAndRequest(github, context, core, decision);
   core.info(`${decision.action}: ${decision.description}`);
   return decision;
 }
 function refreshContext(context, pull) {
+  // `repo` must be re-added explicitly: actions/github-script exposes it through a Proxy, and an
+  // object spread drops computed properties, leaving `owner`/`repo` empty in every API call inside
+  // the refreshed plan (the finalization-shadow handoff hit the same trap).
   return {
-    ...context,
+    repo: context.repo,
+    serverUrl: context.serverUrl,
+    runId: context.runId,
     eventName: 'pull_request_target',
     payload: { ...context.payload, action: 'synchronize', pull_request: pull },
   };

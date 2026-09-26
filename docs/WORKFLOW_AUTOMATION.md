@@ -17,14 +17,16 @@ Complete workflow automation setup for TarkovTracker with CI/CD pipelines, quali
 
 ## Agent validation and review
 
-`package.json` defines commands; `AGENTS.md` defines required validation and review.
+`package.json` defines commands; the root `AGENTS.md` defines required validation and review, and
+path-scoped `supabase/AGENTS.md` and `workers/api-gateway/AGENTS.md` add area-specific rules.
 `code_review.md` supplements that contract with risk areas, without requiring the full suite for
 unrelated changes. Worktree setup and the shared CI setup action use `scripts/ensure-pnpm.sh` to
 verify pnpm against `packageManager`, preparing its complete integrity-qualified pin even when the installed version matches.
 
 Run focused checks while implementing, then required checks after the diff stabilizes. Record the
 commit, dirty worktree state, commands, and results in the PR summary. Invalidate affected results
-when their inputs change. Batch substantiated corrections; defer unrelated cleanup.
+when their inputs change. Batch substantiated corrections; defer unrelated cleanup and optional
+style suggestions.
 
 Documentation, translation, and mechanical formatting changes need deterministic checks and
 self-review. Routine executable changes also receive Codex PR review. Substantial behavior changes
@@ -125,7 +127,8 @@ Fallow, build, database and Worker checks, and Deno tests, requiring their usual
 environment. CI itself retains sharding, secrets/fork rules, and report uploads in workflow jobs.
 Link validation remains in the existing Link Check workflow for applicable documentation paths.
 
-The reduced selection covers only root `.md` files, Markdown under `docs/` and `.github/`, and
+The reduced selection covers only root `.md` files, Markdown under `docs/` and `.github/`, agent
+instruction files named `AGENTS.md` or `CLAUDE.md` at any depth outside `public/`, and
 Crowdin-owned `app/locales/*.json` translations. The source locale `app/locales/en.json` selects
 full validation: application code and Vitest fixtures consume it, and `scripts/crowdin-pr.sh` draws
 the same translation-only boundary. `DESIGN.md`, generated code, scripts, dependencies,
@@ -430,11 +433,20 @@ Validates external links in documentation:
 - Validates HTTP status codes (200, 204, 206, 301, 302, 308)
 - Excludes localhost, internal domains, and email links
 
-**Triggers:** PRs/pushes affecting markdown files, weekly (Sunday 00:00 UTC), manual dispatch
+**Triggers:** Main-branch pushes affecting documentation or link-check configuration, weekly
+(Sunday 00:00 UTC), manual dispatch. It does not run on pull requests because external link
+availability is advisory and can fail for reasons unrelated to the change.
 
 **On failure:** Uploads report artifact with broken links
 
 ### 8. Preview Controller (`.github/workflows/preview.yml`)
+
+Maintainers can enable auto-merge to request a preview after the current PR CI succeeds.
+The status controller dispatches `preview.yml` on `main`, carrying the CI run ID;
+it checks for a matching active dispatch created after the current CI attempt completed so repeated events preserve in-flight previews
+and fork approval requests. Failed or cancelled dispatches remain retryable. Manual `/preview`
+and workflow dispatch remain available. Repository `allow_auto_merge` must be enabled to use
+this optional request path. Automatic events do not upload artifacts themselves.
 
 GitHub Actions controls when pull-request previews deploy to the existing Cloudflare Pages project
 (`tarkovtracker`, `tarkovtrackernuxt.pages.dev`). The controller publishes `Preview Result` on the
@@ -446,15 +458,52 @@ rollout verifies that enforcement. The design, result contract, and invariants a
 [SYSTEMS.md §19](SYSTEMS.md#19-actions-owned-cloudflare-previews).
 
 **Triggers:** `preview-state.yml` receives `workflow_run` for completed CI and metadata-only
-`pull_request_target` events (`opened`, `synchronize`, `reopened`, `ready_for_review`,
-`converted_to_draft`, `closed`). An hourly fallback refreshes only open PRs whose head lacks the required
+`pull_request_target` events (`ready_for_review`, `converted_to_draft`, `auto_merge_enabled`,
+`closed`). Ordinary pushes are evaluated after CI completes; main-push CI completions skip the
+state job. An hourly fallback refreshes only open PRs whose head lacks the required
 status, or is pending only on an unready test merge, after GitHub finishes computing it. It refreshes status without creating deployment
 jobs.
 `preview.yml` accepts only explicit `workflow_dispatch` with a CI run id from `main`.
 Every job checks out the default branch; the privileged automatic triggers are accepted in
 `.github/zizmor.yml` because the state controller is the intended trusted boundary.
 
-**Jobs:** `Refresh preview state` handles automatic events with a single status-only job.
+**Required Actions policy:** `preview-state.yml` is the only workflow in this public repository
+that uses `pull_request_target`. GitHub blocks that event by default in public repositories from
+2026-11-02 unless an applicable Actions event policy allows it, so the repository carries one policy
+scoped to this workflow. It is external state that no checked-in file describes; recreate it with:
+
+```bash
+gh api --method POST \
+  -H "X-GitHub-Api-Version: 2026-03-10" \
+  repos/tarkovtracker-org/TarkovTracker/actions/policies \
+  --input - <<'JSON'
+{
+  "name": "Allow pull_request_target for preview-state",
+  "enforcement": "active",
+  "conditions": {
+    "workflow_path": {
+      "include": [".github/workflows/preview-state.yml"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "restrict_action_events",
+      "parameters": {
+        "allowed_events": ["pull_request_target", "workflow_run", "schedule"]
+      }
+    }
+  ]
+}
+JSON
+```
+
+The `restrict_action_events` allowlist is exhaustive for this workflow and does not permit
+`pull_request_target` anywhere else in the repository; the default public-repository block still
+applies to every other workflow.
+
+**Jobs:** `Refresh preview state` handles automatic events in one job that publishes status and
+can request a separate Preview run when auto-merge is enabled.
 `Plan preview` runs only on explicit dispatch, resolves the candidate through the API, requires
 successful CI evidence, verifies the artifact's manifest and digest, and publishes the interim
 status. Application, configuration, and dependency changes stay `pending` until preview is requested.
@@ -510,7 +559,8 @@ fail closed in the shadow; the existing protected `preview-fork` deployment path
 
 **Trusted automation:** Crowdin translation merges and release staging request one preview after
 their dispatched CI run succeeds on the exact candidate SHA. Allowlisted Dependabot auto-merge
-requests one after all candidate checks pass. Ordinary PR revisions do not deploy automatically.
+requests one after all candidate checks pass and remains the sole automatic request owner for
+Dependabot. Ordinary PR revisions request previews after CI only when auto-merge is enabled.
 
 **Metrics:** each controller run summary records the action (deploy/reuse/skip/wait/fail),
 revision, digest, deployment URL, whether the result was published, and the validation-to-preview
@@ -897,7 +947,8 @@ pnpm run lint:fix
 
 ## Additional Resources
 
-> **Note:** External links are validated automatically on PRs via the `link-check` workflow.
+> **Note:** External links are checked on main documentation pushes, weekly, and by manual dispatch
+> via the `link-check` workflow.
 > Last manual verification: 2026-01-30
 
 | Resource             | Link                                                                                         | Notes                     |
