@@ -8,6 +8,8 @@ const { openPreferences, runtimeConfig } = vi.hoisted(() => ({
     public: {
       appUrl: 'https://tarkovtracker.org',
       appVersion: '1.2.3',
+      githubOwner: 'tarkovtracker-org',
+      githubRepo: 'TarkovTracker',
       googleAnalyticsMeasurementId: 'G-TEST',
       microsoftClarityProjectId: '',
     },
@@ -39,11 +41,24 @@ const mountFooter = async () => {
   });
 };
 describe('AppFooter', () => {
-  beforeEach(() => openPreferences.mockReset());
+  beforeEach(() => {
+    openPreferences.mockReset();
+    // Restore default runtime config; individual tests mutate it to exercise
+    // the release-link fallback branches.
+    runtimeConfig.public.appVersion = '1.2.3';
+    runtimeConfig.public.githubOwner = 'tarkovtracker-org';
+    runtimeConfig.public.githubRepo = 'TarkovTracker';
+  });
   it('renders the navigation groups, version, and analytics preferences action', async () => {
     const wrapper = await mountFooter();
     expect(wrapper.text()).toContain('navigation_drawer.brand_name');
     expect(wrapper.text()).toContain('v1.2.3');
+    const versionLink = wrapper.findAll('a').find((anchor) => anchor.text().includes('v1.2.3'));
+    expect(versionLink?.attributes('href')).toBe(
+      'https://github.com/tarkovtracker-org/TarkovTracker/releases/tag/v1.2.3'
+    );
+    expect(versionLink?.attributes('rel')).toBe('noopener noreferrer');
+    expect(versionLink?.attributes('target')).toBe('_blank');
     expect(wrapper.findAll('section')).toHaveLength(3);
     const analyticsButton = wrapper
       .findAll('button')
@@ -51,5 +66,23 @@ describe('AppFooter', () => {
     expect(analyticsButton).toBeDefined();
     await analyticsButton?.trigger('click');
     expect(openPreferences).toHaveBeenCalledOnce();
+  });
+  it.each(['', 'dev'])('renders no release link for the unversioned %j build', async (version) => {
+    runtimeConfig.public.appVersion = version;
+    const wrapper = await mountFooter();
+    expect(wrapper.text()).toContain('vdev');
+    const versionLink = wrapper.findAll('a').find((anchor) => anchor.text().includes('vdev'));
+    expect(versionLink).toBeUndefined();
+  });
+  it.each([
+    { owner: '', repo: 'TarkovTracker' },
+    { owner: 'tarkovtracker-org', repo: '' },
+  ])('renders no release link for incomplete repo config: %j', async ({ owner, repo }) => {
+    runtimeConfig.public.githubOwner = owner;
+    runtimeConfig.public.githubRepo = repo;
+    const wrapper = await mountFooter();
+    const versionLink = wrapper.findAll('a').find((anchor) => anchor.text().includes('v1.2.3'));
+    expect(versionLink).toBeUndefined();
+    expect(wrapper.text()).toContain('v1.2.3');
   });
 });
