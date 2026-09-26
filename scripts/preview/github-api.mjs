@@ -176,8 +176,13 @@ export async function requestPreviewDispatch(github, repo, decision) {
     ...repo,
     workflow_id: PREVIEW_WORKFLOW_FILE,
     ref: PRODUCTION_BRANCH,
-    inputs: { run_id: String(decision.runId) },
+    inputs: previewDispatchInputs(decision.runId, decision.previewRequest),
   });
+}
+export function previewDispatchInputs(runId, request) {
+  const inputs = { run_id: String(runId) };
+  if (request) inputs.request_comment_id = String(request.commentId);
+  return inputs;
 }
 function truncateDescription(description) {
   return description.length > 140 ? `${description.slice(0, 137)}...` : description;

@@ -441,7 +441,29 @@ availability is advisory and can fail for reasons unrelated to the change.
 
 ### 8. Preview Controller (`.github/workflows/preview.yml`)
 
-Maintainers can enable auto-merge to request a preview after the current PR CI succeeds.
+Maintainers and administrators can comment `/preview` once to enable previews for a PR, including
+fork PRs. The current revision is requested immediately if CI is ready; otherwise the next
+successful CI run requests it. Later revisions refresh automatically after successful CI.
+`/preview stop` disables automatic requests; another `/preview` enables them again. Drafts remain
+paused and resume when marked ready. This opts into previews without opting into merging.
+The latest unedited command from a current maintainer controls the PR. Comments predating the
+opt-in activation instant retain their original one-revision meaning and do not grant persistent
+access. The activation instant defaults to the contract start shipped with the handler, so no
+manual post-merge variable flip is required; the optional repository variable
+`PREVIEW_OPT_IN_START` overrides it for continuity after handler reverts. A non-empty value must
+round-trip as a canonical UTC ISO instant — `0`, date-only, zone-less or impossible values fail
+closed and grant no persistent preview access (an override earlier than the contract start
+likewise grants nothing and serves as an explicit off switch).
+A `/preview stop` remains a revocation barrier when its author currently verifies as maintain/admin,
+or when the request handler accepted it while verifying access — recorded by an acceptance receipt
+comment from `github-actions[bot]`. A historical stop lacking both is not honored, so the previous
+enabled opt-in stays in control; resuming always happens with a fresh command from a current
+maintainer. Manual `workflow_dispatch` previews on the trusted default branch own their
+authorization directly: they carry no standing command authority and cannot be revoked by a later
+stop, while requests bound through `request_comment_id` are re-verified before upload.
+Dependabot retains its dedicated automatic preview owner; `/preview` can request its current
+revision, but does not add a second automatic dispatcher.
+Enabling auto-merge also requests previews when no explicit preview command overrides it.
 The status controller dispatches `preview.yml` on `main`, carrying the CI run ID;
 it checks for a matching active dispatch created after the current CI attempt completed so repeated events preserve in-flight previews
 and fork approval requests. Failed or cancelled dispatches remain retryable. Manual `/preview`
@@ -503,13 +525,14 @@ The `restrict_action_events` allowlist is exhaustive for this workflow and does 
 applies to every other workflow.
 
 **Jobs:** `Refresh preview state` handles automatic events in one job that publishes status and
-can request a separate Preview run when auto-merge is enabled.
+can request a separate Preview run when the PR is opted in or auto-merge is enabled.
 `Plan preview` runs only on explicit dispatch, resolves the candidate through the API, requires
 successful CI evidence, verifies the artifact's manifest and digest, and publishes the interim
 status. Application, configuration, and dependency changes stay `pending` until preview is requested.
 `Deploy preview` runs only for that dispatch in the `preview` environment (same-repository
-candidates) or `preview-fork` (required maintainer approval, self-approval and administrator bypass
-disabled), repeats every freshness check, re-verifies the artifact, uploads it with pinned Wrangler
+candidates and forks opted in by a current maintainer) or `preview-fork` (forks without that opt-in,
+required maintainer approval, self-approval disabled, administrator bypass allowed), repeats every
+freshness and command-authorization check, re-verifies the artifact, uploads it with pinned Wrangler
 from the default-branch lockfile using `--branch preview-*`, and verifies the Cloudflare deployment
 record. `Preview smoke tests` runs Playwright without Cloudflare credentials against the unique
 deployment URL. `Publish preview result` rechecks freshness and publishes success only for a
@@ -525,15 +548,26 @@ and profile version (`[preview <digest12> v1]` marker).
 successful CI run for the PR's current head. The controller repeats every eligibility and freshness
 check; it cannot bypass failed CI or deploy a stale revision.
 
-For a same-repository PR, a maintainer or administrator can instead post the exact comment
-`/preview`. The default-branch `preview-request.yml` workflow checks the comment actor's current
-repository role, resolves the successful CI run for the PR's current head and base, and dispatches
-the same trusted Preview workflow. It replies to authorized requests with the outcome; denied
-requests do not receive a bot reply. It does not
-accept edited comments or fork PRs. The comment does not bypass the controller's artifact and
-freshness checks. A repeat request for the same
-validated deployment reuses its existing evidence; fork previews keep the explicit dispatch and
-`preview-fork` environment approval. A new head or base revision needs fresh CI and a new request.
+The default-branch `preview-request.yml` workflow checks a command author's current repository
+role and dispatches the same trusted Preview workflow when matching CI is ready. It replies to
+authorized requests with the outcome; denied requests do not receive a bot reply. Edited comments
+do not grant access. Fork CI omits PR snapshots, so run selection matches the head repository,
+branch, and SHA; the controller then verifies the artifact's base and test merge against live GitHub
+state. Every refresh reads all comment pages and rechecks the current requester's role. Only
+owner, member, or collaborator comments cause permission lookups, so public outsiders
+cannot trigger one permission lookup per author; association alone never grants access. The upload
+job repeats that authorization check, so a stop, deleted command, or revoked role prevents a queued
+opted-in upload. An upload already underway may finish after `/preview stop`.
+An associated repository user's newer stop remains a revocation barrier if their former maintainer
+role can no longer be verified; a new command from a current maintainer is required to resume.
+Automatic dispatches carry the command ID and fail if it was revoked or superseded before planning;
+they cannot silently fall back to the manual request path.
+A fork with a live maintainer opt-in uses the `preview` environment without a second approval;
+an explicit fork dispatch without one retains `preview-fork` approval or an administrator override.
+Repeating a request for an already validated deployment reuses its evidence. Each new head or base
+still requires fresh CI, artifact verification, deployment, and smoke tests.
+Documentation-only commands acknowledge the opt-in and skip the immediate deployment; later
+executable revisions can then refresh after their own successful CI.
 
 For pull requests, `Preview Result` is published on the validated head commit only. GitHub
 regenerates the test-merge commit (new SHA, same parents and tree) when a merge is attempted, so a
@@ -560,7 +594,8 @@ fail closed in the shadow; the existing protected `preview-fork` deployment path
 **Trusted automation:** Crowdin translation merges and release staging request one preview after
 their dispatched CI run succeeds on the exact candidate SHA. Allowlisted Dependabot auto-merge
 requests one after all candidate checks pass and remains the sole automatic request owner for
-Dependabot. Ordinary PR revisions request previews after CI only when auto-merge is enabled.
+Dependabot. Ordinary PR revisions request previews after CI when opted in with `/preview` or when
+auto-merge is enabled without an explicit `/preview stop`.
 
 **Metrics:** each controller run summary records the action (deploy/reuse/skip/wait/fail),
 revision, digest, deployment URL, whether the result was published, and the validation-to-preview
@@ -578,7 +613,8 @@ The initial rollout readback found only `CI Result`. The live September 23 rules
 `CI Result` and `Preview Result`, and `.github/main-ci-ruleset.json` matches it. Restoring the
 ruleset from that file preserves both required checks.
 `preview` and `preview-fork` are restricted to `main`; fork previews require approval from
-`DysektAI` or `Chica999`, with self-approval and administrator bypass disabled. Both environments
+`DysektAI` or `Chica999` when no live command authorizes the PR. On September 26, administrator
+bypass was enabled for `preview-fork`; self-approval remains disabled. Both environments
 have `CLOUDFLARE_ACCOUNT_ID`. `CLOUDFLARE_PAGES_API_TOKEN` now exists as a secret in both
 environments, and the repository-scoped copy was removed. GitHub confirms secret presence but does
 not reveal its value or scope; the first manual deployment checks that the token works. The connected
