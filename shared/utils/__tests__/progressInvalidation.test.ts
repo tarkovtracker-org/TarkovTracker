@@ -1,5 +1,7 @@
 import {
   computeInvalidProgress,
+  createProgressInvalidator,
+  type InvalidationInput,
   type InvalidationTask,
   type InvalidationTaskCompletion,
 } from '@shared/utils/progressInvalidation';
@@ -18,12 +20,26 @@ const task = (
     : {}),
   ...extra,
 });
-const run = (
-  tasks: InvalidationTask[],
-  taskCompletions: Record<string, InvalidationTaskCompletion>,
-  pmcFaction = 'USEC'
-) => computeInvalidProgress({ tasks, taskCompletions, pmcFaction });
-describe('computeInvalidProgress', () => {
+describe.each([
+  { name: 'mutable', invalidate: computeInvalidProgress },
+  {
+    name: 'prepared',
+    invalidate: (input: InvalidationInput) => createProgressInvalidator(input.tasks)(input),
+  },
+])('$name progress invalidation', ({ invalidate }) => {
+  const run = (
+    tasks: InvalidationTask[],
+    taskCompletions: Record<string, InvalidationTaskCompletion>,
+    pmcFaction = 'USEC'
+  ) => invalidate({ tasks, taskCompletions, pmcFaction });
+  it('ignores prerequisite rows without a task reference', () => {
+    const tasks = [
+      task('orphan', undefined, {
+        taskRequirements: [{ status: ['complete'] }, { status: ['failed'] }],
+      }),
+    ];
+    expect(run(tasks, {})).toEqual({ invalidTasks: {}, invalidObjectives: {} });
+  });
   describe.each([
     { state: 'completed', completion: { complete: true, failed: false }, cascades: false },
     { state: 'failed', completion: { complete: false, failed: true }, cascades: true },
@@ -189,5 +205,58 @@ describe('computeInvalidProgress', () => {
     // Both objectives should also be valid
     expect(result2.invalidObjectives.loyaltyBuyoutObj).toBeFalsy();
     expect(result2.invalidObjectives.safeCorridorObj).toBeFalsy();
+  });
+});
+describe('prepared catalog snapshots', () => {
+  it('shares only catalog structure across player and faction changes', () => {
+    const tasks = [
+      task('root'),
+      task('strict', { on: 'root', status: ['COMPLETE'] }),
+      task('tolerant', { on: 'root', status: ['Complete', 'FAILED'] }),
+      task('failedOnly', { on: 'root', status: ['FAILED'] }),
+      task('bear', undefined, { factionName: 'BEAR' }),
+    ];
+    const prepared = createProgressInvalidator(tasks);
+    const states: InvalidationTaskCompletion[] = [
+      {},
+      { complete: true },
+      { failed: true },
+      { complete: true, failed: true },
+    ];
+    for (const root of states) {
+      for (const pmcFaction of ['USEC', 'BEAR']) {
+        const input = { tasks, taskCompletions: { root }, pmcFaction };
+        expect(prepared(input)).toEqual(computeInvalidProgress(input));
+      }
+    }
+    const input = { taskCompletions: {}, pmcFaction: 'USEC' };
+    const first = prepared(input);
+    first.invalidTasks.injected = true;
+    first.invalidObjectives.injected = true;
+    expect(prepared(input).invalidTasks.injected).toBeUndefined();
+    expect(prepared(input).invalidObjectives.injected).toBeUndefined();
+  });
+  it('observes in-place edits in the mutable entry point while preserving a prepared snapshot', () => {
+    const tasks = [task('root'), task('child', { on: 'root', status: ['COMPLETE'] })];
+    const input = { tasks, taskCompletions: { root: { failed: true } }, pmcFaction: 'USEC' };
+    const prepared = createProgressInvalidator(tasks);
+    const original = prepared(input);
+    tasks[1]!.taskRequirements![0]!.status!.push('FAILED');
+    tasks[1]!.objectives![0]!.id = 'updated';
+    expect(computeInvalidProgress(input).invalidTasks.child).toBeUndefined();
+    expect(prepared(input)).toEqual(original);
+    expect(createProgressInvalidator(tasks)(input)).toEqual(computeInvalidProgress(input));
+  });
+  it('terminates dependency cycles and retains first-match failed-tolerance semantics', () => {
+    const tasks = [
+      task('a', { on: 'b', status: ['complete'] }),
+      task('b', { on: 'a', status: ['complete'] }),
+      task('choice', undefined, { alternatives: ['a'] }),
+      task('tolerant', { on: 'b', status: ['complete', 'failed'] }),
+    ];
+    const input = { tasks, taskCompletions: { choice: { complete: true } }, pmcFaction: 'USEC' };
+    const result = createProgressInvalidator(tasks)(input);
+    expect(result.invalidTasks).toEqual({ a: true, b: true });
+    expect(result).toEqual(computeInvalidProgress(input));
   });
 });
