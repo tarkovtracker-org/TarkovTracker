@@ -14,12 +14,23 @@ export const fullJobs = [
   'security',
 ];
 const reducedJobs = ['lint-format', 'systems-drift', 'security'];
+// Agent instruction files (root or nested AGENTS.md/CLAUDE.md, including `.claude/CLAUDE.md`) are
+// documentation. Under `public/` they would ship as site assets, so they stay full.
+function agentInstructionPath(path) {
+  return /(?:^|\/)(?:AGENTS|CLAUDE)\.md$/.test(path) && !path.startsWith('public/');
+}
+function docsPath(path) {
+  return (
+    /^(?:[^/]+\.md|(?:docs|\.github)\/.+\.(?:md|markdown))$/.test(path) ||
+    agentInstructionPath(path)
+  );
+}
 // Only Crowdin-owned translations are reduced. app/locales/en.json is the source locale that
 // application code and Vitest fixtures consume, so it selects full validation like other inputs
 // (scripts/crowdin-pr.sh draws the same boundary for translation-only PRs).
 function knownPathCategory(path) {
   if (/^app\/locales\/(?!en\.json$)[^/]+\.json$/.test(path)) return 'locales';
-  return /^(?:[^/]+\.md|(?:docs|\.github)\/.+\.(?:md|markdown))$/.test(path) ? 'docs' : 'full';
+  return docsPath(path) ? 'docs' : 'full';
 }
 function unsafePath(path) {
   return path.startsWith('/') || path === 'DESIGN.md' || path.split('/').includes('..');

@@ -639,8 +639,13 @@ export async function planPreview({ github, context, core, inputs, workspace }) 
   return decision;
 }
 function refreshContext(context, pull) {
+  // `repo` must be re-added explicitly: actions/github-script exposes it through a Proxy, and an
+  // object spread drops computed properties, leaving `owner`/`repo` empty in every API call inside
+  // the refreshed plan (the finalization-shadow handoff hit the same trap).
   return {
-    ...context,
+    repo: context.repo,
+    serverUrl: context.serverUrl,
+    runId: context.runId,
     eventName: 'pull_request_target',
     payload: { ...context.payload, action: 'synchronize', pull_request: pull },
   };
