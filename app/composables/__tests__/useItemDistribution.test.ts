@@ -312,6 +312,13 @@ describe('useItemDistribution', () => {
         result.updates.find((u) => u.id === id)?.count ?? mockStoreState.hideoutPartCounts[id];
       expect(assigned('mod-1')! + assigned('mod-2')!).toBe(6);
       expect(result.remainingNonFir).toBe(0);
+      mockStoreState.hideoutPartCounts = {
+        'mod-1': assigned('mod-1')!,
+        'mod-2': assigned('mod-2')!,
+      };
+      const repeated = distributeItems(0, 6, [], hideoutModules);
+      expect(repeated.updates).toHaveLength(0);
+      expect(repeated.remainingNonFir).toBe(0);
     });
     it('lowers current progress when the collected total is smaller', async () => {
       mockStoreState.tasks.set('task-1', { kappaRequired: true, minPlayerLevel: 10 });

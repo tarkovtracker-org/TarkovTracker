@@ -586,8 +586,10 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
    * direct needs of its own; otherwise a broad pool (e.g. "sell 75 of any
    * item") would inflate the searched item's total and Smart Fill targets.
    */
-  const groupedNeeds = computed((): GroupedNeed[] => {
-    const resolved = filteredItems.value.flatMap((need) => {
+  const resolveGroupedNeeds = (
+    needs: (NeededItemTaskObjective | NeededItemHideoutModule)[]
+  ): GroupedNeed[] => {
+    const resolved = needs.flatMap((need) => {
       const target = resolveGroupTarget(need);
       return target ? [{ need, target }] : [];
     });
@@ -595,7 +597,8 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
       resolved.filter((entry) => !isAcceptedRekey(entry)).map((entry) => entry.target.id)
     );
     return resolved.filter((entry) => !isAcceptedRekey(entry) || !directIds.has(entry.target.id));
-  });
+  };
+  const groupedNeeds = computed((): GroupedNeed[] => resolveGroupedNeeds(filteredItems.value));
   const groupedItems = computed((): GroupedNeededItem[] => {
     const startedAt = perfDebug.value ? perfNow() : 0;
     const groups = new Map<string, GroupedNeededItemAccumulator>();
@@ -668,6 +671,17 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   });
   const objectivesByItemId = computed(() => {
     const startedAt = perfDebug.value ? perfNow() : 0;
+    // Keep the modal's Smart Fill targets stable when item progress changes.
+    // Ownership filtering is count-based, so build this from the same view
+    // filters as `filteredItems` except `passesOwnershipToggleFilter`.
+    const modalNeeds = allItems.value
+      .filter(passesCompletionFilter)
+      .filter(passesTypeFilter)
+      .filter(passesFirFilter)
+      .filter(passesSpecialEquipmentFilter)
+      .filter(passesKappaToggleFilter)
+      .filter(passesTeamToggleFilter)
+      .filter(passesSearchFilter);
     const map = new Map<
       string,
       {
@@ -675,7 +689,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
         hideoutModules: NeededItemHideoutModule[];
       }
     >();
-    for (const { need, target } of groupedNeeds.value) {
+    for (const { need, target } of resolveGroupedNeeds(modalNeeds)) {
       const itemId = target.id;
       if (!map.has(itemId)) {
         map.set(itemId, { taskObjectives: [], hideoutModules: [] });
@@ -690,7 +704,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     if (perfDebug.value) {
       logPerf('objectives-by-item-id', {
         groups: map.size,
-        inputItems: filteredItems.value.length,
+        inputItems: modalNeeds.length,
         ms: roundPerfMs(perfNow() - startedAt),
       });
     }

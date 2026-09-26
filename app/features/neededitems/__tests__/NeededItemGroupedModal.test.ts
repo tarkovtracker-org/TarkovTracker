@@ -183,7 +183,7 @@ describe('NeededItemGroupedModal', () => {
     expect(mockSetHideoutPartCount).toHaveBeenCalledWith('module-1', 2);
     expect(mockSetHideoutPartComplete).toHaveBeenCalledWith('module-1');
   });
-  it('clears collected totals after Smart Fill so a filtered list cannot reuse them', async () => {
+  it('keeps collected totals after Smart Fill so they can be reapplied', async () => {
     const wrapper = createWrapper();
     await wrapper.get('[data-testid="set-fir"]').trigger('click');
     const smartFillButton = wrapper
@@ -193,8 +193,8 @@ describe('NeededItemGroupedModal', () => {
     await smartFillButton!.trigger('click');
     expect(mockDistributeItems).toHaveBeenCalledOnce();
     expect(mockApplyDistribution).toHaveBeenCalledOnce();
-    expect(wrapper.get('[data-testid="fir-current"]').text()).toBe('0');
-    expect(wrapper.get('[data-testid="non-fir-current"]').text()).toBe('0');
-    expect(smartFillButton!.attributes('disabled')).toBeDefined();
+    expect(wrapper.get('[data-testid="fir-current"]').text()).toBe('1');
+    expect(wrapper.get('[data-testid="non-fir-current"]').text()).toBe('2');
+    expect(smartFillButton!.attributes('disabled')).toBeUndefined();
   });
 });

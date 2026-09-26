@@ -522,6 +522,34 @@ describe('useNeededItems', () => {
       expect(boltsEntry?.taskObjectives.length).toBeGreaterThan(0);
       expect(boltsEntry?.hideoutModules.length).toBeGreaterThan(0);
     });
+    it('keeps owned objectives in Smart Fill targets when hide-owned is enabled', async () => {
+      const item = createItem('item-shared', 'Shared Item');
+      const objectives = [
+        createTaskObjective('obj-owned', 'task-1', item, 1),
+        createTaskObjective('obj-needed', 'task-1', item, 1),
+      ];
+      const { neededItems } = await setup({
+        metadataStore: { neededItemTaskObjectives: objectives, neededItemHideoutModules: [] },
+        preferencesStore: { getNeededItemsHideOwned: true },
+        tarkovStore: { getObjectiveCount: (id: string) => (id === 'obj-owned' ? 1 : 0) },
+      });
+      expect(neededItems.filteredItems.value.map((item) => item.id)).toEqual(['obj-needed']);
+      expect(
+        neededItems.objectivesByItemId.value
+          .get('item-shared')
+          ?.taskObjectives.map((item) => item.id)
+      ).toEqual(['obj-owned', 'obj-needed']);
+    });
+    it('keeps hidden team objectives out of Smart Fill targets', async () => {
+      const { neededItems } = await setup({
+        includeTeamItems: true,
+        preferencesStore: { itemsTeamAllHidden: true },
+      });
+      const taskObjectiveIds = Array.from(neededItems.objectivesByItemId.value.values()).flatMap(
+        ({ taskObjectives }) => taskObjectives.map((item) => item.id)
+      );
+      expect(taskObjectiveIds).not.toContain('obj-team');
+    });
   });
   describe('sorting', () => {
     it('sorts by priority in descending order', async () => {
