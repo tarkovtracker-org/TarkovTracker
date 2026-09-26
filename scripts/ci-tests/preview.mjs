@@ -29,6 +29,8 @@ import {
   resolveBuildProfile,
 } from '../preview/profile.mjs';
 import { isForbiddenRequest, waitForDeployment } from '../preview/smoke/readiness.mjs';
+const PREVIEW_OPT_IN_START = '2026-09-26T04:12:26Z';
+process.env.PREVIEW_OPT_IN_START = PREVIEW_OPT_IN_START;
 import { buildZip } from './helpers/zip.mjs';
 const sha = (letter) => letter.repeat(40);
 const HEAD = sha('a');
@@ -309,6 +311,8 @@ function fakeMutableState(options) {
     ]),
     failPublish: firstOption(options.failPublish, false),
     failDispatch: firstOption(options.failDispatch, false),
+    comments: firstOption(options.comments, []),
+    requesterRole: firstOption(options.requesterRole, 'maintain'),
     dispatches: [],
   };
 }
@@ -371,6 +375,7 @@ function repoEndpoints(state) {
       },
     },
     repos: {
+      getCollaboratorPermissionLevel: async () => ({ data: { role_name: state.requesterRole } }),
       listPullRequestsAssociatedWithCommit: 'associated',
       listCommitStatusesForRef: 'statuses',
       createCommitStatus: async (input) => {
@@ -380,6 +385,7 @@ function repoEndpoints(state) {
       },
     },
     checks: { listForRef: 'checks' },
+    issues: { listComments: 'comments' },
   };
 }
 function actionEndpoints(state, zipEntries, options) {
@@ -436,6 +442,7 @@ async function paginatedEndpoints(state, endpoint, params, options) {
     jobs: () => state.previousJobs,
     listFiles: () => state.files,
     pulls: () => listPulls(state, params),
+    comments: () => state.comments,
   };
   if (!paged[endpoint]) throw new Error(`unexpected endpoint ${endpoint}`);
   return paged[endpoint]();
@@ -485,6 +492,16 @@ function workflowDispatchContext() {
     payload: { repository: { id: 1, full_name: REPO_NAME } },
     serverUrl: 'https://github.com',
     runId: 556,
+  };
+}
+function previewRequestComment(id = 1, body = '/preview') {
+  return {
+    id,
+    body,
+    user: { login: 'maintainer', type: 'User' },
+    author_association: 'MEMBER',
+    created_at: PREVIEW_OPT_IN_START,
+    updated_at: PREVIEW_OPT_IN_START,
   };
 }
 function scheduleContext() {
@@ -541,7 +558,7 @@ test('auto-merge requests one trusted dispatch after CI instead of uploading', a
   const completed = await plan(t, workflowRunContext(), { pull: autoMerge });
   assert.equal(completed.decision.action, 'request');
   assert.equal(completed.decision.state, 'pending');
-  assert.match(completed.decision.description, /Auto-merge enabled: preview requested/);
+  assert.match(completed.decision.description, /Preview enabled: requested/);
   assert.deepEqual(completed.state.dispatches, [
     {
       ...REPO,
@@ -557,6 +574,8 @@ test('auto-merge requests one trusted dispatch after CI instead of uploading', a
   });
   assert.equal(enabled.decision.action, 'request');
   assert.equal(enabled.state.dispatches.length, 1);
+  assert.equal(enabled.decision.previewAuthorization, 'dispatch');
+  assert.equal(enabled.decision.previewRequest, null);
   // CI still running: nothing to request yet; the CI completion event requests it later.
   const running = await plan(t, pullTargetContext(pullFixture(autoMerge), 'auto_merge_enabled'), {
     pull: autoMerge,
@@ -703,8 +722,169 @@ test('fork candidates wait for a manual request and route through the protected 
   );
   assert.equal(decision.environment, ENVIRONMENTS.fork);
   assert.equal(decision.fork, true);
-  assert.match(state.statuses[0].description, /maintainer approval/);
+  assert.match(state.statuses[0].description, /Comment \/preview/);
   assert.ok(state.statuses[0].description.includes(HEAD.slice(0, 12)));
+});
+test('one maintainer command requests previews after later CI runs and when a draft becomes ready', async (t) => {
+  const comments = [previewRequestComment()];
+  for (const id of [900, 901]) {
+    const run = runFixture({ id });
+    const result = await plan(t, workflowRunContext(run), {
+      comments,
+      run,
+      manifest: { runId: id },
+    });
+    assert.equal(result.decision.action, 'request');
+    assert.equal(result.state.dispatches[0].inputs.run_id, String(id));
+    assert.equal(result.state.dispatches[0].inputs.request_comment_id, '1');
+  }
+  const ready = await plan(t, pullTargetContext(pullFixture(), 'ready_for_review'), { comments });
+  assert.equal(ready.decision.action, 'request');
+  assert.equal(ready.decision.previewAuthorization, 'request');
+  const draft = await plan(t, workflowRunContext(), { comments, pull: { draft: true } });
+  assert.equal(draft.decision.action, 'skip');
+  assert.deepEqual(draft.state.dispatches, []);
+  const stopped = await plan(t, workflowRunContext(), {
+    comments: [...comments, previewRequestComment(2, '/preview stop')],
+    pull: { auto_merge: { enabled_by: { login: 'maintainer' } } },
+  });
+  assert.equal(stopped.decision.action, 'wait');
+  assert.deepEqual(stopped.state.dispatches, []);
+});
+test('a queued automatic dispatch cannot become a manual preview after a stop', async (t) => {
+  for (const comments of [
+    [previewRequestComment(), previewRequestComment(2, '/preview stop')],
+    [],
+    [previewRequestComment(2)],
+  ]) {
+    const result = await plan(t, workflowDispatchContext(), {
+      comments,
+      inputs: { run_id: 900, request_comment_id: '1' },
+    });
+    assert.equal(result.decision.action, 'fail');
+    assert.match(result.decision.description, /revoked or superseded/);
+  }
+});
+test('Dependabot keeps a single automatic preview owner even with a maintainer opt-in', async (t) => {
+  const result = await plan(t, workflowRunContext(), {
+    comments: [previewRequestComment()],
+    pull: { user: { id: 49699333 } },
+  });
+  assert.equal(result.decision.action, 'wait');
+  assert.deepEqual(result.state.dispatches, []);
+});
+test('persistent preview intent follows a new head only after its own successful CI', async (t) => {
+  const headSha = sha('e');
+  const run = runFixture({
+    head_sha: headSha,
+    pull_requests: [{ number: 42, head: { sha: headSha }, base: { sha: BASE } }],
+  });
+  const fake = fakeGithub(t, {
+    comments: [previewRequestComment()],
+    pull: { head: { sha: headSha, ref: 'feature', repo: { full_name: REPO_NAME } } },
+    run,
+    manifest: { headSha },
+  });
+  fake.state.check.head_sha = headSha;
+  const args = {
+    github: fake.github,
+    context: workflowRunContext(run),
+    core: fakeCore(),
+    workspace: tempDir(t),
+  };
+  fake.state.run.conclusion = 'failure';
+  assert.equal((await planPreview(args)).action, 'fail');
+  assert.deepEqual(fake.state.dispatches, []);
+  fake.state.run.conclusion = 'success';
+  const result = await planPreview(args);
+  assert.equal(result.action, 'request');
+  assert.equal(result.headSha, headSha);
+  assert.equal(result.previewRequest.commentId, 1);
+});
+test('a live maintainer command authorizes fork deployment without a second approval', async (t) => {
+  const run = runFixture({ head_repository: { full_name: FORK_NAME }, pull_requests: [] });
+  const pull = pullFixture({ head: { sha: HEAD, ref: 'feature', repo: { full_name: FORK_NAME } } });
+  const options = { run, pull, comments: [previewRequestComment()] };
+  const automatic = await plan(t, workflowRunContext(run), options);
+  assert.equal(automatic.decision.action, 'request');
+  assert.equal(automatic.decision.previewAuthorization, 'request');
+  const context = workflowDispatchContext();
+  const deployed = await plan(t, context, { ...options, inputs: { run_id: 900 } });
+  assert.equal(deployed.decision.action, 'deploy');
+  assert.equal(deployed.decision.previewAuthorization, 'standing');
+  assert.equal(deployed.decision.environment, ENVIRONMENTS.internal);
+  assert.equal(deployed.decision.previewRequest.requestedBy, 'maintainer');
+  const { github, core, decision, state } = deployed;
+  await verifyForDeploy({ github, context, core, decision, destination: join(tempDir(t), 'ok') });
+  for (const change of [
+    () => state.comments.push(previewRequestComment(2, '/preview stop')),
+    () => {
+      state.comments = [previewRequestComment()];
+      state.requesterRole = 'write';
+    },
+    () => {
+      state.requesterRole = 'maintain';
+      state.comments = [];
+    },
+  ]) {
+    change();
+    await assert.rejects(
+      verifyForDeploy({
+        github,
+        context,
+        core,
+        decision,
+        destination: join(tempDir(t), 'revoked'),
+      }),
+      /revoked or superseded/
+    );
+  }
+  await assert.rejects(
+    verifyForDeploy({
+      github,
+      context,
+      core,
+      decision: { ...decision, previewRequest: null },
+      destination: join(tempDir(t), 'missing'),
+    }),
+    /revoked or superseded/
+  );
+});
+test('a manual same-repo dispatch owns its authorization and survives a later stop', async (t) => {
+  const context = workflowDispatchContext();
+  // The PR has an active opt-in, but a plain workflow_dispatch from the trusted default branch
+  // must not inherit standing-command authority: later stops cannot revoke an in-flight run.
+  const { decision, github, state } = await plan(t, context, {
+    comments: [previewRequestComment()],
+    inputs: { run_id: '900' },
+  });
+  assert.equal(decision.action, 'deploy', decision.description);
+  assert.equal(decision.previewAuthorization, 'dispatch');
+  assert.equal(decision.previewRequest, null);
+  state.comments.push(previewRequestComment(2, '/preview stop'));
+  await verifyForDeploy({
+    github,
+    context,
+    core: fakeCore(),
+    decision,
+    destination: join(tempDir(t), 'manual'),
+  });
+  // The same revocation still fails an explicitly bound queued request.
+  const bound = {
+    ...decision,
+    previewAuthorization: 'request',
+    previewRequest: { commentId: 1, enabled: true, requestedBy: 'maintainer' },
+  };
+  await assert.rejects(
+    verifyForDeploy({
+      github,
+      context,
+      core: fakeCore(),
+      decision: bound,
+      destination: join(tempDir(t), 'bound'),
+    }),
+    /revoked or superseded/
+  );
 });
 test('drafts, documentation-only scope and production runs never deploy', async (t) => {
   const draft = await plan(t, workflowRunContext(), { pull: pullFixture({ draft: true }) });

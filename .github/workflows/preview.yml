@@ -13,6 +13,10 @@ on:
         description: Successful CI run id for the exact PR revision to preview.
         required: true
         type: string
+      request_comment_id:
+        description: Command authorizing this automatic request; omit for a manual preview.
+        required: false
+        type: string
 # Repeated requests for the same CI run replace an older attempt. Late results are also rejected
 # by revision checks.
 concurrency:
@@ -20,6 +24,8 @@ concurrency:
   cancel-in-progress: true
 permissions:
   contents: read
+env:
+  PREVIEW_OPT_IN_START: ${{ vars.PREVIEW_OPT_IN_START }}
 jobs:
   plan:
     name: Plan preview
@@ -29,6 +35,7 @@ jobs:
       actions: read
       checks: read
       contents: read
+      issues: read
       pull-requests: read
       statuses: write
     outputs:
@@ -49,6 +56,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           RUN_ID_INPUT: ${{ inputs.run_id }}
+          REQUEST_COMMENT_ID_INPUT: ${{ inputs.request_comment_id }}
         with:
           script: |
             const { planPreview } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/controller.mjs`);
@@ -56,13 +64,13 @@ jobs:
               github,
               context,
               core,
-              inputs: { run_id: process.env.RUN_ID_INPUT },
+              inputs: { run_id: process.env.RUN_ID_INPUT, request_comment_id: process.env.REQUEST_COMMENT_ID_INPUT },
               workspace: process.env.RUNNER_TEMP,
             });
             core.setOutput('decision', JSON.stringify(decision));
             core.setOutput('action', decision.action);
             core.setOutput('environment', decision.environment ?? '');
-            if (decision.fork && decision.action === 'deploy') {
+            if (decision.environment === 'preview-fork' && decision.action === 'deploy') {
               await core.summary
                 .addHeading('Fork preview awaiting approval', 2)
                 .addRaw(`Approving deploys **exactly** revision \`${decision.headSha}\` from \`${decision.headRepo}\` (PR #${decision.pullRequest}). The deployment job re-checks the revision after approval and refuses any other head.`)
@@ -74,14 +82,15 @@ jobs:
     if: needs.plan.outputs.action == 'deploy'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Explicit dispatches use `preview` for same-repository candidates. Forks use `preview-fork`,
-    # which requires maintainer review with administrator bypass disabled. Both hold the token.
+    # A live maintainer /preview command authorizes the PR through `preview`, including forks.
+    # Forks without that opt-in use `preview-fork`, with manual review or an admin override.
     environment:
       name: ${{ needs.plan.outputs.environment }}
       url: ${{ steps.verify-deployment.outputs.url }}
     permissions:
       actions: read
       contents: read
+      issues: read
       pull-requests: read
     outputs:
       url: ${{ steps.verify-deployment.outputs.url }}

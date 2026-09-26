@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { classifyPaths } from '../validation-plan.mjs';
 import { extractZip } from './archive.mjs';
 import { digestDirectory, manifestShapeErrors } from './manifest.mjs';
+import { readPreviewRequest } from './request-authorization.mjs';
 import {
   ciResultCheck,
   downloadArtifact,
@@ -472,9 +473,6 @@ async function previousSuccess(github, context, headSha, digest) {
   }
   return null;
 }
-function firstString(value) {
-  return value?.[0]?.full_name ?? null;
-}
 function decisionIdentity({ candidate, pull }) {
   return {
     pullRequest: pullRequestNumber(pull),
@@ -518,7 +516,29 @@ async function evaluate({ github, context, inputs, workspace }, state) {
   await requireDispatchMergeProof(github, context, state.candidate, state.pull, state.run);
   if (!(await requiresPreview(github, context, state.pull)))
     return { ...decisionBase(state), ...notApplicable() };
+  state.previewRequest = await readPreviewRequest(
+    github,
+    context.repo,
+    pullRequestNumber(state.pull)
+  );
+  requireRequestedCommand(inputs, state.previewRequest);
+  state.previewAuthorization = commandAuthorization(
+    context,
+    inputs,
+    state.fork,
+    state.previewRequest
+  );
   return deployDecision({ github, context, state, workspace });
+}
+function requireRequestedCommand(inputs, request) {
+  const requestedId = optional(inputs, 'request_comment_id');
+  if (!requestedId) return;
+  const activeId = requestCommentId(enabledRequest(request));
+  if (String(requestedId) !== activeId)
+    throw failure('Preview command was revoked or superseded before dispatch.');
+}
+function requestCommentId(request) {
+  return request ? String(request.commentId) : null;
 }
 function draftDecision() {
   return {
@@ -534,7 +554,7 @@ function notApplicable() {
     description: 'Not applicable: documentation-only change set with successful CI.',
   };
 }
-function deploymentDecision(common, earlier, manifest, fork, headSha) {
+function deploymentDecision(common, earlier, manifest, requiresApproval, headSha) {
   if (earlier) {
     return {
       ...common,
@@ -548,10 +568,52 @@ function deploymentDecision(common, earlier, manifest, fork, headSha) {
     ...common,
     action: 'deploy',
     state: 'pending',
-    description: fork
+    description: requiresApproval
       ? `Fork preview awaits maintainer approval for ${headSha.slice(0, 12)}.`
       : 'Deploying the validated preview.',
   };
+}
+function enabledRequest(request) {
+  return request?.enabled ? request : null;
+}
+/**
+ * Deploy authorization sources, tracked explicitly so phase 2 knows what to re-verify:
+ *
+ * - `request`: the dispatch carried `request_comment_id` and planning verified it against the
+ *   PR's live preview request (automatic command dispatches and reruns of a queued request).
+ *   Phase 2 re-verifies the same binding before upload.
+ * - `standing`: a fork candidate rides the PR's current opt-in into the protected `preview`
+ *   environment without an explicit binding. Phase 2 re-verifies the opt-in too.
+ * - `dispatch`: no command authorization — a same-repo trusted default-branch workflow dispatch
+ *   (manual or automation-owned) or a fork awaiting manual approval. A later stop cannot revoke
+ *   these; revision, CI, artifact and freshness checks still apply.
+ */
+const COMMAND_AUTHORIZATIONS = ['request', 'standing'];
+/**
+ * - `request`: the dispatch carried `request_comment_id` and planning verified it against the
+ *   PR's live preview request, or an automatic event will bind its follow-up dispatch to the
+ *   live opt-in. Phase 2 re-verifies the same binding before upload.
+ * - `standing`: a fork candidate rides the PR's current opt-in into the protected `preview`
+ *   environment without an explicit binding. Phase 2 re-verifies the opt-in too.
+ * - `dispatch`: no command authorization — a same-repo trusted default-branch workflow dispatch
+ *   (manual or automation-owned) or a fork awaiting manual approval. A later stop cannot revoke
+ *   these; revision, CI, artifact and freshness checks still apply.
+ */
+function commandAuthorization(context, inputs, fork, request) {
+  if (optional(inputs, 'request_comment_id')) return 'request';
+  if (!request?.enabled) return 'dispatch';
+  return unboundCommandAuthorization(context, fork);
+}
+/**
+ * Without a command bound to the run itself: trusted default-branch dispatches deploy as their
+ * own authority, forks ride the current opt-in (`standing`) or wait for manual approval.
+ */
+function unboundCommandAuthorization(context, fork) {
+  if (context.eventName !== 'workflow_dispatch') return 'request';
+  return fork ? 'standing' : 'dispatch';
+}
+function deploymentEnvironment(fork, request) {
+  return fork && !request ? ENVIRONMENTS.fork : ENVIRONMENTS.internal;
 }
 async function deployDecision({ github, context, state, workspace }) {
   const { candidate, pull, run, fork } = state;
@@ -564,6 +626,8 @@ async function deployDecision({ github, context, state, workspace }) {
     run,
     destination,
   });
+  const commandBound = COMMAND_AUTHORIZATIONS.includes(state.previewAuthorization);
+  const previewRequest = commandBound ? enabledRequest(state.previewRequest) : null;
   const common = {
     ...decisionBase(state),
     artifactId: artifact.id,
@@ -571,10 +635,18 @@ async function deployDecision({ github, context, state, workspace }) {
     digest: manifest.digest,
     previewBranch: manifest.previewBranch,
     appUrl: manifest.appUrl,
-    environment: fork ? ENVIRONMENTS.fork : ENVIRONMENTS.internal,
+    previewRequest,
+    previewAuthorization: state.previewAuthorization,
+    environment: deploymentEnvironment(fork, previewRequest),
   };
   const earlier = await previousSuccess(github, context, candidate.headSha, manifest.digest);
-  return deploymentDecision(common, earlier, manifest, fork, candidate.headSha);
+  return deploymentDecision(
+    common,
+    earlier,
+    manifest,
+    common.environment === ENVIRONMENTS.fork,
+    candidate.headSha
+  );
 }
 function outcomeDecision(error, state) {
   if (!(error instanceof Outcome)) throw error;
@@ -604,14 +676,11 @@ async function publishDecision(github, context, decision) {
   return true;
 }
 function awaitExplicitPreview(decision) {
-  const request = decision.fork
-    ? `Run Preview with run_id=${decision.runId}. Fork needs maintainer approval.`
-    : 'Comment /preview on this PR after CI succeeds.';
   return {
     ...decision,
     action: 'wait',
     state: 'pending',
-    description: `Preview pending: ${decision.headSha.slice(0, 12)}. ${request}`,
+    description: `Preview pending: ${decision.headSha.slice(0, 12)}. Comment /preview to enable automatic previews for this PR.`,
   };
 }
 function isAutomaticDeploy(context, decision) {
@@ -633,18 +702,31 @@ function hasMergeIntent(context, state) {
     isMergeRequestEvent(context),
   ].every(Boolean);
 }
+function hasPreviewIntent(context, state) {
+  // Dependabot's dedicated workflow is the sole automatic request owner.
+  if (optional(optional(state.pull, 'user'), 'id') === 49699333) return false;
+  if (!state.previewRequest) return hasMergeIntent(context, state);
+  return [
+    state.previewRequest.enabled,
+    optional(state.candidate, 'runEvent') === 'pull_request',
+    isPreviewRefreshEvent(context),
+  ].every(Boolean);
+}
+function isPreviewRefreshEvent(context) {
+  return context.eventName === 'workflow_run' || context.payload.action === 'ready_for_review';
+}
 function requestedPreview(decision) {
   return {
     ...decision,
     action: 'request',
     state: 'pending',
-    description: `Auto-merge enabled: preview requested for ${decision.headSha.slice(0, 12)} (run_id=${decision.runId}).`,
+    description: `Preview enabled: requested for ${decision.headSha.slice(0, 12)} (run_id=${decision.runId}).`,
   };
 }
 /** Automatic events never upload: they either request a trusted dispatch or wait for one. */
 function deferAutomaticPreview(context, state, decision) {
   if (!isAutomaticDeploy(context, decision)) return decision;
-  return hasMergeIntent(context, state)
+  return hasPreviewIntent(context, state)
     ? requestedPreview(decision)
     : awaitExplicitPreview(decision);
 }
@@ -788,9 +870,32 @@ function assertDeployablePlan(decision) {
   )
     throw new Error('Refusing to deploy to a non-preview branch.');
 }
+function usesCommandApproval(decision) {
+  // The tracked source decides; the fork/preview coherence clause fails closed on a mutated
+  // decision that routes a fork through the protected `preview` environment without command auth.
+  return (
+    COMMAND_AUTHORIZATIONS.includes(decision.previewAuthorization) ||
+    (decision.fork && decision.environment === ENVIRONMENTS.internal)
+  );
+}
+function samePreviewRequest(request, expected) {
+  if (!request || !expected) return false;
+  return [
+    request.enabled,
+    request.commentId === expected.commentId,
+    request.requestedBy === expected.requestedBy,
+  ].every(Boolean);
+}
+async function verifyPreviewRequest(github, context, decision) {
+  if (!usesCommandApproval(decision)) return;
+  const request = await readPreviewRequest(github, context.repo, decision.pullRequest);
+  if (!samePreviewRequest(request, decision.previewRequest))
+    throw new Error('Preview request was revoked or superseded; request again.');
+}
 /** Phase 2: immediately before upload, repeat freshness checks and re-verify the artifact. */
 export async function verifyForDeploy({ github, context, core, decision, destination }) {
   assertDeployablePlan(decision);
+  await verifyPreviewRequest(github, context, decision);
   const errors = await freshnessErrors(github, context, decision);
   if (errors.length) throw new Error(`Candidate is obsolete: ${errors.join('; ')}`);
   const candidate = candidateFromDecision(decision);
