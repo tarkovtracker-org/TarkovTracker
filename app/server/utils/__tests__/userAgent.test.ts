@@ -38,6 +38,22 @@ describe('resolveTarkovTrackerUserAgent', () => {
       UPSTREAM_USER_AGENT
     );
   });
+  it.each([
+    ['an explicit ftp scheme in APP_URL', { APP_URL: 'ftp://tracker.example.com' }],
+    ['an explicit file scheme in APP_URL', { APP_URL: 'file:///tmp/tracker' }],
+    ['an uppercase explicit scheme in APP_URL', { APP_URL: 'FTP://tracker.example.com' }],
+    ['an explicit ftp scheme in CF_PAGES_URL', { CF_PAGES_URL: 'ftp://tracker.example.com' }],
+    ['an explicit file scheme in CF_PAGES_URL', { CF_PAGES_URL: 'file:///tmp/tracker' }],
+  ])(
+    'falls back to the upstream value for %s instead of mangling the scheme into a bogus origin',
+    (_label, env) => {
+      const result = resolveTarkovTrackerUserAgent(env);
+      // Regression: https normalization used to wrap these values as https://ftp/... etc.,
+      // yielding a bogus origin like (+https://ftp) rather than rejecting the scheme.
+      expect(result).toBe(UPSTREAM_USER_AGENT);
+      expect(result).not.toMatch(/\+https:\/\/(ftp|file)\b/);
+    }
+  );
   it('falls back to the upstream value when the app url resolves to the local dev default', () => {
     // resolvePublicAppUrl({}) === 'http://localhost:3000'; the local dev fallback must never
     // leak into an outbound header that identifies this deployment to a third party.

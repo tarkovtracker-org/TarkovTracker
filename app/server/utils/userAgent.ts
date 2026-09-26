@@ -28,6 +28,17 @@ const isLocalHostname = (hostname: string): boolean => {
  * value, so upstream itself sees no behavior change.
  */
 export const resolveTarkovTrackerUserAgent = (env: NodeJS.ProcessEnv): string => {
+  // resolvePublicAppUrl prepends https:// to any configured value that does not already start
+  // with http(s)://, so an explicit non-HTTP(S) scheme (e.g. ftp://tracker.example.com or
+  // file:///tmp/tracker) would be silently mangled into a bogus http(s) origin
+  // (https://ftp, https://file) instead of being rejected. Inspect the same trimmed value
+  // resolvePublicAppUrl will consume (first non-empty of APP_URL / CF_PAGES_URL) and reject
+  // explicit unsupported schemes up front. Bare hostnames carry no scheme and still go
+  // through the normal https normalization, including localhost handling.
+  const configuredUrl = env.APP_URL?.trim() || env.CF_PAGES_URL?.trim() || '';
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(configuredUrl) && !/^https?:\/\//i.test(configuredUrl)) {
+    return UPSTREAM_TARKOVTRACKER_USER_AGENT;
+  }
   const appUrl = resolvePublicAppUrl(env);
   try {
     const { hostname, origin, protocol } = new URL(appUrl);
