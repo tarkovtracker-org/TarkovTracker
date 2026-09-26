@@ -197,4 +197,23 @@ describe('NeededItemGroupedModal', () => {
     expect(wrapper.get('[data-testid="non-fir-current"]').text()).toBe('2');
     expect(smartFillButton!.attributes('disabled')).toBeUndefined();
   });
+  it('keeps Smart Fill targets stable when grouped membership changes while open', async () => {
+    const secondObjective = { ...mockTaskObjective, id: 'obj-2' };
+    const initialTargets = [mockTaskObjective, secondObjective];
+    const wrapper = createWrapper({ taskObjectives: initialTargets });
+    await wrapper.get('[data-testid="set-fir"]').trigger('click');
+    const findSmartFillButton = () =>
+      wrapper
+        .findAll('button')
+        .find((button) => button.text().includes('needed_items.smart_fill'))!;
+    await findSmartFillButton().trigger('click');
+    await wrapper.setProps({ taskObjectives: [secondObjective] });
+    await findSmartFillButton().trigger('click');
+    expect(mockDistributeItems).toHaveBeenNthCalledWith(1, 1, 2, initialTargets, [
+      mockHideoutModule,
+    ]);
+    expect(mockDistributeItems).toHaveBeenNthCalledWith(2, 1, 2, initialTargets, [
+      mockHideoutModule,
+    ]);
+  });
 });

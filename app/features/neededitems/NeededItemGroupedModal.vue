@@ -272,8 +272,8 @@
     sortTaskObjectives,
     sortHideoutModules,
   } = useItemDistribution();
-  const taskObjectivesList = computed(() => props.taskObjectives ?? []);
-  const hideoutModulesList = computed(() => props.hideoutModules ?? []);
+  const taskObjectivesList = shallowRef([...props.taskObjectives]);
+  const hideoutModulesList = shallowRef([...props.hideoutModules]);
   const sortedTaskObjectives = computed(() => sortTaskObjectives(taskObjectivesList.value));
   const sortedHideoutModules = computed(() => sortHideoutModules(hideoutModulesList.value));
   const getTask = (taskId: string) => metadataStore.getTaskById(taskId);
@@ -348,6 +348,8 @@
     () => props.open,
     (isOpen) => {
       if (isOpen) {
+        taskObjectivesList.value = [...props.taskObjectives];
+        hideoutModulesList.value = [...props.hideoutModules];
         firInput.value = currentFirTotal.value;
         nonFirInput.value = currentNonFirTotal.value;
       }
