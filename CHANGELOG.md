@@ -1,3 +1,10 @@
+## [1.82.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.0...v1.82.1) (2026-09-26)
+
+
+### Bug Fixes
+
+* **deps:** update devalue to patched 5.9.2 ([#935](https://github.com/tarkovtracker-org/TarkovTracker/issues/935)) ([609ac0f](https://github.com/tarkovtracker-org/TarkovTracker/commit/609ac0ffbd1ac50d63b0b04ade0d73746232c472))
+
 # [1.82.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.81.6...v1.82.0) (2026-09-26)
 
 
