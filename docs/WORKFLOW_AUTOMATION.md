@@ -453,8 +453,9 @@ rollout verifies that enforcement. The design, result contract, and invariants a
 [SYSTEMS.md §19](SYSTEMS.md#19-actions-owned-cloudflare-previews).
 
 **Triggers:** `preview-state.yml` receives `workflow_run` for completed CI and metadata-only
-`pull_request_target` events (`opened`, `synchronize`, `reopened`, `ready_for_review`,
-`converted_to_draft`, `closed`). An hourly fallback refreshes only open PRs whose head lacks the required
+`pull_request_target` events (`ready_for_review`, `converted_to_draft`, `auto_merge_enabled`,
+`closed`). Ordinary pushes are evaluated after CI completes; main-push CI completions skip the
+state job. An hourly fallback refreshes only open PRs whose head lacks the required
 status, or is pending only on an unready test merge, after GitHub finishes computing it. It refreshes status without creating deployment
 jobs.
 `preview.yml` accepts only explicit `workflow_dispatch` with a CI run id from `main`.
