@@ -679,6 +679,27 @@ describe('useNeededItems', () => {
       expect(groupIds).toContain('item-analgin');
       expect(groupIds).not.toContain('item-cms');
     });
+    it('keeps searched item totals equal to its direct needs when pools also accept it', async () => {
+      // #882: searching LEDX inflated its combined total with every pooled
+      // "any of these" objective that also accepts LEDX.
+      const augmentin = createItem('item-augmentin', 'Augmentin');
+      const direct = createTaskObjective('obj-direct', 'task-1', augmentin, 2, true);
+      const secondPool: NeededItemTaskObjective = {
+        ...createPooledObjective(),
+        id: 'obj-pool-2',
+        count: 75,
+      };
+      const { neededItems, search } = await setup({
+        metadataStore: {
+          neededItemTaskObjectives: [direct, createPooledObjective(), secondPool],
+        },
+      });
+      search.value = 'augmentin';
+      const group = neededItems.groupedItems.value.find((g) => g.item.id === 'item-augmentin');
+      expect(group?.total).toBe(2);
+      const registered = neededItems.objectivesByItemId.value.get('item-augmentin');
+      expect(registered?.taskObjectives.map((objective) => objective.id)).toEqual(['obj-direct']);
+    });
     it('keeps the primary item as the group key when no accepted item matches', async () => {
       const { neededItems, search } = await setup({
         metadataStore: { neededItemTaskObjectives: [createPooledObjective()] },
