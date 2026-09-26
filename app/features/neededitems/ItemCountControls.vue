@@ -24,8 +24,8 @@
             :max="neededCount"
             :aria-label="$t('needed_items.aria.enter_count')"
             class="bg-surface-900 focus:ring-primary-500 light:text-surface-50 h-full w-full px-0.5 text-center text-[10px] font-semibold text-white focus:ring-2 focus:outline-none focus:ring-inset sm:text-xs lg:px-2 lg:text-sm"
-            @blur="submitEdit"
-            @keydown.enter="submitEdit"
+            @blur="commitEdit"
+            @keydown.enter="commitEdit"
             @keydown.escape="cancelEdit"
           />
         </template>
@@ -34,7 +34,7 @@
             <button
               class="hover:bg-surface-600 light:text-surface-50 h-full w-full px-0.5 text-[10px] font-semibold text-white transition-colors sm:text-xs lg:px-2 lg:text-sm"
               :aria-label="$t('needed_items.aria.click_to_enter_value')"
-              @click="startEditing"
+              @click="startEdit"
             >
               {{ formatNumber(currentCount) }}/{{ formatNumber(neededCount) }}
             </button>
@@ -80,6 +80,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useCountEditController } from '@/composables/useCountEditController';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   const formatNumber = useLocaleNumberFormatter();
   const props = defineProps<{
@@ -92,35 +93,11 @@
     toggle: [];
     setCount: [count: number];
   }>();
-  const isEditing = ref(false);
-  const editValue = ref(0);
-  const inputRef = ref<HTMLInputElement | null>(null);
-  const startEditing = () => {
-    editValue.value = props.currentCount;
-    isEditing.value = true;
-    nextTick(() => {
-      inputRef.value?.focus();
-      inputRef.value?.select();
+  const { isEditing, editValue, inputRef, startEdit, commitEdit, cancelEdit } =
+    useCountEditController({
+      current: () => props.currentCount,
+      max: () => props.neededCount,
+      onUpdate: (count) => emit('setCount', count),
+      externalChangeBehavior: 'cancel',
     });
-  };
-  const submitEdit = () => {
-    if (isEditing.value) {
-      // Clamp value between 0 and neededCount
-      const clampedValue = Math.max(0, Math.min(editValue.value || 0, props.neededCount));
-      emit('setCount', clampedValue);
-      isEditing.value = false;
-    }
-  };
-  const cancelEdit = () => {
-    isEditing.value = false;
-  };
-  // Close editing if currentCount changes externally
-  watch(
-    () => props.currentCount,
-    () => {
-      if (isEditing.value) {
-        isEditing.value = false;
-      }
-    }
-  );
 </script>

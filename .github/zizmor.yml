@@ -15,7 +15,7 @@ rules:
       # The status-only preview controller is the intended trusted boundary for `workflow_run`
       # and `pull_request_target`: it checks out default-branch code, verifies candidate claims
       # against live GitHub state, and never installs or executes candidate code. Deployment lives
-      # in the explicit-dispatch workflow; see docs/SYSTEMS.md §18.
+      # in the explicit-dispatch workflow; see docs/SYSTEMS.md §19.
       - preview-state.yml
   # `./.github/actions/...` is the form the workflow fixtures in scripts/ci-tests assert on; the
   # `$/` alias is equivalent for a same-repository composite action and offers no security gain.

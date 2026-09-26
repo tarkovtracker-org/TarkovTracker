@@ -3,7 +3,7 @@ name: Preview
 # executed, installed, or used as Wrangler configuration. The controller verifies CI evidence and
 # the preview artifact's claims against live GitHub state, uploads only after an explicit trusted
 # dispatch, smoke-tests the unique deployment URL, and publishes the authoritative `Preview Result`
-# status. See docs/SYSTEMS.md §18. Automatic status refresh lives in preview-state.yml so
+# status. See docs/SYSTEMS.md §19. Automatic status refresh lives in preview-state.yml so
 # ordinary pull requests never instantiate skipped deployment or smoke-test jobs.
 on:
   workflow_dispatch:
