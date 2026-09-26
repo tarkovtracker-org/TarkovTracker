@@ -1729,7 +1729,7 @@ See `docs/WORKFLOW_AUTOMATION.md` for triggering, retry, and deployment behavior
 ## When this doc is wrong
 
 If you read something here that does not match the code, the disagreement is a bug — either in the
-code (fix the code) or in this doc (fix the doc in the same PR). `AGENTS.md`'s Maintenance Contract
+code (fix the code) or in this doc (fix the doc in the same PR). `AGENTS.md` (Scoped rules)
 requires updating this file whenever one of these systems changes. When in doubt, the code is the
 source of truth and this doc is the explanation of it.
 
@@ -1854,6 +1854,8 @@ CodeQL) is selected on every CI run. See
 
 - Pushes and dispatches retain full validation; only pull requests receive reduced selection.
 - Reduced selection never applies to `app/locales/en.json`; only non-English translations qualify.
+- Nested `AGENTS.md`/`CLAUDE.md` instruction files count as documentation, except under `public/`,
+  where they would ship as site assets. `format:check` covers them at every depth.
 - Empty, unreadable, or malformed diffs select full validation, workflow linting, and a preview.
 - Missing classifier output or selected jobs that fail, cancel, or unexpectedly skip fail CI Result.
 - Only deliberately unselected jobs may report skipped; systems drift and security always run.
@@ -2140,6 +2142,14 @@ the loader never reaches a real import.
 
 ## 19. Actions-owned Cloudflare previews
 
+Enabling auto-merge requests a preview for the validated PR CI run and attempt. The state
+workflow handles CI completion and metadata events; ordinary pushes wait for CI. Before CI
+finishes the status may be absent, or pending if a metadata event has already run. Main-push
+CI completions do not start a state job. The deployment workflow remains dispatch-only.
+Queued, running, and approval-waiting requests from the trusted `main` preview workflow are
+reused when their run ID matches and they were created after that CI attempt completed; completed failed or cancelled requests can be retried.
+State events serialize within their concurrency group instead of cancelling a dispatching job.
+
 **Summary.** Pull requests and eligible non-main dispatches do not rely on Cloudflare's
 automatic Git previews. The candidate `Validate` job builds the actual Pages output once with the
 anonymous preview profile (`scripts/preview/profile.mjs`), records a versioned manifest
@@ -2165,9 +2175,9 @@ succeed and it must retain a `preview-deployment-<sha>` artifact for the exact c
 ```text
 PR update → CI (selected validation + security + preview build + manifest + artifact)
           → CI Result succeeds
-          → status-only Preview State (workflow_run / pull_request_target) publishes pending
-          → maintainer comments `/preview` on a same-repository PR, or trusted merge automation
-            dispatches Preview for the successful CI run
+          → Preview State (workflow_run / pull_request_target) publishes pending
+          → auto-merge intent, maintainer `/preview`, or trusted merge automation requests Preview
+            for the validated PR CI run and attempt
           → ready PR + current head/base/test-merge + attempt + artifact claims verified
           → environment `preview` or `preview-fork` (maintainer approval for forks)
           → recheck → wrangler pages deploy --branch preview-* → deployment record verified
@@ -2222,7 +2232,7 @@ GitHub has computed the test merge; other pending reasons are left alone.
 - Successful deployments are deduplicated by revision, artifact digest, and profile version through
   the status marker. Before `ready_for_review` reuses a result, the controller authenticates the
   original run and its exact-SHA deployment artifact, then keeps that run URL on the new success.
-- Pull-request and CI-completion events run only the status-only `preview-state.yml` workflow, so
+- Pull-request and CI-completion events run only the trusted `preview-state.yml` workflow, so
   ordinary PRs do not instantiate skipped deployment or smoke-test jobs. These events and comment
   events never upload to Cloudflare. An exact `/preview` comment from a repository maintainer or
   administrator on a same-repository PR resolves the successful CI run matching that PR's number,
@@ -2231,8 +2241,9 @@ GitHub has computed the test merge; other pending reasons are left alone.
   `workflow_dispatch` from `main` can deploy, and it repeats the exact-SHA, CI, artifact, and
   freshness checks. Crowdin and release staging dispatch once after their own exact-SHA CI passes;
   allowlisted Dependabot auto-merge candidates dispatch from a trusted post-CI `workflow_run` after
-  all checks pass. Ordinary PR pushes
-  never request deployment. Cloudflare automatic preview builds are disabled while production Git
+  all checks pass. Dependabot remains owned by that workflow. Ordinary PR CI completions request
+  deployment only when auto-merge is enabled. Metadata requests use `auto_merge_enabled`; the
+  hourly reconciliation remains status-only. Cloudflare automatic preview builds are disabled while production Git
   deployments for `main` remain enabled.
 - The Pages-only deployment token is stored only in the protected `preview` and `preview-fork`
   environments, whose branch policy allows `main`; remove the repository-scoped copy. This prevents
@@ -2265,6 +2276,11 @@ GitHub has computed the test merge; other pending reasons are left alone.
   Dependabot read it on their PR's validated head. All still bind deployment evidence
   to the intended head revision (§14). Production deployment remains Cloudflare's Git
   integration for `main` and is unchanged.
+- The public repository's `pull_request_target` use is confined to `preview-state.yml` by a
+  repository-level Actions policy whose event allowlist is exactly `pull_request_target`,
+  `workflow_run`, and `schedule` for that workflow path. GitHub enforces its default
+  public-repository block of `pull_request_target` from 2026-11-02, so the policy is required
+  external state; `docs/WORKFLOW_AUTOMATION.md` records how to recreate it.
 
 Current gates consume `CI Result` and `Preview Result` on the validated head for PRs and
 standalone branch candidates. Both come from GitHub
@@ -2298,7 +2314,7 @@ deploys nor publishes required statuses. Ordinary CI still builds/uploads `pages
 
 ### Files
 
-- `.github/workflows/preview-state.yml` — automatic, status-only preview state refresh
+- `.github/workflows/preview-state.yml` — automatic preview state refresh and opt-in preview dispatch
 - `.github/workflows/preview.yml` — explicit trusted controller: plan, deploy, smoke, result jobs
 - `.github/workflows/preview-request.yml`, `scripts/preview/comment-request.mjs` — trusted
   maintainer comment request, current CI selection, and dispatch
