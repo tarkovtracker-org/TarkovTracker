@@ -2376,8 +2376,9 @@ flowchart LR
 
 ### Behavior details
 
-- Personal modifiers have negative point costs; negative modifiers grant positive points. A plan is
-  valid when its total is at least zero and no incompatible pair is selected.
+- Selecting a positive modifier subtracts points from the budget (a negative point value), while a
+  negative modifier adds points (a positive point value). A plan is valid when its total is at least
+  zero and no incompatible pair is selected.
 - Incompatibility is checked in both directions because older or edited data may list only one side
   of a pair.
 - Rehydration accepts only a matching user-scoped envelope and a string array of known personal
