@@ -1,7 +1,8 @@
-import { ARTIFACT_NAME, CI_WORKFLOW_PATH, STATUS_CONTEXT } from './profile.mjs';
+import { ARTIFACT_NAME, CI_WORKFLOW_PATH, PRODUCTION_BRANCH, STATUS_CONTEXT } from './profile.mjs';
 // GitHub Actions app id: only check runs and statuses created by Actions count as CI evidence.
 const ACTIONS_APP_ID = 15368;
 const CI_WORKFLOW_FILE = 'ci.yml';
+const PREVIEW_WORKFLOW_FILE = 'preview.yml';
 /** Live pull request state; the controller never trusts payload snapshots for freshness checks. */
 export async function getPull(github, repo, number) {
   const { data } = await github.rest.pulls.get({ ...repo, pull_number: number });
@@ -137,6 +138,46 @@ export async function listPullPaths(github, repo, number) {
   const paths = files.flatMap((file) => [file.filename, file.previous_filename].filter(Boolean));
   // GitHub caps the file listing; an incomplete listing must select the conservative decision.
   return files.length >= 3000 ? [] : paths;
+}
+function matchesPreviewRequest(run, decision) {
+  return [
+    run.path === '.github/workflows/preview.yml',
+    run.event === 'workflow_dispatch',
+    run.head_branch === PRODUCTION_BRANCH,
+    run.display_title === `Preview CI ${decision.runId}`,
+    Date.parse(run.created_at) >= Date.parse(decision.runCompletedAt),
+    run.status !== 'completed',
+  ].every(Boolean);
+}
+/** Active dispatches include queued runs and fork runs awaiting environment approval. */
+async function previewRequestInFlight(github, repo, decision) {
+  const statuses = ['queued', 'in_progress', 'waiting', 'pending', 'requested'];
+  const batches = await Promise.all(
+    statuses.map((status) =>
+      github.paginate(github.rest.actions.listWorkflowRuns, {
+        ...repo,
+        workflow_id: PREVIEW_WORKFLOW_FILE,
+        event: 'workflow_dispatch',
+        branch: PRODUCTION_BRANCH,
+        status,
+        per_page: 100,
+      })
+    )
+  );
+  // Filtered GitHub searches stop at 1,000 results. Never dispatch on incomplete evidence.
+  if (batches.some((runs) => runs.length >= 1000))
+    throw new Error('Active preview lookup exceeded GitHub search limit.');
+  return batches.flat().some((run) => matchesPreviewRequest(run, decision));
+}
+/** Sequential state events must not replace an active deployment for the same CI attempt. */
+export async function requestPreviewDispatch(github, repo, decision) {
+  if (await previewRequestInFlight(github, repo, decision)) return;
+  await github.rest.actions.createWorkflowDispatch({
+    ...repo,
+    workflow_id: PREVIEW_WORKFLOW_FILE,
+    ref: PRODUCTION_BRANCH,
+    inputs: { run_id: String(decision.runId) },
+  });
 }
 function truncateDescription(description) {
   return description.length > 140 ? `${description.slice(0, 137)}...` : description;
