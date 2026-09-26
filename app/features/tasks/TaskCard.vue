@@ -858,7 +858,7 @@
         const requirementStatuses = requirementStatusesByTaskId.value.get(parent.id);
         const statusesToCheck = requirementStatuses?.length ? requirementStatuses : [undefined];
         const unmetStatuses = statusesToCheck.filter(
-          (statuses) => !isTaskRequirementSatisfied(statuses, completion)
+          (statuses) => !isTaskRequirementSatisfied(statuses, completion, isUnlockable)
         );
         if (!unmetStatuses.length) return null;
         const expectedStatuses = Array.from(

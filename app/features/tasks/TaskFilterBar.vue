@@ -524,7 +524,7 @@
     failed: showFailedFilterButton.value,
   }));
   const visibleStatusViews = computed<TaskSecondaryView[]>(() => {
-    return (['all', 'active', 'available', 'locked', 'completed', 'failed'] as const).filter(
+    return (['all', 'available', 'active', 'locked', 'completed', 'failed'] as const).filter(
       (view) => statusViewVisibility.value[view]
     );
   });
