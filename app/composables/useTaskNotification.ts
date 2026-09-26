@@ -44,11 +44,16 @@ export function useTaskNotification(): TaskNotificationReturn {
     }
     taskStatusUpdated.value = false;
   };
+  const restoreTaskAcceptance = (taskId: string, wasActive: boolean) => {
+    if (wasActive) tarkovStore.setTaskActive(taskId);
+    else tarkovStore.setTaskUncompleted(taskId);
+  };
   const onTaskAction = (event: TaskActionPayload) => {
     const taskId = event.taskId;
     const taskName = event.taskName;
     const action = event.action;
     const wasManualFail = event.wasManualFail;
+    const wasActive = tarkovStore.isTaskActive(taskId);
     const entryTitleKeys: Partial<Record<TaskActionPayload['action'], string>> = {
       active: 'activity_log.entry.active',
       complete: 'activity_log.entry.completed',
@@ -84,7 +89,7 @@ export function useTaskNotification(): TaskNotificationReturn {
               });
               updateTaskStatus('page.tasks.questcard.undo_active', taskName);
             } else if (action === 'complete') {
-              tarkovStore.setTaskUncompleted(taskId);
+              restoreTaskAcceptance(taskId, wasActive);
               if (taskToUndo?.objectives) {
                 handleTaskObjectives(taskToUndo.objectives, 'setTaskObjectiveUncomplete');
               }
@@ -139,7 +144,7 @@ export function useTaskNotification(): TaskNotificationReturn {
               });
               updateTaskStatus('page.tasks.questcard.undo_reset_failed', taskName);
             } else if (action === 'fail') {
-              tarkovStore.setTaskUncompleted(taskId);
+              restoreTaskAcceptance(taskId, wasActive);
               if (taskToUndo?.objectives) {
                 handleTaskObjectives(taskToUndo.objectives, 'setTaskObjectiveUncomplete');
               }

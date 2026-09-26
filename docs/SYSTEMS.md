@@ -1979,6 +1979,8 @@ not import quest completions and therefore has no trader/task backfill path.
 
 ### Invariants
 
+- Undoing completion or failure restores whether the task was accepted before that action.
+
 - Canonical requirements, blockers, status comparisons and story alternatives are shared by UI and
   recommendations; no new dependency on the removed upstream task `alternatives` is introduced.
 - Known trader gates may be disabled by preference; unknown data never silently unlocks a task.
