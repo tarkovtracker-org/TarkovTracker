@@ -2256,9 +2256,11 @@ GitHub has computed the test merge; other pending reasons are left alone.
   ordinary PRs do not instantiate skipped deployment or smoke-test jobs. These events and comment
   events never upload to Cloudflare. An exact, unedited `/preview` comment from a current repository
   maintainer or administrator opts that PR into automatic previews, including forks; `/preview stop`
-  disables the opt-in. Commands predating the repository variable `PREVIEW_OPT_IN_START` cannot
-  become persistent grants. Set that variable to the activation time after the handler is on `main`;
-  missing or invalid configuration grants no persistent access.
+  disables the opt-in. Commands predating the rollout activation instant cannot become persistent
+  grants. The instant defaults to the contract start shipped with the handler commit, so no manual
+  post-merge variable flip is required; the optional canonical UTC `PREVIEW_OPT_IN_START` variable
+  overrides it, and any non-empty malformed value (the legacy `0`, date-only, zone-less or
+  impossible strings) fails closed and grants no persistent access — an explicit off switch.
   The request resolves matching successful CI before dispatching the trusted controller. Only a trusted
   `workflow_dispatch` from `main` can deploy, and it repeats the exact-SHA, CI, artifact, and
   freshness checks. Crowdin and release staging dispatch once after their own exact-SHA CI passes;
@@ -2278,10 +2280,15 @@ GitHub has computed the test merge; other pending reasons are left alone.
   role lookup; it never substitutes for the current maintain/admin permission check. Permissions
   are cached only within one scan. Immediately before upload, the command must still be enabled
   with the same ID and author.
-  A newer associated user's stop remains a revocation barrier after a role change; it cannot
-  reactivate an older opt-in. Resuming requires a fresh command from a current maintainer.
+  A newer associated user's stop remains a revocation barrier after a role change when its author
+  currently verifies as maintain/admin or when the handler accepted it while verifying — the
+  receipt comment from `github-actions[bot]` records that acceptance; a historical stop without
+  either is not honored and the previous enabled opt-in stays in control. Resuming requires a
+  fresh command from a current maintainer.
   Automatic dispatches carry the authorizing comment ID, so a command revoked before planning
-  cannot fall back to the manual deployment path.
+  cannot fall back to the manual deployment path. Trusted default-branch dispatches without a
+  bound comment (manual or automation-owned) own their authorization directly and are not revoked
+  by a later stop.
   A stop, deleted command, or revoked role prevents a queued opted-in upload. Each revision still
   requires fresh CI, manifest and digest verification, and smoke tests; the command grants preview
   intent for the PR, never a reusable CI result. Forks without a live opt-in deploy through

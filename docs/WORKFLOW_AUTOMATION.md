@@ -447,9 +447,20 @@ successful CI run requests it. Later revisions refresh automatically after succe
 `/preview stop` disables automatic requests; another `/preview` enables them again. Drafts remain
 paused and resume when marked ready. This opts into previews without opting into merging.
 The latest unedited command from a current maintainer controls the PR. Comments predating the
-repository variable `PREVIEW_OPT_IN_START` retain their original one-revision meaning and do not
-grant persistent access. The variable must be set to the activation time **after** this handler
-is merged to `main`; missing or invalid configuration grants no persistent preview access.
+opt-in activation instant retain their original one-revision meaning and do not grant persistent
+access. The activation instant defaults to the contract start shipped with the handler, so no
+manual post-merge variable flip is required; the optional repository variable
+`PREVIEW_OPT_IN_START` overrides it for continuity after handler reverts. A non-empty value must
+round-trip as a canonical UTC ISO instant — `0`, date-only, zone-less or impossible values fail
+closed and grant no persistent preview access (an override earlier than the contract start
+likewise grants nothing and serves as an explicit off switch).
+A `/preview stop` remains a revocation barrier when its author currently verifies as maintain/admin,
+or when the request handler accepted it while verifying access — recorded by an acceptance receipt
+comment from `github-actions[bot]`. A historical stop lacking both is not honored, so the previous
+enabled opt-in stays in control; resuming always happens with a fresh command from a current
+maintainer. Manual `workflow_dispatch` previews on the trusted default branch own their
+authorization directly: they carry no standing command authority and cannot be revoked by a later
+stop, while requests bound through `request_comment_id` are re-verified before upload.
 Dependabot retains its dedicated automatic preview owner; `/preview` can request its current
 revision, but does not add a second automatic dispatcher.
 Enabling auto-merge also requests previews when no explicit preview command overrides it.

@@ -525,6 +525,12 @@ async function evaluate({ github, context, inputs, workspace }, state) {
     pullRequestNumber(state.pull)
   );
   requireRequestedCommand(inputs, state.previewRequest);
+  state.previewAuthorization = commandAuthorization(
+    context,
+    inputs,
+    state.fork,
+    state.previewRequest
+  );
   return deployDecision({ github, context, state, workspace });
 }
 function requireRequestedCommand(inputs, request) {
@@ -573,6 +579,35 @@ function deploymentDecision(common, earlier, manifest, requiresApproval, headSha
 function enabledRequest(request) {
   return request?.enabled ? request : null;
 }
+/**
+ * Deploy authorization sources, tracked explicitly so phase 2 knows what to re-verify:
+ *
+ * - `request`: the dispatch carried `request_comment_id` and planning verified it against the
+ *   PR's live preview request (automatic command dispatches and reruns of a queued request).
+ *   Phase 2 re-verifies the same binding before upload.
+ * - `standing`: a fork candidate rides the PR's current opt-in into the protected `preview`
+ *   environment without an explicit binding. Phase 2 re-verifies the opt-in too.
+ * - `dispatch`: no command authorization — a same-repo trusted default-branch workflow dispatch
+ *   (manual or automation-owned) or a fork awaiting manual approval. A later stop cannot revoke
+ *   these; revision, CI, artifact and freshness checks still apply.
+ */
+const COMMAND_AUTHORIZATIONS = ['request', 'standing'];
+/**
+ * - `request`: the dispatch carried `request_comment_id` and planning verified it against the
+ *   PR's live preview request, or an automatic event will bind its follow-up dispatch to the
+ *   live opt-in. Phase 2 re-verifies the same binding before upload.
+ * - `standing`: a fork candidate rides the PR's current opt-in into the protected `preview`
+ *   environment without an explicit binding. Phase 2 re-verifies the opt-in too.
+ * - `dispatch`: no command authorization — a same-repo trusted default-branch workflow dispatch
+ *   (manual or automation-owned) or a fork awaiting manual approval. A later stop cannot revoke
+ *   these; revision, CI, artifact and freshness checks still apply.
+ */
+function commandAuthorization(context, inputs, fork, request) {
+  if (optional(inputs, 'request_comment_id')) return 'request';
+  if (!request?.enabled) return 'dispatch';
+  if (context.eventName !== 'workflow_dispatch') return 'request';
+  return fork ? 'standing' : 'dispatch';
+}
 function deploymentEnvironment(fork, request) {
   return fork && !request ? ENVIRONMENTS.fork : ENVIRONMENTS.internal;
 }
@@ -587,7 +622,8 @@ async function deployDecision({ github, context, state, workspace }) {
     run,
     destination,
   });
-  const previewRequest = enabledRequest(state.previewRequest);
+  const commandBound = COMMAND_AUTHORIZATIONS.includes(state.previewAuthorization);
+  const previewRequest = commandBound ? enabledRequest(state.previewRequest) : null;
   const common = {
     ...decisionBase(state),
     artifactId: artifact.id,
@@ -596,6 +632,7 @@ async function deployDecision({ github, context, state, workspace }) {
     previewBranch: manifest.previewBranch,
     appUrl: manifest.appUrl,
     previewRequest,
+    previewAuthorization: state.previewAuthorization,
     environment: deploymentEnvironment(fork, previewRequest),
   };
   const earlier = await previousSuccess(github, context, candidate.headSha, manifest.digest);
@@ -830,8 +867,10 @@ function assertDeployablePlan(decision) {
     throw new Error('Refusing to deploy to a non-preview branch.');
 }
 function usesCommandApproval(decision) {
+  // The tracked source decides; the fork/preview coherence clause fails closed on a mutated
+  // decision that routes a fork through the protected `preview` environment without command auth.
   return (
-    Boolean(decision.previewRequest) ||
+    COMMAND_AUTHORIZATIONS.includes(decision.previewAuthorization) ||
     (decision.fork && decision.environment === ENVIRONMENTS.internal)
   );
 }

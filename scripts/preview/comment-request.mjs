@@ -9,6 +9,7 @@ import {
 import {
   isPreviewMaintainer,
   previewCommand,
+  previewStopReceipt,
   readPreviewRequest,
 } from './request-authorization.mjs';
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
@@ -145,7 +146,7 @@ export async function requestPreviewFromComment({ github, context }) {
   const request = await currentCommand(github, context);
   const pull = await getPull(github, repo, payload.issue.number);
   const result = previewIntent(pull, payload.comment.body);
-  if (!result.enabled) return result;
+  if (!result.enabled) return { ...result, stopCommentId: request.commentId };
   requireOpenPull(pull);
   result.previewRequired = await hasDeployablePaths(github, repo, pull);
   if (![result.previewRequired, pullReady(pull)].every(Boolean)) return result;
@@ -157,8 +158,12 @@ function currentPreviewMessage(request) {
   return 'The next successful CI run will request a preview. Drafts remain paused.';
 }
 export function previewRequestMessage(request, runs) {
-  if (!request.enabled)
-    return 'Preview opt-in disabled for this PR. Comment `/preview` to enable it again. Dependabot keeps its separate automation.';
+  if (!request.enabled) {
+    // The bot receipt proves this stop was accepted after verifying the author's maintain/admin
+    // access, so it stays a revocation barrier even if the author later loses the role.
+    const receipt = request.stopCommentId ? `\n${previewStopReceipt(request.stopCommentId)}` : '';
+    return `Preview opt-in disabled for this PR. Comment \`/preview\` to enable it again. Dependabot keeps its separate automation.${receipt}`;
+  }
   if (!request.automatic) {
     const current = request.ciRunId
       ? 'The current preview was requested.'

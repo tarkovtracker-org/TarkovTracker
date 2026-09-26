@@ -574,6 +574,8 @@ test('auto-merge requests one trusted dispatch after CI instead of uploading', a
   });
   assert.equal(enabled.decision.action, 'request');
   assert.equal(enabled.state.dispatches.length, 1);
+  assert.equal(enabled.decision.previewAuthorization, 'dispatch');
+  assert.equal(enabled.decision.previewRequest, null);
   // CI still running: nothing to request yet; the CI completion event requests it later.
   const running = await plan(t, pullTargetContext(pullFixture(autoMerge), 'auto_merge_enabled'), {
     pull: autoMerge,
@@ -738,6 +740,7 @@ test('one maintainer command requests previews after later CI runs and when a dr
   }
   const ready = await plan(t, pullTargetContext(pullFixture(), 'ready_for_review'), { comments });
   assert.equal(ready.decision.action, 'request');
+  assert.equal(ready.decision.previewAuthorization, 'request');
   const draft = await plan(t, workflowRunContext(), { comments, pull: { draft: true } });
   assert.equal(draft.decision.action, 'skip');
   assert.deepEqual(draft.state.dispatches, []);
@@ -804,9 +807,11 @@ test('a live maintainer command authorizes fork deployment without a second appr
   const options = { run, pull, comments: [previewRequestComment()] };
   const automatic = await plan(t, workflowRunContext(run), options);
   assert.equal(automatic.decision.action, 'request');
+  assert.equal(automatic.decision.previewAuthorization, 'request');
   const context = workflowDispatchContext();
   const deployed = await plan(t, context, { ...options, inputs: { run_id: 900 } });
   assert.equal(deployed.decision.action, 'deploy');
+  assert.equal(deployed.decision.previewAuthorization, 'standing');
   assert.equal(deployed.decision.environment, ENVIRONMENTS.internal);
   assert.equal(deployed.decision.previewRequest.requestedBy, 'maintainer');
   const { github, core, decision, state } = deployed;
@@ -841,6 +846,42 @@ test('a live maintainer command authorizes fork deployment without a second appr
       core,
       decision: { ...decision, previewRequest: null },
       destination: join(tempDir(t), 'missing'),
+    }),
+    /revoked or superseded/
+  );
+});
+test('a manual same-repo dispatch owns its authorization and survives a later stop', async (t) => {
+  const context = workflowDispatchContext();
+  // The PR has an active opt-in, but a plain workflow_dispatch from the trusted default branch
+  // must not inherit standing-command authority: later stops cannot revoke an in-flight run.
+  const { decision, github, state } = await plan(t, context, {
+    comments: [previewRequestComment()],
+    inputs: { run_id: '900' },
+  });
+  assert.equal(decision.action, 'deploy', decision.description);
+  assert.equal(decision.previewAuthorization, 'dispatch');
+  assert.equal(decision.previewRequest, null);
+  state.comments.push(previewRequestComment(2, '/preview stop'));
+  await verifyForDeploy({
+    github,
+    context,
+    core: fakeCore(),
+    decision,
+    destination: join(tempDir(t), 'manual'),
+  });
+  // The same revocation still fails an explicitly bound queued request.
+  const bound = {
+    ...decision,
+    previewAuthorization: 'request',
+    previewRequest: { commentId: 1, enabled: true, requestedBy: 'maintainer' },
+  };
+  await assert.rejects(
+    verifyForDeploy({
+      github,
+      context,
+      core: fakeCore(),
+      decision: bound,
+      destination: join(tempDir(t), 'bound'),
     }),
     /revoked or superseded/
   );
