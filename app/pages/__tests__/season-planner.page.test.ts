@@ -7,17 +7,30 @@ const { seoMetaMock } = vi.hoisted(() => ({
   seoMetaMock: vi.fn(),
 }));
 mockNuxtImport('useSeoMeta', () => seoMetaMock);
-vi.mock('vue-i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('vue-i18n')>()),
-  useI18n: () => ({
-    t: (key: string, values?: string | Record<string, unknown>, choice?: number) => {
-      if (key === 'page.season_planner.points_needed' && typeof values === 'object') {
-        const points = values.points;
-        return `Add ${points} more ${choice === 1 ? 'point' : 'points'} to make this plan valid.`;
-      }
-      return typeof values === 'string' ? values : key;
-    },
-  }),
+mockNuxtImport('useI18n', () => () => ({
+  t: (key: string, values?: string | Record<string, unknown>, choice?: number) => {
+    if (key === 'page.season_planner.points_needed' && typeof values === 'object') {
+      const points = values.points;
+      return `Add ${points} more ${choice === 1 ? 'point' : 'points'} to make this plan valid.`;
+    }
+    const messages: Record<string, string> = {
+      'page.season_planner.title': 'Season Planner',
+      'page.season_planner.description':
+        'Plan your Kord Breach seasonal character modifiers and balance your point budget.',
+      'page.season_planner.total_points': 'Total Points',
+      'page.season_planner.reset': 'Reset Plan',
+      'page.season_planner.conflict_title': 'Modifier Conflict',
+      'page.season_planner.conflict_description':
+        'Some selected modifiers cannot be used together. Remove one of the conflicting modifiers.',
+      'page.season_planner.invalid_total_title': 'Invalid Point Total',
+      'page.season_planner.positive_modifiers': 'Positive Modifiers',
+      'page.season_planner.negative_modifiers': 'Negative Modifiers',
+      'page.season_planner.hardcore_modifiers': 'Hardcore Rules',
+      'page.season_planner.hardcore_description':
+        "Global rules that apply to all seasonal characters. They don't affect your points but define the season's challenge.",
+    };
+    return messages[key] ?? key;
+  },
 }));
 describe('season planner page', () => {
   const globalConfig = {

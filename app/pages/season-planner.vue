@@ -11,15 +11,10 @@
             </span>
             <div>
               <h1 class="text-surface-100 text-2xl font-bold tracking-tight">
-                {{ t('page.season_planner.title', 'Season Planner') }}
+                {{ t('page.season_planner.title') }}
               </h1>
               <p class="text-surface-400 text-sm">
-                {{
-                  t(
-                    'page.season_planner.description',
-                    'Plan your Kord Breach seasonal character modifiers and balance your point budget.'
-                  )
-                }}
+                {{ t('page.season_planner.description') }}
               </p>
             </div>
           </div>
@@ -28,7 +23,7 @@
               class="bg-surface-800 border-surface-700 flex items-center gap-3 rounded-lg border px-4 py-2"
             >
               <span class="text-surface-300 text-sm font-medium">
-                {{ t('page.season_planner.total_points', 'Total Points') }}
+                {{ t('page.season_planner.total_points') }}
               </span>
               <span
                 :class="plannerStore.isValid ? 'text-primary-400' : 'text-red-400'"
@@ -38,7 +33,7 @@
               </span>
             </div>
             <UButton color="neutral" variant="soft" @click="plannerStore.reset()">
-              {{ t('page.season_planner.reset', 'Reset Plan') }}
+              {{ t('page.season_planner.reset') }}
             </UButton>
           </div>
         </div>
@@ -47,13 +42,8 @@
             icon="i-heroicons-exclamation-triangle"
             color="error"
             variant="soft"
-            :title="t('page.season_planner.conflict_title', 'Modifier Conflict')"
-            :description="
-              t(
-                'page.season_planner.conflict_description',
-                'Some selected modifiers cannot be used together. Remove one of the conflicting modifiers.'
-              )
-            "
+            :title="t('page.season_planner.conflict_title')"
+            :description="t('page.season_planner.conflict_description')"
           />
         </div>
         <div v-else-if="!plannerStore.isValid" class="mb-6">
@@ -61,7 +51,7 @@
             icon="i-heroicons-exclamation-triangle"
             color="error"
             variant="soft"
-            :title="t('page.season_planner.invalid_total_title', 'Invalid Point Total')"
+            :title="t('page.season_planner.invalid_total_title')"
             :description="
               t(
                 'page.season_planner.points_needed',
@@ -75,7 +65,7 @@
           <div class="lg:col-span-1">
             <h2 class="text-surface-100 mb-4 flex items-center gap-2 text-lg font-semibold">
               <UIcon name="i-heroicons-plus-circle" class="text-primary-400 h-5 w-5" />
-              {{ t('page.season_planner.positive_modifiers', 'Positive Modifiers') }}
+              {{ t('page.season_planner.positive_modifiers') }}
             </h2>
             <div class="space-y-3">
               <ModifierCard
@@ -91,7 +81,7 @@
           <div class="lg:col-span-1">
             <h2 class="text-surface-100 mb-4 flex items-center gap-2 text-lg font-semibold">
               <UIcon name="i-heroicons-minus-circle" class="h-5 w-5 text-red-400" />
-              {{ t('page.season_planner.negative_modifiers', 'Negative Modifiers') }}
+              {{ t('page.season_planner.negative_modifiers') }}
             </h2>
             <div class="space-y-3">
               <ModifierCard
@@ -107,16 +97,11 @@
           <div class="lg:col-span-1">
             <h2 class="text-surface-100 mb-4 flex items-center gap-2 text-lg font-semibold">
               <UIcon name="i-heroicons-fire" class="h-5 w-5 text-orange-400" />
-              {{ t('page.season_planner.hardcore_modifiers', 'Hardcore Rules') }}
+              {{ t('page.season_planner.hardcore_modifiers') }}
             </h2>
             <div class="bg-surface-800/50 border-surface-700 rounded-lg border p-4">
               <p class="text-surface-400 mb-4 text-sm italic">
-                {{
-                  t(
-                    'page.season_planner.hardcore_description',
-                    "Global rules that apply to all seasonal characters. They don't affect your points but define the season's challenge."
-                  )
-                }}
+                {{ t('page.season_planner.hardcore_description') }}
               </p>
               <div class="space-y-3">
                 <div
@@ -125,15 +110,10 @@
                   class="bg-surface-900/50 border-surface-700 flex flex-col gap-1 rounded-md border p-3"
                 >
                   <span class="text-surface-100 text-sm font-semibold">
-                    {{ t(`page.season_planner.modifiers.${modifier.id}.name`, modifier.name) }}
+                    {{ t(`page.season_planner.modifiers.${modifier.id}.name`) }}
                   </span>
                   <span class="text-surface-400 text-xs">
-                    {{
-                      t(
-                        `page.season_planner.modifiers.${modifier.id}.description`,
-                        modifier.description
-                      )
-                    }}
+                    {{ t(`page.season_planner.modifiers.${modifier.id}.description`) }}
                   </span>
                 </div>
               </div>
@@ -154,12 +134,8 @@
     usesWindowScroll: true,
   });
   useSeoMeta({
-    title: () => t('page.season_planner.seo_title', 'Season Planner - Kord Breach'),
-    description: () =>
-      t(
-        'page.season_planner.seo_description',
-        'Plan your Escape from Tarkov Kord Breach seasonal character modifiers and point balance.'
-      ),
+    title: () => t('page.season_planner.seo_title'),
+    description: () => t('page.season_planner.seo_description'),
   });
   const plannerStore = useSeasonPlannerStore();
   watch(getCurrentSupabaseUserId, () => plannerStore.normalizeSelection(), { immediate: true });

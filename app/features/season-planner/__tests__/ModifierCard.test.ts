@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ModifierCard from '@/features/season-planner/ModifierCard.vue';
 import type { PersonalModifier } from '@/types/season';
 const { translateMock } = vi.hoisted(() => ({
-  translateMock: vi.fn((_key: string, fallback: string) => fallback),
+  translateMock: vi.fn((key: string) => key),
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
@@ -20,7 +20,9 @@ const mockModifier: PersonalModifier = {
 describe('ModifierCard', () => {
   beforeEach(() => {
     translateMock.mockReset();
-    translateMock.mockImplementation((_key: string, fallback: string) => fallback);
+    translateMock.mockImplementation((key: string) =>
+      key.endsWith('.name') ? 'Marathon Runner' : 'Arm and leg stamina is consumed 15% slower.'
+    );
   });
   it('renders modifier details correctly', () => {
     const wrapper = mount(ModifierCard, {
@@ -48,8 +50,8 @@ describe('ModifierCard', () => {
     expect(wrapper.text()).toContain('+4');
   });
   it('renders localized modifier text when a translation is available', () => {
-    translateMock.mockImplementation((key: string, fallback: string) =>
-      key.endsWith('.name') ? 'Localized Marathon Runner' : fallback
+    translateMock.mockImplementation((key: string) =>
+      key.endsWith('.name') ? 'Localized Marathon Runner' : 'Localized description'
     );
     const wrapper = mount(ModifierCard, {
       props: {
@@ -59,8 +61,7 @@ describe('ModifierCard', () => {
     });
     expect(wrapper.text()).toContain('Localized Marathon Runner');
     expect(translateMock).toHaveBeenCalledWith(
-      'page.season_planner.modifiers.marathon_runner.name',
-      'Marathon Runner'
+      'page.season_planner.modifiers.marathon_runner.name'
     );
   });
   it('applies correct classes and accessibility attributes when selected', () => {

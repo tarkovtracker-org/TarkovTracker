@@ -17,7 +17,7 @@
         class="text-sm font-semibold transition-colors"
         :class="selected ? 'text-primary-300' : 'text-surface-100'"
       >
-        {{ t(modifierNameKey, modifier.name) }}
+        {{ t(modifierNameKey) }}
       </span>
       <span
         class="text-xs font-bold tabular-nums"
@@ -30,7 +30,7 @@
       </span>
     </div>
     <p class="text-surface-400 text-xs leading-relaxed">
-      {{ t(modifierDescriptionKey, modifier.description) }}
+      {{ t(modifierDescriptionKey) }}
     </p>
     <div v-if="selected" class="bg-primary-500 absolute top-2 right-2 h-1.5 w-1.5 rounded-full" />
   </button>
