@@ -932,6 +932,17 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   byte-identical to the active copy, a recovery copy, or a newer backup. Session transitions and
   deliberate resets clear only the active key, so recovery copies and unique legacy backups are
   never deleted automatically.
+- **Sign-out.** Every sign-out entry point uses `useSignOut`. It signs out immediately unless the
+  changes are memory-only (local save failed and cloud changes pending); then
+  `SignOutConfirmModal` explains the loss risk and defaults to staying signed in. Retry and
+  export never sign out; only the explicit discard action does. The Supabase plugin falls back to
+  a `scope: 'local'` sign-out when global revocation fails, so signing out works offline.
+- **Removing device data.** `DeviceDataCard` (Settings → Account) is the explicit action,
+  distinct from sign-out and from cloud deletion. It registers `requestDeviceDataRemoval` before
+  signing out so the progress and preferences session transitions retain no copy for that owner,
+  then `removeAccountDeviceData` deletes the owner's active copies, recovery copy, and legacy
+  backups. Other accounts' data and cloud progress are untouched; the next sign-in clears the
+  request. Account deletion uses the same removal for the deleted account.
 
 ### Files
 
@@ -968,6 +979,9 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   retry, manual retry, and export guidance
 - `app/stores/tarkov/accountRecovery.ts`, `app/stores/tarkov/storageQuota.ts` — per-account
   recovery copies and redundancy-only storage cleanup
+- `app/composables/useSignOut.ts`, `app/shell/SignOutConfirmModal.vue`,
+  `app/stores/tarkov/deviceData.ts`, `app/features/settings/DeviceDataCard.vue` — confirmed
+  sign-out for memory-only changes and explicit device-data removal
 - `app/server/api/profile/[userId]/[mode].get.ts`,
   `app/server/api/streamer/[userId]/[mode]/kappa.get.ts`, `app/server/api/team/members.ts` —
   mode-aware sharing and team routes
@@ -992,6 +1006,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   session reset clears both, and a disposed controller cannot publish status for the next session.
 - An account recovery copy is restored or synchronized only while its owner is signed in, and
   automatic cleanup never removes a recovery copy or a legacy backup with unique content.
+- Sign-out never requires cloud connectivity, and memory-only changes are discarded only after
+  the player explicitly confirms the discard action.
 - Legacy `user_system.team` / `team_id` values are used only when neither persistent mode-specific
   team ID exists. They must never make a PvP team appear as the active PvE team or vice versa.
 - Team creation maps both the `team_memberships_user_mode_unique` SQLSTATE `23505` conflict and

@@ -176,6 +176,7 @@ const mountAppBar = async () => {
         },
         Omnibar: true,
         ProgressSaveStatusIndicator: true,
+        SignOutConfirmModal: true,
         SelectMenuFixed: SelectMenuFixedStub,
         UButton: {
           props: ['icon'],
@@ -357,6 +358,42 @@ describe('AppBar account menu', () => {
     await logoutMenuItem.trigger('click');
     await flushPromises();
     expect(mockSupabase.signOut).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+  });
+  it('asks for confirmation instead of discarding memory-only progress changes', async () => {
+    const status = await import('@/stores/tarkov/progressSaveStatus');
+    const { useSignOut } = await import('@/composables/useSignOut');
+    status.recordLocalSave(false, 'quota');
+    status.setCloudSaveStatus({
+      state: 'failed',
+      failure: 'offline',
+      retryAttempt: 3,
+      nextRetryAt: null,
+    });
+    const wrapper = await mountAppBar();
+    await wrapper.get('[data-menu-item="navigation_drawer.logout"]').trigger('click');
+    await flushPromises();
+    expect(mockSupabase.signOut).not.toHaveBeenCalled();
+    expect(useSignOut().confirmOpen.value).toBe(true);
+    useSignOut().confirmOpen.value = false;
+    status.recordLocalSave(true);
+    status.resetCloudSaveStatus();
+    wrapper.unmount();
+  });
+  it('signs out without confirmation when pending changes are saved locally', async () => {
+    const status = await import('@/stores/tarkov/progressSaveStatus');
+    status.recordLocalSave(true);
+    status.setCloudSaveStatus({
+      state: 'failed',
+      failure: 'offline',
+      retryAttempt: 3,
+      nextRetryAt: null,
+    });
+    const wrapper = await mountAppBar();
+    await wrapper.get('[data-menu-item="navigation_drawer.logout"]').trigger('click');
+    await flushPromises();
+    expect(mockSupabase.signOut).toHaveBeenCalledTimes(1);
+    status.resetCloudSaveStatus();
     wrapper.unmount();
   });
 });

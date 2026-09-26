@@ -20,6 +20,7 @@ import {
   type PersistedPreferencesState,
   type PersistedPreferencesStateWithLegacy,
 } from '@/stores/preferences/sanitizers';
+import { isDeviceDataRemovalPending } from '@/stores/tarkov/deviceData';
 import {
   isValidPrimaryView,
   type TaskPrimaryView,
@@ -1092,7 +1093,8 @@ export const resetPreferencesStoreForSessionTransition = (
   if (!import.meta.client) {
     return;
   }
-  if (preservedState) {
+  // An explicit device-data removal keeps no preferences copy for the previous owner.
+  if (preservedState && !isDeviceDataRemovalPending(previousUserId)) {
     localStorage.setItem(STORAGE_KEYS.preferences, preservedState);
     return;
   }

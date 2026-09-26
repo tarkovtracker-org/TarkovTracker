@@ -1,5 +1,6 @@
 <script setup lang="ts">
   import LoginRequiredAlert from '@/components/ui/LoginRequiredAlert.vue';
+  import { removeAccountDeviceData, requestDeviceDataRemoval } from '@/stores/tarkov/deviceData';
   import { useActivityLogStore } from '@/stores/useActivityLogStore';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useSystemStore } from '@/stores/useSystemStore';
@@ -269,7 +270,13 @@
     tarkovStore.$reset();
     clearUserScopedAppStorage(localStorage, { includeAuthSessions: true });
   };
+  /** A deleted account keeps no recovery copy on this device; other accounts keep theirs. */
+  const forgetAccountOnDevice = (userId: string | null) => {
+    if (userId) removeAccountDeviceData(userId);
+  };
   const redirectToHome = async () => {
+    const deletedUserId = $supabase.user.id ?? null;
+    if (deletedUserId) requestDeviceDataRemoval(deletedUserId);
     showSuccessDialog.value = false;
     logger.info('Signing out user and redirecting to dashboard...');
     try {
@@ -279,6 +286,7 @@
       logger.error('Failed to sign out and redirect:', error);
     } finally {
       resetClientState();
+      forgetAccountOnDevice(deletedUserId);
       window.location.href = '/';
     }
   };

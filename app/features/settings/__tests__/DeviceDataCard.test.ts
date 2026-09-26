@@ -1,0 +1,109 @@
+// @vitest-environment happy-dom
+import { mockNuxtImport } from '@nuxt/test-utils/runtime';
+import { flushPromises, mount } from '@vue/test-utils';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { resetCloudSaveStatus, setCloudSaveStatus } from '@/stores/tarkov/progressSaveStatus';
+const { calls, deviceData, signOutNow, toastAdd, user } = vi.hoisted(() => {
+  const order: string[] = [];
+  return {
+    calls: order,
+    deviceData: {
+      requestDeviceDataRemoval: vi.fn(() => order.push('request')),
+      clearDeviceDataRemoval: vi.fn(() => order.push('clear')),
+      removeAccountDeviceData: vi.fn(() => order.push('remove')),
+    },
+    signOutNow: vi.fn(async () => {
+      order.push('signOut');
+      return true;
+    }),
+    toastAdd: vi.fn(),
+    user: { id: 'user-1' as string | null, loggedIn: true },
+  };
+});
+vi.mock('@/stores/tarkov/deviceData', () => deviceData);
+vi.mock('@/composables/useSignOut', () => ({ useSignOut: () => ({ signOutNow }) }));
+vi.mock('@/composables/useDataBackup', () => ({
+  useDataBackup: () => ({ exportProgress: vi.fn() }),
+}));
+vi.mock('vue-i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-i18n')>()),
+  useI18n: () => ({ t: (key: string) => key }),
+}));
+vi.mock('@/utils/logger', () => ({
+  logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+}));
+mockNuxtImport('useToast', () => () => ({ add: toastAdd }));
+mockNuxtImport('useNuxtApp', () => () => ({ $supabase: { user } }));
+const mountCard = async () => {
+  const { default: Card } = await import('@/features/settings/DeviceDataCard.vue');
+  return mount(Card, {
+    global: {
+      stubs: {
+        GenericCard: { template: '<section><slot name="content" /></section>' },
+        UModal: {
+          props: ['open'],
+          template:
+            '<div v-if="open"><slot name="body" /><slot name="footer" :close="() => {}" /></div>',
+        },
+        UAlert: { props: ['title'], template: '<p v-bind="$attrs">{{ title }}</p>' },
+        UIcon: true,
+        UButton: {
+          props: ['disabled'],
+          emits: ['click'],
+          template:
+            '<button v-bind="$attrs" :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
+        },
+      },
+    },
+  });
+};
+describe('DeviceDataCard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    calls.length = 0;
+    resetCloudSaveStatus();
+    user.id = 'user-1';
+    user.loggedIn = true;
+    signOutNow.mockImplementation(async () => {
+      calls.push('signOut');
+      return true;
+    });
+  });
+  it('registers the removal before signing out, then removes stored copies', async () => {
+    const wrapper = await mountCard();
+    await wrapper.get('[data-testid="device-data-remove"]').trigger('click');
+    expect(wrapper.find('[data-testid="device-data-pending-warning"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="device-data-confirm"]').trigger('click');
+    await flushPromises();
+    expect(calls).toEqual(['request', 'signOut', 'remove']);
+    expect(deviceData.removeAccountDeviceData).toHaveBeenCalledWith('user-1');
+    expect(toastAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'settings.device_data.removed' })
+    );
+  });
+  it('removes nothing and cancels the request when sign-out fails', async () => {
+    signOutNow.mockImplementation(async () => {
+      calls.push('signOut');
+      return false;
+    });
+    const wrapper = await mountCard();
+    await wrapper.get('[data-testid="device-data-remove"]').trigger('click');
+    await wrapper.get('[data-testid="device-data-confirm"]').trigger('click');
+    await flushPromises();
+    expect(calls).toEqual(['request', 'signOut', 'clear']);
+    expect(deviceData.removeAccountDeviceData).not.toHaveBeenCalled();
+  });
+  it('warns that pending cloud changes will be discarded and offers export', async () => {
+    setCloudSaveStatus({ state: 'failed', failure: 'offline', retryAttempt: 3, nextRetryAt: null });
+    const wrapper = await mountCard();
+    await wrapper.get('[data-testid="device-data-remove"]').trigger('click');
+    expect(wrapper.find('[data-testid="device-data-pending-warning"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="device-data-export"]').exists()).toBe(true);
+  });
+  it('is unavailable while signed out', async () => {
+    user.id = null;
+    user.loggedIn = false;
+    const wrapper = await mountCard();
+    expect(wrapper.get('[data-testid="device-data-remove"]').attributes('disabled')).toBeDefined();
+  });
+});

@@ -20,6 +20,11 @@ import {
 import { resetApiUpdateState } from '@/stores/tarkov/apiUpdateNotifier';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
 import {
+  clearDeviceDataRemoval,
+  isDeviceDataRemovalPending,
+  removeAccountDeviceData,
+} from '@/stores/tarkov/deviceData';
+import {
   enforceHideoutPrereqs,
   notifyHideoutPrereqEnforcement,
 } from '@/stores/tarkov/hideoutPrereqs';
@@ -1238,15 +1243,37 @@ export function resetTarkovSync(
 /** Without a running controller, acknowledgement of the local copy cannot be proven. */
 const mayHaveUnacknowledgedChanges = (): boolean =>
   !syncController || (syncController.hasPendingChanges?.() ?? true);
+/**
+ * Unacknowledged changes stay recoverable for their owner after sign-out, even if another
+ * account or a guest session later overwrites the active copy. An explicit device-data
+ * removal for that owner retains nothing.
+ */
+const retainPreviousOwnerCopy = (preservedState: string | null, previousUserId: string | null) => {
+  if (isDeviceDataRemovalPending(previousUserId)) return;
+  if (mayHaveUnacknowledgedChanges()) saveAccountRecoveryCopy(preservedState, previousUserId);
+};
+/** Returns `true` when the previous owner's active copy was restored for a guest session. */
+const restorePreviousOwnerCopy = (
+  preservedState: string | null,
+  previousUserId: string | null,
+  currentUserId: string | null
+): boolean => {
+  if (isDeviceDataRemovalPending(previousUserId)) {
+    removeAccountDeviceData(previousUserId as string);
+    return false;
+  }
+  return (
+    Boolean(preservedState && currentUserId === null) &&
+    safeSetItem(STORAGE_KEYS.progress, preservedState as string)
+  );
+};
 export function resetTarkovStoreForSessionTransition(
   previousUserId: string | null = null,
   reason?: string
 ) {
   const preservedState = getPreservedProgressStorageValue(previousUserId);
   const currentUserId = getCurrentSupabaseUserId();
-  // Unacknowledged changes stay recoverable for their owner after sign-out, even if
-  // another account or a guest session later overwrites the active copy.
-  if (mayHaveUnacknowledgedChanges()) saveAccountRecoveryCopy(preservedState, previousUserId);
+  retainPreviousOwnerCopy(preservedState, previousUserId);
   resetProgressMetadataHydration();
   resetTarkovSync(reason, {
     preservePersistedStateForUserId: previousUserId,
@@ -1255,11 +1282,7 @@ export function resetTarkovStoreForSessionTransition(
   if (!import.meta.client) {
     return;
   }
-  if (preservedState && currentUserId === null) {
-    if (safeSetItem(STORAGE_KEYS.progress, preservedState)) {
-      return;
-    }
-  }
+  if (restorePreviousOwnerCopy(preservedState, previousUserId, currentUserId)) return;
   // Only the active copy is cleared: recovery copies belong to their owners.
   clearActiveProgressStorage();
 }
@@ -1289,6 +1312,8 @@ export async function initializeTarkovSync() {
       ownsStartup() && $supabase.user.loggedIn === true && $supabase.user.id === currentUserId;
     const supabaseClient = $supabase.client;
     logger.debug('[TarkovStore] Setting up Supabase sync and listener');
+    // A new sign-in ends any device-data removal requested for the previous session.
+    clearDeviceDataRemoval();
     // Another account's active copy must survive this sign-in as its recovery copy.
     preserveForeignActiveCopy(currentUserId);
     const pendingLocalSnapshot =

@@ -126,6 +126,14 @@
     "export_button": "Export progress",
     "export_hint": "Export downloads your current progress as a backup file, even when saving has failed."
   },
+  "sign_out_confirm": {
+    "title": "Sign out with unsaved changes?",
+    "risk": "Your latest progress changes are not saved in this browser or to the cloud. If you sign out now, they will be lost.",
+    "options": "You can stay signed in and retry saving, or export your current progress before deciding.",
+    "stay_signed_in": "Stay signed in",
+    "discard_and_sign_out": "Sign out and discard changes",
+    "retry_succeeded": "Your changes were saved to the cloud. You can sign out safely."
+  },
   "omnibar": {
     "title": "Search",
     "description": "Search tasks, needed items, and hideout stations",
@@ -2439,6 +2447,17 @@
         "verification_failed": "Human verification failed. Reload the page and try again.",
         "fetch_failed": "Unable to fetch the Tarkov.dev profile. Open the profile on Tarkov.dev, then try again."
       }
+    },
+    "device_data": {
+      "title": "Data on this device",
+      "description": "Signing out keeps this account's saved progress in this browser, so changes that have not reached the cloud yet can sync when you sign back in. Removing this device's data deletes this account's progress, recovery copies, and preferences from this browser and signs you out.",
+      "cloud_unaffected": "Your cloud progress is not deleted. Other accounts' data on this device is not affected.",
+      "remove_button": "Remove this account's data from this device",
+      "confirm_title": "Remove this account's data from this device?",
+      "confirm_description": "This account's progress, recovery copies, and preferences will be deleted from this browser, and you will be signed out. Your cloud progress stays available when you sign in again.",
+      "pending_warning": "Some progress changes have not been saved to the cloud yet. Removing this device's data will permanently discard them. Export your progress first if you want to keep them.",
+      "confirm_button": "Remove data and sign out",
+      "removed": "This account's data was removed from this device."
     }
   },
   "hideout": {

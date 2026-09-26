@@ -69,8 +69,10 @@ export const resetCloudSaveStatus = (): void => {
   status.cloud = createIdleCloudStatus();
   cloudRetryHandler = null;
 };
+export const hasPendingCloudChanges = (): boolean => status.cloud.state !== 'idle';
 /** Pending cloud changes without a confirmed local save may be lost on reload or sign-out. */
-export const hasUnsavedProgressChanges = (): boolean => status.local === 'failed';
+export const hasUnsavedProgressChanges = (): boolean =>
+  status.local === 'failed' && hasPendingCloudChanges();
 const QUOTA_ERROR_NAMES = new Set(['QuotaExceededError', 'NS_ERROR_DOM_QUOTA_REACHED']);
 const UNAVAILABLE_ERROR_NAMES = new Set(['SecurityError', 'InvalidStateError']);
 const errorName = (error: unknown): string =>

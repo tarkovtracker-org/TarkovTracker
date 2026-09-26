@@ -1,0 +1,127 @@
+<template>
+  <GenericCard
+    icon="mdi-cellphone-remove"
+    icon-color="warning"
+    highlight-color="warning"
+    :fill-height="false"
+    :title="t('settings.device_data.title')"
+    title-classes="text-lg font-semibold"
+  >
+    <template #content>
+      <div class="space-y-3 px-4 py-4 text-sm">
+        <p class="text-surface-300">{{ t('settings.device_data.description') }}</p>
+        <p class="text-surface-400">{{ t('settings.device_data.cloud_unaffected') }}</p>
+        <UButton
+          color="error"
+          variant="soft"
+          size="sm"
+          icon="i-mdi-delete-outline"
+          :disabled="!isLoggedIn"
+          data-testid="device-data-remove"
+          @click="confirmOpen = true"
+        >
+          {{ t('settings.device_data.remove_button') }}
+        </UButton>
+      </div>
+    </template>
+  </GenericCard>
+  <UModal v-model:open="confirmOpen" :dismissible="!removing">
+    <template #header>
+      <div class="flex items-center gap-2">
+        <UIcon name="i-mdi-alert" class="text-error-400 h-5 w-5" />
+        <h3 class="text-lg font-semibold">{{ t('settings.device_data.confirm_title') }}</h3>
+      </div>
+    </template>
+    <template #body>
+      <div class="space-y-3 text-sm">
+        <p class="text-surface-200">{{ t('settings.device_data.confirm_description') }}</p>
+        <UAlert
+          v-if="pendingCloudChanges"
+          icon="i-mdi-cloud-alert"
+          color="error"
+          variant="subtle"
+          :title="t('settings.device_data.pending_warning')"
+          data-testid="device-data-pending-warning"
+        />
+      </div>
+    </template>
+    <template #footer="{ close }">
+      <div class="flex w-full flex-wrap items-center gap-2">
+        <UButton color="primary" autofocus @click="close">{{ t('common.cancel') }}</UButton>
+        <UButton
+          v-if="pendingCloudChanges"
+          color="neutral"
+          variant="soft"
+          icon="i-mdi-download"
+          data-testid="device-data-export"
+          @click="handleExport"
+        >
+          {{ t('progress_save_status.export_button') }}
+        </UButton>
+        <UButton
+          color="error"
+          class="ml-auto"
+          :loading="removing"
+          data-testid="device-data-confirm"
+          @click="removeDeviceData"
+        >
+          {{ t('settings.device_data.confirm_button') }}
+        </UButton>
+      </div>
+    </template>
+  </UModal>
+</template>
+<script setup lang="ts">
+  import GenericCard from '@/components/ui/GenericCard.vue';
+  import { useDataBackup } from '@/composables/useDataBackup';
+  import { useSignOut } from '@/composables/useSignOut';
+  import {
+    clearDeviceDataRemoval,
+    removeAccountDeviceData,
+    requestDeviceDataRemoval,
+  } from '@/stores/tarkov/deviceData';
+  import { hasPendingCloudChanges } from '@/stores/tarkov/progressSaveStatus';
+  import { logger } from '@/utils/logger';
+  const { t } = useI18n({ useScope: 'global' });
+  const toast = useToast();
+  const { $supabase } = useNuxtApp();
+  const { exportProgress } = useDataBackup();
+  const { signOutNow } = useSignOut();
+  const confirmOpen = ref(false);
+  const removing = ref(false);
+  const isLoggedIn = computed(() => Boolean($supabase.user.loggedIn && $supabase.user.id));
+  const pendingCloudChanges = computed(hasPendingCloudChanges);
+  const handleExport = async () => {
+    try {
+      await exportProgress();
+    } catch (error) {
+      logger.error('[DeviceData] Export failed:', error);
+      toast.add({ title: t('settings.data_management.export_error_title'), color: 'error' });
+    }
+  };
+  /**
+   * The removal request is registered before sign-out so the session transition keeps
+   * no recovery copy; stored copies are removed again once the transition has run.
+   */
+  const signOutAndRemove = async (userId: string): Promise<boolean> => {
+    requestDeviceDataRemoval(userId);
+    if (!(await signOutNow())) {
+      clearDeviceDataRemoval();
+      return false;
+    }
+    await nextTick();
+    removeAccountDeviceData(userId);
+    return true;
+  };
+  const removeDeviceData = async () => {
+    const userId = $supabase.user.id;
+    if (!userId) return;
+    removing.value = true;
+    const removed = await signOutAndRemove(userId).finally(() => {
+      removing.value = false;
+    });
+    if (!removed) return;
+    confirmOpen.value = false;
+    toast.add({ title: t('settings.device_data.removed'), color: 'success' });
+  };
+</script>

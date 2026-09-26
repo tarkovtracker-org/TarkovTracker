@@ -204,12 +204,14 @@
       </div>
     </div>
     <Omnibar v-if="omnibarMounted" v-model:open="omnibarOpen" />
+    <SignOutConfirmModal v-if="isLoggedIn" />
   </header>
 </template>
 <script setup lang="ts">
   import { useWindowSize } from '@vueuse/core';
   import { storeToRefs } from 'pinia';
   import { useKeybinds } from '@/composables/useKeybinds';
+  import { useSignOut } from '@/composables/useSignOut';
   import { useSupporter } from '@/composables/useSupporter';
   import { useTheme } from '@/composables/useTheme';
   import { getResourceBySlug } from '@/features/resources/resourceData';
@@ -328,7 +330,6 @@
   const skillCalculation = useSkillCalculation();
   const route = useRoute();
   const { $supabase } = useNuxtApp();
-  const toast = useToast();
   const isLoggedIn = computed(() => $supabase.user?.loggedIn ?? false);
   const avatarSrc = computed(() => {
     return preferencesStore.getStreamerMode || !$supabase.user.photoURL
@@ -421,16 +422,9 @@
       },
     ],
   ]);
+  const { requestSignOut } = useSignOut();
   async function logout() {
-    try {
-      await $supabase.signOut();
-    } catch (error) {
-      logger.error('[AppBar] Sign out failed:', error);
-      toast.add({
-        title: t('app_bar.logout_failed'),
-        color: 'error',
-      });
-    }
+    await requestSignOut();
   }
   const { width } = useWindowSize();
   const mdAndDown = computed(() => width.value < SHELL_DESKTOP_BREAKPOINT_PX);

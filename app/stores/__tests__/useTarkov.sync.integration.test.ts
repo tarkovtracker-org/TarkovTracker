@@ -2536,6 +2536,19 @@ describe('useTarkov sync integration', () => {
       expect(localStorage.getItem(`${STORAGE_KEYS.progressBackupPrefix}user-9_123`)).not.toBeNull();
       expect(readRecoveryLevel('user-1')).toBe(3);
     });
+    it('retains nothing for an owner whose device data removal is pending', async () => {
+      const { requestDeviceDataRemoval, clearDeviceDataRemoval } =
+        await import('@/stores/tarkov/deviceData');
+      localStorage.setItem(recoveryKey('user-1'), '{"_userId":"user-1","data":{}}');
+      localStorage.setItem(recoveryKey('user-2'), '{"_userId":"user-2","data":{}}');
+      writeActiveCopy('user-1', 3, Date.parse('2026-02-25T00:00:00.000Z'));
+      requestDeviceDataRemoval('user-1');
+      switchSession('user-1', null, 'logout');
+      expect(localStorage.getItem(STORAGE_KEYS.progress)).toBeNull();
+      expect(localStorage.getItem(recoveryKey('user-1'))).toBeNull();
+      expect(localStorage.getItem(recoveryKey('user-2'))).not.toBeNull();
+      clearDeviceDataRemoval();
+    });
     it('retains a mismatched owner copy found during hydration as its recovery copy', () => {
       writeActiveCopy('user-9', 6, Date.parse('2026-02-25T00:00:00.000Z'));
       const pinia = createPinia().use(piniaPluginPersistedstate);

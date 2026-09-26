@@ -205,6 +205,17 @@ const buildStubClient = (): SupabaseClient => {
     },
   } as unknown as SupabaseClient;
 };
+/**
+ * Signing out must work without cloud connectivity. A failed global revocation (for
+ * example while offline) falls back to ending only this browser's session.
+ */
+const signOutWithLocalFallback = async (client: SupabaseClient): Promise<void> => {
+  const { error } = await client.auth.signOut();
+  if (!error) return;
+  logger.warn('[Supabase] Global sign-out failed; ending the local session only', error);
+  const { error: localError } = await client.auth.signOut({ scope: 'local' });
+  if (localError) throw localError;
+};
 const buildStub = () => {
   const stubUser = createSupabaseUserState();
   return {
@@ -491,8 +502,7 @@ export default defineNuxtPlugin({
       }
       signOutOwnsChannelTeardown = true;
       try {
-        const { error } = await supabaseClient.auth.signOut();
-        if (error) throw error;
+        await signOutWithLocalFallback(supabaseClient);
         await removeAllRealtimeChannels();
       } finally {
         signOutOwnsChannelTeardown = false;
