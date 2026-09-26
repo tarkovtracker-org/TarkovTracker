@@ -1,5 +1,16 @@
 import { classifyPaths } from '../validation-plan.mjs';
-import { ciResultCheck, findLatestPullRun, getPull, listPullPaths } from './github-api.mjs';
+import {
+  ciResultCheck,
+  findLatestPullRun,
+  getPull,
+  listPullPaths,
+  previewDispatchInputs,
+} from './github-api.mjs';
+import {
+  isPreviewMaintainer,
+  previewCommand,
+  readPreviewRequest,
+} from './request-authorization.mjs';
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const userLogin = (user) => user?.login;
 const repositoryName = (repo) => repo?.full_name;
@@ -9,7 +20,7 @@ function isPreviewComment(context) {
   return [
     context.eventName === 'issue_comment',
     payload.action === 'created',
-    payload.comment?.body === '/preview',
+    previewCommand(payload.comment?.body) !== null,
     Boolean(payload.issue?.pull_request),
   ].every(Boolean);
 }
@@ -23,47 +34,28 @@ async function requireMaintainer(github, context) {
   ].every(Boolean);
   if (!sameActor)
     throw new PreviewRequestDenied('Preview request actor could not be authenticated.');
-  const { data: permission } = await github.rest.repos
-    .getCollaboratorPermissionLevel({
-      ...repo,
-      username: actor,
-    })
-    .catch((error) => {
-      if ([403, 404].includes(error.status)) {
-        throw new PreviewRequestDenied(
-          'Only repository maintainers and administrators may request a preview.'
-        );
-      }
-      throw error;
-    });
-  if (!['maintain', 'admin'].includes(permission.role_name)) {
+  if (!(await isPreviewMaintainer(github, repo, actor))) {
     throw new PreviewRequestDenied(
       'Only repository maintainers and administrators may request a preview.'
     );
   }
 }
-function requireReadyPull(pull) {
-  if (![pull.state === 'open', !pull.draft, pull.base.ref === 'main'].every(Boolean)) {
-    throw new Error('Preview requires an open, ready pull request targeting main.');
+function requireOpenPull(pull) {
+  if (![pull.state === 'open', pull.base.ref === 'main'].every(Boolean)) {
+    throw new Error('Preview requires an open pull request targeting main.');
   }
 }
-function requireSameRepository(pull, repo) {
-  if (repositoryName(pull.head.repo) !== `${repo.owner}/${repo.repo}`) {
-    throw new Error('Fork previews retain the existing explicit request and approval path.');
-  }
+function pullReady(pull) {
+  return (
+    !pull.draft && [pull.head.sha, pull.merge_commit_sha].every((sha) => SHA_PATTERN.test(sha))
+  );
 }
-function requirePullRevision(pull) {
-  if (![pull.head.sha, pull.merge_commit_sha].every((sha) => SHA_PATTERN.test(sha))) {
-    throw new Error('GitHub has not prepared the current pull request revision yet.');
-  }
-}
-function requireCurrentPull(pull, repo) {
-  requireReadyPull(pull);
-  requireSameRepository(pull, repo);
-  requirePullRevision(pull);
-}
-function matchesPullSnapshot(run, pull) {
+function matchesPullSnapshot(run, pull, repoName) {
   const snapshots = run?.pull_requests ?? [];
+  // Fork CI omits snapshots. The trusted controller verifies the artifact's current base and
+  // test merge before upload; bind run selection to the fork's repository, branch and head here.
+  if ([repositoryName(pull.head.repo) !== repoName, snapshots.length === 0].every(Boolean))
+    return true;
   return (
     snapshots.filter((item) =>
       [
@@ -80,10 +72,11 @@ function matchesCiRun(run, pull, repoName) {
     run.path === '.github/workflows/ci.yml',
     run.event === 'pull_request',
     run.head_sha === pull.head.sha,
-    repositoryName(run.head_repository) === repoName,
+    repositoryName(run.head_repository) === repositoryName(pull.head.repo),
+    run.head_branch === pull.head.ref,
     run.status === 'completed',
     run.conclusion === 'success',
-    matchesPullSnapshot(run, pull),
+    matchesPullSnapshot(run, pull, repoName),
   ].every(Boolean);
 }
 function matchesCiCheck(check, run, repoName) {
@@ -97,14 +90,9 @@ function matchesCiCheck(check, run, repoName) {
     /^[1-9][0-9]*$/.test(detailsUrl.slice(detailsPrefix.length)),
   ].every(Boolean);
 }
-function requireMatchingCi(run, check, pull, repo) {
+function hasMatchingCi(run, check, pull, repo) {
   const repoName = `${repo.owner}/${repo.repo}`;
-  if (!matchesCiRun(run, pull, repoName)) {
-    throw new Error('The current head and base need a successful, matching CI Result first.');
-  }
-  if (!matchesCiCheck(check, run, repoName)) {
-    throw new Error('The current head and base need a successful, matching CI Result first.');
-  }
+  return matchesCiRun(run, pull, repoName) && matchesCiCheck(check, run, repoName);
 }
 async function requireDeployablePaths(github, repo, pull) {
   const paths = await listPullPaths(github, repo, pull.number);
@@ -112,25 +100,50 @@ async function requireDeployablePaths(github, repo, pull) {
     throw new Error('This documentation-only pull request does not require a preview.');
   }
 }
-/** Resolve a maintainer's exact PR command to the current successful CI run, then dispatch. */
-export async function requestPreviewFromComment({ github, context }) {
-  const { payload, repo } = context;
-  if (!isPreviewComment(context)) return null;
-  await requireMaintainer(github, context);
-  const pull = await getPull(github, repo, payload.issue.number);
-  requireCurrentPull(pull, repo);
-  await requireDeployablePaths(github, repo, pull);
+function matchesPullBranch(run, pull, repo) {
+  return [
+    repositoryName(run.head_repository) === repositoryName(pull.head.repo),
+    run.head_branch === pull.head.ref,
+    matchesPullSnapshot(run, pull, `${repo.owner}/${repo.repo}`),
+  ].every(Boolean);
+}
+async function dispatchCurrentPreview(github, repo, pull, result, request) {
   const run = await findLatestPullRun(github, repo, pull.head.sha, (item) =>
-    matchesPullSnapshot(item, pull)
+    matchesPullBranch(item, pull, repo)
   );
   const check = await ciResultCheck(github, repo, pull.head.sha);
-  requireMatchingCi(run, check, pull, repo);
+  if (!hasMatchingCi(run, check, pull, repo)) return result;
   // The trusted default-branch controller repeats every revision, CI, and artifact check.
   await github.rest.actions.createWorkflowDispatch({
     ...repo,
     workflow_id: 'preview.yml',
     ref: 'main',
-    inputs: { run_id: String(run.id) },
+    inputs: previewDispatchInputs(run.id, request),
   });
-  return { pullRequest: pull.number, headSha: pull.head.sha, ciRunId: run.id };
+  return { ...result, ciRunId: run.id };
+}
+async function currentCommand(github, context) {
+  const request = await readPreviewRequest(github, context.repo, context.payload.issue.number);
+  if (request?.commentId !== context.payload.comment.id)
+    throw new Error('This command was edited, revoked, or superseded by a newer preview command.');
+  return request;
+}
+/** Enable previews for this PR, dispatch now if CI is ready, or let CI completion request it. */
+export async function requestPreviewFromComment({ github, context }) {
+  const { payload, repo } = context;
+  if (!isPreviewComment(context)) return null;
+  await requireMaintainer(github, context);
+  const request = await currentCommand(github, context);
+  const pull = await getPull(github, repo, payload.issue.number);
+  const result = {
+    pullRequest: pull.number,
+    headSha: pull.head.sha,
+    enabled: previewCommand(payload.comment.body),
+    ciRunId: null,
+  };
+  if (!result.enabled) return result;
+  requireOpenPull(pull);
+  await requireDeployablePaths(github, repo, pull);
+  if (!pullReady(pull)) return result;
+  return dispatchCurrentPreview(github, repo, pull, result, request);
 }

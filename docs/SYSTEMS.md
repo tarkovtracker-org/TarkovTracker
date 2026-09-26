@@ -2254,22 +2254,32 @@ GitHub has computed the test merge; other pending reasons are left alone.
   original run and its exact-SHA deployment artifact, then keeps that run URL on the new success.
 - Pull-request and CI-completion events run only the trusted `preview-state.yml` workflow, so
   ordinary PRs do not instantiate skipped deployment or smoke-test jobs. These events and comment
-  events never upload to Cloudflare. An exact `/preview` comment from a repository maintainer or
-  administrator on a same-repository PR resolves the successful CI run matching that PR's number,
-  head, and base before dispatching the trusted controller; forks retain the separate
-  request and protected-environment approval path. Only a trusted
+  events never upload to Cloudflare. An exact, unedited `/preview` comment from a current repository
+  maintainer or administrator opts that PR into automatic previews, including forks; `/preview stop`
+  disables the opt-in. Commands before `2026-09-26T04:12:26Z` cannot become persistent grants.
+  The request resolves matching successful CI before dispatching the trusted controller. Only a trusted
   `workflow_dispatch` from `main` can deploy, and it repeats the exact-SHA, CI, artifact, and
   freshness checks. Crowdin and release staging dispatch once after their own exact-SHA CI passes;
   allowlisted Dependabot auto-merge candidates dispatch from a trusted post-CI `workflow_run` after
-  all checks pass. Dependabot remains owned by that workflow. Ordinary PR CI completions request
-  deployment only when auto-merge is enabled. Metadata requests use `auto_merge_enabled`; the
+  all checks pass. Dependabot remains owned by that workflow unless a maintainer explicitly opts in.
+  Ordinary PR CI completions request deployment when a live command opts in or auto-merge is enabled;
+  a stop overrides either path. Opted-in drafts remain paused until `ready_for_review`.
+  Other metadata requests use `auto_merge_enabled`; the
   hourly reconciliation remains status-only. Cloudflare automatic preview builds are disabled while production Git
   deployments for `main` remain enabled.
 - The Pages-only deployment token is stored only in the protected `preview` and `preview-fork`
   environments, whose branch policy allows `main`; remove the repository-scoped copy. This prevents
   a manually dispatched workflow selected from another ref from reading the deployment credential.
-- Fork candidates deploy only through the protected `preview-fork` environment; the exact revision
-  is shown before approval and rechecked afterward, so approval never carries to another head.
+- Fork candidates with a live maintainer command deploy through `preview`; the controller exhausts
+  comment pagination, chooses the latest authorized command, and rechecks the requester's current
+  role. Immediately before upload, the command must still be enabled with the same ID and author.
+  Automatic dispatches carry the authorizing comment ID, so a command revoked before planning
+  cannot fall back to the manual deployment path.
+  A stop, deleted command, or revoked role prevents a queued opted-in upload. Each revision still
+  requires fresh CI, manifest and digest verification, and smoke tests; the command grants preview
+  intent for the PR, never a reusable CI result. Forks without a live opt-in deploy through
+  `preview-fork`, where manual approval or an administrator override is required. Its self-review
+  rule stays enabled. The exact revision is displayed before approval and rechecked afterward.
   Fork CI runs carry no `pull_requests` and the base repository's commit-association lookup omits
   fork-only commits, so a fork candidate's PR is resolved by listing open PRs for its
   `owner:branch` head and then matching head SHA, head repository, and base like any candidate.

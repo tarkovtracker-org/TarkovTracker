@@ -32,6 +32,7 @@ jobs:
       actions: write
       checks: read
       contents: read
+      issues: read
       pull-requests: read
       statuses: write
     steps:

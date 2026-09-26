@@ -7,7 +7,7 @@ permissions: {}
 jobs:
   request:
     name: Request preview
-    if: github.event.issue.pull_request && github.event.comment.body == '/preview'
+    if: github.event.issue.pull_request && contains(fromJSON('["/preview", "/preview stop"]'), github.event.comment.body)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -38,9 +38,12 @@ jobs:
             try {
               const request = await requestPreviewFromComment({ github, context });
               const runs = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/workflows/preview.yml`;
-              await reply(`Preview requested for commit \`${request.headSha.slice(0, 12)}\`. [View Preview runs](${runs}); this PR's **Preview Result** will update after deployment and smoke tests.`)
+              const result = request.enabled
+                ? `Automatic previews enabled for this PR, including future commits. ${request.ciRunId ? 'The current preview was requested.' : 'The next successful CI run will request a preview.'} [View Preview runs](${runs}); **Preview Result** updates after deployment and smoke tests. Drafts remain paused. Comment \`/preview stop\` to disable automatic previews.`
+                : 'Automatic previews disabled for this PR. Comment `/preview` to enable them again.';
+              await reply(result)
                 .catch((replyError) => core.warning(`Could not post preview request feedback: ${replyError.message}`));
-              core.notice(`Requested preview for PR #${request.pullRequest} at ${request.headSha} using CI run ${request.ciRunId}.`);
+              core.notice(`Preview intent for PR #${request.pullRequest}: enabled=${request.enabled}, CI run=${request.ciRunId ?? 'waiting'}.`);
             } catch (error) {
               if (error instanceof PreviewRequestDenied) throw error;
               const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
