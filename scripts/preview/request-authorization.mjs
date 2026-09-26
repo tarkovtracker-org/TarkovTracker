@@ -2,8 +2,6 @@ const COMMANDS = new Map([
   ['/preview', true],
   ['/preview stop', false],
 ]);
-// Earlier /preview comments requested only one revision and must not become persistent grants.
-export const PREVIEW_OPT_IN_START = '2026-09-26T04:12:26Z';
 /** Only exact commands in new comments express preview intent. */
 export function previewCommand(body) {
   return COMMANDS.get(body) ?? null;
@@ -17,15 +15,16 @@ export async function isPreviewMaintainer(github, repo, username) {
     });
   return ['maintain', 'admin'].includes(data.role_name);
 }
-function originalCommand(comment) {
+function originalCommand(comment, enabledAt) {
   const user = comment.user ?? {};
   return [
     previewCommand(comment.body) !== null,
     user.type === 'User',
+    ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(comment.author_association),
     Boolean(user.login),
     user.login !== 'ghost',
     Number.isSafeInteger(comment.id) && comment.id > 0,
-    Date.parse(comment.created_at) >= Date.parse(PREVIEW_OPT_IN_START),
+    Date.parse(comment.created_at) >= enabledAt,
     comment.created_at === comment.updated_at,
   ].every(Boolean);
 }
@@ -40,13 +39,18 @@ async function cachedMaintainer(github, repo, login, permissions) {
  * Exhaust pagination before choosing a command; a newer stop must never be hidden by a page cap.
  */
 export async function readPreviewRequest(github, repo, pullRequest) {
-  if (!pullRequest) return null;
+  // Set this repository variable only after the new handler is on main. Earlier commands used
+  // the one-revision contract and must never become standing grants. Missing config fails closed.
+  const enabledAt = Date.parse(process.env.PREVIEW_OPT_IN_START);
+  if (![Boolean(pullRequest), Number.isFinite(enabledAt)].every(Boolean)) return null;
   const comments = await github.paginate(github.rest.issues.listComments, {
     ...repo,
     issue_number: pullRequest,
     per_page: 100,
   });
-  const commands = comments.filter(originalCommand).toSorted((a, b) => b.id - a.id);
+  const commands = comments
+    .filter((comment) => originalCommand(comment, enabledAt))
+    .toSorted((a, b) => b.id - a.id);
   const permissions = new Map();
   for (const comment of commands) {
     if (!(await cachedMaintainer(github, repo, comment.user.login, permissions))) continue;

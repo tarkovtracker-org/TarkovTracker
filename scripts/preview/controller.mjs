@@ -662,12 +662,17 @@ function hasMergeIntent(context, state) {
   ].every(Boolean);
 }
 function hasPreviewIntent(context, state) {
+  // Dependabot's dedicated workflow is the sole automatic request owner.
+  if (optional(optional(state.pull, 'user'), 'id') === 49699333) return false;
   if (!state.previewRequest) return hasMergeIntent(context, state);
   return [
     state.previewRequest.enabled,
     optional(state.candidate, 'runEvent') === 'pull_request',
-    context.eventName === 'workflow_run' || context.payload.action === 'ready_for_review',
+    isPreviewRefreshEvent(context),
   ].every(Boolean);
+}
+function isPreviewRefreshEvent(context) {
+  return context.eventName === 'workflow_run' || context.payload.action === 'ready_for_review';
 }
 function requestedPreview(decision) {
   return {

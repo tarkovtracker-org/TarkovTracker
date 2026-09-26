@@ -2256,12 +2256,14 @@ GitHub has computed the test merge; other pending reasons are left alone.
   ordinary PRs do not instantiate skipped deployment or smoke-test jobs. These events and comment
   events never upload to Cloudflare. An exact, unedited `/preview` comment from a current repository
   maintainer or administrator opts that PR into automatic previews, including forks; `/preview stop`
-  disables the opt-in. Commands before `2026-09-26T04:12:26Z` cannot become persistent grants.
+  disables the opt-in. Commands predating the repository variable `PREVIEW_OPT_IN_START` cannot
+  become persistent grants. Set that variable to the activation time after the handler is on `main`;
+  missing or invalid configuration grants no persistent access.
   The request resolves matching successful CI before dispatching the trusted controller. Only a trusted
   `workflow_dispatch` from `main` can deploy, and it repeats the exact-SHA, CI, artifact, and
   freshness checks. Crowdin and release staging dispatch once after their own exact-SHA CI passes;
   allowlisted Dependabot auto-merge candidates dispatch from a trusted post-CI `workflow_run` after
-  all checks pass. Dependabot remains owned by that workflow unless a maintainer explicitly opts in.
+  all checks pass. Dependabot's dedicated workflow remains its sole automatic request owner.
   Ordinary PR CI completions request deployment when a live command opts in or auto-merge is enabled;
   a stop overrides either path. Opted-in drafts remain paused until `ready_for_review`.
   Other metadata requests use `auto_merge_enabled`; the
@@ -2272,7 +2274,10 @@ GitHub has computed the test merge; other pending reasons are left alone.
   a manually dispatched workflow selected from another ref from reading the deployment credential.
 - Fork candidates with a live maintainer command deploy through `preview`; the controller exhausts
   comment pagination, chooses the latest authorized command, and rechecks the requester's current
-  role. Immediately before upload, the command must still be enabled with the same ID and author.
+  role. GitHub's owner/member/collaborator association filters public outsider comments before any
+  role lookup; it never substitutes for the current maintain/admin permission check. Permissions
+  are cached only within one scan. Immediately before upload, the command must still be enabled
+  with the same ID and author.
   Automatic dispatches carry the authorizing comment ID, so a command revoked before planning
   cannot fall back to the manual deployment path.
   A stop, deleted command, or revoked role prevents a queued opted-in upload. Each revision still

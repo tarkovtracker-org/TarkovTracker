@@ -4,10 +4,15 @@ on:
   issue_comment:
     types: [created]
 permissions: {}
+env:
+  PREVIEW_OPT_IN_START: ${{ vars.PREVIEW_OPT_IN_START }}
 jobs:
   request:
     name: Request preview
-    if: github.event.issue.pull_request && contains(fromJSON('["/preview", "/preview stop"]'), github.event.comment.body)
+    if: >-
+      github.event.issue.pull_request &&
+      contains(fromJSON('["/preview", "/preview stop"]'), github.event.comment.body) &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -29,7 +34,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const { PreviewRequestDenied, requestPreviewFromComment } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/comment-request.mjs`);
+            const { PreviewRequestDenied, requestPreviewFromComment, previewRequestMessage } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/comment-request.mjs`);
             const reply = async (body) => github.rest.issues.createComment({
               ...context.repo,
               issue_number: context.payload.issue.number,
@@ -38,16 +43,13 @@ jobs:
             try {
               const request = await requestPreviewFromComment({ github, context });
               const runs = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/workflows/preview.yml`;
-              const result = request.enabled
-                ? `Automatic previews enabled for this PR, including future commits. ${request.ciRunId ? 'The current preview was requested.' : 'The next successful CI run will request a preview.'} [View Preview runs](${runs}); **Preview Result** updates after deployment and smoke tests. Drafts remain paused. Comment \`/preview stop\` to disable automatic previews.`
-                : 'Automatic previews disabled for this PR. Comment `/preview` to enable them again.';
-              await reply(result)
+              await reply(previewRequestMessage(request, runs))
                 .catch((replyError) => core.warning(`Could not post preview request feedback: ${replyError.message}`));
               core.notice(`Preview intent for PR #${request.pullRequest}: enabled=${request.enabled}, CI run=${request.ciRunId ?? 'waiting'}.`);
             } catch (error) {
               if (error instanceof PreviewRequestDenied) throw error;
               const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-              await reply(`Preview request could not be accepted. [See the request run](${run}) for the reason.`)
+              await reply(`Preview command could not finish processing. [See the request run](${run}) for the reason. Comment \`/preview stop\` to disable automatic previews.`)
                 .catch((replyError) => core.warning(`Could not post preview request feedback: ${replyError.message}`));
               throw error;
             }

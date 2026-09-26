@@ -24,6 +24,8 @@ concurrency:
   cancel-in-progress: true
 permissions:
   contents: read
+env:
+  PREVIEW_OPT_IN_START: ${{ vars.PREVIEW_OPT_IN_START }}
 jobs:
   plan:
     name: Plan preview

@@ -94,11 +94,9 @@ function hasMatchingCi(run, check, pull, repo) {
   const repoName = `${repo.owner}/${repo.repo}`;
   return matchesCiRun(run, pull, repoName) && matchesCiCheck(check, run, repoName);
 }
-async function requireDeployablePaths(github, repo, pull) {
+async function hasDeployablePaths(github, repo, pull) {
   const paths = await listPullPaths(github, repo, pull.number);
-  if (!classifyPaths(paths).previewRequired) {
-    throw new Error('This documentation-only pull request does not require a preview.');
-  }
+  return classifyPaths(paths).previewRequired;
 }
 function matchesPullBranch(run, pull, repo) {
   return [
@@ -125,8 +123,19 @@ async function dispatchCurrentPreview(github, repo, pull, result, request) {
 async function currentCommand(github, context) {
   const request = await readPreviewRequest(github, context.repo, context.payload.issue.number);
   if (request?.commentId !== context.payload.comment.id)
-    throw new Error('This command was edited, revoked, or superseded by a newer preview command.');
+    throw new Error(
+      'This command is inactive: check rollout configuration, edits, or a newer preview command.'
+    );
   return request;
+}
+function previewIntent(pull, body) {
+  return {
+    pullRequest: pull.number,
+    headSha: pull.head.sha,
+    enabled: previewCommand(body),
+    automatic: pull.user?.id !== 49699333,
+    ciRunId: null,
+  };
 }
 /** Enable previews for this PR, dispatch now if CI is ready, or let CI completion request it. */
 export async function requestPreviewFromComment({ github, context }) {
@@ -135,15 +144,26 @@ export async function requestPreviewFromComment({ github, context }) {
   await requireMaintainer(github, context);
   const request = await currentCommand(github, context);
   const pull = await getPull(github, repo, payload.issue.number);
-  const result = {
-    pullRequest: pull.number,
-    headSha: pull.head.sha,
-    enabled: previewCommand(payload.comment.body),
-    ciRunId: null,
-  };
+  const result = previewIntent(pull, payload.comment.body);
   if (!result.enabled) return result;
   requireOpenPull(pull);
-  await requireDeployablePaths(github, repo, pull);
-  if (!pullReady(pull)) return result;
+  result.previewRequired = await hasDeployablePaths(github, repo, pull);
+  if (![result.previewRequired, pullReady(pull)].every(Boolean)) return result;
   return dispatchCurrentPreview(github, repo, pull, result, request);
+}
+function currentPreviewMessage(request) {
+  if (request.previewRequired === false) return 'This revision does not require a preview.';
+  if (request.ciRunId) return 'The current preview was requested.';
+  return 'The next successful CI run will request a preview. Drafts remain paused.';
+}
+export function previewRequestMessage(request, runs) {
+  if (!request.enabled)
+    return 'Preview opt-in disabled for this PR. Comment `/preview` to enable it again. Dependabot keeps its separate automation.';
+  if (!request.automatic) {
+    const current = request.ciRunId
+      ? 'The current preview was requested.'
+      : 'No current preview was requested.';
+    return `Dependabot keeps its existing preview automation. ${current} [View Preview runs](${runs}).`;
+  }
+  return `Automatic previews enabled for this PR, including future commits. ${currentPreviewMessage(request)} [View Preview runs](${runs}); **Preview Result** updates after deployment and smoke tests. Comment \`/preview stop\` to disable automatic previews.`;
 }

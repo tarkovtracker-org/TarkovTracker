@@ -19,6 +19,8 @@ concurrency:
   group: preview-state-${{ format('{0}@{1}', github.event.pull_request.head.repo.full_name || github.event.workflow_run.head_repository.full_name, github.event.pull_request.head.ref || github.event.workflow_run.head_branch) }}
   cancel-in-progress: false
 permissions: {}
+env:
+  PREVIEW_OPT_IN_START: ${{ vars.PREVIEW_OPT_IN_START }}
 jobs:
   state:
     name: Refresh preview state

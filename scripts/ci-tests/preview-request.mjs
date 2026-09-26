@@ -1,8 +1,14 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { PreviewRequestDenied, requestPreviewFromComment } from '../preview/comment-request.mjs';
-import { PREVIEW_OPT_IN_START, readPreviewRequest } from '../preview/request-authorization.mjs';
+import {
+  PreviewRequestDenied,
+  requestPreviewFromComment,
+  previewRequestMessage,
+} from '../preview/comment-request.mjs';
+import { readPreviewRequest } from '../preview/request-authorization.mjs';
+const PREVIEW_OPT_IN_START = '2026-09-26T04:12:26Z';
+process.env.PREVIEW_OPT_IN_START = PREVIEW_OPT_IN_START;
 const REPO = { owner: 'example', repo: 'tracker' };
 const HEAD = 'a'.repeat(40);
 const BASE = 'b'.repeat(40);
@@ -91,6 +97,8 @@ test('maintainer command dispatches the current successful PR CI run without an 
     pullRequest: 42,
     headSha: HEAD,
     enabled: true,
+    automatic: true,
+    previewRequired: true,
     ciRunId: RUN_ID,
   });
   assert.deepEqual(f.calls, [
@@ -116,12 +124,8 @@ test('only exact new PR comments from the actor may request a preview', async ()
   await assert.rejects(requestPreviewFromComment(forged), /actor could not be authenticated/);
   assert.deepEqual(forged.calls, []);
 });
-test('non-maintainers, closed PRs and PRs without a deployable change cannot dispatch', async () => {
-  for (const options of [
-    { role: 'write' },
-    { pull: { state: 'closed' } },
-    { files: [{ filename: 'docs/guide.md' }] },
-  ]) {
+test('non-maintainers and closed PRs cannot dispatch', async () => {
+  for (const options of [{ role: 'write' }, { pull: { state: 'closed' } }]) {
     const f = fixture(options);
     await assert.rejects(requestPreviewFromComment(f));
     assert.deepEqual(f.calls, []);
@@ -170,6 +174,8 @@ test('request workflow loads trusted code and does not trigger on edited comment
   assert.match(workflow, /issues: write/);
   assert.match(workflow, /github\.rest\.issues\.createComment/);
   assert.match(workflow, /error instanceof PreviewRequestDenied/);
+  assert.match(workflow, /github\.event\.comment\.author_association/);
+  assert.match(workflow, /PREVIEW_OPT_IN_START: \$\{\{ vars\.PREVIEW_OPT_IN_START \}\}/);
   assert.doesNotMatch(workflow, /secrets\.|pull_request_target|head\.sha/);
 });
 test('fork commands select matching branch CI even when GitHub omits PR snapshots', async () => {
@@ -218,6 +224,7 @@ function comment(id, body = '/preview', overrides = {}) {
     id,
     body,
     user: { type: 'User', login: 'maintainer' },
+    author_association: 'MEMBER',
     created_at: PREVIEW_OPT_IN_START,
     updated_at: PREVIEW_OPT_IN_START,
     ...overrides,
@@ -284,7 +291,7 @@ test('all comment pages are considered so a later stop revokes an older grant', 
 });
 test('a delayed request cannot dispatch after a newer stop command', async () => {
   const f = fixture({ comments: [comment(1), comment(2, '/preview stop')] });
-  await assert.rejects(requestPreviewFromComment(f), /superseded/);
+  await assert.rejects(requestPreviewFromComment(f), /inactive/);
   assert.deepEqual(f.calls, []);
 });
 test('permission lookups are cached per author for one scan and refreshed on the next scan', async () => {
@@ -301,4 +308,43 @@ test('permission lookups are cached per author for one scan and refreshed on the
   assert.equal(calls, 1);
   assert.equal(await readPreviewRequest(github, REPO, 42), null);
   assert.equal(calls, 2);
+});
+test('missing or invalid rollout configuration cannot authorize old commands', async () => {
+  try {
+    for (const value of ['', 'invalid', '2026-09-27T00:00:00Z']) {
+      process.env.PREVIEW_OPT_IN_START = value;
+      assert.equal(await readPreviewRequest(authorizationFixture([comment(1)]), REPO, 42), null);
+    }
+  } finally {
+    process.env.PREVIEW_OPT_IN_START = PREVIEW_OPT_IN_START;
+  }
+});
+test('Dependabot commands report that later previews keep their existing automation', async () => {
+  const f = fixture({ pull: { user: { id: 49699333 } } });
+  const result = await requestPreviewFromComment(f);
+  assert.equal(result.automatic, false);
+  assert.equal(result.ciRunId, RUN_ID);
+});
+test('documentation-only commands accept persistent intent without deploying the current revision', async () => {
+  const f = fixture({ files: [{ filename: 'docs/guide.md' }] });
+  const result = await requestPreviewFromComment(f);
+  assert.equal(result.enabled, true);
+  assert.equal(result.previewRequired, false);
+  assert.deepEqual(f.calls, []);
+  const message = previewRequestMessage(result, 'https://github.com/example/tracker/actions');
+  assert.match(message, /Automatic previews enabled/);
+  assert.match(message, /This revision does not require a preview/);
+});
+test('public outsider commands do not trigger one permission request per author', async () => {
+  const comments = Array.from({ length: 500 }, (_, id) =>
+    comment(id + 1, '/preview', {
+      user: { login: `outsider-${id}`, type: 'User' },
+      author_association: 'CONTRIBUTOR',
+    })
+  );
+  const github = authorizationFixture(comments);
+  github.rest.repos.getCollaboratorPermissionLevel = async () => {
+    throw new Error('Outsiders must be filtered before permission requests.');
+  };
+  assert.equal(await readPreviewRequest(github, REPO, 42), null);
 });

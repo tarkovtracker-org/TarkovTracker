@@ -446,8 +446,12 @@ fork PRs. The current revision is requested immediately if CI is ready; otherwis
 successful CI run requests it. Later revisions refresh automatically after successful CI.
 `/preview stop` disables automatic requests; another `/preview` enables them again. Drafts remain
 paused and resume when marked ready. This opts into previews without opting into merging.
-The latest unedited command from a current maintainer controls the PR. Comments predating
-`2026-09-26T04:12:26Z` retain their original one-revision meaning and do not grant persistent access.
+The latest unedited command from a current maintainer controls the PR. Comments predating the
+repository variable `PREVIEW_OPT_IN_START` retain their original one-revision meaning and do not
+grant persistent access. The variable must be set to the activation time **after** this handler
+is merged to `main`; missing or invalid configuration grants no persistent preview access.
+Dependabot retains its dedicated automatic preview owner; `/preview` can request its current
+revision, but does not add a second automatic dispatcher.
 Enabling auto-merge also requests previews when no explicit preview command overrides it.
 The status controller dispatches `preview.yml` on `main`, carrying the CI run ID;
 it checks for a matching active dispatch created after the current CI attempt completed so repeated events preserve in-flight previews
@@ -538,7 +542,9 @@ role and dispatches the same trusted Preview workflow when matching CI is ready.
 authorized requests with the outcome; denied requests do not receive a bot reply. Edited comments
 do not grant access. Fork CI omits PR snapshots, so run selection matches the head repository,
 branch, and SHA; the controller then verifies the artifact's base and test merge against live GitHub
-state. Every refresh reads all comment pages and rechecks the current requester's role. The upload
+state. Every refresh reads all comment pages and rechecks the current requester's role. Only
+owner, member, or collaborator comments cause permission lookups, so public outsiders
+cannot trigger one permission lookup per author; association alone never grants access. The upload
 job repeats that authorization check, so a stop, deleted command, or revoked role prevents a queued
 opted-in upload. An upload already underway may finish after `/preview stop`.
 Automatic dispatches carry the command ID and fail if it was revoked or superseded before planning;
@@ -547,6 +553,8 @@ A fork with a live maintainer opt-in uses the `preview` environment without a se
 an explicit fork dispatch without one retains `preview-fork` approval or an administrator override.
 Repeating a request for an already validated deployment reuses its evidence. Each new head or base
 still requires fresh CI, artifact verification, deployment, and smoke tests.
+Documentation-only commands acknowledge the opt-in and skip the immediate deployment; later
+executable revisions can then refresh after their own successful CI.
 
 For pull requests, `Preview Result` is published on the validated head commit only. GitHub
 regenerates the test-merge commit (new SHA, same parents and tree) when a merge is attempted, so a

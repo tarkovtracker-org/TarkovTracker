@@ -29,7 +29,8 @@ import {
   resolveBuildProfile,
 } from '../preview/profile.mjs';
 import { isForbiddenRequest, waitForDeployment } from '../preview/smoke/readiness.mjs';
-import { PREVIEW_OPT_IN_START } from '../preview/request-authorization.mjs';
+const PREVIEW_OPT_IN_START = '2026-09-26T04:12:26Z';
+process.env.PREVIEW_OPT_IN_START = PREVIEW_OPT_IN_START;
 import { buildZip } from './helpers/zip.mjs';
 const sha = (letter) => letter.repeat(40);
 const HEAD = sha('a');
@@ -498,6 +499,7 @@ function previewRequestComment(id = 1, body = '/preview') {
     id,
     body,
     user: { login: 'maintainer', type: 'User' },
+    author_association: 'MEMBER',
     created_at: PREVIEW_OPT_IN_START,
     updated_at: PREVIEW_OPT_IN_START,
   };
@@ -759,6 +761,14 @@ test('a queued automatic dispatch cannot become a manual preview after a stop', 
     assert.equal(result.decision.action, 'fail');
     assert.match(result.decision.description, /revoked or superseded/);
   }
+});
+test('Dependabot keeps a single automatic preview owner even with a maintainer opt-in', async (t) => {
+  const result = await plan(t, workflowRunContext(), {
+    comments: [previewRequestComment()],
+    pull: { user: { id: 49699333 } },
+  });
+  assert.equal(result.decision.action, 'wait');
+  assert.deepEqual(result.state.dispatches, []);
 });
 test('persistent preview intent follows a new head only after its own successful CI', async (t) => {
   const headSha = sha('e');
