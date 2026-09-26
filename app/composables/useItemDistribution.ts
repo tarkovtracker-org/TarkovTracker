@@ -126,10 +126,13 @@ export function useItemDistribution(): UseItemDistributionReturn {
   }
   function applyDistribution(result: DistributionResult): void {
     if (result.updates.length === 0) return;
-    const taskObjectiveUpdates: Record<string, { count: number; complete?: boolean }> = {};
+    const taskObjectiveUpdates: Record<
+      string,
+      { count: number; complete?: boolean; timestamp: number }
+    > = {};
     const hideoutPartUpdates: Record<
       string,
-      { count: number; complete: boolean; timestamp?: number }
+      { count: number; complete: boolean; timestamp: number }
     > = {};
     const now = Date.now();
     for (const update of result.updates) {
@@ -137,11 +140,12 @@ export function useItemDistribution(): UseItemDistributionReturn {
       const entry = {
         count: Math.max(0, update.count),
         complete: isComplete,
-        ...(isComplete && { timestamp: now }),
+        timestamp: now,
       };
       if (update.type === 'task') {
         taskObjectiveUpdates[update.id] = {
           count: Math.max(0, update.count),
+          timestamp: now,
           ...(update.count < update.needed && { complete: false }),
         };
       } else {

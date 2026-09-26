@@ -115,6 +115,7 @@ describe('useItemDistribution', () => {
     mockStoreState.taskObjectiveEntries = {};
     mockStoreState.hideoutPartEntries = {};
     mockStoreState.patchedState = null;
+    vi.restoreAllMocks();
     vi.clearAllMocks();
   });
   describe('getObjectiveCurrentCount', () => {
@@ -356,6 +357,7 @@ describe('useItemDistribution', () => {
   });
   describe('applyDistribution', () => {
     it('updates task objectives in store', async () => {
+      vi.spyOn(Date, 'now').mockReturnValue(456);
       const { useItemDistribution } = await import('@/composables/useItemDistribution');
       const { applyDistribution } = useItemDistribution();
       applyDistribution({
@@ -364,9 +366,15 @@ describe('useItemDistribution', () => {
         remainingNonFir: 0,
       });
       const state = mockStoreState.patchedState as {
-        pvp: { taskObjectives: Record<string, { count: number; complete: boolean }> };
+        pvp: {
+          taskObjectives: Record<string, { count: number; complete: boolean; timestamp: number }>;
+        };
       };
-      expect(state.pvp.taskObjectives['obj-1']).toEqual({ count: 3, complete: false });
+      expect(state.pvp.taskObjectives['obj-1']).toEqual({
+        count: 3,
+        complete: false,
+        timestamp: 456,
+      });
     });
     it('updates hideout parts in store', async () => {
       const { useItemDistribution } = await import('@/composables/useItemDistribution');
@@ -383,29 +391,42 @@ describe('useItemDistribution', () => {
       expect(part.count).toBe(5);
       expect(part.complete).toBe(true);
     });
-    it('uncompletes task objectives when Smart Fill lowers their count', async () => {
+    it('timestamps task and hideout reductions so realtime merges keep them', async () => {
+      vi.spyOn(Date, 'now').mockReturnValue(456);
       mockStoreState.objectiveCounts = { 'obj-1': 5 };
       mockStoreState.taskObjectiveEntries = {
         'obj-1': { count: 5, complete: true, timestamp: 123 },
       };
+      mockStoreState.hideoutPartEntries = {
+        'mod-1': { count: 5, complete: true, timestamp: 123 },
+      };
       const { useItemDistribution } = await import('@/composables/useItemDistribution');
       const { applyDistribution } = useItemDistribution();
       applyDistribution({
-        updates: [{ id: 'obj-1', type: 'task', count: 3, needed: 5 }],
+        updates: [
+          { id: 'obj-1', type: 'task', count: 3, needed: 5 },
+          { id: 'mod-1', type: 'hideout', count: 3, needed: 5 },
+        ],
         remainingFir: 0,
         remainingNonFir: 0,
       });
       const state = mockStoreState.patchedState as {
         pvp: {
-          taskObjectives: Record<string, { count: number; complete: boolean; timestamp?: number }>;
+          taskObjectives: Record<string, { count: number; complete: boolean; timestamp: number }>;
+          hideoutParts: Record<string, { count: number; complete: boolean; timestamp: number }>;
         };
       };
       const objective = expectDefined(state.pvp.taskObjectives['obj-1']);
       expect(objective.count).toBe(3);
       expect(objective.complete).toBe(false);
-      expect(objective.timestamp).toBe(123);
+      expect(objective.timestamp).toBe(456);
+      const hideoutPart = expectDefined(state.pvp.hideoutParts['mod-1']);
+      expect(hideoutPart.count).toBe(3);
+      expect(hideoutPart.complete).toBe(false);
+      expect(hideoutPart.timestamp).toBe(456);
     });
-    it('does not set complete flag for task objectives when count reaches needed', async () => {
+    it('timestamps completed task objectives without setting their complete flag', async () => {
+      vi.spyOn(Date, 'now').mockReturnValue(456);
       const { useItemDistribution } = await import('@/composables/useItemDistribution');
       const { applyDistribution } = useItemDistribution();
       applyDistribution({
@@ -415,13 +436,13 @@ describe('useItemDistribution', () => {
       });
       const state = mockStoreState.patchedState as {
         pvp: {
-          taskObjectives: Record<string, { count: number; complete?: boolean; timestamp?: number }>;
+          taskObjectives: Record<string, { count: number; complete?: boolean; timestamp: number }>;
         };
       };
       const objective = expectDefined(state.pvp.taskObjectives['obj-1']);
       expect(objective.count).toBe(5);
       expect(objective.complete).toBeUndefined();
-      expect(objective.timestamp).toBeUndefined();
+      expect(objective.timestamp).toBe(456);
     });
     it('does not patch store when updates array is empty', async () => {
       const { useItemDistribution } = await import('@/composables/useItemDistribution');
