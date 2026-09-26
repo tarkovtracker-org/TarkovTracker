@@ -605,6 +605,30 @@ and repeat linked history/dry-run checks. Pull-request previews intentionally sk
 so a green PR alone does not establish that the production integration has recovered. Do not
 roll back to the pre-atomic leave handler or apply unrelated account-deletion migrations.
 
+### Atomic team-kick rollout (`20260926090000`)
+
+PR #938 (fix for #864) ships the atomic `kick_team` RPC in migration
+`20260926090000_atomic_team_kick.sql` together with the rewritten `team-kick` handler sources in
+one change, mirroring the atomic-leave unit rule: never separate the migration from the handler
+sources it requires. The rollout is database-first: after the merge, the Supabase GitHub
+integration applies the migration and deploys the edge functions (including `team-kick`) together
+in the same integration run against the merge commit — there is no manual SQL step:
+
+- **Do not apply the migration out of band** (no dashboard SQL editor, no `db push`) from PR #938's
+  branch or any unmerged revision — see "Deploy migrations only from a revision that is already
+  merged to `main`" above. Deploying the handler sources without the migration (or the migration
+  without the required handler sources) breaks the RPC-version parity the atomic-leave recovery
+  had to restore.
+- The pre-merge state is already safe: the deployed `team-kick` (non-atomic, direct DELETE +
+  event INSERT) never referenced `kick_team`, so the migration and the handler deploy land in the
+  same integration run on the merge commit with no regression window.
+- PR checks report `Supabase Preview` as `skipping` (per-PR preview databases are intentionally
+  disabled), so validation is: green `Supabase DB` job on the PR, then after merge confirm on the
+  merge commit that `Supabase Preview` succeeded, `supabase migration list --linked` shows
+  `20260926090000` applied remotely (no blank REMOTE rows) and the `team-kick` function shows a
+  new version in the Supabase dashboard. A blank REMOTE row is the pending case; the fallback is
+  the manual `db push` block in "Deployment", not a hand-written apply of the migration.
+
 ### Reconcile migration `20260630075121_reconcile_prod_schema_drift`
 
 - Captures schema changes that were previously made directly in the dashboard (teams
