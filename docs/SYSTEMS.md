@@ -1180,11 +1180,22 @@ flowchart LR
   never an identity from the request body. Membership removal, conditional pointer maintenance,
   and trusted event insertion commit together. The handler performs no later table write, so a
   newer join cannot be overwritten by an old leave response.
-- Leave takes a per-user advisory lock, then the team row and membership row. Ownership transfer
-  locks the team before validating owner and successor membership, preventing promotion of a
-  departed member. Both RPCs have a five-second lock timeout and service-only execution grants.
-  The handler retries the whole leave transaction at most three times, with 50/100 ms delays,
-  only for confirmed `40P01`, `40001`, or `55P03` aborts. Exhaustion returns `503` with
+- `team-kick` calls the service-only `public.kick_team` RPC the same way: ownership validation,
+  the verified-event cooldown check, membership deletion, and the trusted `member_kicked` event
+  commit or roll back together. An event failure can no longer return success with a warning,
+  which would have left a removed member without audit history and let the next kick pass the
+  cooldown immediately. The handler keeps the legacy failure contract (`not_found`/`not_member`
+  → 404, `not_owner` → 403, `self` → 400, `cooldown` → 429); the RPC collapses a non-owner
+  initiator, including one with no membership, to `not_owner` so membership is never revealed.
+  The retry policy is identical to leave: whole-transaction retries with 50/100 ms delays,
+  only for confirmed `40P01`, `40001`, or `55P03` aborts, exhaustion returning `503` with
+  `Retry-After: 1`.
+- Leave takes a per-user advisory lock, then the team row and membership row; kick takes a
+  per-initiator advisory lock, then the team row and the initiator's membership row. Ownership
+  transfer locks the team before validating owner and successor membership, preventing promotion
+  of a departed member. All three RPCs have a five-second lock timeout and service-only execution
+  grants. The handler retries the whole leave transaction at most three times, with 50/100 ms
+  delays, only for confirmed `40P01`, `40001`, or `55P03` aborts. Exhaustion returns `503` with
   `Retry-After: 1`; business results and ambiguous transport failures are not retried.
 - Cooldowns are user/mode-wide across teams but retain the existing event lifetime: disband
   deletes the associated events. They are not durable cooldown evidence after team deletion.
