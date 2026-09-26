@@ -175,6 +175,7 @@ const mountAppBar = async () => {
           template: '<a><slot /></a>',
         },
         Omnibar: true,
+        ProgressSaveStatusIndicator: true,
         SelectMenuFixed: SelectMenuFixedStub,
         UButton: {
           props: ['icon'],

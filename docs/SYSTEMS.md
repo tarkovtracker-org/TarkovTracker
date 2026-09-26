@@ -898,6 +898,28 @@ flowchart LR
    select the character sessions they intend to restore. Missing logs, objective handovers, XP,
    skills, and hideout progress cannot be reconstructed from these quest notifications.
 
+### Save status and recovery
+
+The reliability policy and vocabulary live in `CONTEXT.md`. Local persistence and cloud
+acknowledgement are separate facts, tracked in `app/stores/tarkov/progressSaveStatus.ts` and
+shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
+
+- **Cloud status.** `useSupabaseSync` reports `pending` from the first local change until the
+  service acknowledges the latest version, `saving` while a write is in flight, `retry_scheduled`
+  after a failure, and `failed` once the bounded schedule (`CLOUD_SAVE_RETRY_DELAYS_MS`, 5 s /
+  15 s / 60 s) is exhausted. Exhaustion keeps the changes pending; later edits still attempt a
+  debounced save, and a manual retry (`retryCloudSave`) or the browser `online` event restarts
+  the budget. Failures are classified as `offline`, `rate_limited`, `auth`, or `unknown` so the
+  indicator can distinguish a known cause from an unknown one.
+- **Local status.** The progress persist plugin writes through `progressPersistStorage`, because
+  `pinia-plugin-persistedstate` swallows storage exceptions. Every write of the active progress
+  key goes through `persistActiveProgressValue`, which records `saved` or `failed` (`quota`,
+  `unavailable`, `unknown`). A failed local write means the latest changes are memory-only.
+- **Indicator.** Memory-only changes outrank cloud warnings. Warnings offer an export of the
+  current in-memory progress (`useDataBackup().exportProgress`), which needs no successful save;
+  cloud warnings also offer a manual retry. Guidance never recommends reloading or clearing site
+  data as a fix.
+
 ### Files
 
 - `supabase/migrations/20260804043342_normalize_game_mode_progress_and_add_seasonal.sql` — schema,
@@ -928,6 +950,9 @@ flowchart LR
 - `app/features/team/TeamDangerZone.vue`, `app/features/team/useTeamInviteLink.ts` — resolved active
   team actions and mode-scoped invite links
 - `app/composables/useDataBackup.ts` — season-aware native backups
+- `app/stores/tarkov/progressSaveStatus.ts`, `app/composables/useProgressSaveStatus.ts`,
+  `app/shell/ProgressSaveStatusIndicator.vue` — truthful local/cloud save status, bounded cloud
+  retry, manual retry, and export guidance
 - `app/server/api/profile/[userId]/[mode].get.ts`,
   `app/server/api/streamer/[userId]/[mode]/kappa.get.ts`, `app/server/api/team/members.ts` —
   mode-aware sharing and team routes
@@ -945,6 +970,11 @@ flowchart LR
   existing row and column access, including token-note updates. Billing events remain server-only;
   supporters and admin audit logs expose only their RLS-filtered authenticated reads. New-table
   default privileges require a separate creating-role audit; these revokes do not change defaults.
+- The UI may call progress locally saved only after `persistActiveProgressValue` confirms the
+  write. A cloud failure is never evidence of a local save, and exhausting cloud retries never
+  clears the pending state or discards the changes.
+- Cloud save status and the manual retry handler belong to the current sync controller; a
+  session reset clears both, and a disposed controller cannot publish status for the next session.
 - Legacy `user_system.team` / `team_id` values are used only when neither persistent mode-specific
   team ID exists. They must never make a PvP team appear as the active PvE team or vice versa.
 - Team creation maps both the `team_memberships_user_mode_unique` SQLSTATE `23505` conflict and

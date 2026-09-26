@@ -1,5 +1,6 @@
 import { migrateToGameModeStructure, type UserState } from '@/stores/progressState';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
+import { classifyLocalSaveFailure, recordLocalSave } from '@/stores/tarkov/progressSaveStatus';
 import { clearProgressStorage } from '@/utils/clientStorage';
 import { GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
@@ -163,15 +164,38 @@ export const safeGetItem = (key: string): string | null => {
     return null;
   }
 };
-export const safeSetItem = (key: string, value: string): boolean => {
-  if (typeof window === 'undefined') return false;
+type StorageWriteResult = { ok: true } | { ok: false; error: unknown };
+const writeStorageItem = (key: string, value: string): StorageWriteResult => {
+  if (typeof window === 'undefined') return { ok: false, error: null };
   try {
     localStorage.setItem(key, value);
-    return true;
+    return { ok: true };
   } catch (error) {
     logger.error(`[TarkovStore] Failed to write localStorage key "${key}":`, error);
-    return false;
+    return { ok: false, error };
   }
+};
+export const safeSetItem = (key: string, value: string): boolean => writeStorageItem(key, value).ok;
+/**
+ * Writes the active progress envelope and records whether the browser confirmed it.
+ * Only this confirmation may be described to the player as a local save.
+ */
+export const persistActiveProgressValue = (value: string): boolean => {
+  const result = writeStorageItem(STORAGE_KEYS.progress, value);
+  if (result.ok) recordLocalSave(true);
+  else recordLocalSave(false, classifyLocalSaveFailure(result.error));
+  return result.ok;
+};
+/**
+ * Storage adapter for the progress persist plugin. The plugin swallows storage
+ * exceptions, so writes go through `persistActiveProgressValue` to surface them.
+ */
+export const progressPersistStorage = {
+  getItem: (key: string): string | null => safeGetItem(key),
+  setItem: (key: string, value: string): void => {
+    if (key === STORAGE_KEYS.progress) persistActiveProgressValue(value);
+    else safeSetItem(key, value);
+  },
 };
 export const safeRemoveItem = (key: string): boolean => {
   if (typeof window === 'undefined') return false;
@@ -269,6 +293,6 @@ export const patchStoreState = (
 export const progressStorageSerializer = createProgressStorageSerializer(
   readPersistedProgressState,
   (value) => {
-    safeSetItem(STORAGE_KEYS.progress, value);
+    persistActiveProgressValue(value);
   }
 );

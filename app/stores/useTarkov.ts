@@ -24,6 +24,8 @@ import {
   progressStorageSerializer,
   getPreservedProgressStorageValue,
   patchStoreState,
+  persistActiveProgressValue,
+  progressPersistStorage,
   readPersistedProgressState,
   safeGetItem,
   safeRemoveItem,
@@ -55,6 +57,12 @@ import {
   syncProgressState,
   type ModeProgressClient,
 } from '@/stores/tarkov/progressPersistence';
+import {
+  CLOUD_SAVE_RETRY_DELAYS_MS,
+  registerCloudRetryHandler,
+  resetCloudSaveStatus,
+  setCloudSaveStatus,
+} from '@/stores/tarkov/progressSaveStatus';
 import {
   cleanupRealtimeListener,
   registerSyncControllerGetter,
@@ -1022,7 +1030,7 @@ export const useTarkovStore = defineStore('swapTarkov', {
   // Enable automatic localStorage persistence with user scoping
   persist: {
     key: STORAGE_KEYS.progress, // LocalStorage key for user progress data
-    storage: typeof window !== 'undefined' ? localStorage : undefined,
+    storage: typeof window !== 'undefined' ? progressPersistStorage : undefined,
     // Add userId to serialized data to prevent cross-user contamination
     serializer: {
       serialize: (state: StateTree) => {
@@ -1274,6 +1282,7 @@ export function resetTarkovSync(
     pendingSyncWatchStop = null;
   }
   cleanupRealtimeListener();
+  resetCloudSaveStatus();
   syncUserId = null;
   shownLocalIgnoreReasons.clear();
   resetSyncTimeline();
@@ -1375,8 +1384,7 @@ export async function initializeTarkovSync() {
       if (typeof window === 'undefined') return;
       const sanitizedState = sanitizeOwnedUserState(state);
       if (
-        !safeSetItem(
-          STORAGE_KEYS.progress,
+        !persistActiveProgressValue(
           progressStorageSerializer.serialize(
             cloneStateSnapshot(sanitizedState),
             userId,
@@ -1822,10 +1830,14 @@ export async function initializeTarkovSync() {
         pendingSyncWatchStop = null;
       }
       syncUserId = currentUserId ?? null;
-      syncController = useSupabaseSync({
+      const controller = useSupabaseSync({
         store: tarkovStore,
         table: 'user_progress',
         debounceMs: SYNC_DEBOUNCE_MS,
+        retryDelaysMs: CLOUD_SAVE_RETRY_DELAYS_MS,
+        onSaveStatusChange: (status) => {
+          if (syncController === controller) setCloudSaveStatus(status);
+        },
         onSynced: () => {
           recordLocalSyncTime();
           if (typeof BroadcastChannel !== 'undefined') {
@@ -1883,6 +1895,8 @@ export async function initializeTarkovSync() {
           }
         },
       });
+      syncController = controller;
+      registerCloudRetryHandler(controller.retryNow);
     };
     const shouldStartSyncNow = loadResult.hadRemoteData || hasProgress(tarkovStore.$state);
     if (shouldStartSyncNow) {

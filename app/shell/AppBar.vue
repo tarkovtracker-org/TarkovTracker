@@ -63,6 +63,7 @@
               />
             </span>
           </AppTooltip>
+          <ProgressSaveStatusIndicator />
         </div>
         <!-- Group 1: Utilities (Theme + Bell + Help) -->
         <div class="flex items-center gap-1">

@@ -340,4 +340,132 @@ describe('useSupabaseSync', () => {
     });
     sync.cleanup();
   });
+  describe('cloud save status and bounded retries', () => {
+    const RETRY_DELAYS = [10, 20] as const;
+    const createRetryingSync = async (onSaveStatusChange = vi.fn()) => {
+      const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+      const store = createMockStore({ count: 0 });
+      const sync = useSupabaseSync({
+        store,
+        table: 'user_progress',
+        debounceMs: 5,
+        retryDelaysMs: RETRY_DELAYS,
+        onSaveStatusChange,
+      });
+      return { store, sync, onSaveStatusChange };
+    };
+    it('marks changes pending until the cloud acknowledges them', async () => {
+      const { store, sync, onSaveStatusChange } = await createRetryingSync();
+      store.$state.count = 1;
+      store.notifySubscriber();
+      expect(sync.saveStatus.value.state).toBe('pending');
+      await flushSync(5);
+      expect(sync.saveStatus.value).toEqual({
+        state: 'idle',
+        failure: null,
+        retryAttempt: 0,
+        nextRetryAt: null,
+      });
+      const states = onSaveStatusChange.mock.calls.map(([status]) => status.state);
+      expect(states).toEqual(['pending', 'saving', 'idle']);
+      sync.cleanup();
+    });
+    it('retries on a bounded schedule and keeps changes pending after exhaustion', async () => {
+      upsert.mockResolvedValue({ error: { message: 'Progress sync rate limit exceeded' } });
+      const { store, sync } = await createRetryingSync();
+      store.$state.count = 1;
+      store.notifySubscriber();
+      await flushSync(5);
+      expect(upsert).toHaveBeenCalledTimes(1);
+      expect(sync.saveStatus.value).toMatchObject({
+        state: 'retry_scheduled',
+        failure: 'rate_limited',
+        retryAttempt: 1,
+      });
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS[0]);
+      expect(upsert).toHaveBeenCalledTimes(2);
+      expect(sync.saveStatus.value).toMatchObject({ state: 'retry_scheduled', retryAttempt: 2 });
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS[1]);
+      expect(upsert).toHaveBeenCalledTimes(3);
+      expect(sync.saveStatus.value).toMatchObject({ state: 'failed', failure: 'rate_limited' });
+      expect(sync.hasPendingChanges!()).toBe(true);
+      // Exhaustion does not keep retrying in the background.
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(upsert).toHaveBeenCalledTimes(3);
+      sync.cleanup();
+    });
+    it('offers a manual retry after exhaustion that acknowledges the changes', async () => {
+      upsert.mockResolvedValue({ error: { message: 'boom' } });
+      const { store, sync } = await createRetryingSync();
+      store.$state.count = 2;
+      store.notifySubscriber();
+      await flushSync(5);
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS[0] + RETRY_DELAYS[1]);
+      expect(sync.saveStatus.value).toMatchObject({ state: 'failed', failure: 'unknown' });
+      upsert.mockResolvedValue({ error: null });
+      await expect(sync.retryNow()).resolves.toBe(true);
+      expect(upsert).toHaveBeenLastCalledWith({ count: 2, user_id: 'user-1' });
+      expect(sync.saveStatus.value.state).toBe('idle');
+      expect(sync.hasPendingChanges!()).toBe(false);
+      sync.cleanup();
+    });
+    it('restarts the retry budget after a manual retry fails again', async () => {
+      upsert.mockResolvedValue({ error: { message: 'boom' } });
+      const { store, sync } = await createRetryingSync();
+      store.$state.count = 3;
+      store.notifySubscriber();
+      await flushSync(5);
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS[0] + RETRY_DELAYS[1]);
+      await expect(sync.retryNow()).resolves.toBe(false);
+      expect(sync.saveStatus.value).toMatchObject({ state: 'retry_scheduled', retryAttempt: 1 });
+      sync.cleanup();
+    });
+    it('classifies a thrown network error while offline', async () => {
+      const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+      upsert.mockRejectedValue(new TypeError('Failed to fetch'));
+      const { store, sync } = await createRetryingSync();
+      store.$state.count = 4;
+      store.notifySubscriber();
+      await flushSync(5);
+      expect(sync.saveStatus.value).toMatchObject({ state: 'retry_scheduled', failure: 'offline' });
+      onLine.mockRestore();
+      sync.cleanup();
+    });
+    it('retries pending changes when connectivity returns', async () => {
+      upsert.mockResolvedValueOnce({ error: { message: 'Failed to fetch' } });
+      const { store, sync } = await createRetryingSync();
+      store.$state.count = 5;
+      store.notifySubscriber();
+      await flushSync(5);
+      expect(sync.saveStatus.value.state).toBe('retry_scheduled');
+      window.dispatchEvent(new Event('online'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(upsert).toHaveBeenCalledTimes(2);
+      expect(sync.saveStatus.value.state).toBe('idle');
+      sync.cleanup();
+    });
+    it('stops scheduled retries after cleanup', async () => {
+      upsert.mockResolvedValue({ error: { message: 'boom' } });
+      const { store, sync } = await createRetryingSync();
+      store.$state.count = 6;
+      store.notifySubscriber();
+      await flushSync(5);
+      sync.cleanup();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(upsert).toHaveBeenCalledTimes(1);
+      await expect(sync.retryNow()).resolves.toBe(false);
+    });
+  });
+  describe('classifyCloudSaveFailure', () => {
+    it.each([
+      [{ message: 'Progress sync rate limit exceeded' }, 'rate_limited'],
+      [{ message: 'Not authenticated' }, 'auth'],
+      [new TypeError('Failed to fetch'), 'offline'],
+      [{ message: 'relation missing' }, 'unknown'],
+      [null, 'unknown'],
+    ])('classifies %o as %s', async (error, expected) => {
+      const { classifyCloudSaveFailure } = await import('@/composables/supabase/useSupabaseSync');
+      expect(classifyCloudSaveFailure(error)).toBe(expected);
+    });
+  });
 });

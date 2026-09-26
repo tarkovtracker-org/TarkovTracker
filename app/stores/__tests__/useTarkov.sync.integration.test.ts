@@ -2382,4 +2382,62 @@ describe('useTarkov sync integration', () => {
       expect(showLoadFailed).not.toHaveBeenCalled();
     });
   });
+  describe('progress save status', () => {
+    type StatusOptions = {
+      onSaveStatusChange: (status: Record<string, unknown>) => void;
+      retryDelaysMs: readonly number[];
+    };
+    const failedStatus = {
+      state: 'failed',
+      failure: 'offline',
+      retryAttempt: 3,
+      nextRetryAt: null,
+    };
+    it('mirrors only the current controller and routes manual retries to it', async () => {
+      const retryNow = vi.fn().mockResolvedValue(true);
+      useSupabaseSyncMock.mockReturnValue({
+        cleanup: cleanupSync,
+        syncToSupabase: syncInitialState,
+        pause: pauseSync,
+        resume: resumeSync,
+        retryNow,
+      } as unknown as ReturnType<typeof useSupabaseSyncMock>);
+      await initializeTarkovSync();
+      const status = await import('@/stores/tarkov/progressSaveStatus');
+      const options = useSupabaseSyncMock.mock.calls.at(-1)?.[0] as StatusOptions;
+      expect(options.retryDelaysMs).toEqual(status.CLOUD_SAVE_RETRY_DELAYS_MS);
+      options.onSaveStatusChange(failedStatus);
+      expect(status.progressSaveStatus.cloud).toEqual(failedStatus);
+      await expect(status.retryCloudSave()).resolves.toBe(true);
+      expect(retryNow).toHaveBeenCalledOnce();
+      switchSession('user-1', null, 'signed out');
+      expect(status.progressSaveStatus.cloud.state).toBe('idle');
+      // A disposed controller cannot resurrect a warning for the next session.
+      options.onSaveStatusChange(failedStatus);
+      expect(status.progressSaveStatus.cloud.state).toBe('idle');
+      await expect(status.retryCloudSave()).resolves.toBe(false);
+    });
+    it('records local save failures from the real persistence plugin', async () => {
+      const pinia = createPinia().use(piniaPluginPersistedstate);
+      createApp({}).use(pinia);
+      setActivePinia(pinia);
+      await initializeTarkovSync();
+      const status = await import('@/stores/tarkov/progressSaveStatus');
+      useTarkovStore().$patch((state) => {
+        state.pvp.level = 7;
+      });
+      await nextTick();
+      expect(status.progressSaveStatus.local).toBe('saved');
+      const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+        throw Object.assign(new Error('full'), { name: 'QuotaExceededError' });
+      });
+      useTarkovStore().$patch((state) => {
+        state.pvp.level = 8;
+      });
+      await nextTick();
+      expect(status.progressSaveStatus.local).toBe('failed');
+      expect(status.progressSaveStatus.localFailure).toBe('quota');
+      setItem.mockRestore();
+    });
+  });
 });

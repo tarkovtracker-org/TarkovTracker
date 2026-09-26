@@ -7,6 +7,11 @@ import {
   type RemoteStateMerge,
   type WithRemoteSnapshot,
 } from '@/utils/pendingState';
+import type {
+  CloudSaveFailure,
+  CloudSaveState,
+  CloudSaveStatus,
+} from '@/stores/tarkov/progressSaveStatus';
 import type { StateTree, Store } from 'pinia';
 import type { UserProgressData } from '~/stores/progressState';
 type SupabaseErrorLike = {
@@ -29,6 +34,10 @@ export interface SupabaseSyncConfig<
   sync?: (payload: TPayload) => Promise<{ error: SupabaseErrorLike | null }>;
   debounceMs?: number;
   onSynced?: () => void;
+  /** Delays for automatic retries after a failed write; empty disables them. */
+  retryDelaysMs?: readonly number[];
+  /** Observes cloud save status: pending until the service acknowledges the latest changes. */
+  onSaveStatusChange?: (status: CloudSaveStatus) => void;
 }
 export interface SupabaseSyncReturn<
   TState extends StateTree = StateTree,
@@ -39,6 +48,9 @@ export interface SupabaseSyncReturn<
   withSnapshot?: WithRemoteSnapshot;
   isSyncing: Ref<boolean>;
   isPaused: Ref<boolean>;
+  saveStatus: Ref<CloudSaveStatus>;
+  /** Resets the retry budget and saves now; resolves `true` once nothing is pending. */
+  retryNow: () => Promise<boolean>;
   cleanup: () => void;
   pause: () => void;
   resume: () => void;
@@ -123,6 +135,33 @@ type SupabaseSyncAttempt = {
   error: SupabaseErrorLike | null;
   removedMissingColumns: Set<string>;
 };
+const NETWORK_FAILURE_PATTERNS = ['failed to fetch', 'networkerror', 'network request failed'];
+const AUTH_FAILURE_PATTERNS = ['not authenticated', 'jwt', 'invalid token'];
+const describeFailure = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (error !== null && typeof error === 'object') {
+    const { message, details, hint } = error as SupabaseErrorLike;
+    return `${message ?? ''} ${details ?? ''} ${hint ?? ''}`;
+  }
+  return String(error ?? '');
+};
+const isBrowserOffline = (): boolean =>
+  typeof navigator !== 'undefined' && navigator.onLine === false;
+const matchesAny = (text: string, patterns: readonly string[]): boolean =>
+  patterns.some((pattern) => text.includes(pattern));
+const classifyKnownFailure = (text: string): CloudSaveFailure => {
+  if (text.includes('rate limit')) return 'rate_limited';
+  if (matchesAny(text, AUTH_FAILURE_PATTERNS)) return 'auth';
+  return matchesAny(text, NETWORK_FAILURE_PATTERNS) ? 'offline' : 'unknown';
+};
+/** Distinguishes a known cause from an unknown one so recovery guidance stays truthful. */
+export const classifyCloudSaveFailure = (error: unknown): CloudSaveFailure =>
+  isBrowserOffline() ? 'offline' : classifyKnownFailure(describeFailure(error).toLowerCase());
+const sameSaveStatus = (left: CloudSaveStatus, right: CloudSaveStatus): boolean =>
+  left.state === right.state &&
+  left.failure === right.failure &&
+  left.retryAttempt === right.retryAttempt &&
+  left.nextRetryAt === right.nextRetryAt;
 /** An aborted write is worth one retry; every other failure is reported as-is. */
 const wasWriteAborted = (attempt: SupabaseSyncAttempt): boolean =>
   !attempt.synced && attempt.error !== null && isAbortRequestError(attempt.error);
@@ -145,6 +184,8 @@ export function useSupabaseSync<
   sync,
   debounceMs = 1000,
   onSynced,
+  retryDelaysMs = [],
+  onSaveStatusChange,
 }: SupabaseSyncConfig<TState, TPayload>): SupabaseSyncReturn<TState, TPayload> {
   logger.debug(`[Sync] useSupabaseSync initialized for table: ${table}, debounce: ${debounceMs}ms`);
   const { $supabase } = useNuxtApp();
@@ -157,6 +198,46 @@ export function useSupabaseSync<
   const pendingState = createPendingStateTracker(() => store.$state);
   let disposed = false;
   let syncQueue: Promise<TPayload | null> | null = null;
+  let retryAttempt = 0;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let nextRetryAt: number | null = null;
+  let retriesExhausted = false;
+  let lastFailure: CloudSaveFailure | null = null;
+  const saveStatus = ref<CloudSaveStatus>({
+    state: 'idle',
+    failure: null,
+    retryAttempt: 0,
+    nextRetryAt: null,
+  });
+  const resolveSaveState = (): CloudSaveState => {
+    if (!pendingLocalChanges) return 'idle';
+    if (isSyncing.value) return 'saving';
+    if (retryTimer) return 'retry_scheduled';
+    return retriesExhausted ? 'failed' : 'pending';
+  };
+  const publishSaveStatus = () => {
+    if (disposed) return;
+    const state = resolveSaveState();
+    const next: CloudSaveStatus = {
+      state,
+      failure: state === 'idle' ? null : lastFailure,
+      retryAttempt,
+      nextRetryAt,
+    };
+    if (sameSaveStatus(saveStatus.value, next)) return;
+    saveStatus.value = next;
+    onSaveStatusChange?.(next);
+  };
+  const clearRetryTimer = () => {
+    if (retryTimer) clearTimeout(retryTimer);
+    retryTimer = null;
+    nextRetryAt = null;
+  };
+  const resetRetryBudget = () => {
+    clearRetryTimer();
+    retryAttempt = 0;
+    retriesExhausted = false;
+  };
   /** Transmission is gated while paused or while a remote snapshot is in flight. */
   const isSyncSuspended = (): boolean => isPaused.value || snapshotDepth > 0;
   const syncOwnerId = (): string | null => ($supabase.user.loggedIn ? $supabase.user.id : null);
@@ -243,17 +324,47 @@ export function useSupabaseSync<
     }
     if (attempt.error) reportFailedWrite(attempt.error);
   };
-  const writePayload = async (dataToSave: TPayload, ownerId: string): Promise<boolean> => {
+  const writePayload = async (
+    dataToSave: TPayload,
+    ownerId: string
+  ): Promise<SupabaseSyncAttempt> => {
     let attempt = await upsertWithFallback(dataToSave);
     if (wasWriteAborted(attempt) && !isPaused.value) {
       await delay(ABORT_RETRY_DELAY_MS);
       if (canRetryAbortedWrite(ownerId)) attempt = await upsertWithFallback(dataToSave);
     }
     reportWriteOutcome(attempt);
-    return attempt.synced;
+    return attempt;
+  };
+  const runScheduledRetry = () => {
+    retryTimer = null;
+    nextRetryAt = null;
+    publishSaveStatus();
+    void enqueueSync().catch((error) => {
+      logger.error(`[Sync] Scheduled retry failed for ${table}:`, error);
+    });
+  };
+  /** Transient failures get a bounded schedule; exhaustion keeps the changes pending. */
+  const scheduleRetry = () => {
+    if (disposed || retryTimer) return;
+    const delayMs = retryDelaysMs[retryAttempt];
+    if (delayMs === undefined) {
+      retriesExhausted = true;
+      return;
+    }
+    retryAttempt += 1;
+    nextRetryAt = Date.now() + delayMs;
+    retryTimer = setTimeout(runScheduledRetry, delayMs);
+  };
+  const handleWriteFailure = (error: unknown) => {
+    lastFailure = classifyCloudSaveFailure(error);
+    scheduleRetry();
   };
   const clearPendingVersion = (syncVersion: number) => {
-    if (syncVersion === localVersion) pendingLocalChanges = false;
+    if (syncVersion !== localVersion) return;
+    pendingLocalChanges = false;
+    resetRetryBudget();
+    lastFailure = null;
   };
   const buildSyncPayload = (transformedState: TPayload, ownerId: string): TPayload => {
     const dataToSave: TPayload = { ...transformedState };
@@ -269,6 +380,8 @@ export function useSupabaseSync<
     acknowledge();
     lastSyncedHash = currentHash;
     clearPendingVersion(syncVersion);
+    resetRetryBudget();
+    lastFailure = null;
     logger.debug(`[Sync] ✅ Successfully synced to ${table}`);
     onSynced?.();
   };
@@ -281,9 +394,13 @@ export function useSupabaseSync<
     ownerId: string
   ): Promise<TPayload | null> => {
     logPayload(dataToSave);
-    const synced = await writePayload(dataToSave, ownerId);
-    if (synced && canCommitWrite(ownerId)) commitSync(currentHash, syncVersion, acknowledge);
-    return synced ? transformedState : null;
+    const attempt = await writePayload(dataToSave, ownerId);
+    if (!attempt.synced) {
+      handleWriteFailure(attempt.error);
+      return null;
+    }
+    if (canCommitWrite(ownerId)) commitSync(currentHash, syncVersion, acknowledge);
+    return transformedState;
   };
   const runSyncToSupabase = async (
     transformedState: TPayload,
@@ -326,13 +443,16 @@ export function useSupabaseSync<
       return null;
     }
     isSyncing.value = true;
+    publishSaveStatus();
     try {
       return await runSyncToSupabase(transformedState, syncVersion, acknowledge, ownerId);
     } catch (err) {
       logger.error('[Sync] Unexpected error:', err);
+      handleWriteFailure(err);
       return null;
     } finally {
       isSyncing.value = false;
+      publishSaveStatus();
     }
   };
   const capturePayload = (state: TState): TPayload | null => {
@@ -372,16 +492,33 @@ export function useSupabaseSync<
     // reconciliation is waiting to resume. The RPC suppresses unchanged writes.
     localVersion += 1;
     pendingLocalChanges = true;
+    publishSaveStatus();
     logger.debug(`[Sync] Store state changed for ${table}, triggering debounced sync`);
     void debouncedSync(state as TState).catch((error) => {
       if (isDebounceRejection(error)) return;
       logger.error(`[Sync] Debounced sync failed for ${table}:`, error);
     });
   });
+  /** A manual retry restarts the bounded schedule; it never discards pending changes. */
+  const retryNow = async (): Promise<boolean> => {
+    if (!canQueueSync()) return false;
+    resetRetryBudget();
+    debouncedSync.cancel();
+    publishSaveStatus();
+    if (pendingLocalChanges) await enqueueSync();
+    return !pendingLocalChanges;
+  };
+  const handleOnline = () => {
+    if (pendingLocalChanges && !isSyncing.value) void retryNow();
+  };
+  const watchesConnectivity = retryDelaysMs.length > 0 && typeof window !== 'undefined';
+  if (watchesConnectivity) window.addEventListener('online', handleOnline);
   const cleanup = () => {
     disposed = true;
+    clearRetryTimer();
     debouncedSync.cancel();
     unsubscribe();
+    if (watchesConnectivity) window.removeEventListener('online', handleOnline);
   };
   if (getCurrentInstance()) {
     onUnmounted(cleanup);
@@ -419,6 +556,8 @@ export function useSupabaseSync<
     withSnapshot,
     isSyncing,
     isPaused,
+    saveStatus,
+    retryNow,
     cleanup,
     pause,
     resume,
@@ -426,6 +565,7 @@ export function useSupabaseSync<
       // Imperative saves can precede the subscription's first mutation.
       pendingLocalChanges = true;
       localVersion += 1;
+      publishSaveStatus();
       return enqueueSync(state);
     },
   };
