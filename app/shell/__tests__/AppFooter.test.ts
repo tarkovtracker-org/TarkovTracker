@@ -41,7 +41,14 @@ const mountFooter = async () => {
   });
 };
 describe('AppFooter', () => {
-  beforeEach(() => openPreferences.mockReset());
+  beforeEach(() => {
+    openPreferences.mockReset();
+    // Restore default runtime config; individual tests mutate it to exercise
+    // the release-link fallback branches.
+    runtimeConfig.public.appVersion = '1.2.3';
+    runtimeConfig.public.githubOwner = 'tarkovtracker-org';
+    runtimeConfig.public.githubRepo = 'TarkovTracker';
+  });
   it('renders the navigation groups, version, and analytics preferences action', async () => {
     const wrapper = await mountFooter();
     expect(wrapper.text()).toContain('navigation_drawer.brand_name');
@@ -58,5 +65,20 @@ describe('AppFooter', () => {
     expect(analyticsButton).toBeDefined();
     await analyticsButton?.trigger('click');
     expect(openPreferences).toHaveBeenCalledOnce();
+  });
+  it('renders the version without a release link for the unversioned dev build', async () => {
+    runtimeConfig.public.appVersion = 'dev';
+    const wrapper = await mountFooter();
+    expect(wrapper.text()).toContain('vdev');
+    const versionLink = wrapper.findAll('a').find((anchor) => anchor.text().includes('vdev'));
+    expect(versionLink).toBeUndefined();
+  });
+  it('renders the version without a release link when repo config is absent', async () => {
+    runtimeConfig.public.githubOwner = '';
+    runtimeConfig.public.githubRepo = '';
+    const wrapper = await mountFooter();
+    const versionLink = wrapper.findAll('a').find((anchor) => anchor.text().includes('v1.2.3'));
+    expect(versionLink).toBeUndefined();
+    expect(wrapper.text()).toContain('v1.2.3');
   });
 });
