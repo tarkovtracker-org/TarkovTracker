@@ -1738,6 +1738,7 @@
     "analytics_preferences": "分析偏好",
     "game_attribution": "Escape from Tarkov 及相关游戏内容和素材是 Battlestate Games Limited 及其授权方的商标和版权作品。保留所有权利。TarkovTracker 是非官方粉丝项目，与 Battlestate Games 无关联且未获其认可。",
     "tagline": "跟踪您从Tarkov的追求、隐藏升级和物品需求在一个地方。",
+    "version_release_link": "View the release notes for version {version} on GitHub",
     "sections": {
       "explore": "浏览",
       "project": "项目",
