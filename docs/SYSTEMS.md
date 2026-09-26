@@ -732,6 +732,10 @@ sequenceDiagram
   app and API share one invalidation algorithm: a requirement whose `status` includes `failed`
   never invalidates its task when the prerequisite is failed. Shared utilities must not import
   Nuxt or Worker runtime modules; invalidation logic must not be re-implemented per runtime.
+- Gateway task catalogs are frozen with one prepared dependency graph per snapshot. Catalog expiry
+  replaces the catalog and graph together.
+- Each player receives fresh invalidation state; mutable player state is never shared between
+  requests through the catalog or prepared graph.
 - Completed and failed tasks (including legacy records with both flags set) and their objectives
   are never marked invalid. This terminal-state guard applies to faction, prerequisite, and legacy
   alternative entry points. Completed tasks stop propagation; failed tasks still invalidate strict
