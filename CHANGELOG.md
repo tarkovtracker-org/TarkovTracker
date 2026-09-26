@@ -1,3 +1,10 @@
+## [1.81.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.81.5...v1.81.6) (2026-09-26)
+
+
+### Performance Improvements
+
+* reduce Workers CPU for cached items and progress ([#932](https://github.com/tarkovtracker-org/TarkovTracker/issues/932)) ([8bfb4b1](https://github.com/tarkovtracker-org/TarkovTracker/commit/8bfb4b13dd75b9922275b986a50d2f40786022e5))
+
 ## [1.81.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.81.4...v1.81.5) (2026-09-26)
 
 
