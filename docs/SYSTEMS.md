@@ -1246,7 +1246,9 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
    follows (`tarkov-dev-profile` prefix,
    default TTL 15 min, `NUXT_TARKOV_DEV_PROFILE_CACHE_TTL_MS`; upstream 404s are negative-cached
    for 60 s).
-3. On cache miss it fetches upstream with the shared User-Agent. With `?fresh=1` (sent by the
+3. On cache miss it fetches upstream with the shared User-Agent, which identifies the deployment
+   using the origin from `APP_URL` (or `CF_PAGES_URL`). Missing, malformed, and local addresses
+   retain the upstream `https://tarkovtracker.org` identity. With `?fresh=1` (sent by the
    client for explicit refetches and automatically after a stale rejection), serving from cache is
    skipped; the cache is still read to obtain the ETag for conditional `If-None-Match` revalidation.
    A `304` re-stamps a fresh cached entry without extending a payload that fails the freshness gate.
@@ -1277,6 +1279,9 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
 - The browser never fetches `players.tarkov.dev` directly (no upstream CORS); the proxy is the only
   path, and it never talks to the api-gateway Worker or its daily token quotas — the rate-limit
   buckets are route-specific.
+- The shared outbound User-Agent identifies this deployment using the origin from `APP_URL` or
+  `CF_PAGES_URL`; missing, malformed, and local values retain the upstream
+  `https://tarkovtracker.org` identity.
 - A minute-scale limiter always runs before siteverify or any cache/upstream access. When Turnstile
   is enabled it uses the verification bucket, so invalid tokens cannot hammer siteverify while the
   hourly admitted-request quota remains reserved for verified traffic.

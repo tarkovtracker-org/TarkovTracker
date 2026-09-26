@@ -1,3 +1,10 @@
+## [1.82.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.3...v1.82.4) (2026-09-26)
+
+
+### Bug Fixes
+
+* **server:** derive the outbound User-Agent from the deployment's app URL ([#914](https://github.com/tarkovtracker-org/TarkovTracker/issues/914)) ([cd48917](https://github.com/tarkovtracker-org/TarkovTracker/commit/cd489175ed71d988f63a75f96ce3d75f79bc4844))
+
 ## [1.82.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.2...v1.82.3) (2026-09-26)
 
 

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
 import { TURNSTILE_TEST_SECRET_KEY } from '@/utils/turnstileKeys';
 const {
   consumeSharedRateLimitWithResetMock,
@@ -157,7 +158,7 @@ describe('/api/tarkov-dev/profile', () => {
       expect.objectContaining({
         headers: {
           accept: 'application/json',
-          'user-agent': 'TarkovTracker/1.0 (+https://tarkovtracker.org)',
+          'user-agent': TARKOVTRACKER_USER_AGENT,
         },
         signal: expect.any(AbortSignal),
       })
