@@ -40,6 +40,7 @@ describe('transformProgress invalidation', () => {
       expect(entryFor(result.tasksProgress, id)).toEqual({
         id,
         complete: completion.complete && !completion.failed,
+        active: false,
         ...(completion.failed ? { failed: true } : {}),
       });
     }
