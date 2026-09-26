@@ -24,7 +24,10 @@
           <span class="text-surface-100 w-full truncate text-xs font-semibold">
             {{ entry.taskName }}
           </span>
-          <span v-if="!isCompact" class="text-surface-400 w-full truncate text-xs">
+          <span
+            v-if="!isCompact || hasDuplicateTaskNames"
+            class="text-surface-400 w-full truncate text-xs"
+          >
             {{ entry.description }}
           </span>
         </button>
@@ -36,7 +39,7 @@
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import type { Composer } from 'vue-i18n';
-  const props = defineProps<{ objectiveIds: string[]; t: Composer['t']; autofocus?: boolean }>();
+  const props = defineProps<{ objectiveIds: string[]; t: Composer['t'] }>();
   const emit = defineEmits<{ close: []; select: [objectiveId: string] }>();
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
@@ -54,7 +57,12 @@
       };
     })
   );
-  onMounted(() => {
-    if (props.autofocus) entryButtons.value[0]?.focus();
-  });
+  const hasDuplicateTaskNames = computed(
+    () => new Set(entries.value.map((entry) => entry.taskName)).size < entries.value.length
+  );
+  const focusFirstEntry = () => {
+    const firstEntry = entryButtons.value[0];
+    if (firstEntry?.isConnected) firstEntry.focus();
+  };
+  defineExpose({ focusFirstEntry });
 </script>

@@ -54,4 +54,44 @@ describe('LeafletObjectiveStack', () => {
     await wrapper.trigger('keydown', { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(2);
   });
+  it('focuses its first entry only after the popup content is attached', async () => {
+    const { wrapper } = await setup();
+    const firstEntry = wrapper.findAll('li button')[0]!.element as HTMLButtonElement;
+    const focus = vi.spyOn(firstEntry, 'focus');
+    const focusFirstEntry = (wrapper.vm as unknown as { focusFirstEntry: () => void })
+      .focusFirstEntry;
+    focusFirstEntry();
+    expect(focus).not.toHaveBeenCalled();
+    document.body.appendChild(wrapper.element);
+    focusFirstEntry();
+    expect(document.activeElement).toBe(firstEntry);
+    wrapper.unmount();
+  });
+  it('keeps objective descriptions visible for duplicate task names in compact mode', async () => {
+    vi.doMock('@/stores/useMetadata', () => ({
+      useMetadataStore: () => ({
+        objectives: [
+          { id: 'obj-one', taskId: 'same-task', description: 'First objective' },
+          { id: 'obj-two', taskId: 'same-task', description: 'Second objective' },
+        ],
+        tasks: [{ id: 'same-task', name: 'Shared task' }],
+      }),
+    }));
+    vi.doMock('@/stores/usePreferences', () => ({
+      usePreferencesStore: () => ({ getMapTooltipDensity: 'compact' }),
+    }));
+    const { default: LeafletObjectiveStack } =
+      await import('@/features/maps/LeafletObjectiveStack.vue');
+    const wrapper = mount(LeafletObjectiveStack, {
+      props: {
+        objectiveIds: ['obj-one', 'obj-two'],
+        t: ((key: string) => key) as never,
+      },
+      global: { stubs: { UIcon: true } },
+    });
+    const entries = wrapper.findAll('li button');
+    expect(entries).toHaveLength(2);
+    expect(entries[0]!.text()).toContain('First objective');
+    expect(entries[1]!.text()).toContain('Second objective');
+  });
 });

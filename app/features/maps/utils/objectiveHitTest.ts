@@ -4,8 +4,17 @@
  */
 export type HitPoint = { x: number; y: number };
 export type ObjectiveHitShape =
-  | { kind: 'zone'; objectiveId: string; ring: HitPoint[]; area: number }
+  | {
+      kind: 'zone';
+      objectiveId: string;
+      ring: HitPoint[];
+      area: number;
+      center?: HitPoint;
+      radius?: number;
+    }
   | { kind: 'point'; objectiveId: string; center: HitPoint; radius: number };
+export type ObjectiveHitCandidate<T> = { shape: ObjectiveHitShape; source: T };
+export type ObjectiveHitSource<T> = { shape: ObjectiveHitShape; source: T };
 const crossesRay = (a: HitPoint, b: HitPoint, point: HitPoint): boolean => {
   if (a.y > point.y === b.y > point.y) return false;
   return point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x;
@@ -18,20 +27,47 @@ const isInsideRing = (ring: HitPoint[], point: HitPoint): boolean => {
   return inside;
 };
 const isHit = (shape: ObjectiveHitShape, point: HitPoint): boolean => {
-  if (shape.kind === 'zone') return isInsideRing(shape.ring, point);
+  if (shape.kind === 'zone') {
+    return (
+      isInsideRing(shape.ring, point) ||
+      (shape.center !== undefined &&
+        shape.radius !== undefined &&
+        Math.hypot(shape.center.x - point.x, shape.center.y - point.y) <= shape.radius)
+    );
+  }
   return Math.hypot(shape.center.x - point.x, shape.center.y - point.y) <= shape.radius;
 };
 /** Points first (most specific), then zones from smallest to largest area. */
 const hitRank = (shape: ObjectiveHitShape): number => (shape.kind === 'point' ? -1 : shape.area);
 /**
- * Returns the unique objective IDs whose shapes contain `point`, most specific
- * first.
+ * Returns the first hit shape for each objective, most specific first.
  */
+export const findObjectiveHitsAtPoint = (
+  shapes: readonly ObjectiveHitShape[],
+  point: HitPoint
+): ObjectiveHitShape[] => {
+  const hits = shapes.filter((shape) => isHit(shape, point));
+  hits.sort((a, b) => hitRank(a) - hitRank(b));
+  const seen = new Set<string>();
+  return hits.filter((shape) => {
+    if (seen.has(shape.objectiveId)) return false;
+    seen.add(shape.objectiveId);
+    return true;
+  });
+};
+/** Preserves the source object for each first-ranked objective hit. */
+export const findObjectiveHitSourcesAtPoint = <T>(
+  candidates: readonly ObjectiveHitCandidate<T>[],
+  point: HitPoint
+): ObjectiveHitSource<T>[] => {
+  const sourceByShape = new Map(candidates.map(({ shape, source }) => [shape, source]));
+  return findObjectiveHitsAtPoint(
+    candidates.map(({ shape }) => shape),
+    point
+  ).map((shape) => ({ shape, source: sourceByShape.get(shape)! }));
+};
+/** Returns the unique objective IDs whose shapes contain `point`. */
 export const findObjectivesAtPoint = (
   shapes: readonly ObjectiveHitShape[],
   point: HitPoint
-): string[] => {
-  const hits = shapes.filter((shape) => isHit(shape, point));
-  hits.sort((a, b) => hitRank(a) - hitRank(b));
-  return [...new Set(hits.map((shape) => shape.objectiveId))];
-};
+): string[] => findObjectiveHitsAtPoint(shapes, point).map((shape) => shape.objectiveId);
