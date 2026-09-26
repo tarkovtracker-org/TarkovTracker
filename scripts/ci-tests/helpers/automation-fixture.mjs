@@ -92,11 +92,6 @@ if (args[0] === 'api') {
     console.log('{"message":"Updating pull request branch"}'); process.exit(0);
   }
   const endpoint = args[args.indexOf('api') + 1] === '--paginate' ? args[2] : args[1];
-  if (endpoint === 'repos/' + p.GITHUB_REPOSITORY + '/pulls/' + p.PR_NUMBER) {
-    if (args.includes('--jq')) console.log(p.MERGE_SHA);
-    else console.log(JSON.stringify({ merge_commit_sha: p.MERGE_SHA }));
-    process.exit(0);
-  }
   if (endpoint === 'repos/' + p.GITHUB_REPOSITORY + '/rules/branches/main?per_page=100') { console.log(p.RULES); process.exit(0); }
   if (endpoint.includes('/rulesets/')) { console.error('Ruleset details require administrator access'); process.exit(1); }
   if (endpoint.startsWith('repos/' + p.GITHUB_REPOSITORY + '/commits/') && /\/commits\/[a-f0-9]{40}\/check-runs\?check_name=CI%20Result&filter=latest&per_page=100$/.test(endpoint)) {
@@ -147,7 +142,7 @@ if (args[0] === 'api') {
   if (/^repos\/[^/]+\/[^/]+\/actions\/runs\/[0-9]+\/artifacts\?per_page=100$/.test(endpoint)) {
     const events = fs.readFileSync(p.EVENTS, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
     const statusSha = ([...events].reverse().find((event) => event.type === 'preview-result') || {}).sha || '';
-    const sha = statusSha === p.MERGE_SHA ? p.PREVIEW_SHA : statusSha || p.PREVIEW_SHA || '';
+    const sha = statusSha || p.PREVIEW_SHA || '';
     console.log(JSON.stringify({ artifacts: [{ name: 'preview-deployment-' + sha, expired: false }] }));
     process.exit(0);
   }
@@ -227,7 +222,10 @@ process.exit(result.status ?? 1);
         ruleset_id: 42,
         parameters: {
           strict_required_status_checks_policy: true,
-          required_status_checks: [{ context: 'CI Result', integration_id: 15368 }],
+          required_status_checks: [
+            { context: 'CI Result', integration_id: 15368 },
+            { context: 'Preview Result', integration_id: 15368 },
+          ],
         },
       },
     ]),
@@ -236,7 +234,6 @@ process.exit(result.status ?? 1);
     CURRENT_BASE: base,
     ACTUAL_HEAD: head,
     PREVIEW_SHA: head,
-    MERGE_SHA: 'c'.repeat(40),
     PR_STATES: JSON.stringify([pr]),
     CALLS: join(root, 'calls'),
     COUNTER: join(root, 'counter'),

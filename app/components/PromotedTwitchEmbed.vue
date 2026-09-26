@@ -8,7 +8,7 @@
       "
       :aria-label="t('promoted_stream.region_label', { streamer: displayName })"
     >
-      <!-- Player chrome follows SYSTEMS.md §16: floating chrome is theme-aware in light
+      <!-- Player chrome follows SYSTEMS.md §17: floating chrome is theme-aware in light
         mode while the video stage below stays black in both themes. The title keeps
         text-surface-100 and the icon text-primary-400; the light token ladder flips the
         former to dark ink and remaps the latter to primary-800, so only the plate needs

@@ -5,6 +5,13 @@
 - **Purpose:** durable architecture record and resumable implementation plan for the Tarkov data and progress system.
 - **Decision status:** target architecture agreed; Phase 0 deployment safeguards completed.
 - **Interim state:** direct Worker JSON fetching remains an interim compatibility path, not the intended end state.
+- **Status 2026-09-25:** Phase-3 items verified resolved (original text below preserved): shared
+  `shared/utils/progressInvalidation.ts` is imported by both the app
+  (`app/stores/useProgress.ts`, `app/server/utils/streamerKappa.ts`) and the Worker
+  (`workers/api-gateway/src/utils/transform.ts`); `scripts/precompute/precompute.ts` applies the
+  overlay before projection and guards with `assertLooksLikeTasksCore`; client writes are hardened
+  via `20260830130000_harden_client_progress_access.sql` (direct client writes revoked, sync RPC
+  enforced). See in-place statuses below.
 
 ## Executive decision
 
@@ -105,6 +112,10 @@ Root cause:
 
 The pipeline must apply the overlay to a complete canonical model before creating endpoint-specific projections.
 
+**Status 2026-09-25: resolved — `scripts/precompute/precompute.ts` applies the overlay before
+projection (`applyOverlay` before reduced projections) and guards with `assertLooksLikeTasksCore`,
+which rejects non-array `objectives`/`failConditions`.**
+
 ### P0: the API Worker and frontend do not use one rules implementation
 
 `app/utils/progressInvalidation.ts` and `workers/api-gateway/src/utils/invalidation.ts` differ.
@@ -116,6 +127,10 @@ Examples:
 - Worker still depends on `alternatives`, a field removed from upstream APIs.
 
 Adding a third SQL implementation would increase drift. Extract one shared pure TypeScript engine.
+
+**Status 2026-09-25: resolved — shared `shared/utils/progressInvalidation.ts` is imported by both
+the app (`app/stores/useProgress.ts`, `app/server/utils/streamerKappa.ts`) and the Worker
+(`workers/api-gateway/src/utils/transform.ts`).**
 
 ### Resolved: interim Worker JSON migration was mode-insensitive
 
@@ -146,6 +161,9 @@ The Worker reads current progress before generating dependent changes. Concurren
 ### P1: browser and API writes use different persistence paths
 
 Browser full-row upserts and API partial merges can overwrite one another. Both must eventually use server-side merge/command contracts.
+
+**Status 2026-09-25: hardened — `20260830130000_harden_client_progress_access.sql` revokes direct
+client writes on `user_progress`/`user_game_mode_progress` and enforces the server-side sync RPC.**
 
 ### P1: API request path has avoidable Supabase round trips
 
