@@ -919,6 +919,19 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   current in-memory progress (`useDataBackup().exportProgress`), which needs no successful save;
   cloud warnings also offer a manual retry. Guidance never recommends reloading or clearing site
   data as a fix.
+- **Account recovery copies.** `app/stores/tarkov/accountRecovery.ts` keeps at most one copy per
+  owner under `v2_progress_recovery_<userId>`. A session transition retains the previous owner's
+  active copy when the sync controller reports pending changes, or when no controller ran and
+  acknowledgement cannot be proven. Sign-in retains any other account's active copy before it is
+  cleared, including the hydration-time owner mismatch that previously created throwaway
+  `progress_backup_*` keys. At sign-in the owner's recovery copy is reconciled through the normal
+  startup merge when it is newer than the owner's active copy, and it is removed only after a
+  successful startup load, because the resolved state was then uploaded or already matched the
+  service. Copies are read only for their owner and never uploaded for another account.
+- **Storage pressure.** `relieveProgressStoragePressure` removes only legacy backups that are
+  byte-identical to the active copy, a recovery copy, or a newer backup. Session transitions and
+  deliberate resets clear only the active key, so recovery copies and unique legacy backups are
+  never deleted automatically.
 
 ### Files
 
@@ -953,6 +966,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
 - `app/stores/tarkov/progressSaveStatus.ts`, `app/composables/useProgressSaveStatus.ts`,
   `app/shell/ProgressSaveStatusIndicator.vue` — truthful local/cloud save status, bounded cloud
   retry, manual retry, and export guidance
+- `app/stores/tarkov/accountRecovery.ts`, `app/stores/tarkov/storageQuota.ts` — per-account
+  recovery copies and redundancy-only storage cleanup
 - `app/server/api/profile/[userId]/[mode].get.ts`,
   `app/server/api/streamer/[userId]/[mode]/kappa.get.ts`, `app/server/api/team/members.ts` —
   mode-aware sharing and team routes
@@ -975,6 +990,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   clears the pending state or discards the changes.
 - Cloud save status and the manual retry handler belong to the current sync controller; a
   session reset clears both, and a disposed controller cannot publish status for the next session.
+- An account recovery copy is restored or synchronized only while its owner is signed in, and
+  automatic cleanup never removes a recovery copy or a legacy backup with unique content.
 - Legacy `user_system.team` / `team_id` values are used only when neither persistent mode-specific
   team ID exists. They must never make a PvP team appear as the active PvE team or vice versa.
 - Team creation maps both the `team_memberships_user_mode_unique` SQLSTATE `23505` conflict and

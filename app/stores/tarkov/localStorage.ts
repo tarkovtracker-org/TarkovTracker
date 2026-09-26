@@ -1,7 +1,6 @@
 import { migrateToGameModeStructure, type UserState } from '@/stores/progressState';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
 import { classifyLocalSaveFailure, recordLocalSave } from '@/stores/tarkov/progressSaveStatus';
-import { clearProgressStorage } from '@/utils/clientStorage';
 import { GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import {
@@ -207,27 +206,12 @@ export const safeRemoveItem = (key: string): boolean => {
     return false;
   }
 };
-export const clearProgressStorageSafely = () => {
-  try {
-    clearProgressStorage();
-  } catch (error) {
-    logger.error('[TarkovStore] Failed to clear progress storage:', error);
-  }
-};
 export const clearActiveProgressStorage = () => {
   if (typeof window === 'undefined') return;
   safeRemoveItem(STORAGE_KEYS.progress);
   safeRemoveItem(LEGACY_STORAGE_KEYS.progress);
 };
-export const backupProgressStorageValue = (rawValue: string, storedUserId: string | null) => {
-  if (typeof window === 'undefined') return;
-  const ownerKey = storedUserId || 'anonymous';
-  const backupKey = `${STORAGE_KEYS.progressBackupPrefix}${ownerKey}_${Date.now()}`;
-  if (safeSetItem(backupKey, rawValue) && import.meta.dev) {
-    logger.debug(`[TarkovStore] Data backed up to ${backupKey}`);
-  }
-};
-const parsePersistedProgressState = (
+export const parsePersistedProgressState = (
   rawValue: string | null | undefined,
   userId: string | null
 ): PersistedProgressSnapshot | null => {

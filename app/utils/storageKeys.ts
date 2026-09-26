@@ -7,6 +7,8 @@ export const STORAGE_KEYS = {
   analyticsConsent: `${STORAGE_PREFIX}analytics_consent`,
   dashboardFocusAttribution: `${STORAGE_PREFIX}dashboard_focus_attribution`,
   progressBackupPrefix: `${STORAGE_PREFIX}progress_backup_`,
+  /** One account recovery copy per owner: `${prefix}${userId}` (see `CONTEXT.md`). */
+  progressRecoveryPrefix: `${STORAGE_PREFIX}progress_recovery_`,
   adminLastPurge: `${STORAGE_PREFIX}tt:admin:last-purge`,
   cachePurgeAt: `${STORAGE_PREFIX}tt:cache:last-purge`,
   cachePurgeCheckAt: `${STORAGE_PREFIX}tt:cache:last-check`,

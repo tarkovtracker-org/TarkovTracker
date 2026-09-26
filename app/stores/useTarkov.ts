@@ -10,6 +10,13 @@ import {
   type UserProgressData,
   type UserState,
 } from '@/stores/progressState';
+import {
+  preserveForeignActiveCopy,
+  readAccountRecoveryCopy,
+  removeAccountRecoveryCopy,
+  saveAccountRecoveryCopy,
+  selectRecoverySnapshot,
+} from '@/stores/tarkov/accountRecovery';
 import { resetApiUpdateState } from '@/stores/tarkov/apiUpdateNotifier';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
 import {
@@ -17,9 +24,7 @@ import {
   notifyHideoutPrereqEnforcement,
 } from '@/stores/tarkov/hideoutPrereqs';
 import {
-  backupProgressStorageValue,
   clearActiveProgressStorage,
-  clearProgressStorageSafely,
   cloneStateSnapshot,
   progressStorageSerializer,
   getPreservedProgressStorageValue,
@@ -28,7 +33,6 @@ import {
   progressPersistStorage,
   readPersistedProgressState,
   safeGetItem,
-  safeRemoveItem,
   safeSetItem,
   type PersistedProgressSnapshot,
 } from '@/stores/tarkov/localStorage';
@@ -79,6 +83,7 @@ import {
   invalidateStartupOwnership,
   type StartupOwnershipGuard,
 } from '@/stores/tarkov/startupOwnership';
+import { relieveProgressStoragePressure } from '@/stores/tarkov/storageQuota';
 import {
   beginLocalSync,
   recordLocalSyncTime,
@@ -113,8 +118,6 @@ export type { PrestigeRunRecord } from '@/stores/tarkov/prestige';
 // Constants
 // ============================================================================
 const QUOTA_CHECK_INTERVAL_MS = 60000;
-const ESTIMATED_QUOTA_BYTES = 5 * 1024 * 1024;
-const QUOTA_SAFETY_BUFFER_BYTES = 512 * 1024;
 const SYNC_DEBOUNCE_MS = 5000;
 const ISSUE_71_ACCOUNT_AGE_THRESHOLD_MS = 5000;
 const LOAD_RETRY_COUNT = 3;
@@ -252,7 +255,7 @@ const persistOnlineReset = async (
   const freshState = buildOnlineResetState(store);
   const { error } = await syncProgressState(client, userId, freshState);
   throwSyncError(error, 'Failed to reset online profile');
-  clearProgressStorage();
+  clearActiveProgressStorage();
   patchProgressState(store, freshState);
 };
 const persistPrestigeLevel = async (
@@ -1042,67 +1045,10 @@ export const useTarkovStore = defineStore('swapTarkov', {
           currentUserId,
           now
         );
-        // QUOTA MANAGEMENT: Check if localStorage has enough space
-        // Throttled to avoid performance impact - only check every 60 seconds
         const shouldCheckQuota = now - lastQuotaCheckTime > QUOTA_CHECK_INTERVAL_MS;
         if (shouldCheckQuota && typeof window !== 'undefined') {
           lastQuotaCheckTime = now;
-          try {
-            // Estimate current localStorage usage
-            let currentUsage = 0;
-            for (const key in localStorage) {
-              if (Object.prototype.hasOwnProperty.call(localStorage, key)) {
-                currentUsage += localStorage[key].length + key.length;
-              }
-            }
-            const neededSpace = serialized.length;
-            const estimatedQuota = ESTIMATED_QUOTA_BYTES;
-            const safetyBuffer = QUOTA_SAFETY_BUFFER_BYTES;
-            // If we're close to quota, clean up old backups
-            if (currentUsage + neededSpace > estimatedQuota - safetyBuffer) {
-              logger.warn('[TarkovStore] localStorage quota low, cleaning up old backups', {
-                currentUsage: Math.round(currentUsage / 1024) + 'KB',
-                needed: Math.round(neededSpace / 1024) + 'KB',
-                quota: Math.round(estimatedQuota / 1024) + 'KB',
-              });
-              // Get all backup keys sorted by timestamp (oldest first)
-              const backupKeys = Object.keys(localStorage)
-                .filter((k) => k.startsWith(STORAGE_KEYS.progressBackupPrefix))
-                .sort((a, b) => {
-                  // Extract timestamp from key (format: prefix_userId_timestamp or prefix_isoString)
-                  const extractTimestamp = (key: string): number => {
-                    const suffix = key.substring(STORAGE_KEYS.progressBackupPrefix.length);
-                    // Try parsing as ISO string first
-                    const isoDate = Date.parse(suffix);
-                    if (!isNaN(isoDate)) return isoDate;
-                    // Try extracting numeric timestamp from userId_timestamp format
-                    const parts = suffix.split('_');
-                    const lastPart = parts[parts.length - 1] ?? '';
-                    const numericTimestamp = parseInt(lastPart, 10);
-                    return isNaN(numericTimestamp) ? 0 : numericTimestamp;
-                  };
-                  return extractTimestamp(a) - extractTimestamp(b);
-                });
-              // Remove old backups until we have enough space
-              let removedCount = 0;
-              for (const key of backupKeys) {
-                if (currentUsage + neededSpace <= estimatedQuota - safetyBuffer) break;
-                const keySize = localStorage[key].length + key.length;
-                if (safeRemoveItem(key)) {
-                  currentUsage -= keySize;
-                  removedCount++;
-                  logger.debug(`[TarkovStore] Removed old backup: ${key}`);
-                }
-              }
-              if (removedCount > 0) {
-                logger.info(`[TarkovStore] Cleaned up ${removedCount} old backups to free space`);
-              }
-            }
-          } catch (quotaError) {
-            logger.error('[TarkovStore] Error managing localStorage quota:', quotaError);
-            // If we can't manage quota, try to at least warn the user
-            // The persist plugin will handle the actual save error
-          }
+          relieveProgressStoragePressure(serialized.length);
         }
         return serialized;
       },
@@ -1129,9 +1075,9 @@ export const useTarkovStore = defineStore('swapTarkov', {
             logger.warn(
               `[TarkovStore] localStorage userId mismatch! ` +
                 `Stored: ${storedUserId}, Current: ${currentUserId}. ` +
-                `Backing up and clearing localStorage to prevent data corruption.`
+                `Retaining it as that account's recovery copy and clearing the active copy.`
             );
-            backupProgressStorageValue(value, storedUserId);
+            saveAccountRecoveryCopy(value, storedUserId);
             clearActiveProgressStorage();
             return structuredClone(defaultState);
           }
@@ -1289,12 +1235,18 @@ export function resetTarkovSync(
   progressStorageSerializer.reset();
   resetApiUpdateState();
 }
+/** Without a running controller, acknowledgement of the local copy cannot be proven. */
+const mayHaveUnacknowledgedChanges = (): boolean =>
+  !syncController || (syncController.hasPendingChanges?.() ?? true);
 export function resetTarkovStoreForSessionTransition(
   previousUserId: string | null = null,
   reason?: string
 ) {
   const preservedState = getPreservedProgressStorageValue(previousUserId);
   const currentUserId = getCurrentSupabaseUserId();
+  // Unacknowledged changes stay recoverable for their owner after sign-out, even if
+  // another account or a guest session later overwrites the active copy.
+  if (mayHaveUnacknowledgedChanges()) saveAccountRecoveryCopy(preservedState, previousUserId);
   resetProgressMetadataHydration();
   resetTarkovSync(reason, {
     preservePersistedStateForUserId: previousUserId,
@@ -1308,7 +1260,8 @@ export function resetTarkovStoreForSessionTransition(
       return;
     }
   }
-  clearProgressStorageSafely();
+  // Only the active copy is cleared: recovery copies belong to their owners.
+  clearActiveProgressStorage();
 }
 export async function initializeTarkovSync() {
   const tarkovStore = useTarkovStore();
@@ -1336,10 +1289,18 @@ export async function initializeTarkovSync() {
       ownsStartup() && $supabase.user.loggedIn === true && $supabase.user.id === currentUserId;
     const supabaseClient = $supabase.client;
     logger.debug('[TarkovStore] Setting up Supabase sync and listener');
-    const preservedLocalSnapshot =
+    // Another account's active copy must survive this sign-in as its recovery copy.
+    preserveForeignActiveCopy(currentUserId);
+    const pendingLocalSnapshot =
       pendingResetProgressSnapshot?.userId === currentUserId
         ? pendingResetProgressSnapshot.snapshot
         : null;
+    const preservedLocalSnapshot =
+      pendingLocalSnapshot ??
+      selectRecoverySnapshot(
+        readAccountRecoveryCopy(currentUserId),
+        readPersistedProgressState(currentUserId)
+      );
     const getLocalStorageMeta = () => {
       if (preservedLocalSnapshot) {
         return {
@@ -1426,7 +1387,8 @@ export async function initializeTarkovSync() {
       let shouldPersistSanitizedLocalState = hasDeprecatedTarkovDevProfileData(tarkovStore.$state);
       let needsRemoteCleanup = false;
       if (storedUserId && storedUserId !== currentUserId) {
-        logger.warn('[TarkovStore] Local progress belongs to a different user; clearing');
+        logger.warn('[TarkovStore] Local progress belongs to a different user; retaining it');
+        preserveForeignActiveCopy(currentUserId);
         clearActiveProgressStorage();
         resetStoreToDefault();
         notifyLocalIgnored('other_account');
@@ -1783,6 +1745,9 @@ export async function initializeTarkovSync() {
     if (preservedLocalSnapshot) {
       pendingResetProgressSnapshot = null;
     }
+    // A successful load reconciled any recovery copy with the cloud: the resolved state
+    // was uploaded or already matched the service, so the copy is no longer the only one.
+    removeAccountRecoveryCopy(currentUserId);
     // Repair failed task states for existing users (runs once after data load)
     // This reapplies valid branch failures and clears stale failed flags
     const completionSchemaMigration = tarkovStore.migrateTaskCompletionSchema();

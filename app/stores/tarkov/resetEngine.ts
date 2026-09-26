@@ -1,4 +1,5 @@
 import { defaultState, type UserProgressData, type UserState } from '@/stores/progressState';
+import { clearActiveProgressStorage } from '@/stores/tarkov/localStorage';
 import {
   getNextProgressEpoch,
   mergeManualActivityHistory,
@@ -10,7 +11,6 @@ import { syncProgressState } from '@/stores/tarkov/progressPersistence';
 import { getRegisteredSyncController } from '@/stores/tarkov/realtimeListener';
 import { recordLocalSyncTime } from '@/stores/tarkov/syncTimeline';
 import { delay } from '@/utils/async';
-import { clearProgressStorage } from '@/utils/clientStorage';
 import { ACTIVE_SEASON_NUMBER, GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 const RESET_SETTLE_DELAY_MS = 100;
@@ -223,5 +223,6 @@ export const performReset = async (mode: ResetMode, store: ResetTargetStore): Pr
       state.tarkovUid = freshState.tarkovUid;
     }
   });
-  clearProgressStorage();
+  // Only this session's active copy: other accounts' recovery data is not part of a reset.
+  clearActiveProgressStorage();
 };

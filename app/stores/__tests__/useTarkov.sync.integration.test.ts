@@ -2440,4 +2440,113 @@ describe('useTarkov sync integration', () => {
       setItem.mockRestore();
     });
   });
+  describe('account recovery copies', () => {
+    const recoveryKey = (userId: string) => `${STORAGE_KEYS.progressRecoveryPrefix}${userId}`;
+    const writeActiveCopy = (userId: string | null, level: number, timestamp: number) =>
+      localStorage.setItem(
+        STORAGE_KEYS.progress,
+        JSON.stringify({
+          _timestamp: timestamp,
+          _userId: userId,
+          data: { ...structuredClone(defaultState), pvp: progressWithLevel(level) },
+        })
+      );
+    const readRecoveryLevel = (userId: string) =>
+      JSON.parse(localStorage.getItem(recoveryKey(userId)) ?? 'null')?.data?.pvp?.level;
+    it('keeps unacknowledged changes for their owner across guest and other-account use', async () => {
+      const store = useTarkovStore();
+      const preservedAt = Date.parse('2026-02-25T00:00:00.000Z');
+      writeActiveCopy('user-1', 11, preservedAt);
+      switchSession('user-1', null, 'logout');
+      expect(readRecoveryLevel('user-1')).toBe(11);
+      // A guest session overwrites the active copy; the recovery copy is separate.
+      writeActiveCopy(null, 4, preservedAt + 1000);
+      switchSession(null, 'user-2', 'login');
+      single.mockResolvedValue({
+        data: createRemoteRow({
+          user_id: 'user-2',
+          pvp_data: progressWithLevel(2),
+          updated_at: '2026-03-01T00:00:00.000Z',
+        }),
+        error: null,
+      });
+      await initializeTarkovSync();
+      expect(store.pvp.level).toBe(2);
+      expect(readRecoveryLevel('user-1')).toBe(11);
+      switchSession('user-2', 'user-1', 'account switch');
+      single.mockResolvedValue({
+        data: createRemoteRow({
+          pvp_data: progressWithLevel(1),
+          updated_at: '2026-02-01T00:00:00.000Z',
+        }),
+        error: null,
+      });
+      await initializeTarkovSync();
+      expect(store.pvp.level).toBe(11);
+      expect(getLastSyncPayload().p_modes.pvp).toEqual(expect.objectContaining({ level: 11 }));
+      // Reconciled with the cloud, so the copy is retired; the other account's is kept.
+      expect(localStorage.getItem(recoveryKey('user-1'))).toBeNull();
+      expect(readRecoveryLevel('user-2')).toBe(2);
+    });
+    it('does not restore a recovery copy older than the owner active copy', async () => {
+      const store = useTarkovStore();
+      const base = Date.parse('2026-02-25T00:00:00.000Z');
+      localStorage.setItem(
+        recoveryKey('user-1'),
+        JSON.stringify({
+          _timestamp: base,
+          _userId: 'user-1',
+          data: { ...structuredClone(defaultState), pvp: progressWithLevel(5) },
+        })
+      );
+      writeActiveCopy('user-1', 9, base + 1000);
+      single.mockResolvedValue({
+        data: createRemoteRow({
+          pvp_data: progressWithLevel(1),
+          updated_at: '2026-02-01T00:00:00.000Z',
+        }),
+        error: null,
+      });
+      await initializeTarkovSync();
+      expect(store.pvp.level).toBe(9);
+      expect(localStorage.getItem(recoveryKey('user-1'))).toBeNull();
+    });
+    it('skips the recovery copy when the cloud acknowledged every change', async () => {
+      const hasPendingChanges = vi.fn(() => false);
+      useSupabaseSyncMock.mockReturnValue({
+        cleanup: cleanupSync,
+        syncToSupabase: syncInitialState,
+        pause: pauseSync,
+        resume: resumeSync,
+        hasPendingChanges,
+      } as unknown as ReturnType<typeof useSupabaseSyncMock>);
+      writeActiveCopy('user-1', 3, Date.parse('2026-02-25T00:00:00.000Z'));
+      await initializeTarkovSync();
+      switchSession('user-1', null, 'logout');
+      expect(hasPendingChanges).toHaveBeenCalled();
+      expect(localStorage.getItem(recoveryKey('user-1'))).toBeNull();
+    });
+    it('keeps other accounts recovery copies and backups across session transitions', () => {
+      localStorage.setItem(recoveryKey('user-9'), '{"_userId":"user-9","data":{}}');
+      localStorage.setItem(`${STORAGE_KEYS.progressBackupPrefix}user-9_123`, '{"data":{}}');
+      writeActiveCopy('user-1', 3, Date.parse('2026-02-25T00:00:00.000Z'));
+      switchSession('user-1', 'user-2', 'account switch');
+      expect(localStorage.getItem(STORAGE_KEYS.progress) ?? '').not.toContain('"user-1"');
+      expect(localStorage.getItem(recoveryKey('user-9'))).not.toBeNull();
+      expect(localStorage.getItem(`${STORAGE_KEYS.progressBackupPrefix}user-9_123`)).not.toBeNull();
+      expect(readRecoveryLevel('user-1')).toBe(3);
+    });
+    it('retains a mismatched owner copy found during hydration as its recovery copy', () => {
+      writeActiveCopy('user-9', 6, Date.parse('2026-02-25T00:00:00.000Z'));
+      const pinia = createPinia().use(piniaPluginPersistedstate);
+      createApp({}).use(pinia);
+      setActivePinia(pinia);
+      const store = useTarkovStore();
+      expect(store.pvp.level).toBe(1);
+      expect(readRecoveryLevel('user-9')).toBe(6);
+      expect(
+        Object.keys(localStorage).some((key) => key.startsWith(STORAGE_KEYS.progressBackupPrefix))
+      ).toBe(false);
+    });
+  });
 });

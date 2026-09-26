@@ -17,8 +17,8 @@ mockNuxtImport('useNuxtApp', () => () => ({ $supabase: supabaseContext }));
 vi.mock('@/stores/tarkov/progressPersistence', () => ({
   syncProgressState: syncProgressStateMock,
 }));
-vi.mock('@/utils/clientStorage', () => ({
-  clearProgressStorage: clearProgressStorageMock,
+vi.mock('@/stores/tarkov/localStorage', () => ({
+  clearActiveProgressStorage: clearProgressStorageMock,
 }));
 vi.mock('@/stores/tarkov/realtimeListener', () => ({
   getRegisteredSyncController: () => null,
