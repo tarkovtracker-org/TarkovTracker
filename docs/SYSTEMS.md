@@ -2281,22 +2281,46 @@ GitHub has computed the test merge; other pending reasons are left alone.
   original run and its exact-SHA deployment artifact, then keeps that run URL on the new success.
 - Pull-request and CI-completion events run only the trusted `preview-state.yml` workflow, so
   ordinary PRs do not instantiate skipped deployment or smoke-test jobs. These events and comment
-  events never upload to Cloudflare. An exact `/preview` comment from a repository maintainer or
-  administrator on a same-repository PR resolves the successful CI run matching that PR's number,
-  head, and base before dispatching the trusted controller; forks retain the separate
-  request and protected-environment approval path. Only a trusted
+  events never upload to Cloudflare. An exact, unedited `/preview` comment from a current repository
+  maintainer or administrator opts that PR into automatic previews, including forks; `/preview stop`
+  disables the opt-in. Commands predating the rollout activation instant cannot become persistent
+  grants. The instant defaults to the contract start shipped with the handler commit, so no manual
+  post-merge variable flip is required; the optional canonical UTC `PREVIEW_OPT_IN_START` variable
+  overrides it, and any non-empty malformed value (the legacy `0`, date-only, zone-less or
+  impossible strings) fails closed and grants no persistent access — an explicit off switch.
+  The request resolves matching successful CI before dispatching the trusted controller. Only a trusted
   `workflow_dispatch` from `main` can deploy, and it repeats the exact-SHA, CI, artifact, and
   freshness checks. Crowdin and release staging dispatch once after their own exact-SHA CI passes;
   allowlisted Dependabot auto-merge candidates dispatch from a trusted post-CI `workflow_run` after
-  all checks pass. Dependabot remains owned by that workflow. Ordinary PR CI completions request
-  deployment only when auto-merge is enabled. Metadata requests use `auto_merge_enabled`; the
+  all checks pass. Dependabot's dedicated workflow remains its sole automatic request owner.
+  Ordinary PR CI completions request deployment when a live command opts in or auto-merge is enabled;
+  a stop overrides either path. Opted-in drafts remain paused until `ready_for_review`.
+  Other metadata requests use `auto_merge_enabled`; the
   hourly reconciliation remains status-only. Cloudflare automatic preview builds are disabled while production Git
   deployments for `main` remain enabled.
 - The Pages-only deployment token is stored only in the protected `preview` and `preview-fork`
   environments, whose branch policy allows `main`; remove the repository-scoped copy. This prevents
   a manually dispatched workflow selected from another ref from reading the deployment credential.
-- Fork candidates deploy only through the protected `preview-fork` environment; the exact revision
-  is shown before approval and rechecked afterward, so approval never carries to another head.
+- Fork candidates with a live maintainer command deploy through `preview`; the controller exhausts
+  comment pagination, chooses the latest authorized command, and rechecks the requester's current
+  role. GitHub's owner/member/collaborator association filters public outsider comments before any
+  role lookup; it never substitutes for the current maintain/admin permission check. Permissions
+  are cached only within one scan. Immediately before upload, the command must still be enabled
+  with the same ID and author.
+  A newer associated user's stop remains a revocation barrier after a role change when its author
+  currently verifies as maintain/admin or when the handler accepted it while verifying — the
+  receipt comment from `github-actions[bot]` records that acceptance; a historical stop without
+  either is not honored and the previous enabled opt-in stays in control. Resuming requires a
+  fresh command from a current maintainer.
+  Automatic dispatches carry the authorizing comment ID, so a command revoked before planning
+  cannot fall back to the manual deployment path. Trusted default-branch dispatches without a
+  bound comment (manual or automation-owned) own their authorization directly and are not revoked
+  by a later stop.
+  A stop, deleted command, or revoked role prevents a queued opted-in upload. Each revision still
+  requires fresh CI, manifest and digest verification, and smoke tests; the command grants preview
+  intent for the PR, never a reusable CI result. Forks without a live opt-in deploy through
+  `preview-fork`, where manual approval or an administrator override is required. Its self-review
+  rule stays enabled. The exact revision is displayed before approval and rechecked afterward.
   Fork CI runs carry no `pull_requests` and the base repository's commit-association lookup omits
   fork-only commits, so a fork candidate's PR is resolved by listing open PRs for its
   `owner:branch` head and then matching head SHA, head repository, and base like any candidate.
