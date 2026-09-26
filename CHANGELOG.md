@@ -1,3 +1,84 @@
+## [1.81.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.81.3...v1.81.4) (2026-09-25)
+
+
+### Bug Fixes
+
+* **preview:** resolve fork pull requests by owner:branch head ([#928](https://github.com/tarkovtracker-org/TarkovTracker/issues/928)) ([55e0d0f](https://github.com/tarkovtracker-org/TarkovTracker/commit/55e0d0fcb3355708971eeacf98629435557f0f53))
+
+## [1.81.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.81.2...v1.81.3) (2026-09-25)
+
+
+### Bug Fixes
+
+* **ui:** normalize needed-item inline count edits ([#896](https://github.com/tarkovtracker-org/TarkovTracker/issues/896)) ([eb23cfa](https://github.com/tarkovtracker-org/TarkovTracker/commit/eb23cfa5bf7560e2c9e91da5fc2a0abc167e8980))
+
+## [1.81.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.81.1...v1.81.2) (2026-09-25)
+
+
+### Bug Fixes
+
+* **ci:** bind Preview Result to the PR head, not the regenerable test merge ([#924](https://github.com/tarkovtracker-org/TarkovTracker/issues/924)) ([74cc542](https://github.com/tarkovtracker-org/TarkovTracker/commit/74cc5420db6ea34bb912abef05a4dfd8fbb845e0)), closes [#916](https://github.com/tarkovtracker-org/TarkovTracker/issues/916)
+
+## [1.81.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.81.0...v1.81.1) (2026-09-23)
+
+
+### Bug Fixes
+
+* **ci:** pass computed GitHub repository context to shadow planner ([#905](https://github.com/tarkovtracker-org/TarkovTracker/issues/905)) ([715266a](https://github.com/tarkovtracker-org/TarkovTracker/commit/715266a649f9b1691bc8b06f942fa55f4b9fda5c))
+
+# [1.81.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.80.2...v1.81.0) (2026-09-23)
+
+
+### Bug Fixes
+
+* **ci:** bind preview gates to GitHub response fields ([#897](https://github.com/tarkovtracker-org/TarkovTracker/issues/897)) ([e33246c](https://github.com/tarkovtracker-org/TarkovTracker/commit/e33246c7c28a47d504441c4861e8ee3c4820481b))
+* **release:** bind recovery preview evidence to the controller run behind the status ([b2ad626](https://github.com/tarkovtracker-org/TarkovTracker/commit/b2ad626da4c20ed6d774c4ac09f9cd98bb40001b))
+* **preview:** bind staged-gate evidence to run-owned deployment artifacts ([3445986](https://github.com/tarkovtracker-org/TarkovTracker/commit/3445986b3865ff109e822881dfe8afe5d989b606))
+* **preview:** exact ref match in the staged gate; assert cancellation ordering ([ca6c3cf](https://github.com/tarkovtracker-org/TarkovTracker/commit/ca6c3cf4db34b8228b04850d19c3eb9bf258fe3a))
+* **preview:** read the run tree from head_commit.tree_id ([1ef4c0d](https://github.com/tarkovtracker-org/TarkovTracker/commit/1ef4c0db9d249dd5cbdfda7ec46a9417718b8faf))
+* **preview:** report nothing when a superseded run is cancelled ([15fdb5f](https://github.com/tarkovtracker-org/TarkovTracker/commit/15fdb5f6db2b677dd416344579c3f21ddc3e9904))
+* **release:** require the trusted workflow ref and correct job stream shape ([2a723ef](https://github.com/tarkovtracker-org/TarkovTracker/commit/2a723ef16482edbe89892ed2ae02c137314f1064)), closes [#891](https://github.com/tarkovtracker-org/TarkovTracker/issues/891)
+* **ci:** stop echoing external deployment evidence into job logs ([8c2ecbd](https://github.com/tarkovtracker-org/TarkovTracker/commit/8c2ecbd7e452840a1a29f155696cba1c1978a89e))
+* **preview:** verify dispatch-identity and tree claims; validate preview-required plans ([9c14255](https://github.com/tarkovtracker-org/TarkovTracker/commit/9c14255bfd2a4ba0e909bc52d5851c9f08e02c30))
+* **release:** verify the controller result job behind recovery preview evidence ([8d8333a](https://github.com/tarkovtracker-org/TarkovTracker/commit/8d8333a053fd175b5af170596d52d56259fef9a9)), closes [#890](https://github.com/tarkovtracker-org/TarkovTracker/issues/890)
+
+
+### Features
+
+* **ci:** replace Cloudflare Git previews with an Actions-owned trusted controller ([44a3f0a](https://github.com/tarkovtracker-org/TarkovTracker/commit/44a3f0af3cdd272fc8509895558fe2b6ff0a848d))
+
+## [1.80.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.80.1...v1.80.2) (2026-09-17)
+
+
+### Bug Fixes
+
+* **config:** load production observer environment safely ([#880](https://github.com/tarkovtracker-org/TarkovTracker/issues/880)) ([b667f16](https://github.com/tarkovtracker-org/TarkovTracker/commit/b667f1692ec8da029873d68b4c2a110782b510af))
+
+## [1.80.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.80.0...v1.80.1) (2026-09-17)
+
+
+### Bug Fixes
+
+* **api:** share progress invalidation between app and gateway [CH-001] ([#876](https://github.com/tarkovtracker-org/TarkovTracker/issues/876)) ([0daf56c](https://github.com/tarkovtracker-org/TarkovTracker/commit/0daf56cc6d84bdfa121efc52bf528ae58f68abcf))
+
+# [1.80.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.6...v1.80.0) (2026-09-17)
+
+
+### Bug Fixes
+
+* **supporter:** align advertised perks with current entitlements ([#873](https://github.com/tarkovtracker-org/TarkovTracker/issues/873)) ([dc8c3c6](https://github.com/tarkovtracker-org/TarkovTracker/commit/dc8c3c60436147b6e70f03186df76e80619e0566))
+* **ci:** dispatch automation checks with the job token ([#863](https://github.com/tarkovtracker-org/TarkovTracker/issues/863)) ([8b2aa22](https://github.com/tarkovtracker-org/TarkovTracker/commit/8b2aa22e466a0a9a32e5c108ed24ead67c2fd356))
+* **ci:** enforce validated automation and main freshness ([#862](https://github.com/tarkovtracker-org/TarkovTracker/issues/862)) ([48c2c82](https://github.com/tarkovtracker-org/TarkovTracker/commit/48c2c82fe1b946edb4c6f3e90b3a2619cfdf50b0))
+* **ci:** report dispatched validation to branch rules ([#865](https://github.com/tarkovtracker-org/TarkovTracker/issues/865)) ([a8826b0](https://github.com/tarkovtracker-org/TarkovTracker/commit/a8826b0b0992f96f6255d2f531f1f74b1a92fb58))
+* **team:** restore deployed atomic leave migration and handler ([#874](https://github.com/tarkovtracker-org/TarkovTracker/issues/874)) ([4d8128f](https://github.com/tarkovtracker-org/TarkovTracker/commit/4d8128f892b81c6d1b4ad9750283806387443c5c))
+* **supabase:** restore the deployed team event authority migration ([#858](https://github.com/tarkovtracker-org/TarkovTracker/issues/858)) ([836e002](https://github.com/tarkovtracker-org/TarkovTracker/commit/836e002c9023bdb709fe8c551b5a08dd6696b937)), closes [#855](https://github.com/tarkovtracker-org/TarkovTracker/issues/855)
+
+
+### Features
+
+* **config:** report remote migration history through the prod-db observer ([#860](https://github.com/tarkovtracker-org/TarkovTracker/issues/860)) ([6944f71](https://github.com/tarkovtracker-org/TarkovTracker/commit/6944f71c72685b6eb15840cc8469c8ffe6e3d4ed))
+* **api:** retire legacy /api/v2 routes from production ([#720](https://github.com/tarkovtracker-org/TarkovTracker/issues/720)) ([#859](https://github.com/tarkovtracker-org/TarkovTracker/issues/859)) ([461b1ea](https://github.com/tarkovtracker-org/TarkovTracker/commit/461b1eaf934ca3611470f4cbc6bbedab91f419a7))
+
 ## [1.79.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.79.5...v1.79.6) (2026-09-16)
 
 

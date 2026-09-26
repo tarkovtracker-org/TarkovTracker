@@ -3,7 +3,12 @@ import { chmodSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fixture, git } from './helpers/automation-fixture.mjs';
-import { jobBlock, workflowEvent, workflowStep } from './helpers/workflow-blocks.mjs';
+import {
+  jobBlock,
+  permissionsBlock,
+  workflowEvent,
+  workflowStep,
+} from './helpers/workflow-blocks.mjs';
 const read = (path) => readFileSync(path, 'utf8');
 /** Require a successful gate subprocess with its diagnostic on failure. */
 function passed(result) {
@@ -113,15 +118,7 @@ test('server-side head guard rejects a race after the last metadata read', (t) =
 test('merge rejects every non-CLEAN state and conflicting or malformed mergeability', (t) => {
   const f = fixture(t);
   passed(f.run('prepare'));
-  for (const mergeStateStatus of [
-    'DIRTY',
-    'BLOCKED',
-    'BEHIND',
-    'UNSTABLE',
-    'DRAFT',
-    'HAS_HOOKS',
-    null,
-  ]) {
+  for (const mergeStateStatus of ['DIRTY', 'BEHIND', 'UNSTABLE', 'DRAFT', 'HAS_HOOKS', null]) {
     rejected(
       f.run('merge', { PR_STATES: JSON.stringify([{ ...f.pr, mergeStateStatus }]) }),
       /ineligible/
@@ -132,13 +129,16 @@ test('merge rejects every non-CLEAN state and conflicting or malformed mergeabil
   }
   assert.ok(!f.calls().some((args) => args[1] === 'merge'));
 });
-test('unknown mergeability retries until clean, and unresolved state times out', (t) => {
+test('unknown or temporarily blocked mergeability retries until clean, then times out', (t) => {
   const f = fixture(t);
   passed(f.run('prepare'));
   const unknown = { ...f.pr, mergeable: 'UNKNOWN', mergeStateStatus: 'UNKNOWN' };
+  const blocked = { ...f.pr, mergeStateStatus: 'BLOCKED' };
   passed(f.run('merge', { PR_STATES: JSON.stringify([unknown, unknown, f.pr]) }));
+  passed(f.run('merge', { PR_STATES: JSON.stringify([blocked, blocked, f.pr]) }));
   rejected(f.run('merge', { PR_STATES: JSON.stringify([unknown]) }), /Timed out/);
-  assert.equal(f.calls().filter((args) => args[1] === 'merge').length, 1);
+  rejected(f.run('merge', { PR_STATES: JSON.stringify([blocked]) }), /Timed out/);
+  assert.equal(f.calls().filter((args) => args[1] === 'merge').length, 2);
 });
 test('missing merge credential, changed main, changed checkout or PR identity fail closed', (t) => {
   const f = fixture(t);
@@ -164,7 +164,7 @@ function assertStepOrder(job, first, second) {
 /** Verify each workflow boundary within its owning job and step. */
 function assertWorkflowBoundaries(workflow) {
   const workflowSettings = workflow.slice(0, workflow.indexOf('\njobs:'));
-  assert.match(workflowSettings, /permissions:\n {2}actions: write\n/);
+  assert.match(permissionsBlock(workflowSettings), /^ {2}actions: write$/m);
   workflowEvent(read('.github/workflows/ci.yml'), 'workflow_dispatch');
   const sync = jobBlock(workflow, 'sync');
   assertStepOrder(
@@ -203,7 +203,7 @@ function assertWorkflowBoundaries(workflow) {
 }
 test('workflow separates trusted gate, immutable setup, token-free checks and job-token merge', () => {
   assertWorkflowBoundaries(read('.github/workflows/crowdin.yml'));
-  assert.match(read('.github/workflows/ci.yml'), /push:\n {4}branches: \[main,/);
+  assert.match(read('.github/workflows/ci.yml'), /push:\n {4}branches: \[main\]/);
   assert.match(read('.github/workflows/release.yml'), /workflow_run.event == 'push'/);
 });
 test('unrelated steps and jobs cannot satisfy the real merge-step contract', () => {
@@ -258,7 +258,36 @@ test('Crowdin waits for successful exact-head CI and rejects terminal failures',
   rejected(f.run('merge', { CHECK_APP: '999' }), /Timed out/);
   assert.ok(!f.calls().some((args) => args[1] === 'merge'));
 });
-test('main policy configuration enforces GitHub Actions CI and freshness without exceptions', () => {
+test('Crowdin also waits for the authoritative Preview Result and rejects a failed or missing preview', (t) => {
+  const f = fixture(t);
+  passed(f.run('prepare'));
+  for (const PREVIEW_STATE of ['failure', 'error']) {
+    rejected(f.run('merge', { PREVIEW_STATE }), /Preview Result did not succeed/);
+  }
+  rejected(f.run('merge', { PREVIEW_PRESENT: 'false' }), /Timed out waiting for Preview Result/);
+  rejected(f.run('merge', { PREVIEW_STATE: 'pending' }), /Timed out waiting for Preview Result/);
+  rejected(
+    f.run('merge', { PREVIEW_TARGET_URL: 'https://github.com/other/repo/actions/runs/555' }),
+    /Preview Result did not succeed: unbound/
+  );
+  rejected(
+    f.run('merge', {
+      PREVIEW_TARGET_URL: 'https://github.com/example/repo/actions/runs/555/extra',
+    }),
+    /Preview Result did not succeed: unbound/
+  );
+  assert.ok(!f.calls().some((args) => args[1] === 'merge'));
+  // The preview gate is consulted only after CI Result succeeded on the same head.
+  const events = f.events();
+  const ci = events.findIndex((event) => event.type === 'ci-result');
+  const request = events.findIndex((event) => event.type === 'preview-dispatch');
+  const preview = events.findIndex((event) => event.type === 'preview-result');
+  assert.ok(ci !== -1 && request > ci && preview > request);
+  assert.deepEqual(events[request], { type: 'preview-dispatch', runId: 'run_id=1', ref: 'main' });
+  // Preview Result is read on the validated head, never on the regenerable test merge.
+  assert.equal(events[preview].sha, f.env.HEAD_SHA);
+});
+test('main policy configuration enforces GitHub Actions CI, preview and freshness without exceptions', () => {
   const policy = JSON.parse(read('.github/main-ci-ruleset.json'));
   assert.equal(policy.enforcement, 'active');
   assert.equal(policy.target, 'branch');
@@ -269,7 +298,10 @@ test('main policy configuration enforces GitHub Actions CI and freshness without
       type: 'required_status_checks',
       parameters: {
         strict_required_status_checks_policy: true,
-        required_status_checks: [{ context: 'CI Result', integration_id: 15368 }],
+        required_status_checks: [
+          { context: 'CI Result', integration_id: 15368 },
+          { context: 'Preview Result', integration_id: 15368 },
+        ],
       },
     },
   ]);
@@ -280,7 +312,7 @@ test('a candidate must contain main even when its full tree only differs in tran
   rejected(f.run('prepare'), /must include current main/);
   assert.equal(f.output(), '');
 });
-test('policy checks reject loose freshness, another provider and another required context', (t) => {
+test('policy checks reject loose freshness, missing preview and foreign providers', (t) => {
   const f = fixture(t);
   passed(f.run('prepare'));
   const policy = JSON.parse(read('.github/main-ci-ruleset.json'));
@@ -289,6 +321,17 @@ test('policy checks reject loose freshness, another provider and another require
     {
       strict_required_status_checks_policy: true,
       required_status_checks: [{ context: 'CI Result', integration_id: 999 }],
+    },
+    {
+      strict_required_status_checks_policy: true,
+      required_status_checks: [{ context: 'CI Result', integration_id: 15368 }],
+    },
+    {
+      strict_required_status_checks_policy: true,
+      required_status_checks: [
+        { context: 'CI Result', integration_id: 15368 },
+        { context: 'Preview Result', integration_id: 999 },
+      ],
     },
     {
       strict_required_status_checks_policy: true,
@@ -340,7 +383,7 @@ test('Crowdin dispatches candidate CI before merge and main CI after merge', (t)
   const result = f.run('merge');
   assert.equal(result.status, 0, result.stderr);
   const calls = f.calls();
-  const dispatches = calls.filter((args) => args[0] === 'workflow');
+  const dispatches = calls.filter((args) => args[0] === 'workflow' && args[2] === 'ci.yml');
   assert.deepEqual(
     dispatches.map((args) => args.at(-1)),
     ['locales', 'main']
@@ -348,6 +391,13 @@ test('Crowdin dispatches candidate CI before merge and main CI after merge', (t)
   const merged = calls.findIndex((args) => args[0] === 'pr' && args[1] === 'merge');
   assert.ok(calls.indexOf(dispatches[0]) < merged);
   assert.ok(calls.indexOf(dispatches[1]) > merged);
+});
+test('Crowdin refuses mismatched CI evidence and failed preview requests before merge', (t) => {
+  const f = fixture(t);
+  passed(f.run('prepare'));
+  rejected(f.run('merge', { CI_RUN_HEAD: 'a'.repeat(40) }), /did not succeed on/);
+  rejected(f.run('merge', { PREVIEW_DISPATCH_FAIL: 'true' }), /./);
+  assert.ok(!f.calls().some((args) => args[1] === 'merge'));
 });
 test('Crowdin refuses to merge when dispatch fails', (t) => {
   const f = fixture(t);
@@ -360,4 +410,13 @@ test('Crowdin dispatch permission cannot come from an unrelated job', () => {
   const readOnly = workflow.replace('actions: write', 'actions: read');
   const unrelated = '\n  unrelated:\n    permissions:\n      actions: write\n';
   assert.throws(() => assertWorkflowBoundaries(readOnly + unrelated));
+});
+test('Crowdin permission key order does not change dispatch authorization', () => {
+  const workflow = read('.github/workflows/crowdin.yml');
+  const reordered = workflow.replace(
+    '  actions: write\n  checks: read',
+    '  checks: read\n  actions: write'
+  );
+  assert.notEqual(reordered, workflow, 'permission reordering must apply');
+  assertWorkflowBoundaries(reordered);
 });

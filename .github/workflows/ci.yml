@@ -2,7 +2,7 @@ name: CI
 on:
   workflow_dispatch:
   push:
-    branches: [main, 'wip/**']
+    branches: [main]
   pull_request:
     branches: [main]
 concurrency:
@@ -20,6 +20,7 @@ jobs:
       full: ${{ steps.plan.outputs.full }}
       i18n: ${{ steps.plan.outputs.i18n }}
       workflows: ${{ steps.plan.outputs.workflows }}
+      preview: ${{ steps.plan.outputs.preview }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -195,7 +196,8 @@ jobs:
           fail_ci_if_error: false
   validate:
     needs: changes
-    if: needs.changes.outputs.full == 'true'
+    # Translation-only pull requests keep the reduced test selection but still build a preview.
+    if: needs.changes.outputs.full == 'true' || needs.changes.outputs.preview == 'true'
     name: Validate
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -205,16 +207,41 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
       - uses: ./.github/actions/setup-project
-      - name: Build
-        run: pnpm run build
+      # Main builds keep the production configuration. Pull requests and non-main dispatches build
+      # the anonymous preview profile (scripts/preview/profile.mjs) whose output the trusted preview
+      # controller later uploads to the existing Pages preview environment. Candidate builds receive
+      # no deployment credentials; the exported values below are build inputs only.
+      - name: Resolve build profile
+        id: profile
         env:
-          NODE_ENV: production
-          APP_URL: https://tarkovtracker.org
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           CLARITY_PROJECT_ID: ${{ vars.CLARITY_PROJECT_ID }}
           GA_MEASUREMENT_ID: ${{ vars.GA_MEASUREMENT_ID }}
           SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: node scripts/preview/build-profile.mjs
+      - name: Build
+        run: pnpm run build
+      - name: Write preview manifest
+        if: steps.profile.outputs.profile == 'preview'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PREVIEW_BRANCH: ${{ steps.profile.outputs.preview_branch }}
+          APP_URL: ${{ steps.profile.outputs.app_url }}
+        run: node scripts/preview/write-manifest.mjs
+      - name: Upload preview build
+        if: steps.profile.outputs.profile == 'preview'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pages-preview
+          path: dist
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload build artifacts
         if: github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -270,22 +297,59 @@ jobs:
       - name: Test api-gateway
         if: hashFiles('workers/api-gateway/package.json') != ''
         run: pnpm run test:api-gateway
+  # Dependency audit, Gitleaks, and CodeQL run for every CI event and gate `CI Result`. The reusable
+  # workflow's scanner errors, cancellations, or missing jobs surface as a non-success result here.
+  security:
+    name: Security
+    uses: ./.github/workflows/security.yml
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
   ci-result:
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
     name: CI Result
     if: always()
     needs:
-      [changes, fallow, lint-format, typecheck, test, validate, supabase-db, systems-drift, workers]
+      [
+        changes,
+        fallow,
+        lint-format,
+        typecheck,
+        test,
+        validate,
+        supabase-db,
+        systems-drift,
+        workers,
+        security,
+      ]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Checkout trusted CI aggregation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          # Never execute candidate-branch code in the status-writing job.
+          ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
       - name: Require all selected jobs to succeed
+        id: validation
         env:
           VALIDATION_PLAN: ${{ needs.changes.outputs.plan }}
           CI_NEEDS: ${{ toJSON(needs) }}
         run: node scripts/check-ci-result.mjs
+      - name: Report dispatched CI to branch rules
+        if: always() && github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        env:
+          VALIDATION_OUTCOME: ${{ steps.validation.outcome }}
+        with:
+          script: |
+            const { reportDispatchedCi } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/report-dispatched-ci.mjs`);
+            await reportDispatchedCi({ github, context, outcome: process.env.VALIDATION_OUTCOME });

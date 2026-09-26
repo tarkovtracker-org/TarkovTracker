@@ -41,9 +41,14 @@ and have an agent verify the answer against the code.
     map marker categories and split pinned/active requirements
 
 13. [Fallow audit snapshots](#13-fallow-audit-snapshots) — consistent generated context and local source attribution
-14. [CI validation selection](#14-ci-validation-selection) — conservative classification and strict aggregation
-15. [Canonical task progression](#15-canonical-task-progression) — declared trader gates and import semantics
-16. [Light/dark theme system](#16-lightdark-theme-system) — token flip, boot script, and theme controls
+14. [Release validation and publication](#14-release-validation-and-publication) — validated-SHA
+    publication gate, recovery, and Crowdin merges
+15. [CI validation selection](#15-ci-validation-selection) — conservative classification and strict aggregation
+16. [Canonical task progression](#16-canonical-task-progression) — declared trader gates and import semantics
+17. [Light/dark theme system](#17-lightdark-theme-system) — token flip, boot script, and theme controls
+18. [Test suite execution model](#18-test-suite-execution-model) — isolated workers and sharded coverage
+19. [Actions-owned Cloudflare previews](#19-actions-owned-cloudflare-previews) — validated CI builds,
+    trusted controller, isolated preview environment, and the `Preview Result` gate
 
 ---
 
@@ -141,13 +146,15 @@ flowchart LR
   respectively. The upstream endpoint catalog is the authority for supported slugs.
 - Language is validated with `getValidatedLanguage()` and defaults to `en`.
 
----
+### Prestige, editions, fleet verification, and cache bundle scope
 
 Prestige and progression-catalog responses await overlay refresh before creating downstream cache entries. Story chapters normalize missing/nonfinite order to zero, and prestige rows fall back to chapter names/IDs when requirement labels are absent.
 
 Overlay fleet verification requires `X-Cache-Status: PRECOMPUTE` and matching nonempty version/SHA identities in the published overlay, full-fleet manifest, and served response. Invalid timestamps or malformed provenance remain unverified. Filtered busts do not certify a complete release: rerun the unfiltered precompute before promotion. The production verifier uses the configured HTTPS `OVERLAY_URL` (defaulting to the published main overlay).
 
 Critical cache bundles carry mode/language scope and replace every matching collection, including empty arrays. Cached hydration owns the request tokens and clears stale errors/loading; superseded initializers and background callbacks cannot overwrite the new scope.
+
+---
 
 ## 2. Data fetching pipeline
 
@@ -378,7 +385,7 @@ sequenceDiagram
   a patched task's merged list into `traderLevelRequirements` and
   `traderRequirements` (reputation-only) for compatibility, and regenerates the canonical
   `normalizedTraderRequirements` consumed by availability, badges and progress implications
-  (section 15). A patch's `traderRequirements` replaces the whole requirement set.
+  (section 16). A patch's `traderRequirements` replaces the whole requirement set.
 - Overlay corrections and `tasksAdd` entries merge into already-adapted tasks, so `applyOverlay`
   re-normalizes the declared prerequisite and prestige gates it can reach. A corrected task is
   re-normalized only when the patch touches `taskRequirements` or `requiredPrestige`, and a
@@ -388,7 +395,7 @@ sequenceDiagram
   stays a list and a resolvable `requiredPrestige` becomes a normalized `{ id }` reference. The
   overlay keeps an id-less `{ name, prestigeLevel }` reference verbatim, so it is not a loss and gets
   no diagnostic; only a declared gate the normalization had to drop becomes a
-  `requirementDiagnostics` entry (section 15).
+  `requirementDiagnostics` entry (section 16).
 - On fetch failure, serves the last good overlay (stale) rather than failing the request.
 - Overlay supports mode-specific corrections under `modes[gameMode]` plus global corrections.
 - Per-locale corrections under `locales[locale]` patch `tasks`, `items`, `traders` and `maps`
@@ -672,8 +679,8 @@ sequenceDiagram
    Auth (24h cache), and loads matching tasks/hideout metadata from `json.tarkov.dev` via
    `workers/api-gateway/src/services/tarkov.ts` (1h memory cache).
 6. **Transform.** `workers/api-gateway/src/utils/transform.ts` converts the JSONB objects into the
-   public array format, applies invalidation (`workers/api-gateway/src/utils/invalidation.ts`) and
-   game-edition hideout auto-completes. Task progress includes `active` when the stored JSONB value
+   public array format, applies invalidation (`shared/utils/progressInvalidation.ts`, the same
+   algorithm the app uses) and game-edition hideout auto-completes. Task progress includes `active` when the stored JSONB value
    explicitly contains a boolean. Legacy terminal rows that omit it are normalized to `false`,
    while ambiguous incomplete omission remains observable as unknown.
 7. **Task writes.** Single and batch task writes accept `active`, `completed`, `failed`, and
@@ -701,15 +708,25 @@ sequenceDiagram
   progress reads/writes
 - `workers/api-gateway/src/services/supporter.ts`, `workers/api-gateway/src/services/usage.ts`,
   `workers/api-gateway/src/services/tarkov.ts`
-- `workers/api-gateway/src/utils/transform.ts`, `workers/api-gateway/src/utils/invalidation.ts`
+- `workers/api-gateway/src/utils/transform.ts`
+- `shared/utils/progressInvalidation.ts` — runtime-independent task/objective invalidation
+  (faction, failed-only and failed prerequisites, `failed`-tolerant requirements), shared by the
+  app progress store, public profile/streamer views, and the Worker transform
 - `shared/utils/userMetadata.ts` — runtime-independent provider metadata parsing, shared with app
   user hydration through the `@shared` alias in Nuxt and the Worker build/test configuration
 - `docs/RATE_LIMITING.md`, `docs/API.md` — ownership map and client-facing docs
 
 ### Invariants
 
-- App user hydration and API progress responses share provider metadata fallback ordering. Shared
-  utilities must not import Nuxt or Worker runtime modules.
+- App user hydration and API progress responses share provider metadata fallback ordering, and the
+  app and API share one invalidation algorithm: a requirement whose `status` includes `failed`
+  never invalidates its task when the prerequisite is failed. Shared utilities must not import
+  Nuxt or Worker runtime modules; invalidation logic must not be re-implemented per runtime.
+- Completed and failed tasks (including legacy records with both flags set) and their objectives
+  are never marked invalid. This terminal-state guard applies to faction, prerequisite, and legacy
+  alternative entry points. Completed tasks stop propagation; failed tasks still invalidate strict
+  dependents, but not dependents whose requirements accept failure. Faction mismatch alone does
+  not cascade.
 - A request makes at most one Durable Object call (the daily quota). There is no burst bucket, no
   IP backstop bucket, and no refund reconciliation; reintroducing any of those is a regression.
 - The daily quota fails open on DO unavailability (logs `daily_quota_unavailable`); the pre-auth
@@ -1311,7 +1328,14 @@ flowchart LR
    `pending_remotely` (in the checkout, not applied). It makes remote/local migration divergence
    observable without migration or Management API credentials.
 9. Production credentials are supplied only through `PROD_DB_URL`, which must identify a dedicated
-   observer role. The wrapper removes its password before invoking the Supabase CLI and supplies
+   observer role. The wrapper reads only `PROD_DB_*` keys from the repository-root `.env` when they
+   are not already exported; explicit environment variables take precedence and other keys in that
+   file are ignored. Values remain literal, including passwords; certificate paths must be absolute.
+   `PROD_DB_ENV_FILE`, exported by the invoking shell, overrides the file path; setting it inside
+   `.env` is unsupported. An explicitly selected file must be readable; an absent
+   default `.env` is allowed. Other exported variables remain inherited, so callers must keep
+   privileged credentials out of the invoking environment. The wrapper removes its password before
+   invoking the Supabase CLI and supplies
    the password through a mode-`0600` temporary `PGPASSFILE`, keeping it out of child-process
    arguments and command errors. The credential file is removed after each CLI invocation.
    The role's actual database privileges are the hard safety boundary; connection defaults such as
@@ -1647,13 +1671,40 @@ The checkout stays pinned to the validated SHA. The production build still runs 
 - CI cancellation must not cancel a publisher; only release jobs share `release-main` with
   `cancel-in-progress: false`. Git non-fast-forward protection and semantic-release's upstream
   check remain the final safeguards if main advances after the last eligibility check.
-- Release version commits pass ordinary CI on a temporary `wip/release-*` branch before the
-  identical SHA advances main. The main ruleset requires successful GitHub Actions `CI Result`,
-  strict freshness, and no bypass actors. Non-fast-forward promotion fails if main advances.
+- Dispatched CI publishes the aggregate validator outcome as a `CI Result` commit status on the
+  exact workflow-run SHA. GitHub excludes dispatch-created job checks from branch rules; the
+  status uses the GitHub Actions job token with job-scoped `statuses: write` and
+  `pull-requests: read` for Crowdin merge attestation. That job checks out
+  the trusted default branch for aggregation and reporting, never candidate branch code. Only aggregate
+  success publishes success; failed, cancelled, skipped, or missing validation publishes failure.
+  Validation jobs unknown to the trusted aggregator also fail the result, so a new job must land in
+  the trusted contract before it can gate. The `security` gate is selected by every plan; every
+  selected job must report `success`, every known but unselected job must report `skipped`, and a
+  missing result fails the aggregate — so an older candidate workflow that omits a required job
+  can never pass. (The former `optionalJobs` compatibility window expired when all active
+  candidate workflows had landed the `security` job.) Status publication errors fail the
+  CI Result job, so automation cannot promote the commit.
+- Release version commits pass explicitly dispatched CI on a temporary `wip/release-*` branch and
+  receive an Actions-owned preview (§19) before the identical SHA advances main; the embedded
+  version makes them deployable changes. `scripts/github-ci-gate.sh` waits for the exact dispatched
+  CI run and its `CI Result`, requests one preview, then waits for the authoritative `Preview Result`
+  on the same SHA; gate waits are bounded to 60 minutes, and the containing Release and Crowdin
+  workflows are bounded to 90 minutes. Ordinary
+  `wip/**` push CI no longer exists. The main ruleset requires successful GitHub Actions
+  `CI Result` and `Preview Result`, strict freshness, and no bypass actors. Non-fast-forward
+  promotion fails if main advances.
 - If publication fails after version promotion, an explicit rerun can recover only the direct
-  version-only child of the original CI revision, with successful exact-head CI and unchanged
-  manifest/changelog history. Recovery creates missing tags/releases idempotently, rejects tag
-  conflicts, and never advances main or bumps another version.
+  version-only child of the original CI revision, with successful exact-head `CI Result` **and**
+  `Preview Result` and unchanged manifest/changelog history. The `Preview Result` evidence is
+  authenticated, not merely present: the newest status returned by the exact-SHA commit endpoint
+  must be a success, and its `target_url` must resolve to a completed `workflow_dispatch` run of
+  `.github/workflows/preview.yml` whose branch is `main` and whose head repository matches this
+  repository (GitHub reports path and branch separately). Its `Publish preview result` job must
+  conclude successfully, and the run must retain `preview-deployment-<sha>` evidence for the exact
+  version commit. These checks prove a candidate was deployed, smoke-tested, and authoritatively
+  reported (never an `ignore` no-op run).
+  Recovery creates missing tags/releases
+  idempotently, rejects tag conflicts, and never advances main or bumps another version.
 - The staging push uses `GITHUB_TOKEN` and explicitly dispatches CI; main promotion uses it to
   avoid recursive Actions runs. Version commits have no skip marker; Cloudflare still rebuilds.
 - A green workflow run must continue to mean the test shards and Supabase validation passed;
@@ -1671,11 +1722,22 @@ behind branch, explicitly dispatches candidate CI, and performs the final merge;
 - Behind translation branches first receive a GitHub branch update guarded by the expected head.
   Only afterward does the workflow capture and validate a candidate. Conflicts fail closed.
 - Candidates contain captured main. Preflight checks reject observed main/head changes and
-  non-clean merge states. Only unknown calculations retry.
-- The gate awaits successful GitHub Actions `CI Result` on the exact head and verifies the effective
-  repository rule requires that check with strict freshness. The administrator verifies the deployed
+  non-clean merge states. Unknown calculations and a temporary `BLOCKED` state after preview
+  success retry for up to 60 seconds; only `MERGEABLE / CLEAN` may merge.
+- The gate awaits successful GitHub Actions `CI Result` and then the `Preview Result` commit status
+  on the exact head (the explicit `locales` dispatch produces the preview even though job-token
+  PR updates leave ordinary `pull_request` runs approval-required) and verifies the effective
+  repository rule requires the CI check with strict freshness. The administrator verifies the deployed
   ruleset has no bypass actors; automation does not receive ruleset write access to read that list.
   GitHub enforces the base requirement at merge time; missing/weakened required checks fail closed.
+- The trusted dispatched CI result job also reports `CI Result` on GitHub's test-merge commit only
+  when exactly one eligible same-repository `locales` PR has the validated head, its base equals
+  current main on both reads, its merge SHA stays unchanged, and the head and test-merge Git trees
+  are identical. This attests the same fully tested files without running candidate code in the
+  status-writing job. A missing test-merge SHA is fetched from the selected PR with a bounded retry.
+  A changed revision or different tree fails the result job before preview and leaves the merge
+  status absent. A later failed dispatch publishes failure to the same PR's current test-merge SHA
+  as well as the head, superseding any earlier success on that merge commit.
 - The server-side `--match-head-commit` guard must use the SHA that passed all validation.
 - Merges use `GITHUB_TOKEN`, then explicitly dispatch main CI for the release gate. No personal
   GitHub token is needed. CI dispatch failures fail the workflow; candidate failures prevent merging.
@@ -1749,8 +1811,8 @@ clears even when the filtered task IDs have not changed.
 
 Keep the tasks page's eight-card batches, preload margin, and auto-load caps. Do not defer
 critical metadata or change task filters, progress state, or card expansion to mask mounting
-cost. Performance validation and the issue #444 baseline are documented in
-`docs/task-performance-validation.md`.
+cost. The #808/#444 performance validation is historical and archived in git history; keep the
+behavioral invariants above (eight-card batches, preload margin, and auto-load caps) unchanged.
 
 ### Task card layout and legacy density preferences
 
@@ -1788,7 +1850,7 @@ match aligned: if one matches by name-or-short-name and the other does not, the 
 a pooled objective under a different item than the list pins, which contradicts the searched
 identity.
 
-## 14. CI validation selection
+## 15. CI validation selection
 
 `scripts/validation-plan.mjs` classifies Git paths and validates aggregate outcomes;
 `scripts/validate-changes.mjs` exposes local execution and CI outputs;
@@ -1799,22 +1861,31 @@ translation files. `DESIGN.md`, the source locale `app/locales/en.json`, unknown
 executable changes select full validation. Local input includes
 committed and dirty paths; CI input is the explicit revision diff. Renames contribute both paths.
 Pull requests receive the selected jobs; the classifier also reports `workflows` so workflow
-linting runs only for non-Markdown automation paths and unreadable diffs. See
+linting runs only for non-Markdown automation paths and unreadable diffs, and an independent
+`previewRequired` decision (`preview` output): only a change set made entirely of known
+documentation paths needs no deployable preview. Translations, configuration, dependencies,
+executable code, and unknown or unreadable paths require one, so translation-only pull requests
+keep the reduced test selection but add the `validate` build job. The `security` job (reusable
+`.github/workflows/security.yml`: production dependency audit at the critical threshold, Gitleaks,
+CodeQL) is selected on every CI run. See
 `docs/WORKFLOW_AUTOMATION.md` for the recorded rollout evidence and local/full execution profiles.
 
 ### Invariants
 
 - Pushes and dispatches retain full validation; only pull requests receive reduced selection.
 - Reduced selection never applies to `app/locales/en.json`; only non-English translations qualify.
-- Empty, unreadable, or malformed diffs select full validation and workflow linting.
+- Empty, unreadable, or malformed diffs select full validation, workflow linting, and a preview.
 - Missing classifier output or selected jobs that fail, cancel, or unexpectedly skip fail CI Result.
-- Only deliberately unselected jobs may report skipped; systems drift always runs.
+- Only deliberately unselected jobs may report skipped; systems drift and security always run.
+  Scanner errors, cancellation, or a missing security result fail `CI Result`; the
+  development-dependency audit is informational and never gates.
+- `previewRequired` is independent of `full`: a translation-only plan is reduced yet builds.
 - Existing shard discovery, coverage enforcement, secret restrictions, and merge governance remain.
 - Dependabot auto-merge requires the immutable Dependabot account ID for both the PR author and
   event actor; the actor restriction alone never establishes trust.
 - The aggregate covers repository CI jobs, not independently reported Security or Codecov statuses.
 
-## 15. Canonical task progression
+## 16. Canonical task progression
 
 Hideout cards evaluate the declared trader comparison against current loyalty (legacy default `>=`). Completed-module enforcement retains a build if the current stored loyalty satisfies the comparison (including legacy values above the normal range), or if any valid loyalty level at or below it satisfies that comparison, so advancing past an upper-bound or equality requirement cannot erase built modules or their parts. Lower-bound loyalty downgrades still revoke dependent builds. Disabled trader gating bypasses both checks. Optional profile chapter and prestige normalization run inside their optional request boundaries: malformed catalogs show a partial failure without discarding successful task catalogs. Overlay promotion requires a nonempty editions catalog as well as complete provenance, and forced edition refreshes forward `cacheBust=1` to bypass the worker overlay cache.
 
@@ -1931,7 +2002,7 @@ not import quest completions and therefore has no trader/task backfill path.
   approved branch revision with no language/mode filters, verify all 48 new-key writes succeeded,
   and record that evidence. Do not rely on cold fallback to bridge this cache-contract rollout.
 
-## 16. Light/dark theme system
+## 17. Light/dark theme system
 
 **Summary**: Dark is the default and only mandatory theme; light mode is an opt-in user
 preference (issue #102). The light theme never edits component markup globally: it flips the
@@ -2040,7 +2111,7 @@ App boot
 - `app/shell/AppBar.vue` — sun/moon toggle in the utilities group (collapses into More menu on mobile)
 - `nuxt.config.ts` — boot script, light skeleton fallbacks, pinned `colorMode`
 
-## 17. Test suite execution model
+## 18. Test suite execution model
 
 Test **files** run in parallel, each in its own forked worker. `vitest.config.ts` sets
 `pool: 'forks'` with `isolate: true`, and Vitest's pool only reuses a runner while `isolate` is
@@ -2086,3 +2157,181 @@ the loader never reaches a real import.
 - `.github/workflows/ci.yml` — the four shard jobs and the Deno test step
 - `scripts/ci-tests/workflows.mjs` — asserts the shard command and required check names
 - `tests/test-setup.ts` — shared fetch stubs, console filtering, auto-unmount
+
+## 19. Actions-owned Cloudflare previews
+
+**Summary.** Pull requests and eligible non-main dispatches do not rely on Cloudflare's
+automatic Git previews. The candidate `Validate` job builds the actual Pages output once with the
+anonymous preview profile (`scripts/preview/profile.mjs`), records a versioned manifest
+(`scripts/preview/manifest.mjs`, `scripts/preview/write-manifest.mjs`) inside the output, and
+uploads it as the `pages-preview` artifact (seven-day retention). Main pushes keep the production
+configuration. The trusted controller in `.github/workflows/preview.yml`
+(`scripts/preview/controller.mjs`, `scripts/preview/github-api.mjs`, `scripts/preview/archive.mjs`)
+loads from the default branch, resolves the candidate through the GitHub API, requires successful
+`CI Result` and current revision evidence, verifies every manifest claim and the recomputed content
+digest, uploads the verified output with pinned Wrangler to the existing `tarkovtracker` Pages
+project's preview environment under a generated `preview-*` branch, verifies the deployment record
+(`scripts/preview/deployment.mjs`, `scripts/preview/verify-deployment.mjs`), runs the Playwright
+smoke suite (`scripts/preview/smoke/preview.smoke.mjs`) without Cloudflare credentials, and
+publishes the authoritative `Preview Result` commit status. Downstream consumers (the release
+gate and interrupted-release recovery) must not trust the status in isolation: commit statuses
+are forgeable by write collaborators, so the evidence binds to the controller run behind its
+`target_url`. That run must report path `.github/workflows/preview.yml`, event
+`workflow_dispatch`, branch `main`, and this repository; its `Publish preview result` job must
+succeed and it must retain a `preview-deployment-<sha>` artifact for the exact candidate.
+
+### Flow
+
+```text
+PR update → CI (selected validation + security + preview build + manifest + artifact)
+          → CI Result succeeds
+          → status-only Preview State (workflow_run / pull_request_target) publishes pending
+          → maintainer comments `/preview` on a same-repository PR, or trusted merge automation
+            dispatches Preview for the successful CI run
+          → ready PR + current head/base/test-merge + attempt + artifact claims verified
+          → environment `preview` or `preview-fork` (maintainer approval for forks)
+          → recheck → wrangler pages deploy --branch preview-* → deployment record verified
+          → smoke tests on the unique deployment URL (5-minute startup window)
+          → freshness recheck → Preview Result success [preview <digest12> v<profile>]
+```
+
+### Result contract
+
+| Situation                                                          | `Preview Result`                           |
+| ------------------------------------------------------------------ | ------------------------------------------ |
+| Validation running, deployable draft, fork awaiting approval       | pending, with reason                       |
+| Preview-required PR has successful CI but no dispatch yet          | pending, waiting for a maintainer request  |
+| Successful CI and verified documentation-only scope                | success: not applicable                    |
+| Current deployment and smoke tests succeed                         | success, with digest/profile marker        |
+| Validation, artifact verification, deployment, or smoke tests fail | failure                                    |
+| Revision or attempt becomes obsolete                               | no success is published for that candidate |
+
+Statuses target only the validated head SHA, for pull requests and standalone branch previews
+alike, so GitHub shows one required result. They never target the controller's default-branch SHA
+or the test-merge commit: GitHub regenerates a PR's test-merge commit (new SHA, same parents and
+tree) when a merge is attempted, which dropped test-merge statuses and blocked every merge. The
+ruleset's strict freshness requires the head to contain current main at merge time, so a
+head-bound result cannot merge against a stale base. The status links to the controller run summary, which
+records action, revision, digest, deployment URL, and validation-to-preview duration.
+Artifact claims still bind to the test merge. When GitHub has not computed it yet, the controller
+retries and leaves the required result pending. A regenerated test merge is the same candidate only
+when both commits have the current base and head as parents and identical trees. A dispatched branch
+build associated with a PR can satisfy that PR only if its Git tree matches the test-merge tree
+and its base is current main, including when the change is documentation-only. The comparison is
+repeated before deployment and final success. An hourly state-only reconciliation re-evaluates a head
+with no result, or whose latest result is pending only because the test merge was not ready, once
+GitHub has computed the test merge; other pending reasons are left alone.
+
+### Invariants
+
+- Candidate builds receive no deployment credentials. The controller never checks out, installs,
+  or executes candidate code and never consumes candidate Wrangler configuration; the uploader
+  discovers `wrangler.toml` from the default-branch checkout at the repository root, uses a fixed
+  project name and generated `preview-*` branch, and rejects the configured production branch at
+  every layer.
+- Every manifest field is a claim: repository, pull request, head SHA, base SHA, checked-out
+  test-merge SHA, tree SHA, run id, run attempt, build-profile version, preview branch, app URL,
+  and digest are compared with live GitHub state and the recomputed digest before planning and
+  again immediately before upload. A superseded attempt, moved head, moved base, or test merge
+  with different parents or tree cannot deploy, and a late success is not published for an obsolete
+  candidate. A regenerated test merge with the same parents and tree is the same candidate.
+- Automatic state refresh uses the latest CI run for the candidate head and branch. A delayed
+  completion from an older run does not overwrite the current preview status, including for forks.
+- Archives are parsed from the central directory before extraction; symbolic links, special
+  files, traversal, absolute paths, duplicates, encryption, and checksum mismatches are rejected.
+- Successful deployments are deduplicated by revision, artifact digest, and profile version through
+  the status marker. Before `ready_for_review` reuses a result, the controller authenticates the
+  original run and its exact-SHA deployment artifact, then keeps that run URL on the new success.
+- Pull-request and CI-completion events run only the status-only `preview-state.yml` workflow, so
+  ordinary PRs do not instantiate skipped deployment or smoke-test jobs. These events and comment
+  events never upload to Cloudflare. An exact `/preview` comment from a repository maintainer or
+  administrator on a same-repository PR resolves the successful CI run matching that PR's number,
+  head, and base before dispatching the trusted controller; forks retain the separate
+  request and protected-environment approval path. Only a trusted
+  `workflow_dispatch` from `main` can deploy, and it repeats the exact-SHA, CI, artifact, and
+  freshness checks. Crowdin and release staging dispatch once after their own exact-SHA CI passes;
+  allowlisted Dependabot auto-merge candidates dispatch from a trusted post-CI `workflow_run` after
+  all checks pass. Ordinary PR pushes
+  never request deployment. Cloudflare automatic preview builds are disabled while production Git
+  deployments for `main` remain enabled.
+- The Pages-only deployment token is stored only in the protected `preview` and `preview-fork`
+  environments, whose branch policy allows `main`; remove the repository-scoped copy. This prevents
+  a manually dispatched workflow selected from another ref from reading the deployment credential.
+- Fork candidates deploy only through the protected `preview-fork` environment; the exact revision
+  is shown before approval and rechecked afterward, so approval never carries to another head.
+  Fork CI runs carry no `pull_requests` and the base repository's commit-association lookup omits
+  fork-only commits, so a fork candidate's PR is resolved by listing open PRs for its
+  `owner:branch` head and then matching head SHA, head repository, and base like any candidate.
+- The Pages preview environment has no production KV or Durable Object bindings and empty Supabase,
+  analytics, Turnstile, Stripe, and log-forwarding values; the anonymous build sets `APP_URL` to the
+  controlled branch alias so host trust covers the unique deployment URL, and the app's offline
+  Supabase fallback activates on `pages.dev`. Public game data still flows through `/api/tarkov/*`.
+- Nuxt's Turnstile key-pair validation runs only for production `build`/`generate` commands, not for
+  `pnpm install`'s `nuxt prepare`; deployable builds still reject a one-sided key configuration.
+- Smoke tests run in a separate credential-free job against the unique deployment URL and require
+  the served manifest, usable `/` and `/tasks` content, loaded assets, the anonymous
+  `/api/tarkov/cache-meta` shape, nonempty `/api/tarkov/bootstrap?lang=en` data, and no browser
+  requests to Supabase, Stripe, or analytics hosts. Persistent failure blocks merging.
+- Reporting failures fail the controller so automation cannot promote the commit. Deployment and
+  smoke evidence artifacts are retained for 30 days. An unexpected controller error re-identifies
+  the current PR or standalone branch before publishing failure; the CI run's PR base snapshot must
+  still match, so an obsolete event cannot turn a newer PR revision red. A `pull_request` CI run
+  must carry matching PR, head, and base snapshots to be attributed to the current revision; runs
+  without them, notably forks, have no trustworthy run-scoped base, so an unexpected refresh error
+  leaves the existing result unchanged. A failure for a planned decision targets that decision's head
+  and does not require a computed test merge. Tree equality remains required for a dispatched branch build claiming
+  preview success.
+- Release staging and recovery read `Preview Result` on the standalone version commit; Crowdin and
+  Dependabot read it on their PR's validated head. All still bind deployment evidence
+  to the intended head revision (§14). Production deployment remains Cloudflare's Git
+  integration for `main` and is unchanged.
+
+Current gates consume `CI Result` and `Preview Result` on the validated head for PRs and
+standalone branch candidates. Both come from GitHub
+Actions (app id 15368), and waiting automation re-reads them from the API rather than trusting
+`target_url` or a payload snapshot. The app id does not authenticate a workflow definition: a
+same-repository PR can edit its `pull_request` workflow and request `statuses: write`. The opt-in
+shadow below never publishes a merge result; a separate trusted publisher boundary is required
+before moving the ordinary preview build out of CI. When an aggregate accepts a job during a
+documented compatibility window, the window
+applies only to that job's absence; a reported non-success outcome still fails the aggregate, and
+the accepting aggregator version ships in the same change that activates the job.
+
+### Opt-in finalization shadow
+
+`.github/workflows/finalization-shadow.yml` is a non-authoritative rehearsal of a late build.
+A maintain/admin actor dispatches it from `main` with an open non-draft PR number and its successful
+exact-head CI run id. The trusted planner checks the live head/base/test-merge parents and tree,
+the CI run's PR snapshot, and the attempt-specific `CI Result` job. Docs-only changes skip build.
+The `github-script` handoff passes the repository explicitly because spreading its context drops
+the computed `repo` property; missing repository identity fails planning before any build.
+Docs-only runs still receive a terminal revision recheck. GitHub's workflow-run API may omit the
+PR/base snapshot for fork runs; the shadow rejects those runs until an authenticated historical
+base source is available. This does not change the existing approved fork-preview path.
+Deployable changes build the test merge in a digest-pinned Node container without repository
+write credentials, Actions runtime/cache token, OIDC, deployment secrets, or Docker socket. A
+trusted host step rejects links, special files, and oversized output before the artifact uploader
+can read it. A separate clean runner treats the candidate build artifact as hostile, safely extracts it, rechecks
+the live revision, and seals `pages-preview-shadow` with a digest and versioned manifest. Competing
+same-PR dispatches cancel; pushes and base changes invalidate the old request. The shadow neither
+deploys nor publishes required statuses. Ordinary CI still builds/uploads `pages-preview`.
+
+### Files
+
+- `.github/workflows/preview-state.yml` — automatic, status-only preview state refresh
+- `.github/workflows/preview.yml` — explicit trusted controller: plan, deploy, smoke, result jobs
+- `.github/workflows/preview-request.yml`, `scripts/preview/comment-request.mjs` — trusted
+  maintainer comment request, current CI selection, and dispatch
+- `.github/workflows/finalization-shadow.yml`, `scripts/preview/finalization-shadow.mjs`,
+  `scripts/preview/shadow-container.sh` — opt-in late-build rehearsal, no deployment or required result
+- `.github/workflows/ci.yml` — `Validate` build profile, manifest, `pages-preview` artifact; `security` call
+- `.github/workflows/security.yml` — reusable audit/Gitleaks/CodeQL workflow plus weekly schedule
+- `scripts/preview/profile.mjs` — project identity, branch alias derivation, anonymous build env
+- `scripts/preview/build-profile.mjs` — candidate-side profile selection for the single build step
+- `scripts/preview/manifest.mjs`, `scripts/preview/write-manifest.mjs` — digest and manifest
+- `scripts/preview/controller.mjs`, `scripts/preview/github-api.mjs`, `scripts/preview/archive.mjs` — verification and reporting
+- `scripts/preview/deployment.mjs`, `scripts/preview/verify-deployment.mjs` — deployment record evidence
+- `scripts/preview/smoke/preview.smoke.mjs`, `scripts/preview/smoke/readiness.mjs` — smoke suite
+- `scripts/github-ci-gate.sh`, `scripts/release-recovery.mjs` — dual-gate waits for automation
+- `wrangler.toml` — isolated `[env.preview.vars]`
+- `scripts/ci-tests/preview.mjs`, `scripts/ci-tests/preview-workflow.mjs`, `scripts/ci-tests/security.mjs` — regression tests

@@ -269,7 +269,10 @@ Fetches cache purge timestamp to detect server-side cache clears.
 }
 ```
 
-**Cache TTL:** Never cached (`Cache-Control: no-store`)
+**Cache-Control:** `public, max-age=0, must-revalidate` for clients; the Cloudflare CDN may serve
+the purge timestamp for up to 360s total (300s fresh plus up to 60s stale while revalidating
+in the background), so clients relying on `lastPurgeAt` can detect a purge up to ~6 minutes late
+(`Cloudflare-CDN-Cache-Control: public, max-age=300, stale-while-revalidate=60`).
 
 ---
 
@@ -545,9 +548,12 @@ Nuxt/Pages `/api/*` routes return errors in this format:
 Admin routes also include a stable machine-readable code in `data.code`. The English serialized
 `statusMessage` fallback remains for API clients that do not localize responses; the admin UI maps these codes to
 locale keys instead of rendering server text. Current admin codes are `admin_privileges_required`,
-`authentication_required`, `invalid_channel`, `invalid_display_name`, `invalid_enabled_flag`, `invalid_request_body`,
-`invalid_target_user_id`, `invalid_tier`, `service_config_missing`, `supabase_request_failed`,
-`supporter_update_failed`, and `twitch_config_update_failed`.
+`authentication_required`, `cache_purge_failed`, `invalid_channel`, `invalid_display_name`,
+`invalid_enabled_flag`, `invalid_purge_type`, `invalid_request_body`,
+`invalid_target_user_id`, `invalid_tier`, `method_not_allowed`, `service_config_missing`,
+`supabase_request_failed`,
+`supporter_update_failed`, and `twitch_config_update_failed`; the set lives in
+`app/utils/adminErrors.ts` (`AdminErrorCode`).
 
 The public API gateway (`api.tarkovtracker.org`) uses its own envelope,
 `{"success": false, "error": "..."}`. Unexpected gateway failures always return `500` with the fixed
@@ -561,23 +567,27 @@ problems keep their specific `4xx` messages in the same envelope.
 
 ### Client-Side (IndexedDB)
 
-The client caches API responses in IndexedDB with keys like:
+The client caches API responses in IndexedDB with keys like (the game-data segment embeds the
+payload schema version built by `generateCacheKey`):
 
-- `tarkov-tasks-core-regular-en`
-- `tarkov-hideout-pve-de`
-- `tarkov-tasks-core-pvp-season-en`
-- `tarkov-items-lite-regular-en`
-- `tarkov-prestige-all-regular-en`
+- `tarkov-tasks-core-json-v3-regular-en`
+- `tarkov-hideout-json-v5-pve-de`
+- `tarkov-tasks-core-json-v3-pvp-season-en`
+- `tarkov-items-lite-json-v2-regular-en`
 
 ### Server-Side (Edge)
 
 Cloudflare edge caching with `Cache-Control` headers:
 
 ```http
-Cache-Control: public, max-age=43200
+Cache-Control: public, max-age=43200, s-maxage=43200
 ```
 
-Note: 43200 seconds = 12 hours (default), 86400 seconds = 24 hours (extended)
+Note: 43200 seconds = 12 hours (default), 86400 seconds = 24 hours (extended). Only fresh
+cacheable responses (`HIT`, `MISS`, `PRECOMPUTE` in `app/server/utils/edgeCache.ts`) carry
+`s-maxage`; bypass, local `DEV`, and stale-hit responses are `Cache-Control: no-cache`. On stored
+`MISS` entries `s-maxage` equals `ttl + staleTtl` so the Cloudflare CDN keeps the entry past max-age
+while a background refresh runs (stale-while-revalidate).
 
 ### Cache Busting
 

@@ -200,9 +200,10 @@
   const perks = computed(() => [
     { icon: 'i-mdi-shield-star-outline', label: t('page.supporter.perk_badge') },
     { icon: 'i-mdi-discord', label: t('page.supporter.perk_discord') },
+    { icon: 'i-mdi-api', label: t('page.supporter.perk_api_rate_limit') },
     {
       icon: 'i-mdi-calendar-clock',
-      label: t('page.supporter.perk_data_retention', 'Extended inactive account retention'),
+      label: t('page.supporter.perk_data_retention'),
     },
   ]);
   const baseAmount = computed(() => numericAmount.value || ONE_TIME_BASE);

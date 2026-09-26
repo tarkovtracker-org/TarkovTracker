@@ -1,4 +1,4 @@
-import { computeInvalidProgress } from './invalidation';
+import { computeInvalidProgress } from '@shared/utils/progressInvalidation';
 import type {
   UserProgressData,
   UserProgressModeRow,

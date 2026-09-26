@@ -4,7 +4,12 @@ import { writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fixture, git } from './helpers/automation-fixture.mjs';
-import { jobBlock, workflowEvent, workflowStep } from './helpers/workflow-blocks.mjs';
+import {
+  jobBlock,
+  permissionsBlock,
+  workflowEvent,
+  workflowStep,
+} from './helpers/workflow-blocks.mjs';
 /** Stage realistic generated assets without modifying application code. */
 function releaseFixture(t) {
   const f = fixture(t);
@@ -31,6 +36,8 @@ test('release validates a staging commit before promoting that identical SHA wit
   const dispatchIndex = events.findIndex((event) => event.type === 'dispatch');
   assert.equal(events[dispatchIndex]?.ref, 'wip/release-1.2.3-123-1');
   const ciIndex = events.findIndex((event) => event.type === 'ci-result');
+  const requestIndex = events.findIndex((event) => event.type === 'preview-dispatch');
+  const previewIndex = events.findIndex((event) => event.type === 'preview-result');
   const mainIndex = events.findIndex(
     (event) => event.type === 'push' && event.args.at(-1) === `${sha}:refs/heads/main`
   );
@@ -44,6 +51,12 @@ test('release validates a staging commit before promoting that identical SHA wit
     conclusion: 'success',
   });
   assert.ok(ciIndex < mainIndex, 'successful exact-head CI must precede main promotion');
+  assert.ok(ciIndex < requestIndex && requestIndex < previewIndex && previewIndex < mainIndex);
+  assert.deepEqual(events[requestIndex], {
+    type: 'preview-dispatch',
+    runId: 'run_id=1',
+    ref: 'main',
+  });
   const pushes = f.pushes();
   assert.equal(pushes[0].credential, 'main');
   assert.equal(pushes[0].args.at(-1), `${sha}:refs/heads/wip/release-1.2.3-123-1`);
@@ -60,6 +73,34 @@ test('failed staging CI leaves main unchanged and never attempts promotion', (t)
   assert.match(result.stderr, /CI Result did not succeed/);
   assert.equal(git(f.repo, '--git-dir', f.remote, 'rev-parse', 'main'), f.base);
   assert.equal(f.pushes().length, 1);
+  assert.ok(!f.events().some((event) => event.type === 'preview-dispatch'));
+});
+test('release refuses a stale CI run or failed preview dispatch before promotion', (t) => {
+  for (const overrides of [
+    { CI_RUN_HEAD: 'a'.repeat(40) },
+    { CI_WATCH_FAIL: 'true' },
+    { PREVIEW_DISPATCH_FAIL: 'true' },
+  ]) {
+    const f = releaseFixture(t);
+    const result = f.release(overrides);
+    assert.equal(result.status, 1);
+    assert.equal(git(f.repo, '--git-dir', f.remote, 'rev-parse', 'main'), f.base);
+    assert.equal(f.pushes().length, 1);
+  }
+});
+test('a version commit without a successful preview is never promoted', (t) => {
+  const f = releaseFixture(t);
+  const result = f.release({ PREVIEW_STATE: 'failure' });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Preview Result did not succeed/);
+  assert.equal(git(f.repo, '--git-dir', f.remote, 'rev-parse', 'main'), f.base);
+  assert.equal(f.pushes().length, 1);
+  const events = f.events();
+  const preview = events.find((event) => event.type === 'preview-result');
+  assert.ok(preview && preview.sha !== f.base);
+  const missing = releaseFixture(t).release({ PREVIEW_PRESENT: 'false' });
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /Timed out waiting for Preview Result/);
 });
 test('concurrent main advancement is rejected by the actual Git push', (t) => {
   const f = releaseFixture(t);
@@ -86,11 +127,13 @@ test('release refuses unrelated staged content', (t) => {
 /** Keep trigger, job eligibility and publication credentials within their owning blocks. */
 function assertReleaseWorkflowBoundaries(ci, releaseWorkflow) {
   workflowEvent(ci, 'workflow_dispatch');
-  assert.match(workflowEvent(ci, 'push'), /branches: \[main, 'wip\/\*\*'\]/);
+  // Staging branches receive CI only through explicit dispatch; ordinary wip/** push CI is gone.
+  assert.match(workflowEvent(ci, 'push'), /^ {4}branches: \[main\]$/m);
+  assert.doesNotMatch(workflowEvent(ci, 'push'), /wip/);
   const release = jobBlock(releaseWorkflow, 'release');
   const eligibility = release.slice(0, release.indexOf('    steps:'));
   assert.match(eligibility, /head_branch == 'main'/);
-  assert.match(eligibility, /permissions:\n {6}actions: write\n/);
+  assert.match(permissionsBlock(eligibility, '    '), /^ {6}actions: write$/m);
   assert.match(
     workflowStep(release, 'Semantic Release'),
     /GITHUB_TOKEN: \$\{\{ secrets.GITHUB_TOKEN \}\}/
@@ -109,12 +152,11 @@ test('release staging runs ordinary CI while publication retains its main-only g
 test('unrelated triggers, jobs and steps cannot satisfy the release workflow contract', () => {
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
   const release = readFileSync('.github/workflows/release.yml', 'utf8');
-  const wrongTrigger = ci
-    .replace("branches: [main, 'wip/**']", 'branches: [main]')
-    .replace(
-      'pull_request:\n    branches: [main]',
-      "pull_request:\n    branches: [main, 'wip/**']"
-    );
+  const wrongTrigger = ci.replace(
+    'push:\n    branches: [main]',
+    "push:\n    branches: [main, 'wip/**']"
+  );
+  assert.notEqual(wrongTrigger, ci);
   assert.throws(() => assertReleaseWorkflowBoundaries(wrongTrigger, release));
   const wrongJob =
     release.replace("head_branch == 'main'", "head_branch == 'develop'") +
@@ -174,4 +216,14 @@ test('dispatched main Fallow audit compares the real parent instead of main agai
   assert.equal(result.status, 0, result.stderr);
   assert.equal(f.output(), `base=${f.head}\n`);
   assert.notEqual(f.head, git(f.repo, 'rev-parse', 'HEAD'));
+});
+test('release permission key order does not change dispatch authorization', () => {
+  const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const workflow = readFileSync('.github/workflows/release.yml', 'utf8');
+  const reordered = workflow.replace(
+    '      actions: write\n      checks: read',
+    '      checks: read\n      actions: write'
+  );
+  assert.notEqual(reordered, workflow, 'permission reordering must apply');
+  assertReleaseWorkflowBoundaries(ci, reordered);
 });

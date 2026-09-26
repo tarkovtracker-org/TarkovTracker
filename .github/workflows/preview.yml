@@ -1,0 +1,262 @@
+name: Preview
+# Trusted preview controller. Every job checks out the default branch; candidate code is never
+# executed, installed, or used as Wrangler configuration. The controller verifies CI evidence and
+# the preview artifact's claims against live GitHub state, uploads only after an explicit trusted
+# dispatch, smoke-tests the unique deployment URL, and publishes the authoritative `Preview Result`
+# status. See docs/SYSTEMS.md §19. Automatic status refresh lives in preview-state.yml so
+# ordinary pull requests never instantiate skipped deployment or smoke-test jobs.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful CI run id for the exact PR revision to preview.
+        required: true
+        type: string
+# Repeated requests for the same CI run replace an older attempt. Late results are also rejected
+# by revision checks.
+concurrency:
+  group: preview-${{ inputs.run_id }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  plan:
+    name: Plan preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      pull-requests: read
+      statuses: write
+    outputs:
+      decision: ${{ steps.plan.outputs.decision }}
+      action: ${{ steps.plan.outputs.action }}
+      environment: ${{ steps.plan.outputs.environment }}
+    steps:
+      - name: Checkout trusted controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Resolve candidate and verify evidence
+        id: plan
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          RUN_ID_INPUT: ${{ inputs.run_id }}
+        with:
+          script: |
+            const { planPreview } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/controller.mjs`);
+            const decision = await planPreview({
+              github,
+              context,
+              core,
+              inputs: { run_id: process.env.RUN_ID_INPUT },
+              workspace: process.env.RUNNER_TEMP,
+            });
+            core.setOutput('decision', JSON.stringify(decision));
+            core.setOutput('action', decision.action);
+            core.setOutput('environment', decision.environment ?? '');
+            if (decision.fork && decision.action === 'deploy') {
+              await core.summary
+                .addHeading('Fork preview awaiting approval', 2)
+                .addRaw(`Approving deploys **exactly** revision \`${decision.headSha}\` from \`${decision.headRepo}\` (PR #${decision.pullRequest}). The deployment job re-checks the revision after approval and refuses any other head.`)
+                .write();
+            }
+  deploy:
+    name: Deploy preview
+    needs: plan
+    if: needs.plan.outputs.action == 'deploy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Explicit dispatches use `preview` for same-repository candidates. Forks use `preview-fork`,
+    # which requires maintainer review with administrator bypass disabled. Both hold the token.
+    environment:
+      name: ${{ needs.plan.outputs.environment }}
+      url: ${{ steps.verify-deployment.outputs.url }}
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      url: ${{ steps.verify-deployment.outputs.url }}
+      deployment_id: ${{ steps.verify-deployment.outputs.deployment_id }}
+      head_sha: ${{ steps.verify.outputs.head_sha }}
+      digest: ${{ steps.verify.outputs.digest }}
+      preview_branch: ${{ steps.verify.outputs.preview_branch }}
+    steps:
+      - name: Checkout trusted deployment tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Activate packageManager
+        run: bash scripts/ensure-pnpm.sh
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      # Pinned Wrangler from the trusted default-branch lockfile; no lifecycle scripts run here.
+      - name: Install pinned deployment tooling
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Recheck revision and verify artifact
+        id: verify
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DECISION: ${{ needs.plan.outputs.decision }}
+        with:
+          script: |
+            const { verifyForDeploy } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/controller.mjs`);
+            const decision = JSON.parse(process.env.DECISION);
+            const manifest = await verifyForDeploy({
+              github,
+              context,
+              core,
+              decision,
+              destination: `${process.env.RUNNER_TEMP}/preview-dist`,
+            });
+            core.setOutput('head_sha', manifest.headSha);
+            core.setOutput('digest', manifest.digest);
+            core.setOutput('preview_branch', manifest.previewBranch);
+      - name: Upload verified output to the Pages preview environment
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.ndjson
+          WRANGLER_SEND_METRICS: 'false'
+          PREVIEW_BRANCH: ${{ steps.verify.outputs.preview_branch }}
+          HEAD_SHA: ${{ steps.verify.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          case "$PREVIEW_BRANCH" in
+            preview-*) ;;
+            *) echo "::error::Refusing to deploy branch '$PREVIEW_BRANCH'."; exit 1 ;;
+          esac
+          [ "$PREVIEW_BRANCH" != "main" ]
+          # Trusted explicit configuration from the default branch, never the candidate's: the
+          # deploy job checks out the default branch into the workspace and Wrangler discovers
+          # the repo-root wrangler.toml from there (Pages commands reject explicit config paths).
+          pnpm exec wrangler pages deploy "$RUNNER_TEMP/preview-dist" \
+            --project-name tarkovtracker \
+            --branch "$PREVIEW_BRANCH" \
+            --commit-hash "$HEAD_SHA" \
+            --commit-message "Actions preview for $HEAD_SHA" \
+            --commit-dirty=true
+      - name: Verify deployment record
+        id: verify-deployment
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.ndjson
+          EXPECTED_PREVIEW_BRANCH: ${{ steps.verify.outputs.preview_branch }}
+          EXPECTED_HEAD_SHA: ${{ steps.verify.outputs.head_sha }}
+          EXPECTED_DIGEST: ${{ steps.verify.outputs.digest }}
+          EVIDENCE_PATH: ${{ runner.temp }}/deployment-evidence.json
+        run: node scripts/preview/verify-deployment.mjs
+      - name: Retain deployment evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-deployment-${{ steps.verify.outputs.head_sha || github.run_id }}
+          path: ${{ runner.temp }}/deployment-evidence.json
+          if-no-files-found: ignore
+          retention-days: 30
+  smoke:
+    name: Preview smoke tests
+    needs: [plan, deploy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout trusted smoke suite
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-project
+      - name: Install pinned browser
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run smoke tests against the unique deployment URL
+        env:
+          PREVIEW_URL: ${{ needs.deploy.outputs.url }}
+          EXPECTED_HEAD_SHA: ${{ needs.deploy.outputs.head_sha }}
+          EXPECTED_DIGEST: ${{ needs.deploy.outputs.digest }}
+          EXPECTED_PREVIEW_BRANCH: ${{ needs.deploy.outputs.preview_branch }}
+          SMOKE_REPORT_DIR: ${{ runner.temp }}/smoke-report
+        run: pnpm exec playwright test --config scripts/preview/smoke/playwright.config.mjs
+      - name: Retain smoke evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-smoke-${{ needs.deploy.outputs.head_sha || github.run_id }}
+          path: ${{ runner.temp }}/smoke-report
+          if-no-files-found: ignore
+          retention-days: 30
+  result:
+    name: Publish preview result
+    needs: [plan, deploy, smoke]
+    if: always() && needs.plan.outputs.action != 'ignore'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      statuses: write
+    steps:
+      - name: Checkout trusted reporting
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Publish Preview Result
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          RUN_ID_INPUT: ${{ inputs.run_id }}
+          DECISION: ${{ needs.plan.outputs.decision }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          SMOKE_RESULT: ${{ needs.smoke.result }}
+          DEPLOYMENT_URL: ${{ needs.deploy.outputs.url }}
+          DEPLOYMENT_ID: ${{ needs.deploy.outputs.deployment_id }}
+        with:
+          script: |
+            const { publishResult, publishControllerFailure } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/controller.mjs`);
+            const decision = process.env.DECISION ? JSON.parse(process.env.DECISION) : null;
+            if (process.env.PLAN_RESULT === 'cancelled') {
+              // Superseded by a newer run in this preview's concurrency group: the successor
+              // owns reporting for this candidate, and the runner already marked this run
+              // cancelled — publishing would be a false failure on a superseded attempt.
+              core.notice('Preview run superseded by a newer run for the same candidate.');
+              return;
+            }
+            if (process.env.PLAN_RESULT !== 'success' || !decision) {
+              await publishControllerFailure({ github, context, core, decision, inputs: { run_id: process.env.RUN_ID_INPUT } });
+              core.setFailed('Preview planning did not succeed.');
+              return;
+            }
+            try {
+              await publishResult({
+                github,
+                context,
+                core,
+                decision,
+                outcomes: { deploy: process.env.DEPLOY_RESULT, smoke: process.env.SMOKE_RESULT },
+                evidence: { url: process.env.DEPLOYMENT_URL, deploymentId: process.env.DEPLOYMENT_ID },
+              });
+            } catch (error) {
+              await publishControllerFailure({ github, context, core, decision });
+              throw error;
+            }
