@@ -54,7 +54,15 @@ describe('progress save status', () => {
     expect(() => progressPersistStorage.setItem(STORAGE_KEYS.progress, '{}')).not.toThrow();
     expect(progressSaveStatus.local).toBe('failed');
     expect(progressSaveStatus.localFailure).toBe('quota');
+  });
+  it('treats only pending cloud changes without a local save as unsaved changes', () => {
+    recordLocalSave(false, 'quota');
+    // Acknowledged by the cloud: the latest changes are not at risk.
+    expect(hasUnsavedProgressChanges()).toBe(false);
+    setCloudSaveStatus({ state: 'failed', failure: 'offline', retryAttempt: 3, nextRetryAt: null });
     expect(hasUnsavedProgressChanges()).toBe(true);
+    recordLocalSave(true);
+    expect(hasUnsavedProgressChanges()).toBe(false);
   });
   it('clears the unsaved state after a later write succeeds', () => {
     const { control, values } = stubFailingStorage();
