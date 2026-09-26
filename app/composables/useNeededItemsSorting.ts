@@ -67,8 +67,9 @@ export function useNeededItemsSorting(
   const PRIORITY_HIDEOUT = 2;
   const PRIORITY_AVAILABLE = 1;
   const PRIORITY_DEFAULT = 0;
-  // A hideout need is buildable only when its module is the station's next
-  // level and that level's station, skill, and trader prerequisites are met.
+  /**
+   * Checks whether a hideout need is the station's next level and its configured prerequisites are met.
+   */
   const isHideoutModuleBuildable = (item: NeededItemHideoutModule): boolean => {
     const { stationId, level } = item.hideoutModule;
     const currentLevel = progressStore.hideoutLevels?.[stationId]?.self ?? 0;
