@@ -1738,6 +1738,7 @@
     "analytics_preferences": "Préférences analytiques",
     "game_attribution": "Escape from Tarkov et le contenu et les matériaux de jeu associés sont des marques déposées et des œuvres protégées par le droit d'auteur de Battlestate Games Limited et de ses concédants. Tous droits réservés. TarkovTracker est un projet de fans non officiel et n'est pas affilié à Battlestate Games ni approuvé par celui-ci.",
     "tagline": "Suivez votre fuite des quêtes de Tarkov, des améliorations cachées et des exigences d'objets en un seul endroit.",
+    "version_release_link": "Voir les notes de publication pour la version {version} sur GitHub",
     "sections": {
       "explore": "Explorer",
       "project": "Projet",
