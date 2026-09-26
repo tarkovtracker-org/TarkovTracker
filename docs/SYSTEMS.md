@@ -1882,6 +1882,13 @@ match aligned: if one matches by name-or-short-name and the other does not, the 
 a pooled objective under a different item than the list pins, which contradicts the searched
 identity.
 
+### Needed Items priority ordering
+
+In descending priority order, active tasks rank above buildable hideout modules, followed by
+available tasks and all other needs. A hideout module is buildable only when it is the station's
+next level and its station, skill, and trader prerequisites pass under the user's corresponding
+requirement settings. Grouped-by-item sorting and smart-fill distribution keep their own behavior.
+
 ## 15. CI validation selection
 
 `scripts/validation-plan.mjs` classifies Git paths and validates aggregate outcomes;
