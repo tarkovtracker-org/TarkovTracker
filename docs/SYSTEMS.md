@@ -918,6 +918,9 @@ flowchart LR
   `manualActivityHistory` to the persisted progress allowlist and its entry/history sanitizers
 - `app/stores/tarkov/progressPersistence.ts`, `app/stores/tarkov/realtimeListener.ts`,
   `app/stores/useTarkov.ts` — load, merge, write, and realtime flow
+- `app/stores/tarkov/startupOwnership.ts` — monotonic generation invalidating suspended startup runs
+  at session teardowns; `app/composables/useAppInitialization.ts` preserves newer-run lifecycle
+  state when a superseded initialization completes or rejects late
 - `app/stores/useSystemStore.ts`, `app/stores/useTeamStore.ts` — mode-specific teams and teammate
   hydration
 - `app/features/team/TeamDangerZone.vue`, `app/features/team/useTeamInviteLink.ts` — resolved active
@@ -970,6 +973,19 @@ flowchart LR
   name, and every task completion. The seed is a write-time repair, not a backfill: it touches only
   the row the write already locks. Reader-side fallback alone cannot close this hole, because the
   merge base comes from the row rather than from anything the caller sends.
+- Authenticated progress startup captures a generation, user ID, and client before its first await.
+  `resetTarkovSync` and newer initializations invalidate ownership synchronously. Both generation
+  and live identity are checked before resuming account-scoped effects after reads, retry delays,
+  merge/migration/repair writes, and before starting sync or listener setup. The freshness-column
+  compatibility fallback checks ownership before dispatching its second query. Identity alone is
+  insufficient for A→B→A transitions. Queries and broadcasts use the captured user ID. An RPC
+  already dispatched may settle, but stale acknowledgements cannot patch progress, advance its
+  persistence baseline, or install/replace sync machinery. Superseded initialization failures do
+  not report a current-session load failure or clear the newer app-initialization lifecycle state.
+  Deferred metadata work checks ownership before dispatching initialization and its follow-up
+  refresh; already-dispatched public-catalog requests retain metadata's mode/language/request
+  guards. Their catalog repair hooks intentionally apply to the currently loaded progress, not to
+  a captured account snapshot.
 - Historical Seasonal rows are retained but never merged into the active season. Locally persisted
   Seasonal progress is stamped with its season number and reset to defaults when that stamp does not
   match the active season; absent stamps are treated as the active season. `sync_user_game_mode_progress`
