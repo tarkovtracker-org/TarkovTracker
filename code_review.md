@@ -1,6 +1,6 @@
 # TarkovTracker — Code Review Policy
 
-Repo-specific review policy loaded by the `production-readiness-review` skill.
+Repo-specific review policy loaded by the `review-production` skill.
 Its validation commands and risk areas override the skill's defaults.
 
 ## Table of Contents
