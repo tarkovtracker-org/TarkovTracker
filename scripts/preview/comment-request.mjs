@@ -157,18 +157,23 @@ function currentPreviewMessage(request) {
   if (request.ciRunId) return 'The current preview was requested.';
   return 'The next successful CI run will request a preview. Drafts remain paused.';
 }
-export function previewRequestMessage(request, runs) {
-  if (!request.enabled) {
-    // The bot receipt proves this stop was accepted after verifying the author's maintain/admin
-    // access, so it stays a revocation barrier even if the author later loses the role.
-    const receipt = request.stopCommentId ? `\n${previewStopReceipt(request.stopCommentId)}` : '';
-    return `Preview opt-in disabled for this PR. Comment \`/preview\` to enable it again. Dependabot keeps its separate automation.${receipt}`;
-  }
-  if (!request.automatic) {
-    const current = request.ciRunId
-      ? 'The current preview was requested.'
-      : 'No current preview was requested.';
-    return `Dependabot keeps its existing preview automation. ${current} [View Preview runs](${runs}).`;
-  }
+function disabledPreviewMessage(request) {
+  // The bot receipt proves this stop was accepted after verifying the author's maintain/admin
+  // access, so it stays a revocation barrier even if the author later loses the role.
+  const receipt = request.stopCommentId ? `\n${previewStopReceipt(request.stopCommentId)}` : '';
+  return `Preview opt-in disabled for this PR. Comment \`/preview\` to enable it again. Dependabot keeps its separate automation.${receipt}`;
+}
+function dependabotPreviewMessage(request, runs) {
+  const current = request.ciRunId
+    ? 'The current preview was requested.'
+    : 'No current preview was requested.';
+  return `Dependabot keeps its existing preview automation. ${current} [View Preview runs](${runs}).`;
+}
+function automaticPreviewMessage(request, runs) {
   return `Automatic previews enabled for this PR, including future commits. ${currentPreviewMessage(request)} [View Preview runs](${runs}); **Preview Result** updates after deployment and smoke tests. Comment \`/preview stop\` to disable automatic previews.`;
+}
+export function previewRequestMessage(request, runs) {
+  if (!request.enabled) return disabledPreviewMessage(request);
+  if (!request.automatic) return dependabotPreviewMessage(request, runs);
+  return automaticPreviewMessage(request, runs);
 }

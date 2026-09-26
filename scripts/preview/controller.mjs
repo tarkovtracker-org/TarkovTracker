@@ -473,9 +473,6 @@ async function previousSuccess(github, context, headSha, digest) {
   }
   return null;
 }
-function firstString(value) {
-  return value?.[0]?.full_name ?? null;
-}
 function decisionIdentity({ candidate, pull }) {
   return {
     pullRequest: pullRequestNumber(pull),
@@ -605,6 +602,13 @@ const COMMAND_AUTHORIZATIONS = ['request', 'standing'];
 function commandAuthorization(context, inputs, fork, request) {
   if (optional(inputs, 'request_comment_id')) return 'request';
   if (!request?.enabled) return 'dispatch';
+  return unboundCommandAuthorization(context, fork);
+}
+/**
+ * Without a command bound to the run itself: trusted default-branch dispatches deploy as their
+ * own authority, forks ride the current opt-in (`standing`) or wait for manual approval.
+ */
+function unboundCommandAuthorization(context, fork) {
   if (context.eventName !== 'workflow_dispatch') return 'request';
   return fork ? 'standing' : 'dispatch';
 }

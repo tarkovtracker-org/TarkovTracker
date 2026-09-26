@@ -42,23 +42,37 @@ async function cachedMaintainer(github, repo, login, permissions) {
  * continuity after handler reverts.
  */
 const ROLLOUT_PATTERN = /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\dZ$/;
+/** Parse a canonical UTC ISO-seconds string into its epoch milliseconds, or null. */
+function canonicalInstant(value) {
+  if (typeof value !== 'string') return null;
+  if (!ROLLOUT_PATTERN.test(value)) return null;
+  const instant = Date.parse(value);
+  if (!Number.isFinite(instant)) return null;
+  return instant;
+}
+/** Whether rendering `instant` reproduces the same canonical UTC ISO-seconds string. */
+function roundTripsInstant(value, instant) {
+  return new Date(instant).toISOString().replace('.000Z', 'Z') === value;
+}
 /** Canonical UTC ISO-seconds instant, or null when the value is not canonical UTC ISO. */
 export function rolloutEnabledAt(value) {
-  if (typeof value !== 'string' || !ROLLOUT_PATTERN.test(value)) return null;
-  const enabledAt = Date.parse(value);
-  if (!Number.isFinite(enabledAt)) return null;
-  return new Date(enabledAt).toISOString().replace('.000Z', 'Z') === value ? enabledAt : null;
+  const instant = canonicalInstant(value);
+  if (!Number.isFinite(instant)) return null;
+  return roundTripsInstant(value, instant) ? instant : null;
 }
 const CONTRACT_START = '2026-09-26T04:12:26Z';
+/** Resolve a configured override against the contract start; null when it is denied. */
+function overrideRolloutStart(contractStart, configured) {
+  const override = rolloutEnabledAt(configured);
+  if (override === null) return configured ? null : contractStart;
+  return override >= contractStart ? override : null;
+}
 export function previewRolloutStart() {
-  const configured = process.env.PREVIEW_OPT_IN_START;
+  const contractStart = rolloutEnabledAt(CONTRACT_START);
   // A constant that ever stops round-tripping denies everything, so the contract cannot be
   // silently resurrected from a pre-protocol activation instant like year 0000.
-  const contractStart = rolloutEnabledAt(CONTRACT_START);
   if (!Number.isFinite(contractStart)) return null;
-  const override = rolloutEnabledAt(configured);
-  if (override !== null) return override >= contractStart ? override : null;
-  return configured ? null : contractStart;
+  return overrideRolloutStart(contractStart, process.env.PREVIEW_OPT_IN_START);
 }
 /**
  * Acceptance receipt for an authorized `/preview stop`: the request handler posts it only after
@@ -71,15 +85,28 @@ export function previewStopReceipt(commentId) {
   return `<!-- preview-receipt stop=${commentId} enabled=false -->`;
 }
 function stopAcceptedByReceipt(comments, stop) {
-  return comments.some(
-    (receipt) =>
-      receipt.user?.type === 'Bot' &&
-      receipt.user.login === RECEIPT_BOT &&
-      Number.isSafeInteger(receipt.id) &&
-      receipt.id > stop.id &&
-      receipt.created_at === receipt.updated_at &&
-      Date.parse(receipt.updated_at) >= Date.parse(stop.created_at) &&
-      Number(STOP_RECEIPT.exec(receipt.body ?? '')?.[1]) === stop.id
+  return comments.some((receipt) => receiptAcceptsStop(receipt, stop));
+}
+/** Whether the receipt comment was authored by the handler bot. */
+function receiptByBot(receipt) {
+  return receipt.user?.type === 'Bot' && receipt.user.login === RECEIPT_BOT;
+}
+/** Whether the receipt is unedited, has a valid id and strictly follows the stop command. */
+function receiptFollowsStop(receipt, stop) {
+  return (
+    Number.isSafeInteger(receipt.id) &&
+    receipt.id > stop.id &&
+    receipt.created_at === receipt.updated_at &&
+    Date.parse(receipt.updated_at) >= Date.parse(stop.created_at)
+  );
+}
+/** Whether the receipt body binds the stop command's comment id. */
+function receiptBindsStop(receipt, stop) {
+  return Number(STOP_RECEIPT.exec(receipt.body ?? '')?.[1]) === stop.id;
+}
+function receiptAcceptsStop(receipt, stop) {
+  return (
+    receiptByBot(receipt) && receiptFollowsStop(receipt, stop) && receiptBindsStop(receipt, stop)
   );
 }
 async function effectiveCommand(github, repo, comment, permissions, comments) {
