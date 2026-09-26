@@ -32,7 +32,17 @@
       >
         <p class="text-surface-400">
           TarkovTracker &copy; 2020–{{ new Date().getFullYear() }}
-          <span class="text-surface-400 font-mono">v{{ appVersion }}</span>
+          <a
+            v-if="releaseUrl"
+            :href="releaseUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-info-400 hover:text-info-300 focus-visible:ring-primary-500 rounded font-mono focus-visible:ring-2 focus-visible:outline-none"
+            :title="t('footer.version_release_link', { version: appVersion })"
+          >
+            v{{ appVersion }}
+          </a>
+          <span v-else class="text-surface-400 font-mono">v{{ appVersion }}</span>
         </p>
         <p class="text-surface-400 max-w-xl leading-relaxed">
           {{ t('footer.game_attribution') }}
@@ -49,6 +59,14 @@
   const { t } = useI18n({ useScope: 'global' });
   const runtimeConfig = useRuntimeConfig();
   const appVersion = runtimeConfig.public.appVersion || 'dev';
+  const releaseUrl = computed(() => {
+    const version = String(runtimeConfig.public.appVersion || '').trim();
+    if (!version || version === 'dev') return '';
+    const owner = String(runtimeConfig.public.githubOwner || '').trim();
+    const repo = String(runtimeConfig.public.githubRepo || '').trim();
+    if (!owner || !repo) return '';
+    return `https://github.com/${owner}/${repo}/releases/tag/v${version}`;
+  });
   const analyticsConfigured =
     shouldEnableAnalyticsIntegrations({
       appUrl: runtimeConfig.public.appUrl,
