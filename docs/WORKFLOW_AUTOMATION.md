@@ -441,6 +441,13 @@ availability is advisory and can fail for reasons unrelated to the change.
 
 ### 8. Preview Controller (`.github/workflows/preview.yml`)
 
+Maintainers can enable auto-merge to request a preview after the current PR CI succeeds.
+The status controller dispatches `preview.yml` on `main`, carrying the CI run ID;
+it checks for a matching active dispatch created after the current CI attempt completed so repeated events preserve in-flight previews
+and fork approval requests. Failed or cancelled dispatches remain retryable. Manual `/preview`
+and workflow dispatch remain available. Repository `allow_auto_merge` must be enabled to use
+this optional request path. Automatic events do not upload artifacts themselves.
+
 GitHub Actions controls when pull-request previews deploy to the existing Cloudflare Pages project
 (`tarkovtracker`, `tarkovtrackernuxt.pages.dev`). The controller publishes `Preview Result` on the
 validated head SHA for PRs and standalone release candidates; an explicit
@@ -451,8 +458,9 @@ rollout verifies that enforcement. The design, result contract, and invariants a
 [SYSTEMS.md §19](SYSTEMS.md#19-actions-owned-cloudflare-previews).
 
 **Triggers:** `preview-state.yml` receives `workflow_run` for completed CI and metadata-only
-`pull_request_target` events (`opened`, `synchronize`, `reopened`, `ready_for_review`,
-`converted_to_draft`, `closed`). An hourly fallback refreshes only open PRs whose head lacks the required
+`pull_request_target` events (`ready_for_review`, `converted_to_draft`, `auto_merge_enabled`,
+`closed`). Ordinary pushes are evaluated after CI completes; main-push CI completions skip the
+state job. An hourly fallback refreshes only open PRs whose head lacks the required
 status, or is pending only on an unready test merge, after GitHub finishes computing it. It refreshes status without creating deployment
 jobs.
 `preview.yml` accepts only explicit `workflow_dispatch` with a CI run id from `main`.
@@ -494,7 +502,8 @@ The `restrict_action_events` allowlist is exhaustive for this workflow and does 
 `pull_request_target` anywhere else in the repository; the default public-repository block still
 applies to every other workflow.
 
-**Jobs:** `Refresh preview state` handles automatic events with a single status-only job.
+**Jobs:** `Refresh preview state` handles automatic events in one job that publishes status and
+can request a separate Preview run when auto-merge is enabled.
 `Plan preview` runs only on explicit dispatch, resolves the candidate through the API, requires
 successful CI evidence, verifies the artifact's manifest and digest, and publishes the interim
 status. Application, configuration, and dependency changes stay `pending` until preview is requested.
@@ -550,7 +559,8 @@ fail closed in the shadow; the existing protected `preview-fork` deployment path
 
 **Trusted automation:** Crowdin translation merges and release staging request one preview after
 their dispatched CI run succeeds on the exact candidate SHA. Allowlisted Dependabot auto-merge
-requests one after all candidate checks pass. Ordinary PR revisions do not deploy automatically.
+requests one after all candidate checks pass and remains the sole automatic request owner for
+Dependabot. Ordinary PR revisions request previews after CI only when auto-merge is enabled.
 
 **Metrics:** each controller run summary records the action (deploy/reuse/skip/wait/fail),
 revision, digest, deployment URL, whether the result was published, and the validation-to-preview

@@ -308,6 +308,8 @@ function fakeMutableState(options) {
       { name: `preview-deployment-${HEAD}`, expired: false },
     ]),
     failPublish: firstOption(options.failPublish, false),
+    failDispatch: firstOption(options.failDispatch, false),
+    dispatches: [],
   };
 }
 /** In-memory GitHub API with recorded status writes and mutable evidence. */
@@ -391,6 +393,11 @@ function actionEndpoints(state, zipEntries, options) {
       listWorkflowRuns: async () => ({
         data: { workflow_runs: options.noRuns ? [] : (options.latestRuns ?? [state.run]) },
       }),
+      createWorkflowDispatch: async (input) => {
+        if (state.failDispatch) throw new Error('dispatch rejected');
+        state.dispatches.push(input);
+        return { data: {} };
+      },
       listWorkflowRunArtifacts: 'artifacts',
       listJobsForWorkflowRun: 'jobs',
       downloadArtifact: async () => {
@@ -413,6 +420,10 @@ function dispatchStatuses(state, params) {
   return active ? [state.dispatchStatus] : [];
 }
 async function paginatedEndpoints(state, endpoint, params, options) {
+  if (params.workflow_id === 'preview.yml') {
+    assert.ok(['queued', 'in_progress', 'waiting', 'pending', 'requested'].includes(params.status));
+    return (options.previewRuns ?? []).filter((run) => run.status === params.status);
+  }
   const paged = {
     associated: () => options.associated ?? [state.pull],
     checks: () => [state.check],
@@ -524,6 +535,117 @@ test('a validated same-repository pull request waits for an explicit preview req
   assert.deepEqual(statusStates(state.statuses), ['a:pending']);
   assert.ok(state.statuses.every((status) => status.context === 'Preview Result'));
   assert.match(state.statuses[0].target_url, /actions\/runs\/555$/);
+});
+test('auto-merge requests one trusted dispatch after CI instead of uploading', async (t) => {
+  const autoMerge = { auto_merge: { enabled_by: { login: 'maintainer' }, merge_method: 'squash' } };
+  const completed = await plan(t, workflowRunContext(), { pull: autoMerge });
+  assert.equal(completed.decision.action, 'request');
+  assert.equal(completed.decision.state, 'pending');
+  assert.match(completed.decision.description, /Auto-merge enabled: preview requested/);
+  assert.deepEqual(completed.state.dispatches, [
+    {
+      ...REPO,
+      workflow_id: 'preview.yml',
+      ref: 'main',
+      inputs: { run_id: '900' },
+    },
+  ]);
+  // The pending status is published before the dispatch so the dispatched run supersedes it.
+  assert.deepEqual(statusStates(completed.state.statuses), ['a:pending']);
+  const enabled = await plan(t, pullTargetContext(pullFixture(autoMerge), 'auto_merge_enabled'), {
+    pull: autoMerge,
+  });
+  assert.equal(enabled.decision.action, 'request');
+  assert.equal(enabled.state.dispatches.length, 1);
+  // CI still running: nothing to request yet; the CI completion event requests it later.
+  const running = await plan(t, pullTargetContext(pullFixture(autoMerge), 'auto_merge_enabled'), {
+    pull: autoMerge,
+    run: { status: 'in_progress', conclusion: null },
+  });
+  assert.equal(running.decision.action, 'wait');
+  assert.deepEqual(running.state.dispatches, []);
+  // Without auto-merge, ordinary revisions keep waiting and never dispatch.
+  const ordinary = await plan(t, workflowRunContext());
+  assert.equal(ordinary.decision.action, 'wait');
+  assert.match(ordinary.decision.description, /Comment \/preview/);
+  assert.deepEqual(ordinary.state.dispatches, []);
+});
+test('auto-merge preserves active previews and retries completed attempts', async (t) => {
+  const request = {
+    path: '.github/workflows/preview.yml',
+    event: 'workflow_dispatch',
+    head_branch: 'main',
+    display_title: 'Preview CI 900',
+    created_at: '2099-01-01T00:00:00Z',
+    status: 'queued',
+  };
+  const pull = { auto_merge: { enabled_by: { login: 'maintainer' } } };
+  for (const status of ['queued', 'in_progress', 'waiting', 'pending', 'requested']) {
+    const result = await plan(t, workflowRunContext(), {
+      pull,
+      previewRuns: [{ ...request, status }],
+    });
+    assert.deepEqual(result.state.dispatches, [], status);
+  }
+  for (const override of [
+    { status: 'completed', conclusion: 'failure' },
+    { status: 'completed', conclusion: 'cancelled' },
+    { created_at: '2000-01-01T00:00:00Z' },
+    { display_title: 'Preview CI 901' },
+    { head_branch: 'untrusted' },
+    { path: '.github/workflows/other.yml' },
+    { event: 'pull_request' },
+  ]) {
+    const result = await plan(t, workflowRunContext(), {
+      pull,
+      previewRuns: [{ ...request, ...override }],
+    });
+    assert.equal(result.state.dispatches.length, 1, JSON.stringify(override));
+  }
+});
+test('automatic requests fail closed when active-run lookup is truncated', async (t) => {
+  const result = await plan(t, workflowRunContext(), {
+    pull: { auto_merge: { enabled_by: { login: 'maintainer' } } },
+    previewRuns: Array.from({ length: 1000 }, () => ({ status: 'waiting' })),
+  });
+  assert.deepEqual(result.state.dispatches, []);
+  assert.equal(result.decision.action, 'wait');
+  assert.match(result.core.warnings.join(' '), /search limit/);
+});
+test('automatic requests leave Dependabot and hourly reconciliation to their owners', async (t) => {
+  const pull = { auto_merge: { enabled_by: { login: 'maintainer' } }, user: { id: 49699333 } };
+  const bot = await plan(t, workflowRunContext(), { pull });
+  assert.deepEqual(bot.state.dispatches, []);
+  const refresh = await plan(t, pullTargetContext(pullFixture(), 'synchronize'), {
+    pull: { auto_merge: pull.auto_merge },
+  });
+  assert.deepEqual(refresh.state.dispatches, []);
+});
+test('auto-merge never dispatches for automation CI runs, reuse, or explicit dispatches', async (t) => {
+  const autoMerge = { auto_merge: { enabled_by: { login: 'maintainer' } } };
+  const automation = await plan(t, workflowRunContext(runFixture({ event: 'workflow_dispatch' })), {
+    pull: autoMerge,
+    run: { event: 'workflow_dispatch' },
+  });
+  assert.notEqual(automation.decision.action, 'request');
+  assert.deepEqual(automation.state.dispatches, []);
+  const explicit = await plan(t, workflowDispatchContext(), {
+    pull: autoMerge,
+    inputs: { run_id: '900' },
+  });
+  assert.equal(explicit.decision.action, 'deploy');
+  assert.deepEqual(explicit.state.dispatches, []);
+});
+test('a rejected automatic request falls back to the manual instruction', async (t) => {
+  const { decision, state, core } = await plan(t, workflowRunContext(), {
+    pull: { auto_merge: { enabled_by: { login: 'maintainer' } } },
+    failDispatch: true,
+  });
+  assert.equal(decision.action, 'wait');
+  assert.match(decision.description, /Comment \/preview/);
+  assert.match(core.warnings.join('\n'), /Automatic preview request failed/);
+  assert.equal(state.statuses.at(-1).state, 'pending');
+  assert.match(state.statuses.at(-1).description, /Comment \/preview/);
 });
 test('delayed same-repo and fork CI completions cannot overwrite newer preview state', async (t) => {
   for (const fork of [false, true]) {

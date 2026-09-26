@@ -1,6 +1,6 @@
 name: Preview State
-# Trusted, status-only controller for automatic PR and CI events. Deployment jobs exist only in
-# the explicitly dispatched Preview workflow.
+# Trusted controller for automatic PR and CI events. It publishes status and may request a
+# separate Preview run; deployment jobs exist only in that dispatched workflow.
 #
 # `pull_request_target` is deliberate: fork PRs need a write token to receive a status. It is safe
 # here because the job only checks out the default branch and never installs or runs candidate code.
@@ -14,18 +14,22 @@ on:
     workflows: [CI]
     types: [completed]
   pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
+    types: [ready_for_review, converted_to_draft, auto_merge_enabled, closed]
 concurrency:
-  group: preview-state-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || format('{0}@{1}', github.event.workflow_run.head_repository.full_name, github.event.workflow_run.head_branch) }}
-  cancel-in-progress: true
+  group: preview-state-${{ format('{0}@{1}', github.event.pull_request.head.repo.full_name || github.event.workflow_run.head_repository.full_name, github.event.pull_request.head.ref || github.event.workflow_run.head_branch) }}
+  cancel-in-progress: false
 permissions: {}
 jobs:
   state:
     name: Refresh preview state
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.event == 'pull_request' ||
+      github.event.workflow_run.event == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      actions: read
+      actions: write
       checks: read
       contents: read
       pull-requests: read
