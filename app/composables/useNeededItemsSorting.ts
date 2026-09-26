@@ -1,3 +1,4 @@
+import { useHideoutStationStatus } from '@/composables/useHideoutStationStatus';
 import { getNeededItemData } from '@/features/neededitems/neededItemFilters';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useProgressStore } from '@/stores/useProgress';
@@ -39,6 +40,7 @@ export function useNeededItemsSorting(
   const { sortBy, sortDirection } = options;
   const metadataStore = useMetadataStore();
   const progressStore = useProgressStore();
+  const { arePrereqsMet } = useHideoutStationStatus();
   const getSortComparison = (sort: NeededItemsSortBy, a: SortValues, b: SortValues): number => {
     switch (sort) {
       case 'priority':
@@ -59,11 +61,19 @@ export function useNeededItemsSorting(
       return sortDirection.value === 'asc' ? cmp : -cmp;
     };
   };
-  // Descending sort order: ACTIVE > HIDEOUT > AVAILABLE > others.
+  // Descending sort order: ACTIVE > BUILDABLE HIDEOUT > AVAILABLE > others
+  // (locked tasks and hideout modules that cannot be built yet).
   const PRIORITY_ACTIVE = 3;
   const PRIORITY_HIDEOUT = 2;
   const PRIORITY_AVAILABLE = 1;
   const PRIORITY_DEFAULT = 0;
+  // A hideout need is buildable only when its module is the station's next
+  // level and that level's station, skill, and trader prerequisites are met.
+  const isHideoutModuleBuildable = (item: NeededItemHideoutModule): boolean => {
+    const { stationId, level } = item.hideoutModule;
+    const currentLevel = progressStore.hideoutLevels?.[stationId]?.self ?? 0;
+    return level === currentLevel + 1 && arePrereqsMet(item.hideoutModule);
+  };
   const getNeededItemPriority = (
     item: NeededItemTaskObjective | NeededItemHideoutModule
   ): number => {
@@ -75,7 +85,7 @@ export function useNeededItemsSorting(
           ? PRIORITY_AVAILABLE
           : PRIORITY_DEFAULT;
     }
-    return PRIORITY_HIDEOUT;
+    return isHideoutModuleBuildable(item) ? PRIORITY_HIDEOUT : PRIORITY_DEFAULT;
   };
   const getNeededItemSortValues = (
     item: NeededItemTaskObjective | NeededItemHideoutModule
