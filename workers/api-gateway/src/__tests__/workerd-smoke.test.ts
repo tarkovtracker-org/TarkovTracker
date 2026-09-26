@@ -1,5 +1,5 @@
 import { fileURLToPath, URL } from 'node:url';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestHarness, type TestHarness } from 'wrangler';
 const GATEWAY_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SUPABASE_URL = 'https://supabase.example/project';
@@ -73,7 +73,7 @@ const createOutboundFetchMock = (requests: OutboundRequest[], unhandledUrls: str
   });
 describe('api-gateway workerd smoke', () => {
   let harness: TestHarness | undefined;
-  beforeAll(async () => {
+  beforeEach(async () => {
     harness = createTestHarness({
       root: GATEWAY_ROOT,
       workers: [
@@ -90,11 +90,9 @@ describe('api-gateway workerd smoke', () => {
     });
     await harness.listen();
   }, 30_000);
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-  afterAll(async () => {
+  afterEach(async () => {
     await harness?.close();
+    vi.unstubAllGlobals();
   }, 30_000);
   it('executes the Seasonal progress path with production configuration', async () => {
     if (!harness) throw new Error('Test harness did not start');
@@ -139,5 +137,64 @@ describe('api-gateway workerd smoke', () => {
     expect(modeUrl.searchParams.get('game_mode')).toBe('eq.seasonal');
     expect(modeUrl.searchParams.get('season_number')).toBe('eq.1');
     expect(unhandledUrls).toEqual([]);
+  }, 30_000);
+  it('shares catalog I/O across requests after the initiating client disconnects', async () => {
+    if (!harness) throw new Error('Test harness did not start');
+    const requests: OutboundRequest[] = [];
+    const unhandledUrls: string[] = [];
+    const outbound = createOutboundFetchMock(requests, unhandledUrls);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let catalogRequests = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (requestUrl(input).startsWith('https://json.tarkov.dev/')) {
+          catalogRequests++;
+          await gate;
+        }
+        return outbound(input, init);
+      })
+    );
+    const headers = {
+      Authorization: 'Bearer SZN_workerd_test',
+      'User-Agent': 'RuntimeSmoke/1.0 (+https://example.com)',
+    };
+    const controller = new AbortController();
+    const first = harness
+      .getWorker()
+      .fetch('https://api.tarkovtracker.org/progress', { headers, signal: controller.signal });
+    const cancellation = first.then(
+      () => 'completed',
+      () => 'aborted'
+    );
+    try {
+      await vi.waitFor(() => expect(catalogRequests).toBe(2));
+      const others = Array.from({ length: 8 }, () =>
+        harness!.getWorker().fetch('https://api.tarkovtracker.org/progress', { headers })
+      );
+      await vi.waitFor(() =>
+        expect(
+          requests.filter(({ url }) => url.includes('/user_game_mode_progress?'))
+        ).toHaveLength(9)
+      );
+      controller.abort();
+      expect(await cancellation).toBe('aborted');
+      release();
+      const responses = await Promise.all(others);
+      for (const response of responses) {
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({
+          success: true,
+          meta: { gameMode: 'seasonal' },
+        });
+      }
+      expect(catalogRequests).toBe(2);
+      expect(unhandledUrls).toEqual([]);
+    } finally {
+      release();
+    }
   }, 30_000);
 });

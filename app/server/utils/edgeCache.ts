@@ -23,6 +23,8 @@ type CacheOptions = {
   // to the regular edge-cache path.
   precomputed?: boolean;
   staleTtl?: number;
+  // Only for routes whose cached payload is final (no post-cache overlay/adaptation).
+  response?: boolean;
 };
 type CfExecutionContext = { waitUntil?: (promise: Promise<unknown>) => void } | undefined;
 type CfRuntimeContext = { cloudflare?: { context?: CfExecutionContext } };
@@ -44,10 +46,19 @@ type EdgeCacheDependencies = {
   setResponseHeadersFn?: typeof setResponseHeaders;
 };
 function getOverlayHeadersMeta(payload: unknown): OverlayHeadersMeta | null {
+  if (payload instanceof Response) {
+    return readStoredOverlayMeta(payload.headers);
+  }
   if (!payload || typeof payload !== 'object') return null;
   const meta = (payload as { dataOverlay?: OverlayHeadersMeta }).dataOverlay;
   if (!meta || typeof meta !== 'object') return null;
   return meta;
+}
+function readStoredOverlayMeta(headers: Headers): OverlayHeadersMeta {
+  const fields = ['status', 'version', 'generated', 'sha256'] as const;
+  return Object.fromEntries(
+    fields.map((field) => [field, headers.get(`X-Overlay-${field}`) ?? undefined])
+  );
 }
 function isTruthyFlag(value: unknown): boolean {
   if (typeof value === 'boolean') return value;
@@ -70,12 +81,32 @@ function setCacheResponseHeaders(
     status === 'HIT' || status === 'MISS' || status === 'PRECOMPUTE'
       ? `public, max-age=${ttl}, s-maxage=${ttl}`
       : 'no-cache';
-  setHeaders(event, {
+  const headers = {
     'X-Cache-Status': status,
     'X-Cache-Key': fullCacheKey,
     'Cache-Control': cacheControl,
     ...buildOverlayResponseHeaders(overlayMeta),
-  });
+  };
+  setHeaders(event, headers);
+  return headers;
+}
+const STORED_RESPONSE_VERSION = '1';
+async function readCachedPayload<T>(cached: Response, response: boolean): Promise<T | Response> {
+  // Entries written before metadata was stored in headers still take the object path.
+  if (response && cached.headers.get('X-Cache-Response-Version') === STORED_RESPONSE_VERSION) {
+    return cached;
+  }
+  return cached.json() as Promise<T>;
+}
+function cacheResult<T>(
+  payload: T | Response,
+  headers: Record<string, string>,
+  response: boolean
+): T | Response {
+  if (!response) return payload;
+  const body = payload instanceof Response ? payload.body : JSON.stringify(payload);
+  // Deliberately omit internal retention/metadata headers and any stored encoding/length.
+  return new Response(body, { headers: { 'Content-Type': 'application/json', ...headers } });
 }
 function getCloudflareCacheFromGlobal(): CacheLike | undefined {
   if (typeof globalThis.caches === 'undefined') return undefined;
@@ -111,6 +142,8 @@ function buildStoredResponse<T>(
       'X-Cache-Status': 'MISS',
       'X-Cache-Key': fullCacheKey,
       'X-Cache-Stored-At': String(Date.now()),
+      'X-Cache-Response-Version': STORED_RESPONSE_VERSION,
+      ...buildOverlayResponseHeaders(getOverlayHeadersMeta(payload)),
     },
   });
 }
@@ -167,14 +200,33 @@ export function shouldBypassCache(event: H3Event): boolean {
  * @param ttl - Time to live in seconds (default: 43200 = 12 hours)
  * @returns Promise resolving to cached or fresh data
  */
+export function edgeCache<T>(
+  event: H3Event,
+  key: string,
+  fetcher: () => Promise<T>,
+  ttl: number,
+  options: CacheOptions & { response: true }
+): Promise<Response>;
+export function edgeCache<T>(
+  event: H3Event,
+  key: string,
+  fetcher: () => Promise<T>,
+  ttl?: number,
+  options?: CacheOptions & { response?: false }
+): Promise<T>;
 export async function edgeCache<T>(
   event: H3Event,
   key: string,
   fetcher: () => Promise<T>,
   ttl = 43200,
   options: CacheOptions = {}
-): Promise<T> {
-  const { cacheKeyPrefix = 'tarkovtracker', deps, staleTtl = ttl } = options;
+): Promise<T | Response> {
+  const {
+    cacheKeyPrefix = 'tarkovtracker',
+    deps,
+    staleTtl = ttl,
+    response: asResponse = false,
+  } = options;
   const createErrorFn = deps?.createErrorFn ?? createError;
   const setHeaders = deps?.setResponseHeadersFn ?? setResponseHeaders;
   const cache = deps?.cache ?? getCloudflareCacheFromGlobal();
@@ -190,7 +242,7 @@ export async function edgeCache<T>(
           const envelope = await precomputedStore.get(key, 'json');
           if (isPrecomputedEnvelope<T>(envelope)) {
             const overlayMeta = getOverlayHeadersMeta(envelope.payload);
-            setCacheResponseHeaders(
+            const headers = setCacheResponseHeaders(
               event,
               setHeaders,
               fullCacheKey,
@@ -198,7 +250,7 @@ export async function edgeCache<T>(
               ttl,
               overlayMeta
             );
-            return envelope.payload;
+            return cacheResult(envelope.payload, headers, asResponse);
           }
           logger.info(`No precomputed entry for ${key}; falling back to edge cache`);
         } catch (precomputedError) {
@@ -213,14 +265,21 @@ export async function edgeCache<T>(
       if (bypassRequested) {
         const response = await fetcher();
         const overlayMeta = getOverlayHeadersMeta(response);
-        setCacheResponseHeaders(event, setHeaders, fullCacheKey, 'BYPASS', ttl, overlayMeta);
-        return response;
+        const headers = setCacheResponseHeaders(
+          event,
+          setHeaders,
+          fullCacheKey,
+          'BYPASS',
+          ttl,
+          overlayMeta
+        );
+        return cacheResult(response, headers, asResponse);
       }
       const cacheKeyRequest = buildEdgeCacheRequest(cacheKeyPrefix, key, resolveAppUrl(deps));
       const cfContext = (event.context as CfRuntimeContext).cloudflare?.context;
       const cachedResponse = await cache.match(cacheKeyRequest);
       if (cachedResponse) {
-        const data = await cachedResponse.json();
+        const data = await readCachedPayload<T>(cachedResponse, asResponse);
         const overlayMeta = getOverlayHeadersMeta(data);
         const storedAtRaw = cachedResponse.headers.get('X-Cache-Stored-At');
         const storedAt = storedAtRaw ? Number(storedAtRaw) : Number.NaN;
@@ -237,11 +296,25 @@ export async function edgeCache<T>(
             staleTtl,
             ttl,
           });
-          setCacheResponseHeaders(event, setHeaders, fullCacheKey, 'STALE', ttl, overlayMeta);
-          return data;
+          const headers = setCacheResponseHeaders(
+            event,
+            setHeaders,
+            fullCacheKey,
+            'STALE',
+            ttl,
+            overlayMeta
+          );
+          return cacheResult(data, headers, asResponse);
         }
-        setCacheResponseHeaders(event, setHeaders, fullCacheKey, 'HIT', ttl, overlayMeta);
-        return data;
+        const headers = setCacheResponseHeaders(
+          event,
+          setHeaders,
+          fullCacheKey,
+          'HIT',
+          ttl,
+          overlayMeta
+        );
+        return cacheResult(data, headers, asResponse);
       }
       logger.info(`Cache miss for ${fullCacheKey}`);
       const response = await fetcher();
@@ -252,14 +325,28 @@ export async function edgeCache<T>(
       } else {
         await cache.put(cacheKeyRequest, cacheResponse.clone());
       }
-      setCacheResponseHeaders(event, setHeaders, fullCacheKey, 'MISS', ttl, overlayMeta);
-      return response;
+      const headers = setCacheResponseHeaders(
+        event,
+        setHeaders,
+        fullCacheKey,
+        'MISS',
+        ttl,
+        overlayMeta
+      );
+      return cacheResult(response, headers, asResponse);
     }
     logger.info(`Fetching data for ${fullCacheKey} (DEV)`);
     const response = await fetcher();
     const overlayMeta = getOverlayHeadersMeta(response);
-    setCacheResponseHeaders(event, setHeaders, fullCacheKey, 'DEV', ttl, overlayMeta);
-    return response;
+    const headers = setCacheResponseHeaders(
+      event,
+      setHeaders,
+      fullCacheKey,
+      'DEV',
+      ttl,
+      overlayMeta
+    );
+    return cacheResult(response, headers, asResponse);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(`Error in edgeCache for ${fullCacheKey}:`, error);
