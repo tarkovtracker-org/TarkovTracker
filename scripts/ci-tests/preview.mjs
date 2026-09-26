@@ -484,6 +484,8 @@ class ScriptContext {
   constructor(payload) {
     this.payload = payload;
     this.eventName = 'schedule';
+    this.serverUrl = 'https://github.com';
+    this.runId = 556;
   }
   get repo() {
     const repository = this.payload.repository;
@@ -1331,6 +1333,10 @@ test('hourly reconciliation keeps the repository identity of a proxied context',
   assert.equal(pullQuery.owner, 'tarkovtracker-org');
   assert.equal(pullQuery.repo, 'TarkovTracker');
   assert.equal(pullQuery.base, 'main');
+  assert.equal(
+    fake.state.statuses[0].target_url,
+    'https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/556'
+  );
 });
 test('hourly reconciliation re-evaluates a head left pending on an unready test merge', async (t) => {
   // Planning before GitHub computes the test merge publishes pending on the head. Once the merge

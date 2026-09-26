@@ -644,6 +644,8 @@ function refreshContext(context, pull) {
   // the refreshed plan (the finalization-shadow handoff hit the same trap).
   return {
     repo: context.repo,
+    serverUrl: context.serverUrl,
+    runId: context.runId,
     eventName: 'pull_request_target',
     payload: { ...context.payload, action: 'synchronize', pull_request: pull },
   };
