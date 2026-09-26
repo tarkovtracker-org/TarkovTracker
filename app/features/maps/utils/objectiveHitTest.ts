@@ -12,7 +12,13 @@ export type ObjectiveHitShape =
       center?: HitPoint;
       radius?: number;
     }
-  | { kind: 'point'; objectiveId: string; center: HitPoint; radius: number };
+  | {
+      kind: 'point';
+      objectiveId: string;
+      center: HitPoint;
+      radius: number;
+      hitTolerance?: number;
+    };
 export type ObjectiveHitGeometry<TPosition> =
   | {
       kind: 'zone';
@@ -22,7 +28,13 @@ export type ObjectiveHitGeometry<TPosition> =
       center: TPosition;
       radius: number;
     }
-  | { kind: 'point'; objectiveId: string; center: TPosition; radius: number };
+  | {
+      kind: 'point';
+      objectiveId: string;
+      center: TPosition;
+      radius: number;
+      hitTolerance?: number;
+    };
 export type ObjectiveHitCandidate<T> = { shape: ObjectiveHitShape; source: T };
 export type ObjectiveHitSource<T> = { shape: ObjectiveHitShape; source: T };
 export const projectObjectiveHitShape = <TPosition>(
@@ -44,6 +56,7 @@ export const projectObjectiveHitShape = <TPosition>(
     objectiveId: geometry.objectiveId,
     center: project(geometry.center),
     radius: geometry.radius,
+    ...(geometry.hitTolerance !== undefined && { hitTolerance: geometry.hitTolerance }),
   };
 };
 const crossesRay = (a: HitPoint, b: HitPoint, point: HitPoint): boolean => {
@@ -66,7 +79,10 @@ const isHit = (shape: ObjectiveHitShape, point: HitPoint): boolean => {
         Math.hypot(shape.center.x - point.x, shape.center.y - point.y) <= shape.radius)
     );
   }
-  return Math.hypot(shape.center.x - point.x, shape.center.y - point.y) <= shape.radius;
+  return (
+    Math.hypot(shape.center.x - point.x, shape.center.y - point.y) <=
+    shape.radius + (shape.hitTolerance ?? 0)
+  );
 };
 /** Points first (most specific), then zones from smallest to largest area. */
 const hitRank = (shape: ObjectiveHitShape): number => (shape.kind === 'point' ? -1 : shape.area);

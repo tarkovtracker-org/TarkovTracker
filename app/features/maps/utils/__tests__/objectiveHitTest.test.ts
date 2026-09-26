@@ -166,4 +166,15 @@ describe('findObjectivesAtPoint', () => {
     ];
     expect(findObjectivesAtPoint(shapes, { x: 14, y: 12 })).toEqual(['point-near']);
   });
+  it('includes half the marker stroke outside a point radius', () => {
+    const shape: ObjectiveHitShape = {
+      kind: 'point',
+      objectiveId: 'point-a',
+      center: { x: 50, y: 50 },
+      radius: 8,
+      hitTolerance: 1,
+    };
+    expect(findObjectivesAtPoint([shape], { x: 59, y: 50 })).toEqual(['point-a']);
+    expect(findObjectivesAtPoint([shape], { x: 59.1, y: 50 })).toEqual([]);
+  });
 });

@@ -1400,6 +1400,7 @@
         objectiveId: source.objectiveId,
         center: source.marker.getLatLng(),
         radius: source.marker.getRadius(),
+        hitTolerance: (source.marker.options.weight ?? 0) / 2,
       },
       project
     );

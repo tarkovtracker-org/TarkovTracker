@@ -493,7 +493,7 @@ describe('LeafletMap controls', () => {
     try {
       const firstMarker = createdLayers[0];
       expect(firstMarker).toBeDefined();
-      firstMarker?.handlers.get('click')?.[0]?.({ containerPoint: { x: 50, y: 50 } });
+      firstMarker?.handlers.get('click')?.[0]?.({ containerPoint: { x: 59, y: 50 } });
       const popup = popups[0];
       expect(popup).toBeDefined();
       const objectiveButtons = popup?.element.querySelectorAll('ul button');
