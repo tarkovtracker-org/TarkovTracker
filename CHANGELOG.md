@@ -1,3 +1,10 @@
+## [1.82.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.4...v1.82.5) (2026-09-26)
+
+
+### Bug Fixes
+
+* **app:** rank buildable hideout needs before locked stations ([#940](https://github.com/tarkovtracker-org/TarkovTracker/issues/940)) ([ce67df4](https://github.com/tarkovtracker-org/TarkovTracker/commit/ce67df4f5bc7aa72d28d4b18d68ef6a6ef6ab288)), closes [#917](https://github.com/tarkovtracker-org/TarkovTracker/issues/917)
+
 ## [1.82.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.3...v1.82.4) (2026-09-26)
 
 
