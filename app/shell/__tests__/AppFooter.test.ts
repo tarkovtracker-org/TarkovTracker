@@ -58,6 +58,7 @@ describe('AppFooter', () => {
       'https://github.com/tarkovtracker-org/TarkovTracker/releases/tag/v1.2.3'
     );
     expect(versionLink?.attributes('rel')).toBe('noopener noreferrer');
+    expect(versionLink?.attributes('target')).toBe('_blank');
     expect(wrapper.findAll('section')).toHaveLength(3);
     const analyticsButton = wrapper
       .findAll('button')
@@ -66,16 +67,19 @@ describe('AppFooter', () => {
     await analyticsButton?.trigger('click');
     expect(openPreferences).toHaveBeenCalledOnce();
   });
-  it('renders the version without a release link for the unversioned dev build', async () => {
-    runtimeConfig.public.appVersion = 'dev';
+  it.each(['', 'dev'])('renders no release link for the unversioned %j build', async (version) => {
+    runtimeConfig.public.appVersion = version;
     const wrapper = await mountFooter();
     expect(wrapper.text()).toContain('vdev');
     const versionLink = wrapper.findAll('a').find((anchor) => anchor.text().includes('vdev'));
     expect(versionLink).toBeUndefined();
   });
-  it('renders the version without a release link when repo config is absent', async () => {
-    runtimeConfig.public.githubOwner = '';
-    runtimeConfig.public.githubRepo = '';
+  it.each([
+    { owner: '', repo: 'TarkovTracker' },
+    { owner: 'tarkovtracker-org', repo: '' },
+  ])('renders no release link for incomplete repo config: %j', async ({ owner, repo }) => {
+    runtimeConfig.public.githubOwner = owner;
+    runtimeConfig.public.githubRepo = repo;
     const wrapper = await mountFooter();
     const versionLink = wrapper.findAll('a').find((anchor) => anchor.text().includes('v1.2.3'));
     expect(versionLink).toBeUndefined();
