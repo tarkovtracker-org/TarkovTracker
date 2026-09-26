@@ -14,6 +14,8 @@ export const STORAGE_KEYS = {
   activityLogManual: `${STORAGE_PREFIX}activity_log_manual`,
   activityLogLastRead: `${STORAGE_PREFIX}activity_log_last_read`,
   tasksMapPanelExpanded: `${STORAGE_PREFIX}tasks_map_panel_expanded`,
+  // Preserve existing preview users' plans; ownership is enforced by the serializer.
+  seasonPlanner: 'season-planner-v1',
 } as const;
 export const LEGACY_STORAGE_KEYS = {
   progress: 'progress',
