@@ -2241,6 +2241,9 @@ GitHub has computed the test merge; other pending reasons are left alone.
   a manually dispatched workflow selected from another ref from reading the deployment credential.
 - Fork candidates deploy only through the protected `preview-fork` environment; the exact revision
   is shown before approval and rechecked afterward, so approval never carries to another head.
+  Fork CI runs carry no `pull_requests` and the base repository's commit-association lookup omits
+  fork-only commits, so a fork candidate's PR is resolved by listing open PRs for its
+  `owner:branch` head and then matching head SHA, head repository, and base like any candidate.
 - The Pages preview environment has no production KV or Durable Object bindings and empty Supabase,
   analytics, Turnstile, Stripe, and log-forwarding values; the anonymous build sets `APP_URL` to the
   controlled branch alias so host trust covers the unique deployment URL, and the app's offline
