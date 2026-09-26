@@ -33,8 +33,14 @@ async function cachedMaintainer(github, repo, login, permissions) {
     permissions.set(login, await isPreviewMaintainer(github, repo, login));
   return permissions.get(login);
 }
+async function effectiveCommand(github, repo, comment, permissions) {
+  // A newer associated user's stop is a revocation barrier even if their former maintainer role
+  // can no longer be verified. Only a fresh, currently authorized opt-in can resume previews.
+  if (previewCommand(comment.body) === false) return true;
+  return cachedMaintainer(github, repo, comment.user.login, permissions);
+}
 /**
- * Read the latest unedited command from a current maintainer. Intent belongs to this PR, so
+ * Read the latest unedited, authorized opt-in or revocation barrier. Intent belongs to this PR, so
  * later successful revisions refresh automatically. A later /preview stop revokes that intent.
  * Exhaust pagination before choosing a command; a newer stop must never be hidden by a page cap.
  */
@@ -53,7 +59,7 @@ export async function readPreviewRequest(github, repo, pullRequest) {
     .toSorted((a, b) => b.id - a.id);
   const permissions = new Map();
   for (const comment of commands) {
-    if (!(await cachedMaintainer(github, repo, comment.user.login, permissions))) continue;
+    if (!(await effectiveCommand(github, repo, comment, permissions))) continue;
     return {
       commentId: comment.id,
       enabled: previewCommand(comment.body),

@@ -348,3 +348,16 @@ test('public outsider commands do not trigger one permission request per author'
   };
   assert.equal(await readPreviewRequest(github, REPO, 42), null);
 });
+test('a stop remains a barrier after its author loses maintainer access', async () => {
+  const commands = [
+    comment(1),
+    comment(2, '/preview stop', { user: { login: 'former-maintainer', type: 'User' } }),
+  ];
+  const github = authorizationFixture(commands);
+  github.rest.repos.getCollaboratorPermissionLevel = async ({ username }) => ({
+    data: { role_name: username === 'maintainer' ? 'admin' : 'read' },
+  });
+  assert.equal((await readPreviewRequest(github, REPO, 42)).enabled, false);
+  commands.push(comment(3));
+  assert.equal((await readPreviewRequest(github, REPO, 42)).enabled, true);
+});

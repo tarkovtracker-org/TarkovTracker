@@ -547,6 +547,8 @@ owner, member, or collaborator comments cause permission lookups, so public outs
 cannot trigger one permission lookup per author; association alone never grants access. The upload
 job repeats that authorization check, so a stop, deleted command, or revoked role prevents a queued
 opted-in upload. An upload already underway may finish after `/preview stop`.
+An associated repository user's newer stop remains a revocation barrier if their former maintainer
+role can no longer be verified; a new command from a current maintainer is required to resume.
 Automatic dispatches carry the command ID and fail if it was revoked or superseded before planning;
 they cannot silently fall back to the manual request path.
 A fork with a live maintainer opt-in uses the `preview` environment without a second approval;

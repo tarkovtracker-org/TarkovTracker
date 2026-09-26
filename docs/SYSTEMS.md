@@ -2278,6 +2278,8 @@ GitHub has computed the test merge; other pending reasons are left alone.
   role lookup; it never substitutes for the current maintain/admin permission check. Permissions
   are cached only within one scan. Immediately before upload, the command must still be enabled
   with the same ID and author.
+  A newer associated user's stop remains a revocation barrier after a role change; it cannot
+  reactivate an older opt-in. Resuming requires a fresh command from a current maintainer.
   Automatic dispatches carry the authorizing comment ID, so a command revoked before planning
   cannot fall back to the manual deployment path.
   A stop, deleted command, or revoked role prevents a queued opted-in upload. Each revision still
