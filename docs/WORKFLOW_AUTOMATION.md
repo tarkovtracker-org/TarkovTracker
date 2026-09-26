@@ -433,7 +433,9 @@ Validates external links in documentation:
 - Validates HTTP status codes (200, 204, 206, 301, 302, 308)
 - Excludes localhost, internal domains, and email links
 
-**Triggers:** PRs/pushes affecting markdown files, weekly (Sunday 00:00 UTC), manual dispatch
+**Triggers:** Main-branch pushes affecting documentation or link-check configuration, weekly
+(Sunday 00:00 UTC), manual dispatch. It does not run on pull requests because external link
+availability is advisory and can fail for reasons unrelated to the change.
 
 **On failure:** Uploads report artifact with broken links
 
@@ -935,7 +937,8 @@ pnpm run lint:fix
 
 ## Additional Resources
 
-> **Note:** External links are validated automatically on PRs via the `link-check` workflow.
+> **Note:** External links are checked on main documentation pushes, weekly, and by manual dispatch
+> via the `link-check` workflow.
 > Last manual verification: 2026-01-30
 
 | Resource             | Link                                                                                         | Notes                     |
