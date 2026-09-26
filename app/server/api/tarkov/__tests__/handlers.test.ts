@@ -239,7 +239,7 @@ describe('Tarkov API handlers', () => {
       'items-json-v2-en-regular',
       expect.any(Function),
       222,
-      { cacheKeyPrefix: 'tarkov' }
+      { cacheKeyPrefix: 'tarkov', response: true }
     );
   });
   it('throws for malformed upstream payloads on items-lite', async () => {

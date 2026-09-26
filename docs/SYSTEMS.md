@@ -255,6 +255,13 @@ and IndexedDB rejects a proxy with `DataCloneError`, disabling that cache entry 
 
 ### Stale-while-revalidate
 
+The full-items route opts into `edgeCache({ response: true })`: final cached JSON is streamed on
+hits rather than parsed and serialized again. New entries store sanitized overlay headers and an
+internal response-format marker alongside their body. Older or unknown markers fall back to JSON
+parsing, so no purge or coordinated rollout is required. Only public cache/overlay headers are
+returned; internal retention and storage metadata remain private to the Cache API. The default
+object-returning path, hideout's post-cache overlay, and precomputed KV validation are unchanged.
+
 When an edge cache entry exists but is older than `ttl`, the handler:
 
 1. Returns the stale payload immediately with `X-Cache-Status: STALE`.
@@ -334,6 +341,8 @@ flowchart TD
 - The cache key must include language and game mode so two locales or modes never share an entry.
 - Hideout edge-cache entries must contain the adapted base payload, not the overlay-applied response;
   `hideout.get.ts` applies the overlay after `edgeCache()` and restores the overlay metadata headers.
+- Only final-payload routes may request response mode. Fresh and stale hits must retain the same
+  outward cache and overlay headers as the object path; a stale stream still schedules revalidation.
 - The browser hideout cache version must match the server route version and its TTL must not exceed
   the one-hour overlay TTL.
 - The precomputed envelope is only trusted if `isPrecomputedEnvelope()` returns true; a corrupt
@@ -678,11 +687,19 @@ sequenceDiagram
    account-wide `game_edition` from `user_progress`, resolves a display-name fallback from Supabase
    Auth (24h cache), and loads matching tasks/hideout metadata from `json.tarkov.dev` via
    `workers/api-gateway/src/services/tarkov.ts` (1h memory cache).
+   Concurrent misses share one fetch/normalization per resource and upstream mode within an isolate.
+   The originating request retains that operation with `waitUntil`; streams are consumed there and
+   only parsed public catalog data is shared. Every settled operation leaves the in-flight map;
+   failures remain uncached and retryable, with the existing 30-second fetch timeout.
 6. **Transform.** `workers/api-gateway/src/utils/transform.ts` converts the JSONB objects into the
    public array format, applies invalidation (`shared/utils/progressInvalidation.ts`, the same
-   algorithm the app uses) and game-edition hideout auto-completes. Task progress includes `active` when the stored JSONB value
+   algorithm the app uses) and game-edition hideout auto-completes. Task progress includes `active`
+   when the stored JSONB value
    explicitly contains a boolean. Legacy terminal rows that omit it are normalized to `false`,
    while ambiguous incomplete omission remains observable as unknown.
+   Gateway task catalogs are frozen and registered with a prepared dependency graph once per catalog
+   snapshot. Expiry replaces the catalog and graph together. Each player still gets fresh invalidation
+   state. The app's mutable entry point rebuilds its graph so in-place metadata edits remain visible.
 7. **Task writes.** Single and batch task writes accept `active`, `completed`, `failed`, and
    `uncompleted`. They persist canonical `complete`/`failed`/`active` triples. Dependency processing
    materializes missing auto-unlocked successors as explicitly neutral, never active, and never
@@ -722,6 +739,10 @@ sequenceDiagram
   app and API share one invalidation algorithm: a requirement whose `status` includes `failed`
   never invalidates its task when the prerequisite is failed. Shared utilities must not import
   Nuxt or Worker runtime modules; invalidation logic must not be re-implemented per runtime.
+- Gateway task catalogs are frozen with one prepared dependency graph per snapshot. Catalog expiry
+  replaces the catalog and graph together.
+- Each player receives fresh invalidation state; mutable player state is never shared between
+  requests through the catalog or prepared graph.
 - Completed and failed tasks (including legacy records with both flags set) and their objectives
   are never marked invalid. This terminal-state guard applies to faction, prerequisite, and legacy
   alternative entry points. Completed tasks stop propagation; failed tasks still invalidate strict

@@ -1,4 +1,5 @@
 import { computeInvalidProgress } from '@shared/utils/progressInvalidation';
+import { getTaskCatalogInvalidator } from './task-catalog';
 import type {
   UserProgressData,
   UserProgressModeRow,
@@ -79,7 +80,8 @@ export function transformProgress(
   const pmcFaction = progressData?.pmcFaction ?? 'USEC';
   const taskCompletions = progressData?.taskCompletions ?? {};
   // Compute invalid tasks/objectives
-  const { invalidTasks, invalidObjectives } = computeInvalidProgress({
+  const invalidator = getTaskCatalogInvalidator(tasks) ?? computeInvalidProgress;
+  const { invalidTasks, invalidObjectives } = invalidator({
     tasks,
     taskCompletions,
     pmcFaction,
