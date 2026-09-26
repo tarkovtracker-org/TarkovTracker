@@ -1941,8 +1941,9 @@ successful task and objective data with an error indicator. Profiles prefer the 
 editions, falling back to the active catalog while unavailable. Missing core/objective catalogs
 remain fatal.
 Completed and failed tasks are terminal.
-The existing acceptance-unknown interpretation is retained; this does not introduce #715's
-explicit Accept workflow.
+The explicit Accept workflow stores `active: true`; a neutral write stores `active: false`.
+Legacy rows without an `active` key retain the unlockable prerequisite fallback. Task cards use
+the same fallback when explaining prerequisite status, without labeling unknown tasks Active.
 
 Shared story chapters followed by matching mode corrections produce `Task.storyUnlocks` from
 `questUnlocks`. Availability requires all independent gates AND (all quest requirements OR any
