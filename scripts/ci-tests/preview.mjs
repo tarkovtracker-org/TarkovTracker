@@ -6,10 +6,10 @@ import { test } from 'node:test';
 import { extractZip, listZipEntries, zipEntryErrors } from '../preview/archive.mjs';
 import {
   ENVIRONMENTS,
-  fallbackHead,
   planPreview,
   publishControllerFailure,
   publishResult,
+  reconcileMissingPreviewStatuses,
   successMarker,
   verifyForDeploy,
   verifyManifest,
@@ -250,7 +250,7 @@ function runFixture(overrides = {}) {
     head_commit: { tree_id: TREE },
     run_attempt: 1,
     updated_at: new Date(Date.now() - 120000).toISOString(),
-    pull_requests: [{ number: 42 }],
+    pull_requests: [{ number: 42, head: { sha: HEAD }, base: { sha: BASE } }],
     ...overrides,
   };
 }
@@ -282,6 +282,7 @@ function fakeState(options) {
   state.dispatchStatus = { id: 5, context: 'CI Result', state: 'success' };
   state.archive = null;
   state.statuses = [];
+  state.pullListQueries = [];
   return state;
 }
 function firstOption(value, fallback) {
@@ -290,6 +291,11 @@ function firstOption(value, fallback) {
 function fakeMutableState(options) {
   return {
     pull: pullFixture(options.pull),
+    pullLookups: 0,
+    readyMergeAfter: options.readyMergeAfter ?? null,
+    mergeTree: options.mergeTree ?? TREE,
+    commits: firstOption(options.commits, {}),
+    mainSha: options.mainSha ?? BASE,
     run: runFixture(options.run),
     previewStatuses: firstOption(options.previewStatuses, []),
     files: firstOption(options.files, [{ filename: 'app/a.ts' }]),
@@ -327,12 +333,43 @@ function fakeGithub(t, options = {}) {
 }
 function pullEndpoints(state) {
   return {
-    get: async () => ({ data: state.pull }),
+    get: async () => {
+      state.pullLookups += 1;
+      if (state.pullLookups === state.readyMergeAfter)
+        state.pull = { ...state.pull, merge_commit_sha: MERGE };
+      return { data: state.pull };
+    },
     listFiles: 'listFiles',
+    list: 'pulls',
+  };
+}
+function fakeCommits(state) {
+  const merge = state.pull.merge_commit_sha;
+  const current = {
+    tree: { sha: state.mergeTree },
+    parents: [{ sha: state.pull.base.sha }, { sha: state.pull.head.sha }],
+  };
+  return {
+    [state.run.head_sha]: { tree: { sha: TREE } },
+    ...(merge ? { [merge]: current } : {}),
+    ...state.commits,
   };
 }
 function repoEndpoints(state) {
   return {
+    git: {
+      getCommit: async ({ commit_sha }) => {
+        const commit = fakeCommits(state)[commit_sha];
+        if (commit instanceof Error) throw commit;
+        if (!commit)
+          throw Object.assign(new Error(`unknown Git commit ${commit_sha}`), { status: 404 });
+        return { data: commit };
+      },
+      getRef: async ({ ref }) => {
+        assert.equal(ref, 'heads/main');
+        return { data: { object: { sha: state.mainSha } } };
+      },
+    },
     repos: {
       listPullRequestsAssociatedWithCommit: 'associated',
       listCommitStatusesForRef: 'statuses',
@@ -353,8 +390,15 @@ function actionEndpoints(state, zipEntries, options) {
         if (run_id === state.previousRun.id) return { data: state.previousRun };
         throw Object.assign(new Error('Not found'), { status: 404 });
       },
-      listWorkflowRuns: async () => ({
-        data: { workflow_runs: options.noRuns ? [] : [state.run] },
+      listWorkflowRuns: async ({ workflow_id }) => ({
+        data: {
+          workflow_runs:
+            workflow_id === 'preview.yml'
+              ? (options.previewRuns ?? [])
+              : options.noRuns
+                ? []
+                : (options.latestRuns ?? [state.run]),
+        },
       }),
       createWorkflowDispatch: async (input) => {
         if (state.failDispatch) throw new Error('dispatch rejected');
@@ -371,6 +415,13 @@ function actionEndpoints(state, zipEntries, options) {
     },
   };
 }
+/** `pulls.list` honours the `owner:branch` head filter the way GitHub does. */
+function listPulls(state, params) {
+  state.pullListQueries.push(params);
+  if (!params.head) return [state.pull];
+  const owner = state.pull.head.repo?.full_name.split('/')[0];
+  return params.head === `${owner}:${state.pull.head.ref}` ? [state.pull] : [];
+}
 function dispatchStatuses(state, params) {
   const active = params.ref === HEAD && state.run.event === 'workflow_dispatch';
   return active ? [state.dispatchStatus] : [];
@@ -379,11 +430,15 @@ async function paginatedEndpoints(state, endpoint, params, options) {
   const paged = {
     associated: () => options.associated ?? [state.pull],
     checks: () => [state.check],
-    statuses: () => [...dispatchStatuses(state, params), ...state.previewStatuses],
+    statuses: () => [
+      ...dispatchStatuses(state, params),
+      ...(params.ref === state.pull.head.sha ? state.previewStatuses : []),
+    ],
     artifacts: () =>
       params.run_id === state.previousRun.id ? state.previousArtifacts : state.artifacts,
     jobs: () => state.previousJobs,
     listFiles: () => state.files,
+    pulls: () => listPulls(state, params),
   };
   if (!paged[endpoint]) throw new Error(`unexpected endpoint ${endpoint}`);
   return paged[endpoint]();
@@ -435,6 +490,9 @@ function workflowDispatchContext() {
     runId: 556,
   };
 }
+function scheduleContext() {
+  return { ...workflowDispatchContext(), eventName: 'schedule' };
+}
 async function plan(t, context, options = {}) {
   const fake = fakeGithub(t, options);
   const core = fakeCore();
@@ -456,15 +514,15 @@ test('a validated same-repository pull request waits for an explicit preview req
   const { decision, state, manifest } = await plan(t, workflowRunContext());
   assert.equal(decision.action, 'wait');
   assert.equal(decision.state, 'pending');
-  assert.match(decision.description, /run_id=900/);
+  assert.match(decision.description, /Comment \/preview/);
   assert.equal(decision.environment, ENVIRONMENTS.internal);
   assert.equal(decision.fork, false);
   assert.equal(decision.digest, manifest.digest);
   assert.equal(decision.previewBranch, 'preview-pr-42');
   assert.equal(decision.runAttempt, 1);
   assert.equal(decision.mergeSha, MERGE);
-  // Pending is reported on the candidate head and the verified test-merge commit.
-  assert.deepEqual(statusStates(state.statuses), ['a:pending', 'c:pending']);
+  // The PR reports one required status on its validated head; GitHub regenerates test merges.
+  assert.deepEqual(statusStates(state.statuses), ['a:pending']);
   assert.ok(state.statuses.every((status) => status.context === 'Preview Result'));
   assert.match(state.statuses[0].target_url, /actions\/runs\/555$/);
 });
@@ -475,10 +533,15 @@ test('auto-merge requests one trusted dispatch after CI instead of uploading', a
   assert.equal(completed.decision.state, 'pending');
   assert.match(completed.decision.description, /Auto-merge enabled: preview requested/);
   assert.deepEqual(completed.state.dispatches, [
-    { ...REPO, workflow_id: 'preview.yml', ref: 'main', inputs: { run_id: '900' } },
+    {
+      ...REPO,
+      workflow_id: 'preview.yml',
+      ref: 'main',
+      inputs: { run_id: '900', run_attempt: '1' },
+    },
   ]);
   // The pending status is published before the dispatch so the dispatched run supersedes it.
-  assert.deepEqual(statusStates(completed.state.statuses), ['a:pending', 'c:pending']);
+  assert.deepEqual(statusStates(completed.state.statuses), ['a:pending']);
   const enabled = await plan(t, pullTargetContext(pullFixture(autoMerge), 'auto_merge_enabled'), {
     pull: autoMerge,
   });
@@ -494,8 +557,40 @@ test('auto-merge requests one trusted dispatch after CI instead of uploading', a
   // Without auto-merge, ordinary revisions keep waiting and never dispatch.
   const ordinary = await plan(t, workflowRunContext());
   assert.equal(ordinary.decision.action, 'wait');
-  assert.match(ordinary.decision.description, /Enable auto-merge, or run Preview with run_id=900/);
+  assert.match(ordinary.decision.description, /Comment \/preview/);
   assert.deepEqual(ordinary.state.dispatches, []);
+});
+test('auto-merge preserves active previews and retries completed attempts', async (t) => {
+  const request = {
+    path: '.github/workflows/preview.yml',
+    event: 'workflow_dispatch',
+    head_branch: 'main',
+    display_title: 'Preview CI 900 attempt 1',
+    status: 'queued',
+  };
+  const pull = { auto_merge: { enabled_by: { login: 'maintainer' } } };
+  for (const status of ['queued', 'in_progress', 'waiting', 'pending', 'requested']) {
+    const result = await plan(t, workflowRunContext(), {
+      pull,
+      previewRuns: [{ ...request, status }],
+    });
+    assert.deepEqual(result.state.dispatches, [], status);
+  }
+  for (const override of [
+    { status: 'completed', conclusion: 'failure' },
+    { status: 'completed', conclusion: 'cancelled' },
+    { display_title: 'Preview CI 900 attempt 2' },
+    { display_title: 'Preview CI 901 attempt 1' },
+    { head_branch: 'untrusted' },
+    { path: '.github/workflows/other.yml' },
+    { event: 'pull_request' },
+  ]) {
+    const result = await plan(t, workflowRunContext(), {
+      pull,
+      previewRuns: [{ ...request, ...override }],
+    });
+    assert.equal(result.state.dispatches.length, 1, JSON.stringify(override));
+  }
 });
 test('auto-merge never dispatches for automation CI runs, reuse, or explicit dispatches', async (t) => {
   const autoMerge = { auto_merge: { enabled_by: { login: 'maintainer' } } };
@@ -518,10 +613,40 @@ test('a rejected automatic request falls back to the manual instruction', async 
     failDispatch: true,
   });
   assert.equal(decision.action, 'wait');
-  assert.match(decision.description, /run_id=900/);
+  assert.match(decision.description, /Comment \/preview/);
   assert.match(core.warnings.join('\n'), /Automatic preview request failed/);
   assert.equal(state.statuses.at(-1).state, 'pending');
-  assert.match(state.statuses.at(-1).description, /run Preview with run_id=900/);
+  assert.match(state.statuses.at(-1).description, /Comment \/preview/);
+});
+test('delayed same-repo and fork CI completions cannot overwrite newer preview state', async (t) => {
+  for (const fork of [false, true]) {
+    const headRepo = fork ? FORK_NAME : REPO_NAME;
+    const run = runFixture({
+      id: 899,
+      head_repository: { full_name: headRepo },
+      pull_requests: fork ? [] : [{ number: 42 }],
+    });
+    const pull = pullFixture({
+      head: { sha: HEAD, ref: 'feature', repo: { full_name: headRepo } },
+    });
+    const { decision, state } = await plan(t, workflowRunContext(run), {
+      run,
+      pull,
+      associated: [pull],
+      latestRuns: [runFixture({ id: 900, head_repository: { full_name: headRepo } })],
+    });
+    assert.equal(decision.action, 'ignore');
+    assert.deepEqual(state.statuses, []);
+  }
+});
+test('an unrelated branch sharing the head SHA does not supersede this PR', async (t) => {
+  const run = runFixture();
+  const { decision, state } = await plan(t, workflowRunContext(run), {
+    run,
+    latestRuns: [runFixture({ id: 901, head_branch: 'another-branch' }), run],
+  });
+  assert.equal(decision.action, 'wait');
+  assert.deepEqual(statusStates(state.statuses), ['a:pending']);
 });
 test('an explicit dispatch deploys only after rechecking the validated CI run', async (t) => {
   const { decision, state, manifest } = await plan(t, workflowDispatchContext(), {
@@ -530,17 +655,23 @@ test('an explicit dispatch deploys only after rechecking the validated CI run', 
   assert.equal(decision.action, 'deploy');
   assert.equal(decision.environment, ENVIRONMENTS.internal);
   assert.equal(decision.digest, manifest.digest);
-  assert.deepEqual(statusStates(state.statuses), ['a:pending', 'c:pending']);
+  assert.deepEqual(statusStates(state.statuses), ['a:pending']);
 });
 test('fork candidates wait for a manual request and route through the protected environment', async (t) => {
   const run = runFixture({ head_repository: { full_name: FORK_NAME }, pull_requests: [] });
   const pull = pullFixture({ head: { sha: HEAD, ref: 'feature', repo: { full_name: FORK_NAME } } });
+  // GitHub's base-repository commit association never returns PRs for fork-only commits.
   const { decision, state } = await plan(t, workflowRunContext(run), {
     pull,
-    associated: [pull],
+    associated: [],
     run: { head_repository: { full_name: FORK_NAME }, pull_requests: [] },
   });
   assert.equal(decision.action, 'wait', decision.description);
+  assert.equal(decision.pullRequest, pull.number);
+  assert.deepEqual(
+    state.pullListQueries.map(({ head, base, state: pullState }) => ({ head, base, pullState })),
+    [{ head: 'someone:feature', base: 'main', pullState: 'open' }]
+  );
   assert.equal(decision.environment, ENVIRONMENTS.fork);
   assert.equal(decision.fork, true);
   assert.match(state.statuses[0].description, /maintainer approval/);
@@ -551,7 +682,7 @@ test('drafts, documentation-only scope and production runs never deploy', async 
   assert.equal(draft.decision.action, 'skip');
   assert.equal(draft.decision.state, 'pending');
   assert.match(draft.decision.description, /Draft/);
-  assert.deepEqual(statusStates(draft.state.statuses), ['a:pending', 'c:pending']);
+  assert.deepEqual(statusStates(draft.state.statuses), ['a:pending']);
   const docs = await plan(t, workflowRunContext(), {
     files: [{ filename: 'docs/a.md', previous_filename: 'docs/b.md' }, { filename: 'README.md' }],
   });
@@ -581,10 +712,10 @@ test('running, failed and unsuccessful CI evidence map to pending or failure', a
     }
   );
   assert.equal(running.decision.action, 'wait');
-  assert.deepEqual(statusStates(running.state.statuses), ['a:pending', 'c:pending']);
+  assert.deepEqual(statusStates(running.state.statuses), ['a:pending']);
   const failed = await plan(t, workflowRunContext(), { run: { conclusion: 'failure' } });
   assert.equal(failed.decision.action, 'fail');
-  assert.deepEqual(statusStates(failed.state.statuses), ['a:failure', 'c:failure']);
+  assert.deepEqual(statusStates(failed.state.statuses), ['a:failure']);
   const cancelled = await plan(t, workflowRunContext(), { run: { conclusion: 'cancelled' } });
   assert.equal(cancelled.decision.state, 'failure');
   const fake = fakeGithub(t);
@@ -616,8 +747,10 @@ test('head movement, base movement, stale attempts and superseded runs cannot de
   assert.match(baseShaMoved.decision.description, /baseSha/);
   const recomputing = await plan(t, workflowRunContext(), {
     pull: pullFixture({ merge_commit_sha: null }),
+    readyMergeAfter: 2,
   });
   assert.equal(recomputing.decision.action, 'wait');
+  assert.deepEqual(statusStates(recomputing.state.statuses), ['a:pending']);
   const staleAttempt = await plan(t, workflowRunContext(runFixture({ run_attempt: 2 })), {
     run: { run_attempt: 2 },
   });
@@ -684,6 +817,12 @@ test('tampered manifests, missing or expired artifacts and malicious archives fa
     /traversal/
   );
   assert.deepEqual(fake.state.statuses, []);
+  await publishControllerFailure({
+    github: fake.github,
+    context: workflowRunContext(),
+    core: fakeCore(),
+  });
+  assert.deepEqual(statusStates(fake.state.statuses), ['a:failure']);
 });
 test('a matching earlier success is reused instead of redeploying', async (t) => {
   const first = await plan(t, workflowRunContext());
@@ -708,7 +847,7 @@ test('a matching earlier success is reused instead of redeploying', async (t) =>
   });
   assert.equal(reused.decision.action, 'reuse');
   assert.equal(reused.decision.reuseTargetUrl, PREVIOUS_PREVIEW_URL);
-  assert.deepEqual(statusStates(reused.state.statuses), ['a:success', 'c:success']);
+  assert.deepEqual(statusStates(reused.state.statuses), ['a:success']);
   assert.ok(reused.state.statuses.every((status) => status.target_url === PREVIOUS_PREVIEW_URL));
   for (const options of [
     { previousArtifacts: [] },
@@ -819,6 +958,68 @@ test('manual branch previews deploy without a pull request and reject the produc
   assert.equal(crowdin.decision.pullRequest, 42);
   assert.equal(crowdin.decision.runEvent, 'workflow_dispatch');
   assert.equal(crowdin.decision.previewBranch, localesBranch);
+  assert.deepEqual(statusStates(crowdin.state.statuses), ['a:pending']);
+  const differentTree = await plan(t, workflowDispatchContext(), {
+    inputs: { run_id: '900' },
+    pull: localesPull,
+    associated: [localesPull],
+    mergeTree: sha('e'),
+    run: { event: 'workflow_dispatch', head_branch: 'locales', pull_requests: [] },
+  });
+  assert.equal(differentTree.decision.action, 'wait');
+  assert.match(differentTree.decision.description, /differs from the PR test merge/);
+  assert.deepEqual(statusStates(differentTree.state.statuses), ['a:pending']);
+  const staleBase = await plan(t, workflowDispatchContext(), {
+    inputs: { run_id: '900' },
+    pull: localesPull,
+    associated: [localesPull],
+    mainSha: sha('e'),
+    run: { event: 'workflow_dispatch', head_branch: 'locales', pull_requests: [] },
+  });
+  assert.equal(staleBase.decision.action, 'wait');
+  assert.match(staleBase.decision.description, /base is no longer current main/);
+  const docsOnly = await plan(t, workflowDispatchContext(), {
+    inputs: { run_id: '900' },
+    pull: localesPull,
+    associated: [localesPull],
+    files: [{ filename: 'docs/preview.md' }],
+    mergeTree: sha('e'),
+    run: { event: 'workflow_dispatch', head_branch: 'locales', pull_requests: [] },
+  });
+  assert.equal(docsOnly.decision.action, 'wait');
+  assert.match(docsOnly.decision.description, /differs from the PR test merge/);
+  assert.deepEqual(statusStates(docsOnly.state.statuses), ['a:pending']);
+  const matchingDocs = await plan(t, workflowDispatchContext(), {
+    inputs: { run_id: '900' },
+    pull: localesPull,
+    associated: [localesPull],
+    files: [{ filename: 'docs/preview.md' }],
+    run: { event: 'workflow_dispatch', head_branch: 'locales', pull_requests: [] },
+  });
+  assert.equal(matchingDocs.decision.action, 'skip');
+  assert.deepEqual(statusStates(matchingDocs.state.statuses), ['a:success']);
+  const { github, state, decision } = crowdin;
+  state.mergeTree = sha('e');
+  await assert.rejects(
+    verifyForDeploy({
+      github,
+      context: workflowDispatchContext(),
+      core: fakeCore(),
+      decision,
+      destination: join(tempDir(t), 'changed-tree'),
+    }),
+    /differs from the PR test merge/
+  );
+  const late = await publishResult({
+    github,
+    context: workflowDispatchContext(),
+    core: fakeCore(),
+    decision,
+    outcomes: { deploy: 'success', smoke: 'success' },
+    evidence: {},
+  });
+  assert.equal(late, 'obsolete');
+  assert.deepEqual(statusStates(state.statuses), ['a:pending']);
   const production = await plan(
     t,
     workflowRunContext(runFixture({ event: 'workflow_dispatch', head_branch: 'main' }))
@@ -946,6 +1147,54 @@ test('deployment verification repeats freshness checks and re-verifies the artif
     /head moved/
   );
 });
+test('a regenerated test merge with the same parents and tree keeps the candidate current', async (t) => {
+  // GitHub rewrites the test-merge commit (new SHA, same parents and tree) when a merge is
+  // attempted. The artifact built from the earlier SHA still represents the same content.
+  const regenerated = sha('9');
+  const sameMerge = { tree: { sha: TREE }, parents: [{ sha: BASE }, { sha: HEAD }] };
+  const context = workflowDispatchContext();
+  const { decision, github, state } = await plan(t, context, {
+    inputs: { run_id: '900' },
+    pull: pullFixture({ merge_commit_sha: regenerated }),
+    commits: { [MERGE]: sameMerge },
+  });
+  assert.equal(decision.action, 'deploy', decision.description);
+  assert.deepEqual(statusStates(state.statuses), ['a:pending']);
+  state.pull = pullFixture({ merge_commit_sha: sha('8') });
+  state.commits[regenerated] = sameMerge;
+  const core = fakeCore();
+  await verifyForDeploy({
+    github,
+    context,
+    core,
+    decision,
+    destination: join(tempDir(t), 'regenerated'),
+  });
+  state.statuses.length = 0;
+  const published = await publishResult({
+    github,
+    context,
+    core,
+    decision,
+    outcomes: { deploy: 'success', smoke: 'success' },
+    evidence: {},
+  });
+  assert.equal(published, 'success');
+  assert.deepEqual(statusStates(state.statuses), ['a:success']);
+  for (const [label, commit] of [
+    ['tree', { ...sameMerge, tree: { sha: sha('e') } }],
+    ['base parent', { ...sameMerge, parents: [{ sha: sha('f') }, { sha: HEAD }] }],
+    ['head parent', { ...sameMerge, parents: [{ sha: BASE }, { sha: sha('e') }] }],
+  ]) {
+    const changed = await plan(t, context, {
+      inputs: { run_id: '900' },
+      pull: pullFixture({ merge_commit_sha: regenerated }),
+      commits: { [MERGE]: commit },
+    });
+    assert.equal(changed.decision.action, 'fail', label);
+    assert.match(changed.decision.description, /checkedOutSha/, label);
+  }
+});
 test('results publish success only for a current candidate and failure for failed stages', async (t) => {
   const context = workflowDispatchContext();
   const { decision, github, state } = await plan(t, context, { inputs: { run_id: '900' } });
@@ -960,7 +1209,7 @@ test('results publish success only for a current candidate and failure for faile
     evidence: { url: `https://abc.${PAGES_DOMAIN}` },
   });
   assert.equal(outcome, 'success');
-  assert.deepEqual(statusStates(state.statuses), ['a:success', 'c:success']);
+  assert.deepEqual(statusStates(state.statuses), ['a:success']);
   assert.ok(state.statuses[0].description.includes(successMarker(decision.digest)));
   state.statuses.length = 0;
   for (const outcomes of [
@@ -1057,11 +1306,6 @@ test('controller crashes report failure on the candidate revision and never on m
     decision: null,
   });
   assert.deepEqual(statusStates(fake.state.statuses), ['a:failure']);
-  assert.equal(
-    fallbackHead(workflowRunContext(runFixture({ head_branch: 'main', event: 'push' }))),
-    null
-  );
-  assert.equal(fallbackHead(pullTargetContext(pullFixture(), 'opened')), HEAD);
   fake.state.statuses.length = 0;
   await publishControllerFailure({
     github: fake.github,
@@ -1070,13 +1314,156 @@ test('controller crashes report failure on the candidate revision and never on m
     decision: null,
   });
   assert.deepEqual(fake.state.statuses, []);
+  const standaloneRun = runFixture({
+    event: 'workflow_dispatch',
+    head_branch: 'wip/release-1.2.3-1-1',
+    pull_requests: [],
+  });
+  const standalone = fakeGithub(t, { run: standaloneRun, associated: [] });
+  await publishControllerFailure({
+    github: standalone.github,
+    context: workflowDispatchContext(),
+    core,
+    inputs: { run_id: '900' },
+  });
+  assert.deepEqual(statusStates(standalone.state.statuses), ['a:failure']);
+  const superseded = fakeGithub(t, { latestRuns: [runFixture({ id: 901 })] });
+  await publishControllerFailure({
+    github: superseded.github,
+    context: workflowRunContext(),
+    core,
+  });
+  assert.deepEqual(superseded.state.statuses, []);
+  const oldBase = fakeGithub(t, {
+    pull: pullFixture({ base: { sha: sha('f'), ref: 'main' } }),
+  });
+  await publishControllerFailure({
+    github: oldBase.github,
+    context: workflowRunContext(),
+    core,
+  });
+  assert.deepEqual(oldBase.state.statuses, []);
+  const forkPull = pullFixture({
+    head: { sha: HEAD, ref: 'feature', repo: { full_name: FORK_NAME } },
+  });
+  const forkRun = runFixture({
+    head_repository: { full_name: FORK_NAME },
+    pull_requests: [],
+  });
+  const fork = fakeGithub(t, { pull: forkPull, run: forkRun });
+  await publishControllerFailure({
+    github: fork.github,
+    context: workflowRunContext(forkRun),
+    core,
+  });
+  assert.deepEqual(fork.state.statuses, []);
+  const differentMergeTree = fakeGithub(t, { pull: forkPull, run: forkRun, mergeTree: sha('e') });
+  await publishControllerFailure({
+    github: differentMergeTree.github,
+    context: workflowRunContext(forkRun),
+    core,
+  });
+  assert.deepEqual(differentMergeTree.state.statuses, []);
+  const staleForkBase = fakeGithub(t, { pull: forkPull, run: forkRun, mainSha: sha('e') });
+  await publishControllerFailure({
+    github: staleForkBase.github,
+    context: workflowRunContext(forkRun),
+    core,
+  });
+  assert.deepEqual(staleForkBase.state.statuses, []);
   await publishControllerFailure({
     github: fake.github,
     context: workflowRunContext(),
     core,
-    decision: { headSha: HEAD, mergeSha: MERGE },
+    decision: { pullRequest: 42, headSha: HEAD, mergeSha: MERGE },
   });
-  assert.deepEqual(statusStates(fake.state.statuses), ['a:failure', 'c:failure']);
+  assert.deepEqual(statusStates(fake.state.statuses), ['a:failure']);
+  fake.state.statuses.length = 0;
+  await publishControllerFailure({
+    github: fake.github,
+    context: workflowRunContext(),
+    core,
+    decision: { pullRequest: 42, headSha: HEAD, mergeSha: null },
+  });
+  // Head-targeted statuses do not depend on GitHub having computed the test merge.
+  assert.deepEqual(statusStates(fake.state.statuses), ['a:failure']);
+});
+test('hourly reconciliation repairs only missing head statuses', async (t) => {
+  const fake = fakeGithub(t);
+  const options = {
+    github: fake.github,
+    context: scheduleContext(),
+    core: fakeCore(),
+    workspace: tempDir(t),
+  };
+  await reconcileMissingPreviewStatuses(options);
+  assert.deepEqual(statusStates(fake.state.statuses), ['a:pending']);
+  fake.state.statuses.length = 0;
+  fake.state.previewStatuses = [{ id: 10, context: 'Preview Result', state: 'pending' }];
+  await reconcileMissingPreviewStatuses(options);
+  assert.deepEqual(fake.state.statuses, []);
+  fake.state.previewStatuses = [];
+  fake.state.pull = pullFixture({ merge_commit_sha: null });
+  await reconcileMissingPreviewStatuses(options);
+  assert.deepEqual(fake.state.statuses, []);
+});
+test('hourly reconciliation re-evaluates a head left pending on an unready test merge', async (t) => {
+  // Planning before GitHub computes the test merge publishes pending on the head. Once the merge
+  // exists, the fallback must re-evaluate that head even though a status is already present.
+  const early = await plan(t, workflowRunContext(), {
+    pull: pullFixture({ merge_commit_sha: null }),
+  });
+  assert.equal(early.decision.action, 'wait');
+  const [mergePending] = early.state.statuses;
+  assert.equal(mergePending.sha, HEAD);
+  const fake = fakeGithub(t, {
+    previewStatuses: [{ id: 10, context: 'Preview Result', ...mergePending }],
+  });
+  const options = {
+    github: fake.github,
+    context: scheduleContext(),
+    core: fakeCore(),
+    workspace: tempDir(t),
+  };
+  await reconcileMissingPreviewStatuses(options);
+  assert.deepEqual(statusStates(fake.state.statuses), ['a:pending']);
+  assert.match(fake.state.statuses[0].description, /Comment \/preview/);
+  // A newer ordinary pending reason (awaiting a request or deployment) is left alone.
+  fake.state.statuses.length = 0;
+  fake.state.previewStatuses = [
+    { id: 10, context: 'Preview Result', ...mergePending },
+    { id: 11, context: 'Preview Result', state: 'pending', description: 'Deploying.' },
+  ];
+  await reconcileMissingPreviewStatuses(options);
+  assert.deepEqual(fake.state.statuses, []);
+});
+test('test-merge lookups fail closed on missing commits and propagate API failures', async (t) => {
+  const regenerated = sha('9');
+  const context = workflowDispatchContext();
+  const missing = await plan(t, context, {
+    inputs: { run_id: '900' },
+    pull: pullFixture({ merge_commit_sha: regenerated }),
+    commits: { [MERGE]: Object.assign(new Error('No commit found'), { status: 422 }) },
+  });
+  assert.equal(missing.decision.action, 'fail');
+  assert.match(missing.decision.description, /checkedOutSha/);
+  const reversed = await plan(t, context, {
+    inputs: { run_id: '900' },
+    pull: pullFixture({ merge_commit_sha: regenerated }),
+    commits: {
+      [MERGE]: { tree: { sha: TREE }, parents: [{ sha: HEAD }, { sha: BASE }] },
+      [regenerated]: { tree: { sha: TREE }, parents: [{ sha: HEAD }, { sha: BASE }] },
+    },
+  });
+  assert.equal(reversed.decision.action, 'fail');
+  await assert.rejects(
+    plan(t, context, {
+      inputs: { run_id: '900' },
+      pull: pullFixture({ merge_commit_sha: regenerated }),
+      commits: { [MERGE]: Object.assign(new Error('Server error'), { status: 500 }) },
+    }),
+    /Server error/
+  );
 });
 test('verifyManifest reports every mismatched claim', (t) => {
   const dir = tempDir(t);

@@ -30,6 +30,7 @@ test('Dependabot waits only for the authoritative aggregates supplied by reposit
   assert.match(wait, /select\(\.name == \$name and \.app\.id == 15368\)/);
   assert.match(wait, /failing_status_count.*-gt 0/);
   for (const job of [
+    'Refresh preview state',
     'Plan preview',
     'Deploy preview',
     'Preview smoke tests',
@@ -38,6 +39,10 @@ test('Dependabot waits only for the authoritative aggregates supplied by reposit
     assert.ok(wait.includes(`.name != "${job}"`));
   assert.match(gate, /^ {2}actions: write$/m);
   assert.match(wait, /preview_requested=false/);
+  assert.match(wait, /commits\/\$HEAD_SHA\/status/);
+  assert.doesNotMatch(wait, /merge_commit_sha|merge_sha/);
+  assert.match(wait, /select\(\.context == "Preview Result"\)/);
+  assert.match(wait, /preview_status_contexts/);
   assert.match(wait, /gh workflow run preview\.yml.*--ref main -f "run_id=\$bound_run_id"/);
   assert.match(wait, /\.path == "\.github\/workflows\/ci\.yml"/);
   assert.match(wait, /deadline=\$\(\(SECONDS \+ 3600\)\)/);

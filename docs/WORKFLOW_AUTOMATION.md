@@ -146,7 +146,7 @@ Non-English formatting exclusions and Crowdin ownership remain intact.
    (`proposed.full=false`, runs succeeded), executable #855 and mixed docs/workflow #862/#863
    (`proposed.full=true`), and failing executable runs on #848/#852/#862 where a failed shard, Fallow,
    or lint job made `CI Result` fail. The only required check on `main` is `CI Result`
-   (`Main CI freshness` ruleset), so skipped jobs cannot leave a pull request blocked.
+   (`Main CI freshness` ruleset at that rollout stage), so skipped jobs could not leave a pull request blocked.
 2. Done: the classifier invocation no longer passes `--shadow`; pull requests receive path selection
    while push and dispatch events retain `--full`. Required-check settings were not changed. Roll
    back by restoring `--shadow` in the `Classify changes` step and inverting the `--shadow`
@@ -156,7 +156,9 @@ Non-English formatting exclusions and Crowdin ownership remain intact.
    Path selection does not change release triggers, validation, or main-run cancellation.
    Do not treat local fixtures as evidence of GitHub App or branch-protection behavior.
 
-The initial observations are recorded in [the baseline report](ci-turnaround-baseline.md).
+The initial observations come from the pre-rollout baseline collected on 2026-09-06, which was
+archived in git history once the rollout completed (recorded 2026-09-16; no report file remains
+in-tree).
 The read-only `scripts/workflow-metrics.mjs` collector samples the preceding 20 merged PRs and emits
 per-PR CI and release timings as JSON. Run it with authenticated `gh` and save stdout to a report:
 
@@ -278,7 +280,7 @@ this workflow controls release/version publication, not when the initial deploym
 **Required main policy:** `.github/main-ci-ruleset.json` records the desired API configuration for
 the `Main CI freshness` repository ruleset. Rollout must apply it and verify active enforcement and
 an empty bypass list before merging the automation changes. It targets
-`refs/heads/main`, requires `CI Result` from GitHub Actions (integration ID `15368`), enables
+`refs/heads/main`, requires both `CI Result` and `Preview Result` from GitHub Actions (integration ID `15368`), enables
 `strict_required_status_checks_policy`, and has an empty `bypass_actors` list. This applies to
 all PRs and direct pushes, including administrators and automation. Existing deletion/force-push
 rules remain separate. Behind branches must incorporate current main and pass CI again; do not
@@ -434,26 +436,35 @@ Validates external links in documentation:
 
 ### 8. Preview Controller (`.github/workflows/preview.yml`)
 
+Maintainers can enable auto-merge to request a preview after the current PR CI succeeds.
+The status controller dispatches `preview.yml` on `main`, carrying the CI run and attempt;
+it checks for a matching active dispatch first so repeated events preserve in-flight previews
+and fork approval requests. Failed or cancelled dispatches remain retryable. Manual `/preview`
+and workflow dispatch remain available. Repository `allow_auto_merge` must be enabled to use
+this optional request path. Automatic events do not upload artifacts themselves.
+
 GitHub Actions controls when pull-request previews deploy to the existing Cloudflare Pages project
-(`tarkovtracker`, `tarkovtrackernuxt.pages.dev`). The controller publishes a current-SHA `Preview
-Result` for eligible PR revisions; an explicit maintainer request or trusted merge automation
+(`tarkovtracker`, `tarkovtrackernuxt.pages.dev`). The controller publishes `Preview Result` on the
+validated head SHA for PRs and standalone release candidates; an explicit
+maintainer request or trusted merge automation
 dispatch uploads the validated artifact. Cloudflare-managed preview builds are disabled while automatic production deployments
-for `main` remain enabled. `Preview Result` becomes a required merge check after the staged rollout
-and acceptance scenarios below pass. The design, result contract, and invariants are specified in
-[SYSTEMS.md §18](SYSTEMS.md#18-actions-owned-cloudflare-previews).
+for `main` remain enabled. The live ruleset requires both `CI Result` and `Preview Result`;
+rollout verifies that enforcement. The design, result contract, and invariants are specified in
+[SYSTEMS.md §19](SYSTEMS.md#19-actions-owned-cloudflare-previews).
 
-**Triggers:** `workflow_run` for completed CI (pull-request and dispatched runs only; main-push
-completions skip planning), metadata-only `pull_request_target` events (`ready_for_review`,
-`converted_to_draft`, `auto_merge_enabled`, `closed`), and an explicit `workflow_dispatch`
-accepting a CI run id from `main` only. Pushes are evaluated once, when their CI completes, so each
-revision starts one controller run. Automatic events refresh the status or, with auto-merge
-enabled, dispatch the controller; they never upload to Pages. Every job checks out the default
-branch; both privileged triggers are accepted in `.github/zizmor.yml` because the controller is
-the intended trusted boundary.
+**Triggers:** `preview-state.yml` receives `workflow_run` for completed CI and metadata-only
+`pull_request_target` events (`opened`, `synchronize`, `reopened`, `ready_for_review`,
+`converted_to_draft`, `closed`). An hourly fallback refreshes only open PRs whose head lacks the required
+status, or is pending only on an unready test merge, after GitHub finishes computing it. It refreshes status without creating deployment
+jobs.
+`preview.yml` accepts only explicit `workflow_dispatch` with a CI run id from `main`.
+Every job checks out the default branch; the privileged automatic triggers are accepted in
+`.github/zizmor.yml` because the state controller is the intended trusted boundary.
 
-**Jobs:** `Plan preview` resolves the candidate through the API, requires successful CI evidence,
-verifies the artifact's manifest and digest, and publishes the interim status. Application,
-configuration, and dependency changes stay `pending` until preview is requested.
+**Jobs:** `Refresh preview state` handles automatic events with a single status-only job.
+`Plan preview` runs only on explicit dispatch, resolves the candidate through the API, requires
+successful CI evidence, verifies the artifact's manifest and digest, and publishes the interim
+status. Application, configuration, and dependency changes stay `pending` until preview is requested.
 `Deploy preview` runs only for that dispatch in the `preview` environment (same-repository
 candidates) or `preview-fork` (required maintainer approval, self-approval and administrator bypass
 disabled), repeats every freshness check, re-verifies the artifact, uploads it with pinned Wrangler
@@ -463,26 +474,52 @@ deployment URL. `Publish preview result` rechecks freshness and publishes succes
 still-current candidate; any failed stage publishes failure, and a controller crash publishes
 failure on the candidate revision.
 
-**Merge flow:** open the PR and iterate freely; pushes run CI only. When ready, enable auto-merge
-(`gh pr merge <n> --auto --squash`). The controller requests the preview for the validated head, and
-GitHub merges once `CI Result` and `Preview Result` pass. If `main` moves, update the branch: the new
-revision's CI completion requests a fresh preview while auto-merge stays enabled.
-
 **Defaults:** preview-required changes stay pending until explicitly previewed; drafts stay pending;
-documentation-only PRs receive `success: not applicable`; fork PRs need both a request (dispatch
-or maintainer-enabled auto-merge) and environment approval. A previous success is reused only for the same revision, artifact digest,
+documentation-only PRs receive `success: not applicable`; fork PRs need both an explicit dispatch
+and environment approval. A previous success is reused only for the same revision, artifact digest,
 and profile version (`[preview <digest12> v1]` marker).
 
 **Manual preview:** `gh workflow run preview.yml --ref main -f run_id=<ci-run-id>`. Use the
 successful CI run for the PR's current head. The controller repeats every eligibility and freshness
 check; it cannot bypass failed CI or deploy a stale revision.
 
+For a same-repository PR, a maintainer or administrator can instead post the exact comment
+`/preview`. The default-branch `preview-request.yml` workflow checks the comment actor's current
+repository role, resolves the successful CI run for the PR's current head and base, and dispatches
+the same trusted Preview workflow. It replies to authorized requests with the outcome; denied
+requests do not receive a bot reply. It does not
+accept edited comments or fork PRs. The comment does not bypass the controller's artifact and
+freshness checks. A repeat request for the same
+validated deployment reuses its existing evidence; fork previews keep the explicit dispatch and
+`preview-fork` environment approval. A new head or base revision needs fresh CI and a new request.
+
+For pull requests, `Preview Result` is published on the validated head commit only. GitHub
+regenerates the test-merge commit (new SHA, same parents and tree) when a merge is attempted, so a
+status there disappears and blocks the merge; strict ruleset freshness keeps a head-bound result
+tied to current main. Artifact verification still binds to the test merge and accepts a
+regenerated commit only with the same base/head parents and tree. A dispatched
+branch build associated with a PR can satisfy it only when the build tree matches that test merge
+and the PR base is current main; otherwise the result stays pending. Crowdin, Dependabot, and
+standalone release candidates read the head status. A briefly missing test merge is retried and
+the result stays pending. The hourly fallback re-evaluates that head once the test merge
+becomes available after the event retry. One required context appears per PR.
+
+**Late-build shadow:** `gh workflow run finalization-shadow.yml --ref main -f pull_request=<pr-number> -f ci_run_id=<ci-run-id>`.
+Only a maintain/admin actor can request this non-authoritative rehearsal. It checks the current
+PR, base, test merge, CI run and attempt, then builds a deployable candidate in an isolated
+credential-free container unless the PR is docs-only. A trusted host step rejects links and special
+files before upload; a fresh trusted runner seals the output as
+`pages-preview-shadow`. The shadow does not deploy, publish `CI Result`/`Preview Result`, or change
+merge behavior. Ordinary PR CI continues to build and upload `pages-preview`. Re-dispatch after a
+push or base change; dispatch from `main` so the trusted default-branch workflow definition runs.
+Docs-only requests recheck the revision before finishing. Fork runs without a CI API base snapshot
+fail closed in the shadow; the existing protected `preview-fork` deployment path is unaffected.
+
 **Trusted automation:** Crowdin translation merges and release staging request one preview after
 their dispatched CI run succeeds on the exact candidate SHA. Allowlisted Dependabot auto-merge
-requests one after all candidate checks pass. Ordinary PR revisions deploy only after auto-merge is
-enabled or a maintainer dispatches.
+requests one after all candidate checks pass. Ordinary PR revisions do not deploy automatically.
 
-**Metrics:** each controller run summary records the action (deploy/reuse/skip/wait/request/fail),
+**Metrics:** each controller run summary records the action (deploy/reuse/skip/wait/fail),
 revision, digest, deployment URL, whether the result was published, and the validation-to-preview
 duration. Deployment (`preview-deployment-<sha>`) and smoke (`preview-smoke-<sha>`) evidence
 artifacts are retained for 30 days. Count deployments, skipped drafts, reused artifacts, and
@@ -494,8 +531,9 @@ Cloudflare MCP readback: Pages project `tarkovtracker` keeps `main` as its produ
 keeps production Git deployments enabled. `preview_deployment_setting` is `none`; preview runtime
 variables match the anonymous checked-in configuration, and production KV and Durable Object
 bindings and production secrets are absent. Production deployment configuration was unchanged.
-GitHub CLI readback: the existing `Main CI freshness` ruleset still requires only `CI Result`.
-Repository auto-merge (`allow_auto_merge`) must be enabled for the merge-intent preview request.
+The initial rollout readback found only `CI Result`. The live September 23 ruleset requires both
+`CI Result` and `Preview Result`, and `.github/main-ci-ruleset.json` matches it. Restoring the
+ruleset from that file preserves both required checks.
 `preview` and `preview-fork` are restricted to `main`; fork previews require approval from
 `DysektAI` or `Chica999`, with self-approval and administrator bypass disabled. Both environments
 have `CLOUDFLARE_ACCOUNT_ID`. `CLOUDFLARE_PAGES_API_TOKEN` now exists as a secret in both
@@ -503,7 +541,7 @@ environments, and the repository-scoped copy was removed. GitHub confirms secret
 not reveal its value or scope; the first manual deployment checks that the token works. The connected
 Cloudflare API credential cannot create API tokens.
 
-Ordered rollout (keep `Preview Result` non-required until acceptance passes):
+Ordered rollout (verify `Preview Result` enforcement; apply the ruleset only if it is absent):
 
 1. Capture settings (done above). Readback commands, run with a scoped `CLOUDFLARE_API_TOKEN`:
 
@@ -524,25 +562,31 @@ Ordered rollout (keep `Preview Result` non-required until acceptance passes):
    a manual dispatch can select another ref's workflow file.
 4. Merge the trusted-controller bootstrap change that fixes the default-branch credential mapping
    and makes automatic controller events wait instead of uploading. A PR's edits to
-   `preview.yml` cannot exercise themselves because `workflow_run` loads that workflow from `main`.
+   `preview-state.yml` cannot exercise itself because `workflow_run` loads that workflow from `main`.
 5. The live isolation and cost controls are complete: Cloudflare automatic preview builds are off,
    production deployments remain on, and the Pages preview runtime has no production secrets or
    bindings. GitHub environments are created and protected as described above. Do not reuse the
    KV-only `CLOUDFLARE_API_TOKEN`.
 6. After the bootstrap change is on `main`, dispatch `preview.yml` with the successful `run_id` for
-   PR #896's current head. Confirm upload, deployment record, smoke suite, and current-SHA status.
+   PR #896's current head. Confirm upload, deployment record, smoke suite, and head-SHA status.
    Dispatch from `main`; do not test candidate-controlled workflow code with deployment secrets.
-7. Complete the live acceptance scenarios (application PR success and failure, documentation-only
-   PR, translation PR, draft transition, approved fork, superseded revision, release-staging
-   candidate; confirm GitHub blocks merging when the preview fails or is missing). Then add
-   `Preview Result` (GitHub Actions, integration id `15368`) to `.github/main-ci-ruleset.json` and
-   the deployed `Main CI freshness` ruleset alongside `CI Result`, preserving strict freshness and the
-   empty bypass list:
+7. Verify that the deployed ruleset already requires `Preview Result` alongside `CI Result`, with
+   strict freshness and the empty bypass list, and that a preview-required PR with a missing or
+   pending `Preview Result` is blocked. Apply `.github/main-ci-ruleset.json` only if that
+   requirement is absent, then repeat the verification. Confirm one current-head application PR
+   uploads, passes smoke tests, and publishes `Preview Result: success`, and that its prior
+   automatic result stayed pending without a Pages build. Review the controller's failure and
+   stale-revision fixtures and the existing failed PR evidence:
 
    ```bash
-   gh api -X PUT repos/tarkovtracker-org/TarkovTracker/rulesets/23539975 --input .github/main-ci-ruleset.json
    gh api repos/tarkovtracker-org/TarkovTracker/rules/branches/main
+   # Only if Preview Result is not already required:
+   gh api -X PUT repos/tarkovtracker-org/TarkovTracker/rulesets/23539975 --input .github/main-ci-ruleset.json
    ```
+
+   Check documentation-only, translation, draft transition, approved fork, superseded revision,
+   and release-staging behavior on the next matching live candidates. Keep fixture coverage for
+   these cases; do not create extra Pages builds solely to exercise the rollout matrix.
 
 8. Remove temporary compatibility behavior after the new paths are verified.
 

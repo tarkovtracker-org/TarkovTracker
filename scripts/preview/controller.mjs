@@ -29,6 +29,9 @@ import {
 // artifacts, workflow payloads, and manifests as claims to verify against live GitHub state.
 export const ENVIRONMENTS = { internal: 'preview', fork: 'preview-fork' };
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
+// Every "test merge not ready" pending reason starts with this prefix so the hourly fallback can
+// re-evaluate it once GitHub computes the merge; other pending reasons are left alone.
+const MERGE_PENDING = 'GitHub has not finished computing';
 class Outcome extends Error {
   constructor(action, state, description) {
     super(description);
@@ -122,11 +125,35 @@ async function resolveCandidate({ github, context, inputs }) {
 /* ------------------------------------------------------------------------------------------ */
 /* Live state                                                                                  */
 /* ------------------------------------------------------------------------------------------ */
-async function resolvePull(github, context, candidate) {
-  if (candidate.pullRequest) return getPull(github, context.repo, candidate.pullRequest);
-  const pull = await findPullForHead(github, context.repo, candidate);
+async function findCandidatePull(github, context, candidate) {
+  return candidate.pullRequest
+    ? await getPull(github, context.repo, candidate.pullRequest)
+    : await findPullForHead(github, context.repo, candidate);
+}
+function assertCandidatePull(pull, candidate) {
   if (!pull && candidate.runEvent === 'pull_request')
     throw ignore('No open pull request currently points at the validated head.');
+}
+async function resolvePull(github, context, candidate) {
+  const pull = await findCandidatePull(github, context, candidate);
+  assertCandidatePull(pull, candidate);
+  return needsMergeRetry(pull) ? waitForMerge(github, context, candidate, pull) : pull;
+}
+function needsMergeRetry(pull) {
+  return pull && pull.state === 'open' && !SHA_PATTERN.test(String(pull.merge_commit_sha));
+}
+function pullRevisionChanged(current, candidate) {
+  return current.head.sha !== candidate.headSha || current.base.ref !== PRODUCTION_BRANCH;
+}
+async function waitForMerge(github, context, candidate, pull) {
+  // GitHub briefly returns a null test merge after a PR is opened or synchronized. Retry
+  // before verifying; artifact claims bind to the test merge even though the status targets the head.
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const current = await getPull(github, context.repo, pull.number);
+    if (pullRevisionChanged(current, candidate)) return current;
+    if (SHA_PATTERN.test(String(current.merge_commit_sha))) return current;
+  }
   return pull;
 }
 function assertPullState(pull) {
@@ -152,11 +179,28 @@ async function runById(github, context, candidate) {
     throw failure('CI run identity does not match the candidate revision.');
   return run;
 }
+function sameCandidateBranch(run, candidate) {
+  return [
+    run.head_repository?.full_name === candidate.headRepo,
+    run.head_branch === candidate.headBranch,
+  ].every(Boolean);
+}
+function assertLatestPullRun(candidate, latest) {
+  if (!latest) throw pending('Waiting for CI to start for this revision.');
+  if (candidate.runId && candidate.runId !== latest.id) {
+    throw ignore('A newer CI run superseded this preview state event.');
+  }
+}
+async function resolvePullRun(github, context, candidate) {
+  const latest = await findLatestPullRun(github, context.repo, candidate.headSha, (run) =>
+    sameCandidateBranch(run, candidate)
+  );
+  assertLatestPullRun(candidate, latest);
+  return candidate.runId ? runById(github, context, candidate) : latest;
+}
 async function resolveRun(github, context, candidate) {
-  if (candidate.runId) return runById(github, context, candidate);
-  const run = await findLatestPullRun(github, context.repo, candidate.headSha);
-  if (!run) throw pending('Waiting for CI to start for this revision.');
-  return run;
+  if (candidate.runEvent === 'pull_request') return resolvePullRun(github, context, candidate);
+  return runById(github, context, candidate);
 }
 function assertRunRepository(run, candidate) {
   if (run.head_repository?.full_name !== candidate.headRepo)
@@ -207,6 +251,85 @@ function runTreeSha(run) {
   const tree = run.head_commit?.tree_id;
   return SHA_PATTERN.test(String(tree)) ? tree : null;
 }
+function dispatchMergePrerequisite(pull, run) {
+  if (!SHA_PATTERN.test(String(pull.merge_commit_sha)))
+    return `${MERGE_PENDING} the PR test merge; retry after it is ready.`;
+  if (!runTreeSha(run)) return 'Dispatched CI run has no verifiable Git tree.';
+  return null;
+}
+async function currentPullBaseMismatch(github, context, pull) {
+  if (!SHA_PATTERN.test(String(pull.merge_commit_sha)))
+    return `${MERGE_PENDING} the PR test merge; retry after it is ready.`;
+  const { data: main } = await github.rest.git.getRef({
+    ...context.repo,
+    ref: `heads/${PRODUCTION_BRANCH}`,
+  });
+  return pull.base.sha === main.object.sha
+    ? null
+    : 'PR base is no longer current main; rerun PR CI before requesting a preview.';
+}
+async function dispatchMergeMismatch(github, context, pull, run) {
+  const prerequisite = dispatchMergePrerequisite(pull, run);
+  if (prerequisite) return prerequisite;
+  const baseMismatch = await currentPullBaseMismatch(github, context, pull);
+  if (baseMismatch) return baseMismatch;
+  const { data: merge } = await github.rest.git.getCommit({
+    ...context.repo,
+    commit_sha: pull.merge_commit_sha,
+  });
+  return merge.tree.sha === runTreeSha(run)
+    ? null
+    : 'Dispatched branch build differs from the PR test merge; request a preview from PR CI.';
+}
+/* GitHub can regenerate a PR's test-merge commit (observed when a merge is attempted) with the
+   same parents and tree but a new SHA. A test merge is identified by that content, not its SHA. */
+function shapeOf(data) {
+  return { tree: data.tree?.sha, parents: (data.parents ?? []).map((parent) => parent.sha) };
+}
+function missingCommit(error) {
+  return [404, 422].includes(error.status);
+}
+async function commitShape(github, context, sha) {
+  try {
+    const { data } = await github.rest.git.getCommit({ ...context.repo, commit_sha: sha });
+    return shapeOf(data);
+  } catch (error) {
+    if (missingCommit(error)) return null;
+    throw error;
+  }
+}
+function representsPull(shape, pull) {
+  return [
+    shape.parents.length === 2,
+    shape.parents[0] === pull.base.sha,
+    shape.parents[1] === pull.head.sha,
+    SHA_PATTERN.test(String(shape.tree)),
+  ].every(Boolean);
+}
+function comparableMerges(pull, sha) {
+  return [sha, pull.merge_commit_sha].every((value) => SHA_PATTERN.test(String(value)));
+}
+function sameMergeContent(claimed, current, pull) {
+  if (!claimed || !current) return false;
+  return [
+    representsPull(claimed, pull),
+    representsPull(current, pull),
+    claimed.tree === current.tree,
+  ].every(Boolean);
+}
+/** True when `sha` is the PR's current test merge or a regenerated equivalent of it. */
+async function equivalentTestMerge(github, context, pull, sha) {
+  if (!comparableMerges(pull, sha)) return false;
+  if (sha === pull.merge_commit_sha) return true;
+  const claimed = await commitShape(github, context, sha);
+  const current = await commitShape(github, context, pull.merge_commit_sha);
+  return sameMergeContent(claimed, current, pull);
+}
+async function requireDispatchMergeProof(github, context, candidate, pull, run) {
+  if (!pull || candidate.runEvent !== 'workflow_dispatch') return;
+  const mismatch = await dispatchMergeMismatch(github, context, pull, run);
+  if (mismatch) throw pending(mismatch);
+}
 function claimCheckedOutSha(candidate, pull) {
   return candidate.runEvent === 'pull_request' && pull ? pull.merge_commit_sha : candidate.headSha;
 }
@@ -235,7 +358,7 @@ export function verifyManifest(manifest, expected, digest) {
   const errors = manifestShapeErrors(manifest);
   if (errors.length) return errors;
   if (!SHA_PATTERN.test(String(expected.checkedOutSha)))
-    return ['GitHub has not finished computing the test merge for this revision.'];
+    return [`${MERGE_PENDING} the test merge for this revision.`];
   const mismatches = claimErrors(manifest, expected);
   if (manifest.digest !== digest) mismatches.push('digest: build output does not match manifest');
   return mismatches;
@@ -254,13 +377,24 @@ function readManifest(destination) {
     throw failure('Preview artifact has no readable manifest.');
   }
 }
+async function mergeBoundExpectation({ github, context, candidate, pull, manifest, expected }) {
+  if (candidate.runEvent !== 'pull_request' || !pull) return expected;
+  const equivalent = await equivalentTestMerge(github, context, pull, manifest.checkedOutSha);
+  return equivalent ? { ...expected, checkedOutSha: manifest.checkedOutSha } : expected;
+}
 async function verifiedArtifact({ github, context, candidate, pull, run, destination }) {
   const artifact = await fetchArtifact(github, context, run, destination);
   const manifest = readManifest(destination);
-  const expected = expectedManifest(context, candidate, pull, run);
+  const expected = await mergeBoundExpectation({
+    github,
+    context,
+    candidate,
+    pull,
+    manifest,
+    expected: expectedManifest(context, candidate, pull, run),
+  });
   const errors = verifyManifest(manifest, expected, digestDirectory(destination));
-  if (errors.length === 1 && errors[0].startsWith('GitHub has not finished'))
-    throw pending(errors[0]);
+  if (errors.length === 1 && errors[0].startsWith(MERGE_PENDING)) throw pending(errors[0]);
   if (errors.length) throw failure(`Preview artifact verification failed: ${errors.join('; ')}`);
   return { artifact, manifest };
 }
@@ -329,12 +463,12 @@ async function authenticatedPreviousSuccess(github, context, status, sha) {
 function matchesSuccessMarker(status, marker) {
   return status.state === 'success' && status.description?.includes(marker);
 }
-async function previousSuccess(github, context, sha, digest) {
-  const statuses = await allStatuses(github, context.repo, sha, 'Preview Result');
+async function previousSuccess(github, context, headSha, digest) {
+  const statuses = await allStatuses(github, context.repo, headSha, 'Preview Result');
   const marker = successMarker(digest);
   for (const status of statuses.toSorted((left, right) => right.id - left.id)) {
     if (!matchesSuccessMarker(status, marker)) continue;
-    if (await authenticatedPreviousSuccess(github, context, status, sha)) return status;
+    if (await authenticatedPreviousSuccess(github, context, status, headSha)) return status;
   }
   return null;
 }
@@ -381,6 +515,7 @@ async function evaluate({ github, context, inputs, workspace }, state) {
   state.run = await resolveRun(github, context, state.candidate);
   checkRunState(state.run, state.candidate);
   await checkCiResult(github, context, state.candidate);
+  await requireDispatchMergeProof(github, context, state.candidate, state.pull, state.run);
   if (!(await requiresPreview(github, context, state.pull)))
     return { ...decisionBase(state), ...notApplicable() };
   return deployDecision({ github, context, state, workspace });
@@ -397,6 +532,25 @@ function notApplicable() {
     action: 'skip',
     state: 'success',
     description: 'Not applicable: documentation-only change set with successful CI.',
+  };
+}
+function deploymentDecision(common, earlier, manifest, fork, headSha) {
+  if (earlier) {
+    return {
+      ...common,
+      action: 'reuse',
+      state: 'success',
+      description: `Preview already deployed for this revision ${successMarker(manifest.digest)}`,
+      reuseTargetUrl: earlier.target_url,
+    };
+  }
+  return {
+    ...common,
+    action: 'deploy',
+    state: 'pending',
+    description: fork
+      ? `Fork preview awaits maintainer approval for ${headSha.slice(0, 12)}.`
+      : 'Deploying the validated preview.',
   };
 }
 async function deployDecision({ github, context, state, workspace }) {
@@ -420,23 +574,7 @@ async function deployDecision({ github, context, state, workspace }) {
     environment: fork ? ENVIRONMENTS.fork : ENVIRONMENTS.internal,
   };
   const earlier = await previousSuccess(github, context, candidate.headSha, manifest.digest);
-  if (earlier) {
-    return {
-      ...common,
-      action: 'reuse',
-      state: 'success',
-      description: `Preview already deployed for this revision ${successMarker(manifest.digest)}`,
-      reuseTargetUrl: earlier.target_url,
-    };
-  }
-  return {
-    ...common,
-    action: 'deploy',
-    state: 'pending',
-    description: fork
-      ? `Fork preview awaits maintainer approval for ${candidate.headSha.slice(0, 12)}.`
-      : 'Deploying the validated preview.',
-  };
+  return deploymentDecision(common, earlier, manifest, fork, candidate.headSha);
 }
 function outcomeDecision(error, state) {
   if (!(error instanceof Outcome)) throw error;
@@ -447,18 +585,6 @@ function outcomeDecision(error, state) {
     description: error.message,
   };
 }
-function workflowRunHead(context) {
-  const run = context.payload.workflow_run;
-  if (run && run.head_branch !== PRODUCTION_BRANCH && isCiRun(run)) return run.head_sha;
-  return null;
-}
-function pullEventHead(context) {
-  return context.payload.pull_request?.head?.sha ?? null;
-}
-/** Best-effort revision for reporting a controller crash; never the production branch. */
-export function fallbackHead(context) {
-  return workflowRunHead(context) ?? pullEventHead(context);
-}
 /* ------------------------------------------------------------------------------------------ */
 /* Public phases                                                                               */
 /* ------------------------------------------------------------------------------------------ */
@@ -466,25 +592,26 @@ function statusTargetUrl(context, decision) {
   return decision.reuseTargetUrl ?? runUrl(context);
 }
 async function publishDecision(github, context, decision) {
-  if (!decision.state || !decision.headSha) return;
-  const targets = [decision.headSha, decision.mergeSha].filter(
-    (sha, index, all) => sha && all.indexOf(sha) === index
-  );
-  for (const sha of targets) {
-    await publishStatus(github, context.repo, {
-      sha,
-      state: decision.state,
-      description: decision.description,
-      targetUrl: statusTargetUrl(context, decision),
-    });
-  }
+  if (!decision.state || !decision.headSha) return false;
+  // Always report on the validated head. GitHub regenerates the test-merge commit when a merge is
+  // attempted, dropping any status on it; strict ruleset freshness binds the head to current main.
+  await publishStatus(github, context.repo, {
+    sha: decision.headSha,
+    state: decision.state,
+    description: decision.description,
+    targetUrl: statusTargetUrl(context, decision),
+  });
+  return true;
 }
 function awaitExplicitPreview(decision) {
+  const request = decision.fork
+    ? `Run Preview with run_id=${decision.runId}. Fork needs maintainer approval.`
+    : 'Comment /preview on this PR after CI succeeds.';
   return {
     ...decision,
     action: 'wait',
     state: 'pending',
-    description: `Preview pending: ${decision.headSha.slice(0, 12)}. Enable auto-merge, or run Preview with run_id=${decision.runId}.${decision.fork ? ' Fork needs maintainer approval.' : ''}`,
+    description: `Preview pending: ${decision.headSha.slice(0, 12)}. ${request}`,
   };
 }
 function isAutomaticDeploy(context, decision) {
@@ -513,10 +640,10 @@ function deferAutomaticPreview(context, state, decision) {
 }
 /** Publish the interim status first so the dispatched run's newer statuses always supersede it. */
 async function publishAndRequest(github, context, core, decision) {
-  await publishDecision(github, context, decision);
+  decision.statusPublished = await publishPlannedDecision(github, context, core, decision);
   if (decision.action !== 'request') return decision;
   try {
-    await requestPreviewDispatch(github, context.repo, decision.runId);
+    await requestPreviewDispatch(github, context.repo, decision);
     return decision;
   } catch (error) {
     core.warning(`Automatic preview request failed: ${error.message}`);
@@ -524,6 +651,12 @@ async function publishAndRequest(github, context, core, decision) {
     await publishDecision(github, context, manual);
     return manual;
   }
+}
+async function publishPlannedDecision(github, context, core, decision) {
+  if (decision.action === 'ignore') return false;
+  if (decision.pullRequest && !decision.mergeSha)
+    core.warning('PR test merge is not ready; Preview Result stays pending until a later refresh.');
+  return publishDecision(github, context, decision);
 }
 /** Phase 1: resolve the candidate, verify evidence, publish the interim status, emit the plan. */
 export async function planPreview({ github, context, core, inputs, workspace }) {
@@ -535,10 +668,60 @@ export async function planPreview({ github, context, core, inputs, workspace }) 
     decision = outcomeDecision(error, state);
   }
   decision = deferAutomaticPreview(context, state, decision);
-  if (decision.action !== 'ignore')
-    decision = await publishAndRequest(github, context, core, decision);
+  decision = await publishAndRequest(github, context, core, decision);
   core.info(`${decision.action}: ${decision.description}`);
   return decision;
+}
+function refreshContext(context, pull) {
+  return {
+    ...context,
+    eventName: 'pull_request_target',
+    payload: { ...context.payload, action: 'synchronize', pull_request: pull },
+  };
+}
+function awaitingTestMerge(status) {
+  return status.state === 'pending' && String(status.description).startsWith(MERGE_PENDING);
+}
+/** Refresh a head with no result, or one left pending only because the test merge was not ready. */
+async function needsPreviewRefresh(github, context, pull) {
+  if (!SHA_PATTERN.test(String(pull.merge_commit_sha))) return false;
+  const statuses = await allStatuses(github, context.repo, pull.head.sha, 'Preview Result');
+  const latest = statuses.toSorted((left, right) => right.id - left.id)[0];
+  return !latest || awaitingTestMerge(latest);
+}
+async function refreshMissingPull(github, context, core, workspace, item) {
+  const pull = await getPull(github, context.repo, item.number);
+  if (!(await needsPreviewRefresh(github, context, pull))) return;
+  const current = refreshContext(context, pull);
+  try {
+    await planPreview({
+      github,
+      context: current,
+      core,
+      workspace: join(workspace, `pr-${pull.number}`),
+    });
+  } catch (error) {
+    await publishControllerFailure({ github, context: current, core });
+    throw error;
+  }
+}
+/** Hourly fallback for a test merge that became available after the last PR/CI event. */
+export async function reconcileMissingPreviewStatuses({ github, context, core, workspace }) {
+  const pulls = await github.paginate(github.rest.pulls.list, {
+    ...context.repo,
+    state: 'open',
+    base: PRODUCTION_BRANCH,
+    per_page: 100,
+  });
+  const errors = [];
+  for (const pull of pulls) {
+    try {
+      await refreshMissingPull(github, context, core, workspace, pull);
+    } catch (error) {
+      errors.push(`#${pull.number}: ${error.message}`);
+    }
+  }
+  if (errors.length) throw new Error(`Preview reconciliation failed: ${errors.join('; ')}`);
 }
 function pullReadinessError(pull) {
   if (pull.state !== 'open' || pull.draft) return 'pull request is not open and ready';
@@ -547,7 +730,9 @@ function pullReadinessError(pull) {
 async function pullFreshnessErrors(github, context, decision) {
   const pull = await getPull(github, context.repo, decision.pullRequest);
   const headMoved = pull.head.sha !== decision.headSha ? 'pull request head moved' : null;
-  const mergeChanged = pull.merge_commit_sha !== decision.mergeSha ? 'test merge changed' : null;
+  const mergeChanged = (await equivalentTestMerge(github, context, pull, decision.mergeSha))
+    ? null
+    : 'test merge changed';
   return [pullReadinessError(pull), headMoved, mergeChanged].filter(Boolean);
 }
 function runFreshnessErrors(run, decision) {
@@ -561,7 +746,13 @@ async function freshnessErrors(github, context, decision) {
     ? await pullFreshnessErrors(github, context, decision)
     : [];
   const run = await getRun(github, context.repo, decision.runId);
-  return [...pullErrors, ...runFreshnessErrors(run, decision)];
+  const mismatch = await dispatchFreshnessMismatch(github, context, decision, run);
+  return [...pullErrors, ...runFreshnessErrors(run, decision), ...(mismatch ? [mismatch] : [])];
+}
+async function dispatchFreshnessMismatch(github, context, decision, run) {
+  if (!decision.pullRequest || decision.runEvent !== 'workflow_dispatch') return null;
+  const pull = await getPull(github, context.repo, decision.pullRequest);
+  return dispatchMergeMismatch(github, context, pull, run);
 }
 function candidateFromDecision(decision) {
   return {
@@ -647,18 +838,17 @@ async function publishTerminal(github, context, core, decision, result) {
     core.warning(`Not publishing success for an obsolete candidate: ${stale.join('; ')}`);
     return false;
   }
-  await publishDecision(github, context, {
+  return publishDecision(github, context, {
     ...decision,
     state: result.state,
     description: result.message,
   });
-  return true;
 }
 /** Phase 3: publish the authoritative result only for a still-current candidate. */
 export async function publishResult({ github, context, core, decision, outcomes, evidence }) {
   if (decision.action !== 'deploy') {
     const planned = new Outcome(decision.action, decision.state, decision.description);
-    await summarize(core, decision, planned, true, evidence);
+    await summarize(core, decision, planned, decision.statusPublished, evidence);
     return decision.state;
   }
   const result = terminalResult(decision, outcomes);
@@ -667,17 +857,56 @@ export async function publishResult({ github, context, core, decision, outcomes,
   if (result.state === 'failure') core.setFailed(result.message);
   return published ? result.state : 'obsolete';
 }
-/** Report a controller crash on the candidate revision so the gate cannot pass by omission. */
-export async function publishControllerFailure({ github, context, core, decision }) {
-  const headSha = decision?.headSha ?? fallbackHead(context);
-  if (!headSha) {
-    core.warning('Controller failed before a candidate revision was known.');
-    return;
+function unchangedFailureEvent(context, pull) {
+  if (context.eventName !== 'pull_request_target') return true;
+  const event = context.payload.pull_request;
+  const sameBase = event.base.sha === pull.base.sha;
+  const eventMerge = event.merge_commit_sha;
+  return (
+    sameBase && (!SHA_PATTERN.test(String(eventMerge)) || eventMerge === pull.merge_commit_sha)
+  );
+}
+function sameFailureSnapshot(snapshot, pull) {
+  return [
+    snapshot.number === pull.number,
+    snapshot.head?.sha === pull.head.sha,
+    snapshot.base?.sha === pull.base.sha,
+  ].every(Boolean);
+}
+function currentFailureRun(candidate, pull, run) {
+  if (!pull || candidate.runEvent !== 'pull_request') return true;
+  const snapshots = run.pull_requests ?? [];
+  // Fork runs may omit PR/base snapshots. An old run with the same head cannot be attributed
+  // to today's test merge, so leave its required status pending instead of failing the wrong SHA.
+  return snapshots.some((snapshot) => sameFailureSnapshot(snapshot, pull));
+}
+async function liveFailureIdentity(github, context, inputs) {
+  const candidate = await resolveCandidate({ github, context, inputs });
+  const pull = await resolvePull(github, context, candidate);
+  checkPullFreshness(pull, candidate);
+  if (pull && !unchangedFailureEvent(context, pull)) return null;
+  const run = await resolveRun(github, context, candidate);
+  if (!currentFailureRun(candidate, pull, run)) return null;
+  await requireDispatchMergeProof(github, context, candidate, pull, run);
+  return decisionBase({ candidate, pull });
+}
+async function failureIdentity(github, context, core, inputs, decision) {
+  if (decision?.headSha) return decision;
+  try {
+    return await liveFailureIdentity(github, context, inputs);
+  } catch (error) {
+    core.warning(`Could not identify a current candidate for failure reporting: ${error.message}`);
+    return null;
   }
-  await publishDecision(github, context, {
-    ...decision,
-    headSha,
+}
+/** Re-identify the live candidate after a controller crash; never fail a stale PR revision. */
+export async function publishControllerFailure({ github, context, core, inputs, decision }) {
+  const identity = await failureIdentity(github, context, core, inputs, decision);
+  if (!identity) return;
+  const published = await publishDecision(github, context, {
+    ...identity,
     state: 'failure',
     description: 'Preview controller failed; inspect the workflow run.',
   });
+  if (!published) core.warning('No failure status was published.');
 }

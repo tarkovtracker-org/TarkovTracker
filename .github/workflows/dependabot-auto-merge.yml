@@ -124,22 +124,35 @@ jobs:
             check_runs="$(
               gh api \
                 "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs?per_page=100" \
-                --jq '.check_runs | map(select(.name != "Auto-merge safe Dependabot PR" and .name != "Plan preview" and .name != "Deploy preview" and .name != "Preview smoke tests" and .name != "Publish preview result"))'
+                --jq '.check_runs | map(select(.name != "Auto-merge safe Dependabot PR" and .name != "Refresh preview state" and .name != "Plan preview" and .name != "Deploy preview" and .name != "Preview smoke tests" and .name != "Publish preview result"))'
             )"
             status_contexts="$(
               gh api \
                 "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/status" \
-                --jq '.statuses | sort_by(.context, .id) | group_by(.context) | map(last)'
+                --jq '.statuses | sort_by(.context, .id) | group_by(.context) | map(last) | map(select(.context != "Preview Result"))'
+            )"
+            current_pr="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+            if ! jq -e --arg sha "$HEAD_SHA" '.state == "open" and .draft == false and .base.ref == "main" and .head.sha == $sha' >/dev/null <<< "$current_pr"; then
+              echo "::error::Dependabot pull request changed while waiting for preview."
+              exit 1
+            fi
+            # Preview Result targets the validated head: GitHub regenerates the test-merge
+            # commit when a merge is attempted, so a status there would not survive.
+            preview_status_contexts="$(
+              gh api \
+                "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/status" \
+                --jq '[.statuses[] | select(.context == "Preview Result")] | sort_by(.id) | if length > 0 then [last] else [] end'
             )"
             failing_count="$(
               jq '[.[] | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out" or .conclusion == "action_required")] | length' <<< "$check_runs"
             )"
             failing_status_count="$(
-              jq '[.[] | select(.state == "failure" or .state == "error")] | length' <<< "$status_contexts"
+              jq -n --argjson head "$status_contexts" --argjson preview "$preview_status_contexts" '[($head + $preview)[] | select(.state == "failure" or .state == "error")] | length'
             )"
             if [ "$failing_count" -gt 0 ] || [ "$failing_status_count" -gt 0 ]; then
               jq -r '.[] | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out" or .conclusion == "action_required") | "::error::\(.name) concluded \(.conclusion)"' <<< "$check_runs"
               jq -r '.[] | select(.state == "failure" or .state == "error") | "::error::\(.context) concluded \(.state)"' <<< "$status_contexts"
+              jq -r '.[] | select(.state == "failure" or .state == "error") | "::error::\(.context) concluded \(.state)"' <<< "$preview_status_contexts"
               exit 1
             fi
             missing_checks=()
@@ -148,7 +161,7 @@ jobs:
               jq '[.[] | select(.status != "completed")] | length' <<< "$check_runs"
             )"
             pending_status_count="$(
-              jq '[.[] | select(.state == "pending")] | length' <<< "$status_contexts"
+              jq -n --argjson head "$status_contexts" --argjson preview "$preview_status_contexts" '[($head + $preview)[] | select(.state == "pending")] | length'
             )"
             other_pending_status_count="$(
               jq '[.[] | select(.context != "Preview Result" and .state == "pending")] | length' <<< "$status_contexts"
@@ -174,7 +187,7 @@ jobs:
             fi
             for status_context in "${expected_statuses[@]}"; do
               latest_state="$(
-                jq -r --arg name "$status_context" '[.[] | select(.context == $name)] | last | .state // "missing"' <<< "$status_contexts"
+                jq -r --arg name "$status_context" '[.[] | select(.context == $name)] | last | .state // "missing"' <<< "$preview_status_contexts"
               )"
               case "$latest_state" in
                 success) ;;

@@ -1,3 +1,31 @@
+## [1.81.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.81.3...v1.81.4) (2026-09-25)
+
+
+### Bug Fixes
+
+* **preview:** resolve fork pull requests by owner:branch head ([#928](https://github.com/tarkovtracker-org/TarkovTracker/issues/928)) ([55e0d0f](https://github.com/tarkovtracker-org/TarkovTracker/commit/55e0d0fcb3355708971eeacf98629435557f0f53))
+
+## [1.81.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.81.2...v1.81.3) (2026-09-25)
+
+
+### Bug Fixes
+
+* **ui:** normalize needed-item inline count edits ([#896](https://github.com/tarkovtracker-org/TarkovTracker/issues/896)) ([eb23cfa](https://github.com/tarkovtracker-org/TarkovTracker/commit/eb23cfa5bf7560e2c9e91da5fc2a0abc167e8980))
+
+## [1.81.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.81.1...v1.81.2) (2026-09-25)
+
+
+### Bug Fixes
+
+* **ci:** bind Preview Result to the PR head, not the regenerable test merge ([#924](https://github.com/tarkovtracker-org/TarkovTracker/issues/924)) ([74cc542](https://github.com/tarkovtracker-org/TarkovTracker/commit/74cc5420db6ea34bb912abef05a4dfd8fbb845e0)), closes [#916](https://github.com/tarkovtracker-org/TarkovTracker/issues/916)
+
+## [1.81.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.81.0...v1.81.1) (2026-09-23)
+
+
+### Bug Fixes
+
+* **ci:** pass computed GitHub repository context to shadow planner ([#905](https://github.com/tarkovtracker-org/TarkovTracker/issues/905)) ([715266a](https://github.com/tarkovtracker-org/TarkovTracker/commit/715266a649f9b1691bc8b06f942fa55f4b9fda5c))
+
 # [1.81.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.80.2...v1.81.0) (2026-09-23)
 
 

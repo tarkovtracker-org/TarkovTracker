@@ -17,13 +17,39 @@ function matchesCandidate(pull, candidate) {
   ];
   return checks.every(Boolean);
 }
-/** Resolve the open pull request whose current head is the validated commit, if any. */
-export async function findPullForHead(github, repo, candidate) {
-  const pulls = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
+function isForkCandidate(repo, candidate) {
+  return Boolean(candidate.headRepo) && candidate.headRepo !== `${repo.owner}/${repo.repo}`;
+}
+/** `owner:branch` filter for a fork candidate; null for same-repository candidates. */
+function forkHeadFilter(repo, candidate) {
+  if (!isForkCandidate(repo, candidate) || !candidate.headBranch) return null;
+  return `${candidate.headRepo.split('/')[0]}:${candidate.headBranch}`;
+}
+/**
+ * Candidate PRs for a validated head. The base repository's commit-association lookup never
+ * returns PRs for commits that exist only in a fork, and fork CI runs carry no `pull_requests`,
+ * so fork candidates are listed by their `owner:branch` head instead.
+ */
+async function listCandidatePulls(github, repo, candidate) {
+  const head = forkHeadFilter(repo, candidate);
+  if (head) {
+    return github.paginate(github.rest.pulls.list, {
+      ...repo,
+      state: 'open',
+      head,
+      base: candidate.baseBranch,
+      per_page: 100,
+    });
+  }
+  return github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
     ...repo,
     commit_sha: candidate.headSha,
     per_page: 100,
   });
+}
+/** Resolve the open pull request whose current head is the validated commit, if any. */
+export async function findPullForHead(github, repo, candidate) {
+  const pulls = await listCandidatePulls(github, repo, candidate);
   const matches = pulls.filter((pull) => matchesCandidate(pull, candidate));
   return matches.length === 1 ? matches[0] : null;
 }
@@ -31,16 +57,18 @@ export async function getRun(github, repo, runId) {
   const { data } = await github.rest.actions.getWorkflowRun({ ...repo, run_id: runId });
   return data;
 }
-/** Newest CI run for one pull request head; used when a metadata event carries no run. */
-export async function findLatestPullRun(github, repo, headSha) {
+/** Newest matching PR CI run for a head; callers bind it to the requested PR or branch. */
+export async function findLatestPullRun(github, repo, headSha, matches = () => true) {
   const { data } = await github.rest.actions.listWorkflowRuns({
     ...repo,
     workflow_id: CI_WORKFLOW_FILE,
     event: 'pull_request',
     head_sha: headSha,
-    per_page: 20,
+    per_page: 100,
   });
-  return data.workflow_runs.toSorted((left, right) => right.id - left.id)[0] ?? null;
+  return (
+    data.workflow_runs.filter(matches).toSorted((left, right) => right.id - left.id)[0] ?? null
+  );
 }
 export function isCiRun(run) {
   return (
@@ -111,13 +139,34 @@ export async function listPullPaths(github, repo, number) {
   // GitHub caps the file listing; an incomplete listing must select the conservative decision.
   return files.length >= 3000 ? [] : paths;
 }
-/** Dispatch the trusted controller from the default branch for one validated CI run. */
-export async function requestPreviewDispatch(github, repo, runId) {
+function matchesPreviewRequest(run, decision) {
+  return [
+    run.path === '.github/workflows/preview.yml',
+    run.event === 'workflow_dispatch',
+    run.head_branch === PRODUCTION_BRANCH,
+    run.display_title === `Preview CI ${decision.runId} attempt ${decision.runAttempt}`,
+    run.status !== 'completed',
+  ].every(Boolean);
+}
+/** Active dispatches include queued runs and fork runs awaiting environment approval. */
+async function previewRequestInFlight(github, repo, decision) {
+  const { data } = await github.rest.actions.listWorkflowRuns({
+    ...repo,
+    workflow_id: PREVIEW_WORKFLOW_FILE,
+    event: 'workflow_dispatch',
+    branch: PRODUCTION_BRANCH,
+    per_page: 100,
+  });
+  return data.workflow_runs.some((run) => matchesPreviewRequest(run, decision));
+}
+/** Sequential state events must not replace an active deployment for the same CI attempt. */
+export async function requestPreviewDispatch(github, repo, decision) {
+  if (await previewRequestInFlight(github, repo, decision)) return;
   await github.rest.actions.createWorkflowDispatch({
     ...repo,
     workflow_id: PREVIEW_WORKFLOW_FILE,
     ref: PRODUCTION_BRANCH,
-    inputs: { run_id: String(runId) },
+    inputs: { run_id: String(decision.runId), run_attempt: String(decision.runAttempt) },
   });
 }
 function truncateDescription(description) {

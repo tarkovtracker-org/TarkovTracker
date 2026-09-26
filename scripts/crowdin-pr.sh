@@ -121,6 +121,11 @@ merge() {
   require_main_ci_policy
   dispatch_ci locales
   request_preview_after_dispatched_ci "$HEAD_SHA"
+  local pr
+  pr="$(read_pr)"
+  check_identity "$pr"
+  check_revision "$pr"
+  # Preview Result targets the validated head; GitHub may regenerate the test merge at merge time.
   wait_for_preview_result "$HEAD_SHA"
   wait_for_mergeability
   require_main_ci_policy

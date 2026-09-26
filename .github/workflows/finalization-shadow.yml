@@ -1,0 +1,189 @@
+name: Finalization shadow
+# Opt-in, credential-free rehearsal. This workflow never deploys or publishes required results.
+# Keep the dispatch on main: workflow_dispatch may otherwise execute a candidate workflow file.
+on:
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Open non-draft PR number targeting main
+        required: true
+        type: string
+      ci_run_id:
+        description: Successful exact-head pull_request CI run id
+        required: true
+        type: string
+concurrency:
+  group: finalization-shadow-pr-${{ inputs.pull_request }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  plan:
+    name: Plan finalization shadow
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      pull-requests: read
+    outputs:
+      decision: ${{ steps.plan.outputs.decision }}
+    steps:
+      - name: Checkout trusted planner
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Resolve exact candidate
+        id: plan
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PR_INPUT: ${{ inputs.pull_request }}
+          CI_RUN_INPUT: ${{ inputs.ci_run_id }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        with:
+          script: |
+            const { planShadow } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/finalization-shadow.mjs`);
+            const decision = await planShadow({
+              github, context: { ref: context.ref, repo: context.repo, actor: context.actor,
+                triggeringActor: process.env.TRIGGERING_ACTOR },
+              inputs: { pull_request: process.env.PR_INPUT, ci_run_id: process.env.CI_RUN_INPUT },
+            });
+            core.setOutput('decision', JSON.stringify(decision));
+            core.notice(decision.previewRequired
+              ? `Shadow build requested for PR #${decision.pullRequest} at ${decision.headSha}`
+              : `Preview N/A for documentation-only PR #${decision.pullRequest}`);
+  build:
+    name: Build finalization shadow
+    needs: plan
+    if: needs.plan.result == 'success' && fromJSON(needs.plan.outputs.decision).previewRequired
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout default-branch build tools
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: trusted
+          persist-credentials: false
+      - name: Checkout exact test merge
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ fromJSON(needs.plan.outputs.decision).mergeSha }}
+          path: candidate
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: trusted/.nvmrc
+      - name: Build candidate in isolated container
+        env:
+          APP_URL: ${{ fromJSON(needs.plan.outputs.decision).appUrl }}
+        run: |
+          bash "$GITHUB_WORKSPACE/trusted/scripts/preview/shadow-container.sh" \
+            "$GITHUB_WORKSPACE/candidate" "$APP_URL" "$GITHUB_WORKSPACE/trusted"
+      - name: Reject unsafe candidate output before host upload
+        env:
+          DIST_DIR: ${{ github.workspace }}/candidate/dist
+        run: |
+          node --input-type=module <<'NODE'
+          const { validateShadowOutput } = await import(`${process.env.GITHUB_WORKSPACE}/trusted/scripts/preview/finalization-shadow.mjs`);
+          const result = validateShadowOutput(process.env.DIST_DIR);
+          console.log(`Validated ${result.entries} entries and ${result.bytes} bytes before upload`);
+          NODE
+      - name: Retain unverified build output
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pages-preview-shadow-output
+          path: candidate/dist
+          if-no-files-found: error
+          retention-days: 7
+  verify:
+    name: Verify finalization shadow
+    needs: [plan, build]
+    if: >-
+      always() && needs.plan.result == 'success' &&
+      (needs.build.result == 'success' ||
+      (needs.build.result == 'skipped' && !fromJSON(needs.plan.outputs.decision).previewRequired))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout trusted verifier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Recheck documentation-only result
+        if: ${{ !fromJSON(needs.plan.outputs.decision).previewRequired }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DECISION: ${{ needs.plan.outputs.decision }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        with:
+          script: |
+            const { recheckShadow } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/finalization-shadow.mjs`);
+            const decision = JSON.parse(process.env.DECISION);
+            await recheckShadow({ github, context: { ref: context.ref, repo: context.repo, actor: context.actor,
+              triggeringActor: process.env.TRIGGERING_ACTOR }, expected: decision });
+            core.notice(`Documentation-only shadow N/A remains current for PR #${decision.pullRequest}`);
+      - name: Recheck revision and seal artifact in a separate trusted runner
+        if: ${{ fromJSON(needs.plan.outputs.decision).previewRequired }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DECISION: ${{ needs.plan.outputs.decision }}
+          ARTIFACT_DIR: ${{ runner.temp }}/shadow-dist
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        with:
+          script: |
+            const { mkdirSync } = await import('node:fs');
+            const { recheckShadow, sealShadowArtifact } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/finalization-shadow.mjs`);
+            const { extractZip } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/archive.mjs`);
+            const { downloadArtifact } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview/github-api.mjs`);
+            const decision = JSON.parse(process.env.DECISION);
+            await recheckShadow({ github, context: { ref: context.ref, repo: context.repo, actor: context.actor,
+              triggeringActor: process.env.TRIGGERING_ACTOR }, expected: decision });
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+              ...context.repo, run_id: context.runId, per_page: 100,
+            });
+            const raw = artifacts.filter(({ name }) => name === 'pages-preview-shadow-output');
+            if (raw.length !== 1 || raw[0].expired) throw new Error('Expected one unexpired raw shadow artifact from this run');
+            mkdirSync(process.env.ARTIFACT_DIR, { recursive: true });
+            extractZip(await downloadArtifact(github, context.repo, raw[0].id), process.env.ARTIFACT_DIR);
+            await recheckShadow({ github, context: { ref: context.ref, repo: context.repo, actor: context.actor,
+              triggeringActor: process.env.TRIGGERING_ACTOR }, expected: decision });
+            const expected = {
+              repository: `${context.repo.owner}/${context.repo.repo}`,
+              pullRequest: decision.pullRequest,
+              headSha: decision.headSha,
+              baseSha: decision.baseSha,
+              checkedOutSha: decision.mergeSha,
+              treeSha: decision.treeSha,
+              runId: context.runId,
+              runAttempt: context.runAttempt,
+              previewBranch: decision.previewBranch,
+              appUrl: decision.appUrl,
+            };
+            sealShadowArtifact(process.env.ARTIFACT_DIR, expected);
+            core.notice(`Shadow artifact sealed for PR #${decision.pullRequest} at ${decision.headSha}`);
+      - name: Retain sealed shadow artifact
+        if: ${{ fromJSON(needs.plan.outputs.decision).previewRequired }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pages-preview-shadow
+          path: ${{ runner.temp }}/shadow-dist
+          if-no-files-found: error
+          retention-days: 7

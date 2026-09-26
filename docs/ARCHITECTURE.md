@@ -15,16 +15,16 @@ TarkovTracker is a sophisticated single-page application (SPA) for tracking prog
 
 | Layer             | Technology       | Version  |
 | ----------------- | ---------------- | -------- |
-| Framework         | Nuxt             | ^4.4.2   |
+| Framework         | Nuxt             | ^4.5.1   |
 | UI Library        | Vue 3            | ^3.5.32  |
-| Component Library | @nuxt/ui         | ^4.6.1   |
+| Component Library | @nuxt/ui         | ^4.10.0  |
 | Styling           | Tailwind CSS     | ^4.2.2   |
-| State Management  | Pinia            | ^3.0.4   |
-| Backend           | Supabase         | ^2.103.0 |
+| State Management  | Pinia            | ^4.0.2   |
+| Backend           | Supabase         | ^2.110.2 |
 | Deployment        | Cloudflare Pages | -        |
 | Maps              | Leaflet          | ^1.9.4   |
 | Graphs            | Vue Flow         | ^1.48.2  |
-| i18n              | Vue I18n         | ^11.3.2  |
+| i18n              | Vue I18n         | ^11.4.10 |
 
 ## Project Structure
 
@@ -36,13 +36,18 @@ TarkovTracker is a sophisticated single-page application (SPA) for tracking prog
 │   ├── composables/         # Reusable composition functions
 │   ├── data/                # Static data (maps.json)
 │   ├── features/            # Feature modules (domain slices)
+│   │   ├── about/           # About page (team members, help links)
 │   │   ├── admin/           # Admin dashboard
+│   │   ├── credits/         # Contributor credits
 │   │   ├── dashboard/       # Main dashboard
 │   │   ├── drawer/          # Side-drawer and help UI
 │   │   ├── hideout/         # Hideout tracking
+│   │   ├── kappa/           # Kappa completion tracker
 │   │   ├── maps/            # Interactive maps
 │   │   ├── neededitems/     # Required items tracker
+│   │   ├── omnibar/         # Global search/command omnibar
 │   │   ├── profile/         # Profile and shared progress views
+│   │   ├── resources/       # Resource guides
 │   │   ├── settings/        # User settings
 │   │   ├── storyline/       # Storyline progression
 │   │   ├── streamer-tools/  # Streamer overlay tooling
@@ -189,7 +194,7 @@ Manages isolated progress for persistent PvP, persistent PvE, and numbered Seaso
 
 **Location:** `app/stores/useMetadata.ts`
 
-Manages static game data from tarkov.dev API.
+Manages static game data from the `json.tarkov.dev` API.
 
 **Key Features:**
 
@@ -325,18 +330,26 @@ All game data is fetched through Nuxt server routes that proxy to `json.tarkov.d
 Internal modes map to upstream endpoints as `pvp` → `regular`, `pve` → `pve`, and
 `seasonal` → `pvp-season`.
 
-| Endpoint                       | Purpose              | Cache TTL |
-| ------------------------------ | -------------------- | --------- |
-| `/api/tarkov/bootstrap`        | Player levels        | 12h       |
-| `/api/tarkov/tasks-core`       | Tasks, maps, traders | 12h       |
-| `/api/tarkov/tasks-objectives` | Task objectives      | 12h       |
-| `/api/tarkov/tasks-rewards`    | Task rewards         | 12h       |
-| `/api/tarkov/hideout`          | Hideout stations     | 12h       |
-| `/api/tarkov/items-lite`       | Items (minimal)      | 24h       |
-| `/api/tarkov/items`            | Items (full)         | 24h       |
-| `/api/tarkov/prestige`         | Prestige levels      | 24h       |
-| `/api/tarkov/map-spawns`       | Map spawn points     | 12h       |
-| `/api/tarkov/cache-meta`       | Cache purge status   | 5m edge   |
+> Canonical endpoint details: [`SYSTEMS.md` §1](./SYSTEMS.md#1-tarkovdev-data-integration) and
+> [`API.md`](./API.md). The table below is a quick map.
+
+| Endpoint                       | Purpose                   | Cache TTL   |
+| ------------------------------ | ------------------------- | ----------- |
+| `/api/tarkov/bootstrap`        | Player levels             | 12h         |
+| `/api/tarkov/tasks-core`       | Tasks, maps, traders      | 12h         |
+| `/api/tarkov/tasks-objectives` | Task objectives           | 12h         |
+| `/api/tarkov/tasks-rewards`    | Task rewards              | 12h         |
+| `/api/tarkov/hideout`          | Hideout stations          | 12h         |
+| `/api/tarkov/items-lite`       | Items (minimal)           | 24h         |
+| `/api/tarkov/items`            | Items (full)              | 24h         |
+| `/api/tarkov/prestige`         | Prestige levels           | 24h         |
+| `/api/tarkov/editions`         | Editions, chapters, perks | — (overlay) |
+| `/api/tarkov/map-spawns`       | Map spawn points          | 12h         |
+| `/api/tarkov/overlay-status`   | Precompute fleet manifest | no-store    |
+| `/api/tarkov/cache-meta`       | Cache purge status        | 5m edge     |
+
+`editions` projects the overlay directly and sets no explicit server cache TTL; `overlay-status`
+reads the precompute manifest and is always `no-store`.
 
 ### Team API
 
@@ -345,6 +358,13 @@ Internal modes map to upstream endpoints as `pvp` → `regular`, `pve` → `pve`
 | `/api/team/members` | GET    | Fetch team member profiles |
 
 ### Caching Strategy
+
+Layer 1 of the server cache is the optional precomputed `TARKOV_DATA` KV (populated off the request path by
+the scheduled precompute workflow; currently only `/api/tarkov/tasks-core` reads it via
+`precomputed: true` — other game-data routes start at the per-colo Cache API); the full four-layer
+fall-through is specified in
+[`SYSTEMS.md` §3](./SYSTEMS.md#3-multi-layer-caching). The diagram below shows the
+client → edge → upstream path.
 
 ```mermaid
 graph TD
@@ -384,7 +404,8 @@ runtimeConfig: {
     allowedHosts: process.env.API_ALLOWED_HOSTS,
     trustedIpRanges: process.env.API_TRUSTED_IP_RANGES,
     requireAuth: process.env.API_REQUIRE_AUTH !== 'false',
-    publicRoutes: '/api/tarkov/*,/api/tarkov-dev/profile',
+    publicRoutes:
+      '/api/tarkov/*,/api/tarkov-dev/profile,/api/changelog,/api/contributors,/api/logs/client,/api/profile/*,/api/streamer/*,/api/twitch/*',
     trustProxy: resolveTrustProxySetting({
       API_TRUST_PROXY: process.env.API_TRUST_PROXY,
       NITRO_PRESET: process.env.NITRO_PRESET,
@@ -493,6 +514,7 @@ Placement is enabled for both environments through the top-level `[placement]` b
 | `SUPABASE_URL`                                   | Shared Supabase project URL for auth and sync            | Yes¹     |
 | `SUPABASE_ANON_KEY`                              | Shared Supabase anon key for auth and sync               | Yes¹     |
 | `NUXT_PUBLIC_CLIENT_LOG_SINK_URL`                | Optional browser log collector URL (disabled by default) | No       |
+| `NUXT_PUBLIC_LOG_LEVEL`                          | Client log level (debug, info, warn, error)              | No       |
 | `NUXT_PUBLIC_TURNSTILE_SITE_KEY`                 | Turnstile widget sitekey for Tarkov.dev profile imports  | No²      |
 | `NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES` | Browser cooldown after a confirmed profile import        | No       |
 
@@ -540,6 +562,10 @@ builds. This is a Vite build-time variable, not Nuxt runtime configuration.
 | `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_MINUTE` | Per-IP profile-import requests per minute           | No         |
 | `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_HOUR`   | Per-IP profile-import requests per hour             | No         |
 | `NUXT_TARKOV_DEV_PROFILE_MAX_UPDATED_AGE_DAYS`  | Reject older profile snapshots; `0` disables        | No         |
+| `NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE`       | Per-IP team-members requests per minute             | No         |
+| `NUXT_TEAM_MEMBERS_CACHE_TTL_MS`                | Team-members shared-cache TTL in milliseconds       | No         |
+| `NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE`     | Per-IP shared-profile requests per minute           | No         |
+| `NUXT_SHARED_PROFILE_CACHE_TTL_MS`              | Shared-profile shared-cache TTL in milliseconds     | No         |
 | `NUXT_TURNSTILE_SECRET_KEY`                     | Server-side Turnstile secret for profile imports    | No²        |
 
 **Build-time / platform:**
@@ -559,7 +585,9 @@ Edge Function values. Nuxt uses `NUXT_SUPABASE_SERVICE_KEY` for the privileged k
 canonical application URL used by `admin-cache-purge`; it has no alias fallback.
 `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are shared canonical names used by both Nuxt and
 Edge Functions. `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_SUPPORTER_ROLE_ID`,
-`DISCORD_LINKED_ROLE_ID`, `CLOUDFLARE_ZONE_ID`, and `CLOUDFLARE_API_TOKEN` are Edge-only. See
+`DISCORD_LINKED_ROLE_ID`, `CLOUDFLARE_ZONE_ID`, and `CLOUDFLARE_API_TOKEN` are Edge-only.
+`DISCORD_SCAV_ROLE_ID`, `DISCORD_TIMMY_ROLE_ID`, and `DISCORD_CHAD_ROLE_ID` are optional
+Edge-only tier roles for supporter sync (role sync skips the tier role when one is unset). See
 `supabase/functions/.env.example`.
 
 **Cloudflare Workers** (`workers/api-gateway`, set via `wrangler secret put`):
