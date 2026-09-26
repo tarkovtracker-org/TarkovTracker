@@ -493,6 +493,19 @@ function workflowDispatchContext() {
 function scheduleContext() {
   return { ...workflowDispatchContext(), eventName: 'schedule' };
 }
+/** Mimics actions/github-script's proxied context: `repo` is a computed read that spread drops. */
+class ScriptContext {
+  constructor(payload) {
+    this.payload = payload;
+    this.eventName = 'schedule';
+    this.serverUrl = 'https://github.com';
+    this.runId = 556;
+  }
+  get repo() {
+    const repository = this.payload.repository;
+    return { owner: repository.owner.login, repo: repository.name };
+  }
+}
 async function plan(t, context, options = {}) {
   const fake = fakeGithub(t, options);
   const core = fakeCore();
@@ -1406,6 +1419,30 @@ test('hourly reconciliation repairs only missing head statuses', async (t) => {
   fake.state.pull = pullFixture({ merge_commit_sha: null });
   await reconcileMissingPreviewStatuses(options);
   assert.deepEqual(fake.state.statuses, []);
+});
+test('hourly reconciliation keeps the repository identity of a proxied context', async (t) => {
+  // actions/github-script exposes the context through a Proxy whose `repo`/`repoUrl` are computed
+  // reads. Spreading that context drops them, which emptied every API path during hourly
+  // reconciliation (`GET /repos///pulls/915 - 404`) and failed the whole schedule run.
+  const fake = fakeGithub(t);
+  const options = {
+    github: fake.github,
+    context: new ScriptContext({
+      repository: { id: 1, owner: { login: 'tarkovtracker-org' }, name: 'TarkovTracker' },
+    }),
+    core: fakeCore(),
+    workspace: tempDir(t),
+  };
+  await reconcileMissingPreviewStatuses(options);
+  assert.deepEqual(statusStates(fake.state.statuses), ['a:pending']);
+  const [pullQuery] = fake.state.pullListQueries;
+  assert.equal(pullQuery.owner, 'tarkovtracker-org');
+  assert.equal(pullQuery.repo, 'TarkovTracker');
+  assert.equal(pullQuery.base, 'main');
+  assert.equal(
+    fake.state.statuses[0].target_url,
+    'https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/556'
+  );
 });
 test('hourly reconciliation re-evaluates a head left pending on an unready test merge', async (t) => {
   // Planning before GitHub computes the test merge publishes pending on the head. Once the merge
