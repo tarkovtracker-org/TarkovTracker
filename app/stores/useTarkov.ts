@@ -67,6 +67,11 @@ import {
   resolveInitialSyncState,
 } from '@/stores/tarkov/resetEngine';
 import {
+  beginStartupOwnership,
+  invalidateStartupOwnership,
+  type StartupOwnershipGuard,
+} from '@/stores/tarkov/startupOwnership';
+import {
   beginLocalSync,
   recordLocalSyncTime,
   resetSyncTimeline,
@@ -1178,41 +1183,62 @@ registerTarkovMetadataHooks({
     useTarkovStore().migrateStoryObjectiveIds();
   },
 });
-const syncMetadataAfterStartup = (tarkovStore: TarkovStore) => {
+/** Fence new metadata work; already-dispatched public catalogs retain their own scope guards. */
+const refreshStartupMetadata = async (
+  tarkovStore: TarkovStore,
+  isStartupCurrent: StartupOwnershipGuard
+): Promise<void> => {
+  const metadataStore = useMetadataStore();
+  if (!isStartupCurrent()) return;
+  await metadataStore.initialize({ gameMode: tarkovStore.getCurrentGameMode() });
+  if (!isStartupCurrent()) return;
+  if (metadataStore.currentGameMode === tarkovStore.getCurrentGameMode()) return;
+  await metadataStore.refresh();
+};
+/** Report metadata failures only for the startup that still owns the session. */
+const reportStartupMetadataFailure = (
+  tarkovStore: TarkovStore,
+  isStartupCurrent: StartupOwnershipGuard,
+  error: unknown
+): void => {
+  if (!isStartupCurrent()) return;
+  const metadataStore = useMetadataStore();
+  const metadataGameMode = metadataStore.currentGameMode;
+  const tarkovGameMode = tarkovStore.getCurrentGameMode();
+  logger.error(
+    '[TarkovStore] Failed to refresh metadata after startup sync',
+    {
+      event: METADATA_REFRESH_FAILURE_EVENT,
+      metadataGameMode,
+      tarkovGameMode,
+    },
+    error
+  );
+  if (import.meta.client) {
+    window.dispatchEvent(
+      new CustomEvent(METADATA_REFRESH_FAILURE_EVENT, {
+        detail: {
+          error,
+          metadataGameMode,
+          tarkovGameMode,
+        },
+      })
+    );
+  }
+};
+const syncMetadataAfterStartup = (
+  tarkovStore: TarkovStore,
+  isStartupCurrent: StartupOwnershipGuard
+) => {
   const metadataStore = useMetadataStore();
   if (metadataStore.currentGameMode === tarkovStore.getCurrentGameMode()) {
     return;
   }
   void (async () => {
     try {
-      await metadataStore.initialize({ gameMode: tarkovStore.getCurrentGameMode() });
-      if (metadataStore.currentGameMode === tarkovStore.getCurrentGameMode()) {
-        return;
-      }
-      await metadataStore.refresh();
+      await refreshStartupMetadata(tarkovStore, isStartupCurrent);
     } catch (error) {
-      const metadataGameMode = metadataStore.currentGameMode;
-      const tarkovGameMode = tarkovStore.getCurrentGameMode();
-      logger.error(
-        '[TarkovStore] Failed to refresh metadata after startup sync',
-        {
-          event: METADATA_REFRESH_FAILURE_EVENT,
-          metadataGameMode,
-          tarkovGameMode,
-        },
-        error
-      );
-      if (import.meta.client) {
-        window.dispatchEvent(
-          new CustomEvent(METADATA_REFRESH_FAILURE_EVENT, {
-            detail: {
-              error,
-              metadataGameMode,
-              tarkovGameMode,
-            },
-          })
-        );
-      }
+      reportStartupMetadataFailure(tarkovStore, isStartupCurrent, error);
     }
   })();
 };
@@ -1228,6 +1254,7 @@ export function resetTarkovSync(
   reason?: string,
   options?: { preservePersistedStateForUserId?: string | null }
 ) {
+  invalidateStartupOwnership();
   if (options) {
     const userId = options.preservePersistedStateForUserId ?? null;
     pendingResetProgressSnapshot = {
@@ -1293,6 +1320,12 @@ export async function initializeTarkovSync() {
       resetProgressMetadataHydration();
       resetTarkovSync('user changed');
     }
+    // Fence account-scoped continuations after every await. Generation detects
+    // A→B→A; live identity also covers changes before the auth watcher flushes.
+    const ownsStartup = beginStartupOwnership();
+    const isStartupCurrent = (): boolean =>
+      ownsStartup() && $supabase.user.loggedIn === true && $supabase.user.id === currentUserId;
+    const supabaseClient = $supabase.client;
     logger.debug('[TarkovStore] Setting up Supabase sync and listener');
     const preservedLocalSnapshot =
       pendingResetProgressSnapshot?.userId === currentUserId
@@ -1370,6 +1403,13 @@ export async function initializeTarkovSync() {
       needsRemoteCleanup: boolean;
       ok: boolean;
     }> => {
+      // Cancellation shape for a superseded run. The single continuation checks
+      // ownership before acting, so these are never reported as active failures.
+      const cancelledLoad = (): {
+        hadRemoteData: boolean;
+        needsRemoteCleanup: boolean;
+        ok: boolean;
+      } => ({ hadRemoteData: false, needsRemoteCleanup: false, ok: false });
       const localMeta = getLocalStorageMeta();
       const storedUserId = localMeta?.storedUserId ?? null;
       const localTimestamp = localMeta?.timestamp ?? null;
@@ -1434,7 +1474,7 @@ export async function initializeTarkovSync() {
         return scoreMode(state.pvp) + scoreMode(state.pve) + scoreMode(state.seasonal);
       };
       logger.debug('[TarkovStore] Initial load starting...', {
-        userId: $supabase.user.id,
+        userId: currentUserId,
         hasLocalProgress,
       });
       // Try to load from Supabase with retry logic to prevent race conditions
@@ -1444,12 +1484,14 @@ export async function initializeTarkovSync() {
         if (attempt > 0) {
           logger.debug(`[TarkovStore] Retry attempt ${attempt + 1}/${LOAD_RETRY_COUNT}`);
           await delay(LOAD_RETRY_DELAY_MS);
+          if (!isStartupCurrent()) return cancelledLoad();
         }
-        const result = await $supabase.client
+        const result = await supabaseClient
           .from('user_progress')
           .select('user_id,current_game_mode,game_edition,tarkov_uid,updated_at')
-          .eq('user_id', $supabase.user.id)
+          .eq('user_id', currentUserId)
           .single();
+        if (!isStartupCurrent()) return cancelledLoad();
         data = result.data as UserProgressRow | null;
         error = result.error as { code?: string; message?: string } | null;
         // Break if we got data or a real error (not "no rows")
@@ -1469,18 +1511,23 @@ export async function initializeTarkovSync() {
         return { hadRemoteData, needsRemoteCleanup, ok: false };
       }
       let modeProgressResult = await loadModeProgress(
-        $supabase.client as unknown as ModeProgressClient,
-        currentUserId
+        supabaseClient as unknown as ModeProgressClient,
+        currentUserId,
+        isStartupCurrent
       );
+      if (!isStartupCurrent()) return cancelledLoad();
       for (let attempt = 1; attempt < LOAD_RETRY_COUNT && modeProgressResult.error; attempt++) {
         logger.debug(
           `[TarkovStore] Retrying normalized mode progress load (${attempt + 1}/${LOAD_RETRY_COUNT})`
         );
         await delay(LOAD_RETRY_DELAY_MS);
+        if (!isStartupCurrent()) return cancelledLoad();
         modeProgressResult = await loadModeProgress(
-          $supabase.client as unknown as ModeProgressClient,
-          currentUserId
+          supabaseClient as unknown as ModeProgressClient,
+          currentUserId,
+          isStartupCurrent
         );
+        if (!isStartupCurrent()) return cancelledLoad();
       }
       if (modeProgressResult.error) {
         logger.error(
@@ -1494,15 +1541,18 @@ export async function initializeTarkovSync() {
         .map((mode) => `${mode}_data`);
       if (data && missingLegacyFields.length > 0) {
         const readLegacy = () =>
-          $supabase.client
+          supabaseClient
             .from('user_progress')
             .select(missingLegacyFields.join(','))
             .eq('user_id', currentUserId)
             .single();
         let legacy = await readLegacy();
+        if (!isStartupCurrent()) return cancelledLoad();
         for (let attempt = 1; attempt < LOAD_RETRY_COUNT && legacy.error; attempt++) {
           await delay(LOAD_RETRY_DELAY_MS);
+          if (!isStartupCurrent()) return cancelledLoad();
           legacy = await readLegacy();
+          if (!isStartupCurrent()) return cancelledLoad();
         }
         if (legacy.error) return { hadRemoteData, needsRemoteCleanup, ok: false };
         data = {
@@ -1586,10 +1636,11 @@ export async function initializeTarkovSync() {
             });
             recordLocalSyncTime();
             const { error: upsertError } = await syncProgressState(
-              $supabase.client,
+              supabaseClient,
               currentUserId,
               resolvedState
             );
+            if (!isStartupCurrent()) return cancelledLoad();
             if (upsertError) {
               logger.error('[TarkovStore] Error syncing merged progress to Supabase:', upsertError);
               return { hadRemoteData, needsRemoteCleanup, ok: false };
@@ -1653,10 +1704,11 @@ export async function initializeTarkovSync() {
         logger.debug('[TarkovStore] Migrating localStorage data to Supabase');
         recordLocalSyncTime(); // Track for self-origin filtering
         const { error: upsertError } = await syncProgressState(
-          $supabase.client,
+          supabaseClient,
           currentUserId,
           localState
         );
+        if (!isStartupCurrent()) return cancelledLoad();
         if (upsertError) {
           logger.error('[TarkovStore] Error migrating local data to Supabase:', upsertError);
           return { hadRemoteData, needsRemoteCleanup, ok: false };
@@ -1713,12 +1765,13 @@ export async function initializeTarkovSync() {
     // Wait for data load to complete BEFORE enabling sync
     // This prevents race conditions and overwriting server data with empty local state
     const loadResult = await loadData();
+    if (!isStartupCurrent()) return;
     if (!loadResult.ok) {
       logger.error('[TarkovStore] Initial load failed; sync not started');
       throw new Error('Supabase initial load failed');
     }
     markProgressMetadataHydrated();
-    syncMetadataAfterStartup(tarkovStore);
+    syncMetadataAfterStartup(tarkovStore, isStartupCurrent);
     if (preservedLocalSnapshot) {
       pendingResetProgressSnapshot = null;
     }
@@ -1748,10 +1801,11 @@ export async function initializeTarkovSync() {
       try {
         recordLocalSyncTime();
         const { error: upsertError } = await syncProgressState(
-          $supabase.client,
+          supabaseClient,
           currentUserId,
           tarkovStore.$state
         );
+        if (!isStartupCurrent()) return;
         if (upsertError) {
           throw upsertError;
         }
@@ -1761,6 +1815,7 @@ export async function initializeTarkovSync() {
       }
     }
     const startSync = () => {
+      if (!isStartupCurrent()) return;
       if (syncController) return;
       if (pendingSyncWatchStop) {
         pendingSyncWatchStop();
@@ -1774,7 +1829,7 @@ export async function initializeTarkovSync() {
         onSynced: () => {
           recordLocalSyncTime();
           if (typeof BroadcastChannel !== 'undefined') {
-            const bc = new BroadcastChannel(`tarkov-progress:${$supabase.user.id}`);
+            const bc = new BroadcastChannel(`tarkov-progress:${currentUserId}`);
             bc.postMessage('updated');
             bc.close();
           }
@@ -1809,7 +1864,7 @@ export async function initializeTarkovSync() {
         sync: async (payload: UserProgressSyncPayload) => {
           const finish = beginLocalSync();
           try {
-            const result = await $supabase.client.rpc('sync_user_game_mode_progress', {
+            const result = await supabaseClient.rpc('sync_user_game_mode_progress', {
               p_current_game_mode: payload.current_game_mode,
               p_game_edition: payload.game_edition,
               p_seasonal_season_number: ACTIVE_SEASON_NUMBER,
@@ -1837,12 +1892,11 @@ export async function initializeTarkovSync() {
       const stopWatch = watch(
         () => hasProgress(tarkovStore.$state),
         (hasTrackedProgress) => {
-          if (hasTrackedProgress) {
-            startSync();
-            // The subscription was created after this mutation (including legacy
-            // history adoption), so explicitly persist the snapshot that started it.
-            if (syncController) void syncInitialTrackedProgress(syncController, currentUserId);
-          }
+          if (!hasTrackedProgress || !isStartupCurrent()) return;
+          startSync();
+          // The subscription was created after this mutation (including legacy
+          // history adoption), so explicitly persist the snapshot that started it.
+          if (syncController) void syncInitialTrackedProgress(syncController, currentUserId);
         },
         { flush: 'post' }
       );
@@ -1852,7 +1906,8 @@ export async function initializeTarkovSync() {
     // Setup realtime listener for remote changes from other devices. Awaited so
     // initialization does not report success before the channel is acknowledged
     // by Realtime; failed or stalled joins reject explicitly and are handled by
-    // the app initialization boundary.
+    // the app initialization boundary. The listener fences its own async setup.
+    if (!isStartupCurrent()) return;
     await setupRealtimeListener(tarkovStore);
   }
 }
