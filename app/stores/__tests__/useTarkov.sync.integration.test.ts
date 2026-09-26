@@ -13,19 +13,22 @@ import {
 } from '@/stores/useTarkov';
 import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
-import type { UserProgressData } from '@/stores/progressState';
+import type { UserProgressData, UserState } from '@/stores/progressState';
 import type { Task } from '@/types/tarkov';
 const {
   channel,
   cleanupSync,
   syncInitialState,
   createRemoteRow,
+  clearUserIdFilters,
   getModeProgressCallback,
   getRealtimeCallback,
+  getUserIdFilters,
   i18nTranslate,
   loggerMock,
   metadataStoreMock,
   modeProgressResult,
+  modeProgressQuery,
   pauseSync,
   resumeSync,
   setModeProgressCallback,
@@ -59,6 +62,7 @@ const {
   });
   const createRemoteRow = (
     overrides: Partial<{
+      user_id: string;
       current_game_mode: string | null;
       game_edition: number | null;
       tarkov_uid: number | null;
@@ -146,7 +150,13 @@ const {
     },
   };
   modeProgressQuery.in.mockImplementation(() => modeProgressQuery);
-  const eq = vi.fn(() => ({ single }));
+  // Records each `.eq('user_id', <id>)` filter so tests can attribute queries to
+  // the session that issued them across auth transitions.
+  const userIdFilters: string[] = [];
+  const eq = vi.fn((_column: unknown, value: unknown) => {
+    userIdFilters.push(String(value));
+    return { single };
+  });
   const select = vi.fn(() => ({ eq }));
   const rpc = vi.fn(async (_name?: string, _args?: SyncRpcArgs): Promise<RpcResult> => ({
     error: null,
@@ -170,7 +180,12 @@ const {
   const from = vi.fn((table: string) => {
     if (table === 'user_game_mode_progress') {
       return {
-        select: vi.fn(() => ({ eq: vi.fn(() => modeProgressQuery) })),
+        select: vi.fn(() => ({
+          eq: vi.fn((_column: unknown, value: unknown) => {
+            userIdFilters.push(String(value));
+            return modeProgressQuery;
+          }),
+        })),
       };
     }
     return {
@@ -228,12 +243,17 @@ const {
     cleanupSync,
     syncInitialState,
     createRemoteRow,
+    clearUserIdFilters: () => {
+      userIdFilters.length = 0;
+    },
     getModeProgressCallback: () => realtimeState.modeProgressCallback,
     getRealtimeCallback: () => realtimeState.callback,
+    getUserIdFilters: () => [...userIdFilters],
     i18nTranslate,
     loggerMock,
     metadataStoreMock,
     modeProgressResult,
+    modeProgressQuery,
     pauseSync,
     resumeSync,
     setRealtimeCallback: (callback: ((payload: { new: unknown; old: unknown }) => void) | null) => {
@@ -377,12 +397,154 @@ const setLocalProgress = (level = 5) => {
     state.pvp.level = level;
   });
 };
+// ---------------------------------------------------------------------------
+// Stale session continuation helpers (startup account-switch reproduction)
+// ---------------------------------------------------------------------------
+type SupabaseRowResult = {
+  data: ReturnType<typeof createRemoteRow> | null;
+  error: { code?: string; message: string } | null;
+};
+type PersistedProgressEnvelope = {
+  _timestamp?: number;
+  _metadataTimestamp?: number;
+  _userId?: string | null;
+  data?: UserState;
+};
+const SESSION_BASE_MS = Date.parse('2026-02-22T00:00:00.000Z');
+const sessionClock = (offsetMs: number): string =>
+  new Date(SESSION_BASE_MS + offsetMs).toISOString();
+/** Defers one Supabase row read so it can be released after auth transitions. */
+const createDeferredRead = (): {
+  promise: Promise<SupabaseRowResult>;
+  reject: (error: unknown) => void;
+  resolve: (result: SupabaseRowResult) => void;
+} => {
+  let reject!: (error: unknown) => void;
+  let resolve!: (result: SupabaseRowResult) => void;
+  return {
+    promise: new Promise<SupabaseRowResult>((res, rej) => {
+      reject = rej;
+      resolve = res;
+    }),
+    reject: (error: unknown) => reject(error),
+    resolve: (result: SupabaseRowResult) => resolve(result),
+  };
+};
+/**
+ * Defers one normalized mode-progress read (both chained `.in` filters resolve
+ * to the same pending thenable) so it can be released after auth transitions.
+ */
+const createDeferredModeRead = (): {
+  begin: () => void;
+  release: (
+    rows: Array<{ game_mode: string; progress_data: UserProgressData; season_number: number }>,
+    error?: { code?: string; message: string } | null
+  ) => void;
+} => {
+  type DeferredModeReadResult = {
+    data: Array<{
+      game_mode: string;
+      progress_data: UserProgressData;
+      season_number: number;
+    }> | null;
+    error: { code?: string; message: string } | null;
+  };
+  let resolveRows!: (result: DeferredModeReadResult) => void;
+  const pending = new Promise<DeferredModeReadResult>((resolve) => {
+    resolveRows = resolve;
+  });
+  const deferredQuery = {
+    in: () => deferredQuery,
+    then: <TResult1 = DeferredModeReadResult, TResult2 = never>(
+      onfulfilled?: ((value: DeferredModeReadResult) => TResult1 | PromiseLike<TResult1>) | null,
+      onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+    ) => pending.then(onfulfilled, onrejected),
+  };
+  return {
+    // The first `.in` call returns the pending thenable; the second `.in` runs
+    // on the deferred itself (chained to it), so only one once-entry is queued
+    // and no stale queue entry can leak to a later session's read.
+    begin: () => {
+      modeProgressQuery.in.mockImplementationOnce(() => deferredQuery);
+    },
+    release: (rows, error = null) => resolveRows({ data: rows, error }),
+  };
+};
+const seedOwnedEnvelope = (
+  userId: string,
+  progressOverrides: Partial<UserState>,
+  timestamp = SESSION_BASE_MS
+) => {
+  localStorage.setItem(
+    STORAGE_KEYS.progress,
+    JSON.stringify({
+      _timestamp: timestamp,
+      _userId: userId,
+      data: { ...structuredClone(defaultState), ...progressOverrides },
+    })
+  );
+};
+const readPersistedEnvelope = (): PersistedProgressEnvelope => {
+  const raw = localStorage.getItem(STORAGE_KEYS.progress);
+  expect(raw).not.toBeNull();
+  return JSON.parse(raw ?? '{}') as PersistedProgressEnvelope;
+};
+const compoundProgress = (level: number, taskId: string): UserProgressData => ({
+  ...progressWithTaskState(taskId, true),
+  level,
+});
+const modeRow = (mode: string, progress: UserProgressData) => ({
+  game_mode: mode,
+  progress_data: progress,
+  season_number: 0,
+});
+/** Models the real auth transition: the context user changes, then the app resets. */
+const switchSession = (
+  previousUserId: string | null,
+  nextUserId: string | null,
+  reason = 'user switched'
+) => {
+  supabaseContext.user.id = nextUserId;
+  supabaseContext.user.loggedIn = nextUserId !== null;
+  resetTarkovStoreForSessionTransition(previousUserId, reason);
+};
+/** Lets fire-and-forget realtime snapshot reads and upserts finish before observing. */
+const settleBackgroundWork = async (): Promise<void> => {
+  for (let round = 0; round < 6; round += 1) await Promise.resolve();
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
+  for (let round = 0; round < 2; round += 1) await Promise.resolve();
+};
+/** Freezes every install/write boundary a stale continuation could touch. */
+const watchSessionActivity = () => ({
+  channelRemovals: supabaseContext.client.removeChannel.mock.calls.length,
+  listenerInstalls: supabaseContext.client.channel.mock.calls.length,
+  realtimeEventHandlers: channel.on.mock.calls.length,
+  realtimeJoins: channel.subscribe.mock.calls.length,
+  syncControllers: useSupabaseSyncMock.mock.calls.length,
+  upsertWrites: rpc.mock.calls.length,
+  userFilters: getUserIdFilters(),
+});
+const expectNoFollowOnSessionActivity = (
+  baseline: ReturnType<typeof watchSessionActivity>,
+  after: ReturnType<typeof watchSessionActivity>
+) => {
+  expect(after.channelRemovals).toBe(baseline.channelRemovals);
+  expect(after.listenerInstalls).toBe(baseline.listenerInstalls);
+  expect(after.realtimeEventHandlers).toBe(baseline.realtimeEventHandlers);
+  expect(after.realtimeJoins).toBe(baseline.realtimeJoins);
+  expect(after.syncControllers).toBe(baseline.syncControllers);
+  expect(after.upsertWrites).toBe(baseline.upsertWrites);
+  expect(after.userFilters).toEqual(baseline.userFilters);
+};
 describe('useTarkov sync integration', () => {
   beforeEach(() => {
     resetTarkovSync('test setup');
     setActivePinia(createPinia());
     localStorage.clear();
     vi.clearAllMocks();
+    clearUserIdFilters();
     setRealtimeCallback(null);
     setModeProgressCallback(null);
     supabaseContext.user.id = 'user-1';
@@ -1897,5 +2059,327 @@ describe('useTarkov sync integration', () => {
     await expect(initializeTarkovSync()).rejects.toThrow('Supabase initial load failed');
     expect(showLoadFailed).toHaveBeenCalledTimes(1);
     expect(useSupabaseSyncMock).not.toHaveBeenCalled();
+  });
+  // ---------------------------------------------------------------------------
+  // Approved race: a startup read that stays pending across an auth transition.
+  // A's continuation must not patch the store/persisted envelope after the
+  // transition, and must not install or replace sync/listener machinery.
+  // ---------------------------------------------------------------------------
+  describe('stale startup initialization continued across auth transitions', () => {
+    const seedSessionA = () =>
+      seedOwnedEnvelope('user-1', {
+        pvp: compoundProgress(10, 'task-local-a'),
+        pve: progressWithLevel(7),
+      });
+    const releaseStaleRead = (
+      deferred: ReturnType<typeof createDeferredRead>,
+      result: SupabaseRowResult
+    ) => {
+      modeProgressResult.data = [
+        modeRow('pvp', compoundProgress(10, 'task-stale-a')),
+        modeRow('pve', progressWithLevel(3)),
+      ];
+      deferred.resolve(result);
+    };
+    it('leaves the switched-to session untouched when the previous session read resolves late', async () => {
+      seedSessionA();
+      const staleRead = createDeferredRead();
+      single.mockImplementationOnce(() => staleRead.promise);
+      const staleInit = initializeTarkovSync();
+      expect(getUserIdFilters()).toEqual(['user-1']);
+      switchSession('user-1', 'user-2');
+      single.mockResolvedValue({
+        data: createRemoteRow({
+          updated_at: sessionClock(2_000),
+          user_id: 'user-2',
+          pvp_data: compoundProgress(33, 'task-b'),
+          pve_data: progressWithLevel(11),
+        }),
+        error: null,
+      });
+      await initializeTarkovSync();
+      await settleBackgroundWork();
+      const store = useTarkovStore();
+      expect(store.pvp.taskCompletions['task-b']?.complete).toBe(true);
+      expect(store.pvp.level).toBe(33);
+      expect(readPersistedEnvelope()._userId).toBe('user-2');
+      const baseline = watchSessionActivity();
+      releaseStaleRead(staleRead, {
+        data: createRemoteRow({ user_id: 'user-1', updated_at: sessionClock(9_000) }),
+        error: null,
+      });
+      await staleInit.catch(() => undefined);
+      await settleBackgroundWork();
+      expectNoFollowOnSessionActivity(baseline, watchSessionActivity());
+      expect(useTarkovStore().pvp.level).toBe(33);
+      expect(useTarkovStore().pve.level).toBe(11);
+      expect(useTarkovStore().pvp.taskCompletions['task-b']?.complete).toBe(true);
+      expect(useTarkovStore().pvp.taskCompletions['task-stale-a']).toBeUndefined();
+      const envelope = readPersistedEnvelope();
+      expect(envelope._userId).toBe('user-2');
+      expect(envelope.data?.pvp?.taskCompletions?.['task-b']?.complete).toBe(true);
+      expect(showLocalIgnored).not.toHaveBeenCalled();
+      expect(showLoadFailed).not.toHaveBeenCalled();
+    });
+    it('keeps the signed-out store and protected snapshot untouched when a pending read resolves late', async () => {
+      seedSessionA();
+      const staleRead = createDeferredRead();
+      single.mockImplementationOnce(() => staleRead.promise);
+      const staleInit = initializeTarkovSync();
+      expect(getUserIdFilters()).toEqual(['user-1']);
+      switchSession('user-1', null, 'logout');
+      expect(useTarkovStore().pvp.taskCompletions['task-local-a']).toBeUndefined();
+      expect(readPersistedEnvelope()._userId).toBe('user-1');
+      const baseline = watchSessionActivity();
+      releaseStaleRead(staleRead, {
+        data: createRemoteRow({ user_id: 'user-1', updated_at: sessionClock(9_000) }),
+        error: null,
+      });
+      await staleInit.catch(() => undefined);
+      await settleBackgroundWork();
+      expectNoFollowOnSessionActivity(baseline, watchSessionActivity());
+      expect(useTarkovStore().pvp.level).toBe(1);
+      expect(useTarkovStore().pvp.taskCompletions['task-stale-a']).toBeUndefined();
+      const envelope = readPersistedEnvelope();
+      expect(envelope._userId).toBe('user-1');
+      expect(envelope._timestamp).toBe(SESSION_BASE_MS);
+      expect(showLocalIgnored).not.toHaveBeenCalled();
+      expect(showLoadFailed).not.toHaveBeenCalled();
+    });
+    it('does not continue a stale initial read after a newer session for the same identity ran', async () => {
+      seedSessionA();
+      const staleLegacyRead = createDeferredRead();
+      single
+        .mockResolvedValueOnce({
+          data: createRemoteRow({
+            user_id: 'user-1',
+            updated_at: sessionClock(1_000),
+            pvp_data: null,
+            pve_data: null,
+          }),
+          error: null,
+        })
+        .mockImplementationOnce(() => staleLegacyRead.promise);
+      const staleInit = initializeTarkovSync();
+      await settleBackgroundWork();
+      switchSession('user-1', 'user-2');
+      single.mockResolvedValue({
+        data: createRemoteRow({
+          updated_at: sessionClock(2_000),
+          user_id: 'user-2',
+          pvp_data: compoundProgress(33, 'task-b'),
+          pve_data: progressWithLevel(11),
+        }),
+        error: null,
+      });
+      await initializeTarkovSync();
+      await settleBackgroundWork();
+      switchSession('user-2', 'user-1');
+      const freshRow = createRemoteRow({
+        updated_at: sessionClock(30_000),
+        user_id: 'user-1',
+        pvp_data: compoundProgress(50, 'task-return-second'),
+        pve_data: progressWithLevel(12),
+      });
+      single
+        .mockResolvedValue({ data: freshRow, error: null })
+        .mockResolvedValueOnce({ data: freshRow, error: null })
+        .mockResolvedValueOnce({ data: freshRow, error: null });
+      await initializeTarkovSync();
+      await settleBackgroundWork();
+      const store = useTarkovStore();
+      expect(store.pvp.taskCompletions['task-return-second']?.complete).toBe(true);
+      expect(store.pvp.level).toBe(50);
+      const baseline = watchSessionActivity();
+      staleLegacyRead.resolve({
+        data: createRemoteRow({
+          user_id: 'user-1',
+          updated_at: sessionClock(1_000),
+          pvp_data: compoundProgress(10, 'task-stale-a'),
+          pve_data: progressWithLevel(3),
+        }),
+        error: null,
+      });
+      await staleInit.catch(() => undefined);
+      await settleBackgroundWork();
+      expectNoFollowOnSessionActivity(baseline, watchSessionActivity());
+      expect(store.pvp.level).toBe(50);
+      expect(store.pve.level).toBe(12);
+      expect(store.pvp.taskCompletions['task-return-second']?.complete).toBe(true);
+      expect(store.pvp.taskCompletions['task-stale-a']).toBeUndefined();
+      const envelope = readPersistedEnvelope();
+      expect(envelope._userId).toBe('user-1');
+      expect(envelope.data?.pvp?.level).toBe(50);
+      expect(showLocalIgnored).not.toHaveBeenCalled();
+      expect(showLoadFailed).not.toHaveBeenCalled();
+    });
+    it('does not surface a stale failed read as the active session load failure', async () => {
+      seedSessionA();
+      const staleRead = createDeferredRead();
+      single.mockImplementationOnce(() => staleRead.promise);
+      const staleInit = initializeTarkovSync();
+      switchSession('user-1', 'user-2');
+      single.mockResolvedValue({
+        data: createRemoteRow({
+          updated_at: sessionClock(2_000),
+          user_id: 'user-2',
+          pvp_data: compoundProgress(33, 'task-b'),
+          pve_data: progressWithLevel(11),
+        }),
+        error: null,
+      });
+      await initializeTarkovSync();
+      await settleBackgroundWork();
+      const baseline = watchSessionActivity();
+      staleRead.resolve({
+        data: null,
+        error: { message: 'stale row read failed' },
+      });
+      await staleInit.catch(() => undefined);
+      await settleBackgroundWork();
+      expect(loggerMock.error).not.toHaveBeenCalledWith(
+        '[TarkovStore] Error loading data from Supabase:',
+        expect.objectContaining({ message: 'stale row read failed' })
+      );
+      expect(loggerMock.error).not.toHaveBeenCalledWith(
+        '[TarkovStore] Initial load failed; sync not started'
+      );
+      expect(showLoadFailed).not.toHaveBeenCalled();
+      expectNoFollowOnSessionActivity(baseline, watchSessionActivity());
+      expect(useTarkovStore().pvp.taskCompletions['task-b']?.complete).toBe(true);
+      expect(useTarkovStore().pvp.level).toBe(33);
+      expect(readPersistedEnvelope()._userId).toBe('user-2');
+    });
+    it('leaves the switched-to session untouched when a deferred normalized read resolves late', async () => {
+      seedSessionA();
+      single.mockResolvedValue({
+        data: createRemoteRow({ user_id: 'user-1', updated_at: sessionClock(9_000) }),
+        error: null,
+      });
+      const staleModeRead = createDeferredModeRead();
+      staleModeRead.begin();
+      const staleInit = initializeTarkovSync();
+      await settleBackgroundWork();
+      // The row read and the deferred normalized read were both issued for user-1.
+      expect(getUserIdFilters()).toEqual(['user-1', 'user-1']);
+      switchSession('user-1', 'user-2');
+      single.mockResolvedValue({
+        data: createRemoteRow({
+          updated_at: sessionClock(2_000),
+          user_id: 'user-2',
+          pvp_data: compoundProgress(33, 'task-b'),
+          pve_data: progressWithLevel(11),
+        }),
+        error: null,
+      });
+      await initializeTarkovSync();
+      await settleBackgroundWork();
+      const baseline = watchSessionActivity();
+      staleModeRead.release([
+        modeRow('pvp', compoundProgress(10, 'task-stale-a')),
+        modeRow('pve', progressWithLevel(3)),
+      ]);
+      await staleInit.catch(() => undefined);
+      await settleBackgroundWork();
+      expectNoFollowOnSessionActivity(baseline, watchSessionActivity());
+      expect(useTarkovStore().pvp.level).toBe(33);
+      expect(useTarkovStore().pve.level).toBe(11);
+      expect(useTarkovStore().pvp.taskCompletions['task-stale-a']).toBeUndefined();
+      const envelope = readPersistedEnvelope();
+      expect(envelope._userId).toBe('user-2');
+      expect(envelope.data?.pvp?.level).toBe(33);
+      expect(showLocalIgnored).not.toHaveBeenCalled();
+      expect(showLoadFailed).not.toHaveBeenCalled();
+    });
+    it.each([
+      { boundary: 'successful retry', retry: true, error: null },
+      {
+        boundary: 'freshness compatibility fallback',
+        retry: false,
+        error: { code: '42703', message: 'column progress_updated_at does not exist' },
+      },
+    ])('fences normalized follow-on reads after a stale $boundary', async ({ retry, error }) => {
+      seedSessionA();
+      const deferred = createDeferredModeRead();
+      if (retry) modeProgressResult.errorSequence = [{ message: 'temporary read failure' }];
+      else deferred.begin();
+      const pending = initializeTarkovSync();
+      await settleBackgroundWork();
+      if (retry) deferred.begin();
+      await vi.waitFor(() => expect(getUserIdFilters()).toHaveLength(retry ? 3 : 2), {
+        timeout: 2000,
+      });
+      switchSession('user-1', 'user-2');
+      single.mockResolvedValue({
+        data: createRemoteRow({ user_id: 'user-2', pvp_data: compoundProgress(33, 'task-b') }),
+        error: null,
+      });
+      await initializeTarkovSync();
+      await settleBackgroundWork();
+      const baseline = watchSessionActivity();
+      deferred.release([], error);
+      await pending;
+      await settleBackgroundWork();
+      expectNoFollowOnSessionActivity(baseline, watchSessionActivity());
+      expect(useTarkovStore().pvp.level).toBe(33);
+    });
+    it('leaves real persisted storage untouched when a superseded merge write settles late', async () => {
+      // The race the non-plugin harness cannot observe: the persisted-state
+      // plugin serializes every state patch, so a stale continuation's post-ack
+      // patch would write another account's progress into actual storage.
+      const pinia = createPinia().use(piniaPluginPersistedstate);
+      createApp({}).use(pinia);
+      setActivePinia(pinia);
+      seedSessionA();
+      // A row without an account clock keeps the owned local progress as the
+      // merge winner, so the initial merge write actually dispatches.
+      const staleOwnerRow = createRemoteRow({ user_id: 'user-1', updated_at: null });
+      const staleRead = createDeferredRead();
+      single.mockImplementationOnce(() => staleRead.promise);
+      single.mockResolvedValue({ data: staleOwnerRow, error: null });
+      const staleMergeWrite = Promise.withResolvers<{
+        error: { code?: string; message: string } | null;
+      }>();
+      rpc.mockImplementationOnce(() => staleMergeWrite.promise as ReturnType<typeof rpc>);
+      const staleInit = initializeTarkovSync();
+      // Resolve the owner's read while it still owns the session, so the merge
+      // write itself dispatches and then suspends as the in-flight patch owner...
+      staleRead.resolve({
+        data: staleOwnerRow,
+        error: null,
+      });
+      await settleBackgroundWork();
+      expect(rpc).toHaveBeenCalledTimes(1);
+      switchSession('user-1', 'user-2');
+      single.mockResolvedValue({
+        data: createRemoteRow({
+          updated_at: sessionClock(2_000),
+          user_id: 'user-2',
+          pvp_data: compoundProgress(33, 'task-b'),
+          pve_data: progressWithLevel(11),
+        }),
+        error: null,
+      });
+      await initializeTarkovSync();
+      await settleBackgroundWork();
+      await nextTick();
+      const baseline = watchSessionActivity();
+      staleMergeWrite.resolve({ error: null });
+      await staleInit.catch(() => undefined);
+      await settleBackgroundWork();
+      await nextTick();
+      expectNoFollowOnSessionActivity(baseline, watchSessionActivity());
+      const store = useTarkovStore();
+      expect(store.pvp.level).toBe(33);
+      expect(store.pve.level).toBe(11);
+      expect(store.pvp.taskCompletions['task-b']?.complete).toBe(true);
+      expect(store.pvp.taskCompletions['task-stale-a']).toBeUndefined();
+      const envelope = readPersistedEnvelope();
+      expect(envelope._userId).toBe('user-2');
+      expect(envelope.data?.pvp?.level).toBe(33);
+      expect(envelope.data?.pvp?.taskCompletions?.['task-stale-a']).toBeUndefined();
+      expect(showLocalIgnored).not.toHaveBeenCalled();
+      expect(showLoadFailed).not.toHaveBeenCalled();
+    });
   });
 });
