@@ -1738,6 +1738,7 @@
     "analytics_preferences": "Nastavení analytiky",
     "game_attribution": "Úniky z Tarkov a související herní obsah a materiály jsou ochranné známky a autorská práva díla Battlestate Games Limited a jejích poskytovatelů. Všechna práva vyhrazena. TarkovTracker je neoficiální projekt fanoušků a není spojen s Battlestate nebo potvrzen.",
     "tagline": "Sledujte svůj útěk od Tarkov úkolů, skryjte vylepšení a požadavky na předměty na jednom místě.",
+    "version_release_link": "Zobrazit poznámky k vydání pro verzi {version} na GitHubu",
     "sections": {
       "explore": "Prozkoumat",
       "project": "Projekt",
