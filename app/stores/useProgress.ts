@@ -518,11 +518,15 @@ export const useProgressStore = defineStore('progress', () => {
     // For teammates or when manual mode, use stored level
     return currentData?.level ?? 1;
   };
-  const getTaskStatus = (teamId: string, taskId: string): 'completed' | 'failed' | 'incomplete' => {
+  const getTaskStatus = (
+    teamId: string,
+    taskId: string
+  ): 'active' | 'completed' | 'failed' | 'incomplete' => {
     const storeKey = getTeamIndex(teamId);
     const store = teamStores.value[storeKey];
     const currentData = getGameModeData(store);
     const taskCompletion = currentData?.taskCompletions?.[taskId];
+    if (isTaskActive(taskCompletion)) return 'active';
     return getTaskStatusFromFlags(taskCompletion);
   };
   const tasksState = computed<Record<string, TaskState>>(() => {

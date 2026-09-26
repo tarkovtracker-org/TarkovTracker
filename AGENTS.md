@@ -47,6 +47,11 @@ or test logic changes make it relevant.
   of the removed task `alternatives` field.
 - Modes are `pvp`, `pve`, `seasonal` (upstream `pvp-season`). Keep `ACTIVE_SEASON` synchronized
   with the database functions and preserve Seasonal history.
+- Ordinary task acceptance uses the optional `active` flag. Active writes set
+  `{complete:false, failed:false, active:true}`; completed, failed, and neutral writes set
+  `active:false`. Missing `active` remains unknown: do not backfill ambiguous rows or mark
+  automatically unlocked successors active. Legacy prerequisite fallback is documented in
+  `docs/SYSTEMS.md` §2.
 - Secrets stay in runtime env or platform secret stores under canonical names; never commit
   credentials, service-role keys, or generated secret-bearing files.
 - Overlay consumers enforce HTTPS and preserve the cache/adaptation/overlay ordering in

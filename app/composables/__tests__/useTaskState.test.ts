@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive, ref } from 'vue';
 import { isTaskSuccessful, useTaskState } from '@/composables/useTaskState';
 const progress = reactive({
+  active: {} as Record<string, boolean>,
   complete: {} as Record<string, boolean>,
   failed: {} as Record<string, boolean>,
   unlockedTasks: {} as Record<string, { self?: boolean }>,
@@ -9,6 +10,7 @@ const progress = reactive({
 });
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
+    isTaskActive: (id: string) => progress.active[id] === true,
     isTaskComplete: (id: string) => progress.complete[id] === true,
     isTaskFailed: (id: string) => progress.failed[id] === true,
   }),
@@ -16,6 +18,7 @@ vi.mock('@/stores/useTarkov', () => ({
 vi.mock('@/stores/useProgress', () => ({ useProgressStore: () => progress }));
 describe('task state decisions', () => {
   beforeEach(() => {
+    progress.active = {};
     progress.complete = {};
     progress.failed = {};
     progress.unlockedTasks = {};

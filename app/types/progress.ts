@@ -6,6 +6,7 @@ export interface TaskObjective {
 export interface TaskCompletion {
   complete?: boolean;
   failed?: boolean;
+  active?: boolean;
   timestamp?: number;
   manual?: boolean;
 }
@@ -20,7 +21,7 @@ export interface HideoutModule {
 }
 export interface ApiTaskUpdate {
   id: string;
-  state: 'completed' | 'failed' | 'uncompleted';
+  state: 'active' | 'completed' | 'failed' | 'uncompleted';
 }
 export interface ApiUpdateMeta {
   id: string;
@@ -35,6 +36,7 @@ export interface TraderProgress {
 export const MANUAL_ACTIVITY_TYPES = ['task', 'hideout', 'item', 'system'] as const;
 export type ManualActivityType = (typeof MANUAL_ACTIVITY_TYPES)[number];
 export const MANUAL_ACTIVITY_ACTIONS = [
+  'active',
   'complete',
   'uncomplete',
   'fail',

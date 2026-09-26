@@ -6,6 +6,7 @@ import type { TaskEvaluationMap } from '@/stores/taskAvailability';
 import type { UserProgressData } from '@/types/progress';
 import type { Task } from '@/types/tarkov';
 const taskState = reactive({
+  active: false,
   complete: false,
   failed: false,
 });
@@ -29,6 +30,7 @@ const tarkovStoreMock = {
   getPMCFaction: vi.fn(() => 'USEC'),
   getTraderLevel: vi.fn(() => 1),
   getTraderReputation: vi.fn(() => 0),
+  isTaskActive: vi.fn(() => taskState.active),
   isTaskComplete: vi.fn(() => taskState.complete),
   isTaskFailed: vi.fn(() => taskState.failed),
   isTaskObjectiveComplete: vi.fn(() => false),
@@ -181,6 +183,7 @@ const mountTaskCard = async (taskOverrides: Partial<Task> = {}) =>
   });
 describe('TaskCard appearance and expansion controls', () => {
   beforeEach(() => {
+    taskState.active = false;
     taskState.complete = false;
     taskState.failed = false;
     preferencesState.collapseDefault = false;

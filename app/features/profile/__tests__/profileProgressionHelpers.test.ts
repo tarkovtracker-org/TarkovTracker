@@ -45,14 +45,20 @@ describe('profileProgressionHelpers', () => {
         displayName: 'Test User',
         level: 18,
         pmcFaction: 'BEAR',
-        taskCompletions: { a: { complete: true } },
+        taskCompletions: {
+          a: { active: true, complete: false, failed: false },
+          legacy: { complete: false, failed: false },
+        },
       },
       defaultProgressData
     );
     expect(normalized.displayName).toBe('Test User');
     expect(normalized.level).toBe(18);
     expect(normalized.pmcFaction).toBe('BEAR');
-    expect(normalized.taskCompletions).toEqual({ a: { complete: true } });
+    expect(normalized.taskCompletions).toEqual({
+      a: { active: true, complete: false, failed: false },
+      legacy: { complete: false, failed: false },
+    });
     expect(normalized.hideoutModules).toEqual({});
   });
 });

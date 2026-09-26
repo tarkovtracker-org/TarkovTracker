@@ -99,6 +99,11 @@ export function transformProgress(
       if (data.failed === true) {
         entry.failed = true;
       }
+      if (data.complete === true || data.failed === true) {
+        entry.active = false;
+      } else if (typeof data.active === 'boolean') {
+        entry.active = data.active;
+      }
       return entry;
     }
   );
