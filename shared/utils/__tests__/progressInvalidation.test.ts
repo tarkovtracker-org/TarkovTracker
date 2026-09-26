@@ -32,6 +32,14 @@ describe.each([
     taskCompletions: Record<string, InvalidationTaskCompletion>,
     pmcFaction = 'USEC'
   ) => invalidate({ tasks, taskCompletions, pmcFaction });
+  it('ignores prerequisite rows without a task reference', () => {
+    const tasks = [
+      task('orphan', undefined, {
+        taskRequirements: [{ status: ['complete'] }, { status: ['failed'] }],
+      }),
+    ];
+    expect(run(tasks, {})).toEqual({ invalidTasks: {}, invalidObjectives: {} });
+  });
   describe.each([
     { state: 'completed', completion: { complete: true, failed: false }, cascades: false },
     { state: 'failed', completion: { complete: false, failed: true }, cascades: true },
