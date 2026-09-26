@@ -1738,7 +1738,7 @@
     "analytics_preferences": "Настройки аналитики",
     "game_attribution": "Escape from Tarkov и связанный игровой контент и материалы являются товарными знаками и защищены авторским правом Battlestate Games Limited и ее лицензиаров. Все права защищены. TarkovTracker является неофициальным фанатским проектом и не связан с Battlestate Games и не одобрен ею.",
     "tagline": "Отслеживайте свои побеги от заданий Таркова, улучшений в укрытии и требований к предметам в одном месте.",
-    "version_release_link": "View the release notes for version {version} on GitHub",
+    "version_release_link": "Просмотреть заметки о выпуске {version} на GitHub",
     "sections": {
       "explore": "Исследовать",
       "project": "Проект",
