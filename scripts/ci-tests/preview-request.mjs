@@ -372,6 +372,23 @@ test('incomplete edit metadata cannot fall back to an earlier preview grant', as
   });
   await assert.rejects(readPreviewRequest(github, REPO, 42), /incomplete .* edit metadata/);
 });
+test('a comment added between REST and GraphQL snapshots fails closed', async () => {
+  const github = authorizationFixture([comment(1)]);
+  github.graphql = async () => ({
+    repository: {
+      pullRequest: {
+        comments: {
+          nodes: [
+            { fullDatabaseId: '1', lastEditedAt: null },
+            { fullDatabaseId: '2', lastEditedAt: null },
+          ],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      },
+    },
+  });
+  await assert.rejects(readPreviewRequest(github, REPO, 42), /inconsistent .* snapshots/);
+});
 test('all comment pages are considered so a later stop revokes an older grant', async () => {
   const comments = [comment(1), ...Array.from({ length: 101 }, (_, i) => comment(i + 2, 'hello'))];
   comments.push(comment(104, '/preview stop'));

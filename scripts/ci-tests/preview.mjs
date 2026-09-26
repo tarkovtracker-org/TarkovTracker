@@ -334,7 +334,7 @@ function fakeGithub(t, options = {}) {
   };
   const paginate = (endpoint, params) => paginatedEndpoints(state, endpoint, params, options);
   return {
-    github: { rest, paginate, graphql: commentEditTimesGraphql(state.comments) },
+    github: { rest, paginate, graphql: commentEditTimesGraphql(state) },
     state,
     manifest,
     dir,
@@ -452,8 +452,9 @@ async function paginatedEndpoints(state, endpoint, params, options) {
   if (!paged[endpoint]) throw new Error(`unexpected endpoint ${endpoint}`);
   return paged[endpoint]();
 }
-function commentEditTimesGraphql(comments) {
+function commentEditTimesGraphql(state) {
   return async (_query, { cursor }) => {
+    const comments = state.comments;
     const start = cursor === null ? 0 : Number(cursor);
     const page = comments.slice(start, start + 100);
     const end = start + page.length;

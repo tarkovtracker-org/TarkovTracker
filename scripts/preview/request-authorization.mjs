@@ -104,6 +104,16 @@ function assertCompleteCommentEditTimes(comments, editTimes) {
     }
   }
 }
+/** Fail closed if comments changed between the REST and GraphQL snapshots. */
+function assertMatchingCommentSnapshots(comments, editTimes) {
+  assertCompleteCommentEditTimes(comments, editTimes);
+  const restCommentIds = new Set(comments.map((comment) => comment.id));
+  for (const commentId of editTimes.keys()) {
+    if (!restCommentIds.has(commentId)) {
+      throw new Error('GitHub returned inconsistent pull request comment snapshots.');
+    }
+  }
+}
 function assertValidRestCommentId(commentId) {
   if (!Number.isSafeInteger(commentId)) {
     throw new Error('GitHub returned an invalid REST pull request comment ID.');
@@ -246,7 +256,7 @@ export async function readPreviewRequest(github, repo, pullRequest) {
     per_page: 100,
   });
   const editTimes = await readCommentEditTimes(github, repo, pullRequest);
-  assertCompleteCommentEditTimes(comments, editTimes);
+  assertMatchingCommentSnapshots(comments, editTimes);
   const commands = comments
     .filter((comment) => originalCommand(comment, enabledAt, editTimes))
     .toSorted((a, b) => b.id - a.id);

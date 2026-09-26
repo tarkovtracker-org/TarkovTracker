@@ -448,7 +448,8 @@ successful CI run requests it. Later revisions refresh automatically after succe
 paused and resume when marked ready. This opts into previews without opting into merging.
 The latest unedited command from a current maintainer controls the PR. Body edits are detected with
 GraphQL `lastEditedAt`; REST `updated_at` can change for metadata updates and does not by itself
-invalidate a command. Comments predating the opt-in activation instant retain their original
+invalidate a command. Missing edit metadata or inconsistent REST/GraphQL comment snapshots fail
+closed. Comments predating the opt-in activation instant retain their original
 one-revision meaning and do not grant persistent access. The activation instant defaults to the
 contract start shipped with the handler, so no manual post-merge variable flip is required; the
 optional repository variable `PREVIEW_OPT_IN_START` overrides it for continuity after handler

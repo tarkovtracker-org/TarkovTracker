@@ -2301,7 +2301,7 @@ GitHub has computed the test merge; other pending reasons are left alone.
   maintainer or administrator opts that PR into automatic previews, including forks; `/preview stop`
   disables the opt-in. The controller uses GraphQL `lastEditedAt` to detect body edits; REST
   `updated_at` can change for metadata updates and does not by itself invalidate a command. Missing
-  edit metadata fails closed. Commands predating the rollout activation instant cannot become
+  edit metadata or inconsistent REST/GraphQL comment snapshots fail closed. Commands predating the rollout activation instant cannot become
   persistent grants. The instant defaults to the contract start shipped with the handler commit,
   so no manual post-merge variable flip is required. The optional canonical UTC
   `PREVIEW_OPT_IN_START` variable overrides it; any non-empty malformed value (the legacy `0`,
