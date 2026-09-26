@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  findObjectiveHitStackAtPoint,
   findObjectiveHitsAtPoint,
   findObjectiveHitSourcesAtPoint,
   findObjectivesAtPoint,
+  projectObjectiveHitShape,
   type ObjectiveHitShape,
 } from '@/features/maps/utils/objectiveHitTest';
 const square = (x: number, y: number, size: number) => [
@@ -88,6 +90,73 @@ describe('findObjectivesAtPoint', () => {
       { x: 50, y: 50 }
     );
     expect(hits.map((hit) => hit.source)).toEqual([pointPopup, zonePopup]);
+  });
+  it('projects zone and point geometry into container coordinates', () => {
+    const project = ({ x, y }: { x: number; y: number }) => ({ x: x * 2, y: y * 3 });
+    expect(
+      projectObjectiveHitShape(
+        {
+          kind: 'zone',
+          objectiveId: 'zone-a',
+          ring: square(0, 0, 10),
+          area: 100,
+          center: { x: 5, y: 5 },
+          radius: 4,
+        },
+        project
+      )
+    ).toEqual({
+      kind: 'zone',
+      objectiveId: 'zone-a',
+      ring: square(0, 0, 10).map(project),
+      area: 100,
+      center: { x: 10, y: 15 },
+      radius: 4,
+    });
+    expect(
+      projectObjectiveHitShape(
+        { kind: 'point', objectiveId: 'point-a', center: { x: 5, y: 5 }, radius: 4 },
+        project
+      )
+    ).toEqual({ kind: 'point', objectiveId: 'point-a', center: { x: 10, y: 15 }, radius: 4 });
+  });
+  it('keeps the hovered occurrence for its objective in the stack', () => {
+    const pointShape: ObjectiveHitShape = {
+      kind: 'point',
+      objectiveId: 'point-a',
+      center: { x: 50, y: 50 },
+      radius: 8,
+    };
+    const zoneShape: ObjectiveHitShape = {
+      kind: 'zone',
+      objectiveId: 'zone-a',
+      ring: square(0, 0, 200),
+      area: 40000,
+    };
+    const hitPoint = { objectiveId: 'point-a', control: { showPopup: vi.fn() } };
+    const actualHoveredPoint = { objectiveId: 'point-a', control: { showPopup: vi.fn() } };
+    const zone = { objectiveId: 'zone-a', control: { showPopup: vi.fn() } };
+    expect(
+      findObjectiveHitStackAtPoint(
+        [
+          { shape: zoneShape, source: zone },
+          { shape: pointShape, source: hitPoint },
+        ],
+        { x: 50, y: 50 },
+        actualHoveredPoint
+      )
+    ).toEqual([actualHoveredPoint, zone]);
+  });
+  it('puts the hovered objective first when no source hit matches it', () => {
+    const outside = { objectiveId: 'outside', control: { showPopup: vi.fn() } };
+    const hit = { objectiveId: 'hit', control: { showPopup: vi.fn() } };
+    const shapes: ObjectiveHitShape[] = [
+      { kind: 'point', objectiveId: 'hit', center: { x: 10, y: 10 }, radius: 5 },
+    ];
+    expect(
+      findObjectiveHitStackAtPoint([{ shape: shapes[0]!, source: hit }], { x: 10, y: 10 }, outside)
+    ).toEqual([outside, hit]);
+    expect(findObjectiveHitStackAtPoint([], { x: 10, y: 10 }, outside)).toEqual([outside]);
   });
   it('ignores shapes away from the cursor', () => {
     const shapes: ObjectiveHitShape[] = [

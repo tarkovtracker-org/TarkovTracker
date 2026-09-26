@@ -13,8 +13,39 @@ export type ObjectiveHitShape =
       radius?: number;
     }
   | { kind: 'point'; objectiveId: string; center: HitPoint; radius: number };
+export type ObjectiveHitGeometry<TPosition> =
+  | {
+      kind: 'zone';
+      objectiveId: string;
+      ring: readonly TPosition[];
+      area: number;
+      center: TPosition;
+      radius: number;
+    }
+  | { kind: 'point'; objectiveId: string; center: TPosition; radius: number };
 export type ObjectiveHitCandidate<T> = { shape: ObjectiveHitShape; source: T };
 export type ObjectiveHitSource<T> = { shape: ObjectiveHitShape; source: T };
+export const projectObjectiveHitShape = <TPosition>(
+  geometry: ObjectiveHitGeometry<TPosition>,
+  project: (position: TPosition) => HitPoint
+): ObjectiveHitShape => {
+  if (geometry.kind === 'zone') {
+    return {
+      kind: 'zone',
+      objectiveId: geometry.objectiveId,
+      ring: geometry.ring.map(project),
+      area: geometry.area,
+      center: project(geometry.center),
+      radius: geometry.radius,
+    };
+  }
+  return {
+    kind: 'point',
+    objectiveId: geometry.objectiveId,
+    center: project(geometry.center),
+    radius: geometry.radius,
+  };
+};
 const crossesRay = (a: HitPoint, b: HitPoint, point: HitPoint): boolean => {
   if (a.y > point.y === b.y > point.y) return false;
   return point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x;
@@ -65,6 +96,18 @@ export const findObjectiveHitSourcesAtPoint = <T>(
     candidates.map(({ shape }) => shape),
     point
   ).map((shape) => ({ shape, source: sourceByShape.get(shape)! }));
+};
+/** Returns each hit objective's source, substituting the hovered occurrence. */
+export const findObjectiveHitStackAtPoint = <T extends { objectiveId: string }>(
+  candidates: readonly ObjectiveHitCandidate<T>[],
+  point: HitPoint,
+  fallback: T
+): T[] => {
+  const entries = findObjectiveHitSourcesAtPoint(candidates, point).map(({ source }) => source);
+  const fallbackIndex = entries.findIndex((entry) => entry.objectiveId === fallback.objectiveId);
+  if (fallbackIndex < 0) return [fallback, ...entries];
+  entries[fallbackIndex] = fallback;
+  return entries;
 };
 /** Returns the unique objective IDs whose shapes contain `point`. */
 export const findObjectivesAtPoint = (
