@@ -1,4 +1,5 @@
 name: Preview
+run-name: Preview CI ${{ inputs.run_id }}
 # Trusted preview controller. Every job checks out the default branch; candidate code is never
 # executed, installed, or used as Wrangler configuration. The controller verifies CI evidence and
 # the preview artifact's claims against live GitHub state, uploads only after an explicit trusted
