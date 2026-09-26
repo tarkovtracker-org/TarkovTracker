@@ -17,14 +17,16 @@ Complete workflow automation setup for TarkovTracker with CI/CD pipelines, quali
 
 ## Agent validation and review
 
-`package.json` defines commands; `AGENTS.md` defines required validation and review.
+`package.json` defines commands; the root `AGENTS.md` defines required validation and review, and
+path-scoped `supabase/AGENTS.md` and `workers/api-gateway/AGENTS.md` add area-specific rules.
 `code_review.md` supplements that contract with risk areas, without requiring the full suite for
 unrelated changes. Worktree setup and the shared CI setup action use `scripts/ensure-pnpm.sh` to
 verify pnpm against `packageManager`, preparing its complete integrity-qualified pin even when the installed version matches.
 
 Run focused checks while implementing, then required checks after the diff stabilizes. Record the
 commit, dirty worktree state, commands, and results in the PR summary. Invalidate affected results
-when their inputs change. Batch substantiated corrections; defer unrelated cleanup.
+when their inputs change. Batch substantiated corrections; defer unrelated cleanup and optional
+style suggestions.
 
 Documentation, translation, and mechanical formatting changes need deterministic checks and
 self-review. Routine executable changes also receive Codex PR review. Substantial behavior changes
@@ -125,7 +127,8 @@ Fallow, build, database and Worker checks, and Deno tests, requiring their usual
 environment. CI itself retains sharding, secrets/fork rules, and report uploads in workflow jobs.
 Link validation remains in the existing Link Check workflow for applicable documentation paths.
 
-The reduced selection covers only root `.md` files, Markdown under `docs/` and `.github/`, and
+The reduced selection covers only root `.md` files, Markdown under `docs/` and `.github/`, agent
+instruction files named `AGENTS.md` or `CLAUDE.md` at any depth outside `public/`, and
 Crowdin-owned `app/locales/*.json` translations. The source locale `app/locales/en.json` selects
 full validation: application code and Vitest fixtures consume it, and `scripts/crowdin-pr.sh` draws
 the same translation-only boundary. `DESIGN.md`, generated code, scripts, dependencies,
@@ -455,6 +458,41 @@ jobs.
 `preview.yml` accepts only explicit `workflow_dispatch` with a CI run id from `main`.
 Every job checks out the default branch; the privileged automatic triggers are accepted in
 `.github/zizmor.yml` because the state controller is the intended trusted boundary.
+
+**Required Actions policy:** `preview-state.yml` is the only workflow in this public repository
+that uses `pull_request_target`. GitHub blocks that event by default in public repositories from
+2026-11-02 unless an applicable Actions event policy allows it, so the repository carries one policy
+scoped to this workflow. It is external state that no checked-in file describes; recreate it with:
+
+```bash
+gh api --method POST \
+  -H "X-GitHub-Api-Version: 2026-03-10" \
+  repos/tarkovtracker-org/TarkovTracker/actions/policies \
+  --input - <<'JSON'
+{
+  "name": "Allow pull_request_target for preview-state",
+  "enforcement": "active",
+  "conditions": {
+    "workflow_path": {
+      "include": [".github/workflows/preview-state.yml"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "restrict_action_events",
+      "parameters": {
+        "allowed_events": ["pull_request_target", "workflow_run", "schedule"]
+      }
+    }
+  ]
+}
+JSON
+```
+
+The `restrict_action_events` allowlist is exhaustive for this workflow and does not permit
+`pull_request_target` anywhere else in the repository; the default public-repository block still
+applies to every other workflow.
 
 **Jobs:** `Refresh preview state` handles automatic events with a single status-only job.
 `Plan preview` runs only on explicit dispatch, resolves the candidate through the API, requires
