@@ -2299,11 +2299,14 @@ GitHub has computed the test merge; other pending reasons are left alone.
   ordinary PRs do not instantiate skipped deployment or smoke-test jobs. These events and comment
   events never upload to Cloudflare. An exact, unedited `/preview` comment from a current repository
   maintainer or administrator opts that PR into automatic previews, including forks; `/preview stop`
-  disables the opt-in. Commands predating the rollout activation instant cannot become persistent
-  grants. The instant defaults to the contract start shipped with the handler commit, so no manual
-  post-merge variable flip is required; the optional canonical UTC `PREVIEW_OPT_IN_START` variable
-  overrides it, and any non-empty malformed value (the legacy `0`, date-only, zone-less or
-  impossible strings) fails closed and grants no persistent access — an explicit off switch.
+  disables the opt-in. The controller uses GraphQL `lastEditedAt` to detect body edits; REST
+  `updated_at` can change for metadata updates and does not by itself invalidate a command. Missing
+  edit metadata fails closed. Commands predating the rollout activation instant cannot become
+  persistent grants. The instant defaults to the contract start shipped with the handler commit,
+  so no manual post-merge variable flip is required. The optional canonical UTC
+  `PREVIEW_OPT_IN_START` variable overrides it; any non-empty malformed value (the legacy `0`,
+  date-only, zone-less or impossible strings) fails closed and grants no persistent access — an
+  explicit off switch.
   The request resolves matching successful CI before dispatching the trusted controller. Only a trusted
   `workflow_dispatch` from `main` can deploy, and it repeats the exact-SHA, CI, artifact, and
   freshness checks. Crowdin and release staging dispatch once after their own exact-SHA CI passes;

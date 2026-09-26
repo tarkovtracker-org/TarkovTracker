@@ -333,7 +333,12 @@ function fakeGithub(t, options = {}) {
     ...actionEndpoints(state, zipEntries, options),
   };
   const paginate = (endpoint, params) => paginatedEndpoints(state, endpoint, params, options);
-  return { github: { rest, paginate }, state, manifest, dir };
+  return {
+    github: { rest, paginate, graphql: commentEditTimesGraphql(state.comments) },
+    state,
+    manifest,
+    dir,
+  };
 }
 function pullEndpoints(state) {
   return {
@@ -446,6 +451,29 @@ async function paginatedEndpoints(state, endpoint, params, options) {
   };
   if (!paged[endpoint]) throw new Error(`unexpected endpoint ${endpoint}`);
   return paged[endpoint]();
+}
+function commentEditTimesGraphql(comments) {
+  return async (_query, { cursor }) => {
+    const start = cursor === null ? 0 : Number(cursor);
+    const page = comments.slice(start, start + 100);
+    const end = start + page.length;
+    return {
+      repository: {
+        pullRequest: {
+          comments: {
+            nodes: page.map(({ id, lastEditedAt }) => ({
+              databaseId: id,
+              lastEditedAt: lastEditedAt ?? null,
+            })),
+            pageInfo: {
+              hasNextPage: end < comments.length,
+              endCursor: end < comments.length ? String(end) : null,
+            },
+          },
+        },
+      },
+    };
+  };
 }
 function fakeCore() {
   const core = {
