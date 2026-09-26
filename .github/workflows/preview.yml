@@ -1,5 +1,5 @@
 name: Preview
-run-name: Preview CI ${{ inputs.run_id }} attempt ${{ inputs.run_attempt }}
+run-name: Preview CI ${{ inputs.run_id }}
 # Trusted preview controller. Every job checks out the default branch; candidate code is never
 # executed, installed, or used as Wrangler configuration. The controller verifies CI evidence and
 # the preview artifact's claims against live GitHub state, uploads only after an explicit trusted
@@ -12,11 +12,6 @@ on:
       run_id:
         description: Successful CI run id for the exact PR revision to preview.
         required: true
-        type: string
-      run_attempt:
-        description: CI attempt identifier for request deduplication only.
-        required: false
-        default: '1'
         type: string
 # Repeated requests for the same CI run replace an older attempt. Late results are also rejected
 # by revision checks.

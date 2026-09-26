@@ -144,20 +144,21 @@ function matchesPreviewRequest(run, decision) {
     run.path === '.github/workflows/preview.yml',
     run.event === 'workflow_dispatch',
     run.head_branch === PRODUCTION_BRANCH,
-    run.display_title === `Preview CI ${decision.runId} attempt ${decision.runAttempt}`,
+    run.display_title === `Preview CI ${decision.runId}`,
+    Date.parse(run.created_at) >= Date.parse(decision.runCompletedAt),
     run.status !== 'completed',
   ].every(Boolean);
 }
 /** Active dispatches include queued runs and fork runs awaiting environment approval. */
 async function previewRequestInFlight(github, repo, decision) {
-  const { data } = await github.rest.actions.listWorkflowRuns({
+  const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
     ...repo,
     workflow_id: PREVIEW_WORKFLOW_FILE,
     event: 'workflow_dispatch',
     branch: PRODUCTION_BRANCH,
     per_page: 100,
   });
-  return data.workflow_runs.some((run) => matchesPreviewRequest(run, decision));
+  return runs.some((run) => matchesPreviewRequest(run, decision));
 }
 /** Sequential state events must not replace an active deployment for the same CI attempt. */
 export async function requestPreviewDispatch(github, repo, decision) {
@@ -166,7 +167,7 @@ export async function requestPreviewDispatch(github, repo, decision) {
     ...repo,
     workflow_id: PREVIEW_WORKFLOW_FILE,
     ref: PRODUCTION_BRANCH,
-    inputs: { run_id: String(decision.runId), run_attempt: String(decision.runAttempt) },
+    inputs: { run_id: String(decision.runId) },
   });
 }
 function truncateDescription(description) {

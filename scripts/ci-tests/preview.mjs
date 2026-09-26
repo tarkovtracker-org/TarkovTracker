@@ -390,15 +390,8 @@ function actionEndpoints(state, zipEntries, options) {
         if (run_id === state.previousRun.id) return { data: state.previousRun };
         throw Object.assign(new Error('Not found'), { status: 404 });
       },
-      listWorkflowRuns: async ({ workflow_id }) => ({
-        data: {
-          workflow_runs:
-            workflow_id === 'preview.yml'
-              ? (options.previewRuns ?? [])
-              : options.noRuns
-                ? []
-                : (options.latestRuns ?? [state.run]),
-        },
+      listWorkflowRuns: async () => ({
+        data: { workflow_runs: options.noRuns ? [] : (options.latestRuns ?? [state.run]) },
       }),
       createWorkflowDispatch: async (input) => {
         if (state.failDispatch) throw new Error('dispatch rejected');
@@ -427,6 +420,7 @@ function dispatchStatuses(state, params) {
   return active ? [state.dispatchStatus] : [];
 }
 async function paginatedEndpoints(state, endpoint, params, options) {
+  if (params.workflow_id === 'preview.yml') return options.previewRuns ?? [];
   const paged = {
     associated: () => options.associated ?? [state.pull],
     checks: () => [state.check],
@@ -550,7 +544,7 @@ test('auto-merge requests one trusted dispatch after CI instead of uploading', a
       ...REPO,
       workflow_id: 'preview.yml',
       ref: 'main',
-      inputs: { run_id: '900', run_attempt: '1' },
+      inputs: { run_id: '900' },
     },
   ]);
   // The pending status is published before the dispatch so the dispatched run supersedes it.
@@ -578,7 +572,8 @@ test('auto-merge preserves active previews and retries completed attempts', asyn
     path: '.github/workflows/preview.yml',
     event: 'workflow_dispatch',
     head_branch: 'main',
-    display_title: 'Preview CI 900 attempt 1',
+    display_title: 'Preview CI 900',
+    created_at: '2099-01-01T00:00:00Z',
     status: 'queued',
   };
   const pull = { auto_merge: { enabled_by: { login: 'maintainer' } } };
@@ -592,8 +587,8 @@ test('auto-merge preserves active previews and retries completed attempts', asyn
   for (const override of [
     { status: 'completed', conclusion: 'failure' },
     { status: 'completed', conclusion: 'cancelled' },
-    { display_title: 'Preview CI 900 attempt 2' },
-    { display_title: 'Preview CI 901 attempt 1' },
+    { created_at: '2000-01-01T00:00:00Z' },
+    { display_title: 'Preview CI 901' },
     { head_branch: 'untrusted' },
     { path: '.github/workflows/other.yml' },
     { event: 'pull_request' },
@@ -604,6 +599,15 @@ test('auto-merge preserves active previews and retries completed attempts', asyn
     });
     assert.equal(result.state.dispatches.length, 1, JSON.stringify(override));
   }
+});
+test('automatic requests leave Dependabot and hourly reconciliation to their owners', async (t) => {
+  const pull = { auto_merge: { enabled_by: { login: 'maintainer' } }, user: { id: 49699333 } };
+  const bot = await plan(t, workflowRunContext(), { pull });
+  assert.deepEqual(bot.state.dispatches, []);
+  const refresh = await plan(t, pullTargetContext(pullFixture(), 'synchronize'), {
+    pull: { auto_merge: pull.auto_merge },
+  });
+  assert.deepEqual(refresh.state.dispatches, []);
 });
 test('auto-merge never dispatches for automation CI runs, reuse, or explicit dispatches', async (t) => {
   const autoMerge = { auto_merge: { enabled_by: { login: 'maintainer' } } };

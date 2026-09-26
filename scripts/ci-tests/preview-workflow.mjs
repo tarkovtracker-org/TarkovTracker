@@ -82,6 +82,16 @@ test('preview controller runs trusted code only and isolates credentials per job
     /workflows: \[CI\]\n\s+types: \[completed\]/
   );
   assert.match(workflowEvent(stateWorkflow, 'schedule'), /cron: '17 \* \* \* \*'/);
+  assert.match(stateWorkflow, /cancel-in-progress: false/);
+  assert.match(
+    stateWorkflow,
+    /github\.event\.pull_request\.head\.repo\.full_name \|\| github\.event\.workflow_run\.head_repository\.full_name/
+  );
+  assert.match(
+    stateWorkflow,
+    /github\.event\.pull_request\.head\.ref \|\| github\.event\.workflow_run\.head_branch/
+  );
+  assert.match(workflow, /run-name: Preview CI \$\{\{ inputs\.run_id \}\}/);
   assert.match(stateWorkflow, /reconcileMissingPreviewStatuses/);
   assert.doesNotMatch(workflow, /pull_request_target:|workflow_run:/);
   assert.doesNotMatch(stateWorkflow, /workflow_dispatch:|secrets\.|\bdeploy:|\bsmoke:/);

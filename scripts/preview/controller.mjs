@@ -622,8 +622,16 @@ function isAutomaticDeploy(context, decision) {
  * write access). Only pull-request CI candidates qualify; release and Crowdin automation dispatch
  * their own previews. The upload itself still happens only in the dispatched run.
  */
-function hasMergeIntent(state) {
-  return Boolean(state.candidate?.runEvent === 'pull_request' && state.pull?.auto_merge);
+function isMergeRequestEvent(context) {
+  return context.eventName === 'workflow_run' || context.payload.action === 'auto_merge_enabled';
+}
+function hasMergeIntent(context, state) {
+  return [
+    optional(state.candidate, 'runEvent') === 'pull_request',
+    Boolean(state.pull?.auto_merge),
+    state.pull?.user?.id !== 49699333, // Dependabot owns its request through its merge workflow.
+    isMergeRequestEvent(context),
+  ].every(Boolean);
 }
 function requestedPreview(decision) {
   return {
@@ -636,7 +644,9 @@ function requestedPreview(decision) {
 /** Automatic events never upload: they either request a trusted dispatch or wait for one. */
 function deferAutomaticPreview(context, state, decision) {
   if (!isAutomaticDeploy(context, decision)) return decision;
-  return hasMergeIntent(state) ? requestedPreview(decision) : awaitExplicitPreview(decision);
+  return hasMergeIntent(context, state)
+    ? requestedPreview(decision)
+    : awaitExplicitPreview(decision);
 }
 /** Publish the interim status first so the dispatched run's newer statuses always supersede it. */
 async function publishAndRequest(github, context, core, decision) {

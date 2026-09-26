@@ -2145,7 +2145,7 @@ workflow handles CI completion and metadata events; ordinary pushes wait for CI.
 finishes the status may be absent, or pending if a metadata event has already run. Main-push
 CI completions do not start a state job. The deployment workflow remains dispatch-only.
 Queued, running, and approval-waiting requests from the trusted `main` preview workflow are
-reused for the same CI run and attempt; completed failed or cancelled requests can be retried.
+reused when their run ID matches and they were created after that CI attempt completed; completed failed or cancelled requests can be retried.
 State events serialize within their concurrency group instead of cancelling a dispatching job.
 
 **Summary.** Pull requests and eligible non-main dispatches do not rely on Cloudflare's
@@ -2174,8 +2174,8 @@ succeed and it must retain a `preview-deployment-<sha>` artifact for the exact c
 PR update → CI (selected validation + security + preview build + manifest + artifact)
           → CI Result succeeds
           → status-only Preview State (workflow_run / pull_request_target) publishes pending
-          → maintainer comments `/preview` on a same-repository PR, or trusted merge automation
-            dispatches Preview for the successful CI run
+          → auto-merge intent, maintainer `/preview`, or trusted merge automation requests Preview
+            for the validated PR CI run and attempt
           → ready PR + current head/base/test-merge + attempt + artifact claims verified
           → environment `preview` or `preview-fork` (maintainer approval for forks)
           → recheck → wrangler pages deploy --branch preview-* → deployment record verified
@@ -2239,8 +2239,9 @@ GitHub has computed the test merge; other pending reasons are left alone.
   `workflow_dispatch` from `main` can deploy, and it repeats the exact-SHA, CI, artifact, and
   freshness checks. Crowdin and release staging dispatch once after their own exact-SHA CI passes;
   allowlisted Dependabot auto-merge candidates dispatch from a trusted post-CI `workflow_run` after
-  all checks pass. Ordinary PR pushes
-  never request deployment. Cloudflare automatic preview builds are disabled while production Git
+  all checks pass. Dependabot remains owned by that workflow. Ordinary PR CI completions request
+  deployment only when auto-merge is enabled. Metadata requests use `auto_merge_enabled`; the
+  hourly reconciliation remains status-only. Cloudflare automatic preview builds are disabled while production Git
   deployments for `main` remain enabled.
 - The Pages-only deployment token is stored only in the protected `preview` and `preview-fork`
   environments, whose branch policy allows `main`; remove the repository-scoped copy. This prevents

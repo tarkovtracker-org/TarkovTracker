@@ -437,8 +437,8 @@ Validates external links in documentation:
 ### 8. Preview Controller (`.github/workflows/preview.yml`)
 
 Maintainers can enable auto-merge to request a preview after the current PR CI succeeds.
-The status controller dispatches `preview.yml` on `main`, carrying the CI run and attempt;
-it checks for a matching active dispatch first so repeated events preserve in-flight previews
+The status controller dispatches `preview.yml` on `main`, carrying the CI run ID;
+it checks for a matching active dispatch created after the current CI attempt completed so repeated events preserve in-flight previews
 and fork approval requests. Failed or cancelled dispatches remain retryable. Manual `/preview`
 and workflow dispatch remain available. Repository `allow_auto_merge` must be enabled to use
 this optional request path. Automatic events do not upload artifacts themselves.
@@ -517,7 +517,8 @@ fail closed in the shadow; the existing protected `preview-fork` deployment path
 
 **Trusted automation:** Crowdin translation merges and release staging request one preview after
 their dispatched CI run succeeds on the exact candidate SHA. Allowlisted Dependabot auto-merge
-requests one after all candidate checks pass. Ordinary PR revisions do not deploy automatically.
+requests one after all candidate checks pass and remains the sole automatic request owner for
+Dependabot. Ordinary PR revisions request previews after CI only when auto-merge is enabled.
 
 **Metrics:** each controller run summary records the action (deploy/reuse/skip/wait/fail),
 revision, digest, deployment URL, whether the result was published, and the validation-to-preview

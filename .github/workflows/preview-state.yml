@@ -10,7 +10,7 @@ on:
   pull_request_target:
     types: [ready_for_review, converted_to_draft, auto_merge_enabled, closed]
 concurrency:
-  group: preview-state-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || format('{0}@{1}', github.event.workflow_run.head_repository.full_name, github.event.workflow_run.head_branch) }}
+  group: preview-state-${{ format('{0}@{1}', github.event.pull_request.head.repo.full_name || github.event.workflow_run.head_repository.full_name, github.event.pull_request.head.ref || github.event.workflow_run.head_branch) }}
   cancel-in-progress: false
 permissions: {}
 jobs:
