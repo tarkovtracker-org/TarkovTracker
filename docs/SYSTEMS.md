@@ -2175,7 +2175,7 @@ succeed and it must retain a `preview-deployment-<sha>` artifact for the exact c
 ```text
 PR update → CI (selected validation + security + preview build + manifest + artifact)
           → CI Result succeeds
-          → status-only Preview State (workflow_run / pull_request_target) publishes pending
+          → Preview State (workflow_run / pull_request_target) publishes pending
           → auto-merge intent, maintainer `/preview`, or trusted merge automation requests Preview
             for the validated PR CI run and attempt
           → ready PR + current head/base/test-merge + attempt + artifact claims verified
@@ -2232,7 +2232,7 @@ GitHub has computed the test merge; other pending reasons are left alone.
 - Successful deployments are deduplicated by revision, artifact digest, and profile version through
   the status marker. Before `ready_for_review` reuses a result, the controller authenticates the
   original run and its exact-SHA deployment artifact, then keeps that run URL on the new success.
-- Pull-request and CI-completion events run only the status-only `preview-state.yml` workflow, so
+- Pull-request and CI-completion events run only the trusted `preview-state.yml` workflow, so
   ordinary PRs do not instantiate skipped deployment or smoke-test jobs. These events and comment
   events never upload to Cloudflare. An exact `/preview` comment from a repository maintainer or
   administrator on a same-repository PR resolves the successful CI run matching that PR's number,
@@ -2314,7 +2314,7 @@ deploys nor publishes required statuses. Ordinary CI still builds/uploads `pages
 
 ### Files
 
-- `.github/workflows/preview-state.yml` — automatic, status-only preview state refresh
+- `.github/workflows/preview-state.yml` — automatic preview state refresh and opt-in preview dispatch
 - `.github/workflows/preview.yml` — explicit trusted controller: plan, deploy, smoke, result jobs
 - `.github/workflows/preview-request.yml`, `scripts/preview/comment-request.mjs` — trusted
   maintainer comment request, current CI selection, and dispatch

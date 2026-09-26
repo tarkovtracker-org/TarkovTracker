@@ -1,6 +1,6 @@
 name: Preview State
-# Trusted, status-only controller for automatic PR and CI events. Deployment jobs exist only in
-# the explicitly dispatched Preview workflow.
+# Trusted controller for automatic PR and CI events. It publishes status and may request a
+# separate Preview run; deployment jobs exist only in that dispatched workflow.
 #
 # `pull_request_target` is deliberate: fork PRs need a write token to receive a status. It is safe
 # here because the job only checks out the default branch and never installs or runs candidate code.

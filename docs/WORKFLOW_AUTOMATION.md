@@ -500,7 +500,8 @@ The `restrict_action_events` allowlist is exhaustive for this workflow and does 
 `pull_request_target` anywhere else in the repository; the default public-repository block still
 applies to every other workflow.
 
-**Jobs:** `Refresh preview state` handles automatic events with a single status-only job.
+**Jobs:** `Refresh preview state` handles automatic events in one job that publishes status and
+can request a separate Preview run when auto-merge is enabled.
 `Plan preview` runs only on explicit dispatch, resolves the candidate through the API, requires
 successful CI evidence, verifies the artifact's manifest and digest, and publishes the interim
 status. Application, configuration, and dependency changes stay `pending` until preview is requested.
