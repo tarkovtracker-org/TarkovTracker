@@ -11,6 +11,8 @@ export type ObjectiveHitShape =
       area: number;
       center?: HitPoint;
       radius?: number;
+      strokeWidth?: number;
+      centerHitTolerance?: number;
     }
   | {
       kind: 'point';
@@ -27,6 +29,8 @@ export type ObjectiveHitGeometry<TPosition> =
       area: number;
       center: TPosition;
       radius: number;
+      strokeWidth?: number;
+      centerHitTolerance?: number;
     }
   | {
       kind: 'point';
@@ -49,6 +53,10 @@ export const projectObjectiveHitShape = <TPosition>(
       area: geometry.area,
       center: project(geometry.center),
       radius: geometry.radius,
+      ...(geometry.strokeWidth !== undefined && { strokeWidth: geometry.strokeWidth }),
+      ...(geometry.centerHitTolerance !== undefined && {
+        centerHitTolerance: geometry.centerHitTolerance,
+      }),
     };
   }
   return {
@@ -70,13 +78,42 @@ const isInsideRing = (ring: HitPoint[], point: HitPoint): boolean => {
   }
   return inside;
 };
+const distanceToSegment = (start: HitPoint, end: HitPoint, point: HitPoint): number => {
+  const deltaX = end.x - start.x;
+  const deltaY = end.y - start.y;
+  const lengthSquared = deltaX * deltaX + deltaY * deltaY;
+  if (lengthSquared === 0) return Math.hypot(point.x - start.x, point.y - start.y);
+  const fraction = Math.max(
+    0,
+    Math.min(1, ((point.x - start.x) * deltaX + (point.y - start.y) * deltaY) / lengthSquared)
+  );
+  return Math.hypot(
+    point.x - (start.x + fraction * deltaX),
+    point.y - (start.y + fraction * deltaY)
+  );
+};
+const isWithinRingStroke = (ring: HitPoint[], point: HitPoint, strokeWidth: number): boolean => {
+  const tolerance = strokeWidth / 2;
+  if (tolerance <= 0 || ring.length < 2) return false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    if (distanceToSegment(ring[j]!, ring[i]!, point) <= tolerance) return true;
+  }
+  return false;
+};
+const isZoneCenterHit = (
+  shape: Extract<ObjectiveHitShape, { kind: 'zone' }>,
+  point: HitPoint
+): boolean =>
+  shape.center !== undefined &&
+  shape.radius !== undefined &&
+  Math.hypot(shape.center.x - point.x, shape.center.y - point.y) <=
+    shape.radius + (shape.centerHitTolerance ?? 0);
 const isHit = (shape: ObjectiveHitShape, point: HitPoint): boolean => {
   if (shape.kind === 'zone') {
     return (
       isInsideRing(shape.ring, point) ||
-      (shape.center !== undefined &&
-        shape.radius !== undefined &&
-        Math.hypot(shape.center.x - point.x, shape.center.y - point.y) <= shape.radius)
+      isWithinRingStroke(shape.ring, point, shape.strokeWidth ?? 0) ||
+      isZoneCenterHit(shape, point)
     );
   }
   return (

@@ -102,6 +102,8 @@ describe('findObjectivesAtPoint', () => {
           area: 100,
           center: { x: 5, y: 5 },
           radius: 4,
+          strokeWidth: 2.25,
+          centerHitTolerance: 0.75,
         },
         project
       )
@@ -112,6 +114,8 @@ describe('findObjectivesAtPoint', () => {
       area: 100,
       center: { x: 10, y: 15 },
       radius: 4,
+      strokeWidth: 2.25,
+      centerHitTolerance: 0.75,
     });
     expect(
       projectObjectiveHitShape(
@@ -176,5 +180,29 @@ describe('findObjectivesAtPoint', () => {
     };
     expect(findObjectivesAtPoint([shape], { x: 59, y: 50 })).toEqual(['point-a']);
     expect(findObjectivesAtPoint([shape], { x: 59.1, y: 50 })).toEqual([]);
+  });
+  it('includes only the polygon stroke outside a zone fill', () => {
+    const zone: ObjectiveHitShape = {
+      kind: 'zone',
+      objectiveId: 'zone-a',
+      ring: square(0, 0, 100),
+      area: 10000,
+      strokeWidth: 2,
+    };
+    expect(findObjectivesAtPoint([zone], { x: 50, y: -0.9 })).toEqual(['zone-a']);
+    expect(findObjectivesAtPoint([zone], { x: 50, y: -1.1 })).toEqual([]);
+  });
+  it('includes the center marker stroke outside a zone radius', () => {
+    const zone: ObjectiveHitShape = {
+      kind: 'zone',
+      objectiveId: 'zone-a',
+      ring: square(0, 0, 100),
+      area: 10000,
+      center: { x: 200, y: 200 },
+      radius: 5,
+      centerHitTolerance: 0.75,
+    };
+    expect(findObjectivesAtPoint([zone], { x: 205.7, y: 200 })).toEqual(['zone-a']);
+    expect(findObjectivesAtPoint([zone], { x: 205.8, y: 200 })).toEqual([]);
   });
 });

@@ -1369,6 +1369,7 @@
         objectiveId: string;
         latLngs: L.LatLngExpression[];
         area: number;
+        polygon: L.Polygon;
         centerMarker: L.CircleMarker;
         control: ObjectivePopupControl;
       }
@@ -1390,6 +1391,8 @@
           area: source.area,
           center: source.centerMarker.getLatLng(),
           radius: source.centerMarker.getRadius(),
+          strokeWidth: source.polygon.options.weight ?? 0,
+          centerHitTolerance: (source.centerMarker.options.weight ?? 0) / 2,
         },
         project
       );
@@ -1765,6 +1768,7 @@
               objectiveId,
               latLngs,
               area,
+              polygon,
               centerMarker,
               control: zoneControl,
             });
