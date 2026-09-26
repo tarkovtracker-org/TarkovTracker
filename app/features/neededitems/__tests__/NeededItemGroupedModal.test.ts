@@ -14,10 +14,14 @@ mockNuxtImport('useI18n', () => () => ({
 mockNuxtImport('useToast', () => () => ({
   add: vi.fn(),
 }));
+const { mockDistributeItems, mockApplyDistribution } = vi.hoisted(() => ({
+  mockDistributeItems: vi.fn(),
+  mockApplyDistribution: vi.fn(),
+}));
 vi.mock('@/composables/useItemDistribution', () => ({
   useItemDistribution: () => ({
-    distributeItems: vi.fn(),
-    applyDistribution: vi.fn(),
+    distributeItems: mockDistributeItems,
+    applyDistribution: mockApplyDistribution,
     resetObjectives: vi.fn(),
     sortTaskObjectives: <T>(list: T[]): T[] => list,
     sortHideoutModules: <T>(list: T[]): T[] => list,
@@ -123,7 +127,15 @@ describe('NeededItemGroupedModal', () => {
             template: '<a><slot /></a>',
           },
           NeededItemGroupedInputControls: {
-            template: '<div data-testid="input-controls" />',
+            props: ['firCurrent', 'nonFirCurrent'],
+            emits: ['update:fir'],
+            template: `
+              <div data-testid="input-controls">
+                <span data-testid="fir-current">{{ firCurrent }}</span>
+                <span data-testid="non-fir-current">{{ nonFirCurrent }}</span>
+                <button data-testid="set-fir" @click="$emit('update:fir', 1)">Set FIR</button>
+              </div>
+            `,
           },
         },
       },
@@ -170,5 +182,19 @@ describe('NeededItemGroupedModal', () => {
     await increaseBtn.trigger('click');
     expect(mockSetHideoutPartCount).toHaveBeenCalledWith('module-1', 2);
     expect(mockSetHideoutPartComplete).toHaveBeenCalledWith('module-1');
+  });
+  it('clears collected totals after Smart Fill so a filtered list cannot reuse them', async () => {
+    const wrapper = createWrapper();
+    await wrapper.get('[data-testid="set-fir"]').trigger('click');
+    const smartFillButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('needed_items.smart_fill'));
+    expect(smartFillButton).toBeDefined();
+    await smartFillButton!.trigger('click');
+    expect(mockDistributeItems).toHaveBeenCalledOnce();
+    expect(mockApplyDistribution).toHaveBeenCalledOnce();
+    expect(wrapper.get('[data-testid="fir-current"]').text()).toBe('0');
+    expect(wrapper.get('[data-testid="non-fir-current"]').text()).toBe('0');
+    expect(smartFillButton!.attributes('disabled')).toBeDefined();
   });
 });
