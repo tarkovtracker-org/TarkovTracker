@@ -1,3 +1,10 @@
+## [1.82.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.1...v1.82.2) (2026-09-26)
+
+
+### Bug Fixes
+
+* **app:** fence stale startup initialization across session transitions ([#937](https://github.com/tarkovtracker-org/TarkovTracker/issues/937)) ([15c9d83](https://github.com/tarkovtracker-org/TarkovTracker/commit/15c9d8376316937048a7ec61b2dec079f4c163ef))
+
 ## [1.82.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.0...v1.82.1) (2026-09-26)
 
 
