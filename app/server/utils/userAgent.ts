@@ -33,10 +33,15 @@ export const resolveTarkovTrackerUserAgent = (env: NodeJS.ProcessEnv): string =>
   // file:///tmp/tracker) would be silently mangled into a bogus http(s) origin
   // (https://ftp, https://file) instead of being rejected. Inspect the same trimmed value
   // resolvePublicAppUrl will consume (first non-empty of APP_URL / CF_PAGES_URL) and reject
-  // explicit unsupported schemes up front. Bare hostnames carry no scheme and still go
-  // through the normal https normalization, including localhost handling.
+  // explicit unsupported schemes up front. Bare hostnames with optional numeric ports still
+  // go through the normal https normalization, including localhost handling.
   const configuredUrl = env.APP_URL?.trim() || env.CF_PAGES_URL?.trim() || '';
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(configuredUrl) && !/^https?:\/\//i.test(configuredUrl)) {
+  const isBareHostnameWithPort = /^[a-z0-9.-]+:\d+(?:[/?#]|$)/i.test(configuredUrl);
+  if (
+    /^[a-z][a-z0-9+.-]*:/i.test(configuredUrl) &&
+    !/^https?:\/\//i.test(configuredUrl) &&
+    !isBareHostnameWithPort
+  ) {
     return UPSTREAM_TARKOVTRACKER_USER_AGENT;
   }
   const appUrl = resolvePublicAppUrl(env);

@@ -17,6 +17,11 @@ describe('resolveTarkovTrackerUserAgent', () => {
       'TarkovTracker/1.0 (+https://tracker.example.com)'
     );
   });
+  it('preserves a bare hostname with a port as a host instead of an explicit scheme', () => {
+    expect(resolveTarkovTrackerUserAgent({ APP_URL: 'tracker.example.com:3000' })).toBe(
+      'TarkovTracker/1.0 (+https://tracker.example.com:3000)'
+    );
+  });
   it('drops a configured path/query/hash, keeping only the origin', () => {
     expect(
       resolveTarkovTrackerUserAgent({
@@ -39,6 +44,11 @@ describe('resolveTarkovTrackerUserAgent', () => {
     );
   });
   it.each([
+    [
+      'an explicit mailto scheme without slashes in APP_URL',
+      { APP_URL: 'mailto:contact@example.com' },
+    ],
+    ['an explicit ftp scheme without slashes in APP_URL', { APP_URL: 'ftp:tracker.example.com' }],
     ['an explicit ftp scheme in APP_URL', { APP_URL: 'ftp://tracker.example.com' }],
     ['an explicit file scheme in APP_URL', { APP_URL: 'file:///tmp/tracker' }],
     ['an uppercase explicit scheme in APP_URL', { APP_URL: 'FTP://tracker.example.com' }],

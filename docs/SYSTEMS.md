@@ -1279,6 +1279,9 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
 - The browser never fetches `players.tarkov.dev` directly (no upstream CORS); the proxy is the only
   path, and it never talks to the api-gateway Worker or its daily token quotas — the rate-limit
   buckets are route-specific.
+- The shared outbound User-Agent identifies this deployment using the origin from `APP_URL` or
+  `CF_PAGES_URL`; missing, malformed, and local values retain the upstream
+  `https://tarkovtracker.org` identity.
 - A minute-scale limiter always runs before siteverify or any cache/upstream access. When Turnstile
   is enabled it uses the verification bucket, so invalid tokens cannot hammer siteverify while the
   hourly admitted-request quota remains reserved for verified traffic.
