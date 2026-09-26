@@ -95,6 +95,23 @@ function nextCommentCursor(pageInfo, currentCursor) {
   }
   return nextCursor;
 }
+/** Fail closed unless GraphQL returned edit metadata for every comment from the REST snapshot. */
+function assertCompleteCommentEditTimes(comments, editTimes) {
+  for (const comment of comments) {
+    assertValidRestCommentId(comment.id);
+    if (!editTimes.has(comment.id)) {
+      throw new Error('GitHub returned incomplete pull request comment edit metadata.');
+    }
+  }
+}
+function assertValidRestCommentId(commentId) {
+  if (!Number.isSafeInteger(commentId)) {
+    throw new Error('GitHub returned an invalid REST pull request comment ID.');
+  }
+  if (commentId <= 0) {
+    throw new Error('GitHub returned an invalid REST pull request comment ID.');
+  }
+}
 export async function isPreviewMaintainer(github, repo, username) {
   const { data } = await github.rest.repos
     .getCollaboratorPermissionLevel({ ...repo, username })
@@ -229,6 +246,7 @@ export async function readPreviewRequest(github, repo, pullRequest) {
     per_page: 100,
   });
   const editTimes = await readCommentEditTimes(github, repo, pullRequest);
+  assertCompleteCommentEditTimes(comments, editTimes);
   const commands = comments
     .filter((comment) => originalCommand(comment, enabledAt, editTimes))
     .toSorted((a, b) => b.id - a.id);
