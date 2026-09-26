@@ -184,6 +184,9 @@ const createPreferencesStore = () => ({
   setNeededItemsCardStyle: vi.fn(),
   itemsTeamAllHidden: false,
   setItemsTeamHideAll: vi.fn(),
+  getHideoutRequireStationLevels: true,
+  getHideoutRequireSkillLevels: true,
+  getHideoutRequireTraderLoyalty: true,
 });
 const createTarkovStore = () => ({
   getGameEdition: () => 1,
@@ -531,10 +534,63 @@ describe('useNeededItems', () => {
           const state = progressStore.tasksState?.[item.taskId];
           return state === TASK_STATE.ACTIVE ? 3 : state === TASK_STATE.AVAILABLE ? 1 : 0;
         }
-        return 2;
+        // Only station-1 level 1 is the next buildable level; station-2 level 2 is locked.
+        return item.hideoutModule.stationId === 'station-1' ? 2 : 0;
       });
       const sortedPriorities = [...priorities].sort((a, b) => b - a);
       expect(priorities).toEqual(sortedPriorities);
+    });
+    describe('hideout priority', () => {
+      const lockedByStation = () => {
+        const module = createHideoutModule(
+          'hideout-locked',
+          'station-1',
+          1,
+          createItem('item-cpu', 'CPU'),
+          1
+        );
+        module.hideoutModule.stationLevelRequirements = [
+          { id: 'req-1', station: { id: 'station-2', name: 'Intelligence Center' }, level: 1 },
+        ];
+        return module;
+      };
+      const buildable = () =>
+        createHideoutModule('hideout-ready', 'station-2', 1, createItem('item-bolts', 'Bolts'), 1);
+      const sortedHideoutIds = async (
+        modules: NeededItemHideoutModule[],
+        preferences: Partial<ReturnType<typeof createPreferencesStore>> = {}
+      ) => {
+        const { neededItems } = await setup({
+          metadataStore: { neededItemTaskObjectives: [], neededItemHideoutModules: modules },
+          preferencesStore: {
+            getNeededItemsSortBy: 'priority',
+            getNeededItemsSortDirection: 'desc',
+            ...preferences,
+          },
+        });
+        return neededItems.filteredItems.value.map((item) => item.id);
+      };
+      it('ranks buildable stations before stations with unmet prerequisites', async () => {
+        const ids = await sortedHideoutIds([lockedByStation(), buildable()]);
+        expect(ids).toEqual(['hideout-ready', 'hideout-locked']);
+      });
+      it('ranks the next station level before later levels', async () => {
+        const later = createHideoutModule(
+          'hideout-later',
+          'station-1',
+          3,
+          createItem('item-cpu', 'CPU'),
+          1
+        );
+        const ids = await sortedHideoutIds([later, buildable()]);
+        expect(ids).toEqual(['hideout-ready', 'hideout-later']);
+      });
+      it('ignores station prerequisites the user has chosen not to enforce', async () => {
+        const ids = await sortedHideoutIds([lockedByStation(), buildable()], {
+          getHideoutRequireStationLevels: false,
+        });
+        expect(ids).toEqual(['hideout-locked', 'hideout-ready']);
+      });
     });
     it('sorts by name in ascending order', async () => {
       const { neededItems } = await setup({
