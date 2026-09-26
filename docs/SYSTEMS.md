@@ -1874,7 +1874,11 @@ active, the combined view re-keys the pooled objective under the matched accepte
 by name or short name) and registers it in `objectivesByItemId` under the same key; list and grid
 views pin the display to the matched item. Without an accepted match, the primary item stays
 canonical under the grouped-view rule that nameless items are not grouped. A pooled objective
-always contributes to exactly one group, so search-time re-keying never double-counts; progress
+contributes to at most one group, so search-time re-keying never double-counts. When the matched
+item already has direct needs (needs whose own primary item is that item), re-keyed pooled
+objectives are dropped from the combined view instead of joining that group, so the searched
+item's total and Smart Fill targets match the unsearched view (#882: a LEDX search otherwise
+added every "sell N of any item" pool). Progress
 writes stay bound to the objective ID regardless of which item identity is displayed.
 
 Keep `findAcceptedItemMatchIndex` (search filter and display pin) and the grouped-view accepted

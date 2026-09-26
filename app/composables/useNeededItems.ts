@@ -574,12 +574,32 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     if (!canGroupItem(primaryData)) return null;
     return { id: primaryData.id, data: primaryData, name: primaryData.name };
   };
+  type GroupedNeed = {
+    need: NeededItemTaskObjective | NeededItemHideoutModule;
+    target: GroupTarget;
+  };
+  const isAcceptedRekey = ({ need, target }: GroupedNeed): boolean =>
+    target.id !== getNeededItemData(need)?.id;
+  /**
+   * Needs paired with their combined-view group. A pooled objective re-keyed
+   * under a searched accepted item only joins that group when the item has no
+   * direct needs of its own; otherwise a broad pool (e.g. "sell 75 of any
+   * item") would inflate the searched item's total and Smart Fill targets.
+   */
+  const groupedNeeds = computed((): GroupedNeed[] => {
+    const resolved = filteredItems.value.flatMap((need) => {
+      const target = resolveGroupTarget(need);
+      return target ? [{ need, target }] : [];
+    });
+    const directIds = new Set(
+      resolved.filter((entry) => !isAcceptedRekey(entry)).map((entry) => entry.target.id)
+    );
+    return resolved.filter((entry) => !isAcceptedRekey(entry) || !directIds.has(entry.target.id));
+  });
   const groupedItems = computed((): GroupedNeededItem[] => {
     const startedAt = perfDebug.value ? perfNow() : 0;
     const groups = new Map<string, GroupedNeededItemAccumulator>();
-    for (const need of filteredItems.value) {
-      const target = resolveGroupTarget(need);
-      if (!target) continue;
+    for (const { need, target } of groupedNeeds.value) {
       const { id: itemId, data: itemData, name: itemName } = target;
       const existingGroup = groups.get(itemId);
       if (!existingGroup) {
@@ -655,9 +675,8 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
         hideoutModules: NeededItemHideoutModule[];
       }
     >();
-    for (const need of filteredItems.value) {
-      const itemId = resolveGroupTarget(need)?.id;
-      if (!itemId) continue;
+    for (const { need, target } of groupedNeeds.value) {
+      const itemId = target.id;
       if (!map.has(itemId)) {
         map.set(itemId, { taskObjectives: [], hideoutModules: [] });
       }
