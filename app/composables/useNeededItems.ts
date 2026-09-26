@@ -587,14 +587,18 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
    * item") would inflate the searched item's total and Smart Fill targets.
    */
   const resolveGroupedNeeds = (
-    needs: (NeededItemTaskObjective | NeededItemHideoutModule)[]
+    needs: (NeededItemTaskObjective | NeededItemHideoutModule)[],
+    suppressionNeeds = needs
   ): GroupedNeed[] => {
     const resolved = needs.flatMap((need) => {
       const target = resolveGroupTarget(need);
       return target ? [{ need, target }] : [];
     });
     const directIds = new Set(
-      resolved.filter((entry) => !isAcceptedRekey(entry)).map((entry) => entry.target.id)
+      suppressionNeeds.flatMap((need) => {
+        const target = resolveGroupTarget(need);
+        return target && target.id === getNeededItemData(need)?.id ? [target.id] : [];
+      })
     );
     return resolved.filter((entry) => !isAcceptedRekey(entry) || !directIds.has(entry.target.id));
   };
@@ -689,7 +693,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
         hideoutModules: NeededItemHideoutModule[];
       }
     >();
-    for (const { need, target } of resolveGroupedNeeds(modalNeeds)) {
+    for (const { need, target } of resolveGroupedNeeds(modalNeeds, filteredItems.value)) {
       const itemId = target.id;
       if (!map.has(itemId)) {
         map.set(itemId, { taskObjectives: [], hideoutModules: [] });

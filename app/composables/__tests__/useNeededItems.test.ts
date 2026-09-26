@@ -540,6 +540,28 @@ describe('useNeededItems', () => {
           ?.taskObjectives.map((item) => item.id)
       ).toEqual(['obj-owned', 'obj-needed']);
     });
+    it('preserves pooled Smart Fill targets when an owned direct need is hidden during search', async () => {
+      const augmentin = createItem('item-augmentin', 'Augmentin');
+      const direct = createTaskObjective('obj-owned-direct', 'task-1', augmentin, 1);
+      const primary = createItem('item-cms', 'CMS Kit');
+      const pooled: NeededItemTaskObjective = {
+        ...createTaskObjective('obj-pool-search', 'task-1', primary, 5, true),
+        acceptedItems: [primary, augmentin],
+      };
+      const { neededItems, search } = await setup({
+        metadataStore: { neededItemTaskObjectives: [direct, pooled] },
+        preferencesStore: { getNeededItemsHideOwned: true },
+        tarkovStore: { getObjectiveCount: (id: string) => (id === direct.id ? 1 : 0) },
+      });
+      search.value = 'augmentin';
+      expect(neededItems.filteredItems.value.map((need) => need.id)).toEqual([pooled.id]);
+      expect(neededItems.groupedItems.value.map((group) => group.item.id)).toContain(augmentin.id);
+      expect(
+        neededItems.objectivesByItemId.value
+          .get(augmentin.id)
+          ?.taskObjectives.map((objective) => objective.id)
+      ).toEqual([direct.id, pooled.id]);
+    });
     it('keeps hidden team objectives out of Smart Fill targets', async () => {
       const { neededItems } = await setup({
         includeTeamItems: true,
