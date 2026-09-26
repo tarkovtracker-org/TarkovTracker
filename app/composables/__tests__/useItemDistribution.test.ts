@@ -285,9 +285,25 @@ describe('useItemDistribution', () => {
       expect(hideoutUpdate.count).toBe(3);
       expect(result.remainingFir).toBe(1);
     });
-    it('respects current progress when distributing', async () => {
+    it('treats collected counts as totals instead of adding to current progress', async () => {
+      // #867: re-running Smart Fill with 6 collected after 5 were already
+      // assigned must leave 6 assigned, not 5 + 6.
+      mockStoreState.hideoutPartCounts = { 'mod-1': 3, 'mod-2': 2 };
+      const { useItemDistribution } = await import('@/composables/useItemDistribution');
+      const { distributeItems } = useItemDistribution();
+      const hideoutModules = [
+        createHideoutModule('mod-1', { count: 8, level: 1 }),
+        createHideoutModule('mod-2', { count: 4, level: 2 }),
+      ];
+      const result = distributeItems(0, 6, [], hideoutModules);
+      const assigned = (id: string) =>
+        result.updates.find((u) => u.id === id)?.count ?? mockStoreState.hideoutPartCounts[id];
+      expect(assigned('mod-1')! + assigned('mod-2')!).toBe(6);
+      expect(result.remainingNonFir).toBe(0);
+    });
+    it('lowers current progress when the collected total is smaller', async () => {
       mockStoreState.tasks.set('task-1', { kappaRequired: true, minPlayerLevel: 10 });
-      mockStoreState.objectiveCounts = { 'obj-1': 2 };
+      mockStoreState.objectiveCounts = { 'obj-1': 4 };
       const { useItemDistribution } = await import('@/composables/useItemDistribution');
       const { distributeItems } = useItemDistribution();
       const taskObjectives = [
@@ -295,7 +311,7 @@ describe('useItemDistribution', () => {
       ];
       const result = distributeItems(2, 0, taskObjectives, []);
       const update = expectDefined(result.updates[0]);
-      expect(update.count).toBe(4);
+      expect(update.count).toBe(2);
       expect(result.remainingFir).toBe(0);
     });
     it('returns empty updates when objectives are already satisfied', async () => {
@@ -308,7 +324,7 @@ describe('useItemDistribution', () => {
       ];
       const result = distributeItems(10, 0, taskObjectives, []);
       expect(result.updates).toHaveLength(0);
-      expect(result.remainingFir).toBe(10);
+      expect(result.remainingFir).toBe(5);
     });
     it('handles empty objectives array', async () => {
       const { useItemDistribution } = await import('@/composables/useItemDistribution');

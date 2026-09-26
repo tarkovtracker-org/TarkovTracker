@@ -378,8 +378,6 @@
         hideoutModulesList.value
       );
       applyDistribution(result);
-      firInput.value = 0;
-      nonFirInput.value = 0;
     } catch (error) {
       logger.error('Failed to smart fill needed items.', error);
       toast.add({
