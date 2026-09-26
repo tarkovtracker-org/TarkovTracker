@@ -10,6 +10,7 @@ const patterns = [
   '*.md',
   '*.{js,mjs,cjs,json}',
   '.github/**/*.md',
+  '**/{AGENTS,CLAUDE}.md',
   'DESIGN.md',
   'nuxt.config.ts',
   'app/app.config.ts',
