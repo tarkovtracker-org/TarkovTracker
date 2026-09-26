@@ -1738,6 +1738,7 @@
     "analytics_preferences": "Analyse-Einstellungen",
     "game_attribution": "Escape from Tarkov und zugehörige Spielinhalte und Materialien sind Marken und urheberrechtlich geschützte Werke von Battlestate Games Limited und seinen Lizenzgebern. Alle Rechte vorbehalten. TarkovTracker ist ein inoffizielles Fan-Projekt und ist nicht mit Battlestate Games verbunden oder von diesem unterstützt.",
     "tagline": "Verfolge deine Flucht von Tarkov-Quests, verstecke Upgrades und Items Anforderungen an einem Ort.",
+    "version_release_link": "View the release notes for version {version} on GitHub",
     "sections": {
       "explore": "Erforschen",
       "project": "Projekt",
