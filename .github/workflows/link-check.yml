@@ -1,13 +1,5 @@
 name: Link Check
 on:
-  pull_request:
-    paths:
-      - 'docs/**/*.md'
-      - '*.md'
-      - 'public/llms.txt'
-      - 'lychee.toml'
-      - 'lychee.llms.toml'
-      - '.github/workflows/link-check.yml'
   push:
     branches: [main]
     paths:
