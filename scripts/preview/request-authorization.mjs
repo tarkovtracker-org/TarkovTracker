@@ -7,7 +7,7 @@ const COMMENT_EDITS_QUERY = `
     repository(owner: $owner, name: $name) {
       pullRequest(number: $number) {
         comments(first: 100, after: $cursor) {
-          nodes { databaseId lastEditedAt }
+          nodes { fullDatabaseId lastEditedAt }
           pageInfo { hasNextPage endCursor }
         }
       }
@@ -66,14 +66,23 @@ function validatedCommentConnection(comments) {
 }
 function addCommentEditTimes(editTimes, comments) {
   for (const comment of comments) {
-    if (!Number.isSafeInteger(comment.databaseId)) {
+    const databaseId = commentDatabaseId(comment.fullDatabaseId);
+    if (databaseId === null) {
       throw new Error('GitHub returned invalid pull request comment edit metadata.');
     }
     if (!validCommentEditTime(comment.lastEditedAt)) {
       throw new Error('GitHub returned invalid pull request comment edit metadata.');
     }
-    editTimes.set(comment.databaseId, comment.lastEditedAt);
+    editTimes.set(databaseId, comment.lastEditedAt);
   }
+}
+/** Convert GraphQL's 64-bit decimal ID to a safe REST ID for exact matching. */
+function commentDatabaseId(fullDatabaseId) {
+  if (typeof fullDatabaseId !== 'string') return null;
+  if (!/^[1-9]\d*$/.test(fullDatabaseId)) return null;
+  const databaseId = Number(fullDatabaseId);
+  if (!Number.isSafeInteger(databaseId)) return null;
+  return databaseId;
 }
 function validCommentEditTime(lastEditedAt) {
   return lastEditedAt === null || typeof lastEditedAt === 'string';

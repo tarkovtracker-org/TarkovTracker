@@ -247,7 +247,7 @@ function commentEditTimesGraphql(comments) {
         pullRequest: {
           comments: {
             nodes: page.map(({ id, lastEditedAt }) => ({
-              databaseId: id,
+              fullDatabaseId: String(id),
               lastEditedAt: lastEditedAt ?? null,
             })),
             pageInfo: {
@@ -348,6 +348,14 @@ test('metadata updates do not revoke unchanged commands or accepted stop receipt
     commentId: 2,
     enabled: false,
     requestedBy: 'former-maintainer',
+  });
+});
+test('comment IDs above GraphQL Int range retain preview authorization', async () => {
+  const highId = 2_147_483_648;
+  assert.deepEqual(await readPreviewRequest(authorizationFixture([comment(highId)]), REPO, 42), {
+    commentId: highId,
+    enabled: true,
+    requestedBy: 'maintainer',
   });
 });
 test('all comment pages are considered so a later stop revokes an older grant', async () => {

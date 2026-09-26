@@ -462,7 +462,7 @@ function commentEditTimesGraphql(comments) {
         pullRequest: {
           comments: {
             nodes: page.map(({ id, lastEditedAt }) => ({
-              databaseId: id,
+              fullDatabaseId: String(id),
               lastEditedAt: lastEditedAt ?? null,
             })),
             pageInfo: {
