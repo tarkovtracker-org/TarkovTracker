@@ -31,12 +31,9 @@ const getPersistedSelectedModifiers = (value: unknown): unknown => {
 };
 const SEASON_PLANNER_SERIALIZER = {
   serialize: (state: StateTree): string => {
-    const currentUserId = getCurrentSupabaseUserId();
-    const selectedModifiers =
-      isRecord(state) && state.ownerUserId === currentUserId
-        ? normalizeSelectedModifiers(state.selectedModifiers)
-        : [];
-    return serializeUserScopedStorage({ selectedModifiers }, currentUserId);
+    const ownerUserId = typeof state.ownerUserId === 'string' ? state.ownerUserId : null;
+    const selectedModifiers = normalizeSelectedModifiers(state.selectedModifiers);
+    return serializeUserScopedStorage({ selectedModifiers }, ownerUserId);
   },
   deserialize: (raw: string): SeasonPlannerState => {
     const currentUserId = getCurrentSupabaseUserId();
@@ -48,6 +45,24 @@ const SEASON_PLANNER_SERIALIZER = {
       ownerUserId: currentUserId,
       selectedModifiers: normalizeSelectedModifiers(getPersistedSelectedModifiers(wrapped.data)),
     };
+  },
+};
+// Separate slots protect a saved signed-in plan while startup still appears anonymous.
+const ownerStorageKey = (key: string, owner: string | null): string =>
+  `${key}:${JSON.stringify(owner)}`;
+const SEASON_PLANNER_STORAGE = {
+  getItem(key: string): string | null {
+    const owner = getCurrentSupabaseUserId();
+    const saved = localStorage.getItem(ownerStorageKey(key, owner));
+    if (saved !== null) return saved;
+    // Existing preview users used a single envelope; migrate only its matching owner.
+    const legacy = localStorage.getItem(key);
+    if (legacy === null) return null;
+    return parseUserScopedStorage(legacy)?._userId === owner ? legacy : null;
+  },
+  setItem(key: string, raw: string): void {
+    const envelope = parseUserScopedStorage(raw);
+    if (envelope) localStorage.setItem(ownerStorageKey(key, envelope._userId), raw);
   },
 };
 export const useSeasonPlannerStore = defineStore('seasonPlanner', {
@@ -89,11 +104,13 @@ export const useSeasonPlannerStore = defineStore('seasonPlanner', {
     prepareForCurrentUser() {
       const currentUserId = getCurrentSupabaseUserId();
       if (this.ownerUserId !== currentUserId) {
-        this.ownerUserId = currentUserId;
-        this.selectedModifiers = [];
+        const raw = SEASON_PLANNER_STORAGE.getItem(STORAGE_KEYS.seasonPlanner);
+        this.$patch(
+          raw ? SEASON_PLANNER_SERIALIZER.deserialize(raw) : createEmptyState(currentUserId)
+        );
         return;
       }
-      this.selectedModifiers = normalizeSelectedModifiers(this.selectedModifiers);
+      this.$patch({ selectedModifiers: normalizeSelectedModifiers(this.selectedModifiers) });
     },
     isSelected(id: string): boolean {
       return this.selectedModifierIds.includes(id);
@@ -106,11 +123,11 @@ export const useSeasonPlannerStore = defineStore('seasonPlanner', {
       const selectedIds = this.selectedModifierIds;
       const index = selectedIds.indexOf(id);
       if (index > -1) {
-        this.selectedModifiers.splice(index, 1);
+        this.$patch({ selectedModifiers: selectedIds.filter((selectedId) => selectedId !== id) });
         return;
       }
       if (!this.conflictsWithSelection(id, selectedIds)) {
-        this.selectedModifiers.push(id);
+        this.$patch({ selectedModifiers: [...selectedIds, id] });
       }
     },
     normalizeSelection() {
@@ -121,11 +138,11 @@ export const useSeasonPlannerStore = defineStore('seasonPlanner', {
           normalizedIds.push(id);
         }
       }
-      this.selectedModifiers = normalizedIds;
+      this.$patch({ selectedModifiers: normalizedIds });
     },
     reset() {
       this.prepareForCurrentUser();
-      this.selectedModifiers = [];
+      this.$patch({ selectedModifiers: [] });
     },
     conflictsWithSelection(id: string, selectedIds: readonly string[]): boolean {
       const modifier = this.personalModifiers.find((candidate) => candidate.id === id);
@@ -140,7 +157,7 @@ export const useSeasonPlannerStore = defineStore('seasonPlanner', {
   },
   persist: {
     key: STORAGE_KEYS.seasonPlanner,
-    storage: typeof window !== 'undefined' ? localStorage : undefined,
+    storage: typeof window !== 'undefined' ? SEASON_PLANNER_STORAGE : undefined,
     serializer: SEASON_PLANNER_SERIALIZER,
   },
 });

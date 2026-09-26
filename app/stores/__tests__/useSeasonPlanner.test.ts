@@ -226,10 +226,35 @@ describe('useSeasonPlannerStore', () => {
       store.toggleModifier('no_flea_market');
       expect(store.selectedModifierIds).toEqual(['no_flea_market']);
       await nextTick();
-      expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.seasonPlanner) ?? '{}')).toMatchObject({
+      expect(
+        JSON.parse(localStorage.getItem(`${STORAGE_KEYS.seasonPlanner}:"user-2"`) ?? '{}')
+      ).toMatchObject({
         _userId: 'user-2',
         data: { selectedModifiers: ['no_flea_market'] },
       });
+    });
+    it('retains a signed-in plan during anonymous startup and restores it after login', async () => {
+      const saved = serializeUserScopedStorage(
+        { selectedModifiers: ['marathon_runner'] },
+        'user-1'
+      );
+      localStorage.setItem(STORAGE_KEYS.seasonPlanner, saved);
+      const store = useSeasonPlannerStore();
+      store.normalizeSelection();
+      store.toggleModifier('no_flea_market');
+      await nextTick();
+      expect(localStorage.getItem(STORAGE_KEYS.seasonPlanner)).toBe(saved);
+      currentUserId.value = 'user-1';
+      store.normalizeSelection();
+      expect(store.selectedModifiers).toEqual(['marathon_runner']);
+      store.toggleModifier('allergic');
+      await nextTick();
+      currentUserId.value = null;
+      store.normalizeSelection();
+      expect(store.selectedModifiers).toEqual(['no_flea_market']);
+      currentUserId.value = 'user-1';
+      store.normalizeSelection();
+      expect(store.selectedModifiers).toEqual(['marathon_runner', 'allergic']);
     });
     it('handles a malformed selection patched into the live store', () => {
       const store = useSeasonPlannerStore();

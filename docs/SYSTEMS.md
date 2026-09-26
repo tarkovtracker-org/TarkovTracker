@@ -2347,8 +2347,10 @@ flowchart LR
 - Rehydration accepts only a matching user-scoped envelope and a string array of known personal
   modifier IDs. Duplicate and stale IDs are removed before they reach the UI; `normalizeSelection`
   also removes incompatible persisted entries after mount.
-- The store tracks the owner of its in-memory selection and clears it before a different user can
-  read or mutate the store. A malformed persisted value falls back to an empty plan.
+- Persistence uses separate owner slots, including an anonymous slot. Legacy envelopes are read
+  only by their matching owner. Delayed authentication restores that owner's plan without
+  overwriting it during anonymous startup; identity changes reload the matching slot.
+- A malformed persisted value falls back to an empty plan.
 
 ### Files
 

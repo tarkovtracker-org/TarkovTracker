@@ -147,6 +147,7 @@
 <script setup lang="ts">
   import ModifierCard from '@/features/season-planner/ModifierCard.vue';
   import { useSeasonPlannerStore } from '@/stores/useSeasonPlanner';
+  import { getCurrentSupabaseUserId } from '@/utils/userScopedStorage';
   import type { HardcoreModifier, PersonalModifier } from '@/types/season';
   const { t } = useI18n({ useScope: 'global' });
   definePageMeta({
@@ -161,9 +162,7 @@
       ),
   });
   const plannerStore = useSeasonPlannerStore();
-  onMounted(() => {
-    plannerStore.normalizeSelection();
-  });
+  watch(getCurrentSupabaseUserId, () => plannerStore.normalizeSelection(), { immediate: true });
   const positiveModifiers = computed(() =>
     plannerStore.personalModifiers.filter((m): m is PersonalModifier => m.type === 'positive')
   );
