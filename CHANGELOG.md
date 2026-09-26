@@ -1,3 +1,10 @@
+## [1.82.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.5...v1.82.6) (2026-09-26)
+
+
+### Bug Fixes
+
+* **app:** keep searched item totals free of pooled objectives ([#882](https://github.com/tarkovtracker-org/TarkovTracker/issues/882)) ([#942](https://github.com/tarkovtracker-org/TarkovTracker/issues/942)) ([04287b1](https://github.com/tarkovtracker-org/TarkovTracker/commit/04287b1e9a1726b23c5f91060bbac6c22c0b16ad))
+
 ## [1.82.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.4...v1.82.5) (2026-09-26)
 
 
