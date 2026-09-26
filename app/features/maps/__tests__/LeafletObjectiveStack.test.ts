@@ -48,6 +48,13 @@ describe('LeafletObjectiveStack', () => {
     await wrapper.findAll('li button')[1]!.trigger('click');
     expect(onSelect).toHaveBeenCalledWith('obj-zone');
   });
+  it('uses fallback labels when objective metadata is unavailable', async () => {
+    const { wrapper } = await setup();
+    await wrapper.setProps({ objectiveIds: ['obj-missing'] });
+    const entry = wrapper.find('li button');
+    expect(entry.text()).toContain('common.task');
+    expect(entry.text()).not.toContain('undefined');
+  });
   it('closes from the close button and Escape', async () => {
     const { wrapper, onClose } = await setup();
     await wrapper.get('button[aria-label="common.close"]').trigger('click');
@@ -93,5 +100,38 @@ describe('LeafletObjectiveStack', () => {
     expect(entries).toHaveLength(2);
     expect(entries[0]!.text()).toContain('First objective');
     expect(entries[1]!.text()).toContain('Second objective');
+  });
+  it('hides compact descriptions when task names already distinguish entries', async () => {
+    vi.doMock('@/stores/useMetadata', () => ({
+      useMetadataStore: () => ({
+        objectives: [
+          { id: 'obj-one', taskId: 'task-one', description: 'First objective' },
+          { id: 'obj-two', taskId: 'task-two', description: 'Second objective' },
+        ],
+        tasks: [
+          { id: 'task-one', name: 'First task' },
+          { id: 'task-two', name: 'Second task' },
+        ],
+      }),
+    }));
+    vi.doMock('@/stores/usePreferences', () => ({
+      usePreferencesStore: () => ({ getMapTooltipDensity: 'compact' }),
+    }));
+    const { default: LeafletObjectiveStack } =
+      await import('@/features/maps/LeafletObjectiveStack.vue');
+    const wrapper = mount(LeafletObjectiveStack, {
+      props: {
+        objectiveIds: ['obj-one', 'obj-two'],
+        t: ((key: string) => key) as never,
+      },
+      global: { stubs: { UIcon: true } },
+    });
+    const entries = wrapper.findAll('li button');
+    expect(entries).toHaveLength(2);
+    expect(entries[0]!.text()).toContain('First task');
+    expect(entries[0]!.text()).not.toContain('First objective');
+    expect(entries[1]!.text()).toContain('Second task');
+    expect(entries[1]!.text()).not.toContain('Second objective');
+    wrapper.unmount();
   });
 });

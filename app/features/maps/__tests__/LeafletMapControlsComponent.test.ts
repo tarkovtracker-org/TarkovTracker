@@ -10,9 +10,10 @@ const { mapState, mockMapInstance, resetMapMarkerColorsSpy } = vi.hoisted(() => 
     zoomSnapDuringCall: undefined as number | undefined,
     on: vi.fn(),
     off: vi.fn(),
-    hasLayer: vi.fn(() => false),
+    hasLayer: vi.fn((layer?: { isOpen?: boolean }) => Boolean(layer?.isOpen)),
     getPane: vi.fn(() => document.createElement('div')),
     getContainer: vi.fn(() => document.createElement('div')),
+    latLngToContainerPoint: vi.fn(() => ({ x: 50, y: 50 })),
     getMinZoom: vi.fn(() => -2),
     getMaxZoom: vi.fn(() => 10),
     panBy: vi.fn(),
@@ -41,7 +42,14 @@ const { mapState, mockMapInstance, resetMapMarkerColorsSpy } = vi.hoisted(() => 
   return {
     mockMapInstance: mapInstance,
     resetMapMarkerColorsSpy: vi.fn(),
-    mapState: { hasMultipleFloors: false, isLoading: false },
+    mapState: {
+      hasMultipleFloors: false,
+      isLoading: false,
+      leaflet: null as unknown,
+      objectiveLayer: null as unknown,
+      extractLayer: null as unknown,
+      spawnLayer: null as unknown,
+    },
   };
 });
 const refreshViewSpy = vi.fn();
@@ -61,16 +69,16 @@ vi.mock('@/composables/useLeafletMap', () => ({
     useLeafletMapOptionsSpy(options);
     return {
       mapInstance: shallowRef(mockMapInstance),
-      leaflet: shallowRef(null),
+      leaflet: shallowRef(mapState.leaflet),
       selectedFloor: ref(''),
       floors: ref([]),
       hasMultipleFloors: ref(mapState.hasMultipleFloors),
       isLoading: ref(mapState.isLoading),
       isIdle: ref(false),
       svgLayer: shallowRef(null),
-      objectiveLayer: shallowRef(null),
-      extractLayer: shallowRef(null),
-      spawnLayer: shallowRef(null),
+      objectiveLayer: shallowRef(mapState.objectiveLayer),
+      extractLayer: shallowRef(mapState.extractLayer),
+      spawnLayer: shallowRef(mapState.spawnLayer),
       setFloor: setFloorSpy,
       refreshView: refreshViewSpy,
       clearMarkers: vi.fn(),
@@ -91,6 +99,9 @@ vi.mock('@/stores/usePreferences', () => ({
       COOP_EXTRACT: '#777777',
     },
     getMapTooltipDensity: 'comfortable',
+    getMapShowSelfObjectives: true,
+    getMapShowPinnedObjectives: false,
+    getMapShowTeamObjectives: false,
     getMapZoneOpacity: 0.3,
     getMapZoomSpeed: 1,
     mapPanSpeed: 1,
@@ -99,6 +110,29 @@ vi.mock('@/stores/usePreferences', () => ({
     setMapTooltipDensity: vi.fn(),
     setMapZoneOpacity: vi.fn(),
     setMapZoomSpeed: vi.fn(),
+  }),
+}));
+vi.mock('@/stores/useMetadata', () => ({
+  useMetadataStore: () => ({
+    objectives: [
+      { id: 'objective-a', taskId: 'task-a', description: 'Objective A' },
+      { id: 'objective-b', taskId: 'task-b', description: 'Objective B' },
+    ],
+    tasks: [
+      { id: 'task-a', name: 'Task A' },
+      { id: 'task-b', name: 'Task B' },
+    ],
+  }),
+}));
+vi.mock('@/stores/useTarkov', () => ({
+  useTarkovStore: () => ({
+    getObjectiveCount: () => 0,
+    isTaskObjectiveComplete: () => false,
+    isTaskComplete: () => false,
+    isTaskFailed: () => false,
+    setObjectiveCount: vi.fn(),
+    setTaskObjectiveComplete: vi.fn(),
+    setTaskObjectiveUncomplete: vi.fn(),
   }),
 }));
 const mapData = {
@@ -129,6 +163,10 @@ const mountMap = async (props: Record<string, unknown> = {}) => {
 describe('LeafletMap controls', () => {
   beforeEach(() => {
     mapState.hasMultipleFloors = false;
+    mapState.leaflet = null;
+    mapState.objectiveLayer = null;
+    mapState.extractLayer = null;
+    mapState.spawnLayer = null;
     localStorage.clear();
     refreshViewSpy.mockClear();
     setFloorSpy.mockClear();
@@ -141,6 +179,14 @@ describe('LeafletMap controls', () => {
     mockMapInstance.panTo.mockClear();
     mockMapInstance.zoomIn.mockClear();
     mockMapInstance.zoomOut.mockClear();
+    mockMapInstance.hasLayer.mockReset();
+    mockMapInstance.hasLayer.mockImplementation((layer) => Boolean(layer?.isOpen));
+    mockMapInstance.getPane.mockReset();
+    mockMapInstance.getPane.mockImplementation(() => document.createElement('div'));
+    mockMapInstance.getContainer.mockReset();
+    mockMapInstance.getContainer.mockImplementation(() => document.createElement('div'));
+    mockMapInstance.latLngToContainerPoint.mockClear();
+    mockMapInstance.latLngToContainerPoint.mockReturnValue({ x: 50, y: 50 });
   });
   it('keeps enabled extract labels readable on the light toolbar and updates when toggled', async () => {
     const wrapper = await mountMap({ showPmcExtracts: true });
@@ -304,5 +350,172 @@ describe('LeafletMap controls', () => {
     expect(mockMapInstance.setView).not.toHaveBeenCalled();
     expect(mockMapInstance.panTo).toHaveBeenCalledWith([3.5, 4.5], { animate: false });
     wrapper.unmount();
+  });
+  it('stacks overlapping objectives, focuses after attach, and restores map focus on close', async () => {
+    type FakeEvent = { containerPoint?: { x: number; y: number } };
+    type FakeHandler = (event?: FakeEvent) => void;
+    const createdLayers: Array<{
+      handlers: Map<string, FakeHandler[]>;
+      options: Record<string, unknown>;
+      setStyle: ReturnType<typeof vi.fn>;
+      getLatLng: () => { lat: number; lng: number };
+      getRadius: () => number;
+    }> = [];
+    const createLayer = (options: Record<string, unknown> = {}) => {
+      const handlers = new Map<string, FakeHandler[]>();
+      const layer = {
+        handlers,
+        options,
+        setStyle: vi.fn(),
+        getLatLng: () => ({ lat: 0, lng: 0 }),
+        getRadius: () => 8,
+        getBounds: () => ({ getCenter: () => ({ lat: 0, lng: 0 }) }),
+        on(name: string, handler: FakeHandler) {
+          handlers.set(name, [...(handlers.get(name) ?? []), handler]);
+          return layer;
+        },
+      };
+      createdLayers.push(layer);
+      return layer;
+    };
+    const createLayerGroup = () => ({ clearLayers: vi.fn(), addLayer: vi.fn() });
+    const mapPane = document.createElement('div');
+    mapPane.innerHTML = '<svg width="100" height="100"></svg>';
+    mockMapInstance.getPane.mockReturnValue(mapPane);
+    mockMapInstance.getContainer.mockReturnValue(mapPane);
+    const popups: Array<{
+      element: HTMLElement;
+      isOpen: boolean;
+      setContent: (content: HTMLElement) => void;
+      setLatLng: ReturnType<typeof vi.fn>;
+      getElement: () => HTMLElement;
+      addTo: () => void;
+      remove: () => void;
+      on: (name: string, handler: FakeHandler) => void;
+      once: (name: string, handler: FakeHandler) => void;
+    }> = [];
+    const createPopup = () => {
+      const element = document.createElement('div');
+      const handlers = new Map<string, FakeHandler[]>();
+      const onceHandlers = new Map<string, FakeHandler[]>();
+      const fire = (name: string) => {
+        for (const handler of handlers.get(name) ?? []) handler();
+        for (const handler of onceHandlers.get(name) ?? []) handler();
+        onceHandlers.delete(name);
+      };
+      const popup = {
+        element,
+        isOpen: false,
+        setContent(content: HTMLElement) {
+          element.replaceChildren(content);
+        },
+        setLatLng: vi.fn(),
+        getElement: () => element,
+        addTo() {
+          popup.isOpen = true;
+          document.body.append(element);
+          fire('add');
+        },
+        remove() {
+          popup.isOpen = false;
+          fire('remove');
+          element.remove();
+        },
+        on(name: string, handler: FakeHandler) {
+          handlers.set(name, [...(handlers.get(name) ?? []), handler]);
+        },
+        once(name: string, handler: FakeHandler) {
+          onceHandlers.set(name, [...(onceHandlers.get(name) ?? []), handler]);
+        },
+      };
+      popups.push(popup);
+      return popup;
+    };
+    const circleMarker = vi.fn((_position: unknown, options: Record<string, unknown>) =>
+      createLayer(options)
+    );
+    const objectiveLayer = createLayerGroup();
+    mapState.leaflet = {
+      circleMarker,
+      polygon: (_positions: unknown, options: Record<string, unknown>) => createLayer(options),
+      popup: createPopup,
+      DomEvent: { stop: vi.fn() },
+    };
+    mapState.objectiveLayer = objectiveLayer;
+    mapState.extractLayer = createLayerGroup();
+    mapState.spawnLayer = createLayerGroup();
+    mockMapInstance.hasLayer.mockImplementation((layer) => Boolean(layer?.isOpen));
+    const marks = [
+      {
+        id: 'objective-a',
+        users: ['self'],
+        zones: [
+          {
+            map: { id: 'customs' },
+            outline: [
+              { x: 0, z: 0 },
+              { x: 20, z: 0 },
+              { x: 0, z: 20 },
+            ],
+          },
+        ],
+        possibleLocations: [],
+      },
+      {
+        id: 'objective-b',
+        users: ['self'],
+        zones: [],
+        possibleLocations: [{ map: { id: 'customs' }, positions: [{ x: 10, z: 10 }] }],
+      },
+    ];
+    const wrapper = await mountMap({
+      map: {
+        ...mapData,
+        svg: {
+          file: 'customs.svg',
+          floors: ['ground'],
+          defaultFloor: 'ground',
+          coordinateRotation: 0,
+          bounds: [
+            [0, 0],
+            [100, 100],
+          ],
+        },
+      },
+      marks,
+      showExtracts: false,
+      showPmcSpawns: false,
+    });
+    await wrapper.setProps({ marks: [...marks] });
+    await nextTick();
+    expect(objectiveLayer.clearLayers).toHaveBeenCalled();
+    expect(circleMarker).toHaveBeenCalled();
+    try {
+      const firstMarker = createdLayers[0];
+      expect(firstMarker).toBeDefined();
+      firstMarker?.handlers.get('click')?.[0]?.({ containerPoint: { x: 50, y: 50 } });
+      const popup = popups[0];
+      expect(popup).toBeDefined();
+      const objectiveButtons = popup?.element.querySelectorAll('ul button');
+      expect(objectiveButtons).toHaveLength(2);
+      expect(document.activeElement).toBe(objectiveButtons?.[0]);
+      const closeButton = popup?.element.querySelector<HTMLButtonElement>('button');
+      const mapSurface = wrapper.element as HTMLElement;
+      expect(closeButton).toBeDefined();
+      closeButton?.focus();
+      closeButton?.click();
+      expect(document.activeElement).toBe(mapSurface);
+      firstMarker?.handlers.get('mouseover')?.[0]?.({ containerPoint: { x: 50, y: 50 } });
+      firstMarker?.handlers.get('mouseout')?.[0]?.();
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      const mapVm = wrapper.vm as unknown as {
+        activateObjectivePopup: (objectiveId: string) => boolean;
+      };
+      expect(mapVm.activateObjectivePopup('objective-a')).toBe(true);
+      expect(popups[1]?.element.textContent).toContain('Task A');
+    } finally {
+      wrapper.unmount();
+      popups.forEach((popup) => popup.element.remove());
+    }
   });
 });
