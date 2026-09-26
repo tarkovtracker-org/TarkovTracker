@@ -284,9 +284,10 @@ test('Crowdin also waits for the authoritative Preview Result and rejects a fail
   const preview = events.findIndex((event) => event.type === 'preview-result');
   assert.ok(ci !== -1 && request > ci && preview > request);
   assert.deepEqual(events[request], { type: 'preview-dispatch', runId: 'run_id=1', ref: 'main' });
-  assert.equal(events[preview].sha, f.env.MERGE_SHA);
+  // Preview Result is read on the validated head, never on the regenerable test merge.
+  assert.equal(events[preview].sha, f.env.HEAD_SHA);
 });
-test('main policy configuration enforces GitHub Actions CI and freshness without exceptions', () => {
+test('main policy configuration enforces GitHub Actions CI, preview and freshness without exceptions', () => {
   const policy = JSON.parse(read('.github/main-ci-ruleset.json'));
   assert.equal(policy.enforcement, 'active');
   assert.equal(policy.target, 'branch');
@@ -297,7 +298,10 @@ test('main policy configuration enforces GitHub Actions CI and freshness without
       type: 'required_status_checks',
       parameters: {
         strict_required_status_checks_policy: true,
-        required_status_checks: [{ context: 'CI Result', integration_id: 15368 }],
+        required_status_checks: [
+          { context: 'CI Result', integration_id: 15368 },
+          { context: 'Preview Result', integration_id: 15368 },
+        ],
       },
     },
   ]);
@@ -308,7 +312,7 @@ test('a candidate must contain main even when its full tree only differs in tran
   rejected(f.run('prepare'), /must include current main/);
   assert.equal(f.output(), '');
 });
-test('policy checks reject loose freshness, another provider and another required context', (t) => {
+test('policy checks reject loose freshness, missing preview and foreign providers', (t) => {
   const f = fixture(t);
   passed(f.run('prepare'));
   const policy = JSON.parse(read('.github/main-ci-ruleset.json'));
@@ -317,6 +321,17 @@ test('policy checks reject loose freshness, another provider and another require
     {
       strict_required_status_checks_policy: true,
       required_status_checks: [{ context: 'CI Result', integration_id: 999 }],
+    },
+    {
+      strict_required_status_checks_policy: true,
+      required_status_checks: [{ context: 'CI Result', integration_id: 15368 }],
+    },
+    {
+      strict_required_status_checks_policy: true,
+      required_status_checks: [
+        { context: 'CI Result', integration_id: 15368 },
+        { context: 'Preview Result', integration_id: 999 },
+      ],
     },
     {
       strict_required_status_checks_policy: true,

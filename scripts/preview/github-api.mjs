@@ -16,13 +16,39 @@ function matchesCandidate(pull, candidate) {
   ];
   return checks.every(Boolean);
 }
-/** Resolve the open pull request whose current head is the validated commit, if any. */
-export async function findPullForHead(github, repo, candidate) {
-  const pulls = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
+function isForkCandidate(repo, candidate) {
+  return Boolean(candidate.headRepo) && candidate.headRepo !== `${repo.owner}/${repo.repo}`;
+}
+/** `owner:branch` filter for a fork candidate; null for same-repository candidates. */
+function forkHeadFilter(repo, candidate) {
+  if (!isForkCandidate(repo, candidate) || !candidate.headBranch) return null;
+  return `${candidate.headRepo.split('/')[0]}:${candidate.headBranch}`;
+}
+/**
+ * Candidate PRs for a validated head. The base repository's commit-association lookup never
+ * returns PRs for commits that exist only in a fork, and fork CI runs carry no `pull_requests`,
+ * so fork candidates are listed by their `owner:branch` head instead.
+ */
+async function listCandidatePulls(github, repo, candidate) {
+  const head = forkHeadFilter(repo, candidate);
+  if (head) {
+    return github.paginate(github.rest.pulls.list, {
+      ...repo,
+      state: 'open',
+      head,
+      base: candidate.baseBranch,
+      per_page: 100,
+    });
+  }
+  return github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
     ...repo,
     commit_sha: candidate.headSha,
     per_page: 100,
   });
+}
+/** Resolve the open pull request whose current head is the validated commit, if any. */
+export async function findPullForHead(github, repo, candidate) {
+  const pulls = await listCandidatePulls(github, repo, candidate);
   const matches = pulls.filter((pull) => matchesCandidate(pull, candidate));
   return matches.length === 1 ? matches[0] : null;
 }

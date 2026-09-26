@@ -64,7 +64,7 @@ STRIPE_PRICE_CHAD_YEARLY = "price_1Ta2npLaRBke56G2I0UqI1HD"
 # are intentionally absent: the precomputed-payload readers and the rate limiter degrade to their
 # Cache API paths, so previews still serve public game data through /api/tarkov/*. Preview
 # environment secrets (service-role, Stripe, Turnstile, log sinks) are managed in the Pages
-# dashboard and must remain unset; see docs/runbook.md "Preview environment isolation".
+# dashboard and must remain unset so previews stay isolated.
 [env.preview.vars]
 NODE_ENV = "production"
 APP_URL = ""

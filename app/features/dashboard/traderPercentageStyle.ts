@@ -5,7 +5,7 @@ import type { CSSProperties } from 'vue';
  * The gradient encodes task progress and is shared by both themes; only the
  * lightness is theme-dependent. Yellow hues cannot clear WCAG AA on the light
  * theme's paper surfaces at the dark-theme lightness, so light mode uses the same
- * hue/saturation at a deepened lightness (see SYSTEMS.md §16, inline-color rule).
+ * hue/saturation at a deepened lightness (see SYSTEMS.md §17, inline-color rule).
  *
  * Two consumers with different requirements:
  * - Trader card percentage text: body text needs 4.5:1, so light uses 22%
