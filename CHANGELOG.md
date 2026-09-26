@@ -1,3 +1,10 @@
+## [1.82.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.2...v1.82.3) (2026-09-26)
+
+
+### Bug Fixes
+
+* **team:** make team-kick atomic via service-role-only kick_team RPC ([#938](https://github.com/tarkovtracker-org/TarkovTracker/issues/938)) ([578c067](https://github.com/tarkovtracker-org/TarkovTracker/commit/578c06777fa78713b2dcc724a9de5145f47b8794)), closes [#864](https://github.com/tarkovtracker-org/TarkovTracker/issues/864)
+
 ## [1.82.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.1...v1.82.2) (2026-09-26)
 
 
