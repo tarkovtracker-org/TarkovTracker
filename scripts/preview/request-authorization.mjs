@@ -2,9 +2,125 @@ const COMMANDS = new Map([
   ['/preview', true],
   ['/preview stop', false],
 ]);
+const COMMENT_EDITS_QUERY = `
+  query PullRequestCommentEdits($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+    repository(owner: $owner, name: $name) {
+      pullRequest(number: $number) {
+        comments(first: 100, after: $cursor) {
+          nodes { fullDatabaseId lastEditedAt }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }
+  }
+`;
 /** Only exact commands in new comments express preview intent. */
 export function previewCommand(body) {
   return COMMANDS.get(body) ?? null;
+}
+/**
+ * REST `updated_at` also changes for metadata updates. Use GraphQL's body-edit timestamp so those
+ * updates cannot revoke an otherwise unchanged command or stop receipt.
+ */
+async function readCommentEditTimes(github, repo, pullRequestNumber) {
+  const editTimes = new Map();
+  let cursor = null;
+  while (true) {
+    const response = await github.graphql(COMMENT_EDITS_QUERY, {
+      owner: repo.owner,
+      name: repo.repo,
+      number: pullRequestNumber,
+      cursor,
+    });
+    const comments = pullRequestCommentConnection(response);
+    addCommentEditTimes(editTimes, comments.nodes);
+    cursor = nextCommentCursor(comments.pageInfo, cursor);
+    if (cursor === null) return editTimes;
+  }
+}
+function pullRequestCommentConnection(response) {
+  if (!response) {
+    throw new Error('GitHub did not return pull request comment edit metadata.');
+  }
+  const repository = response.repository;
+  if (!repository) {
+    throw new Error('GitHub did not return pull request comment edit metadata.');
+  }
+  const pullRequest = repository.pullRequest;
+  if (!pullRequest) {
+    throw new Error('GitHub did not return pull request comment edit metadata.');
+  }
+  return validatedCommentConnection(pullRequest.comments);
+}
+function validatedCommentConnection(comments) {
+  if (!comments) {
+    throw new Error('GitHub did not return pull request comment edit metadata.');
+  }
+  if (!Array.isArray(comments.nodes)) {
+    throw new Error('GitHub did not return pull request comment edit metadata.');
+  }
+  if (!comments.pageInfo) {
+    throw new Error('GitHub did not return pull request comment edit metadata.');
+  }
+  return comments;
+}
+function addCommentEditTimes(editTimes, comments) {
+  for (const comment of comments) {
+    const databaseId = commentDatabaseId(comment.fullDatabaseId);
+    if (databaseId === null) {
+      throw new Error('GitHub returned invalid pull request comment edit metadata.');
+    }
+    if (!validCommentEditTime(comment.lastEditedAt)) {
+      throw new Error('GitHub returned invalid pull request comment edit metadata.');
+    }
+    editTimes.set(databaseId, comment.lastEditedAt);
+  }
+}
+/** Convert GraphQL's 64-bit decimal ID to a safe REST ID for exact matching. */
+function commentDatabaseId(fullDatabaseId) {
+  if (typeof fullDatabaseId !== 'string') return null;
+  if (!/^[1-9]\d*$/.test(fullDatabaseId)) return null;
+  const databaseId = Number(fullDatabaseId);
+  if (!Number.isSafeInteger(databaseId)) return null;
+  return databaseId;
+}
+function validCommentEditTime(lastEditedAt) {
+  return lastEditedAt === null || typeof lastEditedAt === 'string';
+}
+function nextCommentCursor(pageInfo, currentCursor) {
+  if (!pageInfo.hasNextPage) return null;
+  const nextCursor = pageInfo.endCursor;
+  if (typeof nextCursor !== 'string' || nextCursor === currentCursor) {
+    throw new Error('GitHub returned an invalid pull request comment cursor.');
+  }
+  return nextCursor;
+}
+/** Fail closed unless GraphQL returned edit metadata for every comment from the REST snapshot. */
+function assertCompleteCommentEditTimes(comments, editTimes) {
+  for (const comment of comments) {
+    assertValidRestCommentId(comment.id);
+    if (!editTimes.has(comment.id)) {
+      throw new Error('GitHub returned incomplete pull request comment edit metadata.');
+    }
+  }
+}
+/** Fail closed if comments changed between the REST and GraphQL snapshots. */
+function assertMatchingCommentSnapshots(comments, editTimes) {
+  assertCompleteCommentEditTimes(comments, editTimes);
+  const restCommentIds = new Set(comments.map((comment) => comment.id));
+  for (const commentId of editTimes.keys()) {
+    if (!restCommentIds.has(commentId)) {
+      throw new Error('GitHub returned inconsistent pull request comment snapshots.');
+    }
+  }
+}
+function assertValidRestCommentId(commentId) {
+  if (!Number.isSafeInteger(commentId)) {
+    throw new Error('GitHub returned an invalid REST pull request comment ID.');
+  }
+  if (commentId <= 0) {
+    throw new Error('GitHub returned an invalid REST pull request comment ID.');
+  }
 }
 export async function isPreviewMaintainer(github, repo, username) {
   const { data } = await github.rest.repos
@@ -15,7 +131,7 @@ export async function isPreviewMaintainer(github, repo, username) {
     });
   return ['maintain', 'admin'].includes(data.role_name);
 }
-function originalCommand(comment, enabledAt) {
+function originalCommand(comment, enabledAt, editTimes) {
   const user = comment.user ?? {};
   return [
     previewCommand(comment.body) !== null,
@@ -25,7 +141,8 @@ function originalCommand(comment, enabledAt) {
     user.login !== 'ghost',
     Number.isSafeInteger(comment.id) && comment.id > 0,
     Date.parse(comment.created_at) >= enabledAt,
-    comment.created_at === comment.updated_at,
+    editTimes.has(comment.id),
+    editTimes.get(comment.id) === null,
   ].every(Boolean);
 }
 async function cachedMaintainer(github, repo, login, permissions) {
@@ -84,32 +201,34 @@ const RECEIPT_BOT = 'github-actions[bot]';
 export function previewStopReceipt(commentId) {
   return `<!-- preview-receipt stop=${commentId} enabled=false -->`;
 }
-function stopAcceptedByReceipt(comments, stop) {
-  return comments.some((receipt) => receiptAcceptsStop(receipt, stop));
+function stopAcceptedByReceipt(comments, stop, editTimes) {
+  return comments.some((receipt) => receiptAcceptsStop(receipt, stop, editTimes));
 }
 /** Whether the receipt comment was authored by the handler bot. */
 function receiptByBot(receipt) {
   return receipt.user?.type === 'Bot' && receipt.user.login === RECEIPT_BOT;
 }
-/** Whether the receipt is unedited, has a valid id and strictly follows the stop command. */
-function receiptFollowsStop(receipt, stop) {
+/** Whether the receipt body is unedited, has a valid id, and follows the stop command. */
+function receiptFollowsStop(receipt, stop, lastEditedAt) {
   return (
     Number.isSafeInteger(receipt.id) &&
     receipt.id > stop.id &&
-    receipt.created_at === receipt.updated_at &&
-    Date.parse(receipt.updated_at) >= Date.parse(stop.created_at)
+    lastEditedAt === null &&
+    Date.parse(receipt.created_at) >= Date.parse(stop.created_at)
   );
 }
 /** Whether the receipt body binds the stop command's comment id. */
 function receiptBindsStop(receipt, stop) {
   return Number(STOP_RECEIPT.exec(receipt.body ?? '')?.[1]) === stop.id;
 }
-function receiptAcceptsStop(receipt, stop) {
+function receiptAcceptsStop(receipt, stop, editTimes) {
   return (
-    receiptByBot(receipt) && receiptFollowsStop(receipt, stop) && receiptBindsStop(receipt, stop)
+    receiptByBot(receipt) &&
+    receiptFollowsStop(receipt, stop, editTimes.get(receipt.id)) &&
+    receiptBindsStop(receipt, stop)
   );
 }
-async function effectiveCommand(github, repo, comment, permissions, comments) {
+async function effectiveCommand(github, repo, comment, permissions, comments, editTimes) {
   // A newer stop is a revocation barrier when its author currently verifies as maintain/admin or
   // when the handler accepted it while verifying (receipt). A historical stop whose author lost
   // maintainer access and that carries no receipt must not stand; only a fresh, currently
@@ -117,7 +236,7 @@ async function effectiveCommand(github, repo, comment, permissions, comments) {
   if (previewCommand(comment.body) === false)
     return (
       (await cachedMaintainer(github, repo, comment.user.login, permissions)) ||
-      stopAcceptedByReceipt(comments, comment)
+      stopAcceptedByReceipt(comments, comment, editTimes)
     );
   return cachedMaintainer(github, repo, comment.user.login, permissions);
 }
@@ -136,12 +255,15 @@ export async function readPreviewRequest(github, repo, pullRequest) {
     issue_number: pullRequest,
     per_page: 100,
   });
+  const editTimes = await readCommentEditTimes(github, repo, pullRequest);
+  assertMatchingCommentSnapshots(comments, editTimes);
   const commands = comments
-    .filter((comment) => originalCommand(comment, enabledAt))
+    .filter((comment) => originalCommand(comment, enabledAt, editTimes))
     .toSorted((a, b) => b.id - a.id);
   const permissions = new Map();
   for (const comment of commands) {
-    if (!(await effectiveCommand(github, repo, comment, permissions, comments))) continue;
+    if (!(await effectiveCommand(github, repo, comment, permissions, comments, editTimes)))
+      continue;
     return {
       commentId: comment.id,
       enabled: previewCommand(comment.body),

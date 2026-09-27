@@ -94,6 +94,7 @@ function fixture(options = {}) {
     if (endpoint === 'comments') return options.comments ?? [context.payload.comment];
     return originalPaginate(endpoint, params);
   };
+  github.graphql = commentEditTimesGraphql(options.comments ?? [context.payload.comment]);
   return { github, context, calls };
 }
 test('maintainer command dispatches the current successful PR CI run without an id', async () => {
@@ -176,7 +177,8 @@ test('request workflow loads trusted code and does not trigger on edited comment
   assert.match(workflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}\}/);
   assert.match(workflow, /persist-credentials: false/);
   assert.match(workflow, /actions: write/);
-  assert.match(workflow, /issues: write/);
+  assert.match(workflow, /issues: read/);
+  assert.match(workflow, /pull-requests: write/);
   assert.match(workflow, /github\.rest\.issues\.createComment/);
   assert.match(workflow, /error instanceof PreviewRequestDenied/);
   assert.match(workflow, /github\.event\.comment\.author_association/);
@@ -235,8 +237,32 @@ function comment(id, body = '/preview', overrides = {}) {
     ...overrides,
   };
 }
+function commentEditTimesGraphql(comments) {
+  return async (_query, { cursor }) => {
+    const start = cursor === null ? 0 : Number(cursor);
+    const page = comments.slice(start, start + 100);
+    const end = start + page.length;
+    return {
+      repository: {
+        pullRequest: {
+          comments: {
+            nodes: page.map(({ id, lastEditedAt }) => ({
+              fullDatabaseId: String(id),
+              lastEditedAt: lastEditedAt ?? null,
+            })),
+            pageInfo: {
+              hasNextPage: end < comments.length,
+              endCursor: end < comments.length ? String(end) : null,
+            },
+          },
+        },
+      },
+    };
+  };
+}
 function authorizationFixture(comments, role = 'maintain') {
   return {
+    graphql: commentEditTimesGraphql(comments),
     rest: {
       issues: { listComments: 'comments' },
       repos: { getCollaboratorPermissionLevel: async () => ({ data: { role_name: role } }) },
@@ -278,7 +304,7 @@ test('the latest authorized command controls persistent PR preview intent', asyn
 });
 test('edited, forged, bot and no-longer-authorized commands cannot grant access', async () => {
   const invalid = [
-    comment(1, '/preview', { updated_at: '2026-09-26T00:01:00Z' }),
+    comment(1, '/preview', { lastEditedAt: '2026-09-26T00:01:00Z' }),
     comment(2, '/preview', { user: { login: 'bot', type: 'Bot' } }),
     comment(3, '/preview', { user: { login: 'ghost', type: 'User' } }),
     comment(4, '/preview please'),
@@ -304,6 +330,64 @@ test('edited, forged, bot and no-longer-authorized commands cannot grant access'
     throw Object.assign(new Error('API unavailable'), { status: 500 });
   };
   await assert.rejects(readPreviewRequest(missing, REPO, 42), /API unavailable/);
+});
+test('metadata updates do not revoke unchanged commands or accepted stop receipts', async () => {
+  const changedMetadata = comment(1, '/preview', { updated_at: '2026-09-26T00:01:00Z' });
+  assert.deepEqual(await readPreviewRequest(authorizationFixture([changedMetadata]), REPO, 42), {
+    commentId: 1,
+    enabled: true,
+    requestedBy: 'maintainer',
+  });
+  const commands = [
+    comment(1),
+    comment(2, '/preview stop', { user: { login: 'former-maintainer', type: 'User' } }),
+    receipt(3, 2, { updated_at: '2026-09-26T05:00:00Z' }),
+  ];
+  const github = roleFixture(commands, { maintainer: 'admin', 'former-maintainer': 'read' });
+  assert.deepEqual(await readPreviewRequest(github, REPO, 42), {
+    commentId: 2,
+    enabled: false,
+    requestedBy: 'former-maintainer',
+  });
+});
+test('comment IDs above GraphQL Int range retain preview authorization', async () => {
+  const highId = 2_147_483_648;
+  assert.deepEqual(await readPreviewRequest(authorizationFixture([comment(highId)]), REPO, 42), {
+    commentId: highId,
+    enabled: true,
+    requestedBy: 'maintainer',
+  });
+});
+test('incomplete edit metadata cannot fall back to an earlier preview grant', async () => {
+  const github = authorizationFixture([comment(1), comment(2, '/preview stop')]);
+  github.graphql = async () => ({
+    repository: {
+      pullRequest: {
+        comments: {
+          nodes: [{ fullDatabaseId: '1', lastEditedAt: null }],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      },
+    },
+  });
+  await assert.rejects(readPreviewRequest(github, REPO, 42), /incomplete .* edit metadata/);
+});
+test('a comment added between REST and GraphQL snapshots fails closed', async () => {
+  const github = authorizationFixture([comment(1)]);
+  github.graphql = async () => ({
+    repository: {
+      pullRequest: {
+        comments: {
+          nodes: [
+            { fullDatabaseId: '1', lastEditedAt: null },
+            { fullDatabaseId: '2', lastEditedAt: null },
+          ],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      },
+    },
+  });
+  await assert.rejects(readPreviewRequest(github, REPO, 42), /inconsistent .* snapshots/);
 });
 test('all comment pages are considered so a later stop revokes an older grant', async () => {
   const comments = [comment(1), ...Array.from({ length: 101 }, (_, i) => comment(i + 2, 'hello'))];
@@ -421,7 +505,7 @@ test('receipts must come from the handler bot, follow the stop, bind its id, and
     ],
     ['posted before the stop', receipt(1, 2)],
     ['binding another stop', receipt(3, 9)],
-    ['edited after posting', receipt(3, 2, { updated_at: '2026-09-26T05:00:00Z' })],
+    ['edited after posting', receipt(3, 2, { lastEditedAt: '2026-09-26T05:00:00Z' })],
     [
       'marker in prose',
       comment(3, `hello ${previewStopReceipt(2).slice(4, -4)} world`, {
