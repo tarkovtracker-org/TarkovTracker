@@ -70,6 +70,13 @@ wait_for_preview_result() {
     sleep 10
   done
 }
+# Revalidate both authoritative branch-rule results on one exact SHA before an unstable-state
+# fallback merge; callers still rely on GitHub's normal merge enforcement for every other rule.
+wait_for_validated_ci_and_preview() {
+  local sha="$1"
+  wait_for_ci_result "$sha"
+  wait_for_preview_result "$sha"
+}
 # Statuses are forgeable by write collaborators: authenticate the reported success against
 # run-owned state before the gate may pass. The bound run must use the trusted controller
 # workflow on main, complete with a successful result publication, and

@@ -54,20 +54,24 @@ inside `app/locales/` may differ; empty diffs, deletions, symlinks, renames from
 executable code are rejected. The checkout and dependency setup use this validated commit before
 formatting (`format:check`), locale integrity (`i18n:check`), and systems drift (`systems:check`) run.
 
-The final merge step rechecks PR identity, both commit SHAs, and mergeability. Only `MERGEABLE` /
-`CLEAN` is accepted. Unresolved GitHub calculations are retried up to 20 times, three seconds apart;
-all other states fail closed. `--match-head-commit` atomically guards the squash merge against a
-last-moment PR push. A fixed commit body prevents inherited CI-skip markers from suppressing the
-post-merge run. The gate is copied from trusted main before synchronization and survives checkout.
+The final merge step rechecks PR identity, both commit SHAs, and mergeability. `MERGEABLE` / `CLEAN`
+is accepted directly. If GitHub reports `MERGEABLE` / `UNSTABLE`, the gate revalidates successful
+`CI Result` and `Preview Result` statuses on the exact candidate head, then attempts a regular
+head-pinned merge; GitHub's server-side branch rules still enforce every required check. The gate
+never uses the admin bypass. Unresolved GitHub calculations are retried up to 20 times, three
+seconds apart; conflicting or otherwise ineligible states fail closed. `--match-head-commit`
+atomically guards the squash merge against a last-moment PR push. A fixed commit body prevents
+inherited CI-skip markers from suppressing the post-merge run. The gate is copied from trusted main
+before synchronization and survives checkout.
 If main or the PR changes during validation, rerun Crowdin Sync; do not bypass the guard.
 If the post-merge dispatch fails, manually dispatch `CI` on `main`; rerunning a no-change sync
 does not recreate the merged PR. Publication still requires successful CI for current main.
 The candidate must contain captured main. Before merging, the gate awaits successful `CI Result`
-from GitHub Actions on that exact head (up to thirty minutes) and verifies the effective repository
-rule requires that check with strict branch freshness. The deployed no-bypass ruleset closes
-the base-advance race at merge time; a missing or weakened required check leaves the PR open. Both trusted
-gate scripts are preserved before checkout changes. See `docs/WORKFLOW_AUTOMATION.md` for the
-repository-wide policy and release compatibility.
+and `Preview Result` statuses on that exact head (up to thirty minutes) and verifies the effective
+repository rule requires both checks with strict branch freshness. The deployed no-bypass ruleset
+closes the base-advance race at merge time; a missing or weakened required check leaves the PR open.
+Both trusted gate scripts are preserved before checkout changes. See `docs/WORKFLOW_AUTOMATION.md`
+for the repository-wide policy and release compatibility.
 
 Cloudflare Git deployments run independently of GitHub Actions. Release eligibility still requires
 successful push or dispatched CI for current main, and semantic-release decides whether a version is warranted;
