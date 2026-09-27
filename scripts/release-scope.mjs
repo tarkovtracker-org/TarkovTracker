@@ -11,6 +11,7 @@ export const INTERNAL_SCOPES = Object.freeze([
   'build',
   'ci',
   'config',
+  'dependencies',
   'deps',
   'deps-dev',
   'docs',
