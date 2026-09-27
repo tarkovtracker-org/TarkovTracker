@@ -123,6 +123,23 @@ describe('changelog endpoint', () => {
     ]);
     expect(requests().some((url) => url.endsWith(`/commits/${shaB}`))).toBe(false);
   });
+  it('keeps release entries past the bullet cap available through commits', async () => {
+    const repo = 'https://github.com/owner/repo';
+    const shas = Array.from({ length: 6 }, (_, i) => String(i + 1).repeat(40));
+    const body = shas
+      .map((sha, i) => `* **app:** change ${i + 1} ([${sha.slice(0, 7)}](${repo}/commit/${sha}))`)
+      .join('\n');
+    mocks.query.mockReturnValue({ limit: 5, releases: 1 });
+    mocks.fetch.mockImplementation(async (url: string) => {
+      if (url.includes('/releases?')) return json([release('v2', '2026-09-05', body)]);
+      if (url.includes('/commits?'))
+        return json(shas.map((sha, i) => commit(sha, '2026-09-04', `fix(app): change ${i + 1}`)));
+      return json({});
+    });
+    const response = await (await loadHandler())(event);
+    expect(response.items[0]?.bullets).toHaveLength(5);
+    expect(response.items[1]?.bullets).toEqual([{ text: 'Fixed change 6.' }]);
+  });
   it('groups useful commits by day, aggregates available stats and exposes pagination', async () => {
     mocks.query.mockReturnValue({ limit: 1 });
     mocks.fetch.mockImplementation(async (url: string) => {

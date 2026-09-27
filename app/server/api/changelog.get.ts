@@ -6,7 +6,7 @@ import {
   cleanText,
   normalizeCommitMessage,
   releaseBullets,
-  releaseCommitShas,
+  releaseEntries,
 } from '@/utils/changelog';
 import type {
   ChangelogBullet,
@@ -504,10 +504,15 @@ type GroupedCommitItem = {
 const sortByDateDesc = <T extends { date: string }>(items: T[]): T[] => {
   return [...items].sort((a, b) => b.date.localeCompare(a.date));
 };
-// Commits already covered by a fetched release (shown or hidden as internal) are not repeated.
+// Commits shown as a release bullet are not repeated. Entries past the per-release cap are not
+// displayed, so they stay eligible for the commit fallback; internal ones are filtered there anyway.
+const displayedReleaseShas = (release: GitHubRelease): string[] =>
+  releaseEntries(release.body, '')
+    .slice(0, changelogConfig.MAX_BULLETS_PER_GROUP)
+    .flatMap((entry) => entry.shas);
 const collectReleasedShas = (releases: GitHubRelease[] | null): Set<string> => {
   const published = Array.isArray(releases) ? releases.filter((release) => !release.draft) : [];
-  return new Set(published.flatMap((release) => releaseCommitShas(release.body)));
+  return new Set(published.flatMap(displayedReleaseShas));
 };
 const toProcessedCommit = (commit: GitHubCommitListItem): ProcessedCommit | null => {
   const bullet = normalizeCommitMessage(commit.commit?.message ?? '');

@@ -34,6 +34,7 @@ const INTERNAL_SCOPES = new Set([
   'build',
   'ci',
   'config',
+  'dependencies',
   'deps',
   'deps-dev',
   'docs',
@@ -51,12 +52,12 @@ const CONVENTIONAL_PATTERN = /^([a-z]+)(?:\(([^)]+)\))?!?:\s*(.+)$/i;
 // semantic-release entry: `* **scope:** subject ([#12](url)) ([abc1234](url)), closes [#9](url)`
 const RELEASE_SCOPE_PATTERN = /^\*\*([^*:]+):\*\*\s*/;
 const RELEASE_REFERENCE_PATTERN = /\s*\(\[[^\]]+\]\([^)]+\)\)/g;
-// Only the generated trailer, e.g. `, closes [#9](url), [#10](url)`; never words in the subject.
-const RELEASE_CLOSES_PATTERN = /,\s*closes\s+\[#\d+\]\([^)]*\)(?:,\s*\[#\d+\]\([^)]*\))*\s*$/i;
+// Only the generated trailer, e.g. `, closes [#9](url) [#10](url)` (comma or space separated);
+// never words in the subject.
+const RELEASE_CLOSES_PATTERN = /,\s*closes\s+\[#\d+\]\([^)]*\)(?:[,\s]+\[#\d+\]\([^)]*\))*\s*$/i;
 const RELEASE_COMMIT_PATTERN = /\/commit\/([0-9a-f]{40})\b/gi;
 const isInternalScope = (scope: string | undefined): boolean =>
   Boolean(scope) && INTERNAL_SCOPES.has(String(scope).trim().toLowerCase());
-const isText = (value: string | null): value is string => Boolean(value);
 const INFERRED_MAP: Readonly<Record<string, string>> = Object.freeze({
   add: 'Added',
   adds: 'Added',
@@ -102,20 +103,26 @@ export const toReleaseBullet = (line: string): string | null => {
     .replace(RELEASE_REFERENCE_PATTERN, '');
   return toSentence(subject) || null;
 };
-/**
- * Player-facing bullets for a release body. The label is used only when the body has no entries
- * at all; a release whose entries are all internal yields no bullets and is hidden.
- */
-export const releaseBullets = (body: string | null | undefined, label: string): string[] => {
-  const lines = extractReleaseBullets(body);
-  if (!lines.length && label) return [toSentence(label)];
-  return lines.map(toReleaseBullet).filter(isText);
+export type ReleaseEntry = { text: string; shas: string[] };
+const commitShas = (line: string): string[] =>
+  Array.from(line.matchAll(RELEASE_COMMIT_PATTERN), (match) => String(match[1]).toLowerCase());
+const toReleaseEntry = (line: string): ReleaseEntry[] => {
+  const text = toReleaseBullet(line);
+  return text ? [{ text, shas: commitShas(line) }] : [];
 };
-/** Full commit SHAs linked from a release body, used to avoid listing a change twice. */
-export const releaseCommitShas = (body: string | null | undefined): string[] =>
-  Array.from((body ?? '').matchAll(RELEASE_COMMIT_PATTERN), (match) =>
-    String(match[1]).toLowerCase()
-  );
+/**
+ * Player-facing entries for a release body, each with the full commit SHAs it links. The label is
+ * used only when the body has no entries at all; a release whose entries are all internal yields
+ * none and is hidden.
+ */
+export const releaseEntries = (body: string | null | undefined, label: string): ReleaseEntry[] => {
+  const lines = extractReleaseBullets(body);
+  if (!lines.length && label) return [{ text: toSentence(label), shas: [] }];
+  return lines.flatMap(toReleaseEntry);
+};
+/** Player-facing bullet text for a release body; see `releaseEntries`. */
+export const releaseBullets = (body: string | null | undefined, label: string): string[] =>
+  releaseEntries(body, label).map((entry) => entry.text);
 const VERB_PATTERN =
   /^(add|adds|added|fix|fixes|fixed|improve|improves|improved|update|updates|updated|refactor|refactors|refactored)\b\s*/i;
 const conventionalBullet = (type: string, scope: string | undefined, subject: string) => {

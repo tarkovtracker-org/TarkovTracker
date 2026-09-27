@@ -4,7 +4,7 @@ import {
   extractReleaseBullets,
   normalizeCommitMessage,
   releaseBullets,
-  releaseCommitShas,
+  releaseEntries,
   toReleaseBullet,
   toSentence,
 } from '@/utils/changelog';
@@ -52,8 +52,13 @@ describe('public changelog text', () => {
         `**ui:** menu closes after navigation ([#5](${repo}/issues/5)), closes [#3](${repo}/issues/3), [#4](${repo}/issues/4)`
       )
     ).toBe('Menu closes after navigation.');
+    expect(
+      toReleaseBullet(
+        `**app:** team sync ([abc1234](${repo}/commit/${sha})), closes [#643](${repo}/issues/643) [#644](${repo}/issues/644)`
+      )
+    ).toBe('Team sync.');
   });
-  it.each(['ci', 'preview', 'release', 'test', 'deps', 'Docs', 'config'])(
+  it.each(['ci', 'preview', 'release', 'test', 'deps', 'dependencies', 'Docs', 'config'])(
     'hides release entries with the internal %s scope',
     (scope) => expect(toReleaseBullet(entry(scope, 'harden the pipeline'))).toBeNull()
   );
@@ -70,12 +75,22 @@ describe('public changelog text', () => {
     expect(releaseBullets('', 'v2 launch')).toEqual(['V2 launch.']);
     expect(releaseBullets(null, '')).toEqual([]);
   });
-  it('collects full commit SHAs referenced by a release body', () => {
+  it('pairs each release entry with the full commit SHAs it links', () => {
     const other = 'ce67df4f5bc7aa72d28d4b18d68ef6a6ef6ab288';
     expect(
-      releaseCommitShas(releaseBody(entry('app', 'one'), entry('ci', 'two', other.toUpperCase())))
-    ).toEqual([sha, other]);
-    expect(releaseCommitShas(null)).toEqual([]);
+      releaseEntries(
+        releaseBody(
+          entry('app', 'one'),
+          entry('ci', 'hidden'),
+          entry('maps', 'two', other.toUpperCase())
+        ),
+        'v1'
+      )
+    ).toEqual([
+      { text: 'One.', shas: [sha] },
+      { text: 'Two.', shas: [other] },
+    ]);
+    expect(releaseEntries('', 'v1')).toEqual([{ text: 'V1.', shas: [] }]);
   });
   it.each([
     ['feat(tasks): tracker (#42)', 'Added tracker.'],
