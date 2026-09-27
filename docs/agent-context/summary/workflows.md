@@ -72,7 +72,7 @@ sequenceDiagram
     UI->>Tarkov: mutate (complete task / objective count)
     Tarkov->>LS: persist immediately (local-first)
     Tarkov->>Sync: queue debounced sync
-    Sync->>RPC: syncProgressState() after debounce
+    Sync->>RPC: inline sync callback invokes sync_user_game_mode_progress after debounce
     RPC->>DB: update per-mode row and legacy compatibility row
     RT-->>Tarkov: remote change event
     Tarkov->>Tarkov: filter self-origin echo

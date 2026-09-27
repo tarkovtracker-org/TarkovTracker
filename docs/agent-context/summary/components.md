@@ -44,26 +44,27 @@
 
 Reusable composition functions. Notable ones:
 
-| Composable                                                           | Responsibility                                                 |
-| -------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `useAppInitialization.ts`                                            | App bootstrap sequencing.                                      |
-| `useGraphBuilder.ts` / `useTaskGraphData.ts`                         | Build task/hideout dependency graphs for Vue Flow.             |
-| `useTaskFiltering.ts` / `useTaskCounts.ts` / `useTaskActions.ts`     | Task list filtering, counting, and mutations.                  |
-| `useTaskRouteSync.ts` / `useTaskRepair.ts` / `useTaskState.ts`       | Task URL query sync, corrupted progress repair, state eval.    |
-| `useHideoutStationStatus.ts` / `useHideoutFiltering.ts`              | Hideout station level calculations, filtering, and route sync. |
-| `useNeededItems.ts` / `useItemDistribution.ts`                       | Aggregate and distribute required items across tasks/hideout.  |
-| `useDashboardStats.ts` / `useDashboardRecommendations.ts`            | Dashboard metrics and "next action" recommendations.           |
-| `useStorylineChapters.ts`                                            | Storyline chapter progression state.                           |
-| `useSkillCalculation.ts` / `useXpCalculation.ts`                     | Skill/XP/level derivations.                                    |
-| `useLeafletMap.ts` / `useMapObjectiveMarks.ts` / `useMapResize.ts`   | Interactive map rendering and objective markers.               |
-| `useDataBackup.ts` / `useDebugStateExport.ts`                        | Export/import + debug snapshots of progress/preferences.       |
-| `useTarkovDevImport.ts` / `useEftLogsImport.ts`                      | Import progress from tarkov.dev profiles and EFT log files.    |
-| `useSupporter.ts`                                                    | Supporter status + Stripe checkout/portal entry points.        |
-| `useTurnstile.ts`                                                    | Cloudflare Turnstile token acquisition for protected actions.  |
-| `useOAuthLogin.ts` / `useOAuthConsent.ts` / `useAnalyticsConsent.ts` | Auth popup flow + consent management.                          |
-| `useProductAnalytics.ts` / `useAnalyticsEvents.ts`                   | Consent-gated analytics event dispatch and user properties.    |
-| `api/useEdgeFunctions.ts`                                            | Typed wrapper for invoking Supabase Edge Functions.            |
-| `supabase/useSupabaseSync.ts` / `useSupabaseListener.ts`             | Progress sync + realtime listening.                            |
+| Composable                                                           | Responsibility                                                |
+| -------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `useAppInitialization.ts`                                            | App bootstrap sequencing.                                     |
+| `useGraphBuilder.ts` / `useTaskGraphData.ts`                         | Build task/hideout dependency graphs for Vue Flow.            |
+| `useTaskFiltering.ts` / `useTaskCounts.ts` / `useTaskActions.ts`     | Task list filtering, counting, and mutations.                 |
+| `useTaskRouteSync.ts` / `useTaskRepair.ts` / `useTaskState.ts`       | Task URL query sync, corrupted progress repair, state eval.   |
+| `useHideoutRouteSync.ts`                                             | Hideout URL query and preference store route sync.            |
+| `useHideoutStationStatus.ts` / `useHideoutFiltering.ts`              | Hideout station level calculations and filtering.             |
+| `useNeededItems.ts` / `useItemDistribution.ts`                       | Aggregate and distribute required items across tasks/hideout. |
+| `useDashboardStats.ts` / `useDashboardRecommendations.ts`            | Dashboard metrics and "next action" recommendations.          |
+| `useStorylineChapters.ts`                                            | Storyline chapter progression state.                          |
+| `useSkillCalculation.ts` / `useXpCalculation.ts`                     | Skill/XP/level derivations.                                   |
+| `useLeafletMap.ts` / `useMapObjectiveMarks.ts` / `useMapResize.ts`   | Interactive map rendering and objective markers.              |
+| `useDataBackup.ts` / `useDebugStateExport.ts`                        | Export/import + debug snapshots of progress/preferences.      |
+| `useTarkovDevImport.ts` / `useEftLogsImport.ts`                      | Import progress from tarkov.dev profiles and EFT log files.   |
+| `useSupporter.ts`                                                    | Supporter status + Stripe checkout/portal entry points.       |
+| `useTurnstile.ts`                                                    | Cloudflare Turnstile token acquisition for protected actions. |
+| `useOAuthLogin.ts` / `useOAuthConsent.ts` / `useAnalyticsConsent.ts` | Auth popup flow + consent management.                         |
+| `useProductAnalytics.ts` / `useAnalyticsEvents.ts`                   | Consent-gated analytics event dispatch and user properties.   |
+| `api/useEdgeFunctions.ts`                                            | Typed wrapper for invoking Supabase Edge Functions.           |
+| `supabase/useSupabaseSync.ts` / `useSupabaseListener.ts`             | Progress sync + realtime listening.                           |
 
 ## Plugins (`app/plugins/`)
 
@@ -119,31 +120,31 @@ Each slice contains its Vue components and slice-local helpers/composables. High
 
 ## Server Components (`app/server/`)
 
-| Component                | File                                                                                                                                                                                           | Responsibility                                              |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| Tarkov proxy routes      | `api/tarkov/*.get.ts` (`tasks-core`, `tasks-objectives`, `tasks-rewards`, `hideout`, `items`, `items-lite`, `map-spawns`, `prestige`, `editions`, `overlay-status`, `bootstrap`, `cache-meta`) | Serve game data via cache + overlay.                        |
-| json.tarkov.dev adapters | `utils/tarkov-json.ts`                                                                                                                                                                         | Fetch + adapt static JSON into app types.                   |
-| Overlay engine           | `utils/overlay.ts`, `utils/overlayAdditions.ts`, `utils/overlayValidation.ts`, `utils/overlayProjectors.ts`                                                                                    | Apply community data corrections/additions.                 |
-| Edge cache & storage     | `utils/edgeCache.ts`, `utils/sharedEdgeStore.ts`, `utils/edgeCacheKey.ts`, `utils/precomputedTarkov.ts`                                                                                        | Cloudflare edge cache + KV precomputed data integration.    |
-| API protection & auth    | `middleware/api-protection.ts`, `utils/turnstile.ts`, `utils/requestIdentity.ts`, `utils/adminSupabase.ts`                                                                                     | CORS, auth, host/IP allowlist, Turnstile validation.        |
-| Team/profile             | `api/team/members.ts`, `api/profile/[userId]/[mode].get.ts`                                                                                                                                    | Team + shared profile data (cache + rate limit).            |
-| Stripe                   | `api/stripe/{checkout,portal}.post.ts`, `utils/stripeCheckoutValidation.ts`, `utils/supporterCustomerLookup.ts`                                                                                | Checkout/portal sessions + validation.                      |
-| Streamer overlay         | `routes/overlay/kappa/[userId]/[mode].get.ts`, `api/streamer/[userId]/[mode]/kappa.get.ts`, `utils/streamerKappa.ts`                                                                           | Server-rendered overlay output and JSON API.                |
-| Admin endpoints          | `api/admin/{supporter,twitch-config}.post.ts`, `api/admin/api-usage.get.ts`                                                                                                                    | Supporter access grant, Twitch embed config, API analytics. |
-| Client telemetry & logs  | `api/account/activity.post.ts`, `api/logs/client.post.ts`                                                                                                                                      | Client diagnostics ingestion and manual activity auditing.  |
-| Misc                     | `api/changelog.get.ts`, `api/contributors.get.ts`, `api/twitch/{config,live}.get.ts`, `api/tarkov-dev/profile.get.ts`                                                                          | Supporting public and proxy endpoints.                      |
+| Component                | File                                                                                                                                                                                           | Responsibility                                               |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Tarkov proxy routes      | `api/tarkov/*.get.ts` (`tasks-core`, `tasks-objectives`, `tasks-rewards`, `hideout`, `items`, `items-lite`, `map-spawns`, `prestige`, `editions`, `overlay-status`, `bootstrap`, `cache-meta`) | Serve game data via cache + overlay.                         |
+| json.tarkov.dev adapters | `utils/tarkov-json.ts`                                                                                                                                                                         | Fetch + adapt static JSON into app types.                    |
+| Overlay engine           | `utils/overlay.ts`, `utils/overlayAdditions.ts`, `utils/overlayValidation.ts`, `utils/overlayProjectors.ts`                                                                                    | Apply community data corrections/additions.                  |
+| Edge cache & storage     | `utils/edgeCache.ts`, `utils/sharedEdgeStore.ts`, `utils/edgeCacheKey.ts`, `utils/precomputedTarkov.ts`                                                                                        | Cloudflare edge cache + KV precomputed data integration.     |
+| API protection & auth    | `middleware/api-protection.ts`, `utils/turnstile.ts`, `utils/requestIdentity.ts`, `utils/adminSupabase.ts`                                                                                     | CORS, auth, host/IP allowlist, Turnstile validation.         |
+| Team/profile             | `api/team/members.ts`, `api/profile/[userId]/[mode].get.ts`                                                                                                                                    | Team + shared profile data (cache + rate limit).             |
+| Stripe                   | `api/stripe/{checkout,portal}.post.ts`, `utils/stripeCheckoutValidation.ts`, `utils/supporterCustomerLookup.ts`                                                                                | Checkout/portal sessions + validation.                       |
+| Streamer overlay         | `routes/overlay/kappa/[userId]/[mode].get.ts`, `api/streamer/[userId]/[mode]/kappa.get.ts`, `utils/streamerKappa.ts`                                                                           | Server-rendered overlay output and JSON API.                 |
+| Admin endpoints          | `api/admin/{supporter,twitch-config}.post.ts`, `api/admin/api-usage.get.ts`                                                                                                                    | Supporter access grant, Twitch embed config, API analytics.  |
+| Client telemetry & logs  | `api/account/activity.post.ts`, `api/logs/client.post.ts`                                                                                                                                      | Client diagnostics logging and account IP security auditing. |
+| Misc                     | `api/changelog.get.ts`, `api/contributors.get.ts`, `api/twitch/{config,live}.get.ts`, `api/tarkov-dev/profile.get.ts`                                                                          | Supporting public and proxy endpoints.                       |
 
 ## Supabase Edge Functions (`supabase/functions/`)
 
-| Function                                                                                   | Responsibility                                                                      |
-| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
-| `team-create` / `team-join` / `team-leave` / `team-kick` / `team-disband` / `team-members` | Team lifecycle (per-user rate limited).                                             |
-| `token-create` / `token-revoke`                                                            | API token issuance/revocation (hashed storage).                                     |
-| `discord-role-sync` / `discord-unlink`                                                     | Supporter Discord role synchronization and account unlinking.                       |
-| `account-delete` / `account-delete-reconcile`                                              | Account deletion job + reconciliation.                                              |
-| `stripe-webhook`                                                                           | Process Stripe events; grant/revoke supporter; sync Discord roles.                  |
-| `admin-cache-purge`                                                                        | Purge Cloudflare + data caches (admin-gated).                                       |
-| `_shared/*`                                                                                | `auth.ts`, `cors.ts`, `discord.ts`, `rate-limit.ts`, generated `database.types.ts`. |
+| Function                                                                                   | Responsibility                                                                                                 |
+| ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `team-create` / `team-join` / `team-leave` / `team-kick` / `team-disband` / `team-members` | Team lifecycle (per-user rate limited).                                                                        |
+| `token-create` / `token-revoke`                                                            | API token issuance/revocation (hashed storage).                                                                |
+| `discord-role-sync` / `discord-unlink`                                                     | Supporter Discord role synchronization/revocation; identity unlink itself goes through Supabase Auth (client). |
+| `account-delete` / `account-delete-reconcile`                                              | Account deletion job + reconciliation.                                                                         |
+| `stripe-webhook`                                                                           | Process Stripe events; grant/revoke supporter; sync Discord roles.                                             |
+| `admin-cache-purge`                                                                        | Purge Cloudflare + data caches (admin-gated).                                                                  |
+| `_shared/*`                                                                                | `auth.ts`, `cors.ts`, `discord.ts`, `rate-limit.ts`, generated `database.types.ts`.                            |
 
 ## Cloudflare Worker (`workers/api-gateway/src/`)
 
