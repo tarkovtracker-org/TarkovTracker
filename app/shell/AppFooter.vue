@@ -43,6 +43,20 @@
             v{{ appVersion }}
           </a>
           <span v-else class="text-surface-400 font-mono">v{{ appVersion }}</span>
+          <template v-if="buildCommit">
+            <span class="text-surface-500" aria-hidden="true">·</span>
+            <a
+              v-if="buildCommitUrl"
+              :href="buildCommitUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-surface-400 hover:text-surface-300 focus-visible:ring-primary-500 rounded font-mono focus-visible:ring-2 focus-visible:outline-none"
+              :title="t('footer.build_commit_link', { commit: shortBuildCommit })"
+            >
+              {{ shortBuildCommit }}
+            </a>
+            <span v-else class="text-surface-400 font-mono">{{ shortBuildCommit }}</span>
+          </template>
         </p>
         <p class="text-surface-400 max-w-xl leading-relaxed">
           {{ t('footer.game_attribution') }}
@@ -53,20 +67,29 @@
 </template>
 <script setup lang="ts">
   import AppFooterColumn from '@/shell/AppFooterColumn.vue';
+  import { normalizeBuildCommit } from '@/utils/buildCommit';
   import { logger } from '@/utils/logger';
   import { shouldEnableAnalyticsIntegrations } from '@/utils/runtimeConfig';
   import type { FooterNavItem } from '@/shell/footerNavigation';
   const { t } = useI18n({ useScope: 'global' });
   const runtimeConfig = useRuntimeConfig();
   const appVersion = runtimeConfig.public.appVersion || 'dev';
-  const releaseUrl = computed(() => {
-    const version = String(runtimeConfig.public.appVersion || '').trim();
-    if (!version || version === 'dev') return '';
+  // Identifies the exact deploy between releases; empty for local builds.
+  const buildCommit = normalizeBuildCommit(runtimeConfig.public.buildCommit);
+  const shortBuildCommit = buildCommit.slice(0, 7);
+  const repositoryUrl = computed(() => {
     const owner = String(runtimeConfig.public.githubOwner || '').trim();
     const repo = String(runtimeConfig.public.githubRepo || '').trim();
-    if (!owner || !repo) return '';
-    return `https://github.com/${owner}/${repo}/releases/tag/v${version}`;
+    return owner && repo ? `https://github.com/${owner}/${repo}` : '';
   });
+  const releaseUrl = computed(() => {
+    const version = String(runtimeConfig.public.appVersion || '').trim();
+    if (!version || version === 'dev' || !repositoryUrl.value) return '';
+    return `${repositoryUrl.value}/releases/tag/v${version}`;
+  });
+  const buildCommitUrl = computed(() =>
+    buildCommit && repositoryUrl.value ? `${repositoryUrl.value}/commit/${buildCommit}` : ''
+  );
   const analyticsConfigured =
     shouldEnableAnalyticsIntegrations({
       appUrl: runtimeConfig.public.appUrl,

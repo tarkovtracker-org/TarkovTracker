@@ -405,7 +405,9 @@ version commit. Failures before promotion use the ordinary original-workflow ret
 
 Cloudflare Git deployments remain independent and build the version commit. The footer version
 comes from `packageJson.version` in `nuxt.config.ts`, so this second production build makes the
-footer match the published release. Staging branches may also receive preview builds according
+footer match the published release. The footer also shows the short build commit
+(`CF_PAGES_COMMIT_SHA` on Cloudflare Pages, else `GITHUB_SHA`, via `app/utils/buildCommit.ts`),
+so every deploy stays identifiable even when several merges share one version. Staging branches may also receive preview builds according
 to the platform's branch settings.
 
 > [!WARNING]
