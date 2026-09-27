@@ -123,9 +123,10 @@ wait for it; every merge still deploys on its own.
 **Jobs:** `Release` (find the newest main CI run for the trigger commit and require success, check
 current main, install through the shared `setup-project` action, build, recheck, semantic-release).
 The workflow reuses CI's test shards and database checks. It rejects other refs and events, failed
-or unfinished CI, a moved main, and automation-skip directives before publishing. Conventional
-commits since the last tag determine whether a version is warranted. Publication is serialized
-without cancelling an active release. See `docs/WORKFLOW_AUTOMATION.md` for details.
+or unfinished CI, a moved main, and automation-skip directives before publishing. Releases batch
+every commit since the previous tag; conventional commits outside internal scopes determine
+whether a version is warranted (`scripts/release-scope.mjs`). Publication is serialized without
+cancelling an active release. See `docs/WORKFLOW_AUTOMATION.md` for details.
 
 ### PR Checks (`pr-checks.yml`)
 
