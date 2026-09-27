@@ -937,6 +937,9 @@ flowchart LR
 ### Invariants
 
 - `pvp` and `pve` always use season `0`; `seasonal` always uses a positive season.
+- Persisted API task-update metadata accepts only `active`, `completed`, `failed`, and
+  `uncompleted`. Its sanitizer strips malformed entries and unknown states; enabling a new producer
+  requires aligned application/gateway consumers and a verified database rollout first.
 - Browser roles never need table maintenance privileges (`TRUNCATE`, `REFERENCES`, `TRIGGER`,
   `MAINTAIN`) on account, progress, team, billing, or audit tables. Explicit forward revokes preserve
   existing row and column access, including token-note updates. Billing events remain server-only;
