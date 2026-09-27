@@ -27,21 +27,23 @@ to decide which detailed file(s) to read for a given question.
 | `interfaces.md`   | HTTP endpoints, public API gateway, Edge Functions, MCP servers, integration points         | Request/response shapes and boundaries    |
 | `data_models.md`  | Core TypeScript types and Supabase data model                                               | Data shapes (Task, progress, DB tables)   |
 | `workflows.md`    | Key processes: data fetch, sync, auth, teams, imports, payments, deploy                     | How an end-to-end flow works step by step |
-| `dependencies.md` | External dependencies and how/why they are used                                             | Why a library is present / its role       |
+| `dependencies.md` | Dependency boundaries and architectural roles                                               | Architectural boundaries / manifest roles |
 
 ## Question Routing
 
-| If the question is about…                             | Read                                       |
-| ----------------------------------------------------- | ------------------------------------------ |
-| "Where does X live?" / project structure              | root `AGENTS.md` (Project Map section)     |
-| "How is state managed?" / sync / conflict resolution  | `components.md`, `workflows.md`            |
-| "What does this store/composable/util do?"            | `components.md`                            |
-| "What endpoints exist?" / API contract / rate limits  | `interfaces.md`, `workflows.md`            |
-| "What fields does a Task / progress record have?"     | `data_models.md`                           |
-| "How does login / team join / import / payment work?" | `workflows.md`                             |
-| "Why is dependency Y here?" / build tooling           | `dependencies.md`                          |
-| "What conventions/guardrails must I follow?"          | root `AGENTS.md`                           |
-| Environment variables                                 | `docs/ARCHITECTURE.md` (canonical env map) |
+| If the question is about…                                         | Read                                       |
+| ----------------------------------------------------------------- | ------------------------------------------ |
+| "Where does X live?" / project structure                          | root `AGENTS.md` (Project Map section)     |
+| "How is state managed?" / sync / conflict resolution              | `components.md`, `workflows.md`            |
+| "What does this store/composable/util do?"                        | `components.md`                            |
+| "What endpoints exist?" / API contract / rate limits              | `interfaces.md`, `workflows.md`            |
+| "What fields does a Task / progress record have?"                 | `data_models.md`                           |
+| "How does login / team join / import / payment work?"             | `workflows.md`                             |
+| "Why is dependency Y here?" / dependencies / tooling              | `package.json` + `dependencies.md`         |
+| "Why does the app do X?" / caching / overlay / systems invariants | `docs/SYSTEMS.md` (spec & invariants)      |
+| Rate limiting / abuse controls ownership                          | `docs/RATE_LIMITING.md`                    |
+| "What conventions/guardrails must I follow?"                      | root `AGENTS.md`                           |
+| Environment variables                                             | `docs/ARCHITECTURE.md` (canonical env map) |
 
 ## Cross-References (Repository Docs)
 
@@ -49,7 +51,9 @@ These generated docs complement — and do not replace — the hand-maintained d
 
 - Root `AGENTS.md` — canonical agent contract (commands, hard rules, conventions).
 - `docs/ARCHITECTURE.md` — authoritative architecture + canonical environment variable map.
+- `docs/SYSTEMS.md` — plain-language spec of non-obvious systems (overlay, multi-layer caching, precompute, invariants).
 - `docs/API.md` — authoritative API reference (endpoints, caching, languages, game modes).
+- `docs/RATE_LIMITING.md` — ownership map for API, Edge, Pages, DB, and Auth rate-limit controls.
 - `docs/agent-context/codex-analytics-setup.md` — Codex/MCP analytics access (GA4, Clarity, Cloudflare).
 - `.github/CONTRIBUTING.md`, `docs/runbook.md`, `docs/WORKFLOW_AUTOMATION.md`, `DESIGN.md`.
 
