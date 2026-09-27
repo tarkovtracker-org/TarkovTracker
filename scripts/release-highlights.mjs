@@ -45,7 +45,7 @@ export const MAX_CONCURRENT_LOOKUPS = 4;
 const TRUSTED_AUTHORS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 // `permission` is the effective base permission (custom and `maintain` roles map to `write`).
 const WRITE_PERMISSIONS = new Set(['write', 'admin']);
-const FENCE = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/;
+const FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 const REVERTS = /^This reverts commit ([0-9a-f]{7,40})\b/im;
 const REQUEST_TIMEOUT_MS = 10_000;
 const PULL_QUERY = `query($owner: String!, $name: String!, $number: Int!) {

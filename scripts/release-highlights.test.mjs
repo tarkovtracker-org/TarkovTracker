@@ -182,6 +182,13 @@ describe('release note parsing', () => {
       releaseNotesFromBody(`${template('Visible note.')}\n<!-- ## Release note\nHidden`)
     ).toEqual(['Visible note.']);
   });
+  it.each(['\t', ' \t', '  \t', '   \t', '    '])(
+    'keeps a real note after an indented literal fence (%j)',
+    (indent) => {
+      const body = `## Summary\n\n${indent}\`\`\`\n\n## Release note\n\nReal note.`;
+      expect(releaseNotesFromBody(body)).toEqual(['Real note.']);
+    }
+  );
   // A closed fence hides only its contents; an unterminated one hides the rest of the body.
   it.each([
     [
