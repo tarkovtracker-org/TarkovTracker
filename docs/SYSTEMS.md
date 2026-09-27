@@ -1877,9 +1877,17 @@ canonical under the grouped-view rule that nameless items are not grouped. A poo
 contributes to at most one group, so search-time re-keying never double-counts. When the matched
 item already has direct needs (needs whose own primary item is that item), re-keyed pooled
 objectives are dropped from the combined view instead of joining that group, so the searched
-item's total and Smart Fill targets match the unsearched view (#882: a LEDX search otherwise
-added every "sell N of any item" pool). Progress
-writes stay bound to the objective ID regardless of which item identity is displayed.
+item's displayed total stays aligned with its visible direct needs (#882: a LEDX search otherwise
+added every "sell N of any item" pool). Progress writes stay bound to the objective ID regardless
+of which item identity is displayed.
+
+The grouped card total uses `filteredItems`, including the ownership filter. Its modal target list
+uses the same view filters except ownership, so owned direct needs can remain editable and resettable
+even when hidden from the card total. Resolve the modal's accepted-item suppression against the
+visible `filteredItems` set; recalculating it over the expanded modal targets can incorrectly hide a
+pooled objective that the card displays. Snapshot modal targets and collected totals when the modal
+opens, and close it if the active game mode changes. Mutations must be guarded against writing the
+snapshot into a different mode's progress profile.
 
 Keep `findAcceptedItemMatchIndex` (search filter and display pin) and the grouped-view accepted
 match aligned: if one matches by name-or-short-name and the other does not, the grouped view shows
