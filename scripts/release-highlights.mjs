@@ -106,7 +106,7 @@ function emailish(token) {
   const at = token.indexOf('@');
   return at > 0 && /\.\w/.test(token.slice(at + 1));
 }
-const autolinked = (token) => token.includes('//') || /^www\./i.test(token) || emailish(token);
+const autolinked = (token) => token.includes('//') || /www\./i.test(token) || emailish(token);
 function stripHtml(text) {
   // A removal can join nested fragments into another tag. Reach a fixed point on the already
   // bounded note before checking links; a leftover malformed opener loses its single '<'.

@@ -103,6 +103,8 @@ describe('release note parsing', () => {
   it.each([
     ['[[trusted text](https://discard.example)](//evil.example/phish)', 'trusted text'],
     ['Open //evil.example/phish or www.evil.example today', 'Open or today'],
+    ['Open (www.evil.example/phish) today', 'Open today'],
+    ['Open (WWW.evil.example/phish) today', 'Open today'],
     ['Mirror at ftp://files.example/x', 'Mirror at'],
     ['Use [x][ref] style', 'Use xref style'],
     ['Mail support@example.com for help', 'Mail for help'],
