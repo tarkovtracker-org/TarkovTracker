@@ -568,7 +568,8 @@
       "go_to_in_task_list": "Перейти к цели в списке заданий",
       "complete": "Завершить цель",
       "uncomplete": "Отменить завершение цели",
-      "objective_unavailable": "Цель недоступна."
+      "objective_unavailable": "Цель недоступна.",
+      "stacked_objectives": "{count} objectives here"
     }
   },
   "page": {

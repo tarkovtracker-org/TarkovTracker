@@ -568,7 +568,8 @@
       "go_to_in_task_list": "在任务列表中前往目标",
       "complete": "完成目标",
       "uncomplete": "取消完成目标",
-      "objective_unavailable": "目标不可用。"
+      "objective_unavailable": "目标不可用。",
+      "stacked_objectives": "{count} objectives here"
     }
   },
   "page": {

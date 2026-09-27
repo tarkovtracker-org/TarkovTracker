@@ -568,7 +568,8 @@
       "go_to_in_task_list": "Go to objective in task list",
       "complete": "Complete objective",
       "uncomplete": "Uncomplete objective",
-      "objective_unavailable": "Objective unavailable."
+      "objective_unavailable": "Objective unavailable.",
+      "stacked_objectives": "{count} objetivos aqui"
     }
   },
   "page": {
