@@ -47,7 +47,7 @@ exits nonzero. A successful exit confirms review completion, not merge readiness
 
 The guard checks live PR review evidence, waits for outstanding requests, and reuses completed
 code reviews for the current commit. Security-review completion alone is not code-review
-completion. Only a report's top-level security heading identifies a security report; quoted
+completion. A report's top-level security heading or dedicated leading marker identifies a security report; quoted
 security headings inside a code review do not exclude that review. Completion requires an exact full commit identity: abbreviated bot evidence is
 resolved through GitHub's commit endpoint, and ambiguous or unavailable resolution fails closed.
 The PR head and eligibility are refreshed after collecting evidence. A completed code review can contain findings; the normal feedback-resolution gate

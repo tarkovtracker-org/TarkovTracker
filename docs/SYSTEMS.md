@@ -1964,7 +1964,7 @@ first-line commands from trusted GitHub associations exclude outsider markers an
 and tied second-resolution request/completion
 timestamps reuse exact-commit completion while running bot activity still blocks requests.
 Completed code reviews are reused by commit,
-independently of security reviews and unresolved findings; only top-level security report headings
+independently of security reviews and unresolved findings; only top-level security report headings or the dedicated leading marker
 exclude security evidence, preserving quoted headings in code reviews. This cooperative guard cannot serialize unrelated clones or
 callers that bypass it. See [the review workflow](WORKFLOW_AUTOMATION.md#codex-request-deduplication-and-waiting)
 for agent commands and recovery boundaries.

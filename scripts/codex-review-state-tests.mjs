@@ -37,7 +37,8 @@ const summary = (sha) => ({
 });
 test('quoted security headings do not hide exact-head code-review completion', () => {
   const comment = reviewComment(head);
-  comment.body += '\n\nExample report:\n### Codex Security Review\nNo security issues found.';
+  comment.body +=
+    '\n\nExample report:\n<!-- codex-security-review-finding:v1 -->\n### Codex Security Review\nNo security issues found.';
   const formal = {
     user: comment.user,
     state: 'COMMENTED',
@@ -53,6 +54,13 @@ test('top-level security report envelopes never establish code-review completion
   comment.body = `\n### 🛡️ Codex Security Review\n${comment.body}`;
   assert.deepEqual(evidenceShas([comment]), []);
   assert.equal(classifyState(inputs({ comments: [comment] }), now).status, 'unreviewed');
+  comment.body = `<!-- codex-security-review-finding:v1 -->\n${comment.body}`;
+  assert.deepEqual(evidenceShas([comment]), []);
+  assert.equal(classifyState(inputs({ comments: [comment] }), now).status, 'unreviewed');
+  assert.equal(
+    classifyState(inputs({ comments: [comment, reviewComment(head)] }), now).status,
+    'complete'
+  );
 });
 test('untagged requests require a later completion for the exact current head', () => {
   const requested = request('2026-09-27T01:30:00Z');
