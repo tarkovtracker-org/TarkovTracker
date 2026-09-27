@@ -205,6 +205,108 @@ const writeStorageItem = (key: string, value: string): StorageWriteResult => {
   }
 };
 export const safeSetItem = (key: string, value: string): boolean => writeStorageItem(key, value).ok;
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value && typeof value === 'object' && !Array.isArray(value));
+const hasEnvelopeMetadata = (data: Record<string, unknown>): boolean =>
+  ['_userId', '_timestamp', '_metadataTimestamp', '_modeTimestamps'].some((key) => key in data);
+const hasLegacyProgressFields = (data: Record<string, unknown>): boolean =>
+  Object.keys(defaultState).some((key) => key in data) ||
+  Object.keys(defaultState.pvp).some((key) => key in data);
+const parsesProgressForOwner = (raw: string, userId: string | null): boolean => {
+  try {
+    return parsePersistedProgressState(raw, userId) !== null;
+  } catch {
+    return false;
+  }
+};
+const isLegacyProgressStorageValue = (raw: string): boolean => {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return isRecord(parsed) && !hasEnvelopeMetadata(parsed) && hasLegacyProgressFields(parsed);
+  } catch {
+    return false;
+  }
+};
+const hasInvalidScopedOwnerId = (raw: string): boolean => {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return (
+      isRecord(parsed) &&
+      'data' in parsed &&
+      (!Object.hasOwn(parsed, '_userId') ||
+        (parsed._userId !== null &&
+          (typeof parsed._userId !== 'string' || parsed._userId.length === 0)))
+    );
+  } catch {
+    return false;
+  }
+};
+export const isUnparseableProgressStorageValue = (raw: string): boolean => {
+  if (hasInvalidScopedOwnerId(raw)) return true;
+  const wrapped = parseUserScopedStorage<unknown>(raw);
+  if (wrapped) {
+    if (!isRecord(wrapped.data) || !hasLegacyProgressFields(wrapped.data)) {
+      return true;
+    }
+    return !parsesProgressForOwner(raw, wrapped._userId);
+  }
+  return !isLegacyProgressStorageValue(raw) || !parsesProgressForOwner(raw, null);
+};
+const hasOpaqueProgressQuarantine = (raw: string): boolean => {
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (
+      key?.startsWith(STORAGE_KEYS.progressQuarantinePrefix) &&
+      localStorage.getItem(key) === raw
+    ) {
+      return true;
+    }
+  }
+  return false;
+};
+const writeOpaqueProgressQuarantine = (raw: string): boolean => {
+  const token =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    const key = `${STORAGE_KEYS.progressQuarantinePrefix}${token}_${attempt}`;
+    const existing = localStorage.getItem(key);
+    if (existing === raw) return true;
+    if (existing !== null) continue;
+    localStorage.setItem(key, raw);
+    return localStorage.getItem(key) === raw;
+  }
+  return false;
+};
+/**
+ * Retains unparseable active bytes in a fresh ownerless slot. Quarantined values are never
+ * interpreted as progress and are not overwritten, exported, or pruned as backups.
+ */
+export const preserveUnparseableActiveProgress = (raw: string): boolean => {
+  if (typeof window === 'undefined' || !raw) return false;
+  try {
+    if (localStorage.getItem(STORAGE_KEYS.progress) !== raw) return false;
+    if (!isUnparseableProgressStorageValue(raw)) return false;
+    if (hasOpaqueProgressQuarantine(raw)) return true;
+    return writeOpaqueProgressQuarantine(raw);
+  } catch (error) {
+    logger.error('[TarkovStore] Could not quarantine unparseable active progress:', error);
+  }
+  return false;
+};
+/** Explicit device cleanup may release malformed active bytes only after exact quarantine. */
+export const quarantineAndRemoveUnparseableActiveProgress = (raw: string): boolean => {
+  if (!preserveUnparseableActiveProgress(raw)) return false;
+  try {
+    if (localStorage.getItem(STORAGE_KEYS.progress) !== raw) return false;
+    localStorage.removeItem(STORAGE_KEYS.progress);
+    return localStorage.getItem(STORAGE_KEYS.progress) === null;
+  } catch (error) {
+    logger.error('[TarkovStore] Could not remove quarantined active progress:', error);
+    return false;
+  }
+};
 /**
  * Writes the active progress envelope and records whether the browser confirmed it.
  * Only this confirmation may be described to the player as a local save.

@@ -4,28 +4,37 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import AccountDeletionCard from '@/features/settings/AccountDeletionCard.vue';
-const { user, signOut, invoke, remove, request, reset, refreshedOwner } = vi.hoisted(() => ({
-  user: { id: 'deleted-owner' as string | null, loggedIn: true, providers: [] },
-  signOut: vi.fn(),
-  invoke: vi.fn(),
-  remove: vi.fn(),
-  request: vi.fn(),
-  reset: vi.fn(),
-  refreshedOwner: { id: 'deleted-owner' },
-}));
+import { STORAGE_KEYS } from '@/utils/storageKeys';
+const { user, signOut, invoke, remove, request, reset, refreshedOwner, sessionSwitch, toastAdd } =
+  vi.hoisted(() => ({
+    user: { id: 'deleted-owner' as string | null, loggedIn: true, providers: [] },
+    signOut: vi.fn(),
+    invoke: vi.fn(),
+    remove: vi.fn(),
+    request: vi.fn(),
+    reset: vi.fn(),
+    refreshedOwner: { id: 'deleted-owner' },
+    sessionSwitch: { value: false },
+    toastAdd: vi.fn(),
+  }));
 const reactiveUser = reactive(user);
 mockNuxtImport('useNuxtApp', () => () => ({
   $supabase: {
     user: reactiveUser,
     signOut,
     client: {
-      auth: { getSession: async () => ({ data: { session: {} }, error: null }) },
+      auth: {
+        getSession: async () => {
+          if (sessionSwitch.value) reactiveUser.id = 'new-owner';
+          return { data: { session: {} }, error: null };
+        },
+      },
       functions: { invoke },
     },
   },
 }));
 mockNuxtImport('useI18n', () => () => ({ t: (key: string) => key }));
-mockNuxtImport('useToast', () => () => ({ add: vi.fn() }));
+mockNuxtImport('useToast', () => () => ({ add: toastAdd }));
 vi.mock('@/utils/logger', () => ({ logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() } }));
 vi.mock('@/utils/supabaseAuth', () => ({
   refreshSupabaseSession: async () => ({
@@ -49,7 +58,6 @@ vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({ $reset: reset }),
   resetTarkovSync: reset,
 }));
-vi.mock('@/utils/clientStorage', () => ({ clearUserScopedAppStorage: reset }));
 const mountCard = () =>
   mount(AccountDeletionCard, {
     global: {
@@ -88,8 +96,10 @@ const clickText = async (wrapper: ReturnType<typeof mountCard>, text: string) =>
 describe('account deletion device removal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     reactiveUser.id = 'deleted-owner';
     refreshedOwner.id = 'deleted-owner';
+    sessionSwitch.value = false;
     user.loggedIn = true;
     invoke.mockResolvedValue({ data: { success: true }, error: null });
     remove.mockReturnValue(true);
@@ -146,7 +156,19 @@ describe('account deletion device removal', () => {
     expect(remove).toHaveBeenCalledWith('deleted-owner');
     wrapper.unmount();
   });
-  it('cancels an account deletion if identity changes during the request', async () => {
+  it("does not clear another account's active progress after deleting the current account", async () => {
+    const foreignProgress = JSON.stringify({ _userId: 'new-owner', data: null });
+    localStorage.setItem(STORAGE_KEYS.progress, foreignProgress);
+    const wrapper = mountCard();
+    await clickText(wrapper, 'settings.account.begin_deletion');
+    await wrapper.get('input').setValue('settings.account_data.confirm_phrase_value');
+    await clickText(wrapper, 'settings.account_data.delete_forever');
+    await clickText(wrapper, 'settings.account_data.go_to_dashboard');
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(foreignProgress);
+    expect(remove).toHaveBeenCalledWith('deleted-owner');
+    wrapper.unmount();
+  });
+  it('reports the original account as deleted when identity changes during the request', async () => {
     invoke.mockImplementationOnce(async () => {
       reactiveUser.id = 'new-owner';
       return { data: { success: true }, error: null };
@@ -155,15 +177,96 @@ describe('account deletion device removal', () => {
     await clickText(wrapper, 'settings.account.begin_deletion');
     await wrapper.get('input').setValue('settings.account_data.confirm_phrase_value');
     await clickText(wrapper, 'settings.account_data.delete_forever');
-    expect(
-      wrapper
-        .findAll('button')
-        .some((button) => button.text() === 'settings.account_data.go_to_dashboard')
-    ).toBe(false);
+    expect(wrapper.text()).toContain('settings.account_data.other_session_deleted_description');
+    expect(wrapper.text()).not.toContain('settings.account_data.session_changed');
     expect(remove).toHaveBeenCalledWith('deleted-owner');
     expect(remove).not.toHaveBeenCalledWith('new-owner');
+    await clickText(wrapper, 'settings.account_data.go_to_dashboard');
     expect(reset).not.toHaveBeenCalled();
     expect(signOut).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('signs out the deleted account if it becomes current again during deletion', async () => {
+    invoke.mockImplementationOnce(async () => {
+      reactiveUser.id = null;
+      reactiveUser.id = 'deleted-owner';
+      return { data: { success: true }, error: null };
+    });
+    signOut.mockImplementationOnce(async () => {
+      reactiveUser.id = null;
+    });
+    const wrapper = mountCard();
+    await clickText(wrapper, 'settings.account.begin_deletion');
+    await wrapper.get('input').setValue('settings.account_data.confirm_phrase_value');
+    await clickText(wrapper, 'settings.account_data.delete_forever');
+    expect(wrapper.text()).toContain('settings.account_data.delete_success_description');
+    await clickText(wrapper, 'settings.account_data.go_to_dashboard');
+    expect(request).toHaveBeenCalledWith('deleted-owner');
+    expect(signOut).toHaveBeenCalledOnce();
+    expect(reset).toHaveBeenCalled();
+    expect(remove).toHaveBeenCalledWith('deleted-owner');
+    wrapper.unmount();
+  });
+  it('checks the current identity again when leaving the deletion success dialog', async () => {
+    invoke.mockImplementationOnce(async () => {
+      reactiveUser.id = 'new-owner';
+      return { data: { success: true }, error: null };
+    });
+    const wrapper = mountCard();
+    await clickText(wrapper, 'settings.account.begin_deletion');
+    await wrapper.get('input').setValue('settings.account_data.confirm_phrase_value');
+    await clickText(wrapper, 'settings.account_data.delete_forever');
+    expect(wrapper.text()).toContain('settings.account_data.other_session_deleted_description');
+    reactiveUser.id = 'deleted-owner';
+    await clickText(wrapper, 'settings.account_data.go_to_dashboard');
+    expect(signOut).toHaveBeenCalledOnce();
+    expect(reset).toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('closes a stale confirmation and clears its phrase before a new account can open it', async () => {
+    const wrapper = mountCard();
+    await clickText(wrapper, 'settings.account.begin_deletion');
+    await wrapper.get('input').setValue('settings.account_data.confirm_phrase_value');
+    const oldDelete = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'settings.account_data.delete_forever')!;
+    reactiveUser.id = 'new-owner';
+    await flushPromises();
+    expect(wrapper.find('input').exists()).toBe(false);
+    await clickText(wrapper, 'settings.account.begin_deletion');
+    expect((wrapper.get('input').element as HTMLInputElement).value).toBe('');
+    await oldDelete.trigger('click');
+    await flushPromises();
+    expect(wrapper.find('input').exists()).toBe(true);
+    expect(invoke).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('stops before invocation and closes the dialog when the session switches during verification', async () => {
+    sessionSwitch.value = true;
+    const wrapper = mountCard();
+    await clickText(wrapper, 'settings.account.begin_deletion');
+    await wrapper.get('input').setValue('settings.account_data.confirm_phrase_value');
+    await clickText(wrapper, 'settings.account_data.delete_forever');
+    expect(invoke).not.toHaveBeenCalled();
+    expect(wrapper.find('input').exists()).toBe(false);
+    expect(toastAdd).toHaveBeenCalledWith({
+      title: 'settings.account_data.session_changed',
+      color: 'warning',
+    });
+    expect(remove).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('reports scheduled cleanup after the original account was deleted', async () => {
+    invoke.mockResolvedValueOnce({
+      data: { success: true, cleanupScheduled: true, message: 'Queued' },
+      error: null,
+    });
+    const wrapper = mountCard();
+    await clickText(wrapper, 'settings.account.begin_deletion');
+    await wrapper.get('input').setValue('settings.account_data.confirm_phrase_value');
+    await clickText(wrapper, 'settings.account_data.delete_forever');
+    expect(wrapper.text()).toContain('settings.account_data.cleanup_pending');
     wrapper.unmount();
   });
   it('rejects a refreshed session for a different account before invoking deletion', async () => {

@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { defaultState } from '@/stores/progressState';
 import {
   isAccountRecoveryRetentionBlocked,
   resetAccountRecoveryRetentionBlock,
@@ -18,7 +19,8 @@ import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
 vi.mock('@/utils/logger', () => ({
   logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
-const owned = (userId: string | null) => JSON.stringify({ _userId: userId, data: {} });
+const owned = (userId: string | null) =>
+  JSON.stringify({ _userId: userId, data: structuredClone(defaultState) });
 describe('device data removal', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -80,18 +82,22 @@ describe('device data removal', () => {
   });
   it('keeps writes blocked when the owned active envelope cannot be removed', () => {
     localStorage.setItem(STORAGE_KEYS.progress, owned('user-1'));
-    vi.spyOn(localStorage, 'removeItem').mockImplementation((key: string) => {
+    const removeItemSpy = vi.spyOn(localStorage, 'removeItem').mockImplementation((key: string) => {
       if (key === STORAGE_KEYS.progress) throw new Error('storage unavailable');
       return Storage.prototype.removeItem.call(localStorage, key);
     });
-    vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, value: string) => {
-      if (key.startsWith(STORAGE_KEYS.progressRecoveryPrefix)) throw new Error('storage full');
-      return Storage.prototype.setItem.call(localStorage, key, value);
-    });
+    const setItemSpy = vi
+      .spyOn(localStorage, 'setItem')
+      .mockImplementation((key: string, value: string) => {
+        if (key.startsWith(STORAGE_KEYS.progressRecoveryPrefix)) throw new Error('storage full');
+        return Storage.prototype.setItem.call(localStorage, key, value);
+      });
     expect(removeAccountDeviceData('user-1')).toBe(false);
     expect(isAccountRecoveryRetentionBlocked()).toBe(true);
     progressPersistStorage.setItem(STORAGE_KEYS.progress, owned(null));
     expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(owned('user-1'));
+    removeItemSpy.mockRestore();
+    setItemSpy.mockRestore();
   });
   it('keeps active copies that belong to another account or a guest', () => {
     localStorage.setItem(STORAGE_KEYS.progress, owned(null));
@@ -100,11 +106,162 @@ describe('device data removal', () => {
     expect(localStorage.getItem(STORAGE_KEYS.progress)).not.toBeNull();
     expect(localStorage.getItem(STORAGE_KEYS.preferences)).not.toBeNull();
   });
-  it('fails closed when the active progress envelope cannot be read as owned data', () => {
-    localStorage.setItem(STORAGE_KEYS.progress, '{malformed');
-    expect(removeAccountDeviceData('user-1')).toBe(false);
+  it('leaves an unreadable active envelope owned by another account untouched', () => {
+    const raw = JSON.stringify({ _userId: 'user-2', data: null });
+    localStorage.setItem(STORAGE_KEYS.progress, raw);
+    expect(removeAccountDeviceData('user-1')).toBe(true);
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(raw);
+    expect(
+      Object.keys(localStorage).some((key) => key.startsWith(STORAGE_KEYS.progressQuarantinePrefix))
+    ).toBe(false);
+  });
+  it.each([
+    { kind: 'malformed JSON', raw: '{malformed' },
+    { kind: 'obsolete scoped envelope', raw: JSON.stringify({ _userId: 'user-1', _timestamp: 7 }) },
+    {
+      kind: 'scoped envelope with null data',
+      raw: JSON.stringify({ _userId: 'user-1', data: null }),
+    },
+    {
+      kind: 'scoped envelope with invalid data type',
+      raw: JSON.stringify({ _userId: 'user-1', data: 'bad' }),
+    },
+    {
+      kind: 'scoped envelope with only unknown data fields',
+      raw: JSON.stringify({ _userId: 'user-1', data: { futureOnlyField: true } }),
+    },
+  ])('quarantines $kind before replacement without assigning an owner', ({ raw }) => {
+    localStorage.setItem(STORAGE_KEYS.progress, raw);
     progressPersistStorage.setItem(STORAGE_KEYS.progress, owned(null));
-    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe('{malformed');
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(owned(null));
+    const quarantineKeys = Object.keys(localStorage).filter((key) =>
+      key.startsWith(STORAGE_KEYS.progressQuarantinePrefix)
+    );
+    expect(quarantineKeys).toHaveLength(1);
+    expect(localStorage.getItem(quarantineKeys[0]!)).toBe(raw);
+    expect(Object.keys(localStorage)).not.toContain(`${STORAGE_KEYS.progressRecoveryPrefix}null`);
+    progressPersistStorage.setItem(STORAGE_KEYS.progress, owned(null));
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(owned(null));
+  });
+  it.each(['{malformed', JSON.stringify({ _userId: 'user-1', data: null })])(
+    'releases opaque active bytes for explicit removal only after quarantine',
+    (raw) => {
+      localStorage.setItem(STORAGE_KEYS.progress, raw);
+      expect(removeAccountDeviceData('user-1')).toBe(false);
+      expect(localStorage.getItem(STORAGE_KEYS.progress)).toBeNull();
+      const quarantineKeys = Object.keys(localStorage).filter((key) =>
+        key.startsWith(STORAGE_KEYS.progressQuarantinePrefix)
+      );
+      expect(quarantineKeys).toHaveLength(1);
+      expect(localStorage.getItem(quarantineKeys[0]!)).toBe(raw);
+      expect(isAccountRecoveryRetentionBlocked()).toBe(false);
+      progressPersistStorage.setItem(STORAGE_KEYS.progress, owned(null));
+      expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(owned(null));
+    }
+  );
+  it('fails closed when opaque active bytes cannot be quarantined', () => {
+    const raw = '{malformed';
+    localStorage.setItem(STORAGE_KEYS.progress, raw);
+    const setItemSpy = vi
+      .spyOn(localStorage, 'setItem')
+      .mockImplementation((key: string, value: string) => {
+        if (key.startsWith(STORAGE_KEYS.progressQuarantinePrefix)) {
+          throw new Error('storage full');
+        }
+        return Storage.prototype.setItem.call(localStorage, key, value);
+      });
+    expect(removeAccountDeviceData('user-1')).toBe(false);
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(raw);
+    expect(
+      Object.keys(localStorage).some((key) => key.startsWith(STORAGE_KEYS.progressQuarantinePrefix))
+    ).toBe(false);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+    setItemSpy.mockRestore();
+  });
+  it('fails closed when quarantine readback differs from the opaque active bytes', () => {
+    const raw = '{malformed';
+    localStorage.setItem(STORAGE_KEYS.progress, raw);
+    let quarantineReads = 0;
+    const getItemSpy = vi.spyOn(localStorage, 'getItem').mockImplementation((key: string) => {
+      if (key.startsWith(STORAGE_KEYS.progressQuarantinePrefix)) {
+        quarantineReads += 1;
+        return quarantineReads === 1 ? null : 'readback mismatch';
+      }
+      return Storage.prototype.getItem.call(localStorage, key);
+    });
+    expect(removeAccountDeviceData('user-1')).toBe(false);
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(raw);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+    getItemSpy.mockRestore();
+  });
+  it('reuses an exact quarantine copy when an active write fails and is retried', () => {
+    const raw = '{malformed';
+    localStorage.setItem(STORAGE_KEYS.progress, raw);
+    let failedActiveWrite = false;
+    const setItemSpy = vi
+      .spyOn(localStorage, 'setItem')
+      .mockImplementation((key: string, value: string) => {
+        if (key === STORAGE_KEYS.progress && !failedActiveWrite) {
+          failedActiveWrite = true;
+          throw new Error('storage full');
+        }
+        return Storage.prototype.setItem.call(localStorage, key, value);
+      });
+    progressPersistStorage.setItem(STORAGE_KEYS.progress, owned(null));
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(raw);
+    const quarantineKeys = Object.keys(localStorage).filter((key) =>
+      key.startsWith(STORAGE_KEYS.progressQuarantinePrefix)
+    );
+    expect(quarantineKeys).toHaveLength(1);
+    expect(localStorage.getItem(quarantineKeys[0]!)).toBe(raw);
+    progressPersistStorage.setItem(STORAGE_KEYS.progress, owned(null));
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(owned(null));
+    expect(
+      Object.keys(localStorage).filter((key) =>
+        key.startsWith(STORAGE_KEYS.progressQuarantinePrefix)
+      )
+    ).toHaveLength(1);
+    setItemSpy.mockRestore();
+  });
+  it('does not overwrite a colliding quarantine slot', () => {
+    vi.stubGlobal('crypto', { randomUUID: () => 'fixed-token' });
+    const occupiedKey = `${STORAGE_KEYS.progressQuarantinePrefix}fixed-token_0`;
+    localStorage.setItem(occupiedKey, 'previous opaque value');
+    const raw = '{malformed';
+    localStorage.setItem(STORAGE_KEYS.progress, raw);
+    progressPersistStorage.setItem(STORAGE_KEYS.progress, owned(null));
+    expect(localStorage.getItem(occupiedKey)).toBe('previous opaque value');
+    expect(localStorage.getItem(`${STORAGE_KEYS.progressQuarantinePrefix}fixed-token_1`)).toBe(raw);
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(owned(null));
+  });
+  it('keeps active bytes when every candidate quarantine slot is occupied', () => {
+    vi.stubGlobal('crypto', { randomUUID: () => 'fixed-token' });
+    const raw = '{malformed';
+    localStorage.setItem(STORAGE_KEYS.progress, raw);
+    for (let attempt = 0; attempt < 16; attempt += 1) {
+      localStorage.setItem(
+        `${STORAGE_KEYS.progressQuarantinePrefix}fixed-token_${attempt}`,
+        `other-${attempt}`
+      );
+    }
+    progressPersistStorage.setItem(STORAGE_KEYS.progress, owned(null));
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(raw);
+    expect(localStorage.getItem(`${STORAGE_KEYS.progressQuarantinePrefix}fixed-token_15`)).toBe(
+      'other-15'
+    );
+  });
+  it('retains the quarantined bytes when removal of the active key throws', () => {
+    const raw = '{malformed';
+    localStorage.setItem(STORAGE_KEYS.progress, raw);
+    vi.spyOn(localStorage, 'removeItem').mockImplementation((key: string) => {
+      if (key === STORAGE_KEYS.progress) throw new Error('storage unavailable');
+      return Storage.prototype.removeItem.call(localStorage, key);
+    });
+    expect(removeAccountDeviceData('user-1')).toBe(false);
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(raw);
+    expect(
+      Object.keys(localStorage).some((key) => key.startsWith(STORAGE_KEYS.progressQuarantinePrefix))
+    ).toBe(true);
     expect(isAccountRecoveryRetentionBlocked()).toBe(true);
   });
   it('reports incomplete removal and leaves backups when storage keys cannot be listed', () => {

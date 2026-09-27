@@ -494,15 +494,28 @@ export default defineNuxtPlugin({
       if (error) throw error;
       return data;
     };
-    const signOut = async () => {
+    const signOut = async (expectedUserId?: string) => {
       await ensureClientInitialized();
       if (!supabaseClient) {
         logger.debug('[Supabase] signOut skipped because client is not initialized');
         return;
       }
+      if (expectedUserId) {
+        // Recheck after initialization so a different session present now is never signed out.
+        // Local scope avoids revoking other sessions of the already-deleted account, but the SDK
+        // can still change sessions during its asynchronous sign-out; callers must not rely on
+        // this as an atomic owner fence.
+        const { data, error } = await supabaseClient.auth.getSession();
+        if (error || user.id !== expectedUserId || data.session?.user.id !== expectedUserId) return;
+      }
       signOutOwnsChannelTeardown = true;
       try {
-        await signOutWithLocalFallback(supabaseClient);
+        if (expectedUserId) {
+          const { error } = await supabaseClient.auth.signOut({ scope: 'local' });
+          if (error) throw error;
+        } else {
+          await signOutWithLocalFallback(supabaseClient);
+        }
         await removeAllRealtimeChannels();
       } finally {
         signOutOwnsChannelTeardown = false;

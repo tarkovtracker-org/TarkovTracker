@@ -915,6 +915,10 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   `pinia-plugin-persistedstate` swallows storage exceptions. Every write of the active progress
   key goes through `persistActiveProgressValue`, which records `saved` or `failed` (`quota`,
   `unavailable`, `unknown`). A failed local write means the latest changes are memory-only.
+  If active bytes parse as neither a scoped envelope nor legacy progress, replacement first saves
+  and reads back the exact bytes under an ownerless quarantine key. Quarantined bytes are never
+  hydrated, assigned to an account, included in debug exports, or pruned as backups; if preservation
+  fails, replacement is rejected and the active value remains untouched.
 - **Indicator.** Memory-only changes outrank cloud warnings. Warnings offer an export of the
   current in-memory progress (`useDataBackup().exportProgress`), which needs no successful save;
   cloud warnings also offer a manual retry. Guidance never recommends reloading or clearing site
@@ -952,8 +956,12 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   request. Removal and discard confirmations belong to the authenticated owner that opened them
   and are invalidated when that owner changes. Incomplete backup cleanup reports failure but blocks
   new guest writes only while the removed owner still occupies active storage. Account deletion uses
-  the same removal for the captured deleted account; a later authenticated session is never signed
-  out or reset by that cleanup, including identity changes during an awaited request.
+  the same removal for the captured deleted account and checks identity before sign-out and reset.
+  The SDK sign-out remains asynchronous and needs an atomic owner fence before this deletion flow
+  can be considered safe for an in-flight account switch.
+  Unparseable active bytes have no provable owner: explicit removal quarantines them before
+  releasing the active key, then reports incomplete removal because the opaque copy remains. If
+  quarantine cannot be verified, removal fails and the active write barrier stays in place.
 
 ### Files
 

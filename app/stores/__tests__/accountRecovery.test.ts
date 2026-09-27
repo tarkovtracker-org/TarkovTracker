@@ -626,6 +626,59 @@ describe('account recovery copies', () => {
     preserveForeignActiveCopy('user-2');
     expect(Object.keys(localStorage)).toHaveLength(2);
   });
+  it('quarantines malformed foreign data instead of creating a normalized recovery copy', () => {
+    const raw = JSON.stringify({
+      _userId: 'user-2',
+      _timestamp: Date.now() + 60_000_000,
+      data: null,
+    });
+    localStorage.setItem(STORAGE_KEYS.progress, raw);
+    expect(preserveForeignActiveCopy('user-1')).toBe(true);
+    expect(hasAccountRecoveryCopy('user-2')).toBe(false);
+    const quarantineKeys = Object.keys(localStorage).filter((key) =>
+      key.startsWith(STORAGE_KEYS.progressQuarantinePrefix)
+    );
+    expect(quarantineKeys).toHaveLength(1);
+    expect(localStorage.getItem(quarantineKeys[0]!)).toBe(raw);
+  });
+  it('quarantines an envelope whose raw owner id has an invalid type', () => {
+    const raw = JSON.stringify({
+      _userId: 123,
+      _timestamp: 10,
+      data: structuredClone(defaultState),
+    });
+    localStorage.setItem(STORAGE_KEYS.progress, raw);
+    expect(preserveForeignActiveCopy('user-1')).toBe(true);
+    expect(hasAccountRecoveryCopy('user-1')).toBe(false);
+    expect(hasAccountRecoveryCopy('123')).toBe(false);
+    const quarantineKeys = Object.keys(localStorage).filter((key) =>
+      key.startsWith(STORAGE_KEYS.progressQuarantinePrefix)
+    );
+    expect(quarantineKeys).toHaveLength(1);
+    expect(localStorage.getItem(quarantineKeys[0]!)).toBe(raw);
+  });
+  it('quarantines a scoped envelope that omits its owner id', () => {
+    const raw = JSON.stringify({ data: structuredClone(defaultState) });
+    localStorage.setItem(STORAGE_KEYS.progress, raw);
+    expect(preserveForeignActiveCopy('user-1')).toBe(true);
+    expect(hasAccountRecoveryCopy('user-1')).toBe(false);
+    const quarantineKeys = Object.keys(localStorage).filter((key) =>
+      key.startsWith(STORAGE_KEYS.progressQuarantinePrefix)
+    );
+    expect(quarantineKeys).toHaveLength(1);
+    expect(localStorage.getItem(quarantineKeys[0]!)).toBe(raw);
+  });
+  it('quarantines a scoped envelope with an empty owner id', () => {
+    const raw = JSON.stringify({ _userId: '', data: structuredClone(defaultState) });
+    localStorage.setItem(STORAGE_KEYS.progress, raw);
+    expect(preserveForeignActiveCopy('user-1')).toBe(true);
+    expect(hasAccountRecoveryCopy('user-1')).toBe(false);
+    const quarantineKeys = Object.keys(localStorage).filter((key) =>
+      key.startsWith(STORAGE_KEYS.progressQuarantinePrefix)
+    );
+    expect(quarantineKeys).toHaveLength(1);
+    expect(localStorage.getItem(quarantineKeys[0]!)).toBe(raw);
+  });
   it.each([
     [null, null, null],
     [10, null, 10],

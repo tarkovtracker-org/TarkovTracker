@@ -573,6 +573,10 @@ describe('useDataBackup', () => {
       localStorage.setItem(`${STORAGE_KEYS.progressBackupPrefix}user-123_1700000009999`, 'backup');
       localStorage.setItem(`${STORAGE_KEYS.progressRecoveryPrefix}user-123`, 'recovery');
       localStorage.setItem(
+        `${STORAGE_KEYS.progressQuarantinePrefix}opaque-copy_0`,
+        '{opaque malformed bytes}'
+      );
+      localStorage.setItem(
         `${STORAGE_KEYS.progressSupersededPrefix}user-123_1700000009999_abcd`,
         'superseded'
       );
@@ -647,6 +651,7 @@ describe('useDataBackup', () => {
         expect(debugJson.storage.authStorageKeyCount).toBe(1);
         expect(debugJson.storage.localStorageKeys).not.toContain('sb-localhost-auth-token');
         expect(debugJson.storage.localStorageKeys.join('\n')).not.toContain('user-123');
+        expect(debugJson.storage.localStorageKeys.join('\n')).not.toContain('progress_quarantine');
         const progressSnapshot = debugJson.storage.progress;
         expect(progressSnapshot).not.toBeNull();
         if (!progressSnapshot) {
@@ -659,6 +664,7 @@ describe('useDataBackup', () => {
         expect(debugJson.storage.progressBackups[0]!.storageKey).toContain('{owner:');
         expect(debugText).not.toContain('player@example.com');
         expect(debugText).not.toContain('token-secret');
+        expect(debugText).not.toContain('{opaque malformed bytes}');
         expect(debugText).not.toContain('user-123');
         expect(debugText).not.toContain('teammate-1');
         expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:test-debug-url');

@@ -2,6 +2,8 @@ import { defaultState, type UserProgressData, type UserState } from '@/stores/pr
 import {
   parsePersistedProgressState,
   cloneStateSnapshot,
+  isUnparseableProgressStorageValue,
+  preserveUnparseableActiveProgress,
   safeGetItem,
   safeRemoveItem,
   safeSetItem,
@@ -301,16 +303,19 @@ export const selectFreshestOwnerProgressSnapshot = (
 /** Retains the active copy for its owner when it belongs to an account other than `userId`. */
 export const preserveForeignActiveCopy = (userId: string | null): boolean => {
   const raw = safeGetItem(STORAGE_KEYS.progress);
-  const ownerId = raw ? (parseUserScopedStorage<unknown>(raw)?._userId ?? null) : null;
+  if (!raw) return true;
+  if (isUnparseableProgressStorageValue(raw)) {
+    return preserveUnparseableActiveProgress(raw);
+  }
+  const ownerId = parseUserScopedStorage<unknown>(raw)?._userId ?? null;
   if (!ownerId || ownerId === userId) return true;
   const retained = saveAccountRecoveryCopy(raw, ownerId);
   if (!retained) retentionFailure = true;
   return retained;
 };
-setActiveProgressRetentionGuard((current, next) => {
-  if (!current) return true;
+const retainParseableActiveProgress = (current: string, next: string | null): boolean => {
   const currentEnvelope = parseUserScopedStorage<unknown>(current);
-  if (!currentEnvelope) return parsePersistedProgressState(current, null) !== null;
+  if (!currentEnvelope) return true;
   const ownerId = currentEnvelope._userId;
   const nextOwnerId = next ? (parseUserScopedStorage<unknown>(next)?._userId ?? null) : null;
   if (!ownerId || ownerId === nextOwnerId) return true;
@@ -321,4 +326,12 @@ setActiveProgressRetentionGuard((current, next) => {
     setActiveProgressWritesBlocked(true);
   }
   return retained;
-});
+};
+const retainActiveProgressBeforeChange = (current: string | null, next: string | null): boolean => {
+  if (!current) return true;
+  if (isUnparseableProgressStorageValue(current)) {
+    return preserveUnparseableActiveProgress(current);
+  }
+  return retainParseableActiveProgress(current, next);
+};
+setActiveProgressRetentionGuard(retainActiveProgressBeforeChange);

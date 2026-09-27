@@ -68,4 +68,12 @@ describe('progress storage quota relief', () => {
     expect(safeRemoveItem).not.toHaveBeenCalled();
     expect(localStorage.getItem(backupKey)).toBe('only-backup-copy');
   });
+  it('never prunes opaque progress quarantine during quota relief', () => {
+    const quarantineKey = `${STORAGE_KEYS.progressQuarantinePrefix}opaque_0`;
+    const raw = '{unparseable active bytes';
+    localStorage.setItem(quarantineKey, raw);
+    relieveProgressStoragePressure(5 * 1024 * 1024);
+    expect(localStorage.getItem(quarantineKey)).toBe(raw);
+    expect(safeRemoveItem).not.toHaveBeenCalledWith(quarantineKey);
+  });
 });

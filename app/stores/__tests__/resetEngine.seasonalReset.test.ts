@@ -247,6 +247,32 @@ describe('performReset seasonal', () => {
       displacedProgress
     );
   });
+  it('archives authenticated local changes when no sync controller can confirm acknowledgement', async () => {
+    const store = createStore();
+    const displacedProgress = structuredClone(store.$state.pvp);
+    await performReset('pvp', store);
+    expect(pendingCloudChanges.value).toBe(false);
+    expect(unsavedProgressChanges.value).toBe(false);
+    expect(saveSupersededProgressCopyMock).toHaveBeenCalledWith(
+      'user-1',
+      'pvp',
+      null,
+      displacedProgress
+    );
+    expect(saveSupersededProgressCopyMock.mock.invocationCallOrder[0]).toBeLessThan(
+      syncProgressStateMock.mock.invocationCallOrder[0]!
+    );
+  });
+  it('aborts a controllerless idle-status reset when local progress cannot be archived', async () => {
+    saveSupersededProgressCopyMock.mockReturnValueOnce(null);
+    const store = createStore();
+    await expect(performReset('pvp', store)).rejects.toThrow(
+      'Could not retain pending progress before reset'
+    );
+    expect(store.$state.pvp.level).toBe(42);
+    expect(syncProgressStateMock).not.toHaveBeenCalled();
+    expect(clearProgressStorageMock).not.toHaveBeenCalled();
+  });
   it('aborts a controllerless reset when its unsaved copy cannot be retained', async () => {
     unsavedProgressChanges.value = true;
     saveSupersededProgressCopyMock.mockReturnValueOnce(null);

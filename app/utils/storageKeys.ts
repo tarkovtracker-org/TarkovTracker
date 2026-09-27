@@ -11,6 +11,8 @@ export const STORAGE_KEYS = {
   progressRecoveryPrefix: `${STORAGE_PREFIX}progress_recovery_`,
   /** Export-only progress displaced by a reset or Seasonal rollover. */
   progressSupersededPrefix: `${STORAGE_PREFIX}progress_superseded_`,
+  /** Opaque, ownerless preservation for active progress that cannot be parsed. */
+  progressQuarantinePrefix: `${STORAGE_PREFIX}progress_quarantine_`,
   adminLastPurge: `${STORAGE_PREFIX}tt:admin:last-purge`,
   cachePurgeAt: `${STORAGE_PREFIX}tt:cache:last-purge`,
   cachePurgeCheckAt: `${STORAGE_PREFIX}tt:cache:last-check`,

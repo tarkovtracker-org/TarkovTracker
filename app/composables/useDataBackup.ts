@@ -545,7 +545,10 @@ async function sanitizeStorageKey(key: string): Promise<string> {
   return supersededKey ?? key;
 }
 async function sanitizeStorageKeys(storage: Storage | null): Promise<string[]> {
-  const keys = getStorageKeys(storage).filter((key) => !isSupabaseAuthStorageKey(key));
+  const keys = getStorageKeys(storage).filter(
+    (key) =>
+      !isSupabaseAuthStorageKey(key) && !key.startsWith(STORAGE_KEYS.progressQuarantinePrefix)
+  );
   return await Promise.all(keys.map((key) => sanitizeStorageKey(key)));
 }
 async function buildProgressBackupSnapshots(

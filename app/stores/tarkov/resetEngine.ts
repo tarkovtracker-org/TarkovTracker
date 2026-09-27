@@ -1,4 +1,5 @@
 import { defaultState, type UserProgressData, type UserState } from '@/stores/progressState';
+import { deepEqual } from '@/stores/tarkov/deepEqual';
 import { clearActiveProgressStorage } from '@/stores/tarkov/localStorage';
 import {
   getNextProgressEpoch,
@@ -23,6 +24,26 @@ export type ResetMode = GameMode | 'all';
 type ResetTargetStore = {
   $patch: (fn: (state: UserState) => void) => void;
   $state: UserState;
+};
+const hasPendingOrUnsavedProgress = (): boolean =>
+  hasPendingCloudChanges() || hasUnsavedProgressChanges();
+const hasChangesInResetModes = (
+  resetModes: GameMode[],
+  state: UserState,
+  defaults: UserState
+): boolean => resetModes.some((mode) => !deepEqual(state[mode], defaults[mode]));
+const hasControllerlessLocalChanges = (
+  syncControllerAvailable: boolean,
+  hasLocalChanges: boolean
+): boolean => !syncControllerAvailable && hasLocalChanges;
+const ownerIdToRetainBeforeReset = (
+  ownerId: string | null,
+  syncControllerAvailable: boolean,
+  hasLocalChanges: boolean
+): string | null => {
+  if (!ownerId) return null;
+  if (hasPendingOrUnsavedProgress()) return ownerId;
+  return hasControllerlessLocalChanges(syncControllerAvailable, hasLocalChanges) ? ownerId : null;
 };
 const shouldPreferLocalStartupMetadata = (
   localTimestamp: number | null,
@@ -200,12 +221,19 @@ export const performReset = async (mode: ResetMode, store: ResetTargetStore): Pr
   const freshState = structuredClone(defaultState);
   const resetModes = mode === 'all' ? GAME_MODE_VALUES : [mode];
   const ownerId = $supabase.user.loggedIn ? $supabase.user.id : null;
-  if (ownerId && (hasPendingCloudChanges() || hasUnsavedProgressChanges())) {
+  const syncController = getRegisteredSyncController();
+  const hasLocalChanges = hasChangesInResetModes(resetModes, store.$state, freshState);
+  const retentionOwnerId = ownerIdToRetainBeforeReset(
+    ownerId,
+    Boolean(syncController),
+    hasLocalChanges
+  );
+  if (retentionOwnerId) {
     for (const resetMode of resetModes) {
       const seasonNumber =
         resetMode === 'seasonal' ? (store.$state.seasonalSeasonNumber ?? null) : null;
       const copy = saveSupersededProgressCopy(
-        ownerId,
+        retentionOwnerId,
         resetMode,
         seasonNumber,
         store.$state[resetMode]

@@ -2187,6 +2187,7 @@
       "delete_success_title": "Account Deleted Successfully",
       "delete_success_sr_only": "Your account deletion is complete, and you will be redirected to the dashboard.",
       "delete_success_description": "Your account and all associated data have been permanently deleted.",
+      "other_session_deleted_description": "The account that started this deletion was deleted. Your current account is still signed in and was not changed.",
       "cleanup_pending": "Some data cleanup is still in progress and will complete shortly.",
       "redirect_message": "Thank you for using TarkovTracker. You will be redirected to the dashboard.",
       "go_to_dashboard": "Go to Dashboard",
