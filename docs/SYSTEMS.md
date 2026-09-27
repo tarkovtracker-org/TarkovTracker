@@ -1956,7 +1956,9 @@ share request serialization and durable intent through their Git common director
 case-insensitive repository identity for new and existing intents. Existing
 pending reviews, uncertain delivery, and unknown status block new requests; elapsed time does
 not authorize a retry. Completion matches the exact full commit; abbreviated evidence requires
-GitHub resolution, and head changes during evidence reads fail closed. Successful posts record
+GitHub resolution, and head or base changes during evidence reads fail closed. Reusing a
+head-commit completion does not certify coverage of the current base or diff; retargeting requires
+independent review of that diff before merging. Successful posts record
 GitHub timestamps; uncertain local intents require matching completion without comparing host
 clocks. Dead local lock owners can be recovered under a separate recovery lock; live, foreign,
 or uncertain owners require operator inspection. Startup grace uses GitHub's response clock;

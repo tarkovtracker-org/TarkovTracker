@@ -66,20 +66,37 @@ function fetchState({ repo, pr, runGh, intents }) {
   );
   const resolvedShas = resolveEvidence(prefix, evidenceShas(comments, reviews), runGh);
   const { pull: refreshed, serverTime } = readPull(runGh, `${prefix}/pulls/${pr}`);
-  const changed = changedHead(pull, refreshed);
+  const changed = changedSnapshot(pull, refreshed);
   if (changed) return changed;
   return classifyState(
     { pull: refreshed, comments, reviews, requestedReviewers, intents, resolvedShas },
     serverTime
   );
 }
-function changedHead(pull, refreshed) {
-  if (headOf(pull) === headOf(refreshed)) return null;
-  return {
-    status: 'unknown',
-    headSha: headOf(refreshed),
-    reason: 'PR head changed while collecting review evidence; inspect the new revision',
-  };
+function baseOf(pull) {
+  return pull.base ?? {};
+}
+function baseChanged(pull, refreshed) {
+  const originalBase = baseOf(pull);
+  const refreshedBase = baseOf(refreshed);
+  return originalBase.ref !== refreshedBase.ref || originalBase.sha !== refreshedBase.sha;
+}
+function changedSnapshot(pull, refreshed) {
+  if (headOf(pull) !== headOf(refreshed)) {
+    return {
+      status: 'unknown',
+      headSha: headOf(refreshed),
+      reason: 'PR head changed while collecting review evidence; inspect the new revision',
+    };
+  }
+  if (baseChanged(pull, refreshed)) {
+    return {
+      status: 'unknown',
+      headSha: headOf(refreshed),
+      reason: 'PR base changed while collecting review evidence; inspect the new target',
+    };
+  }
+  return null;
 }
 function headOf(pull) {
   return pull.head?.sha ?? '';

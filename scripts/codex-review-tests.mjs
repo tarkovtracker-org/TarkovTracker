@@ -315,6 +315,50 @@ test('request stabilization detects a changed head before posting', async () => 
     rmSync(root, { recursive: true, force: true });
   }
 });
+test('request snapshots fail closed when the base ref or SHA changes', async () => {
+  const cases = [
+    {
+      label: 'base ref retarget',
+      initial: { ref: 'main', sha: oldHead },
+      refreshed: { ref: 'release', sha: oldHead },
+    },
+    {
+      label: 'base SHA advance',
+      initial: { ref: 'main', sha: oldHead },
+      refreshed: { ref: 'main', sha: '39ba60fa9c000000000000000000000000000000' },
+    },
+  ];
+  for (const scenario of cases) {
+    const root = mkdtempSync(join(tmpdir(), 'codex-review-base-race-'));
+    let pullReads = 0;
+    let posts = 0;
+    const routes = emptyApiRoutes({ commentsResponse: JSON.stringify(cleanComment()) });
+    routes['repos/example/repo/pulls/44'] = () => {
+      pullReads += 1;
+      const base = pullReads === 1 ? scenario.initial : scenario.refreshed;
+      return JSON.stringify(pull(head, { base }));
+    };
+    routes.post = () => {
+      posts += 1;
+    };
+    try {
+      const result = await runGuard(
+        { pr: 44, repo: 'example/repo', request: true, waitSeconds: 0 },
+        {
+          gitCommonDir: root,
+          now: () => now,
+          runGh: mockGh(routes),
+        }
+      );
+      assert.equal(result.status, 'unknown', scenario.label);
+      assert.match(result.reason, /base changed/, scenario.label);
+      assert.equal(posts, 0, scenario.label);
+      assert.equal(existsSync(join(root, 'codex-review-guard')), false, scenario.label);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
 test('GitHub read failure never reaches the post endpoint', async () => {
   const root = mkdtempSync(join(tmpdir(), 'codex-review-api-error-'));
   let posts = 0;
