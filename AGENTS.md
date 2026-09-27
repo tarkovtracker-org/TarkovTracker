@@ -65,6 +65,11 @@ or test logic changes make it relevant.
 
 ## Review
 
+- Request Codex reviews only through `node scripts/codex-review.mjs <PR> --request --wait-seconds 600`
+  when posting a review request is authorized. Never post raw `@codex review`
+  comments. For read-only status/waiting, omit `--request`. Pending, running, unknown, or timed-out
+  reviews mean wait and report the state; never bypass the guard or repost to speed up a review.
+  Reuse completed review evidence for the same commit; completion does not mean findings are resolved.
 - Docs, translations, mechanical formatting: self-review plus deterministic checks. Routine
   executable changes: Codex PR review. Substantial changes (public contracts, persisted state,
   cross-module behavior, auth, billing, migrations, concurrency): also one local CodeRabbit review

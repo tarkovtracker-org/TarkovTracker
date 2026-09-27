@@ -1948,6 +1948,29 @@ CodeQL) is selected on every CI run. See
   event actor; the actor restriction alone never establishes trust.
 - The aggregate covers repository CI jobs, not independently reported Security or Codecov statuses.
 
+### Agent review request coordination
+
+`scripts/codex-review.mjs` checks live GitHub review evidence before an agent requests Codex review.
+Read-only inspection is the default; authorized requests require `--request`. Local worktrees
+share request serialization and durable intent through their Git common directory, using
+case-insensitive repository identity for new and existing intents. Existing
+pending reviews, uncertain delivery, and unknown status block new requests; elapsed time does
+not authorize a retry. Completion matches the exact full commit; abbreviated evidence requires
+GitHub resolution, and head or base changes during evidence reads fail closed. Reusing a
+head-commit completion does not certify coverage of the current base or diff; retargeting requires
+independent review of that diff before merging. Successful posts record
+GitHub timestamps; uncertain local intents require matching completion without comparing host
+clocks. Dead local lock owners can be recovered under a separate recovery lock; live, foreign,
+or uncertain owners require operator inspection. Startup grace uses GitHub's response clock;
+first-line commands from trusted GitHub associations exclude outsider markers and prose examples,
+and tied second-resolution request/completion
+timestamps reuse exact-commit completion while running bot activity still blocks requests.
+Completed code reviews are reused by commit,
+independently of security reviews and unresolved findings; only top-level security report headings or the dedicated leading marker
+exclude security evidence, preserving quoted headings in code reviews. This cooperative guard cannot serialize unrelated clones or
+callers that bypass it. See [the review workflow](WORKFLOW_AUTOMATION.md#codex-request-deduplication-and-waiting)
+for agent commands and recovery boundaries.
+
 ## 16. Canonical task progression
 
 Hideout cards evaluate the declared trader comparison against current loyalty (legacy default `>=`). Completed-module enforcement retains a build if the current stored loyalty satisfies the comparison (including legacy values above the normal range), or if any valid loyalty level at or below it satisfies that comparison, so advancing past an upper-bound or equality requirement cannot erase built modules or their parts. Lower-bound loyalty downgrades still revoke dependent builds. Disabled trader gating bypasses both checks. Optional profile chapter and prestige normalization run inside their optional request boundaries: malformed catalogs show a partial failure without discarding successful task catalogs. Overlay promotion requires a nonempty editions catalog as well as complete provenance, and forced edition refreshes forward `cacheBust=1` to bypass the worker overlay cache.
