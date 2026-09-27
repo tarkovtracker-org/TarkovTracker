@@ -1,11 +1,12 @@
 // @vitest-environment node
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   collectHighlights,
+  MAX_CONCURRENT_LOOKUPS,
   pullRequestNumber,
   cancelledCommits,
   releaseNotesFromBody,
@@ -52,6 +53,20 @@ describe('release note parsing', () => {
       'Second note',
     ]);
   });
+  it('keeps nested list content with its top-level bullet', () => {
+    expect(
+      releaseNotesFromBody(template('- Added map filters:\n  - by trader\n  - by location.'))
+    ).toEqual(['Added map filters: by trader by location.']);
+  });
+  it('does not lift indented markers or code into top-level notes', () => {
+    // An indented-only block is not a list; the whole section stays one prose entry.
+    expect(releaseNotesFromBody(template('Handles the new flags:\n\n    - example flag.'))).toEqual(
+      ['Handles the new flags: - example flag.']
+    );
+    expect(releaseNotesFromBody(template('  - nested only\n  - markers do not split.'))).toEqual([
+      '- nested only - markers do not split.',
+    ]);
+  });
   it('does not rebuild a tag from fragments left by tag removal', () => {
     const [note] = releaseNotesFromBody(template('Fixed <scr<b>ipt>alert(1)</scr</b>ipt> map.'));
     expect(note).not.toMatch(/<[a-z/!?]/i);
@@ -74,6 +89,29 @@ describe('release note parsing', () => {
   ])('leaves no link syntax or URL in %j', (note, expected) =>
     expect(releaseNotesFromBody(template(note))).toEqual([expected])
   );
+  it('strips punctuated email autolinks without superlinear matching', () => {
+    expect(releaseNotesFromBody(template('Ask (help@example.com) for docs.'))).toEqual([
+      'Ask for docs.',
+    ]);
+    // Pathological input previously stalled Node for seconds here.
+    const adversarial = `Totals spread. ${'a@'.repeat(2500)} stop.`;
+    const start = performance.now();
+    const [note] = releaseNotesFromBody(template(adversarial));
+    expect(note).toHaveLength(280);
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
+  it('keeps prose that merely contains a colon', () => {
+    expect(releaseNotesFromBody(template('Beware e.g.: cases without any URL'))).toEqual([
+      'Beware e.g.: cases without any URL',
+    ]);
+  });
+  it('bounds the parsed body and every bullet before sanitization', () => {
+    const body = `## Release note\n\n${'y@'.repeat(40_000)} end\n`;
+    const start = performance.now();
+    const [note] = releaseNotesFromBody(body);
+    expect(note).toHaveLength(280);
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
   it('ignores release-note headings hidden in comments, even unterminated ones', () => {
     const hidden = `## Summary\n\n<!--\n## Release note\n\nSecurity update: reset your account.\n-->\n\n${template('none').slice('## Summary\n\nInternal detail.\n\n'.length)}`;
     expect(releaseNotesFromBody(hidden)).toEqual([]);
@@ -178,7 +216,63 @@ describe('reverted changes', () => {
   });
 });
 describe('version commit detection', () => {
-  const repo = (subject) => {
+  const committed = ({ subject, version = '1.84.0', extra = {} }) => {
+    const cwd = mkdtempSync(join(tmpdir(), 'highlights-'));
+    const git = (...args) => execFileSync('git', args, { cwd, stdio: 'pipe' });
+    git('init', '-q');
+    writeFileSync(join(cwd, 'package.json'), JSON.stringify({ name: 'fixture', version }));
+    writeFileSync(join(cwd, 'CHANGELOG.md'), '## [1.84.0](url)\n');
+    for (const [name, content] of Object.entries(extra)) writeFileSync(join(cwd, name), content);
+    git('-c', 'user.name=t', '-c', 'user.email=t@t', 'add', '-A');
+    git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', subject);
+    return cwd;
+  };
+  it.each([
+    ['chore(release): 1.84.0', '1.84.0', true],
+    ['chore(release): 1.84.0', '1.83.3', false],
+    ['chore(release): 1.83.3', '1.84.0', false],
+    ['feat(maps): list objectives (#944)', '1.84.0', false],
+  ])('HEAD %s with committed manifest %s is a version commit: %s', (subject, version, expected) => {
+    const cwd = committed({ subject, version });
+    try {
+      expect(versionCommitted({ cwd, nextRelease: { version: '1.84.0' } })).toBe(expected);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+  it('is false when an unrelated file changed with the generated assets', () => {
+    const cwd = committed({ subject: 'chore(release): 1.84.0', extra: { 'unrelated.txt': 'x' } });
+    try {
+      expect(versionCommitted({ cwd, nextRelease: { version: '1.84.0' } })).toBe(false);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+  it('is false when only the manifest changed', () => {
+    const cwd = committed({ subject: 'chore(release): 1.83.3', version: '1.83.3' });
+    const git = (...args) => execFileSync('git', args, { cwd, stdio: 'pipe' });
+    try {
+      writeFileSync(
+        join(cwd, 'package.json'),
+        JSON.stringify({ name: 'fixture', version: '1.84.0' })
+      );
+      git('-c', 'user.name=t', '-c', 'user.email=t@t', 'add', 'package.json');
+      git(
+        '-c',
+        'user.name=t',
+        '-c',
+        'user.email=t@t',
+        'commit',
+        '-q',
+        '-m',
+        'chore(release): 1.84.0'
+      );
+      expect(versionCommitted({ cwd, nextRelease: { version: '1.84.0' } })).toBe(false);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+  it('is false when the matching subject changed no generated asset', () => {
     const cwd = mkdtempSync(join(tmpdir(), 'highlights-'));
     const git = (...args) => execFileSync('git', args, { cwd, stdio: 'pipe' });
     git('init', '-q');
@@ -191,18 +285,10 @@ describe('version commit detection', () => {
       '-q',
       '--allow-empty',
       '-m',
-      subject
+      'chore(release): 1.84.0'
     );
-    return cwd;
-  };
-  it.each([
-    ['chore(release): 1.84.0', true],
-    ['chore(release): 1.83.3', false],
-    ['feat(maps): list objectives (#944)', false],
-  ])('HEAD %s means committed=%s for 1.84.0', (subject, expected) => {
-    const cwd = repo(subject);
     try {
-      expect(versionCommitted({ cwd, nextRelease: { version: '1.84.0' } })).toBe(expected);
+      expect(versionCommitted({ cwd, nextRelease: { version: '1.84.0' } })).toBe(false);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -360,5 +446,55 @@ describe('release highlights', () => {
       '## [1.84.0](url) (2026-09-29)\n\n\n### Highlights\n\n* Better Smart Fill. ([#943](https://github.com/o/r/pull/943))\n\n\n### Bug Fixes\n\n* **app:** fix\n'
     );
     expect(withHighlights(notes, [], 'o/r')).toBe(notes);
+  });
+});
+describe('bounded lookups', () => {
+  const logger = { log: vi.fn() };
+  const env = { GITHUB_REPOSITORY: 'o/r', GITHUB_TOKEN: 't' };
+  const pull = () =>
+    json({
+      data: {
+        repository: {
+          pullRequest: {
+            body: template('- note a\n- note b\n- note c'),
+            merged: true,
+            mergedAt: '2026-09-27T12:00:00Z',
+            authorAssociation: 'MEMBER',
+            author: { login: 'maintainer' },
+          },
+        },
+      },
+    });
+  it('bounds request concurrency and stops launching at the release cap', async () => {
+    let active = 0;
+    let peak = 0;
+    const looked = new Set();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url, init) => {
+        active += 1;
+        peak = Math.max(peak, active);
+        try {
+          if (url.includes('/collaborators/')) return json({ permission: 'write' });
+          const { number } = JSON.parse(init.body).variables;
+          looked.add(number);
+          // The first PR completes alone while the next batch is still running.
+          await new Promise((resolve) => setTimeout(resolve, number === 100 ? 20 : 60));
+          return pull();
+        } finally {
+          active -= 1;
+        }
+      })
+    );
+    const commits = Array.from({ length: 12 }, (_, i) => ({
+      message: `fix(app): change (#${100 + i})`,
+    }));
+    const highlights = await collectHighlights({ commits, env, logger });
+    expect(highlights).toHaveLength(5);
+    expect(peak).toBeLessThanOrEqual(MAX_CONCURRENT_LOOKUPS);
+    // PRs are looked up in commit order until five notes are collected; the tail is untouched.
+    const fetched = [...looked].sort((a, b) => a - b);
+    expect(fetched).toEqual([100, 101, 102, 103, 104]);
+    expect(looked).not.toContain(111);
   });
 });

@@ -9,21 +9,38 @@
  * collaborator-permission API, not just the author association): anyone else able to edit that
  * description also has write access, which closes the auto-merge window in which a lower-privilege
  * author could change an approved note. Notes are reduced to plain text (no
- * link syntax, URLs, or HTML) so they cannot carry a link into the project's release notes.
- * Highlights are added only after the version commit exists (`versionCommitted`), so PR text is
- * published in the GitHub release but never written to the committed, secret-scanned CHANGELOG.md.
+ * link syntax, URLs, or HTML; only top-level bullets are highlights; nested and indented content
+ * stays with its parent) so they cannot carry a link into the project's release notes. Untrusted
+ * text is never matched by superlinear patterns: parsing is bounded by GitHub's body limit, each
+ * bullet is bounded before sanitization, and autolinks are detected per whitespace token.
+ * Highlights are added only after this release's version commit is verified to be HEAD
+ * (`versionCommitted`, authenticated by its generated release state, not just its subject), so
+ * PR text is published in the GitHub release but never written to the committed,
+ * secret-scanned CHANGELOG.md. Lookups run with bounded concurrency and stop at the highlight cap.
  */
 import { execFileSync } from 'node:child_process';
 const PR_REFERENCE = /\(#(\d+)\)\s*$/;
 const NOTE_HEADING = /^##[ \t]+release[ \t]+notes?[ \t]*$/im;
 const NEXT_HEADING = /^#{1,2}[ \t]+\S/m;
-const LIST_ITEM = /^\s*(?:[-*+]|\d+\.)\s+/;
+// Zero leading whitespace: nested list markers and indented code are continuation content of
+// their parent bullet, never new top-level highlights.
+const TOP_LIST_ITEM = /^(?:[-*+]|\d+\.)[ \t]+/;
+const NESTED_LIST_ITEM = /^[ \t]+(?:[-*+]|\d+\.)[ \t]+/;
 const NO_NOTE = /^(?:none|n\/a|na|-+|no)\.?$/i;
 const MAX_NOTE_LENGTH = 280;
 const MAX_NOTES_PER_PULL = 3;
+// PR bodies cannot exceed GitHub's own 65 536-character body limit, so this bound parses every
+// real body whole while still bounding regex work on untrusted text.
+const MAX_BODY_LENGTH = 65_536;
+// A raw bullet cannot usefully shrink toward nothing while joining wrapper lines, so a bounded
+// prefix is sanitized before the 280-code-point cap.
+const MAX_RAW_NOTE = 4_096;
 // The in-app changelog shows at most MAX_BULLETS_PER_GROUP (5) bullets per release, and
 // Highlights come first, so a larger cap would hide later notes there.
 const MAX_HIGHLIGHTS = 5;
+// PR lookups run with bounded concurrency so a batched release cannot hit GitHub's secondary
+// limits, and workers stop launching once MAX_HIGHLIGHTS notes are collectable.
+export const MAX_CONCURRENT_LOOKUPS = 4;
 const TRUSTED_AUTHORS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 // `permission` is the effective base permission (custom and `maintain` roles map to `write`).
 const WRITE_PERMISSIONS = new Set(['write', 'admin']);
@@ -70,6 +87,7 @@ function stripFencedCode(text) {
 function noteSection(body) {
   // Hidden comments and fenced examples cannot start or end the real section.
   const text = String(body ?? '')
+    .slice(0, MAX_BODY_LENGTH)
     .replace(/\r\n/g, '\n')
     .replace(HTML_COMMENT, '');
   return sectionAfterHeading(stripFencedCode(text));
@@ -81,20 +99,32 @@ function sectionAfterHeading(text) {
   const end = rest.search(NEXT_HEADING);
   return end === -1 ? rest : rest.slice(0, end);
 }
-// Drop link targets, then all brackets, so no (nested) link syntax can survive; remove URLs of any
-// scheme, protocol-relative and `www.` autolinks, and HTML tags (`<b>`, not `< 20 kg`). Removing
-// tags can join fragments into a new one (`<scr<b>ipt>`), so any `<` still opening a tag is dropped.
+// A live autolink can only start inside one whitespace-delimited token. Each token is checked
+// with bounded, non-overlapping matches (no large optional spans that backtrack superlinearly on
+// untrusted text), and a token that could render as a link (scheme or protocol-relative `//`,
+// `www.` autolink, or an email) is dropped whole.
+function emailish(token) {
+  const at = token.indexOf('@');
+  return at > 0 && /\.\w/.test(token.slice(at + 1));
+}
+const autolinked = (token) => token.includes('//') || /^www\./i.test(token) || emailish(token);
 function plainText(line) {
   return line
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\]\([^)]*\)/g, ']')
     .replace(/[[\]!]*\[|\]/g, '')
-    .replace(/(?:\b[a-z][\w+.-]*:)?\/\/\S+|\bwww\.\S+|\S+@\S+\.\w+/gi, '')
+    .split(/\s+/)
+    .map((token) => (autolinked(token) ? '' : token))
+    .join(' ')
     .replace(/<\/?[a-z][^<>]*>/gi, '')
     .replace(/<(?=[a-z/!?])/gi, '');
 }
 function cleanNote(item) {
-  const text = plainText(item).replace(LIST_ITEM, '').replace(/\s+/g, ' ').trim();
+  // Sanitization only ever shortens, so a bounded raw prefix cannot lose a shorter highlight.
+  const text = plainText(Array.from(item).slice(0, MAX_RAW_NOTE).join(''))
+    .replace(TOP_LIST_ITEM, '')
+    .replace(/\s+/g, ' ')
+    .trim();
   // Count and cut by code point so a surrogate pair is never split.
   const chars = Array.from(text);
   if (chars.length <= MAX_NOTE_LENGTH) return text;
@@ -103,13 +133,15 @@ function cleanNote(item) {
     .join('')
     .trimEnd()}…`;
 }
-// Each list item keeps its wrapped continuation lines; a blank line or prose paragraph ends it.
+// Each top-level list item keeps its wrapped, nested, and indented code continuation lines; a
+// blank line or prose paragraph ends it. Indented markers never start new items here, and their
+// marker tokens are dropped so nested content reads as plain text with its parent.
 function listItems(section) {
   const blocks = section.split(/\n[ \t]*\n/);
-  const lines = blocks.filter((block) => LIST_ITEM.test(block)).flatMap((b) => b.split('\n'));
+  const lines = blocks.flatMap((block) => (TOP_LIST_ITEM.test(block) ? block.split('\n') : []));
   return lines.reduce((items, line) => {
-    if (LIST_ITEM.test(line)) items.push(line);
-    else if (items.length) items[items.length - 1] += ` ${line}`;
+    if (TOP_LIST_ITEM.test(line)) items.push(line);
+    else if (items.length) items[items.length - 1] += ` ${line.replace(NESTED_LIST_ITEM, '')}`;
     return items;
   }, []);
 }
@@ -156,11 +188,42 @@ export function cancelledCommits(commits) {
   };
   return new Set(commits.filter((commit) => !isEffective(commit) || targets.has(commit)));
 }
-/** Whether the release's version commit exists, i.e. CHANGELOG.md has already been committed. */
+// A real version commit is created by release automation and changes exactly the two generated
+// assets, with the committed manifest carrying the new version.
+const VERSION_ASSETS = ['CHANGELOG.md', 'package.json'];
+const isVersionAssets = (assets) =>
+  VERSION_ASSETS.length === assets.length &&
+  VERSION_ASSETS.every((asset) => assets.includes(asset));
+/** HEAD's subject, changed files, and the committed manifest's version. */
+function headInfo(cwd) {
+  const subject = execFileSync('git', ['log', '-1', '--format=%s'], { cwd, encoding: 'utf8' });
+  const assets = execFileSync('git', ['show', '--format=', '--name-only', 'HEAD'], {
+    cwd,
+    encoding: 'utf8',
+  })
+    .split('\n')
+    .map((name) => name.trim())
+    .filter(Boolean);
+  const manifest = JSON.parse(
+    execFileSync('git', ['show', '--format=', 'HEAD:package.json'], { cwd, encoding: 'utf8' })
+  );
+  return { subject, assets, version: manifest?.version };
+}
+const isVersionCommit = ({ subject, assets, version }, releaseVersion) =>
+  subject.trim() === `chore(release): ${releaseVersion}` &&
+  isVersionAssets(assets) &&
+  version === releaseVersion;
+/**
+ * Whether HEAD is this release's version commit, i.e. CHANGELOG.md has already been committed.
+ * The subject alone is user-controlled (a squash-merged PR can carry the same subject), so the
+ * generated release state must match too: HEAD changes exactly the two generated assets and its
+ * committed manifest carries the release version.
+ */
 export function versionCommitted({ cwd, nextRelease }) {
+  const version = nextRelease?.version;
+  if (!version) return false;
   try {
-    const subject = execFileSync('git', ['log', '-1', '--format=%s'], { cwd, encoding: 'utf8' });
-    return subject.trim() === `chore(release): ${nextRelease?.version}`;
+    return isVersionCommit(headInfo(cwd), version);
   } catch {
     return false;
   }
@@ -240,19 +303,44 @@ function lookupOptions({ env = {}, repositoryUrl, logger }) {
   const token = env.GITHUB_TOKEN || env.GH_TOKEN;
   return slug && token ? { slug, token, logger } : null;
 }
+// Look up notes for every PR number with bounded concurrency, no longer launching once the
+// release's highlight cap is collectable. Results are held per number, so assembly below stays
+// in commit order regardless of completion order.
+async function collectNotes(options, numbers) {
+  const results = [];
+  let collected = 0;
+  let next = 0;
+  const worker = async () => {
+    while (collected < MAX_HIGHLIGHTS) {
+      const index = next++;
+      if (index >= numbers.length) return;
+      const notes = await notesForPull(options, numbers[index]);
+      results[index] = notes;
+      collected += notes.length;
+    }
+  };
+  const workers = Array.from({ length: Math.min(MAX_CONCURRENT_LOOKUPS, numbers.length) }, () =>
+    worker()
+  );
+  await Promise.all(workers);
+  return results;
+}
 /**
  * Highlights for the given commits, in commit order, one entry per note. Reverts are paired across
  * every commit in the range before `excluded` (e.g. internal scopes) drops candidates, so an
- * excluded commit can still cancel the change it reverts.
+ * excluded commit can still cancel the change it reverts. Lookups run with bounded concurrency
+ * and stop once the release cap is collectable, so a batch cannot flood the API.
  */
 export async function collectHighlights({ commits, excluded = () => false, ...context }) {
   const options = lookupOptions(context);
   if (!options) return [];
   const cancelled = cancelledCommits(commits);
   const kept = commits.filter((commit) => !cancelled.has(commit) && !excluded(commit));
-  const numbers = [...new Set(kept.map((commit) => pullRequestNumber(commit.message)))];
-  const notes = await Promise.all(numbers.filter(Boolean).map((n) => notesForPull(options, n)));
-  return notes.flat().slice(0, MAX_HIGHLIGHTS);
+  const numbers = [...new Set(kept.map((commit) => pullRequestNumber(commit.message)))].filter(
+    Boolean
+  );
+  const results = await collectNotes(options, numbers);
+  return results.flatMap((notes) => notes ?? []).slice(0, MAX_HIGHLIGHTS);
 }
 /** Insert a `### Highlights` list directly below the version heading of generated notes. */
 export function withHighlights(notes, highlights, slug) {

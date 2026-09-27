@@ -449,8 +449,17 @@ by hand), or its GraphQL
 limit. To fix a note after merge, add it to
 the GitHub release by hand rather than editing the PR (an edit after merge also removes a note
 that would otherwise publish). Notes become plain text: link syntax, images, URLs of any scheme,
-and HTML tags are removed (including any `<` that would still open a tag), headings inside HTML comments or code fences are ignored, and each note
-is capped at 280 characters. A PR reverted within the same release contributes no highlight, and
+and HTML tags are removed (including any `<` that would still open a tag), headings inside HTML
+comments or code fences are ignored, and each note is capped at 280 code points. Only top-level
+bullets are published: wrapped continuation lines, nested list items, and indented code stay
+with their parent bullet. Parsing is bounded before sanitization — PR text within GitHub's body
+limit, each bullet within `MAX_RAW_NOTE` code points, autolink triggers detected per
+whitespace-delimited token — so a long or pathological note cannot stall generation. PR lookups
+run in commit order with bounded concurrency, stopping once the five-highlight cap is
+collectable. PR text never enters `CHANGELOG.md`: highlights attach only when notes are
+regenerated after the version commit, which is authenticated from its generated state (exactly
+`CHANGELOG.md` and `package.json` changed, and the committed manifest already carries the
+release version) rather than its user-controlled subject. A PR reverted within the same release contributes no highlight, and
 neither does its revert, even when the revert has an internal scope; a revert of that revert
 restores the original highlight.
 

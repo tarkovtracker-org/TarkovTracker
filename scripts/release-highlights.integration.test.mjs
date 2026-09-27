@@ -71,10 +71,15 @@ it('publishes highlights in the GitHub release but not the committed changelog',
             generateNotes: releaseScope.generateNotes,
           },
           {
-            // Mirrors the changelog + release-commit prepare steps.
+            // Mirrors the changelog + release-commit prepare steps, including the generated
+            // assets: the changelog and a manifest whose only change is the version.
             prepare: (_config, { nextRelease }) => {
               writeFileSync(join(f.repo, 'CHANGELOG.md'), nextRelease.notes);
-              f.git('add', 'CHANGELOG.md');
+              writeFileSync(
+                join(f.repo, 'package.json'),
+                JSON.stringify({ name: 'fixture', version: nextRelease.version })
+              );
+              f.git('add', 'CHANGELOG.md', 'package.json');
               f.commit(`chore(release): ${nextRelease.version}`);
             },
           },
