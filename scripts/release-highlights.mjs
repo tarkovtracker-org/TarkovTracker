@@ -23,9 +23,8 @@ import { fromMarkdown } from 'mdast-util-from-markdown';
 export { versionCommitted } from './release-note-state.mjs';
 const PR_REFERENCE = /\(#(\d+)\)\s*$/;
 const RELEASE_NOTE_HEADING = /^release notes?$/i;
-// Zero leading whitespace: nested list markers and indented code are continuation content of
-// their parent bullet, never new top-level highlights.
-const TOP_LIST_ITEM = /^(?:[-*+]|\d+[.)])[ \t]+/;
+// This strips a root list marker only after the AST has distinguished it from nested items/code.
+const TOP_LIST_ITEM = /^ {0,3}(?:[-*+]|\d+[.)])[ \t]+/;
 const NESTED_LIST_ITEM = /^[ \t]+(?:[-*+]|\d+[.)])[ \t]+/;
 const NO_NOTE = /^(?:none|n\/a|na|-+|no)\.?$/i;
 const MAX_NOTE_LENGTH = 280;
@@ -102,10 +101,24 @@ function maskRanges(source, ranges) {
     });
   return state.text + source.slice(state.offset);
 }
+const TEXT_NODE_TYPES = new Set(['text', 'inlineCode', 'code']);
+const BREAK_NODE_TYPES = new Set(['break']);
 function appendNodeText(stack, text) {
   const node = stack.pop();
-  if (node.type === 'text' || node.type === 'inlineCode') text.push(node.value);
+  if (TEXT_NODE_TYPES.has(node.type)) text.push(node.value);
+  else if (BREAK_NODE_TYPES.has(node.type)) text.push(' ');
   else if (hasChildren(node)) pushChildren(stack, node.children);
+}
+function markdownText(source) {
+  const blocks = fromMarkdown(source.replace(/\0/g, '')).children;
+  return blocks
+    .map((block) => {
+      const stack = [block];
+      const text = [];
+      while (stack.length) appendNodeText(stack, text);
+      return text.join('');
+    })
+    .join('\n');
 }
 function headingText(heading) {
   const stack = [];
@@ -154,12 +167,11 @@ function stripHtml(text) {
   return text.replace(/<(?=[a-z/!?])/gi, '');
 }
 function plainText(line) {
-  return stripHtml(line.replace(/\0/g, ''))
+  return stripHtml(markdownText(line).replace(/[*_~\x60]/g, ''))
     .replace(/^[ ]{0,3}>[ \t]?/gm, '')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\]\([^)]*\)/g, ']')
     .replace(/[[\]!]*\[|\]/g, '')
-    .replace(/[*_`~]/g, '')
     .split(/\s+/)
     .map((token) => (autolinked(token) ? '' : token))
     .join(' ');
@@ -178,15 +190,27 @@ function cleanNote(item) {
     .join('')
     .trimEnd()}…`;
 }
-// Each top-level list item keeps its wrapped, nested, and indented code continuation lines; a
-// blank line or prose paragraph ends it. Indented markers never start new items here, and their
-// marker tokens are dropped so nested content reads as plain text with its parent.
+function rootListItemLines(block) {
+  const lines = new Set();
+  for (const node of fromMarkdown(block).children) {
+    if (node.type !== 'list') continue;
+    for (const item of node.children) lines.add(item.position.start.line - 1);
+  }
+  return lines;
+}
+function appendListBlock(block, items) {
+  const rootLines = rootListItemLines(block);
+  if (!rootLines.has(0)) return;
+  block.split('\n').forEach((line, index) => {
+    if (rootLines.has(index)) items.push(line);
+    else if (items.length) items[items.length - 1] += ' ' + line.replace(NESTED_LIST_ITEM, '');
+  });
+}
+// Each AST-identified root list item keeps its wrapped, nested, and indented code continuation
+// lines. Blank blocks and prose that precedes a list remain outside the highlight items.
 function listItems(section) {
-  const blocks = section.split(/\n[ \t]*\n/);
-  const lines = blocks.flatMap((block) => (TOP_LIST_ITEM.test(block) ? block.split('\n') : []));
-  return lines.reduce((items, line) => {
-    if (TOP_LIST_ITEM.test(line)) items.push(line);
-    else if (items.length) items[items.length - 1] += ` ${line.replace(NESTED_LIST_ITEM, '')}`;
+  return section.split(/\n[ \t]*\n/).reduce((items, block) => {
+    appendListBlock(block, items);
     return items;
   }, []);
 }

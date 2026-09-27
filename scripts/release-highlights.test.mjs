@@ -62,18 +62,33 @@ describe('release note parsing', () => {
       'Second note',
     ]);
   });
+  it.each([1, 2, 3])(
+    'splits root bullets indented by %i spaces without lifting nested bullets',
+    (indentation) => {
+      const rootIndent = ' '.repeat(indentation);
+      const nestedIndent = ' '.repeat(indentation + 2);
+      const body = template(
+        `${rootIndent}- First root note\n${nestedIndent}- Nested detail\n${rootIndent}- Second root note`
+      );
+      expect(releaseNotesFromBody(body)).toEqual([
+        'First root note Nested detail',
+        'Second root note',
+      ]);
+    }
+  );
   it('keeps nested list content with its top-level bullet', () => {
     expect(
       releaseNotesFromBody(template('- Added map filters:\n  - by trader\n  - by location.'))
     ).toEqual(['Added map filters: by trader by location.']);
   });
-  it('does not lift indented markers or code into top-level notes', () => {
+  it('keeps indented code in prose and recognizes root list markers with indentation', () => {
     // An indented-only block is not a list; the whole section stays one prose entry.
     expect(releaseNotesFromBody(template('Handles the new flags:\n\n    - example flag.'))).toEqual(
       ['Handles the new flags: - example flag.']
     );
-    expect(releaseNotesFromBody(template('  - nested only\n  - markers do not split.'))).toEqual([
-      '- nested only - markers do not split.',
+    expect(releaseNotesFromBody(template('  - first root item\n  - second root item'))).toEqual([
+      'first root item',
+      'second root item',
     ]);
   });
   it('does not rebuild a tag from fragments left by tag removal', () => {
@@ -87,6 +102,14 @@ describe('release note parsing', () => {
     expect(releaseNotesFromBody(template('Fixed https:/**/evil.example map.'))).toEqual([
       'Fixed map.',
     ]);
+  });
+  it('decodes entities before sanitizing and publishing malformed HTML fragments', () => {
+    const body = template('<**a href="https&#x3A;&#x2F;&#x2F;evil.example">click</a>');
+    const [text] = releaseNotesFromBody(body);
+    expect(text).toBe('click');
+    const output = withHighlights('## [1.84.0](url)\n', [{ number: 943, text }], 'o/r');
+    expect(output).not.toMatch(/<a\b/i);
+    expect(output).not.toContain('evil.example');
   });
   it('publishes emphasized conventional notes as plain text', () => {
     const notes = releaseNotesFromBody(template('**release:** __Smart Fill__ keeps totals.'));
