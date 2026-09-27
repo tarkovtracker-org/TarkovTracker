@@ -225,6 +225,7 @@ describe('release highlights', () => {
             merged: true,
             mergedAt: '2026-09-27T12:00:00Z',
             authorAssociation: 'MEMBER',
+            author: { login: 'maintainer' },
             ...extra,
           },
         },
@@ -237,8 +238,10 @@ describe('release highlights', () => {
       949: () => json({}, 503),
       950: () => merged(template('Edited later'), { lastEditedAt: '2026-09-30T00:00:00Z' }),
     };
-    const fetchMock = vi.fn(async (_url, init) =>
-      responses[JSON.parse(init.body).variables.number]()
+    const fetchMock = vi.fn(async (url, init) =>
+      url.includes('/collaborators/')
+        ? json({ role_name: 'write' })
+        : responses[JSON.parse(init.body).variables.number]()
     );
     vi.stubGlobal('fetch', fetchMock);
     const highlights = await collectHighlights({
@@ -250,7 +253,8 @@ describe('release highlights', () => {
       { number: 943, text: 'Smart Fill spreads items.' },
       { number: 944, text: 'Maps list objectives' },
     ]);
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    // Four PR lookups plus a permission check for each of the two PRs with publishable notes.
+    expect(fetchMock).toHaveBeenCalledTimes(6);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('https://api.github.com/graphql');
     expect(init.headers.Authorization).toBe('Bearer fixture-token');
@@ -258,7 +262,7 @@ describe('release highlights', () => {
     expect(logger.log).toHaveBeenCalledWith(
       'Skipping release note for #%d: %s',
       949,
-      'GitHub returned 503 for #949'
+      'GitHub returned 503'
     );
     expect(logger.log).toHaveBeenCalledWith(
       'Skipping release note for #%d: %s',
@@ -269,13 +273,35 @@ describe('release highlights', () => {
   it('caps the total number of highlights per release', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => merged(template('- a\n- b\n- c')))
+      vi.fn(async (url) =>
+        url.includes('/collaborators/')
+          ? json({ role_name: 'admin' })
+          : merged(template('- a\n- b\n- c'))
+      )
     );
     const many = Array.from({ length: 12 }, (_, i) => ({
       message: `fix(app): change (#${100 + i})`,
     }));
     const env = { GITHUB_REPOSITORY: 'o/r', GITHUB_TOKEN: 't' };
     expect(await collectHighlights({ commits: many, env, logger })).toHaveLength(25);
+  });
+  it.each([
+    ['read', 'PR author lacks write access'],
+    ['triage', 'PR author lacks write access'],
+    [null, 'GitHub returned 404'],
+  ])('skips notes when the author permission is %s', async (role, reason) => {
+    const log = vi.fn();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url) =>
+        url.includes('/collaborators/maintainer/permission')
+          ? json(role ? { role_name: role } : {}, role ? 200 : 404)
+          : merged(template('Note.'))
+      )
+    );
+    const env = { GITHUB_REPOSITORY: 'o/r', GITHUB_TOKEN: 't' };
+    expect(await collectHighlights({ commits: [commits[0]], env, logger: { log } })).toEqual([]);
+    expect(log).toHaveBeenCalledWith('Skipping release note for #%d: %s', 943, reason);
   });
   it.each([
     [{}, 'https://github.com/owner/repo.git'],

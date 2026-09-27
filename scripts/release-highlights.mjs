@@ -5,9 +5,10 @@
  *
  * Trust boundary: PR descriptions stay editable after merge, and batched releases publish days
  * later. A note is used only when the PR is merged and its description was last edited at or
- * before the merge, and only for PRs authored by a repository owner, member, or collaborator:
- * anyone else who can edit that description also has write access, which closes the auto-merge
- * window in which an external author could change an approved note. Notes are reduced to plain text (no
+ * before the merge, and only for PRs whose author currently has write access (checked through the
+ * collaborator-permission API, not just the author association): anyone else able to edit that
+ * description also has write access, which closes the auto-merge window in which a lower-privilege
+ * author could change an approved note. Notes are reduced to plain text (no
  * link syntax, URLs, or HTML) so they cannot carry a link into the project's release notes.
  * Highlights are added only after the version commit exists (`versionCommitted`), so PR text is
  * published in the GitHub release but never written to the committed, secret-scanned CHANGELOG.md.
@@ -22,6 +23,7 @@ const MAX_NOTE_LENGTH = 280;
 const MAX_NOTES_PER_PULL = 3;
 const MAX_HIGHLIGHTS = 25;
 const TRUSTED_AUTHORS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+const WRITE_ROLES = new Set(['write', 'maintain', 'admin']);
 const FENCE = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/;
 // GitHub hides an unterminated comment through the end of the body, so strip to the end too.
 const HTML_COMMENT = /<!--[\s\S]*?(?:-->|$(?![\s\S]))/g;
@@ -29,7 +31,9 @@ const REVERTS = /^This reverts commit ([0-9a-f]{7,40})\b/im;
 const REQUEST_TIMEOUT_MS = 10_000;
 const PULL_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
-    pullRequest(number: $number) { body merged mergedAt lastEditedAt authorAssociation }
+    pullRequest(number: $number) {
+      body merged mergedAt lastEditedAt authorAssociation author { login }
+    }
   }
 }`;
 /** PR number from a squash-merge header such as `fix(app): keep totals (#943)`. */
@@ -173,23 +177,47 @@ const REVIEW_CHECKS = [
 export function unreviewedReason(pull) {
   return REVIEW_CHECKS.find(([fails]) => fails(pull))?.[1] ?? null;
 }
-async function fetchPull({ slug, number, token }) {
-  const [owner, name] = slug.split('/');
-  const response = await fetch('https://api.github.com/graphql', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: PULL_QUERY, variables: { owner, name, number } }),
+async function githubRequest(url, token, init = {}) {
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      ...init.headers,
+    },
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
-  if (!response.ok) throw new Error(`GitHub returned ${response.status} for #${number}`);
-  const pull = (await response.json()).data?.repository?.pullRequest;
+  if (!response.ok) throw new Error(`GitHub returned ${response.status}`);
+  return response.json();
+}
+// Association alone is a prefilter; the permission API confirms current write access.
+async function authorCanWrite({ slug, token }, login) {
+  if (!login) return false;
+  const url = `https://api.github.com/repos/${slug}/collaborators/${encodeURIComponent(login)}/permission`;
+  const permission = await githubRequest(url, token);
+  return WRITE_ROLES.has(permission.role_name);
+}
+async function queryPull({ slug, token }, number) {
+  const [owner, name] = slug.split('/');
+  const result = await githubRequest('https://api.github.com/graphql', token, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: PULL_QUERY, variables: { owner, name, number } }),
+  });
+  return result.data?.repository?.pullRequest;
+}
+async function fetchPull(options, number) {
+  const pull = await queryPull(options, number);
   const reason = unreviewedReason(pull);
   if (reason) throw new Error(reason);
+  if (!(await authorCanWrite(options, pull.author?.login))) {
+    throw new Error('PR author lacks write access');
+  }
   return pull.body;
 }
 async function notesForPull(options, number) {
   try {
-    const body = await fetchPull({ ...options, number });
+    const body = await fetchPull(options, number);
     return releaseNotesFromBody(body).map((text) => ({ number, text }));
   } catch (error) {
     options.logger.log('Skipping release note for #%d: %s', number, error.message);

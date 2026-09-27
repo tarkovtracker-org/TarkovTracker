@@ -66,7 +66,8 @@ describe('release scope plugin', () => {
     expect(await analyzeCommits(config, context(messages))).toBe(expected);
   });
   it('omits internal-scope commits from generated notes and adds PR highlights', async () => {
-    const fetchMock = vi.fn(async (_url, init) => {
+    const fetchMock = vi.fn(async (url, init) => {
+      if (url.includes('/collaborators/')) return Response.json({ role_name: 'maintain' });
       const { number } = JSON.parse(init.body).variables;
       const note = number === 943 ? 'Smart Fill now spreads collected items evenly.' : 'none';
       const pullRequest = {
@@ -74,6 +75,7 @@ describe('release scope plugin', () => {
         merged: true,
         mergedAt: 'x',
         authorAssociation: 'MEMBER',
+        author: { login: 'maintainer' },
       };
       return Response.json({ data: { repository: { pullRequest } } });
     });
@@ -94,7 +96,9 @@ describe('release scope plugin', () => {
       '### Highlights\n\n* Smart Fill now spreads collected items evenly. ([#943](https://github.com/tarkovtracker-org/TarkovTracker/pull/943))'
     );
     // Internal-scope commits are filtered before any PR lookup.
-    const numbers = fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body).variables.number);
+    const numbers = fetchMock.mock.calls
+      .filter(([url]) => url.endsWith('/graphql'))
+      .map(([, init]) => JSON.parse(init.body).variables.number);
     expect(numbers).toEqual([943, 944]);
   });
   it('keeps PR text out of pre-commit notes, which become CHANGELOG.md', async () => {

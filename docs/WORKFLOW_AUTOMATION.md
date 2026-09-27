@@ -441,8 +441,9 @@ sections and `none` are skipped. A failed PR lookup is logged and skipped, so hi
 changelog shows the first bullets of each release, so highlights appear there first.
 
 Only a description written by someone with write access and unchanged since merge is published:
-a note is skipped when the PR is not merged, its author is not an owner, member, or collaborator
-(for external contributions, add the highlight to the GitHub release by hand), or its GraphQL
+a note is skipped when the PR is not merged, its author lacks current write access (checked with
+the collaborator-permission API; for other contributions, add the highlight to the GitHub release
+by hand), or its GraphQL
 `lastEditedAt` is later than `mergedAt`. At most 3 notes per PR and 25 per release are listed. To fix a note after merge, add it to
 the GitHub release by hand rather than editing the PR (an edit after merge also removes a note
 that would otherwise publish). Notes become plain text: link syntax, images, URLs of any scheme,
