@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
+import { collectHighlights, repositorySlug, withHighlights } from './release-highlights.mjs';
 /**
  * Conventional-commit scopes for tooling, automation, documentation, and dependencies. Commits
  * with these scopes never create a release and are left out of release notes, even when their type
@@ -52,5 +53,10 @@ export async function analyzeCommits(config, context) {
 /** semantic-release `generateNotes` step with internal-scope commits removed. */
 export async function generateNotes(config, context) {
   const generator = await load('@semantic-release/release-notes-generator');
-  return generator.generateNotes(config, playerFacing(context));
+  const filtered = playerFacing(context);
+  const notes = await generator.generateNotes(config, filtered);
+  const repositoryUrl = context.options?.repositoryUrl;
+  const slug = repositorySlug(context.env, repositoryUrl);
+  const highlights = await collectHighlights({ ...filtered, repositoryUrl });
+  return withHighlights(notes, highlights, slug);
 }

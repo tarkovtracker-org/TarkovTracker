@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   analyzeCommits,
   generateNotes,
@@ -22,6 +22,7 @@ const context = (messages) => ({
   lastRelease: { gitTag: 'v1.83.3', version: '1.83.3' },
   nextRelease: { gitTag: 'v1.84.0', version: '1.84.0' },
 });
+afterEach(() => vi.unstubAllGlobals());
 describe('release scope plugin', () => {
   it.each([
     ['fix(ci): honor verified gates (#946)', true],
@@ -49,7 +50,15 @@ describe('release scope plugin', () => {
   ])('releases %j as %s', async (messages, expected) => {
     expect(await analyzeCommits(config, context(messages))).toBe(expected);
   });
-  it('omits internal-scope commits from generated notes', async () => {
+  it('omits internal-scope commits from generated notes and adds PR highlights', async () => {
+    const fetchMock = vi.fn(async (url) =>
+      Response.json({
+        body: url.endsWith('/pulls/943')
+          ? '## Release note\n\nSmart Fill now spreads collected items evenly.\n'
+          : '## Release note\n\nnone\n',
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
     const notes = await generateNotes(
       config,
       context([
@@ -62,6 +71,11 @@ describe('release scope plugin', () => {
     expect(notes).toContain('make Smart Fill distribute collected totals');
     expect(notes).toContain('list every objective under the cursor');
     expect(notes).not.toMatch(/Codex|bump nuxt|\*\*ci:\*\*|\*\*deps:\*\*/);
+    expect(notes).toContain(
+      '### Highlights\n\n* Smart Fill now spreads collected items evenly. ([#943](https://github.com/tarkovtracker-org/TarkovTracker/pull/943))'
+    );
+    // Internal-scope commits are filtered before any PR lookup.
+    expect(fetchMock.mock.calls.map(([url]) => url.split('/').at(-1))).toEqual(['943', '944']);
   });
   it('reports how many commits were ignored', async () => {
     const run = context(['fix(ci): a', 'fix(app): b']);

@@ -429,6 +429,14 @@ in `CHANGELOG.md` or the GitHub release. The list is `INTERNAL_SCOPES` in that f
 changelog filter in `app/utils/changelog.ts`. Internal commits still deploy normally; they are only
 left out of versioning. Use a product scope (`app`, `api`, `maps`, …) when a change affects players.
 
+**Release note highlights.** While generating notes, the same plugin reads the `## Release note`
+section of each merged PR (from the `(#123)` suffix of its squash commit, using the release job's
+`GITHUB_TOKEN`; `scripts/release-highlights.mjs`) and lists those sentences under
+`### Highlights` above the generated Features and Bug Fixes. Empty sections and `none` are
+skipped. A failed PR lookup is logged and skipped, so highlights never block a release. The in-app
+changelog shows the first bullets of each release, so highlights appear there first. PR bodies are
+maintainer-reviewed before merge; HTML is stripped and each note is capped at 280 characters.
+
 ### 4. PR Checks (`.github/workflows/pr-checks.yml`)
 
 Enhanced PR validation:
