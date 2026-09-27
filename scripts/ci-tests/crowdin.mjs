@@ -144,7 +144,6 @@ test('MERGEABLE/UNSTABLE revalidates exact required gates and still uses GitHub 
   assert.ok(!merge.includes('--admin'));
   assert.equal(f.events().filter((event) => event.type === 'ci-result').length, 2);
   assert.equal(f.events().filter((event) => event.type === 'preview-result').length, 4);
-
   const serverRejected = fixture(t);
   passed(serverRejected.run('prepare'));
   const unstableServerRejected = { ...serverRejected.pr, mergeStateStatus: 'UNSTABLE' };
