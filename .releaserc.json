@@ -2,7 +2,7 @@
   "branches": ["main"],
   "plugins": [
     [
-      "@semantic-release/commit-analyzer",
+      "./scripts/release-scope.mjs",
       {
         "preset": "angular",
         "releaseRules": [
@@ -19,29 +19,10 @@
             "release": "patch"
           },
           {
-            "type": "refactor",
-            "release": "patch"
-          },
-          {
             "type": "revert",
             "release": "patch"
-          },
-          {
-            "type": "docs",
-            "scope": "README",
-            "release": "patch"
-          },
-          {
-            "scope": "no-release",
-            "release": false
           }
-        ]
-      }
-    ],
-    [
-      "@semantic-release/release-notes-generator",
-      {
-        "preset": "angular",
+        ],
         "writerOpts": {
           "commitsSort": ["subject", "scope"]
         }
