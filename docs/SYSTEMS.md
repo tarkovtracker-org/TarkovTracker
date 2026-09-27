@@ -935,6 +935,11 @@ flowchart LR
 ### Invariants
 
 - `pvp` and `pve` always use season `0`; `seasonal` always uses a positive season.
+- Browser roles never need table maintenance privileges (`TRUNCATE`, `REFERENCES`, `TRIGGER`,
+  `MAINTAIN`) on account, progress, team, billing, or audit tables. Explicit forward revokes preserve
+  existing row and column access, including token-note updates. Billing events remain server-only;
+  supporters and admin audit logs expose only their RLS-filtered authenticated reads. New-table
+  default privileges require a separate creating-role audit; these revokes do not change defaults.
 - Legacy `user_system.team` / `team_id` values are used only when neither persistent mode-specific
   team ID exists. They must never make a PvP team appear as the active PvE team or vice versa.
 - Team creation maps both the `team_memberships_user_mode_unique` SQLSTATE `23505` conflict and
@@ -1426,6 +1431,16 @@ flowchart LR
   Supabase deployment workflow. The only classified multi-statement form is table-level ACL
   statements, optionally inside one `BEGIN`/`COMMIT` pair, and that transaction remains flagged as
   transaction control.
+- Preflight masks string literals the way PostgreSQL lexes them with `standard_conforming_strings`
+  on: standard strings end at an undoubled `'`, while `E'...'` escape strings (an `E` not preceded
+  by an identifier character) also skip the character after each backslash, including in
+  newline-separated continuation segments. Unterminated literals fail closed. A migration that
+  changes `standard_conforming_strings` must contain further statements to matter, which already
+  keeps it `incomplete`.
+- Dollar-quoted values (`$tag$ ... $tag$`) are not masked: their bodies can be executable (`DO`,
+  function bodies), so the text stays visible to classification and the observer's unsafe-SQL
+  check, and quotes inside never start a literal. Any dollar quote is an unsupported construct,
+  which keeps the migration `incomplete`.
 - `migration-history` reads only the `version` column of `supabase_migrations.schema_migrations`.
   The stored `statements` column is never selected, and the observer's ledger grant is column-level
   for the same reason, so migration SQL and any literal inside it stay out of both the report and
@@ -1718,14 +1733,18 @@ See [the workflow guide](WORKFLOW_AUTOMATION.md#fallow-changed-file-gate) for us
 
 ## 14. Release validation and publication
 
-Release starts after successful main push or explicitly dispatched CI, reusing its test shards and database validation.
-`scripts/release-gate.mjs` checks live workflow identity, repository, conclusion, attempt, and SHA
-against the triggering event and current main before setup and immediately before publishing.
-The checkout stays pinned to the validated SHA. The production build still runs in Release.
+Release runs on a weekly schedule or explicit dispatch on `main`, batching every commit since the
+previous tag; deploys never wait for it. `scripts/release-gate.mjs` takes the run's trigger commit
+as the candidate, requires the newest same-repository main CI run (push or dispatch of
+`.github/workflows/ci.yml`) for that exact SHA to have succeeded, and checks current main before
+setup and immediately before publishing, reusing CI's test shards and database validation. The
+checkout stays pinned to the validated SHA. The production build still runs in Release.
 
 ### Invariants
 
-- PR, fork, unsuccessful, superseded, and stale CI-attempt events cannot authorize publication.
+- Only `schedule` and `workflow_dispatch` runs on `refs/heads/main` can publish. Fork, PR, staging
+  branch, unsuccessful, unfinished, or superseded CI cannot authorize publication; when several
+  trusted CI runs exist for the candidate, the newest decides.
 - `scripts/release-scope.mjs` removes commits whose header scope (or the header wrapped by any
   number of `Revert "…"` / `revert:` prefixes) is in `INTERNAL_SCOPES` before both commit analysis and note generation.
   Those commits never set the version type (including breaking-change markers) and never appear in
