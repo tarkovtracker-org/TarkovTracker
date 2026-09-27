@@ -61,7 +61,7 @@
                 <UIcon name="i-mdi-auto-fix" class="mr-1 h-4 w-4" />
                 {{ $t('needed_items.smart_fill') }}
               </UButton>
-              <UButton variant="soft" @click="handleReset">
+              <UButton variant="soft" :disabled="!isTargetGameModeActive" @click="handleReset">
                 <UIcon name="i-mdi-refresh" class="mr-1 h-4 w-4" />
                 {{ $t('common.reset') }}
               </UButton>
@@ -113,6 +113,7 @@
                   </span>
                   <div class="bg-surface-700 flex items-center rounded border border-white/20">
                     <button
+                      :disabled="!isTargetGameModeActive"
                       class="text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 flex h-6 w-6 items-center justify-center rounded-l transition-colors hover:text-white"
                       :aria-label="
                         t('needed_items.aria.decrease_objective_count', {
@@ -134,6 +135,7 @@
                       {{ getObjectiveCount(obj) }}/{{ obj.count }}
                     </span>
                     <button
+                      :disabled="!isTargetGameModeActive"
                       class="text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 flex h-6 w-6 items-center justify-center rounded-r transition-colors hover:text-white"
                       :aria-label="
                         t('needed_items.aria.increase_objective_count', {
@@ -193,6 +195,7 @@
                   </span>
                   <div class="bg-surface-700 flex items-center rounded border border-white/20">
                     <button
+                      :disabled="!isTargetGameModeActive"
                       class="text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 flex h-6 w-6 items-center justify-center rounded-l transition-colors hover:text-white"
                       :aria-label="
                         t('needed_items.aria.decrease_hideout_count', {
@@ -214,6 +217,7 @@
                       {{ getHideoutCount(mod) }}/{{ mod.count }}
                     </span>
                     <button
+                      :disabled="!isTargetGameModeActive"
                       class="text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 flex h-6 w-6 items-center justify-center rounded-r transition-colors hover:text-white"
                       :aria-label="
                         t('needed_items.aria.increase_hideout_count', {
@@ -245,6 +249,7 @@
     NeededItemTaskObjective,
     TarkovItem,
   } from '@/types/tarkov';
+  import type { GameMode } from '@/utils/constants';
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
   const props = withDefaults(
@@ -260,7 +265,7 @@
       hideoutModules: () => [],
     }
   );
-  defineEmits<{
+  const emit = defineEmits<{
     'update:open': [value: boolean];
   }>();
   const metadataStore = useMetadataStore();
@@ -274,6 +279,15 @@
   } = useItemDistribution();
   const taskObjectivesList = shallowRef([...props.taskObjectives]);
   const hideoutModulesList = shallowRef([...props.hideoutModules]);
+  const targetGameMode = ref<GameMode>(tarkovStore.getCurrentGameMode());
+  const isTargetGameModeActive = computed(
+    () => targetGameMode.value === tarkovStore.getCurrentGameMode()
+  );
+  const canMutateTargetGameMode = () => {
+    if (targetGameMode.value === tarkovStore.getCurrentGameMode()) return true;
+    emit('update:open', false);
+    return false;
+  };
   const sortedTaskObjectives = computed(() => sortTaskObjectives(taskObjectivesList.value));
   const sortedHideoutModules = computed(() => sortHideoutModules(hideoutModulesList.value));
   const getTask = (taskId: string) => metadataStore.getTaskById(taskId);
@@ -345,9 +359,18 @@
   const firInput = ref(0);
   const nonFirInput = ref(0);
   watch(
+    () => tarkovStore.getCurrentGameMode(),
+    (currentGameMode) => {
+      if (props.open && targetGameMode.value !== currentGameMode) {
+        emit('update:open', false);
+      }
+    }
+  );
+  watch(
     () => props.open,
     (isOpen) => {
       if (isOpen) {
+        targetGameMode.value = tarkovStore.getCurrentGameMode();
         taskObjectivesList.value = [...props.taskObjectives];
         hideoutModulesList.value = [...props.hideoutModules];
         firInput.value = currentFirTotal.value;
@@ -369,9 +392,12 @@
     for (const mod of hideoutModulesList.value) total += Math.min(getHideoutCount(mod), mod.count);
     return total;
   });
-  const canSmartFill = computed(() => firInput.value > 0 || nonFirInput.value > 0);
+  const canSmartFill = computed(
+    () => isTargetGameModeActive.value && (firInput.value > 0 || nonFirInput.value > 0)
+  );
   const isComplete = computed(() => currentTotal.value >= totalNeeded.value);
   const handleSmartFill = () => {
+    if (!canMutateTargetGameMode()) return;
     try {
       const result = distributeItems(
         firInput.value,
@@ -390,6 +416,7 @@
     }
   };
   const handleReset = () => {
+    if (!canMutateTargetGameMode()) return;
     try {
       resetObjectives(taskObjectivesList.value, hideoutModulesList.value);
       firInput.value = 0;
@@ -404,17 +431,20 @@
     }
   };
   const increaseObjective = (obj: NeededItemTaskObjective) => {
+    if (!canMutateTargetGameMode()) return;
     const current = getObjectiveCount(obj);
     const newCount = Math.min(current + 1, obj.count);
     tarkovStore.setObjectiveCount(obj.id, newCount);
   };
   const decreaseObjective = (obj: NeededItemTaskObjective) => {
+    if (!canMutateTargetGameMode()) return;
     const current = getObjectiveCount(obj);
     if (current <= 0) return;
     const newCount = Math.max(current - 1, 0);
     tarkovStore.setObjectiveCount(obj.id, newCount);
   };
   const increaseHideout = (mod: NeededItemHideoutModule) => {
+    if (!canMutateTargetGameMode()) return;
     const current = getHideoutCount(mod);
     if (current >= mod.count) return;
     const newCount = current + 1;
@@ -424,6 +454,7 @@
     }
   };
   const decreaseHideout = (mod: NeededItemHideoutModule) => {
+    if (!canMutateTargetGameMode()) return;
     const current = getHideoutCount(mod);
     if (current <= 0) return;
     const newCount = current - 1;
