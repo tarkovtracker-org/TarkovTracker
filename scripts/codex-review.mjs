@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs as parseOptions } from 'node:util';
-import { classifyState } from './codex-review-state.mjs';
+import { acquireLock, releaseLock } from './codex-review-lock.mjs';
+import { classifyState, evidenceShas } from './codex-review-state.mjs';
 export { classifyState } from './codex-review-state.mjs';
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const POLL_INTERVAL_MS = 30_000;
@@ -56,7 +57,35 @@ function fetchState({ repo, pr, runGh, intents, now }) {
     runGh(['api', `${prefix}/pulls/${pr}/requested_reviewers`]),
     'requested reviewers'
   );
-  return classifyState({ pull, comments, reviews, requestedReviewers, intents }, now);
+  const resolvedShas = resolveEvidence(prefix, evidenceShas(comments, reviews), runGh);
+  const refreshed = parseJson(runGh(['api', `${prefix}/pulls/${pr}`]), 'pull request');
+  const changed = changedHead(pull, refreshed);
+  if (changed) return changed;
+  return classifyState(
+    { pull: refreshed, comments, reviews, requestedReviewers, intents, resolvedShas },
+    now
+  );
+}
+function changedHead(pull, refreshed) {
+  if (headOf(pull) === headOf(refreshed)) return null;
+  return {
+    status: 'unknown',
+    headSha: headOf(refreshed),
+    reason: 'PR head changed while collecting review evidence; inspect the new revision',
+  };
+}
+function headOf(pull) {
+  return pull.head?.sha ?? '';
+}
+function resolveEvidence(prefix, shas, runGh) {
+  return Object.fromEntries(shas.map((sha) => [sha, resolveCommit(prefix, sha, runGh)]));
+}
+function resolveCommit(prefix, sha, runGh) {
+  const commit = parseJson(runGh(['api', `${prefix}/commits/${sha}`]), 'review commit');
+  if (!/^[0-9a-f]{40}$/i.test(commit.sha) || !commit.sha.toLowerCase().startsWith(sha)) {
+    throw new Error('GitHub did not uniquely resolve the reviewed commit');
+  }
+  return commit.sha.toLowerCase();
 }
 function readIntents(directory, repo, pr) {
   const prefix = `${repo.replaceAll('/', '_')}-${pr}-`;
@@ -77,30 +106,16 @@ function readIntents(directory, repo, pr) {
     return intent;
   });
 }
-function persistIntent(directory, repo, pr, sha, createdAt) {
+function persistIntent(directory, repo, pr, sha, createdAt, requestedAt = null) {
   mkdirSync(directory, { recursive: true });
   const path = join(directory, `${repo.replaceAll('/', '_')}-${pr}-${sha}.json`);
   const temporaryPath = `${path}.${process.pid}.tmp`;
-  writeFileSync(temporaryPath, `${JSON.stringify({ repo, pr, sha, createdAt })}\n`, {
+  writeFileSync(temporaryPath, `${JSON.stringify({ repo, pr, sha, createdAt, requestedAt })}\n`, {
     flag: 'wx',
     mode: 0o600,
   });
   renameSync(temporaryPath, path);
   return path;
-}
-function acquireLock(path) {
-  try {
-    mkdirSync(path, { mode: 0o700 });
-  } catch (error) {
-    if (error.code === 'EEXIST') return false;
-    throw error;
-  }
-  writeFileSync(
-    join(path, 'owner.json'),
-    `${JSON.stringify({ pid: process.pid, createdAt: Date.now() })}\n`,
-    { mode: 0o600 }
-  );
-  return true;
 }
 function usage() {
   return 'Usage: node scripts/codex-review.mjs PR [--repo owner/name] [--request] [--wait-seconds N]';
@@ -187,9 +202,10 @@ function observe(context) {
   return fetchState({ ...context, intents, now: context.now() });
 }
 function postRequest(context, headSha) {
-  persistIntent(context.intentDirectory, context.repo, context.pr, headSha, context.now());
+  const createdAt = context.now();
+  persistIntent(context.intentDirectory, context.repo, context.pr, headSha, createdAt);
   const body = `@codex review\n\n<!-- codex-review-request:${headSha} -->`;
-  context.runGh([
+  const response = context.runGh([
     'api',
     `repos/${context.repo}/issues/${context.pr}/comments`,
     '--method',
@@ -197,6 +213,18 @@ function postRequest(context, headSha) {
     '-f',
     `body=${body}`,
   ]);
+  const posted = parseJson(response, 'posted review request');
+  const requestedAt = Date.parse(posted.created_at);
+  if (Number.isFinite(requestedAt)) {
+    persistIntent(
+      context.intentDirectory,
+      context.repo,
+      context.pr,
+      headSha,
+      createdAt,
+      requestedAt
+    );
+  }
   context.request = false;
   return {
     status: 'pending',
@@ -218,17 +246,18 @@ function lockedRequest(context, previous) {
 }
 function requestOnce(context, state) {
   mkdirSync(context.stateDirectory, { recursive: true });
-  if (!acquireLock(context.lockPath)) {
+  const token = acquireLock(context.lockPath);
+  if (!token) {
     return {
       status: 'pending',
       headSha: state.headSha,
-      reason: 'Another request invocation holds the shared lock',
+      reason: 'Shared lock has a live or uncertain owner; inspect before manual recovery',
     };
   }
   try {
     return lockedRequest(context, state);
   } finally {
-    rmSync(context.lockPath, { recursive: true, force: true });
+    releaseLock(context.lockPath, token);
   }
 }
 function step(context) {

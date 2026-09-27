@@ -17,6 +17,7 @@ const pull = (sha = head, extra = {}) => ({
 const emptyInputs = (extra = {}) => ({
   pull: pull(),
   comments: [],
+  resolvedShas: { '84671de': head, '84671de394': head, '29ba60fa9c': oldHead },
   reviews: [],
   requestedReviewers: { users: [] },
   intents: [],
@@ -62,6 +63,7 @@ function emptyApiRoutes({
     'repos/example/repo/issues/44/comments': commentsResponse,
     'repos/example/repo/pulls/44/reviews': reviewsResponse,
     'repos/example/repo/pulls/44/requested_reviewers': JSON.stringify({ users: [] }),
+    'repos/example/repo/commits/84671de394': JSON.stringify({ sha: head }),
   };
 }
 test('parses bounded CLI arguments and rejects invalid wait durations', () => {
@@ -272,7 +274,7 @@ test('read-only inspection writes nothing and request waits for observed complet
     const requestGh = mockGh(requestRoutes);
     const result = await runGuard({ ...args, request: true }, { ...commonDeps, runGh: requestGh });
     assert.equal(posted, true);
-    assert.equal(pullReads, 4);
+    assert.equal(pullReads, 8);
     assert.equal(commentReads, 4);
     assert.equal(result.status, 'complete');
     assert.equal(result.result, 'clean');
@@ -341,7 +343,13 @@ test('older unmatched requests cannot hide newer current-head requests or intent
   const newRequest = request('2026-09-27T01:30:00Z', head);
   const comments = [oldRequest, cleanComment(), newRequest];
   assert.equal(classifyState(emptyInputs({ comments }), now).status, 'pending');
-  const intents = [{ sha: head, createdAt: Date.parse('2026-09-27T01:30:00Z') }];
+  const intents = [
+    {
+      sha: head,
+      createdAt: Date.parse('2026-09-27T01:30:00Z'),
+      requestedAt: Date.parse('2026-09-27T01:30:00Z'),
+    },
+  ];
   assert.equal(
     classifyState(emptyInputs({ comments: [cleanComment()], intents }), now).status,
     'pending'
@@ -353,4 +361,102 @@ test('recent updates allow automatic review startup on older PRs', () => {
     classifyState(emptyInputs({ pull: pull(head, { updated_at }) }), now).status,
     'pending'
   );
+});
+test('read-only completion fails closed when the head changes during evidence collection', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'codex-review-read-race-'));
+  const routes = emptyApiRoutes({ commentsResponse: JSON.stringify(cleanComment()) });
+  let reads = 0;
+  routes['repos/example/repo/pulls/44'] = () =>
+    JSON.stringify(pull(++reads === 1 ? head : oldHead));
+  try {
+    const state = await runGuard(
+      { pr: 44, repo: 'example/repo', request: false, waitSeconds: 0 },
+      { gitCommonDir: root, now: () => now, runGh: mockGh(routes) }
+    );
+    assert.equal(state.status, 'unknown');
+    assert.equal(state.headSha, oldHead);
+    assert.equal(existsSync(join(root, 'codex-review-guard')), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+test('abbreviated review commits require GitHub resolution and ambiguity never posts', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'codex-review-sha-'));
+  const options = { pr: 44, repo: 'example/repo', request: true, waitSeconds: 0 };
+  let posts = 0;
+  const routes = emptyApiRoutes({ commentsResponse: JSON.stringify(cleanComment()) });
+  routes.post = () => {
+    posts += 1;
+  };
+  try {
+    const state = await runGuard(options, {
+      gitCommonDir: root,
+      now: () => now,
+      runGh: mockGh(routes),
+    });
+    assert.equal(state.status, 'complete');
+    assert.equal(posts, 0);
+    routes['repos/example/repo/commits/84671de394'] = () => {
+      throw new Error('GitHub ambiguous commit abbreviation');
+    };
+    await assert.rejects(
+      runGuard(options, {
+        gitCommonDir: root,
+        now: () => now,
+        runGh: mockGh(routes),
+      }),
+      /ambiguous commit/
+    );
+    assert.equal(posts, 0);
+    assert.equal(existsSync(join(root, 'codex-review-guard')), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+test('posting saves GitHub time while preserving intent before delivery', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'codex-review-server-time-'));
+  const serverTime = '2026-09-27T02:01:00Z';
+  const intentPath = join(root, 'codex-review-guard', 'intents', `example_repo-44-${head}.json`);
+  const routes = emptyApiRoutes();
+  const runGh = (args) => {
+    if (!args.includes('--method')) return mockResponse(routes[args.at(-1)], args);
+    const before = JSON.parse(readFileSync(intentPath, 'utf8'));
+    assert.equal(before.requestedAt, null);
+    assert.equal(before.sha, head);
+    return JSON.stringify({ created_at: serverTime, id: 123 });
+  };
+  try {
+    await runGuard(
+      { pr: 44, repo: 'example/repo', request: true, waitSeconds: 0 },
+      {
+        gitCommonDir: root,
+        now: () => now + 3600_000,
+        runGh,
+      }
+    );
+    const saved = JSON.parse(readFileSync(intentPath, 'utf8'));
+    assert.equal(saved.requestedAt, Date.parse(serverTime));
+    assert.equal(saved.createdAt, now + 3600_000);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+test('a draft transition during evidence reads cannot return successful completion', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'codex-review-draft-race-'));
+  const routes = emptyApiRoutes({ commentsResponse: JSON.stringify(cleanComment()) });
+  let reads = 0;
+  routes['repos/example/repo/pulls/44'] = () => JSON.stringify(pull(head, { draft: ++reads > 1 }));
+  try {
+    const state = await runGuard(
+      { pr: 44, repo: 'example/repo', waitSeconds: 0 },
+      {
+        gitCommonDir: root,
+        now: () => now,
+        runGh: mockGh(routes),
+      }
+    );
+    assert.equal(state.status, 'unknown');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
