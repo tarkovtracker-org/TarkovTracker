@@ -1714,7 +1714,8 @@ The checkout stays pinned to the validated SHA. The production build still runs 
 - Release-note highlights (`scripts/release-highlights.mjs`) are the only release input read from
   mutable GitHub content. They are additive and fail open: a lookup error, timeout (10 s), missing
   token, unmerged PR, a PR author without current write access (association prefilter, then the
-  collaborator-permission API must report `write`, `maintain`, or `admin`), or a description edited
+  collaborator-permission API's effective `permission` must be `write` or `admin`, which covers
+  `maintain` and custom roles), or a description edited
   after `mergedAt` skips that note and never blocks or alters versioning. At most 3 notes per PR and 25 per release are published. Notes are reduced to plain text (no link syntax, URLs, or HTML; comments and
   code fences cannot supply the section). Highlights are added only when notes are regenerated
   after the `chore(release): <version>` commit exists (semantic-release regenerates notes when a

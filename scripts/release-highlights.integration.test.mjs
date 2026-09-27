@@ -51,7 +51,7 @@ it('publishes highlights in the GitHub release but not the committed changelog',
     'fetch',
     vi.fn(async (url) =>
       String(url).includes('/collaborators/')
-        ? Response.json({ role_name: 'write' })
+        ? Response.json({ permission: 'write' })
         : Response.json({ data: { repository: { pullRequest } } })
     )
   );

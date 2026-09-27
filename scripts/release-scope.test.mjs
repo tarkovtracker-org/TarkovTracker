@@ -67,7 +67,8 @@ describe('release scope plugin', () => {
   });
   it('omits internal-scope commits from generated notes and adds PR highlights', async () => {
     const fetchMock = vi.fn(async (url, init) => {
-      if (url.includes('/collaborators/')) return Response.json({ role_name: 'maintain' });
+      if (url.includes('/collaborators/'))
+        return Response.json({ permission: 'write', role_name: 'maintain' });
       const { number } = JSON.parse(init.body).variables;
       const note = number === 943 ? 'Smart Fill now spreads collected items evenly.' : 'none';
       const pullRequest = {

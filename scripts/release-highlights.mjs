@@ -23,7 +23,8 @@ const MAX_NOTE_LENGTH = 280;
 const MAX_NOTES_PER_PULL = 3;
 const MAX_HIGHLIGHTS = 25;
 const TRUSTED_AUTHORS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
-const WRITE_ROLES = new Set(['write', 'maintain', 'admin']);
+// `permission` is the effective base permission (custom and `maintain` roles map to `write`).
+const WRITE_PERMISSIONS = new Set(['write', 'admin']);
 const FENCE = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/;
 // GitHub hides an unterminated comment through the end of the body, so strip to the end too.
 const HTML_COMMENT = /<!--[\s\S]*?(?:-->|$(?![\s\S]))/g;
@@ -85,12 +86,18 @@ function plainText(line) {
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\]\([^)]*\)/g, ']')
     .replace(/[[\]!]*\[|\]/g, '')
-    .replace(/(?:\b[a-z][\w+.-]*:)?\/\/\S+|\bwww\.\S+/gi, '')
+    .replace(/(?:\b[a-z][\w+.-]*:)?\/\/\S+|\bwww\.\S+|\S+@\S+\.\w+/gi, '')
     .replace(/<\/?[a-z][^<>]*>/gi, '');
 }
 function cleanNote(item) {
   const text = plainText(item).replace(LIST_ITEM, '').replace(/\s+/g, ' ').trim();
-  return text.length > MAX_NOTE_LENGTH ? `${text.slice(0, MAX_NOTE_LENGTH - 1).trimEnd()}…` : text;
+  // Count and cut by code point so a surrogate pair is never split.
+  const chars = Array.from(text);
+  if (chars.length <= MAX_NOTE_LENGTH) return text;
+  return `${chars
+    .slice(0, MAX_NOTE_LENGTH - 1)
+    .join('')
+    .trimEnd()}…`;
 }
 // Each list item keeps its wrapped continuation lines; a blank line or prose paragraph ends it.
 function listItems(section) {
@@ -195,7 +202,7 @@ async function authorCanWrite({ slug, token }, login) {
   if (!login) return false;
   const url = `https://api.github.com/repos/${slug}/collaborators/${encodeURIComponent(login)}/permission`;
   const permission = await githubRequest(url, token);
-  return WRITE_ROLES.has(permission.role_name);
+  return WRITE_PERMISSIONS.has(permission.permission);
 }
 async function queryPull({ slug, token }, number) {
   const [owner, name] = slug.split('/');

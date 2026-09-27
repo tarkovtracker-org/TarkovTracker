@@ -66,6 +66,7 @@ describe('release note parsing', () => {
     ['Open //evil.example/phish or www.evil.example today', 'Open or today'],
     ['Mirror at ftp://files.example/x', 'Mirror at'],
     ['Use [x][ref] style', 'Use xref style'],
+    ['Mail support@example.com for help', 'Mail for help'],
   ])('leaves no link syntax or URL in %j', (note, expected) =>
     expect(releaseNotesFromBody(template(note))).toEqual([expected])
   );
@@ -110,6 +111,9 @@ describe('release note parsing', () => {
     const [long] = releaseNotesFromBody(template('x'.repeat(400)));
     expect(long).toHaveLength(280);
     expect(long.endsWith('…')).toBe(true);
+    const [emoji] = releaseNotesFromBody(template('😀'.repeat(300)));
+    expect(Array.from(emoji)).toHaveLength(280);
+    expect(emoji).toBe(`${'😀'.repeat(279)}…`);
   });
   it.each([
     [{ GITHUB_REPOSITORY: 'owner/repo' }, 'https://github.com/other/x.git', 'owner/repo'],
@@ -240,7 +244,7 @@ describe('release highlights', () => {
     };
     const fetchMock = vi.fn(async (url, init) =>
       url.includes('/collaborators/')
-        ? json({ role_name: 'write' })
+        ? json({ permission: 'write' })
         : responses[JSON.parse(init.body).variables.number]()
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -275,7 +279,7 @@ describe('release highlights', () => {
       'fetch',
       vi.fn(async (url) =>
         url.includes('/collaborators/')
-          ? json({ role_name: 'admin' })
+          ? json({ permission: 'admin' })
           : merged(template('- a\n- b\n- c'))
       )
     );
@@ -287,7 +291,7 @@ describe('release highlights', () => {
   });
   it.each([
     ['read', 'PR author lacks write access'],
-    ['triage', 'PR author lacks write access'],
+    ['none', 'PR author lacks write access'],
     [null, 'GitHub returned 404'],
   ])('skips notes when the author permission is %s', async (role, reason) => {
     const log = vi.fn();
@@ -295,13 +299,27 @@ describe('release highlights', () => {
       'fetch',
       vi.fn(async (url) =>
         url.includes('/collaborators/maintainer/permission')
-          ? json(role ? { role_name: role } : {}, role ? 200 : 404)
+          ? json(role ? { permission: role, role_name: 'custom-writer' } : {}, role ? 200 : 404)
           : merged(template('Note.'))
       )
     );
     const env = { GITHUB_REPOSITORY: 'o/r', GITHUB_TOKEN: 't' };
     expect(await collectHighlights({ commits: [commits[0]], env, logger: { log } })).toEqual([]);
     expect(log).toHaveBeenCalledWith('Skipping release note for #%d: %s', 943, reason);
+  });
+  it('accepts custom roles whose effective permission is write', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url) =>
+        url.includes('/collaborators/')
+          ? json({ permission: 'write', role_name: 'release-editor' })
+          : merged(template('Note.'))
+      )
+    );
+    const env = { GITHUB_REPOSITORY: 'o/r', GITHUB_TOKEN: 't' };
+    expect(await collectHighlights({ commits: [commits[0]], env, logger })).toEqual([
+      { number: 943, text: 'Note.' },
+    ]);
   });
   it.each([
     [{}, 'https://github.com/owner/repo.git'],
