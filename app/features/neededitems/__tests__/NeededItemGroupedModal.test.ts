@@ -2,6 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { nextTick, ref } from 'vue';
 import NeededItemGroupedModal from '@/features/neededitems/NeededItemGroupedModal.vue';
 import type {
   GroupedItemInfo,
@@ -14,11 +15,16 @@ mockNuxtImport('useI18n', () => () => ({
 mockNuxtImport('useToast', () => () => ({
   add: vi.fn(),
 }));
+const { mockDistributeItems, mockApplyDistribution, mockResetObjectives } = vi.hoisted(() => ({
+  mockDistributeItems: vi.fn(),
+  mockApplyDistribution: vi.fn(),
+  mockResetObjectives: vi.fn(),
+}));
 vi.mock('@/composables/useItemDistribution', () => ({
   useItemDistribution: () => ({
-    distributeItems: vi.fn(),
-    applyDistribution: vi.fn(),
-    resetObjectives: vi.fn(),
+    distributeItems: mockDistributeItems,
+    applyDistribution: mockApplyDistribution,
+    resetObjectives: mockResetObjectives,
     sortTaskObjectives: <T>(list: T[]): T[] => list,
     sortHideoutModules: <T>(list: T[]): T[] => list,
   }),
@@ -39,6 +45,7 @@ const {
   mockCounts: {
     objectiveCount: 1,
     hideoutCount: 2,
+    currentGameMode: { value: 'pvp' },
   },
   mockSetObjectiveCount: vi.fn(),
   mockSetHideoutPartCount: vi.fn(),
@@ -49,6 +56,7 @@ vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
     getObjectiveCount: () => mockCounts.objectiveCount,
     getHideoutPartCount: () => mockCounts.hideoutCount,
+    getCurrentGameMode: () => mockCounts.currentGameMode.value,
     isTaskComplete: () => false,
     isHideoutModuleComplete: () => false,
     setObjectiveCount: mockSetObjectiveCount,
@@ -62,6 +70,7 @@ describe('NeededItemGroupedModal', () => {
   beforeEach(() => {
     mockCounts.objectiveCount = 1;
     mockCounts.hideoutCount = 2;
+    mockCounts.currentGameMode = ref('pvp');
     vi.clearAllMocks();
   });
   const mockItemInfo: GroupedItemInfo = {
@@ -114,7 +123,8 @@ describe('NeededItemGroupedModal', () => {
             template: '<i :data-icon="name" />',
           },
           UButton: {
-            template: '<button><slot /></button>',
+            props: ['disabled'],
+            template: '<button :disabled="disabled"><slot /></button>',
           },
           NuxtLink: {
             template: '<a><slot /></a>',
@@ -123,7 +133,15 @@ describe('NeededItemGroupedModal', () => {
             template: '<a><slot /></a>',
           },
           NeededItemGroupedInputControls: {
-            template: '<div data-testid="input-controls" />',
+            props: ['firCurrent', 'nonFirCurrent'],
+            emits: ['update:fir'],
+            template: `
+              <div data-testid="input-controls">
+                <span data-testid="fir-current">{{ firCurrent }}</span>
+                <span data-testid="non-fir-current">{{ nonFirCurrent }}</span>
+                <button data-testid="set-fir" @click="$emit('update:fir', 1)">Set FIR</button>
+              </div>
+            `,
           },
         },
       },
@@ -170,5 +188,68 @@ describe('NeededItemGroupedModal', () => {
     await increaseBtn.trigger('click');
     expect(mockSetHideoutPartCount).toHaveBeenCalledWith('module-1', 2);
     expect(mockSetHideoutPartComplete).toHaveBeenCalledWith('module-1');
+  });
+  it('keeps collected totals after Smart Fill so they can be reapplied', async () => {
+    const wrapper = createWrapper();
+    await wrapper.get('[data-testid="set-fir"]').trigger('click');
+    const smartFillButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('needed_items.smart_fill'));
+    expect(smartFillButton).toBeDefined();
+    await smartFillButton!.trigger('click');
+    expect(mockDistributeItems).toHaveBeenCalledOnce();
+    expect(mockApplyDistribution).toHaveBeenCalledOnce();
+    expect(wrapper.get('[data-testid="fir-current"]').text()).toBe('1');
+    expect(wrapper.get('[data-testid="non-fir-current"]').text()).toBe('2');
+    expect(smartFillButton!.attributes('disabled')).toBeUndefined();
+  });
+  it('keeps Smart Fill targets stable when grouped membership changes while open', async () => {
+    const secondObjective = { ...mockTaskObjective, id: 'obj-2' };
+    const initialTargets = [mockTaskObjective, secondObjective];
+    const wrapper = createWrapper({ taskObjectives: initialTargets });
+    await wrapper.get('[data-testid="set-fir"]').trigger('click');
+    const findSmartFillButton = () =>
+      wrapper
+        .findAll('button')
+        .find((button) => button.text().includes('needed_items.smart_fill'))!;
+    await findSmartFillButton().trigger('click');
+    await wrapper.setProps({ taskObjectives: [secondObjective] });
+    await findSmartFillButton().trigger('click');
+    expect(mockDistributeItems).toHaveBeenNthCalledWith(1, 1, 2, initialTargets, [
+      mockHideoutModule,
+    ]);
+    expect(mockDistributeItems).toHaveBeenNthCalledWith(2, 1, 2, initialTargets, [
+      mockHideoutModule,
+    ]);
+  });
+  it('closes and disables edits when the game mode changes while open', async () => {
+    const wrapper = createWrapper();
+    mockCounts.currentGameMode.value = 'pve';
+    await nextTick();
+    const findButton = (label: string) =>
+      wrapper.findAll('button').find((button) => button.text().includes(label))!;
+    expect(wrapper.emitted('update:open')).toContainEqual([false]);
+    expect(findButton('needed_items.smart_fill').attributes('disabled')).toBeDefined();
+    expect(findButton('common.reset').attributes('disabled')).toBeDefined();
+  });
+  it('blocks edits immediately when the current game mode changes', async () => {
+    const wrapper = createWrapper();
+    await wrapper.get('[data-testid="set-fir"]').trigger('click');
+    mockCounts.currentGameMode.value = 'pve';
+    const findButton = (label: string) =>
+      wrapper.findAll('button').find((button) => button.text().includes(label))!;
+    const pendingClicks = [
+      findButton('needed_items.smart_fill').trigger('click'),
+      findButton('common.reset').trigger('click'),
+      wrapper
+        .find('button[aria-label*="needed_items.aria.increase_hideout_count"]')
+        .trigger('click'),
+    ];
+    await Promise.all(pendingClicks);
+    expect(mockDistributeItems).not.toHaveBeenCalled();
+    expect(mockApplyDistribution).not.toHaveBeenCalled();
+    expect(mockResetObjectives).not.toHaveBeenCalled();
+    expect(mockSetHideoutPartCount).not.toHaveBeenCalled();
+    expect(wrapper.emitted('update:open')).toContainEqual([false]);
   });
 });

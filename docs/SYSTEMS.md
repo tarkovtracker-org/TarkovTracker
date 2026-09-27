@@ -936,6 +936,9 @@ flowchart LR
   `manualActivityHistory` to the persisted progress allowlist and its entry/history sanitizers
 - `app/stores/tarkov/progressPersistence.ts`, `app/stores/tarkov/realtimeListener.ts`,
   `app/stores/useTarkov.ts` — load, merge, write, and realtime flow
+- `app/stores/tarkov/startupOwnership.ts` — monotonic generation invalidating suspended startup runs
+  at session teardowns; `app/composables/useAppInitialization.ts` preserves newer-run lifecycle
+  state when a superseded initialization completes or rejects late
 - `app/stores/useSystemStore.ts`, `app/stores/useTeamStore.ts` — mode-specific teams and teammate
   hydration
 - `app/features/team/TeamDangerZone.vue`, `app/features/team/useTeamInviteLink.ts` — resolved active
@@ -988,6 +991,19 @@ flowchart LR
   name, and every task completion. The seed is a write-time repair, not a backfill: it touches only
   the row the write already locks. Reader-side fallback alone cannot close this hole, because the
   merge base comes from the row rather than from anything the caller sends.
+- Authenticated progress startup captures a generation, user ID, and client before its first await.
+  `resetTarkovSync` and newer initializations invalidate ownership synchronously. Both generation
+  and live identity are checked before resuming account-scoped effects after reads, retry delays,
+  merge/migration/repair writes, and before starting sync or listener setup. The freshness-column
+  compatibility fallback checks ownership before dispatching its second query. Identity alone is
+  insufficient for A→B→A transitions. Queries and broadcasts use the captured user ID. An RPC
+  already dispatched may settle, but stale acknowledgements cannot patch progress, advance its
+  persistence baseline, or install/replace sync machinery. Superseded initialization failures do
+  not report a current-session load failure or clear the newer app-initialization lifecycle state.
+  Deferred metadata work checks ownership before dispatching initialization and its follow-up
+  refresh; already-dispatched public-catalog requests retain metadata's mode/language/request
+  guards. Their catalog repair hooks intentionally apply to the currently loaded progress, not to
+  a captured account snapshot.
 - Historical Seasonal rows are retained but never merged into the active season. Locally persisted
   Seasonal progress is stamped with its season number and reset to defaults when that stamp does not
   match the active season; absent stamps are treated as the active season. `sync_user_game_mode_progress`
@@ -1201,11 +1217,22 @@ flowchart LR
   never an identity from the request body. Membership removal, conditional pointer maintenance,
   and trusted event insertion commit together. The handler performs no later table write, so a
   newer join cannot be overwritten by an old leave response.
-- Leave takes a per-user advisory lock, then the team row and membership row. Ownership transfer
-  locks the team before validating owner and successor membership, preventing promotion of a
-  departed member. Both RPCs have a five-second lock timeout and service-only execution grants.
-  The handler retries the whole leave transaction at most three times, with 50/100 ms delays,
-  only for confirmed `40P01`, `40001`, or `55P03` aborts. Exhaustion returns `503` with
+- `team-kick` calls the service-only `public.kick_team` RPC the same way: ownership validation,
+  the verified-event cooldown check, membership deletion, and the trusted `member_kicked` event
+  commit or roll back together. An event failure can no longer return success with a warning,
+  which would have left a removed member without audit history and let the next kick pass the
+  cooldown immediately. The handler keeps the legacy failure contract (`not_found`/`not_member`
+  → 404, `not_owner` → 403, `self` → 400, `cooldown` → 429); the RPC collapses a non-owner
+  initiator, including one with no membership, to `not_owner` so membership is never revealed.
+  The retry policy is identical to leave: whole-transaction retries with 50/100 ms delays,
+  only for confirmed `40P01`, `40001`, or `55P03` aborts, exhaustion returning `503` with
+  `Retry-After: 1`.
+- Leave takes a per-user advisory lock, then the team row and membership row; kick takes a
+  per-initiator advisory lock, then the team row and the initiator's membership row. Ownership
+  transfer locks the team before validating owner and successor membership, preventing promotion
+  of a departed member. All three RPCs have a five-second lock timeout and service-only execution
+  grants. The handler retries the whole leave transaction at most three times, with 50/100 ms
+  delays, only for confirmed `40P01`, `40001`, or `55P03` aborts. Exhaustion returns `503` with
   `Retry-After: 1`; business results and ambiguous transport failures are not retried.
 - Cooldowns are user/mode-wide across teams but retain the existing event lifetime: disband
   deletes the associated events. They are not durable cooldown evidence after team deletion.
@@ -1240,7 +1267,9 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
    follows (`tarkov-dev-profile` prefix,
    default TTL 15 min, `NUXT_TARKOV_DEV_PROFILE_CACHE_TTL_MS`; upstream 404s are negative-cached
    for 60 s).
-3. On cache miss it fetches upstream with the shared User-Agent. With `?fresh=1` (sent by the
+3. On cache miss it fetches upstream with the shared User-Agent, which identifies the deployment
+   using the origin from `APP_URL` (or `CF_PAGES_URL`). Missing, malformed, and local addresses
+   retain the upstream `https://tarkovtracker.org` identity. With `?fresh=1` (sent by the
    client for explicit refetches and automatically after a stale rejection), serving from cache is
    skipped; the cache is still read to obtain the ETag for conditional `If-None-Match` revalidation.
    A `304` re-stamps a fresh cached entry without extending a payload that fails the freshness gate.
@@ -1271,6 +1300,9 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
 - The browser never fetches `players.tarkov.dev` directly (no upstream CORS); the proxy is the only
   path, and it never talks to the api-gateway Worker or its daily token quotas — the rate-limit
   buckets are route-specific.
+- The shared outbound User-Agent identifies this deployment using the origin from `APP_URL` or
+  `CF_PAGES_URL`; missing, malformed, and local values retain the upstream
+  `https://tarkovtracker.org` identity.
 - A minute-scale limiter always runs before siteverify or any cache/upstream access. When Turnstile
   is enabled it uses the verification bucket, so invalid tokens cannot hammer siteverify while the
   hourly admitted-request quota remains reserved for verified traffic.
@@ -1331,18 +1363,30 @@ flowchart LR
    database statistics reset time, statement statistics reset time, and I/O statistics reset time.
    These timestamps establish the window for cumulative counters.
 4. Schema, count, sample, and distribution operations use validated identifiers and bounded SQL.
-   Samples select allowlisted low-risk columns and are capped at 20 rows; distributions are capped
-   at 50 groups.
+   The schema report includes relation ACL entries, effective PUBLIC grants, privileges for the
+   observer and existing `anon`, `authenticated`, and `service_role` roles (including inherited role
+   membership), per-role schema `USAGE`, relation owners, and row-level-security flags. Effective
+   privileges are listed only when the role also has `USAGE` on the relation's schema. Column-level
+   ACL entries and the effective per-column privileges they grant are reported separately. Health
+   reports whether the role can use the migration-history schema and read the `version` or
+   `statements` column. Samples select
+   allowlisted low-risk columns and are capped at 20 rows; distributions are capped at 50 groups.
 5. The observer rejects writes, DDL, transaction-control statements, `EXPLAIN ANALYZE`, arbitrary
    SQL, unbounded samples, and non-allowlisted distributions.
 6. `canary` runs only health and telemetry reports and is the first production validation path.
-   It rejects privileged/write-capable roles and unbounded transaction or lock timeouts before it
+   It rejects privileged/write-capable roles, read access to stored migration statements, and
+   unbounded transaction or lock timeouts before it
    runs the telemetry reports. It never reads application rows or runs migration preflight.
 7. `preflight --migration <path>` parses the migration to identify referenced relations and
    operation classes, then collects table/index, traffic, vacuum, outliers, lock, and blocking reports
    sequentially to avoid a burst of production inspection queries. It returns an evidence-only JSON
    report. Unsupported or ambiguous syntax fails closed with `assessment: incomplete`,
-   `risk: unknown`, and `requires_manual_review: true`. It does not execute the migration.
+   `risk: unknown`, and `requires_manual_review: true`. Multiple statements are classified only
+   when every statement is a supported table-level `GRANT`/`REVOKE`, optionally wrapped in one
+   `BEGIN`/`COMMIT` pair; ACL relations come from the `ON` clause, reserved keywords are rejected as
+   unquoted relation or role names, unquoted relation names fold to lowercase, and privilege names
+   are not data changes. It does not execute
+   the migration.
 8. `migration-history` reads applied version identifiers from
    `supabase_migrations.schema_migrations` and compares them against `supabase/migrations` in the
    current checkout, reporting `missing_locally` (applied remotely, absent from the checkout) and
@@ -1384,17 +1428,25 @@ flowchart LR
 - Every successful operation returns JSON with `ok`, `operation`, `target`, `generated_at`, an
   `observation` object, and `data` or report fields.
 - Built-in telemetry is allowlisted and does not depend on Supabase CLI text formatting.
+- The schema report exposes catalog ACLs, PUBLIC grants, effective privileges for the observer and
+  existing `anon`, `authenticated`, and `service_role` roles, relation owners, and RLS flags without
+  reading application rows. Effective privileges account for inherited roles, require schema
+  `USAGE` on the relation's schema (reported separately as `schema_usage`), and cover the server's
+  supported table privileges. Column-only grants appear in `column_grants` and
+  `effective_column_privileges`.
 - SQL identifiers are validated before interpolation, row and group limits are enforced, sensitive
   sample columns are excluded, and sensitive distributions are rejected.
 - The observer never executes migrations, arbitrary SQL, writes, DDL, `EXPLAIN ANALYZE`, or
   transaction-control statements.
 - `canary` is telemetry-only and excludes samples, distributions, and preflight.
 - `canary` must fail before telemetry collection when the observer is privileged, can write
-  application tables or create persistent objects, lacks default read-only transactions, or has
-  unbounded statement or lock timeouts.
+  application tables or create persistent objects, can read stored migration `statements`, lacks
+  default read-only transactions, or has unbounded statement or lock timeouts.
 - Migration preflight is evidence-only and fails closed on unsupported or ambiguous syntax;
   production reports run sequentially, and migration execution remains in the reviewed merge and
-  Supabase deployment workflow.
+  Supabase deployment workflow. The only classified multi-statement form is table-level ACL
+  statements, optionally inside one `BEGIN`/`COMMIT` pair, and that transaction remains flagged as
+  transaction control.
 - `migration-history` reads only the `version` column of `supabase_migrations.schema_migrations`.
   The stored `statements` column is never selected, and the observer's ledger grant is column-level
   for the same reason, so migration SQL and any literal inside it stay out of both the report and
@@ -1626,6 +1678,8 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 - `app/composables/useMapObjectiveMarks.ts` — objective users, categories, map marks, and shared
   visibility state.
 - `app/features/maps/LeafletMap.vue` — marker category filtering and map rendering.
+- `app/features/maps/utils/objectiveHitTest.ts` and `LeafletObjectiveStack.vue` — stacked
+  objective hover list.
 - `app/features/maps/MapRequiredItemsSummary.vue` — pinned/active grouping and preference gates.
 - `app/features/maps/composables/useMapRequiredItems.ts` — selected-map item/key aggregation.
 - `app/features/tasks/task-objective-equipment.ts` — canonical bring-mode equipment extraction.
@@ -1655,6 +1709,11 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 - A group given a title renders its section headings one level down (`h4`) and uses the short
   `required_items` / `required_keys` labels; an untitled standalone group keeps the `h3` level and
   the longer `*_summary` labels.
+- Hovering or clicking an objective marker hit-tests every visible zone and point in container
+  pixels. When more than one distinct objective is under the pointer, the popup is a compact stacked
+  list (points first, then zones smallest to largest); choosing an entry pins that objective's full
+  tooltip. A zone and its own center marker count as one objective, so a single objective still gets
+  the full tooltip directly (#919).
 
 ## 13. Fallow audit snapshots
 
@@ -1688,6 +1747,11 @@ The checkout stays pinned to the validated SHA. The production build still runs 
 ### Invariants
 
 - PR, fork, unsuccessful, superseded, and stale CI-attempt events cannot authorize publication.
+- `scripts/release-scope.mjs` removes commits whose header scope (or the header wrapped by any
+  number of `Revert "…"` / `revert:` prefixes) is in `INTERNAL_SCOPES` before both commit analysis and note generation.
+  Those commits never set the version type (including breaking-change markers) and never appear in
+  `CHANGELOG.md` or GitHub releases; they still deploy. Unscoped and product-scoped commits keep
+  the stock Angular rules, except that `refactor` and `docs` no longer release.
 - Never replace the validated checkout with a newer main commit to make publishing succeed.
 - CI cancellation must not cancel a publisher; only release jobs share `release-main` with
   `cancel-in-progress: false`. Git non-fast-forward protection and semantic-release's upstream
@@ -1743,12 +1807,15 @@ behind branch, explicitly dispatches candidate CI, and performs the final merge;
 - Behind translation branches first receive a GitHub branch update guarded by the expected head.
   Only afterward does the workflow capture and validate a candidate. Conflicts fail closed.
 - Candidates contain captured main. Preflight checks reject observed main/head changes and
-  non-clean merge states. Unknown calculations and a temporary `BLOCKED` state after preview
-  success retry for up to 60 seconds; only `MERGEABLE / CLEAN` may merge.
+  conflicting or stale merge states. Unknown calculations and a temporary `BLOCKED` state after
+  preview success retry for up to 60 seconds. If GitHub continues to report
+  `MERGEABLE / UNSTABLE` for approval-required `pull_request` suites, the gate revalidates the
+  required exact-head `CI Result` and trusted `Preview Result`, then attempts an ordinary
+  head-pinned merge; GitHub's server-side rules still reject any unmet requirement.
 - The gate awaits successful GitHub Actions `CI Result` and then the `Preview Result` commit status
   on the exact head (the explicit `locales` dispatch produces the preview even though job-token
   PR updates leave ordinary `pull_request` runs approval-required) and verifies the effective
-  repository rule requires the CI check with strict freshness. The administrator verifies the deployed
+  repository rule requires both checks with strict freshness. The administrator verifies the deployed
   ruleset has no bypass actors; automation does not receive ruleset write access to read that list.
   GitHub enforces the base requirement at merge time; missing/weakened required checks fail closed.
 - The trusted dispatched CI result job also reports `CI Result` on GitHub's test-merge commit only
@@ -1863,13 +1930,32 @@ active, the combined view re-keys the pooled objective under the matched accepte
 by name or short name) and registers it in `objectivesByItemId` under the same key; list and grid
 views pin the display to the matched item. Without an accepted match, the primary item stays
 canonical under the grouped-view rule that nameless items are not grouped. A pooled objective
-always contributes to exactly one group, so search-time re-keying never double-counts; progress
-writes stay bound to the objective ID regardless of which item identity is displayed.
+contributes to at most one group, so search-time re-keying never double-counts. When the matched
+item already has direct needs (needs whose own primary item is that item), re-keyed pooled
+objectives are dropped from the combined view instead of joining that group, so the searched
+item's displayed total stays aligned with its visible direct needs (#882: a LEDX search otherwise
+added every "sell N of any item" pool). Progress writes stay bound to the objective ID regardless
+of which item identity is displayed.
+
+The grouped card total uses `filteredItems`, including the ownership filter. Its modal target list
+uses the same view filters except ownership, so owned direct needs can remain editable and resettable
+even when hidden from the card total. Resolve the modal's accepted-item suppression against the
+visible `filteredItems` set; recalculating it over the expanded modal targets can incorrectly hide a
+pooled objective that the card displays. Snapshot modal targets and collected totals when the modal
+opens, and close it if the active game mode changes. Mutations must be guarded against writing the
+snapshot into a different mode's progress profile.
 
 Keep `findAcceptedItemMatchIndex` (search filter and display pin) and the grouped-view accepted
 match aligned: if one matches by name-or-short-name and the other does not, the grouped view shows
 a pooled objective under a different item than the list pins, which contradicts the searched
 identity.
+
+### Needed Items priority ordering
+
+In descending priority order, active tasks rank above buildable hideout modules, followed by
+available tasks and all other needs. A hideout module is buildable only when it is the station's
+next level and its station, skill, and trader prerequisites pass under the user's corresponding
+requirement settings. Grouped-by-item sorting and smart-fill distribution keep their own behavior.
 
 ## 15. CI validation selection
 
@@ -1907,6 +1993,29 @@ CodeQL) is selected on every CI run. See
 - Dependabot auto-merge requires the immutable Dependabot account ID for both the PR author and
   event actor; the actor restriction alone never establishes trust.
 - The aggregate covers repository CI jobs, not independently reported Security or Codecov statuses.
+
+### Agent review request coordination
+
+`scripts/codex-review.mjs` checks live GitHub review evidence before an agent requests Codex review.
+Read-only inspection is the default; authorized requests require `--request`. Local worktrees
+share request serialization and durable intent through their Git common directory, using
+case-insensitive repository identity for new and existing intents. Existing
+pending reviews, uncertain delivery, and unknown status block new requests; elapsed time does
+not authorize a retry. Completion matches the exact full commit; abbreviated evidence requires
+GitHub resolution, and head or base changes during evidence reads fail closed. Reusing a
+head-commit completion does not certify coverage of the current base or diff; retargeting requires
+independent review of that diff before merging. Successful posts record
+GitHub timestamps; uncertain local intents require matching completion without comparing host
+clocks. Dead local lock owners can be recovered under a separate recovery lock; live, foreign,
+or uncertain owners require operator inspection. Startup grace uses GitHub's response clock;
+first-line commands from trusted GitHub associations exclude outsider markers and prose examples,
+and tied second-resolution request/completion
+timestamps reuse exact-commit completion while running bot activity still blocks requests.
+Completed code reviews are reused by commit,
+independently of security reviews and unresolved findings; only top-level security report headings or the dedicated leading marker
+exclude security evidence, preserving quoted headings in code reviews. This cooperative guard cannot serialize unrelated clones or
+callers that bypass it. See [the review workflow](WORKFLOW_AUTOMATION.md#codex-request-deduplication-and-waiting)
+for agent commands and recovery boundaries.
 
 ## 16. Canonical task progression
 
@@ -2278,22 +2387,49 @@ GitHub has computed the test merge; other pending reasons are left alone.
   original run and its exact-SHA deployment artifact, then keeps that run URL on the new success.
 - Pull-request and CI-completion events run only the trusted `preview-state.yml` workflow, so
   ordinary PRs do not instantiate skipped deployment or smoke-test jobs. These events and comment
-  events never upload to Cloudflare. An exact `/preview` comment from a repository maintainer or
-  administrator on a same-repository PR resolves the successful CI run matching that PR's number,
-  head, and base before dispatching the trusted controller; forks retain the separate
-  request and protected-environment approval path. Only a trusted
+  events never upload to Cloudflare. An exact, unedited `/preview` comment from a current repository
+  maintainer or administrator opts that PR into automatic previews, including forks; `/preview stop`
+  disables the opt-in. The controller uses GraphQL `lastEditedAt` to detect body edits; REST
+  `updated_at` can change for metadata updates and does not by itself invalidate a command. Missing
+  edit metadata or inconsistent REST/GraphQL comment snapshots fail closed. Commands predating the rollout activation instant cannot become
+  persistent grants. The instant defaults to the contract start shipped with the handler commit,
+  so no manual post-merge variable flip is required. The optional canonical UTC
+  `PREVIEW_OPT_IN_START` variable overrides it; any non-empty malformed value (the legacy `0`,
+  date-only, zone-less or impossible strings) fails closed and grants no persistent access — an
+  explicit off switch.
+  The request resolves matching successful CI before dispatching the trusted controller. Only a trusted
   `workflow_dispatch` from `main` can deploy, and it repeats the exact-SHA, CI, artifact, and
   freshness checks. Crowdin and release staging dispatch once after their own exact-SHA CI passes;
   allowlisted Dependabot auto-merge candidates dispatch from a trusted post-CI `workflow_run` after
-  all checks pass. Dependabot remains owned by that workflow. Ordinary PR CI completions request
-  deployment only when auto-merge is enabled. Metadata requests use `auto_merge_enabled`; the
+  all checks pass. Dependabot's dedicated workflow remains its sole automatic request owner.
+  Ordinary PR CI completions request deployment when a live command opts in or auto-merge is enabled;
+  a stop overrides either path. Opted-in drafts remain paused until `ready_for_review`.
+  Other metadata requests use `auto_merge_enabled`; the
   hourly reconciliation remains status-only. Cloudflare automatic preview builds are disabled while production Git
   deployments for `main` remain enabled.
 - The Pages-only deployment token is stored only in the protected `preview` and `preview-fork`
   environments, whose branch policy allows `main`; remove the repository-scoped copy. This prevents
   a manually dispatched workflow selected from another ref from reading the deployment credential.
-- Fork candidates deploy only through the protected `preview-fork` environment; the exact revision
-  is shown before approval and rechecked afterward, so approval never carries to another head.
+- Fork candidates with a live maintainer command deploy through `preview`; the controller exhausts
+  comment pagination, chooses the latest authorized command, and rechecks the requester's current
+  role. GitHub's owner/member/collaborator association filters public outsider comments before any
+  role lookup; it never substitutes for the current maintain/admin permission check. Permissions
+  are cached only within one scan. Immediately before upload, the command must still be enabled
+  with the same ID and author.
+  A newer associated user's stop remains a revocation barrier after a role change when its author
+  currently verifies as maintain/admin or when the handler accepted it while verifying — the
+  receipt comment from `github-actions[bot]` records that acceptance; a historical stop without
+  either is not honored and the previous enabled opt-in stays in control. Resuming requires a
+  fresh command from a current maintainer.
+  Automatic dispatches carry the authorizing comment ID, so a command revoked before planning
+  cannot fall back to the manual deployment path. Trusted default-branch dispatches without a
+  bound comment (manual or automation-owned) own their authorization directly and are not revoked
+  by a later stop.
+  A stop, deleted command, or revoked role prevents a queued opted-in upload. Each revision still
+  requires fresh CI, manifest and digest verification, and smoke tests; the command grants preview
+  intent for the PR, never a reusable CI result. Forks without a live opt-in deploy through
+  `preview-fork`, where manual approval or an administrator override is required. Its self-review
+  rule stays enabled. The exact revision is displayed before approval and rechecked afterward.
   Fork CI runs carry no `pull_requests` and the base repository's commit-association lookup omits
   fork-only commits, so a fork candidate's PR is resolved by listing open PRs for its
   `owner:branch` head and then matching head SHA, head repository, and base like any candidate.

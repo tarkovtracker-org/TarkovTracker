@@ -8,6 +8,7 @@ const { openPreferences, runtimeConfig } = vi.hoisted(() => ({
     public: {
       appUrl: 'https://tarkovtracker.org',
       appVersion: '1.2.3',
+      buildCommit: '',
       githubOwner: 'tarkovtracker-org',
       githubRepo: 'TarkovTracker',
       googleAnalyticsMeasurementId: 'G-TEST',
@@ -46,6 +47,7 @@ describe('AppFooter', () => {
     // Restore default runtime config; individual tests mutate it to exercise
     // the release-link fallback branches.
     runtimeConfig.public.appVersion = '1.2.3';
+    runtimeConfig.public.buildCommit = '';
     runtimeConfig.public.githubOwner = 'tarkovtracker-org';
     runtimeConfig.public.githubRepo = 'TarkovTracker';
   });
@@ -84,5 +86,25 @@ describe('AppFooter', () => {
     const versionLink = wrapper.findAll('a').find((anchor) => anchor.text().includes('v1.2.3'));
     expect(versionLink).toBeUndefined();
     expect(wrapper.text()).toContain('v1.2.3');
+  });
+  it('links the short build commit so a deploy is identifiable between releases', async () => {
+    const sha = 'dce724280dd507aba2fdec7d9712c3fe20d60cfa';
+    runtimeConfig.public.buildCommit = sha.toUpperCase();
+    const wrapper = await mountFooter();
+    const commitLink = wrapper.findAll('a').find((anchor) => anchor.text() === 'dce7242');
+    expect(commitLink?.attributes('href')).toBe(
+      `https://github.com/tarkovtracker-org/TarkovTracker/commit/${sha}`
+    );
+    expect(commitLink?.attributes('rel')).toBe('noopener noreferrer');
+    expect(commitLink?.attributes('title')).toBe('footer.build_commit_link');
+  });
+  it('shows an unlinked commit without repo config and nothing for invalid values', async () => {
+    runtimeConfig.public.buildCommit = 'a'.repeat(40);
+    runtimeConfig.public.githubOwner = '';
+    const unlinked = await mountFooter();
+    expect(unlinked.text()).toContain('aaaaaaa');
+    expect(unlinked.findAll('a').some((anchor) => anchor.text() === 'aaaaaaa')).toBe(false);
+    runtimeConfig.public.buildCommit = 'abc1234';
+    expect((await mountFooter()).text()).not.toContain('abc1234');
   });
 });

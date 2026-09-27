@@ -1014,6 +1014,10 @@ export type Database = {
         Args: { p_team_id: string; p_user_id: string }
         Returns: string
       }
+      kick_team: {
+        Args: { p_initiator_id: string; p_member_id: string; p_team_id: string }
+        Returns: string
+      }
       merge_progress_data: {
         Args: {
           p_field: string

@@ -46,9 +46,11 @@ const isMissingProgressFreshness = (error: SupabaseError | null): boolean =>
   /\bprogress_updated_at\b/.test(error.message);
 /** Retry only the additive freshness column; all other read failures stay visible. */
 export const readWithProgressFreshness = async <T extends { error: SupabaseError | null }>(
-  read: (includeFreshness: boolean) => PromiseLike<T>
+  read: (includeFreshness: boolean) => PromiseLike<T>,
+  canContinue: () => boolean = () => true
 ): Promise<T> => {
   const result = await read(true);
+  if (!canContinue()) return result;
   if (isMissingProgressFreshness(result.error)) {
     return await read(false);
   }
@@ -131,7 +133,8 @@ const latestModeTimestamp = (byMode: Partial<Record<GameMode, number>>): number 
 };
 export const loadModeProgress = async (
   client: ModeProgressClient,
-  userId: string
+  userId: string,
+  canContinue: () => boolean = () => true
 ): Promise<{
   data: Partial<Record<GameMode, UserProgressData>>;
   updatedAt?: number;
@@ -139,17 +142,19 @@ export const loadModeProgress = async (
   error: SupabaseError | null;
 }> => {
   try {
-    const { data: rows, error } = await readWithProgressFreshness((includeFreshness) =>
-      client
-        .from('user_game_mode_progress')
-        .select(
-          includeFreshness
-            ? 'game_mode,season_number,progress_data,progress_updated_at'
-            : 'game_mode,season_number,progress_data'
-        )
-        .eq('user_id', userId)
-        .in('game_mode', GAME_MODE_VALUES)
-        .in('season_number', [0, ACTIVE_SEASON_NUMBER])
+    const { data: rows, error } = await readWithProgressFreshness(
+      (includeFreshness) =>
+        client
+          .from('user_game_mode_progress')
+          .select(
+            includeFreshness
+              ? 'game_mode,season_number,progress_data,progress_updated_at'
+              : 'game_mode,season_number,progress_data'
+          )
+          .eq('user_id', userId)
+          .in('game_mode', GAME_MODE_VALUES)
+          .in('season_number', [0, ACTIVE_SEASON_NUMBER]),
+      canContinue
     );
     if (error) return { data: {}, error };
     const loadedRows = rows ?? [];

@@ -212,7 +212,29 @@ flowchart LR
 
 **Abuse gate**: a pre-authentication IP-keyed Cloudflare Workers Rate Limiting binding that
 shields the `api_tokens` lookup from floods. Coarse by design (infrastructure protection, not a
-customer quota). Counter is per-Cloudflare-location and eventually consistent.
+customer quota). Counter is per-Cloudflare-location and eventually consistent. Its current
+safeguard is 300 requests per minute per IP; the daily tier quotas above remain unchanged and are
+account-level (keyed by `user_id`), while `token_id` only provides a breakdown of quota denials.
+
+The Worker emits structured `daily_quota_429` and `abuse_gate_429` log events. In Cloudflare
+Workers Logs, use the Query Builder with a **Last 24 hours** time range, **Count** aggregation, and
+sort by Count descending. These event counts are separate: daily quota denials identify authenticated
+users and tokens, while abuse-gate denials are pre-authentication and identify hashed client IPs.
+
+| Purpose                               | Filters                                                                   | Group by              |
+| ------------------------------------- | ------------------------------------------------------------------------- | --------------------- |
+| Daily quota denials by user           | `event` equals `daily_quota_429`                                          | `user_id`             |
+| Daily quota denials by user and token | `event` equals `daily_quota_429`                                          | `user_id`, `token_id` |
+| Abuse-gate denials by hashed IP       | `event` equals `abuse_gate_429`; `ip_hash` matches Regex `^[0-9a-f]{16}$` | `ip_hash`             |
+
+The IP-hash filter excludes missing or null hashes. The gateway logs a truncated HMAC-SHA-256 hash
+of the client IP, never the raw IP. After deployment is approved, verify all three queries in live
+logs; if no events are present, leave verification pending. Do not generate load by repeatedly
+triggering denials. This is a focused visibility path; Logpush, WAF rules, and alerting are deferred.
+
+See Cloudflare's [Workers Logs documentation](https://developers.cloudflare.com/workers/observability/logs/workers-logs/)
+and [Query Builder documentation](https://developers.cloudflare.com/workers/observability/query-builder/)
+for the logging and query controls.
 
 Details and response headers: [`API.md`](./API.md#rate-limits-api-gateway)
 

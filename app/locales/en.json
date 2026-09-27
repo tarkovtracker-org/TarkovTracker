@@ -572,7 +572,8 @@
       "go_to_in_task_list": "Go to objective in task list",
       "complete": "Complete objective",
       "uncomplete": "Uncomplete objective",
-      "objective_unavailable": "Objective unavailable."
+      "objective_unavailable": "Objective unavailable.",
+      "stacked_objectives": "{count} objectives here"
     }
   },
   "page": {
@@ -1745,6 +1746,7 @@
     "game_attribution": "Escape from Tarkov and related game content and materials are trademarks and copyrighted works of Battlestate Games Limited and its licensors. All rights reserved. TarkovTracker is an unofficial fan project and is not affiliated with or endorsed by Battlestate Games.",
     "tagline": "Track your Escape from Tarkov quests, hideout upgrades, and item requirements in one place.",
     "version_release_link": "View the release notes for version {version} on GitHub",
+    "build_commit_link": "View build commit {commit} on GitHub",
     "sections": {
       "explore": "Explore",
       "project": "Project",

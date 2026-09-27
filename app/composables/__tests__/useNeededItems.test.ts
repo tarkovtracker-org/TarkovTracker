@@ -184,6 +184,9 @@ const createPreferencesStore = () => ({
   setNeededItemsCardStyle: vi.fn(),
   itemsTeamAllHidden: false,
   setItemsTeamHideAll: vi.fn(),
+  getHideoutRequireStationLevels: true,
+  getHideoutRequireSkillLevels: true,
+  getHideoutRequireTraderLoyalty: true,
 });
 const createTarkovStore = () => ({
   getGameEdition: () => 1,
@@ -519,6 +522,56 @@ describe('useNeededItems', () => {
       expect(boltsEntry?.taskObjectives.length).toBeGreaterThan(0);
       expect(boltsEntry?.hideoutModules.length).toBeGreaterThan(0);
     });
+    it('keeps owned objectives in Smart Fill targets when hide-owned is enabled', async () => {
+      const item = createItem('item-shared', 'Shared Item');
+      const objectives = [
+        createTaskObjective('obj-owned', 'task-1', item, 1),
+        createTaskObjective('obj-needed', 'task-1', item, 1),
+      ];
+      const { neededItems } = await setup({
+        metadataStore: { neededItemTaskObjectives: objectives, neededItemHideoutModules: [] },
+        preferencesStore: { getNeededItemsHideOwned: true },
+        tarkovStore: { getObjectiveCount: (id: string) => (id === 'obj-owned' ? 1 : 0) },
+      });
+      expect(neededItems.filteredItems.value.map((item) => item.id)).toEqual(['obj-needed']);
+      expect(
+        neededItems.objectivesByItemId.value
+          .get('item-shared')
+          ?.taskObjectives.map((item) => item.id)
+      ).toEqual(['obj-owned', 'obj-needed']);
+    });
+    it('preserves pooled Smart Fill targets when an owned direct need is hidden during search', async () => {
+      const augmentin = createItem('item-augmentin', 'Augmentin');
+      const direct = createTaskObjective('obj-owned-direct', 'task-1', augmentin, 1);
+      const primary = createItem('item-cms', 'CMS Kit');
+      const pooled: NeededItemTaskObjective = {
+        ...createTaskObjective('obj-pool-search', 'task-1', primary, 5, true),
+        acceptedItems: [primary, augmentin],
+      };
+      const { neededItems, search } = await setup({
+        metadataStore: { neededItemTaskObjectives: [direct, pooled] },
+        preferencesStore: { getNeededItemsHideOwned: true },
+        tarkovStore: { getObjectiveCount: (id: string) => (id === direct.id ? 1 : 0) },
+      });
+      search.value = 'augmentin';
+      expect(neededItems.filteredItems.value.map((need) => need.id)).toEqual([pooled.id]);
+      expect(neededItems.groupedItems.value.map((group) => group.item.id)).toContain(augmentin.id);
+      expect(
+        neededItems.objectivesByItemId.value
+          .get(augmentin.id)
+          ?.taskObjectives.map((objective) => objective.id)
+      ).toEqual([direct.id, pooled.id]);
+    });
+    it('keeps hidden team objectives out of Smart Fill targets', async () => {
+      const { neededItems } = await setup({
+        includeTeamItems: true,
+        preferencesStore: { itemsTeamAllHidden: true },
+      });
+      const taskObjectiveIds = Array.from(neededItems.objectivesByItemId.value.values()).flatMap(
+        ({ taskObjectives }) => taskObjectives.map((item) => item.id)
+      );
+      expect(taskObjectiveIds).not.toContain('obj-team');
+    });
   });
   describe('sorting', () => {
     it('sorts by priority in descending order', async () => {
@@ -531,10 +584,63 @@ describe('useNeededItems', () => {
           const state = progressStore.tasksState?.[item.taskId];
           return state === TASK_STATE.ACTIVE ? 3 : state === TASK_STATE.AVAILABLE ? 1 : 0;
         }
-        return 2;
+        // Only station-1 level 1 is the next buildable level; station-2 level 2 is locked.
+        return item.hideoutModule.stationId === 'station-1' ? 2 : 0;
       });
       const sortedPriorities = [...priorities].sort((a, b) => b - a);
       expect(priorities).toEqual(sortedPriorities);
+    });
+    describe('hideout priority', () => {
+      const lockedByStation = () => {
+        const module = createHideoutModule(
+          'hideout-locked',
+          'station-1',
+          1,
+          createItem('item-cpu', 'CPU'),
+          1
+        );
+        module.hideoutModule.stationLevelRequirements = [
+          { id: 'req-1', station: { id: 'station-2', name: 'Intelligence Center' }, level: 1 },
+        ];
+        return module;
+      };
+      const buildable = () =>
+        createHideoutModule('hideout-ready', 'station-2', 1, createItem('item-bolts', 'Bolts'), 1);
+      const sortedHideoutIds = async (
+        modules: NeededItemHideoutModule[],
+        preferences: Partial<ReturnType<typeof createPreferencesStore>> = {}
+      ) => {
+        const { neededItems } = await setup({
+          metadataStore: { neededItemTaskObjectives: [], neededItemHideoutModules: modules },
+          preferencesStore: {
+            getNeededItemsSortBy: 'priority',
+            getNeededItemsSortDirection: 'desc',
+            ...preferences,
+          },
+        });
+        return neededItems.filteredItems.value.map((item) => item.id);
+      };
+      it('ranks buildable stations before stations with unmet prerequisites', async () => {
+        const ids = await sortedHideoutIds([lockedByStation(), buildable()]);
+        expect(ids).toEqual(['hideout-ready', 'hideout-locked']);
+      });
+      it('ranks the next station level before later levels', async () => {
+        const later = createHideoutModule(
+          'hideout-later',
+          'station-1',
+          3,
+          createItem('item-cpu', 'CPU'),
+          1
+        );
+        const ids = await sortedHideoutIds([later, buildable()]);
+        expect(ids).toEqual(['hideout-ready', 'hideout-later']);
+      });
+      it('ignores station prerequisites the user has chosen not to enforce', async () => {
+        const ids = await sortedHideoutIds([lockedByStation(), buildable()], {
+          getHideoutRequireStationLevels: false,
+        });
+        expect(ids).toEqual(['hideout-locked', 'hideout-ready']);
+      });
     });
     it('sorts by name in ascending order', async () => {
       const { neededItems } = await setup({
@@ -622,6 +728,27 @@ describe('useNeededItems', () => {
       const groupIds = neededItems.groupedItems.value.map((group) => group.item.id);
       expect(groupIds).toContain('item-analgin');
       expect(groupIds).not.toContain('item-cms');
+    });
+    it('keeps searched item totals equal to its direct needs when pools also accept it', async () => {
+      // #882: searching LEDX inflated its combined total with every pooled
+      // "any of these" objective that also accepts LEDX.
+      const augmentin = createItem('item-augmentin', 'Augmentin');
+      const direct = createTaskObjective('obj-direct', 'task-1', augmentin, 2, true);
+      const secondPool: NeededItemTaskObjective = {
+        ...createPooledObjective(),
+        id: 'obj-pool-2',
+        count: 75,
+      };
+      const { neededItems, search } = await setup({
+        metadataStore: {
+          neededItemTaskObjectives: [direct, createPooledObjective(), secondPool],
+        },
+      });
+      search.value = 'augmentin';
+      const group = neededItems.groupedItems.value.find((g) => g.item.id === 'item-augmentin');
+      expect(group?.total).toBe(2);
+      const registered = neededItems.objectivesByItemId.value.get('item-augmentin');
+      expect(registered?.taskObjectives.map((objective) => objective.id)).toEqual(['obj-direct']);
     });
     it('keeps the primary item as the group key when no accepted item matches', async () => {
       const { neededItems, search } = await setup({

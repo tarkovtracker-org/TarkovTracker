@@ -568,7 +568,8 @@
       "go_to_in_task_list": "Ir al objetivo en la lista de tareas",
       "complete": "Completar objetivo",
       "uncomplete": "Descompletar objetivo",
-      "objective_unavailable": "Objetivo no disponible."
+      "objective_unavailable": "Objetivo no disponible.",
+      "stacked_objectives": "{count} objectives here"
     }
   },
   "page": {

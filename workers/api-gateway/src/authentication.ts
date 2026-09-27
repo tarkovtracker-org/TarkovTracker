@@ -106,13 +106,11 @@ async function enforceAbuseGate(context: AuthenticationContext): Promise<Respons
     );
   }
   if (!result || result.success) return null;
-  console.warn(
-    JSON.stringify({
-      event: 'abuse_gate_429',
-      action: context.action,
-      ip_hash: await getIpHash(),
-    })
-  );
+  console.warn({
+    event: 'abuse_gate_429',
+    action: context.action,
+    ip_hash: await getIpHash(),
+  });
   return errorResponse('Too many requests', 429, context.envOrigin, context.requestOrigin, {
     'Retry-After': String(ABUSE_GATE_PERIOD_SEC),
   });
@@ -162,16 +160,14 @@ function exceededQuotaResponse(
   headers: Record<string, string>
 ): Response {
   trackUsage(context, token, tier, kind, true);
-  console.warn(
-    JSON.stringify({
-      event: 'daily_quota_429',
-      action: context.action,
-      kind,
-      user_id: token.user_id,
-      token_id: token.token_id,
-      retry_after_s: typeof daily.resetAt === 'number' ? retryAfterSeconds(daily.resetAt) : null,
-    })
-  );
+  console.warn({
+    event: 'daily_quota_429',
+    action: context.action,
+    kind,
+    user_id: token.user_id,
+    token_id: token.token_id,
+    retry_after_s: typeof daily.resetAt === 'number' ? retryAfterSeconds(daily.resetAt) : null,
+  });
   const message = tier === 'free' ? upgradeMessage(kind) : daily.message || 'Rate limit exceeded';
   return errorResponse(message, 429, context.envOrigin, context.requestOrigin, headers);
 }

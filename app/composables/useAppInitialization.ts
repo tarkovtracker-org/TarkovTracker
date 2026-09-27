@@ -197,18 +197,14 @@ export function useAppInitialization() {
     syncStarted = true;
     try {
       await initializeTarkovSync();
-      if (expectedUserId && getAuthenticatedUserId() !== expectedUserId) {
-        syncStarted = false;
-        return;
-      }
-      if (expectedToken !== undefined && expectedToken !== authChangeToken) {
-        syncStarted = false;
-        return;
-      }
+      // The replacement session owns syncStarted; stale completions must not clear it.
+      if (isStaleInitialization(expectedUserId, expectedToken)) return;
       activityLogStore.migrateLegacyManualEntries();
       cancelSyncRetry();
       syncRetryAttempts = 0;
     } catch (error) {
+      // Cancel silently rather than reporting failure or resetting a newer session.
+      if (isStaleInitialization(expectedUserId, expectedToken)) return;
       syncStarted = false;
       logger.error('[useAppInitialization] Error initializing Supabase sync:', error);
       handleSyncFailure(expectedUserId, expectedToken);

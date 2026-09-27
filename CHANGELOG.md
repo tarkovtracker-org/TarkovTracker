@@ -1,3 +1,101 @@
+# [1.84.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.5...v1.84.0) (2026-09-27)
+
+
+### Features
+
+* **ui:** show the build commit next to the footer version ([#952](https://github.com/tarkovtracker-org/TarkovTracker/issues/952)) ([2b9bc86](https://github.com/tarkovtracker-org/TarkovTracker/commit/2b9bc86133117a34dd5ca982e6387cdb6ad42891))
+
+## [1.83.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.4...v1.83.5) (2026-09-27)
+
+
+### Bug Fixes
+
+* **app:** show only player-facing changes in the changelog ([#950](https://github.com/tarkovtracker-org/TarkovTracker/issues/950)) ([e20ccf4](https://github.com/tarkovtracker-org/TarkovTracker/commit/e20ccf42a7b43bb51b4b7de28e998132b529021b)), closes [#n](https://github.com/tarkovtracker-org/TarkovTracker/issues/n)
+
+## [1.83.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.3...v1.83.4) (2026-09-27)
+
+
+### Bug Fixes
+
+* restore production observer grant evidence and ACL preflight ([#954](https://github.com/tarkovtracker-org/TarkovTracker/issues/954)) ([e217df9](https://github.com/tarkovtracker-org/TarkovTracker/commit/e217df97166c508d63794fbee350bbc16d4d5a41))
+
+## [1.83.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.2...v1.83.3) (2026-09-27)
+
+
+### Bug Fixes
+
+* **ci:** guard duplicate Codex review requests ([#948](https://github.com/tarkovtracker-org/TarkovTracker/issues/948)) ([dce7242](https://github.com/tarkovtracker-org/TarkovTracker/commit/dce724280dd507aba2fdec7d9712c3fe20d60cfa))
+
+## [1.83.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.1...v1.83.2) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** emit searchable quota and abuse rejection logs ([#949](https://github.com/tarkovtracker-org/TarkovTracker/issues/949)) ([7932be8](https://github.com/tarkovtracker-org/TarkovTracker/commit/7932be8079b5c59c6cccd9d8b983ab9910204f48))
+
+## [1.83.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.0...v1.83.1) (2026-09-27)
+
+
+### Bug Fixes
+
+* **ci:** honor verified gates on unstable merge state ([#946](https://github.com/tarkovtracker-org/TarkovTracker/issues/946)) ([1e9c0d4](https://github.com/tarkovtracker-org/TarkovTracker/commit/1e9c0d4b2612deeaa1b034ed5865b721f55eca69))
+
+# [1.83.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.8...v1.83.0) (2026-09-27)
+
+
+### Features
+
+* **maps:** list every objective under the cursor on overlapping markers ([#919](https://github.com/tarkovtracker-org/TarkovTracker/issues/919)) ([#944](https://github.com/tarkovtracker-org/TarkovTracker/issues/944)) ([5f9f898](https://github.com/tarkovtracker-org/TarkovTracker/commit/5f9f898af501ff65206b31fcb5d5d155fb5bb90a))
+
+## [1.82.8](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.7...v1.82.8) (2026-09-27)
+
+
+### Bug Fixes
+
+* **app:** make Smart Fill distribute collected totals ([#867](https://github.com/tarkovtracker-org/TarkovTracker/issues/867)) ([#943](https://github.com/tarkovtracker-org/TarkovTracker/issues/943)) ([bd4f70b](https://github.com/tarkovtracker-org/TarkovTracker/commit/bd4f70b79f9a32ddff647d7a340fa0afbd93e43d))
+
+## [1.82.7](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.6...v1.82.7) (2026-09-27)
+
+
+### Bug Fixes
+
+* **ci:** stabilize preview comment authorization ([#941](https://github.com/tarkovtracker-org/TarkovTracker/issues/941)) ([67b6812](https://github.com/tarkovtracker-org/TarkovTracker/commit/67b68125e7b7e21ca2dbddc16c02ce8de4c44606))
+
+## [1.82.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.5...v1.82.6) (2026-09-26)
+
+
+### Bug Fixes
+
+* **app:** keep searched item totals free of pooled objectives ([#882](https://github.com/tarkovtracker-org/TarkovTracker/issues/882)) ([#942](https://github.com/tarkovtracker-org/TarkovTracker/issues/942)) ([04287b1](https://github.com/tarkovtracker-org/TarkovTracker/commit/04287b1e9a1726b23c5f91060bbac6c22c0b16ad))
+
+## [1.82.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.4...v1.82.5) (2026-09-26)
+
+
+### Bug Fixes
+
+* **app:** rank buildable hideout needs before locked stations ([#940](https://github.com/tarkovtracker-org/TarkovTracker/issues/940)) ([ce67df4](https://github.com/tarkovtracker-org/TarkovTracker/commit/ce67df4f5bc7aa72d28d4b18d68ef6a6ef6ab288)), closes [#917](https://github.com/tarkovtracker-org/TarkovTracker/issues/917)
+
+## [1.82.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.3...v1.82.4) (2026-09-26)
+
+
+### Bug Fixes
+
+* **server:** derive the outbound User-Agent from the deployment's app URL ([#914](https://github.com/tarkovtracker-org/TarkovTracker/issues/914)) ([cd48917](https://github.com/tarkovtracker-org/TarkovTracker/commit/cd489175ed71d988f63a75f96ce3d75f79bc4844))
+
+## [1.82.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.2...v1.82.3) (2026-09-26)
+
+
+### Bug Fixes
+
+* **team:** make team-kick atomic via service-role-only kick_team RPC ([#938](https://github.com/tarkovtracker-org/TarkovTracker/issues/938)) ([578c067](https://github.com/tarkovtracker-org/TarkovTracker/commit/578c06777fa78713b2dcc724a9de5145f47b8794)), closes [#864](https://github.com/tarkovtracker-org/TarkovTracker/issues/864)
+
+## [1.82.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.1...v1.82.2) (2026-09-26)
+
+
+### Bug Fixes
+
+* **app:** fence stale startup initialization across session transitions ([#937](https://github.com/tarkovtracker-org/TarkovTracker/issues/937)) ([15c9d83](https://github.com/tarkovtracker-org/TarkovTracker/commit/15c9d8376316937048a7ec61b2dec079f4c163ef))
+
 ## [1.82.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.0...v1.82.1) (2026-09-26)
 
 

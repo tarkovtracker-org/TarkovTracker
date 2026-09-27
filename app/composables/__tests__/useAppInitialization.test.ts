@@ -436,5 +436,29 @@ describe('useAppInitialization locale setup', () => {
       expect(mockResetTarkovSync).not.toHaveBeenCalled();
       wrapper.unmount();
     });
+    it('treats a late superseded initialization failure as cancellation', async () => {
+      // Covers the lifecycle-state half of the startup ownership invariant: a
+      // former session's pending initialization rejects after the newer session
+      // already owns `syncStarted`, and the stale completion must not report
+      // active failure or clear the newer run's lifecycle marker.
+      const staleInit = Promise.withResolvers<undefined>();
+      mockInitializeTarkovSync.mockReturnValueOnce(staleInit.promise);
+      mockSupabaseUser.loggedIn = true;
+      mockSupabaseUser.id = 'user-1';
+      await mountWithComposable();
+      await flushPromises();
+      mockSupabaseUser.id = 'user-2';
+      await flushPromises();
+      expect(mockActivityLogMigrateLegacyManualEntries).toHaveBeenCalledTimes(1);
+      staleInit.reject(new Error('superseded startup read failed'));
+      await flushPromises();
+      const { logger } = await import('@/utils/logger');
+      expect(logger.error).not.toHaveBeenCalledWith(
+        '[useAppInitialization] Error initializing Supabase sync:',
+        expect.anything()
+      );
+      expect(mockResetTarkovSync).not.toHaveBeenCalled();
+      expect(mockShowLoadFailed).not.toHaveBeenCalled();
+    });
   });
 });

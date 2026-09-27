@@ -110,6 +110,9 @@ test('preview controller runs trusted code only and isolates credentials per job
     /catch \(error\) \{\s+await publishControllerFailure\(\{ github, context, core \}\);\s+throw error;/
   );
   assert.match(workflowEvent(workflow, 'workflow_dispatch'), /run_id:/);
+  assert.match(workflowEvent(workflow, 'workflow_dispatch'), /request_comment_id:/);
+  for (const trustedWorkflow of [workflow, stateWorkflow])
+    assert.match(trustedWorkflow, /PREVIEW_OPT_IN_START: \$\{\{ vars\.PREVIEW_OPT_IN_START \}\}/);
   assert.match(workflow, /cancel-in-progress: true/);
   assert.match(jobBlock(workflow, 'deploy'), /if: needs\.plan\.outputs\.action == 'deploy'/);
   assert.match(

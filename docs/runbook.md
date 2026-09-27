@@ -605,6 +605,30 @@ and repeat linked history/dry-run checks. Pull-request previews intentionally sk
 so a green PR alone does not establish that the production integration has recovered. Do not
 roll back to the pre-atomic leave handler or apply unrelated account-deletion migrations.
 
+### Atomic team-kick rollout (`20260926090000`)
+
+PR #938 (fix for #864) ships the atomic `kick_team` RPC in migration
+`20260926090000_atomic_team_kick.sql` together with the rewritten `team-kick` handler sources in
+one change, mirroring the atomic-leave unit rule: never separate the migration from the handler
+sources it requires. The rollout is database-first: after the merge, the Supabase GitHub
+integration applies the migration and deploys the edge functions (including `team-kick`) together
+in the same integration run against the merge commit — there is no manual SQL step:
+
+- **Do not apply the migration out of band** (no dashboard SQL editor, no `db push`) from PR #938's
+  branch or any unmerged revision — see "Deploy migrations only from a revision that is already
+  merged to `main`" above. Deploying the handler sources without the migration (or the migration
+  without the required handler sources) breaks the RPC-version parity the atomic-leave recovery
+  had to restore.
+- The pre-merge state is already safe: the deployed `team-kick` (non-atomic, direct DELETE +
+  event INSERT) never referenced `kick_team`, so the migration and the handler deploy land in the
+  same integration run on the merge commit with no regression window.
+- PR checks report `Supabase Preview` as `skipping` (per-PR preview databases are intentionally
+  disabled), so validation is: green `Supabase DB` job on the PR, then after merge confirm on the
+  merge commit that `Supabase Preview` succeeded, `supabase migration list --linked` shows
+  `20260926090000` applied remotely (no blank REMOTE rows) and the `team-kick` function shows a
+  new version in the Supabase dashboard. A blank REMOTE row is the pending case; the fallback is
+  the manual `db push` block in "Deployment", not a hand-written apply of the migration.
+
 ### Reconcile migration `20260630075121_reconcile_prod_schema_drift`
 
 - Captures schema changes that were previously made directly in the dashboard (teams
@@ -657,16 +681,22 @@ Keep the invoking environment free of privileged credentials. Export `PROD_DB_EN
 invoking shell to select a different file (for example, `export PROD_DB_ENV_FILE=/path/to/observer.env`);
 setting this selector inside `.env` is unsupported. The command fails if the selected file cannot be
 read; an absent default `.env` is allowed. Values are literal:
-no shell or variable expansion occurs. Use absolute certificate paths in `sslrootcert`, not `$HOME`
-or `${HOME}`. An inline environment
+no shell or variable expansion occurs. The wrapper rejects relative or missing certificate paths
+before invoking the CLI. Use absolute certificate paths in `sslrootcert`, not `$HOME` or
+`${HOME}`. An inline environment
 assignment remains supported for non-interactive automation whose secret store masks command input.
 
 Available reports include `health`, `schema`, `migration-history`, `db-stats`, `table-stats`,
 `index-stats`, `traffic`, `outliers`, `calls`, `locks`, `blocking`, `long-running`, `vacuum`,
 `bloat`, `role-stats`, bounded `sample`, `distribution`, and `count`. `sample` excludes columns
 matching the sensitive-column policy and is capped at 20 rows; `distribution` is capped at 50
-groups. `EXPLAIN ANALYZE`, arbitrary SQL, writes, DDL, migration commands, and unbounded row access
-are not supported.
+groups. The schema report exposes catalog ACL entries, PUBLIC grants, observer-effective privileges
+through inherited roles, privileges effective for existing `anon`, `authenticated`, and `service_role`
+roles, per-role schema `USAGE`, relation owners, and row-level-security flags. A privilege counts as
+effective only when the role can also use the relation's schema. Column-level ACL entries and
+the per-column privileges they make effective are listed separately. Health shows schema usage and read
+access to the migration `version` and `statements` columns. `EXPLAIN ANALYZE`, arbitrary SQL,
+writes, DDL, migration commands, and unbounded row access are not supported.
 
 `migration-history` reads applied version identifiers from `supabase_migrations.schema_migrations`
 and compares them with `supabase/migrations` in the current checkout. It reports `missing_locally`
@@ -688,7 +718,8 @@ guaranteed to describe the same environment as the observer credential.
 `canary` is the first production validation command. It runs only health and telemetry reports:
 `db-stats`, `role-stats`, `table-stats`, `index-stats`, and `outliers`. It does not sample rows,
 run distributions, or execute migration preflight. Before collecting telemetry it rejects
-privileged or write-capable roles, persistent-object creation privileges, disabled default
+privileged or write-capable roles, persistent-object creation privileges, read access to stored
+migration `statements`, disabled default
 read-only transactions, and unbounded statement or lock timeouts. Every report includes an
 `observation` object with capture time, observer application name, database statistics reset time,
 statement statistics reset time, and I/O statistics reset time. These reset times are required to
@@ -698,9 +729,12 @@ interpret cumulative counters.
 then combines that information with production table/index, traffic, vacuum, query, lock, and
 blocking reports. The result is evidence-only and must be reviewed by a human before a migration is
 merged. It does not execute the migration. If the parser sees dynamic SQL, unsupported statements,
-quoted identifiers, multiple statements, or any unclassified syntax, it returns
-`assessment: incomplete`, `risk: unknown`, and `requires_manual_review: true`; it never treats an
-unrecognized migration as safe.
+quoted identifiers, malformed literals or comments, multiple statements, or any unclassified syntax,
+it returns `assessment: incomplete`, `risk: unknown`, and `requires_manual_review: true`; it never
+treats an unrecognized migration as safe. The only multi-statement exception is a migration made
+entirely of table-level `GRANT`/`REVOKE` statements, optionally wrapped in one `BEGIN`/`COMMIT`
+pair. Privilege names such as `UPDATE` and `DELETE` in those statements are not data changes, and
+the explicit transaction is still reported as transaction control.
 
 Provision the observer role out of band through the Supabase SQL editor or approved database
 operation. Grant only `CONNECT`, required schema/catalog visibility, and `pg_monitor`; Supabase CLI
