@@ -62,6 +62,22 @@ describe('progressState getters task completion compatibility', () => {
     expect(getters.isTaskComplete(state)('task-1')).toBe(false);
     expect(getters.isTaskFailed(state)('task-1')).toBe(true);
   });
+  it('reads active completions and defaults missing or explicitly false flags to inactive', () => {
+    const activeState = createStateWithTaskCompletion({
+      active: true,
+      complete: false,
+      failed: false,
+    });
+    const inactiveState = createStateWithTaskCompletion({
+      active: false,
+      complete: false,
+      failed: false,
+    });
+    const legacyState = createStateWithTaskCompletion({ complete: false, failed: false });
+    expect(getters.isTaskActive(activeState)('task-1')).toBe(true);
+    expect(getters.isTaskActive(inactiveState)('task-1')).toBe(false);
+    expect(getters.isTaskActive(legacyState)('task-1')).toBe(false);
+  });
 });
 describe('progressState task lifecycle', () => {
   it('writes canonical active, completed, failed, and neutral states', () => {

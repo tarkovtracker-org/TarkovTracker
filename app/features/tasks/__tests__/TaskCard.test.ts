@@ -2,6 +2,7 @@ import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import TaskCard from '@/features/tasks/TaskCard.vue';
+import type { TaskActionPayload } from '@/composables/useTaskActions';
 import type { TaskEvaluationMap } from '@/stores/taskAvailability';
 import type { UserProgressData } from '@/types/progress';
 import type { Task } from '@/types/tarkov';
@@ -51,11 +52,14 @@ const taskFilteringMock = {
   isGlobalTask: vi.fn(() => false),
 };
 const useTaskActionsMock = {
+  markTaskActive: vi.fn(),
   markTaskAvailable: vi.fn(),
   markTaskComplete: vi.fn(),
   markTaskFailed: vi.fn(),
   markTaskUncomplete: vi.fn(),
 };
+let mockTaskActionListener: ((payload: TaskActionPayload) => void) | undefined;
+let mockTaskGetter: (() => Task) | undefined;
 const useTaskCardLinksMock = {
   copyTaskLink: vi.fn(),
   openItemOnTarkovDev: vi.fn(),
@@ -90,7 +94,11 @@ vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => tarkovStoreMock,
 }));
 vi.mock('@/composables/useTaskActions', () => ({
-  useTaskActions: () => useTaskActionsMock,
+  useTaskActions: (getTask: () => Task, onAction: (payload: TaskActionPayload) => void) => {
+    mockTaskGetter = getTask;
+    mockTaskActionListener = onAction;
+    return useTaskActionsMock;
+  },
 }));
 vi.mock('@/composables/useTaskCardLinks', () => ({
   useTaskCardLinks: () => useTaskCardLinksMock,
@@ -127,12 +135,15 @@ const TaskCardHeaderStub = {
 };
 const TaskCardBadgesStub = {
   template: '<div data-testid="task-card-badges"><slot name="actions" /></div>',
-  props: ['task', 'traderRequirements'],
+  props: ['task', 'traderRequirements', 'isActive'],
 };
 const TaskCardActionsStub = {
+  props: ['state', 'size', 'isFailed'],
+  emits: ['complete', 'active', 'uncomplete', 'available', 'failed'],
   template: '<div data-testid="task-card-actions" />',
 };
 const TaskCardBackgroundStub = {
+  props: ['isComplete', 'isFailed', 'isLocked', 'isInvalid'],
   template: '<div data-testid="task-card-background" />',
 };
 const TaskCardRewardsStub = {
@@ -150,7 +161,10 @@ const AppTooltipStub = {
 const QuestObjectivesStub = {
   template: '<div data-testid="task-objectives" />',
 };
-const mountTaskCard = async (taskOverrides: Partial<Task> = {}) =>
+const mountTaskCard = async (
+  taskOverrides: Partial<Task> = {},
+  cardOverrides: { accentVariant?: 'default' | 'global' } = {}
+) =>
   mountSuspended(TaskCard, {
     props: {
       task: {
@@ -161,6 +175,7 @@ const mountTaskCard = async (taskOverrides: Partial<Task> = {}) =>
         taskRequirements: [],
         ...taskOverrides,
       },
+      ...cardOverrides,
     },
     global: {
       stubs: {
@@ -196,8 +211,11 @@ describe('TaskCard appearance and expansion controls', () => {
     progressStoreMock.tasksFailed = {};
     progressStoreMock.unlockedTasks = { 'task-1': { self: true } };
     vi.clearAllMocks();
+    mockTaskActionListener = undefined;
+    mockTaskGetter = undefined;
     metadataStoreMock.getTaskById.mockReset();
     tarkovStoreMock.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
+    tarkovStoreMock.getObjectiveCount.mockReturnValue(0);
   });
   it('emits the failed-card class contract: dark surface with pale light-mode companions', async () => {
     // This asserts the emitted class names only; the resolved per-theme rendering is
@@ -219,6 +237,38 @@ describe('TaskCard appearance and expansion controls', () => {
     expect(wrapper.get('[data-testid="task-card-title"]').text()).toBe('Sample task');
     expect(wrapper.find('[data-testid="task-blockers"]').exists()).toBe(false);
     wrapper.unmount();
+  });
+  it('styles available global cards and wires accept actions', async () => {
+    const wrapper = await mountTaskCard({}, { accentVariant: 'global' });
+    const card = wrapper.get('article');
+    expect(card.classes()).toContain('bg-info-500/5');
+    expect(card.classes()).toContain('border-l-4');
+    expect(card.classes()).toContain('border-l-info-400');
+    const actions = wrapper.findComponent(TaskCardActionsStub);
+    expect(actions.props('state')).toBe('available');
+    expect(mockTaskGetter?.()).toBe(wrapper.props('task'));
+    useTaskActionsMock.markTaskActive.mockImplementation(() => {
+      mockTaskActionListener?.({ taskId: 'task-1', taskName: 'Sample task', action: 'active' });
+    });
+    actions.vm.$emit('active');
+    expect(useTaskActionsMock.markTaskActive).toHaveBeenCalledOnce();
+    expect(wrapper.emitted('on-task-action')).toEqual([
+      [{ taskId: 'task-1', taskName: 'Sample task', action: 'active' }],
+    ]);
+  });
+  it('gives an active global card its active action and background state', async () => {
+    taskState.active = true;
+    const wrapper = await mountTaskCard({}, { accentVariant: 'global' });
+    expect(wrapper.get('article').classes()).toContain('border-primary-500/45');
+    expect(wrapper.get('article').classes()).toContain('border-l-info-400');
+    expect(wrapper.findComponent(TaskCardBadgesStub).props('isActive')).toBe(true);
+    expect(wrapper.findComponent(TaskCardActionsStub).props('state')).toBe('active');
+    expect(wrapper.findComponent(TaskCardBackgroundStub).props()).toEqual({
+      isComplete: false,
+      isFailed: false,
+      isLocked: false,
+      isInvalid: false,
+    });
   });
   it('renders canonical blockers and evaluates reputation badges', async () => {
     progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
@@ -258,6 +308,7 @@ describe('TaskCard appearance and expansion controls', () => {
         taskRequirements: [{ task: { id: 'prior' }, status: ['complete'] }],
       });
       expect(wrapper.text().includes('Prior quest')).toBe(!complete);
+      expect(wrapper.find('a[href="/tasks?task=prior"]').exists()).toBe(!complete);
       wrapper.unmount();
     }
   );
@@ -311,5 +362,20 @@ describe('TaskCard appearance and expansion controls', () => {
     const reset = wrapper.get('button[aria-label="Reset item counts"]');
     expect(disclosure.element.contains(reset.element)).toBe(false);
     expect(disclosure.find('button').exists()).toBe(false);
+  });
+  it('enables item-count reset only while progress is nonterminal', async () => {
+    tarkovStoreMock.getObjectiveCount.mockReturnValue(2);
+    const wrapper = await mountTaskCard({
+      objectives: [{ id: 'objective-1', item: { id: 'item-1' } }],
+    });
+    const reset = wrapper.get('button[aria-label="Reset item counts"]');
+    expect(reset.attributes('disabled')).toBeUndefined();
+    taskState.complete = true;
+    await wrapper.vm.$nextTick();
+    expect(reset.attributes('disabled')).toBeDefined();
+    taskState.complete = false;
+    taskState.failed = true;
+    await wrapper.vm.$nextTick();
+    expect(reset.attributes('disabled')).toBeDefined();
   });
 });

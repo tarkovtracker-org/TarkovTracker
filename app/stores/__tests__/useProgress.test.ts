@@ -125,10 +125,17 @@ describe('useProgressStore', () => {
     setupMocks({
       selfCompletions: {
         'task-active': { active: true, complete: false, failed: false },
+        'task-inactive': { active: false, complete: false, failed: false },
+        'task-legacy': { complete: false, failed: false },
+      },
+      teammateCompletions: {
+        'task-active': { active: true, complete: false, failed: false },
+        'task-inactive': { active: false, complete: false, failed: false },
         'task-legacy': { complete: false, failed: false },
       },
       tasks: [
         { id: 'task-active', factionName: 'Any', name: 'Active Task' },
+        { id: 'task-inactive', factionName: 'Any', name: 'Inactive Task' },
         { id: 'task-legacy', factionName: 'Any', name: 'Legacy Task' },
       ],
     });
@@ -136,6 +143,9 @@ describe('useProgressStore', () => {
     const store = useProgressStore();
     expect(store.tasksState['task-active']).toBe(TASK_STATE.ACTIVE);
     expect(store.tasksState['task-legacy']).toBe(TASK_STATE.AVAILABLE);
+    expect(store.getTaskStatus('teammate-1', 'task-active')).toBe('active');
+    expect(store.getTaskStatus('teammate-1', 'task-inactive')).toBe('incomplete');
+    expect(store.getTaskStatus('teammate-1', 'task-legacy')).toBe('incomplete');
   });
   it('reacts when teammate stores are added after progress store initialization', async () => {
     const { teammateStore, teammateStores } = setupMocks({

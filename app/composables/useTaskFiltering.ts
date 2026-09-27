@@ -11,7 +11,6 @@ import {
   isActiveTeamTask,
   isAvailableTeamTask,
   matchesAllUsersView,
-  TRADER_SORT_RANK,
   type TeamTaskStatus,
 } from '@/utils/allUsersTaskStatus';
 import { TRADER_ORDER } from '@/utils/constants';
@@ -202,13 +201,13 @@ export function useTaskFiltering() {
   /**
    * Check if a task is invalid (permanently blocked) for a user
    */
-  const allVisibleTeamIds = (): string[] => Object.keys(progressStore.visibleTeamStores || {});
+  const allVisibleTeamIds = (): string[] => Object.keys(progressStore.visibleTeamStores);
   const isTaskInvalidForTeams = (taskId: string, teamIds: string[]): boolean =>
     teamIds.every((teamId) => progressStore.invalidTasks?.[taskId]?.[teamId] === true);
-  const isTaskInvalid = (taskId: string, userView: string, teamIds?: string[]): boolean => {
-    if (!isAllUsersView(userView)) return isTaskInvalidForTeams(taskId, [userView]);
-    return isTaskInvalidForTeams(taskId, teamIds ?? allVisibleTeamIds());
-  };
+  const isUserTaskInvalid = (taskId: string, userId: string): boolean =>
+    isTaskInvalidForTeams(taskId, [userId]);
+  const areAllUsersTaskInvalid = (taskId: string, teamIds: string[]): boolean =>
+    isTaskInvalidForTeams(taskId, teamIds);
   /**
    * Filter tasks by status (available, locked, completed) and user view
    */
@@ -260,9 +259,8 @@ export function useTaskFiltering() {
   ): string[] =>
     statuses.filter(predicate).map(({ teamId }) => progressStore.getDisplayName(teamId));
   const isInvalidForStatuses = (task: Task, statuses: TeamTaskStatus[]): boolean =>
-    isTaskInvalid(
+    areAllUsersTaskInvalid(
       task.id,
-      'all',
       statuses.map(({ teamId }) => teamId)
     );
   const allUsersTaskBuilders: Record<TaskSecondaryView, AllUsersTaskBuilder> = {
@@ -338,7 +336,7 @@ export function useTaskFiltering() {
     switch (secondaryView) {
       case 'available':
         filtered = filtered.filter((task) => {
-          if (isTaskInvalid(task.id, userView)) return false;
+          if (isUserTaskInvalid(task.id, userView)) return false;
           const isUnlocked = progressStore.unlockedTasks?.[task.id]?.[userView] === true;
           const { isActive, isCompleted, isFailed } = getUserTaskStatus(task.id, userView);
           return isUnlocked && !isActive && !isCompleted && !isFailed;
@@ -352,7 +350,7 @@ export function useTaskFiltering() {
         break;
       case 'locked':
         filtered = filtered.filter((task) => {
-          if (isTaskInvalid(task.id, userView)) return false;
+          if (isUserTaskInvalid(task.id, userView)) return false;
           const { isActive, isCompleted, isFailed } = getUserTaskStatus(task.id, userView);
           const unlockedTasks = progressStore.unlockedTasks?.[task.id];
           return !isActive && !isCompleted && !isFailed && unlockedTasks?.[userView] !== true;
@@ -470,23 +468,23 @@ export function useTaskFiltering() {
   };
   const getAllUsersTraderStatusRank = (task: Task): number => {
     const relevantTeamIds = getRelevantTeamIds(task, allVisibleTeamIds());
-    if (relevantTeamIds.length === 0) return TRADER_SORT_RANK.notApplicable;
     return getAllUsersTraderRank(
       relevantTeamIds.map((teamId) => getTaskStatus(task.id, teamId)),
-      isTaskInvalid(task.id, 'all', relevantTeamIds)
+      areAllUsersTaskInvalid(task.id, relevantTeamIds)
     );
   };
   const getUserTraderStatusRank = (task: Task, userView: string): number =>
     getUserTraderRank({
       ...getUserTaskStatus(task.id, userView),
       isUnlocked: progressStore.unlockedTasks?.[task.id]?.[userView] === true,
-      isInvalid: isTaskInvalid(task.id, userView),
+      isInvalid: isUserTaskInvalid(task.id, userView),
     });
   const getTraderStatusSortRank = (task: Task, userView: string): number =>
     isAllUsersView(userView)
       ? getAllUsersTraderStatusRank(task)
       : getUserTraderStatusRank(task, userView);
   const groupTraderTasksByStatus = (taskList: Task[], userView: string): Task[] => {
+    // All-user tasks reach this point only after filtering retained at least one relevant teammate.
     const sortByStatusRank = (tasks: Task[]): Task[] =>
       tasks
         .map((task, index) => ({

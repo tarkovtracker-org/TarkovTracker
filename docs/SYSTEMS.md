@@ -771,7 +771,9 @@ active: true }`; completed, failed, and neutral writes set `active: false`. Miss
 - Auto-unlocked successors with no stored progress stay absent and their availability is derived
   from task requirements and current progress. The gateway writes only explicitly requested task
   IDs, so no implicit successor update can overwrite concurrent or explicit progress. An active
-  prerequisite is satisfied only by an explicit active task or a task that has since completed.
+  prerequisite is satisfied by an explicit active task or a task that has since completed when the
+  task has an `active` field. Legacy rows without `active` retain the client unlockable prerequisite
+  fallback described under Task availability below.
 - The ETag digest and the gzip decision both derive from the same serialized UTF-8 payload bytes,
   so the validator and the payload can never disagree. The wire body is those bytes uncompressed,
   or a `CompressionStream('gzip')` over them when gzip is negotiated — the ETag always represents
@@ -821,6 +823,8 @@ flowchart LR
    completions live in these JSONB blobs; the optional `active` boolean is preserved by local
    persistence, merges, realtime, team and sharing transforms. Missing legacy incomplete values
    remain missing, while terminal complete or failed rows are normalized to `active: false`.
+   Persisted `lastApiUpdate` and `apiUpdateHistory` retain task states `active`, `completed`, `failed`, and
+   `uncompleted`; malformed entries and unknown states are stripped by the database sanitizer.
 3. Realtime listens to both the account row and normalized rows. A normalized event is applied only
    when its mode is supported and its season equals the active season. The long-lived system and team
    listeners run in detached scopes so route unmounts cannot orphan their channels. The team store
@@ -954,6 +958,9 @@ flowchart LR
 ### Invariants
 
 - `pvp` and `pve` always use season `0`; `seasonal` always uses a positive season.
+- Persisted API task-update metadata accepts only `active`, `completed`, `failed`, and
+  `uncompleted`. Its sanitizer strips malformed entries and unknown states; enabling a new producer
+  requires aligned application/gateway consumers and a verified database rollout first.
 - Browser roles never need table maintenance privileges (`TRUNCATE`, `REFERENCES`, `TRIGGER`,
   `MAINTAIN`) on account, progress, team, billing, or audit tables. Explicit forward revokes preserve
   existing row and column access, including token-note updates. Billing events remain server-only;

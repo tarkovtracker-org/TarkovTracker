@@ -306,6 +306,16 @@ describe('TaskFilterBar', () => {
     expect(buttonTexts.some((text) => text.includes('Active2'))).toBe(true);
     expect(buttonTexts.some((text) => text.includes('available1'))).toBe(true);
   });
+  it('switches to the active task view when its status filter is selected', async () => {
+    const { TaskFilterBar, preferencesStore } = await setup();
+    const wrapper = mountTaskFilterBar(TaskFilterBar);
+    const activeButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().startsWith('Active'));
+    expect(activeButton).toBeTruthy();
+    await activeButton!.trigger('click');
+    expect(preferencesStore.setTaskSecondaryView).toHaveBeenCalledWith('active');
+  });
   it('applies stronger selected styling to the active primary and status views', async () => {
     const { TaskFilterBar } = await setup({
       preferencesStore: {
@@ -500,6 +510,18 @@ describe('TaskFilterBar', () => {
     expect(availableButton).toBeTruthy();
     const badge = availableButton!.find('.rounded-full');
     expect(badge.exists()).toBe(true);
+    expect(badge.classes()).toContain('bg-surface-600');
+    expect(badge.classes()).toContain('light:text-surface-50');
+  });
+  it('keeps the zero-count active badge readable in light mode', async () => {
+    const { TaskFilterBar } = await setup({ statusCounts: { active: 0 } });
+    const wrapper = mountTaskFilterBar(TaskFilterBar);
+    const activeButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().startsWith('Active'));
+    expect(activeButton).toBeTruthy();
+    const badge = activeButton!.find('.rounded-full');
+    expect(badge.text()).toBe('0');
     expect(badge.classes()).toContain('bg-surface-600');
     expect(badge.classes()).toContain('light:text-surface-50');
   });

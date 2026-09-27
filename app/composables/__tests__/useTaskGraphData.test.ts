@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { ref } from 'vue';
 import { collectAncestorTaskIds, resolveTaskNodeStatus } from '@/composables/useTaskGraphData';
 import { TASK_STATE } from '@/utils/constants';
 import type { Task } from '@/types/tarkov';
@@ -51,5 +52,44 @@ describe('resolveTaskNodeStatus', () => {
         'available-task': TASK_STATE.AVAILABLE,
       })
     ).toBe('available');
+  });
+  it('treats missing and unrecognized progress states as locked', () => {
+    expect(resolveTaskNodeStatus('missing-task', {})).toBe('locked');
+    expect(resolveTaskNodeStatus('unknown-task', { 'unknown-task': 'queued' })).toBe('locked');
+  });
+});
+describe('useTaskGraphData', () => {
+  it('limits graph nodes and edges to the allowed task IDs', async () => {
+    const tasks = ref<Task[]>([
+      createTask({
+        id: 'allowed-parent',
+        trader: { id: 'other-trader' },
+        children: ['trader-task'],
+      }),
+      createTask({
+        id: 'trader-task',
+        trader: { id: 'trader-1' },
+        parents: ['allowed-parent', 'excluded-parent'],
+      }),
+      createTask({ id: 'excluded-parent', trader: { id: 'other-trader' } }),
+      createTask({ id: 'other-trader-task', trader: { id: 'trader-1' } }),
+    ]);
+    const tasksState = { 'trader-task': TASK_STATE.ACTIVE };
+    vi.resetModules();
+    vi.doMock('@/stores/useMetadata', () => ({
+      useMetadataStore: () => ({
+        get tasks() {
+          return tasks.value;
+        },
+      }),
+    }));
+    vi.doMock('@/stores/useProgress', () => ({
+      useProgressStore: () => ({ tasksState }),
+    }));
+    const { useTaskGraphData } = await import('@/composables/useTaskGraphData');
+    const graph = useTaskGraphData(ref('trader-1'), ref(null), ref(new Set(['trader-task'])));
+    expect(graph.nodes.value.map(({ id }) => id)).toEqual(['trader-task']);
+    expect(graph.nodes.value[0]?.data).toMatchObject({ status: 'active', isRoot: true });
+    expect(graph.edges.value).toEqual([]);
   });
 });

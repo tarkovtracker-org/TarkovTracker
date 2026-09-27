@@ -534,6 +534,31 @@ describe('Shared Profile API', () => {
     const result = await handler(mockEvent as H3Event);
     expect(result.data).toEqual({ displayName: 'PublicPlayer', level: 24 });
   });
+  it('preserves active API task updates and drops unsupported update states', async () => {
+    mockFetch
+      .mockResolvedValueOnce(progressResponse())
+      .mockResolvedValueOnce(
+        modeProgressResponse({
+          level: 24,
+          lastApiUpdate: {
+            id: 'update-1',
+            at: 1000,
+            source: 'api',
+            tasks: [
+              { id: 'task-active', state: 'active' },
+              { id: 'task-invalid', state: 'queued' },
+            ],
+          },
+        })
+      )
+      .mockResolvedValueOnce(preferencesResponse());
+    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+    const result = await handler(mockEvent as H3Event);
+    expect(result.data?.lastApiUpdate).toMatchObject({
+      id: 'update-1',
+      tasks: [{ id: 'task-active', state: 'active' }],
+    });
+  });
   it('hides display name for public pvp profile when privacy mode is enabled', async () => {
     mockFetch
       .mockResolvedValueOnce(progressResponse())
