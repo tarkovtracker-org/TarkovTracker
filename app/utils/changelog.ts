@@ -19,8 +19,14 @@ export const toSentence = (value: string): string => {
   }
   return text;
 };
-// Conventional commit types that describe a change players can notice.
-const USER_FACING_TYPES = new Set(['feat', 'fix', 'perf', 'ui']);
+// Conventional commit types players can notice, with the leading verb the changelog page turns
+// into a badge (`app/pages/changelog.vue`).
+const USER_FACING_VERBS: Readonly<Record<string, string>> = Object.freeze({
+  feat: 'Added',
+  fix: 'Fixed',
+  perf: 'Improved',
+  ui: 'Updated',
+});
 // Scopes for tooling, automation, documentation, and dependencies. A `fix(ci):` commit is still
 // internal even though its type would otherwise be user-facing.
 const INTERNAL_SCOPES = new Set([
@@ -45,7 +51,8 @@ const CONVENTIONAL_PATTERN = /^([a-z]+)(?:\(([^)]+)\))?!?:\s*(.+)$/i;
 // semantic-release entry: `* **scope:** subject ([#12](url)) ([abc1234](url)), closes [#9](url)`
 const RELEASE_SCOPE_PATTERN = /^\*\*([^*:]+):\*\*\s*/;
 const RELEASE_REFERENCE_PATTERN = /\s*\(\[[^\]]+\]\([^)]+\)\)/g;
-const RELEASE_CLOSES_PATTERN = /,?\s*closes\b.*$/i;
+// Only the generated trailer, e.g. `, closes [#9](url), [#10](url)`; never words in the subject.
+const RELEASE_CLOSES_PATTERN = /,\s*closes\s+\[#\d+\]\([^)]*\)(?:,\s*\[#\d+\]\([^)]*\))*\s*$/i;
 const RELEASE_COMMIT_PATTERN = /\/commit\/([0-9a-f]{40})\b/gi;
 const isInternalScope = (scope: string | undefined): boolean =>
   Boolean(scope) && INTERNAL_SCOPES.has(String(scope).trim().toLowerCase());
@@ -112,8 +119,10 @@ export const releaseCommitShas = (body: string | null | undefined): string[] =>
 const VERB_PATTERN =
   /^(add|adds|added|fix|fixes|fixed|improve|improves|improved|update|updates|updated|refactor|refactors|refactored)\b\s*/i;
 const conventionalBullet = (type: string, scope: string | undefined, subject: string) => {
-  if (!USER_FACING_TYPES.has(type.toLowerCase()) || isInternalScope(scope)) return null;
-  return toSentence(subject) || null;
+  const verb = USER_FACING_VERBS[type.toLowerCase()];
+  const text = cleanText(subject);
+  if (!verb || !text || isInternalScope(scope)) return null;
+  return toSentence(`${verb} ${text}`);
 };
 const inferredBullet = (line: string): string | null => {
   const keyword = line.match(VERB_PATTERN)?.[1]?.toLowerCase();

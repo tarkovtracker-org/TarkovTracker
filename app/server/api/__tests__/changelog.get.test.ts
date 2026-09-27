@@ -32,7 +32,7 @@ const release = (tag: string, day: string, body = '- Improved maps') => ({
   published_at: `${day}T12:00:00Z`,
   body,
 });
-const commit = (sha: string, day: string, message = 'fix: keep map markers visible') => ({
+const commit = (sha: string, day: string, message = 'fix: map markers') => ({
   sha,
   commit: { message, author: { date: `${day}T12:00:00Z` } },
 });
@@ -109,7 +109,7 @@ describe('changelog endpoint', () => {
         return json([
           commit(shaA, '2026-09-06', 'fix(ci): guard reviews'),
           commit(shaB, '2026-09-05', 'feat(maps): add filters'),
-          commit(shaC, '2026-09-04', 'fix(app): keep totals accurate'),
+          commit(shaC, '2026-09-04', 'fix(app): stale item totals'),
         ]);
       return json({ stats: { additions: 1, deletions: 0 } });
     });
@@ -118,7 +118,7 @@ describe('changelog endpoint', () => {
       { label: 'v2', bullets: [{ text: 'Add filters.' }] },
       {
         label: undefined,
-        bullets: [{ text: 'Keep totals accurate.', stats: { additions: 1, deletions: 0 } }],
+        bullets: [{ text: 'Fixed stale item totals.', stats: { additions: 1, deletions: 0 } }],
       },
     ]);
     expect(requests().some((url) => url.endsWith(`/commits/${shaB}`))).toBe(false);
@@ -130,7 +130,7 @@ describe('changelog endpoint', () => {
       if (url.includes('/commits?'))
         return json([
           commit('a', '2026-09-05'),
-          commit('b', '2026-09-05', 'feat: add filters'),
+          commit('b', '2026-09-05', 'feat: filters'),
           commit('ignored', '2026-09-05', 'chore: dependencies'),
           commit('c', '2026-09-04'),
         ]);
@@ -144,7 +144,7 @@ describe('changelog endpoint', () => {
       items: [
         {
           date: '2026-09-05',
-          bullets: [{ text: 'Keep map markers visible.' }, { text: 'Add filters.' }],
+          bullets: [{ text: 'Fixed map markers.' }, { text: 'Added filters.' }],
           stats: { additions: 4, deletions: 1 },
         },
       ],
@@ -163,7 +163,7 @@ describe('changelog endpoint', () => {
       return json({ stats: { additions: 1, deletions: 0 } });
     });
     expect((await (await loadHandler())(event)).items[0]?.bullets[0]).toMatchObject({
-      text: 'Keep map markers visible.',
+      text: 'Fixed map markers.',
     });
     expect(requests().filter((url) => url.includes('/commits?'))).toHaveLength(2);
   });

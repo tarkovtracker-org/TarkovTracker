@@ -47,6 +47,11 @@ describe('public changelog text', () => {
       )
     ).toBe('Rank buildable needs.');
     expect(toReleaseBullet('unscoped change ([#1](url))')).toBe('Unscoped change.');
+    expect(
+      toReleaseBullet(
+        `**ui:** menu closes after navigation ([#5](${repo}/issues/5)), closes [#3](${repo}/issues/3), [#4](${repo}/issues/4)`
+      )
+    ).toBe('Menu closes after navigation.');
   });
   it.each(['ci', 'preview', 'release', 'test', 'deps', 'Docs', 'config'])(
     'hides release entries with the internal %s scope',
@@ -73,11 +78,11 @@ describe('public changelog text', () => {
     expect(releaseCommitShas(null)).toEqual([]);
   });
   it.each([
-    ['feat(tasks): add tracker (#42)', 'Add tracker.'],
-    ['fix: keep map markers visible', 'Keep map markers visible.'],
-    ['perf: speed up task rendering', 'Speed up task rendering.'],
-    ['ui: refresh filters', 'Refresh filters.'],
-    ['fix(api)!: reject expired tokens', 'Reject expired tokens.'],
+    ['feat(tasks): tracker (#42)', 'Added tracker.'],
+    ['fix: broken map', 'Fixed broken map.'],
+    ['perf: task rendering', 'Improved task rendering.'],
+    ['ui: filters', 'Updated filters.'],
+    ['fix(api)!: expired token handling', 'Fixed expired token handling.'],
     ['Adds map filters', 'Added map filters.'],
     ['Fixes stale counts', 'Fixed stale counts.'],
     ['Updates trader cards', 'Updated trader cards.'],
