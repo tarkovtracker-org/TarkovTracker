@@ -701,9 +701,10 @@ sequenceDiagram
    snapshot. Expiry replaces the catalog and graph together. Each player still gets fresh invalidation
    state. The app's mutable entry point rebuilds its graph so in-place metadata edits remain visible.
 7. **Task writes.** Single and batch task writes accept `active`, `completed`, `failed`, and
-   `uncompleted`. They persist canonical `complete`/`failed`/`active` triples. Dependency processing
-   materializes missing auto-unlocked successors as explicitly neutral, never active, and never
-   overwrites existing successor progress.
+   `uncompleted`. They persist canonical `complete`/`failed`/`active` triples only for task IDs
+   explicitly supplied by the caller. Auto-unlocked successors with no stored progress stay absent;
+   client availability derives from task requirements and current progress. The gateway does not
+   issue implicit successor writes that could overwrite concurrent or explicit progress.
 8. **Conditional response.** `conditionalReadResponse` in `workers/api-gateway/src/responses.ts`
    serializes once, derives a weak `ETag` from the payload, answers `304` on a matching
    `If-None-Match`, and sets `Cache-Control: private, max-age=15` plus
@@ -767,10 +768,10 @@ sequenceDiagram
 active: true }`; completed, failed, and neutral writes set `active: false`. Missing `active` on
   legacy incomplete task rows means unknown and is never inferred or mass-backfilled; a terminal
   completed or failed row is inactive by definition and is normalized to `active: false`.
-- Auto-unlocked successors are neutral/available, not active, and are materialized only when they
-  have no stored progress. Dependency propagation never downgrades an existing neutral, active,
-  completed, failed, or legacy-ambiguous successor row. An active prerequisite is satisfied only by
-  an explicit active task or a task that has since completed.
+- Auto-unlocked successors with no stored progress stay absent and their availability is derived
+  from task requirements and current progress. The gateway writes only explicitly requested task
+  IDs, so no implicit successor update can overwrite concurrent or explicit progress. An active
+  prerequisite is satisfied only by an explicit active task or a task that has since completed.
 - The ETag digest and the gzip decision both derive from the same serialized UTF-8 payload bytes,
   so the validator and the payload can never disagree. The wire body is those bytes uncompressed,
   or a `CompressionStream('gzip')` over them when gzip is negotiated — the ETag always represents
