@@ -16,6 +16,7 @@ import {
   versionCommitted,
   withHighlights,
 } from './release-highlights.mjs';
+import { clearPreparedVersion, recordPreparedVersion } from './release-note-state.mjs';
 const template = (note) =>
   `## Summary\n\nInternal detail.\n\n## Release note\n\n<!-- For players. Write "none" for internal changes. -->\n\n${note}\n\n## Changes\n\n- Refactored the store\n`;
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status });
@@ -35,6 +36,13 @@ describe('release note parsing', () => {
       releaseNotesFromBody(template('Smart Fill now spreads collected items evenly.'))
     ).toEqual(['Smart Fill now spreads collected items evenly.']);
   });
+  it.each([' ## Changes', '  ## Changes', '   ## Changes'])(
+    'ends at a root heading with up to three leading spaces (%j)',
+    (heading) => {
+      const body = `## Release note\n\nPlayer update.\n\n${heading}\n\n- Internal change.`;
+      expect(releaseNotesFromBody(body)).toEqual(['Player update.']);
+    }
+  );
   it('keeps one entry per bullet and strips markup', () => {
     const body = template(
       '- Maps list every objective\n* <b>Faster</b>   task filters\n\n1. Third'
@@ -91,6 +99,18 @@ describe('release note parsing', () => {
     const body = '## Summary\n\n```html\n<!--\n```\n\n## Release note\n\nReal update.\n';
     expect(releaseNotesFromBody(body)).toEqual(['Real update.']);
   });
+  it.each(['pre', 'script', 'style'])(
+    'ignores a release heading inside a raw HTML %s block',
+    (tag) => {
+      const body = `## Summary\n\n<${tag}>\n## Release note\nFake note.\n</${tag}>\n\n## Release note\n\nReal note.`;
+      expect(releaseNotesFromBody(body)).toEqual(['Real note.']);
+    }
+  );
+  it('preserves notes between separate comment and fenced-code masks', () => {
+    const body =
+      '## Release note\n\nFirst note. <!-- hidden --> second note.\n\n```md\nFake heading\n```\n\nThird note.\n\n## Changes\n\n- Internal.';
+    expect(releaseNotesFromBody(body)).toEqual(['First note. second note. Third note.']);
+  });
   it('does not let comment-looking code before the release section consume it', () => {
     expect(
       releaseNotesFromBody('`<!--` is an example token.\n\n## Release note\n\nReal update.')
@@ -126,6 +146,10 @@ describe('release note parsing', () => {
     expect(
       releaseNotesFromBody('Escaped \\` <!-- hidden --> `\n## Release note\nReal update.')
     ).toEqual(['Real update.']);
+  });
+  it('uses CommonMark code-span closure when a backslash precedes the closing tick', () => {
+    const body = '## Release note\n\nUse `literal\\` before <!-- hidden --> this.';
+    expect(releaseNotesFromBody(body)).toEqual(['Use literal\\ before this.']);
   });
   it.each(['- First\n\n- Second', '- First\n- Second'])(
     'keeps the first item when a section starts with a newline (%j)',
@@ -174,6 +198,12 @@ describe('release note parsing', () => {
     const [note] = releaseNotesFromBody(body);
     expect(note).toHaveLength(280);
     expect(performance.now() - start).toBeLessThan(1000);
+  });
+  it('walks a deeply nested maximum-size Markdown tree without recursion', () => {
+    const nestedQuotes = `${'> '.repeat(10_000)}ignored\n\n`;
+    const body = `## Summary\n\n${nestedQuotes}## Release note\n\nReal note.\n\n<!--${'x'.repeat(46_000)}-->`;
+    expect(body.length).toBeGreaterThan(65_536);
+    expect(releaseNotesFromBody(body)).toEqual(['Real note.']);
   });
   it('ignores release-note headings hidden in comments, even unterminated ones', () => {
     const hidden = `## Summary\n\n<!--\n## Release note\n\nSecurity update: reset your account.\n-->\n\n${template('none').slice('## Summary\n\nInternal detail.\n\n'.length)}`;
@@ -322,6 +352,12 @@ describe('version commit detection', () => {
     git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', subject);
     return cwd;
   };
+  const preparedContext = (cwd) => {
+    const context = { cwd, nextRelease: { version: '1.84.0' } };
+    const sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim();
+    recordPreparedVersion(context, sha);
+    return context;
+  };
   it.each([
     ['chore(release): 1.84.0', '1.84.0', true],
     ['chore(release): 1.84.0', '1.83.3', false],
@@ -330,7 +366,35 @@ describe('version commit detection', () => {
   ])('HEAD %s with committed manifest %s is a version commit: %s', (subject, version, expected) => {
     const cwd = committed({ subject, version });
     try {
-      expect(versionCommitted({ cwd, nextRelease: { version: '1.84.0' } })).toBe(expected);
+      expect(versionCommitted(preparedContext(cwd))).toBe(expected);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+  it('requires this run to prepare the matching two-asset commit and current HEAD', () => {
+    const cwd = committed({ subject: 'chore(release): 1.84.0' });
+    const context = { cwd, nextRelease: { version: '1.84.0' } };
+    const git = (...args) => execFileSync('git', args, { cwd, stdio: 'pipe' });
+    try {
+      expect(versionCommitted(context)).toBe(false);
+      const sha = git('rev-parse', 'HEAD').toString().trim();
+      recordPreparedVersion(context, sha);
+      expect(versionCommitted(context)).toBe(true);
+      clearPreparedVersion(context);
+      expect(versionCommitted(context)).toBe(false);
+      recordPreparedVersion(context, sha);
+      git(
+        '-c',
+        'user.name=t',
+        '-c',
+        'user.email=t@t',
+        'commit',
+        '-q',
+        '--allow-empty',
+        '-m',
+        'chore: move HEAD after preparation'
+      );
+      expect(versionCommitted(context)).toBe(false);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -338,7 +402,7 @@ describe('version commit detection', () => {
   it('is false when an unrelated file changed with the generated assets', () => {
     const cwd = committed({ subject: 'chore(release): 1.84.0', extra: { 'unrelated.txt': 'x' } });
     try {
-      expect(versionCommitted({ cwd, nextRelease: { version: '1.84.0' } })).toBe(false);
+      expect(versionCommitted(preparedContext(cwd))).toBe(false);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -362,28 +426,27 @@ describe('version commit detection', () => {
         '-m',
         'chore(release): 1.84.0'
       );
-      expect(versionCommitted({ cwd, nextRelease: { version: '1.84.0' } })).toBe(false);
+      expect(versionCommitted(preparedContext(cwd))).toBe(false);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
   });
   it('is false when the matching subject changed no generated asset', () => {
-    const cwd = mkdtempSync(join(tmpdir(), 'highlights-'));
+    const cwd = committed({ subject: 'chore: fixture' });
     const git = (...args) => execFileSync('git', args, { cwd, stdio: 'pipe' });
-    git('init', '-q');
-    git(
-      '-c',
-      'user.name=t',
-      '-c',
-      'user.email=t@t',
-      'commit',
-      '-q',
-      '--allow-empty',
-      '-m',
-      'chore(release): 1.84.0'
-    );
     try {
-      expect(versionCommitted({ cwd, nextRelease: { version: '1.84.0' } })).toBe(false);
+      git(
+        '-c',
+        'user.name=t',
+        '-c',
+        'user.email=t@t',
+        'commit',
+        '-q',
+        '--allow-empty',
+        '-m',
+        'chore(release): 1.84.0'
+      );
+      expect(versionCommitted(preparedContext(cwd))).toBe(false);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

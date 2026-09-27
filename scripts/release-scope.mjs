@@ -6,6 +6,7 @@ import {
   versionCommitted,
   withHighlights,
 } from './release-highlights.mjs';
+import { clearPreparedVersion } from './release-note-state.mjs';
 /**
  * Conventional-commit scopes for tooling, automation, documentation, and dependencies. Commits
  * with these scopes never create a release and are left out of release notes, even when their type
@@ -57,6 +58,8 @@ async function load(name) {
 }
 /** semantic-release `analyzeCommits` step with internal-scope commits removed. */
 export async function analyzeCommits(config, context) {
+  // A new release invocation must not inherit an earlier run's prepare proof.
+  clearPreparedVersion(context);
   const analyzer = await load('@semantic-release/commit-analyzer');
   return analyzer.analyzeCommits(config, playerFacing(context));
 }

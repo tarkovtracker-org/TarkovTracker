@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { versionCommitted } from './release-highlights.mjs';
+import { clearPreparedVersion } from './release-note-state.mjs';
 import {
   analyzeCommits,
   generateNotes,
@@ -28,6 +29,10 @@ const context = (messages) => ({
 vi.mock('./release-highlights.mjs', async (original) => ({
   ...(await original()),
   versionCommitted: vi.fn(() => true),
+}));
+vi.mock('./release-note-state.mjs', async (original) => ({
+  ...(await original()),
+  clearPreparedVersion: vi.fn(),
 }));
 afterEach(() => vi.unstubAllGlobals());
 describe('release scope plugin', () => {
@@ -131,6 +136,7 @@ describe('release scope plugin', () => {
   it('reports how many commits were ignored', async () => {
     const run = context(['fix(ci): a', 'fix(app): b']);
     await analyzeCommits(config, run);
+    expect(clearPreparedVersion).toHaveBeenCalledWith(run);
     expect(run.logger.log).toHaveBeenCalledWith(
       'Ignoring %d internal-scope commit(s) for this release',
       1

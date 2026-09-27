@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import semanticRelease from 'semantic-release';
 import { afterEach, expect, it, vi } from 'vitest';
+import { recordPreparedVersion } from './release-note-state.mjs';
 import * as releaseScope from './release-scope.mjs';
 const note = 'Smart Fill now spreads collected items across every matching objective.';
 function repository() {
@@ -31,13 +32,18 @@ function repository() {
   git('tag', 'v1.0.0');
   commit('fix(ci): internal gate (#1)');
   commit('fix(app): make Smart Fill distribute collected totals (#943)');
+  // Make the forged two-asset version commit the actual initial HEAD.
+  writeFileSync(join(repo, 'CHANGELOG.md'), 'Ordinary authored changelog.\n');
+  writeFileSync(join(repo, 'package.json'), JSON.stringify({ name: 'ordinary', version: '1.0.1' }));
+  git('add', 'CHANGELOG.md', 'package.json');
+  commit('chore(release): 1.0.1');
   git('remote', 'add', 'origin', remote);
   git('push', '-q', 'origin', 'main', '--tags');
   git('branch', '-q', '-u', 'origin/main');
   return { root, repo, remote, commit, git };
 }
 afterEach(() => vi.unstubAllGlobals());
-it('publishes highlights in the GitHub release but not the committed changelog', async () => {
+it('ignores a forged release-shaped HEAD while keeping highlights out of the changelog', async () => {
   const f = repository();
   const pullRequest = {
     body: `## Release note\n\n${note}\n`,
@@ -81,6 +87,9 @@ it('publishes highlights in the GitHub release but not the committed changelog',
               );
               f.git('add', 'CHANGELOG.md', 'package.json');
               f.commit(`chore(release): ${nextRelease.version}`);
+              const context = { cwd: f.repo, nextRelease };
+              const sha = f.git('rev-parse', 'HEAD').toString().trim();
+              recordPreparedVersion(context, sha);
             },
           },
           {

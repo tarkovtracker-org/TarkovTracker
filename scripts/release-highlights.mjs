@@ -14,14 +14,14 @@
  * text is never matched by superlinear patterns: parsing is bounded by GitHub's body limit, each
  * bullet is bounded before sanitization, and autolinks are detected per whitespace token.
  * Highlights are added only after this release's version commit is verified to be HEAD
- * (`versionCommitted`, authenticated by its generated release state, not just its subject), so
+ * (`versionCommitted`, authenticated by this run's prepared HEAD SHA and its generated assets), so
  * PR text is published in the GitHub release but never written to the committed,
  * secret-scanned CHANGELOG.md. Lookups run with bounded concurrency and stop at the highlight cap.
  */
-import { execFileSync } from 'node:child_process';
+import { fromMarkdown } from 'mdast-util-from-markdown';
+export { versionCommitted } from './release-note-state.mjs';
 const PR_REFERENCE = /\(#(\d+)\)\s*$/;
-const NOTE_HEADING = /^##[ \t]+release[ \t]+notes?(?:[ \t]+#+)?[ \t]*$/im;
-const NEXT_HEADING = /^#{1,2}[ \t]+\S/m;
+const RELEASE_NOTE_HEADING = /^release notes?$/i;
 // Zero leading whitespace: nested list markers and indented code are continuation content of
 // their parent bullet, never new top-level highlights.
 const TOP_LIST_ITEM = /^(?:[-*+]|\d+[.)])[ \t]+/;
@@ -45,7 +45,6 @@ export const MAX_CONCURRENT_LOOKUPS = 4;
 const TRUSTED_AUTHORS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 // `permission` is the effective base permission (custom and `maintain` roles map to `write`).
 const WRITE_PERMISSIONS = new Set(['write', 'admin']);
-const FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 const REVERTS = /^This reverts commit ([0-9a-f]{7,40})\b/im;
 const REQUEST_TIMEOUT_MS = 10_000;
 const PULL_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
@@ -61,169 +60,77 @@ export function pullRequestNumber(message) {
   const match = header.match(PR_REFERENCE);
   return match ? Number(match[1]) : null;
 }
-// CommonMark fences: a closing fence uses the opening character, is at least as long, and has no
-// info string; an unterminated fence runs to the end of the body.
-function closesFence(line, open) {
-  const match = line.match(FENCE);
-  if (!match || match[2].trim()) return false;
-  return match[1][0] === open[0] && match[1].length >= open.length;
+function pushChildren(stack, children) {
+  for (let index = children.length - 1; index >= 0; index -= 1) stack.push(children[index]);
 }
-function hasInvalidFenceInfo(match) {
-  return match[1][0] === '`' && match[2].includes('`');
+const hasChildren = (node) => Array.isArray(node.children);
+function isFencedCode(node, source) {
+  if (node.type !== 'code') return false;
+  // Fenced nodes start at their marker; indented code starts at the line indentation.
+  const marker = source[node.position.start.offset];
+  return marker === '`' || marker === '~';
 }
-function openingFence(line) {
-  const match = line.match(FENCE);
-  if (!match) return null;
-  if (hasInvalidFenceInfo(match)) return null;
-  return match[1];
-}
-function fenceStep(state, line) {
-  if (state.open) {
-    if (closesFence(line, state.open)) state.open = null;
-    return state;
-  }
-  state.open = openingFence(line);
-  // A removed block must not join inline-code spans in the surrounding paragraphs.
-  state.kept.push(state.open ? '' : line);
-  return state;
-}
-function stripFencedCode(text) {
-  return text.split('\n').reduce(fenceStep, { open: null, kept: [] }).kept.join('\n');
-}
-function backtickRun(line, start) {
-  let end = start;
-  while (line[end] === '`') end += 1;
-  return end - start;
-}
-const isIndentedCode = (line) => /^(?: {4}| {0,3}\t)/.test(line);
-function countLineBackticks(line, counts) {
-  for (let index = 0; index < line.length;) {
-    if (line[index] !== '`') {
-      index += 1;
-      continue;
+const isMaskedNode = (node, source) => node.type === 'html' || isFencedCode(node, source);
+function collectMaskRanges(source, root) {
+  const nodes = [];
+  const ranges = [];
+  pushChildren(nodes, root.children);
+  while (nodes.length) {
+    const node = nodes.pop();
+    if (isMaskedNode(node, source)) {
+      ranges.push({ start: node.position.start.offset, end: node.position.end.offset });
     }
-    const run = backtickRun(line, index);
-    counts.set(run, (counts.get(run) ?? 0) + 1);
-    index += run;
+    if (hasChildren(node)) pushChildren(nodes, node.children);
   }
+  return ranges;
 }
-function countBackticks(lines) {
-  const counts = new Map();
-  lines.filter((line) => !isIndentedCode(line)).forEach((line) => countLineBackticks(line, counts));
-  return counts;
+function appendMaskedRange(state, range, source) {
+  if (range.end <= state.offset) return;
+  const start = Math.max(range.start, state.offset);
+  state.text += source.slice(state.offset, start);
+  // Preserve offsets and text adjacency until sentinels are removed before sanitization.
+  state.text += source.slice(start, range.end).replace(/[^\n]/g, '\0');
+  state.offset = range.end;
 }
-function consumeBacktickCounts(line, start, end, counts) {
-  for (let index = start; index < end;) {
-    if (line[index] !== '`') {
-      index += 1;
-      continue;
-    }
-    const run = backtickRun(line, index);
-    counts.set(run, counts.get(run) - 1);
-    index += run;
-  }
+function maskRanges(source, ranges) {
+  const state = { text: '', offset: 0 };
+  ranges
+    .sort((left, right) => left.start - right.start)
+    .forEach((range) => {
+      appendMaskedRange(state, range, source);
+    });
+  return state.text + source.slice(state.offset);
 }
-function skipComment(line, index, state, tickCounts) {
-  const close = line.indexOf('-->', index);
-  const end = close === -1 ? line.length : close;
-  consumeBacktickCounts(line, index, end, tickCounts);
-  state.inComment = close === -1;
-  return close === -1 ? line.length : close + 3;
+function appendNodeText(stack, text) {
+  const node = stack.pop();
+  if (node.type === 'text' || node.type === 'inlineCode') text.push(node.value);
+  else if (hasChildren(node)) pushChildren(stack, node.children);
 }
-function escapedBacktick(line, index) {
-  let slashes = 0;
-  for (let cursor = index - 1; line[cursor] === '\\'; cursor -= 1) slashes += 1;
-  return slashes % 2 === 1;
+function headingText(heading) {
+  const stack = [];
+  const text = [];
+  pushChildren(stack, heading.children);
+  while (stack.length) appendNodeText(stack, text);
+  return text.join('').replace(/\s+/g, ' ').trim();
 }
-const canOpenCodeTick = (line, index, state, remaining) =>
-  !state.codeTicks && remaining > 0 && !escapedBacktick(line, index);
-function consumeCodeTick(line, index, state, tickCounts) {
-  const run = backtickRun(line, index);
-  const remaining = tickCounts.get(run) - 1;
-  tickCounts.set(run, remaining);
-  if (state.codeTicks === run) state.codeTicks = 0;
-  else if (canOpenCodeTick(line, index, state, remaining)) {
-    state.codeTicks = run;
-  }
-  return { text: line.slice(index, index + run), next: index + run };
-}
-function isCommentStart(line, index, state) {
-  return !state.codeTicks && line.startsWith('<!--', index);
-}
-function scanVisibleStep(line, index, state, tickCounts) {
-  if (line[index] === '`') return consumeCodeTick(line, index, state, tickCounts);
-  if (isCommentStart(line, index, state)) {
-    state.inComment = true;
-    return { text: '', next: index + 4 };
-  }
-  return { text: line[index], next: index + 1 };
-}
-function scanCommentLine(line, state, tickCounts) {
-  let index = 0;
-  let visible = '';
-  while (index < line.length) {
-    if (state.inComment) index = skipComment(line, index, state, tickCounts);
-    else {
-      const step = scanVisibleStep(line, index, state, tickCounts);
-      visible += step.text;
-      index = step.next;
-    }
-  }
-  return visible;
-}
-function appendCommentLine(line, state, tickCounts, kept) {
-  if (isIndentedCode(line) && !state.inComment) {
-    if (!state.inComment) kept.push(line);
-    state.codeTicks = 0;
-    return;
-  }
-  const visible = scanCommentLine(line, state, tickCounts);
-  kept.push(visible);
-}
-const isListBoundary = (line) => /^[ \t]{0,3}(?:[-*+]|\d+[.)])[ \t]+/.test(line);
-const isHeadingBoundary = (line) => /^[ \t]{0,3}#{1,6}(?:[ \t]|$)/.test(line);
-const isHeadingOrQuote = (line) => isHeadingBoundary(line) || /^[ ]{0,3}>/.test(line);
-const isRuleBoundary = (line) => /^(?:=+|-+|\*{3,}|_{3,})$/.test(line.trim().replace(/[ \t]/g, ''));
-const isStandaloneBlock = (line) =>
-  !line.trim() || isHeadingOrQuote(line) || isIndentedCode(line) || isRuleBoundary(line);
-function flushInlineBlock(state) {
-  if (state.current.length) state.blocks.push(state.current);
-  state.current = [];
-}
-function appendInlineBlock(state, line) {
-  if (isStandaloneBlock(line) || isListBoundary(line)) flushInlineBlock(state);
-  if (isStandaloneBlock(line)) state.blocks.push([line]);
-  else state.current.push(line);
-}
-function groupInlineBlocks(lines) {
-  const state = { blocks: [], current: [] };
-  lines.forEach((line) => appendInlineBlock(state, line));
-  flushInlineBlock(state);
-  return state.blocks;
-}
-function stripCommentsOutsideCode(text) {
-  const state = { inComment: false, codeTicks: 0 };
-  const kept = [];
-  for (const block of groupInlineBlocks(text.split('\n'))) {
-    state.codeTicks = 0;
-    const tickCounts = countBackticks(block);
-    for (const line of block) appendCommentLine(line, state, tickCounts, kept);
-  }
-  return kept.join('\n');
-}
+const isReleaseHeading = (node) =>
+  node.type === 'heading' && node.depth === 2 && RELEASE_NOTE_HEADING.test(headingText(node));
+const isSectionBoundary = (node) => node.type === 'heading' && node.depth <= 2;
 function noteSection(body) {
-  // Hidden comments and fenced examples cannot start or end the real section.
-  const text = String(body ?? '')
+  const source = String(body ?? '')
     .slice(0, MAX_BODY_LENGTH)
     .replace(/\r\n/g, '\n');
-  return sectionAfterHeading(stripCommentsOutsideCode(stripFencedCode(text)));
-}
-function sectionAfterHeading(text) {
-  const start = text.search(NOTE_HEADING);
-  if (start === -1) return '';
-  const rest = text.slice(start).replace(NOTE_HEADING, '').replace(/^\n+/, '');
-  const end = rest.search(NEXT_HEADING);
-  return end === -1 ? rest : rest.slice(0, end);
+  const root = fromMarkdown(source);
+  const startIndex = root.children.findIndex(isReleaseHeading);
+  if (startIndex === -1) return '';
+  const heading = root.children[startIndex];
+  const nextIndex = root.children.findIndex(
+    (node, index) => index > startIndex && isSectionBoundary(node)
+  );
+  const end = nextIndex === -1 ? source.length : root.children[nextIndex].position.start.offset;
+  return maskRanges(source, collectMaskRanges(source, root))
+    .slice(heading.position.end.offset, end)
+    .replace(/^\n+/, '');
 }
 // A live autolink can only start inside one whitespace-delimited token. Each token is checked
 // with bounded, non-overlapping matches (no large optional spans that backtrack superlinearly on
@@ -245,7 +152,7 @@ function stripHtml(text) {
   return text.replace(/<(?=[a-z/!?])/gi, '');
 }
 function plainText(line) {
-  return stripHtml(line)
+  return stripHtml(line.replace(/\0/g, ''))
     .replace(/^[ ]{0,3}>[ \t]?/gm, '')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\]\([^)]*\)/g, ']')
@@ -323,46 +230,6 @@ export function cancelledCommits(commits) {
     return effective.get(commit);
   };
   return new Set(commits.filter((commit) => !isEffective(commit) || targets.has(commit)));
-}
-// A real version commit is created by release automation and changes exactly the two generated
-// assets, with the committed manifest carrying the new version.
-const VERSION_ASSETS = ['CHANGELOG.md', 'package.json'];
-const isVersionAssets = (assets) =>
-  VERSION_ASSETS.length === assets.length &&
-  VERSION_ASSETS.every((asset) => assets.includes(asset));
-/** HEAD's subject, changed files, and the committed manifest's version. */
-function headInfo(cwd) {
-  const subject = execFileSync('git', ['log', '-1', '--format=%s'], { cwd, encoding: 'utf8' });
-  const assets = execFileSync('git', ['show', '--format=', '--name-only', 'HEAD'], {
-    cwd,
-    encoding: 'utf8',
-  })
-    .split('\n')
-    .map((name) => name.trim())
-    .filter(Boolean);
-  const manifest = JSON.parse(
-    execFileSync('git', ['show', '--format=', 'HEAD:package.json'], { cwd, encoding: 'utf8' })
-  );
-  return { subject, assets, version: manifest?.version };
-}
-const isVersionCommit = ({ subject, assets, version }, releaseVersion) =>
-  subject.trim() === `chore(release): ${releaseVersion}` &&
-  isVersionAssets(assets) &&
-  version === releaseVersion;
-/**
- * Whether HEAD is this release's version commit, i.e. CHANGELOG.md has already been committed.
- * The subject alone is user-controlled (a squash-merged PR can carry the same subject), so the
- * generated release state must match too: HEAD changes exactly the two generated assets and its
- * committed manifest carries the release version.
- */
-export function versionCommitted({ cwd, nextRelease }) {
-  const version = nextRelease?.version;
-  if (!version) return false;
-  try {
-    return isVersionCommit(headInfo(cwd), version);
-  } catch {
-    return false;
-  }
 }
 const SLUG = /^[\w.-]+\/[\w.-]+$/;
 const GITHUB_URL = /github\.com[/:]([\w.-]+)\/([\w.-]+?)(?:\.git)?$/;
