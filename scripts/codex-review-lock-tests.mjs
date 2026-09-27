@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import fs, {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -102,6 +110,25 @@ test('concurrent dead-owner recovery admits only one live lock holder', async ()
     assert.equal(outcomes.filter(Boolean).length, 1);
     assert.equal(existsSync(path), false);
   } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+test('a failed owner metadata write removes only the newly created lock', (t) => {
+  const { root, path } = fixture();
+  const failure = new Error('simulated metadata write failure');
+  try {
+    t.mock.method(fs, 'writeFileSync', () => {
+      throw failure;
+    });
+    syncBuiltinESMExports();
+    assert.throws(
+      () => acquireLock(path),
+      (error) => error === failure
+    );
+    assert.equal(existsSync(path), false);
+  } finally {
+    t.mock.restoreAll();
+    syncBuiltinESMExports();
     rmSync(root, { recursive: true, force: true });
   }
 });

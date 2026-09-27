@@ -38,11 +38,16 @@ function deadOwner(owner) {
 function ownDirectory(path) {
   if (!createDirectory(path)) return null;
   const token = randomUUID();
-  writeFileSync(
-    join(path, 'owner.json'),
-    `${JSON.stringify({ pid: process.pid, host: hostname(), token })}\n`,
-    { mode: 0o600, flag: 'wx' }
-  );
+  try {
+    writeFileSync(
+      join(path, 'owner.json'),
+      `${JSON.stringify({ pid: process.pid, host: hostname(), token })}\n`,
+      { mode: 0o600, flag: 'wx' }
+    );
+  } catch (error) {
+    rmSync(path, { recursive: true });
+    throw error;
+  }
   return token;
 }
 function recoverLock(path) {
