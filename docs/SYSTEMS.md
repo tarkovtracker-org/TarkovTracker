@@ -1342,18 +1342,30 @@ flowchart LR
    database statistics reset time, statement statistics reset time, and I/O statistics reset time.
    These timestamps establish the window for cumulative counters.
 4. Schema, count, sample, and distribution operations use validated identifiers and bounded SQL.
-   Samples select allowlisted low-risk columns and are capped at 20 rows; distributions are capped
-   at 50 groups.
+   The schema report includes relation ACL entries, effective PUBLIC grants, privileges for the
+   observer and existing `anon`, `authenticated`, and `service_role` roles (including inherited role
+   membership), per-role schema `USAGE`, relation owners, and row-level-security flags. Effective
+   privileges are listed only when the role also has `USAGE` on the relation's schema. Column-level
+   ACL entries and the effective per-column privileges they grant are reported separately. Health
+   reports whether the role can use the migration-history schema and read the `version` or
+   `statements` column. Samples select
+   allowlisted low-risk columns and are capped at 20 rows; distributions are capped at 50 groups.
 5. The observer rejects writes, DDL, transaction-control statements, `EXPLAIN ANALYZE`, arbitrary
    SQL, unbounded samples, and non-allowlisted distributions.
 6. `canary` runs only health and telemetry reports and is the first production validation path.
-   It rejects privileged/write-capable roles and unbounded transaction or lock timeouts before it
+   It rejects privileged/write-capable roles, read access to stored migration statements, and
+   unbounded transaction or lock timeouts before it
    runs the telemetry reports. It never reads application rows or runs migration preflight.
 7. `preflight --migration <path>` parses the migration to identify referenced relations and
    operation classes, then collects table/index, traffic, vacuum, outliers, lock, and blocking reports
    sequentially to avoid a burst of production inspection queries. It returns an evidence-only JSON
    report. Unsupported or ambiguous syntax fails closed with `assessment: incomplete`,
-   `risk: unknown`, and `requires_manual_review: true`. It does not execute the migration.
+   `risk: unknown`, and `requires_manual_review: true`. Multiple statements are classified only
+   when every statement is a supported table-level `GRANT`/`REVOKE`, optionally wrapped in one
+   `BEGIN`/`COMMIT` pair; ACL relations come from the `ON` clause, reserved keywords are rejected as
+   unquoted relation or role names, unquoted relation names fold to lowercase, and privilege names
+   are not data changes. It does not execute
+   the migration.
 8. `migration-history` reads applied version identifiers from
    `supabase_migrations.schema_migrations` and compares them against `supabase/migrations` in the
    current checkout, reporting `missing_locally` (applied remotely, absent from the checkout) and
@@ -1395,17 +1407,25 @@ flowchart LR
 - Every successful operation returns JSON with `ok`, `operation`, `target`, `generated_at`, an
   `observation` object, and `data` or report fields.
 - Built-in telemetry is allowlisted and does not depend on Supabase CLI text formatting.
+- The schema report exposes catalog ACLs, PUBLIC grants, effective privileges for the observer and
+  existing `anon`, `authenticated`, and `service_role` roles, relation owners, and RLS flags without
+  reading application rows. Effective privileges account for inherited roles, require schema
+  `USAGE` on the relation's schema (reported separately as `schema_usage`), and cover the server's
+  supported table privileges. Column-only grants appear in `column_grants` and
+  `effective_column_privileges`.
 - SQL identifiers are validated before interpolation, row and group limits are enforced, sensitive
   sample columns are excluded, and sensitive distributions are rejected.
 - The observer never executes migrations, arbitrary SQL, writes, DDL, `EXPLAIN ANALYZE`, or
   transaction-control statements.
 - `canary` is telemetry-only and excludes samples, distributions, and preflight.
 - `canary` must fail before telemetry collection when the observer is privileged, can write
-  application tables or create persistent objects, lacks default read-only transactions, or has
-  unbounded statement or lock timeouts.
+  application tables or create persistent objects, can read stored migration `statements`, lacks
+  default read-only transactions, or has unbounded statement or lock timeouts.
 - Migration preflight is evidence-only and fails closed on unsupported or ambiguous syntax;
   production reports run sequentially, and migration execution remains in the reviewed merge and
-  Supabase deployment workflow.
+  Supabase deployment workflow. The only classified multi-statement form is table-level ACL
+  statements, optionally inside one `BEGIN`/`COMMIT` pair, and that transaction remains flagged as
+  transaction control.
 - `migration-history` reads only the `version` column of `supabase_migrations.schema_migrations`.
   The stored `statements` column is never selected, and the observer's ledger grant is column-level
   for the same reason, so migration SQL and any literal inside it stay out of both the report and
@@ -1706,6 +1726,11 @@ The checkout stays pinned to the validated SHA. The production build still runs 
 ### Invariants
 
 - PR, fork, unsuccessful, superseded, and stale CI-attempt events cannot authorize publication.
+- `scripts/release-scope.mjs` removes commits whose header scope (or the header wrapped by any
+  number of `Revert "…"` / `revert:` prefixes) is in `INTERNAL_SCOPES` before both commit analysis and note generation.
+  Those commits never set the version type (including breaking-change markers) and never appear in
+  `CHANGELOG.md` or GitHub releases; they still deploy. Unscoped and product-scoped commits keep
+  the stock Angular rules, except that `refactor` and `docs` no longer release.
 - Never replace the validated checkout with a newer main commit to make publishing succeed.
 - CI cancellation must not cancel a publisher; only release jobs share `release-main` with
   `cancel-in-progress: false`. Git non-fast-forward protection and semantic-release's upstream
@@ -1947,6 +1972,29 @@ CodeQL) is selected on every CI run. See
 - Dependabot auto-merge requires the immutable Dependabot account ID for both the PR author and
   event actor; the actor restriction alone never establishes trust.
 - The aggregate covers repository CI jobs, not independently reported Security or Codecov statuses.
+
+### Agent review request coordination
+
+`scripts/codex-review.mjs` checks live GitHub review evidence before an agent requests Codex review.
+Read-only inspection is the default; authorized requests require `--request`. Local worktrees
+share request serialization and durable intent through their Git common directory, using
+case-insensitive repository identity for new and existing intents. Existing
+pending reviews, uncertain delivery, and unknown status block new requests; elapsed time does
+not authorize a retry. Completion matches the exact full commit; abbreviated evidence requires
+GitHub resolution, and head or base changes during evidence reads fail closed. Reusing a
+head-commit completion does not certify coverage of the current base or diff; retargeting requires
+independent review of that diff before merging. Successful posts record
+GitHub timestamps; uncertain local intents require matching completion without comparing host
+clocks. Dead local lock owners can be recovered under a separate recovery lock; live, foreign,
+or uncertain owners require operator inspection. Startup grace uses GitHub's response clock;
+first-line commands from trusted GitHub associations exclude outsider markers and prose examples,
+and tied second-resolution request/completion
+timestamps reuse exact-commit completion while running bot activity still blocks requests.
+Completed code reviews are reused by commit,
+independently of security reviews and unresolved findings; only top-level security report headings or the dedicated leading marker
+exclude security evidence, preserving quoted headings in code reviews. This cooperative guard cannot serialize unrelated clones or
+callers that bypass it. See [the review workflow](WORKFLOW_AUTOMATION.md#codex-request-deduplication-and-waiting)
+for agent commands and recovery boundaries.
 
 ## 16. Canonical task progression
 

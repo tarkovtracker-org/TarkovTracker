@@ -1,3 +1,38 @@
+# [1.84.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.5...v1.84.0) (2026-09-27)
+
+
+### Features
+
+* **ui:** show the build commit next to the footer version ([#952](https://github.com/tarkovtracker-org/TarkovTracker/issues/952)) ([2b9bc86](https://github.com/tarkovtracker-org/TarkovTracker/commit/2b9bc86133117a34dd5ca982e6387cdb6ad42891))
+
+## [1.83.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.4...v1.83.5) (2026-09-27)
+
+
+### Bug Fixes
+
+* **app:** show only player-facing changes in the changelog ([#950](https://github.com/tarkovtracker-org/TarkovTracker/issues/950)) ([e20ccf4](https://github.com/tarkovtracker-org/TarkovTracker/commit/e20ccf42a7b43bb51b4b7de28e998132b529021b)), closes [#n](https://github.com/tarkovtracker-org/TarkovTracker/issues/n)
+
+## [1.83.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.3...v1.83.4) (2026-09-27)
+
+
+### Bug Fixes
+
+* restore production observer grant evidence and ACL preflight ([#954](https://github.com/tarkovtracker-org/TarkovTracker/issues/954)) ([e217df9](https://github.com/tarkovtracker-org/TarkovTracker/commit/e217df97166c508d63794fbee350bbc16d4d5a41))
+
+## [1.83.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.2...v1.83.3) (2026-09-27)
+
+
+### Bug Fixes
+
+* **ci:** guard duplicate Codex review requests ([#948](https://github.com/tarkovtracker-org/TarkovTracker/issues/948)) ([dce7242](https://github.com/tarkovtracker-org/TarkovTracker/commit/dce724280dd507aba2fdec7d9712c3fe20d60cfa))
+
+## [1.83.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.1...v1.83.2) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** emit searchable quota and abuse rejection logs ([#949](https://github.com/tarkovtracker-org/TarkovTracker/issues/949)) ([7932be8](https://github.com/tarkovtracker-org/TarkovTracker/commit/7932be8079b5c59c6cccd9d8b983ab9910204f48))
+
 ## [1.83.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.0...v1.83.1) (2026-09-27)
 
 

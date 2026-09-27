@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, writeFileSync, type Dirent } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveTrustProxySetting } from './app/utils/apiProtectionConfig';
+import { resolveBuildCommit } from './app/utils/buildCommit';
 import { ENTRY_RECOVERY_SCRIPT } from './app/utils/entryRecoveryScript';
 import { SUPPORTED_LOCALES } from './app/utils/locales';
 import {
@@ -33,6 +34,7 @@ const appDir = resolve(__dirname, 'app');
 const testsDir = resolve(__dirname, 'tests');
 const packageJson = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'));
 const appVersion = packageJson.version ?? 'dev';
+const buildCommit = resolveBuildCommit(process.env);
 const clientLogSinkUrl = resolveClientLogSinkUrl(process.env);
 const isNonProduction = process.env.NODE_ENV !== 'production';
 const CONFIGURED_NITRO_PRESET = process.env.NITRO_PRESET;
@@ -198,6 +200,7 @@ export default defineNuxtConfig({
       logLevel: process.env.NUXT_PUBLIC_LOG_LEVEL || '',
       appUrl: PUBLIC_APP_URL,
       appVersion,
+      buildCommit,
       googleAnalyticsMeasurementId: IS_PRODUCTION_BUILD ? GOOGLE_ANALYTICS_MEASUREMENT_ID : '',
       microsoftClarityProjectId: IS_PRODUCTION_BUILD ? MICROSOFT_CLARITY_PROJECT_ID : '',
       supabaseAnonKey: PUBLIC_SUPABASE_ANON_KEY,
