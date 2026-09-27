@@ -52,6 +52,10 @@ describe('release note parsing', () => {
       'Second note',
     ]);
   });
+  it('does not rebuild a tag from fragments left by tag removal', () => {
+    const [note] = releaseNotesFromBody(template('Fixed <scr<b>ipt>alert(1)</scr</b>ipt> map.'));
+    expect(note).not.toMatch(/<[a-z/!?]/i);
+  });
   it('keeps comparison text and strips links, images, URLs and tags', () => {
     expect(
       releaseNotesFromBody(template('Loads < 20 kg and > 5 kg now filter correctly.'))
@@ -148,6 +152,23 @@ describe('reverted changes', () => {
     };
     expect([...cancelledCommits([restore, revert, original])]).toEqual([restore, revert]);
   });
+  it('pairs reverts before excluding commits, so an excluded revert still cancels', async () => {
+    const internalRevert = {
+      hash: 'f'.repeat(40),
+      message: `fix(release): undo layer (#13)\n\nThis reverts commit ${original.hash}.`,
+    };
+    const fetchMock = vi.fn(async () => json({}));
+    vi.stubGlobal('fetch', fetchMock);
+    const env = { GITHUB_REPOSITORY: 'o/r', GITHUB_TOKEN: 't' };
+    const excluded = (commit) => commit === internalRevert;
+    await collectHighlights({
+      commits: [internalRevert, original],
+      excluded,
+      env,
+      logger: { log: vi.fn() },
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it('does not look up notes for cancelled PRs', async () => {
     const fetchMock = vi.fn(async () => json({}));
     vi.stubGlobal('fetch', fetchMock);
@@ -201,7 +222,10 @@ describe('reviewed release notes', () => {
   it.each([
     [pull({ lastEditedAt: null }), null],
     [pull({ lastEditedAt: '2026-09-27T11:59:59Z' }), null],
-    [pull({ lastEditedAt: mergedAt, authorAssociation: 'OWNER' }), null],
+    [
+      pull({ lastEditedAt: mergedAt, authorAssociation: 'OWNER' }),
+      'description was edited after merge',
+    ],
     [pull({ authorAssociation: 'COLLABORATOR' }), null],
     [pull({ lastEditedAt: '2026-09-27T12:00:01Z' }), 'description was edited after merge'],
     [pull({ authorAssociation: 'CONTRIBUTOR' }), 'PR author lacks write access'],
@@ -287,7 +311,7 @@ describe('release highlights', () => {
       message: `fix(app): change (#${100 + i})`,
     }));
     const env = { GITHUB_REPOSITORY: 'o/r', GITHUB_TOKEN: 't' };
-    expect(await collectHighlights({ commits: many, env, logger })).toHaveLength(25);
+    expect(await collectHighlights({ commits: many, env, logger })).toHaveLength(5);
   });
   it.each([
     ['read', 'PR author lacks write access'],

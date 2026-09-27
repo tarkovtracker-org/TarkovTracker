@@ -102,6 +102,17 @@ describe('release scope plugin', () => {
       .map(([, init]) => JSON.parse(init.body).variables.number);
     expect(numbers).toEqual([943, 944]);
   });
+  it('lets an internal-scope revert cancel the highlight of the change it reverts', async () => {
+    const fetchMock = vi.fn(async () => Response.json({}));
+    vi.stubGlobal('fetch', fetchMock);
+    const run = context(['feat(maps): new layer (#10)']);
+    run.commits.push({
+      hash: 'f'.repeat(40),
+      message: `fix(release): undo layer (#13)\n\nThis reverts commit ${run.commits[0].hash}.`,
+    });
+    await generateNotes(config, run);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it('keeps PR text out of pre-commit notes, which become CHANGELOG.md', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);

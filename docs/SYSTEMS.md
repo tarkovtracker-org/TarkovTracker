@@ -1716,12 +1716,15 @@ The checkout stays pinned to the validated SHA. The production build still runs 
   token, unmerged PR, a PR author without current write access (association prefilter, then the
   collaborator-permission API's effective `permission` must be `write` or `admin`, which covers
   `maintain` and custom roles), or a description edited
-  after `mergedAt` skips that note and never blocks or alters versioning. At most 3 notes per PR and 25 per release are published. Notes are reduced to plain text (no link syntax, URLs, or HTML; comments and
+  at or after `mergedAt` (equal second-precision times are ambiguous) skips that note and never
+  blocks or alters versioning. At most 3 notes per PR and 5 per release are published; 5 is the
+  in-app changelog's per-release bullet limit and Highlights are listed first. Notes are reduced to plain text (no link syntax, URLs, or HTML; comments and
   code fences cannot supply the section). Highlights are added only when notes are regenerated
   after the `chore(release): <version>` commit exists (semantic-release regenerates notes when a
   prepare step moves HEAD; `release-highlights.integration.test.mjs` guards that behavior), so PR
   text reaches the GitHub release but is never committed to `CHANGELOG.md` or seen by the staging secret scan; recovered publications
-  (rebuilt from `CHANGELOG.md`) therefore have none. In-range reverts resolve by parity.
+  (rebuilt from `CHANGELOG.md`) therefore have none. In-range reverts resolve by parity across all
+  commits before internal-scope commits are dropped, so an internal revert still cancels.
 - Never replace the validated checkout with a newer main commit to make publishing succeed.
 - CI cancellation must not cancel a publisher; only release jobs share `release-main` with
   `cancel-in-progress: false`. Git non-fast-forward protection and semantic-release's upstream

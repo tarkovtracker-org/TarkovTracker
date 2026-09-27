@@ -5,7 +5,7 @@
  *
  * Trust boundary: PR descriptions stay editable after merge, and batched releases publish days
  * later. A note is used only when the PR is merged and its description was last edited at or
- * before the merge, and only for PRs whose author currently has write access (checked through the
+ * before the merge (an edit in the same timestamp second is ambiguous and rejected), and only for PRs whose author currently has write access (checked through the
  * collaborator-permission API, not just the author association): anyone else able to edit that
  * description also has write access, which closes the auto-merge window in which a lower-privilege
  * author could change an approved note. Notes are reduced to plain text (no
@@ -21,7 +21,9 @@ const LIST_ITEM = /^\s*(?:[-*+]|\d+\.)\s+/;
 const NO_NOTE = /^(?:none|n\/a|na|-+|no)\.?$/i;
 const MAX_NOTE_LENGTH = 280;
 const MAX_NOTES_PER_PULL = 3;
-const MAX_HIGHLIGHTS = 25;
+// The in-app changelog shows at most MAX_BULLETS_PER_GROUP (5) bullets per release, and
+// Highlights come first, so a larger cap would hide later notes there.
+const MAX_HIGHLIGHTS = 5;
 const TRUSTED_AUTHORS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 // `permission` is the effective base permission (custom and `maintain` roles map to `write`).
 const WRITE_PERMISSIONS = new Set(['write', 'admin']);
@@ -80,14 +82,16 @@ function sectionAfterHeading(text) {
   return end === -1 ? rest : rest.slice(0, end);
 }
 // Drop link targets, then all brackets, so no (nested) link syntax can survive; remove URLs of any
-// scheme, protocol-relative and `www.` autolinks, and HTML tags (`<b>`, not `< 20 kg`).
+// scheme, protocol-relative and `www.` autolinks, and HTML tags (`<b>`, not `< 20 kg`). Removing
+// tags can join fragments into a new one (`<scr<b>ipt>`), so any `<` still opening a tag is dropped.
 function plainText(line) {
   return line
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\]\([^)]*\)/g, ']')
     .replace(/[[\]!]*\[|\]/g, '')
     .replace(/(?:\b[a-z][\w+.-]*:)?\/\/\S+|\bwww\.\S+|\S+@\S+\.\w+/gi, '')
-    .replace(/<\/?[a-z][^<>]*>/gi, '');
+    .replace(/<\/?[a-z][^<>]*>/gi, '')
+    .replace(/<(?=[a-z/!?])/gi, '');
 }
 function cleanNote(item) {
   const text = plainText(item).replace(LIST_ITEM, '').replace(/\s+/g, ' ').trim();
@@ -172,9 +176,9 @@ export function repositorySlug(env = {}, repositoryUrl = '') {
   const fromEnv = String(env.GITHUB_REPOSITORY);
   return SLUG.test(fromEnv) ? fromEnv : slugFromUrl(repositoryUrl);
 }
-/** Why a PR's current description cannot be published, or null when it is the merged text. */
-// A missing lastEditedAt parses to NaN, and NaN > mergedAt is false: never edited is reviewed.
-const editedAfterMerge = (pull) => Date.parse(pull.lastEditedAt) > Date.parse(pull.mergedAt);
+// A missing lastEditedAt parses to NaN, and NaN >= mergedAt is false: never edited is reviewed.
+// GitHub timestamps have second precision, so an edit in the merge's second may follow the merge.
+const editedAfterMerge = (pull) => Date.parse(pull.lastEditedAt) >= Date.parse(pull.mergedAt);
 const REVIEW_CHECKS = [
   [(pull) => !pull?.merged, 'PR is not merged'],
   [(pull) => !TRUSTED_AUTHORS.has(pull.authorAssociation), 'PR author lacks write access'],
@@ -236,12 +240,16 @@ function lookupOptions({ env = {}, repositoryUrl, logger }) {
   const token = env.GITHUB_TOKEN || env.GH_TOKEN;
   return slug && token ? { slug, token, logger } : null;
 }
-/** Highlights for the given commits, in commit order, one entry per note. */
-export async function collectHighlights({ commits, ...context }) {
+/**
+ * Highlights for the given commits, in commit order, one entry per note. Reverts are paired across
+ * every commit in the range before `excluded` (e.g. internal scopes) drops candidates, so an
+ * excluded commit can still cancel the change it reverts.
+ */
+export async function collectHighlights({ commits, excluded = () => false, ...context }) {
   const options = lookupOptions(context);
   if (!options) return [];
   const cancelled = cancelledCommits(commits);
-  const kept = commits.filter((commit) => !cancelled.has(commit));
+  const kept = commits.filter((commit) => !cancelled.has(commit) && !excluded(commit));
   const numbers = [...new Set(kept.map((commit) => pullRequestNumber(commit.message)))];
   const notes = await Promise.all(numbers.filter(Boolean).map((n) => notesForPull(options, n)));
   return notes.flat().slice(0, MAX_HIGHLIGHTS);

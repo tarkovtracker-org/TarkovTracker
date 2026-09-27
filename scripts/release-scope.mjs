@@ -72,6 +72,10 @@ export async function generateNotes(config, context) {
   if (!versionCommitted(context)) return notes;
   const repositoryUrl = context.options?.repositoryUrl;
   const slug = repositorySlug(context.env, repositoryUrl);
-  const highlights = await collectHighlights({ ...filtered, repositoryUrl });
+  const highlights = await collectHighlights({
+    ...context,
+    excluded: (commit) => isInternalCommit(commit.message),
+    repositoryUrl,
+  });
   return withHighlights(notes, highlights, slug);
 }

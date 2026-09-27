@@ -444,12 +444,15 @@ Only a description written by someone with write access and unchanged since merg
 a note is skipped when the PR is not merged, its author lacks current write access (checked with
 the collaborator-permission API; for other contributions, add the highlight to the GitHub release
 by hand), or its GraphQL
-`lastEditedAt` is later than `mergedAt`. At most 3 notes per PR and 25 per release are listed. To fix a note after merge, add it to
+`lastEditedAt` is at or after `mergedAt` (second precision makes an equal time ambiguous). At most
+3 notes per PR and 5 per release are listed, matching the in-app changelog's per-release bullet
+limit. To fix a note after merge, add it to
 the GitHub release by hand rather than editing the PR (an edit after merge also removes a note
 that would otherwise publish). Notes become plain text: link syntax, images, URLs of any scheme,
-and HTML tags are removed, headings inside HTML comments or code fences are ignored, and each note
+and HTML tags are removed (including any `<` that would still open a tag), headings inside HTML comments or code fences are ignored, and each note
 is capped at 280 characters. A PR reverted within the same release contributes no highlight, and
-neither does its revert; a revert of that revert restores the original highlight.
+neither does its revert, even when the revert has an internal scope; a revert of that revert
+restores the original highlight.
 
 ### 4. PR Checks (`.github/workflows/pr-checks.yml`)
 
