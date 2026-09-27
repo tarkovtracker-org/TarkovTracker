@@ -118,14 +118,15 @@ direct validation before auto-merging safe translation updates.
 
 ### Release (`release.yml`)
 
-**Trigger:** Successful completion of `CI` for a same-repository push or explicit dispatch on `main`.
-**Jobs:** `Release` (validate the CI run and current main SHA, install through the shared
-`setup-project` action, build, recheck, semantic-release).
-The workflow reuses CI's test shards and database checks. It rejects stale commits and CI attempts,
-PR/fork events, and automation-skip directives before publishing. Documentation-only pushes can
-reach the gate; conventional commits outside internal scopes determine whether a version is
-warranted (`scripts/release-scope.mjs`). Publication is
-serialized without cancelling an active release. See `docs/WORKFLOW_AUTOMATION.md` for details.
+**Trigger:** Weekly schedule (Tuesdays 15:00 UTC) and manual dispatch on `main`. Deploys do not
+wait for it; every merge still deploys on its own.
+**Jobs:** `Release` (find the newest main CI run for the trigger commit and require success, check
+current main, install through the shared `setup-project` action, build, recheck, semantic-release).
+The workflow reuses CI's test shards and database checks. It rejects other refs and events, failed
+or unfinished CI, a moved main, and automation-skip directives before publishing. Releases batch
+every commit since the previous tag; conventional commits outside internal scopes determine
+whether a version is warranted (`scripts/release-scope.mjs`). Publication is serialized without
+cancelling an active release. See `docs/WORKFLOW_AUTOMATION.md` for details.
 
 ### PR Checks (`pr-checks.yml`)
 
@@ -173,7 +174,8 @@ changes; preview-required changes stay pending until an explicit validated deplo
 Reduced CI runs can skip jobs by design without leaving a PR blocked on a missing context. External
 Codecov/Security gates remain unchanged; Codecov statuses default to success when no report exists.
 
-Successful main CI completion separately triggers the gated `Release` workflow.
+`Release` runs weekly or on manual dispatch, not on CI completion; it publishes only when the
+newest main CI run for its commit succeeded.
 Lighthouse runs only when the PR touches UI paths or already carries `performance`/`ui`.
 
 ## Secrets

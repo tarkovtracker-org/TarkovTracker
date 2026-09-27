@@ -1718,14 +1718,18 @@ See [the workflow guide](WORKFLOW_AUTOMATION.md#fallow-changed-file-gate) for us
 
 ## 14. Release validation and publication
 
-Release starts after successful main push or explicitly dispatched CI, reusing its test shards and database validation.
-`scripts/release-gate.mjs` checks live workflow identity, repository, conclusion, attempt, and SHA
-against the triggering event and current main before setup and immediately before publishing.
-The checkout stays pinned to the validated SHA. The production build still runs in Release.
+Release runs on a weekly schedule or explicit dispatch on `main`, batching every commit since the
+previous tag; deploys never wait for it. `scripts/release-gate.mjs` takes the run's trigger commit
+as the candidate, requires the newest same-repository main CI run (push or dispatch of
+`.github/workflows/ci.yml`) for that exact SHA to have succeeded, and checks current main before
+setup and immediately before publishing, reusing CI's test shards and database validation. The
+checkout stays pinned to the validated SHA. The production build still runs in Release.
 
 ### Invariants
 
-- PR, fork, unsuccessful, superseded, and stale CI-attempt events cannot authorize publication.
+- Only `schedule` and `workflow_dispatch` runs on `refs/heads/main` can publish. Fork, PR, staging
+  branch, unsuccessful, unfinished, or superseded CI cannot authorize publication; when several
+  trusted CI runs exist for the candidate, the newest decides.
 - `scripts/release-scope.mjs` removes commits whose header scope (or the header wrapped by any
   number of `Revert "…"` / `revert:` prefixes) is in `INTERNAL_SCOPES` before both commit analysis and note generation.
   Those commits never set the version type (including breaking-change markers) and never appear in
