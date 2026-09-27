@@ -440,8 +440,12 @@ changelog shows the first bullets of each release, so highlights appear there fi
 
 Only the description the merging maintainer saw is published: a note is skipped when the PR is not
 merged or its GraphQL `lastEditedAt` is later than `mergedAt`. To fix a note after merge, add it to
-the GitHub release by hand rather than editing the PR. Links, images, bare URLs, and HTML tags are
-stripped, and each note is capped at 280 characters.
+the GitHub release by hand rather than editing the PR (an edit after merge also removes a note
+that would otherwise publish). Notes become plain text: link syntax, images, URLs of any scheme,
+and HTML tags are removed, headings inside code fences are ignored, and each note is capped at 280
+characters. Notes containing a credential-like token are skipped so generated `CHANGELOG.md`
+content cannot fail the staging secret scan. A PR reverted within the same release contributes no
+highlight, and neither does its revert.
 
 ### 4. PR Checks (`.github/workflows/pr-checks.yml`)
 

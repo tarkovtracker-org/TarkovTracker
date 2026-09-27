@@ -1714,7 +1714,9 @@ The checkout stays pinned to the validated SHA. The production build still runs 
 - Release-note highlights (`scripts/release-highlights.mjs`) are the only release input read from
   mutable GitHub content. They are additive and fail open: a lookup error, timeout (10 s), missing
   token, unmerged PR, or a description edited after `mergedAt` skips that note and never blocks or
-  alters versioning. Links, URLs, and HTML are stripped before publication.
+  alters versioning. Notes are reduced to plain text (no link syntax, URLs, or HTML); notes with
+  credential-like tokens are skipped so they cannot fail the staging secret scan; a change and its
+  revert within one release are both omitted.
 - Never replace the validated checkout with a newer main commit to make publishing succeed.
 - CI cancellation must not cancel a publisher; only release jobs share `release-main` with
   `cancel-in-progress: false`. Git non-fast-forward protection and semantic-release's upstream

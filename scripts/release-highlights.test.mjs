@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   collectHighlights,
   pullRequestNumber,
+  cancelledCommits,
   releaseNotesFromBody,
   repositorySlug,
   unreviewedReason,
@@ -55,6 +56,25 @@ describe('release note parsing', () => {
     );
     expect(releaseNotesFromBody(linked)).toEqual(['See the new map at now.']);
   });
+  it.each([
+    ['[[trusted text](https://discard.example)](//evil.example/phish)', 'trusted text'],
+    ['Open //evil.example/phish or www.evil.example today', 'Open or today'],
+    ['Mirror at ftp://files.example/x', 'Mirror at'],
+    ['Use [x][ref] style', 'Use xref style'],
+  ])('leaves no link syntax or URL in %j', (note, expected) =>
+    expect(releaseNotesFromBody(template(note))).toEqual([expected])
+  );
+  it('skips notes with credential-like tokens but keeps ordinary words and numbers', () => {
+    expect(
+      releaseNotesFromBody(
+        template('- Key AKIAIOSFODNN7EXAMPLE\n- Internationalization for 12 languages')
+      )
+    ).toEqual(['Internationalization for 12 languages']);
+  });
+  it('ignores release-note headings inside fenced code examples', () => {
+    const body = `## Summary\n\n\`\`\`md\n## Release note\nnone\n\`\`\`\n\n~~~\n## Changes\n~~~\n\n${template('Real note.').slice('## Summary\n\nInternal detail.\n\n'.length)}`;
+    expect(releaseNotesFromBody(body)).toEqual(['Real note.']);
+  });
   it.each(['none', 'None.', 'N/A', '-', '', '<!-- only a comment -->'])(
     'treats %j as no player-facing note',
     (note) => expect(releaseNotesFromBody(template(note))).toEqual([])
@@ -81,6 +101,27 @@ describe('release note parsing', () => {
   ])('derives the repository from %j and %s', (env, url, expected) =>
     expect(repositorySlug(env, url)).toBe(expected)
   );
+});
+describe('reverted changes', () => {
+  const original = { hash: 'a1b2c3d4'.padEnd(40, '0'), message: 'feat(maps): new layer (#10)' };
+  const revert = {
+    hash: 'f'.repeat(40),
+    message: `Revert "feat(maps): new layer (#10)" (#11)\n\nThis reverts commit ${original.hash.slice(0, 12)}.`,
+  };
+  it('cancels a change and its revert when both are in the release', () => {
+    const other = { hash: 'b'.repeat(40), message: 'fix(app): other (#12)' };
+    expect([...cancelledCommits([original, other, revert])]).toEqual([original, revert]);
+  });
+  it('keeps a revert of a change from an earlier release', () => {
+    expect(cancelledCommits([revert]).size).toBe(0);
+  });
+  it('does not look up notes for cancelled PRs', async () => {
+    const fetchMock = vi.fn(async () => json({}));
+    vi.stubGlobal('fetch', fetchMock);
+    const env = { GITHUB_REPOSITORY: 'o/r', GITHUB_TOKEN: 't' };
+    await collectHighlights({ commits: [original, revert], env, logger: { log: vi.fn() } });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 describe('reviewed release notes', () => {
   const mergedAt = '2026-09-27T12:00:00Z';
