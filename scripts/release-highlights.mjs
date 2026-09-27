@@ -23,9 +23,6 @@ import { fromMarkdown } from 'mdast-util-from-markdown';
 export { versionCommitted } from './release-note-state.mjs';
 const PR_REFERENCE = /\(#(\d+)\)\s*$/;
 const RELEASE_NOTE_HEADING = /^release notes?$/i;
-// This strips a root list marker only after the AST has distinguished it from nested items/code.
-const TOP_LIST_ITEM = /^ {0,3}(?:[-*+]|\d+[.)])[ \t]+/;
-const NESTED_LIST_ITEM = /^[ \t]+(?:[-*+]|\d+[.)])[ \t]+/;
 const NO_NOTE = /^(?:none|n\/a|na|-+|no)\.?$/i;
 const MAX_NOTE_LENGTH = 280;
 const MAX_NOTES_PER_PULL = 3;
@@ -102,12 +99,20 @@ function maskRanges(source, ranges) {
   return state.text + source.slice(state.offset);
 }
 const TEXT_NODE_TYPES = new Set(['text', 'inlineCode', 'code']);
-const BREAK_NODE_TYPES = new Set(['break']);
+const SPACED_NODE_TYPES = new Set(['list', 'listItem', 'blockquote']);
+const SPACE_NODE = { type: 'space' };
+const SPACE_NODE_TYPES = new Set(['break', 'space']);
+function pushNodeChildren(stack, node) {
+  for (let index = node.children.length - 1; index >= 0; index -= 1) {
+    stack.push(node.children[index]);
+    if (index > 0 && SPACED_NODE_TYPES.has(node.type)) stack.push(SPACE_NODE);
+  }
+}
 function appendNodeText(stack, text) {
   const node = stack.pop();
-  if (TEXT_NODE_TYPES.has(node.type)) text.push(node.value);
-  else if (BREAK_NODE_TYPES.has(node.type)) text.push(' ');
-  else if (hasChildren(node)) pushChildren(stack, node.children);
+  if (SPACE_NODE_TYPES.has(node.type)) text.push(' ');
+  else if (TEXT_NODE_TYPES.has(node.type)) text.push(node.value);
+  else if (hasChildren(node)) pushNodeChildren(stack, node);
 }
 function markdownText(source) {
   const blocks = fromMarkdown(source.replace(/\0/g, '')).children;
@@ -179,7 +184,6 @@ function plainText(line) {
 function cleanNote(item) {
   // Sanitization only ever shortens, so a bounded raw prefix cannot lose a shorter highlight.
   const text = plainText(Array.from(item).slice(0, MAX_RAW_NOTE).join(''))
-    .replace(TOP_LIST_ITEM, '')
     .replace(/\s+/g, ' ')
     .trim();
   // Count and cut by code point so a surrogate pair is never split.
@@ -190,29 +194,15 @@ function cleanNote(item) {
     .join('')
     .trimEnd()}…`;
 }
-function rootListItemLines(block) {
-  const lines = new Set();
-  for (const node of fromMarkdown(block).children) {
-    if (node.type !== 'list') continue;
-    for (const item of node.children) lines.add(item.position.start.line - 1);
-  }
-  return lines;
-}
-function appendListBlock(block, items) {
-  const rootLines = rootListItemLines(block);
-  if (!rootLines.has(0)) return;
-  block.split('\n').forEach((line, index) => {
-    if (rootLines.has(index)) items.push(line);
-    else if (items.length) items[items.length - 1] += ' ' + line.replace(NESTED_LIST_ITEM, '');
-  });
-}
-// Each AST-identified root list item keeps its wrapped, nested, and indented code continuation
-// lines. Blank blocks and prose that precedes a list remain outside the highlight items.
 function listItems(section) {
-  return section.split(/\n[ \t]*\n/).reduce((items, block) => {
-    appendListBlock(block, items);
-    return items;
-  }, []);
+  const items = [];
+  for (const node of fromMarkdown(section).children) {
+    if (node.type !== 'list') continue;
+    for (const item of node.children) {
+      items.push(section.slice(item.position.start.offset, item.position.end.offset));
+    }
+  }
+  return items;
 }
 const publishable = (note) => Boolean(note) && !NO_NOTE.test(note);
 /** Player-facing notes from a PR body; `[]` when the section is missing, empty, or `none`. */

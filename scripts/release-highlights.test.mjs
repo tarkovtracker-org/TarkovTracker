@@ -81,6 +81,11 @@ describe('release note parsing', () => {
       releaseNotesFromBody(template('- Added map filters:\n  - by trader\n  - by location.'))
     ).toEqual(['Added map filters: by trader by location.']);
   });
+  it('keeps a loose nested list with its root bullet', () => {
+    expect(releaseNotesFromBody(template('- Added filters:\n\n  - by trader'))).toEqual([
+      'Added filters: by trader',
+    ]);
+  });
   it('keeps indented code in prose and recognizes root list markers with indentation', () => {
     // An indented-only block is not a list; the whole section stays one prose entry.
     expect(releaseNotesFromBody(template('Handles the new flags:\n\n    - example flag.'))).toEqual(
