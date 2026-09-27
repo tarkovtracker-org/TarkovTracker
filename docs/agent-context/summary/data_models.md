@@ -196,7 +196,7 @@ erDiagram
     team_memberships }o--|| auth_users : "user_id"
     api_tokens }o--|| auth_users : "user_id"
     supporters }o--|| auth_users : "user_id"
-    discord_account_links }o--|| auth_users : "user_id"
+    discord_account_links |o--|| auth_users : "user_id"
     user_prestige_runs }o--|| auth_users : "user_id"
 
     user_progress {
