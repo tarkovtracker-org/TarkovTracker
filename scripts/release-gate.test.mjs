@@ -13,6 +13,7 @@ function fixture() {
     conclusion: 'success',
     head_sha: sha,
     run_attempt: 1,
+    run_started_at: '2026-09-29T14:00:00Z',
     head_commit: { message: 'fix(api): reject malformed state' },
   };
   const context = {
@@ -86,12 +87,44 @@ describe('release eligibility', () => {
     f.run.event = 'workflow_dispatch';
     expect((await releaseEligibility(f)).release).toBe(true);
   });
-  it('lets the newest trusted CI run decide, including a later failure', async () => {
+  it('lets the most recently started CI attempt decide, including a later failure', async () => {
     const f = fixture();
-    f.runs.push({ ...f.run, id: 200, event: 'workflow_dispatch', conclusion: 'failure' });
+    const later = '2026-09-29T14:30:00Z';
+    f.runs.push({
+      ...f.run,
+      id: 200,
+      event: 'workflow_dispatch',
+      conclusion: 'failure',
+      run_started_at: later,
+    });
     expect((await releaseEligibility(f)).release).toBe(false);
-    f.runs.splice(1, 1, { ...f.run, id: 50, conclusion: 'failure' });
+    f.runs.splice(1, 1, {
+      ...f.run,
+      id: 50,
+      conclusion: 'failure',
+      run_started_at: '2026-09-29T13:00:00Z',
+    });
     expect((await releaseEligibility(f)).release).toBe(true);
+  });
+  it('treats a rerun of an older run record as the latest evidence', async () => {
+    const f = fixture();
+    // Run 100 was created first but rerun after run 123 succeeded; its attempt 2 is still running.
+    f.runs.push({
+      ...f.run,
+      id: 100,
+      run_attempt: 2,
+      status: 'in_progress',
+      conclusion: null,
+      run_started_at: '2026-09-29T15:00:00Z',
+    });
+    expect(await releaseEligibility(f)).toMatchObject({ release: false });
+  });
+  it('breaks start-time ties by the newer run id', async () => {
+    const f = fixture();
+    f.runs.push({ ...f.run, id: 50, conclusion: 'failure' });
+    expect((await releaseEligibility(f)).release).toBe(true);
+    f.runs.push({ ...f.run, id: 300, conclusion: 'failure' });
+    expect((await releaseEligibility(f)).release).toBe(false);
   });
 });
 describe('release freshness and failures', () => {

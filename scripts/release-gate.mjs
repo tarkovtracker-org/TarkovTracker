@@ -31,7 +31,13 @@ function candidateSha(context) {
   const releaseRun = RELEASE_EVENTS.has(context.eventName) && context.ref === MAIN_REF;
   return releaseRun && FULL_SHA.test(String(context.sha)) ? context.sha : null;
 }
-// The newest trusted main CI run for the candidate decides, so a later failed run is not bypassed.
+// A rerun keeps its run id but restarts, so order by the latest attempt's start time, then id.
+function latestAttempt(a, b) {
+  const started = (run) => Date.parse(run.run_started_at) || 0;
+  return started(b) - started(a) || b.id - a.id;
+}
+// The most recently executed trusted main CI run for the candidate decides, so a later failed or
+// in-progress attempt is never bypassed by an older success.
 async function latestCiRun({ github, context, sha }) {
   const repositoryId = context.payload.repository.id;
   const { data } = await github.rest.actions.listWorkflowRuns({
@@ -42,7 +48,7 @@ async function latestCiRun({ github, context, sha }) {
     per_page: 100,
   });
   const runs = data.workflow_runs.filter((run) => trustedRun(run, repositoryId, sha));
-  return runs.sort((a, b) => b.id - a.id)[0] ?? null;
+  return runs.sort(latestAttempt)[0] ?? null;
 }
 function ciProblem(run) {
   if (!run) return 'No main CI run exists for this commit.';

@@ -331,9 +331,10 @@ warrant a version; weeks with only internal or non-releasing commits publish not
 
 The release candidate is the run's trigger commit (`github.sha`, the head of `main` when the run
 started; reruns keep it). `release-gate.mjs` finds the newest same-repository `CI` run
-(`.github/workflows/ci.yml`, push or dispatch on `main`) for that exact SHA and requires it to have
-completed successfully, so a later failed or in-progress run blocks publication instead of an older
-success being reused. It then re-reads `refs/heads/main`, both before dependency setup and again
+(`.github/workflows/ci.yml`, push or dispatch on `main`) for that exact SHA, ordered by the latest
+attempt's start time so a rerun of an older run record counts as newest, and requires it to have
+completed successfully. A later failed or in-progress attempt therefore blocks publication instead
+of an older success being reused. It then re-reads `refs/heads/main`, both before dependency setup and again
 immediately before publishing. If CI for the head is still running, or main advanced after the run
 started, the run skips; dispatch Release again once main CI passes. Release never substitutes a
 newer, unvalidated checkout.

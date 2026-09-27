@@ -173,7 +173,8 @@ changes; preview-required changes stay pending until an explicit validated deplo
 Reduced CI runs can skip jobs by design without leaving a PR blocked on a missing context. External
 Codecov/Security gates remain unchanged; Codecov statuses default to success when no report exists.
 
-Successful main CI completion separately triggers the gated `Release` workflow.
+`Release` runs weekly or on manual dispatch, not on CI completion; it publishes only when the
+newest main CI run for its commit succeeded.
 Lighthouse runs only when the PR touches UI paths or already carries `performance`/`ui`.
 
 ## Secrets
