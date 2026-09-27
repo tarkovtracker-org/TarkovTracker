@@ -235,7 +235,11 @@ function assertWorkflowBoundaries(workflow) {
 test('workflow separates trusted gate, immutable setup, token-free checks and job-token merge', () => {
   assertWorkflowBoundaries(read('.github/workflows/crowdin.yml'));
   assert.match(read('.github/workflows/ci.yml'), /push:\n {4}branches: \[main\]/);
-  assert.match(read('.github/workflows/release.yml'), /workflow_run.event == 'push'/);
+  // Crowdin merges dispatch CI on main; the release gate must accept that dispatched evidence.
+  assert.match(
+    read('scripts/release-gate.mjs'),
+    /\['push', 'workflow_dispatch'\]\.includes\(run\?\.event\)/
+  );
 });
 test('unrelated steps and jobs cannot satisfy the real merge-step contract', () => {
   const workflow = read('.github/workflows/crowdin.yml');
