@@ -274,6 +274,10 @@ async function authorCanWrite({ slug, token }, login) {
   const permission = await githubRequest(url, token);
   return WRITE_PERMISSIONS.has(permission.permission);
 }
+function graphQLErrorMessage(errors) {
+  if (!errors || errors.length === 0) return '';
+  return `GitHub GraphQL returned errors: ${errors[0].message}`;
+}
 async function queryPull({ slug, token }, number) {
   const [owner, name] = slug.split('/');
   const result = await githubRequest('https://api.github.com/graphql', token, {
@@ -281,6 +285,8 @@ async function queryPull({ slug, token }, number) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query: PULL_QUERY, variables: { owner, name, number } }),
   });
+  const errorMessage = graphQLErrorMessage(result.errors);
+  if (errorMessage) throw new Error(errorMessage);
   return result.data?.repository?.pullRequest;
 }
 async function fetchPull(options, number) {

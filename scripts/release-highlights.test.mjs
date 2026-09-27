@@ -542,6 +542,38 @@ describe('release highlights', () => {
       'description was edited after merge'
     );
   });
+  it('skips HTTP 200 GraphQL errors and logs their diagnostic', async () => {
+    const log = vi.fn();
+    const fetchMock = vi.fn(async () =>
+      json({
+        errors: [{ message: 'Field pullRequest is not accessible' }],
+        data: {
+          repository: {
+            pullRequest: {
+              body: template('Must not be published.'),
+              merged: true,
+              mergedAt: '2026-09-27T12:00:00Z',
+              authorAssociation: 'MEMBER',
+              author: { login: 'maintainer' },
+            },
+          },
+        },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const highlights = await collectHighlights({
+      commits: [{ message: 'fix(app): update (#943)' }],
+      env: { GITHUB_REPOSITORY: 'owner/repo', GITHUB_TOKEN: 'fixture-token' },
+      logger: { log },
+    });
+    expect(highlights).toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith(
+      'Skipping release note for #%d: %s',
+      943,
+      'GitHub GraphQL returned errors: Field pullRequest is not accessible'
+    );
+  });
   it('attaches validated commit hashes for each PR and renders commit links', async () => {
     const sha = 'A'.repeat(40);
     vi.stubGlobal(
