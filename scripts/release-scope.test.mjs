@@ -19,6 +19,7 @@ const context = (messages) => ({
   })),
   logger: { log: vi.fn() },
   cwd: process.cwd(),
+  env: { GITHUB_TOKEN: 'fixture-token' },
   options: { repositoryUrl: `${repo}.git` },
   lastRelease: { gitTag: 'v1.83.3', version: '1.83.3' },
   nextRelease: { gitTag: 'v1.84.0', version: '1.84.0' },
@@ -57,13 +58,12 @@ describe('release scope plugin', () => {
     expect(await analyzeCommits(config, context(messages))).toBe(expected);
   });
   it('omits internal-scope commits from generated notes and adds PR highlights', async () => {
-    const fetchMock = vi.fn(async (url) =>
-      Response.json({
-        body: url.endsWith('/pulls/943')
-          ? '## Release note\n\nSmart Fill now spreads collected items evenly.\n'
-          : '## Release note\n\nnone\n',
-      })
-    );
+    const fetchMock = vi.fn(async (_url, init) => {
+      const { number } = JSON.parse(init.body).variables;
+      const note = number === 943 ? 'Smart Fill now spreads collected items evenly.' : 'none';
+      const pullRequest = { body: `## Release note\n\n${note}\n`, merged: true, mergedAt: 'x' };
+      return Response.json({ data: { repository: { pullRequest } } });
+    });
     vi.stubGlobal('fetch', fetchMock);
     const notes = await generateNotes(
       config,
@@ -81,7 +81,8 @@ describe('release scope plugin', () => {
       '### Highlights\n\n* Smart Fill now spreads collected items evenly. ([#943](https://github.com/tarkovtracker-org/TarkovTracker/pull/943))'
     );
     // Internal-scope commits are filtered before any PR lookup.
-    expect(fetchMock.mock.calls.map(([url]) => url.split('/').at(-1))).toEqual(['943', '944']);
+    const numbers = fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body).variables.number);
+    expect(numbers).toEqual([943, 944]);
   });
   it('reports how many commits were ignored', async () => {
     const run = context(['fix(ci): a', 'fix(app): b']);

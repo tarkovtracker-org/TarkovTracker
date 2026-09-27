@@ -5,6 +5,7 @@ import {
   pullRequestNumber,
   releaseNotesFromBody,
   repositorySlug,
+  unreviewedReason,
   withHighlights,
 } from './release-highlights.mjs';
 const template = (note) =>
@@ -36,6 +37,24 @@ describe('release note parsing', () => {
       'Third',
     ]);
   });
+  it('keeps wrapped continuation lines with their bullet', () => {
+    const body = template(
+      '- Smart Fill now spreads items across every\n  matching objective.\n- Second note\n\nTrailing prose'
+    );
+    expect(releaseNotesFromBody(body)).toEqual([
+      'Smart Fill now spreads items across every matching objective.',
+      'Second note',
+    ]);
+  });
+  it('keeps comparison text and strips links, images, URLs and tags', () => {
+    expect(
+      releaseNotesFromBody(template('Loads < 20 kg and > 5 kg now filter correctly.'))
+    ).toEqual(['Loads < 20 kg and > 5 kg now filter correctly.']);
+    const linked = template(
+      'See [the new map](https://evil.example) ![x](https://img) at https://evil.example <a href="x">now</a>.'
+    );
+    expect(releaseNotesFromBody(linked)).toEqual(['See the new map at now.']);
+  });
   it.each(['none', 'None.', 'N/A', '-', '', '<!-- only a comment -->'])(
     'treats %j as no player-facing note',
     (note) => expect(releaseNotesFromBody(template(note))).toEqual([])
@@ -63,22 +82,48 @@ describe('release note parsing', () => {
     expect(repositorySlug(env, url)).toBe(expected)
   );
 });
+describe('reviewed release notes', () => {
+  const mergedAt = '2026-09-27T12:00:00Z';
+  it.each([
+    [{ merged: true, mergedAt, lastEditedAt: null }, null],
+    [{ merged: true, mergedAt, lastEditedAt: '2026-09-27T11:59:59Z' }, null],
+    [{ merged: true, mergedAt, lastEditedAt: mergedAt }, null],
+    [
+      { merged: true, mergedAt, lastEditedAt: '2026-09-27T12:00:01Z' },
+      'description was edited after merge',
+    ],
+    [{ merged: false, mergedAt: null, lastEditedAt: null }, 'PR is not merged'],
+    [null, 'PR is not merged'],
+  ])('classifies %j', (pull, expected) => expect(unreviewedReason(pull)).toBe(expected));
+});
 describe('release highlights', () => {
   const logger = { log: vi.fn() };
   const commits = [
     { message: 'fix(app): make Smart Fill distribute totals (#943)' },
     { message: 'feat(maps): list objectives (#944)' },
     { message: 'fix(api): quiet change (#949)' },
+    { message: 'fix(app): edited after merge (#950)' },
     { message: 'fix(app): direct push without a PR' },
     { message: 'fix(app): follow-up (#943)' },
   ];
-  it('collects notes once per PR, skipping none and failed lookups', async () => {
-    const fetchMock = vi.fn(async (url) => {
-      if (url.endsWith('/pulls/943')) return json({ body: template('Smart Fill spreads items.') });
-      if (url.endsWith('/pulls/944')) return json({ body: template('- Maps list objectives') });
-      if (url.endsWith('/pulls/949')) return json({}, 503);
-      throw new Error(`unexpected ${url}`);
+  const merged = (body, extra = {}) =>
+    json({
+      data: {
+        repository: {
+          pullRequest: { body, merged: true, mergedAt: '2026-09-27T12:00:00Z', ...extra },
+        },
+      },
     });
+  it('collects notes once per PR, skipping none, edited, and failed lookups', async () => {
+    const responses = {
+      943: () => merged(template('Smart Fill spreads items.')),
+      944: () => merged(template('- Maps list objectives')),
+      949: () => json({}, 503),
+      950: () => merged(template('Edited later'), { lastEditedAt: '2026-09-30T00:00:00Z' }),
+    };
+    const fetchMock = vi.fn(async (_url, init) =>
+      responses[JSON.parse(init.body).variables.number]()
+    );
     vi.stubGlobal('fetch', fetchMock);
     const highlights = await collectHighlights({
       commits,
@@ -89,18 +134,29 @@ describe('release highlights', () => {
       { number: 943, text: 'Smart Fill spreads items.' },
       { number: 944, text: 'Maps list objectives' },
     ]);
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer fixture-token');
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://api.github.com/graphql');
+    expect(init.headers.Authorization).toBe('Bearer fixture-token');
+    expect(JSON.parse(init.body).variables).toEqual({ owner: 'owner', name: 'repo', number: 943 });
     expect(logger.log).toHaveBeenCalledWith(
       'Skipping release note for #%d: %s',
       949,
       'GitHub returned 503 for #949'
     );
+    expect(logger.log).toHaveBeenCalledWith(
+      'Skipping release note for #%d: %s',
+      950,
+      'description was edited after merge'
+    );
   });
-  it('makes no requests without a GitHub repository', async () => {
+  it.each([
+    [{}, 'https://github.com/owner/repo.git'],
+    [{ GITHUB_REPOSITORY: 'not a slug', GITHUB_TOKEN: 'x' }, 'https://gitlab.com/owner/repo'],
+  ])('makes no requests without a repository and token: %j', async (env, repositoryUrl) => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
-    expect(await collectHighlights({ commits, env: {}, repositoryUrl: '', logger })).toEqual([]);
+    expect(await collectHighlights({ commits, env, repositoryUrl, logger })).toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
   it('places highlights directly below the version heading', () => {
