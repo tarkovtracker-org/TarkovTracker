@@ -164,7 +164,17 @@ export const safeGetItem = (key: string): string | null => {
   }
 };
 type StorageWriteResult = { ok: true } | { ok: false; error: unknown };
+let activeProgressWritesBlocked = false;
+export const setActiveProgressWritesBlocked = (blocked: boolean): void => {
+  activeProgressWritesBlocked = blocked;
+};
 const writeStorageItem = (key: string, value: string): StorageWriteResult => {
+  if (key === STORAGE_KEYS.progress && activeProgressWritesBlocked) {
+    return {
+      ok: false,
+      error: new Error('Progress retention must succeed before active progress can change'),
+    };
+  }
   if (typeof window === 'undefined') return { ok: false, error: null };
   try {
     localStorage.setItem(key, value);

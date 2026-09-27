@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultState } from '@/stores/progressState';
 import {
   hasAccountRecoveryCopy,
+  isAccountRecoveryRetentionBlocked,
   preserveForeignActiveCopy,
   readAccountRecoveryCopy,
   removeAccountRecoveryCopy,
@@ -57,6 +58,44 @@ describe('account recovery copies', () => {
       throw Object.assign(new Error('full'), { name: 'QuotaExceededError' });
     });
     expect(saveAccountRecoveryCopy(envelope('user-1', 10), 'user-1')).toBe(false);
+    setItem.mockRestore();
+  });
+  it('retains raw stale-season progress before sanitizing a recovery envelope', () => {
+    const staleSeason = 999;
+    const raw = JSON.stringify({
+      _timestamp: 10,
+      _userId: 'user-1',
+      data: {
+        ...structuredClone(defaultState),
+        seasonalSeasonNumber: staleSeason,
+        seasonal: { ...defaultState.seasonal, level: 17, active: true },
+      },
+    });
+    localStorage.setItem(recoveryKey('user-1'), raw);
+    const recovered = readAccountRecoveryCopy('user-1');
+    expect(recovered?.state.seasonal.level).toBe(defaultState.seasonal.level);
+    expect(localStorage.getItem(recoveryKey('user-1'))).toBe(raw);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(false);
+  });
+  it('keeps a stale-season recovery envelope when its export copy cannot be written', () => {
+    const staleSeason = 999;
+    const raw = JSON.stringify({
+      _timestamp: 10,
+      _userId: 'user-1',
+      data: {
+        ...structuredClone(defaultState),
+        seasonalSeasonNumber: staleSeason,
+        seasonal: { ...defaultState.seasonal, level: 17 },
+      },
+    });
+    localStorage.setItem(recoveryKey('user-1'), raw);
+    const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+      if (key.startsWith(STORAGE_KEYS.progressSupersededPrefix)) throw new Error('full');
+      return Storage.prototype.setItem.call(localStorage, key, value);
+    });
+    expect(readAccountRecoveryCopy('user-1')).toBeNull();
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+    expect(localStorage.getItem(recoveryKey('user-1'))).toBe(raw);
     setItem.mockRestore();
   });
   it('removes a recovery copy for its owner only', () => {

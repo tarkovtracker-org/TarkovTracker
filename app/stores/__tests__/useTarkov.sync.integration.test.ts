@@ -5,6 +5,11 @@ import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp, nextTick } from 'vue';
 import { defaultState } from '@/stores/progressState';
+import { resetAccountRecoveryRetentionBlock } from '@/stores/tarkov/accountRecovery';
+import {
+  setActiveProgressWritesBlocked,
+  progressPersistStorage,
+} from '@/stores/tarkov/localStorage';
 import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
 import {
   initializeTarkovSync,
@@ -542,6 +547,8 @@ const expectNoFollowOnSessionActivity = (
 describe('useTarkov sync integration', () => {
   beforeEach(() => {
     resetTarkovSync('test setup');
+    resetAccountRecoveryRetentionBlock();
+    setActiveProgressWritesBlocked(false);
     setActivePinia(createPinia());
     localStorage.clear();
     vi.clearAllMocks();
@@ -2585,6 +2592,82 @@ describe('useTarkov sync integration', () => {
       expect(
         Object.keys(localStorage).some((key) => key.startsWith(STORAGE_KEYS.progressBackupPrefix))
       ).toBe(false);
+    });
+    it('blocks a new owner from replacing the active copy when recovery retention fails', async () => {
+      const original = JSON.stringify({
+        _timestamp: 10,
+        _userId: 'user-1',
+        data: { ...structuredClone(defaultState), pvp: progressWithLevel(15) },
+      });
+      localStorage.setItem(STORAGE_KEYS.progress, original);
+      const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+        if (key === recoveryKey('user-1')) throw new Error('full');
+        return Storage.prototype.setItem.call(localStorage, key, value);
+      });
+      switchSession('user-1', 'user-2', 'quota during account switch');
+      expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(original);
+      progressPersistStorage.setItem(
+        STORAGE_KEYS.progress,
+        JSON.stringify({ _userId: 'user-2', data: defaultState })
+      );
+      expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(original);
+      await initializeTarkovSync();
+      expect(useSupabaseSyncMock).not.toHaveBeenCalled();
+      expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(original);
+      setItem.mockRestore();
+    });
+    it('archives recovery-only progress before applying a higher remote reset epoch', async () => {
+      const localEpoch = 1;
+      const raw = JSON.stringify({
+        _timestamp: Date.parse('2026-02-25T00:00:00.000Z'),
+        _userId: 'user-1',
+        data: {
+          ...structuredClone(defaultState),
+          pvp: { ...progressWithLevel(12), progressEpoch: localEpoch },
+        },
+      });
+      localStorage.setItem(recoveryKey('user-1'), raw);
+      single.mockResolvedValue({
+        data: createRemoteRow({
+          pvp_data: { ...progressWithLevel(1), progressEpoch: localEpoch + 1 },
+        }),
+        error: null,
+      });
+      await initializeTarkovSync();
+      expect(listSupersededProgressCopies('user-1')).toEqual([
+        expect.objectContaining({
+          mode: 'pvp',
+          seasonNumber: null,
+          progress: expect.objectContaining({ level: 12, progressEpoch: localEpoch }),
+        }),
+      ]);
+      expect(useTarkovStore().pvp.progressEpoch).toBe(localEpoch + 1);
+      expect(localStorage.getItem(recoveryKey('user-1'))).toBeNull();
+    });
+    it('keeps recovery-only progress and aborts reconciliation when reset archival fails', async () => {
+      const raw = JSON.stringify({
+        _timestamp: Date.parse('2026-02-25T00:00:00.000Z'),
+        _userId: 'user-1',
+        data: {
+          ...structuredClone(defaultState),
+          pvp: { ...progressWithLevel(12), progressEpoch: 1 },
+        },
+      });
+      localStorage.setItem(recoveryKey('user-1'), raw);
+      single.mockResolvedValue({
+        data: createRemoteRow({ pvp_data: { ...progressWithLevel(1), progressEpoch: 2 } }),
+        error: null,
+      });
+      const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+        if (key.startsWith(STORAGE_KEYS.progressSupersededPrefix)) throw new Error('full');
+        return Storage.prototype.setItem.call(localStorage, key, value);
+      });
+      await expect(initializeTarkovSync()).rejects.toThrow('Supabase initial load failed');
+      expect(localStorage.getItem(recoveryKey('user-1'))).toBe(raw);
+      expect(listSupersededProgressCopies('user-1')).toEqual([]);
+      expect(useTarkovStore().pvp.progressEpoch).toBe(1);
+      expect(useSupabaseSyncMock).not.toHaveBeenCalled();
+      setItem.mockRestore();
     });
   });
 });

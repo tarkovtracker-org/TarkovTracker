@@ -4,15 +4,22 @@ import {
   safeRemoveItem,
   safeSetItem,
   type PersistedProgressSnapshot,
+  setActiveProgressWritesBlocked,
 } from '@/stores/tarkov/localStorage';
+import { saveSupersededProgressCopy } from '@/stores/tarkov/supersededProgress';
+import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import { hasMaterializedProgress } from '@/utils/modeProgressFallback';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import { parseUserScopedStorage } from '@/utils/userScopedStorage';
+import type { UserProgressData } from '@/stores/progressState';
 /**
  * Account recovery copies (see `CONTEXT.md`): locally saved progress retained for its
  * owning account after sign-out or an account switch, restored only for that owner.
  */
 const recoveryKey = (userId: string): string => `${STORAGE_KEYS.progressRecoveryPrefix}${userId}`;
+let retentionFailure = false;
+let blockedAccountOwner: string | null = null;
 const envelopeTimestamp = (raw: string | null): number | null => {
   const parsed = raw ? parseUserScopedStorage<unknown>(raw) : null;
   return parsed?._timestamp ?? null;
@@ -37,10 +44,62 @@ const isRetainable = (raw: string | null, ownerId: string | null): ownerId is st
  */
 export const saveAccountRecoveryCopy = (raw: string | null, ownerId: string | null): boolean => {
   if (!raw || !isRetainable(raw, ownerId)) return false;
-  return hasNewerCopy(ownerId, raw) || writeRecoveryCopy(ownerId, raw);
+  const retained = hasNewerCopy(ownerId, raw) || writeRecoveryCopy(ownerId, raw);
+  if (!retained) {
+    retentionFailure = true;
+    blockedAccountOwner = ownerId;
+  } else if (blockedAccountOwner === ownerId) {
+    retentionFailure = false;
+    blockedAccountOwner = null;
+    setActiveProgressWritesBlocked(false);
+  }
+  return retained;
 };
-export const readAccountRecoveryCopy = (userId: string): PersistedProgressSnapshot | null =>
-  parsePersistedProgressState(safeGetItem(recoveryKey(userId)), userId);
+export const retryBlockedAccountRecoveryRetention = (): boolean => {
+  if (!blockedAccountOwner) return true;
+  const raw = safeGetItem(STORAGE_KEYS.progress);
+  if (!raw) return false;
+  return saveAccountRecoveryCopy(raw, blockedAccountOwner);
+};
+export const isAccountRecoveryRetentionBlocked = (): boolean => retentionFailure;
+export const markAccountRecoveryRetentionBlocked = (): void => {
+  retentionFailure = true;
+};
+export const resetAccountRecoveryRetentionBlock = (): void => {
+  retentionFailure = false;
+  blockedAccountOwner = null;
+};
+const preserveRawMismatchedSeason = (userId: string, raw: string): boolean => {
+  const wrapped = parseUserScopedStorage<Record<string, unknown>>(raw);
+  const data = wrapped?.data;
+  const seasonal = data?.seasonal;
+  const seasonNumber = data?.seasonalSeasonNumber;
+  if (
+    typeof seasonNumber !== 'number' ||
+    seasonNumber === ACTIVE_SEASON_NUMBER ||
+    !hasMaterializedProgress(seasonal)
+  ) {
+    return true;
+  }
+  const retained = saveSupersededProgressCopy(
+    userId,
+    'seasonal',
+    seasonNumber,
+    seasonal as UserProgressData
+  );
+  if (!retained) retentionFailure = true;
+  return retained !== null;
+};
+export const readAccountRecoveryCopy = (userId: string): PersistedProgressSnapshot | null => {
+  const raw = safeGetItem(recoveryKey(userId));
+  if (!raw || !preserveRawMismatchedSeason(userId, raw)) return null;
+  const snapshot = parsePersistedProgressState(raw, userId);
+  if (snapshot) {
+    retentionFailure = false;
+    setActiveProgressWritesBlocked(false);
+  }
+  return snapshot;
+};
 export const hasAccountRecoveryCopy = (userId: string): boolean =>
   safeGetItem(recoveryKey(userId)) !== null;
 export const removeAccountRecoveryCopy = (userId: string): void => {
@@ -59,8 +118,11 @@ export const selectRecoverySnapshot = (
   return (recovery.timestamp ?? 0) > (active.timestamp ?? 0) ? recovery : null;
 };
 /** Retains the active copy for its owner when it belongs to an account other than `userId`. */
-export const preserveForeignActiveCopy = (userId: string | null): void => {
+export const preserveForeignActiveCopy = (userId: string | null): boolean => {
   const raw = safeGetItem(STORAGE_KEYS.progress);
   const ownerId = raw ? (parseUserScopedStorage<unknown>(raw)?._userId ?? null) : null;
-  if (ownerId && ownerId !== userId) saveAccountRecoveryCopy(raw, ownerId);
+  if (!ownerId || ownerId === userId) return true;
+  const retained = saveAccountRecoveryCopy(raw, ownerId);
+  if (!retained) retentionFailure = true;
+  return retained;
 };
