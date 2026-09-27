@@ -88,9 +88,8 @@ function noteSection(body) {
   // Hidden comments and fenced examples cannot start or end the real section.
   const text = String(body ?? '')
     .slice(0, MAX_BODY_LENGTH)
-    .replace(/\r\n/g, '\n')
-    .replace(HTML_COMMENT, '');
-  return sectionAfterHeading(stripFencedCode(text));
+    .replace(/\r\n/g, '\n');
+  return sectionAfterHeading(stripFencedCode(text).replace(HTML_COMMENT, ''));
 }
 function sectionAfterHeading(text) {
   const start = text.search(NOTE_HEADING);
@@ -108,16 +107,25 @@ function emailish(token) {
   return at > 0 && /\.\w/.test(token.slice(at + 1));
 }
 const autolinked = (token) => token.includes('//') || /^www\./i.test(token) || emailish(token);
+function stripHtml(text) {
+  // A removal can join nested fragments into another tag. Reach a fixed point on the already
+  // bounded note before checking links; a leftover malformed opener loses its single '<'.
+  let previous;
+  do {
+    previous = text;
+    text = text.replace(/<\/?[a-z][^<>]*>/gi, '');
+  } while (text !== previous);
+  return text.replace(/<(?=[a-z/!?])/gi, '');
+}
 function plainText(line) {
-  return line
+  return stripHtml(line)
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\]\([^)]*\)/g, ']')
     .replace(/[[\]!]*\[|\]/g, '')
+    .replace(/[*_`~]/g, '')
     .split(/\s+/)
     .map((token) => (autolinked(token) ? '' : token))
-    .join(' ')
-    .replace(/<\/?[a-z][^<>]*>/gi, '')
-    .replace(/<(?=[a-z/!?])/gi, '');
+    .join(' ');
 }
 function cleanNote(item) {
   // Sanitization only ever shortens, so a bounded raw prefix cannot lose a shorter highlight.

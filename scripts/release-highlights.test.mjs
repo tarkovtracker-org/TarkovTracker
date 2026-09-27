@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { releaseBullets } from '@/utils/changelog';
 import {
   collectHighlights,
   MAX_CONCURRENT_LOOKUPS,
@@ -70,6 +71,25 @@ describe('release note parsing', () => {
   it('does not rebuild a tag from fragments left by tag removal', () => {
     const [note] = releaseNotesFromBody(template('Fixed <scr<b>ipt>alert(1)</scr</b>ipt> map.'));
     expect(note).not.toMatch(/<[a-z/!?]/i);
+  });
+  it('checks autolinks after removing HTML and Markdown fragments', () => {
+    expect(releaseNotesFromBody(template('Fixed https:/<b></b>/evil.example map.'))).toEqual([
+      'Fixed map.',
+    ]);
+    expect(releaseNotesFromBody(template('Fixed https:/**/evil.example map.'))).toEqual([
+      'Fixed map.',
+    ]);
+  });
+  it('publishes emphasized conventional notes as plain text', () => {
+    const notes = releaseNotesFromBody(template('**release:** __Smart Fill__ keeps totals.'));
+    expect(notes).toEqual(['release: Smart Fill keeps totals.']);
+    expect(releaseBullets(`### Highlights\n\n- ${notes[0]}`, '')).toEqual([
+      'Release: Smart Fill keeps totals.',
+    ]);
+  });
+  it('does not let a comment opener inside a fence consume the real section', () => {
+    const body = '## Summary\n\n```html\n<!--\n```\n\n## Release note\n\nReal update.\n';
+    expect(releaseNotesFromBody(body)).toEqual(['Real update.']);
   });
   it('keeps comparison text and strips links, images, URLs and tags', () => {
     expect(

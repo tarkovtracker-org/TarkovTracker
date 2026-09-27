@@ -1739,8 +1739,9 @@ The checkout stays pinned to the validated SHA. The production build still runs 
   at or after `mergedAt` (equal second-precision times are ambiguous) skips that note and never
   blocks or alters versioning. At most 3 notes per PR and 5 per release are published; 5 is the
   in-app changelog's per-release bullet limit and Highlights are listed first. Notes are reduced
-  to plain text (no link syntax, URLs, or HTML; comments and code fences cannot supply the
-  section; only top-level bullets are highlights and their wrapped, nested, or indented content
+  to plain text (no link syntax, URLs, HTML, or Markdown emphasis; fenced code is removed before
+  hidden comments, HTML fragments are removed to a fixed point before autolink detection;
+  only top-level bullets are highlights and their wrapped, nested, or indented content
   stays with the parent bullet). Parsing is bounded before sanitization — PR text within GitHub's
   body limit, each bullet within `MAX_RAW_NOTE` code points, autolinks detected per
   whitespace-delimited token with no superlinear matching — so untrusted text cannot stall the
