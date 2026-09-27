@@ -4,10 +4,6 @@
 rules:
   dangerous-triggers:
     ignore:
-      # Release must run with write credentials after CI completes on main. The job never
-      # executes candidate code before `release-gate.mjs` validates the exact SHA; see
-      # docs/WORKFLOW_AUTOMATION.md "Release Automation".
-      - release.yml
       # Auto-merge uses a trusted post-CI workflow_run because Dependabot PR events get read-only
       # tokens. It never checks out or executes PR code; it checks live metadata and merges only
       # allowlisted lockfile-only changes; see docs/WORKFLOW_AUTOMATION.md "Dependabot Auto Merge".

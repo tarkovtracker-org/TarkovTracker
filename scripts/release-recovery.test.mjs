@@ -369,7 +369,7 @@ describe('interrupted release recovery', () => {
     f.github.rest.repos.getReleaseByTag.mockResolvedValue({ data: { draft: true } });
     await expect(publishRecoveredRelease(f)).rejects.toThrow('not a stable publication');
   });
-  it('permits recovery only on an explicitly enabled rerun of the trusted original CI event', async () => {
+  it('permits recovery only on an explicitly enabled rerun of the original release run', async () => {
     const f = fixture();
     const run = {
       id: 12,
@@ -382,12 +382,12 @@ describe('interrupted release recovery', () => {
       head_sha: f.baseSha,
       run_attempt: 1,
     };
-    f.context.payload = { workflow_run: run, repository: { id: 42 } };
+    // A rerun keeps the original trigger commit, which is now the version commit's parent.
+    Object.assign(f.context, { eventName: 'schedule', ref: 'refs/heads/main', sha: f.baseSha });
+    f.context.payload = { repository: { id: 42 } };
     f.github.rest.actions = {
       ...f.github.rest.actions,
-      getWorkflowRun: vi.fn(({ run_id }) =>
-        Promise.resolve({ data: run_id === 12 ? run : f.previewRun })
-      ),
+      listWorkflowRuns: vi.fn().mockResolvedValue({ data: { workflow_runs: [run] } }),
     };
     f.github.rest.git.getRef.mockResolvedValue({ data: { object: { sha: f.sha } } });
     expect((await releaseEligibility(f)).release).toBe(false);
