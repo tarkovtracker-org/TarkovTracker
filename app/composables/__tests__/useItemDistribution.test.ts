@@ -456,7 +456,11 @@ describe('useItemDistribution', () => {
     });
   });
   describe('resetObjectives', () => {
-    it('resets task objective counts to zero', async () => {
+    it('resets task objective state with a fresh timestamp', async () => {
+      vi.spyOn(Date, 'now').mockReturnValue(456);
+      mockStoreState.taskObjectiveEntries = {
+        'obj-1': { count: 1, complete: true, timestamp: 123 },
+      };
       const { useItemDistribution } = await import('@/composables/useItemDistribution');
       const { resetObjectives } = useItemDistribution();
       const taskObjectives = [
@@ -465,27 +469,43 @@ describe('useItemDistribution', () => {
       ];
       resetObjectives(taskObjectives, []);
       const state = mockStoreState.patchedState as {
-        pvp: { taskObjectives: Record<string, { count: number }> };
+        pvp: {
+          taskObjectives: Record<string, { count: number; complete: boolean; timestamp: number }>;
+        };
       };
       expect(state.pvp.taskObjectives['obj-1']).toEqual({
         count: 0,
+        complete: false,
+        timestamp: 456,
       });
       expect(state.pvp.taskObjectives['obj-2']).toEqual({
         count: 0,
+        complete: false,
+        timestamp: 456,
       });
     });
-    it('resets hideout part counts to zero', async () => {
+    it('resets hideout part state with a fresh timestamp', async () => {
+      vi.spyOn(Date, 'now').mockReturnValue(456);
+      mockStoreState.hideoutPartEntries = {
+        'mod-1': { count: 1, complete: true, timestamp: 123 },
+      };
       const { useItemDistribution } = await import('@/composables/useItemDistribution');
       const { resetObjectives } = useItemDistribution();
       const hideoutModules = [createHideoutModule('mod-1'), createHideoutModule('mod-2')];
       resetObjectives([], hideoutModules);
       const state = mockStoreState.patchedState as {
-        pvp: { hideoutParts: Record<string, { count: number; complete: boolean }> };
+        pvp: {
+          hideoutParts: Record<string, { count: number; complete: boolean; timestamp: number }>;
+        };
       };
       const firstPart = expectDefined(state.pvp.hideoutParts['mod-1']);
       const secondPart = expectDefined(state.pvp.hideoutParts['mod-2']);
       expect(firstPart.count).toBe(0);
       expect(secondPart.count).toBe(0);
+      expect(firstPart.complete).toBe(false);
+      expect(secondPart.complete).toBe(false);
+      expect(firstPart.timestamp).toBe(456);
+      expect(secondPart.timestamp).toBe(456);
     });
     it('does not patch store when both arrays are empty', async () => {
       const { useItemDistribution } = await import('@/composables/useItemDistribution');

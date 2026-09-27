@@ -184,6 +184,7 @@ export function useItemDistribution(): UseItemDistributionReturn {
     hideoutModules: NeededItemHideoutModule[]
   ): void {
     if (taskObjectives.length === 0 && hideoutModules.length === 0) return;
+    const now = Date.now();
     tarkovStore.$patch((state) => {
       const currentData = state[state.currentGameMode];
       if (!currentData.taskObjectives) {
@@ -196,6 +197,8 @@ export function useItemDistribution(): UseItemDistributionReturn {
         currentData.taskObjectives[obj.id] = {
           ...currentData.taskObjectives[obj.id],
           count: 0,
+          complete: false,
+          timestamp: now,
         };
       }
       for (const mod of hideoutModules) {
@@ -203,7 +206,7 @@ export function useItemDistribution(): UseItemDistributionReturn {
           ...currentData.hideoutParts[mod.id],
           count: 0,
           complete: false,
-          timestamp: undefined,
+          timestamp: now,
         };
       }
     });
