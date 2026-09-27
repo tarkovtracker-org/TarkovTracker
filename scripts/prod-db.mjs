@@ -960,16 +960,76 @@ function getSqlLiteralStep(source, index, backslashEscapes) {
 function isBackslashEscape(character, backslashEscapes) {
   return backslashEscapes && character === '\\';
 }
-// PostgreSQL continues a string across whitespace that contains a newline (optionally with
-// `--` comments), and an escape string's continuation segments keep backslash escapes. As in
-// scan.l, horizontal whitespace before the newline includes form feed and vertical tab.
-const SQL_STRING_CONTINUATION =
-  /(?:[ \t\f\v]|--[^\n\r]*)*[\n\r](?:[ \t\n\r\f\v]|--[^\n\r]*[\n\r])*'/y;
+// PostgreSQL continues a string at the next quote when whitespace containing a newline separates
+// the segments, and `--` comments count as whitespace (scan.l). An escape string's continuation
+// segments keep backslash escapes. As in scan.l, whitespace before the first newline excludes
+// carriage returns and newlines. The gap is scanned with explicit one-step helpers instead of a
+// regex: a comment body matching runs of dashes overlaps later repetitions of `--`, so an
+// equivalent regex backtracks exponentially on gaps of many repeated comment markers.
+const SQL_HORIZONTAL_SPACE = ' \t\f\v';
+const SQL_CONTINUATION_SPACE = `${SQL_HORIZONTAL_SPACE}\n\r`;
+function isSqlHorizontalSpace(character) {
+  return SQL_HORIZONTAL_SPACE.includes(character);
+}
+// Horizontal whitespace after the continuation newline may also include newlines (scan.l `space`).
+function isSqlContinuationSpace(character) {
+  return SQL_CONTINUATION_SPACE.includes(character);
+}
+function isSqlNewline(character) {
+  return character === '\n' || character === '\r';
+}
+// Index just past the newline that must end the first gap between segments, or -1 when the gap
+// cannot reach one. A `--` comment decides the gap: the newline ending it is the gap's mandatory
+// newline, so it splits the gap into the inter-quote side and the newline-opened side in one step.
+function getAfterContinuationNewline(source, index) {
+  const cursor = skipHorizontalSpaces(source, index);
+  if (isCommentStart(source, cursor)) return skipThroughSqlNewline(source, cursor + 2);
+  return cursor < source.length && isSqlNewline(source[cursor]) ? cursor + 1 : -1;
+}
+function skipHorizontalSpaces(source, index) {
+  let cursor = index;
+  while (cursor < source.length && isSqlHorizontalSpace(source[cursor])) {
+    cursor += 1;
+  }
+  return cursor;
+}
+// Index of the quote opening the next segment, or -1 when no continuation follows the newline.
+function skipToContinuationQuote(source, index) {
+  let cursor = index;
+  while (cursor < source.length) {
+    if (source[cursor] === "'") return cursor;
+    const stepped = skipContinuationStep(source, cursor);
+    if (stepped === -1) return -1;
+    cursor = stepped;
+  }
+  return -1;
+}
+// End of one continuation step: one whitespace character (newlines included, after the newline
+// that opened it), or a `--` comment running through the newline that ends it, because comments
+// are whitespace in scan.l. A comment running to EOF cannot continue: -1, like any other
+// non-whitespace character.
+function skipContinuationStep(source, index) {
+  if (isSqlContinuationSpace(source[index])) return index + 1;
+  return isCommentStart(source, index) ? skipThroughSqlNewline(source, index + 2) : -1;
+}
+function isCommentStart(source, index) {
+  return source[index] === '-' && source[index + 1] === '-';
+}
+// Index just past the newline that ends a `--` comment, or -1 when the comment runs to EOF.
+function skipThroughSqlNewline(source, index) {
+  let cursor = index;
+  while (cursor < source.length) {
+    if (isSqlNewline(source[cursor])) return cursor + 1;
+    cursor += 1;
+  }
+  return -1;
+}
 // Index of the next segment's opening quote, or -1 when the escape string ends at `end`.
 function getContinuationQuote(source, end, backslashEscapes) {
   if (!backslashEscapes) return -1;
-  SQL_STRING_CONTINUATION.lastIndex = end;
-  return SQL_STRING_CONTINUATION.test(source) ? SQL_STRING_CONTINUATION.lastIndex - 1 : -1;
+  const afterNewline = getAfterContinuationNewline(source, end);
+  if (afterNewline === -1) return -1;
+  return skipToContinuationQuote(source, afterNewline);
 }
 function extractMigrationRelations(source) {
   const normalizedSource = normalizeMigrationSql(source);

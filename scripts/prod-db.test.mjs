@@ -274,6 +274,23 @@ describe('prod-db migration preflight', () => {
     expect(result.migration.classification.statement_count).toBe(1);
     expect(result.migration.classification.has_malformed_literal).toBe(false);
   });
+  it('scans gaps of repeated comment markers without exponential backtracking', () => {
+    const markers = ' --'.repeat(50000);
+    const source = `update public.events set status = E'a' --${markers};`;
+    const started = Date.now();
+    const result = JSON.parse(run(['preflight', '--migration', writeFixture(source)]));
+    expect(Date.now() - started).toBeLessThan(1500);
+    expect(result.migration.classification.statement_count).toBe(1);
+    expect(result.migration.classification.contains_ddl).toBe(false);
+    expect(result.migration.classification.has_malformed_literal).toBe(false);
+  });
+  it('continues E strings across long gaps of many comment segments', () => {
+    const comments = Array.from({ length: 5000 }, (_, index) => `-- marker ${index}\n`).join('');
+    const source = `comment on table public.events is E'a' ${comments}'\\' '; drop table public.events; -- ';`;
+    const result = JSON.parse(run(['preflight', '--migration', writeFixture(source)]));
+    expect(result.migration.classification.statement_count).toBe(2);
+    expect(result.migration.classification.contains_ddl).toBe(true);
+  });
   it('fails closed for an unterminated E string', () => {
     const source = "update public.events set status = E'unterminated\\';";
     const result = JSON.parse(run(['preflight', '--migration', writeFixture(source)]));
