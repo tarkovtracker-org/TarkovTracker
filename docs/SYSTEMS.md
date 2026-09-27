@@ -801,7 +801,9 @@ flowchart LR
    client sync always carries every mode in one payload, so a stale Seasonal entry is skipped rather
    than raising: persistent PvP and PvE from the same request still commit. The RPC rejects payloads
    larger than 512 KiB and allows at most 60 direct client syncs per user per minute. API gateway
-   reads resolve the active Seasonal number through the database before selecting a row.
+   reads resolve the active Seasonal number through the database before selecting a row. Persisted
+   `lastApiUpdate` and `apiUpdateHistory` retain task states `active`, `completed`, `failed`, and
+   `uncompleted`; malformed entries and unknown states are stripped by the database sanitizer.
 3. Realtime listens to both the account row and normalized rows. A normalized event is applied only
    when its mode is supported and its season equals the active season. The long-lived system and team
    listeners run in detached scopes so route unmounts cannot orphan their channels. The team store
