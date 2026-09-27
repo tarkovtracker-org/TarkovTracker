@@ -12,21 +12,21 @@
 
 ```mermaid
 graph TD
-    App[app/ Nuxt SPA]
-    App --> Nuxt[nuxt + vue + @nuxt/ui]
-    App --> TW[tailwindcss v4]
-    App --> Pinia[pinia + persistedstate]
-    App --> SB[@supabase/supabase-js]
-    App --> Domain[leaflet + @vue-flow/* + fflate]
-    App --> I18n[vue-i18n + @nuxtjs/i18n]
-    App --> Server[ofetch + h3 + jsonpath-plus + lru-cache]
+    App["app/ Nuxt SPA"]
+    App --> Nuxt["nuxt + vue + @nuxt/ui"]
+    App --> TW["tailwindcss v4"]
+    App --> Pinia["pinia + persistedstate"]
+    App --> SB["@supabase/supabase-js"]
+    App --> Domain["leaflet + @vue-flow/* + fflate"]
+    App --> I18n["vue-i18n + @nuxtjs/i18n"]
+    App --> Server["ofetch + h3 + jsonpath-plus + lru-cache"]
 
-    Worker[workers/api-gateway]
-    Worker --> CF[wrangler + workerd]
-    Worker --> OpenAPI[@apidevtools/swagger-parser + openapi-types]
+    Worker["workers/api-gateway"]
+    Worker --> CF["wrangler + workerd"]
+    Worker --> OpenAPI["@apidevtools/swagger-parser + openapi-types"]
 
-    EdgeFns[supabase/functions]
-    EdgeFns --> Deno[Deno runtime + import maps]
+    EdgeFns["supabase/functions"]
+    EdgeFns --> Deno["Deno runtime + import maps"]
 ```
 
 ## Dependency Invariants & Policies
