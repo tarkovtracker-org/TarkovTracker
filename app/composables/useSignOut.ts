@@ -19,10 +19,10 @@ export function useSignOut() {
   const currentOwner = (): string | null => $supabase.user?.id ?? null;
   watch(() => [$supabase.user?.id, $supabase.user?.loggedIn], clearConfirmation, { flush: 'sync' });
   const signingOut = ref(false);
-  const signOutNow = async (): Promise<boolean> => {
+  const signOutNow = async (expectedUserId = currentOwner()): Promise<boolean> => {
     signingOut.value = true;
     try {
-      await $supabase.signOut();
+      await $supabase.signOut(expectedUserId ?? undefined);
       return true;
     } catch (error) {
       logger.error('[SignOut] Sign out failed:', error);
@@ -39,7 +39,7 @@ export function useSignOut() {
       confirmOpen.value = true;
       return false;
     }
-    return await signOutNow();
+    return await signOutNow(currentOwner());
   };
   const discardAndSignOut = async (openingOwner: string | null): Promise<boolean> => {
     if (!confirmOpen.value || openingOwner !== confirmationOwner.value) return false;
@@ -48,7 +48,7 @@ export function useSignOut() {
       return false;
     }
     clearConfirmation();
-    return await signOutNow();
+    return await signOutNow(openingOwner);
   };
   return {
     confirmOpen,
