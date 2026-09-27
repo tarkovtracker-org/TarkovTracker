@@ -189,6 +189,14 @@ describe('release note parsing', () => {
       expect(releaseNotesFromBody(body)).toEqual(['Real note.']);
     }
   );
+  it.each([' \t', '  \t', '   \t'])(
+    'ignores a comment opener in mixed-indent code (%j)',
+    (indent) => {
+      expect(
+        releaseNotesFromBody(`## Summary\n\n${indent}<!--\n\n## Release note\n\nReal note.`)
+      ).toEqual(['Real note.']);
+    }
+  );
   it('keeps the real note after an invalid backtick-fence info string', () => {
     expect(
       releaseNotesFromBody('## Summary\n\n```lang`invalid\n\n## Release note\n\nReal note.')

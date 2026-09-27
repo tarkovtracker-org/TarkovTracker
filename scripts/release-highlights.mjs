@@ -68,10 +68,14 @@ function closesFence(line, open) {
   if (!match || match[2].trim()) return false;
   return match[1][0] === open[0] && match[1].length >= open.length;
 }
+function hasInvalidFenceInfo(match) {
+  return match[1][0] === '`' && match[2].includes('`');
+}
 function openingFence(line) {
   const match = line.match(FENCE);
-  if (match?.[1][0] === '`' && match[2].includes('`')) return null;
-  return match?.[1] ?? null;
+  if (!match) return null;
+  if (hasInvalidFenceInfo(match)) return null;
+  return match[1];
 }
 function fenceStep(state, line) {
   if (state.open) {
@@ -91,7 +95,7 @@ function backtickRun(line, start) {
   while (line[end] === '`') end += 1;
   return end - start;
 }
-const isIndentedCode = (line) => /^(?: {4}|\t)/.test(line);
+const isIndentedCode = (line) => /^(?: {4}| {0,3}\t)/.test(line);
 function countLineBackticks(line, counts) {
   for (let index = 0; index < line.length;) {
     if (line[index] !== '`') {
