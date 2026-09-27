@@ -1,3 +1,10 @@
+## [1.83.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.1...v1.83.2) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** emit searchable quota and abuse rejection logs ([#949](https://github.com/tarkovtracker-org/TarkovTracker/issues/949)) ([7932be8](https://github.com/tarkovtracker-org/TarkovTracker/commit/7932be8079b5c59c6cccd9d8b983ab9910204f48))
+
 ## [1.83.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.0...v1.83.1) (2026-09-27)
 
 
