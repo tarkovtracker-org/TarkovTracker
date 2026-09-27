@@ -4,9 +4,9 @@ import { createLogger } from '@/server/utils/logger';
 import { getSharedCache, resolveSharedCacheOrigin } from '@/server/utils/sharedEdgeStore';
 import {
   cleanText,
-  extractReleaseBullets,
   normalizeCommitMessage,
-  toSentence,
+  releaseBullets,
+  releaseCommitShas,
 } from '@/utils/changelog';
 import type {
   ChangelogBullet,
@@ -463,14 +463,9 @@ const buildReleaseItems = async (
     if (!release) continue;
     const date = (release.published_at || release.created_at || '').slice(0, 10);
     const label = cleanText(release.name || release.tag_name || '');
-    const rawBullets = extractReleaseBullets(release.body);
-    const bullets: ChangelogBullet[] = rawBullets
-      .map((b) => ({ text: toSentence(b) }))
-      .filter((b) => b.text)
-      .slice(0, changelogConfig.MAX_BULLETS_PER_GROUP);
-    if (!bullets.length && label) {
-      bullets.push({ text: toSentence(label) });
-    }
+    const bullets: ChangelogBullet[] = releaseBullets(release.body, label)
+      .slice(0, changelogConfig.MAX_BULLETS_PER_GROUP)
+      .map((text) => ({ text }));
     const tagName = release.tag_name ?? undefined;
     const prevRelease = validReleases[i + 1];
     const prevTagName = prevRelease?.tag_name ?? undefined;
@@ -509,6 +504,11 @@ type GroupedCommitItem = {
 const sortByDateDesc = <T extends { date: string }>(items: T[]): T[] => {
   return [...items].sort((a, b) => b.date.localeCompare(a.date));
 };
+// Commits already covered by a fetched release (shown or hidden as internal) are not repeated.
+const collectReleasedShas = (releases: GitHubRelease[] | null): Set<string> => {
+  const published = Array.isArray(releases) ? releases.filter((release) => !release.draft) : [];
+  return new Set(published.flatMap((release) => releaseCommitShas(release.body)));
+};
 const toProcessedCommit = (commit: GitHubCommitListItem): ProcessedCommit | null => {
   const bullet = normalizeCommitMessage(commit.commit?.message ?? '');
   if (!bullet) return null;
@@ -518,29 +518,46 @@ const toProcessedCommit = (commit: GitHubCommitListItem): ProcessedCommit | null
   if (!day || !sha) return null;
   return { sha, date: day, bullet };
 };
+type CommitCollector = {
+  processed: ProcessedCommit[];
+  days: Set<string>;
+  dayLimit: number;
+  releasedShas: ReadonlySet<string>;
+};
+const isCollectorFull = (collector: CommitCollector): boolean =>
+  collector.days.size > collector.dayLimit;
+// Adds one visible, not-yet-released commit and reports whether the day limit is now exceeded.
+const collectCommit = (collector: CommitCollector, commit: GitHubCommitListItem): boolean => {
+  const processedCommit = toProcessedCommit(commit);
+  if (!processedCommit || collector.releasedShas.has(processedCommit.sha.toLowerCase())) {
+    return false;
+  }
+  collector.processed.push(processedCommit);
+  collector.days.add(processedCommit.date);
+  return isCollectorFull(collector);
+};
+const collectCommitPage = (collector: CommitCollector, commits: GitHubCommitListItem[]): void => {
+  for (const commit of commits) {
+    if (collectCommit(collector, commit)) return;
+  }
+};
 const fetchCommitCandidates = async (
   dayLimit: number,
   baseUrl: string,
   githubToken?: string,
-  timeoutMs: number = changelogConfig.DEFAULT_GITHUB_TIMEOUT_MS
+  timeoutMs: number = changelogConfig.DEFAULT_GITHUB_TIMEOUT_MS,
+  releasedShas: ReadonlySet<string> = new Set()
 ): Promise<ProcessedCommit[]> => {
-  const processed: ProcessedCommit[] = [];
-  const uniqueDays = new Set<string>();
+  const collector: CommitCollector = { processed: [], days: new Set(), dayLimit, releasedShas };
   for (let page = 1; page <= changelogConfig.MAX_COMMIT_PAGES; page++) {
-    if (uniqueDays.size > dayLimit) break;
+    if (isCollectorFull(collector)) break;
     const commitUrl = `${baseUrl}/commits?per_page=${changelogConfig.COMMIT_PAGE_SIZE}&page=${page}`;
     const commits = await fetchGithub<GitHubCommitListItem[]>(commitUrl, githubToken, timeoutMs);
     if (!Array.isArray(commits) || !commits.length) break;
-    for (const commit of commits) {
-      const processedCommit = toProcessedCommit(commit);
-      if (!processedCommit) continue;
-      processed.push(processedCommit);
-      uniqueDays.add(processedCommit.date);
-      if (uniqueDays.size > dayLimit) break;
-    }
+    collectCommitPage(collector, commits);
     if (commits.length < changelogConfig.COMMIT_PAGE_SIZE) break;
   }
-  return processed;
+  return collector.processed;
 };
 const buildCommitItems = async (
   commits: ProcessedCommit[],
@@ -628,7 +645,13 @@ export default defineEventHandler(async (event): Promise<ChangelogResponse> => {
     const fetchLimit = commitLimit + 1;
     const commits =
       commitLimit > 0
-        ? await fetchCommitCandidates(fetchLimit, baseUrl, githubToken, timeoutMs)
+        ? await fetchCommitCandidates(
+            fetchLimit,
+            baseUrl,
+            githubToken,
+            timeoutMs,
+            collectReleasedShas(releases)
+          )
         : [];
     if (releaseFetchFailed && !releaseItems.length && !commits.length) {
       return { source: 'commits', items: [], hasMore: false, error: 'Failed to fetch changelog' };

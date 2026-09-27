@@ -32,7 +32,7 @@ const release = (tag: string, day: string, body = '- Improved maps') => ({
   published_at: `${day}T12:00:00Z`,
   body,
 });
-const commit = (sha: string, day: string, message = 'fix: map markers') => ({
+const commit = (sha: string, day: string, message = 'fix: keep map markers visible') => ({
   sha,
   commit: { message, author: { date: `${day}T12:00:00Z` } },
 });
@@ -91,6 +91,38 @@ describe('changelog endpoint', () => {
       'Cache-Control': 'public, max-age=300, s-maxage=300',
     });
   });
+  it('hides internal-only releases and does not repeat released commits', async () => {
+    const repo = 'https://github.com/owner/repo';
+    const shaA = 'a'.repeat(40);
+    const shaB = 'b'.repeat(40);
+    const shaC = 'c'.repeat(40);
+    const entry = (scope: string, subject: string, sha: string) =>
+      `* **${scope}:** ${subject} ([#9](${repo}/issues/9)) ([${sha.slice(0, 7)}](${repo}/commit/${sha}))`;
+    mocks.query.mockReturnValue({ limit: 5, releases: 2 });
+    mocks.fetch.mockImplementation(async (url: string) => {
+      if (url.includes('/releases?'))
+        return json([
+          release('v3', '2026-09-06', `### Bug Fixes\n\n${entry('ci', 'guard reviews', shaA)}`),
+          release('v2', '2026-09-05', `### Features\n\n${entry('maps', 'add filters', shaB)}`),
+        ]);
+      if (url.includes('/commits?'))
+        return json([
+          commit(shaA, '2026-09-06', 'fix(ci): guard reviews'),
+          commit(shaB, '2026-09-05', 'feat(maps): add filters'),
+          commit(shaC, '2026-09-04', 'fix(app): keep totals accurate'),
+        ]);
+      return json({ stats: { additions: 1, deletions: 0 } });
+    });
+    const response = await (await loadHandler())(event);
+    expect(response.items.map(({ label, bullets }) => ({ label, bullets }))).toEqual([
+      { label: 'v2', bullets: [{ text: 'Add filters.' }] },
+      {
+        label: undefined,
+        bullets: [{ text: 'Keep totals accurate.', stats: { additions: 1, deletions: 0 } }],
+      },
+    ]);
+    expect(requests().some((url) => url.endsWith(`/commits/${shaB}`))).toBe(false);
+  });
   it('groups useful commits by day, aggregates available stats and exposes pagination', async () => {
     mocks.query.mockReturnValue({ limit: 1 });
     mocks.fetch.mockImplementation(async (url: string) => {
@@ -98,7 +130,7 @@ describe('changelog endpoint', () => {
       if (url.includes('/commits?'))
         return json([
           commit('a', '2026-09-05'),
-          commit('b', '2026-09-05', 'feat: filters'),
+          commit('b', '2026-09-05', 'feat: add filters'),
           commit('ignored', '2026-09-05', 'chore: dependencies'),
           commit('c', '2026-09-04'),
         ]);
@@ -112,7 +144,7 @@ describe('changelog endpoint', () => {
       items: [
         {
           date: '2026-09-05',
-          bullets: [{ text: 'Fixed map markers.' }, { text: 'Added filters.' }],
+          bullets: [{ text: 'Keep map markers visible.' }, { text: 'Add filters.' }],
           stats: { additions: 4, deletions: 1 },
         },
       ],
@@ -131,7 +163,7 @@ describe('changelog endpoint', () => {
       return json({ stats: { additions: 1, deletions: 0 } });
     });
     expect((await (await loadHandler())(event)).items[0]?.bullets[0]).toMatchObject({
-      text: 'Fixed map markers.',
+      text: 'Keep map markers visible.',
     });
     expect(requests().filter((url) => url.includes('/commits?'))).toHaveLength(2);
   });
