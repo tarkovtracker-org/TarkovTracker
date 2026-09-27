@@ -568,7 +568,8 @@
       "go_to_in_task_list": "Vai all'obiettivo nell'elenco missioni",
       "complete": "Completa obiettivo",
       "uncomplete": "Obiettivo incompleto",
-      "objective_unavailable": "Obiettivo non disponibile."
+      "objective_unavailable": "Obiettivo non disponibile.",
+      "stacked_objectives": "{count} objectives here"
     }
   },
   "page": {
