@@ -1,3 +1,10 @@
+## [1.82.7](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.6...v1.82.7) (2026-09-27)
+
+
+### Bug Fixes
+
+* **ci:** stabilize preview comment authorization ([#941](https://github.com/tarkovtracker-org/TarkovTracker/issues/941)) ([67b6812](https://github.com/tarkovtracker-org/TarkovTracker/commit/67b68125e7b7e21ca2dbddc16c02ce8de4c44606))
+
 ## [1.82.6](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.5...v1.82.6) (2026-09-26)
 
 
