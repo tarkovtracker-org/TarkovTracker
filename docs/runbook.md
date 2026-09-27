@@ -693,7 +693,8 @@ matching the sensitive-column policy and is capped at 20 rows; `distribution` is
 groups. The schema report exposes catalog ACL entries, PUBLIC grants, observer-effective privileges
 through inherited roles, privileges effective for existing `anon`, `authenticated`, and `service_role`
 roles, per-role schema `USAGE`, relation owners, and row-level-security flags. A privilege counts as
-effective only when the role can also use the relation's schema. Health shows schema usage and read
+effective only when the role can also use the relation's schema. Column-level ACL entries and
+the per-column privileges they make effective are listed separately. Health shows schema usage and read
 access to the migration `version` and `statements` columns. `EXPLAIN ANALYZE`, arbitrary SQL,
 writes, DDL, migration commands, and unbounded row access are not supported.
 
@@ -717,7 +718,8 @@ guaranteed to describe the same environment as the observer credential.
 `canary` is the first production validation command. It runs only health and telemetry reports:
 `db-stats`, `role-stats`, `table-stats`, `index-stats`, and `outliers`. It does not sample rows,
 run distributions, or execute migration preflight. Before collecting telemetry it rejects
-privileged or write-capable roles, persistent-object creation privileges, disabled default
+privileged or write-capable roles, persistent-object creation privileges, read access to stored
+migration `statements`, disabled default
 read-only transactions, and unbounded statement or lock timeouts. Every report includes an
 `observation` object with capture time, observer application name, database statistics reset time,
 statement statistics reset time, and I/O statistics reset time. These reset times are required to

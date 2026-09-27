@@ -1345,14 +1345,16 @@ flowchart LR
    The schema report includes relation ACL entries, effective PUBLIC grants, privileges for the
    observer and existing `anon`, `authenticated`, and `service_role` roles (including inherited role
    membership), per-role schema `USAGE`, relation owners, and row-level-security flags. Effective
-   privileges are listed only when the role also has `USAGE` on the relation's schema. Health
+   privileges are listed only when the role also has `USAGE` on the relation's schema. Column-level
+   ACL entries and the effective per-column privileges they grant are reported separately. Health
    reports whether the role can use the migration-history schema and read the `version` or
    `statements` column. Samples select
    allowlisted low-risk columns and are capped at 20 rows; distributions are capped at 50 groups.
 5. The observer rejects writes, DDL, transaction-control statements, `EXPLAIN ANALYZE`, arbitrary
    SQL, unbounded samples, and non-allowlisted distributions.
 6. `canary` runs only health and telemetry reports and is the first production validation path.
-   It rejects privileged/write-capable roles and unbounded transaction or lock timeouts before it
+   It rejects privileged/write-capable roles, read access to stored migration statements, and
+   unbounded transaction or lock timeouts before it
    runs the telemetry reports. It never reads application rows or runs migration preflight.
 7. `preflight --migration <path>` parses the migration to identify referenced relations and
    operation classes, then collects table/index, traffic, vacuum, outliers, lock, and blocking reports
@@ -1361,7 +1363,8 @@ flowchart LR
    `risk: unknown`, and `requires_manual_review: true`. Multiple statements are classified only
    when every statement is a supported table-level `GRANT`/`REVOKE`, optionally wrapped in one
    `BEGIN`/`COMMIT` pair; ACL relations come from the `ON` clause, reserved keywords are rejected as
-   unquoted relation or role names, and privilege names are not data changes. It does not execute
+   unquoted relation or role names, unquoted relation names fold to lowercase, and privilege names
+   are not data changes. It does not execute
    the migration.
 8. `migration-history` reads applied version identifiers from
    `supabase_migrations.schema_migrations` and compares them against `supabase/migrations` in the
@@ -1408,15 +1411,16 @@ flowchart LR
   existing `anon`, `authenticated`, and `service_role` roles, relation owners, and RLS flags without
   reading application rows. Effective privileges account for inherited roles, require schema
   `USAGE` on the relation's schema (reported separately as `schema_usage`), and cover the server's
-  supported table privileges.
+  supported table privileges. Column-only grants appear in `column_grants` and
+  `effective_column_privileges`.
 - SQL identifiers are validated before interpolation, row and group limits are enforced, sensitive
   sample columns are excluded, and sensitive distributions are rejected.
 - The observer never executes migrations, arbitrary SQL, writes, DDL, `EXPLAIN ANALYZE`, or
   transaction-control statements.
 - `canary` is telemetry-only and excludes samples, distributions, and preflight.
 - `canary` must fail before telemetry collection when the observer is privileged, can write
-  application tables or create persistent objects, lacks default read-only transactions, or has
-  unbounded statement or lock timeouts.
+  application tables or create persistent objects, can read stored migration `statements`, lacks
+  default read-only transactions, or has unbounded statement or lock timeouts.
 - Migration preflight is evidence-only and fails closed on unsupported or ambiguous syntax;
   production reports run sequentially, and migration execution remains in the reviewed merge and
   Supabase deployment workflow. The only classified multi-statement form is table-level ACL

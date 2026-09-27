@@ -66,7 +66,7 @@ let data = [{
   can_create_in_public: false,
   can_use_migration_schema: true,
   can_read_migration_versions: true,
-  can_read_migration_statements: false,
+  can_read_migration_statements: process.env.FAKE_SUPABASE_STATEMENT_ACCESS === 'true',
   can_create_in_database: false,
   custom_config: 'secret-setting',
   arguments: args,
@@ -99,6 +99,10 @@ if (sql.includes('aclexplode')) {
       service_role: ['select', 'insert', 'update', 'delete'],
     },
     schema_usage: { observer: true, anon: true, authenticated: true, service_role: true },
+    column_grants: [
+      { column: 'note', grantee: 'authenticated', privilege: 'UPDATE', grantable: false },
+    ],
+    effective_column_privileges: { authenticated: { note: ['update'] } },
   }];
 }
 if (sql.includes('from supabase_migrations.schema_migrations')) {
@@ -263,6 +267,14 @@ describe('prod-db migration preflight', () => {
       ])
     );
     expect(specialRoles.migration.classification.assessment).toBe('classified');
+    const mixedCase = JSON.parse(
+      run([
+        'preflight',
+        '--migration',
+        writeFixture('GRANT SELECT ON Public.Events, Audit_Log TO authenticated;'),
+      ])
+    );
+    expect(mixedCase.migration.relations).toEqual(['public.audit_log', 'public.events']);
     const quotedRole = JSON.parse(
       run([
         'preflight',
@@ -354,6 +366,14 @@ COMMIT;`;
       authenticated: true,
       service_role: true,
     });
+    expect(query.column_grants).toEqual([
+      { column: 'note', grantee: 'authenticated', privilege: 'UPDATE', grantable: false },
+    ]);
+    expect(query.effective_column_privileges).toEqual({ authenticated: { note: ['update'] } });
+    expect(sql).toContain('aclexplode(a.attacl)');
+    expect(sql).toContain(
+      'has_column_privilege(checked.role_oid, c.oid, a.attnum, column_privilege)'
+    );
   });
 });
 describe('prod-db command boundary', () => {
@@ -439,6 +459,11 @@ describe('prod-db canary', () => {
   it('rejects an unsafe observer role before running the canary reports', () => {
     expect(() => run(['canary'], { FAKE_SUPABASE_UNSAFE: 'true' })).toThrow(
       'unsafe observer configuration: observer role is a superuser'
+    );
+  });
+  it('rejects an observer that can read stored migration statements', () => {
+    expect(() => run(['canary'], { FAKE_SUPABASE_STATEMENT_ACCESS: 'true' })).toThrow(
+      'unsafe observer configuration: observer role can read stored migration statements'
     );
   });
   it('fails closed when observer health fields are missing', () => {

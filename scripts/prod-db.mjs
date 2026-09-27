@@ -526,6 +526,7 @@ function validateCanaryHealth(report) {
     'has_table_write',
     'can_create_in_public',
     'can_create_in_database',
+    'can_read_migration_statements',
     'default_transaction_read_only',
     'statement_timeout',
     'lock_timeout',
@@ -541,6 +542,7 @@ function validateCanaryHealth(report) {
     [health.has_table_write, 'observer role can write application tables'],
     [health.can_create_in_public, 'observer role can create objects in public'],
     [health.can_create_in_database, 'observer role can create schemas'],
+    [health.can_read_migration_statements, 'observer role can read stored migration statements'],
     [health.default_transaction_read_only !== 'on', 'default_transaction_read_only is not on'],
     [/^0(?:ms|s|min)?$/.test(health.statement_timeout ?? ''), 'statement_timeout is not bounded'],
     [/^0(?:ms|s|min)?$/.test(health.lock_timeout ?? ''), 'lock_timeout is not bounded'],
@@ -634,6 +636,49 @@ async function runSchema() {
     ),
     '{}'::jsonb
   ) as schema_usage,
+  coalesce(
+    (
+      select jsonb_agg(jsonb_build_object(
+        'column', a.attname,
+        'grantee', case when acl.grantee = 0 then 'PUBLIC' else coalesce(role.rolname, acl.grantee::text) end,
+        'privilege', acl.privilege_type,
+        'grantable', acl.is_grantable
+      ) order by a.attnum, coalesce(role.rolname, 'PUBLIC'), acl.privilege_type)
+      from pg_catalog.pg_attribute a
+      cross join lateral aclexplode(a.attacl) acl
+      left join pg_catalog.pg_roles role on role.oid = acl.grantee
+      where a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped and a.attacl is not null
+    ),
+    '[]'::jsonb
+  ) as column_grants,
+  coalesce(
+    (
+      select jsonb_object_agg(per_role.role_name, per_role.columns)
+      from (
+        select per_column.role_name, jsonb_object_agg(per_column.column_name, per_column.privileges) as columns
+        from (
+          select checked.role_name, a.attname as column_name, jsonb_agg(column_privilege order by column_privilege) as privileges
+          from (
+            select 'observer' as role_name, observer.oid as role_oid
+            from pg_catalog.pg_roles observer
+            where observer.rolname = current_user
+            union all
+            select core_role.rolname, core_role.oid
+            from pg_catalog.pg_roles core_role
+            where core_role.rolname in ('anon', 'authenticated', 'service_role')
+          ) checked
+          cross join pg_catalog.pg_attribute a
+          cross join unnest(array['select', 'insert', 'update', 'references']) as column_privilege
+          where a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped and a.attacl is not null
+            and has_schema_privilege(checked.role_oid, n.oid, 'usage')
+            and has_column_privilege(checked.role_oid, c.oid, a.attnum, column_privilege)
+          group by checked.role_name, a.attnum, a.attname
+        ) per_column
+        group by per_column.role_name
+      ) per_role
+    ),
+    '{}'::jsonb
+  ) as effective_column_privileges,
   pg_total_relation_size(c.oid) as total_size_bytes,
   obj_description(c.oid, 'pg_class') as description
 from pg_catalog.pg_class c
@@ -896,7 +941,8 @@ function extractMigrationRelations(source) {
   return [...new Set(relations)].sort((left, right) => left.localeCompare(right));
 }
 function normalizeRelation(value) {
-  const relation = value.replace(/^public\./i, 'public.');
+  // Unquoted PostgreSQL identifiers fold to lowercase; quoted identifiers already fail closed.
+  const relation = value.toLowerCase();
   const ignored = ['select', 'where', 'set', 'values', 'using', 'on'];
   if (ignored.includes(relation.toLowerCase())) return undefined;
   return relation.includes('.') ? relation : `public.${relation}`;
