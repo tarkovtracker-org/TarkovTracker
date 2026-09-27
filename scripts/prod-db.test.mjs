@@ -19,6 +19,8 @@ const script = join(root, 'scripts/prod-db');
 const directory = mkdtempSync(join(tmpdir(), 'prod-db-'));
 const emptyEnvFile = join(directory, 'empty.env');
 writeFileSync(emptyEnvFile, '');
+const certificate = join(directory, 'observer.crt');
+writeFileSync(certificate, 'test certificate fixture');
 const migration = join(directory, 'migration.sql');
 const unsafeMigration = join(directory, 'unsafe-migration.sql');
 const literalMigration = join(directory, 'literal-migration.sql');
@@ -62,6 +64,9 @@ let data = [{
   is_write_role: false,
   has_table_write: false,
   can_create_in_public: false,
+  can_use_migration_schema: true,
+  can_read_migration_versions: true,
+  can_read_migration_statements: process.env.FAKE_SUPABASE_STATEMENT_ACCESS === 'true',
   can_create_in_database: false,
   custom_config: 'secret-setting',
   arguments: args,
@@ -76,7 +81,31 @@ if (process.env.FAKE_SUPABASE_INCOMPLETE === 'true') delete data[0].lock_timeout
 if (sql.includes('pg_catalog.pg_attribute')) {
   data = [{ column_name: 'id' }, { column_name: 'email' }];
 }
-if (sql.includes('supabase_migrations.schema_migrations')) {
+if (sql.includes('aclexplode')) {
+  data = [{
+    schema: 'public',
+    relation: 'events',
+    relation_type: 'table',
+    arguments: args,
+    grants: [
+      { grantee: 'PUBLIC', privilege: 'SELECT', grantable: false, inherited_by_observer: true },
+      { grantee: 'pi_reader', privilege: 'UPDATE', grantable: false, inherited_by_observer: true },
+    ],
+    effective_observer_privileges: ['select', 'update'],
+    public_privileges: ['SELECT'],
+    effective_core_role_privileges: {
+      anon: ['select'],
+      authenticated: ['select'],
+      service_role: ['select', 'insert', 'update', 'delete'],
+    },
+    schema_usage: { observer: true, anon: true, authenticated: true, service_role: true },
+    column_grants: [
+      { column: 'note', grantee: 'authenticated', privilege: 'UPDATE', grantable: false },
+    ],
+    effective_column_privileges: { authenticated: { note: ['update'] } },
+  }];
+}
+if (sql.includes('from supabase_migrations.schema_migrations')) {
   if (process.env.FAKE_SUPABASE_DENY_HISTORY === 'true') {
     console.error('failed to execute query: error: permission denied for schema supabase_migrations');
     process.exit(1);
@@ -113,6 +142,11 @@ function run(args, extraEnv = {}, executable = script) {
     encoding: 'utf8',
   });
 }
+function writeFixture(source) {
+  const path = join(directory, `fixture-${Math.random().toString(16).slice(2)}.sql`);
+  writeFileSync(path, source);
+  return path;
+}
 describe('prod-db observer', () => {
   it('keeps the tracked wrapper executable', () => {
     expect(statSync(script).mode & 0o111).not.toBe(0);
@@ -123,6 +157,9 @@ describe('prod-db observer', () => {
     expect(result.operation).toBe('health');
     expect(result.target).toBe('local');
     expect(result.data.rows[0]).toHaveProperty('database');
+    expect(result.data.rows[0].can_use_migration_schema).toBe(true);
+    expect(result.data.rows[0].can_read_migration_versions).toBe(true);
+    expect(result.data.rows[0].can_read_migration_statements).toBe(false);
     expect(result.observation.observer_application_name).toBe('pi-prod-observer');
     expect(result.observation).toHaveProperty('statement_stats_reset');
     expect(result.observation).toHaveProperty('io_stats_reset');
@@ -182,6 +219,161 @@ describe('prod-db migration preflight', () => {
     expect(result.migration.classification.has_malformed_literal).toBe(true);
     expect(result.assessment).toBe('incomplete');
     expect(result.risk).toBe('unknown');
+  });
+  it('classifies table grants without treating UPDATE or DELETE privileges as data changes', () => {
+    for (const statement of [
+      'GRANT UPDATE, DELETE ON TABLE public.events TO pi_reader;',
+      'REVOKE UPDATE, DELETE ON public.events FROM PUBLIC;',
+    ]) {
+      const result = JSON.parse(run(['preflight', '--migration', writeFixture(statement)]));
+      expect(result.migration.classification.contains_data_change).toBe(false);
+      expect(result.migration.relations).toEqual(['public.events']);
+      expect(result.migration.classification.assessment).toBe('classified');
+    }
+  });
+  it('keeps ACL migrations incomplete when syntax is unsupported or mixed with DML', () => {
+    const unsupported = JSON.parse(
+      run([
+        'preflight',
+        '--migration',
+        writeFixture('GRANT EXECUTE ON FUNCTION public.read_event() TO PUBLIC;'),
+      ])
+    );
+    expect(unsupported.migration.classification.assessment).toBe('incomplete');
+    expect(unsupported.migration.classification.contains_data_change).toBe(false);
+    const malformed = JSON.parse(
+      run([
+        'preflight',
+        '--migration',
+        writeFixture('GRANT ALL, SELECT ON public.events TO pi_reader;'),
+      ])
+    );
+    expect(malformed.migration.classification.assessment).toBe('incomplete');
+    for (const statement of [
+      'GRANT SELECT ON TABLE select TO authenticated;',
+      'GRANT SELECT ON public.events TO table;',
+      'REVOKE SELECT ON user FROM anon;',
+    ]) {
+      const reserved = JSON.parse(run(['preflight', '--migration', writeFixture(statement)]));
+      expect(reserved.migration.classification.assessment).toBe('incomplete');
+    }
+    const specialRoles = JSON.parse(
+      run([
+        'preflight',
+        '--migration',
+        writeFixture(
+          'GRANT SELECT ON public.select_log, public.user$events TO current_user, public, public_reader;'
+        ),
+      ])
+    );
+    expect(specialRoles.migration.classification.assessment).toBe('classified');
+    const mixedCase = JSON.parse(
+      run([
+        'preflight',
+        '--migration',
+        writeFixture('GRANT SELECT ON Public.Events, Audit_Log TO authenticated;'),
+      ])
+    );
+    expect(mixedCase.migration.relations).toEqual(['public.audit_log', 'public.events']);
+    const quotedRole = JSON.parse(
+      run([
+        'preflight',
+        '--migration',
+        writeFixture("GRANT SELECT ON public.events TO authenticated 'invalid';"),
+      ])
+    );
+    expect(quotedRole.migration.classification.assessment).toBe('incomplete');
+    const unclosedComment = JSON.parse(
+      run([
+        'preflight',
+        '--migration',
+        writeFixture('GRANT SELECT ON public.events TO authenticated /* unclosed'),
+      ])
+    );
+    expect(unclosedComment.migration.classification.has_malformed_comment).toBe(true);
+    expect(unclosedComment.migration.classification.assessment).toBe('incomplete');
+    const nestedComment = JSON.parse(
+      run([
+        'preflight',
+        '--migration',
+        writeFixture('GRANT SELECT ON public.events TO authenticated /* outer /* inner */'),
+      ])
+    );
+    expect(nestedComment.migration.classification.has_malformed_comment).toBe(true);
+    expect(nestedComment.migration.classification.assessment).toBe('incomplete');
+    const mixed = JSON.parse(
+      run([
+        'preflight',
+        '--migration',
+        writeFixture(
+          "GRANT UPDATE ON public.events TO pi_reader; UPDATE public.events SET status = 'ready';"
+        ),
+      ])
+    );
+    expect(mixed.migration.classification.assessment).toBe('incomplete');
+    expect(mixed.migration.classification.contains_data_change).toBe(true);
+  });
+  it('classifies the multi-table billing ACL transaction and excludes privilege words from DML', () => {
+    const billingAcl = `BEGIN;
+REVOKE ALL ON TABLE public.stripe_events, public.supporters, public.admin_audit_log FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.supporters, public.admin_audit_log TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.stripe_events, public.supporters, public.admin_audit_log TO service_role;
+COMMIT;`;
+    const result = JSON.parse(run(['preflight', '--migration', writeFixture(billingAcl)]));
+    expect(result.migration.classification.assessment).toBe('classified');
+    expect(result.migration.classification.contains_ddl).toBe(false);
+    expect(result.migration.classification.contains_data_change).toBe(false);
+    expect(result.migration.classification.contains_transaction_control).toBe(true);
+    expect(result.migration.relations).toEqual([
+      'public.admin_audit_log',
+      'public.stripe_events',
+      'public.supporters',
+    ]);
+  });
+  it('reports raw ACL entries and effective table privileges from catalog evidence', () => {
+    const result = JSON.parse(run(['schema']));
+    const query = result.data.rows[0];
+    expect(query.grants).toContainEqual(
+      expect.objectContaining({
+        grantee: 'PUBLIC',
+        privilege: 'SELECT',
+        inherited_by_observer: true,
+      })
+    );
+    expect(query.grants).toContainEqual(
+      expect.objectContaining({
+        grantee: 'pi_reader',
+        privilege: 'UPDATE',
+        inherited_by_observer: true,
+      })
+    );
+    expect(query.effective_observer_privileges).toEqual(['select', 'update']);
+    expect(query.public_privileges).toEqual(['SELECT']);
+    expect(query.effective_core_role_privileges).toEqual({
+      anon: ['select'],
+      authenticated: ['select'],
+      service_role: ['select', 'insert', 'update', 'delete'],
+    });
+    const sql = query.arguments.at(-1);
+    expect(sql).toContain('aclexplode');
+    expect(sql).toContain('pg_has_role');
+    expect(sql).toContain('has_table_privilege');
+    expect(sql).toContain("has_schema_privilege(current_user, n.oid, 'usage')");
+    expect(sql).toContain("has_schema_privilege(core_role.oid, n.oid, 'usage')");
+    expect(query.schema_usage).toEqual({
+      observer: true,
+      anon: true,
+      authenticated: true,
+      service_role: true,
+    });
+    expect(query.column_grants).toEqual([
+      { column: 'note', grantee: 'authenticated', privilege: 'UPDATE', grantable: false },
+    ]);
+    expect(query.effective_column_privileges).toEqual({ authenticated: { note: ['update'] } });
+    expect(sql).toContain('aclexplode(a.attacl)');
+    expect(sql).toContain(
+      'has_column_privilege(checked.role_oid, c.oid, a.attnum, column_privilege)'
+    );
   });
 });
 describe('prod-db command boundary', () => {
@@ -267,6 +459,11 @@ describe('prod-db canary', () => {
   it('rejects an unsafe observer role before running the canary reports', () => {
     expect(() => run(['canary'], { FAKE_SUPABASE_UNSAFE: 'true' })).toThrow(
       'unsafe observer configuration: observer role is a superuser'
+    );
+  });
+  it('rejects an observer that can read stored migration statements', () => {
+    expect(() => run(['canary'], { FAKE_SUPABASE_STATEMENT_ACCESS: 'true' })).toThrow(
+      'unsafe observer configuration: observer role can read stored migration statements'
     );
   });
   it('fails closed when observer health fields are missing', () => {
@@ -392,7 +589,7 @@ describe('prod-db environment file', () => {
   it('preserves literal passwords and absolute certificate paths', () => {
     writeFileSync(
       observerEnvFile,
-      'PROD_DB_URL="postgresql://pi_prod_observer:literal$HOME@example.test:5432/postgres?sslmode=verify-full&sslrootcert=/certs/observer.crt"\n'
+      `PROD_DB_URL="postgresql://pi_prod_observer:literal$HOME@example.test:5432/postgres?sslmode=verify-full&sslrootcert=${certificate}"\n`
     );
     const result = JSON.parse(
       run(['health'], { PROD_DB_ENV_FILE: observerEnvFile, PROD_DB_TARGET: 'primary' })
@@ -401,9 +598,27 @@ describe('prod-db environment file', () => {
     expect(row.literal_password_received).toBe(true);
     expect(row.prod_db_url_received).toBe(false);
     expect(row.arguments[row.arguments.indexOf('--db-url') + 1]).toContain(
-      'sslrootcert=/certs/observer.crt'
+      `sslrootcert=${certificate}`
     );
     expect(row.arguments.join(' ')).not.toContain('literal$HOME');
+  });
+  it('rejects literal home-variable certificate paths before invoking Supabase', () => {
+    expect(() =>
+      run(['health'], {
+        PROD_DB_TARGET: 'primary',
+        PROD_DB_URL:
+          'postgresql://pi_prod_observer:secret@example.test:5432/postgres?sslmode=verify-full&sslrootcert=$HOME%2Fcerts%2Fca.crt',
+      })
+    ).toThrow('environment values are literal, so expand $HOME');
+  });
+  it('rejects missing absolute certificate files with the configured path', () => {
+    expect(() =>
+      run(['health'], {
+        PROD_DB_TARGET: 'primary',
+        PROD_DB_URL:
+          'postgresql://pi_prod_observer:secret@example.test:5432/postgres?sslmode=verify-full&sslrootcert=%2Fmissing%2Fprod-db-ca.crt',
+      })
+    ).toThrow('sslrootcert certificate file does not exist: /missing/prod-db-ca.crt');
   });
   it('fails when an explicitly selected env file is empty', () => {
     expect(() => run(['health'], { PROD_DB_ENV_FILE: '' })).toThrow('failed to read');

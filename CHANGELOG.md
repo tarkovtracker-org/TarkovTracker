@@ -1,3 +1,10 @@
+## [1.83.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.3...v1.83.4) (2026-09-27)
+
+
+### Bug Fixes
+
+* restore production observer grant evidence and ACL preflight ([#954](https://github.com/tarkovtracker-org/TarkovTracker/issues/954)) ([e217df9](https://github.com/tarkovtracker-org/TarkovTracker/commit/e217df97166c508d63794fbee350bbc16d4d5a41))
+
 ## [1.83.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.2...v1.83.3) (2026-09-27)
 
 
