@@ -436,7 +436,10 @@ describe('daily quota and abuse gate', () => {
     };
     vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
     const res = await worker.fetch(
-      buildRequest('/token', { method: 'GET', headers: { Authorization: 'Bearer PVP_abc123' } }),
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123' },
+      }),
       env
     );
     expect(res.status).toBe(200);
@@ -479,6 +482,7 @@ describe('daily quota and abuse gate', () => {
   });
   it('returns an upgrade message when a free user exhausts the daily quota', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000_000_000);
     const calls: LimiterCall[] = [];
     const rpcCalls: Array<Record<string, unknown>> = [];
     const env: Env = {
@@ -494,29 +498,45 @@ describe('daily quota and abuse gate', () => {
     };
     vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free', rpcCalls }));
     const res = await worker.fetch(
-      buildRequest('/token', { method: 'GET', headers: { Authorization: 'Bearer PVP_abc123' } }),
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '198.51.100.7' },
+      }),
       env
     );
     expect(res.status).toBe(429);
+    expect(res.headers.get('Retry-After')).toBe('1');
     const body = (await res.json()) as { success: boolean; error: string };
     expect(body.success).toBe(false);
     expect(body.error).toContain(UPGRADE_URL);
     expect(body.error).toContain('Daily read quota');
+    expect(res.headers.get('Retry-After')).toMatch(/^\d+$/);
     expect(res.headers.get('X-RateLimit-Remaining')).toBe('0');
     await flushAsync();
     expect(rpcCalls).toHaveLength(1);
     expect(rpcCalls[0]).toMatchObject({ p_user_id: 'user-free', p_throttled: 1, p_reads: 0 });
     const throttleLog = warnSpy.mock.calls
-      .map((c) => String(c[0]))
-      .find((s) => s.includes('daily_quota_429'));
-    expect(throttleLog).toBeDefined();
-    expect(JSON.parse(throttleLog!)).toMatchObject({
+      .map(([entry]) => entry)
+      .find(
+        (entry) =>
+          typeof entry === 'object' &&
+          entry !== null &&
+          'event' in entry &&
+          entry.event === 'daily_quota_429'
+      );
+    expect(throttleLog).toEqual({
       event: 'daily_quota_429',
       action: 'token-info',
       kind: 'read',
       user_id: 'user-free',
       token_id: 'token-1',
+      retry_after_s: expect.any(Number),
     });
+    expect(res.headers.get('Retry-After')).toBe(
+      String((throttleLog as Record<string, unknown>).retry_after_s)
+    );
+    expect(JSON.stringify(throttleLog)).not.toContain('PVP_abc123');
+    expect(JSON.stringify(throttleLog)).not.toContain('198.51.100.7');
   });
   it('records successful usage through the record_api_usage rpc', async () => {
     const calls: LimiterCall[] = [];
@@ -584,19 +604,68 @@ describe('daily quota and abuse gate', () => {
       env
     );
     expect(res.status).toBe(429);
+    expect(res.headers.get('Retry-After')).toBe('60');
+    expect(res.headers.has('X-RateLimit-Limit')).toBe(false);
     expect(abuseLimit).toHaveBeenCalledWith({ key: 'api:203.0.113.1' });
     // No DO calls — abuse gate rejects before token validation.
     expect(calls).toHaveLength(0);
     const warnLog = warnSpy.mock.calls
-      .map((c) => String(c[0]))
-      .find((s) => s.includes('abuse_gate_429'));
-    expect(warnLog).toBeDefined();
-    expect(warnLog).not.toContain('203.0.113.1');
-    expect(JSON.parse(warnLog!)).toMatchObject({
+      .map(([entry]) => entry)
+      .find(
+        (entry) =>
+          typeof entry === 'object' &&
+          entry !== null &&
+          'event' in entry &&
+          entry.event === 'abuse_gate_429'
+      );
+    expect(warnLog).toEqual({
       event: 'abuse_gate_429',
       action: 'token-info',
       ip_hash: await expectedIpHash('203.0.113.1', TEST_IP_HASH_SECRET),
     });
+    expect(JSON.stringify(warnLog)).not.toContain('203.0.113.1');
+    expect(JSON.stringify(warnLog)).not.toContain('PVP_abc123');
+  });
+  it('logs a null hash when the abuse gate rejects without a hash secret', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const calls: LimiterCall[] = [];
+    const abuseLimit = vi.fn().mockResolvedValue({ success: false });
+    const env: Env = {
+      API_GATEWAY_LIMITER: makeCapturingLimiter(calls, () => ({
+        allowed: true,
+        remaining: 5,
+        resetAt: Date.now() + 1000,
+      })),
+      API_ABUSE_LIMITER: { limit: abuseLimit } as unknown as RateLimit,
+      SUPABASE_URL: 'https://supabase.example',
+      SUPABASE_ANON_KEY: 'anon',
+      SUPABASE_SERVICE_ROLE_KEY: 'service',
+      ALLOWED_ORIGIN: '*',
+    };
+    vi.stubGlobal('fetch', makeFetchMock({ userId: 'user-free' }));
+    const res = await worker.fetch(
+      buildRequest('/token', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer PVP_abc123', 'CF-Connecting-IP': '203.0.113.2' },
+      }),
+      env
+    );
+    expect(res.status).toBe(429);
+    expect(res.headers.get('Retry-After')).toBe('60');
+    expect(abuseLimit).toHaveBeenCalledWith({ key: 'api:203.0.113.2' });
+    expect(calls).toHaveLength(0);
+    const warnLog = warnSpy.mock.calls
+      .map(([entry]) => entry)
+      .find(
+        (entry) =>
+          typeof entry === 'object' &&
+          entry !== null &&
+          'event' in entry &&
+          entry.event === 'abuse_gate_429'
+      );
+    expect(warnLog).toEqual({ event: 'abuse_gate_429', action: 'token-info', ip_hash: null });
+    expect(JSON.stringify(warnLog)).not.toContain('203.0.113.2');
+    expect(JSON.stringify(warnLog)).not.toContain('PVP_abc123');
   });
   it('skips the abuse gate when the binding is absent', async () => {
     const calls: LimiterCall[] = [];
