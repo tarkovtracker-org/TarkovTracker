@@ -1,3 +1,10 @@
+# [1.84.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.5...v1.84.0) (2026-09-27)
+
+
+### Features
+
+* **ui:** show the build commit next to the footer version ([#952](https://github.com/tarkovtracker-org/TarkovTracker/issues/952)) ([2b9bc86](https://github.com/tarkovtracker-org/TarkovTracker/commit/2b9bc86133117a34dd5ca982e6387cdb6ad42891))
+
 ## [1.83.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.4...v1.83.5) (2026-09-27)
 
 

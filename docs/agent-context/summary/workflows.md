@@ -66,12 +66,14 @@ sequenceDiagram
     participant LS as localStorage
     participant Sync as useSupabaseSync
     participant RT as Realtime channel
-    participant DB as Supabase user_progress
+    participant RPC as sync_user_game_mode_progress RPC
+    participant DB as user_game_mode_progress + legacy user_progress
 
     UI->>Tarkov: mutate (complete task / objective count)
     Tarkov->>LS: persist immediately (local-first)
-    Tarkov->>Sync: queue debounced upsert
-    Sync->>DB: upsert after debounce
+    Tarkov->>Sync: queue debounced sync
+    Sync->>RPC: inline sync callback invokes sync_user_game_mode_progress after debounce
+    RPC->>DB: update per-mode row and legacy compatibility row
     RT-->>Tarkov: remote change event
     Tarkov->>Tarkov: filter self-origin echo
     Tarkov->>Tarkov: progressMerge (sticky-complete, timestamp, max-value)
@@ -218,12 +220,13 @@ graph LR
     Dev[pnpm run dev] --> Code[edit app/]
     Code --> Hook[husky + lint-staged: prettier + eslint --fix]
     Hook --> Commit[conventional commit]
-    Commit --> CI[lint / typecheck / test / validate:openapi]
+    Commit --> CI[CI: fallow / lint-format / typecheck / test / validate / db / systems-drift / workers / security]
     CI --> Build[nuxt build]
     Build --> Pages[Cloudflare Pages]
     Build --> Worker[wrangler deploy api-gateway]
 ```
 
 Pre-finish validation policy (root `AGENTS.md`): run the smallest relevant check — `typecheck` for
-TS changes, `lint` for code, `i18n:check` for locale changes. Avoid running the full suite unless
-test logic or executable code changed. Formatting is handled by the pre-commit hook.
+TS changes, `lint` for code, `i18n:check` for locale changes, or the path-specific checks in
+`workers/api-gateway/AGENTS.md` / `supabase/AGENTS.md`. Avoid running the full suite unless test logic
+or executable code changed. Formatting is handled by the pre-commit hook and `format:check`.
