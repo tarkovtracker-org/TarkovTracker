@@ -855,8 +855,14 @@ function normalizeMigrationSql(source) {
   return normalized;
 }
 function formatMaskedSqlToken(source, index, token) {
+  if (token.kind === 'dollar') return formatDollarQuotedToken(source, index, token);
   const masked = source.slice(index, token.end).replace(/[^\n]/g, ' ');
   return `${masked}${getSqlTokenMarker(token)}`;
+}
+// Dollar-quoted bodies can be executable (DO blocks, function bodies), so their text stays visible
+// to every check; only quote characters are blanked because string rules do not apply inside.
+function formatDollarQuotedToken(source, index, token) {
+  return source.slice(index, token.end).replaceAll("'", ' ');
 }
 function getSqlTokenMarker(token) {
   return token.kind === 'literal' ? getLiteralTokenMarker(token) : getCommentTokenMarker(token);
@@ -872,8 +878,35 @@ function getMaskedSqlToken(source, index) {
   if (lineComment) return lineComment;
   const blockComment = getDelimitedSqlToken(source, index, '/*', '*/', 2);
   if (blockComment) return blockComment;
-  if (source[index] !== "'") return undefined;
-  return getSqlLiteralToken(source, index);
+  return getSqlStringToken(source, index) ?? getDollarQuotedToken(source, index);
+}
+const SQL_IDENTIFIER_CHARACTER = /[a-zA-Z0-9_$\u0080-\uffff]/;
+const SQL_DOLLAR_QUOTE_TAG = /\$(?:[a-zA-Z_\u0080-\uffff][a-zA-Z0-9_\u0080-\uffff]*)?\$/y;
+function getDollarQuoteTag(source, index) {
+  if (SQL_IDENTIFIER_CHARACTER.test(source[index - 1] ?? '')) return undefined;
+  SQL_DOLLAR_QUOTE_TAG.lastIndex = index;
+  return SQL_DOLLAR_QUOTE_TAG.exec(source)?.[0];
+}
+// `$tag$ ... $tag$` has no escapes or nested quoting, so `'` and E'...' inside it never start a
+// literal. An unclosed body runs to the end of the source, as in PostgreSQL.
+function getDollarQuotedToken(source, index) {
+  const tag = source[index] === '$' ? getDollarQuoteTag(source, index) : undefined;
+  if (!tag) return undefined;
+  const close = source.indexOf(tag, index + tag.length);
+  const end = close === -1 ? source.length : close + tag.length;
+  return { end, kind: 'dollar', malformed: close === -1 };
+}
+function getSqlStringToken(source, index) {
+  if (source[index] === "'") return getSqlLiteralToken(source, index, false);
+  if (isEscapeStringStart(source, index)) return getSqlLiteralToken(source, index + 1, true);
+  return undefined;
+}
+// E'...' starts an escape string only when E is not the tail of an identifier (`xE'a'` is the
+// identifier `xe` followed by a standard string). PostgreSQL treats bytes >= 0x80 as identifier
+// characters, so any non-ASCII character is treated the same way.
+function isEscapeStringStart(source, index) {
+  const isPrefix = /[eE]/.test(source[index]) && source[index + 1] === "'";
+  return isPrefix && !SQL_IDENTIFIER_CHARACTER.test(source[index - 1] ?? '');
 }
 function getDelimitedSqlToken(source, index, opening, closing, closingLength) {
   if (!source.startsWith(opening, index)) return undefined;
@@ -897,20 +930,106 @@ function hasNestedBlockComment(source, index, opening, closing, end) {
     closing === '*/' && end !== -1 && source.slice(index + opening.length, end).includes(opening)
   );
 }
-function getSqlLiteralToken(source, start) {
-  let index = start + 1;
-  while (index < source.length) {
-    if (source[index] !== "'") {
-      index += 1;
-      continue;
-    }
-    if (source[index + 1] === "'") {
-      index += 2;
-      continue;
-    }
-    return { end: index + 1, kind: 'literal', malformed: false };
+// `start` is the opening quote. Escape strings skip the character after each backslash, so `\'`
+// does not close the literal. Continuation segments are consumed iteratively so the number of
+// segments never grows the call stack.
+function getSqlLiteralToken(source, start, backslashEscapes) {
+  for (let quote = start; ;) {
+    const close = findSqlLiteralClose(source, quote + 1, backslashEscapes);
+    if (close === -1) return { end: source.length, kind: 'literal', malformed: true };
+    const next = getContinuationQuote(source, close + 1, backslashEscapes);
+    if (next === -1) return { end: close + 1, kind: 'literal', malformed: false };
+    quote = next;
   }
-  return { end: source.length, kind: 'literal', malformed: true };
+}
+// Index of the closing quote at or after `index`, or -1 when the literal is unterminated.
+function findSqlLiteralClose(source, index, backslashEscapes) {
+  let cursor = index;
+  while (cursor < source.length) {
+    const step = getSqlLiteralStep(source, cursor, backslashEscapes);
+    if (step === 0) return cursor;
+    cursor += step;
+  }
+  return -1;
+}
+// Returns how far to advance inside a literal, or 0 when `index` is the closing quote.
+function getSqlLiteralStep(source, index, backslashEscapes) {
+  if (source[index] === "'") return source[index + 1] === "'" ? 2 : 0;
+  return isBackslashEscape(source[index], backslashEscapes) ? 2 : 1;
+}
+function isBackslashEscape(character, backslashEscapes) {
+  return backslashEscapes && character === '\\';
+}
+// PostgreSQL continues a string at the next quote when whitespace containing a newline separates
+// the segments, and `--` comments count as whitespace (scan.l). An escape string's continuation
+// segments keep backslash escapes. As in scan.l, whitespace before the first newline excludes
+// carriage returns and newlines. The gap is scanned with explicit one-step helpers instead of a
+// regex: a comment body matching runs of dashes overlaps later repetitions of `--`, so an
+// equivalent regex backtracks exponentially on gaps of many repeated comment markers.
+const SQL_HORIZONTAL_SPACE = ' \t\f\v';
+const SQL_CONTINUATION_SPACE = `${SQL_HORIZONTAL_SPACE}\n\r`;
+function isSqlHorizontalSpace(character) {
+  return SQL_HORIZONTAL_SPACE.includes(character);
+}
+// Horizontal whitespace after the continuation newline may also include newlines (scan.l `space`).
+function isSqlContinuationSpace(character) {
+  return SQL_CONTINUATION_SPACE.includes(character);
+}
+function isSqlNewline(character) {
+  return character === '\n' || character === '\r';
+}
+// Index just past the newline that must end the first gap between segments, or -1 when the gap
+// cannot reach one. A `--` comment decides the gap: the newline ending it is the gap's mandatory
+// newline, so it splits the gap into the inter-quote side and the newline-opened side in one step.
+function getAfterContinuationNewline(source, index) {
+  const cursor = skipHorizontalSpaces(source, index);
+  if (isCommentStart(source, cursor)) return skipThroughSqlNewline(source, cursor + 2);
+  return cursor < source.length && isSqlNewline(source[cursor]) ? cursor + 1 : -1;
+}
+function skipHorizontalSpaces(source, index) {
+  let cursor = index;
+  while (cursor < source.length && isSqlHorizontalSpace(source[cursor])) {
+    cursor += 1;
+  }
+  return cursor;
+}
+// Index of the quote opening the next segment, or -1 when no continuation follows the newline.
+function skipToContinuationQuote(source, index) {
+  let cursor = index;
+  while (cursor < source.length) {
+    if (source[cursor] === "'") return cursor;
+    const stepped = skipContinuationStep(source, cursor);
+    if (stepped === -1) return -1;
+    cursor = stepped;
+  }
+  return -1;
+}
+// End of one continuation step: one whitespace character (newlines included, after the newline
+// that opened it), or a `--` comment running through the newline that ends it, because comments
+// are whitespace in scan.l. A comment running to EOF cannot continue: -1, like any other
+// non-whitespace character.
+function skipContinuationStep(source, index) {
+  if (isSqlContinuationSpace(source[index])) return index + 1;
+  return isCommentStart(source, index) ? skipThroughSqlNewline(source, index + 2) : -1;
+}
+function isCommentStart(source, index) {
+  return source[index] === '-' && source[index + 1] === '-';
+}
+// Index just past the newline that ends a `--` comment, or -1 when the comment runs to EOF.
+function skipThroughSqlNewline(source, index) {
+  let cursor = index;
+  while (cursor < source.length) {
+    if (isSqlNewline(source[cursor])) return cursor + 1;
+    cursor += 1;
+  }
+  return -1;
+}
+// Index of the next segment's opening quote, or -1 when the escape string ends at `end`.
+function getContinuationQuote(source, end, backslashEscapes) {
+  if (!backslashEscapes) return -1;
+  const afterNewline = getAfterContinuationNewline(source, end);
+  if (afterNewline === -1) return -1;
+  return skipToContinuationQuote(source, afterNewline);
 }
 function extractMigrationRelations(source) {
   const normalizedSource = normalizeMigrationSql(source);
@@ -993,6 +1112,7 @@ function classifyMigration(source) {
     .filter(Boolean);
   const unsupportedPatterns = [
     /\bdo\s*\$\$/,
+    /(?:^|[^a-z0-9_$\u0080-\uffff])\$(?:[a-z_\u0080-\uffff][a-z0-9_\u0080-\uffff]*)?\$/,
     /\bcreate\s+(?:or\s+replace\s+)?function\b/,
     /\bcreate\s+(?:or\s+replace\s+)?procedure\b/,
     /\bcreate\s+(?:or\s+replace\s+)?trigger\b/,
