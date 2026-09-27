@@ -247,6 +247,33 @@ describe('prod-db migration preflight', () => {
       expect(result.migration.classification.has_unclassified_statement).toBe(false);
     }
   });
+  it('continues E strings across vertical tabs before the newline', () => {
+    const source =
+      "comment on table public.events is E'a'\v\n'\\' '; drop table public.events; -- ';";
+    const result = JSON.parse(run(['preflight', '--migration', writeFixture(source)]));
+    expect(result.migration.classification.statement_count).toBe(2);
+    expect(result.migration.classification.contains_ddl).toBe(true);
+  });
+  it('does not start E strings or literals inside dollar-quoted values', () => {
+    for (const source of [
+      "comment on table public.events is $$ E'\\' $$; drop table public.events; -- ';",
+      "comment on table public.events is $tag$ it's $tag$; drop table public.events;",
+    ]) {
+      const result = JSON.parse(run(['preflight', '--migration', writeFixture(source)]));
+      expect(result.migration.classification.statement_count).toBe(2);
+      expect(result.migration.classification.contains_ddl).toBe(true);
+      expect(result.migration.relations).toContain('public.events');
+      expect(result.migration.classification.unsupported_constructs.length).toBeGreaterThan(0);
+      expect(result.assessment).toBe('incomplete');
+    }
+  });
+  it('handles many E string continuation segments without recursion', () => {
+    const segments = Array.from({ length: 20000 }, () => "'\\x'").join('\n');
+    const source = `update public.events set status = E${segments};`;
+    const result = JSON.parse(run(['preflight', '--migration', writeFixture(source)]));
+    expect(result.migration.classification.statement_count).toBe(1);
+    expect(result.migration.classification.has_malformed_literal).toBe(false);
+  });
   it('fails closed for an unterminated E string', () => {
     const source = "update public.events set status = E'unterminated\\';";
     const result = JSON.parse(run(['preflight', '--migration', writeFixture(source)]));

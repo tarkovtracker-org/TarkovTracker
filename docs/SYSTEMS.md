@@ -1432,6 +1432,10 @@ flowchart LR
   newline-separated continuation segments. Unterminated literals fail closed. A migration that
   changes `standard_conforming_strings` must contain further statements to matter, which already
   keeps it `incomplete`.
+- Dollar-quoted values (`$tag$ ... $tag$`) are not masked: their bodies can be executable (`DO`,
+  function bodies), so the text stays visible to classification and the observer's unsafe-SQL
+  check, and quotes inside never start a literal. Any dollar quote is an unsupported construct,
+  which keeps the migration `incomplete`.
 - `migration-history` reads only the `version` column of `supabase_migrations.schema_migrations`.
   The stored `statements` column is never selected, and the observer's ledger grant is column-level
   for the same reason, so migration SQL and any literal inside it stay out of both the report and

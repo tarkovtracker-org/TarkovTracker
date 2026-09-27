@@ -855,8 +855,14 @@ function normalizeMigrationSql(source) {
   return normalized;
 }
 function formatMaskedSqlToken(source, index, token) {
+  if (token.kind === 'dollar') return formatDollarQuotedToken(source, index, token);
   const masked = source.slice(index, token.end).replace(/[^\n]/g, ' ');
   return `${masked}${getSqlTokenMarker(token)}`;
+}
+// Dollar-quoted bodies can be executable (DO blocks, function bodies), so their text stays visible
+// to every check; only quote characters are blanked because string rules do not apply inside.
+function formatDollarQuotedToken(source, index, token) {
+  return source.slice(index, token.end).replaceAll("'", ' ');
 }
 function getSqlTokenMarker(token) {
   return token.kind === 'literal' ? getLiteralTokenMarker(token) : getCommentTokenMarker(token);
@@ -872,7 +878,23 @@ function getMaskedSqlToken(source, index) {
   if (lineComment) return lineComment;
   const blockComment = getDelimitedSqlToken(source, index, '/*', '*/', 2);
   if (blockComment) return blockComment;
-  return getSqlStringToken(source, index);
+  return getSqlStringToken(source, index) ?? getDollarQuotedToken(source, index);
+}
+const SQL_IDENTIFIER_CHARACTER = /[a-zA-Z0-9_$\u0080-\uffff]/;
+const SQL_DOLLAR_QUOTE_TAG = /\$(?:[a-zA-Z_\u0080-\uffff][a-zA-Z0-9_\u0080-\uffff]*)?\$/y;
+function getDollarQuoteTag(source, index) {
+  if (SQL_IDENTIFIER_CHARACTER.test(source[index - 1] ?? '')) return undefined;
+  SQL_DOLLAR_QUOTE_TAG.lastIndex = index;
+  return SQL_DOLLAR_QUOTE_TAG.exec(source)?.[0];
+}
+// `$tag$ ... $tag$` has no escapes or nested quoting, so `'` and E'...' inside it never start a
+// literal. An unclosed body runs to the end of the source, as in PostgreSQL.
+function getDollarQuotedToken(source, index) {
+  const tag = source[index] === '$' ? getDollarQuoteTag(source, index) : undefined;
+  if (!tag) return undefined;
+  const close = source.indexOf(tag, index + tag.length);
+  const end = close === -1 ? source.length : close + tag.length;
+  return { end, kind: 'dollar', malformed: close === -1 };
 }
 function getSqlStringToken(source, index) {
   if (source[index] === "'") return getSqlLiteralToken(source, index, false);
@@ -884,7 +906,7 @@ function getSqlStringToken(source, index) {
 // characters, so any non-ASCII character is treated the same way.
 function isEscapeStringStart(source, index) {
   const isPrefix = /[eE]/.test(source[index]) && source[index + 1] === "'";
-  return isPrefix && !/[a-zA-Z0-9_$\u0080-\uffff]/.test(source[index - 1] ?? '');
+  return isPrefix && !SQL_IDENTIFIER_CHARACTER.test(source[index - 1] ?? '');
 }
 function getDelimitedSqlToken(source, index, opening, closing, closingLength) {
   if (!source.startsWith(opening, index)) return undefined;
@@ -909,15 +931,26 @@ function hasNestedBlockComment(source, index, opening, closing, end) {
   );
 }
 // `start` is the opening quote. Escape strings skip the character after each backslash, so `\'`
-// does not close the literal.
+// does not close the literal. Continuation segments are consumed iteratively so the number of
+// segments never grows the call stack.
 function getSqlLiteralToken(source, start, backslashEscapes) {
-  let index = start + 1;
-  while (index < source.length) {
-    const step = getSqlLiteralStep(source, index, backslashEscapes);
-    if (step === 0) return getClosedSqlLiteralToken(source, index + 1, backslashEscapes);
-    index += step;
+  for (let quote = start; ;) {
+    const close = findSqlLiteralClose(source, quote + 1, backslashEscapes);
+    if (close === -1) return { end: source.length, kind: 'literal', malformed: true };
+    const next = getContinuationQuote(source, close + 1, backslashEscapes);
+    if (next === -1) return { end: close + 1, kind: 'literal', malformed: false };
+    quote = next;
   }
-  return { end: source.length, kind: 'literal', malformed: true };
+}
+// Index of the closing quote at or after `index`, or -1 when the literal is unterminated.
+function findSqlLiteralClose(source, index, backslashEscapes) {
+  let cursor = index;
+  while (cursor < source.length) {
+    const step = getSqlLiteralStep(source, cursor, backslashEscapes);
+    if (step === 0) return cursor;
+    cursor += step;
+  }
+  return -1;
 }
 // Returns how far to advance inside a literal, or 0 when `index` is the closing quote.
 function getSqlLiteralStep(source, index, backslashEscapes) {
@@ -928,14 +961,15 @@ function isBackslashEscape(character, backslashEscapes) {
   return backslashEscapes && character === '\\';
 }
 // PostgreSQL continues a string across whitespace that contains a newline (optionally with
-// `--` comments), and an escape string's continuation segments keep backslash escapes.
+// `--` comments), and an escape string's continuation segments keep backslash escapes. As in
+// scan.l, horizontal whitespace before the newline includes form feed and vertical tab.
 const SQL_STRING_CONTINUATION =
-  /[ \t\f]*(?:--[^\n\r]*)?[\n\r](?:[ \t\n\r\f\v]|--[^\n\r]*[\n\r])*'/y;
-function getClosedSqlLiteralToken(source, end, backslashEscapes) {
-  if (!backslashEscapes) return { end, kind: 'literal', malformed: false };
+  /(?:[ \t\f\v]|--[^\n\r]*)*[\n\r](?:[ \t\n\r\f\v]|--[^\n\r]*[\n\r])*'/y;
+// Index of the next segment's opening quote, or -1 when the escape string ends at `end`.
+function getContinuationQuote(source, end, backslashEscapes) {
+  if (!backslashEscapes) return -1;
   SQL_STRING_CONTINUATION.lastIndex = end;
-  if (!SQL_STRING_CONTINUATION.test(source)) return { end, kind: 'literal', malformed: false };
-  return getSqlLiteralToken(source, SQL_STRING_CONTINUATION.lastIndex - 1, true);
+  return SQL_STRING_CONTINUATION.test(source) ? SQL_STRING_CONTINUATION.lastIndex - 1 : -1;
 }
 function extractMigrationRelations(source) {
   const normalizedSource = normalizeMigrationSql(source);
@@ -1018,6 +1052,7 @@ function classifyMigration(source) {
     .filter(Boolean);
   const unsupportedPatterns = [
     /\bdo\s*\$\$/,
+    /(?:^|[^a-z0-9_$\u0080-\uffff])\$(?:[a-z_\u0080-\uffff][a-z0-9_\u0080-\uffff]*)?\$/,
     /\bcreate\s+(?:or\s+replace\s+)?function\b/,
     /\bcreate\s+(?:or\s+replace\s+)?procedure\b/,
     /\bcreate\s+(?:or\s+replace\s+)?trigger\b/,
