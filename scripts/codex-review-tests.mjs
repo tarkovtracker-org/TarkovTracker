@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -193,7 +193,7 @@ test('unknown Codex activity and newly created PR grace fail closed', () => {
     'pending'
   );
 });
-test('request lock prevents a second process and ambiguous post leaves durable intent', async () => {
+test('mixed-case repo retries find an ambiguous post intent without posting again', async () => {
   const root = mkdtempSync(join(tmpdir(), 'codex-review-guard-'));
   const stateRoot = join(root, 'codex-review-guard');
   const lock = join(stateRoot, 'request.lock');
@@ -222,19 +222,19 @@ test('request lock prevents a second process and ambiguous post leaves durable i
       }),
     };
     await assert.rejects(
-      runGuard({ pr: 44, repo: 'example/repo', request: true, waitSeconds: 0 }, failingDeps)
+      runGuard({ pr: 44, repo: 'Example/Repo', request: true, waitSeconds: 0 }, failingDeps)
     );
     assert.equal(posts, 1);
+    const canonicalIntentPath = join(stateRoot, 'intents', `example_repo-44-${head}.json`);
+    const mixedCaseIntentPath = join(stateRoot, 'intents', `Example_Repo-44-${head}.json`);
+    renameSync(canonicalIntentPath, mixedCaseIntentPath);
     const retry = await runGuard(
       { pr: 44, repo: 'example/repo', request: true, waitSeconds: 0 },
       failingDeps
     );
     assert.equal(retry.status, 'pending');
     assert.equal(posts, 1);
-    const intentText = readFileSync(
-      join(stateRoot, 'intents', `example_repo-44-${head}.json`),
-      'utf8'
-    );
+    const intentText = readFileSync(mixedCaseIntentPath, 'utf8');
     assert.equal(JSON.parse(intentText).sha, head);
   } finally {
     rmSync(root, { recursive: true, force: true });

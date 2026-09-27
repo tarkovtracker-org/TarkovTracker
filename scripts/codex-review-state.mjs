@@ -9,7 +9,7 @@ const unknown = (reason) => ({ kind: 'unknown', reason });
 const status = (value, reason) => ({ status: value, reason });
 const isCodex = (item) => item.user?.login === BOT;
 const bodyOf = (item) => item.body ?? '';
-const isSecurity = (body) => /^#{1,3}\s+.*Codex Security Review\b/im.test(body);
+const isSecurity = (body) => /^#{1,3}[ \t]+[^\r\n]*Codex Security Review\b/i.test(body.trimStart());
 function resolvedAbbreviation(sha, resolvedShas) {
   if (!ABBREVIATED_SHA.test(sha)) return null;
   return resolvedShas?.[sha] ?? null;

@@ -1952,7 +1952,8 @@ CodeQL) is selected on every CI run. See
 
 `scripts/codex-review.mjs` checks live GitHub review evidence before an agent requests Codex review.
 Read-only inspection is the default; authorized requests require `--request`. Local worktrees
-share request serialization and durable intent through their Git common directory. Existing
+share request serialization and durable intent through their Git common directory, using
+case-insensitive repository identity for new and existing intents. Existing
 pending reviews, uncertain delivery, and unknown status block new requests; elapsed time does
 not authorize a retry. Completion matches the exact full commit; abbreviated evidence requires
 GitHub resolution, and head changes during evidence reads fail closed. Successful posts record
@@ -1963,7 +1964,8 @@ first-line commands from trusted GitHub associations exclude outsider markers an
 and tied second-resolution request/completion
 timestamps reuse exact-commit completion while running bot activity still blocks requests.
 Completed code reviews are reused by commit,
-independently of security reviews and unresolved findings. This cooperative guard cannot serialize unrelated clones or
+independently of security reviews and unresolved findings; only top-level security report headings
+exclude security evidence, preserving quoted headings in code reviews. This cooperative guard cannot serialize unrelated clones or
 callers that bypass it. See [the review workflow](WORKFLOW_AUTOMATION.md#codex-request-deduplication-and-waiting)
 for agent commands and recovery boundaries.
 

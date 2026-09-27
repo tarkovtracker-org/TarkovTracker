@@ -95,11 +95,11 @@ function resolveCommit(prefix, sha, runGh) {
   return commit.sha.toLowerCase();
 }
 function readIntents(directory, repo, pr) {
-  const prefix = `${repo.replaceAll('/', '_')}-${pr}-`;
+  const prefix = `${repo.replaceAll('/', '_')}-${pr}-`.toLowerCase();
   let files;
   try {
     files = readdirSync(directory).filter(
-      (name) => name.startsWith(prefix) && name.endsWith('.json')
+      (name) => name.toLowerCase().startsWith(prefix) && name.endsWith('.json')
     );
   } catch (error) {
     if (error.code === 'ENOENT') return [];
@@ -200,7 +200,7 @@ function dependencies(deps) {
   };
 }
 function contextFor(options, deps) {
-  const repo = options.repo ?? commandRepo(deps.runGh);
+  const repo = (options.repo ?? commandRepo(deps.runGh)).toLowerCase();
   const gitCommon = deps.gitCommonDir ?? commonGitDir(deps.runGit);
   return { ...options, ...deps, repo, ...guardPaths(gitCommon) };
 }

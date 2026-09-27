@@ -35,6 +35,25 @@ const summary = (sha) => ({
   user: { login: 'chatgpt-codex-connector[bot]' },
   body: `<!-- codex-pull-request-review-summary -->\n| **Code Review** | ✅ **Completed** <relative-time datetime="2026-09-27T02:00:00Z">done</relative-time> | \`${sha}\` | Manual |`,
 });
+test('quoted security headings do not hide exact-head code-review completion', () => {
+  const comment = reviewComment(head);
+  comment.body += '\n\nExample report:\n### Codex Security Review\nNo security issues found.';
+  const formal = {
+    user: comment.user,
+    state: 'COMMENTED',
+    commit_id: head,
+    submitted_at: comment.created_at,
+    body: '### Codex Review\nNo findings.\n\nExample:\n### Codex Security Review',
+  };
+  assert.equal(classifyState(inputs({ comments: [comment] }), now).status, 'complete');
+  assert.equal(classifyState(inputs({ reviews: [formal] }), now).status, 'complete');
+});
+test('top-level security report envelopes never establish code-review completion', () => {
+  const comment = reviewComment(head.slice(0, 10));
+  comment.body = `\n### 🛡️ Codex Security Review\n${comment.body}`;
+  assert.deepEqual(evidenceShas([comment]), []);
+  assert.equal(classifyState(inputs({ comments: [comment] }), now).status, 'unreviewed');
+});
 test('untagged requests require a later completion for the exact current head', () => {
   const requested = request('2026-09-27T01:30:00Z');
   const olderHeadCompletion = reviewComment(otherHead, '2026-09-27T02:30:00Z');
