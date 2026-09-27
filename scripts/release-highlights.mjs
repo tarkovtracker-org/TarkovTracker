@@ -189,9 +189,8 @@ function stripHtml(text) {
   let previous;
   do {
     previous = text;
-    text = text
-      .replace(/<\/?[*_~\x60]*[a-z][^<>]*>/gi, '')
-      .replace(/<\/?\[\/?[a-z][\w-]*\](?:\s+[^<>]*)?>/gi, '');
+    text = text.replace(/<\/?[*_~\x60]*[a-z][^<>]*>/gi, '');
+    text = text.replace(/<\/?\[\/?[a-z][\w-]*\](?:\s+[^<>]*)?>/gi, '');
   } while (text !== previous);
   return text.replace(/<(?=[*_~\x60\s]*[a-z/!?])/gi, '');
 }
