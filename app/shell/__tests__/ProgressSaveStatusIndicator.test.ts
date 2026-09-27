@@ -46,6 +46,13 @@ const mountIndicator = async () => {
     },
   });
 };
+it('does not claim a confirmed local copy before the first local write', async () => {
+  cloud('failed', { failure: null });
+  const wrapper = await mountIndicator();
+  expect(wrapper.text()).not.toContain('progress_save_status.local_saved_note');
+  expect(wrapper.find('[data-testid="progress-save-status"]').exists()).toBe(true);
+  wrapper.unmount();
+});
 describe('ProgressSaveStatusIndicator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -122,5 +129,23 @@ describe('ProgressSaveStatusIndicator', () => {
     expect(toastAdd).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'settings.data_management.export_error_title' })
     );
+  });
+  it('reports a successful cloud retry and hides the completed warning', async () => {
+    cloud('failed', { failure: 'offline' });
+    registerCloudRetryHandler(async () => {
+      cloud('idle');
+      return true;
+    });
+    const wrapper = await mountIndicator();
+    await wrapper.get('[data-testid="progress-save-retry"]').trigger('click');
+    await flushPromises();
+    expect(toastAdd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'progress_save_status.retry_succeeded',
+        color: 'success',
+      })
+    );
+    expect(wrapper.find('[data-testid="progress-save-status"]').exists()).toBe(false);
+    wrapper.unmount();
   });
 });

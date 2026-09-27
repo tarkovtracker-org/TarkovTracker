@@ -1,5 +1,9 @@
 <template>
-  <UModal v-model:open="confirmOpen" :dismissible="!signingOut">
+  <UModal
+    :key="confirmationOwner ?? 'closed'"
+    v-model:open="confirmOpen"
+    :dismissible="!signingOut"
+  >
     <template #header>
       <div class="flex items-center gap-2">
         <UIcon name="i-mdi-content-save-alert-outline" class="text-error-400 h-5 w-5" />
@@ -47,7 +51,7 @@
           class="ml-auto"
           :loading="signingOut"
           data-testid="sign-out-discard"
-          @click="discardAndSignOut"
+          @click="discardAction"
         >
           {{ t('sign_out_confirm.discard_and_sign_out') }}
         </UButton>
@@ -63,7 +67,11 @@
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
   const { exportProgress } = useDataBackup();
-  const { confirmOpen, signingOut, discardAndSignOut } = useSignOut();
+  const { confirmOpen, confirmationOwner, signingOut, discardAndSignOut } = useSignOut();
+  const discardAction = computed(() => {
+    const openingOwner = confirmationOwner.value;
+    return () => discardAndSignOut(openingOwner);
+  });
   const retrying = ref(false);
   /** Retrying never signs out; a successful save only removes the need to confirm. */
   const handleRetry = async () => {

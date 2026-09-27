@@ -924,11 +924,13 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   active copy when the sync controller reports pending changes, or when no controller ran and
   acknowledgement cannot be proven. Sign-in retains any other account's active copy before it is
   cleared, including the hydration-time owner mismatch that previously created throwaway
-  `progress_backup_*` keys. At sign-in the owner's recovery copy is reconciled through the normal
-  startup merge when it is newer than the owner's active copy, and it is removed only after a
+  `progress_backup_*` keys. At sign-in recovery, active storage, and session handoff copies are composed using independent
+  metadata and mode clocks before the normal startup merge. Higher reset epochs take precedence
+  only after displaced progress is retained for export. Old-season placeholders cannot compete
+  with current Seasonal progress. The recovery copy is removed only after a
   successful startup load, because the resolved state was then uploaded or already matched the
   service. Copies are read only for their owner and never uploaded for another account.
-- **Superseded copies.** Before a deliberate reset with pending cloud changes, the store keeps each
+- **Superseded copies.** Before a deliberate reset with pending cloud changes or memory-only local changes, the store keeps each
   affected mode under an owner-scoped export-only key. Hydration also retains materialized Seasonal
   progress stamped for an older season before sanitization clears it. These copies keep their
   original mode and season, are available from Settings → Account for export, and are never loaded
@@ -947,7 +949,11 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   signing out so the progress and preferences session transitions retain no copy for that owner,
   then `removeAccountDeviceData` deletes the owner's active copies, recovery copy, and legacy
   backups. Other accounts' data and cloud progress are untouched; the next sign-in clears the
-  request. Account deletion uses the same removal for the deleted account.
+  request. Removal and discard confirmations belong to the authenticated owner that opened them
+  and are invalidated when that owner changes. Incomplete backup cleanup reports failure but blocks
+  new guest writes only while the removed owner still occupies active storage. Account deletion uses
+  the same removal for the captured deleted account; a later authenticated session is never signed
+  out or reset by that cleanup, including identity changes during an awaited request.
 
 ### Files
 

@@ -33,14 +33,14 @@
           icon="i-mdi-delete-outline"
           :disabled="!isLoggedIn"
           data-testid="device-data-remove"
-          @click="confirmOpen = true"
+          @click="openRemovalConfirmation"
         >
           {{ t('settings.device_data.remove_button') }}
         </UButton>
       </div>
     </template>
   </GenericCard>
-  <UModal v-model:open="confirmOpen" :dismissible="!removing">
+  <UModal :key="confirmationOwner ?? 'closed'" v-model:open="confirmOpen" :dismissible="!removing">
     <template #header>
       <div class="flex items-center gap-2">
         <UIcon name="i-mdi-alert" class="text-error-400 h-5 w-5" />
@@ -78,7 +78,7 @@
           class="ml-auto"
           :loading="removing"
           data-testid="device-data-confirm"
-          @click="removeDeviceData"
+          @click="removalAction"
         >
           {{ t('settings.device_data.confirm_button') }}
         </UButton>
@@ -95,7 +95,10 @@
     removeAccountDeviceData,
     requestDeviceDataRemoval,
   } from '@/stores/tarkov/deviceData';
-  import { hasPendingCloudChanges } from '@/stores/tarkov/progressSaveStatus';
+  import {
+    hasPendingCloudChanges,
+    hasUnsavedProgressChanges,
+  } from '@/stores/tarkov/progressSaveStatus';
   import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
   import { logger } from '@/utils/logger';
   const { t } = useI18n({ useScope: 'global' });
@@ -104,9 +107,21 @@
   const { exportProgress, exportSupersededProgress } = useDataBackup();
   const { signOutNow } = useSignOut();
   const confirmOpen = ref(false);
+  const confirmationOwner = ref<string | null>(null);
   const removing = ref(false);
   const isLoggedIn = computed(() => Boolean($supabase.user.loggedIn && $supabase.user.id));
-  const pendingCloudChanges = computed(hasPendingCloudChanges);
+  const pendingCloudChanges = computed(
+    () => hasPendingCloudChanges() || hasUnsavedProgressChanges()
+  );
+  const closeRemovalConfirmation = () => {
+    confirmationOwner.value = null;
+    confirmOpen.value = false;
+  };
+  const openRemovalConfirmation = () => {
+    if (!isLoggedIn.value) return;
+    confirmationOwner.value = $supabase.user.id;
+    confirmOpen.value = true;
+  };
   const supersededCopies = ref(
     $supabase.user.id ? listSupersededProgressCopies($supabase.user.id) : []
   );
@@ -115,7 +130,14 @@
       ? listSupersededProgressCopies($supabase.user.id)
       : [];
   };
-  watch(() => $supabase.user.id, refreshSupersededCopies);
+  watch(
+    () => [$supabase.user.id, $supabase.user.loggedIn],
+    () => {
+      closeRemovalConfirmation();
+      refreshSupersededCopies();
+    },
+    { flush: 'sync' }
+  );
   onMounted(() =>
     window.addEventListener('tt:superseded-progress-change', refreshSupersededCopies)
   );
@@ -155,8 +177,18 @@
     clearDeviceDataRemoval();
     return removed ? 'removed' : 'remove_failed';
   };
-  const removeDeviceData = async () => {
-    const userId = $supabase.user.id;
+  const isCurrentLoggedInOwner = (owner: string | null): boolean =>
+    Boolean(owner) && owner === $supabase.user.id && isLoggedIn.value;
+  const confirmedRemovalOwner = (userId: string | null): string | null => {
+    if (userId !== confirmationOwner.value) return null;
+    if (!isCurrentLoggedInOwner(userId)) {
+      closeRemovalConfirmation();
+      return null;
+    }
+    return userId;
+  };
+  const removeDeviceData = async (openingOwner: string | null) => {
+    const userId = confirmedRemovalOwner(openingOwner);
     if (!userId) return;
     removing.value = true;
     const result = await signOutAndRemove(userId).finally(() => {
@@ -171,4 +203,8 @@
     confirmOpen.value = false;
     toast.add({ title: t('settings.device_data.removed'), color: 'success' });
   };
+  const removalAction = computed(() => {
+    const openingOwner = confirmationOwner.value;
+    return () => removeDeviceData(openingOwner);
+  });
 </script>

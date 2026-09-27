@@ -1,5 +1,7 @@
+import { defaultState, type UserProgressData, type UserState } from '@/stores/progressState';
 import {
   parsePersistedProgressState,
+  cloneStateSnapshot,
   safeGetItem,
   safeRemoveItem,
   safeSetItem,
@@ -7,13 +9,13 @@ import {
   type PersistedProgressSnapshot,
   setActiveProgressWritesBlocked,
 } from '@/stores/tarkov/localStorage';
+import { toProgressEpoch } from '@/stores/tarkov/progressMerge';
 import { saveSupersededProgressCopy } from '@/stores/tarkov/supersededProgress';
-import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
+import { GAME_MODE_VALUES, ACTIVE_SEASON_NUMBER, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { hasMaterializedProgress } from '@/utils/modeProgressFallback';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import { parseUserScopedStorage } from '@/utils/userScopedStorage';
-import type { UserProgressData } from '@/stores/progressState';
 /**
  * Account recovery copies (see `CONTEXT.md`): locally saved progress retained for its
  * owning account after sign-out or an account switch, restored only for that owner.
@@ -21,17 +23,8 @@ import type { UserProgressData } from '@/stores/progressState';
 const recoveryKey = (userId: string): string => `${STORAGE_KEYS.progressRecoveryPrefix}${userId}`;
 let retentionFailure = false;
 let blockedAccountOwner: string | null = null;
-const envelopeTimestamp = (raw: string | null): number | null => {
-  const parsed = raw ? parseUserScopedStorage<unknown>(raw) : null;
-  return parsed?._timestamp ?? null;
-};
 const isOwnedBy = (raw: string, ownerId: string): boolean =>
   parseUserScopedStorage<unknown>(raw)?._userId === ownerId;
-/** An existing copy with a newer clock holds later changes and must not be replaced. */
-const hasNewerCopy = (ownerId: string, raw: string): boolean => {
-  const existing = envelopeTimestamp(safeGetItem(recoveryKey(ownerId)));
-  return existing !== null && existing > (envelopeTimestamp(raw) ?? 0);
-};
 const writeRecoveryCopy = (ownerId: string, raw: string): boolean => {
   const saved = safeSetItem(recoveryKey(ownerId), raw);
   if (!saved) logger.error('[AccountRecovery] Could not retain the account recovery copy');
@@ -39,20 +32,193 @@ const writeRecoveryCopy = (ownerId: string, raw: string): boolean => {
 };
 const isRetainable = (raw: string | null, ownerId: string | null): ownerId is string =>
   Boolean(raw && ownerId && isOwnedBy(raw, ownerId));
+const staleSeasonalData = (
+  data: Record<string, unknown> | undefined
+): { seasonNumber: number; progress: UserProgressData } | null => {
+  const seasonNumber = data?.seasonalSeasonNumber;
+  const progress = data?.seasonal;
+  if (typeof seasonNumber !== 'number') return null;
+  if (seasonNumber === ACTIVE_SEASON_NUMBER) return null;
+  if (!hasMaterializedProgress(progress)) return null;
+  return { seasonNumber, progress: progress as UserProgressData };
+};
+const archiveStaleSeasonalData = (
+  userId: string,
+  stale: { seasonNumber: number; progress: UserProgressData }
+): boolean => {
+  const retained = saveSupersededProgressCopy(
+    userId,
+    'seasonal',
+    stale.seasonNumber,
+    stale.progress
+  );
+  if (!retained) blockAccountRecoveryRetentionForOwner(userId);
+  return retained !== null;
+};
+function preserveRawMismatchedSeason(userId: string, raw: string): boolean {
+  const wrapped = parseUserScopedStorage<Record<string, unknown>>(raw);
+  if (!wrapped || wrapped._userId !== userId) return false;
+  const stale = staleSeasonalData(wrapped.data);
+  return stale ? archiveStaleSeasonalData(userId, stale) : true;
+}
+const validClock = (value: number | null | undefined): number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0;
+const snapshotMetadataClock = (snapshot: PersistedProgressSnapshot): number =>
+  validClock(snapshot.metadataTimestamp ?? snapshot.timestamp);
+const snapshotModeClock = (snapshot: PersistedProgressSnapshot, mode: GameMode): number =>
+  mode === 'seasonal' && !isCurrentSeasonalSnapshot(snapshot)
+    ? 0
+    : validClock(snapshot.modeTimestamps?.[mode] ?? snapshot.timestamp);
+const isCurrentSeasonalSnapshot = (snapshot: PersistedProgressSnapshot): boolean =>
+  (snapshot.seasonalSourceSeasonNumber ?? snapshot.state.seasonalSeasonNumber) ===
+  ACTIVE_SEASON_NUMBER;
+const currentSeasonSnapshots = (
+  snapshots: PersistedProgressSnapshot[]
+): PersistedProgressSnapshot[] => snapshots.filter(isCurrentSeasonalSnapshot);
+const latestSnapshotByClock = (
+  snapshots: PersistedProgressSnapshot[],
+  getClock: (snapshot: PersistedProgressSnapshot) => number
+): PersistedProgressSnapshot =>
+  snapshots.reduce((winner, candidate) =>
+    getClock(candidate) >= getClock(winner) ? candidate : winner
+  );
+const archiveDisplacedMode = (
+  ownerId: string | null,
+  snapshot: PersistedProgressSnapshot,
+  mode: GameMode
+): boolean => {
+  const progress = snapshot.state[mode];
+  if (!hasMaterializedProgress(progress)) return true;
+  if (!ownerId) return false;
+  const seasonNumber = mode === 'seasonal' ? (snapshot.state.seasonalSeasonNumber ?? null) : null;
+  const archived = saveSupersededProgressCopy(ownerId, mode, seasonNumber, progress);
+  if (archived) return true;
+  blockAccountRecoveryRetentionForOwner(ownerId);
+  setActiveProgressWritesBlocked(true);
+  return false;
+};
+const preferModeSnapshot = (
+  winner: PersistedProgressSnapshot,
+  candidate: PersistedProgressSnapshot,
+  ownerId: string | null,
+  mode: GameMode
+): PersistedProgressSnapshot | null => {
+  const winnerEpoch = toProgressEpoch(winner.state[mode]);
+  const candidateEpoch = toProgressEpoch(candidate.state[mode]);
+  if (candidateEpoch > winnerEpoch) {
+    return archiveDisplacedMode(ownerId, winner, mode) ? candidate : null;
+  }
+  if (candidateEpoch < winnerEpoch) {
+    return archiveDisplacedMode(ownerId, candidate, mode) ? winner : null;
+  }
+  return snapshotModeClock(candidate, mode) >= snapshotModeClock(winner, mode) ? candidate : winner;
+};
+const newestModeSnapshot = (
+  snapshots: PersistedProgressSnapshot[],
+  ownerId: string | null,
+  mode: GameMode
+): PersistedProgressSnapshot | null => {
+  let winner = snapshots[0]!;
+  for (const candidate of snapshots.slice(1)) {
+    const preferred = preferModeSnapshot(winner, candidate, ownerId, mode);
+    if (!preferred) return null;
+    winner = preferred;
+  }
+  return winner;
+};
+/** Compose wrapper snapshots by the clocks that own each independent field. */
+const composeOwnerSnapshots = (
+  snapshots: PersistedProgressSnapshot[],
+  ownerId: string | null
+): PersistedProgressSnapshot | null => {
+  if (!snapshots.length) return null;
+  const metadataWinner = latestSnapshotByClock(snapshots, snapshotMetadataClock);
+  const state = cloneStateSnapshot(metadataWinner.state);
+  const modeTimestamps: Partial<Record<GameMode, number>> = {};
+  for (const mode of GAME_MODE_VALUES) {
+    const candidates = mode === 'seasonal' ? currentSeasonSnapshots(snapshots) : snapshots;
+    const winner = candidates.length ? newestModeSnapshot(candidates, ownerId, mode) : null;
+    if (!candidates.length) {
+      state.seasonal = cloneStateSnapshot(defaultState.seasonal);
+      modeTimestamps[mode] = 0;
+      continue;
+    }
+    if (!winner) return null;
+    state[mode] = cloneStateSnapshot(winner.state[mode]);
+    modeTimestamps[mode] = snapshotModeClock(winner, mode);
+  }
+  state.seasonalSeasonNumber = ACTIVE_SEASON_NUMBER;
+  const timestamps = snapshots.map((snapshot) => validClock(snapshot.timestamp));
+  const timestamp = Math.max(...timestamps);
+  return {
+    hadDeprecatedProgressData: snapshots.some((snapshot) => snapshot.hadDeprecatedProgressData),
+    state,
+    storedUserId: ownerId,
+    timestamp,
+    metadataTimestamp: snapshotMetadataClock(metadataWinner),
+    modeTimestamps,
+    seasonalSourceSeasonNumber: ACTIVE_SEASON_NUMBER,
+  };
+};
+const parseOwnedRecoverySnapshot = (
+  raw: string,
+  ownerId: string
+): PersistedProgressSnapshot | null => {
+  const wrapped = parseUserScopedStorage<UserState>(raw);
+  if (!wrapped || wrapped._userId !== ownerId) return null;
+  if (!preserveRawMismatchedSeason(ownerId, raw)) return null;
+  return parsePersistedProgressState(raw, ownerId);
+};
+const readRecoveryStorage = (ownerId: string): { ok: boolean; raw: string | null } => {
+  if (typeof window === 'undefined') return { ok: false, raw: null };
+  try {
+    return { ok: true, raw: localStorage.getItem(recoveryKey(ownerId)) };
+  } catch (error) {
+    logger.error('[AccountRecovery] Could not read the account recovery copy', error);
+    return { ok: false, raw: null };
+  }
+};
 /**
- * Retains `raw` as `ownerId`'s recovery copy. Returns `true` when a confirmed copy
- * exists afterwards (written now or already newer), so callers may drop their copy.
+ * Retains `raw` as `ownerId`'s recovery copy. Returns `true` only when the newest
+ * metadata and each mode are represented, with any displaced reset data exportable.
  */
 export const saveAccountRecoveryCopy = (raw: string | null, ownerId: string | null): boolean => {
   if (!raw || !isRetainable(raw, ownerId)) return false;
-  const retained = hasNewerCopy(ownerId, raw) || writeRecoveryCopy(ownerId, raw);
+  const source = parseOwnedRecoverySnapshot(raw, ownerId);
+  const current = readRecoveryStorage(ownerId);
+  if (!source || !current.ok) {
+    blockAccountRecoveryRetentionForOwner(ownerId);
+    setActiveProgressWritesBlocked(true);
+    return false;
+  }
+  const snapshots = [
+    ...(current.raw === null
+      ? []
+      : [parseOwnedRecoverySnapshot(current.raw, ownerId)].filter(
+          (snapshot): snapshot is PersistedProgressSnapshot => snapshot !== null
+        )),
+    source,
+  ];
+  if (current.raw !== null && snapshots.length < 2) {
+    blockAccountRecoveryRetentionForOwner(ownerId);
+    setActiveProgressWritesBlocked(true);
+    return false;
+  }
+  const composed = composeOwnerSnapshots(snapshots, ownerId);
+  if (!composed) return false;
+  const encoded = JSON.stringify({
+    _timestamp: composed.timestamp,
+    _metadataTimestamp: composed.metadataTimestamp,
+    _modeTimestamps: composed.modeTimestamps,
+    _userId: ownerId,
+    data: composed.state,
+  });
+  const retained = current.raw === encoded || writeRecoveryCopy(ownerId, encoded);
   if (!retained) {
-    retentionFailure = true;
-    blockedAccountOwner = ownerId;
+    blockAccountRecoveryRetentionForOwner(ownerId);
+    setActiveProgressWritesBlocked(true);
   } else if (blockedAccountOwner === ownerId) {
-    retentionFailure = false;
-    blockedAccountOwner = null;
-    setActiveProgressWritesBlocked(false);
+    clearBlockedAccountRecoveryRetention(ownerId);
   }
   return retained;
 };
@@ -62,8 +228,10 @@ export const retryBlockedAccountRecoveryRetention = (): boolean => {
   if (active && isOwnedBy(active, blockedAccountOwner)) {
     return saveAccountRecoveryCopy(active, blockedAccountOwner);
   }
-  const recovery = safeGetItem(recoveryKey(blockedAccountOwner));
-  return recovery ? saveAccountRecoveryCopy(recovery, blockedAccountOwner) : false;
+  const recovery = readRecoveryStorage(blockedAccountOwner);
+  return recovery.ok && recovery.raw
+    ? saveAccountRecoveryCopy(recovery.raw, blockedAccountOwner)
+    : false;
 };
 export const isAccountRecoveryRetentionBlocked = (): boolean => retentionFailure;
 export const markAccountRecoveryRetentionBlocked = (): void => {
@@ -84,34 +252,20 @@ export const clearBlockedAccountRecoveryRetention = (ownerId: string): void => {
   blockedAccountOwner = null;
   setActiveProgressWritesBlocked(false);
 };
-const preserveRawMismatchedSeason = (userId: string, raw: string): boolean => {
-  const wrapped = parseUserScopedStorage<Record<string, unknown>>(raw);
-  const data = wrapped?.data;
-  const seasonal = data?.seasonal;
-  const seasonNumber = data?.seasonalSeasonNumber;
-  if (
-    typeof seasonNumber !== 'number' ||
-    seasonNumber === ACTIVE_SEASON_NUMBER ||
-    !hasMaterializedProgress(seasonal)
-  ) {
-    return true;
-  }
-  const retained = saveSupersededProgressCopy(
-    userId,
-    'seasonal',
-    seasonNumber,
-    seasonal as UserProgressData
-  );
-  if (!retained) blockAccountRecoveryRetentionForOwner(userId);
-  return retained !== null;
-};
 export const readAccountRecoveryCopy = (userId: string): PersistedProgressSnapshot | null => {
-  const raw = safeGetItem(recoveryKey(userId));
-  if (!raw || !preserveRawMismatchedSeason(userId, raw)) return null;
-  const snapshot = parsePersistedProgressState(raw, userId);
+  const { ok, raw } = readRecoveryStorage(userId);
+  if (!ok) {
+    blockAccountRecoveryRetentionForOwner(userId);
+    setActiveProgressWritesBlocked(true);
+    return null;
+  }
+  if (!raw) return null;
+  const snapshot = parseOwnedRecoverySnapshot(raw, userId);
   if (snapshot) {
-    retentionFailure = false;
-    setActiveProgressWritesBlocked(false);
+    if (blockedAccountOwner === userId) clearBlockedAccountRecoveryRetention(userId);
+  } else {
+    blockAccountRecoveryRetentionForOwner(userId);
+    setActiveProgressWritesBlocked(true);
   }
   return snapshot;
 };
@@ -125,13 +279,24 @@ export const selectFreshestOwnerProgressSnapshot = (
   active: PersistedProgressSnapshot | null,
   handoff: PersistedProgressSnapshot | null = null
 ): PersistedProgressSnapshot | null => {
-  let newest = active;
-  for (const candidate of [recovery, handoff]) {
-    if (candidate && (!newest || (candidate.timestamp ?? 0) > (newest.timestamp ?? 0))) {
-      newest = candidate;
-    }
+  const snapshots = [recovery, handoff, active].filter(
+    (snapshot): snapshot is PersistedProgressSnapshot => snapshot !== null
+  );
+  const ownerId = active?.storedUserId ?? recovery?.storedUserId ?? handoff?.storedUserId ?? null;
+  if (
+    ownerId &&
+    snapshots.some(
+      (snapshot) => snapshot.storedUserId !== null && snapshot.storedUserId !== ownerId
+    )
+  ) {
+    blockAccountRecoveryRetentionForOwner(ownerId);
+    setActiveProgressWritesBlocked(true);
+    return null;
   }
-  return newest;
+  return composeOwnerSnapshots(
+    snapshots.filter((snapshot) => snapshot.storedUserId === ownerId),
+    ownerId
+  );
 };
 /** Retains the active copy for its owner when it belongs to an account other than `userId`. */
 export const preserveForeignActiveCopy = (userId: string | null): boolean => {

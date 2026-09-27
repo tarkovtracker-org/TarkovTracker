@@ -8,13 +8,15 @@ import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 const {
   clearProgressStorageMock,
   pendingCloudChanges,
+  unsavedProgressChanges,
   saveSupersededProgressCopyMock,
   supabaseContext,
   syncProgressStateMock,
 } = vi.hoisted(() => ({
   clearProgressStorageMock: vi.fn(),
   pendingCloudChanges: { value: false },
-  saveSupersededProgressCopyMock: vi.fn(() => ({ id: 'copy-1' })),
+  unsavedProgressChanges: { value: false },
+  saveSupersededProgressCopyMock: vi.fn((): { id: string } | null => ({ id: 'copy-1' })),
   supabaseContext: {
     client: {},
     user: { id: 'user-1' as string | null, loggedIn: true },
@@ -33,6 +35,7 @@ vi.mock('@/stores/tarkov/realtimeListener', () => ({
 }));
 vi.mock('@/stores/tarkov/progressSaveStatus', () => ({
   hasPendingCloudChanges: () => pendingCloudChanges.value,
+  hasUnsavedProgressChanges: () => unsavedProgressChanges.value,
 }));
 vi.mock('@/stores/tarkov/supersededProgress', () => ({
   saveSupersededProgressCopy: saveSupersededProgressCopyMock,
@@ -59,6 +62,7 @@ describe('performReset seasonal', () => {
     supabaseContext.user.id = 'user-1';
     syncProgressStateMock.mockResolvedValue({ error: null });
     pendingCloudChanges.value = false;
+    unsavedProgressChanges.value = false;
     saveSupersededProgressCopyMock.mockClear();
   });
   it('merges timestamped progress when a visibility-only mode timestamp is newer', () => {
@@ -230,6 +234,29 @@ describe('performReset seasonal', () => {
       ACTIVE_SEASON_NUMBER,
       displacedProgress
     );
+  });
+  it('archives controllerless unsaved changes before resetting a mode', async () => {
+    unsavedProgressChanges.value = true;
+    const store = createStore();
+    const displacedProgress = structuredClone(store.$state.pvp);
+    await performReset('pvp', store);
+    expect(saveSupersededProgressCopyMock).toHaveBeenCalledWith(
+      'user-1',
+      'pvp',
+      null,
+      displacedProgress
+    );
+  });
+  it('aborts a controllerless reset when its unsaved copy cannot be retained', async () => {
+    unsavedProgressChanges.value = true;
+    saveSupersededProgressCopyMock.mockReturnValueOnce(null);
+    const store = createStore();
+    await expect(performReset('pvp', store)).rejects.toThrow(
+      'Could not retain pending progress before reset'
+    );
+    expect(store.$state.pvp.level).toBe(42);
+    expect(syncProgressStateMock).not.toHaveBeenCalled();
+    expect(clearProgressStorageMock).not.toHaveBeenCalled();
   });
   it('keeps local state intact when the remote reset fails', async () => {
     syncProgressStateMock.mockResolvedValue({ error: { message: 'network down' } });

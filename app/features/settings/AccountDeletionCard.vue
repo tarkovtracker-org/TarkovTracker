@@ -22,6 +22,38 @@
   const tarkovStore = useTarkovStore();
   const showConfirmationDialog = ref(false);
   const showSuccessDialog = ref(false);
+  const deletedAccountOwner = ref<string | null>(null);
+  let accountRevision = 0;
+  let deletedAccountRevision = 0;
+  watch(
+    () => $supabase.user.id,
+    () => {
+      accountRevision += 1;
+    },
+    { flush: 'sync' }
+  );
+  const ownsDeletionSession = (owner: string | null, revision: number): boolean =>
+    Boolean(owner) && $supabase.user.id === owner && accountRevision === revision;
+  const assertDeletionSession = (owner: string | null, revision: number): void => {
+    if (!ownsDeletionSession(owner, revision))
+      throw new Error(t('settings.account_data.session_changed'));
+  };
+  const assertRefreshedDeletionOwner = (
+    session: NonNullable<Awaited<ReturnType<typeof refreshSupabaseSession>>>,
+    owner: string | null
+  ): void => {
+    if (session.user.id !== owner) throw new Error(t('settings.account_data.session_changed'));
+  };
+  const retainSuccessfulDeletionCleanup = (
+    success: boolean | undefined,
+    owner: string | null,
+    revision: number
+  ): void => {
+    if (success && !ownsDeletionSession(owner, revision)) forgetAccountOnDevice(owner);
+  };
+  const canResetDeletedSession = (owner: string, revision: number): boolean =>
+    ownsDeletionSession(owner, revision) ||
+    ($supabase.user.id === null && accountRevision === revision + 1);
   const confirmationText = ref('');
   const confirmationError = ref(false);
   const deleteError = ref('');
@@ -151,8 +183,12 @@
     }
     isDeleting.value = true;
     deleteError.value = '';
+    const requestedOwner = $supabase.user.id;
+    const requestedRevision = accountRevision;
     try {
+      assertDeletionSession(requestedOwner, requestedRevision);
       const { data: sessionData, error: sessionError } = await $supabase.client.auth.getSession();
+      assertDeletionSession(requestedOwner, requestedRevision);
       if (sessionError) {
         logger.error('Session error:', sessionError);
         throw new Error(`Session error: ${sessionError.message}`);
@@ -172,7 +208,13 @@
       if (!refreshedSession) {
         throw new Error('Unable to verify your session. Please refresh the page and try again.');
       }
-      const { data, error } = await $supabase.client.functions.invoke('account-delete');
+      assertDeletionSession(requestedOwner, requestedRevision);
+      assertRefreshedDeletionOwner(refreshedSession, requestedOwner);
+      const { data, error } = await $supabase.client.functions.invoke('account-delete', {
+        headers: { Authorization: `Bearer ${refreshedSession.access_token}` },
+      });
+      retainSuccessfulDeletionCleanup(data?.success, requestedOwner, requestedRevision);
+      assertDeletionSession(requestedOwner, requestedRevision);
       if (error) {
         logger.error('Edge function error:', error);
         let errorMessage = 'Failed to delete account. Please try again.';
@@ -243,6 +285,8 @@
         throw new Error(errorMessage);
       }
       if (data?.success) {
+        deletedAccountOwner.value = requestedOwner;
+        deletedAccountRevision = requestedRevision;
         showConfirmationDialog.value = false;
         if (data.cleanupScheduled) {
           logger.info('Account deleted, cleanup scheduled:', data.message);
@@ -274,18 +318,27 @@
   const forgetAccountOnDevice = (userId: string | null) => {
     if (userId) removeAccountDeviceData(userId);
   };
+  const signOutDeletedSession = async (owner: string, revision: number): Promise<void> => {
+    if (!ownsDeletionSession(owner, revision)) return;
+    requestDeviceDataRemoval(owner);
+    await $supabase.signOut();
+  };
+  const resetDeletedSession = (owner: string, revision: number): void => {
+    if (canResetDeletedSession(owner, revision)) resetClientState();
+  };
   const redirectToHome = async () => {
-    const deletedUserId = $supabase.user.id ?? null;
-    if (deletedUserId) requestDeviceDataRemoval(deletedUserId);
+    const deletedUserId = deletedAccountOwner.value;
+    if (!deletedUserId) return;
+    const revision = deletedAccountRevision;
     showSuccessDialog.value = false;
     logger.info('Signing out user and redirecting to dashboard...');
     try {
-      await $supabase.signOut();
+      await signOutDeletedSession(deletedUserId, revision);
       logger.info('Successfully signed out, performing hard reload...');
     } catch (error) {
       logger.error('Failed to sign out and redirect:', error);
     } finally {
-      resetClientState();
+      resetDeletedSession(deletedUserId, revision);
       forgetAccountOnDevice(deletedUserId);
       window.location.href = '/';
     }

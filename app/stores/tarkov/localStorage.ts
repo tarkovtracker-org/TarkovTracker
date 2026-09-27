@@ -1,7 +1,7 @@
 import { migrateToGameModeStructure, type UserState } from '@/stores/progressState';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
 import { classifyLocalSaveFailure, recordLocalSave } from '@/stores/tarkov/progressSaveStatus';
-import { GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
+import { ACTIVE_SEASON_NUMBER, GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import {
   hasDeprecatedTarkovDevProfileData,
@@ -16,6 +16,8 @@ export type PersistedProgressSnapshot = {
   timestamp: number | null;
   metadataTimestamp?: number;
   modeTimestamps?: Partial<Record<GameMode, number>>;
+  /** Original season attached to the seasonal payload before migration/sanitization. */
+  seasonalSourceSeasonNumber?: number;
 };
 const metadataKeys = ['currentGameMode', 'gameEdition', 'tarkovUid'] as const;
 const sameMetadata = (left: Partial<UserState>, right: Partial<UserState>) =>
@@ -28,8 +30,16 @@ type RemoteProgressSnapshot = {
   updatedAtByMode: Partial<Record<GameMode, number>>;
   metadataTimestamp?: number;
 };
-const retainedModeTimestamp = (previous: PersistedProgressSnapshot, mode: GameMode): number =>
-  previous.modeTimestamps?.[mode] ?? previous.timestamp ?? 0;
+const retainedModeTimestamp = (previous: PersistedProgressSnapshot, mode: GameMode): number => {
+  if (
+    mode === 'seasonal' &&
+    previous.seasonalSourceSeasonNumber !== undefined &&
+    previous.seasonalSourceSeasonNumber !== ACTIVE_SEASON_NUMBER
+  ) {
+    return 0;
+  }
+  return previous.modeTimestamps?.[mode] ?? previous.timestamp ?? 0;
+};
 const nextModeTimestamp = (
   previous: PersistedProgressSnapshot | null,
   state: UserState,
@@ -112,6 +122,7 @@ export const createProgressStorageSerializer = (
       storedUserId: userId,
       timestamp,
       modeTimestamps,
+      seasonalSourceSeasonNumber: state.seasonalSeasonNumber ?? ACTIVE_SEASON_NUMBER,
       hadDeprecatedProgressData: false,
     };
     return JSON.stringify({
@@ -265,6 +276,7 @@ export const parsePersistedProgressState = (
       timestamp: wrapped._timestamp ?? null,
       metadataTimestamp: wrapped._metadataTimestamp,
       modeTimestamps: wrapped._modeTimestamps,
+      seasonalSourceSeasonNumber: wrapped.data.seasonalSeasonNumber ?? ACTIVE_SEASON_NUMBER,
     };
   }
   try {
@@ -274,6 +286,7 @@ export const parsePersistedProgressState = (
       state: sanitizeOwnedUserState(migrateToGameModeStructure(parsed)),
       storedUserId: null,
       timestamp: null,
+      seasonalSourceSeasonNumber: parsed.seasonalSeasonNumber ?? ACTIVE_SEASON_NUMBER,
     };
   } catch {
     return null;

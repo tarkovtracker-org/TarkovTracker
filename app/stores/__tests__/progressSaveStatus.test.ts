@@ -111,6 +111,13 @@ describe('progress save status', () => {
     expect(first).not.toHaveBeenCalled();
     expect(second).toHaveBeenCalledOnce();
   });
+  it('clears the retry handler when its owning controller unregisters', async () => {
+    const handler = vi.fn().mockResolvedValue(true);
+    const unregister = registerCloudRetryHandler(handler);
+    unregister();
+    await expect(retryCloudSave()).resolves.toBe(false);
+    expect(handler).not.toHaveBeenCalled();
+  });
   it('resets cloud status and the retry handler with the session', async () => {
     registerCloudRetryHandler(vi.fn().mockResolvedValue(true));
     setCloudSaveStatus({ state: 'failed', failure: 'offline', retryAttempt: 3, nextRetryAt: null });
@@ -121,5 +128,12 @@ describe('progress save status', () => {
   it('reports a rejected retry handler as a failed retry', async () => {
     registerCloudRetryHandler(vi.fn().mockRejectedValue(new Error('boom')));
     await expect(retryCloudSave()).resolves.toBe(false);
+  });
+  it('keeps an unacknowledged failure when cloud idle was already idle', () => {
+    resetCloudSaveStatus();
+    recordLocalSave(false);
+    setCloudSaveStatus({ state: 'idle', failure: null, retryAttempt: 0, nextRetryAt: null });
+    expect(progressSaveStatus.localFailure).toBe('unknown');
+    expect(hasUnsavedProgressChanges()).toBe(true);
   });
 });

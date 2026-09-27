@@ -17,13 +17,17 @@ const isRetainedCopyKey = (key: string): boolean =>
 const listStoredEntries = (): StoredEntry[] =>
   Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
     .filter((key): key is string => key !== null)
-    .map((key) => ({ key, value: safeGetItem(key) ?? '' }));
+    // A failed read cannot prove two stored copies are identical. Keep it out of pruning.
+    .flatMap((key) => {
+      const value = safeGetItem(key);
+      return value === null ? [] : [{ key, value }];
+    });
 const estimateUsage = (entries: StoredEntry[]): number =>
   entries.reduce((total, entry) => total + entry.key.length + entry.value.length, 0);
 /** Backup keys end in `_<epoch ms>` (or an ISO date in the oldest format). */
 const backupCreatedAt = (key: string): number => {
   const suffix = key.slice(key.lastIndexOf('_') + 1);
-  const numeric = Number.parseInt(suffix, 10);
+  const numeric = Number(suffix);
   if (Number.isFinite(numeric)) return numeric;
   const parsed = Date.parse(suffix);
   return Number.isNaN(parsed) ? 0 : parsed;

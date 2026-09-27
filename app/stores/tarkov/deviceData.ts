@@ -62,13 +62,15 @@ export const removeAccountDeviceData = (userId: string): boolean => {
   let removed = keys !== null;
   removed = removeAccountRecoveryCopy(userId) && removed;
   removed = removeSupersededProgressCopies(userId) && removed;
-  removed = removeIfOwned(STORAGE_KEYS.progress, userId, true) && removed;
+  const activeRemoved = removeIfOwned(STORAGE_KEYS.progress, userId, true);
+  removed = activeRemoved && removed;
   removed = removeIfOwned(STORAGE_KEYS.preferences, userId) && removed;
   for (const key of keys ?? []) {
     if (!isRecognizedBackupKey(key)) continue;
     removed = removeIfOwned(key, userId) && removed;
   }
-  if (removed) {
+  // A retained backup is already isolated; only an active copy needs a write barrier.
+  if (activeRemoved) {
     clearBlockedAccountRecoveryRetention(userId);
   } else {
     blockAccountRecoveryRetentionForOwner(userId);

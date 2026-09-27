@@ -64,6 +64,25 @@ describe('nuxtSecurityConfig', () => {
       rmSync(outputDir, { force: true, recursive: true });
     }
   });
+  it('rejects a Pages header config that allows cross-origin framing', () => {
+    const outputDir = mkdtempSync(join(tmpdir(), 'tarkovtracker-pages-'));
+    try {
+      writeFileSync(
+        join(outputDir, '_routes.json'),
+        JSON.stringify({ include: ['/api/*', '/overlay/*'] })
+      );
+      writeFileSync(join(outputDir, 'index.html'), '<main>SPA</main>');
+      writeFileSync(
+        join(outputDir, '_headers'),
+        '/*\n  Content-Security-Policy: frame-ancestors *\n'
+      );
+      expect(() => assertCloudflarePagesOutput(outputDir, ['/api/*', '/overlay/*'])).toThrow(
+        'prevent cross-origin framing'
+      );
+    } finally {
+      rmSync(outputDir, { force: true, recursive: true });
+    }
+  });
   it('builds an overlay-specific CSP route rule that is stricter than the app-wide rule', () => {
     const routeRules = buildContentSecurityPolicyRouteRules({
       clientLogSinkUrl: 'https://logs.example.com/v1/collect',

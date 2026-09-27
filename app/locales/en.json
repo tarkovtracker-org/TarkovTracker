@@ -2189,7 +2189,8 @@
       "delete_success_description": "Your account and all associated data have been permanently deleted.",
       "cleanup_pending": "Some data cleanup is still in progress and will complete shortly.",
       "redirect_message": "Thank you for using TarkovTracker. You will be redirected to the dashboard.",
-      "go_to_dashboard": "Go to Dashboard"
+      "go_to_dashboard": "Go to Dashboard",
+      "session_changed": "Your signed-in account changed. No further action will be taken in this session."
     },
     "discord_link": {
       "title": "Discord Account",

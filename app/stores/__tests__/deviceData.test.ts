@@ -10,14 +10,20 @@ import {
   removeAccountDeviceData,
   requestDeviceDataRemoval,
 } from '@/stores/tarkov/deviceData';
-import { setActiveProgressWritesBlocked } from '@/stores/tarkov/localStorage';
+import {
+  progressPersistStorage,
+  setActiveProgressWritesBlocked,
+} from '@/stores/tarkov/localStorage';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
 vi.mock('@/utils/logger', () => ({
   logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 const owned = (userId: string | null) => JSON.stringify({ _userId: userId, data: {} });
 describe('device data removal', () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
   beforeEach(() => {
     localStorage.clear();
     clearDeviceDataRemoval();
@@ -55,7 +61,7 @@ describe('device data removal', () => {
       localStorage.getItem(`${LEGACY_STORAGE_KEYS.progressBackupPrefix}2026-01-02T00:00:00.000Z`)
     ).not.toBeNull();
   });
-  it('reports incomplete cleanup and keeps retention blocked when any owned delete fails', () => {
+  it('reports incomplete backup cleanup while allowing guest saves after active removal', () => {
     const activeKey = STORAGE_KEYS.progress;
     const recoveryKey = `${STORAGE_KEYS.progressRecoveryPrefix}user-1`;
     localStorage.setItem(activeKey, owned('user-1'));
@@ -68,7 +74,24 @@ describe('device data removal', () => {
     expect(removeAccountDeviceData('user-1')).toBe(false);
     expect(localStorage.getItem(activeKey)).toBeNull();
     expect(localStorage.getItem(recoveryKey)).not.toBeNull();
+    expect(isAccountRecoveryRetentionBlocked()).toBe(false);
+    progressPersistStorage.setItem(STORAGE_KEYS.progress, owned(null));
+    expect(localStorage.getItem(activeKey)).toBe(owned(null));
+  });
+  it('keeps writes blocked when the owned active envelope cannot be removed', () => {
+    localStorage.setItem(STORAGE_KEYS.progress, owned('user-1'));
+    vi.spyOn(localStorage, 'removeItem').mockImplementation((key: string) => {
+      if (key === STORAGE_KEYS.progress) throw new Error('storage unavailable');
+      return Storage.prototype.removeItem.call(localStorage, key);
+    });
+    vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, value: string) => {
+      if (key.startsWith(STORAGE_KEYS.progressRecoveryPrefix)) throw new Error('storage full');
+      return Storage.prototype.setItem.call(localStorage, key, value);
+    });
+    expect(removeAccountDeviceData('user-1')).toBe(false);
     expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+    progressPersistStorage.setItem(STORAGE_KEYS.progress, owned(null));
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(owned('user-1'));
   });
   it('keeps active copies that belong to another account or a guest', () => {
     localStorage.setItem(STORAGE_KEYS.progress, owned(null));
@@ -76,6 +99,42 @@ describe('device data removal', () => {
     removeAccountDeviceData('user-1');
     expect(localStorage.getItem(STORAGE_KEYS.progress)).not.toBeNull();
     expect(localStorage.getItem(STORAGE_KEYS.preferences)).not.toBeNull();
+  });
+  it('fails closed when the active progress envelope cannot be read as owned data', () => {
+    localStorage.setItem(STORAGE_KEYS.progress, '{malformed');
+    expect(removeAccountDeviceData('user-1')).toBe(false);
+    progressPersistStorage.setItem(STORAGE_KEYS.progress, owned(null));
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe('{malformed');
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+  });
+  it('reports incomplete removal and leaves backups when storage keys cannot be listed', () => {
+    const backupKey = `${STORAGE_KEYS.progressBackupPrefix}user-1_10`;
+    localStorage.setItem(backupKey, owned('user-1'));
+    vi.spyOn(localStorage, 'key').mockImplementation(() => {
+      throw new Error('storage unavailable');
+    });
+    expect(removeAccountDeviceData('user-1')).toBe(false);
+    expect(localStorage.getItem(backupKey)).toBe(owned('user-1'));
+  });
+  it('blocks active writes when the active envelope cannot be read during removal', () => {
+    const original = owned('user-1');
+    localStorage.setItem(STORAGE_KEYS.progress, original);
+    vi.spyOn(localStorage, 'getItem').mockImplementation((key: string) => {
+      if (key === STORAGE_KEYS.progress) throw new Error('storage unavailable');
+      return Storage.prototype.getItem.call(localStorage, key);
+    });
+    expect(removeAccountDeviceData('user-1')).toBe(false);
+    progressPersistStorage.setItem(STORAGE_KEYS.progress, owned(null));
+    expect(Storage.prototype.getItem.call(localStorage, STORAGE_KEYS.progress)).toBe(original);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+  });
+  it('does not attempt device removal outside the browser', () => {
+    localStorage.setItem(STORAGE_KEYS.progress, owned('user-1'));
+    vi.stubGlobal('window', undefined);
+    expect(removeAccountDeviceData('user-1')).toBe(false);
+    expect(Storage.prototype.getItem.call(localStorage, STORAGE_KEYS.progress)).toBe(
+      owned('user-1')
+    );
   });
   it('tracks a pending removal for one owner until cleared', () => {
     expect(isDeviceDataRemovalPending('user-1')).toBe(false);

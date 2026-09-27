@@ -8,7 +8,10 @@ import {
   toProgressEpoch,
 } from '@/stores/tarkov/progressMerge';
 import { syncProgressState } from '@/stores/tarkov/progressPersistence';
-import { hasPendingCloudChanges } from '@/stores/tarkov/progressSaveStatus';
+import {
+  hasPendingCloudChanges,
+  hasUnsavedProgressChanges,
+} from '@/stores/tarkov/progressSaveStatus';
 import { getRegisteredSyncController } from '@/stores/tarkov/realtimeListener';
 import { saveSupersededProgressCopy } from '@/stores/tarkov/supersededProgress';
 import { recordLocalSyncTime } from '@/stores/tarkov/syncTimeline';
@@ -197,7 +200,7 @@ export const performReset = async (mode: ResetMode, store: ResetTargetStore): Pr
   const freshState = structuredClone(defaultState);
   const resetModes = mode === 'all' ? GAME_MODE_VALUES : [mode];
   const ownerId = $supabase.user.loggedIn ? $supabase.user.id : null;
-  if (ownerId && hasPendingCloudChanges()) {
+  if (ownerId && (hasPendingCloudChanges() || hasUnsavedProgressChanges())) {
     for (const resetMode of resetModes) {
       const seasonNumber =
         resetMode === 'seasonal' ? (store.$state.seasonalSeasonNumber ?? null) : null;

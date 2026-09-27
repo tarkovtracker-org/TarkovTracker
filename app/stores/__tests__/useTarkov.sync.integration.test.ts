@@ -5,7 +5,10 @@ import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp, nextTick } from 'vue';
 import { defaultState } from '@/stores/progressState';
-import { resetAccountRecoveryRetentionBlock } from '@/stores/tarkov/accountRecovery';
+import {
+  isAccountRecoveryRetentionBlocked,
+  resetAccountRecoveryRetentionBlock,
+} from '@/stores/tarkov/accountRecovery';
 import {
   clearActiveProgressStorage,
   setActiveProgressWritesBlocked,
@@ -616,6 +619,54 @@ describe('useTarkov sync integration', () => {
         progress: expect.objectContaining({ level: 17 }),
       }),
     ]);
+  });
+  it('blocks stale-season hydration when the export copy cannot be retained', () => {
+    const staleSeason = ACTIVE_SEASON_NUMBER + 1;
+    const data = {
+      ...structuredClone(defaultState),
+      seasonal: progressWithLevel(17),
+      seasonalSeasonNumber: staleSeason,
+    };
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({ _userId: 'user-1', _timestamp: Date.now(), data })
+    );
+    vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+      if (key.startsWith(STORAGE_KEYS.progressSupersededPrefix)) throw new Error('storage full');
+      return Storage.prototype.setItem.call(localStorage, key, value);
+    });
+    const pinia = createPinia().use(piniaPluginPersistedstate);
+    createApp({}).use(pinia);
+    setActivePinia(pinia);
+    const store = useTarkovStore();
+    expect(store.seasonal.level).toBe(defaultState.seasonal.level);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      '[TarkovStore] Error deserializing localStorage:',
+      expect.objectContaining({
+        message: 'Could not retain stale-season progress before sanitizing it',
+      })
+    );
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toContain('"seasonalSeasonNumber":');
+    expect(listSupersededProgressCopies('user-1')).toEqual([]);
+  });
+  it('sanitizes stale guest-season data without creating an owner export copy', () => {
+    const staleSeason = ACTIVE_SEASON_NUMBER + 1;
+    const data = {
+      ...structuredClone(defaultState),
+      seasonal: progressWithLevel(17),
+      seasonalSeasonNumber: staleSeason,
+    };
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({ _userId: null, _timestamp: Date.now(), data })
+    );
+    const pinia = createPinia().use(piniaPluginPersistedstate);
+    createApp({}).use(pinia);
+    setActivePinia(pinia);
+    const store = useTarkovStore();
+    expect(store.seasonal.level).toBe(defaultState.seasonal.level);
+    expect(listSupersededProgressCopies('user-1')).toEqual([]);
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -2698,6 +2749,54 @@ describe('useTarkov sync integration', () => {
       );
       expect(useTarkovStore().pvp.level).toBe(2);
     });
+    it('aborts sign-in when a foreign active copy cannot be retained', async () => {
+      const original = JSON.stringify({
+        _timestamp: 10,
+        _userId: 'user-9',
+        data: { ...structuredClone(defaultState), pvp: progressWithLevel(15) },
+      });
+      localStorage.setItem(STORAGE_KEYS.progress, original);
+      vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+        if (key === recoveryKey('user-9')) throw new Error('storage full');
+        return Storage.prototype.setItem.call(localStorage, key, value);
+      });
+      await expect(initializeTarkovSync()).rejects.toThrow('Account recovery retention is blocked');
+      expect(useSupabaseSyncMock).not.toHaveBeenCalled();
+      expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(original);
+      expect(showLoadFailed).toHaveBeenCalled();
+    });
+    it('aborts sign-in when the current recovery copy is malformed', async () => {
+      localStorage.setItem(recoveryKey('user-1'), '{malformed');
+      await expect(initializeTarkovSync()).rejects.toThrow('Account recovery retention is blocked');
+      expect(useSupabaseSyncMock).not.toHaveBeenCalled();
+      expect(localStorage.getItem(recoveryKey('user-1'))).toBe('{malformed');
+      expect(showLoadFailed).toHaveBeenCalled();
+    });
+    it('aborts reconciliation when a foreign active copy appears after the startup guard', async () => {
+      const original = JSON.stringify({
+        _timestamp: 10,
+        _userId: 'user-9',
+        data: { ...structuredClone(defaultState), pvp: progressWithLevel(15) },
+      });
+      localStorage.setItem(STORAGE_KEYS.progress, original);
+      const getItem = localStorage.getItem.bind(localStorage);
+      let activeReads = 0;
+      vi.spyOn(localStorage, 'getItem').mockImplementation((key: string) => {
+        if (key === STORAGE_KEYS.progress) {
+          activeReads += 1;
+          if (activeReads === 1) return null;
+        }
+        return getItem(key);
+      });
+      vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+        if (key === recoveryKey('user-9')) throw new Error('storage full');
+        return Storage.prototype.setItem.call(localStorage, key, value);
+      });
+      await expect(initializeTarkovSync()).rejects.toThrow('Supabase initial load failed');
+      expect(activeReads).toBeGreaterThanOrEqual(2);
+      expect(useSupabaseSyncMock).not.toHaveBeenCalled();
+      expect(Storage.prototype.getItem.call(localStorage, STORAGE_KEYS.progress)).toBe(original);
+    });
     it('releases only the removed owner retention barrier after explicit device-data removal', async () => {
       const original = JSON.stringify({
         _timestamp: 10,
@@ -2749,6 +2848,35 @@ describe('useTarkov sync integration', () => {
       ]);
       expect(useTarkovStore().pvp.progressEpoch).toBe(localEpoch + 1);
       expect(localStorage.getItem(recoveryKey('user-1'))).toBeNull();
+    });
+    it('retains displaced Seasonal progress with its active season before a remote reset', async () => {
+      const localEpoch = 1;
+      const raw = JSON.stringify({
+        _timestamp: Date.parse('2026-02-25T00:00:00.000Z'),
+        _userId: 'user-1',
+        data: {
+          ...structuredClone(defaultState),
+          seasonalSeasonNumber: ACTIVE_SEASON_NUMBER,
+          seasonal: { ...progressWithLevel(12), progressEpoch: localEpoch },
+        },
+      });
+      localStorage.setItem(recoveryKey('user-1'), raw);
+      modeProgressResult.data = [
+        {
+          game_mode: 'seasonal',
+          season_number: ACTIVE_SEASON_NUMBER,
+          progress_data: { ...progressWithLevel(1), progressEpoch: localEpoch + 1 },
+        },
+      ];
+      await initializeTarkovSync();
+      expect(listSupersededProgressCopies('user-1')).toEqual([
+        expect.objectContaining({
+          mode: 'seasonal',
+          seasonNumber: ACTIVE_SEASON_NUMBER,
+          progress: expect.objectContaining({ level: 12, progressEpoch: localEpoch }),
+        }),
+      ]);
+      expect(useTarkovStore().seasonal.progressEpoch).toBe(localEpoch + 1);
     });
     it('keeps recovery-only progress and aborts reconciliation when reset archival fails', async () => {
       const raw = JSON.stringify({

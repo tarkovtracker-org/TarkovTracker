@@ -4,17 +4,26 @@ import { defaultState } from '@/stores/progressState';
 import {
   hasAccountRecoveryCopy,
   isAccountRecoveryRetentionBlocked,
+  blockAccountRecoveryRetentionForOwner,
   preserveForeignActiveCopy,
   readAccountRecoveryCopy,
   removeAccountRecoveryCopy,
+  retryBlockedAccountRecoveryRetention,
+  resetAccountRecoveryRetentionBlock,
   saveAccountRecoveryCopy,
   selectFreshestOwnerProgressSnapshot,
 } from '@/stores/tarkov/accountRecovery';
-import { progressPersistStorage } from '@/stores/tarkov/localStorage';
+import {
+  progressPersistStorage,
+  parsePersistedProgressState,
+  setActiveProgressWritesBlocked,
+} from '@/stores/tarkov/localStorage';
 import {
   findRedundantProgressBackups,
   relieveProgressStoragePressure,
 } from '@/stores/tarkov/storageQuota';
+import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
+import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import type { PersistedProgressSnapshot } from '@/stores/tarkov/localStorage';
 vi.mock('@/utils/logger', () => ({
@@ -26,16 +35,45 @@ const envelope = (userId: string | null, timestamp: number, level = 1) =>
     _userId: userId,
     data: { ...structuredClone(defaultState), pvp: { ...defaultState.pvp, level } },
   });
+const progressEnvelope = (
+  userId: string,
+  timestamp: number,
+  state: typeof defaultState,
+  clocks: {
+    metadataTimestamp?: number;
+    modeTimestamps?: Partial<Record<'pvp' | 'pve' | 'seasonal', number>>;
+  } = {}
+) =>
+  JSON.stringify({
+    _timestamp: timestamp,
+    ...(clocks.metadataTimestamp === undefined
+      ? {}
+      : { _metadataTimestamp: clocks.metadataTimestamp }),
+    ...(clocks.modeTimestamps === undefined ? {} : { _modeTimestamps: clocks.modeTimestamps }),
+    _userId: userId,
+    data: state,
+  });
 const recoveryKey = (userId: string) => `${STORAGE_KEYS.progressRecoveryPrefix}${userId}`;
-const snapshot = (timestamp: number | null): PersistedProgressSnapshot => ({
+const snapshot = (
+  timestamp: number | null,
+  state = structuredClone(defaultState),
+  clocks: {
+    metadataTimestamp?: number;
+    modeTimestamps?: Partial<Record<'pvp' | 'pve' | 'seasonal', number>>;
+  } = {},
+  storedUserId: string | null = 'user-1'
+): PersistedProgressSnapshot => ({
   hadDeprecatedProgressData: false,
-  state: structuredClone(defaultState),
-  storedUserId: 'user-1',
+  state,
+  storedUserId,
   timestamp,
+  ...clocks,
 });
 describe('account recovery copies', () => {
   beforeEach(() => {
     localStorage.clear();
+    resetAccountRecoveryRetentionBlock();
+    setActiveProgressWritesBlocked(false);
   });
   it('retains only copies owned by the named account', () => {
     expect(saveAccountRecoveryCopy(envelope('user-2', 10), 'user-1')).toBe(false);
@@ -54,6 +92,337 @@ describe('account recovery copies', () => {
     saveAccountRecoveryCopy(envelope('user-1', 30, 12), 'user-1');
     expect(readAccountRecoveryCopy('user-1')?.state.pvp.level).toBe(12);
   });
+  it('composes the newest metadata and each mode using their own clocks', () => {
+    const recoveryState = {
+      ...structuredClone(defaultState),
+      gameEdition: 2,
+      pvp: { ...defaultState.pvp, level: 20 },
+    };
+    const activeState = {
+      ...structuredClone(defaultState),
+      currentGameMode: 'pve' as const,
+      gameEdition: 3,
+      pvp: { ...defaultState.pvp, level: 3 },
+      pve: { ...defaultState.pve, level: 30 },
+    };
+    const selected = selectFreshestOwnerProgressSnapshot(
+      snapshot(1_000, recoveryState, {
+        metadataTimestamp: 10,
+        modeTimestamps: { pvp: 200, pve: 100 },
+      }),
+      snapshot(20, activeState, {
+        metadataTimestamp: 300,
+        modeTimestamps: { pvp: 50, pve: 150 },
+      })
+    );
+    expect(selected?.state.gameEdition).toBe(3);
+    expect(selected?.state.currentGameMode).toBe('pve');
+    expect(selected?.state.pvp.level).toBe(20);
+    expect(selected?.state.pve.level).toBe(30);
+    expect(selected?.metadataTimestamp).toBe(300);
+    expect(selected?.modeTimestamps).toMatchObject({ pvp: 200, pve: 150 });
+  });
+  it('rereads a two-tab recovery copy and retains independently newer fields', () => {
+    const original = {
+      ...structuredClone(defaultState),
+      pvp: { ...defaultState.pvp, level: 8 },
+    };
+    const otherTab = {
+      ...structuredClone(defaultState),
+      currentGameMode: 'pve' as const,
+      gameEdition: 3,
+      pve: { ...defaultState.pve, level: 12 },
+    };
+    const staleInput = progressEnvelope('user-1', 100, original, {
+      metadataTimestamp: 100,
+      modeTimestamps: { pvp: 100 },
+    });
+    saveAccountRecoveryCopy(staleInput, 'user-1');
+    localStorage.setItem(
+      recoveryKey('user-1'),
+      progressEnvelope('user-1', 101, otherTab, {
+        metadataTimestamp: 250,
+        modeTimestamps: { pvp: 50, pve: 250 },
+      })
+    );
+    expect(saveAccountRecoveryCopy(staleInput, 'user-1')).toBe(true);
+    const retained = readAccountRecoveryCopy('user-1');
+    expect(retained?.state.pvp.level).toBe(8);
+    expect(retained?.state.pve.level).toBe(12);
+    expect(retained?.state.gameEdition).toBe(3);
+    expect(retained?.state.currentGameMode).toBe('pve');
+  });
+  it('uses the outer timestamp as the fallback clock for legacy wrappers', () => {
+    const legacy = JSON.stringify({
+      _timestamp: 100,
+      _userId: 'user-1',
+      data: { ...structuredClone(defaultState), pvp: { ...defaultState.pvp, level: 9 } },
+    });
+    const newerClockInput = progressEnvelope(
+      'user-1',
+      90,
+      { ...structuredClone(defaultState), pvp: { ...defaultState.pvp, level: 3 } },
+      { metadataTimestamp: 90, modeTimestamps: { pvp: 90 } }
+    );
+    localStorage.setItem(recoveryKey('user-1'), legacy);
+    expect(saveAccountRecoveryCopy(newerClockInput, 'user-1')).toBe(true);
+    expect(readAccountRecoveryCopy('user-1')?.state.pvp.level).toBe(9);
+    expect(readAccountRecoveryCopy('user-1')?.modeTimestamps?.pvp).toBe(100);
+  });
+  it('excludes stale-season recovery progress when composing with current active progress', () => {
+    const staleSeason = 999;
+    const staleRaw = progressEnvelope(
+      'user-1',
+      1_000,
+      {
+        ...structuredClone(defaultState),
+        seasonalSeasonNumber: staleSeason,
+        seasonal: { ...defaultState.seasonal, level: 70 },
+      },
+      { modeTimestamps: { seasonal: 1_000 } }
+    );
+    const activeRaw = progressEnvelope(
+      'user-1',
+      100,
+      { ...structuredClone(defaultState), seasonal: { ...defaultState.seasonal, level: 20 } },
+      { modeTimestamps: { seasonal: 100 } }
+    );
+    localStorage.setItem(recoveryKey('user-1'), staleRaw);
+    const oldRecovery = readAccountRecoveryCopy('user-1');
+    const active = parsePersistedProgressState(activeRaw, 'user-1');
+    expect(oldRecovery?.seasonalSourceSeasonNumber).toBe(staleSeason);
+    expect(active?.seasonalSourceSeasonNumber).toBe(ACTIVE_SEASON_NUMBER);
+    const selected = selectFreshestOwnerProgressSnapshot(oldRecovery, active);
+    expect(selected?.state.seasonal.level).toBe(20);
+    expect(selected?.modeTimestamps?.seasonal).toBe(100);
+    expect(listSupersededProgressCopies('user-1')).toHaveLength(1);
+  });
+  it('archives an unknown numeric season before allowing current-season progress to win', () => {
+    const unknownSeason = 0;
+    const staleRaw = progressEnvelope(
+      'user-1',
+      1_000,
+      {
+        ...structuredClone(defaultState),
+        seasonalSeasonNumber: unknownSeason,
+        seasonal: { ...defaultState.seasonal, level: 70 },
+      },
+      { modeTimestamps: { seasonal: 1_000 } }
+    );
+    const active = parsePersistedProgressState(
+      progressEnvelope(
+        'user-1',
+        100,
+        { ...structuredClone(defaultState), seasonal: { ...defaultState.seasonal, level: 20 } },
+        { modeTimestamps: { seasonal: 100 } }
+      ),
+      'user-1'
+    );
+    localStorage.setItem(recoveryKey('user-1'), staleRaw);
+    const recovery = readAccountRecoveryCopy('user-1');
+    const selected = selectFreshestOwnerProgressSnapshot(recovery, active);
+    expect(selected?.state.seasonal.level).toBe(20);
+    expect(listSupersededProgressCopies('user-1').map((copy) => copy.seasonNumber)).toContain(
+      unknownSeason
+    );
+  });
+  it('does not export stale seasonal data when the raw seasonal payload has no progress', () => {
+    const raw = JSON.stringify({
+      _timestamp: 1_000,
+      _userId: 'user-1',
+      data: {
+        ...structuredClone(defaultState),
+        seasonalSeasonNumber: 999,
+        seasonal: null,
+      },
+    });
+    localStorage.setItem(recoveryKey('user-1'), raw);
+    expect(readAccountRecoveryCopy('user-1')?.state.seasonal).toEqual(defaultState.seasonal);
+    expect(listSupersededProgressCopies('user-1')).toHaveLength(0);
+    expect(localStorage.getItem(recoveryKey('user-1'))).toBe(raw);
+  });
+  it('excludes stale active and handoff seasonal progress when current recovery exists', () => {
+    const staleSeason = 999;
+    const staleRaw = progressEnvelope(
+      'user-1',
+      1_000,
+      {
+        ...structuredClone(defaultState),
+        seasonalSeasonNumber: staleSeason,
+        seasonal: { ...defaultState.seasonal, level: 70 },
+      },
+      { modeTimestamps: { seasonal: 1_000 } }
+    );
+    const currentRecoveryRaw = progressEnvelope(
+      'user-1',
+      100,
+      { ...structuredClone(defaultState), seasonal: { ...defaultState.seasonal, level: 20 } },
+      { modeTimestamps: { seasonal: 100 } }
+    );
+    const stale = parsePersistedProgressState(staleRaw, 'user-1')!;
+    localStorage.setItem(recoveryKey('user-1'), currentRecoveryRaw);
+    const currentRecovery = readAccountRecoveryCopy('user-1');
+    expect(stale.seasonalSourceSeasonNumber).toBe(staleSeason);
+    expect(
+      selectFreshestOwnerProgressSnapshot(currentRecovery, stale, stale)?.state.seasonal.level
+    ).toBe(20);
+  });
+  it('keeps unscoped legacy reset conflicts unresolved when owner export is impossible', () => {
+    const legacySnapshot = (epoch: number) =>
+      parsePersistedProgressState(
+        JSON.stringify({
+          ...structuredClone(defaultState),
+          pvp: { ...defaultState.pvp, level: epoch + 1, progressEpoch: epoch },
+        }),
+        null
+      );
+    expect(selectFreshestOwnerProgressSnapshot(legacySnapshot(1), legacySnapshot(2))).toBeNull();
+    expect(listSupersededProgressCopies('user-1')).toHaveLength(0);
+  });
+  it('blocks composition of snapshots from different owners', () => {
+    const selected = selectFreshestOwnerProgressSnapshot(
+      snapshot(10, structuredClone(defaultState), {}, 'user-1'),
+      snapshot(20, structuredClone(defaultState), {}, 'user-2')
+    );
+    expect(selected).toBeNull();
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+  });
+  it('clears only a matching owner retention block after rereading its copy', () => {
+    localStorage.setItem(recoveryKey('user-1'), envelope('user-1', 10, 7));
+    blockAccountRecoveryRetentionForOwner('user-1');
+    setActiveProgressWritesBlocked(true);
+    expect(readAccountRecoveryCopy('user-1')?.state.pvp.level).toBe(7);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(false);
+  });
+  it('retries retention from the matching recovery copy after active storage is absent', () => {
+    localStorage.setItem(recoveryKey('user-1'), envelope('user-1', 10, 7));
+    blockAccountRecoveryRetentionForOwner('user-1');
+    setActiveProgressWritesBlocked(true);
+    expect(retryBlockedAccountRecoveryRetention()).toBe(true);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(false);
+    expect(readAccountRecoveryCopy('user-1')?.state.pvp.level).toBe(7);
+  });
+  it('keeps retention blocked when retry cannot read the recovery copy', () => {
+    blockAccountRecoveryRetentionForOwner('user-1');
+    const key = recoveryKey('user-1');
+    const getItem = vi.spyOn(localStorage, 'getItem').mockImplementation((requestedKey) => {
+      if (requestedKey === key) throw new Error('storage denied');
+      return Storage.prototype.getItem.call(localStorage, requestedKey);
+    });
+    expect(retryBlockedAccountRecoveryRetention()).toBe(false);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+    getItem.mockRestore();
+  });
+  it('keeps retention blocked when retry finds no recovery copy', () => {
+    blockAccountRecoveryRetentionForOwner('user-1');
+    setActiveProgressWritesBlocked(true);
+    expect(retryBlockedAccountRecoveryRetention()).toBe(false);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+  });
+  it('uses a zero seasonal clock when every available snapshot is from an old season', () => {
+    const stale = snapshot(
+      1_000,
+      {
+        ...structuredClone(defaultState),
+        seasonal: { ...defaultState.seasonal, level: 1 },
+      },
+      { modeTimestamps: { seasonal: 1_000 } }
+    );
+    stale.seasonalSourceSeasonNumber = 999;
+    const selected = selectFreshestOwnerProgressSnapshot(stale, null);
+    expect(selected?.state.seasonal).toEqual(defaultState.seasonal);
+    expect(selected?.modeTimestamps?.seasonal).toBe(0);
+  });
+  it('archives a displaced current-season reset epoch with its season identity', () => {
+    const lowerEpoch = {
+      ...structuredClone(defaultState),
+      seasonal: { ...defaultState.seasonal, level: 18, progressEpoch: 1 },
+    };
+    const raw = progressEnvelope('user-1', 10, lowerEpoch, {
+      modeTimestamps: { seasonal: 10 },
+    });
+    localStorage.setItem(recoveryKey('user-1'), raw);
+    const higherEpoch = {
+      ...structuredClone(defaultState),
+      seasonal: { ...defaultState.seasonal, level: 3, progressEpoch: 2 },
+    };
+    expect(
+      saveAccountRecoveryCopy(
+        progressEnvelope('user-1', 20, higherEpoch, { modeTimestamps: { seasonal: 20 } }),
+        'user-1'
+      )
+    ).toBe(true);
+    expect(
+      listSupersededProgressCopies('user-1').some(
+        (copy) => copy.mode === 'seasonal' && copy.seasonNumber === ACTIVE_SEASON_NUMBER
+      )
+    ).toBe(true);
+  });
+  it.each([
+    {
+      existingEpoch: 1,
+      existingLevel: 9,
+      existingClock: 999,
+      incomingEpoch: 2,
+      incomingLevel: 3,
+      incomingClock: 10,
+      retainedLevel: 3,
+      supersededLevel: 9,
+    },
+    {
+      existingEpoch: 2,
+      existingLevel: 9,
+      existingClock: 10,
+      incomingEpoch: 1,
+      incomingLevel: 3,
+      incomingClock: 999,
+      retainedLevel: 9,
+      supersededLevel: 3,
+    },
+  ])(
+    'gives the higher reset epoch precedence and archives the lower-epoch copy',
+    ({
+      existingEpoch,
+      existingLevel,
+      existingClock,
+      incomingEpoch,
+      incomingLevel,
+      incomingClock,
+      retainedLevel,
+      supersededLevel,
+    }) => {
+      const current = {
+        ...structuredClone(defaultState),
+        pvp: { ...defaultState.pvp, level: existingLevel, progressEpoch: existingEpoch },
+      };
+      const displaced = {
+        ...structuredClone(defaultState),
+        pvp: { ...defaultState.pvp, level: incomingLevel, progressEpoch: incomingEpoch },
+      };
+      localStorage.setItem(
+        recoveryKey('user-1'),
+        progressEnvelope('user-1', existingClock, current, {
+          modeTimestamps: { pvp: existingClock },
+        })
+      );
+      expect(
+        saveAccountRecoveryCopy(
+          progressEnvelope('user-1', incomingClock, displaced, {
+            modeTimestamps: { pvp: incomingClock },
+          }),
+          'user-1'
+        )
+      ).toBe(true);
+      const retained = readAccountRecoveryCopy('user-1');
+      expect(retained?.state.pvp.progressEpoch).toBe(2);
+      expect(retained?.state.pvp.level).toBe(retainedLevel);
+      expect(
+        listSupersededProgressCopies('user-1').some(
+          (copy) => copy.mode === 'pvp' && copy.progress.level === supersededLevel
+        )
+      ).toBe(true);
+    }
+  );
   it('allows supported unscoped legacy progress to migrate to an owned envelope', () => {
     localStorage.setItem(
       STORAGE_KEYS.progress,
@@ -71,6 +440,60 @@ describe('account recovery copies', () => {
       throw Object.assign(new Error('full'), { name: 'QuotaExceededError' });
     });
     expect(saveAccountRecoveryCopy(envelope('user-1', 10), 'user-1')).toBe(false);
+    setItem.mockRestore();
+  });
+  it('fails closed when the recovery copy cannot be read', () => {
+    const key = recoveryKey('user-1');
+    const getItem = vi.spyOn(localStorage, 'getItem').mockImplementation((requestedKey) => {
+      if (requestedKey === key) throw new Error('storage denied');
+      return Storage.prototype.getItem.call(localStorage, requestedKey);
+    });
+    expect(readAccountRecoveryCopy('user-1')).toBeNull();
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+    getItem.mockRestore();
+  });
+  it('fails closed when recovery is requested without a browser window', () => {
+    vi.stubGlobal('window', undefined);
+    try {
+      expect(readAccountRecoveryCopy('user-1')).toBeNull();
+      expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+  it('rejects corrupt recovery envelopes without treating them as owner progress', () => {
+    localStorage.setItem(recoveryKey('user-1'), '{broken');
+    expect(readAccountRecoveryCopy('user-1')).toBeNull();
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+    expect(localStorage.getItem(recoveryKey('user-1'))).toBe('{broken');
+  });
+  it('rejects recovery envelopes scoped to a different account', () => {
+    const foreign = envelope('user-1', 10, 7);
+    localStorage.setItem(recoveryKey('user-2'), foreign);
+    expect(readAccountRecoveryCopy('user-2')).toBeNull();
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+    expect(localStorage.getItem(recoveryKey('user-2'))).toBe(foreign);
+  });
+  it('fails retention closed when reading the existing recovery slot throws', () => {
+    const raw = envelope('user-1', 10, 7);
+    const key = recoveryKey('user-1');
+    const getItem = vi.spyOn(localStorage, 'getItem').mockImplementation((requestedKey) => {
+      if (requestedKey === key) throw new Error('storage denied');
+      return Storage.prototype.getItem.call(localStorage, requestedKey);
+    });
+    expect(saveAccountRecoveryCopy(raw, 'user-1')).toBe(false);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+    getItem.mockRestore();
+  });
+  it('fails closed when the owner recovery write hits quota', () => {
+    const key = recoveryKey('user-1');
+    const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation((requestedKey, value) => {
+      if (requestedKey === key)
+        throw Object.assign(new Error('full'), { name: 'QuotaExceededError' });
+      return Storage.prototype.setItem.call(localStorage, requestedKey, value);
+    });
+    expect(saveAccountRecoveryCopy(envelope('user-1', 10, 7), 'user-1')).toBe(false);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
     setItem.mockRestore();
   });
   it('retains raw stale-season progress before sanitizing a recovery envelope', () => {
@@ -107,6 +530,81 @@ describe('account recovery copies', () => {
       return Storage.prototype.setItem.call(localStorage, key, value);
     });
     expect(readAccountRecoveryCopy('user-1')).toBeNull();
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+    expect(localStorage.getItem(recoveryKey('user-1'))).toBe(raw);
+    setItem.mockRestore();
+  });
+  it('does not replace a stale-season recovery copy when superseded export fails', () => {
+    const staleSeason = 999;
+    const raw = JSON.stringify({
+      _timestamp: 10,
+      _userId: 'user-1',
+      data: {
+        ...structuredClone(defaultState),
+        seasonalSeasonNumber: staleSeason,
+        seasonal: { ...defaultState.seasonal, level: 17 },
+      },
+    });
+    localStorage.setItem(recoveryKey('user-1'), raw);
+    const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+      if (key.startsWith(STORAGE_KEYS.progressSupersededPrefix)) throw new Error('full');
+      return Storage.prototype.setItem.call(localStorage, key, value);
+    });
+    expect(saveAccountRecoveryCopy(envelope('user-1', 20, 12), 'user-1')).toBe(false);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+    expect(localStorage.getItem(recoveryKey('user-1'))).toBe(raw);
+    setItem.mockRestore();
+  });
+  it('does not replace lower-epoch recovery progress when reset export fails', () => {
+    const lowerEpoch = {
+      ...structuredClone(defaultState),
+      pvp: { ...defaultState.pvp, level: 18, progressEpoch: 1 },
+    };
+    const raw = progressEnvelope('user-1', 10, lowerEpoch, {
+      modeTimestamps: { pvp: 10 },
+    });
+    localStorage.setItem(recoveryKey('user-1'), raw);
+    const higherEpoch = {
+      ...structuredClone(defaultState),
+      pvp: { ...defaultState.pvp, level: 3, progressEpoch: 2 },
+    };
+    const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+      if (key.startsWith(STORAGE_KEYS.progressSupersededPrefix)) throw new Error('full');
+      return Storage.prototype.setItem.call(localStorage, key, value);
+    });
+    expect(
+      saveAccountRecoveryCopy(
+        progressEnvelope('user-1', 20, higherEpoch, { modeTimestamps: { pvp: 20 } }),
+        'user-1'
+      )
+    ).toBe(false);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+    expect(localStorage.getItem(recoveryKey('user-1'))).toBe(raw);
+    setItem.mockRestore();
+  });
+  it('does not discard incoming lower-epoch progress when its export fails', () => {
+    const higherEpoch = {
+      ...structuredClone(defaultState),
+      pvp: { ...defaultState.pvp, level: 18, progressEpoch: 2 },
+    };
+    const raw = progressEnvelope('user-1', 10, higherEpoch, {
+      modeTimestamps: { pvp: 10 },
+    });
+    localStorage.setItem(recoveryKey('user-1'), raw);
+    const lowerEpoch = {
+      ...structuredClone(defaultState),
+      pvp: { ...defaultState.pvp, level: 3, progressEpoch: 1 },
+    };
+    const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+      if (key.startsWith(STORAGE_KEYS.progressSupersededPrefix)) throw new Error('full');
+      return Storage.prototype.setItem.call(localStorage, key, value);
+    });
+    expect(
+      saveAccountRecoveryCopy(
+        progressEnvelope('user-1', 20, lowerEpoch, { modeTimestamps: { pvp: 20 } }),
+        'user-1'
+      )
+    ).toBe(false);
     expect(isAccountRecoveryRetentionBlocked()).toBe(true);
     expect(localStorage.getItem(recoveryKey('user-1'))).toBe(raw);
     setItem.mockRestore();
