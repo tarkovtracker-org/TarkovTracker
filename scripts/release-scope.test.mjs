@@ -43,6 +43,12 @@ describe('release scope plugin', () => {
   ])('classifies %s as internal=%s', (message, expected) =>
     expect(isInternalCommit(message)).toBe(expected)
   );
+  it('matches the in-app changelog internal-scope filter', () => {
+    const source = readFileSync(new URL('../app/utils/changelog.ts', import.meta.url), 'utf8');
+    const block = source.match(/const INTERNAL_SCOPES = new Set\(\[([^\]]*)\]\)/)?.[1] ?? '';
+    const appScopes = [...block.matchAll(/'([^']+)'/g)].map((match) => match[1]);
+    expect(appScopes).toEqual([...INTERNAL_SCOPES]);
+  });
   it('lists core automation scopes in sorted order', () => {
     expect(INTERNAL_SCOPES).toEqual(expect.arrayContaining(['ci', 'preview', 'release', 'deps']));
     expect([...INTERNAL_SCOPES].sort()).toEqual([...INTERNAL_SCOPES]);

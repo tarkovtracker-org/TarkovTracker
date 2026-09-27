@@ -28,7 +28,8 @@ const USER_FACING_VERBS: Readonly<Record<string, string>> = Object.freeze({
   ui: 'Updated',
 });
 // Scopes for tooling, automation, documentation, and dependencies. A `fix(ci):` commit is still
-// internal even though its type would otherwise be user-facing.
+// internal even though its type would otherwise be user-facing. `no-release` is the explicit
+// opt-out. Keep aligned with `INTERNAL_SCOPES` in `scripts/release-scope.mjs`.
 const INTERNAL_SCOPES = new Set([
   'agents',
   'build',
@@ -38,6 +39,7 @@ const INTERNAL_SCOPES = new Set([
   'deps',
   'deps-dev',
   'docs',
+  'no-release',
   'preview',
   'previews',
   'release',

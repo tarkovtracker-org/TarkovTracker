@@ -119,6 +119,7 @@ describe('public changelog text', () => {
     'fix(preview): stabilize comment authorization',
     'feat(release): batch versions',
     'fix(deps): bump nuxt',
+    'fix(no-release): quiet change',
     'unknown message',
     'fix: **',
   ])('omits non-user-facing or empty change %s', (input) =>
