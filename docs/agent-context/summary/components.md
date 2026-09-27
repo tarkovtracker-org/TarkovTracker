@@ -21,44 +21,49 @@
 
 ### Tarkov store internals (`app/stores/tarkov/`)
 
-| File                     | Responsibility                                           |
-| ------------------------ | -------------------------------------------------------- |
-| `realtimeListener.ts`    | Supabase realtime subscription lifecycle for progress.   |
-| `progressMerge.ts`       | Merge remote/local progress with conflict rules.         |
-| `conflictDetection.ts`   | Detect divergence between local and remote state.        |
-| `prestige.ts`            | Prestige run logic and prestige-level handling.          |
-| `hideoutPrereqs.ts`      | Enforce hideout prerequisite completion.                 |
-| `resetEngine.ts`         | Reset progress (all / per-mode / current mode).          |
-| `localStorage.ts`        | User-scoped persistence helpers.                         |
-| `promiseStore.ts`        | In-flight request de-duplication.                        |
-| `apiUpdateNotifier.ts`   | Surface API-driven task update notifications.            |
-| `progressPersistence.ts` | Supabase persistence layer for progress sync.            |
-| `metadataStoreBridge.ts` | Bridge between metadata store and tarkov store.          |
-| `syncTimeline.ts`        | Ordered timeline of sync events for conflict resolution. |
-| `deepEqual.ts`           | Deep equality comparison for progress diffing.           |
-| `itemPicker.ts`          | Item selection logic for hideout/task item picking.      |
-| `fetchResponse.ts`       | Typed fetch response handling for store operations.      |
+| File                     | Responsibility                                                              |
+| ------------------------ | --------------------------------------------------------------------------- |
+| `realtimeListener.ts`    | Supabase realtime subscription lifecycle for progress.                      |
+| `progressMerge.ts`       | Merge remote/local progress with conflict rules.                            |
+| `conflictDetection.ts`   | Detect divergence between local and remote state.                           |
+| `prestige.ts`            | Prestige run logic and prestige-level handling.                             |
+| `hideoutPrereqs.ts`      | Enforce hideout prerequisite completion.                                    |
+| `resetEngine.ts`         | Reset progress (all / per-mode / current mode).                             |
+| `localStorage.ts`        | User-scoped persistence helpers.                                            |
+| `promiseStore.ts`        | In-flight request de-duplication.                                           |
+| `apiUpdateNotifier.ts`   | Surface API-driven task update notifications.                               |
+| `progressPersistence.ts` | Supabase persistence layer for progress sync.                               |
+| `metadataStoreBridge.ts` | Bridge between metadata store and tarkov store.                             |
+| `syncTimeline.ts`        | Ordered timeline of sync events for conflict resolution.                    |
+| `deepEqual.ts`           | Deep equality comparison for progress diffing.                              |
+| `itemPicker.ts`          | Item selection logic for hideout/task item picking.                         |
+| `fetchResponse.ts`       | Typed fetch response handling for store operations.                         |
+| `startupOwnership.ts`    | Generation guard invalidating suspended work across auth/reset transitions. |
 
 ## Composables (`app/composables/`)
 
 Reusable composition functions. Notable ones:
 
-| Composable                                                           | Responsibility                                                |
-| -------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `useAppInitialization.ts`                                            | App bootstrap sequencing.                                     |
-| `useGraphBuilder.ts` / `useTaskGraphData.ts`                         | Build task/hideout dependency graphs for Vue Flow.            |
-| `useTaskFiltering.ts` / `useTaskCounts.ts` / `useTaskActions.ts`     | Task list filtering, counting, and mutations.                 |
-| `useNeededItems.ts` / `useItemDistribution.ts`                       | Aggregate and distribute required items across tasks/hideout. |
-| `useDashboardStats.ts` / `useDashboardRecommendations.ts`            | Dashboard metrics and "next action" recommendations.          |
-| `useStorylineChapters.ts`                                            | Storyline chapter progression state.                          |
-| `useSkillCalculation.ts` / `useXpCalculation.ts`                     | Skill/XP/level derivations.                                   |
-| `useLeafletMap.ts` / `useMapObjectiveMarks.ts` / `useMapResize.ts`   | Interactive map rendering and objective markers.              |
-| `useDataBackup.ts` / `useDebugStateExport.ts`                        | Export/import + debug snapshots of progress/preferences.      |
-| `useTarkovDevImport.ts` / `useEftLogsImport.ts`                      | Import progress from tarkov.dev profiles and EFT log files.   |
-| `useSupporter.ts`                                                    | Supporter status + Stripe checkout/portal entry points.       |
-| `useOAuthLogin.ts` / `useOAuthConsent.ts` / `useAnalyticsConsent.ts` | Auth popup flow + consent management.                         |
-| `api/useEdgeFunctions.ts`                                            | Typed wrapper for invoking Supabase Edge Functions.           |
-| `supabase/useSupabaseSync.ts` / `useSupabaseListener.ts`             | Progress sync + realtime listening.                           |
+| Composable                                                           | Responsibility                                                 |
+| -------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `useAppInitialization.ts`                                            | App bootstrap sequencing.                                      |
+| `useGraphBuilder.ts` / `useTaskGraphData.ts`                         | Build task/hideout dependency graphs for Vue Flow.             |
+| `useTaskFiltering.ts` / `useTaskCounts.ts` / `useTaskActions.ts`     | Task list filtering, counting, and mutations.                  |
+| `useTaskRouteSync.ts` / `useTaskRepair.ts` / `useTaskState.ts`       | Task URL query sync, corrupted progress repair, state eval.    |
+| `useHideoutStationStatus.ts` / `useHideoutFiltering.ts`              | Hideout station level calculations, filtering, and route sync. |
+| `useNeededItems.ts` / `useItemDistribution.ts`                       | Aggregate and distribute required items across tasks/hideout.  |
+| `useDashboardStats.ts` / `useDashboardRecommendations.ts`            | Dashboard metrics and "next action" recommendations.           |
+| `useStorylineChapters.ts`                                            | Storyline chapter progression state.                           |
+| `useSkillCalculation.ts` / `useXpCalculation.ts`                     | Skill/XP/level derivations.                                    |
+| `useLeafletMap.ts` / `useMapObjectiveMarks.ts` / `useMapResize.ts`   | Interactive map rendering and objective markers.               |
+| `useDataBackup.ts` / `useDebugStateExport.ts`                        | Export/import + debug snapshots of progress/preferences.       |
+| `useTarkovDevImport.ts` / `useEftLogsImport.ts`                      | Import progress from tarkov.dev profiles and EFT log files.    |
+| `useSupporter.ts`                                                    | Supporter status + Stripe checkout/portal entry points.        |
+| `useTurnstile.ts`                                                    | Cloudflare Turnstile token acquisition for protected actions.  |
+| `useOAuthLogin.ts` / `useOAuthConsent.ts` / `useAnalyticsConsent.ts` | Auth popup flow + consent management.                          |
+| `useProductAnalytics.ts` / `useAnalyticsEvents.ts`                   | Consent-gated analytics event dispatch and user properties.    |
+| `api/useEdgeFunctions.ts`                                            | Typed wrapper for invoking Supabase Edge Functions.            |
+| `supabase/useSupabaseSync.ts` / `useSupabaseListener.ts`             | Progress sync + realtime listening.                            |
 
 ## Plugins (`app/plugins/`)
 
@@ -93,6 +98,7 @@ Each slice contains its Vue components and slice-local helpers/composables. High
 
 | Slice            | Key components                                                                                                  |
 | ---------------- | --------------------------------------------------------------------------------------------------------------- |
+| `about`          | `AboutHelpLinks.vue`, `AboutMemberCard.vue`, `AboutMembersGroup.vue`, `teamMembers.ts`                          |
 | `tasks`          | `TaskCard.vue`, `TaskFilterBar.vue`, `TaskObjective.vue`, `TaskGraphView.vue`, `composables/useTaskFilters.ts`  |
 | `hideout`        | `HideoutCard.vue`, `HideoutRequirement.vue`, `HideoutSettingsDrawer.vue`                                        |
 | `maps`           | `LeafletMap.vue`, `LeafletObjectiveTooltip.vue`, `composables/useLeafletMapControls.ts`                         |
@@ -113,17 +119,19 @@ Each slice contains its Vue components and slice-local helpers/composables. High
 
 ## Server Components (`app/server/`)
 
-| Component                | File                                                                                                            | Responsibility                                   |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| Tarkov proxy routes      | `api/tarkov/*.get.ts`                                                                                           | Serve game data via cache + overlay.             |
-| json.tarkov.dev adapters | `utils/tarkov-json.ts`                                                                                          | Fetch + adapt static JSON into app types.        |
-| Overlay engine           | `utils/overlay.ts`                                                                                              | Apply community data corrections/additions.      |
-| Edge cache               | `utils/edgeCache.ts`, `utils/sharedEdgeStore.ts`, `utils/edgeCacheKey.ts`                                       | Cloudflare cache integration + keys.             |
-| API protection           | `middleware/api-protection.ts`                                                                                  | CORS, auth, host/IP allowlist, public routes.    |
-| Team/profile             | `api/team/members.ts`, `api/profile/[userId]/[mode].get.ts`                                                     | Team + shared profile data (cache + rate limit). |
-| Stripe                   | `api/stripe/{checkout,portal}.post.ts`, `utils/stripeCheckoutValidation.ts`, `utils/supporterCustomerLookup.ts` | Checkout/portal sessions + validation.           |
-| Streamer overlay         | `routes/overlay/kappa/[userId]/[mode].get.ts`, `utils/streamerKappa.ts`                                         | Server-rendered overlay output.                  |
-| Misc                     | `api/changelog.get.ts`, `api/contributors.get.ts`, `api/twitch/live.get.ts`, `api/tarkov-dev/profile.get.ts`    | Supporting endpoints.                            |
+| Component                | File                                                                                                                                                                                           | Responsibility                                              |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Tarkov proxy routes      | `api/tarkov/*.get.ts` (`tasks-core`, `tasks-objectives`, `tasks-rewards`, `hideout`, `items`, `items-lite`, `map-spawns`, `prestige`, `editions`, `overlay-status`, `bootstrap`, `cache-meta`) | Serve game data via cache + overlay.                        |
+| json.tarkov.dev adapters | `utils/tarkov-json.ts`                                                                                                                                                                         | Fetch + adapt static JSON into app types.                   |
+| Overlay engine           | `utils/overlay.ts`, `utils/overlayAdditions.ts`, `utils/overlayValidation.ts`, `utils/overlayProjectors.ts`                                                                                    | Apply community data corrections/additions.                 |
+| Edge cache & storage     | `utils/edgeCache.ts`, `utils/sharedEdgeStore.ts`, `utils/edgeCacheKey.ts`, `utils/precomputedTarkov.ts`                                                                                        | Cloudflare edge cache + KV precomputed data integration.    |
+| API protection & auth    | `middleware/api-protection.ts`, `utils/turnstile.ts`, `utils/requestIdentity.ts`, `utils/adminSupabase.ts`                                                                                     | CORS, auth, host/IP allowlist, Turnstile validation.        |
+| Team/profile             | `api/team/members.ts`, `api/profile/[userId]/[mode].get.ts`                                                                                                                                    | Team + shared profile data (cache + rate limit).            |
+| Stripe                   | `api/stripe/{checkout,portal}.post.ts`, `utils/stripeCheckoutValidation.ts`, `utils/supporterCustomerLookup.ts`                                                                                | Checkout/portal sessions + validation.                      |
+| Streamer overlay         | `routes/overlay/kappa/[userId]/[mode].get.ts`, `api/streamer/[userId]/[mode]/kappa.get.ts`, `utils/streamerKappa.ts`                                                                           | Server-rendered overlay output and JSON API.                |
+| Admin endpoints          | `api/admin/{supporter,twitch-config}.post.ts`, `api/admin/api-usage.get.ts`                                                                                                                    | Supporter access grant, Twitch embed config, API analytics. |
+| Client telemetry & logs  | `api/account/activity.post.ts`, `api/logs/client.post.ts`                                                                                                                                      | Client diagnostics ingestion and manual activity auditing.  |
+| Misc                     | `api/changelog.get.ts`, `api/contributors.get.ts`, `api/twitch/{config,live}.get.ts`, `api/tarkov-dev/profile.get.ts`                                                                          | Supporting public and proxy endpoints.                      |
 
 ## Supabase Edge Functions (`supabase/functions/`)
 
@@ -131,6 +139,7 @@ Each slice contains its Vue components and slice-local helpers/composables. High
 | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
 | `team-create` / `team-join` / `team-leave` / `team-kick` / `team-disband` / `team-members` | Team lifecycle (per-user rate limited).                                             |
 | `token-create` / `token-revoke`                                                            | API token issuance/revocation (hashed storage).                                     |
+| `discord-role-sync` / `discord-unlink`                                                     | Supporter Discord role synchronization and account unlinking.                       |
 | `account-delete` / `account-delete-reconcile`                                              | Account deletion job + reconciliation.                                              |
 | `stripe-webhook`                                                                           | Process Stripe events; grant/revoke supporter; sync Discord roles.                  |
 | `admin-cache-purge`                                                                        | Purge Cloudflare + data caches (admin-gated).                                       |
@@ -138,18 +147,21 @@ Each slice contains its Vue components and slice-local helpers/composables. High
 
 ## Cloudflare Worker (`workers/api-gateway/src/`)
 
-| Component                                     | Responsibility                                               |
-| --------------------------------------------- | ------------------------------------------------------------ |
-| `index.ts`                                    | Worker entry (thin adapter).                                 |
-| `router.ts`                                   | Routing, User-Agent gate, API host boundary enforcement.     |
-| `authentication.ts`                           | Abuse gate, token auth, daily-quota enforcement.             |
-| `rateLimiter.ts`                              | `ApiGatewayRateLimiter` Durable Object + quota client.       |
-| `responses.ts`                                | CORS, envelopes, conditional response, ETag/compression.     |
-| `auth.ts`                                     | Bearer token extraction, SHA-256 validation, usage tracking. |
-| `handlers/progress.ts`                        | Get/update progress (tasks, objectives, level).              |
-| `handlers/team.ts`                            | Team progress aggregation.                                   |
-| `handlers/token.ts`                           | Token info endpoint.                                         |
-| `services/tarkov.ts`                          | Fetch tasks/hideout for transforms.                          |
-| `utils/transform.ts`                          | Progress transform + hideout auto-complete.                  |
-| `utils/{invalidation,memory-cache,logger}.ts` | Cache invalidation + in-memory cache.                        |
-| `openapi.ts`                                  | OpenAPI spec (validated in CI).                              |
+| Component                                                                  | Responsibility                                             |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `index.ts`                                                                 | Worker entry (thin adapter).                               |
+| `router.ts`                                                                | Routing, User-Agent gate, API host boundary enforcement.   |
+| `authentication.ts`                                                        | Abuse gate, token auth, daily-quota enforcement.           |
+| `rateLimiter.ts`                                                           | `ApiGatewayRateLimiter` Durable Object + quota client.     |
+| `limits.ts`                                                                | Tiered daily read/write limits and abuse gate parameters.  |
+| `responses.ts`                                                             | CORS, envelopes, conditional response, ETag/compression.   |
+| `auth.ts`                                                                  | Bearer token extraction, SHA-256 validation.               |
+| `handlers/progress.ts`                                                     | Get/update progress (tasks, objectives, level).            |
+| `handlers/team.ts`                                                         | Team progress aggregation.                                 |
+| `handlers/token.ts`                                                        | Token info endpoint.                                       |
+| `services/tarkov.ts`                                                       | Fetch tasks/hideout for transforms.                        |
+| `services/supporter.ts`                                                    | Resolve supporter tier for rate limits.                    |
+| `services/usage.ts`                                                        | Record daily API token usage metrics.                      |
+| `utils/transform.ts`                                                       | Progress transform + hideout auto-complete.                |
+| `utils/{gameMode,task-catalog,transform,userAgent,memory-cache,logger}.ts` | In-memory cache, task catalog, user agent, logger helpers. |
+| `openapi.ts`                                                               | OpenAPI spec (validated in CI).                            |

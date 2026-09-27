@@ -66,7 +66,7 @@ sequenceDiagram
     participant LS as localStorage
     participant Sync as useSupabaseSync
     participant RT as Realtime channel
-    participant DB as Supabase user_progress
+    participant DB as Supabase user_game_mode_progress
 
     UI->>Tarkov: mutate (complete task / objective count)
     Tarkov->>LS: persist immediately (local-first)
@@ -218,12 +218,13 @@ graph LR
     Dev[pnpm run dev] --> Code[edit app/]
     Code --> Hook[husky + lint-staged: prettier + eslint --fix]
     Hook --> Commit[conventional commit]
-    Commit --> CI[lint / typecheck / test / validate:openapi]
+    Commit --> CI[CI: fallow / lint-format / typecheck / test / validate / db / workers / security]
     CI --> Build[nuxt build]
     Build --> Pages[Cloudflare Pages]
     Build --> Worker[wrangler deploy api-gateway]
 ```
 
 Pre-finish validation policy (root `AGENTS.md`): run the smallest relevant check — `typecheck` for
-TS changes, `lint` for code, `i18n:check` for locale changes. Avoid running the full suite unless
-test logic or executable code changed. Formatting is handled by the pre-commit hook.
+TS changes, `lint` for code, `i18n:check` for locale changes, or the path-specific checks in
+`workers/api-gateway/AGENTS.md` / `supabase/AGENTS.md`. Avoid running the full suite unless test logic
+or executable code changed. Formatting is handled by the pre-commit hook and `format:check`.
