@@ -189,6 +189,23 @@ describe('release note parsing', () => {
       expect(releaseNotesFromBody(body)).toEqual(['Real note.']);
     }
   );
+  it('keeps the real note after an invalid backtick-fence info string', () => {
+    expect(
+      releaseNotesFromBody('## Summary\n\n```lang`invalid\n\n## Release note\n\nReal note.')
+    ).toEqual(['Real note.']);
+  });
+  it('separates parenthesized ordered notes and keeps nested content with its parent', () => {
+    expect(releaseNotesFromBody(template('1) First\n   1) Detail\n2) Second'))).toEqual([
+      'First Detail',
+      'Second',
+    ]);
+  });
+  it.each(['## Release note ##', '## Release notes ###'])(
+    'accepts closing heading hashes (%s)',
+    (heading) => {
+      expect(releaseNotesFromBody(`${heading}\n\nReal note.`)).toEqual(['Real note.']);
+    }
+  );
   // A closed fence hides only its contents; an unterminated one hides the rest of the body.
   it.each([
     [

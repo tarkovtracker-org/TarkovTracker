@@ -20,12 +20,12 @@
  */
 import { execFileSync } from 'node:child_process';
 const PR_REFERENCE = /\(#(\d+)\)\s*$/;
-const NOTE_HEADING = /^##[ \t]+release[ \t]+notes?[ \t]*$/im;
+const NOTE_HEADING = /^##[ \t]+release[ \t]+notes?(?:[ \t]+#+)?[ \t]*$/im;
 const NEXT_HEADING = /^#{1,2}[ \t]+\S/m;
 // Zero leading whitespace: nested list markers and indented code are continuation content of
 // their parent bullet, never new top-level highlights.
-const TOP_LIST_ITEM = /^(?:[-*+]|\d+\.)[ \t]+/;
-const NESTED_LIST_ITEM = /^[ \t]+(?:[-*+]|\d+\.)[ \t]+/;
+const TOP_LIST_ITEM = /^(?:[-*+]|\d+[.)])[ \t]+/;
+const NESTED_LIST_ITEM = /^[ \t]+(?:[-*+]|\d+[.)])[ \t]+/;
 const NO_NOTE = /^(?:none|n\/a|na|-+|no)\.?$/i;
 const MAX_NOTE_LENGTH = 280;
 const MAX_NOTES_PER_PULL = 3;
@@ -69,7 +69,9 @@ function closesFence(line, open) {
   return match[1][0] === open[0] && match[1].length >= open.length;
 }
 function openingFence(line) {
-  return line.match(FENCE)?.[1] ?? null;
+  const match = line.match(FENCE);
+  if (match?.[1][0] === '`' && match[2].includes('`')) return null;
+  return match?.[1] ?? null;
 }
 function fenceStep(state, line) {
   if (state.open) {
