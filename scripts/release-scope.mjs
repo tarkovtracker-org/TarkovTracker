@@ -1,6 +1,11 @@
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
-import { collectHighlights, repositorySlug, withHighlights } from './release-highlights.mjs';
+import {
+  collectHighlights,
+  repositorySlug,
+  versionCommitted,
+  withHighlights,
+} from './release-highlights.mjs';
 /**
  * Conventional-commit scopes for tooling, automation, documentation, and dependencies. Commits
  * with these scopes never create a release and are left out of release notes, even when their type
@@ -55,11 +60,16 @@ export async function analyzeCommits(config, context) {
   const analyzer = await load('@semantic-release/commit-analyzer');
   return analyzer.analyzeCommits(config, playerFacing(context));
 }
-/** semantic-release `generateNotes` step with internal-scope commits removed. */
+/**
+ * semantic-release `generateNotes` step with internal-scope commits removed. semantic-release
+ * regenerates notes after the release-commit prepare step moves HEAD; only that pass, which feeds
+ * the GitHub release but not CHANGELOG.md, adds PR highlights.
+ */
 export async function generateNotes(config, context) {
   const generator = await load('@semantic-release/release-notes-generator');
   const filtered = playerFacing(context);
   const notes = await generator.generateNotes(config, filtered);
+  if (!versionCommitted(context)) return notes;
   const repositoryUrl = context.options?.repositoryUrl;
   const slug = repositorySlug(context.env, repositoryUrl);
   const highlights = await collectHighlights({ ...filtered, repositoryUrl });

@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { versionCommitted } from './release-highlights.mjs';
 import {
   analyzeCommits,
   generateNotes,
@@ -24,6 +25,10 @@ const context = (messages) => ({
   lastRelease: { gitTag: 'v1.83.3', version: '1.83.3' },
   nextRelease: { gitTag: 'v1.84.0', version: '1.84.0' },
 });
+vi.mock('./release-highlights.mjs', async (original) => ({
+  ...(await original()),
+  versionCommitted: vi.fn(() => true),
+}));
 afterEach(() => vi.unstubAllGlobals());
 describe('release scope plugin', () => {
   it.each([
@@ -86,6 +91,15 @@ describe('release scope plugin', () => {
     // Internal-scope commits are filtered before any PR lookup.
     const numbers = fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body).variables.number);
     expect(numbers).toEqual([943, 944]);
+  });
+  it('keeps PR text out of pre-commit notes, which become CHANGELOG.md', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    versionCommitted.mockReturnValueOnce(false);
+    const notes = await generateNotes(config, context(['fix(app): keep totals (#943)']));
+    expect(notes).toContain('keep totals');
+    expect(notes).not.toContain('Highlights');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
   it('reports how many commits were ignored', async () => {
     const run = context(['fix(ci): a', 'fix(app): b']);

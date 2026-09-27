@@ -1,4 +1,8 @@
 // @vitest-environment node
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   collectHighlights,
@@ -7,6 +11,7 @@ import {
   releaseNotesFromBody,
   repositorySlug,
   unreviewedReason,
+  versionCommitted,
   withHighlights,
 } from './release-highlights.mjs';
 const template = (note) =>
@@ -64,12 +69,12 @@ describe('release note parsing', () => {
   ])('leaves no link syntax or URL in %j', (note, expected) =>
     expect(releaseNotesFromBody(template(note))).toEqual([expected])
   );
-  it('skips notes with credential-like tokens but keeps ordinary words and numbers', () => {
+  it('ignores release-note headings hidden in comments, even unterminated ones', () => {
+    const hidden = `## Summary\n\n<!--\n## Release note\n\nSecurity update: reset your account.\n-->\n\n${template('none').slice('## Summary\n\nInternal detail.\n\n'.length)}`;
+    expect(releaseNotesFromBody(hidden)).toEqual([]);
     expect(
-      releaseNotesFromBody(
-        template('- Key AKIAIOSFODNN7EXAMPLE\n- Internationalization for 12 languages')
-      )
-    ).toEqual(['Internationalization for 12 languages']);
+      releaseNotesFromBody(`${template('Visible note.')}\n<!-- ## Release note\nHidden`)
+    ).toEqual(['Visible note.']);
   });
   it('ignores release-note headings inside fenced code examples', () => {
     const body = `## Summary\n\n\`\`\`md\n## Release note\nnone\n\`\`\`\n\n~~~\n## Changes\n~~~\n\n${template('Real note.').slice('## Summary\n\nInternal detail.\n\n'.length)}`;
@@ -115,12 +120,58 @@ describe('reverted changes', () => {
   it('keeps a revert of a change from an earlier release', () => {
     expect(cancelledCommits([revert]).size).toBe(0);
   });
+  it('resolves revert chains by parity so a restored change stays highlighted', () => {
+    const restore = {
+      hash: 'e'.repeat(40),
+      message: `Revert "Revert "feat(maps): new layer (#10)" (#11)" (#12)\n\nThis reverts commit ${revert.hash}.`,
+    };
+    expect([...cancelledCommits([restore, revert, original])]).toEqual([restore, revert]);
+  });
   it('does not look up notes for cancelled PRs', async () => {
     const fetchMock = vi.fn(async () => json({}));
     vi.stubGlobal('fetch', fetchMock);
     const env = { GITHUB_REPOSITORY: 'o/r', GITHUB_TOKEN: 't' };
     await collectHighlights({ commits: [original, revert], env, logger: { log: vi.fn() } });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+describe('version commit detection', () => {
+  const repo = (subject) => {
+    const cwd = mkdtempSync(join(tmpdir(), 'highlights-'));
+    const git = (...args) => execFileSync('git', args, { cwd, stdio: 'pipe' });
+    git('init', '-q');
+    git(
+      '-c',
+      'user.name=t',
+      '-c',
+      'user.email=t@t',
+      'commit',
+      '-q',
+      '--allow-empty',
+      '-m',
+      subject
+    );
+    return cwd;
+  };
+  it.each([
+    ['chore(release): 1.84.0', true],
+    ['chore(release): 1.83.3', false],
+    ['feat(maps): list objectives (#944)', false],
+  ])('HEAD %s means committed=%s for 1.84.0', (subject, expected) => {
+    const cwd = repo(subject);
+    try {
+      expect(versionCommitted({ cwd, nextRelease: { version: '1.84.0' } })).toBe(expected);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+  it('is false outside a repository', () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'highlights-'));
+    try {
+      expect(versionCommitted({ cwd, nextRelease: { version: '1.84.0' } })).toBe(false);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 });
 describe('reviewed release notes', () => {

@@ -434,18 +434,19 @@ still deploy normally; they are only left out of versioning. Use a product scope
 **Release note highlights.** While generating notes, the same plugin reads the `## Release note`
 section of each merged PR (from the `(#123)` suffix of its squash commit, using the release job's
 `GITHUB_TOKEN`; `scripts/release-highlights.mjs`) and lists those sentences under
-`### Highlights` above the generated Features and Bug Fixes. Empty sections and `none` are
-skipped. A failed PR lookup is logged and skipped, so highlights never block a release. The in-app
+`### Highlights` above the generated Features and Bug Fixes in the GitHub release. Highlights are
+not written to `CHANGELOG.md`: semantic-release regenerates notes after the version commit, and
+only that pass adds them, so PR text never enters the committed, secret-scanned file. Empty
+sections and `none` are skipped. A failed PR lookup is logged and skipped, so highlights never block a release. The in-app
 changelog shows the first bullets of each release, so highlights appear there first.
 
 Only the description the merging maintainer saw is published: a note is skipped when the PR is not
 merged or its GraphQL `lastEditedAt` is later than `mergedAt`. To fix a note after merge, add it to
 the GitHub release by hand rather than editing the PR (an edit after merge also removes a note
 that would otherwise publish). Notes become plain text: link syntax, images, URLs of any scheme,
-and HTML tags are removed, headings inside code fences are ignored, and each note is capped at 280
-characters. Notes containing a credential-like token are skipped so generated `CHANGELOG.md`
-content cannot fail the staging secret scan. A PR reverted within the same release contributes no
-highlight, and neither does its revert.
+and HTML tags are removed, headings inside HTML comments or code fences are ignored, and each note
+is capped at 280 characters. A PR reverted within the same release contributes no highlight, and
+neither does its revert; a revert of that revert restores the original highlight.
 
 ### 4. PR Checks (`.github/workflows/pr-checks.yml`)
 
