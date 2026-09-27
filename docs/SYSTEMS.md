@@ -928,10 +928,15 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   startup merge when it is newer than the owner's active copy, and it is removed only after a
   successful startup load, because the resolved state was then uploaded or already matched the
   service. Copies are read only for their owner and never uploaded for another account.
+- **Superseded copies.** Before a deliberate reset with pending cloud changes, the store keeps each
+  affected mode under an owner-scoped export-only key. Hydration also retains materialized Seasonal
+  progress stamped for an older season before sanitization clears it. These copies keep their
+  original mode and season, are available from Settings → Account for export, and are never loaded
+  into the tracker or sent to Supabase. They are removed only with that account's explicit device-data
+  removal.
 - **Storage pressure.** `relieveProgressStoragePressure` removes only legacy backups that are
   byte-identical to the active copy, a recovery copy, or a newer backup. Session transitions and
-  deliberate resets clear only the active key, so recovery copies and unique legacy backups are
-  never deleted automatically.
+  deliberate resets do not delete account recovery copies or unique legacy backups automatically.
 - **Sign-out.** Every sign-out entry point uses `useSignOut`. It signs out immediately unless the
   changes are memory-only (local save failed and cloud changes pending); then
   `SignOutConfirmModal` explains the loss risk and defaults to staying signed in. Retry and
@@ -977,8 +982,9 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
 - `app/stores/tarkov/progressSaveStatus.ts`, `app/composables/useProgressSaveStatus.ts`,
   `app/shell/ProgressSaveStatusIndicator.vue` — truthful local/cloud save status, bounded cloud
   retry, manual retry, and export guidance
-- `app/stores/tarkov/accountRecovery.ts`, `app/stores/tarkov/storageQuota.ts` — per-account
-  recovery copies and redundancy-only storage cleanup
+- `app/stores/tarkov/accountRecovery.ts`, `app/stores/tarkov/supersededProgress.ts`,
+  `app/stores/tarkov/storageQuota.ts` — per-account recovery copies, export-only superseded progress,
+  and redundancy-only storage cleanup
 - `app/composables/useSignOut.ts`, `app/shell/SignOutConfirmModal.vue`,
   `app/stores/tarkov/deviceData.ts`, `app/features/settings/DeviceDataCard.vue` — confirmed
   sign-out for memory-only changes and explicit device-data removal

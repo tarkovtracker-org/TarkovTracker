@@ -11,6 +11,21 @@
       <div class="space-y-3 px-4 py-4 text-sm">
         <p class="text-surface-300">{{ t('settings.device_data.description') }}</p>
         <p class="text-surface-400">{{ t('settings.device_data.cloud_unaffected') }}</p>
+        <div v-if="supersededCopies.length" class="bg-surface-900/60 space-y-2 rounded-md p-3">
+          <p class="text-surface-300">
+            {{ t('settings.device_data.superseded_available', { count: supersededCopies.length }) }}
+          </p>
+          <UButton
+            color="neutral"
+            variant="soft"
+            size="sm"
+            icon="i-mdi-download"
+            data-testid="superseded-progress-export"
+            @click="handleSupersededExport"
+          >
+            {{ t('settings.device_data.superseded_export') }}
+          </UButton>
+        </div>
         <UButton
           color="error"
           variant="soft"
@@ -81,22 +96,45 @@
     requestDeviceDataRemoval,
   } from '@/stores/tarkov/deviceData';
   import { hasPendingCloudChanges } from '@/stores/tarkov/progressSaveStatus';
+  import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
   import { logger } from '@/utils/logger';
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
   const { $supabase } = useNuxtApp();
-  const { exportProgress } = useDataBackup();
+  const { exportProgress, exportSupersededProgress } = useDataBackup();
   const { signOutNow } = useSignOut();
   const confirmOpen = ref(false);
   const removing = ref(false);
   const isLoggedIn = computed(() => Boolean($supabase.user.loggedIn && $supabase.user.id));
   const pendingCloudChanges = computed(hasPendingCloudChanges);
+  const supersededCopies = ref(
+    $supabase.user.id ? listSupersededProgressCopies($supabase.user.id) : []
+  );
+  const refreshSupersededCopies = () => {
+    supersededCopies.value = $supabase.user.id
+      ? listSupersededProgressCopies($supabase.user.id)
+      : [];
+  };
+  onMounted(() =>
+    window.addEventListener('tt:superseded-progress-change', refreshSupersededCopies)
+  );
+  onUnmounted(() =>
+    window.removeEventListener('tt:superseded-progress-change', refreshSupersededCopies)
+  );
   const handleExport = async () => {
     try {
       await exportProgress();
     } catch (error) {
       logger.error('[DeviceData] Export failed:', error);
       toast.add({ title: t('settings.data_management.export_error_title'), color: 'error' });
+    }
+  };
+  const handleSupersededExport = async () => {
+    try {
+      await exportSupersededProgress();
+    } catch (error) {
+      logger.error('[DeviceData] Superseded progress export failed:', error);
+      toast.add({ title: t('settings.device_data.superseded_export_error'), color: 'error' });
     }
   };
   /**

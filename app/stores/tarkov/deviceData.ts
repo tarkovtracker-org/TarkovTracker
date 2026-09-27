@@ -1,5 +1,6 @@
 import { removeAccountRecoveryCopy } from '@/stores/tarkov/accountRecovery';
 import { safeGetItem, safeRemoveItem } from '@/stores/tarkov/localStorage';
+import { removeSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
 import { parseUserScopedStorage } from '@/utils/userScopedStorage';
 /**
@@ -35,6 +36,7 @@ const removeIfOwned = (key: string, userId: string): void => {
 export const removeAccountDeviceData = (userId: string): void => {
   if (typeof window === 'undefined') return;
   removeAccountRecoveryCopy(userId);
+  removeSupersededProgressCopies(userId);
   removeIfOwned(STORAGE_KEYS.progress, userId);
   removeIfOwned(STORAGE_KEYS.preferences, userId);
   listStorageKeys()

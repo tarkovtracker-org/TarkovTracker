@@ -5,6 +5,7 @@ import {
   type UserState,
 } from '@/stores/progressState';
 import { cloneStateSnapshot } from '@/stores/tarkov/localStorage';
+import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
 import {
   getPersistedPreferencesState,
   preferencesDefaultState,
@@ -124,6 +125,7 @@ export type BackupImportTargetModes = {
 };
 export interface UseDataBackupReturn {
   exportProgress: () => Promise<void>;
+  exportSupersededProgress: () => Promise<void>;
   exportError: Ref<string | null>;
   exportDebugSnapshot: () => Promise<void>;
   debugExportError: Ref<string | null>;
@@ -728,6 +730,18 @@ export function useDataBackup(): UseDataBackupReturn {
       throw error instanceof Error ? error : new Error(detail);
     }
   }
+  async function exportSupersededProgress(): Promise<void> {
+    const ownerId = $supabase.user.id;
+    if (!ownerId) throw new Error('Sign in to export superseded progress');
+    const copies = listSupersededProgressCopies(ownerId);
+    if (copies.length === 0) throw new Error('No superseded progress copies are available');
+    await downloadJsonFile('tarkovtracker-superseded-progress', {
+      _format: 'tarkovtracker-superseded-progress',
+      _version: 1,
+      exportedAt: Date.now(),
+      copies: copies.map(({ ownerId: _ownerId, ...copy }) => copy),
+    });
+  }
   async function exportDebugSnapshot(): Promise<void> {
     debugExportError.value = null;
     try {
@@ -884,6 +898,7 @@ export function useDataBackup(): UseDataBackupReturn {
   }
   return {
     exportProgress,
+    exportSupersededProgress,
     exportError,
     exportDebugSnapshot,
     debugExportError,

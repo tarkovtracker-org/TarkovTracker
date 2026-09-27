@@ -5,6 +5,7 @@ import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp, nextTick } from 'vue';
 import { defaultState } from '@/stores/progressState';
+import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
 import {
   initializeTarkovSync,
   resetTarkovStoreForSessionTransition,
@@ -583,6 +584,30 @@ describe('useTarkov sync integration', () => {
       pause: pauseSync,
       resume: resumeSync,
     });
+  });
+  it('retains mismatched-season owned progress for export before sanitizing active state', () => {
+    const staleSeason = ACTIVE_SEASON_NUMBER + 1;
+    const data = {
+      ...structuredClone(defaultState),
+      seasonal: progressWithLevel(17),
+      seasonalSeasonNumber: staleSeason,
+    };
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({ _userId: 'user-1', _timestamp: Date.now(), data })
+    );
+    const pinia = createPinia().use(piniaPluginPersistedstate);
+    createApp({}).use(pinia);
+    setActivePinia(pinia);
+    const store = useTarkovStore();
+    expect(store.seasonal.level).toBe(defaultState.seasonal.level);
+    expect(listSupersededProgressCopies('user-1')).toEqual([
+      expect.objectContaining({
+        mode: 'seasonal',
+        seasonNumber: staleSeason,
+        progress: expect.objectContaining({ level: 17 }),
+      }),
+    ]);
   });
   afterEach(() => {
     vi.restoreAllMocks();

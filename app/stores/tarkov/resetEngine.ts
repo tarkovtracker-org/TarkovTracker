@@ -8,7 +8,9 @@ import {
   toProgressEpoch,
 } from '@/stores/tarkov/progressMerge';
 import { syncProgressState } from '@/stores/tarkov/progressPersistence';
+import { hasPendingCloudChanges } from '@/stores/tarkov/progressSaveStatus';
 import { getRegisteredSyncController } from '@/stores/tarkov/realtimeListener';
+import { saveSupersededProgressCopy } from '@/stores/tarkov/supersededProgress';
 import { recordLocalSyncTime } from '@/stores/tarkov/syncTimeline';
 import { delay } from '@/utils/async';
 import { ACTIVE_SEASON_NUMBER, GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
@@ -194,6 +196,22 @@ export const performReset = async (mode: ResetMode, store: ResetTargetStore): Pr
   const { $supabase } = useNuxtApp();
   const freshState = structuredClone(defaultState);
   const resetModes = mode === 'all' ? GAME_MODE_VALUES : [mode];
+  const ownerId = $supabase.user.loggedIn ? $supabase.user.id : null;
+  if (ownerId && hasPendingCloudChanges()) {
+    for (const resetMode of resetModes) {
+      const seasonNumber =
+        resetMode === 'seasonal' ? (store.$state.seasonalSeasonNumber ?? null) : null;
+      const copy = saveSupersededProgressCopy(
+        ownerId,
+        resetMode,
+        seasonNumber,
+        store.$state[resetMode]
+      );
+      if (!copy) {
+        throw new Error('Could not retain pending progress before reset');
+      }
+    }
+  }
   for (const resetMode of resetModes) {
     freshState[resetMode].progressEpoch = getNextProgressEpoch(store.$state[resetMode]);
   }

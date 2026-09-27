@@ -9,6 +9,8 @@ export const STORAGE_KEYS = {
   progressBackupPrefix: `${STORAGE_PREFIX}progress_backup_`,
   /** One account recovery copy per owner: `${prefix}${userId}` (see `CONTEXT.md`). */
   progressRecoveryPrefix: `${STORAGE_PREFIX}progress_recovery_`,
+  /** Export-only progress displaced by a reset or Seasonal rollover. */
+  progressSupersededPrefix: `${STORAGE_PREFIX}progress_superseded_`,
   adminLastPurge: `${STORAGE_PREFIX}tt:admin:last-purge`,
   cachePurgeAt: `${STORAGE_PREFIX}tt:cache:last-purge`,
   cachePurgeCheckAt: `${STORAGE_PREFIX}tt:cache:last-check`,

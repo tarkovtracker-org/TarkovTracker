@@ -89,6 +89,7 @@ import {
   type StartupOwnershipGuard,
 } from '@/stores/tarkov/startupOwnership';
 import { relieveProgressStoragePressure } from '@/stores/tarkov/storageQuota';
+import { saveSupersededProgressCopy } from '@/stores/tarkov/supersededProgress';
 import {
   beginLocalSync,
   recordLocalSyncTime,
@@ -123,6 +124,22 @@ export type { PrestigeRunRecord } from '@/stores/tarkov/prestige';
 // Constants
 // ============================================================================
 const QUOTA_CHECK_INTERVAL_MS = 60000;
+const preserveMismatchedSeasonalCopy = (ownerId: string, state: UserState): void => {
+  const seasonNumber = state.seasonalSeasonNumber;
+  if (
+    typeof seasonNumber !== 'number' ||
+    seasonNumber === ACTIVE_SEASON_NUMBER ||
+    !hasMaterializedProgress(state.seasonal)
+  ) {
+    return;
+  }
+  saveSupersededProgressCopy(
+    ownerId,
+    GAME_MODES.SEASONAL,
+    seasonNumber,
+    cloneStateSnapshot(state.seasonal)
+  );
+};
 const SYNC_DEBOUNCE_MS = 5000;
 const ISSUE_71_ACCOUNT_AGE_THRESHOLD_MS = 5000;
 const LOAD_RETRY_COUNT = 3;
@@ -1073,6 +1090,7 @@ export const useTarkovStore = defineStore('swapTarkov', {
             );
           }
           const storedUserId = wrapped._userId;
+          if (storedUserId) preserveMismatchedSeasonalCopy(storedUserId, wrapped.data);
           if (storedUserId === currentUserId) {
             return sanitizeOwnedUserState(migrateToGameModeStructure(wrapped.data));
           }

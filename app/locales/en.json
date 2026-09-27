@@ -2450,11 +2450,14 @@
     },
     "device_data": {
       "title": "Data on this device",
-      "description": "Signing out keeps this account's saved progress in this browser, so changes that have not reached the cloud yet can sync when you sign back in. Removing this device's data deletes this account's progress, recovery copies, and preferences from this browser and signs you out.",
+      "description": "Signing out keeps this account's saved progress in this browser, so changes that have not reached the cloud yet can sync when you sign back in. Progress displaced by a reset or Seasonal rollover is kept separately for export. Removing this device's data deletes this account's progress, recovery copies, and preferences from this browser and signs you out.",
       "cloud_unaffected": "Your cloud progress is not deleted. Other accounts' data on this device is not affected.",
+      "superseded_available": "{count} progress change(s) from a reset or Seasonal rollover are retained here for export only. They will not be restored or synced automatically.",
+      "superseded_export": "Export superseded progress",
+      "superseded_export_error": "Could not export superseded progress",
       "remove_button": "Remove this account's data from this device",
       "confirm_title": "Remove this account's data from this device?",
-      "confirm_description": "This account's progress, recovery copies, and preferences will be deleted from this browser, and you will be signed out. Your cloud progress stays available when you sign in again.",
+      "confirm_description": "This account's progress, recovery copies, superseded progress exports, and preferences will be deleted from this browser, and you will be signed out. Your cloud progress stays available when you sign in again.",
       "pending_warning": "Some progress changes have not been saved to the cloud yet. Removing this device's data will permanently discard them. Export your progress first if you want to keep them.",
       "confirm_button": "Remove data and sign out",
       "removed": "This account's data was removed from this device."

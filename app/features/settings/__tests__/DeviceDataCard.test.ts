@@ -3,27 +3,30 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetCloudSaveStatus, setCloudSaveStatus } from '@/stores/tarkov/progressSaveStatus';
-const { calls, deviceData, signOutNow, toastAdd, user } = vi.hoisted(() => {
-  const order: string[] = [];
-  return {
-    calls: order,
-    deviceData: {
-      requestDeviceDataRemoval: vi.fn(() => order.push('request')),
-      clearDeviceDataRemoval: vi.fn(() => order.push('clear')),
-      removeAccountDeviceData: vi.fn(() => order.push('remove')),
-    },
-    signOutNow: vi.fn(async () => {
-      order.push('signOut');
-      return true;
-    }),
-    toastAdd: vi.fn(),
-    user: { id: 'user-1' as string | null, loggedIn: true },
-  };
-});
+const { calls, deviceData, exportSupersededProgress, signOutNow, toastAdd, user } = vi.hoisted(
+  () => {
+    const order: string[] = [];
+    return {
+      calls: order,
+      deviceData: {
+        requestDeviceDataRemoval: vi.fn(() => order.push('request')),
+        clearDeviceDataRemoval: vi.fn(() => order.push('clear')),
+        removeAccountDeviceData: vi.fn(() => order.push('remove')),
+      },
+      signOutNow: vi.fn(async () => {
+        order.push('signOut');
+        return true;
+      }),
+      exportSupersededProgress: vi.fn(async () => undefined),
+      toastAdd: vi.fn(),
+      user: { id: 'user-1' as string | null, loggedIn: true },
+    };
+  }
+);
 vi.mock('@/stores/tarkov/deviceData', () => deviceData);
 vi.mock('@/composables/useSignOut', () => ({ useSignOut: () => ({ signOutNow }) }));
 vi.mock('@/composables/useDataBackup', () => ({
-  useDataBackup: () => ({ exportProgress: vi.fn() }),
+  useDataBackup: () => ({ exportProgress: vi.fn(), exportSupersededProgress }),
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
@@ -59,6 +62,7 @@ const mountCard = async () => {
 };
 describe('DeviceDataCard', () => {
   beforeEach(() => {
+    localStorage.clear();
     vi.clearAllMocks();
     calls.length = 0;
     resetCloudSaveStatus();
@@ -105,5 +109,14 @@ describe('DeviceDataCard', () => {
     user.loggedIn = false;
     const wrapper = await mountCard();
     expect(wrapper.get('[data-testid="device-data-remove"]').attributes('disabled')).toBeDefined();
+  });
+  it('offers export for the signed-in owner’s superseded progress copies', async () => {
+    const { saveSupersededProgressCopy } = await import('@/stores/tarkov/supersededProgress');
+    const { createDefaultOwnedProgressData } = await import('@/utils/progressSanitizers');
+    saveSupersededProgressCopy('user-1', 'seasonal', 1, createDefaultOwnedProgressData(), 100);
+    const wrapper = await mountCard();
+    await wrapper.get('[data-testid="superseded-progress-export"]').trigger('click');
+    await flushPromises();
+    expect(exportSupersededProgress).toHaveBeenCalledOnce();
   });
 });

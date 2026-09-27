@@ -5,8 +5,16 @@ import { defaultState, type UserState } from '@/stores/progressState';
 import { mergeProgressData } from '@/stores/tarkov/progressMerge';
 import { performReset, resolveInitialSyncState } from '@/stores/tarkov/resetEngine';
 import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
-const { clearProgressStorageMock, supabaseContext, syncProgressStateMock } = vi.hoisted(() => ({
+const {
+  clearProgressStorageMock,
+  pendingCloudChanges,
+  saveSupersededProgressCopyMock,
+  supabaseContext,
+  syncProgressStateMock,
+} = vi.hoisted(() => ({
   clearProgressStorageMock: vi.fn(),
+  pendingCloudChanges: { value: false },
+  saveSupersededProgressCopyMock: vi.fn(() => ({ id: 'copy-1' })),
   supabaseContext: {
     client: {},
     user: { id: 'user-1' as string | null, loggedIn: true },
@@ -22,6 +30,12 @@ vi.mock('@/stores/tarkov/localStorage', () => ({
 }));
 vi.mock('@/stores/tarkov/realtimeListener', () => ({
   getRegisteredSyncController: () => null,
+}));
+vi.mock('@/stores/tarkov/progressSaveStatus', () => ({
+  hasPendingCloudChanges: () => pendingCloudChanges.value,
+}));
+vi.mock('@/stores/tarkov/supersededProgress', () => ({
+  saveSupersededProgressCopy: saveSupersededProgressCopyMock,
 }));
 const createStore = () => {
   const state: UserState = structuredClone(defaultState);
@@ -44,6 +58,8 @@ describe('performReset seasonal', () => {
     supabaseContext.user.loggedIn = true;
     supabaseContext.user.id = 'user-1';
     syncProgressStateMock.mockResolvedValue({ error: null });
+    pendingCloudChanges.value = false;
+    saveSupersededProgressCopyMock.mockClear();
   });
   it('merges timestamped progress when a visibility-only mode timestamp is newer', () => {
     const local = structuredClone(defaultState);
@@ -202,6 +218,18 @@ describe('performReset seasonal', () => {
     expect(syncedState.pve.level).toBe(21);
     expect(syncedState.currentGameMode).toBe(store.$state.currentGameMode);
     expect(syncedState.gameEdition).toBe(store.$state.gameEdition);
+  });
+  it('retains affected owner progress before a reset with pending cloud changes', async () => {
+    pendingCloudChanges.value = true;
+    const store = createStore();
+    const displacedProgress = structuredClone(store.$state.seasonal);
+    await performReset('seasonal', store);
+    expect(saveSupersededProgressCopyMock).toHaveBeenCalledWith(
+      'user-1',
+      'seasonal',
+      ACTIVE_SEASON_NUMBER,
+      displacedProgress
+    );
   });
   it('keeps local state intact when the remote reset fails', async () => {
     syncProgressStateMock.mockResolvedValue({ error: { message: 'network down' } });
