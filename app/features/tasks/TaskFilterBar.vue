@@ -215,7 +215,11 @@
             </span>
             <span
               class="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold text-white"
-              :class="displayStatusCounts.active > 0 ? 'bg-primary-500' : 'bg-surface-600'"
+              :class="
+                displayStatusCounts.active > 0
+                  ? 'bg-primary-500'
+                  : 'bg-surface-600 light:text-surface-50'
+              "
             >
               {{ displayStatusCounts.active }}
             </span>
