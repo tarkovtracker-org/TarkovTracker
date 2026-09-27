@@ -160,7 +160,8 @@ function emailish(token) {
   const at = token.indexOf('@');
   return at > 0 && /\.\w/.test(token.slice(at + 1));
 }
-const autolinked = (token) => token.includes('//') || /www\./i.test(token) || emailish(token);
+const autolinked = (token) =>
+  token.includes('//') || token.includes('/\\') || /www\./i.test(token) || emailish(token);
 function stripHtml(text) {
   // A removal can join nested fragments into another tag. Reach a fixed point on the already
   // bounded note before checking links; a leftover malformed opener loses its single '<'.
@@ -172,11 +173,13 @@ function stripHtml(text) {
   return text.replace(/<(?=[a-z/!?])/gi, '');
 }
 function plainText(line) {
-  return stripHtml(markdownText(line).replace(/[*_~\x60]/g, ''))
+  const withoutMarkdown = stripHtml(markdownText(line).replace(/[*_~\x60]/g, ''))
     .replace(/^[ ]{0,3}>[ \t]?/gm, '')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\]\([^)]*\)/g, ']')
-    .replace(/[[\]!]*\[|\]/g, '')
+    .replace(/[[\]!]*\[|\]/g, '');
+  // Bracket cleanup can join an HTML opener. Strip once more before publishing.
+  return stripHtml(withoutMarkdown)
     .split(/\s+/)
     .map((token) => (autolinked(token) ? '' : token))
     .join(' ');
@@ -405,6 +408,11 @@ export async function collectHighlights({ commits, excluded = () => false, ...co
 export function withHighlights(notes, highlights, slug) {
   if (!highlights.length) return notes;
   const items = highlights.map(({ number, text, shas }) => {
+    // Escape at the Markdown output boundary even if an earlier parser missed a tag.
+    const safeText = String(text)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;');
     const pull = `[#${number}](https://github.com/${slug}/pull/${number})`;
     const commits = [
       ...new Set(
@@ -415,7 +423,7 @@ export function withHighlights(notes, highlights, slug) {
     ]
       .slice(0, MAX_COMMIT_LINKS)
       .map((hash) => `[${hash.slice(0, 7)}](https://github.com/${slug}/commit/${hash})`);
-    return `* ${text} (${pull})${commits.map((link) => ` (${link})`).join('')}`;
+    return `* ${safeText} (${pull})${commits.map((link) => ` (${link})`).join('')}`;
   });
   const block = `### Highlights\n\n${items.join('\n')}\n`;
   const [heading, ...rest] = String(notes).split('\n');

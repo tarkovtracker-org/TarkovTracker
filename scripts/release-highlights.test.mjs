@@ -116,6 +116,23 @@ describe('release note parsing', () => {
     expect(output).not.toMatch(/<a\b/i);
     expect(output).not.toContain('evil.example');
   });
+  it('strips an HTML link reconstructed by bracket cleanup before release publication', () => {
+    const body = template('<[a] href="https:/\\evil.example">Update<[/a]>');
+    const [text] = releaseNotesFromBody(body);
+    expect(text).toBe('Update');
+    const output = withHighlights('## [1.84.0](url)\n', [{ number: 943, text }], 'o/r');
+    expect(output).not.toMatch(/<a\b/i);
+    expect(output).not.toContain('evil.example');
+  });
+  it('escapes HTML at the final highlights output boundary', () => {
+    const output = withHighlights(
+      '## [1.84.0](url)\n',
+      [{ number: 943, text: '<a href="https://evil.example">Update</a>' }],
+      'o/r'
+    );
+    expect(output).toContain('&lt;a href="https://evil.example"&gt;Update&lt;/a&gt;');
+    expect(output).not.toMatch(/<a\b/i);
+  });
   it('publishes emphasized conventional notes as plain text', () => {
     const notes = releaseNotesFromBody(template('**release:** __Smart Fill__ keeps totals.'));
     expect(notes).toEqual(['release: Smart Fill keeps totals.']);
