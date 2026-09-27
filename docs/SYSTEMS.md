@@ -1398,6 +1398,10 @@ flowchart LR
 - Every successful operation returns JSON with `ok`, `operation`, `target`, `generated_at`, an
   `observation` object, and `data` or report fields.
 - Built-in telemetry is allowlisted and does not depend on Supabase CLI text formatting.
+- The schema report exposes catalog ACLs, PUBLIC grants, effective privileges for the observer and
+  existing `anon`, `authenticated`, and `service_role` roles, relation owners, and RLS flags without
+  reading application rows. Effective privileges account for inherited roles and the server's
+  supported table privileges.
 - SQL identifiers are validated before interpolation, row and group limits are enforced, sensitive
   sample columns are excluded, and sensitive distributions are rejected.
 - The observer never executes migrations, arbitrary SQL, writes, DDL, `EXPLAIN ANALYZE`, or
