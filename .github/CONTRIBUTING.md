@@ -64,7 +64,7 @@ see [`../docs/contributing/pull-requests.md`](../docs/contributing/pull-requests
 - Each PR focuses on a single change; unrelated changes may be requested to be split or closed.
 - Maintainers review for correctness, style, tests, and scope.
 - Address all feedback on the same PR branch; do not open follow-up PRs for in-scope feedback.
-- Your contribution ships in the next release once merged.
+- Your contribution deploys as soon as it is merged and is listed in the next weekly release.
 
 ## Security and Conduct
 

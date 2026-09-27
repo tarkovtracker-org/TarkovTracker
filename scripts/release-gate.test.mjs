@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import { releaseEligibility } from './release-gate.mjs';
+const sha = 'a'.repeat(40);
 function fixture() {
   const run = {
     id: 123,
@@ -10,67 +11,94 @@ function fixture() {
     path: '.github/workflows/ci.yml',
     status: 'completed',
     conclusion: 'success',
-    head_sha: 'a'.repeat(40),
+    head_sha: sha,
     run_attempt: 1,
     head_commit: { message: 'fix(api): reject malformed state' },
   };
   const context = {
+    eventName: 'schedule',
+    ref: 'refs/heads/main',
+    sha,
     repo: { owner: 'owner', repo: 'repo' },
-    payload: { repository: { id: 456 }, workflow_run: structuredClone(run) },
+    payload: { repository: { id: 456 } },
   };
-  const main = { object: { sha: run.head_sha } };
+  const main = { object: { sha } };
+  const runs = [run];
   const github = {
     rest: {
-      actions: { getWorkflowRun: vi.fn().mockResolvedValue({ data: run }) },
+      actions: {
+        listWorkflowRuns: vi.fn(async () => ({ data: { workflow_runs: runs } })),
+      },
       git: { getRef: vi.fn().mockResolvedValue({ data: main }) },
     },
   };
-  return { run, main, context, github };
+  return { run, runs, main, context, github };
 }
 describe('release eligibility', () => {
-  it('releases only the successful CI commit still at main', async () => {
+  it.each(['schedule', 'workflow_dispatch'])(
+    'releases the %s trigger commit when its main CI passed and it is still main',
+    async (eventName) => {
+      const f = fixture();
+      f.context.eventName = eventName;
+      expect(await releaseEligibility(f)).toMatchObject({ release: true, sha });
+      expect(f.github.rest.actions.listWorkflowRuns).toHaveBeenCalledWith({
+        owner: 'owner',
+        repo: 'repo',
+        workflow_id: 'ci.yml',
+        branch: 'main',
+        head_sha: sha,
+        per_page: 100,
+      });
+    }
+  );
+  it.each([
+    { eventName: 'workflow_run' },
+    { eventName: 'push' },
+    { eventName: 'pull_request' },
+    { ref: 'refs/heads/develop' },
+    { ref: 'refs/tags/v1.2.3' },
+    { sha: 'abc1234' },
+    { sha: undefined },
+  ])('rejects non-release triggers before reading CI: %o', async (changes) => {
     const f = fixture();
-    // Webhook payloads need not include the workflow path; verify it through the API.
-    delete f.context.payload.workflow_run.path;
-    expect(await releaseEligibility(f)).toMatchObject({ release: true, sha: f.run.head_sha });
-    expect(f.github.rest.actions.getWorkflowRun).toHaveBeenCalledWith({
-      owner: 'owner',
-      repo: 'repo',
-      run_id: 123,
-    });
+    Object.assign(f.context, changes);
+    expect((await releaseEligibility(f)).release).toBe(false);
+    expect(f.github.rest.actions.listWorkflowRuns).not.toHaveBeenCalled();
   });
   it.each([
-    { event: 'pull_request' },
-    { head_branch: 'develop' },
-    { head_repository: { id: 999 } },
-    { head_repository: null },
     { conclusion: 'failure' },
     { conclusion: 'cancelled' },
-    { status: 'in_progress' },
-  ])('rejects untrusted or unsuccessful events: %o', async (changes) => {
-    const f = fixture();
-    Object.assign(f.context.payload.workflow_run, changes);
-    expect((await releaseEligibility(f)).release).toBe(false);
-    expect(f.github.rest.actions.getWorkflowRun).not.toHaveBeenCalled();
-  });
-  it.each([
-    { conclusion: 'failure' },
     { status: 'in_progress', conclusion: null },
-    { run_attempt: 2 },
+    { event: 'pull_request' },
+    { head_branch: 'wip/release-1.2.3' },
     { head_sha: 'b'.repeat(40) },
     { path: '.github/workflows/unrelated.yml' },
     { head_repository: { id: 999 } },
-  ])('rejects stale or mismatched live CI evidence: %o', async (changes) => {
+    { head_repository: null },
+  ])('rejects missing, unsuccessful or untrusted CI evidence: %o', async (changes) => {
     const f = fixture();
     Object.assign(f.run, changes);
     expect((await releaseEligibility(f)).release).toBe(false);
+    expect(f.github.rest.git.getRef).not.toHaveBeenCalled();
+  });
+  it('accepts dispatched main CI, such as the Crowdin post-merge run', async () => {
+    const f = fixture();
+    f.run.event = 'workflow_dispatch';
+    expect((await releaseEligibility(f)).release).toBe(true);
+  });
+  it('lets the newest trusted CI run decide, including a later failure', async () => {
+    const f = fixture();
+    f.runs.push({ ...f.run, id: 200, event: 'workflow_dispatch', conclusion: 'failure' });
+    expect((await releaseEligibility(f)).release).toBe(false);
+    f.runs.splice(1, 1, { ...f.run, id: 50, conclusion: 'failure' });
+    expect((await releaseEligibility(f)).release).toBe(true);
   });
 });
 describe('release freshness and failures', () => {
   it('skips a newer unvalidated main instead of checking it out', async () => {
     const f = fixture();
     f.main.object.sha = 'b'.repeat(40);
-    expect((await releaseEligibility(f)).release).toBe(false);
+    expect(await releaseEligibility(f)).toMatchObject({ release: false });
   });
   it('detects main advancing during setup/build, including a release version commit', async () => {
     const f = fixture();
@@ -103,18 +131,7 @@ describe('release freshness and failures', () => {
     const f = fixture();
     f.github.rest.git.getRef.mockRejectedValue(new Error('GitHub unavailable'));
     await expect(releaseEligibility(f)).rejects.toThrow('GitHub unavailable');
-  });
-});
-describe('explicitly dispatched CI release gate', () => {
-  it('accepts successful dispatched CI still at main', async () => {
-    const f = fixture();
-    f.run.event = f.context.payload.workflow_run.event = 'workflow_dispatch';
-    expect(await releaseEligibility(f)).toMatchObject({ release: true, sha: f.run.head_sha });
-  });
-  it('rejects dispatched staging CI even when successful', async () => {
-    const f = fixture();
-    f.run.event = f.context.payload.workflow_run.event = 'workflow_dispatch';
-    f.run.head_branch = f.context.payload.workflow_run.head_branch = 'wip/release-1.2.3';
-    expect((await releaseEligibility(f)).release).toBe(false);
+    f.github.rest.actions.listWorkflowRuns.mockRejectedValue(new Error('Actions unavailable'));
+    await expect(releaseEligibility(f)).rejects.toThrow('Actions unavailable');
   });
 });

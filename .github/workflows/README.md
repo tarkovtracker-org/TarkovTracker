@@ -118,13 +118,14 @@ direct validation before auto-merging safe translation updates.
 
 ### Release (`release.yml`)
 
-**Trigger:** Successful completion of `CI` for a same-repository push or explicit dispatch on `main`.
-**Jobs:** `Release` (validate the CI run and current main SHA, install through the shared
-`setup-project` action, build, recheck, semantic-release).
-The workflow reuses CI's test shards and database checks. It rejects stale commits and CI attempts,
-PR/fork events, and automation-skip directives before publishing. Documentation-only pushes can
-reach the gate; conventional commits determine whether a version is warranted. Publication is
-serialized without cancelling an active release. See `docs/WORKFLOW_AUTOMATION.md` for details.
+**Trigger:** Weekly schedule (Tuesdays 15:00 UTC) and manual dispatch on `main`. Deploys do not
+wait for it; every merge still deploys on its own.
+**Jobs:** `Release` (find the newest main CI run for the trigger commit and require success, check
+current main, install through the shared `setup-project` action, build, recheck, semantic-release).
+The workflow reuses CI's test shards and database checks. It rejects other refs and events, failed
+or unfinished CI, a moved main, and automation-skip directives before publishing. Conventional
+commits since the last tag determine whether a version is warranted. Publication is serialized
+without cancelling an active release. See `docs/WORKFLOW_AUTOMATION.md` for details.
 
 ### PR Checks (`pr-checks.yml`)
 
