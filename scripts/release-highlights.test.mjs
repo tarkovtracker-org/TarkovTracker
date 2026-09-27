@@ -105,6 +105,28 @@ describe('release note parsing', () => {
       'Use code as a marker.',
     ]);
   });
+  it('does not join inline code across Markdown blocks or expose comments', () => {
+    expect(releaseNotesFromBody('## Release note\n\nIntro `\n> <!-- secret --> `\n')).toEqual([
+      'Intro',
+    ]);
+    expect(releaseNotesFromBody('<!--\n    -->\n\n## Release note\n\nReal update.')).toEqual([
+      'Real update.',
+    ]);
+    const body =
+      '## Summary\n\nUnmatched `.\n\n## Release note\n\n<!-- Secret update -->\n\nReal ` update.\n';
+    expect(releaseNotesFromBody(body)).toEqual(['Real update.']);
+    expect(
+      releaseNotesFromBody(
+        'Unmatched `\n```html\nexample\n```\n<!-- hidden -->\n## Release note\nReal ` update.'
+      )
+    ).toEqual(['Real update.']);
+    expect(releaseNotesFromBody(template('Real update <!-- hidden\ncontinues -->'))).toEqual([
+      'Real update',
+    ]);
+    expect(
+      releaseNotesFromBody('Escaped \\` <!-- hidden --> `\n## Release note\nReal update.')
+    ).toEqual(['Real update.']);
+  });
   it.each(['- First\n\n- Second', '- First\n- Second'])(
     'keeps the first item when a section starts with a newline (%j)',
     (items) =>
@@ -447,7 +469,7 @@ describe('release highlights', () => {
       { number: 943, text: 'Note.', shas: [sha.toLowerCase(), 'b'.repeat(40)] },
     ]);
     expect(withHighlights('## [1.84.0](url) (2026-09-29)\n', highlights, 'o/r')).toContain(
-      '* Note. ([#943](https://github.com/o/r/pull/943), [aaaaaaa](https://github.com/o/r/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa), [bbbbbbb](https://github.com/o/r/commit/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb))'
+      '* Note. ([#943](https://github.com/o/r/pull/943)) ([aaaaaaa](https://github.com/o/r/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)) ([bbbbbbb](https://github.com/o/r/commit/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb))'
     );
     expect(
       withHighlights(

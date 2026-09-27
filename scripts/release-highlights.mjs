@@ -77,7 +77,8 @@ function fenceStep(state, line) {
     return state;
   }
   state.open = openingFence(line);
-  if (!state.open) state.kept.push(line);
+  // A removed block must not join inline-code spans in the surrounding paragraphs.
+  state.kept.push(state.open ? '' : line);
   return state;
 }
 function stripFencedCode(text) {
@@ -123,12 +124,21 @@ function skipComment(line, index, state, tickCounts) {
   state.inComment = close === -1;
   return close === -1 ? line.length : close + 3;
 }
+function escapedBacktick(line, index) {
+  let slashes = 0;
+  for (let cursor = index - 1; line[cursor] === '\\'; cursor -= 1) slashes += 1;
+  return slashes % 2 === 1;
+}
+const canOpenCodeTick = (line, index, state, remaining) =>
+  !state.codeTicks && remaining > 0 && !escapedBacktick(line, index);
 function consumeCodeTick(line, index, state, tickCounts) {
   const run = backtickRun(line, index);
   const remaining = tickCounts.get(run) - 1;
   tickCounts.set(run, remaining);
   if (state.codeTicks === run) state.codeTicks = 0;
-  else if (!state.codeTicks && remaining > 0) state.codeTicks = run;
+  else if (canOpenCodeTick(line, index, state, remaining)) {
+    state.codeTicks = run;
+  }
   return { text: line.slice(index, index + run), next: index + run };
 }
 function isCommentStart(line, index, state) {
@@ -156,20 +166,43 @@ function scanCommentLine(line, state, tickCounts) {
   return visible;
 }
 function appendCommentLine(line, state, tickCounts, kept) {
-  if (isIndentedCode(line)) {
+  if (isIndentedCode(line) && !state.inComment) {
     if (!state.inComment) kept.push(line);
     state.codeTicks = 0;
     return;
   }
   const visible = scanCommentLine(line, state, tickCounts);
-  if (!state.inComment) kept.push(visible);
+  kept.push(visible);
+}
+const isListBoundary = (line) => /^[ \t]{0,3}(?:[-*+]|\d+[.)])[ \t]+/.test(line);
+const isHeadingBoundary = (line) => /^[ \t]{0,3}#{1,6}(?:[ \t]|$)/.test(line);
+const isHeadingOrQuote = (line) => isHeadingBoundary(line) || /^[ ]{0,3}>/.test(line);
+const isRuleBoundary = (line) => /^(?:=+|-+|\*{3,}|_{3,})$/.test(line.trim().replace(/[ \t]/g, ''));
+const isStandaloneBlock = (line) =>
+  !line.trim() || isHeadingOrQuote(line) || isIndentedCode(line) || isRuleBoundary(line);
+function flushInlineBlock(state) {
+  if (state.current.length) state.blocks.push(state.current);
+  state.current = [];
+}
+function appendInlineBlock(state, line) {
+  if (isStandaloneBlock(line) || isListBoundary(line)) flushInlineBlock(state);
+  if (isStandaloneBlock(line)) state.blocks.push([line]);
+  else state.current.push(line);
+}
+function groupInlineBlocks(lines) {
+  const state = { blocks: [], current: [] };
+  lines.forEach((line) => appendInlineBlock(state, line));
+  flushInlineBlock(state);
+  return state.blocks;
 }
 function stripCommentsOutsideCode(text) {
   const state = { inComment: false, codeTicks: 0 };
   const kept = [];
-  const lines = text.split('\n');
-  const tickCounts = countBackticks(lines);
-  for (const line of lines) appendCommentLine(line, state, tickCounts, kept);
+  for (const block of groupInlineBlocks(text.split('\n'))) {
+    state.codeTicks = 0;
+    const tickCounts = countBackticks(block);
+    for (const line of block) appendCommentLine(line, state, tickCounts, kept);
+  }
   return kept.join('\n');
 }
 function noteSection(body) {
@@ -207,6 +240,7 @@ function stripHtml(text) {
 }
 function plainText(line) {
   return stripHtml(line)
+    .replace(/^[ ]{0,3}>[ \t]?/gm, '')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\]\([^)]*\)/g, ']')
     .replace(/[[\]!]*\[|\]/g, '')
@@ -471,7 +505,7 @@ export function withHighlights(notes, highlights, slug) {
     ]
       .slice(0, MAX_COMMIT_LINKS)
       .map((hash) => `[${hash.slice(0, 7)}](https://github.com/${slug}/commit/${hash})`);
-    return `* ${text} (${[pull, ...commits].join(', ')})`;
+    return `* ${text} (${pull})${commits.map((link) => ` (${link})`).join('')}`;
   });
   const block = `### Highlights\n\n${items.join('\n')}\n`;
   const [heading, ...rest] = String(notes).split('\n');

@@ -1742,9 +1742,12 @@ checkout stays pinned to the validated SHA. The production build still runs in R
   `maintain` and custom roles), or a description edited
   at or after `mergedAt` (equal second-precision times are ambiguous) skips that note and never
   blocks or alters versioning. At most 3 notes per PR and 5 per release are published; 5 is the
-  in-app changelog's per-release bullet limit and Highlights are listed first. Notes are reduced
+  in-app changelog's per-release bullet limit and Highlights are listed first. Trusted commit
+  links retain each highlight's in-range commit identity so the changelog does not repeat those
+  commits in its fallback; SHAs come from release commits, never PR bodies. Notes are reduced
   to plain text (no link syntax, URLs, HTML, or Markdown emphasis; fenced code is removed before
-  hidden comments, HTML fragments are removed to a fixed point before autolink detection;
+  hidden comments; inline and indented code cannot open hidden comments. HTML fragments are
+  removed to a fixed point before autolink detection;
   only top-level bullets are highlights and their wrapped, nested, or indented content
   stays with the parent bullet). Parsing is bounded before sanitization — PR text within GitHub's
   body limit, each bullet within `MAX_RAW_NOTE` code points, autolinks detected per

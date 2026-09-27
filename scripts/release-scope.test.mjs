@@ -100,7 +100,7 @@ describe('release scope plugin', () => {
     expect(notes).toContain('list every objective under the cursor');
     expect(notes).not.toMatch(/Codex|bump nuxt|\*\*ci:\*\*|\*\*deps:\*\*/);
     expect(notes).toContain(
-      '### Highlights\n\n* Smart Fill now spreads collected items evenly. ([#943](https://github.com/tarkovtracker-org/TarkovTracker/pull/943))'
+      '### Highlights\n\n* Smart Fill now spreads collected items evenly. ([#943](https://github.com/tarkovtracker-org/TarkovTracker/pull/943)) ([0000000](https://github.com/tarkovtracker-org/TarkovTracker/commit/0000000000000000000000000000000000000002))'
     );
     // Internal-scope commits are filtered before any PR lookup.
     const numbers = fetchMock.mock.calls
