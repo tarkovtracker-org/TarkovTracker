@@ -604,7 +604,8 @@ async function runSchema() {
         select distinct lower(acl.privilege_type) as privilege
         from aclexplode(acldefault('r', c.relowner)) acl
       ) available
-      where has_table_privilege(current_user, c.oid, privilege)
+      where has_schema_privilege(current_user, n.oid, 'usage')
+        and has_table_privilege(current_user, c.oid, privilege)
     ),
     array[]::text[]
   ) as effective_observer_privileges,
@@ -618,12 +619,21 @@ async function runSchema() {
           select distinct lower(acl.privilege_type) as privilege
           from aclexplode(acldefault('r', c.relowner)) acl
         ) available
-        where has_table_privilege(core_role.rolname, c.oid, privilege)
+        where has_schema_privilege(core_role.oid, n.oid, 'usage')
+          and has_table_privilege(core_role.oid, c.oid, privilege)
       ) effective on true
       where core_role.rolname in ('anon', 'authenticated', 'service_role')
     ),
     '{}'::jsonb
   ) as effective_core_role_privileges,
+  jsonb_build_object('observer', has_schema_privilege(current_user, n.oid, 'usage')) || coalesce(
+    (
+      select jsonb_object_agg(core_role.rolname, has_schema_privilege(core_role.oid, n.oid, 'usage'))
+      from pg_catalog.pg_roles core_role
+      where core_role.rolname in ('anon', 'authenticated', 'service_role')
+    ),
+    '{}'::jsonb
+  ) as schema_usage,
   pg_total_relation_size(c.oid) as total_size_bytes,
   obj_description(c.oid, 'pg_class') as description
 from pg_catalog.pg_class c
@@ -891,9 +901,26 @@ function normalizeRelation(value) {
   if (ignored.includes(relation.toLowerCase())) return undefined;
   return relation.includes('.') ? relation : `public.${relation}`;
 }
+// PostgreSQL reserved and type/function-name keywords. Unquoted, they are either invalid as table
+// or role names or ambiguous enough that ACL classification fails closed instead of guessing.
+const POSTGRES_RESERVED_IDENTIFIER_WORDS = `
+  all analyse analyze and any array as asc asymmetric authorization binary both case cast check
+  collate collation column concurrently constraint create cross current_catalog current_date
+  current_role current_schema current_time current_timestamp current_user default deferrable
+  desc distinct do else end except false fetch for foreign freeze from full grant group having
+  ilike in initially inner intersect into is isnull join lateral leading left like limit
+  localtime localtimestamp natural not notnull null offset on only or order outer overlaps
+  placing primary references returning right select session_user similar some symmetric
+  system_user table tablesample then to trailing true union unique user using variadic verbose
+  when where window with
+`
+  .trim()
+  .split(/\s+/);
 function isSupportedTableAclStatement(statement) {
-  const identifier = String.raw`[a-zA-Z_][a-zA-Z0-9_$]*(?:\.[a-zA-Z_][a-zA-Z0-9_$]*)?`;
-  const role = String.raw`(?:[a-zA-Z_][a-zA-Z0-9_$]*|public|current_user|current_role|session_user)`;
+  const unreserved = String.raw`(?!(?:${POSTGRES_RESERVED_IDENTIFIER_WORDS.join('|')})(?![a-zA-Z0-9_$]))`;
+  const name = String.raw`${unreserved}[a-zA-Z_][a-zA-Z0-9_$]*`;
+  const identifier = String.raw`${name}(?:\.${name})?`;
+  const role = String.raw`(?:public|current_user|current_role|session_user|${name})`;
   const individualPrivileges = String.raw`(?:select|insert|update|delete|truncate|references|trigger)(?:\s*,\s*(?:select|insert|update|delete|truncate|references|trigger))*`;
   const privileges = String.raw`(?:all(?:\s+privileges)?|${individualPrivileges})`;
   const relations = String.raw`${identifier}(?:\s*,\s*${identifier})*`;

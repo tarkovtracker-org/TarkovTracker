@@ -98,6 +98,7 @@ if (sql.includes('aclexplode')) {
       authenticated: ['select'],
       service_role: ['select', 'insert', 'update', 'delete'],
     },
+    schema_usage: { observer: true, anon: true, authenticated: true, service_role: true },
   }];
 }
 if (sql.includes('from supabase_migrations.schema_migrations')) {
@@ -244,6 +245,24 @@ describe('prod-db migration preflight', () => {
       ])
     );
     expect(malformed.migration.classification.assessment).toBe('incomplete');
+    for (const statement of [
+      'GRANT SELECT ON TABLE select TO authenticated;',
+      'GRANT SELECT ON public.events TO table;',
+      'REVOKE SELECT ON user FROM anon;',
+    ]) {
+      const reserved = JSON.parse(run(['preflight', '--migration', writeFixture(statement)]));
+      expect(reserved.migration.classification.assessment).toBe('incomplete');
+    }
+    const specialRoles = JSON.parse(
+      run([
+        'preflight',
+        '--migration',
+        writeFixture(
+          'GRANT SELECT ON public.select_log, public.user$events TO current_user, public, public_reader;'
+        ),
+      ])
+    );
+    expect(specialRoles.migration.classification.assessment).toBe('classified');
     const quotedRole = JSON.parse(
       run([
         'preflight',
@@ -327,6 +346,14 @@ COMMIT;`;
     expect(sql).toContain('aclexplode');
     expect(sql).toContain('pg_has_role');
     expect(sql).toContain('has_table_privilege');
+    expect(sql).toContain("has_schema_privilege(current_user, n.oid, 'usage')");
+    expect(sql).toContain("has_schema_privilege(core_role.oid, n.oid, 'usage')");
+    expect(query.schema_usage).toEqual({
+      observer: true,
+      anon: true,
+      authenticated: true,
+      service_role: true,
+    });
   });
 });
 describe('prod-db command boundary', () => {

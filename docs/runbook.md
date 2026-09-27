@@ -692,9 +692,10 @@ Available reports include `health`, `schema`, `migration-history`, `db-stats`, `
 matching the sensitive-column policy and is capped at 20 rows; `distribution` is capped at 50
 groups. The schema report exposes catalog ACL entries, PUBLIC grants, observer-effective privileges
 through inherited roles, privileges effective for existing `anon`, `authenticated`, and `service_role`
-roles, relation owners, and row-level-security flags. Health shows schema usage and read access to the
-migration `version` and `statements` columns. `EXPLAIN ANALYZE`, arbitrary SQL, writes, DDL, migration
-commands, and unbounded row access are not supported.
+roles, per-role schema `USAGE`, relation owners, and row-level-security flags. A privilege counts as
+effective only when the role can also use the relation's schema. Health shows schema usage and read
+access to the migration `version` and `statements` columns. `EXPLAIN ANALYZE`, arbitrary SQL,
+writes, DDL, migration commands, and unbounded row access are not supported.
 
 `migration-history` reads applied version identifiers from `supabase_migrations.schema_migrations`
 and compares them with `supabase/migrations` in the current checkout. It reports `missing_locally`

@@ -1344,8 +1344,10 @@ flowchart LR
 4. Schema, count, sample, and distribution operations use validated identifiers and bounded SQL.
    The schema report includes relation ACL entries, effective PUBLIC grants, privileges for the
    observer and existing `anon`, `authenticated`, and `service_role` roles (including inherited role
-   membership), relation owners, and row-level-security flags. Health reports whether the role can use
-   the migration-history schema and read the `version` or `statements` column. Samples select
+   membership), per-role schema `USAGE`, relation owners, and row-level-security flags. Effective
+   privileges are listed only when the role also has `USAGE` on the relation's schema. Health
+   reports whether the role can use the migration-history schema and read the `version` or
+   `statements` column. Samples select
    allowlisted low-risk columns and are capped at 20 rows; distributions are capped at 50 groups.
 5. The observer rejects writes, DDL, transaction-control statements, `EXPLAIN ANALYZE`, arbitrary
    SQL, unbounded samples, and non-allowlisted distributions.
@@ -1358,8 +1360,9 @@ flowchart LR
    report. Unsupported or ambiguous syntax fails closed with `assessment: incomplete`,
    `risk: unknown`, and `requires_manual_review: true`. Multiple statements are classified only
    when every statement is a supported table-level `GRANT`/`REVOKE`, optionally wrapped in one
-   `BEGIN`/`COMMIT` pair; ACL relations come from the `ON` clause, and privilege names are not data
-   changes. It does not execute the migration.
+   `BEGIN`/`COMMIT` pair; ACL relations come from the `ON` clause, reserved keywords are rejected as
+   unquoted relation or role names, and privilege names are not data changes. It does not execute
+   the migration.
 8. `migration-history` reads applied version identifiers from
    `supabase_migrations.schema_migrations` and compares them against `supabase/migrations` in the
    current checkout, reporting `missing_locally` (applied remotely, absent from the checkout) and
@@ -1403,7 +1406,8 @@ flowchart LR
 - Built-in telemetry is allowlisted and does not depend on Supabase CLI text formatting.
 - The schema report exposes catalog ACLs, PUBLIC grants, effective privileges for the observer and
   existing `anon`, `authenticated`, and `service_role` roles, relation owners, and RLS flags without
-  reading application rows. Effective privileges account for inherited roles and the server's
+  reading application rows. Effective privileges account for inherited roles, require schema
+  `USAGE` on the relation's schema (reported separately as `schema_usage`), and cover the server's
   supported table privileges.
 - SQL identifiers are validated before interpolation, row and group limits are enforced, sensitive
   sample columns are excluded, and sensitive distributions are rejected.
