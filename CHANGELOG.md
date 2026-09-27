@@ -1,3 +1,10 @@
+## [1.83.5](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.4...v1.83.5) (2026-09-27)
+
+
+### Bug Fixes
+
+* **app:** show only player-facing changes in the changelog ([#950](https://github.com/tarkovtracker-org/TarkovTracker/issues/950)) ([e20ccf4](https://github.com/tarkovtracker-org/TarkovTracker/commit/e20ccf42a7b43bb51b4b7de28e998132b529021b)), closes [#n](https://github.com/tarkovtracker-org/TarkovTracker/issues/n)
+
 ## [1.83.4](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.3...v1.83.4) (2026-09-27)
 
 
