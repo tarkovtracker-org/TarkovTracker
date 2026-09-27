@@ -1,3 +1,10 @@
+## [1.83.3](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.2...v1.83.3) (2026-09-27)
+
+
+### Bug Fixes
+
+* **ci:** guard duplicate Codex review requests ([#948](https://github.com/tarkovtracker-org/TarkovTracker/issues/948)) ([dce7242](https://github.com/tarkovtracker-org/TarkovTracker/commit/dce724280dd507aba2fdec7d9712c3fe20d60cfa))
+
 ## [1.83.2](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.1...v1.83.2) (2026-09-27)
 
 
