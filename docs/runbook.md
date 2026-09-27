@@ -726,9 +726,12 @@ interpret cumulative counters.
 then combines that information with production table/index, traffic, vacuum, query, lock, and
 blocking reports. The result is evidence-only and must be reviewed by a human before a migration is
 merged. It does not execute the migration. If the parser sees dynamic SQL, unsupported statements,
-quoted identifiers, multiple statements, or any unclassified syntax, it returns
-`assessment: incomplete`, `risk: unknown`, and `requires_manual_review: true`; it never treats an
-unrecognized migration as safe.
+quoted identifiers, malformed literals or comments, multiple statements, or any unclassified syntax,
+it returns `assessment: incomplete`, `risk: unknown`, and `requires_manual_review: true`; it never
+treats an unrecognized migration as safe. The only multi-statement exception is a migration made
+entirely of table-level `GRANT`/`REVOKE` statements, optionally wrapped in one `BEGIN`/`COMMIT`
+pair. Privilege names such as `UPDATE` and `DELETE` in those statements are not data changes, and
+the explicit transaction is still reported as transaction control.
 
 Provision the observer role out of band through the Supabase SQL editor or approved database
 operation. Grant only `CONNECT`, required schema/catalog visibility, and `pg_monitor`; Supabase CLI

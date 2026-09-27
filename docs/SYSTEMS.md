@@ -1356,7 +1356,10 @@ flowchart LR
    operation classes, then collects table/index, traffic, vacuum, outliers, lock, and blocking reports
    sequentially to avoid a burst of production inspection queries. It returns an evidence-only JSON
    report. Unsupported or ambiguous syntax fails closed with `assessment: incomplete`,
-   `risk: unknown`, and `requires_manual_review: true`. It does not execute the migration.
+   `risk: unknown`, and `requires_manual_review: true`. Multiple statements are classified only
+   when every statement is a supported table-level `GRANT`/`REVOKE`, optionally wrapped in one
+   `BEGIN`/`COMMIT` pair; ACL relations come from the `ON` clause, and privilege names are not data
+   changes. It does not execute the migration.
 8. `migration-history` reads applied version identifiers from
    `supabase_migrations.schema_migrations` and compares them against `supabase/migrations` in the
    current checkout, reporting `missing_locally` (applied remotely, absent from the checkout) and
@@ -1412,7 +1415,9 @@ flowchart LR
   unbounded statement or lock timeouts.
 - Migration preflight is evidence-only and fails closed on unsupported or ambiguous syntax;
   production reports run sequentially, and migration execution remains in the reviewed merge and
-  Supabase deployment workflow.
+  Supabase deployment workflow. The only classified multi-statement form is table-level ACL
+  statements, optionally inside one `BEGIN`/`COMMIT` pair, and that transaction remains flagged as
+  transaction control.
 - `migration-history` reads only the `version` column of `supabase_migrations.schema_migrations`.
   The stored `statements` column is never selected, and the observer's ledger grant is column-level
   for the same reason, so migration SQL and any literal inside it stay out of both the report and
