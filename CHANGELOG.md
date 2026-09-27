@@ -1,3 +1,10 @@
+# [1.83.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.8...v1.83.0) (2026-09-27)
+
+
+### Features
+
+* **maps:** list every objective under the cursor on overlapping markers ([#919](https://github.com/tarkovtracker-org/TarkovTracker/issues/919)) ([#944](https://github.com/tarkovtracker-org/TarkovTracker/issues/944)) ([5f9f898](https://github.com/tarkovtracker-org/TarkovTracker/commit/5f9f898af501ff65206b31fcb5d5d155fb5bb90a))
+
 ## [1.82.8](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.7...v1.82.8) (2026-09-27)
 
 
