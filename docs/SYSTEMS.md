@@ -1637,6 +1637,8 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 - `app/composables/useMapObjectiveMarks.ts` — objective users, categories, map marks, and shared
   visibility state.
 - `app/features/maps/LeafletMap.vue` — marker category filtering and map rendering.
+- `app/features/maps/utils/objectiveHitTest.ts` and `LeafletObjectiveStack.vue` — stacked
+  objective hover list.
 - `app/features/maps/MapRequiredItemsSummary.vue` — pinned/active grouping and preference gates.
 - `app/features/maps/composables/useMapRequiredItems.ts` — selected-map item/key aggregation.
 - `app/features/tasks/task-objective-equipment.ts` — canonical bring-mode equipment extraction.
@@ -1666,6 +1668,11 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 - A group given a title renders its section headings one level down (`h4`) and uses the short
   `required_items` / `required_keys` labels; an untitled standalone group keeps the `h3` level and
   the longer `*_summary` labels.
+- Hovering or clicking an objective marker hit-tests every visible zone and point in container
+  pixels. When more than one distinct objective is under the pointer, the popup is a compact stacked
+  list (points first, then zones smallest to largest); choosing an entry pins that objective's full
+  tooltip. A zone and its own center marker count as one objective, so a single objective still gets
+  the full tooltip directly (#919).
 
 ## 13. Fallow audit snapshots
 

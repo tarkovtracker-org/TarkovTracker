@@ -671,8 +671,21 @@
     isCoopExtract,
     useLeafletMapControls,
   } from '@/features/maps/composables/useLeafletMapControls';
+  import LeafletObjectiveStack from '@/features/maps/LeafletObjectiveStack.vue';
   import LeafletObjectiveTooltip from '@/features/maps/LeafletObjectiveTooltip.vue';
   import { getMarksHash, type MapMark } from '@/features/maps/utils/marksHash';
+  import {
+    findObjectiveHitStackAtPoint,
+    projectObjectiveHitShape,
+    type ObjectiveHitShape,
+  } from '@/features/maps/utils/objectiveHitTest';
+  import {
+    focusStackWhenPopupAttached as scheduleStackFocus,
+    restoreMapFocusAfterPopupClose,
+    selectStackedObjective,
+    type ObjectivePopupControl,
+    type ObjectiveStackEntry,
+  } from '@/features/maps/utils/objectiveStack';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { logger } from '@/utils/logger';
   import { clusterSpawns } from '@/utils/mapClustering';
@@ -1350,23 +1363,102 @@
     { layer: L.Layer; getLatLng: () => L.LatLngExpression; showPopup: (pinned: boolean) => void }
   >();
   const lastMarksHash = ref('');
-  const mountObjectiveTooltip = (
-    objectiveId: string,
-    onClose: () => void
-  ): { element: HTMLElement; unmount: () => void } => {
-    const container = document.createElement('div');
-    const app = createApp(LeafletObjectiveTooltip, { objectiveId, onClose, t });
-    app.provide('router', router);
-    app.mount(container);
-    return { element: container, unmount: () => app.unmount() };
+  type ObjectiveHitSource =
+    | {
+        kind: 'zone';
+        objectiveId: string;
+        latLngs: L.LatLngExpression[];
+        area: number;
+        polygon: L.Polygon;
+        centerMarker: L.CircleMarker;
+        control: ObjectivePopupControl;
+      }
+    | {
+        kind: 'point';
+        objectiveId: string;
+        marker: L.CircleMarker;
+        control: ObjectivePopupControl;
+      };
+  let objectiveHitSources: ObjectiveHitSource[] = [];
+  const toHitShape = (map: L.Map, source: ObjectiveHitSource): ObjectiveHitShape => {
+    const project = (latLng: L.LatLngExpression) => map.latLngToContainerPoint(latLng);
+    if (source.kind === 'zone') {
+      return projectObjectiveHitShape(
+        {
+          kind: 'zone',
+          objectiveId: source.objectiveId,
+          ring: source.latLngs,
+          area: source.area,
+          center: source.centerMarker.getLatLng(),
+          radius: source.centerMarker.getRadius(),
+          strokeWidth: source.polygon.options.weight ?? 0,
+          centerHitTolerance: (source.centerMarker.options.weight ?? 0) / 2,
+        },
+        project
+      );
+    }
+    return projectObjectiveHitShape(
+      {
+        kind: 'point',
+        objectiveId: source.objectiveId,
+        center: source.marker.getLatLng(),
+        radius: source.marker.getRadius(),
+        hitTolerance: (source.marker.options.weight ?? 0) / 2,
+      },
+      project
+    );
   };
+  /** Every objective under the pointer (#919), falling back to the hovered one. */
+  const objectivesAtEvent = (
+    event: L.LeafletMouseEvent | undefined,
+    fallbackId: string,
+    fallbackControl: ObjectivePopupControl
+  ): ObjectiveStackEntry[] => {
+    const fallback = { objectiveId: fallbackId, control: fallbackControl };
+    const map = mapInstance.value;
+    if (!map || !event?.containerPoint) return [fallback];
+    const candidates = objectiveHitSources.map((source) => ({
+      shape: toHitShape(map, source),
+      source,
+    }));
+    return findObjectiveHitStackAtPoint(candidates, event.containerPoint, fallback);
+  };
+  type MountedPopupContent = {
+    element: HTMLElement;
+    unmount: () => void;
+    focusFirstButton?: () => void;
+  };
+  const mountPopupContent = (
+    component: typeof LeafletObjectiveTooltip | typeof LeafletObjectiveStack,
+    rootProps: Record<string, unknown>
+  ): MountedPopupContent => {
+    const container = document.createElement('div');
+    const app = createApp(component, { ...rootProps, t });
+    app.provide('router', router);
+    const componentInstance = app.mount(container) as unknown as {
+      focusFirstEntry?: () => void;
+    };
+    return {
+      element: container,
+      unmount: () => app.unmount(),
+      focusFirstButton: () => componentInstance.focusFirstEntry?.(),
+    };
+  };
+  const mountObjectiveTooltip = (objectiveId: string, onClose: () => void) =>
+    mountPopupContent(LeafletObjectiveTooltip, { objectiveId, onClose });
+  const mountObjectiveStack = (
+    objectiveIds: string[],
+    onSelect: (objectiveId: string) => void,
+    onClose: () => void
+  ): MountedPopupContent =>
+    mountPopupContent(LeafletObjectiveStack, { objectiveIds, onSelect, onClose });
   const POPUP_HIDE_DELAY = 100;
   const attachHoverPinPopup = (
     layer: L.Layer,
     objectiveId: string,
     getLatLng: () => L.LatLngExpression
-  ): void => {
-    if (!leaflet.value || !mapInstance.value) return;
+  ): ObjectivePopupControl | null => {
+    if (!leaflet.value || !mapInstance.value) return null;
     const popup = leaflet.value.popup({
       ...popupOptions,
       className: 'map-objective-popup',
@@ -1412,12 +1504,46 @@
         activePinnedPopupCleanup = null;
       }
       if (mapInstance.value) {
+        restoreMapFocusAfterPopupClose(
+          popup.getElement() ?? null,
+          mapSurfaceRef.value ?? null,
+          document.activeElement
+        );
         popup.remove();
         cleanupMountedComponent();
       }
     };
-    const showPopup = (pinned: boolean) => {
-      if (!mapInstance.value) return;
+    let showPopup = (_pinned: boolean, _entries?: ObjectiveStackEntry[]) => {};
+    const control: ObjectivePopupControl = { showPopup: (pinned) => showPopup(pinned) };
+    const mountLayerPopup = (pinned: boolean, entries: ObjectiveStackEntry[]) => {
+      if (entries.length < 2) return mountObjectiveTooltip(objectiveId, unpinAndHide);
+      const onSelect = (id: string) => selectStackedObjective(entries, id, unpinAndHide);
+      return mountObjectiveStack(
+        entries.map((entry) => entry.objectiveId),
+        onSelect,
+        unpinAndHide
+      );
+    };
+    const focusStackWhenPopupAttached = (
+      pinned: boolean,
+      entries: ObjectiveStackEntry[],
+      popupIsOpen: boolean,
+      mountedComponent: MountedPopupContent
+    ) => {
+      if (!pinned || entries.length < 2) return;
+      const focusFirstEntry = () => {
+        mountedComponent.focusFirstButton?.();
+      };
+      scheduleStackFocus(
+        popupIsOpen,
+        (focus) => popup.once('add', focus),
+        () => currentMountedComponent === mountedComponent,
+        focusFirstEntry
+      );
+    };
+    showPopup = (pinned: boolean, entries = [{ objectiveId, control }]) => {
+      const map = mapInstance.value;
+      if (!map) return;
       if (pinned && activePinnedPopupCleanup) {
         activePinnedPopupCleanup();
       }
@@ -1426,12 +1552,13 @@
         setLayerSelected(true);
       }
       cleanupMountedComponent();
-      currentMountedComponent = mountObjectiveTooltip(objectiveId, unpinAndHide);
+      currentMountedComponent = mountLayerPopup(pinned, entries);
+      const mountedComponent = currentMountedComponent;
       popup.setContent(currentMountedComponent.element);
       popup.setLatLng(getLatLng());
-      if (!mapInstance.value.hasLayer(popup)) {
-        popup.addTo(mapInstance.value);
-      }
+      const popupIsOpen = map.hasLayer(popup);
+      focusStackWhenPopupAttached(pinned, entries, popupIsOpen, mountedComponent);
+      if (!popupIsOpen) popup.addTo(map);
       if (pinned) {
         activePinnedPopupCleanup = unpinAndHide;
       }
@@ -1442,15 +1569,19 @@
         cleanupMountedComponent();
       }
     };
-    objectiveMarkers.set(objectiveId, { layer, getLatLng, showPopup });
-    layer.on('mouseover', () => {
+    objectiveMarkers.set(objectiveId, {
+      layer,
+      getLatLng,
+      showPopup: (pinned) => showPopup(pinned),
+    });
+    layer.on('mouseover', (event: L.LeafletMouseEvent) => {
       isHovering = true;
       if (popupHideTimer) {
         clearTimeout(popupHideTimer);
         popupHideTimer = null;
       }
       if (!isPinned) {
-        showPopup(false);
+        showPopup(false, objectivesAtEvent(event, objectiveId, control));
       }
     });
     layer.on('mouseout', () => {
@@ -1465,7 +1596,7 @@
         }
       }, POPUP_HIDE_DELAY);
     });
-    layer.on('click', (event) => {
+    layer.on('click', (event: L.LeafletMouseEvent) => {
       leaflet.value?.DomEvent.stop(event);
       if (isPinned) {
         unpinAndHide();
@@ -1474,7 +1605,7 @@
       if (activePinnedPopupCleanup) {
         activePinnedPopupCleanup();
       }
-      showPopup(true);
+      showPopup(true, objectivesAtEvent(event, objectiveId, control));
     });
     const handlePopupMouseEnter = () => {
       isHovering = true;
@@ -1524,6 +1655,7 @@
       objectiveMarkers.delete(objectiveId);
       cleanupMountedComponent();
     });
+    return control;
   };
   function createObjectiveMarkers(): void {
     if (!leaflet.value || !objectiveLayer.value || !props.map) return;
@@ -1540,9 +1672,11 @@
     }
     objectiveLayer.value.clearLayers();
     objectiveMarkers.clear();
+    objectiveHitSources = [];
     const zoneEntries: Array<{
       polygon: L.Polygon;
       centerMarker: L.CircleMarker;
+      latLngs: L.LatLngExpression[];
       area: number;
       objectiveId: string;
     }> = [];
@@ -1616,20 +1750,29 @@
           weight: 1.5,
           opacity: 1,
         });
-        zoneEntries.push({
-          polygon,
-          centerMarker,
-          area: calculateZoneArea(zone.outline),
-          objectiveId,
-        });
+        const area = calculateZoneArea(zone.outline);
+        zoneEntries.push({ polygon, centerMarker, latLngs: polygonLatLngs, area, objectiveId });
       });
     });
     zoneEntries
       .sort((a, b) => b.area - a.area)
-      .forEach(({ polygon, centerMarker, objectiveId }) => {
+      .forEach(({ polygon, centerMarker, latLngs, area, objectiveId }) => {
         if (objectiveId) {
-          attachHoverPinPopup(polygon, objectiveId, () => polygon.getBounds().getCenter());
+          const zoneControl = attachHoverPinPopup(polygon, objectiveId, () =>
+            polygon.getBounds().getCenter()
+          );
           attachHoverPinPopup(centerMarker, objectiveId, () => centerMarker.getLatLng());
+          if (zoneControl) {
+            objectiveHitSources.push({
+              kind: 'zone',
+              objectiveId,
+              latLngs,
+              area,
+              polygon,
+              centerMarker,
+              control: zoneControl,
+            });
+          }
         }
         polygon.on('mouseover', () =>
           polygon.setStyle({
@@ -1645,7 +1788,8 @@
       });
     pointEntries.forEach(({ marker, objectiveId }) => {
       if (objectiveId) {
-        attachHoverPinPopup(marker, objectiveId, () => marker.getLatLng());
+        const control = attachHoverPinPopup(marker, objectiveId, () => marker.getLatLng());
+        if (control) objectiveHitSources.push({ kind: 'point', objectiveId, marker, control });
       }
       objectiveLayer.value!.addLayer(marker);
     });
@@ -1965,6 +2109,7 @@
       activePinnedPopupCleanup();
     }
     objectiveMarkers.clear();
+    objectiveHitSources = [];
     clearMarkers();
   });
 </script>
