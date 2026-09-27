@@ -36,6 +36,33 @@ Auth, billing, migration, and concurrency changes require independent review; an
 human substitutes if needed. Record missing/rate-limited review as incomplete without retry loops.
 Only substantial behavioral corrections or unresolved significant findings warrant a local rerun.
 
+### Codex request deduplication and waiting
+
+Agents must use `node scripts/codex-review.mjs <PR> --wait-seconds 600` to inspect and wait for
+reviews. Add `--request` only when authorized to post a review request. Use `--repo owner/name`
+when the PR belongs to another repository. Do not post raw `@codex review` comments or issue a
+second request because a polling window expired. Batch corrections before requesting a review.
+Only observed code-review completion exits successfully; pending, unreviewed, or uncertain status
+exits nonzero. A successful exit confirms review completion, not merge readiness.
+
+The guard checks live PR review evidence, waits for outstanding requests, and reuses completed
+code reviews for the current commit. Security-review completion alone is not code-review
+completion. A completed code review can contain findings; the normal feedback-resolution gate
+still applies. Unknown or unavailable status must be reported as incomplete, never treated as
+permission to retry. An unreviewed PR must be quiet for five minutes after creation or its latest
+update before requesting, allowing automatic review to start after opening, pushing, or marking ready.
+
+Request invocations share a lock and durable intent in the Git common directory across local
+worktrees. Intent is saved before posting, so an ambiguous network failure cannot cause the next
+invocation to blindly post again. Inspect GitHub and the recorded intent before manual recovery;
+agents must not delete the guard state to force another request.
+
+This is a cooperative agent guard, not a GitHub-wide restriction: unrelated clones, other machines,
+and callers that bypass the helper do not share the local lock. Existing GitHub requests are still
+checked, but GitHub comment creation has no atomic deduplication key. A server-side single request
+owner would be needed to eliminate that cross-machine race. The helper itself neither merges PRs
+nor resolves findings.
+
 ### Reviewer transition: external verification pending
 
 1. Verify Codex delivers a review on a representative application PR.

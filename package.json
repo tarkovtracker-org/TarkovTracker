@@ -116,7 +116,7 @@
     "test:api-gateway": "vitest --config workers/api-gateway/vitest.config.ts",
     "validate:openapi": "pnpm --filter api-gateway run validate:openapi",
     "validate:changes": "node scripts/validate-changes.mjs",
-    "test:workflow": "node --test scripts/ci-tests/*.mjs"
+    "test:workflow": "node --test scripts/ci-tests/*.mjs scripts/codex-review-tests.mjs"
   },
   "type": "module",
   "lint-staged": {
