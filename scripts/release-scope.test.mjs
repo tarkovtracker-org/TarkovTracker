@@ -38,6 +38,8 @@ describe('release scope plugin', () => {
     ['not conventional', false],
     [`Revert "fix(ci): honor verified gates"\n\nThis reverts commit ${reverted}.`, true],
     ['revert: feat(preview): new controller', true],
+    ['Revert "Revert "feat(ci): add shadow gate""', true],
+    ['Revert "revert: fix(deps): bump"', true],
     ['Revert "fix(app): keep totals accurate"', false],
     [undefined, false],
   ])('classifies %s as internal=%s', (message, expected) =>

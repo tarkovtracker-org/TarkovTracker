@@ -30,8 +30,9 @@ export const INTERNAL_SCOPES = Object.freeze([
 const INTERNAL = new Set(INTERNAL_SCOPES);
 // Matches `type(scope)!: subject`; the scope group is absent for unscoped headers.
 const HEADER = /^[a-z]+\(([^)]+)\)!?:/i;
-// Git's default `Revert "<header>"` and conventional `revert: <header>` wrap the reverted header.
-const REVERT_WRAPPER = /^(?:revert[ \t]+"|revert:[ \t]*)/i;
+// Git's default `Revert "<header>"` and conventional `revert: <header>` wrap the reverted header,
+// possibly repeatedly (`Revert "Revert "fix(ci): …""`).
+const REVERT_WRAPPER = /^(?:revert[ \t]+"|revert:[ \t]*)+/i;
 /** Whether a commit message's header, or the header it reverts, names an internal scope. */
 export function isInternalCommit(message) {
   const header = String(message ?? '').replace(REVERT_WRAPPER, '');
