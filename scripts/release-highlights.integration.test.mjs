@@ -113,7 +113,7 @@ it('ignores a forged release-shaped HEAD while keeping highlights out of the cha
       }
     );
     expect(result.nextRelease.version).toBe('1.0.1');
-    expect(published).toContain(`### Highlights\n\n* ${note} ([#943](`);
+    expect(published).toContain(`### Highlights\n\n* ${note.replaceAll('.', '\\.')} ([#943](`);
     expect(published).not.toContain('internal gate');
     const changelog = readFileSync(join(f.repo, 'CHANGELOG.md'), 'utf8');
     expect(changelog).toContain('make Smart Fill distribute collected totals');

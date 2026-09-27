@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fromMarkdown } from 'mdast-util-from-markdown';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { releaseBullets } from '@/utils/changelog';
 import {
@@ -124,13 +125,35 @@ describe('release note parsing', () => {
     expect(output).not.toMatch(/<a\b/i);
     expect(output).not.toContain('evil.example');
   });
+  it('preserves literal punctuation through generated release notes and changelog extraction', () => {
+    const [text] = releaseNotesFromBody(
+      template(String.raw`PvE\_mode uses 2 * 3, escaped \*, and [label]. &amp;.`)
+    );
+    expect(text).toBe('PvE_mode uses 2 * 3, escaped *, and [label]. &.');
+    const output = withHighlights(
+      '## [1.84.0](url)\n\n[label]: https://evil.example\n',
+      [{ number: 943, text }],
+      'o/r'
+    );
+    expect(output).toContain('PvE\\_mode uses 2 \\* 3, escaped \\*, and \\[label\\]\\. &amp;\\.');
+    expect(releaseBullets(output, '')).toEqual([text]);
+    const nodes = [fromMarkdown(output)];
+    const linkTargets = [];
+    while (nodes.length) {
+      const node = nodes.pop();
+      if (node.type === 'link') linkTargets.push(node.url);
+      if (Array.isArray(node.children)) nodes.push(...node.children);
+    }
+    expect(linkTargets).toContain('https://github.com/o/r/pull/943');
+    expect(linkTargets).not.toContain('https://evil.example');
+  });
   it('escapes HTML at the final highlights output boundary', () => {
     const output = withHighlights(
       '## [1.84.0](url)\n',
       [{ number: 943, text: '<a href="https://evil.example">Update</a>' }],
       'o/r'
     );
-    expect(output).toContain('&lt;a href="https://evil.example"&gt;Update&lt;/a&gt;');
+    expect(output).toContain('&lt;a href="https://evil\\.example"&gt;Update&lt;/a&gt;');
     expect(output).not.toMatch(/<a\b/i);
   });
   it('publishes emphasized conventional notes as plain text', () => {
@@ -172,19 +195,19 @@ describe('release note parsing', () => {
   });
   it('does not join inline code across Markdown blocks or expose comments', () => {
     expect(releaseNotesFromBody('## Release note\n\nIntro `\n> <!-- secret --> `\n')).toEqual([
-      'Intro',
+      'Intro `',
     ]);
     expect(releaseNotesFromBody('<!--\n    -->\n\n## Release note\n\nReal update.')).toEqual([
       'Real update.',
     ]);
     const body =
       '## Summary\n\nUnmatched `.\n\n## Release note\n\n<!-- Secret update -->\n\nReal ` update.\n';
-    expect(releaseNotesFromBody(body)).toEqual(['Real update.']);
+    expect(releaseNotesFromBody(body)).toEqual(['Real ` update.']);
     expect(
       releaseNotesFromBody(
         'Unmatched `\n```html\nexample\n```\n<!-- hidden -->\n## Release note\nReal ` update.'
       )
-    ).toEqual(['Real update.']);
+    ).toEqual(['Real ` update.']);
     expect(releaseNotesFromBody(template('Real update <!-- hidden\ncontinues -->'))).toEqual([
       'Real update',
     ]);
@@ -216,9 +239,9 @@ describe('release note parsing', () => {
     ['Open (www.evil.example/phish) today', 'Open today'],
     ['Open (WWW.evil.example/phish) today', 'Open today'],
     ['Mirror at ftp://files.example/x', 'Mirror at'],
-    ['Use [x][ref] style', 'Use xref style'],
+    ['Use [x][ref] style', 'Use [x][ref] style'],
     ['Mail support@example.com for help', 'Mail for help'],
-  ])('leaves no link syntax or URL in %j', (note, expected) =>
+  ])('removes live links while preserving unresolved reference text in %j', (note, expected) =>
     expect(releaseNotesFromBody(template(note))).toEqual([expected])
   );
   it('strips punctuated email autolinks without superlinear matching', () => {
@@ -751,7 +774,7 @@ describe('release highlights', () => {
       { number: 943, text: 'Note.', shas: [sha.toLowerCase(), 'b'.repeat(40)] },
     ]);
     expect(withHighlights('## [1.84.0](url) (2026-09-29)\n', highlights, 'o/r')).toContain(
-      '* Note. ([#943](https://github.com/o/r/pull/943)) ([aaaaaaa](https://github.com/o/r/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)) ([bbbbbbb](https://github.com/o/r/commit/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb))'
+      '* Note\\. ([#943](https://github.com/o/r/pull/943)) ([aaaaaaa](https://github.com/o/r/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)) ([bbbbbbb](https://github.com/o/r/commit/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb))'
     );
     expect(
       withHighlights(
@@ -831,7 +854,7 @@ describe('release highlights', () => {
   it('places highlights directly below the version heading', () => {
     const notes = '## [1.84.0](url) (2026-09-29)\n\n\n### Bug Fixes\n\n* **app:** fix\n';
     expect(withHighlights(notes, [{ number: 943, text: 'Better Smart Fill.' }], 'o/r')).toBe(
-      '## [1.84.0](url) (2026-09-29)\n\n\n### Highlights\n\n* Better Smart Fill. ([#943](https://github.com/o/r/pull/943))\n\n\n### Bug Fixes\n\n* **app:** fix\n'
+      '## [1.84.0](url) (2026-09-29)\n\n\n### Highlights\n\n* Better Smart Fill\\. ([#943](https://github.com/o/r/pull/943))\n\n\n### Bug Fixes\n\n* **app:** fix\n'
     );
     expect(withHighlights(notes, [], 'o/r')).toBe(notes);
   });

@@ -9,9 +9,9 @@
  * description requires a trusted author association and current author write access; an edited
  * description requires a known last editor with current write access. The collaborator-permission
  * API checks the actor responsible for the published body, including triage users who can edit a
- * PR description but cannot write. Notes are reduced to plain text (no
- * link syntax, URLs, or HTML; only top-level bullets are highlights; nested and indented content
- * stays with its parent) so they cannot carry a link into the project's release notes. Untrusted
+ * PR description but cannot write. Notes are reduced to plain text (no embedded link destinations,
+ * active autolinks, or HTML; only top-level bullets are highlights; nested and indented content
+ * stays with its parent). Literal Markdown punctuation is escaped when published. Untrusted
  * text is never matched by superlinear patterns: parsing is bounded by GitHub's body limit, each
  * bullet is bounded before sanitization, and autolinks are detected per whitespace token.
  * Highlights are added only after this release's version commit is verified to be HEAD
@@ -40,6 +40,25 @@ const MAX_COMMIT_LINKS = 20;
 // limits, and workers stop launching once MAX_HIGHLIGHTS notes are collectable.
 export const MAX_CONCURRENT_LOOKUPS = 4;
 const TRUSTED_AUTHORS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+const MARKDOWN_PUNCTUATION = new Set([
+  '\\',
+  '`',
+  '*',
+  '_',
+  '{',
+  '}',
+  '[',
+  ']',
+  '(',
+  ')',
+  '#',
+  '+',
+  '-',
+  '.',
+  '!',
+  '|',
+  '~',
+]);
 // `permission` is the effective base permission (custom and `maintain` roles map to `write`).
 const WRITE_PERMISSIONS = new Set(['write', 'admin']);
 const REVERTS = /^This reverts commit ([0-9a-f]{7,40})\b/im;
@@ -162,26 +181,28 @@ function emailish(token) {
 }
 const autolinked = (token) =>
   token.includes('//') || token.includes('/\\') || /www\./i.test(token) || emailish(token);
+const possiblyAutolinked = (token) =>
+  autolinked(token) || autolinked(token.replace(/[*_~\x60]/g, ''));
 function stripHtml(text) {
   // A removal can join nested fragments into another tag. Reach a fixed point on the already
   // bounded note before checking links; a leftover malformed opener loses its single '<'.
   let previous;
   do {
     previous = text;
-    text = text.replace(/<\/?[a-z][^<>]*>/gi, '');
+    text = text
+      .replace(/<\/?[*_~\x60]*[a-z][^<>]*>/gi, '')
+      .replace(/<\/?\[\/?[a-z][\w-]*\](?:\s+[^<>]*)?>/gi, '');
   } while (text !== previous);
-  return text.replace(/<(?=[a-z/!?])/gi, '');
+  return text.replace(/<(?=[*_~\x60\s]*[a-z/!?])/gi, '');
 }
+const stripMarkdownLinkResidue = (text) =>
+  text.replace(/\[([^\]]+)\]\((?:[a-z][a-z\d+.-]*:|\/\/)[^)]*\)/gi, '$1');
 function plainText(line) {
-  const withoutMarkdown = stripHtml(markdownText(line).replace(/[*_~\x60]/g, ''))
-    .replace(/^[ ]{0,3}>[ \t]?/gm, '')
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
-    .replace(/\]\([^)]*\)/g, ']')
-    .replace(/[[\]!]*\[|\]/g, '');
-  // Bracket cleanup can join an HTML opener. Strip once more before publishing.
-  return stripHtml(withoutMarkdown)
+  // mdast has already removed Markdown syntax while retaining literal punctuation from text nodes.
+  // Strip HTML both before and after tokenization so fragments cannot join into a live tag.
+  return stripHtml(stripMarkdownLinkResidue(stripHtml(markdownText(line))))
     .split(/\s+/)
-    .map((token) => (autolinked(token) ? '' : token))
+    .map((token) => (possiblyAutolinked(token) ? '' : token))
     .join(' ');
 }
 function cleanNote(item) {
@@ -408,8 +429,13 @@ export async function collectHighlights({ commits, excluded = () => false, ...co
 export function withHighlights(notes, highlights, slug) {
   if (!highlights.length) return notes;
   const items = highlights.map(({ number, text, shas }) => {
+    // Escape Markdown punctuation so literal text cannot form emphasis or a reference link.
+    // HTML entities are decoded by GitHub after Markdown parsing, preserving the displayed text.
+    const markdownText = Array.from(String(text), (character) =>
+      MARKDOWN_PUNCTUATION.has(character) ? `\\${character}` : character
+    ).join('');
     // Escape at the Markdown output boundary even if an earlier parser missed a tag.
-    const safeText = String(text)
+    const safeText = markdownText
       .replaceAll('&', '&amp;')
       .replaceAll('<', '&lt;')
       .replaceAll('>', '&gt;');
