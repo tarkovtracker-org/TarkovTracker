@@ -935,6 +935,11 @@ flowchart LR
 ### Invariants
 
 - `pvp` and `pve` always use season `0`; `seasonal` always uses a positive season.
+- Browser roles never need table maintenance privileges (`TRUNCATE`, `REFERENCES`, `TRIGGER`,
+  `MAINTAIN`) on account, progress, team, billing, or audit tables. Explicit forward revokes preserve
+  existing row and column access, including token-note updates. Billing events remain server-only;
+  supporters and admin audit logs expose only their RLS-filtered authenticated reads. New-table
+  default privileges require a separate creating-role audit; these revokes do not change defaults.
 - Legacy `user_system.team` / `team_id` values are used only when neither persistent mode-specific
   team ID exists. They must never make a PvP team appear as the active PvE team or vice versa.
 - Team creation maps both the `team_memberships_user_mode_unique` SQLSTATE `23505` conflict and
