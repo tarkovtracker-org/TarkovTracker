@@ -5,7 +5,9 @@
  *
  * Trust boundary: PR descriptions stay editable after merge, and batched releases publish days
  * later. A note is used only when the PR is merged and its description was last edited at or
- * before the merge, i.e. the text the merging maintainer saw. Notes are reduced to plain text (no
+ * before the merge, and only for PRs authored by a repository owner, member, or collaborator:
+ * anyone else who can edit that description also has write access, which closes the auto-merge
+ * window in which an external author could change an approved note. Notes are reduced to plain text (no
  * link syntax, URLs, or HTML) so they cannot carry a link into the project's release notes.
  * Highlights are added only after the version commit exists (`versionCommitted`), so PR text is
  * published in the GitHub release but never written to the committed, secret-scanned CHANGELOG.md.
@@ -17,14 +19,17 @@ const NEXT_HEADING = /^#{1,2}[ \t]+\S/m;
 const LIST_ITEM = /^\s*(?:[-*+]|\d+\.)\s+/;
 const NO_NOTE = /^(?:none|n\/a|na|-+|no)\.?$/i;
 const MAX_NOTE_LENGTH = 280;
-const FENCED_CODE = /^[ \t]*(```|~~~)[^\n]*\n[\s\S]*?^[ \t]*\1[^\n]*$/gm;
+const MAX_NOTES_PER_PULL = 3;
+const MAX_HIGHLIGHTS = 25;
+const TRUSTED_AUTHORS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+const FENCE = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/;
 // GitHub hides an unterminated comment through the end of the body, so strip to the end too.
 const HTML_COMMENT = /<!--[\s\S]*?(?:-->|$(?![\s\S]))/g;
 const REVERTS = /^This reverts commit ([0-9a-f]{7,40})\b/im;
 const REQUEST_TIMEOUT_MS = 10_000;
 const PULL_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
-    pullRequest(number: $number) { body merged mergedAt lastEditedAt }
+    pullRequest(number: $number) { body merged mergedAt lastEditedAt authorAssociation }
   }
 }`;
 /** PR number from a squash-merge header such as `fix(app): keep totals (#943)`. */
@@ -33,12 +38,36 @@ export function pullRequestNumber(message) {
   const match = header.match(PR_REFERENCE);
   return match ? Number(match[1]) : null;
 }
+// CommonMark fences: a closing fence uses the opening character, is at least as long, and has no
+// info string; an unterminated fence runs to the end of the body.
+function closesFence(line, open) {
+  const match = line.match(FENCE);
+  if (!match || match[2].trim()) return false;
+  return match[1][0] === open[0] && match[1].length >= open.length;
+}
+function openingFence(line) {
+  return line.match(FENCE)?.[1] ?? null;
+}
+function fenceStep(state, line) {
+  if (state.open) {
+    if (closesFence(line, state.open)) state.open = null;
+    return state;
+  }
+  state.open = openingFence(line);
+  if (!state.open) state.kept.push(line);
+  return state;
+}
+function stripFencedCode(text) {
+  return text.split('\n').reduce(fenceStep, { open: null, kept: [] }).kept.join('\n');
+}
 function noteSection(body) {
   // Hidden comments and fenced examples cannot start or end the real section.
   const text = String(body ?? '')
     .replace(/\r\n/g, '\n')
-    .replace(HTML_COMMENT, '')
-    .replace(FENCED_CODE, '');
+    .replace(HTML_COMMENT, '');
+  return sectionAfterHeading(stripFencedCode(text));
+}
+function sectionAfterHeading(text) {
   const start = text.search(NOTE_HEADING);
   if (start === -1) return '';
   const rest = text.slice(start).replace(NOTE_HEADING, '');
@@ -75,7 +104,7 @@ export function releaseNotesFromBody(body) {
   const section = noteSection(body);
   const items = listItems(section);
   const notes = items.length ? items : [section];
-  return notes.map(cleanNote).filter(publishable);
+  return notes.map(cleanNote).filter(publishable).slice(0, MAX_NOTES_PER_PULL);
 }
 const revertedPrefix = (commit) =>
   String(commit.message ?? '')
@@ -133,11 +162,16 @@ export function repositorySlug(env = {}, repositoryUrl = '') {
   return SLUG.test(fromEnv) ? fromEnv : slugFromUrl(repositoryUrl);
 }
 /** Why a PR's current description cannot be published, or null when it is the merged text. */
+// A missing lastEditedAt parses to NaN, and NaN > mergedAt is false: never edited is reviewed.
+const editedAfterMerge = (pull) => Date.parse(pull.lastEditedAt) > Date.parse(pull.mergedAt);
+const REVIEW_CHECKS = [
+  [(pull) => !pull?.merged, 'PR is not merged'],
+  [(pull) => !TRUSTED_AUTHORS.has(pull.authorAssociation), 'PR author lacks write access'],
+  [editedAfterMerge, 'description was edited after merge'],
+];
+/** Why a PR's current description cannot be published, or null when it is the merged text. */
 export function unreviewedReason(pull) {
-  if (!pull?.merged) return 'PR is not merged';
-  // A missing lastEditedAt parses to NaN, and NaN > mergedAt is false: never edited is reviewed.
-  const editedAfterMerge = Date.parse(pull.lastEditedAt) > Date.parse(pull.mergedAt);
-  return editedAfterMerge ? 'description was edited after merge' : null;
+  return REVIEW_CHECKS.find(([fails]) => fails(pull))?.[1] ?? null;
 }
 async function fetchPull({ slug, number, token }) {
   const [owner, name] = slug.split('/');
@@ -175,7 +209,7 @@ export async function collectHighlights({ commits, ...context }) {
   const kept = commits.filter((commit) => !cancelled.has(commit));
   const numbers = [...new Set(kept.map((commit) => pullRequestNumber(commit.message)))];
   const notes = await Promise.all(numbers.filter(Boolean).map((n) => notesForPull(options, n)));
-  return notes.flat();
+  return notes.flat().slice(0, MAX_HIGHLIGHTS);
 }
 /** Insert a `### Highlights` list directly below the version heading of generated notes. */
 export function withHighlights(notes, highlights, slug) {

@@ -76,6 +76,23 @@ describe('release note parsing', () => {
       releaseNotesFromBody(`${template('Visible note.')}\n<!-- ## Release note\nHidden`)
     ).toEqual(['Visible note.']);
   });
+  // A closed fence hides only its contents; an unterminated one hides the rest of the body.
+  it.each([
+    [
+      'a longer fence containing a shorter one',
+      '````md\n```\n## Release note\nFake\n```\n````',
+      ['Real note.'],
+    ],
+    ['an unterminated fence', '```md\n## Release note\nFake', []],
+    ['a tilde fence that backticks cannot close', '~~~\n```\n## Release note\nFake\n```', []],
+  ])('ignores headings inside %s', (_label, fenced, expected) => {
+    const real = template('Real note.').slice('## Summary\n\nInternal detail.\n\n'.length);
+    expect(releaseNotesFromBody(`## Summary\n\n${fenced}\n\n${real}`)).toEqual(expected);
+  });
+  it('keeps at most three notes per PR', () => {
+    const body = template(['- one', '- two', '- three', '- four'].join('\n'));
+    expect(releaseNotesFromBody(body)).toEqual(['one', 'two', 'three']);
+  });
   it('ignores release-note headings inside fenced code examples', () => {
     const body = `## Summary\n\n\`\`\`md\n## Release note\nnone\n\`\`\`\n\n~~~\n## Changes\n~~~\n\n${template('Real note.').slice('## Summary\n\nInternal detail.\n\n'.length)}`;
     expect(releaseNotesFromBody(body)).toEqual(['Real note.']);
@@ -176,17 +193,18 @@ describe('version commit detection', () => {
 });
 describe('reviewed release notes', () => {
   const mergedAt = '2026-09-27T12:00:00Z';
+  const pull = (extra) => ({ merged: true, mergedAt, authorAssociation: 'MEMBER', ...extra });
   it.each([
-    [{ merged: true, mergedAt, lastEditedAt: null }, null],
-    [{ merged: true, mergedAt, lastEditedAt: '2026-09-27T11:59:59Z' }, null],
-    [{ merged: true, mergedAt, lastEditedAt: mergedAt }, null],
-    [
-      { merged: true, mergedAt, lastEditedAt: '2026-09-27T12:00:01Z' },
-      'description was edited after merge',
-    ],
-    [{ merged: false, mergedAt: null, lastEditedAt: null }, 'PR is not merged'],
+    [pull({ lastEditedAt: null }), null],
+    [pull({ lastEditedAt: '2026-09-27T11:59:59Z' }), null],
+    [pull({ lastEditedAt: mergedAt, authorAssociation: 'OWNER' }), null],
+    [pull({ authorAssociation: 'COLLABORATOR' }), null],
+    [pull({ lastEditedAt: '2026-09-27T12:00:01Z' }), 'description was edited after merge'],
+    [pull({ authorAssociation: 'CONTRIBUTOR' }), 'PR author lacks write access'],
+    [pull({ authorAssociation: 'NONE' }), 'PR author lacks write access'],
+    [pull({ merged: false }), 'PR is not merged'],
     [null, 'PR is not merged'],
-  ])('classifies %j', (pull, expected) => expect(unreviewedReason(pull)).toBe(expected));
+  ])('classifies %j', (value, expected) => expect(unreviewedReason(value)).toBe(expected));
 });
 describe('release highlights', () => {
   const logger = { log: vi.fn() };
@@ -202,7 +220,13 @@ describe('release highlights', () => {
     json({
       data: {
         repository: {
-          pullRequest: { body, merged: true, mergedAt: '2026-09-27T12:00:00Z', ...extra },
+          pullRequest: {
+            body,
+            merged: true,
+            mergedAt: '2026-09-27T12:00:00Z',
+            authorAssociation: 'MEMBER',
+            ...extra,
+          },
         },
       },
     });
@@ -241,6 +265,17 @@ describe('release highlights', () => {
       950,
       'description was edited after merge'
     );
+  });
+  it('caps the total number of highlights per release', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => merged(template('- a\n- b\n- c')))
+    );
+    const many = Array.from({ length: 12 }, (_, i) => ({
+      message: `fix(app): change (#${100 + i})`,
+    }));
+    const env = { GITHUB_REPOSITORY: 'o/r', GITHUB_TOKEN: 't' };
+    expect(await collectHighlights({ commits: many, env, logger })).toHaveLength(25);
   });
   it.each([
     [{}, 'https://github.com/owner/repo.git'],

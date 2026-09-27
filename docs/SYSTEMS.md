@@ -1713,8 +1713,9 @@ The checkout stays pinned to the validated SHA. The production build still runs 
   the stock Angular rules, except that `refactor` and `docs` no longer release.
 - Release-note highlights (`scripts/release-highlights.mjs`) are the only release input read from
   mutable GitHub content. They are additive and fail open: a lookup error, timeout (10 s), missing
-  token, unmerged PR, or a description edited after `mergedAt` skips that note and never blocks or
-  alters versioning. Notes are reduced to plain text (no link syntax, URLs, or HTML; comments and
+  token, unmerged PR, a PR author without write access (GraphQL `authorAssociation` other than
+  `OWNER`/`MEMBER`/`COLLABORATOR`), or a description edited after `mergedAt` skips that note and
+  never blocks or alters versioning. At most 3 notes per PR and 25 per release are published. Notes are reduced to plain text (no link syntax, URLs, or HTML; comments and
   code fences cannot supply the section). Highlights are added only when notes are regenerated
   after the `chore(release): <version>` commit exists, so PR text reaches the GitHub release but is
   never committed to `CHANGELOG.md` or seen by the staging secret scan; recovered publications

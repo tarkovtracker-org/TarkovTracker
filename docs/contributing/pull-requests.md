@@ -62,7 +62,8 @@ asks for the following sections. Complete every section:
 - **Summary** — a brief description of what the PR does.
 - **Release note** — one or two player-facing sentences (or bullets) for the next release's
   Highlights and the in-app changelog, or `none` for changes players will not notice. Describe the
-  effect, not the implementation.
+  effect, not the implementation. Notes from contributors without write access are not published
+  automatically; a maintainer adds them to the release.
 - **Changes** — a list of the key changes made.
 - **Type of Change** — mark the relevant option(s): bug fix, new feature, enhancement, refactoring,
   documentation update, dependency update, or other.

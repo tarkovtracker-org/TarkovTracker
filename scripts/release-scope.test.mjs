@@ -69,7 +69,12 @@ describe('release scope plugin', () => {
     const fetchMock = vi.fn(async (_url, init) => {
       const { number } = JSON.parse(init.body).variables;
       const note = number === 943 ? 'Smart Fill now spreads collected items evenly.' : 'none';
-      const pullRequest = { body: `## Release note\n\n${note}\n`, merged: true, mergedAt: 'x' };
+      const pullRequest = {
+        body: `## Release note\n\n${note}\n`,
+        merged: true,
+        mergedAt: 'x',
+        authorAssociation: 'MEMBER',
+      };
       return Response.json({ data: { repository: { pullRequest } } });
     });
     vi.stubGlobal('fetch', fetchMock);
