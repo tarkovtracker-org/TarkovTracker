@@ -220,7 +220,7 @@ graph LR
     Dev[pnpm run dev] --> Code[edit app/]
     Code --> Hook[husky + lint-staged: prettier + eslint --fix]
     Hook --> Commit[conventional commit]
-    Commit --> CI[CI: fallow / lint-format / typecheck / test / validate / db / workers / security]
+    Commit --> CI[CI: fallow / lint-format / typecheck / test / validate / db / systems-drift / workers / security]
     CI --> Build[nuxt build]
     Build --> Pages[Cloudflare Pages]
     Build --> Worker[wrangler deploy api-gateway]

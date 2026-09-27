@@ -1,11 +1,11 @@
 # Dependencies — TarkovTracker
 
-> Package manifests (`package.json` and `workers/api-gateway/package.json`) declare dependencies and scripts; `pnpm-workspace.yaml` defines `catalog:` versions and overrides, and the lockfiles hold resolved versions. Together these are the authoritative sources. This file documents only the architectural dependency boundaries and policies to keep maintenance overhead and token footprint minimal.
+> Package manifests (`package.json` and `workers/api-gateway/package.json`) declare dependencies and scripts; `pnpm-workspace.yaml` defines `catalog:` versions and overrides, and the root `pnpm-lock.yaml` holds resolved versions for both packages. Together these are the authoritative sources. This file documents only the architectural dependency boundaries and policies to keep maintenance overhead and token footprint minimal.
 
 ## Authoritative Manifests
 
 - **Root manifest (`package.json`)**: SPA application dependencies, shared utils, dev tooling, test runners, linters, and precompute scripts.
-- **API Gateway manifest (`workers/api-gateway/package.json`)**: Standalone Cloudflare Worker package with independent dependencies and lockfile.
+- **API Gateway manifest (`workers/api-gateway/package.json`)**: Standalone Cloudflare Worker package with its own dependencies, a `pnpm-workspace.yaml` member resolved in the root `pnpm-lock.yaml`.
 - **Supabase Edge Functions (`supabase/functions/deno.json`)**: Runs on **Deno** (not the Node tree), importing via URL / import maps.
 
 ## Architecture Boundaries
