@@ -794,13 +794,23 @@ function normalizeMigrationSql(source) {
       index += 1;
       continue;
     }
-    normalized += source.slice(index, token.end).replace(/[^\n]/g, ' ');
-    if (token.kind === 'literal') normalized += '\u0001';
-    if (token.malformed && token.kind === 'literal') normalized += "'";
-    if (token.malformed && token.kind === 'comment') normalized += '\u0002';
+    normalized += formatMaskedSqlToken(source, index, token);
     index = token.end;
   }
   return normalized;
+}
+function formatMaskedSqlToken(source, index, token) {
+  const masked = source.slice(index, token.end).replace(/[^\n]/g, ' ');
+  return `${masked}${getSqlTokenMarker(token)}`;
+}
+function getSqlTokenMarker(token) {
+  return token.kind === 'literal' ? getLiteralTokenMarker(token) : getCommentTokenMarker(token);
+}
+function getLiteralTokenMarker(token) {
+  return token.malformed ? "\u0001'" : '\u0001';
+}
+function getCommentTokenMarker(token) {
+  return token.malformed ? '\u0002' : '';
 }
 function getMaskedSqlToken(source, index) {
   const lineComment = getDelimitedSqlToken(source, index, '--', '\n', 0);
@@ -816,12 +826,21 @@ function getDelimitedSqlToken(source, index, opening, closing, closingLength) {
   return {
     end: end === -1 ? source.length : end + closingLength,
     kind: 'comment',
-    malformed:
-      (end === -1 && closing !== '\n') ||
-      (closing === '*/' &&
-        end !== -1 &&
-        source.slice(index + opening.length, end).includes(opening)),
+    malformed: isMalformedDelimitedComment(source, index, opening, closing, end),
   };
+}
+function isMalformedDelimitedComment(source, index, opening, closing, end) {
+  return (
+    isUnclosedComment(closing, end) || hasNestedBlockComment(source, index, opening, closing, end)
+  );
+}
+function isUnclosedComment(closing, end) {
+  return end === -1 && closing !== '\n';
+}
+function hasNestedBlockComment(source, index, opening, closing, end) {
+  return (
+    closing === '*/' && end !== -1 && source.slice(index + opening.length, end).includes(opening)
+  );
 }
 function getSqlLiteralToken(source, start) {
   let index = start + 1;
@@ -940,17 +959,9 @@ function classifyMigration(source) {
     'update',
   ];
   const onlySupportedAcl = isSupportedAclSequence(statementTexts);
-  const hasUnclassifiedStatement = statementTexts.some((statement) => {
-    const hasSupportedPrefix = supportedStatementPrefixes.some((prefix) =>
-      statement.startsWith(prefix)
-    );
-    const isAcl = /^(?:grant|revoke)\b/.test(statement);
-    const validTransactionBoundary = onlySupportedAcl && /^(?:begin|commit)$/.test(statement);
-    return (
-      (!hasSupportedPrefix && !validTransactionBoundary) ||
-      (isAcl && !isSupportedTableAclStatement(statement))
-    );
-  });
+  const hasUnclassifiedStatement = statementTexts.some((statement) =>
+    isUnsupportedMigrationStatement(statement, supportedStatementPrefixes, onlySupportedAcl)
+  );
   const nonAclStatements = statementTexts.filter(
     (statement) => !/^(?:grant|revoke)\b/.test(statement)
   );
@@ -974,6 +985,12 @@ function classifyMigration(source) {
     statementCount: statementTexts.length,
   });
   return formatMigrationClassification(classification, incomplete);
+}
+function isUnsupportedMigrationStatement(statement, supportedPrefixes, onlySupportedAcl) {
+  if (/^(?:grant|revoke)\b/.test(statement)) return !isSupportedTableAclStatement(statement);
+  const hasSupportedPrefix = supportedPrefixes.some((prefix) => statement.startsWith(prefix));
+  const isTransactionBoundary = /^(?:begin|commit)$/.test(statement);
+  return !hasSupportedPrefix && !(onlySupportedAcl && isTransactionBoundary);
 }
 function getMigrationClassification(normalized, nonAclSql, details) {
   const statements = normalized
