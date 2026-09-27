@@ -1726,6 +1726,11 @@ The checkout stays pinned to the validated SHA. The production build still runs 
 ### Invariants
 
 - PR, fork, unsuccessful, superseded, and stale CI-attempt events cannot authorize publication.
+- `scripts/release-scope.mjs` removes commits whose header scope (or the header wrapped by any
+  number of `Revert "…"` / `revert:` prefixes) is in `INTERNAL_SCOPES` before both commit analysis and note generation.
+  Those commits never set the version type (including breaking-change markers) and never appear in
+  `CHANGELOG.md` or GitHub releases; they still deploy. Unscoped and product-scoped commits keep
+  the stock Angular rules, except that `refactor` and `docs` no longer release.
 - Never replace the validated checkout with a newer main commit to make publishing succeed.
 - CI cancellation must not cancel a publisher; only release jobs share `release-main` with
   `cancel-in-progress: false`. Git non-fast-forward protection and semantic-release's upstream

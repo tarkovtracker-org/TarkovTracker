@@ -123,7 +123,8 @@ direct validation before auto-merging safe translation updates.
 `setup-project` action, build, recheck, semantic-release).
 The workflow reuses CI's test shards and database checks. It rejects stale commits and CI attempts,
 PR/fork events, and automation-skip directives before publishing. Documentation-only pushes can
-reach the gate; conventional commits determine whether a version is warranted. Publication is
+reach the gate; conventional commits outside internal scopes determine whether a version is
+warranted (`scripts/release-scope.mjs`). Publication is
 serialized without cancelling an active release. See `docs/WORKFLOW_AUTOMATION.md` for details.
 
 ### PR Checks (`pr-checks.yml`)
