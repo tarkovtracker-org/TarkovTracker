@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseEnv, promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
@@ -86,6 +86,28 @@ const HEALTH_SQL = `select
   r.rolbypassrls as can_bypass_rls,
   pg_has_role(current_user, 'pg_write_all_data', 'member') as is_write_role,
   has_schema_privilege(current_user, 'public', 'create') as can_create_in_public,
+  coalesce(
+    has_schema_privilege(current_user, to_regnamespace('supabase_migrations'), 'usage'),
+    false
+  ) as can_use_migration_schema,
+  coalesce(
+    has_column_privilege(
+      current_user,
+      (select c.oid from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace where n.nspname = 'supabase_migrations' and c.relname = 'schema_migrations'),
+      'version',
+      'select'
+    ),
+    false
+  ) as can_read_migration_versions,
+  coalesce(
+    has_column_privilege(
+      current_user,
+      (select c.oid from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace where n.nspname = 'supabase_migrations' and c.relname = 'schema_migrations'),
+      'statements',
+      'select'
+    ),
+    false
+  ) as can_read_migration_statements,
   has_database_privilege(current_user, current_database(), 'create') as can_create_in_database,
   exists (
     select 1
@@ -220,6 +242,16 @@ function validateConnectionUrl(parsed) {
 function validateConnectionSecurity(parsed) {
   const sslMode = parsed.searchParams.get('sslmode');
   if (sslMode !== 'verify-full') throw new Error('PROD_DB_URL must set sslmode=verify-full');
+  validateRootCertificate(parsed.searchParams.get('sslrootcert'));
+}
+function validateRootCertificate(rootCertificate) {
+  if (rootCertificate === null) return;
+  if (!isAbsolute(rootCertificate))
+    throw new Error(
+      'PROD_DB_URL sslrootcert must be an absolute path; environment values are literal, so expand $HOME before setting the certificate path'
+    );
+  if (!existsSync(rootCertificate))
+    throw new Error(`PROD_DB_URL sslrootcert certificate file does not exist: ${rootCertificate}`);
 }
 function validateConnectionProtocol(parsed) {
   if (!['postgres:', 'postgresql:'].includes(parsed.protocol))
@@ -537,6 +569,61 @@ async function runSchema() {
     when 'f' then 'foreign_table'
     else c.relkind::text
   end as relation_type,
+  (select owner.rolname from pg_catalog.pg_roles owner where owner.oid = c.relowner) as owner_role,
+  c.relrowsecurity as row_level_security,
+  c.relforcerowsecurity as force_row_level_security,
+  coalesce(
+    (
+      select jsonb_agg(jsonb_build_object(
+        'grantee', case when acl.grantee = 0 then 'PUBLIC' else coalesce(role.rolname, acl.grantee::text) end,
+        'privilege', acl.privilege_type,
+        'grantable', acl.is_grantable,
+        'inherited_by_observer', case
+          when acl.grantee = 0 then true
+          when acl.grantee = (select oid from pg_catalog.pg_roles where rolname = current_user) then true
+          else pg_has_role(current_user, acl.grantee, 'USAGE')
+        end
+      ) order by coalesce(role.rolname, 'PUBLIC'), acl.privilege_type)
+      from aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) acl
+      left join pg_catalog.pg_roles role on role.oid = acl.grantee
+    ),
+    '[]'::jsonb
+  ) as grants,
+  coalesce(
+    (
+      select array_agg(distinct acl.privilege_type order by acl.privilege_type)
+      from aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) acl
+      where acl.grantee = 0
+    ),
+    array[]::text[]
+  ) as public_privileges,
+  coalesce(
+    (
+      select array_agg(privilege order by privilege)
+      from (
+        select distinct lower(acl.privilege_type) as privilege
+        from aclexplode(acldefault('r', c.relowner)) acl
+      ) available
+      where has_table_privilege(current_user, c.oid, privilege)
+    ),
+    array[]::text[]
+  ) as effective_observer_privileges,
+  coalesce(
+    (
+      select jsonb_object_agg(core_role.rolname, coalesce(effective.privileges, '[]'::jsonb))
+      from pg_catalog.pg_roles core_role
+      left join lateral (
+        select jsonb_agg(privilege order by privilege) as privileges
+        from (
+          select distinct lower(acl.privilege_type) as privilege
+          from aclexplode(acldefault('r', c.relowner)) acl
+        ) available
+        where has_table_privilege(core_role.rolname, c.oid, privilege)
+      ) effective on true
+      where core_role.rolname in ('anon', 'authenticated', 'service_role')
+    ),
+    '{}'::jsonb
+  ) as effective_core_role_privileges,
   pg_total_relation_size(c.oid) as total_size_bytes,
   obj_description(c.oid, 'pg_class') as description
 from pg_catalog.pg_class c
@@ -708,7 +795,9 @@ function normalizeMigrationSql(source) {
       continue;
     }
     normalized += source.slice(index, token.end).replace(/[^\n]/g, ' ');
-    if (token.malformed) normalized += "'";
+    if (token.kind === 'literal') normalized += '\u0001';
+    if (token.malformed && token.kind === 'literal') normalized += "'";
+    if (token.malformed && token.kind === 'comment') normalized += '\u0002';
     index = token.end;
   }
   return normalized;
@@ -724,7 +813,15 @@ function getMaskedSqlToken(source, index) {
 function getDelimitedSqlToken(source, index, opening, closing, closingLength) {
   if (!source.startsWith(opening, index)) return undefined;
   const end = source.indexOf(closing, index + opening.length);
-  return { end: end === -1 ? source.length : end + closingLength };
+  return {
+    end: end === -1 ? source.length : end + closingLength,
+    kind: 'comment',
+    malformed:
+      (end === -1 && closing !== '\n') ||
+      (closing === '*/' &&
+        end !== -1 &&
+        source.slice(index + opening.length, end).includes(opening)),
+  };
 }
 function getSqlLiteralToken(source, start) {
   let index = start + 1;
@@ -737,9 +834,9 @@ function getSqlLiteralToken(source, start) {
       index += 2;
       continue;
     }
-    return { end: index + 1, malformed: false };
+    return { end: index + 1, kind: 'literal', malformed: false };
   }
-  return { end: source.length, malformed: true };
+  return { end: source.length, kind: 'literal', malformed: true };
 }
 function extractMigrationRelations(source) {
   const normalizedSource = normalizeMigrationSql(source);
@@ -754,7 +851,18 @@ function extractMigrationRelations(source) {
     new RegExp(String.raw`\bfrom\s+${identifier}`, 'gi'),
     new RegExp(String.raw`\bjoin\s+${identifier}`, 'gi'),
   ];
-  const matches = patterns.flatMap((pattern) => [...normalizedSource.matchAll(pattern)]);
+  const matches = normalizedSource.split(';').flatMap((statement) => {
+    if (/^\s*(?:grant|revoke)\b/i.test(statement)) {
+      const aclRelationPattern = new RegExp(
+        String.raw`\bon\s+(?:table\s+)?((?:${identifier})(?:\s*,\s*${identifier})*)\s+(?:to|from)\b`,
+        'gi'
+      );
+      return [...statement.matchAll(aclRelationPattern)].flatMap((match) =>
+        match[1].split(',').map((relation) => [undefined, relation.trim()])
+      );
+    }
+    return patterns.flatMap((pattern) => [...statement.matchAll(pattern)]);
+  });
   const relations = matches.map((match) => normalizeRelation(match[1])).filter(Boolean);
   return [...new Set(relations)].sort((left, right) => left.localeCompare(right));
 }
@@ -763,6 +871,27 @@ function normalizeRelation(value) {
   const ignored = ['select', 'where', 'set', 'values', 'using', 'on'];
   if (ignored.includes(relation.toLowerCase())) return undefined;
   return relation.includes('.') ? relation : `public.${relation}`;
+}
+function isSupportedTableAclStatement(statement) {
+  const identifier = String.raw`[a-zA-Z_][a-zA-Z0-9_$]*(?:\.[a-zA-Z_][a-zA-Z0-9_$]*)?`;
+  const role = String.raw`(?:[a-zA-Z_][a-zA-Z0-9_$]*|public|current_user|current_role|session_user)`;
+  const individualPrivileges = String.raw`(?:select|insert|update|delete|truncate|references|trigger)(?:\s*,\s*(?:select|insert|update|delete|truncate|references|trigger))*`;
+  const privileges = String.raw`(?:all(?:\s+privileges)?|${individualPrivileges})`;
+  const relations = String.raw`${identifier}(?:\s*,\s*${identifier})*`;
+  const grant = new RegExp(
+    String.raw`^grant\s+${privileges}\s+on\s+(?:table\s+)?${relations}\s+to\s+${role}(?:\s*,\s*${role})*(?:\s+with\s+grant\s+option)?$`,
+    'i'
+  );
+  const revoke = new RegExp(
+    String.raw`^revoke\s+${privileges}\s+on\s+(?:table\s+)?${relations}\s+from\s+${role}(?:\s*,\s*${role})*(?:\s+cascade|\s+restrict)?$`,
+    'i'
+  );
+  return grant.test(statement) || revoke.test(statement);
+}
+function isSupportedAclSequence(statements) {
+  const wrappedInTransaction = statements[0] === 'begin' && statements.at(-1) === 'commit';
+  const aclStatements = wrappedInTransaction ? statements.slice(1, -1) : statements;
+  return aclStatements.length > 0 && aclStatements.every(isSupportedTableAclStatement);
 }
 function classifyMigration(source) {
   const normalized = normalizeMigrationSql(source).toLowerCase();
@@ -792,6 +921,7 @@ function classifyMigration(source) {
     .map((pattern) => pattern.source);
   const hasQuotedIdentifier = /["`]/.test(normalized);
   const hasMalformedLiteral = normalized.includes("'");
+  const hasMalformedComment = normalized.includes('\u0002');
   const hasDynamicSql = /\b(?:execute|format)\b/.test(normalized);
   const supportedStatementPrefixes = [
     'alter table',
@@ -809,42 +939,65 @@ function classifyMigration(source) {
     'truncate table',
     'update',
   ];
-  const hasUnclassifiedStatement = statementTexts.some(
-    (statement) => !supportedStatementPrefixes.some((prefix) => statement.startsWith(prefix))
+  const onlySupportedAcl = isSupportedAclSequence(statementTexts);
+  const hasUnclassifiedStatement = statementTexts.some((statement) => {
+    const hasSupportedPrefix = supportedStatementPrefixes.some((prefix) =>
+      statement.startsWith(prefix)
+    );
+    const isAcl = /^(?:grant|revoke)\b/.test(statement);
+    const validTransactionBoundary = onlySupportedAcl && /^(?:begin|commit)$/.test(statement);
+    return (
+      (!hasSupportedPrefix && !validTransactionBoundary) ||
+      (isAcl && !isSupportedTableAclStatement(statement))
+    );
+  });
+  const nonAclStatements = statementTexts.filter(
+    (statement) => !/^(?:grant|revoke)\b/.test(statement)
   );
+  const nonAclSql = nonAclStatements.join(';');
   const incomplete = [
     unsupported_constructs.length > 0,
     hasQuotedIdentifier,
     hasMalformedLiteral,
+    hasMalformedComment,
     hasDynamicSql,
     hasUnclassifiedStatement,
-    statementTexts.length > 1,
+    statementTexts.length > 1 && !onlySupportedAcl,
   ].some(Boolean);
-  const classification = getMigrationClassification(normalized, {
+  const classification = getMigrationClassification(normalized, nonAclSql, {
     unsupported_constructs,
     hasQuotedIdentifier,
     hasMalformedLiteral,
+    hasMalformedComment,
     hasDynamicSql,
     hasUnclassifiedStatement,
     statementCount: statementTexts.length,
   });
   return formatMigrationClassification(classification, incomplete);
 }
-function getMigrationClassification(normalized, details) {
+function getMigrationClassification(normalized, nonAclSql, details) {
+  const statements = normalized
+    .split(';')
+    .map((statement) => statement.trim())
+    .filter(Boolean);
   return {
-    contains_ddl: /\b(alter|create|drop|truncate|rename)\b/.test(normalized),
-    contains_data_change: /\b(insert|update|delete|merge)\b/.test(normalized),
-    contains_index_build: /\bcreate\s+(?:unique\s+)?index\b/.test(normalized),
-    contains_concurrent_index: /\bcreate\s+(?:unique\s+)?index\s+concurrently\b/.test(normalized),
+    contains_ddl: /\b(alter|create|drop|truncate|rename)\b/.test(nonAclSql),
+    contains_data_change: statements.some(
+      (statement) =>
+        !/^(?:grant|revoke)\b/.test(statement) && /\b(insert|update|delete|merge)\b/.test(statement)
+    ),
+    contains_index_build: /\bcreate\s+(?:unique\s+)?index\b/.test(nonAclSql),
+    contains_concurrent_index: /\bcreate\s+(?:unique\s+)?index\s+concurrently\b/.test(nonAclSql),
     contains_table_rewrite_risk:
       /\balter\s+table\b[\s\S]*\b(add\s+column|alter\s+column|set\s+data|type|rewrite)\b/.test(
-        normalized
+        nonAclSql
       ),
-    contains_transaction_control: /\b(begin|commit|rollback)\b/.test(normalized),
-    contains_timeout: /\bstatement_timeout\b/.test(normalized),
+    contains_transaction_control: /\b(begin|commit|rollback)\b/.test(nonAclSql),
+    contains_timeout: /\bstatement_timeout\b/.test(nonAclSql),
     unsupported_constructs: details.unsupported_constructs,
     has_quoted_identifier: details.hasQuotedIdentifier,
     has_malformed_literal: details.hasMalformedLiteral,
+    has_malformed_comment: details.hasMalformedComment,
     has_dynamic_sql: details.hasDynamicSql,
     has_unclassified_statement: details.hasUnclassifiedStatement,
     statement_count: details.statementCount,

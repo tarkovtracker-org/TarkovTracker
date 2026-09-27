@@ -1342,8 +1342,11 @@ flowchart LR
    database statistics reset time, statement statistics reset time, and I/O statistics reset time.
    These timestamps establish the window for cumulative counters.
 4. Schema, count, sample, and distribution operations use validated identifiers and bounded SQL.
-   Samples select allowlisted low-risk columns and are capped at 20 rows; distributions are capped
-   at 50 groups.
+   The schema report includes relation ACL entries, effective PUBLIC grants, privileges for the
+   observer and existing `anon`, `authenticated`, and `service_role` roles (including inherited role
+   membership), relation owners, and row-level-security flags. Health reports whether the role can use
+   the migration-history schema and read the `version` or `statements` column. Samples select
+   allowlisted low-risk columns and are capped at 20 rows; distributions are capped at 50 groups.
 5. The observer rejects writes, DDL, transaction-control statements, `EXPLAIN ANALYZE`, arbitrary
    SQL, unbounded samples, and non-allowlisted distributions.
 6. `canary` runs only health and telemetry reports and is the first production validation path.

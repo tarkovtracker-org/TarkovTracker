@@ -681,16 +681,20 @@ Keep the invoking environment free of privileged credentials. Export `PROD_DB_EN
 invoking shell to select a different file (for example, `export PROD_DB_ENV_FILE=/path/to/observer.env`);
 setting this selector inside `.env` is unsupported. The command fails if the selected file cannot be
 read; an absent default `.env` is allowed. Values are literal:
-no shell or variable expansion occurs. Use absolute certificate paths in `sslrootcert`, not `$HOME`
-or `${HOME}`. An inline environment
+no shell or variable expansion occurs. The wrapper rejects relative or missing certificate paths
+before invoking the CLI. Use absolute certificate paths in `sslrootcert`, not `$HOME` or
+`${HOME}`. An inline environment
 assignment remains supported for non-interactive automation whose secret store masks command input.
 
 Available reports include `health`, `schema`, `migration-history`, `db-stats`, `table-stats`,
 `index-stats`, `traffic`, `outliers`, `calls`, `locks`, `blocking`, `long-running`, `vacuum`,
 `bloat`, `role-stats`, bounded `sample`, `distribution`, and `count`. `sample` excludes columns
 matching the sensitive-column policy and is capped at 20 rows; `distribution` is capped at 50
-groups. `EXPLAIN ANALYZE`, arbitrary SQL, writes, DDL, migration commands, and unbounded row access
-are not supported.
+groups. The schema report exposes catalog ACL entries, PUBLIC grants, observer-effective privileges
+through inherited roles, privileges effective for existing `anon`, `authenticated`, and `service_role`
+roles, relation owners, and row-level-security flags. Health shows schema usage and read access to the
+migration `version` and `statements` columns. `EXPLAIN ANALYZE`, arbitrary SQL, writes, DDL, migration
+commands, and unbounded row access are not supported.
 
 `migration-history` reads applied version identifiers from `supabase_migrations.schema_migrations`
 and compares them with `supabase/migrations` in the current checkout. It reports `missing_locally`
