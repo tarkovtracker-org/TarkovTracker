@@ -195,7 +195,7 @@ erDiagram
     teams ||--o{ team_memberships : "team_id"
     team_memberships }o--|| auth_users : "user_id"
     api_tokens }o--|| auth_users : "user_id"
-    api_usage_daily }o--|| api_tokens : "token_id"
+    api_usage_daily }o--|| auth_users : "user_id"
     supporters }o--|| auth_users : "user_id"
     discord_account_links }o--|| auth_users : "user_id"
     user_prestige_runs }o--|| auth_users : "user_id"
@@ -242,15 +242,19 @@ erDiagram
         uuid token_id
         uuid user_id
         text token_hash
+        text token_value
         text note
         text game_mode
         bool is_active
     }
     api_usage_daily {
-        uuid token_id
-        date usage_date
-        int read_count
-        int write_count
+        uuid user_id
+        text token_id
+        date day
+        text tier
+        int reads
+        int writes
+        int throttled
     }
     supporters {
         uuid user_id
@@ -258,16 +262,19 @@ erDiagram
         text stripe_customer_id
     }
     discord_account_links {
-        uuid id
         uuid user_id
         text discord_user_id
         text discord_username
     }
     user_prestige_runs {
+        uuid id
         uuid user_id
-        int prestige_level
-        timestamptz completed_at
-        int progress_epoch
+        text mode
+        int prestige_from
+        int prestige_to
+        jsonb archived_progress
+        jsonb summary
+        timestamptz created_at
     }
     stripe_events {
         text id
@@ -275,22 +282,22 @@ erDiagram
     }
 ```
 
-| Table / object               | Role                                                                                      |
-| ---------------------------- | ----------------------------------------------------------------------------------------- |
-| `user_progress`              | Legacy per-user progress (pvp_data/pve_data); compatibility row for rolling deploys       |
-| `user_game_mode_progress`    | Normalized per-mode progress; PK `(user_id, game_mode, season_number)`; realtime-enabled  |
-| `user_system`                | Per-user system row (team linkage, seasonal_team_id, admin flag)                          |
-| `user_preferences`           | Per-user UI preferences (columns added incrementally via migrations)                      |
-| `teams` / `team_memberships` | Team ownership + membership (game-mode aware; accepts pvp/pve/seasonal)                   |
-| `api_tokens`                 | Hashed API tokens for the gateway (prefixed PVP_/PVE_/SZN_; hashed `token_hash` stored)   |
-| `api_usage_daily`            | Daily API read/write quota tracking per gateway token                                     |
-| `supporters`                 | Supporter tier + Stripe customer linkage                                                  |
-| `discord_account_links`      | Discord account linkage for supporter role synchronization                                |
-| `stripe_events`              | Idempotency/retention for webhook events                                                  |
-| `user_prestige_runs`         | Prestige run history (+ progress epoch)                                                   |
-| `account_deletion_jobs`      | Account deletion job tracking                                                             |
-| `admin_audit_log`            | Admin action audit trail                                                                  |
-| RPCs                         | `sync_user_game_mode_progress`, `merge_progress_data`, prestige, rate limiting, ownership |
+| Table / object               | Role                                                                                                        |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `user_progress`              | Legacy per-user progress (pvp_data/pve_data); compatibility row for rolling deploys                         |
+| `user_game_mode_progress`    | Normalized per-mode progress; PK `(user_id, game_mode, season_number)`; realtime-enabled                    |
+| `user_system`                | Per-user system row (team linkage, seasonal_team_id, admin flag)                                            |
+| `user_preferences`           | Per-user UI preferences (columns added incrementally via migrations)                                        |
+| `teams` / `team_memberships` | Team ownership + membership (game-mode aware; accepts pvp/pve/seasonal)                                     |
+| `api_tokens`                 | Gateway tokens (prefixed PVP_/PVE_/SZN_): `token_hash` for lookup, nullable raw `token_value` for retrieval |
+| `api_usage_daily`            | Daily read/write/throttle counters; PK `(user_id, token_id, day)`, `token_id` is text                       |
+| `supporters`                 | Supporter tier + Stripe customer linkage                                                                    |
+| `discord_account_links`      | Discord account linkage for supporter role sync; PK `user_id`                                               |
+| `stripe_events`              | Idempotency/retention for webhook events                                                                    |
+| `user_prestige_runs`         | Prestige run history (from/to level, archived progress, summary)                                            |
+| `account_deletion_jobs`      | Account deletion job tracking                                                                               |
+| `admin_audit_log`            | Admin action audit trail                                                                                    |
+| RPCs                         | `sync_user_game_mode_progress`, `merge_progress_data`, prestige, rate limiting, ownership                   |
 
 > Game modes: `pvp`, `pve`, `seasonal` internally. Game-data API uses `regular`/`pve`/`pvp-season`.
 > Seasonal progress is keyed by season number (pvp/pve always use season_number=0).

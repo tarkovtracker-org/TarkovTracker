@@ -1,6 +1,6 @@
 # Dependencies — TarkovTracker
 
-> Package manifests (`package.json` and `workers/api-gateway/package.json`) are the **sole authoritative sources** for dependencies, versions, and scripts. This file documents only the architectural dependency boundaries and policies to keep maintenance overhead and token footprint minimal.
+> Package manifests (`package.json` and `workers/api-gateway/package.json`) declare dependencies and scripts; `pnpm-workspace.yaml` defines `catalog:` versions and overrides, and the lockfiles hold resolved versions. Together these are the authoritative sources. This file documents only the architectural dependency boundaries and policies to keep maintenance overhead and token footprint minimal.
 
 ## Authoritative Manifests
 

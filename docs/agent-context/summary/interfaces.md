@@ -1,7 +1,7 @@
 # Interfaces — TarkovTracker
 
-> APIs, interfaces, and integration points. For full endpoint tables with request/response
-> shapes, see `docs/API.md`. This file summarizes the boundaries between subsystems.
+> APIs, interfaces, and integration points. For request/response shapes of the Tarkov data, team,
+> and Stripe endpoints, see `docs/API.md`. This file summarizes the boundaries between subsystems.
 
 ## Interface Map
 
@@ -33,11 +33,12 @@ graph LR
 
 - **`/api/tarkov/*`** — public cached proxies to `json.tarkov.dev` with overlay corrections (`tasks-core`, `tasks-objectives`, `tasks-rewards`, `hideout`, `items`, `items-lite`, `map-spawns`, `prestige`, `editions`, `overlay-status`, `bootstrap`, `cache-meta`). Most use 12h–24h edge TTLs (cache-meta: 5m). See `docs/API.md` §Tarkov Data Endpoints for the full table.
 - **`/api/team/*`, `/api/stripe/*`** — authenticated app routes (Supabase JWT). See `docs/API.md` §Team Endpoints / §Supporter / Stripe Endpoints.
-- **`/api/admin/*`** — authenticated admin management (`supporter`, `twitch-config`, `api-usage`).
+- **`/api/admin/*`** — authenticated admin management (`supporter`, `twitch-config`, `api-usage`). Not in `docs/API.md`; see handlers in `app/server/api/admin/`.
 - **`/api/profile/*`** — public shared profiles (rate-limited, no auth required).
-- **`/api/streamer/*`, `/overlay/*`** — streamer overlays and companion JSON endpoints.
-- **`/api/twitch/*`, `/api/changelog`, `/api/contributors`, `/api/tarkov-dev/profile`** — supporting public endpoints.
-- **`/api/account/activity`, `/api/logs/client`** — client diagnostics and manual activity audit logging.
+- **`/api/streamer/*`, `/overlay/*`** — streamer overlays and companion JSON endpoints. Not in `docs/API.md`; see `app/server/api/streamer/`.
+- **`/api/twitch/*`, `/api/changelog`, `/api/contributors`, `/api/tarkov-dev/profile`** — supporting public endpoints. Not in `docs/API.md`; see their handlers under `app/server/api/`.
+- **`/api/account/activity`** — records a hashed client IP and user agent in `account_ip_audit` (account security, not gameplay activity history).
+- **`/api/logs/client`** — client diagnostics logging.
 
 ### Stripe Request Bodies
 
