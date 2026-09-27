@@ -115,10 +115,10 @@ test('server-side head guard rejects a race after the last metadata read', (t) =
   passed(f.run('prepare'));
   rejected(f.run('merge', { ACTUAL_HEAD: 'b'.repeat(40) }), /Head changed at merge/);
 });
-test('merge rejects every non-CLEAN state and conflicting or malformed mergeability', (t) => {
+test('merge rejects conflicting or ineligible merge states', (t) => {
   const f = fixture(t);
   passed(f.run('prepare'));
-  for (const mergeStateStatus of ['DIRTY', 'BEHIND', 'UNSTABLE', 'DRAFT', 'HAS_HOOKS', null]) {
+  for (const mergeStateStatus of ['DIRTY', 'BEHIND', 'DRAFT', 'HAS_HOOKS', null]) {
     rejected(
       f.run('merge', { PR_STATES: JSON.stringify([{ ...f.pr, mergeStateStatus }]) }),
       /ineligible/
@@ -128,6 +128,38 @@ test('merge rejects every non-CLEAN state and conflicting or malformed mergeabil
     rejected(f.run('merge', { PR_STATES: JSON.stringify([{ ...f.pr, mergeable }]) }), /ineligible/);
   }
   assert.ok(!f.calls().some((args) => args[1] === 'merge'));
+});
+test('MERGEABLE/UNSTABLE revalidates exact required gates and still uses GitHub server enforcement', (t) => {
+  const f = fixture(t);
+  passed(f.run('prepare'));
+  const unstable = { ...f.pr, mergeStateStatus: 'UNSTABLE' };
+  passed(
+    f.run('merge', {
+      PR_STATES: JSON.stringify([unstable, unstable, unstable]),
+    })
+  );
+  const merge = f.calls().find((args) => args[0] === 'pr' && args[1] === 'merge');
+  assert.ok(merge.includes('--match-head-commit'));
+  assert.ok(merge.includes(f.head));
+  assert.ok(!merge.includes('--admin'));
+  assert.equal(f.events().filter((event) => event.type === 'ci-result').length, 2);
+  assert.equal(f.events().filter((event) => event.type === 'preview-result').length, 4);
+
+  const serverRejected = fixture(t);
+  passed(serverRejected.run('prepare'));
+  const unstableServerRejected = { ...serverRejected.pr, mergeStateStatus: 'UNSTABLE' };
+  rejected(
+    serverRejected.run('merge', {
+      PR_STATES: JSON.stringify([
+        unstableServerRejected,
+        unstableServerRejected,
+        unstableServerRejected,
+      ]),
+      MERGE_FAIL: 'true',
+    }),
+    /Server-side branch rules rejected merge/
+  );
+  assert.ok(serverRejected.calls().some((args) => args[0] === 'pr' && args[1] === 'merge'));
 });
 test('unknown or temporarily blocked mergeability retries until clean, then times out', (t) => {
   const f = fixture(t);

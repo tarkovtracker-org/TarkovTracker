@@ -1761,12 +1761,15 @@ behind branch, explicitly dispatches candidate CI, and performs the final merge;
 - Behind translation branches first receive a GitHub branch update guarded by the expected head.
   Only afterward does the workflow capture and validate a candidate. Conflicts fail closed.
 - Candidates contain captured main. Preflight checks reject observed main/head changes and
-  non-clean merge states. Unknown calculations and a temporary `BLOCKED` state after preview
-  success retry for up to 60 seconds; only `MERGEABLE / CLEAN` may merge.
+  conflicting or stale merge states. Unknown calculations and a temporary `BLOCKED` state after
+  preview success retry for up to 60 seconds. If GitHub continues to report
+  `MERGEABLE / UNSTABLE` for approval-required `pull_request` suites, the gate revalidates the
+  required exact-head `CI Result` and trusted `Preview Result`, then attempts an ordinary
+  head-pinned merge; GitHub's server-side rules still reject any unmet requirement.
 - The gate awaits successful GitHub Actions `CI Result` and then the `Preview Result` commit status
   on the exact head (the explicit `locales` dispatch produces the preview even though job-token
   PR updates leave ordinary `pull_request` runs approval-required) and verifies the effective
-  repository rule requires the CI check with strict freshness. The administrator verifies the deployed
+  repository rule requires both checks with strict freshness. The administrator verifies the deployed
   ruleset has no bypass actors; automation does not receive ruleset write access to read that list.
   GitHub enforces the base requirement at merge time; missing/weakened required checks fail closed.
 - The trusted dispatched CI result job also reports `CI Result` on GitHub's test-merge commit only

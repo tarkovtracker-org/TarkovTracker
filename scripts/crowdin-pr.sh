@@ -93,8 +93,10 @@ check_revision() {
   current_base="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
   [[ "$current_base" == "$BASE_SHA" ]] || fail "Main changed after validation; rerun Crowdin Sync."
 }
-# GitHub may report BLOCKED briefly after Preview Result succeeds while branch rules recalculate.
-# Retry that state, but merge only after GitHub reports CLEAN on the unchanged head and base.
+# GitHub may report BLOCKED while branch rules recalculate. Bot-updated PRs can also retain
+# approval-required pull_request suites even after the trusted exact-head gates pass. For that
+# MERGEABLE/UNSTABLE state, revalidate the required gates and let a normal head-pinned merge make
+# GitHub enforce its branch rules; never use the admin bypass.
 wait_for_mergeability() {
   local pr mergeable merge_state attempt
   for ((attempt = 1; attempt <= 20; attempt++)); do
@@ -105,6 +107,20 @@ wait_for_mergeability() {
     merge_state="$(jq -r '.mergeStateStatus' <<< "$pr")"
     case "$mergeable/$merge_state" in
       MERGEABLE/CLEAN) return ;;
+      MERGEABLE/UNSTABLE)
+        require_main_ci_policy
+        wait_for_validated_ci_and_preview "$HEAD_SHA"
+        pr="$(read_pr)"
+        check_identity "$pr"
+        check_revision "$pr"
+        mergeable="$(jq -r '.mergeable' <<< "$pr")"
+        merge_state="$(jq -r '.mergeStateStatus' <<< "$pr")"
+        case "$mergeable/$merge_state" in
+          MERGEABLE/CLEAN|MERGEABLE/UNSTABLE) return ;;
+          UNKNOWN/UNKNOWN|UNKNOWN/CLEAN|MERGEABLE/UNKNOWN|MERGEABLE/BLOCKED) ;;
+          *) fail "Crowdin PR became ineligible: $mergeable / $merge_state" ;;
+        esac
+        ;;
       UNKNOWN/UNKNOWN|UNKNOWN/CLEAN|MERGEABLE/UNKNOWN|MERGEABLE/BLOCKED) ;;
       *) fail "Crowdin PR is ineligible: $mergeable / $merge_state" ;;
     esac

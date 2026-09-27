@@ -162,6 +162,7 @@ if (args[1] === 'merge') {
   const supplied = args[args.indexOf('--match-head-commit') + 1];
   if (supplied !== p.ACTUAL_HEAD) { console.error('Head changed at merge'); process.exit(1); }
   if (p.ACTUAL_BASE && p.ACTUAL_BASE !== p.BASE_SHA) { console.error('Base advanced at merge'); process.exit(1); }
+  if (p.MERGE_FAIL === 'true') { console.error('Server-side branch rules rejected merge'); process.exit(1); }
   process.exit(0);
 }
 process.exit(2);
