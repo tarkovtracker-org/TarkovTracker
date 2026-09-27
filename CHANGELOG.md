@@ -1,3 +1,10 @@
+## [1.83.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.0...v1.83.1) (2026-09-27)
+
+
+### Bug Fixes
+
+* **ci:** honor verified gates on unstable merge state ([#946](https://github.com/tarkovtracker-org/TarkovTracker/issues/946)) ([1e9c0d4](https://github.com/tarkovtracker-org/TarkovTracker/commit/1e9c0d4b2612deeaa1b034ed5865b721f55eca69))
+
 # [1.83.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.8...v1.83.0) (2026-09-27)
 
 
