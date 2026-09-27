@@ -55,14 +55,28 @@ describe('progress save status', () => {
     expect(progressSaveStatus.local).toBe('failed');
     expect(progressSaveStatus.localFailure).toBe('quota');
   });
-  it('treats only pending cloud changes without a local save as unsaved changes', () => {
+  it('warns for failed local persistence until the latest mutation is cloud-acknowledged', () => {
     recordLocalSave(false, 'quota');
-    // Acknowledged by the cloud: the latest changes are not at risk.
+    // No sync controller ran, so cloud idle does not prove that the mutation was saved.
+    expect(hasUnsavedProgressChanges()).toBe(true);
+    setCloudSaveStatus({
+      state: 'saving',
+      failure: null,
+      retryAttempt: 0,
+      nextRetryAt: null,
+    });
+    setCloudSaveStatus({ state: 'idle', failure: null, retryAttempt: 0, nextRetryAt: null });
     expect(hasUnsavedProgressChanges()).toBe(false);
+    recordLocalSave(false, 'quota');
     setCloudSaveStatus({ state: 'failed', failure: 'offline', retryAttempt: 3, nextRetryAt: null });
     expect(hasUnsavedProgressChanges()).toBe(true);
     recordLocalSave(true);
     expect(hasUnsavedProgressChanges()).toBe(false);
+  });
+  it('does not mistake a session reset to cloud idle for an acknowledgement', () => {
+    recordLocalSave(false, 'unavailable');
+    resetCloudSaveStatus();
+    expect(hasUnsavedProgressChanges()).toBe(true);
   });
   it('clears the unsaved state after a later write succeeds', () => {
     const { control, values } = stubFailingStorage();

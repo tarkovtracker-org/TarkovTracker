@@ -2460,7 +2460,8 @@
       "confirm_description": "This account's progress, recovery copies, superseded progress exports, and preferences will be deleted from this browser, and you will be signed out. Your cloud progress stays available when you sign in again.",
       "pending_warning": "Some progress changes have not been saved to the cloud yet. Removing this device's data will permanently discard them. Export your progress first if you want to keep them.",
       "confirm_button": "Remove data and sign out",
-      "removed": "This account's data was removed from this device."
+      "removed": "This account's data was removed from this device.",
+      "remove_error": "Some account data could not be removed from this device. Try again before using another account here."
     }
   },
   "hideout": {

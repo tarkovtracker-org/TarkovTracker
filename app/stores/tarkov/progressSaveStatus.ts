@@ -36,8 +36,12 @@ const status = reactive<ProgressSaveStatusState>({
   localSavedAt: null,
 });
 let cloudRetryHandler: (() => Promise<boolean>) | null = null;
+let unacknowledgedLocalFailure = false;
 export const progressSaveStatus: Readonly<ProgressSaveStatusState> = readonly(status);
 export const setCloudSaveStatus = (next: CloudSaveStatus): void => {
+  if (status.cloud.state !== 'idle' && next.state === 'idle') {
+    unacknowledgedLocalFailure = false;
+  }
   status.cloud = { ...next };
 };
 export const recordLocalSave = (
@@ -46,6 +50,7 @@ export const recordLocalSave = (
 ): void => {
   status.local = succeeded ? 'saved' : 'failed';
   status.localFailure = succeeded ? null : (failure ?? 'unknown');
+  unacknowledgedLocalFailure = !succeeded;
   if (succeeded) status.localSavedAt = Date.now();
 };
 /** The retry handler belongs to one sync controller; stale owners cannot clear a newer one. */
@@ -72,7 +77,7 @@ export const resetCloudSaveStatus = (): void => {
 export const hasPendingCloudChanges = (): boolean => status.cloud.state !== 'idle';
 /** Pending cloud changes without a confirmed local save may be lost on reload or sign-out. */
 export const hasUnsavedProgressChanges = (): boolean =>
-  status.local === 'failed' && hasPendingCloudChanges();
+  status.local === 'failed' && (unacknowledgedLocalFailure || hasPendingCloudChanges());
 const QUOTA_ERROR_NAMES = new Set(['QuotaExceededError', 'NS_ERROR_DOM_QUOTA_REACHED']);
 const UNAVAILABLE_ERROR_NAMES = new Set(['SecurityError', 'InvalidStateError']);
 const errorName = (error: unknown): string =>

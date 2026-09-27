@@ -1008,6 +1008,11 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
 - The UI may call progress locally saved only after `persistActiveProgressValue` confirms the
   write. A cloud failure is never evidence of a local save, and exhausting cloud retries never
   clears the pending state or discards the changes.
+- Active progress replacement and removal must check the latest persisted envelope owner and
+  confirm retention of a foreign owner's recovery copy first. This guard also covers guest
+  hydration after a reload, when no in-memory transition barrier exists; failed retention blocks
+  writes and removal while resetting visible session state. Explicit removal of that same owner's
+  device data is the only bypass.
 - Cloud save status and the manual retry handler belong to the current sync controller; a
   session reset clears both, and a disposed controller cannot publish status for the next session.
 - An account recovery copy is restored or synchronized only while its owner is signed in, and
@@ -2391,6 +2396,11 @@ are forgeable by write collaborators, so the evidence binds to the controller ru
 `target_url`. That run must report path `.github/workflows/preview.yml`, event
 `workflow_dispatch`, branch `main`, and this repository; its `Publish preview result` job must
 succeed and it must retain a `preview-deployment-<sha>` artifact for the exact candidate.
+
+Cloudflare Pages serves static SPA responses outside the Pages Function routes, so runtime route
+rules alone cannot provide browser response headers for those documents. Keep the static
+`public/_headers` frame-ancestor policy in the uploaded build output alongside the runtime app
+CSP; `frame-src` remains an independent directive for permitted embedded content.
 
 ### Flow
 

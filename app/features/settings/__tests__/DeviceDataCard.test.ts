@@ -2,6 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { nextTick, reactive } from 'vue';
 import { resetCloudSaveStatus, setCloudSaveStatus } from '@/stores/tarkov/progressSaveStatus';
 const { calls, deviceData, exportSupersededProgress, signOutNow, toastAdd, user } = vi.hoisted(
   () => {
@@ -11,7 +12,10 @@ const { calls, deviceData, exportSupersededProgress, signOutNow, toastAdd, user 
       deviceData: {
         requestDeviceDataRemoval: vi.fn(() => order.push('request')),
         clearDeviceDataRemoval: vi.fn(() => order.push('clear')),
-        removeAccountDeviceData: vi.fn(() => order.push('remove')),
+        removeAccountDeviceData: vi.fn(() => {
+          order.push('remove');
+          return true;
+        }),
       },
       signOutNow: vi.fn(async () => {
         order.push('signOut');
@@ -23,6 +27,7 @@ const { calls, deviceData, exportSupersededProgress, signOutNow, toastAdd, user 
     };
   }
 );
+const reactiveUser = reactive(user);
 vi.mock('@/stores/tarkov/deviceData', () => deviceData);
 vi.mock('@/composables/useSignOut', () => ({ useSignOut: () => ({ signOutNow }) }));
 vi.mock('@/composables/useDataBackup', () => ({
@@ -36,7 +41,7 @@ vi.mock('@/utils/logger', () => ({
   logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 mockNuxtImport('useToast', () => () => ({ add: toastAdd }));
-mockNuxtImport('useNuxtApp', () => () => ({ $supabase: { user } }));
+mockNuxtImport('useNuxtApp', () => () => ({ $supabase: { user: reactiveUser } }));
 const mountCard = async () => {
   const { default: Card } = await import('@/features/settings/DeviceDataCard.vue');
   return mount(Card, {
@@ -79,7 +84,7 @@ describe('DeviceDataCard', () => {
     expect(wrapper.find('[data-testid="device-data-pending-warning"]').exists()).toBe(false);
     await wrapper.get('[data-testid="device-data-confirm"]').trigger('click');
     await flushPromises();
-    expect(calls).toEqual(['request', 'signOut', 'remove']);
+    expect(calls).toEqual(['request', 'signOut', 'remove', 'clear']);
     expect(deviceData.removeAccountDeviceData).toHaveBeenCalledWith('user-1');
     expect(toastAdd).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'settings.device_data.removed' })
@@ -118,5 +123,29 @@ describe('DeviceDataCard', () => {
     await wrapper.get('[data-testid="superseded-progress-export"]').trigger('click');
     await flushPromises();
     expect(exportSupersededProgress).toHaveBeenCalledOnce();
+  });
+  it('refreshes superseded-copy visibility when the signed-in owner changes', async () => {
+    const listSpy = vi.spyOn(
+      await import('@/stores/tarkov/supersededProgress'),
+      'listSupersededProgressCopies'
+    );
+    const wrapper = await mountCard();
+    reactiveUser.id = 'user-2';
+    await nextTick();
+    expect(listSpy).toHaveBeenLastCalledWith('user-2');
+    expect(wrapper.find('[data-testid="superseded-progress-export"]').exists()).toBe(false);
+  });
+  it('reports a storage cleanup failure instead of claiming removal succeeded', async () => {
+    deviceData.removeAccountDeviceData.mockReturnValue(false);
+    const wrapper = await mountCard();
+    await wrapper.get('[data-testid="device-data-remove"]').trigger('click');
+    await wrapper.get('[data-testid="device-data-confirm"]').trigger('click');
+    await flushPromises();
+    expect(toastAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'settings.device_data.remove_error', color: 'error' })
+    );
+    expect(toastAdd).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'settings.device_data.removed' })
+    );
   });
 });

@@ -115,6 +115,7 @@
       ? listSupersededProgressCopies($supabase.user.id)
       : [];
   };
+  watch(() => $supabase.user.id, refreshSupersededCopies);
   onMounted(() =>
     window.addEventListener('tt:superseded-progress-change', refreshSupersededCopies)
   );
@@ -141,24 +142,32 @@
    * The removal request is registered before sign-out so the session transition keeps
    * no recovery copy; stored copies are removed again once the transition has run.
    */
-  const signOutAndRemove = async (userId: string): Promise<boolean> => {
+  const signOutAndRemove = async (
+    userId: string
+  ): Promise<'removed' | 'remove_failed' | 'sign_out_failed'> => {
     requestDeviceDataRemoval(userId);
     if (!(await signOutNow())) {
       clearDeviceDataRemoval();
-      return false;
+      return 'sign_out_failed';
     }
     await nextTick();
-    removeAccountDeviceData(userId);
-    return true;
+    const removed = removeAccountDeviceData(userId);
+    clearDeviceDataRemoval();
+    return removed ? 'removed' : 'remove_failed';
   };
   const removeDeviceData = async () => {
     const userId = $supabase.user.id;
     if (!userId) return;
     removing.value = true;
-    const removed = await signOutAndRemove(userId).finally(() => {
+    const result = await signOutAndRemove(userId).finally(() => {
       removing.value = false;
     });
-    if (!removed) return;
+    if (result === 'sign_out_failed') return;
+    if (result === 'remove_failed') {
+      confirmOpen.value = false;
+      toast.add({ title: t('settings.device_data.remove_error'), color: 'error' });
+      return;
+    }
     confirmOpen.value = false;
     toast.add({ title: t('settings.device_data.removed'), color: 'success' });
   };

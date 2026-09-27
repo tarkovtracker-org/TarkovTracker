@@ -495,6 +495,11 @@ describe('useDataBackup', () => {
       );
       localStorage.setItem('sb-localhost-auth-token', 'token-secret');
       localStorage.setItem(`${STORAGE_KEYS.progressBackupPrefix}user-123_1700000009999`, 'backup');
+      localStorage.setItem(`${STORAGE_KEYS.progressRecoveryPrefix}user-123`, 'recovery');
+      localStorage.setItem(
+        `${STORAGE_KEYS.progressSupersededPrefix}user-123_1700000009999_abcd`,
+        'superseded'
+      );
       sessionStorage.setItem(STORAGE_KEYS.sessionDataMigrated, 'true');
       window.history.replaceState({}, '', '/settings?tab=data#debug');
       let backupBlob: Blob | null = null;
@@ -565,6 +570,7 @@ describe('useDataBackup', () => {
         );
         expect(debugJson.storage.authStorageKeyCount).toBe(1);
         expect(debugJson.storage.localStorageKeys).not.toContain('sb-localhost-auth-token');
+        expect(debugJson.storage.localStorageKeys.join('\n')).not.toContain('user-123');
         const progressSnapshot = debugJson.storage.progress;
         expect(progressSnapshot).not.toBeNull();
         if (!progressSnapshot) {

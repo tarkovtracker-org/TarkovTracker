@@ -8,7 +8,7 @@ import {
   readAccountRecoveryCopy,
   removeAccountRecoveryCopy,
   saveAccountRecoveryCopy,
-  selectRecoverySnapshot,
+  selectFreshestOwnerProgressSnapshot,
 } from '@/stores/tarkov/accountRecovery';
 import { progressPersistStorage } from '@/stores/tarkov/localStorage';
 import {
@@ -132,15 +132,33 @@ describe('account recovery copies', () => {
     [null, null, null],
     [10, null, 10],
     [20, 10, 20],
-    [10, 20, null],
-    [10, 10, null],
-  ])('selects recovery %s over active %s -> %s', (recovery, active, expected) => {
-    const selected = selectRecoverySnapshot(
-      recovery === null ? null : snapshot(recovery),
-      active === null ? null : snapshot(active)
-    );
-    expect(selected?.timestamp ?? null).toBe(expected);
-  });
+    [10, 20, 20],
+    [10, 10, 10],
+  ])(
+    'selects the freshest recovery %s or active %s snapshot -> %s',
+    (recovery, active, expected) => {
+      const selected = selectFreshestOwnerProgressSnapshot(
+        recovery === null ? null : snapshot(recovery),
+        active === null ? null : snapshot(active)
+      );
+      expect(selected?.timestamp ?? null).toBe(expected);
+    }
+  );
+  it.each([
+    [30, 20, 10, 30],
+    [30, 20, 40, 40],
+    [30, 50, 40, 50],
+  ])(
+    'selects the newest recovery, active, or handoff snapshot (%s, %s, %s)',
+    (recovery, active, handoff, expected) => {
+      const selected = selectFreshestOwnerProgressSnapshot(
+        snapshot(recovery),
+        snapshot(active),
+        snapshot(handoff)
+      );
+      expect(selected?.timestamp ?? null).toBe(expected);
+    }
+  );
 });
 describe('storage pressure relief', () => {
   beforeEach(() => {

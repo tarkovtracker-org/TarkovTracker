@@ -20,7 +20,10 @@ import {
   type PersistedPreferencesState,
   type PersistedPreferencesStateWithLegacy,
 } from '@/stores/preferences/sanitizers';
-import { isDeviceDataRemovalPending } from '@/stores/tarkov/deviceData';
+import {
+  isDeviceDataRemovalPending,
+  registerDeviceDataRemovalCleanup,
+} from '@/stores/tarkov/deviceData';
 import {
   isValidPrimaryView,
   type TaskPrimaryView,
@@ -357,6 +360,7 @@ export const clearPendingResetPreferencesSnapshot = (userId?: string | null): vo
     pendingResetPreferencesSnapshot = null;
   }
 };
+registerDeviceDataRemovalCleanup(clearPendingResetPreferencesSnapshot);
 const serializePersistedPreferencesSnapshot = (
   state: PersistedPreferencesState,
   userId: string | null,
@@ -1086,9 +1090,10 @@ export const resetPreferencesStoreForSessionTransition = (
 ): void => {
   const preferencesStore = usePreferencesStore();
   const preservedState = getPreservedPreferencesStorageValue(previousUserId);
-  pendingResetPreferencesSnapshot = previousUserId
-    ? readPersistedPreferencesSnapshot(previousUserId)
-    : null;
+  pendingResetPreferencesSnapshot =
+    previousUserId && !isDeviceDataRemovalPending(previousUserId)
+      ? readPersistedPreferencesSnapshot(previousUserId)
+      : null;
   preferencesStore.resetToDefaults();
   if (!import.meta.client) {
     return;

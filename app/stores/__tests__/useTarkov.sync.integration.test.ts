@@ -1042,7 +1042,7 @@ describe('useTarkov sync integration', () => {
     expect(store.pvp.level).toBe(9);
     expect(getLastSyncPayload().p_modes.pvp).toEqual(expect.objectContaining({ level: 9 }));
   });
-  it('uses the preserved scoped snapshot after auth reset overwrites localStorage', async () => {
+  it('uses the freshest matching active snapshot when it is newer than the handoff', async () => {
     const store = useTarkovStore();
     store.$patch((state) => {
       state.pvp.level = 14;
@@ -1076,15 +1076,18 @@ describe('useTarkov sync integration', () => {
       JSON.stringify({
         _timestamp: preservedTimestamp + 5000,
         _userId: 'user-2',
-        data: structuredClone(defaultState),
+        data: {
+          ...structuredClone(defaultState),
+          pvp: progressWithLevel(12),
+        },
       })
     );
     const overwrittenSnapshot = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress) || '{}');
     expect(overwrittenSnapshot._userId).toBe('user-2');
-    expect(overwrittenSnapshot.data?.pvp?.level).toBe(1);
+    expect(overwrittenSnapshot.data?.pvp?.level).toBe(12);
     await initializeTarkovSync();
-    expect(store.pvp.level).toBe(9);
-    expect(getLastSyncPayload().p_modes.pvp).toEqual(expect.objectContaining({ level: 9 }));
+    expect(store.pvp.level).toBe(12);
+    expect(getLastSyncPayload().p_modes.pvp).toEqual(expect.objectContaining({ level: 12 }));
   });
   it('restores the previous user snapshot after logout resets the store', async () => {
     const store = useTarkovStore();
@@ -2574,13 +2577,26 @@ describe('useTarkov sync integration', () => {
         await import('@/stores/tarkov/deviceData');
       localStorage.setItem(recoveryKey('user-1'), '{"_userId":"user-1","data":{}}');
       localStorage.setItem(recoveryKey('user-2'), '{"_userId":"user-2","data":{}}');
-      writeActiveCopy('user-1', 3, Date.parse('2026-02-25T00:00:00.000Z'));
+      writeActiveCopy('user-1', 15, Date.parse('2026-02-25T00:00:00.000Z'));
+      resetTarkovSync('capture pre-removal handoff', {
+        preservePersistedStateForUserId: 'user-1',
+      });
       requestDeviceDataRemoval('user-1');
       switchSession('user-1', null, 'logout');
       expect(localStorage.getItem(STORAGE_KEYS.progress)).toBeNull();
       expect(localStorage.getItem(recoveryKey('user-1'))).toBeNull();
       expect(localStorage.getItem(recoveryKey('user-2'))).not.toBeNull();
       clearDeviceDataRemoval();
+      single.mockResolvedValue({
+        data: createRemoteRow({
+          user_id: 'user-1',
+          pvp_data: progressWithLevel(2),
+        }),
+        error: null,
+      });
+      switchSession(null, 'user-1', 'owner signs back in after device removal');
+      await initializeTarkovSync();
+      expect(useTarkovStore().pvp.level).toBe(2);
     });
     it('retains a mismatched owner copy found during hydration as its recovery copy', () => {
       writeActiveCopy('user-9', 6, Date.parse('2026-02-25T00:00:00.000Z'));
@@ -2663,10 +2679,24 @@ describe('useTarkov sync integration', () => {
         JSON.stringify({ _userId: 'user-2', data: defaultState })
       );
       expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(original);
-      await initializeTarkovSync();
+      await expect(initializeTarkovSync()).rejects.toThrow('Account recovery retention is blocked');
       expect(useSupabaseSyncMock).not.toHaveBeenCalled();
       expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(original);
       setItem.mockRestore();
+      single.mockResolvedValue({
+        data: createRemoteRow({
+          user_id: 'user-2',
+          pvp_data: progressWithLevel(2),
+        }),
+        error: null,
+      });
+      await initializeTarkovSync();
+      expect(useSupabaseSyncMock).toHaveBeenCalledTimes(1);
+      expect(readRecoveryLevel('user-1')).toBe(15);
+      expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.progress) ?? '{}')._userId).toBe(
+        'user-2'
+      );
+      expect(useTarkovStore().pvp.level).toBe(2);
     });
     it('releases only the removed owner retention barrier after explicit device-data removal', async () => {
       const original = JSON.stringify({

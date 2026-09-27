@@ -117,20 +117,21 @@ export const readAccountRecoveryCopy = (userId: string): PersistedProgressSnapsh
 };
 export const hasAccountRecoveryCopy = (userId: string): boolean =>
   safeGetItem(recoveryKey(userId)) !== null;
-export const removeAccountRecoveryCopy = (userId: string): void => {
+export const removeAccountRecoveryCopy = (userId: string): boolean =>
   safeRemoveItem(recoveryKey(userId));
-};
-/**
- * Chooses the local snapshot to reconcile at sign-in: the recovery copy wins only when
- * it is newer than the owner's active copy, because both descend from this browser.
- */
-export const selectRecoverySnapshot = (
+/** Chooses the freshest owner snapshot from recovery, active storage, or a session handoff. */
+export const selectFreshestOwnerProgressSnapshot = (
   recovery: PersistedProgressSnapshot | null,
-  active: PersistedProgressSnapshot | null
+  active: PersistedProgressSnapshot | null,
+  handoff: PersistedProgressSnapshot | null = null
 ): PersistedProgressSnapshot | null => {
-  if (!recovery) return null;
-  if (!active) return recovery;
-  return (recovery.timestamp ?? 0) > (active.timestamp ?? 0) ? recovery : null;
+  let newest = active;
+  for (const candidate of [recovery, handoff]) {
+    if (candidate && (!newest || (candidate.timestamp ?? 0) > (newest.timestamp ?? 0))) {
+      newest = candidate;
+    }
+  }
+  return newest;
 };
 /** Retains the active copy for its owner when it belongs to an account other than `userId`. */
 export const preserveForeignActiveCopy = (userId: string | null): boolean => {

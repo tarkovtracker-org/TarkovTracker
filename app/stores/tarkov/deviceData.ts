@@ -1,8 +1,9 @@
 import {
+  blockAccountRecoveryRetentionForOwner,
   clearBlockedAccountRecoveryRetention,
   removeAccountRecoveryCopy,
 } from '@/stores/tarkov/accountRecovery';
-import { safeGetItem, safeRemoveItem } from '@/stores/tarkov/localStorage';
+import { safeRemoveItem, setActiveProgressWritesBlocked } from '@/stores/tarkov/localStorage';
 import { removeSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
 import { parseUserScopedStorage } from '@/utils/userScopedStorage';
@@ -12,6 +13,10 @@ import { parseUserScopedStorage } from '@/utils/userScopedStorage';
  * deleting cloud progress, which this never touches.
  */
 let removalPendingFor: string | null = null;
+const removalCleanupCallbacks = new Set<(userId: string) => void>();
+export const registerDeviceDataRemovalCleanup = (cleanup: (userId: string) => void): void => {
+  removalCleanupCallbacks.add(cleanup);
+};
 /** Session transitions for this owner must not retain copies while removal is pending. */
 export const requestDeviceDataRemoval = (userId: string): void => {
   removalPendingFor = userId;
@@ -25,27 +30,49 @@ const OWNED_BACKUP_PREFIXES = [
   STORAGE_KEYS.progressBackupPrefix,
   LEGACY_STORAGE_KEYS.progressBackupPrefix,
 ];
-const isOwnedBackupKey = (key: string, userId: string): boolean =>
-  OWNED_BACKUP_PREFIXES.some((prefix) => key.startsWith(`${prefix}${userId}_`));
-const listStorageKeys = (): string[] =>
-  Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)).filter(
-    (key): key is string => key !== null
-  );
-const removeIfOwned = (key: string, userId: string, explicitProgressRemoval = false): void => {
-  const raw = safeGetItem(key);
-  if (raw && parseUserScopedStorage<unknown>(raw)?._userId === userId) {
-    safeRemoveItem(key, explicitProgressRemoval ? userId : undefined);
+const isRecognizedBackupKey = (key: string): boolean =>
+  OWNED_BACKUP_PREFIXES.some((prefix) => key.startsWith(prefix));
+const listStorageKeys = (): string[] | null => {
+  try {
+    return Array.from({ length: localStorage.length }, (_, index) =>
+      localStorage.key(index)
+    ).filter((key): key is string => key !== null);
+  } catch {
+    return null;
   }
 };
+const removeIfOwned = (key: string, userId: string, explicitProgressRemoval = false): boolean => {
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(key);
+  } catch {
+    return false;
+  }
+  if (!raw) return true;
+  const envelope = parseUserScopedStorage<unknown>(raw);
+  if (!envelope) return false;
+  if (envelope._userId !== userId) return true;
+  return safeRemoveItem(key, explicitProgressRemoval ? userId : undefined);
+};
 /** Removes every locally stored copy owned by `userId`; other accounts are untouched. */
-export const removeAccountDeviceData = (userId: string): void => {
-  if (typeof window === 'undefined') return;
-  removeAccountRecoveryCopy(userId);
-  removeSupersededProgressCopies(userId);
-  removeIfOwned(STORAGE_KEYS.progress, userId, true);
-  removeIfOwned(STORAGE_KEYS.preferences, userId);
-  listStorageKeys()
-    .filter((key) => isOwnedBackupKey(key, userId))
-    .forEach((key) => safeRemoveItem(key));
-  clearBlockedAccountRecoveryRetention(userId);
+export const removeAccountDeviceData = (userId: string): boolean => {
+  if (typeof window === 'undefined') return false;
+  removalCleanupCallbacks.forEach((cleanup) => cleanup(userId));
+  const keys = listStorageKeys();
+  let removed = keys !== null;
+  removed = removeAccountRecoveryCopy(userId) && removed;
+  removed = removeSupersededProgressCopies(userId) && removed;
+  removed = removeIfOwned(STORAGE_KEYS.progress, userId, true) && removed;
+  removed = removeIfOwned(STORAGE_KEYS.preferences, userId) && removed;
+  for (const key of keys ?? []) {
+    if (!isRecognizedBackupKey(key)) continue;
+    removed = removeIfOwned(key, userId) && removed;
+  }
+  if (removed) {
+    clearBlockedAccountRecoveryRetention(userId);
+  } else {
+    blockAccountRecoveryRetentionForOwner(userId);
+    setActiveProgressWritesBlocked(true);
+  }
+  return removed;
 };

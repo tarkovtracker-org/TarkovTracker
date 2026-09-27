@@ -28,15 +28,15 @@ const isCopy = (value: unknown, ownerId: string): value is SupersededProgressCop
   hasIdentity(value, ownerId) &&
   hasModeAndSeason(value) &&
   hasTimestampAndProgress(value);
-const storageKeys = (): string[] => {
-  if (typeof window === 'undefined') return [];
+const storageKeys = (): string[] | null => {
+  if (typeof window === 'undefined') return null;
   try {
     return Array.from({ length: localStorage.length }, (_, index) =>
       localStorage.key(index)
     ).filter((key): key is string => key !== null);
   } catch (error) {
     logger.error('[ProgressRecovery] Could not list superseded progress copies', error);
-    return [];
+    return null;
   }
 };
 const notifyCopyChange = (): void => {
@@ -75,7 +75,7 @@ export const saveSupersededProgressCopy = (
 };
 /** Superseded copies are listed only for their owning account and are never restored. */
 export const listSupersededProgressCopies = (ownerId: string): SupersededProgressCopy[] =>
-  storageKeys()
+  (storageKeys() ?? [])
     .filter((key) => key.startsWith(ownerPrefix(ownerId)))
     .flatMap((key) => {
       const value = safeGetItem(key);
@@ -87,9 +87,13 @@ export const listSupersededProgressCopies = (ownerId: string): SupersededProgres
       }
     })
     .sort((left, right) => left.supersededAt - right.supersededAt);
-export const removeSupersededProgressCopies = (ownerId: string): void => {
-  storageKeys()
+export const removeSupersededProgressCopies = (ownerId: string): boolean => {
+  const keys = storageKeys();
+  if (!keys) return false;
+  const removed = keys
     .filter((key) => key.startsWith(ownerPrefix(ownerId)))
-    .forEach((key) => safeRemoveItem(key));
+    .map((key) => safeRemoveItem(key))
+    .every(Boolean);
   notifyCopyChange();
+  return removed;
 };

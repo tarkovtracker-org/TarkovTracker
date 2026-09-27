@@ -483,6 +483,7 @@ describe('usePreferencesStore', () => {
       currentUserId.value = null;
       deviceData.requestDeviceDataRemoval('user-1');
       resetPreferencesStoreForSessionTransition('user-1');
+      expect(readPendingResetPreferencesSnapshot('user-1')).toBeNull();
       deviceData.clearDeviceDataRemoval();
       expect(localStorageMock.getItem(STORAGE_KEYS.preferences)).toBeNull();
     });

@@ -19,13 +19,14 @@ import {
   removeAccountRecoveryCopy,
   retryBlockedAccountRecoveryRetention,
   saveAccountRecoveryCopy,
-  selectRecoverySnapshot,
+  selectFreshestOwnerProgressSnapshot,
 } from '@/stores/tarkov/accountRecovery';
 import { resetApiUpdateState } from '@/stores/tarkov/apiUpdateNotifier';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
 import {
   clearDeviceDataRemoval,
   isDeviceDataRemovalPending,
+  registerDeviceDataRemovalCleanup,
   removeAccountDeviceData,
 } from '@/stores/tarkov/deviceData';
 import {
@@ -1192,6 +1193,9 @@ let pendingResetProgressSnapshot: {
   snapshot: PersistedProgressSnapshot | null;
   userId: string | null;
 } | null = null;
+registerDeviceDataRemovalCleanup((userId) => {
+  if (pendingResetProgressSnapshot?.userId === userId) pendingResetProgressSnapshot = null;
+});
 const shownLocalIgnoreReasons = new Set<LocalIgnoredReason>();
 const METADATA_REFRESH_FAILURE_EVENT = 'metadata.refresh.failure';
 registerSyncControllerGetter(() => syncController);
@@ -1281,10 +1285,12 @@ export function resetTarkovSync(
   invalidateStartupOwnership();
   if (options) {
     const userId = options.preservePersistedStateForUserId ?? null;
-    pendingResetProgressSnapshot = {
-      snapshot: readPersistedProgressState(userId),
-      userId,
-    };
+    pendingResetProgressSnapshot = isDeviceDataRemovalPending(userId)
+      ? null
+      : {
+          snapshot: readPersistedProgressState(userId),
+          userId,
+        };
   } else {
     pendingResetProgressSnapshot = null;
   }
@@ -1408,28 +1414,27 @@ export async function initializeTarkovSync() {
     if (!retryBlockedAccountRecoveryRetention()) {
       setActiveProgressWritesBlocked(true);
       toastI18n.showLoadFailed();
-      return;
+      throw new Error('Account recovery retention is blocked');
     }
     // Another account's active copy must survive this sign-in as its recovery copy.
     if (!preserveForeignActiveCopy(currentUserId)) {
       setActiveProgressWritesBlocked(true);
       toastI18n.showLoadFailed();
-      return;
+      throw new Error('Account recovery retention is blocked');
     }
     const pendingLocalSnapshot =
       pendingResetProgressSnapshot?.userId === currentUserId
         ? pendingResetProgressSnapshot.snapshot
         : null;
-    const preservedLocalSnapshot =
-      pendingLocalSnapshot ??
-      selectRecoverySnapshot(
-        readAccountRecoveryCopy(currentUserId),
-        readPersistedProgressState(currentUserId)
-      );
+    const preservedLocalSnapshot = selectFreshestOwnerProgressSnapshot(
+      readAccountRecoveryCopy(currentUserId),
+      readPersistedProgressState(currentUserId),
+      pendingLocalSnapshot
+    );
     if (isAccountRecoveryRetentionBlocked()) {
       setActiveProgressWritesBlocked(true);
       toastI18n.showLoadFailed();
-      return;
+      throw new Error('Account recovery retention is blocked');
     }
     const getLocalStorageMeta = () => {
       if (preservedLocalSnapshot) {

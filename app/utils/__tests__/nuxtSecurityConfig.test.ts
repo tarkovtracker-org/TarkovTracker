@@ -55,6 +55,10 @@ describe('nuxtSecurityConfig', () => {
         JSON.stringify({ include: ['/api/*', '/overlay/*'] })
       );
       writeFileSync(join(outputDir, 'index.html'), '<main>SPA</main>');
+      writeFileSync(
+        join(outputDir, '_headers'),
+        "/*\n  Content-Security-Policy: frame-ancestors 'self'\n"
+      );
       expect(() => assertCloudflarePagesOutput(outputDir, ['/api/*', '/overlay/*'])).not.toThrow();
     } finally {
       rmSync(outputDir, { force: true, recursive: true });
@@ -69,6 +73,7 @@ describe('nuxtSecurityConfig', () => {
     const appCsp = routeRules['/**'].headers['Content-Security-Policy'];
     const overlayCsp = routeRules['/overlay/kappa/**'].headers['Content-Security-Policy'];
     expect(appCsp).toContain("default-src 'self'");
+    expect(appCsp).toContain("frame-ancestors 'self'");
     expect(overlayCsp).toContain("default-src 'none'");
     expect(overlayCsp).toContain("script-src 'unsafe-inline'");
     expect(overlayCsp).toContain("frame-ancestors 'self'");

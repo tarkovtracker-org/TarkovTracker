@@ -36,6 +36,10 @@ export const assertCloudflarePagesOutput = (
   if (readFileSync(resolve(outputDir, 'index.html'), 'utf8').length === 0) {
     throw new Error('[Config] Static SPA entrypoint is empty.');
   }
+  const headers = readFileSync(resolve(outputDir, '_headers'), 'utf8');
+  if (!headers.includes("Content-Security-Policy: frame-ancestors 'self'")) {
+    throw new Error('[Config] Cloudflare Pages output must prevent cross-origin framing.');
+  }
 };
 export const buildContentSecurityPolicyRouteRules = (
   options: AppContentSecurityPolicyOptions

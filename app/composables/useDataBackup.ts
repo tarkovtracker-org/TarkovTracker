@@ -491,26 +491,58 @@ function getStorageKeys(storage: Storage | null): string[] {
 function isSupabaseAuthStorageKey(key: string): boolean {
   return key.endsWith('-auth-token') || key.endsWith('-code-verifier');
 }
-async function sanitizeStorageKey(key: string): Promise<string> {
-  if (
+type ProgressBackupIdentity = { prefix: string; owner: string; createdAt: number | null };
+function getProgressBackupIdentity(key: string): ProgressBackupIdentity | null {
+  const prefix =
     key.startsWith(STORAGE_KEYS.progressBackupPrefix) ||
     key.startsWith(LEGACY_STORAGE_KEYS.progressBackupPrefix)
-  ) {
-    const prefix = key.startsWith(STORAGE_KEYS.progressBackupPrefix)
-      ? STORAGE_KEYS.progressBackupPrefix
-      : LEGACY_STORAGE_KEYS.progressBackupPrefix;
-    const suffix = key.slice(prefix.length);
-    const separatorIndex = suffix.lastIndexOf('_');
-    const owner = separatorIndex >= 0 ? suffix.slice(0, separatorIndex) : suffix;
-    const createdAtRaw = separatorIndex >= 0 ? suffix.slice(separatorIndex + 1) : '';
-    const ownerFingerprint =
-      owner === 'anonymous' ? 'anonymous' : ((await fingerprintValue(owner)) ?? 'unknown');
-    const createdAt = Number.parseInt(createdAtRaw, 10);
-    return `${prefix}{owner:${ownerFingerprint},createdAt:${
-      Number.isFinite(createdAt) ? createdAt : 'unknown'
-    }}`;
-  }
-  return key;
+      ? key.startsWith(STORAGE_KEYS.progressBackupPrefix)
+        ? STORAGE_KEYS.progressBackupPrefix
+        : LEGACY_STORAGE_KEYS.progressBackupPrefix
+      : null;
+  if (!prefix) return null;
+  const suffix = key.slice(prefix.length);
+  const separatorIndex = suffix.lastIndexOf('_');
+  const owner = separatorIndex >= 0 ? suffix.slice(0, separatorIndex) : suffix;
+  const createdAtRaw = separatorIndex >= 0 ? suffix.slice(separatorIndex + 1) : '';
+  const createdAt = Number.parseInt(createdAtRaw, 10);
+  return { prefix, owner, createdAt: Number.isFinite(createdAt) ? createdAt : null };
+}
+async function sanitizeProgressBackupKey(key: string): Promise<string | null> {
+  const identity = getProgressBackupIdentity(key);
+  if (!identity) return null;
+  const ownerFingerprint =
+    identity.owner === 'anonymous'
+      ? 'anonymous'
+      : ((await fingerprintValue(identity.owner)) ?? 'unknown');
+  return `${identity.prefix}{owner:${ownerFingerprint},createdAt:${
+    identity.createdAt ?? 'unknown'
+  }}`;
+}
+async function sanitizeRecoveryKey(key: string): Promise<string | null> {
+  if (!key.startsWith(STORAGE_KEYS.progressRecoveryPrefix)) return null;
+  const owner = key.slice(STORAGE_KEYS.progressRecoveryPrefix.length);
+  return `${STORAGE_KEYS.progressRecoveryPrefix}{owner:${
+    (await fingerprintValue(owner)) ?? 'unknown'
+  }}`;
+}
+async function sanitizeSupersededKey(key: string): Promise<string | null> {
+  if (!key.startsWith(STORAGE_KEYS.progressSupersededPrefix)) return null;
+  const suffix = key.slice(STORAGE_KEYS.progressSupersededPrefix.length);
+  const separatorIndex = suffix.indexOf('_');
+  const owner = separatorIndex >= 0 ? suffix.slice(0, separatorIndex) : suffix;
+  const copyId = separatorIndex >= 0 ? suffix.slice(separatorIndex + 1) : 'unknown';
+  return `${STORAGE_KEYS.progressSupersededPrefix}{owner:${
+    (await fingerprintValue(owner)) ?? 'unknown'
+  },copy:${copyId}}`;
+}
+async function sanitizeStorageKey(key: string): Promise<string> {
+  const backupKey = await sanitizeProgressBackupKey(key);
+  if (backupKey) return backupKey;
+  const recoveryKey = await sanitizeRecoveryKey(key);
+  if (recoveryKey) return recoveryKey;
+  const supersededKey = await sanitizeSupersededKey(key);
+  return supersededKey ?? key;
 }
 async function sanitizeStorageKeys(storage: Storage | null): Promise<string[]> {
   const keys = getStorageKeys(storage).filter((key) => !isSupabaseAuthStorageKey(key));
@@ -526,18 +558,13 @@ async function buildProgressBackupSnapshots(
   );
   return await Promise.all(
     backupKeys.map(async (key) => {
-      const prefix = key.startsWith(STORAGE_KEYS.progressBackupPrefix)
-        ? STORAGE_KEYS.progressBackupPrefix
-        : LEGACY_STORAGE_KEYS.progressBackupPrefix;
-      const suffix = key.slice(prefix.length);
-      const separatorIndex = suffix.lastIndexOf('_');
-      const owner = separatorIndex >= 0 ? suffix.slice(0, separatorIndex) : suffix;
-      const createdAtRaw = separatorIndex >= 0 ? suffix.slice(separatorIndex + 1) : '';
-      const createdAt = Number.parseInt(createdAtRaw, 10);
+      const identity = getProgressBackupIdentity(key);
+      if (!identity) throw new Error('Progress backup key is not recognized');
       return {
         storageKey: await sanitizeStorageKey(key),
-        ownerFingerprint: owner === 'anonymous' ? 'anonymous' : await fingerprintValue(owner),
-        createdAt: Number.isFinite(createdAt) ? createdAt : null,
+        ownerFingerprint:
+          identity.owner === 'anonymous' ? 'anonymous' : await fingerprintValue(identity.owner),
+        createdAt: identity.createdAt,
       };
     })
   );
