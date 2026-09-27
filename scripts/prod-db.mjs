@@ -872,8 +872,19 @@ function getMaskedSqlToken(source, index) {
   if (lineComment) return lineComment;
   const blockComment = getDelimitedSqlToken(source, index, '/*', '*/', 2);
   if (blockComment) return blockComment;
-  if (source[index] !== "'") return undefined;
-  return getSqlLiteralToken(source, index);
+  return getSqlStringToken(source, index);
+}
+function getSqlStringToken(source, index) {
+  if (source[index] === "'") return getSqlLiteralToken(source, index, false);
+  if (isEscapeStringStart(source, index)) return getSqlLiteralToken(source, index + 1, true);
+  return undefined;
+}
+// E'...' starts an escape string only when E is not the tail of an identifier (`xE'a'` is the
+// identifier `xe` followed by a standard string). PostgreSQL treats bytes >= 0x80 as identifier
+// characters, so any non-ASCII character is treated the same way.
+function isEscapeStringStart(source, index) {
+  const isPrefix = /[eE]/.test(source[index]) && source[index + 1] === "'";
+  return isPrefix && !/[a-zA-Z0-9_$\u0080-\uffff]/.test(source[index - 1] ?? '');
 }
 function getDelimitedSqlToken(source, index, opening, closing, closingLength) {
   if (!source.startsWith(opening, index)) return undefined;
@@ -897,20 +908,34 @@ function hasNestedBlockComment(source, index, opening, closing, end) {
     closing === '*/' && end !== -1 && source.slice(index + opening.length, end).includes(opening)
   );
 }
-function getSqlLiteralToken(source, start) {
+// `start` is the opening quote. Escape strings skip the character after each backslash, so `\'`
+// does not close the literal.
+function getSqlLiteralToken(source, start, backslashEscapes) {
   let index = start + 1;
   while (index < source.length) {
-    if (source[index] !== "'") {
-      index += 1;
-      continue;
-    }
-    if (source[index + 1] === "'") {
-      index += 2;
-      continue;
-    }
-    return { end: index + 1, kind: 'literal', malformed: false };
+    const step = getSqlLiteralStep(source, index, backslashEscapes);
+    if (step === 0) return getClosedSqlLiteralToken(source, index + 1, backslashEscapes);
+    index += step;
   }
   return { end: source.length, kind: 'literal', malformed: true };
+}
+// Returns how far to advance inside a literal, or 0 when `index` is the closing quote.
+function getSqlLiteralStep(source, index, backslashEscapes) {
+  if (source[index] === "'") return source[index + 1] === "'" ? 2 : 0;
+  return isBackslashEscape(source[index], backslashEscapes) ? 2 : 1;
+}
+function isBackslashEscape(character, backslashEscapes) {
+  return backslashEscapes && character === '\\';
+}
+// PostgreSQL continues a string across whitespace that contains a newline (optionally with
+// `--` comments), and an escape string's continuation segments keep backslash escapes.
+const SQL_STRING_CONTINUATION =
+  /[ \t\f]*(?:--[^\n\r]*)?[\n\r](?:[ \t\n\r\f\v]|--[^\n\r]*[\n\r])*'/y;
+function getClosedSqlLiteralToken(source, end, backslashEscapes) {
+  if (!backslashEscapes) return { end, kind: 'literal', malformed: false };
+  SQL_STRING_CONTINUATION.lastIndex = end;
+  if (!SQL_STRING_CONTINUATION.test(source)) return { end, kind: 'literal', malformed: false };
+  return getSqlLiteralToken(source, SQL_STRING_CONTINUATION.lastIndex - 1, true);
 }
 function extractMigrationRelations(source) {
   const normalizedSource = normalizeMigrationSql(source);

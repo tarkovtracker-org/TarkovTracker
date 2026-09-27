@@ -220,6 +220,39 @@ describe('prod-db migration preflight', () => {
     expect(result.assessment).toBe('incomplete');
     expect(result.risk).toBe('unknown');
   });
+  it('does not let backslash-escaped quotes in E strings hide statements', () => {
+    for (const source of [
+      "comment on table public.events is E'\\' '; drop table public.events; -- ';",
+      "comment on table public.events is e'\\\\\\' '; drop table public.events; -- ';",
+      "comment on table public.events is E'a'\n'\\' '; drop table public.events; -- ';",
+      "comment on table public.events is E'a' -- note\n-- more\n  '\\' '; drop table public.events; -- ';",
+    ]) {
+      const result = JSON.parse(run(['preflight', '--migration', writeFixture(source)]));
+      expect(result.migration.classification.statement_count).toBe(2);
+      expect(result.migration.classification.contains_ddl).toBe(true);
+      expect(result.assessment).toBe('incomplete');
+      expect(result.requires_manual_review).toBe(true);
+    }
+  });
+  it('masks E string escapes without changing standard string handling', () => {
+    for (const source of [
+      "update public.events set status = E'it\\'s; drop table ignored';",
+      "update public.events set status = E'trailing\\\\';",
+      "update public.events set status = 'C:\\';",
+    ]) {
+      const result = JSON.parse(run(['preflight', '--migration', writeFixture(source)]));
+      expect(result.migration.classification.statement_count).toBe(1);
+      expect(result.migration.classification.contains_ddl).toBe(false);
+      expect(result.migration.classification.has_malformed_literal).toBe(false);
+      expect(result.migration.classification.has_unclassified_statement).toBe(false);
+    }
+  });
+  it('fails closed for an unterminated E string', () => {
+    const source = "update public.events set status = E'unterminated\\';";
+    const result = JSON.parse(run(['preflight', '--migration', writeFixture(source)]));
+    expect(result.migration.classification.has_malformed_literal).toBe(true);
+    expect(result.assessment).toBe('incomplete');
+  });
   it('classifies table grants without treating UPDATE or DELETE privileges as data changes', () => {
     for (const statement of [
       'GRANT UPDATE, DELETE ON TABLE public.events TO pi_reader;',
