@@ -1,3 +1,10 @@
+## [1.82.8](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.7...v1.82.8) (2026-09-27)
+
+
+### Bug Fixes
+
+* **app:** make Smart Fill distribute collected totals ([#867](https://github.com/tarkovtracker-org/TarkovTracker/issues/867)) ([#943](https://github.com/tarkovtracker-org/TarkovTracker/issues/943)) ([bd4f70b](https://github.com/tarkovtracker-org/TarkovTracker/commit/bd4f70b79f9a32ddff647d7a340fa0afbd93e43d))
+
 ## [1.82.7](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.82.6...v1.82.7) (2026-09-27)
 
 
