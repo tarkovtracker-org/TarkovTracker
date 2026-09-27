@@ -91,6 +91,25 @@ describe('release note parsing', () => {
     const body = '## Summary\n\n```html\n<!--\n```\n\n## Release note\n\nReal update.\n';
     expect(releaseNotesFromBody(body)).toEqual(['Real update.']);
   });
+  it('does not let comment-looking code before the release section consume it', () => {
+    expect(
+      releaseNotesFromBody('`<!--` is an example token.\n\n## Release note\n\nReal update.')
+    ).toEqual(['Real update.']);
+    expect(releaseNotesFromBody('    <!--\n\n## Release note\n\nReal update.')).toEqual([
+      'Real update.',
+    ]);
+    expect(
+      releaseNotesFromBody('` unmatched\n<!-- hidden -->\n\n## Release note\n\nReal update.')
+    ).toEqual(['Real update.']);
+    expect(releaseNotesFromBody(template('Use `code` as a marker.'))).toEqual([
+      'Use code as a marker.',
+    ]);
+  });
+  it.each(['- First\n\n- Second', '- First\n- Second'])(
+    'keeps the first item when a section starts with a newline (%j)',
+    (items) =>
+      expect(releaseNotesFromBody(`## Release note\n${items}`)).toEqual(['First', 'Second'])
+  );
   it('keeps comparison text and strips links, images, URLs and tags', () => {
     expect(
       releaseNotesFromBody(template('Loads < 20 kg and > 5 kg now filter correctly.'))
@@ -404,6 +423,49 @@ describe('release highlights', () => {
       'Skipping release note for #%d: %s',
       950,
       'description was edited after merge'
+    );
+  });
+  it('attaches validated commit hashes for each PR and renders commit links', async () => {
+    const sha = 'A'.repeat(40);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url) =>
+        url.includes('/collaborators/') ? json({ permission: 'write' }) : merged(template('Note.'))
+      )
+    );
+    const highlights = await collectHighlights({
+      commits: [
+        { hash: sha, message: 'fix(app): first (#943)' },
+        { hash: 'b'.repeat(40), message: 'fix(app): second (#943)' },
+        { hash: sha, message: 'fix(app): duplicate commit metadata (#943)' },
+        { hash: 'not-a-sha', message: 'fix(app): third (#943)' },
+      ],
+      env: { GITHUB_REPOSITORY: 'o/r', GITHUB_TOKEN: 't' },
+      logger,
+    });
+    expect(highlights).toEqual([
+      { number: 943, text: 'Note.', shas: [sha.toLowerCase(), 'b'.repeat(40)] },
+    ]);
+    expect(withHighlights('## [1.84.0](url) (2026-09-29)\n', highlights, 'o/r')).toContain(
+      '* Note. ([#943](https://github.com/o/r/pull/943), [aaaaaaa](https://github.com/o/r/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa), [bbbbbbb](https://github.com/o/r/commit/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb))'
+    );
+    expect(
+      withHighlights(
+        '## [1.84.0](url) (2026-09-29)\n',
+        [{ number: 943, text: 'Note.', shas: ['a'.repeat(39), 'g'.repeat(40), 'c'.repeat(40)] }],
+        'o/r'
+      )
+    ).toContain(
+      '[ccccccc](https://github.com/o/r/commit/cccccccccccccccccccccccccccccccccccccccc)'
+    );
+    expect(
+      withHighlights(
+        '## [1.84.0](url) (2026-09-29)\n',
+        [{ number: 943, text: 'Note.', shas: ['c'.repeat(40)] }],
+        'o/r'
+      )
+    ).toContain(
+      '[ccccccc](https://github.com/o/r/commit/cccccccccccccccccccccccccccccccccccccccc)'
     );
   });
   it('caps the total number of highlights per release', async () => {

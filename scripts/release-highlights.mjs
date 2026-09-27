@@ -38,6 +38,7 @@ const MAX_RAW_NOTE = 4_096;
 // The in-app changelog shows at most MAX_BULLETS_PER_GROUP (5) bullets per release, and
 // Highlights come first, so a larger cap would hide later notes there.
 const MAX_HIGHLIGHTS = 5;
+const MAX_COMMIT_LINKS = 20;
 // PR lookups run with bounded concurrency so a batched release cannot hit GitHub's secondary
 // limits, and workers stop launching once MAX_HIGHLIGHTS notes are collectable.
 export const MAX_CONCURRENT_LOOKUPS = 4;
@@ -45,8 +46,6 @@ const TRUSTED_AUTHORS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 // `permission` is the effective base permission (custom and `maintain` roles map to `write`).
 const WRITE_PERMISSIONS = new Set(['write', 'admin']);
 const FENCE = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/;
-// GitHub hides an unterminated comment through the end of the body, so strip to the end too.
-const HTML_COMMENT = /<!--[\s\S]*?(?:-->|$(?![\s\S]))/g;
 const REVERTS = /^This reverts commit ([0-9a-f]{7,40})\b/im;
 const REQUEST_TIMEOUT_MS = 10_000;
 const PULL_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
@@ -84,17 +83,106 @@ function fenceStep(state, line) {
 function stripFencedCode(text) {
   return text.split('\n').reduce(fenceStep, { open: null, kept: [] }).kept.join('\n');
 }
+function backtickRun(line, start) {
+  let end = start;
+  while (line[end] === '`') end += 1;
+  return end - start;
+}
+const isIndentedCode = (line) => /^(?: {4}|\t)/.test(line);
+function countLineBackticks(line, counts) {
+  for (let index = 0; index < line.length;) {
+    if (line[index] !== '`') {
+      index += 1;
+      continue;
+    }
+    const run = backtickRun(line, index);
+    counts.set(run, (counts.get(run) ?? 0) + 1);
+    index += run;
+  }
+}
+function countBackticks(lines) {
+  const counts = new Map();
+  lines.filter((line) => !isIndentedCode(line)).forEach((line) => countLineBackticks(line, counts));
+  return counts;
+}
+function consumeBacktickCounts(line, start, end, counts) {
+  for (let index = start; index < end;) {
+    if (line[index] !== '`') {
+      index += 1;
+      continue;
+    }
+    const run = backtickRun(line, index);
+    counts.set(run, counts.get(run) - 1);
+    index += run;
+  }
+}
+function skipComment(line, index, state, tickCounts) {
+  const close = line.indexOf('-->', index);
+  const end = close === -1 ? line.length : close;
+  consumeBacktickCounts(line, index, end, tickCounts);
+  state.inComment = close === -1;
+  return close === -1 ? line.length : close + 3;
+}
+function consumeCodeTick(line, index, state, tickCounts) {
+  const run = backtickRun(line, index);
+  const remaining = tickCounts.get(run) - 1;
+  tickCounts.set(run, remaining);
+  if (state.codeTicks === run) state.codeTicks = 0;
+  else if (!state.codeTicks && remaining > 0) state.codeTicks = run;
+  return { text: line.slice(index, index + run), next: index + run };
+}
+function isCommentStart(line, index, state) {
+  return !state.codeTicks && line.startsWith('<!--', index);
+}
+function scanVisibleStep(line, index, state, tickCounts) {
+  if (line[index] === '`') return consumeCodeTick(line, index, state, tickCounts);
+  if (isCommentStart(line, index, state)) {
+    state.inComment = true;
+    return { text: '', next: index + 4 };
+  }
+  return { text: line[index], next: index + 1 };
+}
+function scanCommentLine(line, state, tickCounts) {
+  let index = 0;
+  let visible = '';
+  while (index < line.length) {
+    if (state.inComment) index = skipComment(line, index, state, tickCounts);
+    else {
+      const step = scanVisibleStep(line, index, state, tickCounts);
+      visible += step.text;
+      index = step.next;
+    }
+  }
+  return visible;
+}
+function appendCommentLine(line, state, tickCounts, kept) {
+  if (isIndentedCode(line)) {
+    if (!state.inComment) kept.push(line);
+    state.codeTicks = 0;
+    return;
+  }
+  const visible = scanCommentLine(line, state, tickCounts);
+  if (!state.inComment) kept.push(visible);
+}
+function stripCommentsOutsideCode(text) {
+  const state = { inComment: false, codeTicks: 0 };
+  const kept = [];
+  const lines = text.split('\n');
+  const tickCounts = countBackticks(lines);
+  for (const line of lines) appendCommentLine(line, state, tickCounts, kept);
+  return kept.join('\n');
+}
 function noteSection(body) {
   // Hidden comments and fenced examples cannot start or end the real section.
   const text = String(body ?? '')
     .slice(0, MAX_BODY_LENGTH)
     .replace(/\r\n/g, '\n');
-  return sectionAfterHeading(stripFencedCode(text).replace(HTML_COMMENT, ''));
+  return sectionAfterHeading(stripCommentsOutsideCode(stripFencedCode(text)));
 }
 function sectionAfterHeading(text) {
   const start = text.search(NOTE_HEADING);
   if (start === -1) return '';
-  const rest = text.slice(start).replace(NOTE_HEADING, '');
+  const rest = text.slice(start).replace(NOTE_HEADING, '').replace(/^\n+/, '');
   const end = rest.search(NEXT_HEADING);
   return end === -1 ? rest : rest.slice(0, end);
 }
@@ -347,15 +435,44 @@ export async function collectHighlights({ commits, excluded = () => false, ...co
   const numbers = [...new Set(kept.map((commit) => pullRequestNumber(commit.message)))].filter(
     Boolean
   );
+  const shasByNumber = new Map(
+    numbers.map((number) => [
+      number,
+      [
+        ...new Set(
+          kept
+            .filter((commit) => pullRequestNumber(commit.message) === number)
+            .map((commit) => commitHash(commit))
+            .filter((hash) => /^[0-9a-f]{40}$/i.test(hash))
+        ),
+      ].map((hash) => hash.toLowerCase()),
+    ])
+  );
   const results = await collectNotes(options, numbers);
-  return results.flatMap((notes) => notes ?? []).slice(0, MAX_HIGHLIGHTS);
+  return results
+    .flatMap((notes) => notes ?? [])
+    .slice(0, MAX_HIGHLIGHTS)
+    .map((highlight) => {
+      const shas = shasByNumber.get(highlight.number) ?? [];
+      return shas.length ? { ...highlight, shas } : highlight;
+    });
 }
 /** Insert a `### Highlights` list directly below the version heading of generated notes. */
 export function withHighlights(notes, highlights, slug) {
   if (!highlights.length) return notes;
-  const items = highlights.map(
-    ({ number, text }) => `* ${text} ([#${number}](https://github.com/${slug}/pull/${number}))`
-  );
+  const items = highlights.map(({ number, text, shas }) => {
+    const pull = `[#${number}](https://github.com/${slug}/pull/${number})`;
+    const commits = [
+      ...new Set(
+        (Array.isArray(shas) ? shas : [])
+          .filter((hash) => typeof hash === 'string' && /^[0-9a-f]{40}$/i.test(hash))
+          .map((hash) => hash.toLowerCase())
+      ),
+    ]
+      .slice(0, MAX_COMMIT_LINKS)
+      .map((hash) => `[${hash.slice(0, 7)}](https://github.com/${slug}/commit/${hash})`);
+    return `* ${text} (${[pull, ...commits].join(', ')})`;
+  });
   const block = `### Highlights\n\n${items.join('\n')}\n`;
   const [heading, ...rest] = String(notes).split('\n');
   return [heading, '', '', block, ...rest].join('\n').replace(/\n{4,}/g, '\n\n\n');
