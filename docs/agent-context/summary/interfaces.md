@@ -1,7 +1,7 @@
 # Interfaces — TarkovTracker
 
-> APIs, interfaces, and integration points. For full endpoint tables with request/response
-> shapes, see `docs/API.md`. This file summarizes the boundaries between subsystems.
+> APIs, interfaces, and integration points. For request/response shapes of the Tarkov data, team,
+> and Stripe endpoints, see `docs/API.md`. This file summarizes the boundaries between subsystems.
 
 ## Interface Map
 
@@ -31,10 +31,14 @@ graph LR
 
 ## Endpoint Summary
 
-- **`/api/tarkov/*`** — public cached proxies to `json.tarkov.dev` with overlay corrections. Most use 12h–24h edge TTLs (cache-meta: 5m). See `docs/API.md` §Tarkov Data Endpoints for the full table.
+- **`/api/tarkov/*`** — public cached proxies to `json.tarkov.dev` with overlay corrections (`tasks-core`, `tasks-objectives`, `tasks-rewards`, `hideout`, `items`, `items-lite`, `map-spawns`, `prestige`, `editions`, `overlay-status`, `bootstrap`, `cache-meta`). Most use 12h–24h edge TTLs (cache-meta: 5m). See `docs/API.md` §Tarkov Data Endpoints for the full table.
 - **`/api/team/*`, `/api/stripe/*`** — authenticated app routes (Supabase JWT). See `docs/API.md` §Team Endpoints / §Supporter / Stripe Endpoints.
+- **`/api/admin/*`** — authenticated admin management (`supporter`, `twitch-config`, `api-usage`). Not in `docs/API.md`; see handlers in `app/server/api/admin/`.
 - **`/api/profile/*`** — public shared profiles (rate-limited, no auth required).
-- **`/overlay/*`** — server-rendered streamer overlays (Nitro route, not Page Function).
+- **`/api/streamer/*`, `/overlay/*`** — streamer overlays and companion JSON endpoints. Not in `docs/API.md`; see `app/server/routes/overlay/kappa/[userId]/[mode].get.ts` (rendered overlay) and `app/server/api/streamer/` (companion JSON).
+- **`/api/twitch/*`, `/api/changelog`, `/api/contributors`, `/api/tarkov-dev/profile`** — supporting public endpoints. Not in `docs/API.md`; see their handlers under `app/server/api/`.
+- **`/api/account/activity`** — records a hashed client IP and user agent in `account_ip_audit` (account security, not gameplay activity history).
+- **`/api/logs/client`** — client diagnostics logging.
 
 ### Stripe Request Bodies
 
@@ -68,25 +72,27 @@ Handlers: `progress.ts`, `team.ts`, `token.ts`. Validate with `pnpm run validate
 
 Invoked via `app/composables/api/useEdgeFunctions.ts` or Stripe webhooks. Auth: `_shared/auth.ts`. Rate limit: `_shared/rate-limit.ts` (RPC).
 
-| Function                                                                                   | Trigger      | Purpose                                    |
-| ------------------------------------------------------------------------------------------ | ------------ | ------------------------------------------ |
-| `team-create` / `team-join` / `team-leave` / `team-kick` / `team-disband` / `team-members` | Client       | Team lifecycle                             |
-| `token-create` / `token-revoke`                                                            | Client       | API token management                       |
-| `account-delete` / `account-delete-reconcile`                                              | Client / job | Account deletion                           |
-| `stripe-webhook`                                                                           | Stripe       | Supporter grant/revoke + Discord role sync |
-| `admin-cache-purge`                                                                        | Admin client | Purge Cloudflare + data caches             |
+| Function                                                                                   | Trigger      | Purpose                                            |
+| ------------------------------------------------------------------------------------------ | ------------ | -------------------------------------------------- |
+| `team-create` / `team-join` / `team-leave` / `team-kick` / `team-disband` / `team-members` | Client       | Team lifecycle                                     |
+| `token-create` / `token-revoke`                                                            | Client       | API token management                               |
+| `discord-role-sync` / `discord-unlink`                                                     | Client       | Supporter Discord role synchronization / unlinking |
+| `account-delete` / `account-delete-reconcile`                                              | Client / job | Account deletion                                   |
+| `stripe-webhook`                                                                           | Stripe       | Supporter grant/revoke + Discord role sync         |
+| `admin-cache-purge`                                                                        | Admin client | Purge Cloudflare + data caches                     |
 
 ## External Integrations
 
-| Integration                    | Direction               | Notes                                                      |
-| ------------------------------ | ----------------------- | ---------------------------------------------------------- |
-| `json.tarkov.dev`              | Outbound (server)       | Static game data; override via `NUXT_TARKOV_JSON_BASE_URL` |
-| `tarkov-data-overlay` (GitHub) | Outbound (server)       | Community data corrections                                 |
-| `players.tarkov.dev`           | Outbound (server proxy) | Profile import JSON                                        |
-| Supabase                       | Bidirectional           | Auth, DB, Realtime, Edge Functions                         |
-| Stripe                         | Outbound + webhook      | Supporter payments                                         |
-| Discord                        | Outbound (edge)         | Supporter role sync                                        |
-| Google Analytics / Clarity     | Client (consent-gated)  | Product analytics                                          |
+| Integration                    | Direction               | Notes                                                                      |
+| ------------------------------ | ----------------------- | -------------------------------------------------------------------------- |
+| `json.tarkov.dev`              | Outbound (server)       | Static game data; override via `NUXT_TARKOV_JSON_BASE_URL`                 |
+| `tarkov-data-overlay` (GitHub) | Outbound (server)       | Community data corrections                                                 |
+| `players.tarkov.dev`           | Outbound (server proxy) | Profile import JSON                                                        |
+| Supabase                       | Bidirectional           | Auth, DB, Realtime, Edge Functions                                         |
+| Stripe                         | Outbound + webhook      | Supporter payments                                                         |
+| Discord API (edge functions)   | Outbound (edge)         | Supporter role sync/revoke (`discord-role-sync`, `discord-unlink`)         |
+| Discord OAuth (Supabase Auth)  | Client auth flow        | Discord identity link/unlink via `auth.linkIdentity`/`auth.unlinkIdentity` |
+| Google Analytics / Clarity     | Client (consent-gated)  | Product analytics                                                          |
 
 ## Error Conventions
 
