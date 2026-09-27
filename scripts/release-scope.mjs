@@ -3,8 +3,8 @@ import { pathToFileURL } from 'node:url';
 /**
  * Conventional-commit scopes for tooling, automation, documentation, and dependencies. Commits
  * with these scopes never create a release and are left out of release notes, even when their type
- * is `feat`, `fix`, or `perf`. Mirrors INTERNAL_SCOPES in app/utils/changelog.ts, plus the explicit
- * `no-release` opt-out.
+ * is `feat`, `fix`, or `perf`. `no-release` is an explicit opt-out for any other change. Keep the
+ * list aligned with the in-app changelog's internal-scope filter.
  */
 export const INTERNAL_SCOPES = Object.freeze([
   'agents',
@@ -28,9 +28,12 @@ export const INTERNAL_SCOPES = Object.freeze([
 const INTERNAL = new Set(INTERNAL_SCOPES);
 // Matches `type(scope)!: subject`; the scope group is absent for unscoped headers.
 const HEADER = /^[a-z]+\(([^)]+)\)!?:/i;
-/** Whether a commit message's header names an internal scope. */
+// Git's default `Revert "<header>"` and conventional `revert: <header>` wrap the reverted header.
+const REVERT_WRAPPER = /^(?:revert[ \t]+"|revert:[ \t]*)/i;
+/** Whether a commit message's header, or the header it reverts, names an internal scope. */
 export function isInternalCommit(message) {
-  const scope = String(message ?? '').match(HEADER)?.[1];
+  const header = String(message ?? '').replace(REVERT_WRAPPER, '');
+  const scope = header.match(HEADER)?.[1];
   return Boolean(scope) && INTERNAL.has(scope.trim().toLowerCase());
 }
 function playerFacing(context) {

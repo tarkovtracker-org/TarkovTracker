@@ -423,11 +423,12 @@ to the platform's branch settings.
 **Internal scopes never release.** `scripts/release-scope.mjs` wraps the commit analyzer and
 release-notes generator (the copies `semantic-release` depends on) and drops commits whose scope is
 internal before either runs, so `fix(ci):` or `feat(preview):` neither bumps the version nor appears
-in `CHANGELOG.md` or the GitHub release. The list is `INTERNAL_SCOPES` in that file (`agents`,
-`build`, `ci`, `config`, `deps`, `deps-dev`, `docs`, `no-release`, `preview`, `previews`,
-`release`, `repo`, `scripts`, `spec`, `test`, `tests`, `workflow`) and mirrors the in-app
-changelog filter in `app/utils/changelog.ts`. Internal commits still deploy normally; they are only
-left out of versioning. Use a product scope (`app`, `api`, `maps`, …) when a change affects players.
+in `CHANGELOG.md` or the GitHub release. Reverts of those commits (Git's default
+`Revert "fix(ci): …"` message or `revert: fix(ci): …`) are internal too. The list is
+`INTERNAL_SCOPES` in that file (`agents`, `build`, `ci`, `config`, `deps`, `deps-dev`, `docs`,
+`no-release`, `preview`, `previews`, `release`, `repo`, `scripts`, `spec`, `test`, `tests`,
+`workflow`); keep the in-app changelog's internal-scope filter aligned with it. Internal commits
+still deploy normally; they are only left out of versioning. Use a product scope (`app`, `api`, `maps`, …) when a change affects players.
 
 ### 4. PR Checks (`.github/workflows/pr-checks.yml`)
 

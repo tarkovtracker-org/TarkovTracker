@@ -10,6 +10,7 @@ import {
 const config = JSON.parse(readFileSync(new URL('../.releaserc.json', import.meta.url), 'utf8'))
   .plugins[0][1];
 const repo = 'https://github.com/tarkovtracker-org/TarkovTracker';
+const reverted = '1e9c0d4b2612deeaa1b034ed5865b721f55eca69';
 const context = (messages) => ({
   commits: messages.map((message, index) => ({
     hash: String(index + 1).padStart(40, '0'),
@@ -32,6 +33,9 @@ describe('release scope plugin', () => {
     ['feat: unscoped feature', false],
     ['chore(release): 1.83.3', true],
     ['not conventional', false],
+    [`Revert "fix(ci): honor verified gates"\n\nThis reverts commit ${reverted}.`, true],
+    ['revert: feat(preview): new controller', true],
+    ['Revert "fix(app): keep totals accurate"', false],
     [undefined, false],
   ])('classifies %s as internal=%s', (message, expected) =>
     expect(isInternalCommit(message)).toBe(expected)
@@ -45,6 +49,8 @@ describe('release scope plugin', () => {
     [['refactor(app): split store', 'docs(README): refresh', 'chore: tidy'], null],
     [['fix(ci): honor verified gates', 'fix(app): keep totals accurate'], 'patch'],
     [['perf(tasks): faster filters'], 'patch'],
+    [[`Revert "fix(ci): honor verified gates"\n\nThis reverts commit ${reverted}.`], null],
+    [[`Revert "fix(app): keep totals accurate"\n\nThis reverts commit ${reverted}.`], 'patch'],
     [['fix(release): gate', 'feat(maps): list objectives'], 'minor'],
   ])('releases %j as %s', async (messages, expected) => {
     expect(await analyzeCommits(config, context(messages))).toBe(expected);
