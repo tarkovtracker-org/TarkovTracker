@@ -1757,9 +1757,10 @@ checkout stays pinned to the validated SHA. The production build still runs in R
   the stock Angular rules, except that `refactor` and `docs` no longer release.
 - Release-note highlights (`scripts/release-highlights.mjs`) are the only release input read from
   mutable GitHub content. They are additive and fail open: a lookup error, timeout (10 s), missing
-  token, unmerged PR, a PR author without current write access (association prefilter, then the
-  collaborator-permission API's effective `permission` must be `write` or `admin`, which covers
-  `maintain` and custom roles), or a description edited
+  token, unmerged PR, an unedited description whose author lacks current write access,
+  an edited description whose last editor lacks current write access (check the selected actor's
+  effective collaborator `permission` for `write` or `admin`, including `maintain` and custom
+  roles), or a description edited
   at or after `mergedAt` (equal second-precision times are ambiguous) skips that note and never
   blocks or alters versioning. At most 3 notes per PR and 5 per release are published; 5 is the
   in-app changelog's per-release bullet limit and Highlights are listed first. Trusted commit

@@ -199,6 +199,12 @@ describe('release note parsing', () => {
     expect(note).toHaveLength(280);
     expect(performance.now() - start).toBeLessThan(1000);
   });
+  it('counts the maximum body length in Unicode code points', () => {
+    const body = `${'😀'.repeat(33_000)}\n\n## Release note\n\nPreserved update.`;
+    expect(body.length).toBeGreaterThan(65_536);
+    expect(Array.from(body).length).toBeLessThan(65_536);
+    expect(releaseNotesFromBody(body)).toEqual(['Preserved update.']);
+  });
   it('walks a deeply nested maximum-size Markdown tree without recursion', () => {
     const nestedQuotes = `${'> '.repeat(10_000)}ignored\n\n`;
     const body = `## Summary\n\n${nestedQuotes}## Release note\n\nReal note.\n\n<!--${'x'.repeat(46_000)}-->`;
@@ -531,6 +537,7 @@ describe('release highlights', () => {
     expect(url).toBe('https://api.github.com/graphql');
     expect(init.headers.Authorization).toBe('Bearer fixture-token');
     expect(JSON.parse(init.body).variables).toEqual({ owner: 'owner', name: 'repo', number: 943 });
+    expect(JSON.parse(init.body).query).toMatch(/editor\s*\{\s*login\s*\}/);
     expect(logger.log).toHaveBeenCalledWith(
       'Skipping release note for #%d: %s',
       949,
@@ -573,6 +580,109 @@ describe('release highlights', () => {
       943,
       'GitHub GraphQL returned errors: Field pullRequest is not accessible'
     );
+  });
+  it('uses author write access for an unedited body without an editor', async () => {
+    const fetchMock = vi.fn(async (url) =>
+      url.includes('/collaborators/')
+        ? json({ permission: 'write' })
+        : merged(template('Current author note.'))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    expect(
+      await collectHighlights({
+        commits: [commits[0]],
+        env: { GITHUB_REPOSITORY: 'owner/repo', GITHUB_TOKEN: 'fixture-token' },
+        logger,
+      })
+    ).toEqual([{ number: 943, text: 'Current author note.' }]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][0]).toContain('/collaborators/maintainer/permission');
+  });
+  it('rejects a triage editor even when the PR author has write access', async () => {
+    const log = vi.fn();
+    const response = merged(template('Do not publish this body.'), {
+      lastEditedAt: '2026-09-27T11:59:59Z',
+      author: { login: 'maintainer-author' },
+      editor: { login: 'triage-editor' },
+    });
+    const fetchMock = vi.fn(async (url) => {
+      if (url.includes('/collaborators/maintainer-author/permission'))
+        return json({ permission: 'write' });
+      if (url.includes('/collaborators/triage-editor/permission')) {
+        return json({ permission: 'triage' });
+      }
+      return response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    expect(
+      await collectHighlights({
+        commits: [commits[0]],
+        env: { GITHUB_REPOSITORY: 'owner/repo', GITHUB_TOKEN: 'fixture-token' },
+        logger: { log },
+      })
+    ).toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(log).toHaveBeenCalledWith(
+      'Skipping release note for #%d: %s',
+      943,
+      'PR last editor lacks write access'
+    );
+  });
+  it('accepts an edited body when the last editor has maintain permission', async () => {
+    const response = merged(template('Reviewed by a maintainer.'), {
+      lastEditedAt: '2026-09-27T11:59:59Z',
+      authorAssociation: 'CONTRIBUTOR',
+      author: { login: 'contributor' },
+      editor: { login: 'maintainer-editor' },
+    });
+    const fetchMock = vi.fn(async (url) => {
+      if (url.includes('/collaborators/contributor/permission'))
+        return json({ permission: 'read' });
+      if (url.includes('/collaborators/maintainer-editor/permission')) {
+        return json({ permission: 'write', role_name: 'maintain' });
+      }
+      return response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    expect(
+      await collectHighlights({
+        commits: [commits[0]],
+        env: { GITHUB_REPOSITORY: 'owner/repo', GITHUB_TOKEN: 'fixture-token' },
+        logger,
+      })
+    ).toEqual([{ number: 943, text: 'Reviewed by a maintainer.' }]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.some(([url]) => url.includes('/collaborators/contributor/'))).toBe(
+      false
+    );
+  });
+  it.each([
+    ['missing', null, 'PR description editor could not be verified'],
+    ['unavailable', { login: 'maintainer-editor' }, 'GitHub returned 503'],
+  ])('fails closed when an edited body has a %s last editor', async (_kind, editor, reason) => {
+    const log = vi.fn();
+    const response = merged(template('Do not publish this body.'), {
+      lastEditedAt: '2026-09-27T11:59:59Z',
+      editor,
+    });
+    const fetchMock = vi.fn(async (url) => {
+      if (url.includes('/collaborators/maintainer/permission'))
+        return json({ permission: 'write' });
+      if (url.includes('/collaborators/maintainer-editor/permission')) return json({}, 503);
+      return response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    expect(
+      await collectHighlights({
+        commits: [commits[0]],
+        env: { GITHUB_REPOSITORY: 'owner/repo', GITHUB_TOKEN: 'fixture-token' },
+        logger: { log },
+      })
+    ).toEqual([]);
+    expect(log).toHaveBeenCalledWith('Skipping release note for #%d: %s', 943, reason);
+    expect(
+      fetchMock.mock.calls.some(([url]) => url.includes('/collaborators/maintainer/permission'))
+    ).toBe(false);
   });
   it('attaches validated commit hashes for each PR and renders commit links', async () => {
     const sha = 'A'.repeat(40);

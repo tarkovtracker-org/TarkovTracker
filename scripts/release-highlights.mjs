@@ -5,10 +5,11 @@
  *
  * Trust boundary: PR descriptions stay editable after merge, and batched releases publish days
  * later. A note is used only when the PR is merged and its description was last edited at or
- * before the merge (an edit in the same timestamp second is ambiguous and rejected), and only for PRs whose author currently has write access (checked through the
- * collaborator-permission API, not just the author association): anyone else able to edit that
- * description also has write access, which closes the auto-merge window in which a lower-privilege
- * author could change an approved note. Notes are reduced to plain text (no
+ * before the merge (an edit in the same timestamp second is ambiguous and rejected). An unedited
+ * description requires a trusted author association and current author write access; an edited
+ * description requires a known last editor with current write access. The collaborator-permission
+ * API checks the actor responsible for the published body, including triage users who can edit a
+ * PR description but cannot write. Notes are reduced to plain text (no
  * link syntax, URLs, or HTML; only top-level bullets are highlights; nested and indented content
  * stays with its parent) so they cannot carry a link into the project's release notes. Untrusted
  * text is never matched by superlinear patterns: parsing is bounded by GitHub's body limit, each
@@ -50,7 +51,7 @@ const REQUEST_TIMEOUT_MS = 10_000;
 const PULL_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
-      body merged mergedAt lastEditedAt authorAssociation author { login }
+      body merged mergedAt lastEditedAt authorAssociation author { login } editor { login }
     }
   }
 }`;
@@ -117,8 +118,9 @@ const isReleaseHeading = (node) =>
   node.type === 'heading' && node.depth === 2 && RELEASE_NOTE_HEADING.test(headingText(node));
 const isSectionBoundary = (node) => node.type === 'heading' && node.depth <= 2;
 function noteSection(body) {
-  const source = String(body ?? '')
+  const source = Array.from(String(body ?? ''))
     .slice(0, MAX_BODY_LENGTH)
+    .join('')
     .replace(/\r\n/g, '\n');
   const root = fromMarkdown(source);
   const startIndex = root.children.findIndex(isReleaseHeading);
@@ -244,11 +246,16 @@ export function repositorySlug(env = {}, repositoryUrl = '') {
 }
 // A missing lastEditedAt parses to NaN, and NaN >= mergedAt is false: never edited is reviewed.
 // GitHub timestamps have second precision, so an edit in the merge's second may follow the merge.
+const descriptionWasEdited = (pull) =>
+  pull.lastEditedAt !== null && pull.lastEditedAt !== undefined;
 const editedAfterMerge = (pull) => Date.parse(pull.lastEditedAt) >= Date.parse(pull.mergedAt);
 const REVIEW_CHECKS = [
   [(pull) => !pull?.merged, 'PR is not merged'],
-  [(pull) => !TRUSTED_AUTHORS.has(pull.authorAssociation), 'PR author lacks write access'],
   [editedAfterMerge, 'description was edited after merge'],
+  [
+    (pull) => !descriptionWasEdited(pull) && !TRUSTED_AUTHORS.has(pull.authorAssociation),
+    'PR author lacks write access',
+  ],
 ];
 /** Why a PR's current description cannot be published, or null when it is the merged text. */
 export function unreviewedReason(pull) {
@@ -274,6 +281,15 @@ async function authorCanWrite({ slug, token }, login) {
   const permission = await githubRequest(url, token);
   return WRITE_PERMISSIONS.has(permission.permission);
 }
+async function lastEditorCanWrite(options, pull) {
+  const login = pull.editor && pull.editor.login;
+  if (!login) throw new Error('PR description editor could not be verified');
+  return authorCanWrite(options, login);
+}
+async function bodyEditorCanWrite(options, pull) {
+  if (descriptionWasEdited(pull)) return lastEditorCanWrite(options, pull);
+  return authorCanWrite(options, pull.author && pull.author.login);
+}
 function graphQLErrorMessage(errors) {
   if (!errors || errors.length === 0) return '';
   return `GitHub GraphQL returned errors: ${errors[0].message}`;
@@ -293,8 +309,9 @@ async function fetchPull(options, number) {
   const pull = await queryPull(options, number);
   const reason = unreviewedReason(pull);
   if (reason) throw new Error(reason);
-  if (!(await authorCanWrite(options, pull.author?.login))) {
-    throw new Error('PR author lacks write access');
+  if (!(await bodyEditorCanWrite(options, pull))) {
+    const subject = descriptionWasEdited(pull) ? 'PR last editor' : 'PR author';
+    throw new Error(`${subject} lacks write access`);
   }
   return pull.body;
 }
