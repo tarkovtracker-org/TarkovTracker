@@ -3,6 +3,7 @@ import {
   safeGetItem,
   safeRemoveItem,
   safeSetItem,
+  setActiveProgressRetentionGuard,
   type PersistedProgressSnapshot,
   setActiveProgressWritesBlocked,
 } from '@/stores/tarkov/localStorage';
@@ -57,17 +58,31 @@ export const saveAccountRecoveryCopy = (raw: string | null, ownerId: string | nu
 };
 export const retryBlockedAccountRecoveryRetention = (): boolean => {
   if (!blockedAccountOwner) return true;
-  const raw = safeGetItem(STORAGE_KEYS.progress);
-  if (!raw) return false;
-  return saveAccountRecoveryCopy(raw, blockedAccountOwner);
+  const active = safeGetItem(STORAGE_KEYS.progress);
+  if (active && isOwnedBy(active, blockedAccountOwner)) {
+    return saveAccountRecoveryCopy(active, blockedAccountOwner);
+  }
+  const recovery = safeGetItem(recoveryKey(blockedAccountOwner));
+  return recovery ? saveAccountRecoveryCopy(recovery, blockedAccountOwner) : false;
 };
 export const isAccountRecoveryRetentionBlocked = (): boolean => retentionFailure;
 export const markAccountRecoveryRetentionBlocked = (): void => {
   retentionFailure = true;
 };
+export const blockAccountRecoveryRetentionForOwner = (ownerId: string): void => {
+  retentionFailure = true;
+  blockedAccountOwner = ownerId;
+};
 export const resetAccountRecoveryRetentionBlock = (): void => {
   retentionFailure = false;
   blockedAccountOwner = null;
+};
+/** Explicit owner-scoped device-data removal is the only path that can discard a blocked copy. */
+export const clearBlockedAccountRecoveryRetention = (ownerId: string): void => {
+  if (blockedAccountOwner !== ownerId) return;
+  retentionFailure = false;
+  blockedAccountOwner = null;
+  setActiveProgressWritesBlocked(false);
 };
 const preserveRawMismatchedSeason = (userId: string, raw: string): boolean => {
   const wrapped = parseUserScopedStorage<Record<string, unknown>>(raw);
@@ -87,7 +102,7 @@ const preserveRawMismatchedSeason = (userId: string, raw: string): boolean => {
     seasonNumber,
     seasonal as UserProgressData
   );
-  if (!retained) retentionFailure = true;
+  if (!retained) blockAccountRecoveryRetentionForOwner(userId);
   return retained !== null;
 };
 export const readAccountRecoveryCopy = (userId: string): PersistedProgressSnapshot | null => {
@@ -126,3 +141,18 @@ export const preserveForeignActiveCopy = (userId: string | null): boolean => {
   if (!retained) retentionFailure = true;
   return retained;
 };
+setActiveProgressRetentionGuard((current, next) => {
+  if (!current) return true;
+  const currentEnvelope = parseUserScopedStorage<unknown>(current);
+  if (!currentEnvelope) return parsePersistedProgressState(current, null) !== null;
+  const ownerId = currentEnvelope._userId;
+  const nextOwnerId = next ? (parseUserScopedStorage<unknown>(next)?._userId ?? null) : null;
+  if (!ownerId || ownerId === nextOwnerId) return true;
+  const retained = saveAccountRecoveryCopy(current, ownerId);
+  if (!retained) {
+    retentionFailure = true;
+    blockedAccountOwner = ownerId;
+    setActiveProgressWritesBlocked(true);
+  }
+  return retained;
+});

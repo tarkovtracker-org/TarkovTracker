@@ -1,4 +1,7 @@
-import { removeAccountRecoveryCopy } from '@/stores/tarkov/accountRecovery';
+import {
+  clearBlockedAccountRecoveryRetention,
+  removeAccountRecoveryCopy,
+} from '@/stores/tarkov/accountRecovery';
 import { safeGetItem, safeRemoveItem } from '@/stores/tarkov/localStorage';
 import { removeSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
@@ -28,18 +31,21 @@ const listStorageKeys = (): string[] =>
   Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)).filter(
     (key): key is string => key !== null
   );
-const removeIfOwned = (key: string, userId: string): void => {
+const removeIfOwned = (key: string, userId: string, explicitProgressRemoval = false): void => {
   const raw = safeGetItem(key);
-  if (raw && parseUserScopedStorage<unknown>(raw)?._userId === userId) safeRemoveItem(key);
+  if (raw && parseUserScopedStorage<unknown>(raw)?._userId === userId) {
+    safeRemoveItem(key, explicitProgressRemoval ? userId : undefined);
+  }
 };
 /** Removes every locally stored copy owned by `userId`; other accounts are untouched. */
 export const removeAccountDeviceData = (userId: string): void => {
   if (typeof window === 'undefined') return;
   removeAccountRecoveryCopy(userId);
   removeSupersededProgressCopies(userId);
-  removeIfOwned(STORAGE_KEYS.progress, userId);
+  removeIfOwned(STORAGE_KEYS.progress, userId, true);
   removeIfOwned(STORAGE_KEYS.preferences, userId);
   listStorageKeys()
     .filter((key) => isOwnedBackupKey(key, userId))
     .forEach((key) => safeRemoveItem(key));
+  clearBlockedAccountRecoveryRetention(userId);
 };

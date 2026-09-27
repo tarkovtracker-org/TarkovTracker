@@ -12,6 +12,7 @@ import {
 } from '@/stores/progressState';
 import {
   isAccountRecoveryRetentionBlocked,
+  blockAccountRecoveryRetentionForOwner,
   markAccountRecoveryRetentionBlocked,
   preserveForeignActiveCopy,
   readAccountRecoveryCopy,
@@ -142,7 +143,7 @@ const preserveMismatchedSeasonalCopy = (ownerId: string, state: UserState): void
     cloneStateSnapshot(state.seasonal)
   );
   if (!saved) {
-    markAccountRecoveryRetentionBlocked();
+    blockAccountRecoveryRetentionForOwner(ownerId);
     setActiveProgressWritesBlocked(true);
     throw new Error('Could not retain stale-season progress before sanitizing it');
   }
@@ -170,7 +171,7 @@ const archiveDisplacedProgress = (
         cloneStateSnapshot(localState[mode])
       )
     ) {
-      markAccountRecoveryRetentionBlocked();
+      blockAccountRecoveryRetentionForOwner(ownerId);
       setActiveProgressWritesBlocked(true);
       logger.error('[TarkovStore] Could not retain progress displaced by a remote reset', { mode });
       return false;
@@ -1141,7 +1142,7 @@ export const useTarkovStore = defineStore('swapTarkov', {
           if (storedUserId === currentUserId) {
             return sanitizeOwnedUserState(migrateToGameModeStructure(wrapped.data));
           }
-          if (storedUserId && currentUserId && storedUserId !== currentUserId) {
+          if (storedUserId && storedUserId !== currentUserId) {
             logger.warn(
               `[TarkovStore] localStorage userId mismatch! ` +
                 `Stored: ${storedUserId}, Current: ${currentUserId}. ` +
@@ -1336,16 +1337,31 @@ const restorePreviousOwnerCopy = (
     safeSetItem(STORAGE_KEYS.progress, preservedState as string)
   );
 };
+const resetSessionMemoryWithProtectedStorage = (
+  reason: string | undefined,
+  userId: string | null
+) => {
+  resetProgressMetadataHydration();
+  resetTarkovSync(reason, { preservePersistedStateForUserId: userId });
+  useTarkovStore().$reset();
+};
 export function resetTarkovStoreForSessionTransition(
   previousUserId: string | null = null,
   reason?: string
 ) {
   const preservedState = getPreservedProgressStorageValue(previousUserId);
   const currentUserId = getCurrentSupabaseUserId();
+  const recoveredBlockedCopy = retryBlockedAccountRecoveryRetention();
+  if (!recoveredBlockedCopy || isAccountRecoveryRetentionBlocked()) {
+    setActiveProgressWritesBlocked(true);
+    resetSessionMemoryWithProtectedStorage(reason, previousUserId);
+    return;
+  }
   const retainedPreviousOwner = retainPreviousOwnerCopy(preservedState, previousUserId);
   if (!retainedPreviousOwner) {
     markAccountRecoveryRetentionBlocked();
-    resetTarkovSync(reason, { preservePersistedStateForUserId: previousUserId });
+    setActiveProgressWritesBlocked(true);
+    resetSessionMemoryWithProtectedStorage(reason, previousUserId);
     return;
   }
   setActiveProgressWritesBlocked(false);

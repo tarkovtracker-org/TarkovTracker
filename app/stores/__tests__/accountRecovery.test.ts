@@ -10,6 +10,7 @@ import {
   saveAccountRecoveryCopy,
   selectRecoverySnapshot,
 } from '@/stores/tarkov/accountRecovery';
+import { progressPersistStorage } from '@/stores/tarkov/localStorage';
 import {
   findRedundantProgressBackups,
   relieveProgressStoragePressure,
@@ -52,6 +53,18 @@ describe('account recovery copies', () => {
     expect(readAccountRecoveryCopy('user-1')?.state.pvp.level).toBe(9);
     saveAccountRecoveryCopy(envelope('user-1', 30, 12), 'user-1');
     expect(readAccountRecoveryCopy('user-1')?.state.pvp.level).toBe(12);
+  });
+  it('allows supported unscoped legacy progress to migrate to an owned envelope', () => {
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({ ...structuredClone(defaultState), pvp: { ...defaultState.pvp, level: 9 } })
+    );
+    const migrated = JSON.stringify({
+      _userId: 'user-1',
+      data: { ...structuredClone(defaultState), pvp: { ...defaultState.pvp, level: 9 } },
+    });
+    progressPersistStorage.setItem(STORAGE_KEYS.progress, migrated);
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(migrated);
   });
   it('reports a copy that could not be written', () => {
     const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {

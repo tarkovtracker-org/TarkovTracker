@@ -165,18 +165,27 @@ export const safeGetItem = (key: string): string | null => {
 };
 type StorageWriteResult = { ok: true } | { ok: false; error: unknown };
 let activeProgressWritesBlocked = false;
+type ActiveProgressRetentionGuard = (current: string | null, next: string | null) => boolean;
+let activeProgressRetentionGuard: ActiveProgressRetentionGuard = (current) => !current;
 export const setActiveProgressWritesBlocked = (blocked: boolean): void => {
   activeProgressWritesBlocked = blocked;
 };
+export const setActiveProgressRetentionGuard = (guard: ActiveProgressRetentionGuard): void => {
+  activeProgressRetentionGuard = guard;
+};
 const writeStorageItem = (key: string, value: string): StorageWriteResult => {
-  if (key === STORAGE_KEYS.progress && activeProgressWritesBlocked) {
-    return {
-      ok: false,
-      error: new Error('Progress retention must succeed before active progress can change'),
-    };
-  }
   if (typeof window === 'undefined') return { ok: false, error: null };
   try {
+    if (key === STORAGE_KEYS.progress) {
+      const current = localStorage.getItem(key);
+      const retained = activeProgressRetentionGuard(current, value);
+      if (activeProgressWritesBlocked || !retained) {
+        return {
+          ok: false,
+          error: new Error('Progress retention must succeed before active progress can change'),
+        };
+      }
+    }
     localStorage.setItem(key, value);
     return { ok: true };
   } catch (error) {
@@ -206,9 +215,24 @@ export const progressPersistStorage = {
     else safeSetItem(key, value);
   },
 };
-export const safeRemoveItem = (key: string): boolean => {
+export const safeRemoveItem = (key: string, explicitOwnerRemoval?: string): boolean => {
   if (typeof window === 'undefined') return false;
   try {
+    if (key === STORAGE_KEYS.progress) {
+      const current = localStorage.getItem(key);
+      const currentOwner = current
+        ? (parseUserScopedStorage<unknown>(current)?._userId ?? null)
+        : null;
+      const explicitRemoval = Boolean(
+        explicitOwnerRemoval && currentOwner === explicitOwnerRemoval
+      );
+      if (
+        !explicitRemoval &&
+        (activeProgressWritesBlocked || !activeProgressRetentionGuard(current, null))
+      ) {
+        return false;
+      }
+    }
     localStorage.removeItem(key);
     return true;
   } catch (error) {
