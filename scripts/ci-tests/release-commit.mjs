@@ -147,6 +147,11 @@ test('release staging runs ordinary CI while publication retains its main-only g
   );
   const config = JSON.parse(read('.releaserc.json'));
   assert.ok(config.plugins.includes('./scripts/release-commit.mjs'));
+  // Internal-scope filtering must wrap both the version analysis and the notes.
+  const names = config.plugins.map((plugin) => (Array.isArray(plugin) ? plugin[0] : plugin));
+  assert.equal(names[0], './scripts/release-scope.mjs');
+  assert.ok(!names.includes('@semantic-release/commit-analyzer'));
+  assert.ok(!names.includes('@semantic-release/release-notes-generator'));
   assert.deepEqual(config.branches, ['main']);
 });
 test('unrelated triggers, jobs and steps cannot satisfy the release workflow contract', () => {
