@@ -1958,7 +1958,10 @@ not authorize a retry. Completion matches the exact full commit; abbreviated evi
 GitHub resolution, and head changes during evidence reads fail closed. Successful posts record
 GitHub timestamps; uncertain local intents require matching completion without comparing host
 clocks. Dead local lock owners can be recovered under a separate recovery lock; live, foreign,
-or uncertain owners require operator inspection. Completed code reviews are reused by commit,
+or uncertain owners require operator inspection. Startup grace uses GitHub's response clock;
+first-line commands exclude prose examples, and tied second-resolution request/completion
+timestamps reuse exact-commit completion while running bot activity still blocks requests.
+Completed code reviews are reused by commit,
 independently of security reviews and unresolved findings. This cooperative guard cannot serialize unrelated clones or
 callers that bypass it. See [the review workflow](WORKFLOW_AUTOMATION.md#codex-request-deduplication-and-waiting)
 for agent commands and recovery boundaries.

@@ -42,9 +42,16 @@ function listPages(text, label) {
     throw new Error(`${label} pagination returned an unexpected shape`);
   }
 }
-function fetchState({ repo, pr, runGh, intents, now }) {
+function readPull(runGh, endpoint) {
+  const response = runGh(['api', '--include', endpoint]).replaceAll('\r\n', '\n');
+  const [headers, ...body] = response.split('\n\n');
+  const serverTime = Date.parse(headers.match(/^date:\s*(.+)$/im)?.[1]);
+  if (!Number.isFinite(serverTime)) throw new Error('GitHub response has no valid server Date');
+  return { pull: parseJson(body.join('\n\n'), 'pull request'), serverTime };
+}
+function fetchState({ repo, pr, runGh, intents }) {
   const prefix = `repos/${repo}`;
-  const pull = parseJson(runGh(['api', `${prefix}/pulls/${pr}`]), 'pull request');
+  const { pull } = readPull(runGh, `${prefix}/pulls/${pr}`);
   const comments = listPages(
     runGh(['api', '--paginate', '--jq', '.[] | @json', `${prefix}/issues/${pr}/comments`]),
     'issue comments'
@@ -58,12 +65,12 @@ function fetchState({ repo, pr, runGh, intents, now }) {
     'requested reviewers'
   );
   const resolvedShas = resolveEvidence(prefix, evidenceShas(comments, reviews), runGh);
-  const refreshed = parseJson(runGh(['api', `${prefix}/pulls/${pr}`]), 'pull request');
+  const { pull: refreshed, serverTime } = readPull(runGh, `${prefix}/pulls/${pr}`);
   const changed = changedHead(pull, refreshed);
   if (changed) return changed;
   return classifyState(
     { pull: refreshed, comments, reviews, requestedReviewers, intents, resolvedShas },
-    now
+    serverTime
   );
 }
 function changedHead(pull, refreshed) {
@@ -199,7 +206,7 @@ function contextFor(options, deps) {
 }
 function observe(context) {
   const intents = readIntents(context.intentDirectory, context.repo, context.pr);
-  return fetchState({ ...context, intents, now: context.now() });
+  return fetchState({ ...context, intents });
 }
 function postRequest(context, headSha) {
   const createdAt = context.now();

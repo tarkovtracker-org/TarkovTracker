@@ -46,6 +46,33 @@ test('untagged requests require a later completion for the exact current head', 
     'complete'
   );
 });
+test('same-second completion finishes exact-SHA comment requests and confirmed intents', () => {
+  const timestamp = '2026-09-27T02:00:00Z';
+  const at = Date.parse(timestamp);
+  const untagged = request(timestamp);
+  const tagged = request(timestamp, head);
+  const intent = { sha: head, createdAt: at - 1000, requestedAt: at };
+  const completion = reviewComment(head, timestamp);
+  for (const candidate of [untagged, tagged]) {
+    assert.equal(
+      classifyState(inputs({ comments: [candidate, completion] }), now).status,
+      'complete'
+    );
+  }
+  assert.equal(
+    classifyState(inputs({ comments: [completion], intents: [intent] }), now).status,
+    'complete'
+  );
+});
+test('same-second completion for an old SHA cannot retire a current-head request', () => {
+  const timestamp = '2026-09-27T02:00:00Z';
+  const requested = request(timestamp, head);
+  const oldCompletion = reviewComment(otherHead, timestamp);
+  assert.equal(
+    classifyState(inputs({ comments: [requested, oldCompletion] }), now).status,
+    'pending'
+  );
+});
 test('an older SHA-tagged request does not block the new head', () => {
   const requested = request('2026-09-27T01:30:00Z', otherHead);
   const oldCompletion = reviewComment(otherHead, '2026-09-27T02:00:00Z');
@@ -127,5 +154,45 @@ test('draft and closed pull requests cannot report review completion', () => {
   assert.equal(
     classifyState(inputs({ pull: pull({ state: 'closed' }), comments }), now).status,
     'unknown'
+  );
+});
+test('only a literal first-line review command is a request', () => {
+  const timestamp = '2026-09-27T02:00:00Z';
+  const examples = [
+    {
+      ...request(timestamp),
+      body: `Please run this command:\n@codex review\n<!-- codex-review-request:${head.slice(0, 10)} -->`,
+    },
+    {
+      ...request(timestamp),
+      body: `\`\`\`text\n@codex review\n<!-- codex-review-request:${head.slice(0, 10)} -->\n\`\`\``,
+    },
+    {
+      ...request(timestamp),
+      body: `  @codex review\n<!-- codex-review-request:${head.slice(0, 10)} -->`,
+    },
+  ];
+  for (const example of examples) {
+    assert.equal(classifyState(inputs({ comments: [example] }), now).status, 'unreviewed');
+  }
+  assert.deepEqual(evidenceShas(examples), []);
+  assert.equal(classifyState(inputs({ comments: [request(timestamp)] }), now).status, 'pending');
+});
+test('a genuine running Code Review summary remains pending', () => {
+  const running = {
+    user: { login: 'chatgpt-codex-connector[bot]' },
+    created_at: '2026-09-27T02:00:00Z',
+    body: `<!-- codex-pull-request-review-summary -->\n| **Code Review** | ⏳ **Running** <relative-time datetime="2026-09-27T02:00:00Z">now</relative-time> | \`${head}\` | Manual |`,
+  };
+  assert.equal(classifyState(inputs({ comments: [running] }), now).status, 'pending');
+  assert.equal(
+    classifyState(inputs({ comments: [running, reviewComment(head, '2026-09-27T02:00:00Z')] }), now)
+      .status,
+    'pending'
+  );
+  assert.equal(
+    classifyState(inputs({ comments: [running, reviewComment(head, '2026-09-27T02:00:01Z')] }), now)
+      .status,
+    'complete'
   );
 });

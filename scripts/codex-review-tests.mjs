@@ -44,13 +44,17 @@ function mockResponse(response, args) {
   if (response === undefined) throw new Error(`unexpected gh call: ${args.join(' ')}`);
   return typeof response === 'function' ? response(args) : response;
 }
+function withServerDate(response, args, serverNow = now) {
+  if (!args.includes('--include')) return response;
+  return `HTTP/2.0 200 OK\r\nDate: ${new Date(serverNow).toUTCString()}\r\n\r\n${response}`;
+}
 function mockGh(routes) {
   return (args) => {
     if (args.includes('--method')) {
       routes.post?.(args);
       return '{}';
     }
-    return mockResponse(routes[args.at(-1)], args);
+    return withServerDate(mockResponse(routes[args.at(-1)], args), args);
   };
 }
 function emptyApiRoutes({
@@ -419,7 +423,8 @@ test('posting saves GitHub time while preserving intent before delivery', async 
   const intentPath = join(root, 'codex-review-guard', 'intents', `example_repo-44-${head}.json`);
   const routes = emptyApiRoutes();
   const runGh = (args) => {
-    if (!args.includes('--method')) return mockResponse(routes[args.at(-1)], args);
+    if (!args.includes('--method'))
+      return withServerDate(mockResponse(routes[args.at(-1)], args), args);
     const before = JSON.parse(readFileSync(intentPath, 'utf8'));
     assert.equal(before.requestedAt, null);
     assert.equal(before.sha, head);
@@ -456,6 +461,77 @@ test('a draft transition during evidence reads cannot return successful completi
       }
     );
     assert.equal(state.status, 'unknown');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+test('startup grace uses GitHub Date even when the local clock is ahead', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'codex-review-grace-skew-'));
+  const recentPull = pull(head, { updated_at: new Date(now - 30_000).toISOString() });
+  const routes = emptyApiRoutes({ pullResponse: recentPull });
+  let posts = 0;
+  routes.post = () => {
+    posts += 1;
+  };
+  try {
+    const state = await runGuard(
+      { pr: 44, repo: 'example/repo', request: true, waitSeconds: 0 },
+      {
+        gitCommonDir: root,
+        now: () => now + 3600_000,
+        runGh: mockGh(routes),
+      }
+    );
+    assert.equal(state.status, 'pending');
+    assert.match(state.reason, /grace period/);
+    assert.equal(posts, 0);
+    assert.equal(existsSync(join(root, 'codex-review-guard')), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+test('expired startup grace uses GitHub Date even when the local clock is behind', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'codex-review-grace-behind-'));
+  const expiredPull = pull(head, { updated_at: new Date(now - 600_000).toISOString() });
+  try {
+    const state = await runGuard(
+      { pr: 44, repo: 'example/repo', request: false, waitSeconds: 0 },
+      {
+        gitCommonDir: root,
+        now: () => now - 3600_000,
+        runGh: mockGh(emptyApiRoutes({ pullResponse: expiredPull })),
+      }
+    );
+    assert.equal(state.status, 'unreviewed');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+test('missing or invalid GitHub Date fails closed before requesting', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'codex-review-no-server-time-'));
+  let posts = 0;
+  const routes = emptyApiRoutes();
+  const runGh = (args) => {
+    if (args.includes('--method')) {
+      posts += 1;
+      return '{}';
+    }
+    return mockResponse(routes[args.at(-1)], args);
+  };
+  try {
+    await assert.rejects(
+      runGuard(
+        { pr: 44, repo: 'example/repo', request: true, waitSeconds: 0 },
+        {
+          gitCommonDir: root,
+          now: () => now,
+          runGh,
+        }
+      ),
+      /no valid server Date/
+    );
+    assert.equal(posts, 0);
+    assert.equal(existsSync(join(root, 'codex-review-guard')), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

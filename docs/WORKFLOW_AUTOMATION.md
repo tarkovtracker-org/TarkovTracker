@@ -53,6 +53,9 @@ The PR head and eligibility are refreshed after collecting evidence. A completed
 still applies. Unknown or unavailable status must be reported as incomplete, never treated as
 permission to retry. An unreviewed PR must be quiet for five minutes after creation or its latest
 update before requesting, allowing automatic review to start after opening, pushing, or marking ready.
+This grace period uses the final PR response's GitHub `Date` header, never the local wall clock;
+missing or invalid server time fails closed. Only a literal first-line `@codex review` command
+counts as a request; prose mentions, fenced examples and indented code do not.
 
 Request invocations share a lock and durable intent in the Git common directory across local
 worktrees. Intent is saved before posting, so an ambiguous network failure cannot cause the next
@@ -63,7 +66,9 @@ A successful post records GitHub's request timestamp, so request/completion orde
 compares the local clock with the server clock. When delivery is uncertain, a matching current
 commit completion can retire the local intent; absence of that evidence remains pending.
 SHA-marked requests for older commits do not block the current commit, while unmarked requests
-require a later completion of the current commit.
+require a completion of the current commit at or after the request time. Equality is accepted
+because GitHub timestamps have second precision and exact-commit completion is reusable;
+bot activity still marked running continues to block a new request.
 
 The helper recovers a request lock only when complete owner metadata identifies this host and
 a PID confirmed dead (`ESRCH`). Live PIDs, permission errors, foreign hosts, missing or malformed

@@ -134,7 +134,7 @@ function collectActivities(comments, reviews, resolvedShas) {
   ];
 }
 function isRequest(comment) {
-  return !isCodex(comment) && /^\s*@codex\s+review(?:\s|$)/im.test(bodyOf(comment));
+  return !isCodex(comment) && /^@codex[ \t]+review(?:[ \t\r\n]|$)/i.test(bodyOf(comment));
 }
 function requestRecord(comment, resolvedShas) {
   const reference = requestSha(bodyOf(comment));
@@ -171,10 +171,13 @@ function requestShaMatches(completed, request, headSha) {
   return request.sha ? request.sha === completed.sha : completed.sha === headSha;
 }
 function completionIsLater(completed, request) {
-  return (request.local && !Number.isFinite(request.at)) || completed.at > request.at;
+  // GitHub timestamps have second precision. Exact-SHA completion at a tied time
+  // is reusable; a bot activity still marked running is checked separately.
+  return (request.local && !Number.isFinite(request.at)) || completed.at >= request.at;
 }
 function finishesRequest(completed, request, headSha) {
   if (!requestShaMatches(completed, request, headSha)) return false;
+  if (request.kind === 'pending') return completed.at > request.at;
   return completionIsLater(completed, request);
 }
 function outstanding(requests, completed, headSha) {
