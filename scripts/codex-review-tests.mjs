@@ -25,6 +25,7 @@ const emptyInputs = (extra = {}) => ({
 });
 const request = (createdAt, sha = null, eyes = 0) => ({
   user: { login: 'DysektAI' },
+  author_association: 'MEMBER',
   body: `@codex review${sha ? `\n\n<!-- codex-review-request:${sha} -->` : ''}`,
   created_at: createdAt,
   reactions: { eyes },

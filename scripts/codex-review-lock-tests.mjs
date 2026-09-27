@@ -28,26 +28,32 @@ function deadLock(path) {
   ]);
 }
 function contend(path) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [
-      '--input-type=module',
-      '-e',
-      `import { acquireLock, releaseLock } from ${JSON.stringify(moduleUrl)};
-       const token = acquireLock(process.argv[1]);
-       process.stdout.write(JSON.stringify(Boolean(token)));
-       if (token) setTimeout(() => releaseLock(process.argv[1], token), 500);`,
-      path,
-    ]);
+  const child = spawn(process.execPath, [
+    '--input-type=module',
+    '-e',
+    `import { acquireLock, releaseLock } from ${JSON.stringify(moduleUrl)};
+     const token = acquireLock(process.argv[1]);
+     process.stdout.write(JSON.stringify(Boolean(token)) + '\\n');
+     if (token) process.stdin.once('data', () => {
+       releaseLock(process.argv[1], token);
+       process.exit(0);
+     });`,
+    path,
+  ]);
+  const exited = new Promise((resolve) => child.once('close', resolve));
+  const acquired = new Promise((resolve, reject) => {
     let output = '';
     child.stdout.on('data', (chunk) => {
       output += chunk;
+      if (output.includes('\n')) resolve(JSON.parse(output));
     });
     child.on('error', reject);
     child.on('exit', (code) => {
-      if (code !== 0) return reject(new Error(`Lock contender exited ${code}`));
-      resolve(JSON.parse(output));
+      if (!output.includes('\n'))
+        reject(new Error(`Lock contender exited ${code} without a result`));
     });
   });
+  return { child, acquired, exited };
 }
 test('live owners and invalid or missing metadata are preserved', () => {
   const { root, path } = fixture();
@@ -104,12 +110,21 @@ test('cross-host owners and interrupted recovery preserve uncertain state', () =
 });
 test('concurrent dead-owner recovery admits only one live lock holder', async () => {
   const { root, path } = fixture();
+  const contenders = [];
   try {
     deadLock(path);
-    const outcomes = await Promise.all([contend(path), contend(path)]);
+    contenders.push(contend(path), contend(path));
+    const outcomes = await Promise.all(contenders.map((item) => item.acquired));
     assert.equal(outcomes.filter(Boolean).length, 1);
+    outcomes.forEach((held, index) => {
+      if (held) contenders[index].child.stdin.end('release\n');
+    });
+    const codes = await Promise.all(contenders.map((item) => item.exited));
+    assert.deepEqual(codes, [0, 0]);
     assert.equal(existsSync(path), false);
   } finally {
+    contenders.forEach((item) => item.child.kill());
+    await Promise.all(contenders.map((item) => item.exited));
     rmSync(root, { recursive: true, force: true });
   }
 });

@@ -22,6 +22,7 @@ const inputs = (extra = {}) => ({
 });
 const request = (createdAt, sha) => ({
   user: { login: 'DysektAI' },
+  author_association: 'MEMBER',
   body: `@codex review${sha ? `\n<!-- codex-review-request:${sha} -->` : ''}`,
   created_at: createdAt,
 });
@@ -195,4 +196,37 @@ test('a genuine running Code Review summary remains pending', () => {
       .status,
     'complete'
   );
+});
+test('outsider request markers cannot override current-head completion or trigger SHA lookups', () => {
+  const timestamp = '2026-09-27T02:30:00Z';
+  const outsider = {
+    ...request(timestamp),
+    author_association: 'NONE',
+    body: '@codex review\n<!-- codex-review-request:not-a-sha -->',
+  };
+  assert.equal(
+    classifyState(inputs({ comments: [reviewComment(head), outsider] }), now).status,
+    'complete'
+  );
+  assert.equal(classifyState(inputs({ comments: [outsider] }), now).status, 'unreviewed');
+  assert.deepEqual(
+    evidenceShas([{ ...outsider, body: request(timestamp, head.slice(0, 10)).body }]),
+    []
+  );
+});
+test('only trusted GitHub request associations can block coordination', () => {
+  for (const association of ['OWNER', 'MEMBER', 'COLLABORATOR']) {
+    const comment = { ...request('2026-09-27T02:00:00Z'), author_association: association };
+    assert.equal(classifyState(inputs({ comments: [comment] }), now).status, 'pending');
+  }
+  for (const association of [
+    'NONE',
+    'CONTRIBUTOR',
+    'FIRST_TIMER',
+    'FIRST_TIME_CONTRIBUTOR',
+    null,
+  ]) {
+    const comment = { ...request('2026-09-27T02:00:00Z'), author_association: association };
+    assert.equal(classifyState(inputs({ comments: [comment] }), now).status, 'unreviewed');
+  }
 });

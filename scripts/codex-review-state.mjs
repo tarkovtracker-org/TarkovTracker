@@ -4,6 +4,7 @@ const SUMMARY = '<!-- codex-pull-request-review-summary -->';
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const ABBREVIATED_SHA = /^[0-9a-f]{7,39}$/i;
 const GRACE_MS = 5 * 60 * 1000;
+const REQUEST_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 const unknown = (reason) => ({ kind: 'unknown', reason });
 const status = (value, reason) => ({ status: value, reason });
 const isCodex = (item) => item.user?.login === BOT;
@@ -134,7 +135,11 @@ function collectActivities(comments, reviews, resolvedShas) {
   ];
 }
 function isRequest(comment) {
-  return !isCodex(comment) && /^@codex[ \t]+review(?:[ \t\r\n]|$)/i.test(bodyOf(comment));
+  return (
+    REQUEST_ASSOCIATIONS.has(comment.author_association) &&
+    !isCodex(comment) &&
+    /^@codex[ \t]+review(?:[ \t\r\n]|$)/i.test(bodyOf(comment))
+  );
 }
 function requestRecord(comment, resolvedShas) {
   const reference = requestSha(bodyOf(comment));

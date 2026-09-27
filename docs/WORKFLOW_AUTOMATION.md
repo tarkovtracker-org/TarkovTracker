@@ -55,7 +55,10 @@ permission to retry. An unreviewed PR must be quiet for five minutes after creat
 update before requesting, allowing automatic review to start after opening, pushing, or marking ready.
 This grace period uses the final PR response's GitHub `Date` header, never the local wall clock;
 missing or invalid server time fails closed. Only a literal first-line `@codex review` command
-counts as a request; prose mentions, fenced examples and indented code do not.
+from a GitHub `OWNER`, `MEMBER`, or `COLLABORATOR` association counts as request evidence;
+prose mentions, fenced examples, indented code, and outsider markers do not. This trusts GitHub's
+association metadata for coordination; it does not grant permission to post a request. Running
+bot activity remains authoritative regardless of who triggered it.
 
 Request invocations share a lock and durable intent in the Git common directory across local
 worktrees. Intent is saved before posting, so an ambiguous network failure cannot cause the next
