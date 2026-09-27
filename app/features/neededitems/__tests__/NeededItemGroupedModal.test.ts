@@ -118,7 +118,8 @@ describe('NeededItemGroupedModal', () => {
             template: '<i :data-icon="name" />',
           },
           UButton: {
-            template: '<button><slot /></button>',
+            props: ['disabled'],
+            template: '<button :disabled="disabled"><slot /></button>',
           },
           NuxtLink: {
             template: '<a><slot /></a>',
