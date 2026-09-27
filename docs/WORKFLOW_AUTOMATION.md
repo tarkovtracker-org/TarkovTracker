@@ -309,25 +309,35 @@ activation change made the job mandatory.
 
 ### 3. Release Automation (`.github/workflows/release.yml`)
 
-Semantic versioning with automated releases:
+Semantic versioning with batched releases. Releasing and deploying are separate: every merge to
+`main` deploys through the Cloudflare and Supabase Git integrations as soon as it lands, while a
+release groups everything merged since the previous tag into one version, changelog entry, and
+GitHub release.
 
 **Jobs:**
 
-- Reuses the successful `CI` run for the exact `main` commit, including all four test shards
-  and the Supabase reset, lint, and pgTAP checks
+- Reuses the newest successful main `CI` run for the exact release commit, including all four test
+  shards and the Supabase reset, lint, and pgTAP checks
 - Runs the production build before publishing
 - Generates changelog from conventional commits
 - Creates GitHub releases
 - Updates version in package.json
 
-**Triggers:** Completion of `CI` for a successful same-repository push or explicit dispatch on `main`. PR runs, failed
-or cancelled CI, and fork runs cannot publish. Successful CI reruns can retry release eligibility;
-there is no manual bypass of the CI gate. Documentation-only pushes may reach the gate, but
-semantic-release still decides whether the accumulated conventional commits warrant a version.
+**Triggers:** A weekly schedule (Tuesdays 15:00 UTC) and manual `workflow_dispatch` on `main`
+(Actions → Release → Run workflow) when a notable change should ship as a release sooner. CI
+completion no longer starts a release. Other refs and events cannot publish, and there is no manual
+bypass of the CI gate. semantic-release still decides whether the accumulated conventional commits
+warrant a version; weeks with only internal or non-releasing commits publish nothing.
 
-`release-gate.mjs` re-reads the triggering run and `refs/heads/main` before dependency setup and
-again immediately before publishing. It verifies the CI workflow path, conclusion, SHA, and run
-attempt. Superseded commits skip; release never substitutes a newer, unvalidated checkout.
+The release candidate is the run's trigger commit (`github.sha`, the head of `main` when the run
+started; reruns keep it). `release-gate.mjs` finds the newest same-repository `CI` run
+(`.github/workflows/ci.yml`, push or dispatch on `main`) for that exact SHA, ordered by the latest
+attempt's start time so a rerun of an older run record counts as newest, and requires it to have
+completed successfully. A later failed or in-progress attempt therefore blocks publication instead
+of an older success being reused. It then re-reads `refs/heads/main`, both before dependency setup and again
+immediately before publishing. If CI for the head is still running, or main advanced after the run
+started, the run skips; dispatch Release again once main CI passes. Release never substitutes a
+newer, unvalidated checkout.
 The gate and its recovery helper initially load from the trusted default-branch SHA and are copied
 to `RUNNER_TEMP` so checks use the same source even after checkout replacement. Only after validation does a
 second checkout pin the triggering CI SHA for building and publishing; it never executes a fork
@@ -903,10 +913,9 @@ maintainer dispatch. Cloudflare automatic preview builds are disabled; productio
 enabled. See the Deployment section of [`runbook.md`](./runbook.md) for what to verify after each
 merge.
 
-A releasing merge deploys twice: once for the merge commit, then again for the
-`chore(release): <version>` commit that carries the bumped `package.json`. The second
-deploy is what makes the footer version match the release, so treat it as part of the merge rather
-than a stray build.
+Each release adds one extra deploy for the `chore(release): <version>` commit that carries the
+bumped `package.json`; it makes the footer version match the release. Merges between releases
+deploy normally and keep the previous version number.
 
 ### Manual Deployment
 
