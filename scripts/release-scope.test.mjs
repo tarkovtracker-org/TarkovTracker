@@ -30,6 +30,7 @@ describe('release scope plugin', () => {
     ['fix(ci): honor verified gates (#946)', true],
     ['feat(Preview)!: new controller', true],
     ['fix(deps-dev): bump vitest', true],
+    ['fix(dependencies): update package versions', true],
     ['fix(no-release): quiet change', true],
     ['fix(app): keep totals accurate', false],
     ['feat: unscoped feature', false],
