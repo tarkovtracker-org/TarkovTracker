@@ -328,7 +328,7 @@ const persistOnlineReset = async (
   const freshState = buildOnlineResetState(store);
   const { error } = await syncProgressState(client, userId, freshState);
   throwSyncError(error, 'Failed to reset online profile');
-  clearActiveProgressStorage();
+  clearActiveProgressStorage(userId);
   patchProgressState(store, freshState);
 };
 const persistPrestigeLevel = async (
@@ -1145,7 +1145,8 @@ export const useTarkovStore = defineStore('swapTarkov', {
           if (storedUserId === currentUserId) {
             return sanitizeOwnedUserState(migrateToGameModeStructure(wrapped.data));
           }
-          if (storedUserId && storedUserId !== currentUserId) {
+          // Until the session hydrates, an owned copy is not known to be foreign.
+          if (storedUserId && currentUserId && storedUserId !== currentUserId) {
             logger.warn(
               `[TarkovStore] localStorage userId mismatch! ` +
                 `Stored: ${storedUserId}, Current: ${currentUserId}. ` +
@@ -1546,7 +1547,7 @@ export async function initializeTarkovSync() {
       let resolvedLocalState: UserState | null = null;
       let shouldPersistSanitizedLocalState = hasDeprecatedTarkovDevProfileData(tarkovStore.$state);
       let needsRemoteCleanup = false;
-      if (storedUserId && storedUserId !== currentUserId) {
+      if (storedUserId && currentUserId && storedUserId !== currentUserId) {
         logger.warn('[TarkovStore] Local progress belongs to a different user; retaining it');
         if (!preserveForeignActiveCopy(currentUserId)) {
           setActiveProgressWritesBlocked(true);

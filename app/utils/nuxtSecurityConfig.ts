@@ -37,9 +37,44 @@ export const assertCloudflarePagesOutput = (
     throw new Error('[Config] Static SPA entrypoint is empty.');
   }
   const headers = readFileSync(resolve(outputDir, '_headers'), 'utf8');
-  if (!headers.includes("Content-Security-Policy: frame-ancestors 'self'")) {
+  if (!pagesHeadersPreventFraming(headers)) {
     throw new Error('[Config] Cloudflare Pages output must prevent cross-origin framing.');
   }
+};
+type PagesHeaderBlock = { pattern: string; headers: string[] };
+/** Cloudflare Pages `_headers`: an unindented URL pattern followed by indented header lines. */
+const parsePagesHeaderBlocks = (source: string): PagesHeaderBlock[] => {
+  const blocks: PagesHeaderBlock[] = [];
+  for (const line of source.split(/\r?\n/)) {
+    if (!line.trim() || line.trimStart().startsWith('#')) continue;
+    if (/^\s/.test(line)) blocks.at(-1)?.headers.push(line.trim());
+    else blocks.push({ pattern: line.trim(), headers: [] });
+  }
+  return blocks;
+};
+const SAME_ORIGIN_FRAME_ANCESTORS = new Set(["'self'", "'none'"]);
+const frameAncestorsOf = (header: string): string | null => {
+  const match = /^content-security-policy:(.*)$/i.exec(header);
+  const directive = match?.[1]
+    ?.split(';')
+    .map((part) => part.trim())
+    .find((part) => part.toLowerCase().startsWith('frame-ancestors'));
+  return directive ? directive.slice('frame-ancestors'.length).trim() : null;
+};
+/**
+ * The catch-all block must set a same-origin `frame-ancestors`, and no block may widen it, because
+ * Pages applies every matching block to a response.
+ */
+export const pagesHeadersPreventFraming = (source: string): boolean => {
+  const blocks = parsePagesHeaderBlocks(source);
+  const policies = blocks.flatMap((block) =>
+    block.headers.map((header) => ({ pattern: block.pattern, value: frameAncestorsOf(header) }))
+  );
+  const framing = policies.filter((policy) => policy.value !== null);
+  return (
+    framing.some((policy) => policy.pattern === '/*') &&
+    framing.every((policy) => SAME_ORIGIN_FRAME_ANCESTORS.has(policy.value!))
+  );
 };
 export const buildContentSecurityPolicyRouteRules = (
   options: AppContentSecurityPolicyOptions

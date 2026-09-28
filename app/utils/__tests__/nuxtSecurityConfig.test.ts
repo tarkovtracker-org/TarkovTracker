@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   assertCloudflarePagesOutput,
+  pagesHeadersPreventFraming,
   buildContentSecurityPolicyRouteRules,
   DEFAULT_NITRO_PRESET,
   promoteSpaFallback,
@@ -82,6 +83,32 @@ describe('nuxtSecurityConfig', () => {
     } finally {
       rmSync(outputDir, { force: true, recursive: true });
     }
+  });
+  it.each([
+    ['catch-all policy', "/*\n  Content-Security-Policy: frame-ancestors 'self'\n", true],
+    [
+      'catch-all with other directives',
+      "# comment\n/*\n  X-Frame-Options: DENY\n  Content-Security-Policy: default-src 'self'; frame-ancestors 'none'\n",
+      true,
+    ],
+    [
+      'policy only on a sub-route',
+      "/other/*\n  Content-Security-Policy: frame-ancestors 'self'\n",
+      false,
+    ],
+    [
+      'catch-all widened by another block',
+      "/*\n  Content-Security-Policy: frame-ancestors *\n/other/*\n  Content-Security-Policy: frame-ancestors 'self'\n",
+      false,
+    ],
+    [
+      'same-origin catch-all widened for a sub-route',
+      "/*\n  Content-Security-Policy: frame-ancestors 'self'\n/embed/*\n  Content-Security-Policy: frame-ancestors https://example.com\n",
+      false,
+    ],
+    ['directive text outside a header', "/*\n  X-Note: frame-ancestors 'self'\n", false],
+  ])('evaluates the effective Pages framing policy: %s', (_name, source, expected) => {
+    expect(pagesHeadersPreventFraming(source)).toBe(expected);
   });
   it('builds an overlay-specific CSP route rule that is stricter than the app-wide rule', () => {
     const routeRules = buildContentSecurityPolicyRouteRules({

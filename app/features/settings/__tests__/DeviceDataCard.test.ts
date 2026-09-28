@@ -319,6 +319,51 @@ describe('DeviceDataCard', () => {
     await flushPromises();
     expect(wrapper.find('[data-testid="device-data-confirm-device-only"]').exists()).toBe(false);
   });
+  it('reports a thrown cleanup as incomplete and clears the removal request', async () => {
+    deviceData.removeAccountDeviceData.mockImplementation(() => {
+      throw new Error('storage exploded');
+    });
+    signOutNow.mockImplementation(async () => {
+      reactiveUser.id = null;
+      reactiveUser.loggedIn = false;
+      return true;
+    });
+    const wrapper = await mountCard();
+    await wrapper.get('[data-testid="device-data-remove"]').trigger('click');
+    await wrapper.get('[data-testid="device-data-confirm"]').trigger('click');
+    await flushPromises();
+    expect(deviceData.clearDeviceDataRemoval).toHaveBeenCalled();
+    expect(toastAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'settings.device_data.remove_error', color: 'error' })
+    );
+    expect(wrapper.find('[data-testid="device-data-remove-incomplete"]').exists()).toBe(true);
+  });
+  it('refreshes superseded copies when another tab changes them', async () => {
+    const wrapper = await mountCard();
+    expect(wrapper.find('[data-testid="superseded-progress-export"]').exists()).toBe(false);
+    const { STORAGE_KEYS } = await import('@/utils/storageKeys');
+    const { createDefaultOwnedProgressData } = await import('@/utils/progressSanitizers');
+    const key = `${STORAGE_KEYS.progressSupersededPrefix}user-1_100_other-tab`;
+    Storage.prototype.setItem.call(
+      localStorage,
+      key,
+      JSON.stringify({
+        id: '100_other-tab',
+        ownerId: 'user-1',
+        mode: 'pvp',
+        seasonNumber: null,
+        supersededAt: 100,
+        progress: createDefaultOwnedProgressData(),
+      })
+    );
+    window.dispatchEvent(new StorageEvent('storage', { key: 'unrelated' }));
+    await nextTick();
+    expect(wrapper.find('[data-testid="superseded-progress-export"]').exists()).toBe(false);
+    window.dispatchEvent(new StorageEvent('storage', { key }));
+    await nextTick();
+    expect(wrapper.find('[data-testid="superseded-progress-export"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
   it('clears owner-scoped export controls when the current account signs out', async () => {
     const wrapper = await mountCard();
     await wrapper.get('[data-testid="device-data-remove"]').trigger('click');

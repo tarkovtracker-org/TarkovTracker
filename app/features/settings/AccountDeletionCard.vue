@@ -4,6 +4,7 @@
   import { resetTarkovSync } from '@/stores/useTarkov';
   import { logger } from '@/utils/logger';
   import { refreshSupabaseSession } from '@/utils/supabaseAuth';
+  import { isSupabaseSessionChangedError } from '@/utils/supabaseAuthFence';
   defineOptions({
     inheritAttrs: false,
   });
@@ -54,6 +55,7 @@
   const accountIdCopied = ref(false);
   const cleanupScheduled = ref(false);
   const deviceCleanupFailed = ref(false);
+  const sessionEndFailed = ref(false);
   const isRetryingDeviceCleanup = ref(false);
   const showUsername = ref(false);
   const showEmail = ref(false);
@@ -351,10 +353,20 @@
       return false;
     }
   };
+  /** The deleted account has no server session left; clear this browser's copy directly. */
+  const endDeletedSession = async (owner: string): Promise<void> => {
+    try {
+      await $supabase.signOut(owner, 'local');
+    } catch (error) {
+      if (isSupabaseSessionChangedError(error) || $supabase.user.id !== owner) return;
+      logger.warn('Local sign-out of the deleted account failed; clearing this device', error);
+      await $supabase.signOutThisDevice(owner);
+    }
+  };
   const signOutDeletedSession = async (owner: string, revision: number): Promise<void> => {
     if (!ownsDeletionSession(owner, revision)) return;
     requestDeviceDataRemoval(owner);
-    await $supabase.signOut(owner, 'local');
+    await endDeletedSession(owner);
   };
   const resetDeletedSession = (owner: string, revision: number): void => {
     if (canResetDeletedSession(owner, revision)) resetClientState();
@@ -372,6 +384,9 @@
     } catch (error) {
       logger.error('Failed to sign out and redirect:', error);
     }
+    // Never leave while this browser still holds the deleted account's session.
+    sessionEndFailed.value = $supabase.user.id === deletedUserId;
+    if (sessionEndFailed.value) return;
     deviceCleanupFailed.value = !forgetAccountOnDevice(deletedUserId);
     if (deviceCleanupFailed.value && !allowRemainingDeviceData) return;
     resetDeletedSession(deletedUserId, revision);
@@ -719,6 +734,9 @@
         </div>
         <div v-if="deviceCleanupFailed" class="text-error-400 text-sm" role="alert">
           {{ $t('settings.account_data.device_cleanup_failed') }}
+        </div>
+        <div v-if="sessionEndFailed" class="text-error-400 text-sm" role="alert">
+          {{ $t('settings.account_data.session_end_failed') }}
         </div>
         <div v-if="!deviceCleanupFailed" class="text-surface-400 text-sm">
           {{ $t('settings.account_data.redirect_message') }}

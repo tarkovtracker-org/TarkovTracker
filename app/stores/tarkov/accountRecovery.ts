@@ -12,7 +12,7 @@ import {
   type PersistedProgressSnapshot,
   setActiveProgressWritesBlocked,
 } from '@/stores/tarkov/localStorage';
-import { toProgressEpoch } from '@/stores/tarkov/progressMerge';
+import { mergeProgressData, toProgressEpoch } from '@/stores/tarkov/progressMerge';
 import { saveSupersededProgressCopy } from '@/stores/tarkov/supersededProgress';
 import { GAME_MODE_VALUES, ACTIVE_SEASON_NUMBER, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
@@ -85,47 +85,63 @@ const latestSnapshotByClock = (
   snapshots.reduce((winner, candidate) =>
     getClock(candidate) >= getClock(winner) ? candidate : winner
   );
+type ModeCandidate = {
+  progress: UserProgressData;
+  clock: number;
+  seasonNumber: number | null;
+};
+const toModeCandidate = (snapshot: PersistedProgressSnapshot, mode: GameMode): ModeCandidate => ({
+  progress: snapshot.state[mode],
+  clock: snapshotModeClock(snapshot, mode),
+  seasonNumber: mode === 'seasonal' ? (snapshot.state.seasonalSeasonNumber ?? null) : null,
+});
 const archiveDisplacedMode = (
   ownerId: string | null,
-  snapshot: PersistedProgressSnapshot,
+  displaced: ModeCandidate,
   mode: GameMode
 ): boolean => {
-  const progress = snapshot.state[mode];
-  if (!hasMaterializedProgress(progress)) return true;
+  if (!hasMaterializedProgress(displaced.progress)) return true;
   if (!ownerId) return false;
-  const seasonNumber = mode === 'seasonal' ? (snapshot.state.seasonalSeasonNumber ?? null) : null;
-  const archived = saveSupersededProgressCopy(ownerId, mode, seasonNumber, progress);
-  if (archived) return true;
+  if (saveSupersededProgressCopy(ownerId, mode, displaced.seasonNumber, displaced.progress)) {
+    return true;
+  }
   blockAccountRecoveryRetentionForOwner(ownerId);
   setActiveProgressWritesBlocked(true);
   return false;
 };
-const preferModeSnapshot = (
-  winner: PersistedProgressSnapshot,
-  candidate: PersistedProgressSnapshot,
+/**
+ * Equal-epoch copies can each hold edits the other lacks (for example two tabs), so they are
+ * merged like any other local/remote pair; the newer clock wins fields that need a single value.
+ */
+const mergeEqualEpochModes = (left: ModeCandidate, right: ModeCandidate): ModeCandidate => {
+  const [older, newer] = right.clock >= left.clock ? [left, right] : [right, left];
+  return { ...newer, progress: mergeProgressData(older.progress, newer.progress, true) };
+};
+const preferModeCandidate = (
+  winner: ModeCandidate,
+  candidate: ModeCandidate,
   ownerId: string | null,
   mode: GameMode
-): PersistedProgressSnapshot | null => {
-  const winnerEpoch = toProgressEpoch(winner.state[mode]);
-  const candidateEpoch = toProgressEpoch(candidate.state[mode]);
+): ModeCandidate | null => {
+  const winnerEpoch = toProgressEpoch(winner.progress);
+  const candidateEpoch = toProgressEpoch(candidate.progress);
   if (candidateEpoch > winnerEpoch) {
     return archiveDisplacedMode(ownerId, winner, mode) ? candidate : null;
   }
   if (candidateEpoch < winnerEpoch) {
     return archiveDisplacedMode(ownerId, candidate, mode) ? winner : null;
   }
-  return snapshotModeClock(candidate, mode) >= snapshotModeClock(winner, mode) ? candidate : winner;
+  return mergeEqualEpochModes(winner, candidate);
 };
-const newestModeSnapshot = (
+const newestModeCandidate = (
   snapshots: PersistedProgressSnapshot[],
   ownerId: string | null,
   mode: GameMode
-): PersistedProgressSnapshot | null => {
-  let winner = snapshots[0]!;
-  for (const candidate of snapshots.slice(1)) {
-    const preferred = preferModeSnapshot(winner, candidate, ownerId, mode);
-    if (!preferred) return null;
-    winner = preferred;
+): ModeCandidate | null => {
+  let winner: ModeCandidate | null = toModeCandidate(snapshots[0]!, mode);
+  for (const snapshot of snapshots.slice(1)) {
+    winner = preferModeCandidate(winner, toModeCandidate(snapshot, mode), ownerId, mode);
+    if (!winner) return null;
   }
   return winner;
 };
@@ -140,15 +156,15 @@ const composeOwnerSnapshots = (
   const modeTimestamps: Partial<Record<GameMode, number>> = {};
   for (const mode of GAME_MODE_VALUES) {
     const candidates = mode === 'seasonal' ? currentSeasonSnapshots(snapshots) : snapshots;
-    const winner = candidates.length ? newestModeSnapshot(candidates, ownerId, mode) : null;
+    const winner = candidates.length ? newestModeCandidate(candidates, ownerId, mode) : null;
     if (!candidates.length) {
       state.seasonal = cloneStateSnapshot(defaultState.seasonal);
       modeTimestamps[mode] = 0;
       continue;
     }
     if (!winner) return null;
-    state[mode] = cloneStateSnapshot(winner.state[mode]);
-    modeTimestamps[mode] = snapshotModeClock(winner, mode);
+    state[mode] = cloneStateSnapshot(winner.progress);
+    modeTimestamps[mode] = winner.clock;
   }
   state.seasonalSeasonNumber = ACTIVE_SEASON_NUMBER;
   const timestamps = snapshots.map((snapshot) => validClock(snapshot.timestamp));

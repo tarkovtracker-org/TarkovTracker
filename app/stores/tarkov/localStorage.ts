@@ -375,9 +375,15 @@ export const safeRemoveItem = (key: string, explicitOwnerRemoval?: string): bool
     return false;
   }
 };
-export const clearActiveProgressStorage = () => {
+/**
+ * `resetOwner` marks a deliberate reset of that owner's own progress: its retention was already
+ * decided before the reset, so the active copy is removed without keeping a recovery copy.
+ * Write barriers still apply.
+ */
+export const clearActiveProgressStorage = (resetOwner?: string | null) => {
   if (typeof window === 'undefined') return;
-  safeRemoveItem(STORAGE_KEYS.progress);
+  const explicitOwner = resetOwner && !activeProgressWritesBlocked ? resetOwner : undefined;
+  safeRemoveItem(STORAGE_KEYS.progress, explicitOwner);
   safeRemoveItem(LEGACY_STORAGE_KEYS.progress);
 };
 export const parsePersistedProgressState = (

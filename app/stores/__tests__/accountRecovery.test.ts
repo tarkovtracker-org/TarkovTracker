@@ -14,6 +14,7 @@ import {
   selectFreshestOwnerProgressSnapshot,
 } from '@/stores/tarkov/accountRecovery';
 import {
+  clearActiveProgressStorage,
   progressPersistStorage,
   parsePersistedProgressState,
   setActiveProgressWritesBlocked,
@@ -196,6 +197,46 @@ describe('account recovery copies', () => {
     expect(selected?.state.seasonal.level).toBe(20);
     expect(selected?.modeTimestamps?.seasonal).toBe(100);
     expect(listSupersededProgressCopies('user-1')).toHaveLength(1);
+  });
+  it('keeps no recovery copy when the owner deliberately resets their own active copy', () => {
+    localStorage.setItem(STORAGE_KEYS.progress, envelope('user-1', 10, 9));
+    clearActiveProgressStorage('user-1');
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBeNull();
+    expect(localStorage.getItem(recoveryKey('user-1'))).toBeNull();
+  });
+  it('still retains the active owner copy when cleanup is not that owner reset', () => {
+    localStorage.setItem(STORAGE_KEYS.progress, envelope('user-1', 10, 9));
+    clearActiveProgressStorage('user-2');
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBeNull();
+    expect(readAccountRecoveryCopy('user-1')?.state.pvp.level).toBe(9);
+  });
+  it('honors the write barrier during an owner reset cleanup', () => {
+    localStorage.setItem(STORAGE_KEYS.progress, envelope('user-1', 10, 9));
+    setActiveProgressWritesBlocked(true);
+    clearActiveProgressStorage('user-1');
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(envelope('user-1', 10, 9));
+  });
+  it('merges divergent equal-epoch edits instead of dropping the older copy', () => {
+    const withTask = (taskId: string, timestamp: number, displayName: string) => ({
+      ...structuredClone(defaultState),
+      pvp: {
+        ...structuredClone(defaultState.pvp),
+        displayName,
+        taskCompletions: { [taskId]: { complete: true, timestamp } },
+      },
+    });
+    const recovery = snapshot(100, withTask('task-a', 100, 'older'), {
+      modeTimestamps: { pvp: 100 },
+    });
+    const active = snapshot(200, withTask('task-b', 200, 'newer'), {
+      modeTimestamps: { pvp: 200 },
+    });
+    const selected = selectFreshestOwnerProgressSnapshot(recovery, active);
+    expect(Object.keys(selected!.state.pvp.taskCompletions).sort()).toEqual(['task-a', 'task-b']);
+    // The newer copy wins single-value fields and the mode clock.
+    expect(selected?.state.pvp.displayName).toBe('newer');
+    expect(selected?.modeTimestamps?.pvp).toBe(200);
+    expect(listSupersededProgressCopies('user-1')).toHaveLength(0);
   });
   it('archives an unknown numeric season before allowing current-season progress to win', () => {
     const unknownSeason = 0;

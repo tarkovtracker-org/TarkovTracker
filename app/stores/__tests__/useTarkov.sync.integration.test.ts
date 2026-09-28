@@ -1023,6 +1023,28 @@ describe('useTarkov sync integration', () => {
     expect(store.pvp.level).toBe(7);
     expect(getLastSyncPayload().p_modes.pvp).toEqual(expect.objectContaining({ level: 7 }));
   });
+  it('keeps the owned active copy in place when hydrating before the session loads', () => {
+    supabaseContext.user.loggedIn = false;
+    supabaseContext.user.id = null;
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({
+        _timestamp: Date.now(),
+        _userId: 'user-1',
+        data: { ...structuredClone(defaultState), pvp: progressWithLevel(7) },
+      })
+    );
+    const pinia = createPinia().use(piniaPluginPersistedstate);
+    createApp({}).use(pinia);
+    setActivePinia(pinia);
+    const store = useTarkovStore();
+    expect(store.pvp.level).toBe(1);
+    expect(localStorage.getItem(`${STORAGE_KEYS.progressRecoveryPrefix}user-1`)).toBeNull();
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!)).toMatchObject({
+      _userId: 'user-1',
+      data: { pvp: { level: 7 } },
+    });
+  });
   it('refreshes metadata after restoring scoped progress with a different game mode', async () => {
     localStorage.setItem(
       STORAGE_KEYS.progress,

@@ -2195,6 +2195,7 @@
       "other_session_deleted_description": "The account that started this deletion was deleted. Your current account is still signed in and was not changed.",
       "cleanup_pending": "Some data cleanup is still in progress and will complete shortly.",
       "device_cleanup_failed": "Some deleted account data remains on this device. Retry cleanup, or continue and leave that data here.",
+      "session_end_failed": "This browser is still signed in to the deleted account. Select Go to dashboard to try signing out again.",
       "retry_device_cleanup": "Retry device cleanup",
       "continue_with_device_data_remaining": "Continue with data remaining",
       "redirect_message": "Thank you for using TarkovTracker. You will be redirected to the dashboard.",

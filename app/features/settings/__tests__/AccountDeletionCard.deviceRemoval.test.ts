@@ -5,23 +5,35 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import AccountDeletionCard from '@/features/settings/AccountDeletionCard.vue';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
-const { user, signOut, invoke, remove, request, reset, refreshedOwner, sessionSwitch, toastAdd } =
-  vi.hoisted(() => ({
-    user: { id: 'deleted-owner' as string | null, loggedIn: true, providers: [] },
-    signOut: vi.fn(),
-    invoke: vi.fn(),
-    remove: vi.fn(),
-    request: vi.fn(),
-    reset: vi.fn(),
-    refreshedOwner: { id: 'deleted-owner' },
-    sessionSwitch: { value: false },
-    toastAdd: vi.fn(),
-  }));
+const {
+  user,
+  signOut,
+  signOutThisDevice,
+  invoke,
+  remove,
+  request,
+  reset,
+  refreshedOwner,
+  sessionSwitch,
+  toastAdd,
+} = vi.hoisted(() => ({
+  user: { id: 'deleted-owner' as string | null, loggedIn: true, providers: [] },
+  signOut: vi.fn(),
+  signOutThisDevice: vi.fn(),
+  invoke: vi.fn(),
+  remove: vi.fn(),
+  request: vi.fn(),
+  reset: vi.fn(),
+  refreshedOwner: { id: 'deleted-owner' },
+  sessionSwitch: { value: false },
+  toastAdd: vi.fn(),
+}));
 const reactiveUser = reactive(user);
 mockNuxtImport('useNuxtApp', () => () => ({
   $supabase: {
     user: reactiveUser,
     signOut,
+    signOutThisDevice,
     client: {
       auth: {
         getSession: async () => {
@@ -103,7 +115,14 @@ describe('account deletion device removal', () => {
     user.loggedIn = true;
     invoke.mockResolvedValue({ data: { success: true }, error: null });
     remove.mockReturnValue(true);
-    signOut.mockResolvedValue(undefined);
+    // A completed sign-out hydrates the signed-out state, as the real plugin does.
+    signOut.mockImplementation(async () => {
+      reactiveUser.id = null;
+      return 'signed_out';
+    });
+    signOutThisDevice.mockImplementation(async () => {
+      reactiveUser.id = null;
+    });
   });
   it.each([false, true])(
     'forgets only the deleted owner after sign-out (failure: %s)',
@@ -127,6 +146,7 @@ describe('account deletion device removal', () => {
       );
       expect(remove).toHaveBeenCalledWith('deleted-owner');
       expect(remove).not.toHaveBeenCalledWith('new-owner');
+      expect(signOutThisDevice).not.toHaveBeenCalled();
       expect(reset).not.toHaveBeenCalled();
       wrapper.unmount();
     }
@@ -334,6 +354,52 @@ describe('account deletion device removal', () => {
     expect(invoke).not.toHaveBeenCalled();
     expect(remove).not.toHaveBeenCalled();
     expect(signOut).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('clears this device session when local sign-out of the deleted account fails', async () => {
+    signOut.mockRejectedValueOnce(new Error('storage write failed'));
+    const wrapper = mountCard();
+    await clickText(wrapper, 'settings.account.begin_deletion');
+    await wrapper.get('input').setValue('settings.account_data.confirm_phrase_value');
+    await clickText(wrapper, 'settings.account_data.delete_forever');
+    await clickText(wrapper, 'settings.account_data.go_to_dashboard');
+    expect(signOutThisDevice).toHaveBeenCalledWith('deleted-owner');
+    expect(remove).toHaveBeenLastCalledWith('deleted-owner');
+    expect(wrapper.text()).not.toContain('settings.account_data.session_end_failed');
+    wrapper.unmount();
+  });
+  it('stays on the dialog while the deleted account session is still active', async () => {
+    signOut.mockRejectedValueOnce(new Error('storage write failed'));
+    signOutThisDevice.mockRejectedValueOnce(new Error('storage write failed'));
+    const wrapper = mountCard();
+    await clickText(wrapper, 'settings.account.begin_deletion');
+    await wrapper.get('input').setValue('settings.account_data.confirm_phrase_value');
+    await clickText(wrapper, 'settings.account_data.delete_forever');
+    const removalsBefore = remove.mock.calls.length;
+    await clickText(wrapper, 'settings.account_data.go_to_dashboard');
+    expect(wrapper.text()).toContain('settings.account_data.session_end_failed');
+    expect(remove).toHaveBeenCalledTimes(removalsBefore);
+    expect(reset).not.toHaveBeenCalled();
+    // Retrying from the same button ends the session and continues.
+    await clickText(wrapper, 'settings.account_data.go_to_dashboard');
+    expect(wrapper.text()).not.toContain('settings.account_data.session_end_failed');
+    expect(remove).toHaveBeenCalledTimes(removalsBefore + 1);
+    wrapper.unmount();
+  });
+  it('does not fall back to a device-only sign-out when another account took over', async () => {
+    const changed = new Error('Supabase session changed before sign-out');
+    changed.name = 'SupabaseSessionChangedError';
+    signOut.mockImplementationOnce(async () => {
+      reactiveUser.id = 'new-owner';
+      throw changed;
+    });
+    const wrapper = mountCard();
+    await clickText(wrapper, 'settings.account.begin_deletion');
+    await wrapper.get('input').setValue('settings.account_data.confirm_phrase_value');
+    await clickText(wrapper, 'settings.account_data.delete_forever');
+    await clickText(wrapper, 'settings.account_data.go_to_dashboard');
+    expect(signOutThisDevice).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalledWith('new-owner');
     wrapper.unmount();
   });
 });

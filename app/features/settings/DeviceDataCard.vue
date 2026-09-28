@@ -151,6 +151,7 @@
   } from '@/stores/tarkov/progressSaveStatus';
   import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
   import { logger } from '@/utils/logger';
+  import { STORAGE_KEYS } from '@/utils/storageKeys';
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
   const { $supabase } = useNuxtApp();
@@ -199,12 +200,20 @@
     },
     { flush: 'sync' }
   );
-  onMounted(() =>
-    window.addEventListener('tt:superseded-progress-change', refreshSupersededCopies)
-  );
-  onUnmounted(() =>
-    window.removeEventListener('tt:superseded-progress-change', refreshSupersededCopies)
-  );
+  /** Other tabs report superseded-copy changes only through the storage event. */
+  const refreshOnSupersededStorageChange = (event: StorageEvent) => {
+    if (event.key === null || event.key.startsWith(STORAGE_KEYS.progressSupersededPrefix)) {
+      refreshSupersededCopies();
+    }
+  };
+  onMounted(() => {
+    window.addEventListener('tt:superseded-progress-change', refreshSupersededCopies);
+    window.addEventListener('storage', refreshOnSupersededStorageChange);
+  });
+  onUnmounted(() => {
+    window.removeEventListener('tt:superseded-progress-change', refreshSupersededCopies);
+    window.removeEventListener('storage', refreshOnSupersededStorageChange);
+  });
   const handleExport = async () => {
     try {
       await exportProgress();
@@ -219,6 +228,14 @@
     } catch (error) {
       logger.error('[DeviceData] Superseded progress export failed:', error);
       toast.add({ title: t('settings.device_data.superseded_export_error'), color: 'error' });
+    }
+  };
+  const tryRemoveAccountDeviceData = (userId: string): boolean => {
+    try {
+      return removeAccountDeviceData(userId);
+    } catch (error) {
+      logger.error('[DeviceData] Removing device data failed:', error);
+      return false;
     }
   };
   type SignOutMode = 'global' | 'device';
@@ -240,7 +257,7 @@
       return 'sign_out_failed';
     }
     await nextTick();
-    const removed = removeAccountDeviceData(userId);
+    const removed = tryRemoveAccountDeviceData(userId);
     clearDeviceDataRemoval();
     if (!removed) markDeviceDataRemovalIncomplete(userId);
     return removed ? 'removed' : 'remove_failed';

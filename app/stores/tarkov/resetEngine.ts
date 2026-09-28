@@ -275,5 +275,5 @@ export const performReset = async (mode: ResetMode, store: ResetTargetStore): Pr
     }
   });
   // Only this session's active copy: other accounts' recovery data is not part of a reset.
-  clearActiveProgressStorage();
+  clearActiveProgressStorage(ownerId);
 };
