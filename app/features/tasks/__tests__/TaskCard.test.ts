@@ -51,6 +51,7 @@ const taskFilteringMock = {
   isGlobalTask: vi.fn(() => false),
 };
 const useTaskActionsMock = {
+  canMarkTaskAvailable: vi.fn(() => true),
   markTaskAvailable: vi.fn(),
   markTaskComplete: vi.fn(),
   markTaskFailed: vi.fn(),

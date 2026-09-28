@@ -19,6 +19,14 @@ const createProgressData = (
   skillOffsets: {},
   storyChapters,
 });
+describe('hasProgress availability confirmations', () => {
+  it('counts a confirmation-only mode as progress so it syncs and survives startup', () => {
+    const pvp = createProgressData({});
+    expect(hasProgress({ pvp })).toBe(false);
+    pvp.taskAvailability = { task: { requirements: 'sig', timestamp: 1 } };
+    expect(hasProgress({ pvp })).toBe(true);
+  });
+});
 describe('mergeProgressData availability confirmation', () => {
   const withConfirmation = (requirements: string, timestamp: number) => {
     const data = createProgressData({});

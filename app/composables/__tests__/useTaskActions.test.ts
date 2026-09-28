@@ -145,6 +145,29 @@ describe('useTaskActions', () => {
     expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
     expect(tarkovStore.setTaskFailed).not.toHaveBeenCalled();
   });
+  it('changes nothing when an unmet prerequisite has an ambiguous status', async () => {
+    const task: Task = {
+      id: 'ambiguous',
+      minPlayerLevel: 40,
+      taskRequirements: [{ task: { id: 'prior' }, status: ['active', 'complete'] }],
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['t'] }],
+    };
+    const { actions, tarkovStore } = await setup(task, [task, { id: 'prior' }], {});
+    expect(actions.canMarkTaskAvailable()).toBe(false);
+    actions.markTaskAvailable();
+    expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
+    expect(tarkovStore.setLevel).not.toHaveBeenCalled();
+  });
+  it('keeps a malformed prerequisite entry locked without throwing', async () => {
+    const task = {
+      id: 'malformed',
+      taskRequirements: [null],
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['t'] }],
+    } as unknown as Task;
+    const { actions, tarkovStore } = await setup(task, [task], {});
+    expect(() => actions.markTaskAvailable()).not.toThrow();
+    expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
+  });
   it('changes nothing for a task whose server gate cannot be confirmed', async () => {
     const prerequisite: Task = { id: 'prior' };
     const task: Task = {

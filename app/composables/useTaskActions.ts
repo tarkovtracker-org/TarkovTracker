@@ -9,6 +9,7 @@ import {
 } from '@/utils/taskOtherRequirements';
 import {
   applyTaskAvailabilityRequirements,
+  canApplyTaskAvailabilityRequirements,
   applyTaskTraderRequirements,
   completeTaskForProgress,
   ensureTaskMinPlayerLevel,
@@ -29,6 +30,8 @@ export type UseTaskActionsReturn = {
   markTaskComplete: (isUndo?: boolean) => void;
   markTaskUncomplete: (isUndo?: boolean) => void;
   markTaskAvailable: () => void;
+  /** Whether Mark available would make the task available rather than leave it locked. */
+  canMarkTaskAvailable: () => boolean;
   markTaskFailed: (isUndo?: boolean) => void;
 };
 const toYesNo = (value: unknown) => (value ? 'yes' : 'no');
@@ -180,20 +183,39 @@ export function useTaskActions(
       });
     }
   };
+  const taskCompletion = (id: string) => tarkovStore.getCurrentProgressData().taskCompletions?.[id];
+  const storyRouteSatisfied = (currentTask: Task) =>
+    (currentTask.storyUnlocks ?? []).some((chapter) =>
+      hasStoryUnlockProgress(chapter.id, {
+        storyChapters: tarkovStore.getCurrentProgressData().storyChapters,
+      })
+    );
+  /**
+   * Mark available must either make the task available or change nothing: an unsupported server
+   * gate or an unmet ambiguous/malformed prerequisite would leave it locked after raising levels,
+   * traders or prerequisites.
+   */
+  const canMarkTaskAvailable = (currentTask: Task): boolean => {
+    const gatesConfirmable =
+      otherRequirementsSignature(currentTask) !== undefined ||
+      !normalizeOtherRequirements(currentTask.otherRequirements).length;
+    return (
+      gatesConfirmable &&
+      canApplyTaskAvailabilityRequirements(
+        currentTask,
+        taskCompletion,
+        storyRouteSatisfied(currentTask)
+      )
+    );
+  };
   const markTaskAvailable = () => {
     const currentTask = task();
     const taskName = getTaskName(currentTask, () => t('common.task', 'Task'));
+    if (!canMarkTaskAvailable(currentTask)) return;
     const requirements = otherRequirementsSignature(currentTask);
-    // An unsupported or malformed server gate can never be confirmed; changing prerequisites,
-    // level or traders would alter progress without making the task available.
-    if (!requirements && normalizeOtherRequirements(currentTask.otherRequirements).length) return;
     applyTaskAvailabilityRequirements({
-      getCompletion: (id) => tarkovStore.getCurrentProgressData().taskCompletions?.[id],
-      skipTaskRequirements: (currentTask.storyUnlocks ?? []).some((chapter) =>
-        hasStoryUnlockProgress(chapter.id, {
-          storyChapters: tarkovStore.getCurrentProgressData().storyChapters,
-        })
-      ),
+      getCompletion: taskCompletion,
+      skipTaskRequirements: storyRouteSatisfied(currentTask),
       onCompleteRequirement: completeTaskForAvailability,
       onFailRequirement: failTaskForAvailability,
       task: currentTask,
@@ -243,6 +265,7 @@ export function useTaskActions(
     markTaskComplete,
     markTaskUncomplete,
     markTaskAvailable,
+    canMarkTaskAvailable: () => canMarkTaskAvailable(task()),
     markTaskFailed,
   };
 }

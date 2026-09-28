@@ -444,10 +444,7 @@
   import { getQueryString } from '@/utils/routeHelpers';
   import { isAvailabilityConfirmed } from '@/utils/taskAvailabilityConfirmation';
   import { countIncompleteSuccessors, resolveImpactTeamIds } from '@/utils/taskImpact';
-  import {
-    normalizeOtherRequirements,
-    otherRequirementsSignature,
-  } from '@/utils/taskOtherRequirements';
+  import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
   import { compareRequirement, getTaskTraderRequirements } from '@/utils/taskRequirements';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
   import type { ActionButtonState } from '@/features/tasks/types';
@@ -562,11 +559,16 @@
     setTimeout(done, OBJECTIVES_LEAVE_MS + 10);
   };
   // Use extracted task actions composable
-  const { markTaskComplete, markTaskUncomplete, markTaskAvailable, markTaskFailed } =
-    useTaskActions(
-      () => props.task,
-      (payload) => emit('on-task-action', payload)
-    );
+  const {
+    markTaskComplete,
+    markTaskUncomplete,
+    markTaskAvailable,
+    markTaskFailed,
+    canMarkTaskAvailable,
+  } = useTaskActions(
+    () => props.task,
+    (payload) => emit('on-task-action', payload)
+  );
   // Helper for status array checks
   const hasStatus = (status: string[] | undefined, statuses: string[]) => {
     const normalized = (status ?? []).map((entry) => entry.toLowerCase());
@@ -930,7 +932,7 @@
   const actionButtonState = computed((): ActionButtonState => {
     if (!isOurFaction.value) return 'none';
     if (isFailed.value) return 'complete';
-    if (isLocked.value) return canConfirmServerGates.value ? 'locked' : 'none';
+    if (isLocked.value) return canMarkTaskAvailable() ? 'locked' : 'none';
     if (isComplete.value) return 'complete';
     if (showHotWheelsFail.value) return 'hotwheels';
     return 'available';
@@ -1027,12 +1029,6 @@
     // No objectives yet - show skeleton while loading or not yet hydrated
     return metadataStore.tasksObjectivesPending || !metadataStore.tasksObjectivesHydrated;
   });
-  /** Unsupported or malformed server gates cannot be confirmed, so Mark available is withheld. */
-  const canConfirmServerGates = computed(
-    () =>
-      !normalizeOtherRequirements(props.task.otherRequirements).length ||
-      otherRequirementsSignature(props.task) !== undefined
-  );
   const hasAvailabilityConfirmation = computed(() => {
     const progress = tarkovStore.getCurrentProgressData();
     return isAvailabilityConfirmed(

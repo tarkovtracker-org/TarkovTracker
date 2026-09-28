@@ -188,8 +188,34 @@ const completionOnlyRequirement = (requirement: TaskRequirement): boolean =>
   (requirement.status ?? []).every((status) =>
     ['complete', 'completed'].includes(status.toLowerCase())
   );
+/** Non-object entries are malformed declared gates, never an unambiguous requirement. */
 const unambiguousRequirement = (requirement: TaskRequirement): boolean =>
-  completionOnlyRequirement(requirement) || isFailedOnlyRequirement(requirement.status);
+  Boolean(requirement && typeof requirement === 'object') &&
+  (completionOnlyRequirement(requirement) || isFailedOnlyRequirement(requirement.status));
+const resolvableRequirement = (
+  requirement: TaskRequirement,
+  getCompletion: (taskId: string) => RawTaskCompletion
+): boolean => {
+  const taskId = requiredTaskId(requirement);
+  if (!taskId) return false;
+  return (
+    alreadyMeetsStatus(getCompletion(taskId), requirement.status) ||
+    unambiguousRequirement(requirement)
+  );
+};
+/**
+ * Mark available can only settle a task's direct prerequisites when each unmet one names a single
+ * status to record; an unmet active/mixed-status or malformed entry leaves the task locked, so the
+ * action must not change any progress for it.
+ */
+export const canApplyTaskAvailabilityRequirements = (
+  task: Task,
+  getCompletion: (taskId: string) => RawTaskCompletion,
+  skipTaskRequirements = false
+): boolean =>
+  skipTaskRequirements ||
+  !Array.isArray(task.taskRequirements) ||
+  task.taskRequirements.every((requirement) => resolvableRequirement(requirement, getCompletion));
 export function applyTaskAvailabilityRequirements(options: {
   getCompletion?: (taskId: string) => RawTaskCompletion;
   skipTaskRequirements?: boolean;
