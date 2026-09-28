@@ -246,6 +246,10 @@ export default defineEventHandler(async (event) => {
     '/api/tarkov-dev/profile',
     '/api/changelog',
     '/api/contributors',
+    // The strict Siteverify relay is public by design: it only validates a browser
+    // Turnstile token with Cloudflare and mints no application clearance; its strict
+    // rate limiting lives in the route handler itself.
+    '/api/security/tarkov-verify',
     '/api/profile/*',
     '/api/streamer/*',
   ];

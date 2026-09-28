@@ -326,6 +326,15 @@ sequenceDiagram
 
 ### Tarkov Data API
 
+Network requests from metadata, shared profiles and log imports use
+[`tarkovApiFetch`](../app/utils/tarkovApiFetch.ts). When enabled it shares an initial access
+probe and one renewal per clearance generation. It inspects `cf-mitigated: challenge`
+before JSON parsing and retries each challenged data request at most once. Caller aborts
+do not cancel other waiters. Existing IndexedDB hits remain independent of verification.
+The root-mounted [`TarkovAccessGate`](../app/components/TarkovAccessGate.vue) can render while
+startup waits; manual retry resumes waiting callers. Cloudflare owns clearance; application
+verification does not authorize CDN hits. Cache and overlay ordering are unchanged.
+
 All game data is fetched through Nuxt server routes that proxy to `json.tarkov.dev` static data.
 Internal modes map to upstream endpoints as `pvp` → `regular`, `pve` → `pve`, and
 `seasonal` → `pvp-season`.
@@ -463,6 +472,22 @@ Node.js version: 24.x
 ```
 
 ### Environment Variables
+
+Browser-clearance settings (all disabled/unset by default):
+
+- `NUXT_PUBLIC_TARKOV_ACCESS_ENABLED`: explicitly enable browser coordination per environment.
+- `NUXT_PUBLIC_TARKOV_ACCESS_SITE_KEY`: dedicated widget public sitekey.
+- `NUXT_TARKOV_ACCESS_SECRET_KEY`: server-only dedicated widget secret.
+- `NUXT_TARKOV_ACCESS_EXPECTED_HOSTNAMES`: comma-separated exact hostname allowlist.
+- `NUXT_TARKOV_VERIFY_RATE_LIMIT_PER_MINUTE`: verification-endpoint limit, default 10.
+- `PREVIEW_ACCESS_CLIENT_ID` / `PREVIEW_ACCESS_CLIENT_SECRET`: trusted smoke-runner secrets,
+  never application/build environment variables.
+- `TARKOV_OPERATIONS_ORIGIN` and `TARKOV_OPERATIONS_CLIENT_ID` / `TARKOV_OPERATIONS_CLIENT_SECRET`:
+  overlay-verification runner configuration for an approved Access-protected operations host.
+
+Production and protected staging require distinct reviewed widget configuration; ordinary
+local/preview builds leave the browser gate disabled. See the
+[rollout gates](./tarkov-clearance-rollout.md) before changing these values.
 
 Naming convention: `SUPABASE_*` for shared Supabase project settings, `NUXT_*` for Nuxt private
 runtime config (server-only), `NUXT_PUBLIC_*` for Nuxt public runtime config (browser-exposed), and

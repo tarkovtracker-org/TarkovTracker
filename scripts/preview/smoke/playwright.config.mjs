@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test';
 // Browser smoke tests for an Actions-owned Cloudflare Pages preview. They run without Cloudflare
-// credentials against the unique deployment URL supplied by the controller. Filenames use
+// deployment credentials against the unique deployment URL supplied by the controller.
+// Optional dedicated Access credentials are scoped by access.mjs, never global headers. Filenames use
 // `.smoke.mjs` so Vitest's default `*.{test,spec}.*` discovery never picks them up.
 export default defineConfig({
   testDir: '.',
@@ -17,7 +18,8 @@ export default defineConfig({
   ],
   use: {
     baseURL: process.env.PREVIEW_URL,
-    trace: 'retain-on-failure',
+    // Traces can contain service-token request headers; never retain them with Access enabled.
+    trace: process.env.PREVIEW_ACCESS_CLIENT_ID ? 'off' : 'retain-on-failure',
     screenshot: 'only-on-failure',
     ignoreHTTPSErrors: false,
   },

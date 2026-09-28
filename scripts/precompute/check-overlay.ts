@@ -6,10 +6,24 @@ import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
 import { fetchOverlay } from '@/server/utils/overlay';
 import { compareOverlayFleet, type OverlayManifest } from './verify-overlay';
 // This command verifies the production fleet and writes a private, unique report.
-const productionOrigin = 'https://tarkovtracker.org';
+const productionOrigin = process.env.TARKOV_OPERATIONS_ORIGIN || 'https://tarkovtracker.org';
+const operationsUrl = new URL(productionOrigin);
+if (operationsUrl.protocol !== 'https:' || operationsUrl.origin !== productionOrigin) {
+  throw new Error('TARKOV_OPERATIONS_ORIGIN must be an HTTPS origin without a path.');
+}
+const operationsId = process.env.TARKOV_OPERATIONS_CLIENT_ID;
+const operationsSecret = process.env.TARKOV_OPERATIONS_CLIENT_SECRET;
+if (Boolean(operationsId) !== Boolean(operationsSecret)) {
+  throw new Error('Both operations Access credentials are required.');
+}
+const operationsHeaders: Record<string, string> =
+  operationsId && operationsSecret
+    ? { 'CF-Access-Client-Id': operationsId, 'CF-Access-Client-Secret': operationsSecret }
+    : {};
 const getJson = async (url: string) => {
   const response = await fetch(url, {
-    headers: { 'User-Agent': 'TarkovTracker-overlay-verification/1.0' },
+    headers: { ...operationsHeaders, 'User-Agent': 'TarkovTracker-overlay-verification/1.0' },
+    redirect: 'error',
     signal: AbortSignal.timeout(60000),
   });
   if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);

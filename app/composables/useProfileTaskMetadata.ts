@@ -2,6 +2,7 @@ import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import { API_GAME_MODES } from '@/utils/constants';
 import { isGameEdition } from '@/utils/editionHelpers';
 import { logger } from '@/utils/logger';
+import { tarkovApiFetch } from '@/utils/tarkovApiFetch';
 import { dedupeTaskObjectiveIds, normalizeTaskObjectives } from '@/utils/taskNormalization';
 import type {
   Task,
@@ -96,14 +97,14 @@ const mergeProfileTasks = (
 const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: AbortSignal) => {
   const query = { gameMode: API_GAME_MODES[gameMode], lang };
   const options = { query, signal: signal };
-  const progressionRequest = $fetch<ProgressionResponse>('/api/tarkov/editions', options);
+  const progressionRequest = tarkovApiFetch<ProgressionResponse>('/api/tarkov/editions', options);
   const [coreResult, objectivesResult, chaptersResult, editionsResult, prestigeResult] =
     await Promise.allSettled([
-      $fetch<{ data: TarkovTasksCoreQueryResult }>('/api/tarkov/tasks-core', options),
-      $fetch<{ data: { tasks: Task[] } }>('/api/tarkov/tasks-objectives', options),
+      tarkovApiFetch<{ data: TarkovTasksCoreQueryResult }>('/api/tarkov/tasks-core', options),
+      tarkovApiFetch<{ data: { tasks: Task[] } }>('/api/tarkov/tasks-objectives', options),
       progressionRequest.then(optionalChapters),
       progressionRequest.then(optionalEditions),
-      $fetch<{ data: { prestige: PrestigeLevel[] } }>('/api/tarkov/prestige', options).then(
+      tarkovApiFetch<{ data: { prestige: PrestigeLevel[] } }>('/api/tarkov/prestige', options).then(
         optionalPrestige
       ),
     ]);

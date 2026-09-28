@@ -40,6 +40,7 @@ import { buildPrestigeTaskMap } from '@/utils/prestige';
 import { resolveSeasonalPerks } from '@/utils/seasonalPerks';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import { normalizeStoryChapter } from '@/utils/storylineObjectives';
+import { tarkovApiFetch } from '@/utils/tarkovApiFetch';
 import {
   CACHE_CONFIG,
   type CacheType,
@@ -304,7 +305,7 @@ const fetchProgressionCatalog = async (
   language: string,
   forceRefresh: boolean
 ): Promise<ProgressionCatalog> => {
-  const response = await $fetch<{ data: CachedEditions }>('/api/tarkov/editions', {
+  const response = await tarkovApiFetch<{ data: CachedEditions }>('/api/tarkov/editions', {
     query: {
       lang: language,
       gameMode: mode,
@@ -881,7 +882,7 @@ export const useMetadataStore = defineStore('metadata', {
         const effectiveQueryParams = forceRefresh
           ? { ...queryParams, cacheBust: '1' }
           : queryParams;
-        const response = await $fetch<FetchResponse<T>>(endpoint, {
+        const response = await tarkovApiFetch<FetchResponse<T>>(endpoint, {
           query: effectiveQueryParams,
         });
         if (isFetchError(response)) {
@@ -977,7 +978,7 @@ export const useMetadataStore = defineStore('metadata', {
       const controller = new AbortController();
       const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
       try {
-        const response = await $fetch<FetchResponse<{ lastPurgeAt: string | null }>>(
+        const response = await tarkovApiFetch<FetchResponse<{ lastPurgeAt: string | null }>>(
           '/api/tarkov/cache-meta',
           { signal: controller.signal }
         );
@@ -1278,7 +1279,7 @@ export const useMetadataStore = defineStore('metadata', {
             ? API_GAME_MODES[GAME_MODES.PVP]
             : API_GAME_MODES[GAME_MODES.PVE];
         try {
-          const response = await $fetch<FetchResponse<TarkovTaskObjectivesQueryResult>>(
+          const response = await tarkovApiFetch<FetchResponse<TarkovTaskObjectivesQueryResult>>(
             '/api/tarkov/tasks-objectives',
             {
               query: {

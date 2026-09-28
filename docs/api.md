@@ -45,6 +45,23 @@ Authorization: Bearer <supabase_jwt_token>
 
 ## Tarkov Data Endpoints
 
+These are internal browser-app endpoints, not a supported external game-data API.
+Integrations should use `https://json.tarkov.dev`. Anonymous visitors remain supported;
+optional browser-verification recovery is disabled by default. Enforcement requires the
+separate [Cloudflare rollout](./tarkov-clearance-rollout.md), not merely deploying this code.
+The progress API at `api.tarkovtracker.org` is outside this change.
+
+`GET /api/tarkov/access-check` is a lightweight, `no-store` probe with no upstream or database
+calls. Cloudflare must challenge it under the same rule as data endpoints. A permitted probe
+returns `{ "ok": true }`; it does not issue clearance.
+
+`POST /api/security/tarkov-verify` accepts JSON `{ "token": "..." }` without login or existing
+clearance. It is size-limited, rate-limited and never cached. The dedicated strict verifier
+checks Siteverify success, exact configured hostname and `tarkov_data_access` action; invalid
+requests/tokens receive 4xx, outages or incomplete configuration receive 503. After success
+the browser must repeat the protected probe. Existing profile-import verification policy is
+unchanged. See [handler](../app/server/api/security/tarkov-verify.post.ts).
+
 > **First-party routes, not a third-party API.** `/api/tarkov/*` exists to serve game data to the
 > TarkovTracker site itself. It is not a supported integration surface, carries no compatibility
 > guarantee, and its response shape can change in any release. Third-party clients should read game

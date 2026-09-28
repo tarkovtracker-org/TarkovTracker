@@ -43,6 +43,7 @@ instead of restating it.
 - [`api.md`](./api.md) — endpoint reference, caching, supported languages, game modes.
 - [`rate-limiting.md`](./rate-limiting.md) — ownership map for API, Edge, Pages, DB, and Auth rate-limit systems.
 - [`runbook.md`](./runbook.md) — required env vars, pre-deploy checks, incident triage and recovery.
+- [`tarkov-clearance-rollout.md`](./tarkov-clearance-rollout.md) — proposed game-data browser verification infrastructure, approval gates, acceptance evidence and edge-first rollback.
 - [`workflow-automation.md`](./workflow-automation.md) — GitHub Actions, pre-commit hooks, Dependabot, releases.
 - [`testing-coverage.md`](./testing-coverage.md) — coverage gates and reproduction. Exact floors live in `vitest.config.ts`.
 

@@ -1,3 +1,4 @@
+import { previewAccessHeaders } from './access.mjs';
 // Bounded startup window for a freshly uploaded Pages deployment. Persistent failure after the
 // window blocks the preview gate; the window never extends for an individual failing check.
 const STARTUP_WINDOW_MS = 5 * 60 * 1000;
@@ -14,7 +15,10 @@ export function previewOrigin() {
 }
 async function probeOnce(origin, fetchImpl) {
   try {
-    const response = await fetchImpl(`${origin}/`, { redirect: 'manual' });
+    const response = await fetchImpl(`${origin}/`, {
+      redirect: 'manual',
+      headers: previewAccessHeaders(),
+    });
     const type = response.headers.get('content-type') || '';
     return response.status === 200 && type.includes('text/html');
   } catch {
