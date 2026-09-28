@@ -12,7 +12,7 @@ import {
   sanitizeManualActivityHistory,
   sanitizeOwnedProgressData,
 } from '@/utils/progressSanitizers';
-import type { ManualActivityEntry } from '@/types/progress';
+import type { ManualActivityEntry, TaskCompletion } from '@/types/progress';
 import type { RawTaskCompletion } from '@/utils/taskStatus';
 const API_UPDATE_HISTORY_LIMIT = 50;
 type CountableEntry = { count?: number; complete?: boolean; timestamp?: number };
@@ -200,23 +200,28 @@ const mergeCountableObjects = <T extends Record<string, CountableEntry>>(
 };
 const normalizeTaskCompletionEntry = (
   completion: RawTaskCompletion
-): { complete?: boolean; failed?: boolean; timestamp?: number; manual?: boolean } | undefined => {
+): TaskCompletion | undefined => {
   if (completion === null || completion === undefined) return undefined;
   if (typeof completion === 'boolean') {
-    return { complete: completion, failed: false };
+    return { complete: completion, failed: false, availabilityRequirements: '' };
   }
-  const normalized: { complete?: boolean; failed?: boolean; timestamp?: number; manual?: boolean } =
-    {
-      complete: completion.complete === true,
-      failed: completion.failed === true,
-    };
+  const normalized: TaskCompletion = {
+    complete: completion.complete === true,
+    failed: completion.failed === true,
+  };
   if (typeof completion.timestamp === 'number') {
     normalized.timestamp = completion.timestamp;
   }
   if (typeof completion.manual === 'boolean') {
     normalized.manual = completion.manual;
   }
-  return normalized;
+  return {
+    ...normalized,
+    availabilityRequirements:
+      typeof completion.availabilityRequirements === 'string'
+        ? completion.availabilityRequirements
+        : '',
+  };
 };
 export const normalizeTaskCompletionsMap = (
   taskCompletions: Record<string, RawTaskCompletion> | undefined
@@ -349,7 +354,7 @@ export function mergeProgressData(
   const mergeTaskCompletion = (
     localComp: RawTaskCompletion,
     remoteComp: RawTaskCompletion
-  ): { complete?: boolean; failed?: boolean; timestamp?: number; manual?: boolean } | undefined => {
+  ): TaskCompletion | undefined => {
     const normalizedLocal = normalizeTaskCompletionEntry(localComp);
     const normalizedRemote = normalizeTaskCompletionEntry(remoteComp);
     if (!normalizedLocal) return normalizedRemote;

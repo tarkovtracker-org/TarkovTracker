@@ -3,6 +3,7 @@ import { hasStoryUnlockProgress } from '@/stores/taskAvailability';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import {
   applyTaskAvailabilityRequirements,
   applyTaskTraderRequirements,
@@ -192,6 +193,8 @@ export function useTaskActions(
     });
     ensureTaskMinPlayerLevel(tarkovStore, currentTask);
     ensureTraderRequirements(currentTask);
+    const requirements = otherRequirementsSignature(currentTask);
+    if (requirements) tarkovStore.confirmTaskAvailability(currentTask.id, requirements);
     emitAction({
       taskId: currentTask.id,
       taskName,

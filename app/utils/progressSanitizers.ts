@@ -72,6 +72,9 @@ export const sanitizeTaskCompletionMap = (value: unknown): UserProgressData['tas
     if (typeof completion.manual === 'boolean') {
       normalized.manual = completion.manual;
     }
+    if (typeof completion.availabilityRequirements === 'string') {
+      normalized.availabilityRequirements = completion.availabilityRequirements;
+    }
     const timestamp = toFiniteNumber(completion.timestamp);
     if (timestamp !== null) {
       normalized.timestamp = Math.max(0, Math.trunc(timestamp));

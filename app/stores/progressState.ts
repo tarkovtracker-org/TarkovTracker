@@ -233,6 +233,7 @@ export const getters = {
 // Helper functions for common operations
 const createCompletion = (complete: boolean, failed = false, manual?: boolean) => {
   const completion: TaskCompletion = {
+    availabilityRequirements: '',
     complete,
     failed,
     timestamp: Date.now(),
@@ -342,6 +343,18 @@ export const actions = {
   setHideoutPartCount(this: UserState, objectiveId: string, count: number) {
     updateObjective(this, 'hideoutParts', objectiveId, {
       count: Math.max(0, count),
+    });
+  },
+  clearTaskAvailability(this: UserState, taskId: string) {
+    updateObjective(this, 'taskCompletions', taskId, {
+      availabilityRequirements: '',
+      timestamp: Date.now(),
+    });
+  },
+  confirmTaskAvailability(this: UserState, taskId: string, requirements: string) {
+    updateObjective(this, 'taskCompletions', taskId, {
+      ...createCompletion(false, false, false),
+      availabilityRequirements: requirements,
     });
   },
   setTaskComplete(this: UserState, taskId: string) {

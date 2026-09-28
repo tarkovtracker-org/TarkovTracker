@@ -63,6 +63,38 @@ describe('progressState getters task completion compatibility', () => {
     expect(getters.isTaskFailed(state)('task-1')).toBe(true);
   });
 });
+describe('task availability confirmations', () => {
+  it('clears only the confirmation and preserves task and objective history', () => {
+    const state = createBaseState();
+    state.pvp.taskObjectives.objective = { count: 2, complete: false };
+    actions.confirmTaskAvailability.call(state, 'task', 'requirements');
+    actions.clearTaskAvailability.call(state, 'task');
+    expect(state.pvp.taskCompletions.task).toMatchObject({
+      complete: false,
+      failed: false,
+      availabilityRequirements: '',
+    });
+    expect(state.pvp.taskObjectives.objective).toEqual({ count: 2, complete: false });
+  });
+  it('scopes confirmation to the current mode and clears it on reset, completion and failure', () => {
+    const state = createBaseState();
+    for (const action of [
+      actions.setTaskUncompleted,
+      actions.setTaskComplete,
+      actions.setTaskFailed,
+    ]) {
+      actions.confirmTaskAvailability.call(state, 'task', 'requirements');
+      expect(state.pvp.taskCompletions.task).toMatchObject({
+        complete: false,
+        failed: false,
+        availabilityRequirements: 'requirements',
+      });
+      expect(state.pve.taskCompletions.task).toBeUndefined();
+      action.call(state, 'task');
+      expect(state.pvp.taskCompletions.task?.availabilityRequirements).toBe('');
+    }
+  });
+});
 describe('progressState storyline timestamps', () => {
   it('records timestamps for storyline uncomplete actions', () => {
     const state = createBaseState();

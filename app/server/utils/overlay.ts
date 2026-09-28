@@ -1,3 +1,4 @@
+import { normalizeOtherRequirements } from '@/utils/taskOtherRequirements';
 import {
   hasDeclaredPrestigeLevel,
   isDeclaredGate,
@@ -514,6 +515,9 @@ function applyDeclaredGateNormalization(
   const declared = declaredGateFields(task);
   normalizeDeclaredRequirements(task);
   normalizeDeclaredPrestige(task);
+  const otherRequirements = normalizeOtherRequirements(task.otherRequirements);
+  if (otherRequirements.length) task.otherRequirements = otherRequirements;
+  else delete task.otherRequirements;
   const dropped = declared.filter((field) => task[field] === undefined);
   recordGateDiagnostics(task, [...retained, ...diagnosticsFor(dropped)]);
 }
@@ -530,7 +534,7 @@ function applyPatchedGateNormalization<T extends { id: string }>(
   const record = task as Record<string, unknown>;
   // Diagnostics are derived state: corrections cannot replace the adapter's evidence.
   recordGateDiagnostics(record, recordedGateDiagnostics(original as Record<string, unknown>));
-  if (!patchesDeclaredGates(patch)) return;
+  if (!patchesDeclaredGates(patch) && !patchesField(patch, 'otherRequirements')) return;
   applyDeclaredGateNormalization(record, retainedGateDiagnostics(record, patch));
 }
 /** Re-normalize a corrected upstream task. */

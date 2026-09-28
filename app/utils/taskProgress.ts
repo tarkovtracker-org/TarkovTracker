@@ -184,6 +184,12 @@ const alreadyMeetsStatus = (completion: RawTaskCompletion, statuses?: string[]):
   );
 };
 const requiredTaskId = (requirement: TaskRequirement) => requirement?.task?.id;
+const completionOnlyRequirement = (requirement: TaskRequirement): boolean =>
+  (requirement.status ?? []).every((status) =>
+    ['complete', 'completed'].includes(status.toLowerCase())
+  );
+const unambiguousRequirement = (requirement: TaskRequirement): boolean =>
+  completionOnlyRequirement(requirement) || isFailedOnlyRequirement(requirement.status);
 export function applyTaskAvailabilityRequirements(options: {
   getCompletion?: (taskId: string) => RawTaskCompletion;
   skipTaskRequirements?: boolean;
@@ -208,14 +214,18 @@ export function applyTaskAvailabilityRequirements(options: {
     if (alreadyMeetsStatus(getCompletion(requirementTaskId), requirement.status)) return;
     if (isFailedOnlyRequirement(requirement.status)) {
       onFailRequirement(requirementTaskId);
-    } else {
+    } else if (completionOnlyRequirement(requirement)) {
       onCompleteRequirement(requirementTaskId);
     }
-    handledRequirementTaskIds.add(requirementTaskId);
   });
+  // Flattened graph ancestors cannot identify a historical route through alternative statuses.
+  if (!taskRequirements.every(unambiguousRequirement)) return;
   predecessors.forEach((predecessorId) => {
     if (!predecessorId) return;
     if (handledRequirementTaskIds.has(predecessorId)) return;
+    // Transitive inference never resurrects a failed task: only the task the player confirmed
+    // available can justify flipping its own direct gates.
+    if (isTaskFailed(getCompletion(predecessorId))) return;
     onCompleteRequirement(predecessorId);
   });
 }

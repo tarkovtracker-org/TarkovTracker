@@ -18,6 +18,7 @@ const createTarkovStore = (options: {
 }) => {
   const objectiveCounts = new Map<string, number>(Object.entries(options.objectiveCounts ?? {}));
   return {
+    confirmTaskAvailability: vi.fn(),
     setTaskComplete: vi.fn(),
     setTaskFailed: vi.fn(),
     setTaskUncompleted: vi.fn(),
@@ -122,6 +123,28 @@ const setup = async (
   };
 };
 describe('useTaskActions', () => {
+  it('confirms only the selected server-gated task without inventing counter contributors', async () => {
+    const task: Task = {
+      id: 'gated',
+      otherRequirements: [
+        {
+          type: 'globalVariable',
+          id: 'gate',
+          variableId: 'counter',
+          compareMethod: '>=',
+          value: 3,
+        },
+      ],
+    };
+    const { actions, tarkovStore } = await setup(task, [task, { id: 'possible-contributor' }], {});
+    actions.markTaskAvailable();
+    expect(tarkovStore.confirmTaskAvailability).toHaveBeenCalledWith(
+      task.id,
+      JSON.stringify(task.otherRequirements)
+    );
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+    expect(tarkovStore.setTaskFailed).not.toHaveBeenCalled();
+  });
   it('tracks each task action once with rich analytics metadata', async () => {
     const task: Task = {
       id: 'task-analytics',

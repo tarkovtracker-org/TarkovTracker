@@ -8,6 +8,18 @@ import {
   sanitizeOwnedUserState,
 } from '@/utils/progressSanitizers';
 describe('sanitizeOwnedProgressData', () => {
+  it('preserves string availability confirmations and rejects malformed ones', () => {
+    const result = sanitizeOwnedProgressData({
+      taskCompletions: {
+        confirmed: { complete: false, availabilityRequirements: 'requirements' },
+        cleared: { complete: false, availabilityRequirements: '' },
+        invalid: { complete: false, availabilityRequirements: true },
+      },
+    });
+    expect(result.taskCompletions.confirmed?.availabilityRequirements).toBe('requirements');
+    expect(result.taskCompletions.cleared?.availabilityRequirements).toBe('');
+    expect(result.taskCompletions.invalid?.availabilityRequirements).toBeUndefined();
+  });
   it('drops legacy tarkov.dev payloads while preserving canonical fields', () => {
     const result = sanitizeOwnedProgressData({
       apiUpdateHistory: [{ at: 100, id: 'update-1', source: 'api' }],

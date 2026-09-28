@@ -4,6 +4,8 @@ export interface TaskObjective {
   timestamp?: number;
 }
 export interface TaskCompletion {
+  /** In-game availability confirmed for this exact set of server-side start requirements. */
+  availabilityRequirements?: string;
   complete?: boolean;
   failed?: boolean;
   timestamp?: number;

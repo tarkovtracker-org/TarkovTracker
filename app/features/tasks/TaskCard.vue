@@ -361,6 +361,15 @@
           "
         />
         <ContextMenuItem
+          v-if="hasAvailabilityConfirmation"
+          icon="i-mdi-lock-reset"
+          :label="t('page.tasks.questcard.clear_availability_confirmation')"
+          @click="
+            tarkovStore.clearTaskAvailability(task.id);
+            close();
+          "
+        />
+        <ContextMenuItem
           v-if="preferencesStore.getEnableManualTaskFail && isOurFaction && !isFailed"
           icon="i-mdi-close-circle"
           :label="t('page.tasks.questcard.mark_failed')"
@@ -1013,6 +1022,12 @@
     // No objectives yet - show skeleton while loading or not yet hydrated
     return metadataStore.tasksObjectivesPending || !metadataStore.tasksObjectivesHydrated;
   });
+  const hasAvailabilityConfirmation = computed(() =>
+    Boolean(
+      tarkovStore.getCurrentProgressData().taskCompletions?.[props.task.id]
+        ?.availabilityRequirements
+    )
+  );
   const openOverflowMenu = (event: MouseEvent) => {
     taskContextMenu.value?.open(event);
   };

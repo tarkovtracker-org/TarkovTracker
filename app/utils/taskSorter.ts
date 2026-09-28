@@ -308,6 +308,8 @@ const finalRanks = new Map<string, number>([
   ['faction', 5],
   ['disabled', 5],
   ['unknown', 6],
+  ['global_variable_unknown', 6],
+  ['dialogue', 6],
   ['cycle', 6],
 ]);
 const distanceTarget = (blocker: TaskAvailabilityResult['blockers'][number]) => {

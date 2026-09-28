@@ -19,6 +19,32 @@ const createProgressData = (
   skillOffsets: {},
   storyChapters,
 });
+describe('mergeProgressData availability confirmation', () => {
+  it('preserves the newer confirmation and never resurrects it after an old-client reset', () => {
+    const confirmed = createProgressData({});
+    confirmed.taskCompletions.task = {
+      complete: false,
+      failed: false,
+      availabilityRequirements: 'requirements',
+      timestamp: 10,
+    };
+    const stale = createProgressData({});
+    stale.taskCompletions.task = { complete: false, timestamp: 5 };
+    expect(mergeProgressData(confirmed, stale).taskCompletions.task?.availabilityRequirements).toBe(
+      'requirements'
+    );
+    expect(mergeProgressData(stale, confirmed).taskCompletions.task?.availabilityRequirements).toBe(
+      'requirements'
+    );
+    stale.taskCompletions.task.timestamp = 20;
+    expect(mergeProgressData(confirmed, stale).taskCompletions.task?.availabilityRequirements).toBe(
+      ''
+    );
+    expect(mergeProgressData(stale, confirmed).taskCompletions.task?.availabilityRequirements).toBe(
+      ''
+    );
+  });
+});
 describe('mergeProgressData story chapters', () => {
   it('merges chapter objectives by key without dropping existing objective progress', () => {
     const local = createProgressData({

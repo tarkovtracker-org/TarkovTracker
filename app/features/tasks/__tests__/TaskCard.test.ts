@@ -24,6 +24,7 @@ const progressStoreMock = {
   visibleTeamStores: { self: {} } as Record<string, Record<string, never>>,
 };
 const tarkovStoreMock = {
+  clearTaskAvailability: vi.fn(),
   getCurrentProgressData: vi.fn((): Partial<UserProgressData> => ({ taskCompletions: {} })),
   getObjectiveCount: vi.fn(() => 0),
   getPMCFaction: vi.fn(() => 'USEC'),
@@ -137,10 +138,12 @@ const TaskCardRewardsStub = {
   template: '<div data-testid="task-card-rewards" />',
 };
 const ContextMenuStub = {
-  template: '<div><slot /></div>',
+  setup: () => ({ close: vi.fn() }),
+  template: '<div><slot :close="close" /></div>',
 };
 const ContextMenuItemStub = {
-  template: '<button><slot /></button>',
+  props: ['label'],
+  template: '<button>{{ label }}</button>',
 };
 const AppTooltipStub = {
   template: '<span><slot /></span>',
@@ -195,6 +198,20 @@ describe('TaskCard appearance and expansion controls', () => {
     vi.clearAllMocks();
     metadataStoreMock.getTaskById.mockReset();
     tarkovStoreMock.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
+  });
+  it('offers a task-local confirmation reset without touching objectives', async () => {
+    tarkovStoreMock.getCurrentProgressData.mockReturnValue({
+      taskCompletions: { 'task-1': { availabilityRequirements: 'requirements' } },
+    });
+    const wrapper = await mountTaskCard();
+    const reset = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'page.tasks.questcard.clear_availability_confirmation');
+    expect(reset).toBeDefined();
+    await reset!.trigger('click');
+    expect(tarkovStoreMock.clearTaskAvailability).toHaveBeenCalledWith('task-1');
+    expect(tarkovStoreMock.setObjectiveCount).not.toHaveBeenCalled();
+    wrapper.unmount();
   });
   it('emits the failed-card class contract: dark surface with pale light-mode companions', async () => {
     // This asserts the emitted class names only; the resolved per-theme rendering is
