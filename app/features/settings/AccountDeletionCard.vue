@@ -1,6 +1,10 @@
 <script setup lang="ts">
   import LoginRequiredAlert from '@/components/ui/LoginRequiredAlert.vue';
-  import { removeAccountDeviceData, requestDeviceDataRemoval } from '@/stores/tarkov/deviceData';
+  import {
+    recordDeviceDataRemovalOutcome,
+    removeAccountDeviceData,
+    requestDeviceDataRemoval,
+  } from '@/stores/tarkov/deviceData';
   import { resetTarkovSync } from '@/stores/useTarkov';
   import { logger } from '@/utils/logger';
   import { refreshSupabaseSession } from '@/utils/supabaseAuth';
@@ -344,14 +348,15 @@
   /** A deleted account keeps no recovery copy on this device; other accounts keep theirs. */
   const forgetAccountOnDevice = (userId: string | null): boolean => {
     if (!userId) return false;
+    let removed = false;
     try {
-      const removed = removeAccountDeviceData(userId);
+      removed = removeAccountDeviceData(userId);
       if (!removed) logger.warn('Some deleted account data could not be removed from this device.');
-      return removed;
     } catch (error) {
       logger.error('Failed to remove deleted account data from this device:', error);
-      return false;
     }
+    recordDeviceDataRemovalOutcome(userId, removed);
+    return removed;
   };
   /** The deleted account has no server session left; clear this browser's copy directly. */
   const endDeletedSession = async (owner: string): Promise<void> => {

@@ -5,8 +5,10 @@ import {
   type UserProgressData,
   type UserState,
 } from '@/stores/progressState';
+import { deepEqual } from '@/stores/tarkov/deepEqual';
 import { GAME_MODES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import { hasMaterializedProgress } from '@/utils/modeProgressFallback';
 import {
   sanitizeManualActivityEpoch,
   sanitizeManualActivityHistory,
@@ -23,6 +25,14 @@ type TimestampedCompletionEntry = { complete?: boolean; timestamp?: number };
 export const coerceGameMode = (mode?: string | null): GameMode => {
   return Object.values(GAME_MODES).includes(mode as GameMode) ? (mode as GameMode) : GAME_MODES.PVP;
 };
+const RESET_CLOCK_KEYS = new Set(['progressEpoch', 'manualActivityEpoch']);
+const DEFAULT_MODE_PROGRESS = defaultState.pvp as unknown as Record<string, unknown>;
+/** True when a mode differs from default progress in anything but its reset clocks. */
+export const hasRetainableModeProgress = (modeData: UserProgressData | undefined): boolean =>
+  hasMaterializedProgress(modeData) &&
+  Object.entries(modeData as UserProgressData).some(
+    ([key, value]) => !RESET_CLOCK_KEYS.has(key) && !deepEqual(value, DEFAULT_MODE_PROGRESS[key])
+  );
 export const hasProgress = (data: unknown): boolean => {
   const state = data as UserState;
   if (!state) return false;

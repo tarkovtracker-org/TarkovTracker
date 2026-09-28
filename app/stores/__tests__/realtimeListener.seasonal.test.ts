@@ -660,7 +660,7 @@ describe('seasonal progress realtime synchronization', () => {
   it('rejects a pre-retry reconcile when the remote snapshot cannot be read', async () => {
     const { cleanupRealtimeListener, reconcileRemoteSnapshot, setupRealtimeListener } =
       await import('@/stores/tarkov/realtimeListener');
-    await expect(reconcileRemoteSnapshot()).resolves.toBeUndefined();
+    await expect(reconcileRemoteSnapshot()).rejects.toThrow('reader unavailable');
     const failure = { message: 'snapshot unavailable' };
     supabaseContext.client.from.mockImplementation((table: string) => ({
       select: () => ({
@@ -673,7 +673,7 @@ describe('seasonal progress realtime synchronization', () => {
     await setupRealtimeListener(store);
     await expect(reconcileRemoteSnapshot()).rejects.toBeTruthy();
     await cleanupRealtimeListener();
-    await expect(reconcileRemoteSnapshot()).resolves.toBeUndefined();
+    await expect(reconcileRemoteSnapshot()).rejects.toThrow('reader unavailable');
   });
   it('waits for a newer reconnect snapshot before a superseded pre-retry reconcile resolves', async () => {
     const { reconcileRemoteSnapshot, setupRealtimeListener } =

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { hasProgress, mergeProgressData } from '@/stores/tarkov/progressMerge';
+import {
+  hasProgress,
+  hasRetainableModeProgress,
+  mergeProgressData,
+} from '@/stores/tarkov/progressMerge';
 import type { ManualActivityEntry, UserProgressData, UserState } from '@/stores/progressState';
 const createProgressData = (
   storyChapters: UserProgressData['storyChapters']
@@ -311,5 +315,20 @@ describe('manual history reconciliation regressions', () => {
       hasProgress({ ...state, pvp: { ...empty, manualActivityHistory: [entry('only')] } })
     ).toBe(true);
     expect(hasProgress({ ...state, pvp: { ...empty, manualActivityEpoch: 1 } })).toBe(true);
+  });
+});
+describe('hasRetainableModeProgress', () => {
+  it('ignores default progress and reset clocks but keeps any real change', () => {
+    const empty = createProgressData({});
+    expect(hasRetainableModeProgress(empty)).toBe(false);
+    expect(hasRetainableModeProgress(undefined)).toBe(false);
+    expect(hasRetainableModeProgress({ ...empty, progressEpoch: 3, manualActivityEpoch: 2 })).toBe(
+      false
+    );
+    expect(hasRetainableModeProgress({ ...empty, displayName: 'player' })).toBe(true);
+    expect(
+      hasRetainableModeProgress({ ...empty, traders: { prapor: { level: 2, reputation: 0 } } })
+    ).toBe(true);
+    expect(hasRetainableModeProgress({ ...empty, level: 2 })).toBe(true);
   });
 });

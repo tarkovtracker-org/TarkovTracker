@@ -12,6 +12,7 @@ const {
   invoke,
   remove,
   request,
+  recordOutcome,
   reset,
   refreshedOwner,
   sessionSwitch,
@@ -23,6 +24,7 @@ const {
   invoke: vi.fn(),
   remove: vi.fn(),
   request: vi.fn(),
+  recordOutcome: vi.fn(),
   reset: vi.fn(),
   refreshedOwner: { id: 'deleted-owner' },
   sessionSwitch: { value: false },
@@ -55,6 +57,7 @@ vi.mock('@/utils/supabaseAuth', () => ({
   }),
 }));
 vi.mock('@/stores/tarkov/deviceData', () => ({
+  recordDeviceDataRemovalOutcome: recordOutcome,
   removeAccountDeviceData: remove,
   requestDeviceDataRemoval: request,
 }));
@@ -304,7 +307,9 @@ describe('account deletion device removal', () => {
       .find((button) => button.text() === 'settings.account_data.go_to_dashboard');
     expect(dashboardButton?.attributes('disabled')).toBeDefined();
     expect(remove).toHaveBeenCalledWith('deleted-owner');
+    expect(recordOutcome).toHaveBeenLastCalledWith('deleted-owner', false);
     await clickText(wrapper, 'settings.account_data.retry_device_cleanup');
+    expect(recordOutcome).toHaveBeenLastCalledWith('deleted-owner', true);
     expect(wrapper.text()).not.toContain('settings.account_data.device_cleanup_failed');
     expect(remove).toHaveBeenCalledTimes(2);
     expect(remove).toHaveBeenNthCalledWith(2, 'deleted-owner');

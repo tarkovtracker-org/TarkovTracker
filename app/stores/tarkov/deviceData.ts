@@ -6,6 +6,7 @@ import {
 import {
   quarantineAndRemoveUnparseableActiveProgress,
   isUnparseableProgressStorageValue,
+  safeGetItem,
   safeRemoveItem,
   safeSetItem,
   setActiveProgressWritesBlocked,
@@ -179,23 +180,34 @@ export const removeAccountDeviceData = (userId: string): boolean => {
 };
 /**
  * Owner whose explicit removal already signed out but left data behind. The retry stays
- * bound to that owner, since the signed-out UI can no longer name it.
+ * bound to that owner, since the signed-out UI can no longer name it; the owner is also
+ * stored so a reload (for example after account deletion) can still retry.
  */
-const incompleteRemovalOwner = ref<string | null>(null);
+const incompleteRemovalOwner = ref<string | null>(
+  safeGetItem(STORAGE_KEYS.deviceDataRemovalIncomplete) || null
+);
 export const incompleteDeviceDataRemovalOwner = readonly(incompleteRemovalOwner);
 export const markDeviceDataRemovalIncomplete = (userId: string): void => {
   incompleteRemovalOwner.value = userId;
+  safeSetItem(STORAGE_KEYS.deviceDataRemovalIncomplete, userId);
+};
+const endIncompleteRemoval = (): void => {
+  incompleteRemovalOwner.value = null;
+  safeRemoveItem(STORAGE_KEYS.deviceDataRemovalIncomplete);
 };
 /** The owner signing back in ends the removal intent; nothing is removed from its session. */
 export const clearIncompleteDeviceDataRemoval = (userId: string | null): void => {
-  if (userId !== null && incompleteRemovalOwner.value === userId) {
-    incompleteRemovalOwner.value = null;
-  }
+  if (userId !== null && incompleteRemovalOwner.value === userId) endIncompleteRemoval();
+};
+/** Records a removal attempt's outcome for `userId`: failures stay retryable across reloads. */
+export const recordDeviceDataRemovalOutcome = (userId: string, removed: boolean): void => {
+  if (!removed) markDeviceDataRemovalIncomplete(userId);
+  else if (incompleteRemovalOwner.value === userId) endIncompleteRemoval();
 };
 export const retryIncompleteDeviceDataRemoval = (): boolean => {
   const owner = incompleteRemovalOwner.value;
   if (!owner) return true;
   const removed = removeAccountDeviceData(owner);
-  if (removed) incompleteRemovalOwner.value = null;
+  if (removed) endIncompleteRemoval();
   return removed;
 };

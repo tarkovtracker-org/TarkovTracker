@@ -66,6 +66,7 @@ import {
   coerceGameMode,
   getNextProgressEpoch,
   hasProgress,
+  hasRetainableModeProgress,
   normalizeTaskCompletionsMap,
   toProgressEpoch,
 } from '@/stores/tarkov/progressMerge';
@@ -161,7 +162,7 @@ const archiveDisplacedProgress = (
 ): boolean => {
   for (const mode of GAME_MODE_VALUES) {
     if (
-      !hasMaterializedProgress(localState[mode]) ||
+      !hasRetainableModeProgress(localState[mode]) ||
       toProgressEpoch(remoteState[mode]) <= toProgressEpoch(localState[mode]) ||
       toProgressEpoch(resolvedState[mode]) !== toProgressEpoch(remoteState[mode])
     ) {

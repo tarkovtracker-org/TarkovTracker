@@ -12,7 +12,11 @@ import {
   type PersistedProgressSnapshot,
   setActiveProgressWritesBlocked,
 } from '@/stores/tarkov/localStorage';
-import { mergePreferringSingleValues, toProgressEpoch } from '@/stores/tarkov/progressMerge';
+import {
+  hasRetainableModeProgress,
+  mergePreferringSingleValues,
+  toProgressEpoch,
+} from '@/stores/tarkov/progressMerge';
 import { saveSupersededProgressCopy } from '@/stores/tarkov/supersededProgress';
 import { GAME_MODE_VALUES, ACTIVE_SEASON_NUMBER, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
@@ -100,7 +104,7 @@ const archiveDisplacedMode = (
   displaced: ModeCandidate,
   mode: GameMode
 ): boolean => {
-  if (!hasMaterializedProgress(displaced.progress)) return true;
+  if (!hasRetainableModeProgress(displaced.progress)) return true;
   if (!ownerId) return false;
   if (saveSupersededProgressCopy(ownerId, mode, displaced.seasonNumber, displaced.progress)) {
     return true;

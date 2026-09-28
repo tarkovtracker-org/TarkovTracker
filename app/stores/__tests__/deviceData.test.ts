@@ -269,6 +269,21 @@ describe('device data removal', () => {
     clearIncompleteDeviceDataRemoval('user-1');
     expect(incompleteDeviceDataRemovalOwner.value).toBeNull();
   });
+  it('keeps an incomplete removal retryable after a reload', async () => {
+    const { markDeviceDataRemovalIncomplete } = await import('@/stores/tarkov/deviceData');
+    markDeviceDataRemovalIncomplete('user-1');
+    expect(localStorage.getItem(STORAGE_KEYS.deviceDataRemovalIncomplete)).toBe('user-1');
+    vi.resetModules();
+    const reloaded = await import('@/stores/tarkov/deviceData');
+    expect(reloaded.incompleteDeviceDataRemovalOwner.value).toBe('user-1');
+    reloaded.recordDeviceDataRemovalOutcome('user-2', true);
+    expect(reloaded.incompleteDeviceDataRemovalOwner.value).toBe('user-1');
+    reloaded.recordDeviceDataRemovalOutcome('user-1', true);
+    expect(reloaded.incompleteDeviceDataRemovalOwner.value).toBeNull();
+    expect(localStorage.getItem(STORAGE_KEYS.deviceDataRemovalIncomplete)).toBeNull();
+    reloaded.recordDeviceDataRemovalOutcome('user-3', false);
+    expect(localStorage.getItem(STORAGE_KEYS.deviceDataRemovalIncomplete)).toBe('user-3');
+  });
   it('fails closed when opaque active bytes cannot be quarantined', () => {
     const raw = '{malformed';
     localStorage.setItem(STORAGE_KEYS.progress, raw);

@@ -8,7 +8,12 @@ import {
   progressStorageSerializer,
   setActiveProgressWritesBlocked,
 } from '@/stores/tarkov/localStorage';
-import { coerceGameMode, mergeProgressData, toProgressEpoch } from '@/stores/tarkov/progressMerge';
+import {
+  coerceGameMode,
+  hasRetainableModeProgress,
+  mergeProgressData,
+  toProgressEpoch,
+} from '@/stores/tarkov/progressMerge';
 import { readWithProgressFreshness } from '@/stores/tarkov/progressPersistence';
 import { hasUnsavedProgressChanges } from '@/stores/tarkov/progressSaveStatus';
 import { saveSupersededProgressCopy } from '@/stores/tarkov/supersededProgress';
@@ -56,7 +61,7 @@ const archiveProgressDisplacedByRemoteReset = (
   remoteProgress: UserProgressData
 ): boolean => {
   if (toProgressEpoch(remoteProgress) <= toProgressEpoch(local[mode])) return true;
-  if (!hasMaterializedProgress(local[mode]) || !mayHaveUnacknowledgedLocalChanges()) return true;
+  if (!hasRetainableModeProgress(local[mode]) || !mayHaveUnacknowledgedLocalChanges()) return true;
   const seasonNumber = mode === 'seasonal' ? (local.seasonalSeasonNumber ?? null) : null;
   return (
     saveSupersededProgressCopy(ownerId, mode, seasonNumber, cloneStateSnapshot(local[mode])) !==
@@ -108,10 +113,12 @@ let heldForUnretainedRemoteReset = false;
 let activeSnapshotRefresh: (() => Promise<void>) | null = null;
 /**
  * Merges the latest remote progress into pending local changes before a retry uploads them.
- * Without a joined channel there is no snapshot reader, so the retry proceeds as before.
+ * Without a listener nothing merges changes made elsewhere, so the retry must not upload.
  */
 export const reconcileRemoteSnapshot = (): Promise<void> =>
-  activeSnapshotRefresh ? activeSnapshotRefresh() : Promise.resolve();
+  activeSnapshotRefresh
+    ? activeSnapshotRefresh()
+    : Promise.reject(new Error('Remote progress snapshot reader unavailable'));
 export const registerSyncControllerGetter = (getter: SyncControllerGetter): void => {
   syncControllerGetter = getter;
 };

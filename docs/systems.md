@@ -912,7 +912,7 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   the budget. Every retry first reads the remote snapshot and merges it into the pending changes,
   as a Realtime reconnect does, so changes saved on another device are not overwritten by a stale
   upload; a retry that overlaps a reconnect waits for the newer snapshot. If no snapshot can be
-  merged (the read fails, the socket is suspended, or the account changed), the retry counts as a
+  merged (no listener is running, the read fails, the socket is suspended, or the account changed), the retry counts as a
   failed attempt and uploads nothing. Failures
   are classified as `offline`, `rate_limited`, `auth`, or `unknown` so the
   indicator can distinguish a known cause from an unknown one. If the initial authenticated sync
@@ -996,6 +996,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   the same removal for the captured deleted account and checks identity before sign-out and reset;
   both sign out through the auth owner fence. If sign-out succeeded but cleanup was incomplete, the
   card keeps a retry bound to the removed owner until it succeeds or that owner signs in again.
+  That owner is also stored, so the retry survives a reload; account deletion records incomplete
+  cleanup the same way.
   If the server cannot be reached, the confirmation offers the disclosed device-only sign-out.
   A removal that throws is reported as incomplete, and the card's superseded-copy list follows
   changes made in other tabs. After account deletion, a failed local sign-out falls back to the
