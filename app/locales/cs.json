@@ -993,7 +993,25 @@
         "map_complete_tasks_toggle_show": "Zobrazit skryté",
         "map_complete_tasks_toggle_hide": "Skrýt mapu kompletní",
         "map_hidden_hint": "Mapa skrytá — klikněte pro zobrazení",
-        "raid_time_tooltip": "Aktuální čas nájezdu ve hře"
+        "raid_time_tooltip": "Aktuální čas nájezdu ve hře",
+        "raid_plan": {
+          "title": "Úkoly na mapě",
+          "summary_all": "Zobrazuji vše {total}",
+          "summary_hidden": "{hidden} z {total} skryto",
+          "choose_quests": "Vybrat úlohy",
+          "show_all": "Zobrazit vše",
+          "popover_description": "Zrušte zaškrtnutí úkolů, které nebudeš spouštět, abys je vymazal z mapy. \"Pouze skryje vše ostatní.",
+          "only": "Pouze",
+          "show_only_named": "Zobrazit pouze {name} na mapě",
+          "show_only_quest": "Zobrazit pouze tento úkol na mapě",
+          "hide_quest": "Skrýt z mapy",
+          "show_quest": "Zobrazit na mapě",
+          "all_hidden_hint": "Každý úkol na této mapě je skrytý. Použijte Zobrazit všechny, abyste je vrátili.",
+          "hidden_section_title": "Skrytý z mapy ({count})",
+          "hidden_section_description": "Stále sledováno, prostě není vykresleno na mapě.",
+          "hidden_section_expand": "Zobrazit skryté úkoly",
+          "hidden_section_collapse": "Sbalit skryté úlohy"
+        }
       },
       "pinned_tasks_section": "Připnuté úkoly",
       "focused_task_section": "Zaměřený úkol",

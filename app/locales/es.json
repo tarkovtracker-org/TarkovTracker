@@ -993,7 +993,25 @@
         "map_complete_tasks_toggle_show": "Mostrar ocultas",
         "map_complete_tasks_toggle_hide": "Ocultar completadas en mapa",
         "map_hidden_hint": "Mapa oculto — haga clic para mostrar",
-        "raid_time_tooltip": "Tiempo actual de la banda del juego"
+        "raid_time_tooltip": "Tiempo actual de la banda del juego",
+        "raid_plan": {
+          "title": "Misiones en el mapa",
+          "summary_all": "Mostrando todo {total}",
+          "summary_hidden": "{hidden} of {total} hidden",
+          "choose_quests": "Elegir misiones",
+          "show_all": "Mostrar todo",
+          "popover_description": "Desmarca las misiones que no estés ejecutando esta banda para borrarlas del mapa. \"Sólo\" oculta todo lo demás.",
+          "only": "Sólo",
+          "show_only_named": "Mostrar solo {name} en el mapa",
+          "show_only_quest": "Mostrar sólo esta misión en el mapa",
+          "hide_quest": "Ocultar del mapa",
+          "show_quest": "Mostrar en el mapa",
+          "all_hidden_hint": "Cada misión en este mapa está oculta. Usa Mostrar todos para traerlos de vuelta.",
+          "hidden_section_title": "Escondido del mapa ({count})",
+          "hidden_section_description": "Seguidamente seguido, no dibujado en el mapa.",
+          "hidden_section_expand": "Mostrar misiones ocultas",
+          "hidden_section_collapse": "Colapsar misiones ocultas"
+        }
       },
       "pinned_tasks_section": "Tareas fijadas",
       "focused_task_section": "Tarea enfocada",
