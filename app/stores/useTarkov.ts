@@ -683,27 +683,36 @@ const selectStartupSnapshot = (userId: string, toastI18n: ReturnType<typeof useT
   if (isAccountRecoveryRetentionBlocked()) failBlockedRetention(toastI18n);
   return snapshot;
 };
+type StartupCloudState = {
+  /** A recovery copy holds changes the cloud has not acknowledged yet. */
+  awaitsUpload: boolean;
+  /** The recovery copy must be retired by the next acknowledged upload. */
+  retirementPending: boolean;
+};
 /**
  * The startup merge reconciled local changes with the cloud; a previous failed attempt's
  * unavailable status no longer applies. Memory-only local changes are acknowledged only when
- * the cloud now holds them, which also retires the recovery copy. Returns whether a recovery
- * copy still awaits its first acknowledged upload.
+ * the cloud now holds them, which also retires the recovery copy. A removal the browser rejects
+ * stays pending for the next acknowledged upload.
  */
-const settleStartupCloudState = (userId: string, cloudHoldsResolvedState: boolean): boolean => {
+const settleStartupCloudState = (
+  userId: string,
+  cloudHoldsResolvedState: boolean
+): StartupCloudState => {
   if (!cloudHoldsResolvedState) {
     resetCloudSaveStatus();
-    return hasAccountRecoveryCopy(userId);
+    const awaitsUpload = hasAccountRecoveryCopy(userId);
+    return { awaitsUpload, retirementPending: awaitsUpload };
   }
   acknowledgeStartupSync();
-  removeAccountRecoveryCopy(userId);
-  return false;
+  return { awaitsUpload: false, retirementPending: !removeAccountRecoveryCopy(userId) };
 };
 /**
  * The first acknowledged upload carries the recovered state, whichever attempt it was. A removal
  * the browser rejects stays pending so a later acknowledged upload retries it.
  */
-const retireRecoveryCopyOnFirstSync = (userId: string, awaitsUpload: boolean) => {
-  let pending = awaitsUpload;
+const retireRecoveryCopyOnFirstSync = (userId: string, retirementPending: boolean) => {
+  let pending = retirementPending;
   return () => {
     if (pending) pending = !removeAccountRecoveryCopy(userId);
   };
@@ -766,7 +775,7 @@ export async function initializeTarkovSync() {
     throw new Error('Supabase initial load failed');
   }
   markProgressMetadataHydrated();
-  const recoveryCopyAwaitsUpload = settleStartupCloudState(
+  const startupCloudState = settleStartupCloudState(
     userId,
     loadResult.hadRemoteData || loadResult.migratedLocalState
   );
@@ -778,8 +787,8 @@ export async function initializeTarkovSync() {
   }
   const syncStart = {
     hadRemoteData: loadResult.hadRemoteData,
-    hasUnsavedHandoff: hasUnsavedProgressChanges() || recoveryCopyAwaitsUpload,
-    onSynced: retireRecoveryCopyOnFirstSync(userId, recoveryCopyAwaitsUpload),
+    hasUnsavedHandoff: hasUnsavedProgressChanges() || startupCloudState.awaitsUpload,
+    onSynced: retireRecoveryCopyOnFirstSync(userId, startupCloudState.retirementPending),
   };
   startProgressSync(tarkovStore, userId, syncStart, isStartupCurrent);
   // MULTI-DEVICE CONFLICT RESOLUTION: awaited so initialization does not report success before

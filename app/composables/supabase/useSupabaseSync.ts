@@ -383,6 +383,7 @@ export function useSupabaseSync<
    */
   const canCommitWrite = (ownerId: string): boolean => !disposed && $supabase.user.id === ownerId;
   const commitSync = (currentHash: string, syncVersion: number, acknowledge: () => void) => {
+    const recoveredFromFailure = lastFailure !== null;
     acknowledge();
     lastSyncedHash = currentHash;
     clearPendingVersion(syncVersion);
@@ -390,6 +391,8 @@ export function useSupabaseSync<
     lastFailure = null;
     logger.debug(`[Sync] ✅ Successfully synced to ${table}`);
     onSynced?.();
+    // Edits made during the recovering upload armed a retry that the reset above cleared.
+    if (recoveredFromFailure) schedulePendingSync();
   };
   const writeAndCommit = async (
     dataToSave: TPayload,
@@ -563,13 +566,17 @@ export function useSupabaseSync<
     isPaused.value = true;
     debouncedSync.cancel();
   };
+  /** Pending changes after a pause or snapshot read; a failed write re-arms its reconciled retry. */
   const schedulePendingSync = () => {
-    if (defersToReconciledRetry()) return;
-    if (!disposed && pendingLocalChanges) {
-      void debouncedSync(store.$state as TState).catch((error) => {
-        if (!isDebounceRejection(error)) logger.error('[Sync] Resumed sync failed', error);
-      });
+    if (disposed || !pendingLocalChanges) return;
+    if (defersToReconciledRetry()) {
+      scheduleRetry();
+      publishSaveStatus();
+      return;
     }
+    void debouncedSync(store.$state as TState).catch((error) => {
+      if (!isDebounceRejection(error)) logger.error('[Sync] Resumed sync failed', error);
+    });
   };
   const resume = () => {
     logger.debug(`[Sync] Resuming sync for ${table}`);

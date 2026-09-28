@@ -539,6 +539,47 @@ describe('useSupabaseSync', () => {
       expect(sync.saveStatus.value.state).toBe('failed');
       sync.cleanup();
     });
+    it('re-arms a reconciled retry that finished while sync was paused', async () => {
+      upsert.mockResolvedValueOnce({ error: { message: 'boom' } });
+      const reconcile = vi.fn(async () => {});
+      const { store, sync } = await createRetryingSync(vi.fn(), reconcile);
+      store.$state.count = 1;
+      store.notifySubscriber();
+      await flushSync(5);
+      sync.pause();
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS[0]);
+      expect(reconcile).toHaveBeenCalledTimes(1);
+      expect(upsert).toHaveBeenCalledTimes(1);
+      sync.resume();
+      expect(sync.saveStatus.value.state).toBe('retry_scheduled');
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS[1]);
+      expect(upsert).toHaveBeenCalledTimes(2);
+      expect(sync.saveStatus.value.state).toBe('idle');
+      sync.cleanup();
+    });
+    it('uploads an edit made while the recovering retry was in flight', async () => {
+      let finishRetry: (value: { error: null }) => void = () => {};
+      upsert
+        .mockResolvedValueOnce({ error: { message: 'boom' } })
+        .mockImplementationOnce(() => new Promise((resolve) => (finishRetry = resolve)));
+      const { store, sync } = await createRetryingSync(
+        vi.fn(),
+        vi.fn(async () => {})
+      );
+      store.$state.count = 1;
+      store.notifySubscriber();
+      await flushSync(5);
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS[0]);
+      expect(upsert).toHaveBeenCalledTimes(2);
+      store.$state.count = 2;
+      store.notifySubscriber();
+      finishRetry({ error: null });
+      await vi.advanceTimersByTimeAsync(5);
+      expect(upsert).toHaveBeenCalledTimes(3);
+      expect(upsert).toHaveBeenLastCalledWith({ count: 2, user_id: 'user-1' });
+      expect(sync.saveStatus.value.state).toBe('idle');
+      sync.cleanup();
+    });
     it('stops scheduled retries after cleanup', async () => {
       upsert.mockResolvedValue({ error: { message: 'boom' } });
       const { store, sync } = await createRetryingSync();

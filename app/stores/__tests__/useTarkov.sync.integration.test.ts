@@ -2804,6 +2804,34 @@ describe('useTarkov sync integration', () => {
         expect(localStorage.getItem(recoveryKey('user-1')) === null).toBe(acknowledged);
       }
     );
+    it('retries a rejected startup recovery copy removal on the next upload', async () => {
+      const store = useTarkovStore();
+      localStorage.setItem(
+        recoveryKey('user-1'),
+        JSON.stringify({
+          _timestamp: Date.parse('2026-02-25T00:00:00.000Z'),
+          _userId: 'user-1',
+          data: { ...structuredClone(defaultState), pvp: progressWithLevel(5) },
+        })
+      );
+      single.mockResolvedValue({
+        data: createRemoteRow({
+          pvp_data: progressWithLevel(1),
+          updated_at: '2026-02-01T00:00:00.000Z',
+        }),
+        error: null,
+      });
+      const removeItem = vi.spyOn(localStorage, 'removeItem').mockImplementation((key: string) => {
+        if (key === recoveryKey('user-1')) throw new DOMException('denied', 'SecurityError');
+      });
+      await initializeTarkovSync();
+      expect(store.pvp.level).toBe(5);
+      expect(localStorage.getItem(recoveryKey('user-1'))).not.toBeNull();
+      removeItem.mockRestore();
+      const options = useSupabaseSyncMock.mock.calls.at(-1)?.[0] as { onSynced: () => void };
+      options.onSynced();
+      expect(localStorage.getItem(recoveryKey('user-1'))).toBeNull();
+    });
     it('retries recovery copy retirement on a later upload when removal fails', async () => {
       localStorage.setItem(
         recoveryKey('user-1'),

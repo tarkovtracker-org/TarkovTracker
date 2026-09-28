@@ -913,7 +913,9 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   after a failure, and `failed` once the bounded schedule (`CLOUD_SAVE_RETRY_DELAYS_MS`, 5 s /
   15 s / 60 s) is exhausted. Exhaustion keeps the changes pending. After a failed write, edits
   never upload directly: they wait for the scheduled retry, and an edit after exhaustion restarts
-  the schedule, as a manual retry (`retryCloudSave`) or the browser `online` event does. Every retry first reads the remote snapshot and merges it into the pending changes,
+  the schedule, as a manual retry (`retryCloudSave`) or the browser `online` event does. A retry
+  that could not upload during a pause is re-armed on resume, and edits made during the upload that
+  recovers from a failure are saved after it. Every retry first reads the remote snapshot and merges it into the pending changes,
   as a Realtime reconnect does, so changes saved on another device are not overwritten by a stale
   upload; a retry that overlaps a reconnect waits for the newer snapshot. If no snapshot can be
   merged (no listener is running, the read fails, the socket is suspended, or the account changed), the retry counts as a
