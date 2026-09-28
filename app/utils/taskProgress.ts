@@ -1,3 +1,10 @@
+import {
+  acceptsActiveStatus,
+  acceptsCompletionStatus,
+  acceptsFailedStatus,
+  isFailedOnlyRequirement,
+  normalizeRequirementStatuses,
+} from '@shared/utils/requirementStatus';
 import { getTaskTraderRequirements } from '@/utils/taskRequirements';
 import {
   isTaskComplete,
@@ -28,18 +35,6 @@ type TaskTraderProgressStore = {
   setTraderLevel: (traderId: string, level: number) => void;
   setTraderReputation: (traderId: string, reputation: number) => void;
 };
-const normalizeStatuses = (statuses?: string[]) =>
-  (statuses ?? []).map((status) => status.toLowerCase());
-const hasAnyStatus = (statuses: string[], values: string[]) =>
-  values.some((value) => statuses.includes(value));
-export function isFailedOnlyRequirement(statuses?: string[]): boolean {
-  const normalized = normalizeStatuses(statuses);
-  if (normalized.length === 0) return false;
-  return (
-    normalized.includes('failed') &&
-    !hasAnyStatus(normalized, ['complete', 'completed', 'active', 'accept', 'accepted'])
-  );
-}
 const getPositiveObjectiveCount = (objective: TaskObjective) => {
   const count = objective.count ?? 0;
   return count > 0 ? count : undefined;
@@ -177,15 +172,14 @@ export function applyTaskTraderRequirements(options: {
   }
 }
 const completedStatusMet = (completion: RawTaskCompletion, values: string[]) =>
-  (!values.length || hasAnyStatus(values, ['complete', 'completed'])) && isTaskComplete(completion);
+  (!values.length || acceptsCompletionStatus(values)) && isTaskComplete(completion);
 const activeStatusMet = (completion: RawTaskCompletion, values: string[]) =>
-  hasAnyStatus(values, ['active', 'accept', 'accepted']) &&
-  (isTaskActive(completion) || isTaskComplete(completion));
+  acceptsActiveStatus(values) && (isTaskActive(completion) || isTaskComplete(completion));
 const alreadyMeetsStatus = (completion: RawTaskCompletion, statuses?: string[]): boolean => {
-  const values = normalizeStatuses(statuses);
+  const values = normalizeRequirementStatuses(statuses);
   return (
     completedStatusMet(completion, values) ||
-    (values.includes('failed') && isTaskFailed(completion)) ||
+    (acceptsFailedStatus(values) && isTaskFailed(completion)) ||
     activeStatusMet(completion, values)
   );
 };

@@ -395,6 +395,7 @@
   </UCard>
 </template>
 <script setup lang="ts">
+  import { isFailedOnlyRequirement } from '@shared/utils/requirementStatus';
   import ContextMenu from '@/components/ui/ContextMenu.vue';
   import ContextMenuItem from '@/components/ui/ContextMenuItem.vue';
   import { useSharedBreakpoints } from '@/composables/useSharedBreakpoints';
@@ -433,7 +434,6 @@
   import { getExclusiveEditionsForTask } from '@/utils/editionHelpers';
   import { getQueryString } from '@/utils/routeHelpers';
   import { countIncompleteSuccessors, resolveImpactTeamIds } from '@/utils/taskImpact';
-  import { isFailedOnlyRequirement } from '@/utils/taskProgress';
   import { compareRequirement, getTaskTraderRequirements } from '@/utils/taskRequirements';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
   import type { ActionButtonState } from '@/features/tasks/types';

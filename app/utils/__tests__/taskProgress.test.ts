@@ -1,3 +1,4 @@
+import { isFailedOnlyRequirement } from '@shared/utils/requirementStatus';
 import { describe, expect, it, vi } from 'vitest';
 import {
   applyTaskAvailabilityRequirements,
@@ -5,7 +6,6 @@ import {
   completeTaskForProgress,
   ensureTaskMinPlayerLevel,
   failTaskForProgress,
-  isFailedOnlyRequirement,
   uncompleteTaskForProgress,
 } from '@/utils/taskProgress';
 import type { Task } from '@/types/tarkov';
