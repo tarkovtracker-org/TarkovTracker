@@ -305,6 +305,11 @@ export const readAccountRecoveryCopy = (userId: string): PersistedProgressSnapsh
 };
 export const hasAccountRecoveryCopy = (userId: string): boolean =>
   safeGetItem(recoveryKey(userId)) !== null;
+/** An unreadable recovery slot or a retention block may still hold the owner's changes. */
+export const mayHoldAccountRecoveryCopy = (userId: string): boolean => {
+  const { ok, raw } = readRecoveryStorage(userId);
+  return !ok || raw !== null || isAccountRecoveryRetentionBlocked();
+};
 export const removeAccountRecoveryCopy = (userId: string): boolean =>
   safeRemoveItem(recoveryKey(userId));
 /** Chooses the freshest owner snapshot from recovery, active storage, or a session handoff. */
@@ -337,7 +342,10 @@ export const preserveForeignActiveCopy = (userId: string | null): boolean => {
   const raw = safeGetItem(STORAGE_KEYS.progress);
   if (!raw) return true;
   if (isUnparseableProgressStorageValue(raw)) {
-    return preserveUnparseableActiveProgress(raw);
+    // Once the opaque bytes are preserved, a barrier from an earlier failed attempt is lifted.
+    const preserved = preserveUnparseableActiveProgress(raw);
+    if (preserved) setActiveProgressWritesBlocked(false);
+    return preserved;
   }
   const ownerId = parseUserScopedStorage<unknown>(raw)?._userId ?? null;
   if (!ownerId || ownerId === userId) return true;

@@ -12,6 +12,7 @@ import {
 import {
   hasAccountRecoveryCopy,
   isAccountRecoveryRetentionBlocked,
+  mayHoldAccountRecoveryCopy,
   markAccountRecoveryRetentionBlocked,
   preserveForeignActiveCopy,
   readAccountRecoveryCopy,
@@ -538,13 +539,14 @@ export function preserveUnsavedSessionProgress(userId: string): void {
 }
 /**
  * Whether local progress may be waiting for the cloud when initialization fails: tracked
- * progress, a failed local save, or a recovery copy. A default account has nothing to save.
+ * progress, a failed local save, or a recovery copy that exists, is unreadable, or is blocked. A
+ * default account has nothing to save.
  */
 export function mayHoldUnsyncedProgress(userId: string): boolean {
   return (
     hasProgress(useTarkovStore().$state) ||
     hasUnsavedProgressChanges() ||
-    hasAccountRecoveryCopy(userId)
+    mayHoldAccountRecoveryCopy(userId)
   );
 }
 /**

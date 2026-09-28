@@ -5,6 +5,7 @@ import {
   hasAccountRecoveryCopy,
   isAccountRecoveryRetentionBlocked,
   blockAccountRecoveryRetentionForOwner,
+  mayHoldAccountRecoveryCopy,
   preserveForeignActiveCopy,
   readAccountRecoveryCopy,
   removeAccountRecoveryCopy,
@@ -17,6 +18,7 @@ import {
   clearActiveProgressStorage,
   progressPersistStorage,
   parsePersistedProgressState,
+  persistActiveProgressValue,
   setActiveProgressWritesBlocked,
 } from '@/stores/tarkov/localStorage';
 import {
@@ -414,6 +416,27 @@ describe('account recovery copies', () => {
     expect(readAccountRecoveryCopy('user-1')).toBeNull();
     expect(isAccountRecoveryRetentionBlocked()).toBe(true);
     getItem.mockRestore();
+  });
+  it('treats an unreadable or blocked recovery slot as possibly holding owner changes', () => {
+    expect(mayHoldAccountRecoveryCopy('user-1')).toBe(false);
+    const key = recoveryKey('user-1');
+    const getItem = vi.spyOn(localStorage, 'getItem').mockImplementation((requestedKey) => {
+      if (requestedKey === key) throw new Error('storage denied');
+      return Storage.prototype.getItem.call(localStorage, requestedKey);
+    });
+    expect(hasAccountRecoveryCopy('user-1')).toBe(false);
+    expect(mayHoldAccountRecoveryCopy('user-1')).toBe(true);
+    getItem.mockRestore();
+    blockAccountRecoveryRetentionForOwner('user-2');
+    expect(mayHoldAccountRecoveryCopy('user-1')).toBe(true);
+  });
+  it('lifts the write barrier once opaque active bytes are preserved on a retry', () => {
+    setActiveProgressWritesBlocked(true);
+    localStorage.setItem(STORAGE_KEYS.progress, '{not json');
+    expect(preserveForeignActiveCopy('user-1')).toBe(true);
+    const envelope = JSON.stringify({ _userId: 'user-1', data: structuredClone(defaultState) });
+    expect(persistActiveProgressValue(envelope)).toBe(true);
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(envelope);
   });
   it('keeps retention blocked when retry finds no recovery copy', () => {
     blockAccountRecoveryRetentionForOwner('user-1');
