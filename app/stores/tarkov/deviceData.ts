@@ -6,7 +6,6 @@ import {
 import {
   quarantineAndRemoveUnparseableActiveProgress,
   isUnparseableProgressStorageValue,
-  safeGetItem,
   safeRemoveItem,
   safeSetItem,
   setActiveProgressWritesBlocked,
@@ -181,52 +180,43 @@ export const removeAccountDeviceData = (userId: string): boolean => {
 };
 /**
  * Owners whose explicit removal already signed out but left data behind. Retries stay bound
- * to those owners, since the signed-out UI can no longer name them; they are also stored so a
- * reload (for example after account deletion) can still retry.
+ * to those owners, since the signed-out UI can no longer name them; each owner also gets its own
+ * stored marker so a reload (for example after account deletion) or another tab can still retry.
  */
-const readIncompleteRemovalOwners = (): string[] => {
-  try {
-    const owners: unknown = JSON.parse(
-      safeGetItem(STORAGE_KEYS.deviceDataRemovalIncomplete) ?? '[]'
-    );
-    return Array.isArray(owners) ? owners.filter((owner) => typeof owner === 'string') : [];
-  } catch {
-    return [];
-  }
-};
+const INCOMPLETE_PREFIX = STORAGE_KEYS.deviceDataRemovalIncompletePrefix;
+const readIncompleteRemovalOwners = (): string[] =>
+  (listStorageKeys() ?? [])
+    .filter((key) => key.startsWith(INCOMPLETE_PREFIX))
+    .map((key) => key.slice(INCOMPLETE_PREFIX.length));
 const incompleteRemovalOwners = ref<string[]>(readIncompleteRemovalOwners());
 export const incompleteDeviceDataRemovalOwner = computed(
   () => incompleteRemovalOwners.value[0] ?? null
 );
-const storeIncompleteRemovalOwners = (owners: string[]): boolean => {
-  incompleteRemovalOwners.value = owners;
-  return owners.length > 0
-    ? safeSetItem(STORAGE_KEYS.deviceDataRemovalIncomplete, JSON.stringify(owners))
-    : safeRemoveItem(STORAGE_KEYS.deviceDataRemovalIncomplete);
-};
 const withoutOwner = (userId: string): string[] =>
   incompleteRemovalOwners.value.filter((owner) => owner !== userId);
 export const markDeviceDataRemovalIncomplete = (userId: string): void => {
-  if (!storeIncompleteRemovalOwners([...withoutOwner(userId), userId])) {
+  incompleteRemovalOwners.value = [...withoutOwner(userId), userId];
+  if (!safeSetItem(`${INCOMPLETE_PREFIX}${userId}`, userId)) {
     logger.warn('[DeviceData] Incomplete removal is retryable only until this page reloads');
   }
 };
+const endIncompleteRemoval = (userId: string): void => {
+  incompleteRemovalOwners.value = withoutOwner(userId);
+  safeRemoveItem(`${INCOMPLETE_PREFIX}${userId}`);
+};
 /** The owner signing back in ends the removal intent; nothing is removed from its session. */
 export const clearIncompleteDeviceDataRemoval = (userId: string | null): void => {
-  if (userId !== null && incompleteRemovalOwners.value.includes(userId)) {
-    storeIncompleteRemovalOwners(withoutOwner(userId));
-  }
+  if (userId !== null) endIncompleteRemoval(userId);
 };
 /** Records a removal attempt's outcome for `userId`: failures stay retryable across reloads. */
 export const recordDeviceDataRemovalOutcome = (userId: string, removed: boolean): void => {
-  if (removed) clearIncompleteDeviceDataRemoval(userId);
+  if (removed) endIncompleteRemoval(userId);
   else markDeviceDataRemovalIncomplete(userId);
 };
-/** Retries every recorded owner; returns `true` once none remains incomplete. */
+/** Retries every owner recorded by any tab; returns `true` once none remains incomplete. */
 export const retryIncompleteDeviceDataRemoval = (): boolean => {
-  const remaining = incompleteRemovalOwners.value.filter(
-    (owner) => !removeAccountDeviceData(owner)
-  );
-  storeIncompleteRemovalOwners(remaining);
-  return remaining.length === 0;
+  const owners = [...new Set([...incompleteRemovalOwners.value, ...readIncompleteRemovalOwners()])];
+  incompleteRemovalOwners.value = owners;
+  owners.filter((owner) => removeAccountDeviceData(owner)).forEach(endIncompleteRemoval);
+  return incompleteRemovalOwners.value.length === 0;
 };

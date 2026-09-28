@@ -946,9 +946,9 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   merge. Copies of a mode at the same reset epoch are merged, so edits held by only one of them
   survive; the newer copy's single-value fields (including deletions) win, as in the startup merge. Higher reset epochs take precedence
   only after displaced progress is retained for export. Old-season placeholders cannot compete
-  with current Seasonal progress. The recovery copy is removed only after a
-  successful startup load, because the resolved state was then uploaded or already matched the
-  service. Copies are read only for their owner and never uploaded for another account. A failed
+  with current Seasonal progress. The recovery copy is removed only once the cloud
+  holds the resolved state: after a startup load that reconciled a cloud record or migrated local
+  progress, or else after the startup upload of the recovered state succeeds. Copies are read only for their owner and never uploaded for another account. A failed
   read of an existing copy blocks sign-in, but a browser that refuses all storage access holds no
   copy to protect, so cloud-only sync still starts there.
 - **Superseded copies.** Before a deliberate reset with pending cloud changes or memory-only local changes, the store keeps each
@@ -998,8 +998,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   the same removal for the captured deleted account and checks identity before sign-out and reset;
   both sign out through the auth owner fence. If sign-out succeeded but cleanup was incomplete, the
   card keeps a retry bound to the removed owner until it succeeds or that owner signs in again.
-  Every such owner is stored when storage accepts the write, so the retry survives a reload and
-  covers each owner; account deletion records incomplete
+  Each such owner gets its own stored marker when storage accepts the write, so the retry survives a
+  reload, covers owners recorded by other tabs, and no tab overwrites another's marker; account deletion records incomplete
   cleanup the same way.
   If the server cannot be reached, the confirmation offers the disclosed device-only sign-out.
   A removal that throws is reported as incomplete, and the card's superseded-copy list follows

@@ -11,6 +11,7 @@ import {
   type UserState,
 } from '@/stores/progressState';
 import {
+  hasAccountRecoveryCopy,
   isAccountRecoveryRetentionBlocked,
   blockAccountRecoveryRetentionForOwner,
   markAccountRecoveryRetentionBlocked,
@@ -1188,6 +1189,20 @@ const attemptInitialProgressSync = async (controller: ProgressSyncController) =>
     return null;
   }
 };
+/**
+ * One attempt: a failure schedules the controller's retries, which merge remote state first.
+ * A recovery copy is retired only after its state reached the cloud.
+ */
+const uploadStartupHandoff = async (
+  controller: ProgressSyncController,
+  userId: string,
+  retiresRecoveryCopy: boolean
+) => {
+  const uploaded = await attemptInitialProgressSync(controller);
+  if (uploaded && retiresRecoveryCopy && isCurrentProgressController(controller, userId)) {
+    removeAccountRecoveryCopy(userId);
+  }
+};
 const syncInitialTrackedProgress = async (controller: ProgressSyncController, userId: string) => {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     if (!isCurrentProgressController(controller, userId)) return;
@@ -1915,15 +1930,18 @@ export async function initializeTarkovSync() {
     // The startup merge reconciled local changes with the cloud; a previous failed attempt's
     // unavailable status no longer applies. Memory-only local changes are acknowledged only
     // when the cloud now holds them. The sync controller reports from here on.
-    if (loadResult.hadRemoteData || migratedLocalState) acknowledgeStartupSync();
+    const cloudHoldsResolvedState = loadResult.hadRemoteData || migratedLocalState;
+    if (cloudHoldsResolvedState) acknowledgeStartupSync();
     else resetCloudSaveStatus();
     syncMetadataAfterStartup(tarkovStore, isStartupCurrent);
     if (preservedLocalSnapshot) {
       pendingResetProgressSnapshot = null;
     }
-    // A successful load reconciled any recovery copy with the cloud: the resolved state
-    // was uploaded or already matched the service, so the copy is no longer the only one.
-    removeAccountRecoveryCopy(currentUserId);
+    // Once the cloud holds the resolved state, a recovery copy is no longer the only one.
+    // Otherwise it stays until the startup upload below succeeds.
+    const recoveryCopyAwaitsUpload =
+      !cloudHoldsResolvedState && hasAccountRecoveryCopy(currentUserId);
+    if (cloudHoldsResolvedState) removeAccountRecoveryCopy(currentUserId);
     // Repair failed task states for existing users (runs once after data load)
     // This reapplies valid branch failures and clears stale failed flags
     const completionSchemaMigration = tarkovStore.migrateTaskCompletionSchema();
@@ -2040,14 +2058,16 @@ export async function initializeTarkovSync() {
       syncController = controller;
       registerCloudRetryHandler(controller.retryNow);
     };
-    // Memory-only changes the startup load did not upload have no other path to the cloud.
-    const hasUnsavedHandoff = hasUnsavedProgressChanges();
+    // Memory-only or recovered changes the startup load did not upload have no other path to
+    // the cloud.
+    const hasUnsavedHandoff = hasUnsavedProgressChanges() || recoveryCopyAwaitsUpload;
     const shouldStartSyncNow =
       loadResult.hadRemoteData || hasProgress(tarkovStore.$state) || hasUnsavedHandoff;
     if (shouldStartSyncNow) {
       startSync();
-      // One attempt: a failure schedules the controller's retries, which merge remote state first.
-      if (hasUnsavedHandoff && syncController) void attemptInitialProgressSync(syncController);
+      if (hasUnsavedHandoff && syncController) {
+        void uploadStartupHandoff(syncController, currentUserId, recoveryCopyAwaitsUpload);
+      }
     } else {
       logger.debug('[TarkovStore] Delaying sync until progress exists');
       const stopWatch = watch(

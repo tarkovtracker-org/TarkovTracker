@@ -2726,6 +2726,33 @@ describe('useTarkov sync integration', () => {
       expect(localStorage.getItem(recoveryKey('user-1'))).toBeNull();
       expect(readRecoveryLevel('user-2')).toBe(2);
     });
+    it.each([
+      ['retires', {}, false],
+      ['keeps', null, true],
+    ])(
+      '%s a metadata-only recovery copy after its startup upload (upload result %j)',
+      async (_label, uploadResult, retained) => {
+        const base = Date.parse('2026-02-25T00:00:00.000Z');
+        localStorage.setItem(
+          recoveryKey('user-1'),
+          JSON.stringify({
+            _timestamp: base,
+            _userId: 'user-1',
+            data: {
+              ...structuredClone(defaultState),
+              pvp: { ...structuredClone(defaultState.pvp), displayName: 'recovered' },
+            },
+          })
+        );
+        single.mockResolvedValue({ data: null, error: { code: 'PGRST116', message: 'No rows' } });
+        syncInitialState.mockResolvedValue(uploadResult);
+        await initializeTarkovSync();
+        await settleBackgroundWork();
+        expect(useTarkovStore().pvp.displayName).toBe('recovered');
+        expect(syncInitialState).toHaveBeenCalledOnce();
+        expect(localStorage.getItem(recoveryKey('user-1')) !== null).toBe(retained);
+      }
+    );
     it('does not fold the transition placeholder into the next owner recovery copy', () => {
       const pinia = createPinia().use(piniaPluginPersistedstate);
       createApp({}).use(pinia);

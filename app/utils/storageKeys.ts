@@ -19,8 +19,11 @@ export const STORAGE_KEYS = {
    * diagnostics exclude it with the quarantined bytes.
    */
   progressQuarantineRemovalMarkerPrefix: `${STORAGE_PREFIX}progress_quarantine_removal_`,
-  /** Owner whose explicit device-data removal left data behind, so a reload can still retry it. */
-  deviceDataRemovalIncomplete: `${STORAGE_PREFIX}device_data_removal_incomplete`,
+  /**
+   * `${prefix}${userId}` marks an explicit device-data removal that left that owner's data
+   * behind, so a reload can still retry it. One key per owner keeps tabs from overwriting others.
+   */
+  deviceDataRemovalIncompletePrefix: `${STORAGE_PREFIX}device_data_removal_incomplete_`,
   adminLastPurge: `${STORAGE_PREFIX}tt:admin:last-purge`,
   cachePurgeAt: `${STORAGE_PREFIX}tt:cache:last-purge`,
   cachePurgeCheckAt: `${STORAGE_PREFIX}tt:cache:last-check`,

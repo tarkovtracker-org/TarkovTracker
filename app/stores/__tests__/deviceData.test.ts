@@ -293,21 +293,27 @@ describe('device data removal', () => {
     localStorage.setItem(`${STORAGE_KEYS.progressRecoveryPrefix}user-2`, owned('user-2'));
     markDeviceDataRemovalIncomplete('user-1');
     markDeviceDataRemovalIncomplete('user-2');
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.deviceDataRemovalIncomplete)!)).toEqual([
-      'user-1',
-      'user-2',
-    ]);
+    // Another tab records its own owner without replacing this tab's marker.
+    localStorage.setItem(`${STORAGE_KEYS.deviceDataRemovalIncompletePrefix}user-3`, 'user-3');
+    localStorage.setItem(`${STORAGE_KEYS.progressRecoveryPrefix}user-3`, owned('user-3'));
     expect(incompleteDeviceDataRemovalOwner.value).toBe('user-1');
     expect(retryIncompleteDeviceDataRemoval()).toBe(true);
     expect(localStorage.getItem(`${STORAGE_KEYS.progressRecoveryPrefix}user-1`)).toBeNull();
     expect(localStorage.getItem(`${STORAGE_KEYS.progressRecoveryPrefix}user-2`)).toBeNull();
-    expect(localStorage.getItem(STORAGE_KEYS.deviceDataRemovalIncomplete)).toBeNull();
+    expect(localStorage.getItem(`${STORAGE_KEYS.progressRecoveryPrefix}user-3`)).toBeNull();
+    expect(
+      Object.keys(localStorage).filter((key) =>
+        key.startsWith(STORAGE_KEYS.deviceDataRemovalIncompletePrefix)
+      )
+    ).toEqual([]);
     expect(incompleteDeviceDataRemovalOwner.value).toBeNull();
   });
   it('keeps an incomplete removal retryable after a reload', async () => {
     const { markDeviceDataRemovalIncomplete } = await import('@/stores/tarkov/deviceData');
     markDeviceDataRemovalIncomplete('user-1');
-    expect(localStorage.getItem(STORAGE_KEYS.deviceDataRemovalIncomplete)).toBe('["user-1"]');
+    expect(localStorage.getItem(`${STORAGE_KEYS.deviceDataRemovalIncompletePrefix}user-1`)).toBe(
+      'user-1'
+    );
     vi.resetModules();
     const reloaded = await import('@/stores/tarkov/deviceData');
     expect(reloaded.incompleteDeviceDataRemovalOwner.value).toBe('user-1');
@@ -315,9 +321,13 @@ describe('device data removal', () => {
     expect(reloaded.incompleteDeviceDataRemovalOwner.value).toBe('user-1');
     reloaded.recordDeviceDataRemovalOutcome('user-1', true);
     expect(reloaded.incompleteDeviceDataRemovalOwner.value).toBeNull();
-    expect(localStorage.getItem(STORAGE_KEYS.deviceDataRemovalIncomplete)).toBeNull();
+    expect(
+      localStorage.getItem(`${STORAGE_KEYS.deviceDataRemovalIncompletePrefix}user-1`)
+    ).toBeNull();
     reloaded.recordDeviceDataRemovalOutcome('user-3', false);
-    expect(localStorage.getItem(STORAGE_KEYS.deviceDataRemovalIncomplete)).toBe('["user-3"]');
+    expect(localStorage.getItem(`${STORAGE_KEYS.deviceDataRemovalIncompletePrefix}user-3`)).toBe(
+      'user-3'
+    );
   });
   it('fails closed when opaque active bytes cannot be quarantined', () => {
     const raw = '{malformed';
