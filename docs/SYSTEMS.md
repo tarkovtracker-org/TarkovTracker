@@ -912,7 +912,9 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   the budget. Failures are classified as `offline`, `rate_limited`, `auth`, or `unknown` so the
   indicator can distinguish a known cause from an unknown one. If the initial authenticated sync
   fails, no controller runs, so `useAppInitialization` marks cloud saving `failed` and its manual
-  retry restarts initialization; a successful startup load clears that status.
+  retry restarts initialization; a successful startup load clears that status. Before any
+  initialization retry, memory-only edits are handed to the startup merge as the newest session
+  snapshot (`preserveUnsavedSessionProgress`), so rehydrating from storage cannot discard them.
 - **Local status.** The progress persist plugin writes through `progressPersistStorage`, because
   `pinia-plugin-persistedstate` swallows storage exceptions. Store and sync writes of the active
   progress key go through `persistActiveProgressValue`, which records `saved` or `failed` (`quota`,

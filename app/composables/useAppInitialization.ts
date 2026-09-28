@@ -9,6 +9,7 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import {
   initializeTarkovSync,
+  preserveUnsavedSessionProgress,
   resetTarkovStoreForSessionTransition,
   resetTarkovSync,
   useTarkovStore,
@@ -104,7 +105,7 @@ export function useAppInitialization() {
     cancelSyncRetry();
     syncRetryTimer = setTimeout(() => {
       syncRetryTimer = null;
-      void runAuthenticatedInitialization(expectedUserId, expectedToken);
+      void retryAuthenticatedInitialization(expectedUserId, expectedToken);
     }, SYNC_RETRY_DELAY_MS);
     syncRetryAttempts += 1;
   };
@@ -128,8 +129,18 @@ export function useAppInitialization() {
   const retrySyncNow = async (expectedUserId?: string, expectedToken?: number) => {
     cancelSyncRetry();
     syncRetryAttempts = 0;
-    await runAuthenticatedInitialization(expectedUserId, expectedToken);
+    await retryAuthenticatedInitialization(expectedUserId, expectedToken);
     return !hasPendingCloudChanges();
+  };
+  /** A retry must not let the startup load rehydrate over edits held only in memory. */
+  const retryAuthenticatedInitialization = async (
+    expectedUserId?: string,
+    expectedToken?: number
+  ) => {
+    if (expectedUserId && !isStaleInitialization(expectedUserId, expectedToken)) {
+      preserveUnsavedSessionProgress(expectedUserId);
+    }
+    await runAuthenticatedInitialization(expectedUserId, expectedToken);
   };
   const runAuthenticatedInitialization = async (
     expectedUserId?: string,

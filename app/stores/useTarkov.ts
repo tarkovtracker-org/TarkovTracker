@@ -75,6 +75,7 @@ import {
 } from '@/stores/tarkov/progressPersistence';
 import {
   CLOUD_SAVE_RETRY_DELAYS_MS,
+  hasUnsavedProgressChanges,
   registerCloudRetryHandler,
   resetCloudSaveStatus,
   setCloudSaveStatus,
@@ -1311,6 +1312,28 @@ export function resetTarkovSync(
   resetSyncTimeline();
   progressStorageSerializer.reset();
   resetApiUpdateState();
+}
+/**
+ * Memory-only edits made while sync was unavailable exist only in the store. Before a retry
+ * reruns the startup load, which rehydrates from storage, hand them over as the newest
+ * session snapshot for `userId` so the startup merge keeps them.
+ */
+export function preserveUnsavedSessionProgress(userId: string): void {
+  if (!hasUnsavedProgressChanges() || getCurrentSupabaseUserId() !== userId) return;
+  const now = Date.now();
+  const state = cloneStateSnapshot(sanitizeOwnedUserState(useTarkovStore().$state));
+  pendingResetProgressSnapshot = {
+    userId,
+    snapshot: {
+      hadDeprecatedProgressData: false,
+      state,
+      storedUserId: userId,
+      timestamp: now,
+      metadataTimestamp: now,
+      modeTimestamps: Object.fromEntries(GAME_MODE_VALUES.map((mode) => [mode, now])),
+      seasonalSourceSeasonNumber: state.seasonalSeasonNumber ?? ACTIVE_SEASON_NUMBER,
+    },
+  };
 }
 /** Without a running controller, acknowledgement of the local copy cannot be proven. */
 const mayHaveUnacknowledgedChanges = (): boolean =>

@@ -39,6 +39,7 @@ vi.mock('@/composables/useSupporter', () => ({ useSupporter: () => mockSupporter
 const mockInitializeTarkovSync = vi.fn(async () => {});
 const mockResetTarkovStoreForSessionTransition = vi.fn();
 const mockResetTarkovSync = vi.fn();
+const mockPreserveUnsavedSessionProgress = vi.fn();
 const mockMigrateDataIfNeeded = vi.fn(async () => {});
 const mockActivityLogResetForSession = vi.fn();
 const mockActivityLogMigrateLegacyManualEntries = vi.fn();
@@ -76,6 +77,8 @@ vi.mock('@/composables/useToastI18n', () => ({
 }));
 vi.mock('@/stores/useTarkov', () => ({
   initializeTarkovSync: () => mockInitializeTarkovSync(),
+  preserveUnsavedSessionProgress: (...args: unknown[]) =>
+    mockPreserveUnsavedSessionProgress(...args),
   resetTarkovStoreForSessionTransition: (...args: unknown[]) =>
     mockResetTarkovStoreForSessionTransition(...args),
   resetTarkovSync: (...args: unknown[]) => mockResetTarkovSync(...args),
@@ -383,6 +386,7 @@ describe('useAppInitialization locale setup', () => {
       expect(mockShowLoadFailed).toHaveBeenCalledTimes(1);
       await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS);
       expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(2);
+      expect(mockPreserveUnsavedSessionProgress).toHaveBeenCalledWith('user-1');
       expect(mockActivityLogMigrateLegacyManualEntries).toHaveBeenCalledTimes(1);
       expect(mockShowLoadFailed).toHaveBeenCalledTimes(1);
       await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS * 2);
@@ -405,7 +409,12 @@ describe('useAppInitialization locale setup', () => {
         // A successful startup load clears the unavailable status (see initializeTarkovSync).
         resetCloudSaveStatus();
       });
+      expect(mockPreserveUnsavedSessionProgress).not.toHaveBeenCalled();
       await expect(retryCloudSave()).resolves.toBe(true);
+      expect(mockPreserveUnsavedSessionProgress).toHaveBeenCalledWith('user-1');
+      expect(mockPreserveUnsavedSessionProgress.mock.invocationCallOrder[0]).toBeLessThan(
+        mockInitializeTarkovSync.mock.invocationCallOrder[1]!
+      );
       expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(2);
       await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS * 2);
       // The manual retry replaced the scheduled one.

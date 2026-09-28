@@ -885,6 +885,45 @@ describe('useTarkov sync integration', () => {
     await expect(initializeTarkovSync()).rejects.toThrow('Supabase initial load failed');
     expect(useSupabaseSyncMock).not.toHaveBeenCalled();
   });
+  it('keeps memory-only edits when a failed initialization is retried', async () => {
+    const { preserveUnsavedSessionProgress } = await import('@/stores/useTarkov');
+    const { recordLocalSave, markCloudSyncUnavailable, resetCloudSaveStatus } =
+      await import('@/stores/tarkov/progressSaveStatus');
+    seedOwnedEnvelope('user-1', { pvp: progressWithLevel(5) });
+    single
+      .mockResolvedValueOnce({ data: createRemoteRow(), error: null })
+      .mockResolvedValue({ data: null, error: { message: 'legacy unavailable' } });
+    await expect(initializeTarkovSync()).rejects.toThrow('Supabase initial load failed');
+    resetTarkovSync('initial sync failed');
+    markCloudSyncUnavailable(async () => false);
+    // The player keeps editing while local writes fail; the edit exists only in memory.
+    recordLocalSave(false, 'quota');
+    useTarkovStore().$patch((state) => {
+      state.pvp.level = 42;
+    });
+    single.mockResolvedValue({ data: createRemoteRow(), error: null });
+    preserveUnsavedSessionProgress('user-1');
+    await initializeTarkovSync();
+    expect(useTarkovStore().pvp.level).toBe(42);
+    recordLocalSave(true);
+    resetCloudSaveStatus();
+  });
+  it('does not replace the store from memory for another account or without unsaved edits', async () => {
+    const { preserveUnsavedSessionProgress } = await import('@/stores/useTarkov');
+    const { recordLocalSave } = await import('@/stores/tarkov/progressSaveStatus');
+    seedOwnedEnvelope('user-1', { pvp: progressWithLevel(5) });
+    recordLocalSave(true);
+    useTarkovStore().$patch((state) => {
+      state.pvp.level = 42;
+    });
+    preserveUnsavedSessionProgress('user-1');
+    recordLocalSave(false, 'quota');
+    preserveUnsavedSessionProgress('user-2');
+    await initializeTarkovSync();
+    // The startup load resolved from storage and the cloud, not from the in-memory edit.
+    expect(useTarkovStore().pvp.level).not.toBe(42);
+    recordLocalSave(true);
+  });
   it('records the local sync timestamp only when the save callback succeeds', async () => {
     await initializeTarkovSync();
     const { getLastLocalSyncTime } = await import('@/stores/tarkov/syncTimeline');
