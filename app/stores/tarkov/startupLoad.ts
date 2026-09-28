@@ -120,6 +120,7 @@ const readLocalMeta = (preserved: PersistedProgressSnapshot | null): LocalMeta =
     return null;
   }
 };
+/** Resets the serializer baseline; callers must do this before patching the persisted store. */
 const adoptSnapshot = (
   local: LocalProgress,
   snapshot: PersistedProgressSnapshot,
@@ -141,9 +142,9 @@ const adoptPreservedSnapshot = (
   local: LocalProgress,
   snapshot: PersistedProgressSnapshot
 ): LocalProgress => {
-  const state = sanitizeOwnedUserState(snapshot.state);
-  patchIfChanged(ctx.store, state);
-  return adoptSnapshot(local, snapshot, state);
+  const adopted = adoptSnapshot(local, snapshot, sanitizeOwnedUserState(snapshot.state));
+  patchIfChanged(ctx.store, adopted.state);
+  return adopted;
 };
 /** Guest progress or this user's own; the current user's scoped copy wins over a guest copy. */
 const readAdoptablePersisted = (ctx: StartupLoadContext, storedUserId: string | null) => {
