@@ -114,6 +114,7 @@
       {
         "id": "SCAV_Underboat_Hideout",
         "name": "Hideout Under the Landing Stage",
+        "nameKey": "maps.extract_names.scav_underboat_hideout",
         "faction": "scav",
         "position": {
           "x": 143.13,

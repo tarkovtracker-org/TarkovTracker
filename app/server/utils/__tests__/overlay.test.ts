@@ -577,6 +577,33 @@ describe('applyMapExtractAdditions', () => {
     const result = applyMapExtractAdditions(map);
     expect(result.extracts).toEqual([{ id: 'valid-ext', name: 'Valid Extract' }]);
   });
+  it('drops additions with missing names, unknown factions or malformed positions', () => {
+    const map = {
+      id: 'map-1',
+      extracts: [],
+      extractsAdd: [
+        { id: 'no-name' },
+        { id: 'bad-faction', name: 'Bad Faction', faction: 'raider' },
+        { id: 'bad-position', name: 'Bad Position', position: { x: 'bad', z: 0 } },
+        { id: 'ok', name: 'Ok', faction: 'pmc', position: { x: 1, y: 2, z: 3 } },
+      ],
+    };
+    expect(applyMapExtractAdditions(map).extracts).toEqual([
+      { id: 'ok', name: 'Ok', faction: 'pmc', position: { x: 1, y: 2, z: 3 } },
+    ]);
+  });
+  it('deduplicates additions against earlier additions', () => {
+    const map = {
+      id: 'map-1',
+      extracts: [],
+      extractsAdd: [
+        { id: 'a', name: 'Alpha' },
+        { id: 'a', name: 'Alpha again' },
+        { id: 'b', name: 'Alpha' },
+      ],
+    };
+    expect(applyMapExtractAdditions(map).extracts).toEqual([{ id: 'a', name: 'Alpha' }]);
+  });
 });
 describe('map overlay integration via applyOverlay', () => {
   it('applies map extracts additions and strips extractsAdd via applyOverlay', async () => {

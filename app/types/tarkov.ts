@@ -320,6 +320,8 @@ export interface MapExtract {
   top?: number;
   /** Bottom boundary for multi-floor extracts */
   bottom?: number;
+  /** i18n key for tracker-supplied extracts, which have no upstream localized name */
+  nameKey?: string;
 }
 export interface MapSvgConfig {
   file: string;

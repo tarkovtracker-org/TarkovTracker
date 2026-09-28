@@ -410,26 +410,38 @@ export function applyTaskObjectiveAdditions<T extends { id: string }>(task: T): 
     objectives: [...existing, ...deduped],
   };
 }
-function isExtractMatching(
-  existingExtract: unknown,
-  targetId: string,
-  targetName: string
-): boolean {
-  if (!isPlainObject(existingExtract)) return false;
-  const existingId = typeof existingExtract.id === 'string' ? existingExtract.id : '';
-  const existingName = typeof existingExtract.name === 'string' ? existingExtract.name : '';
-  if (targetId && existingId === targetId) return true;
-  if (targetName && existingName === targetName) return true;
-  return false;
-}
+const EXTRACT_FACTIONS = new Set(['pmc', 'scav', 'shared']);
+const nonEmptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0;
+const validExtractPosition = (value: unknown): boolean =>
+  value === undefined ||
+  (isPlainObject(value) &&
+    ['x', 'y', 'z'].every(
+      (axis) => typeof value[axis] === 'number' && Number.isFinite(value[axis])
+    ));
+/** Leaflet renders additions verbatim, so malformed entries are dropped rather than forwarded. */
+const isValidExtractAddition = (
+  value: unknown
+): value is Record<string, unknown> & {
+  id: string;
+  name: string;
+} =>
+  isPlainObject(value) &&
+  [
+    nonEmptyString(value.id),
+    nonEmptyString(value.name),
+    value.faction === undefined || EXTRACT_FACTIONS.has(value.faction as string),
+    validExtractPosition(value.position),
+  ].every(Boolean);
+const isExtractMatching = (existing: unknown, id: string, name: string): boolean =>
+  isPlainObject(existing) && (existing.id === id || existing.name === name);
 function filterNewExtracts(existing: unknown[], additions: unknown[]): Record<string, unknown>[] {
   const result: Record<string, unknown>[] = [];
   for (const addition of additions) {
-    if (!isPlainObject(addition)) continue;
-    const id = typeof addition.id === 'string' ? addition.id : '';
-    const name = typeof addition.name === 'string' ? addition.name : '';
-    const exists = existing.some((ext) => isExtractMatching(ext, id, name));
-    if (!exists) result.push(addition);
+    if (!isValidExtractAddition(addition)) continue;
+    const seen = [...existing, ...result];
+    if (!seen.some((ext) => isExtractMatching(ext, addition.id, addition.name)))
+      result.push(addition);
   }
   return result;
 }

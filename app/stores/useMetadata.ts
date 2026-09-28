@@ -196,7 +196,10 @@ const resolveMergedMapExtracts = (
 ): MapExtract[] | undefined => {
   if (!additions || additions.length === 0) return baseExtracts;
   const current = baseExtracts ?? [];
-  const missing = additions.filter((add) => !isMapExtractPresent(current, add));
+  const missing = additions.reduce<MapExtract[]>(
+    (added, add) => (isMapExtractPresent([...current, ...added], add) ? added : [...added, add]),
+    []
+  );
   if (missing.length === 0) return baseExtracts;
   return [...current, ...missing];
 };
