@@ -612,6 +612,7 @@ export interface StaticMapData {
     unavailable?: boolean;
     svg?: MapSvgConfig;
     tile?: MapTileConfig;
+    extractsAdd?: MapExtract[];
   };
 }
 // Store Types

@@ -410,6 +410,49 @@ export function applyTaskObjectiveAdditions<T extends { id: string }>(task: T): 
     objectives: [...existing, ...deduped],
   };
 }
+function isExtractMatching(
+  existingExtract: unknown,
+  targetId: string,
+  targetName: string
+): boolean {
+  if (!isPlainObject(existingExtract)) return false;
+  const existingId = typeof existingExtract.id === 'string' ? existingExtract.id : '';
+  const existingName = typeof existingExtract.name === 'string' ? existingExtract.name : '';
+  if (targetId && existingId === targetId) return true;
+  if (targetName && existingName === targetName) return true;
+  return false;
+}
+function filterNewExtracts(existing: unknown[], additions: unknown[]): Record<string, unknown>[] {
+  const result: Record<string, unknown>[] = [];
+  for (const addition of additions) {
+    if (!isPlainObject(addition)) continue;
+    const id = typeof addition.id === 'string' ? addition.id : '';
+    const name = typeof addition.name === 'string' ? addition.name : '';
+    const exists = existing.some((ext) => isExtractMatching(ext, id, name));
+    if (!exists) result.push(addition);
+  }
+  return result;
+}
+function mergeMapExtractAdditions(
+  map: Record<string, unknown>,
+  additions: unknown[]
+): Record<string, unknown> {
+  const existing = Array.isArray(map.extracts) ? map.extracts : [];
+  const deduped = filterNewExtracts(existing, additions);
+  const { extractsAdd: _omitted, ...rest } = map;
+  if (deduped.length === 0) return rest;
+  return {
+    ...rest,
+    extracts: [...existing, ...deduped],
+  };
+}
+export function applyMapExtractAdditions<T extends { id: string }>(map: T): T {
+  if (!isPlainObject(map)) return map;
+  const obj = map as Record<string, unknown>;
+  const additions = Array.isArray(obj.extractsAdd) ? obj.extractsAdd : [];
+  if (additions.length === 0) return map;
+  return mergeMapExtractAdditions(obj, additions) as T;
+}
 type OverlayTaskAddition = Record<string, unknown> & { id: string };
 function normalizeTaskAdditions(
   additions: Record<string, Record<string, unknown>> | undefined
@@ -603,7 +646,11 @@ function applyEntityCollectionOverlay(
 ): void {
   const entities = target[collection];
   if (!patches || !Array.isArray(entities)) return;
-  target[collection] = applyEntityOverlay(entities, patches);
+  const normalize =
+    collection === 'maps'
+      ? (applyMapExtractAdditions as (map: { id: string }) => { id: string })
+      : undefined;
+  target[collection] = applyEntityOverlay(entities, patches, { normalize });
 }
 const chapterTaskIds = (chapter: Record<string, unknown>): string[] => {
   if (!Array.isArray(chapter.questUnlocks)) return [];

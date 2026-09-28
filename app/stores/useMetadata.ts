@@ -56,6 +56,7 @@ import type {
   HideoutStation,
   NeededItemHideoutModule,
   NeededItemTaskObjective,
+  MapExtract,
   ObjectiveGPSInfo,
   ObjectiveMapInfo,
   PlayerLevel,
@@ -183,6 +184,21 @@ const deriveStaticMapKey = (mapName: string, normalizedName?: string): string =>
   }
   const lower = mapName.toLowerCase();
   return MAP_NAME_MAPPING[lower] ?? lower.replace(/[\s+-]/g, '');
+};
+const isMapExtractPresent = (existing: MapExtract[], addition: MapExtract): boolean =>
+  existing.some(
+    (ext) =>
+      (addition.id && ext.id === addition.id) || (addition.name && ext.name === addition.name)
+  );
+const resolveMergedMapExtracts = (
+  baseExtracts?: MapExtract[],
+  additions?: MapExtract[]
+): MapExtract[] | undefined => {
+  if (!additions || additions.length === 0) return baseExtracts;
+  const current = baseExtracts ?? [];
+  const missing = additions.filter((add) => !isMapExtractPresent(current, add));
+  if (missing.length === 0) return baseExtracts;
+  return [...current, ...missing];
 };
 const beginTaskCoreRefresh = (state: Pick<MetadataState, 'tasksCoreRefreshing'>): symbol => {
   const token = Symbol('taskCoreRefresh');
@@ -496,9 +512,11 @@ export const useMetadataStore = defineStore('metadata', {
           const mergedIds = maps.map((map) => map.id);
           // Check for unavailable before svg check (unavailable maps may not have svg)
           const unavailable = staticData?.unavailable;
+          const extracts = resolveMergedMapExtracts(primaryMap.extracts, staticData?.extractsAdd);
           if (staticData?.svg || staticData?.tile) {
             return {
               ...primaryMap,
+              extracts,
               svg: staticData?.svg,
               tile: staticData?.tile,
               unavailable,
@@ -512,6 +530,7 @@ export const useMetadataStore = defineStore('metadata', {
           }
           return {
             ...primaryMap,
+            extracts,
             unavailable,
             mergedIds,
           };
