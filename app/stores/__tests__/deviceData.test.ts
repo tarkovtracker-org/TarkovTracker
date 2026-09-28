@@ -269,6 +269,20 @@ describe('device data removal', () => {
     clearIncompleteDeviceDataRemoval('user-1');
     expect(incompleteDeviceDataRemovalOwner.value).toBeNull();
   });
+  it('warns when an incomplete removal cannot be stored for a reload', async () => {
+    const { markDeviceDataRemovalIncomplete, incompleteDeviceDataRemovalOwner } =
+      await import('@/stores/tarkov/deviceData');
+    const { logger } = await import('@/utils/logger');
+    const spy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    markDeviceDataRemovalIncomplete('user-1');
+    spy.mockRestore();
+    expect(incompleteDeviceDataRemovalOwner.value).toBe('user-1');
+    expect(logger.warn).toHaveBeenCalledWith(
+      '[DeviceData] Incomplete removal is retryable only until this page reloads'
+    );
+  });
   it('keeps an incomplete removal retryable after a reload', async () => {
     const { markDeviceDataRemovalIncomplete } = await import('@/stores/tarkov/deviceData');
     markDeviceDataRemovalIncomplete('user-1');

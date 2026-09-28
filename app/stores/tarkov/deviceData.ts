@@ -12,6 +12,7 @@ import {
   setActiveProgressWritesBlocked,
 } from '@/stores/tarkov/localStorage';
 import { removeSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
+import { logger } from '@/utils/logger';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
 import { parseUserScopedStorage } from '@/utils/userScopedStorage';
 /**
@@ -189,7 +190,9 @@ const incompleteRemovalOwner = ref<string | null>(
 export const incompleteDeviceDataRemovalOwner = readonly(incompleteRemovalOwner);
 export const markDeviceDataRemovalIncomplete = (userId: string): void => {
   incompleteRemovalOwner.value = userId;
-  safeSetItem(STORAGE_KEYS.deviceDataRemovalIncomplete, userId);
+  if (!safeSetItem(STORAGE_KEYS.deviceDataRemovalIncomplete, userId)) {
+    logger.warn('[DeviceData] Incomplete removal is retryable only until this page reloads');
+  }
 };
 const endIncompleteRemoval = (): void => {
   incompleteRemovalOwner.value = null;

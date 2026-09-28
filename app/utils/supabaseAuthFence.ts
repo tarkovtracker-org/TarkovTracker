@@ -62,10 +62,12 @@ const createWriteTolerantStorage = (persistent: Storage): AuthStorage => {
     },
   };
 };
-/** Browser storage whenever it can be accessed; memory only when access itself is blocked. */
+/** Browser storage whenever it can be read; memory only when access itself is blocked. */
 const resolveBrowserStorage = (): AuthStorage => {
   try {
-    return createWriteTolerantStorage(window.localStorage);
+    const persistent = window.localStorage;
+    persistent.getItem('__tt_auth_storage_probe__');
+    return createWriteTolerantStorage(persistent);
   } catch {
     return createMemoryStorage();
   }

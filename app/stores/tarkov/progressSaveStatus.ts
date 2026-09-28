@@ -82,6 +82,11 @@ export const resetCloudSaveStatus = (): void => {
   status.cloud = createIdleCloudStatus();
   cloudRetryHandler = null;
 };
+/** A successful startup load uploaded or matched the resolved state, so the cloud holds it. */
+export const acknowledgeStartupSync = (): void => {
+  resetCloudSaveStatus();
+  unacknowledgedLocalFailure = false;
+};
 export const hasPendingCloudChanges = (): boolean => status.cloud.state !== 'idle';
 /** Pending cloud changes without a confirmed local save may be lost on reload or sign-out. */
 export const hasUnsavedProgressChanges = (): boolean =>

@@ -650,6 +650,26 @@ describe('useTarkov sync integration', () => {
     expect(localStorage.getItem(STORAGE_KEYS.progress)).toContain('"seasonalSeasonNumber":');
     expect(listSupersededProgressCopies('user-1')).toEqual([]);
   });
+  it('hydrates a default stale-season state without requiring an export copy', () => {
+    const data = {
+      ...structuredClone(defaultState),
+      seasonalSeasonNumber: ACTIVE_SEASON_NUMBER + 1,
+    };
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({ _userId: 'user-1', _timestamp: Date.now(), data })
+    );
+    vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+      if (key.startsWith(STORAGE_KEYS.progressSupersededPrefix)) throw new Error('storage full');
+      return Storage.prototype.setItem.call(localStorage, key, value);
+    });
+    const pinia = createPinia().use(piniaPluginPersistedstate);
+    createApp({}).use(pinia);
+    setActivePinia(pinia);
+    useTarkovStore();
+    expect(isAccountRecoveryRetentionBlocked()).toBe(false);
+    expect(listSupersededProgressCopies('user-1')).toEqual([]);
+  });
   it('sanitizes stale guest-season data without creating an owner export copy', () => {
     const staleSeason = ACTIVE_SEASON_NUMBER + 1;
     const data = {
@@ -905,6 +925,8 @@ describe('useTarkov sync integration', () => {
     preserveUnsavedSessionProgress('user-1');
     await initializeTarkovSync();
     expect(useTarkovStore().pvp.level).toBe(42);
+    const { hasUnsavedProgressChanges } = await import('@/stores/tarkov/progressSaveStatus');
+    expect(hasUnsavedProgressChanges()).toBe(false);
     recordLocalSave(true);
     resetCloudSaveStatus();
   });

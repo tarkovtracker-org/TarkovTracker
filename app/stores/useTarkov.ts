@@ -76,6 +76,7 @@ import {
   type ModeProgressClient,
 } from '@/stores/tarkov/progressPersistence';
 import {
+  acknowledgeStartupSync,
   CLOUD_SAVE_RETRY_DELAYS_MS,
   hasUnsavedProgressChanges,
   registerCloudRetryHandler,
@@ -138,7 +139,7 @@ const QUOTA_CHECK_INTERVAL_MS = 60000;
 const hasMismatchedSeasonalProgress = (state: UserState): boolean =>
   typeof state.seasonalSeasonNumber === 'number' &&
   state.seasonalSeasonNumber !== ACTIVE_SEASON_NUMBER &&
-  hasMaterializedProgress(state.seasonal);
+  hasRetainableModeProgress(state.seasonal);
 const preserveMismatchedSeasonalCopy = (ownerId: string, state: UserState): void => {
   if (!hasMismatchedSeasonalProgress(state)) return;
   const seasonNumber = state.seasonalSeasonNumber as number;
@@ -1908,8 +1909,9 @@ export async function initializeTarkovSync() {
     }
     markProgressMetadataHydrated();
     // The startup merge reconciled local changes with the cloud; a previous failed attempt's
-    // unavailable status no longer applies. The sync controller reports from here on.
-    resetCloudSaveStatus();
+    // unavailable status and any memory-only local failure no longer apply. The sync
+    // controller reports from here on.
+    acknowledgeStartupSync();
     syncMetadataAfterStartup(tarkovStore, isStartupCurrent);
     if (preservedLocalSnapshot) {
       pendingResetProgressSnapshot = null;

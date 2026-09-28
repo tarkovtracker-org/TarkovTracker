@@ -917,7 +917,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   are classified as `offline`, `rate_limited`, `auth`, or `unknown` so the
   indicator can distinguish a known cause from an unknown one. If the initial authenticated sync
   fails, no controller runs, so `useAppInitialization` marks cloud saving `failed` and its manual
-  retry restarts initialization; a successful startup load clears that status. Before any
+  retry restarts initialization; a successful startup load clears that status and acknowledges
+  memory-only local changes, since the resolved state was uploaded or already matched the service. Before any
   initialization retry, memory-only edits are handed to the startup merge as the session snapshot
   (`preserveUnsavedSessionProgress`), so rehydrating from storage cannot discard them. Only the
   edited modes and metadata get new clocks, so untouched modes still yield to newer remote progress.
@@ -955,7 +956,7 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   replaces the mode. If that copy cannot be saved, the reset is not applied, active writes stay
   blocked, and sync stays paused for the session so the displaced edits cannot overwrite the reset;
   the next startup load retries the retention. A deliberate reset clears the owner's active copy
-  without creating an account recovery copy of the pre-reset progress. Hydration also retains materialized Seasonal
+  without creating an account recovery copy of the pre-reset progress. Hydration also retains non-default Seasonal
   progress stamped for an older season before sanitization clears it. These copies keep their
   original mode and season, are available from Settings → Account for export, and are never loaded
   into the tracker or sent to Supabase. They are removed only with that account's explicit device-data
@@ -982,7 +983,7 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   session is held in memory and the stale persisted session is removed, so a readable session is
   never hidden behind an empty memory store. A session another tab persists later takes precedence
   over that memory copy, so the owner fence still sees it. Memory-only storage is used only when
-  access is blocked.
+  reads are blocked.
 - **Removing device data.** `DeviceDataCard` (Settings → Account) is the explicit action,
   distinct from sign-out and from cloud deletion. It registers `requestDeviceDataRemoval` before
   signing out so the progress and preferences session transitions retain no copy for that owner,
@@ -996,7 +997,7 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   the same removal for the captured deleted account and checks identity before sign-out and reset;
   both sign out through the auth owner fence. If sign-out succeeded but cleanup was incomplete, the
   card keeps a retry bound to the removed owner until it succeeds or that owner signs in again.
-  That owner is also stored, so the retry survives a reload; account deletion records incomplete
+  That owner is also stored when storage accepts the write, so the retry survives a reload; account deletion records incomplete
   cleanup the same way.
   If the server cannot be reached, the confirmation offers the disclosed device-only sign-out.
   A removal that throws is reported as incomplete, and the card's superseded-copy list follows

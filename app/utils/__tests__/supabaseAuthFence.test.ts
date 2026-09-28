@@ -83,6 +83,18 @@ describe('owner-fenced Supabase auth storage', () => {
     blocked.mockRestore();
     expect(localStorage.getItem(KEY)).toBeNull();
   });
+  it('falls back to memory storage when browser storage rejects reads', () => {
+    const rejecting = {
+      getItem: () => {
+        throw new DOMException('blocked', 'SecurityError');
+      },
+    } as unknown as Storage;
+    const stubbed = vi.spyOn(window, 'localStorage', 'get').mockReturnValue(rejecting);
+    const { storage } = createOwnerFencedAuthStorage(KEY);
+    storage.setItem(KEY, session('user-1'));
+    expect(storage.getItem(KEY)).toBe(session('user-1'));
+    stubbed.mockRestore();
+  });
   it('keeps a persisted session readable when browser storage rejects writes', () => {
     const persisted = new Map([[KEY, session('user-1')]]);
     const full = {
