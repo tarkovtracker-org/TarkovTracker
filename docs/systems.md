@@ -2082,6 +2082,65 @@ for agent commands and recovery boundaries.
 
 ## 16. Canonical task progression
 
+### Server-side start requirements
+
+`app/utils/taskOtherRequirements.ts` preserves and validates the API's `otherRequirements` at
+adaptation and overlay boundaries. `app/stores/taskServerGates.ts` evaluates global-variable
+comparisons literally, separately from prerequisite edges, and keeps missing or invalid effective
+account values unknown (including `== 0`). Overlay `storyObjective` gates are met by the player's tracked storyline objective
+(not by an in-game confirmation); Mark available and imported EFT starts, completions and failures
+record that objective. Completing or uncompleting an objective stamps a clock after the entry's
+existing one, so a newer device clock cannot override the latest change. `applyOverlay` turns a story gate whose chapter or objective is absent from
+the mode's story catalog into an unknown gate, and a recorded objective in one of the task's own
+story-unlock chapters opens the story route, so Mark available backfills no prerequisites.
+Trader conversations also require confirmation;
+unsupported or malformed requirements remain blocked as `{ type: 'unknown', upstreamType }`, keeping the
+upstream discriminator. Only published start requirements are
+consumed, not finish/fail conditions. Unknown server gates remain in the locked list, with an
+explanation shared by task cards and recommendations.
+
+The [overlay registry](https://github.com/tarkovtracker-org/tarkov-data-overlay/blob/main/docs/GLOBAL_VARIABLES.md)
+currently contains no verified contributor mappings. Its
+[mechanics research](https://github.com/tarkovtracker-org/tarkov-data-overlay/blob/main/docs/GLOBAL_VARIABLE_MECHANICS.md)
+does not establish any trader-tier pool as an exact contributor set. The tracker therefore never
+counts arbitrary trader tasks, assumes missing values are zero, creates synthetic prerequisite
+edges, or shares a value between accounts/modes. The evaluator accepts already-resolved effective
+values, but no automatic account-value feed or verified derivation is supplied by this change.
+
+**Mark available** confirms the selected task's supported server-side start gates from the player's
+in-game observation. Confirmations live in each mode's `taskAvailability` map
+(`{ [taskId]: { requirements, timestamp } }`, `app/utils/taskAvailabilityConfirmation.ts`), never in
+`taskCompletions`: confirming or clearing cannot create an "active" task record or rewrite a status
+another device set. `requirements` is the exact normalized gate signature, and a clear is an empty
+string kept as a tombstone. Sync merges the map per task by the confirmation's own timestamp. A
+confirmation counts only while its signature matches and it is not older than the task's status
+timestamp, so a later reset, completion, failure or progress repair on any device retires it without
+rewriting the map. The row sanitizer preserves the key (migration
+`20260928140000_preserve_task_availability_confirmations.sql`); a missing key means no confirmations.
+It does not set a counter, acknowledge another task's dialogue, or complete candidate contributor
+tasks. It cannot bypass a known unmet value, malformed requirements, or independent
+level/faction/trader/prestige/quest gates, and changed requirements invalidate it. The task's More
+menu clears just the in-game confirmation. Mark available either makes the task available or changes
+nothing: it is withheld for unsupported or malformed server gates and for unmet ambiguous-status or
+malformed prerequisites. A confirmation-only mode counts as progress for sync and startup adoption. Status changes are stamped after the task's confirmation clock, so a
+device whose clock runs ahead cannot keep a confirmation alive past a later reset. Clocks are
+capped at 3000-01-01 (`MAX_CONFIRMATION_TIMESTAMP`, same bound in the migration); a confirmation at
+the cap never counts. Mark available is offered only while every current blocker is one it can
+clear (player level, trader level/reputation, unambiguous prerequisites, unknown-value or
+conversation server gates) and never before the player's own evaluation exists (for example while
+the player's own progress is hidden). An imported EFT
+log start confirms the task's current gate signature, since the game only starts a task whose gates
+are met. Shared profiles evaluate with the owner's confirmations. Incomplete/reset records are not
+confirmation evidence. Explicit prerequisite backfill
+continues for unambiguous completed/failed requirements; active-or-complete and other ambiguous
+status choices no longer fabricate completion histories or flatten alternative ancestors.
+
+This is additive to `tasks-core-json-v3`: old cached payloads that discarded `otherRequirements`
+cannot be repaired in the evaluator. Before claiming the fix is live, verify a successful full
+precompute refresh using this revision and refreshed edge/browser task payloads containing the new
+field. No production precompute or cache purge is performed by opening the PR. Unknown gates that
+are not published upstream cannot be reconstructed from the public task catalog.
+
 Hideout cards evaluate the declared trader comparison against current loyalty (legacy default `>=`). Completed-module enforcement retains a build if the current stored loyalty satisfies the comparison (including legacy values above the normal range), or if any valid loyalty level at or below it satisfies that comparison, so advancing past an upper-bound or equality requirement cannot erase built modules or their parts. Lower-bound loyalty downgrades still revoke dependent builds. Disabled trader gating bypasses both checks. Optional profile chapter and prestige normalization run inside their optional request boundaries: malformed catalogs show a partial failure without discarding successful task catalogs. Overlay promotion requires a nonempty editions catalog as well as complete provenance, and forced edition refreshes forward `cacheBust=1` to bypass the worker overlay cache.
 
 Isolated profile catalogs normalize and qualify duplicate objective IDs and build the same task predecessor graph as active metadata, without mutating active progress. EFT completion imports apply trader implications only when the trader-gating preference captured at confirmation is enabled; task completion and player-level implications remain authoritative. Shared profiles project legacy objective keys through the duplicate-ID mapping without modifying stored progress; explicit task-qualified values take precedence.
