@@ -919,7 +919,7 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   fails, no controller runs, so `useAppInitialization` marks cloud saving `failed` and its manual
   retry restarts initialization; a successful startup load clears that status. It also acknowledges
   memory-only local changes when the cloud now holds them (a cloud record was reconciled or local
-  progress was migrated); otherwise they stay flagged as unsaved. Before any
+  progress was migrated); otherwise sync starts and uploads them. Before any
   initialization retry, memory-only edits are handed to the startup merge as the session snapshot
   (`preserveUnsavedSessionProgress`), so rehydrating from storage cannot discard them. Only the
   edited modes and metadata get new clocks, so untouched modes still yield to newer remote progress.
@@ -998,7 +998,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   the same removal for the captured deleted account and checks identity before sign-out and reset;
   both sign out through the auth owner fence. If sign-out succeeded but cleanup was incomplete, the
   card keeps a retry bound to the removed owner until it succeeds or that owner signs in again.
-  That owner is also stored when storage accepts the write, so the retry survives a reload; account deletion records incomplete
+  Every such owner is stored when storage accepts the write, so the retry survives a reload and
+  covers each owner; account deletion records incomplete
   cleanup the same way.
   If the server cannot be reached, the confirmation offers the disclosed device-only sign-out.
   A removal that throws is reported as incomplete, and the card's superseded-copy list follows

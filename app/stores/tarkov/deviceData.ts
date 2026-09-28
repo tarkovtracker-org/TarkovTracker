@@ -180,37 +180,53 @@ export const removeAccountDeviceData = (userId: string): boolean => {
   return removed;
 };
 /**
- * Owner whose explicit removal already signed out but left data behind. The retry stays
- * bound to that owner, since the signed-out UI can no longer name it; the owner is also
- * stored so a reload (for example after account deletion) can still retry.
+ * Owners whose explicit removal already signed out but left data behind. Retries stay bound
+ * to those owners, since the signed-out UI can no longer name them; they are also stored so a
+ * reload (for example after account deletion) can still retry.
  */
-const incompleteRemovalOwner = ref<string | null>(
-  safeGetItem(STORAGE_KEYS.deviceDataRemovalIncomplete) || null
+const readIncompleteRemovalOwners = (): string[] => {
+  try {
+    const owners: unknown = JSON.parse(
+      safeGetItem(STORAGE_KEYS.deviceDataRemovalIncomplete) ?? '[]'
+    );
+    return Array.isArray(owners) ? owners.filter((owner) => typeof owner === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+const incompleteRemovalOwners = ref<string[]>(readIncompleteRemovalOwners());
+export const incompleteDeviceDataRemovalOwner = computed(
+  () => incompleteRemovalOwners.value[0] ?? null
 );
-export const incompleteDeviceDataRemovalOwner = readonly(incompleteRemovalOwner);
+const storeIncompleteRemovalOwners = (owners: string[]): boolean => {
+  incompleteRemovalOwners.value = owners;
+  return owners.length > 0
+    ? safeSetItem(STORAGE_KEYS.deviceDataRemovalIncomplete, JSON.stringify(owners))
+    : safeRemoveItem(STORAGE_KEYS.deviceDataRemovalIncomplete);
+};
+const withoutOwner = (userId: string): string[] =>
+  incompleteRemovalOwners.value.filter((owner) => owner !== userId);
 export const markDeviceDataRemovalIncomplete = (userId: string): void => {
-  incompleteRemovalOwner.value = userId;
-  if (!safeSetItem(STORAGE_KEYS.deviceDataRemovalIncomplete, userId)) {
+  if (!storeIncompleteRemovalOwners([...withoutOwner(userId), userId])) {
     logger.warn('[DeviceData] Incomplete removal is retryable only until this page reloads');
   }
 };
-const endIncompleteRemoval = (): void => {
-  incompleteRemovalOwner.value = null;
-  safeRemoveItem(STORAGE_KEYS.deviceDataRemovalIncomplete);
-};
 /** The owner signing back in ends the removal intent; nothing is removed from its session. */
 export const clearIncompleteDeviceDataRemoval = (userId: string | null): void => {
-  if (userId !== null && incompleteRemovalOwner.value === userId) endIncompleteRemoval();
+  if (userId !== null && incompleteRemovalOwners.value.includes(userId)) {
+    storeIncompleteRemovalOwners(withoutOwner(userId));
+  }
 };
 /** Records a removal attempt's outcome for `userId`: failures stay retryable across reloads. */
 export const recordDeviceDataRemovalOutcome = (userId: string, removed: boolean): void => {
-  if (!removed) markDeviceDataRemovalIncomplete(userId);
-  else if (incompleteRemovalOwner.value === userId) endIncompleteRemoval();
+  if (removed) clearIncompleteDeviceDataRemoval(userId);
+  else markDeviceDataRemovalIncomplete(userId);
 };
+/** Retries every recorded owner; returns `true` once none remains incomplete. */
 export const retryIncompleteDeviceDataRemoval = (): boolean => {
-  const owner = incompleteRemovalOwner.value;
-  if (!owner) return true;
-  const removed = removeAccountDeviceData(owner);
-  if (removed) endIncompleteRemoval();
-  return removed;
+  const remaining = incompleteRemovalOwners.value.filter(
+    (owner) => !removeAccountDeviceData(owner)
+  );
+  storeIncompleteRemovalOwners(remaining);
+  return remaining.length === 0;
 };

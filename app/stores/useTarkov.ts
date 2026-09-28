@@ -1402,8 +1402,9 @@ export function resetTarkovStoreForSessionTransition(
     return;
   }
   if (restorePreviousOwnerCopy(preservedState, previousUserId, currentUserId)) return;
-  // Only the active copy is cleared: recovery copies belong to their owners.
-  clearActiveProgressStorage();
+  // Only the active copy is cleared: recovery copies belong to their owners. The reset above
+  // may have persisted a default placeholder for the new owner; it is not their progress.
+  clearActiveProgressStorage(currentUserId);
 }
 export async function initializeTarkovSync() {
   const tarkovStore = useTarkovStore();
@@ -2039,9 +2040,15 @@ export async function initializeTarkovSync() {
       syncController = controller;
       registerCloudRetryHandler(controller.retryNow);
     };
-    const shouldStartSyncNow = loadResult.hadRemoteData || hasProgress(tarkovStore.$state);
+    // Memory-only changes the startup load did not upload have no other path to the cloud.
+    const hasUnsavedHandoff = hasUnsavedProgressChanges();
+    const shouldStartSyncNow =
+      loadResult.hadRemoteData || hasProgress(tarkovStore.$state) || hasUnsavedHandoff;
     if (shouldStartSyncNow) {
       startSync();
+      if (hasUnsavedHandoff && syncController) {
+        void syncInitialTrackedProgress(syncController, currentUserId);
+      }
     } else {
       logger.debug('[TarkovStore] Delaying sync until progress exists');
       const stopWatch = watch(

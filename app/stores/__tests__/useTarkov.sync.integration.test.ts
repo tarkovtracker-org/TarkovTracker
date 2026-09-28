@@ -930,7 +930,7 @@ describe('useTarkov sync integration', () => {
     recordLocalSave(true);
     resetCloudSaveStatus();
   });
-  it('keeps a memory-only handoff unacknowledged when startup uploads nothing', async () => {
+  it('uploads a memory-only handoff that the startup load did not upload', async () => {
     const { preserveUnsavedSessionProgress } = await import('@/stores/useTarkov');
     const {
       hasUnsavedProgressChanges,
@@ -950,9 +950,12 @@ describe('useTarkov sync integration', () => {
     });
     single.mockResolvedValue({ data: null, error: { code: 'PGRST116', message: 'No rows' } });
     preserveUnsavedSessionProgress('user-1');
+    syncInitialState.mockClear();
     await initializeTarkovSync();
     expect(useTarkovStore().pvp.displayName).toBe('renamed');
+    // Not acknowledged by the startup load itself; the started controller uploads it.
     expect(hasUnsavedProgressChanges()).toBe(true);
+    expect(syncInitialState).toHaveBeenCalled();
     recordLocalSave(true);
     resetCloudSaveStatus();
   });
@@ -2720,6 +2723,25 @@ describe('useTarkov sync integration', () => {
       // Reconciled with the cloud, so the copy is retired; the other account's is kept.
       expect(localStorage.getItem(recoveryKey('user-1'))).toBeNull();
       expect(readRecoveryLevel('user-2')).toBe(2);
+    });
+    it('does not fold the transition placeholder into the next owner recovery copy', () => {
+      const pinia = createPinia().use(piniaPluginPersistedstate);
+      createApp({}).use(pinia);
+      setActivePinia(pinia);
+      useTarkovStore();
+      const base = Date.parse('2026-02-25T00:00:00.000Z');
+      const recovery = JSON.stringify({
+        _timestamp: base,
+        _userId: 'user-2',
+        data: {
+          ...structuredClone(defaultState),
+          pvp: { ...progressWithLevel(6), displayName: 'second-owner' },
+        },
+      });
+      localStorage.setItem(recoveryKey('user-2'), recovery);
+      writeActiveCopy('user-1', 3, base);
+      switchSession('user-1', 'user-2');
+      expect(localStorage.getItem(recoveryKey('user-2'))).toBe(recovery);
     });
     it('does not restore a recovery copy older than the owner active copy', async () => {
       const store = useTarkovStore();
