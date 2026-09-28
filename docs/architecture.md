@@ -76,7 +76,7 @@ TarkovTracker is a sophisticated single-page application (SPA) for tracking prog
 ```
 
 Rate limiting is multi-plane (Worker DO, Edge mutation counters, Pages shared limits, Auth
-platform limits). See [`RATE_LIMITING.md`](./RATE_LIMITING.md) for ownership, flows, and when to
+platform limits). See [`rate-limiting.md`](./rate-limiting.md) for ownership, flows, and when to
 use which enforcer.
 
 ## Architecture Diagram
@@ -264,7 +264,7 @@ sequenceDiagram
 Persistent PvP and PvE use season number `0`. Seasonal PvP uses the active positive season number
 (`1` for the initial integration). The legacy `user_progress` row remains the account-metadata
 source and temporarily mirrors PvP/PvE for rolling compatibility; Seasonal progress exists only in
-`user_game_mode_progress`. See [`SYSTEMS.md`](./SYSTEMS.md#7-game-mode-and-seasonal-progress-storage)
+`user_game_mode_progress`. See [`systems.md`](./systems.md#7-game-mode-and-seasonal-progress-storage)
 for the storage, RLS, team, sharing, prestige, backup, and compatibility invariants.
 
 ## Authentication
@@ -330,8 +330,8 @@ All game data is fetched through Nuxt server routes that proxy to `json.tarkov.d
 Internal modes map to upstream endpoints as `pvp` → `regular`, `pve` → `pve`, and
 `seasonal` → `pvp-season`.
 
-> Canonical endpoint details: [`SYSTEMS.md` §1](./SYSTEMS.md#1-tarkovdev-data-integration) and
-> [`API.md`](./API.md). The table below is a quick map.
+> Canonical endpoint details: [`systems.md` §1](./systems.md#1-tarkovdev-data-integration) and
+> [`api.md`](./api.md). The table below is a quick map.
 
 | Endpoint                       | Purpose                   | Cache TTL   |
 | ------------------------------ | ------------------------- | ----------- |
@@ -363,7 +363,7 @@ Layer 1 of the server cache is the optional precomputed `TARKOV_DATA` KV (popula
 the scheduled precompute workflow; currently only `/api/tarkov/tasks-core` reads it via
 `precomputed: true` — other game-data routes start at the per-colo Cache API); the full four-layer
 fall-through is specified in
-[`SYSTEMS.md` §3](./SYSTEMS.md#3-multi-layer-caching). The diagram below shows the
+[`systems.md` §3](./systems.md#3-multi-layer-caching). The diagram below shows the
 client → edge → upstream path.
 
 ```mermaid

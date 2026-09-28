@@ -104,7 +104,7 @@ jobs:
               per_page: 100,
             });
             const pathMatch = files.some(({ filename }) =>
-              filename === 'lighthouserc.json' ||
+              filename === '.github/lighthouserc.json' ||
               filename === '.github/workflows/pr-checks.yml' ||
               filename.startsWith('app/components/') ||
               filename.startsWith('app/features/')
@@ -159,7 +159,7 @@ jobs:
       - name: Lighthouse CI
         uses: treosh/lighthouse-ci-action@3e7e23fb74242897f95c0ba9cabad3d0227b9b18 # 12.6.2
         with:
-          configPath: lighthouserc.json
+          configPath: .github/lighthouserc.json
           urls: |
             http://localhost:3000
             http://localhost:3000/tasks

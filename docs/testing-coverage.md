@@ -38,29 +38,10 @@ traps and redundant defensive catches in store helpers are not coverage goals.
 
 ## Measured result
 
-The final full run passed 287 files / 2,888 tests with the new gates enabled.
-
-| Metric     | Baseline |  After |
-| ---------- | -------: | -----: |
-| Lines      |   65.19% | 66.85% |
-| Statements |   63.07% | 64.74% |
-| Functions  |   60.12% | 61.35% |
-| Branches   |   50.88% |  52.2% |
-
-| Current module (under `app/`)         | Lines before → after | Branches before → after |
-| ------------------------------------- | -------------------: | ----------------------: |
-| `stores/utils/gameMode.ts`            |        66.66% → 100% |              75% → 100% |
-| `utils/storeHelpers.ts`               |          0% → 86.95% |                0% → 90% |
-| `composables/useTaskState.ts`         |        85.71% → 100% |              25% → 100% |
-| `composables/useTaskRepair.ts`        |          0% → 91.22% |             0% → 76.19% |
-| `composables/useAppInitialization.ts` |      83.46% → 97.63% |         68.99% → 80.62% |
-| `server/api/changelog.get.ts`         |          0% → 92.85% |             0% → 73.54% |
-| `stores/useTeamStore.ts`              |      57.76% → 81.93% |          49.15% → 66.8% |
-| `utils/changelog.ts`                  |         13.2% → 100% |             0% → 93.02% |
-
-The application denominator is unchanged (31,591 executable lines); the tests
-cover 524 additional lines. These figures are a snapshot, not an expectation
-that future unrelated changes leave coverage percentages identical.
+The closing full run passed 287 files / 2,888 tests with the new gates enabled, covering 524
+additional lines over the baseline. Per-module before/after percentages were a snapshot of that
+run, not a contract — exact floors live in `vitest.config.ts` (see Gates below). Do not extend
+this section with new tables; update the config instead.
 
 ## Gates
 

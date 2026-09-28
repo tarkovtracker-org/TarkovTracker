@@ -248,7 +248,7 @@ replaces the key with the translated string.
    caching entirely and always fetch. Sets `X-Cache-Status: DEV`.
 
 On top of these, the **client** has its own IndexedDB cache in `useMetadataStore` so the browser
-does not re-fetch on every navigation. That layer is documented in `ARCHITECTURE.md`. Anything passed
+does not re-fetch on every navigation. That layer is documented in `architecture.md`. Anything passed
 to `setCachedData` must be structured-cloneable, so store-held catalogs stay `markRaw` on every
 assignment including empty fallbacks: a plain array assigned to store state becomes a reactive proxy,
 and IndexedDB rejects a proxy with `DataCloneError`, disabling that cache entry for every visit.
@@ -625,8 +625,8 @@ If the complete-fleet manifest write fails after payload writes succeed, precomp
 through the `api-gateway` Worker on `api.tarkovtracker.org`. A progress read touches several
 layers; this section is the canonical map of those layers so a failure can be located quickly
 instead of guessed at. Rate-limit ownership details live in
-[`RATE_LIMITING.md`](./RATE_LIMITING.md); client-facing quota docs live in
-[`API.md`](./API.md#rate-limits-api-gateway).
+[`rate-limiting.md`](./rate-limiting.md); client-facing quota docs live in
+[`api.md`](./api.md#rate-limits-api-gateway).
 
 ### Diagram
 
@@ -724,7 +724,7 @@ sequenceDiagram
   app progress store, public profile/streamer views, and the Worker transform
 - `shared/utils/userMetadata.ts` — runtime-independent provider metadata parsing, shared with app
   user hydration through the `@shared` alias in Nuxt and the Worker build/test configuration
-- `docs/RATE_LIMITING.md`, `docs/API.md` — ownership map and client-facing docs
+- `docs/rate-limiting.md`, `docs/api.md` — ownership map and client-facing docs
 
 ### Invariants
 
@@ -1282,7 +1282,7 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
 - `app/composables/useTurnstile.ts`, `app/utils/turnstileKeys.ts` — widget lifecycle + test keys
 - `app/utils/tarkovDevImportCooldown.ts` — localStorage cooldown bookkeeping
 - `app/features/settings/DataManagementCard.vue` — import UI, snapshot age, cooldown countdown
-- `docs/RATE_LIMITING.md` — limiter ownership for this route
+- `docs/rate-limiting.md` — limiter ownership for this route
 
 ### Invariants
 
@@ -1312,7 +1312,7 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
   revalidates with `If-None-Match` when a cached ETag exists — "I just refreshed on tarkov.dev"
   costs at most one conditional upstream request.
 - The client cooldown is UX only (localStorage); the server-side cache + rate limits are the actual
-  cost protection, per the design principle in `docs/RATE_LIMITING.md`.
+  cost protection, per the design principle in `docs/rate-limiting.md`.
 - Ordinary success responses are browser-cacheable (`private`); explicit `fresh=1` responses and
   error responses never are.
 - The client accepts the verified Tarkov.dev `pvp-season` profile source for Seasonal progress.
@@ -1725,7 +1725,7 @@ Candidate source files come from the original checkout's Git index and non-ignor
 file list. This retains staged and unstaged source content, honors repository-local and configured
 exclusions, and includes force-tracked ignored files. A separate temporary index constructs the
 analysis head. Native new-only attribution and configured severities determine the exit status.
-See [the workflow guide](WORKFLOW_AUTOMATION.md#fallow-changed-file-gate) for usage and report IDs.
+See [the workflow guide](workflow-automation.md#fallow-changed-file-gate) for usage and report IDs.
 
 ### Invariants
 
@@ -1868,7 +1868,7 @@ behind branch, explicitly dispatches candidate CI, and performs the final merge;
   The fixed squash message must not inherit automation-skip markers from translation commits.
 - Existing release provenance checks stay intact; Cloudflare Git deployment remains independent.
 
-See `docs/WORKFLOW_AUTOMATION.md` for triggering, retry, and deployment behavior.
+See `docs/workflow-automation.md` for triggering, retry, and deployment behavior.
 
 ## When this doc is wrong
 
@@ -2011,7 +2011,7 @@ executable code, and unknown or unreadable paths require one, so translation-onl
 keep the reduced test selection but add the `validate` build job. The `security` job (reusable
 `.github/workflows/security.yml`: production dependency audit at the critical threshold, Gitleaks,
 CodeQL) is selected on every CI run. See
-`docs/WORKFLOW_AUTOMATION.md` for the recorded rollout evidence and local/full execution profiles.
+`docs/workflow-automation.md` for the recorded rollout evidence and local/full execution profiles.
 
 ### Invariants
 
@@ -2050,7 +2050,7 @@ timestamps reuse exact-commit completion while running bot activity still blocks
 Completed code reviews are reused by commit,
 independently of security reviews and unresolved findings; only top-level security report headings or the dedicated leading marker
 exclude security evidence, preserving quoted headings in code reviews. This cooperative guard cannot serialize unrelated clones or
-callers that bypass it. See [the review workflow](WORKFLOW_AUTOMATION.md#codex-request-deduplication-and-waiting)
+callers that bypass it. See [the review workflow](workflow-automation.md#codex-request-deduplication-and-waiting)
 for agent commands and recovery boundaries.
 
 ## 16. Canonical task progression
@@ -2493,7 +2493,7 @@ GitHub has computed the test merge; other pending reasons are left alone.
   repository-level Actions policy whose event allowlist is exactly `pull_request_target`,
   `workflow_run`, and `schedule` for that workflow path. GitHub enforces its default
   public-repository block of `pull_request_target` from 2026-11-02, so the policy is required
-  external state; `docs/WORKFLOW_AUTOMATION.md` records how to recreate it.
+  external state; `docs/workflow-automation.md` records how to recreate it.
 
 Current gates consume `CI Result` and `Preview Result` on the validated head for PRs and
 standalone branch candidates. Both come from GitHub

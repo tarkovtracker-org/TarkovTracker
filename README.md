@@ -74,7 +74,7 @@ not need to be duplicated under `NUXT_PUBLIC_*`. Without Supabase configured, th
 offline mode with localStorage only — auth, sync, realtime, and team features are unavailable.
 
 > `SUPABASE_URL` and `SUPABASE_ANON_KEY` are required for login/sync. Everything else is optional and
-> documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+> documented in [`docs/architecture.md`](docs/architecture.md).
 
 **Tech stack:** Nuxt 4 (SPA, `ssr: false`), Vue 3 Composition API, TypeScript strict, Pinia,
 Supabase, Tailwind CSS v4, Vitest, Cloudflare Pages/Workers.
@@ -93,7 +93,7 @@ Supabase, Tailwind CSS v4, Vitest, Cloudflare Pages/Workers.
 
 Run `pnpm run lint`, `pnpm run typecheck`, and `pnpm run test` before pushing. The full command
 list (including i18n, Supabase types, OpenAPI validation, and the API gateway tests) is in
-[`AGENTS.md`](AGENTS.md) and [`docs/WORKFLOW_AUTOMATION.md`](docs/WORKFLOW_AUTOMATION.md).
+[`AGENTS.md`](AGENTS.md) and [`docs/workflow-automation.md`](docs/workflow-automation.md).
 
 ### Contributing
 
@@ -115,21 +115,21 @@ feature. PRs that bundle unrelated changes may be asked to split or be closed.
 
 The short version: this README gets you running; the `docs/` folder explains how things work.
 
-| You want to…                                      | Read                                                                                       |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Get started                                       | This README                                                                                |
-| Report a security vulnerability                   | [`SECURITY.md`](SECURITY.md)                                                               |
-| Find where to get help                            | [`SUPPORT.md`](SUPPORT.md)                                                                 |
-| Read the code of conduct                          | [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)                                                 |
-| Understand the systems (caching, data, overlay)   | [`docs/SYSTEMS.md`](docs/SYSTEMS.md)                                                       |
-| Understand the full architecture & data flow      | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)                                             |
-| Read the Tarkov data architecture decision        | [`docs/decisions/tarkov-data-architecture.md`](docs/decisions/tarkov-data-architecture.md) |
-| Use or extend the HTTP/API surface                | [`docs/API.md`](docs/API.md)                                                               |
-| Understand rate limits / abuse controls           | [`docs/RATE_LIMITING.md`](docs/RATE_LIMITING.md)                                           |
-| Deploy, configure env vars, or handle an incident | [`docs/runbook.md`](docs/runbook.md)                                                       |
-| Understand CI/CD, hooks, and releases             | [`docs/WORKFLOW_AUTOMATION.md`](docs/WORKFLOW_AUTOMATION.md)                               |
-| Contribute (issues, branches, PRs, labels)        | [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md)                                       |
-| Work as (or configure) an AI agent                | [`AGENTS.md`](AGENTS.md) + [`docs/agent-context/`](docs/agent-context/)                    |
+| You want to…                                      | Read                                                                    |
+| ------------------------------------------------- | ----------------------------------------------------------------------- |
+| Get started                                       | This README                                                             |
+| Report a security vulnerability                   | [`SECURITY.md`](SECURITY.md)                                            |
+| Find where to get help                            | [`SUPPORT.md`](SUPPORT.md)                                              |
+| Read the code of conduct                          | [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)                              |
+| Understand the systems (caching, data, overlay)   | [`docs/systems.md`](docs/systems.md)                                    |
+| Understand the full architecture & data flow      | [`docs/architecture.md`](docs/architecture.md)                          |
+| Read the Tarkov data architecture decision        | [`docs/decision-tarkov-data.md`](docs/decision-tarkov-data.md)          |
+| Use or extend the HTTP/API surface                | [`docs/api.md`](docs/api.md)                                            |
+| Understand rate limits / abuse controls           | [`docs/rate-limiting.md`](docs/rate-limiting.md)                        |
+| Deploy, configure env vars, or handle an incident | [`docs/runbook.md`](docs/runbook.md)                                    |
+| Understand CI/CD, hooks, and releases             | [`docs/workflow-automation.md`](docs/workflow-automation.md)            |
+| Contribute (issues, branches, PRs, labels)        | [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md)                    |
+| Work as (or configure) an AI agent                | [`AGENTS.md`](AGENTS.md) + [`docs/agent-context/`](docs/agent-context/) |
 
 Start at [`docs/README.md`](docs/README.md) if you are not sure which doc you need.
 
@@ -144,8 +144,8 @@ docs/        Project documentation
 public/      Static assets
 ```
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full module map and
-[`docs/SYSTEMS.md`](docs/SYSTEMS.md) for how the non-obvious systems (Tarkov.dev integration,
+See [`docs/architecture.md`](docs/architecture.md) for the full module map and
+[`docs/systems.md`](docs/systems.md) for how the non-obvious systems (Tarkov.dev integration,
 multi-layer caching, overlay corrections, precompute) actually work.
 
 ### License

@@ -46,8 +46,8 @@ Crawl and discovery directives live at `/robots.txt` and `/sitemap.xml`; see tho
 ## Markdown Docs
 
 - [Project README](https://raw.githubusercontent.com/tarkovtracker-org/TarkovTracker/main/README.md): High-level project summary and setup.
-- [Architecture](https://raw.githubusercontent.com/tarkovtracker-org/TarkovTracker/main/docs/ARCHITECTURE.md): System architecture and feature design.
-- [API Documentation](https://raw.githubusercontent.com/tarkovtracker-org/TarkovTracker/main/docs/API.md): Route-level API behavior, params, and auth notes.
+- [Architecture](https://raw.githubusercontent.com/tarkovtracker-org/TarkovTracker/main/docs/architecture.md): System architecture and feature design.
+- [API Documentation](https://raw.githubusercontent.com/tarkovtracker-org/TarkovTracker/main/docs/api.md): Route-level API behavior, params, and auth notes.
 - [Runbook](https://raw.githubusercontent.com/tarkovtracker-org/TarkovTracker/main/docs/runbook.md): Operational and incident procedures.
 - [Documentation Index](https://raw.githubusercontent.com/tarkovtracker-org/TarkovTracker/main/docs/README.md): Navigation for technical docs.
 
