@@ -457,3 +457,17 @@ export function mergeProgressData(
     Object.entries(mergedState).filter(([, value]) => value !== undefined)
   ) as UserProgressData;
 }
+/**
+ * Merges two copies of one mode where `preferred` is the newer copy: unions progress like
+ * `mergeProgressData`, but takes single-value fields from `preferred` so its deletions stick.
+ */
+export const mergePreferringSingleValues = (
+  other: UserProgressData,
+  preferred: UserProgressData
+): UserProgressData => ({
+  ...mergeProgressData(other, preferred, true),
+  displayName: preferred.displayName,
+  pmcFaction: preferred.pmcFaction,
+  xpOffset: preferred.xpOffset,
+  skillOffsets: preferred.skillOffsets,
+});

@@ -4,6 +4,7 @@ import { clearActiveProgressStorage } from '@/stores/tarkov/localStorage';
 import {
   getNextProgressEpoch,
   mergeManualActivityHistory,
+  mergePreferringSingleValues,
   mergeProgressData,
   mergeStoryChapterProgress,
   toProgressEpoch,
@@ -112,17 +113,9 @@ const mergeModeSnapshot = (
   remoteModeData: UserProgressData,
   preferLocalMode: boolean
 ): UserProgressData => {
-  const preferred = preferLocalMode ? localModeData : remoteModeData;
-  const merged = preferLocalMode
-    ? mergeProgressData(remoteModeData, localModeData, true)
-    : mergeProgressData(localModeData, remoteModeData, true);
-  return {
-    ...merged,
-    displayName: preferred.displayName,
-    pmcFaction: preferred.pmcFaction,
-    xpOffset: preferred.xpOffset,
-    skillOffsets: preferred.skillOffsets,
-  };
+  return preferLocalMode
+    ? mergePreferringSingleValues(remoteModeData, localModeData)
+    : mergePreferringSingleValues(localModeData, remoteModeData);
 };
 const mergeModeHistories = (
   localModeData: UserProgressData,

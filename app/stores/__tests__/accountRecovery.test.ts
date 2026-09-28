@@ -238,6 +238,19 @@ describe('account recovery copies', () => {
     expect(selected?.modeTimestamps?.pvp).toBe(200);
     expect(listSupersededProgressCopies('user-1')).toHaveLength(0);
   });
+  it('keeps deletions of single-value fields from the newer equal-epoch copy', () => {
+    const withFields = (displayName: string | null, skillOffsets: Record<string, number>) => ({
+      ...structuredClone(defaultState),
+      pvp: { ...structuredClone(defaultState.pvp), displayName, skillOffsets },
+    });
+    const recovery = snapshot(100, withFields('older', { Endurance: 5 }), {
+      modeTimestamps: { pvp: 100 },
+    });
+    const active = snapshot(200, withFields(null, {}), { modeTimestamps: { pvp: 200 } });
+    const selected = selectFreshestOwnerProgressSnapshot(recovery, active);
+    expect(selected?.state.pvp.displayName).toBeNull();
+    expect(selected?.state.pvp.skillOffsets).toEqual({});
+  });
   it('archives an unknown numeric season before allowing current-season progress to win', () => {
     const unknownSeason = 0;
     const staleRaw = progressEnvelope(

@@ -12,7 +12,7 @@ import {
   type PersistedProgressSnapshot,
   setActiveProgressWritesBlocked,
 } from '@/stores/tarkov/localStorage';
-import { mergeProgressData, toProgressEpoch } from '@/stores/tarkov/progressMerge';
+import { mergePreferringSingleValues, toProgressEpoch } from '@/stores/tarkov/progressMerge';
 import { saveSupersededProgressCopy } from '@/stores/tarkov/supersededProgress';
 import { GAME_MODE_VALUES, ACTIVE_SEASON_NUMBER, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
@@ -115,7 +115,7 @@ const archiveDisplacedMode = (
  */
 const mergeEqualEpochModes = (left: ModeCandidate, right: ModeCandidate): ModeCandidate => {
   const [older, newer] = right.clock >= left.clock ? [left, right] : [right, left];
-  return { ...newer, progress: mergeProgressData(older.progress, newer.progress, true) };
+  return { ...newer, progress: mergePreferringSingleValues(older.progress, newer.progress) };
 };
 const preferModeCandidate = (
   winner: ModeCandidate,

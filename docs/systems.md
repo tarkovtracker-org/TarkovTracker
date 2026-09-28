@@ -936,7 +936,7 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   rather than treating it as another account's. At sign-in recovery, active storage, and session
   handoff copies are composed using independent metadata and mode clocks before the normal startup
   merge. Copies of a mode at the same reset epoch are merged, so edits held by only one of them
-  survive. Higher reset epochs take precedence
+  survive; the newer copy's single-value fields (including deletions) win, as in the startup merge. Higher reset epochs take precedence
   only after displaced progress is retained for export. Old-season placeholders cannot compete
   with current Seasonal progress. The recovery copy is removed only after a
   successful startup load, because the resolved state was then uploaded or already matched the
