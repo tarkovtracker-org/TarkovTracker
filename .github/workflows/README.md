@@ -24,14 +24,14 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 - `Test (shard 1/4)` … `Test (shard 4/4)` — Vitest with coverage, sharded across 4 parallel jobs. The `github-actions` reporter annotates failed tests directly on the PR diff so the failing test name and assertion are visible without digging into logs. Shards report imported files only to avoid duplicate zero-filled entries, and Codecov merges the per-shard coverage. Unsharded local coverage retains the full `app/**/*.{ts,vue}` denominator.
 - `Validate` — Production Nuxt build (all pull requests, forks included) + artifact upload (main branch only)
 - `Supabase DB` — Reset + pgTAP regressions + lint local migrations
-- `Systems drift check` — verifies `docs/SYSTEMS.md` invariants against the codebase
+- `Systems drift check` — verifies `docs/systems.md` invariants against the codebase
 - `Workers` — Validate api-gateway (generated types, typecheck, OpenAPI, deployment dry-run, Node
   unit tests, and a workerd smoke using the production Wrangler configuration)
 
 Heavy jobs run in parallel after classification; systems drift runs independently.
 Lighthouse scope detection runs independently of PR metadata installation and commitlint.
 
-### Crowdin Sync (`crowdin.yml`)
+### Crowdin Sync (`.github/crowdin.yml`)
 
 **Triggers:** English source, Crowdin config, or sync workflow changes on `main`; daily at
 04:17 UTC; manual dispatch on `main`. Runs are serialized without cancelling an active sync.
@@ -70,7 +70,7 @@ The candidate must contain captured main. Before merging, the gate awaits succes
 and `Preview Result` statuses on that exact head (up to thirty minutes) and verifies the effective
 repository rule requires both checks with strict branch freshness. The deployed no-bypass ruleset
 closes the base-advance race at merge time; a missing or weakened required check leaves the PR open.
-Both trusted gate scripts are preserved before checkout changes. See `docs/WORKFLOW_AUTOMATION.md`
+Both trusted gate scripts are preserved before checkout changes. See `docs/workflow-automation.md`
 for the repository-wide policy and release compatibility.
 
 Cloudflare Git deployments run independently of GitHub Actions. Release eligibility still requires
@@ -106,7 +106,7 @@ for this workflow: the upstream Action prints its environment in debug mode.
 formatting, i18n, and systems drift for locale-only pull requests; the aggregate `CI Result` still
 reports, and Crowdin dispatches a preview so `Preview Result` reports on the PR head; both are
 required. Non-English locale formatting exclusions remain
-intact. See the rollout record in `docs/WORKFLOW_AUTOMATION.md`.
+intact. See the rollout record in `docs/workflow-automation.md`.
 
 Crowdin Sync creates PRs using `GITHUB_TOKEN`. It explicitly dispatches and awaits full CI in addition to
 direct validation before auto-merging safe translation updates.
@@ -126,7 +126,7 @@ The workflow reuses CI's test shards and database checks. It rejects other refs 
 or unfinished CI, a moved main, and automation-skip directives before publishing. Releases batch
 every commit since the previous tag; conventional commits outside internal scopes determine
 whether a version is warranted (`scripts/release-scope.mjs`). Publication is serialized without
-cancelling an active release. See `docs/WORKFLOW_AUTOMATION.md` for details.
+cancelling an active release. See `docs/workflow-automation.md` for details.
 
 ### PR Checks (`pr-checks.yml`)
 
@@ -187,7 +187,7 @@ Workflow-specific secrets are not required for the Gitleaks step anymore. The wo
 Codex is the intended primary reviewer, with one best-effort local CodeRabbit pass for substantial
 behavior changes. Existing automatic provider settings remain unchanged until Codex delivery and
 exclusions are verified on representative PRs. See the reviewer transition checklist in
-`docs/WORKFLOW_AUTOMATION.md`; dashboard settings are not proven by checked-in configuration.
+`docs/workflow-automation.md`; dashboard settings are not proven by checked-in configuration.
 
 ## Commands
 

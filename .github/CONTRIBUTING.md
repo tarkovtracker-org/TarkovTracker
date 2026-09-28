@@ -12,7 +12,7 @@ contributors. It covers the basics and links to focused guides for details.
   issue tracker.
 - **Submit pull requests** — fix a bug, add a feature, or improve docs.
 - **Translate** — add keys to `app/locales/en.json` only; Crowdin propagates the other locales. See
-  [`../docs/contributing/development.md`](../docs/contributing/development.md) for the i18n workflow.
+  [`../docs/contributing.md`](../docs/contributing.md) for the i18n workflow.
 
 ## Where to Ask Questions
 
@@ -43,7 +43,7 @@ pnpm run dev                        # localhost:3000
 > Most features work without Supabase configured; auth and sync are simply disabled.
 
 For the full setup guide, coding standards, common tasks, debugging, and commit conventions, see
-[`../docs/contributing/development.md`](../docs/contributing/development.md).
+[`../docs/contributing.md`](../docs/contributing.md).
 
 ## Pull Request Process (Summary)
 
@@ -57,7 +57,7 @@ For the full setup guide, coding standards, common tasks, debugging, and commit 
 5. Address review feedback; a maintainer merges once approved
 
 For detailed PR requirements, the template fields, the review process, and the pre-submit checklist,
-see [`../docs/contributing/pull-requests.md`](../docs/contributing/pull-requests.md).
+see [`../docs/contributing.md`](../docs/contributing.md).
 
 ## Review Expectations
 

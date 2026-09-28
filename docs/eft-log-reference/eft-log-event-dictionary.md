@@ -1,7 +1,7 @@
 # EFT Log Event Dictionary
 
 Purpose-first lookup for Escape from Tarkov (and EFT: Arena) local logs. Companion to
-`EFT_LOG_EVENTS_REFERENCE.md` (full evidence catalogue). Everything here is backed by the verified
+`eft-log-events-reference.md` (full evidence catalogue). Everything here is backed by the verified
 2026-08-09 (`H`) and 2026-08-29 (`C`, re-scanned and re-confirmed same day) snapshots of the local
 corpus covering builds `0.16.8.0.37972` through `1.1.0.1.46911` (main) and Arena
 `0.3.2.1.38001` / `0.4.2.5.42886`.
@@ -153,7 +153,7 @@ No raid-end event exists on this channel; end evidence lives in `errors`, `outpu
 | `/5xx-error-landing?…`                                                                                  | Upstream gateway failure page                                                                            | H: `1.0.6.5.46221`                                                                                                                            | Proxy-level failure                                           |
 
 Endpoint inventory (139 distinct routes, exact C set verified): see
-`EFT_LOG_EVENTS_REFERENCE.md` §backend. Quest-relevant: `/client/quest/complete` (direct),
+`eft-log-events-reference.md` §backend. Quest-relevant: `/client/quest/complete` (direct),
 `/client/quest/fail` (H-only in evidence), `/client/quest/list`, `/client/quest/getMainQuestsList`,
 `/client/quest/chains`, `/client/quest/getMainQuestNotesList` (+retry),
 `/client/repeatalbeQuests/activityPeriods` (+retry), `/client/completable-item/quests/list`.
@@ -356,7 +356,7 @@ python .eft_log_audit.py \
 
 # Compare endpoints against the reference doc (prints shared/added/missing delta)
 python .eft_log_audit.py --main-root "…" --arena-root "…" \
-  --section endpoints --reference EFT_LOG_EVENTS_REFERENCE.md
+  --section endpoints --reference eft-log-events-reference.md
 
 # Single sections: corpus | channels | modes | signatures | endpoints | notifications | arena | shapes
 # shapes accepts --channels application,backend to dump normalized message shapes for a channel
@@ -364,5 +364,5 @@ python .eft_log_audit.py --main-root "…" --arena-root "…" \
 
 Update workflow after each new game version: run `--section all --out`, diff `signatures`/
 `notifications`/`channels` version maps against the tables above, add new versions to the build
-tables in `EFT_LOG_EVENTS_REFERENCE.md`, extend recipes only when a signal is _directly_ verified,
+tables in `eft-log-events-reference.md`, extend recipes only when a signal is _directly_ verified,
 and record absence as "not in sampled sessions" — never as removal.

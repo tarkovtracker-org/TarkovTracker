@@ -138,7 +138,7 @@ test-merge commit only if both Git trees match, the base is still current main, 
 remains unchanged. It retries briefly while GitHub calculates the test merge, and a later failed
 dispatch supersedes an earlier merge-commit success. Other dispatched runs report only on their
 own exact SHA. See the Crowdin invariant in
-[SYSTEMS.md §14](SYSTEMS.md#14-release-validation-and-publication).
+[systems.md §14](systems.md#14-release-validation-and-publication).
 
 #### Preview build artifact
 
@@ -382,7 +382,7 @@ Automation confirms each accepted dispatch creates a new CI run on the requested
 compare the checked-out commit with its parent, so dispatching main does not compare main with itself.
 
 The dispatched CI status-reporting invariant and trusted-code boundary are defined in
-[SYSTEMS.md §14](SYSTEMS.md#14-release-validation-and-publication).
+[systems.md §14](systems.md#14-release-validation-and-publication).
 
 After rechecking main and the policy, an ordinary non-forced push promotes the identical SHA to
 main using `GITHUB_TOKEN`. A concurrent main advance rejects promotion rather than rebasing
@@ -485,9 +485,9 @@ Enhanced PR validation:
   commit message validation
 - `Lighthouse scope` - decides whether the Lighthouse audit is relevant
 - `Lighthouse` - Performance checks (runs when the PR touches `app/components/`, `app/features/`,
-  `lighthouserc.json`, or the PR Checks workflow, or carries the `performance` or `ui` label)
+  `.github/lighthouserc.json`, or the PR Checks workflow, or carries the `performance` or `ui` label)
 
-**Lighthouse collection (`lighthouserc.json`):** each selected URL is audited once per Lighthouse
+**Lighthouse collection (`.github/lighthouserc.json`):** each selected URL is audited once per Lighthouse
 job. Repeated runs are reserved for investigating a failure or for dedicated performance analysis;
 running each of three routes three times made the Lighthouse job the dominant PR bottleneck.
 
@@ -597,7 +597,7 @@ maintainer request or trusted merge automation
 dispatch uploads the validated artifact. Cloudflare-managed preview builds are disabled while automatic production deployments
 for `main` remain enabled. The live ruleset requires both `CI Result` and `Preview Result`;
 rollout verifies that enforcement. The design, result contract, and invariants are specified in
-[SYSTEMS.md §19](SYSTEMS.md#19-actions-owned-cloudflare-previews).
+[systems.md §19](systems.md#19-actions-owned-cloudflare-previews).
 
 **Triggers:** `preview-state.yml` receives `workflow_run` for completed CI and metadata-only
 `pull_request_target` events (`ready_for_review`, `converted_to_draft`, `auto_merge_enabled`,
@@ -924,7 +924,7 @@ pnpm run setup
 3. Visit <http://localhost:3000>
 
 > Do not commit `.env` — it is in `.gitignore`. The canonical env-var reference
-> lives in [`ARCHITECTURE.md`](./ARCHITECTURE.md) and [`runbook.md`](./runbook.md).
+> lives in [`architecture.md`](./architecture.md) and [`runbook.md`](./runbook.md).
 
 ## Deployment Process
 
@@ -967,11 +967,11 @@ pnpm --filter api-gateway exec wrangler deploy
 
 ### Coverage Reports
 
-- Coverage is uploaded to Codecov by the CI `test` job. Repo-level config is in `codecov.yml`. Uses the org-level `CODECOV_TOKEN` secret for token-authenticated uploads (required on protected branches).
+- Coverage is uploaded to Codecov by the CI `test` job. Repo-level config is in `.github/codecov.yml`. Uses the org-level `CODECOV_TOKEN` secret for token-authenticated uploads (required on protected branches).
 - Bundle analysis is uploaded by the CI `validate` job during `pnpm run build` via `@codecov/nuxt-plugin` (configured in `nuxt.config.ts`). The plugin only activates when `CODECOV_TOKEN` holds a non-empty value, so local builds without that variable and fork pull requests are unaffected. A fork pull request receives no org secrets, so the secret expression expands to an empty string rather than being absent; the emptiness check is what keeps the plugin from loading without a usable upload token.
 - The `validate` job's production build runs on fork pull requests too. It needs no secrets: `SUPABASE_URL` and `SUPABASE_ANON_KEY` expand to empty strings and the app builds in its offline configuration, which still exercises the same TypeScript, bundling, and Nitro output. Coverage and bundle uploads stay fork-skipped because those do require the org token.
 - Test results (JUnit XML) are uploaded via `codecov/codecov-action` with `report_type: test_results`. Vitest outputs `test-report.junit.xml` when `CI=true` (configured in `vitest.config.ts`). The upload step is `!cancelled()`-gated so failing shards' reports still reach Codecov.
-- The CI `test` job runs as a 4-way shard matrix (`Test (shard 1/4)` through `Test (shard 4/4)`). Each shard sets `VITEST_SHARD=N/4`, which enables the `github-actions` reporter (annotates failed tests on the PR diff), disables per-shard coverage thresholds, and reports only files imported by that shard. Codecov merges the per-shard lcov uploads and enforces an absolute floor via the `absolute-floor` project status in `codecov.yml`.
+- The CI `test` job runs as a 4-way shard matrix (`Test (shard 1/4)` through `Test (shard 4/4)`). Each shard sets `VITEST_SHARD=N/4`, which enables the `github-actions` reporter (annotates failed tests on the PR diff), disables per-shard coverage thresholds, and reports only files imported by that shard. Codecov merges the per-shard lcov uploads and enforces an absolute floor via the `absolute-floor` project status in `.github/codecov.yml`.
 - Local `pnpm run test` / `pnpm run test:coverage` remain unsharded. Coverage runs retain the full `app/**/*.{ts,vue}` denominator and enforce the Vitest thresholds.
 - The measured logic baseline, current module mapping, coverage floors, and reproduction commands are documented in [testing-coverage.md](testing-coverage.md). Run Nuxt-generating checks separately from coverage to avoid regeneration races.
 
