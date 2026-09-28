@@ -993,7 +993,25 @@
         "map_complete_tasks_toggle_show": "Show hidden",
         "map_complete_tasks_toggle_hide": "Hide map-complete",
         "map_hidden_hint": "Mapa ukryta — kliknij, aby wyświetlić",
-        "raid_time_tooltip": "Bieżący czas deszczu w grze"
+        "raid_time_tooltip": "Bieżący czas deszczu w grze",
+        "raid_plan": {
+          "title": "Zadania na mapie",
+          "summary_all": "Wyświetlanie wszystkich {total}",
+          "summary_hidden": "{hidden} z {total} ukryty",
+          "choose_quests": "Wybierz zadania",
+          "show_all": "Pokaż wszystkie",
+          "popover_description": "Odznacz zadania, które nie używasz tego raida, aby wyczyścić je z mapy. \"tylko\" ukrywa wszystko inne.",
+          "only": "Tylko",
+          "show_only_named": "Pokaż tylko {name} na mapie",
+          "show_only_quest": "Pokaż tylko to zadanie na mapie",
+          "hide_quest": "Ukryj na mapie",
+          "show_quest": "Pokaż na mapie",
+          "all_hidden_hint": "Każde zadanie na tej mapie jest ukryte. Użyj Pokaż wszystko, aby je przywrócić.",
+          "hidden_section_title": "Ukryte na mapie ({count})",
+          "hidden_section_description": "Wciąż śledzone, po prostu nie rysuje się na mapie.",
+          "hidden_section_expand": "Pokaż ukryte zadania",
+          "hidden_section_collapse": "Zwiń ukryte zadania"
+        }
       },
       "pinned_tasks_section": "Pinned Tasks",
       "focused_task_section": "Focused Task",

@@ -993,7 +993,25 @@
         "map_complete_tasks_toggle_show": "显示隐藏项",
         "map_complete_tasks_toggle_hide": "隐藏地图已完成",
         "map_hidden_hint": "隐藏地图 - 点击显示",
-        "raid_time_tooltip": "当前游戏内搜查时间"
+        "raid_time_tooltip": "当前游戏内搜查时间",
+        "raid_plan": {
+          "title": "在地图上的任务",
+          "summary_all": "Showing all {total}",
+          "summary_hidden": "{hidden} of {total} hidden",
+          "choose_quests": "选择任务",
+          "show_all": "显示全部",
+          "popover_description": "取消勾选你没有运行这次突击来清除它们。\"只能隐藏其他一切。",
+          "only": "仅限",
+          "show_only_named": "Show only {name} on the map",
+          "show_only_quest": "仅在地图上显示此任务",
+          "hide_quest": "从地图隐藏",
+          "show_quest": "在地图上显示",
+          "all_hidden_hint": "此地图上的每一个任务都是隐藏的。使用显示所有来将它们带回来。",
+          "hidden_section_title": "Hidden from map ({count})",
+          "hidden_section_description": "仍在跟踪，只需在地图上绘制。",
+          "hidden_section_expand": "显示隐藏任务",
+          "hidden_section_collapse": "收起隐藏的任务"
+        }
       },
       "pinned_tasks_section": "已固定任务",
       "focused_task_section": "当前聚焦任务",
