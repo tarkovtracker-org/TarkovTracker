@@ -4,6 +4,15 @@
 
 <!-- Provide a brief description of what this PR does -->
 
+## Release note
+
+<!--
+One or two sentences for players, listed under "Highlights" in the next release and the in-app
+changelog. Describe what changes for them, e.g. "Smart Fill now spreads collected items across
+every matching objective." Use bullets for several notes. Write "none" for changes players will
+not notice (CI, tooling, docs, refactors, internal fixes).
+-->
+
 ## Changes
 
 <!-- List the key changes made in this PR -->

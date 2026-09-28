@@ -77,25 +77,56 @@ const INFERRED_MAP: Readonly<Record<string, string>> = Object.freeze({
   refactors: 'Improved',
   refactored: 'Improved',
 });
-export const extractReleaseBullets = (body: string | null | undefined): string[] => {
+type ReleaseBulletSource = { line: string; highlights: boolean };
+const RELEASE_BULLET_PREFIX = /^(?:[-*]\s+|\d+\.\s+)/;
+const HIGHLIGHTS_HEADING = /^###\s+Highlights\s*#*$/i;
+const MARKDOWN_PUNCTUATION = new Set([
+  '\\',
+  '`',
+  '*',
+  '_',
+  '{',
+  '}',
+  '[',
+  ']',
+  '(',
+  ')',
+  '#',
+  '+',
+  '-',
+  '.',
+  '!',
+  '|',
+  '~',
+]);
+const HTML_ENTITIES: Readonly<Record<string, string>> = Object.freeze({
+  amp: '&',
+  lt: '<',
+  gt: '>',
+});
+const releaseBulletSources = (body: string | null | undefined): ReleaseBulletSource[] => {
   if (!body) return [];
+  let inHighlights = false;
   const lines = body
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
-  const bulletLines = lines.filter((line) => /^[-*]\s+/.test(line) || /^\d+\.\s+/.test(line));
-  const sourceLines = bulletLines.length
-    ? bulletLines
-    : lines.filter((line) => !line.startsWith('#'));
-  return sourceLines
-    .map((line) =>
-      line
-        .replace(/^[-*]\s+/, '')
-        .replace(/^\d+\.\s+/, '')
-        .trim()
-    )
-    .filter(Boolean);
+  const records = lines.flatMap((line) => {
+    if (line.startsWith('#')) {
+      inHighlights = HIGHLIGHTS_HEADING.test(line);
+      return [];
+    }
+    return [{ line, highlights: inHighlights }];
+  });
+  const bullets = records.filter(({ line }) => RELEASE_BULLET_PREFIX.test(line));
+  const source = bullets.length ? bullets : records;
+  return source.map(({ line, highlights }) => ({
+    line: line.replace(RELEASE_BULLET_PREFIX, '').trim(),
+    highlights,
+  }));
 };
+export const extractReleaseBullets = (body: string | null | undefined): string[] =>
+  releaseBulletSources(body).map(({ line }) => line);
 /** Player-facing sentence for one semantic-release entry, or null for internal/empty entries. */
 export const toReleaseBullet = (line: string): string | null => {
   if (isInternalScope(line.match(RELEASE_SCOPE_PATTERN)?.[1])) return null;
@@ -108,8 +139,27 @@ export const toReleaseBullet = (line: string): string | null => {
 export type ReleaseEntry = { text: string; shas: string[] };
 const commitShas = (line: string): string[] =>
   Array.from(line.matchAll(RELEASE_COMMIT_PATTERN), (match) => String(match[1]).toLowerCase());
-const toReleaseEntry = (line: string): ReleaseEntry[] => {
-  const text = toReleaseBullet(line);
+const decodeHighlightEntities = (line: string): string =>
+  line.replace(/&(amp|lt|gt);/gi, (entity, name: string) => {
+    return HTML_ENTITIES[name.toLowerCase()] ?? entity;
+  });
+const decodeHighlightMarkdownEscapes = (line: string): string =>
+  line.replace(/\\(.)/g, (escape) => {
+    const character = escape.charAt(1);
+    return MARKDOWN_PUNCTUATION.has(character) ? character : escape;
+  });
+const toHighlightSentence = (line: string): string => {
+  let text = decodeHighlightMarkdownEscapes(
+    decodeHighlightEntities(line.replace(RELEASE_REFERENCE_PATTERN, ''))
+  )
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return '';
+  text = text.charAt(0).toUpperCase() + text.slice(1);
+  return /[.!?]$/.test(text) ? text : `${text}.`;
+};
+const toReleaseEntry = (line: string, isHighlight = false): ReleaseEntry[] => {
+  const text = isHighlight ? toHighlightSentence(line) : toReleaseBullet(line);
   return text ? [{ text, shas: commitShas(line) }] : [];
 };
 /**
@@ -118,9 +168,9 @@ const toReleaseEntry = (line: string): ReleaseEntry[] => {
  * none and is hidden.
  */
 export const releaseEntries = (body: string | null | undefined, label: string): ReleaseEntry[] => {
-  const lines = extractReleaseBullets(body);
+  const lines = releaseBulletSources(body);
   if (!lines.length && label) return [{ text: toSentence(label), shas: [] }];
-  return lines.flatMap(toReleaseEntry);
+  return lines.flatMap(({ line, highlights }) => toReleaseEntry(line, highlights));
 };
 /** Player-facing bullet text for a release body; see `releaseEntries`. */
 export const releaseBullets = (body: string | null | undefined, label: string): string[] =>
