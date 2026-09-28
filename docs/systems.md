@@ -932,8 +932,11 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   previous owner's copy before any guest or other-account state replaces it, so a session
   transition keeps it whether or not the sync controller still reports pending changes. Sign-in retains any other account's active copy before it is
   cleared, including the hydration-time owner mismatch that previously created throwaway
-  `progress_backup_*` keys. At sign-in recovery, active storage, and session handoff copies are composed using independent
-  metadata and mode clocks before the normal startup merge. Higher reset epochs take precedence
+  `progress_backup_*` keys. Hydration before the session is known leaves an owned copy in place
+  rather than treating it as another account's. At sign-in recovery, active storage, and session
+  handoff copies are composed using independent metadata and mode clocks before the normal startup
+  merge. Copies of a mode at the same reset epoch are merged, so edits held by only one of them
+  survive. Higher reset epochs take precedence
   only after displaced progress is retained for export. Old-season placeholders cannot compete
   with current Seasonal progress. The recovery copy is removed only after a
   successful startup load, because the resolved state was then uploaded or already matched the
@@ -945,7 +948,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   reset delivered over Realtime while local changes await acknowledgement does the same before it
   replaces the mode. If that copy cannot be saved, the reset is not applied, active writes stay
   blocked, and sync stays paused for the session so the displaced edits cannot overwrite the reset;
-  the next startup load retries the retention. Hydration also retains materialized Seasonal
+  the next startup load retries the retention. A deliberate reset clears the owner's active copy
+  without creating an account recovery copy of the pre-reset progress. Hydration also retains materialized Seasonal
   progress stamped for an older season before sanitization clears it. These copies keep their
   original mode and season, are available from Settings → Account for export, and are never loaded
   into the tracker or sent to Supabase. They are removed only with that account's explicit device-data
@@ -981,6 +985,9 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   both sign out through the auth owner fence. If sign-out succeeded but cleanup was incomplete, the
   card keeps a retry bound to the removed owner until it succeeds or that owner signs in again.
   If the server cannot be reached, the confirmation offers the disclosed device-only sign-out.
+  A removal that throws is reported as incomplete, and the card's superseded-copy list follows
+  changes made in other tabs. After account deletion, a failed local sign-out falls back to the
+  device-only sign-out; the card does not redirect while the deleted account's session remains.
   Malformed active bytes that name the removing owner are deleted. Bytes with no provable owner are
   quarantined, and the active key is released only after a quarantine-prefixed marker is saved;
   that marker keeps the owner's later removals incomplete while the quarantined copy exists. If quarantine cannot be
@@ -2474,7 +2481,9 @@ succeed and it must retain a `preview-deployment-<sha>` artifact for the exact c
 Cloudflare Pages serves static SPA responses outside the Pages Function routes, so runtime route
 rules alone cannot provide browser response headers for those documents. Keep the static
 `public/_headers` frame-ancestor policy in the uploaded build output alongside the runtime app
-CSP; `frame-src` remains an independent directive for permitted embedded content.
+CSP; `frame-src` remains an independent directive for permitted embedded content. The build-time
+check requires the `/*` block to set a same-origin `frame-ancestors` and rejects any block that
+widens it, because Pages applies every matching block.
 
 ### Flow
 
