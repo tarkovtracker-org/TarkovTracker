@@ -3,5 +3,27 @@
 # config replaces the default rule set and the scan runs with zero rules.
 useDefault = true
 
-[allowlist]
+# Pre-existing commit allowlist (migrated from the root .gitleaks.toml).
+[[allowlists]]
+description = "Pre-existing allowlisted commit"
 commits = ["1215c8b06de6a7c2011aa6ffee39b598e09a3cc1"]
+
+# The Supabase anon key is intentionally public plaintext config (see AGENTS.md
+# "Environment value entry standard"); it is a JWT by format and trips the jwt rule.
+[[allowlists]]
+description = "Supabase anon key is public config, not a secret"
+targetRules = ["jwt"]
+paths = ['''wrangler\.toml''']
+
+# Twitch OAuth client IDs are public identifiers; nuxt.config.ts carries a
+# documented fallback client ID for local/dev builds.
+[[allowlists]]
+description = "Twitch client ID fallback is a public identifier"
+targetRules = ["twitch-api-token"]
+paths = ['''nuxt\.config\.ts''']
+
+# Discord client/application IDs in test fixtures are public identifiers.
+[[allowlists]]
+description = "Discord client IDs in tests are public fixtures"
+targetRules = ["discord-client-id"]
+paths = ['''tests/''']
