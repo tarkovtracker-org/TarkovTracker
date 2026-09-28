@@ -32,14 +32,16 @@ function acceptedAccessSession(status, headersArray) {
   }
   return session;
 }
-// Failed exchanges are evicted so a later attempt can retry within its own bounded window.
-function cachedExchange(cache, origin, exchange) {
-  if (!cache.has(origin)) {
-    const pending = exchange();
-    cache.set(origin, pending);
-    pending.catch(() => cache.delete(origin));
-  }
-  return cache.get(origin);
+// Sessions are re-exchanged well inside Access's shortest session duration (15 minutes), and
+// failed exchanges are evicted, so a later attempt can retry within its own bounded window.
+const SESSION_REUSE_MS = 5 * 60 * 1000;
+function cachedExchange(cache, origin, exchange, now = Date.now) {
+  const cached = cache.get(origin);
+  if (cached && now() - cached.at < SESSION_REUSE_MS) return cached.pending;
+  const pending = exchange();
+  cache.set(origin, { pending, at: now() });
+  pending.catch(() => cache.delete(origin));
+  return pending;
 }
 async function exchangeServiceToken(request, origin, headers) {
   const response = await request.get(`${origin}/`, { headers, maxRedirects: 0 });

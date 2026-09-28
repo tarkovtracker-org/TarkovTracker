@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { mock, test } from 'node:test';
 import {
   assertPreviewTarget,
   previewAccessCookieHeaders,
@@ -194,5 +194,34 @@ test('readiness retries a transient Access exchange within its window', async ()
     });
     assert.equal(attempts, 2);
     assert.deepEqual(calls.at(-1), { cookie: 'CF_Authorization=ready' });
+  });
+});
+test('re-exchanges a cached session before Access can expire it', async () => {
+  await withAccessEnv(async () => {
+    let clock = 0;
+    const now = mock.method(Date, 'now', () => clock);
+    try {
+      let exchanges = 0;
+      const fetchImpl = async () => {
+        exchanges += 1;
+        return {
+          status: 200,
+          headers: { getSetCookie: () => [`CF_Authorization=s${exchanges}; Path=/`] },
+        };
+      };
+      const origin = 'https://ttl.example';
+      assert.deepEqual(await previewAccessCookieHeaders(origin, fetchImpl), {
+        cookie: 'CF_Authorization=s1',
+      });
+      clock = 4 * 60 * 1000;
+      await previewAccessCookieHeaders(origin, fetchImpl);
+      assert.equal(exchanges, 1);
+      clock = 5 * 60 * 1000;
+      assert.deepEqual(await previewAccessCookieHeaders(origin, fetchImpl), {
+        cookie: 'CF_Authorization=s2',
+      });
+    } finally {
+      now.mock.restore();
+    }
   });
 });

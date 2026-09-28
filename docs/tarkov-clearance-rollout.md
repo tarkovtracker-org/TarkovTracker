@@ -94,7 +94,8 @@ whole-ruleset replacement is authorized.
    exposure. Also verify on a real preview host that a cookie-only request carrying that
    session passes the Service Auth policy; Cloudflare does not document session reuse for
    service tokens. The exchange fails closed on a denied (401/403) or cookie-less response,
-   and readiness retries it within its startup window. If cookie reuse is rejected, keep
+   readiness retries it within its startup window, and a session is re-exchanged after five
+   minutes, so keep the Access session duration at 15 minutes or longer. If cookie reuse is rejected, keep
    `PREVIEW_ACCESS_*` unset and route smoke traffic through a trusted proxy instead of
    forwarding the token to preview code. Never pass these secrets to the preview build or
    untrusted PR code.

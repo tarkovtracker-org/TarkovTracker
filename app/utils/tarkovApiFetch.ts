@@ -269,7 +269,9 @@ const tryReadPublicRuntimeConfig = (): TarkovAccessRuntimeConfig | null => {
     return browserConfig;
   }
 };
+/** Browser-only: any server-side render keeps the plain `$fetch` pass-through. */
 export const isTarkovAccessEnabled = (): boolean => {
+  if (!import.meta.client) return false;
   const config = tryReadPublicRuntimeConfig();
   return config?.tarkovAccessEnabled === true || config?.tarkovAccessEnabled === 'true';
 };
