@@ -67,7 +67,7 @@ const mountCard = () =>
         UModal: {
           props: ['open'],
           template:
-            '<div v-if="open"><slot name="body" /><slot name="footer" :close="() => {}" /></div>',
+            '<div v-if="open"><slot name="description" /><slot name="body" /><slot name="footer" :close="() => {}" /></div>',
         },
         UInput: {
           props: ['modelValue'],
@@ -120,6 +120,7 @@ describe('account deletion device removal', () => {
         headers: { Authorization: 'Bearer deleted-owner-fixture-token' },
       });
       await clickText(wrapper, 'settings.account_data.go_to_dashboard');
+      expect(signOut).toHaveBeenCalledWith('deleted-owner', 'local');
       expect(request).toHaveBeenCalledWith('deleted-owner');
       expect(request.mock.invocationCallOrder[0]).toBeLessThan(
         signOut.mock.invocationCallOrder[0]!
@@ -267,6 +268,61 @@ describe('account deletion device removal', () => {
     await wrapper.get('input').setValue('settings.account_data.confirm_phrase_value');
     await clickText(wrapper, 'settings.account_data.delete_forever');
     expect(wrapper.text()).toContain('settings.account_data.cleanup_pending');
+    wrapper.unmount();
+  });
+  it('warns and offers an owner-scoped retry when device cleanup fails', async () => {
+    remove.mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const wrapper = mountCard();
+    await clickText(wrapper, 'settings.account.begin_deletion');
+    await wrapper.get('input').setValue('settings.account_data.confirm_phrase_value');
+    await clickText(wrapper, 'settings.account_data.delete_forever');
+    expect(wrapper.text()).toContain('settings.account_data.device_cleanup_failed');
+    expect(wrapper.text()).toContain('settings.account_data.delete_success_cleanup_failed_sr_only');
+    expect(wrapper.text()).not.toContain('settings.account_data.redirect_message');
+    const dashboardButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'settings.account_data.go_to_dashboard');
+    expect(dashboardButton?.attributes('disabled')).toBeDefined();
+    expect(remove).toHaveBeenCalledWith('deleted-owner');
+    await clickText(wrapper, 'settings.account_data.retry_device_cleanup');
+    expect(wrapper.text()).not.toContain('settings.account_data.device_cleanup_failed');
+    expect(remove).toHaveBeenCalledTimes(2);
+    expect(remove).toHaveBeenNthCalledWith(2, 'deleted-owner');
+    expect(remove).not.toHaveBeenCalledWith('new-owner');
+    expect(signOut).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('allows explicit continuation while warning that persistent device data remains', async () => {
+    remove.mockReturnValue(false);
+    const wrapper = mountCard();
+    await clickText(wrapper, 'settings.account.begin_deletion');
+    await wrapper.get('input').setValue('settings.account_data.confirm_phrase_value');
+    await clickText(wrapper, 'settings.account_data.delete_forever');
+    expect(wrapper.text()).toContain('settings.account_data.device_cleanup_failed');
+    expect(wrapper.text()).toContain('settings.account_data.delete_success_cleanup_failed_sr_only');
+    await clickText(wrapper, 'settings.account_data.retry_device_cleanup');
+    expect(wrapper.text()).toContain('settings.account_data.device_cleanup_failed');
+    const dashboardButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'settings.account_data.go_to_dashboard');
+    expect(dashboardButton?.attributes('disabled')).toBeDefined();
+    await clickText(wrapper, 'settings.account_data.continue_with_device_data_remaining');
+    expect(remove).toHaveBeenCalledTimes(3);
+    expect(remove).toHaveBeenNthCalledWith(3, 'deleted-owner');
+    expect(remove).not.toHaveBeenCalledWith('new-owner');
+    expect(signOut).toHaveBeenCalledWith('deleted-owner', 'local');
+    wrapper.unmount();
+  });
+  it('keeps the warning open when cleanup fails during dashboard continuation', async () => {
+    remove.mockReturnValueOnce(true).mockReturnValueOnce(false);
+    const wrapper = mountCard();
+    await clickText(wrapper, 'settings.account.begin_deletion');
+    await wrapper.get('input').setValue('settings.account_data.confirm_phrase_value');
+    await clickText(wrapper, 'settings.account_data.delete_forever');
+    expect(wrapper.text()).not.toContain('settings.account_data.device_cleanup_failed');
+    await clickText(wrapper, 'settings.account_data.go_to_dashboard');
+    expect(wrapper.text()).toContain('settings.account_data.device_cleanup_failed');
+    expect(remove).toHaveBeenCalledTimes(2);
     wrapper.unmount();
   });
   it('rejects a refreshed session for a different account before invoking deletion', async () => {

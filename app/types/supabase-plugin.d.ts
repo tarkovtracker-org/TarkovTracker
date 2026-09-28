@@ -32,7 +32,7 @@ export interface SupabasePlugin {
     provider: 'twitch' | 'discord' | 'google' | 'github',
     options?: { skipBrowserRedirect?: boolean; redirectTo?: string }
   ) => Promise<{ url?: string }>;
-  signOut: (expectedUserId?: string) => Promise<void>;
+  signOut: (expectedUserId?: string, scope?: 'global' | 'local') => Promise<void>;
   ready: () => Promise<Session | null>;
 }
 declare module '#app' {

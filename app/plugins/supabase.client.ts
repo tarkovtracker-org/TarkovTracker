@@ -205,17 +205,6 @@ const buildStubClient = (): SupabaseClient => {
     },
   } as unknown as SupabaseClient;
 };
-/**
- * Signing out must work without cloud connectivity. A failed global revocation (for
- * example while offline) falls back to ending only this browser's session.
- */
-const signOutWithLocalFallback = async (client: SupabaseClient): Promise<void> => {
-  const { error } = await client.auth.signOut();
-  if (!error) return;
-  logger.warn('[Supabase] Global sign-out failed; ending the local session only', error);
-  const { error: localError } = await client.auth.signOut({ scope: 'local' });
-  if (localError) throw localError;
-};
 const buildStub = () => {
   const stubUser = createSupabaseUserState();
   return {
@@ -232,7 +221,7 @@ const buildStub = () => {
       });
       throw new Error('Supabase not configured - login unavailable in offline mode');
     },
-    signOut: async () => {},
+    signOut: async (_expectedUserId?: string, _scope?: 'global' | 'local') => {},
     ready: async (): Promise<Session | null> => null,
   };
 };
@@ -494,7 +483,7 @@ export default defineNuxtPlugin({
       if (error) throw error;
       return data;
     };
-    const signOut = async (expectedUserId?: string) => {
+    const signOut = async (expectedUserId?: string, scope: 'global' | 'local' = 'global') => {
       await ensureClientInitialized();
       if (!supabaseClient) {
         logger.debug('[Supabase] signOut skipped because client is not initialized');
@@ -502,20 +491,17 @@ export default defineNuxtPlugin({
       }
       if (expectedUserId) {
         // Recheck after initialization so a different session present now is never signed out.
-        // Local scope avoids revoking other sessions of the already-deleted account, but the SDK
-        // can still change sessions during its asynchronous sign-out; callers must not rely on
-        // this as an atomic owner fence.
+        // The SDK may still change sessions between this check and signOut; this is not atomic.
         const { data, error } = await supabaseClient.auth.getSession();
-        if (error || user.id !== expectedUserId || data.session?.user.id !== expectedUserId) return;
+        if (error) throw error;
+        if (user.id !== expectedUserId || data.session?.user.id !== expectedUserId) {
+          throw new Error('Supabase session changed before sign-out');
+        }
       }
       signOutOwnsChannelTeardown = true;
       try {
-        if (expectedUserId) {
-          const { error } = await supabaseClient.auth.signOut({ scope: 'local' });
-          if (error) throw error;
-        } else {
-          await signOutWithLocalFallback(supabaseClient);
-        }
+        const { error } = await supabaseClient.auth.signOut({ scope });
+        if (error) throw error;
         await removeAllRealtimeChannels();
       } finally {
         signOutOwnsChannelTeardown = false;

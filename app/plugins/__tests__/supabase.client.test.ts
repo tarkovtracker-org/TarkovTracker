@@ -581,14 +581,14 @@ describe('supabase plugin', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(removeAllChannels).toHaveBeenCalledTimes(2);
   });
-  it('uses local sign-out only when the current session still belongs to the deleted owner', async () => {
+  it('uses the requested local scope only when the current session still belongs to the deleted owner', async () => {
     const { signOut, getSession } = createClientMock('user-1');
     const plugin = (await import('@/plugins/supabase.client')).default;
     const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
       SupabasePluginProvide | undefined;
     await flushPlugin();
     getSession.mockResolvedValueOnce({ data: { session: createSession('user-1') }, error: null });
-    await result?.provide.supabase.signOut('user-1');
+    await result?.provide.supabase.signOut('user-1', 'local');
     expect(signOut).toHaveBeenCalledOnce();
     expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
   });
@@ -608,12 +608,12 @@ describe('supabase plugin', () => {
     await flushPromises();
     getAuthStateChangeCallback()?.('SIGNED_IN', createSession('user-2'));
     deferred.resolve({ data: { session: createSession('user-2') }, error: null });
-    await signOutPromise;
+    await expect(signOutPromise).rejects.toThrow('Supabase session changed before sign-out');
     expect(signOut).not.toHaveBeenCalled();
     expect(removeAllChannels).not.toHaveBeenCalled();
     expect(result?.provide.supabase.user.id).toBe('user-2');
   });
-  it('ends the local session when global sign-out fails offline', async () => {
+  it('uses global sign-out by default and propagates a revocation error without local fallback', async () => {
     const { removeAllChannels, signOut } = createClientMock('user-1');
     const offlineError = new Error('Failed to fetch');
     signOut.mockResolvedValueOnce({ error: offlineError });
@@ -621,25 +621,24 @@ describe('supabase plugin', () => {
     const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
       SupabasePluginProvide | undefined;
     await flushPlugin();
-    await expect(result?.provide.supabase.signOut()).resolves.toBeUndefined();
-    expect(signOut).toHaveBeenNthCalledWith(2, { scope: 'local' });
-    expect(removeAllChannels).toHaveBeenCalledTimes(1);
-    expect(loggerMock.warn).toHaveBeenCalledWith(
-      '[Supabase] Global sign-out failed; ending the local session only',
-      offlineError
-    );
+    await expect(result?.provide.supabase.signOut()).rejects.toBe(offlineError);
+    expect(signOut).toHaveBeenCalledOnce();
+    expect(signOut).toHaveBeenCalledWith({ scope: 'global' });
+    expect(removeAllChannels).not.toHaveBeenCalled();
   });
-  it('rejects when even the local sign-out fails', async () => {
-    const { removeAllChannels, signOut } = createClientMock('user-1');
-    const localError = new Error('storage unavailable');
-    signOut
-      .mockResolvedValueOnce({ error: new Error('Failed to fetch') })
-      .mockResolvedValueOnce({ error: localError });
+  it('rejects when the owner session read returns an error', async () => {
+    const { getSession, removeAllChannels, signOut } = createClientMock('user-1');
     const plugin = (await import('@/plugins/supabase.client')).default;
     const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
       SupabasePluginProvide | undefined;
     await flushPlugin();
-    await expect(result?.provide.supabase.signOut()).rejects.toBe(localError);
+    const sessionError = new Error('session read failed');
+    getSession.mockResolvedValueOnce({
+      data: { session: createSession('user-1') },
+      error: sessionError,
+    });
+    await expect(result?.provide.supabase.signOut('user-1')).rejects.toBe(sessionError);
+    expect(signOut).not.toHaveBeenCalled();
     expect(removeAllChannels).not.toHaveBeenCalled();
   });
   it('logs realtime cleanup failures after signOut without rejecting', async () => {

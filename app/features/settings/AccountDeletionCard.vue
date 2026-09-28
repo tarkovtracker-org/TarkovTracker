@@ -53,6 +53,8 @@
     ($supabase.user.id === null && accountRevision === revision + 1);
   const accountIdCopied = ref(false);
   const cleanupScheduled = ref(false);
+  const deviceCleanupFailed = ref(false);
+  const isRetryingDeviceCleanup = ref(false);
   const showUsername = ref(false);
   const showEmail = ref(false);
   const showAccountId = ref(false);
@@ -236,7 +238,7 @@
         headers: { Authorization: `Bearer ${refreshedSession.access_token}` },
       });
       if (data?.success && !ownsDeletionSession(requestedOwner, requestedRevision)) {
-        forgetAccountOnDevice(requestedOwner);
+        deviceCleanupFailed.value = !forgetAccountOnDevice(requestedOwner);
         completeDeletion(requestedOwner, requestedRevision, data);
         return;
       }
@@ -311,6 +313,7 @@
         throw new Error(errorMessage);
       }
       if (data?.success) {
+        deviceCleanupFailed.value = !forgetAccountOnDevice(requestedOwner);
         completeDeletion(requestedOwner, requestedRevision, data);
       } else {
         throw new Error('Failed to delete account.');
@@ -337,34 +340,52 @@
     resetTarkovSync('account deleted');
   };
   /** A deleted account keeps no recovery copy on this device; other accounts keep theirs. */
-  const forgetAccountOnDevice = (userId: string | null) => {
-    if (userId) removeAccountDeviceData(userId);
+  const forgetAccountOnDevice = (userId: string | null): boolean => {
+    if (!userId) return false;
+    try {
+      const removed = removeAccountDeviceData(userId);
+      if (!removed) logger.warn('Some deleted account data could not be removed from this device.');
+      return removed;
+    } catch (error) {
+      logger.error('Failed to remove deleted account data from this device:', error);
+      return false;
+    }
   };
   const signOutDeletedSession = async (owner: string, revision: number): Promise<void> => {
     if (!ownsDeletionSession(owner, revision)) return;
     requestDeviceDataRemoval(owner);
-    await $supabase.signOut(owner);
+    await $supabase.signOut(owner, 'local');
   };
   const resetDeletedSession = (owner: string, revision: number): void => {
     if (canResetDeletedSession(owner, revision)) resetClientState();
   };
-  const redirectToHome = async () => {
+  const redirectToHome = async (allowRemainingDeviceData = false) => {
     const deletedUserId = deletedAccountOwner.value;
     if (!deletedUserId) return;
     // A may sign out and sign back in while deletion is in flight. If the deleted account is
     // current at redirect time, fence the sign-out against that current session revision.
     const revision = $supabase.user.id === deletedUserId ? accountRevision : deletedAccountRevision;
-    showSuccessDialog.value = false;
     logger.info('Signing out user and redirecting to dashboard...');
     try {
       await signOutDeletedSession(deletedUserId, revision);
       logger.info('Successfully signed out, performing hard reload...');
     } catch (error) {
       logger.error('Failed to sign out and redirect:', error);
+    }
+    deviceCleanupFailed.value = !forgetAccountOnDevice(deletedUserId);
+    if (deviceCleanupFailed.value && !allowRemainingDeviceData) return;
+    resetDeletedSession(deletedUserId, revision);
+    showSuccessDialog.value = false;
+    window.location.href = '/';
+  };
+  const retryDeviceCleanup = async () => {
+    const deletedUserId = deletedAccountOwner.value;
+    if (!deletedUserId) return;
+    isRetryingDeviceCleanup.value = true;
+    try {
+      deviceCleanupFailed.value = !forgetAccountOnDevice(deletedUserId);
     } finally {
-      resetDeletedSession(deletedUserId, revision);
-      forgetAccountOnDevice(deletedUserId);
-      window.location.href = '/';
+      isRetryingDeviceCleanup.value = false;
     }
   };
 </script>
@@ -672,7 +693,13 @@
     </template>
     <template #description>
       <span class="sr-only">
-        {{ $t('settings.account_data.delete_success_sr_only') }}
+        {{
+          $t(
+            deviceCleanupFailed
+              ? 'settings.account_data.delete_success_cleanup_failed_sr_only'
+              : 'settings.account_data.delete_success_sr_only'
+          )
+        }}
       </span>
     </template>
     <template #body>
@@ -690,14 +717,41 @@
           <UIcon name="i-mdi-information" class="mr-1 inline h-4 w-4" />
           {{ $t('settings.account_data.cleanup_pending') }}
         </div>
-        <div class="text-surface-400 text-sm">
+        <div v-if="deviceCleanupFailed" class="text-error-400 text-sm" role="alert">
+          {{ $t('settings.account_data.device_cleanup_failed') }}
+        </div>
+        <div v-if="!deviceCleanupFailed" class="text-surface-400 text-sm">
           {{ $t('settings.account_data.redirect_message') }}
         </div>
       </div>
     </template>
     <template #footer>
       <div class="flex justify-end">
-        <UButton color="primary" variant="solid" @click="redirectToHome">
+        <UButton
+          v-if="deviceCleanupFailed"
+          color="neutral"
+          variant="outline"
+          :loading="isRetryingDeviceCleanup"
+          :disabled="isRetryingDeviceCleanup"
+          @click="retryDeviceCleanup"
+        >
+          {{ $t('settings.account_data.retry_device_cleanup') }}
+        </UButton>
+        <UButton
+          v-if="deviceCleanupFailed"
+          color="warning"
+          variant="solid"
+          :disabled="isRetryingDeviceCleanup"
+          @click="redirectToHome(true)"
+        >
+          {{ $t('settings.account_data.continue_with_device_data_remaining') }}
+        </UButton>
+        <UButton
+          color="primary"
+          variant="solid"
+          :disabled="deviceCleanupFailed || isRetryingDeviceCleanup"
+          @click="redirectToHome()"
+        >
           {{ $t('settings.account_data.go_to_dashboard') }}
         </UButton>
       </div>

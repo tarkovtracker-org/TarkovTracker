@@ -8,9 +8,9 @@ const clearConfirmation = (): void => {
   confirmationOwner.value = null;
 };
 /**
- * Deliberate sign-out (see `CONTEXT.md`). Signing out stays available without cloud
- * connectivity; only memory-only changes require confirmation, and the default is to
- * stay signed in.
+ * Deliberate sign-out (see `CONTEXT.md`). Normal sign-out requires global revocation;
+ * failures are reported so the user can retry. Only memory-only changes require
+ * confirmation, and the default is to stay signed in.
  */
 export function useSignOut() {
   const { $supabase } = useNuxtApp();

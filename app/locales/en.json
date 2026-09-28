@@ -2186,9 +2186,13 @@
       "delete_forever": "Delete Account Forever",
       "delete_success_title": "Account Deleted Successfully",
       "delete_success_sr_only": "Your account deletion is complete, and you will be redirected to the dashboard.",
+      "delete_success_cleanup_failed_sr_only": "Your account was deleted, but some data remains on this device. You can retry cleanup or continue with that data left here.",
       "delete_success_description": "Your account and all associated data have been permanently deleted.",
       "other_session_deleted_description": "The account that started this deletion was deleted. Your current account is still signed in and was not changed.",
       "cleanup_pending": "Some data cleanup is still in progress and will complete shortly.",
+      "device_cleanup_failed": "Some deleted account data remains on this device. Retry cleanup, or continue and leave that data here.",
+      "retry_device_cleanup": "Retry device cleanup",
+      "continue_with_device_data_remaining": "Continue with data remaining",
       "redirect_message": "Thank you for using TarkovTracker. You will be redirected to the dashboard.",
       "go_to_dashboard": "Go to Dashboard",
       "session_changed": "Your signed-in account changed. No further action will be taken in this session."

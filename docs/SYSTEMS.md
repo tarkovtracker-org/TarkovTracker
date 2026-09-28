@@ -946,8 +946,9 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
 - **Sign-out.** Every sign-out entry point uses `useSignOut`. It signs out immediately unless the
   changes are memory-only (local save failed and cloud changes pending); then
   `SignOutConfirmModal` explains the loss risk and defaults to staying signed in. Retry and
-  export never sign out; only the explicit discard action does. The Supabase plugin falls back to
-  a `scope: 'local'` sign-out when global revocation fails, so signing out works offline.
+  export never sign out; only the explicit discard action does. Normal sign-out requires successful
+  global revocation and reports failures so the user can retry. Account deletion uses local scope
+  only after the server has deleted the account.
 - **Removing device data.** `DeviceDataCard` (Settings → Account) is the explicit action,
   distinct from sign-out and from cloud deletion. It registers `requestDeviceDataRemoval` before
   signing out so the progress and preferences session transitions retain no copy for that owner,
