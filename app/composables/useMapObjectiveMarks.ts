@@ -245,8 +245,15 @@ interface MapObjectiveEntry {
   visibility: MapObjectiveVisibility;
   mark: MapObjectiveMark | null;
 }
-const collectMapTaskIds = (entries: MapObjectiveEntry[]): string[] => [
-  ...new Set(entries.filter((entry) => entry.mark).map((entry) => entry.taskId)),
+const collectMapTaskIds = (
+  entries: MapObjectiveEntry[],
+  categoryEnabled: Record<MapObjectiveCategory, boolean>
+): string[] => [
+  ...new Set(
+    entries
+      .filter((entry) => entry.mark && categoryEnabled[entry.visibility.category])
+      .map((entry) => entry.taskId)
+  ),
 ];
 export function useMapObjectiveMarks({
   mapId,
@@ -317,10 +324,19 @@ export function useMapObjectiveMarks({
     });
     return entries;
   });
-  // Tasks that draw at least one marker on this map, before user hide/focus is applied. Tasks
-  // without a drawable objective here (e.g. global quests) are excluded so focusing cannot blank
-  // the map.
-  const mapTaskIds = computed(() => collectMapTaskIds(mapObjectiveEntries.value));
+  // Tasks that draw at least one marker in an enabled category on this map, before user
+  // hide/focus is applied. Tasks without a drawable objective here (e.g. global quests) are
+  // excluded so focusing cannot blank the map.
+  // Mirrors LeafletMap's category gate so a quest drawn only in a disabled category cannot
+  // activate focus and blank the map.
+  const categoryEnabled = computed<Record<MapObjectiveCategory, boolean>>(() => ({
+    self: preferencesStore.getMapShowSelfObjectives ?? true,
+    pinned: preferencesStore.getMapShowPinnedObjectives ?? true,
+    team: preferencesStore.getMapShowTeamObjectives ?? true,
+  }));
+  const mapTaskIds = computed(() =>
+    collectMapTaskIds(mapObjectiveEntries.value, categoryEnabled.value)
+  );
   const mapTaskVisibilityState = computed(() =>
     buildMapTaskVisibilityState(
       preferencesStore.getMapHiddenTaskIds ?? [],

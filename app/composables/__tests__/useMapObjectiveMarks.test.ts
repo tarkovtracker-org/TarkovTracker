@@ -12,6 +12,7 @@ const mapTeamAllHidden = ref(false);
 const pinnedTaskIds = ref<string[]>([]);
 const mapHiddenTaskIds = ref<string[]>([]);
 const mapFocusTaskIds = ref<string[]>([]);
+const mapShowSelfObjectives = ref(true);
 const completedObjectiveIds = ref<Set<string>>(new Set());
 const completedTaskIds = ref<Set<string>>(new Set());
 const failedTaskIds = ref<Set<string>>(new Set());
@@ -28,6 +29,7 @@ const setup = async () => {
   pinnedTaskIds.value = [];
   mapHiddenTaskIds.value = [];
   mapFocusTaskIds.value = [];
+  mapShowSelfObjectives.value = true;
   completedObjectiveIds.value = new Set();
   completedTaskIds.value = new Set();
   failedTaskIds.value = new Set();
@@ -64,6 +66,9 @@ const setup = async () => {
       },
       get getMapFocusTaskIds() {
         return mapFocusTaskIds.value;
+      },
+      get getMapShowSelfObjectives() {
+        return mapShowSelfObjectives.value;
       },
     }),
   }));
@@ -137,6 +142,13 @@ describe('useMapObjectiveMarks', () => {
       expect(result.mapTaskIds.value).toEqual(['task-a']);
       mapFocusTaskIds.value = ['task-global'];
       expect(result.mapObjectiveMarks.value.map((mark) => mark.id)).toEqual(['obj-a']);
+    });
+    it('leaves tasks drawn only in a disabled marker category out of mapTaskIds', async () => {
+      const result = await run();
+      mapShowSelfObjectives.value = false;
+      expect(result.mapTaskIds.value).toEqual([]);
+      mapFocusTaskIds.value = ['task-a'];
+      expect(result.mapTaskVisibilityState.value.activeFocusTaskIds.size).toBe(0);
     });
     it('ignores a focus set that has no task on the current map', async () => {
       const result = await run();

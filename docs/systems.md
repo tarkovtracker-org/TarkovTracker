@@ -1672,7 +1672,8 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
    self-objective preference. Objectives the player does not still need themselves are dropped, so
    the Team chip never changes required-item summaries.
 5. The raid plan (#918) applies user hide/focus last. `useMapObjectiveMarks` returns `mapTaskIds`
-   (tasks that draw at least one marker on the selected map, before hide/focus) and a
+   (tasks that draw at least one marker in an enabled pinned/self/team category on the selected
+   map, before hide/focus) and a
    `mapTaskVisibilityState`; objectives of tasks that are not shown are removed from both the
    marks and the objective-visibility map, so the required-items summary follows the raid plan.
    `MapTaskVisibilityPanel` (inline and fullscreen) and the task-card toggles edit
