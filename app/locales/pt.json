@@ -993,7 +993,25 @@
         "map_complete_tasks_toggle_show": "Show hidden",
         "map_complete_tasks_toggle_hide": "Hide map-complete",
         "map_hidden_hint": "Mapa oculto - clique para mostrar",
-        "raid_time_tooltip": "Tempo atual de incursão no jogo"
+        "raid_time_tooltip": "Tempo atual de incursão no jogo",
+        "raid_plan": {
+          "title": "Missões no mapa",
+          "summary_all": "Mostrando todos {total}",
+          "summary_hidden": "{hidden} de {total} ocultos",
+          "choose_quests": "Escolher missões",
+          "show_all": "Mostrar todos",
+          "popover_description": "Não marque as missões que você não está executando esse Reide para removê-las do mapa. \"Apenas\" esconde todo o resto.",
+          "only": "Apenas",
+          "show_only_named": "Mostrar apenas {name} no mapa",
+          "show_only_quest": "Mostrar apenas essa missão no mapa",
+          "hide_quest": "Ocultar do mapa",
+          "show_quest": "Exibir no mapa",
+          "all_hidden_hint": "Cada missão nesse mapa está oculta. Use Mostrar tudo para trazê-los de volta.",
+          "hidden_section_title": "Oculto do mapa ({count})",
+          "hidden_section_description": "Ainda monitorado, simplesmente não desenhado no mapa.",
+          "hidden_section_expand": "Mostrar missões ocultas",
+          "hidden_section_collapse": "Recolher missões ocultas"
+        }
       },
       "pinned_tasks_section": "Pinned Tasks",
       "focused_task_section": "Focused Task",

@@ -993,7 +993,25 @@
         "map_complete_tasks_toggle_show": "Afficher masquées",
         "map_complete_tasks_toggle_hide": "Masquer terminées carte",
         "map_hidden_hint": "Carte masquée - cliquez pour afficher",
-        "raid_time_tooltip": "Temps de raid actuel en jeu"
+        "raid_time_tooltip": "Temps de raid actuel en jeu",
+        "raid_plan": {
+          "title": "Quêtes sur la carte",
+          "summary_all": "Affichage de tous les {total}",
+          "summary_hidden": "{hidden} sur {total} masqué",
+          "choose_quests": "Choisir les quêtes",
+          "show_all": "Afficher tout",
+          "popover_description": "Décochez les quêtes que vous n'utilisez pas ce raid pour les éliminer de la carte. « Seulement» masque tout le reste.",
+          "only": "Seulement",
+          "show_only_named": "Afficher seulement {name} sur la carte",
+          "show_only_quest": "Ne montrer que cette quête sur la carte",
+          "hide_quest": "Cacher de la carte",
+          "show_quest": "Afficher sur la carte",
+          "all_hidden_hint": "Chaque quête de cette carte est masquée. Utilisez Show all pour les ramener.",
+          "hidden_section_title": "Masqué sur la carte ({count})",
+          "hidden_section_description": "Toujours suivi, tout simplement pas dessiné sur la carte.",
+          "hidden_section_expand": "Afficher les quêtes cachées",
+          "hidden_section_collapse": "Réduire les quêtes cachées"
+        }
       },
       "pinned_tasks_section": "Quêtes épinglées",
       "focused_task_section": "Quête ciblée",

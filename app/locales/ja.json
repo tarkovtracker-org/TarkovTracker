@@ -993,7 +993,25 @@
         "map_complete_tasks_toggle_show": "非表示タスクを表示",
         "map_complete_tasks_toggle_hide": "マップ完了タスクを非表示",
         "map_hidden_hint": "マップを非表示 — クリックして表示",
-        "raid_time_tooltip": "現在のゲーム内レイド時刻"
+        "raid_time_tooltip": "現在のゲーム内レイド時刻",
+        "raid_plan": {
+          "title": "地図上のクエスト",
+          "summary_all": "すべての {total}を表示",
+          "summary_hidden": "{hidden} / {total} を非表示",
+          "choose_quests": "クエストを選択",
+          "show_all": "すべて表示",
+          "popover_description": "このレイドを実行していないクエストのチェックを外すと、マップからクリアされます。「オンリー」は他のすべてを隠します。",
+          "only": "のみ",
+          "show_only_named": "マップ上に {name} のみ表示",
+          "show_only_quest": "このクエストのみを地図上に表示",
+          "hide_quest": "地図から隠す",
+          "show_quest": "地図上に表示",
+          "all_hidden_hint": "このマップ上のすべてのクエストは非表示になります。すべて表示を使用して元に戻します。",
+          "hidden_section_title": "マップから隠す ({count})",
+          "hidden_section_description": "まだ追跡されていますが、地図には描かれていません。",
+          "hidden_section_expand": "隠されたクエストを表示",
+          "hidden_section_collapse": "隠されたクエストを閉じる"
+        }
       },
       "pinned_tasks_section": "ピン留めされたタスク",
       "focused_task_section": "フォーカスされたタスク",
