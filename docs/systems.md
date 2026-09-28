@@ -915,15 +915,16 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   never upload directly: they wait for the scheduled retry, and an edit after exhaustion restarts
   the schedule, as a manual retry (`retryCloudSave`) or the browser `online` event does. A retry
   that could not upload during a pause is re-armed on resume, and edits made during the upload that
-  recovers from a failure are saved after it. Every retry first reads the remote snapshot and merges it into the pending changes,
+  recovers from a failure get their own reconciled retry. Every retry first reads the remote snapshot and merges it into the pending changes,
   as a Realtime reconnect does, so changes saved on another device are not overwritten by a stale
   upload; a retry that overlaps a reconnect waits for the newer snapshot. If no snapshot can be
   merged (no listener is running, the read fails, the socket is suspended, or the account changed), the retry counts as a
   failed attempt and uploads nothing. Failures
   are classified as `offline`, `rate_limited`, `auth`, or `unknown` so the
   indicator can distinguish a known cause from an unknown one. If the initial authenticated sync
-  fails, no controller runs, so `useAppInitialization` marks cloud saving `failed` and its manual
-  retry restarts initialization; a successful startup load clears that status. It also acknowledges
+  fails, no controller runs, so `useAppInitialization` marks cloud saving `failed` when local
+  progress may be waiting (tracked progress, a failed local save, or a recovery copy; otherwise it
+  is only a load failure), and its manual retry restarts initialization; a successful startup load clears that status. It also acknowledges
   memory-only local changes when the cloud now holds them (a cloud record was reconciled or local
   progress was migrated); otherwise sync starts and uploads them. Before any
   initialization retry, memory-only edits are handed to the startup merge as the session snapshot

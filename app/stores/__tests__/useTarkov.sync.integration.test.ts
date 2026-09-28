@@ -2804,6 +2804,18 @@ describe('useTarkov sync integration', () => {
         expect(localStorage.getItem(recoveryKey('user-1')) === null).toBe(acknowledged);
       }
     );
+    it('reports possibly unsynced progress only when local state could await the cloud', async () => {
+      const { mayHoldUnsyncedProgress } = await import('@/stores/useTarkov');
+      const store = useTarkovStore();
+      expect(mayHoldUnsyncedProgress('user-1')).toBe(false);
+      localStorage.setItem(recoveryKey('user-1'), '{"_userId":"user-1","data":{}}');
+      expect(mayHoldUnsyncedProgress('user-1')).toBe(true);
+      localStorage.removeItem(recoveryKey('user-1'));
+      store.$patch((state) => {
+        state.pvp = progressWithLevel(4);
+      });
+      expect(mayHoldUnsyncedProgress('user-1')).toBe(true);
+    });
     it('retries a rejected startup recovery copy removal on the next upload', async () => {
       const store = useTarkovStore();
       localStorage.setItem(

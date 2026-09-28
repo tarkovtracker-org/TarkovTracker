@@ -537,6 +537,17 @@ export function preserveUnsavedSessionProgress(userId: string): void {
   if (snapshot) progressSync.handOffSnapshot(userId, snapshot);
 }
 /**
+ * Whether local progress may be waiting for the cloud when initialization fails: tracked
+ * progress, a failed local save, or a recovery copy. A default account has nothing to save.
+ */
+export function mayHoldUnsyncedProgress(userId: string): boolean {
+  return (
+    hasProgress(useTarkovStore().$state) ||
+    hasUnsavedProgressChanges() ||
+    hasAccountRecoveryCopy(userId)
+  );
+}
+/**
  * Unacknowledged changes stay recoverable for their owner after sign-out, even if another
  * account or a guest session later overwrites the active copy. An explicit device-data
  * removal for that owner retains nothing.

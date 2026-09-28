@@ -9,6 +9,7 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import {
   initializeTarkovSync,
+  mayHoldUnsyncedProgress,
   preserveUnsavedSessionProgress,
   resetTarkovStoreForSessionTransition,
   resetTarkovSync,
@@ -110,14 +111,18 @@ export function useAppInitialization() {
     syncRetryAttempts += 1;
   };
   const handleSyncFailure = (expectedUserId?: string, expectedToken?: number) => {
-    if (isStaleInitialization(expectedUserId, expectedToken) || !getAuthenticatedUserId()) return;
+    const userId = getAuthenticatedUserId();
+    if (isStaleInitialization(expectedUserId, expectedToken) || !userId) return;
     // A failure after the sync controller or realtime listener was created
     // leaves them partially initialized; the same-user guard inside
     // initializeTarkovSync would then skip listener setup on the retry and
     // disconnect cross-device updates. Tear the machinery down so the retry
     // starts from a clean slate.
     resetTarkovSync('initial sync failed');
-    markCloudSyncUnavailable(() => retrySyncNow(expectedUserId, expectedToken));
+    // A failed load is not a failed save unless local progress may be waiting for the cloud.
+    if (mayHoldUnsyncedProgress(userId)) {
+      markCloudSyncUnavailable(() => retrySyncNow(expectedUserId, expectedToken));
+    }
     reportSyncFailure();
     if (syncRetryAttempts >= SYNC_RETRY_MAX_ATTEMPTS) {
       showLoadFailed();

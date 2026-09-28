@@ -253,6 +253,17 @@ describe('account recovery copies', () => {
     expect(selected?.state.pvp.level).toBe(9);
     expect(selected?.modeTimestamps?.pvp).toBe(100);
   });
+  it('orders an unknown mode clock by its copy write time without inventing a clock', () => {
+    const named = (displayName: string) => ({
+      ...structuredClone(defaultState),
+      pvp: { ...structuredClone(defaultState.pvp), displayName },
+    });
+    const staleRecovery = snapshot(100, named('stale'), { modeTimestamps: { pvp: 100 } });
+    const cloudResolved = snapshot(200, named('cloud'), { modeTimestamps: { pvp: 0 } });
+    const selected = selectFreshestOwnerProgressSnapshot(staleRecovery, cloudResolved);
+    expect(selected?.state.pvp.displayName).toBe('cloud');
+    expect(selected?.modeTimestamps?.pvp).toBe(0);
+  });
   it('keeps deletions of single-value fields from the newer equal-epoch copy', () => {
     const withFields = (displayName: string | null, skillOffsets: Record<string, number>) => ({
       ...structuredClone(defaultState),

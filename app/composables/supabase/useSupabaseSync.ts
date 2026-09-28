@@ -209,6 +209,8 @@ export function useSupabaseSync<
   let nextRetryAt: number | null = null;
   let retriesExhausted = false;
   let lastFailure: CloudSaveFailure | null = null;
+  /** Set by a failed write; cleared only once the latest local version is acknowledged. */
+  let reconcileRequired = false;
   const saveStatus = ref<CloudSaveStatus>({
     state: 'idle',
     failure: null,
@@ -364,6 +366,7 @@ export function useSupabaseSync<
   };
   const handleWriteFailure = (error: unknown) => {
     lastFailure = classifyCloudSaveFailure(error);
+    reconcileRequired = true;
     scheduleRetry();
   };
   const clearPendingVersion = (syncVersion: number) => {
@@ -371,6 +374,7 @@ export function useSupabaseSync<
     pendingLocalChanges = false;
     resetRetryBudget();
     lastFailure = null;
+    reconcileRequired = false;
   };
   const buildSyncPayload = (transformedState: TPayload, ownerId: string): TPayload => {
     const dataToSave: TPayload = { ...transformedState };
@@ -383,7 +387,6 @@ export function useSupabaseSync<
    */
   const canCommitWrite = (ownerId: string): boolean => !disposed && $supabase.user.id === ownerId;
   const commitSync = (currentHash: string, syncVersion: number, acknowledge: () => void) => {
-    const recoveredFromFailure = lastFailure !== null;
     acknowledge();
     lastSyncedHash = currentHash;
     clearPendingVersion(syncVersion);
@@ -391,8 +394,9 @@ export function useSupabaseSync<
     lastFailure = null;
     logger.debug(`[Sync] ✅ Successfully synced to ${table}`);
     onSynced?.();
-    // Edits made during the recovering upload armed a retry that the reset above cleared.
-    if (recoveredFromFailure) schedulePendingSync();
+    // Edits made during a recovering upload still need a reconciled upload of their own; the
+    // reset above cleared the retry they armed.
+    if (defersToReconciledRetry()) scheduleRetry();
   };
   const writeAndCommit = async (
     dataToSave: TPayload,
@@ -513,7 +517,7 @@ export function useSupabaseSync<
    * uploads. It captures the latest state when it runs, carrying every edit made meanwhile.
    */
   const defersToReconciledRetry = (): boolean =>
-    lastFailure !== null && reconcileBeforeRetry !== undefined && retryDelaysMs.length > 0;
+    reconcileRequired && reconcileBeforeRetry !== undefined && retryDelaysMs.length > 0;
   /** A new edit restarts an exhausted schedule; merges inside a snapshot read do not. */
   const armReconciledRetry = () => {
     debouncedSync.cancel();

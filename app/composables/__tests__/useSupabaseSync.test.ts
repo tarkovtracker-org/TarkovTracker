@@ -557,15 +557,13 @@ describe('useSupabaseSync', () => {
       expect(sync.saveStatus.value.state).toBe('idle');
       sync.cleanup();
     });
-    it('uploads an edit made while the recovering retry was in flight', async () => {
+    it('reconciles an edit made while the recovering retry was in flight', async () => {
       let finishRetry: (value: { error: null }) => void = () => {};
       upsert
         .mockResolvedValueOnce({ error: { message: 'boom' } })
         .mockImplementationOnce(() => new Promise((resolve) => (finishRetry = resolve)));
-      const { store, sync } = await createRetryingSync(
-        vi.fn(),
-        vi.fn(async () => {})
-      );
+      const reconcile = vi.fn(async () => {});
+      const { store, sync } = await createRetryingSync(vi.fn(), reconcile);
       store.$state.count = 1;
       store.notifySubscriber();
       await flushSync(5);
@@ -575,6 +573,11 @@ describe('useSupabaseSync', () => {
       store.notifySubscriber();
       finishRetry({ error: null });
       await vi.advanceTimersByTimeAsync(5);
+      // The follow-up waits for its own reconciled retry instead of a direct upload.
+      expect(upsert).toHaveBeenCalledTimes(2);
+      expect(reconcile).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS[0]);
+      expect(reconcile).toHaveBeenCalledTimes(2);
       expect(upsert).toHaveBeenCalledTimes(3);
       expect(upsert).toHaveBeenLastCalledWith({ count: 2, user_id: 'user-1' });
       expect(sync.saveStatus.value.state).toBe('idle');

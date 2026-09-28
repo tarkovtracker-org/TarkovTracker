@@ -92,13 +92,19 @@ const latestSnapshotByClock = (
 type ModeCandidate = {
   progress: UserProgressData;
   clock: number;
+  /** Orders equal-epoch copies; an unknown (zero) mode clock falls back to the copy's write time. */
+  order: number;
   seasonNumber: number | null;
 };
-const toModeCandidate = (snapshot: PersistedProgressSnapshot, mode: GameMode): ModeCandidate => ({
-  progress: snapshot.state[mode],
-  clock: snapshotModeClock(snapshot, mode),
-  seasonNumber: mode === 'seasonal' ? (snapshot.state.seasonalSeasonNumber ?? null) : null,
-});
+const toModeCandidate = (snapshot: PersistedProgressSnapshot, mode: GameMode): ModeCandidate => {
+  const clock = snapshotModeClock(snapshot, mode);
+  return {
+    progress: snapshot.state[mode],
+    clock,
+    order: clock || validClock(snapshot.timestamp),
+    seasonNumber: mode === 'seasonal' ? (snapshot.state.seasonalSeasonNumber ?? null) : null,
+  };
+};
 const archiveDisplacedMode = (
   ownerId: string | null,
   displaced: ModeCandidate,
@@ -119,7 +125,7 @@ const archiveDisplacedMode = (
  * A newer copy that contributes nothing, such as a default placeholder, keeps the older clock.
  */
 const mergeEqualEpochModes = (left: ModeCandidate, right: ModeCandidate): ModeCandidate => {
-  const [older, newer] = right.clock >= left.clock ? [left, right] : [right, left];
+  const [older, newer] = right.order >= left.order ? [left, right] : [right, left];
   const progress = mergePreferringSingleValues(older.progress, newer.progress);
   const olderAlone = mergePreferringSingleValues(older.progress, older.progress);
   return { ...(deepEqual(progress, olderAlone) ? older : newer), progress };
