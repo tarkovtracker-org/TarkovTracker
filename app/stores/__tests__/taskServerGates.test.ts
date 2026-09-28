@@ -84,6 +84,36 @@ describe('server-side task start gates', () => {
     expect(results.sibling!.self!.available).toBe(false);
     expect(evaluate(gate('>=', 5), confirmed).available).toBe(false);
   });
+  it('never leaks confirmation into downstream active-status requirements', () => {
+    const prerequisite: Task = { ...gate(), id: 'prior', minPlayerLevel: 25 };
+    const dependent: Task = {
+      id: 'target',
+      taskRequirements: [{ task: { id: 'prior' }, status: ['active'] }],
+    };
+    const confirmed = data({ completions: { prior: confirmation(prerequisite) } });
+    // The confirmed prerequisite is still level-blocked, so the dependent stays blocked.
+    expect(
+      buildTaskEvaluations(
+        [prerequisite, dependent],
+        new Map([['self', { ...confirmed, level: 1 }]]),
+        { requireTraderLevels: false }
+      ).target!.self!.available
+    ).toBe(false);
+    // A fully available confirmed prerequisite satisfies the active route exactly like a fresh task.
+    expect(
+      buildTaskEvaluations(
+        [prerequisite, dependent],
+        new Map([['self', { ...confirmed, level: 50 }]]),
+        { requireTraderLevels: false }
+      ).target!.self!.available
+    ).toBe(true);
+    // Without confirmation the gated prerequisite blocks the dependent.
+    expect(
+      buildTaskEvaluations([prerequisite, dependent], new Map([['self', data({ level: 50 })]]), {
+        requireTraderLevels: false,
+      }).target!.self!.available
+    ).toBe(false);
+  });
   it('never bypasses a known unmet value, independent gates or terminal state', () => {
     const task = gate();
     const completions = { target: confirmation(task) };

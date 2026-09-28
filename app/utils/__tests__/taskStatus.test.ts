@@ -10,6 +10,20 @@ import {
 } from '@/utils/taskStatus';
 import type { GameEdition, Task } from '@/types/tarkov';
 describe('taskStatus', () => {
+  describe('availability confirmations are never active progress', () => {
+    it('excludes confirmation-only records while retaining legacy reset semantics', () => {
+      expect(
+        isTaskActive({ complete: false, failed: false, availabilityRequirements: 'requirements' })
+      ).toBe(false);
+      expect(isTaskActive({ complete: false, failed: false, availabilityRequirements: '' })).toBe(
+        true
+      );
+      expect(isTaskActive({ complete: false, failed: false })).toBe(true);
+      expect(isTaskActive({ complete: true, availabilityRequirements: 'requirements' })).toBe(
+        false
+      );
+    });
+  });
   describe('getCompletionFlags', () => {
     it('handles boolean true -> {complete: true, failed: false}', () => {
       expect(getCompletionFlags(true)).toEqual({ complete: true, failed: false });

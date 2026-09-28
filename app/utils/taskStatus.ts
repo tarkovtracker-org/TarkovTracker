@@ -48,8 +48,18 @@ export function isTaskFailed(completion?: RawTaskCompletion): boolean {
  * @see isTaskComplete for checking task completion
  * @see isTaskFailed for checking task failure
  */
+const isConfirmationOnly = (completion: RawTaskCompletion): boolean => {
+  if (!completion || typeof completion !== 'object') return false;
+  return (
+    typeof completion.availabilityRequirements === 'string' &&
+    completion.availabilityRequirements.length > 0
+  );
+};
 export function isTaskActive(completion?: RawTaskCompletion): boolean {
   if (!completion) return false;
+  // Confirming in-game availability is not starting the task: a confirmation-only record must
+  // never satisfy downstream active-status requirements or render as started.
+  if (isConfirmationOnly(completion)) return false;
   return !isTaskComplete(completion) && !isTaskFailed(completion);
 }
 export function getTaskStatusFromFlags(completion?: RawTaskCompletion): TaskStatusResult {

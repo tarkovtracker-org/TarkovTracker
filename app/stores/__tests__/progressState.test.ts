@@ -76,6 +76,22 @@ describe('task availability confirmations', () => {
     });
     expect(state.pvp.taskObjectives.objective).toEqual({ count: 2, complete: false });
   });
+  it('preserves terminal flags on clear so a stale client cannot discard a completion', () => {
+    const state = createBaseState();
+    state.pvp.taskCompletions.task = {
+      complete: true,
+      failed: false,
+      manual: true,
+      timestamp: 10,
+    };
+    actions.clearTaskAvailability.call(state, 'task');
+    expect(state.pvp.taskCompletions.task).toMatchObject({
+      complete: true,
+      failed: false,
+      manual: true,
+      availabilityRequirements: '',
+    });
+  });
   it('scopes confirmation to the current mode and clears it on reset, completion and failure', () => {
     const state = createBaseState();
     for (const action of [

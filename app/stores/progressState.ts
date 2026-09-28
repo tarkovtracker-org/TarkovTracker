@@ -346,7 +346,18 @@ export const actions = {
     });
   },
   clearTaskAvailability(this: UserState, taskId: string) {
+    const currentData = getCurrentData(this);
+    const existing = currentData.taskCompletions?.[taskId];
+    // Clearing only the confirmation must not rewrite task status: preserve the existing
+    // terminal flags so a stale clear cannot discard another client's completion on merge.
     updateObjective(this, 'taskCompletions', taskId, {
+      ...(typeof existing === 'object' && existing !== null
+        ? {
+            complete: existing.complete === true,
+            failed: existing.failed === true,
+            ...(typeof existing.manual === 'boolean' ? { manual: existing.manual } : {}),
+          }
+        : { complete: false, failed: false }),
       availabilityRequirements: '',
       timestamp: Date.now(),
     });
