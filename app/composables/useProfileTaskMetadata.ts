@@ -144,7 +144,7 @@ export function useProfileTaskMetadata(mode: Ref<GameMode>, language: Ref<string
   } | null>(null);
   const error = shallowRef<Error | null>(null);
   const scope = computed(() => `${mode.value}-${language.value}`);
-  // A dismissed security check fails this load; a later successful verification reloads it.
+  // A failed access check fails this load; the next release of access reloads it.
   const { recoveryEpoch } = getTarkovAccessState();
   watch(
     [mode, language, recoveryEpoch],

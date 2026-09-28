@@ -638,6 +638,15 @@ describe('gated transport parity and recovery', () => {
     await flush();
     expect(getTarkovAccessState().retryAvailableAt.value).toBe(60_000);
   });
+  it('bumps the recovery epoch when a later probe recovers from an ordinary failure', async () => {
+    network.mockRejectedValueOnce(new TypeError('offline'));
+    await expect(ensureTarkovAccess()).rejects.toMatchObject({ kind: 'failed' });
+    const state = getTarkovAccessState();
+    expect(state.recoveryEpoch.value).toBe(0);
+    network.mockResolvedValueOnce(json());
+    await ensureTarkovAccess();
+    expect(state.recoveryEpoch.value).toBe(1);
+  });
   it('bumps the recovery epoch once at the first release after a dismissal', async () => {
     network.mockResolvedValueOnce(challenge());
     void ensureTarkovAccess().catch(() => {});

@@ -145,7 +145,7 @@ describe('profile mode metadata', () => {
     expect(result.loading.value).toBe(false);
     scope.stop();
   });
-  it('reloads after access recovers from a dismissed security check', async () => {
+  it('reloads after access recovers from a failed security check', async () => {
     accessGate.pending = Promise.reject(new Error('The security check was dismissed.'));
     const fetch = vi.fn((url: string) => {
       if (url.includes('tasks-')) return Promise.resolve({ data: { tasks: [{ id: 'task' }] } });

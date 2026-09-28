@@ -294,7 +294,7 @@ const accessState = {
   dismissed: ref(false),
   /** Epoch ms before which a rate-limited verification should not be retried. */
   retryAvailableAt: ref(0),
-  /** Bumped by the first release after a dismissal, so consumers it failed can reload. */
+  /** Bumped by the first release after a failed flow, so consumers it failed can reload. */
   recoveryEpoch: ref(0),
 };
 interface AccessFlow {
@@ -323,7 +323,7 @@ const dismissedFlows = new Set<number>();
 let dismissedFailure: TarkovAccessError | null = null;
 /** True while a challenged flow's failure waits for the visible manual retry. */
 let parked = false;
-/** Latched by a dismissal until access is next released. */
+/** Latched by any failed flow until access is next released. */
 let recoveryPending = false;
 const parkedFailures = new WeakSet<Error>();
 const markParked = (failure: TarkovAccessError): TarkovAccessError => {
@@ -479,7 +479,6 @@ const parkVerificationFailure = (cause: unknown): TarkovAccessError => {
 const dismissAccessAttempt = (): TarkovAccessError => {
   const failure = new TarkovAccessError('challenge', 'The security check was dismissed.');
   dismissedFailure = failure;
-  recoveryPending = true;
   accessState.dismissed.value = true;
   accessState.phase.value = 'idle';
   accessState.lastError.value = failure;
@@ -538,6 +537,9 @@ const startAccessFlow = (resumesParked = false): AccessFlow => {
   const run = (async () => {
     try {
       await executeAccessFlow(flowId, startGeneration, resumesParked);
+    } catch (failure) {
+      recoveryPending = true;
+      throw failure;
     } finally {
       settleFlow({ id: flowId });
     }

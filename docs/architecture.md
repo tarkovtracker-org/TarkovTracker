@@ -339,7 +339,7 @@ The root-mounted [`TarkovAccessGate`](../app/components/TarkovAccessGate.vue) ca
 startup waits. Only a flow that met a challenge parks callers behind the gate's manual retry
 (a failed retry stays parked); dismissing the gate rejects them, and later requests fail fast
 until its non-modal verify action retries and reloads metadata; the first release after a
-dismissal also reloads open shared profiles. A rate-limited verification keeps retry disabled
+failed access check also reloads open shared profiles. A rate-limited verification keeps retry disabled
 for the server's `Retry-After` delay. An ordinary probe
 failure rejects its callers without showing the gate, and the next request probes again.
 Gated GETs keep `$fetch`'s single transient retry. Shared-profile loads start their request budget after access is released.
