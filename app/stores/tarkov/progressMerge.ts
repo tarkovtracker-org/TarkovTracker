@@ -27,21 +27,29 @@ export const coerceGameMode = (mode?: string | null): GameMode => {
 export const hasProgress = (data: unknown): boolean => {
   const state = data as UserState;
   if (!state) return false;
-  const modeHasData = (mode: UserProgressData | undefined) =>
-    mode &&
-    (mode.level > 1 ||
-      (mode.prestigeLevel ?? 0) > 0 ||
-      (mode.progressEpoch ?? 0) > 0 ||
-      (mode.manualActivityHistory?.length ?? 0) > 0 ||
-      sanitizeManualActivityEpoch(mode.manualActivityEpoch) > 0 ||
-      Object.keys(mode.taskCompletions || {}).length > 0 ||
-      Object.keys(mode.taskObjectives || {}).length > 0 ||
-      Object.keys(mode.hideoutParts || {}).length > 0 ||
-      Object.keys(mode.hideoutModules || {}).length > 0 ||
-      Object.keys(mode.storyChapters || {}).length > 0 ||
-      Object.keys(mode.taskAvailability || {}).length > 0);
-  return Boolean(modeHasData(state.pvp) || modeHasData(state.pve) || modeHasData(state.seasonal));
+  return [state.pvp, state.pve, state.seasonal].some(modeHasData);
 };
+const PROGRESS_MAP_KEYS = [
+  'taskCompletions',
+  'taskObjectives',
+  'hideoutParts',
+  'hideoutModules',
+  'storyChapters',
+  'taskAvailability',
+] as const;
+const hasEntries = (value: object | undefined): boolean => Object.keys(value ?? {}).length > 0;
+const hasCounterProgress = (mode: UserProgressData): boolean =>
+  [
+    mode.level > 1,
+    (mode.prestigeLevel ?? 0) > 0,
+    (mode.progressEpoch ?? 0) > 0,
+    (mode.manualActivityHistory?.length ?? 0) > 0,
+    sanitizeManualActivityEpoch(mode.manualActivityEpoch) > 0,
+  ].some(Boolean);
+/** Any tracked value, including a confirmation-only map, makes a mode worth syncing and adopting. */
+const modeHasData = (mode: UserProgressData | undefined): boolean =>
+  Boolean(mode) &&
+  (hasCounterProgress(mode!) || PROGRESS_MAP_KEYS.some((key) => hasEntries(mode![key])));
 export const buildUpsertPayload = (
   userId: string,
   state: UserState,
