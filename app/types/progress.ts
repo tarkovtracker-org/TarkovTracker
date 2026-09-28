@@ -9,6 +9,16 @@ export interface TaskCompletion {
   timestamp?: number;
   manual?: boolean;
 }
+/**
+ * In-game availability confirmation for a task's server-side start gates, stored separately from
+ * task status so confirming or clearing it can never rewrite a completion. `requirements` is the
+ * exact normalized gate signature; an empty string is a clear. It is honoured only while not older
+ * than the task's status timestamp, so a later reset/complete/fail on any device supersedes it.
+ */
+export interface TaskAvailabilityConfirmation {
+  requirements: string;
+  timestamp: number;
+}
 export interface HideoutPart {
   count?: number;
   complete?: boolean;
@@ -65,6 +75,7 @@ export interface UserProgressData {
   xpOffset: number;
   taskObjectives: { [objectiveId: string]: TaskObjective };
   taskCompletions: { [taskId: string]: TaskCompletion };
+  taskAvailability?: { [taskId: string]: TaskAvailabilityConfirmation };
   hideoutParts: { [objectiveId: string]: HideoutPart };
   hideoutModules: { [hideoutId: string]: HideoutModule };
   traders: { [traderId: string]: TraderProgress };

@@ -122,6 +122,24 @@ export interface TaskPrestigeReference {
  * never a diagnostic, so these values keep a malformed explicit gate distinguishable from no gate.
  */
 export type TaskRequirementDiagnostic = 'prestige_reference' | 'task_requirement';
+export type TaskOtherRequirement =
+  | {
+      type: 'globalVariable';
+      id: string;
+      variableId: string;
+      compareMethod: RequirementComparison;
+      value: number;
+    }
+  | { type: 'dialogue'; id: string; traders: string[] }
+  /** Overlay story gate: met only when the player completed that storyline objective. */
+  | {
+      type: 'storyObjective';
+      id: string;
+      storyChapter: { id: string; name?: string };
+      objective: { id: string; name?: string };
+    }
+  /** Unsupported or malformed gate; `upstreamType` keeps the original upstream discriminator. */
+  | { type: 'unknown'; upstreamType?: string };
 export interface TaskTraderLevelRequirement {
   id: string;
   trader: { id: string; name: string };
@@ -262,6 +280,7 @@ export interface Task {
   trader?: { id: string; name?: string; normalizedName?: string; imageLink?: string };
   objectives?: TaskObjective[];
   taskRequirements?: TaskRequirement[];
+  otherRequirements?: TaskOtherRequirement[];
   storyUnlocks?: Array<{ id: string; name: string }>;
   minPlayerLevel?: number;
   requiredPrestige?: TaskPrestigeReference;

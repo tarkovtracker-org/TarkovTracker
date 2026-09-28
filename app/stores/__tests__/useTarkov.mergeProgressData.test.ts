@@ -19,6 +19,51 @@ const createProgressData = (
   skillOffsets: {},
   storyChapters,
 });
+describe('hasProgress availability confirmations', () => {
+  it('counts a confirmation-only mode as progress so it syncs and survives startup', () => {
+    const pvp = createProgressData({});
+    expect(hasProgress({ pvp })).toBe(false);
+    pvp.taskAvailability = { task: { requirements: 'sig', timestamp: 1 } };
+    expect(hasProgress({ pvp })).toBe(true);
+  });
+});
+describe('mergeProgressData availability confirmation', () => {
+  const withConfirmation = (requirements: string, timestamp: number) => {
+    const data = createProgressData({});
+    data.taskAvailability = { task: { requirements, timestamp } };
+    return data;
+  };
+  it('keeps the newest confirmation on its own clock and never resurrects a newer clear', () => {
+    const confirmed = withConfirmation('requirements', 10);
+    const cleared = withConfirmation('', 20);
+    for (const [a, b] of [
+      [confirmed, cleared],
+      [cleared, confirmed],
+    ] as const)
+      expect(mergeProgressData(a, b).taskAvailability?.task).toEqual({
+        requirements: '',
+        timestamp: 20,
+      });
+    const older = withConfirmation('', 5);
+    expect(mergeProgressData(older, confirmed).taskAvailability?.task?.requirements).toBe(
+      'requirements'
+    );
+  });
+  it('never lets a stale confirmation or clear discard another client completion', () => {
+    // Review #979: a stale client that confirms or clears later must not rewrite task status.
+    const completedElsewhere = createProgressData({});
+    completedElsewhere.taskCompletions.task = { complete: true, failed: false, timestamp: 200 };
+    const staleClient = withConfirmation('', 300);
+    for (const [a, b] of [
+      [staleClient, completedElsewhere],
+      [completedElsewhere, staleClient],
+    ] as const) {
+      const merged = mergeProgressData(a, b);
+      expect(merged.taskCompletions.task).toMatchObject({ complete: true, failed: false });
+      expect(merged.taskAvailability?.task).toEqual({ requirements: '', timestamp: 300 });
+    }
+  });
+});
 describe('mergeProgressData story chapters', () => {
   it('merges chapter objectives by key without dropping existing objective progress', () => {
     const local = createProgressData({

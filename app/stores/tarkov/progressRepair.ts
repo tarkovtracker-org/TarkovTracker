@@ -4,6 +4,7 @@ import {
 } from '@shared/utils/requirementStatus';
 import { GAME_MODE_VALUES, MANUAL_FAIL_TASK_IDS, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import { nextClock } from '@/utils/taskAvailabilityConfirmation';
 import type { UserProgressData } from '@/stores/progressState';
 import type { TaskCompletion, TaskObjective } from '@/types/progress';
 import type { Task, TaskObjective as TaskObjectiveDefinition } from '@/types/tarkov';
@@ -44,10 +45,18 @@ function markTaskFailed(modeData: UserProgressData, taskId: string, tasks: TaskL
   resetTaskObjectives(modeData, tasks.get(taskId));
   return 1;
 }
+/** A repaired status must retire a confirmation even one stamped by a clock running ahead. */
+const statusClock = (modeData: UserProgressData, taskId: string) =>
+  nextClock(modeData.taskAvailability?.[taskId]?.timestamp ?? -1);
 function markTaskUncompleted(modeData: UserProgressData, taskId: string, tasks: TaskLookup) {
-  const now = Date.now();
+  const now = statusClock(modeData, taskId);
   const completion = (completionsOf(modeData)[taskId] ??= {});
-  Object.assign(completion, { complete: false, failed: false, manual: false, timestamp: now });
+  Object.assign(completion, {
+    complete: false,
+    failed: false,
+    manual: false,
+    timestamp: now,
+  });
   resetTaskObjectives(modeData, tasks.get(taskId), now);
   return 1;
 }

@@ -56,6 +56,15 @@ describe('useTarkovStore failed-state repair', () => {
       manual: false,
     });
   });
+  it('stamps a repaired reset after a confirmation from a clock running ahead', () => {
+    const gameModeData = createProgressData({
+      'task-stale': { complete: true, failed: true },
+    });
+    const ahead = Date.now() + 3_600_000;
+    gameModeData.taskAvailability = { 'task-stale': { requirements: 'sig', timestamp: ahead } };
+    repairModeFailedTasks(gameModeData, new Map([['task-stale', createTask('task-stale')]]));
+    expect(gameModeData.taskCompletions['task-stale']!.timestamp!).toBeGreaterThan(ahead);
+  });
   it('does not retroactively fail completed one-way alternative chains', () => {
     const gameModeData = createProgressData({
       'task-source': { complete: true, failed: false, timestamp: 2000 },

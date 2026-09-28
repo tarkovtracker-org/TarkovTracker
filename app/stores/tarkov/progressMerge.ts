@@ -12,7 +12,8 @@ import {
   sanitizeManualActivityHistory,
   sanitizeOwnedProgressData,
 } from '@/utils/progressSanitizers';
-import type { ManualActivityEntry } from '@/types/progress';
+import { mergeTaskAvailability } from '@/utils/taskAvailabilityConfirmation';
+import type { ManualActivityEntry, TaskCompletion } from '@/types/progress';
 import type { RawTaskCompletion } from '@/utils/taskStatus';
 const API_UPDATE_HISTORY_LIMIT = 50;
 type CountableEntry = { count?: number; complete?: boolean; timestamp?: number };
@@ -26,20 +27,29 @@ export const coerceGameMode = (mode?: string | null): GameMode => {
 export const hasProgress = (data: unknown): boolean => {
   const state = data as UserState;
   if (!state) return false;
-  const modeHasData = (mode: UserProgressData | undefined) =>
-    mode &&
-    (mode.level > 1 ||
-      (mode.prestigeLevel ?? 0) > 0 ||
-      (mode.progressEpoch ?? 0) > 0 ||
-      (mode.manualActivityHistory?.length ?? 0) > 0 ||
-      sanitizeManualActivityEpoch(mode.manualActivityEpoch) > 0 ||
-      Object.keys(mode.taskCompletions || {}).length > 0 ||
-      Object.keys(mode.taskObjectives || {}).length > 0 ||
-      Object.keys(mode.hideoutParts || {}).length > 0 ||
-      Object.keys(mode.hideoutModules || {}).length > 0 ||
-      Object.keys(mode.storyChapters || {}).length > 0);
-  return Boolean(modeHasData(state.pvp) || modeHasData(state.pve) || modeHasData(state.seasonal));
+  return [state.pvp, state.pve, state.seasonal].some(modeHasData);
 };
+const PROGRESS_MAP_KEYS = [
+  'taskCompletions',
+  'taskObjectives',
+  'hideoutParts',
+  'hideoutModules',
+  'storyChapters',
+  'taskAvailability',
+] as const;
+const hasEntries = (value: object | undefined): boolean => Object.keys(value ?? {}).length > 0;
+const hasCounterProgress = (mode: UserProgressData): boolean =>
+  [
+    mode.level > 1,
+    (mode.prestigeLevel ?? 0) > 0,
+    (mode.progressEpoch ?? 0) > 0,
+    (mode.manualActivityHistory?.length ?? 0) > 0,
+    sanitizeManualActivityEpoch(mode.manualActivityEpoch) > 0,
+  ].some(Boolean);
+/** Any tracked value, including a confirmation-only map, makes a mode worth syncing and adopting. */
+const modeHasData = (mode: UserProgressData | undefined): boolean =>
+  Boolean(mode) &&
+  (hasCounterProgress(mode!) || PROGRESS_MAP_KEYS.some((key) => hasEntries(mode![key])));
 export const buildUpsertPayload = (
   userId: string,
   state: UserState,
@@ -200,16 +210,15 @@ const mergeCountableObjects = <T extends Record<string, CountableEntry>>(
 };
 const normalizeTaskCompletionEntry = (
   completion: RawTaskCompletion
-): { complete?: boolean; failed?: boolean; timestamp?: number; manual?: boolean } | undefined => {
+): TaskCompletion | undefined => {
   if (completion === null || completion === undefined) return undefined;
   if (typeof completion === 'boolean') {
     return { complete: completion, failed: false };
   }
-  const normalized: { complete?: boolean; failed?: boolean; timestamp?: number; manual?: boolean } =
-    {
-      complete: completion.complete === true,
-      failed: completion.failed === true,
-    };
+  const normalized: TaskCompletion = {
+    complete: completion.complete === true,
+    failed: completion.failed === true,
+  };
   if (typeof completion.timestamp === 'number') {
     normalized.timestamp = completion.timestamp;
   }
@@ -349,7 +358,7 @@ export function mergeProgressData(
   const mergeTaskCompletion = (
     localComp: RawTaskCompletion,
     remoteComp: RawTaskCompletion
-  ): { complete?: boolean; failed?: boolean; timestamp?: number; manual?: boolean } | undefined => {
+  ): TaskCompletion | undefined => {
     const normalizedLocal = normalizeTaskCompletionEntry(localComp);
     const normalizedRemote = normalizeTaskCompletionEntry(remoteComp);
     if (!normalizedLocal) return normalizedRemote;
@@ -414,6 +423,7 @@ export function mergeProgressData(
     hideoutModules: mergeHideoutModules(local.hideoutModules, remote.hideoutModules),
     hideoutParts: mergeCountableObjects(local.hideoutParts, remote.hideoutParts, preferNewerCount),
     storyChapters: mergeStoryChapterProgress(local.storyChapters, remote.storyChapters),
+    taskAvailability: mergeTaskAvailability(local.taskAvailability, remote.taskAvailability),
     traders: {
       ...local.traders,
       ...remote.traders,

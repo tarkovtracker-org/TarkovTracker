@@ -37,6 +37,7 @@ import {
   sanitizeTraderMap,
   toFiniteNumber,
 } from '@/utils/progressSanitizers';
+import { sanitizeTaskAvailabilityMap } from '@/utils/taskAvailabilityConfirmation';
 import type { ApiProtectionConfig } from '@/server/middleware/api-protection';
 const logger = createLogger('SharedProfileApi');
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -117,6 +118,7 @@ type SanitizedProgressData = Partial<{
     { complete?: boolean; objectives?: Record<string, { complete?: boolean; timestamp?: number }> }
   >;
   taskCompletions: Record<string, SanitizedTaskCompletion>;
+  taskAvailability: Record<string, { requirements: string; timestamp: number }>;
   taskObjectives: Record<string, SanitizedObjectiveProgress>;
   traders: Record<string, SanitizedTrader>;
   xpOffset: number;
@@ -241,6 +243,10 @@ const sanitizeProgressPayload = (
   const storyChapters = sanitizeStoryChaptersMap(value.storyChapters);
   if (Object.keys(storyChapters).length > 0) {
     sanitized.storyChapters = storyChapters;
+  }
+  const taskAvailability = sanitizeTaskAvailabilityMap(value.taskAvailability);
+  if (Object.keys(taskAvailability).length > 0) {
+    sanitized.taskAvailability = taskAvailability;
   }
   const lastApiUpdate = sanitizeApiUpdateMeta(value.lastApiUpdate);
   if (lastApiUpdate) {
