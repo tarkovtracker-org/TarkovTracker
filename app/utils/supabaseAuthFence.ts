@@ -36,14 +36,34 @@ const createMemoryStorage = (): AuthStorage => {
     },
   };
 };
-/** Mirrors the SDK default: browser storage when writable, otherwise memory. */
+/**
+ * Keeps a readable persisted session authoritative even when writes fail (for example a full
+ * quota). A session that cannot be persisted lives in memory, and the stale persisted copy is
+ * removed so a later load cannot resurrect it; removal errors propagate so sign-out fails closed.
+ */
+const createWriteTolerantStorage = (persistent: Storage): AuthStorage => {
+  const unsaved = createMemoryStorage();
+  return {
+    getItem: (key) => unsaved.getItem(key) ?? persistent.getItem(key),
+    setItem: (key, value) => {
+      try {
+        persistent.setItem(key, value);
+        unsaved.removeItem(key);
+      } catch {
+        unsaved.setItem(key, value);
+        persistent.removeItem(key);
+      }
+    },
+    removeItem: (key) => {
+      unsaved.removeItem(key);
+      persistent.removeItem(key);
+    },
+  };
+};
+/** Browser storage whenever it can be accessed; memory only when access itself is blocked. */
 const resolveBrowserStorage = (): AuthStorage => {
   try {
-    const storage = window.localStorage;
-    const probe = '__tt_auth_storage_probe__';
-    storage.setItem(probe, probe);
-    storage.removeItem(probe);
-    return storage;
+    return createWriteTolerantStorage(window.localStorage);
   } catch {
     return createMemoryStorage();
   }

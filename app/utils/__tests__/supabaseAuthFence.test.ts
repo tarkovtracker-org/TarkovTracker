@@ -83,4 +83,23 @@ describe('owner-fenced Supabase auth storage', () => {
     blocked.mockRestore();
     expect(localStorage.getItem(KEY)).toBeNull();
   });
+  it('keeps a persisted session readable when browser storage rejects writes', () => {
+    const persisted = new Map([[KEY, session('user-1')]]);
+    const full = {
+      getItem: (key: string) => persisted.get(key) ?? null,
+      setItem: () => {
+        throw new DOMException('full', 'QuotaExceededError');
+      },
+      removeItem: (key: string) => persisted.delete(key),
+    } as unknown as Storage;
+    const stubbed = vi.spyOn(window, 'localStorage', 'get').mockReturnValue(full);
+    const { storage } = createOwnerFencedAuthStorage(KEY);
+    expect(storage.getItem(KEY)).toBe(session('user-1'));
+    storage.setItem(KEY, session('user-2'));
+    expect(storage.getItem(KEY)).toBe(session('user-2'));
+    expect(persisted.has(KEY)).toBe(false);
+    storage.removeItem(KEY);
+    expect(storage.getItem(KEY)).toBeNull();
+    stubbed.mockRestore();
+  });
 });
