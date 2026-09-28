@@ -44,8 +44,11 @@ function markTaskFailed(modeData: UserProgressData, taskId: string, tasks: TaskL
   resetTaskObjectives(modeData, tasks.get(taskId));
   return 1;
 }
+/** A repaired status must retire a confirmation even one stamped by a clock running ahead. */
+const statusClock = (modeData: UserProgressData, taskId: string) =>
+  Math.max(Date.now(), (modeData.taskAvailability?.[taskId]?.timestamp ?? -1) + 1);
 function markTaskUncompleted(modeData: UserProgressData, taskId: string, tasks: TaskLookup) {
-  const now = Date.now();
+  const now = statusClock(modeData, taskId);
   const completion = (completionsOf(modeData)[taskId] ??= {});
   Object.assign(completion, {
     complete: false,

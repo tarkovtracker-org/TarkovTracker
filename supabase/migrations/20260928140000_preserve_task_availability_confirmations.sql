@@ -1,14 +1,62 @@
--- Preserve per-mode task availability confirmations through the progress sanitizer.
+-- Persist per-mode task availability confirmations.
 --
 -- `taskAvailability` records a player's in-game confirmation of a task's server-side start gates,
 -- keyed by task id as `{ requirements, timestamp }`. It is stored apart from `taskCompletions` so
--- confirming or clearing it never rewrites task status; clients merge it per task by its own
--- timestamp. Without this, the row sanitizer drops the key on every write.
+-- confirming or clearing it never rewrites task status; a clear is an empty `requirements` string
+-- kept as a tombstone.
 --
--- Additive and schema-only: the function body is identical to the previous definition in
--- 20260910055448_harden_manual_activity_history_sync.sql apart from the new key. CREATE OR REPLACE
--- keeps the existing EXECUTE grants and search_path. No data is rewritten; rows gain the key on
--- their next write, and readers treat a missing key as no confirmations.
+-- * `merge_task_availability` resolves each task by the confirmation timestamp.
+-- * `merge_manual_activity_progress`, which both progress-row triggers already run against the stored
+--   row inside the write, now also merges this map, so a stale client or a pre-deployment bundle that
+--   omits the key cannot drop confirmations or clears written by another device. Its body is
+--   otherwise identical to 20260910055448_harden_manual_activity_history_sync.sql.
+-- * `sanitize_user_progress_mode_data` keeps only well-formed entries; its body is otherwise identical
+--   to the same earlier migration.
+--
+-- Schema-only: no data is rewritten. CREATE OR REPLACE keeps existing grants and search_path; the new
+-- helper gets the same grants as `merge_manual_activity_progress`. Readers treat a missing key as no
+-- confirmations.
+
+-- Per-task last-write-wins merge of availability confirmations on their own clock. Malformed entries
+-- are dropped; on a timestamp tie the incoming entry wins, matching the client merge. A missing or
+-- non-object side contributes nothing, so a payload without the key keeps the stored map.
+CREATE OR REPLACE FUNCTION public.merge_task_availability(existing jsonb, incoming jsonb)
+RETURNS jsonb
+LANGUAGE SQL
+IMMUTABLE
+SET search_path = ''
+AS $$
+  SELECT COALESCE(jsonb_object_agg(winner.key, winner.value), '{}'::jsonb)
+  FROM (
+    SELECT DISTINCT ON (entry.key)
+      entry.key,
+      jsonb_build_object(
+        'requirements', entry.value->'requirements',
+        'timestamp', to_jsonb(trunc((entry.value->>'timestamp')::numeric)::bigint)
+      ) AS value
+    FROM (
+      SELECT side.key, side.value, 0 AS precedence
+      FROM jsonb_each(
+        CASE WHEN jsonb_typeof(existing) = 'object' THEN existing ELSE '{}'::jsonb END
+      ) AS side
+      UNION ALL
+      SELECT side.key, side.value, 1 AS precedence
+      FROM jsonb_each(
+        CASE WHEN jsonb_typeof(incoming) = 'object' THEN incoming ELSE '{}'::jsonb END
+      ) AS side
+    ) AS entry
+    WHERE entry.key <> ''
+      AND jsonb_typeof(entry.value) = 'object'
+      AND jsonb_typeof(entry.value->'requirements') = 'string'
+      AND jsonb_typeof(entry.value->'timestamp') = 'number'
+      AND (entry.value->>'timestamp')::numeric >= 0
+      AND (entry.value->>'timestamp')::numeric < 9223372036854775807
+    ORDER BY
+      entry.key,
+      trunc((entry.value->>'timestamp')::numeric) DESC,
+      entry.precedence DESC
+  ) AS winner;
+$$;
 
 CREATE OR REPLACE FUNCTION public.sanitize_user_progress_mode_data(payload jsonb)
 RETURNS jsonb
@@ -177,11 +225,7 @@ AS $$
         ELSE '{}'::jsonb
       END,
       'taskAvailability',
-      CASE
-        WHEN jsonb_typeof(payload->'taskAvailability') = 'object'
-        THEN payload->'taskAvailability'
-        ELSE '{}'::jsonb
-      END,
+      public.merge_task_availability(NULL, payload->'taskAvailability'),
       'taskCompletions',
       CASE
         WHEN jsonb_typeof(payload->'taskCompletions') = 'object'
@@ -214,3 +258,38 @@ AS $$
     )
   );
 $$;
+
+CREATE OR REPLACE FUNCTION public.merge_manual_activity_progress(existing jsonb, incoming jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql IMMUTABLE SET search_path = ''
+AS $$
+DECLARE
+  old_reset integer := public.sanitize_manual_activity_epoch(existing->'progressEpoch');
+  new_reset integer := public.sanitize_manual_activity_epoch(incoming->'progressEpoch');
+  old_epoch integer := public.sanitize_manual_activity_epoch(existing->'manualActivityEpoch');
+  new_epoch integer := public.sanitize_manual_activity_epoch(incoming->'manualActivityEpoch');
+  history jsonb;
+BEGIN
+  IF old_reset > new_reset THEN RETURN existing; END IF;
+  IF new_reset > old_reset THEN RETURN incoming; END IF;
+  IF old_epoch > new_epoch THEN
+    history := existing->'manualActivityHistory';
+  ELSIF new_epoch > old_epoch THEN
+    history := incoming->'manualActivityHistory';
+  ELSE
+    history := public.sanitize_user_progress_manual_activity_history(existing->'manualActivityHistory')
+      || public.sanitize_user_progress_manual_activity_history(incoming->'manualActivityHistory');
+  END IF;
+  RETURN COALESCE(incoming, '{}'::jsonb) || jsonb_build_object(
+    'manualActivityEpoch', greatest(old_epoch, new_epoch),
+    'manualActivityHistory', public.sanitize_user_progress_manual_activity_history(history),
+    'taskAvailability', public.merge_task_availability(
+      existing->'taskAvailability',
+      incoming->'taskAvailability'
+    )
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.merge_task_availability(jsonb, jsonb) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.merge_task_availability(jsonb, jsonb) TO authenticated, service_role;
