@@ -143,22 +143,81 @@ describe('device data removal', () => {
     progressPersistStorage.setItem(STORAGE_KEYS.progress, owned(null));
     expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(owned(null));
   });
-  it.each(['{malformed', JSON.stringify({ _userId: 'user-1', data: null })])(
-    'releases opaque active bytes for explicit removal only after quarantine',
+  const quarantinedValueKeys = () =>
+    Object.keys(localStorage).filter(
+      (key) =>
+        key.startsWith(STORAGE_KEYS.progressQuarantinePrefix) &&
+        !key.startsWith(STORAGE_KEYS.progressQuarantineRemovalMarkerPrefix)
+    );
+  it.each(['{malformed', JSON.stringify({ _userId: '', data: null })])(
+    'releases unattributable active bytes only after quarantine and stays incomplete on retry',
     (raw) => {
       localStorage.setItem(STORAGE_KEYS.progress, raw);
       expect(removeAccountDeviceData('user-1')).toBe(false);
       expect(localStorage.getItem(STORAGE_KEYS.progress)).toBeNull();
-      const quarantineKeys = Object.keys(localStorage).filter((key) =>
-        key.startsWith(STORAGE_KEYS.progressQuarantinePrefix)
-      );
+      const quarantineKeys = quarantinedValueKeys();
       expect(quarantineKeys).toHaveLength(1);
       expect(localStorage.getItem(quarantineKeys[0]!)).toBe(raw);
       expect(isAccountRecoveryRetentionBlocked()).toBe(false);
       progressPersistStorage.setItem(STORAGE_KEYS.progress, owned(null));
       expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(owned(null));
+      // The quarantine has no provable owner, so a retry must not report completion.
+      expect(removeAccountDeviceData('user-1')).toBe(false);
+      expect(localStorage.getItem(quarantineKeys[0]!)).toBe(raw);
+      // Other accounts are not held back by this owner's unattributable bytes.
+      expect(removeAccountDeviceData('user-2')).toBe(true);
+      localStorage.removeItem(quarantineKeys[0]!);
+      expect(removeAccountDeviceData('user-1')).toBe(true);
+      expect(
+        localStorage.getItem(`${STORAGE_KEYS.progressQuarantineRemovalMarkerPrefix}user-1`)
+      ).toBeNull();
     }
   );
+  it('deletes malformed active bytes that name the removing owner without quarantine', () => {
+    localStorage.setItem(STORAGE_KEYS.progress, JSON.stringify({ _userId: 'user-1', data: null }));
+    expect(removeAccountDeviceData('user-1')).toBe(true);
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBeNull();
+    expect(quarantinedValueKeys()).toHaveLength(0);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(false);
+  });
+  it('treats an unreadable quarantine marker as incomplete', () => {
+    localStorage.setItem(
+      `${STORAGE_KEYS.progressQuarantineRemovalMarkerPrefix}user-1`,
+      `${STORAGE_KEYS.progressQuarantinePrefix}missing`
+    );
+    const getItem = localStorage.getItem.bind(localStorage);
+    const spy = vi.spyOn(localStorage, 'getItem').mockImplementation((key: string) => {
+      if (key.startsWith(STORAGE_KEYS.progressQuarantineRemovalMarkerPrefix)) {
+        throw new Error('read blocked');
+      }
+      return getItem(key);
+    });
+    expect(removeAccountDeviceData('user-1')).toBe(false);
+    spy.mockRestore();
+    expect(removeAccountDeviceData('user-1')).toBe(true);
+  });
+  it('retries an incomplete removal for the captured owner only', async () => {
+    const {
+      clearIncompleteDeviceDataRemoval,
+      incompleteDeviceDataRemovalOwner,
+      markDeviceDataRemovalIncomplete,
+      retryIncompleteDeviceDataRemoval,
+    } = await import('@/stores/tarkov/deviceData');
+    localStorage.setItem(`${STORAGE_KEYS.progressRecoveryPrefix}user-1`, owned('user-1'));
+    localStorage.setItem(`${STORAGE_KEYS.progressRecoveryPrefix}user-2`, owned('user-2'));
+    markDeviceDataRemovalIncomplete('user-1');
+    clearIncompleteDeviceDataRemoval('user-2');
+    expect(incompleteDeviceDataRemovalOwner.value).toBe('user-1');
+    expect(retryIncompleteDeviceDataRemoval()).toBe(true);
+    expect(incompleteDeviceDataRemovalOwner.value).toBeNull();
+    expect(localStorage.getItem(`${STORAGE_KEYS.progressRecoveryPrefix}user-1`)).toBeNull();
+    expect(localStorage.getItem(`${STORAGE_KEYS.progressRecoveryPrefix}user-2`)).toBe(
+      owned('user-2')
+    );
+    markDeviceDataRemovalIncomplete('user-1');
+    clearIncompleteDeviceDataRemoval('user-1');
+    expect(incompleteDeviceDataRemovalOwner.value).toBeNull();
+  });
   it('fails closed when opaque active bytes cannot be quarantined', () => {
     const raw = '{malformed';
     localStorage.setItem(STORAGE_KEYS.progress, raw);

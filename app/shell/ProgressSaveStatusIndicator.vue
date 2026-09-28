@@ -1,4 +1,8 @@
 <template>
+  <!-- Always rendered so screen readers announce status changes, not only when opened. -->
+  <span class="sr-only" role="status" aria-live="polite" data-testid="progress-save-status-live">
+    {{ announcement }}
+  </span>
   <UPopover v-if="kind" :content="{ align: 'end', side: 'bottom', sideOffset: 10 }">
     <AppTooltip :text="label">
       <UButton
@@ -13,7 +17,7 @@
       />
     </AppTooltip>
     <template #content>
-      <div class="w-80 space-y-3 p-4 text-sm" role="status">
+      <div class="w-80 space-y-3 p-4 text-sm">
         <p class="font-semibold" :class="presentation.titleClass">{{ label }}</p>
         <p class="text-surface-300">{{ t(`progress_save_status.${kind}_description`) }}</p>
         <p v-if="localNoteKey" class="text-surface-300">{{ t(localNoteKey) }}</p>
@@ -105,6 +109,7 @@
   } = useProgressSaveStatus();
   const presentation = computed(() => PRESENTATION[kind.value ?? 'cloud_pending']);
   const label = computed(() => t(`progress_save_status.${kind.value ?? 'cloud_pending'}_label`));
+  const announcement = computed(() => (kind.value ? label.value : ''));
   /** Only a confirmed local write may be described as locally saved. */
   const localNoteKey = computed(() => {
     if (kind.value === 'local_failed') {

@@ -390,6 +390,28 @@ describe('useAppInitialization locale setup', () => {
       expect(mockResetTarkovSync).toHaveBeenCalledTimes(1);
       wrapper.unmount();
     });
+    it('keeps cloud saving visibly unavailable and retryable after initial sync fails', async () => {
+      vi.useFakeTimers();
+      const { progressSaveStatus, resetCloudSaveStatus, retryCloudSave } =
+        await import('@/stores/tarkov/progressSaveStatus');
+      resetCloudSaveStatus();
+      mockInitializeTarkovSync.mockRejectedValueOnce(new Error('offline'));
+      mockSupabaseUser.loggedIn = true;
+      mockSupabaseUser.id = 'user-1';
+      const wrapper = await mountWithComposable();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(progressSaveStatus.cloud.state).toBe('failed');
+      mockInitializeTarkovSync.mockImplementationOnce(async () => {
+        // A successful startup load clears the unavailable status (see initializeTarkovSync).
+        resetCloudSaveStatus();
+      });
+      await expect(retryCloudSave()).resolves.toBe(true);
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS * 2);
+      // The manual retry replaced the scheduled one.
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(2);
+      wrapper.unmount();
+    });
     it('stops retrying after the bounded number of attempts', async () => {
       vi.useFakeTimers();
       mockInitializeTarkovSync.mockRejectedValue(new Error('offline'));

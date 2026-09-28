@@ -32,7 +32,17 @@ export interface SupabasePlugin {
     provider: 'twitch' | 'discord' | 'google' | 'github',
     options?: { skipBrowserRedirect?: boolean; redirectTo?: string }
   ) => Promise<{ url?: string }>;
-  signOut: (expectedUserId?: string, scope?: 'global' | 'local') => Promise<void>;
+  /**
+   * Resolves `signed_out_locally` when this browser's session ended but the server did not
+   * confirm revocation. Rejects with `SupabaseSessionChangedError` if another account's session
+   * is current, and with the SDK error when the session could not be ended at all.
+   */
+  signOut: (
+    expectedUserId?: string,
+    scope?: 'global' | 'local'
+  ) => Promise<'signed_out' | 'signed_out_locally'>;
+  /** Removes only this browser's copy of the owner's session, without contacting the server. */
+  signOutThisDevice: (expectedUserId: string) => Promise<void>;
   ready: () => Promise<Session | null>;
 }
 declare module '#app' {

@@ -25,6 +25,7 @@ import { resetApiUpdateState } from '@/stores/tarkov/apiUpdateNotifier';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
 import {
   clearDeviceDataRemoval,
+  clearIncompleteDeviceDataRemoval,
   isDeviceDataRemovalPending,
   registerDeviceDataRemovalCleanup,
   removeAccountDeviceData,
@@ -1411,6 +1412,7 @@ export async function initializeTarkovSync() {
     logger.debug('[TarkovStore] Setting up Supabase sync and listener');
     // A new sign-in ends any device-data removal requested for the previous session.
     clearDeviceDataRemoval();
+    clearIncompleteDeviceDataRemoval(currentUserId);
     if (!retryBlockedAccountRecoveryRetention()) {
       setActiveProgressWritesBlocked(true);
       toastI18n.showLoadFailed();
@@ -1885,6 +1887,9 @@ export async function initializeTarkovSync() {
       throw new Error('Supabase initial load failed');
     }
     markProgressMetadataHydrated();
+    // The startup merge reconciled local changes with the cloud; a previous failed attempt's
+    // unavailable status no longer applies. The sync controller reports from here on.
+    resetCloudSaveStatus();
     syncMetadataAfterStartup(tarkovStore, isStartupCurrent);
     if (preservedLocalSnapshot) {
       pendingResetProgressSnapshot = null;

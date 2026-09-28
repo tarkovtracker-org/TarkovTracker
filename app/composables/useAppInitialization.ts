@@ -1,5 +1,9 @@
 import { useSupporter } from '@/composables/useSupporter';
 import { useToastI18n } from '@/composables/useToastI18n';
+import {
+  hasPendingCloudChanges,
+  markCloudSyncUnavailable,
+} from '@/stores/tarkov/progressSaveStatus';
 import { useActivityLogStore } from '@/stores/useActivityLogStore';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
@@ -112,12 +116,20 @@ export function useAppInitialization() {
     // disconnect cross-device updates. Tear the machinery down so the retry
     // starts from a clean slate.
     resetTarkovSync('initial sync failed');
+    markCloudSyncUnavailable(() => retrySyncNow(expectedUserId, expectedToken));
     reportSyncFailure();
     if (syncRetryAttempts >= SYNC_RETRY_MAX_ATTEMPTS) {
       showLoadFailed();
       return;
     }
     scheduleSyncRetry(expectedUserId, expectedToken);
+  };
+  /** Manual retry from the save indicator: restart initialization now with a fresh budget. */
+  const retrySyncNow = async (expectedUserId?: string, expectedToken?: number) => {
+    cancelSyncRetry();
+    syncRetryAttempts = 0;
+    await runAuthenticatedInitialization(expectedUserId, expectedToken);
+    return !hasPendingCloudChanges();
   };
   const runAuthenticatedInitialization = async (
     expectedUserId?: string,

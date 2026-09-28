@@ -230,6 +230,8 @@ export const performReset = async (mode: ResetMode, store: ResetTargetStore): Pr
   );
   if (retentionOwnerId) {
     for (const resetMode of resetModes) {
+      // An untouched mode has nothing to supersede.
+      if (deepEqual(store.$state[resetMode], freshState[resetMode])) continue;
       const seasonNumber =
         resetMode === 'seasonal' ? (store.$state.seasonalSeasonNumber ?? null) : null;
       const copy = saveSupersededProgressCopy(

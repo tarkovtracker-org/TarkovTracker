@@ -910,11 +910,13 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   15 s / 60 s) is exhausted. Exhaustion keeps the changes pending; later edits still attempt a
   debounced save, and a manual retry (`retryCloudSave`) or the browser `online` event restarts
   the budget. Failures are classified as `offline`, `rate_limited`, `auth`, or `unknown` so the
-  indicator can distinguish a known cause from an unknown one.
+  indicator can distinguish a known cause from an unknown one. If the initial authenticated sync
+  fails, no controller runs, so `useAppInitialization` marks cloud saving `failed` and its manual
+  retry restarts initialization; a successful startup load clears that status.
 - **Local status.** The progress persist plugin writes through `progressPersistStorage`, because
-  `pinia-plugin-persistedstate` swallows storage exceptions. Every write of the active progress
-  key goes through `persistActiveProgressValue`, which records `saved` or `failed` (`quota`,
-  `unavailable`, `unknown`). A failed local write means the latest changes are memory-only.
+  `pinia-plugin-persistedstate` swallows storage exceptions. Store and sync writes of the active
+  progress key go through `persistActiveProgressValue`, which records `saved` or `failed` (`quota`,
+  `unavailable`, `unknown`); only the sign-out restore of the previous owner's copy writes directly. A failed local write means the latest changes are memory-only.
   If active bytes parse as neither a scoped envelope nor legacy progress, replacement first saves
   and reads back the exact bytes under an ownerless quarantine key. Quarantined bytes are never
   hydrated, assigned to an account, included in debug exports, or pruned as backups; if preservation
@@ -924,18 +926,22 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   cloud warnings also offer a manual retry. Guidance never recommends reloading or clearing site
   data as a fix.
 - **Account recovery copies.** `app/stores/tarkov/accountRecovery.ts` keeps at most one copy per
-  owner under `v2_progress_recovery_<userId>`. A session transition retains the previous owner's
-  active copy when the sync controller reports pending changes, or when no controller ran and
-  acknowledgement cannot be proven. Sign-in retains any other account's active copy before it is
+  owner under `v2_progress_recovery_<userId>`. The active-progress retention guard saves the
+  previous owner's copy before any guest or other-account state replaces it, so a session
+  transition keeps it whether or not the sync controller still reports pending changes. Sign-in retains any other account's active copy before it is
   cleared, including the hydration-time owner mismatch that previously created throwaway
   `progress_backup_*` keys. At sign-in recovery, active storage, and session handoff copies are composed using independent
   metadata and mode clocks before the normal startup merge. Higher reset epochs take precedence
   only after displaced progress is retained for export. Old-season placeholders cannot compete
   with current Seasonal progress. The recovery copy is removed only after a
   successful startup load, because the resolved state was then uploaded or already matched the
-  service. Copies are read only for their owner and never uploaded for another account.
+  service. Copies are read only for their owner and never uploaded for another account. A failed
+  read of an existing copy blocks sign-in, but a browser that refuses all storage access holds no
+  copy to protect, so cloud-only sync still starts there.
 - **Superseded copies.** Before a deliberate reset with pending cloud changes or memory-only local changes, the store keeps each
-  affected mode under an owner-scoped export-only key. Hydration also retains materialized Seasonal
+  affected mode that differs from its defaults under an owner-scoped export-only key. A remote
+  reset delivered over Realtime while local changes await acknowledgement does the same before it
+  replaces the mode; if that copy cannot be saved, active writes stay blocked. Hydration also retains materialized Seasonal
   progress stamped for an older season before sanitization clears it. These copies keep their
   original mode and season, are available from Settings → Account for export, and are never loaded
   into the tracker or sent to Supabase. They are removed only with that account's explicit device-data
@@ -946,9 +952,18 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
 - **Sign-out.** Every sign-out entry point uses `useSignOut`. It signs out immediately unless the
   changes are memory-only (local save failed and cloud changes pending); then
   `SignOutConfirmModal` explains the loss risk and defaults to staying signed in. Retry and
-  export never sign out; only the explicit discard action does. Normal sign-out requires successful
-  global revocation and reports failures so the user can retry. Account deletion uses local scope
-  only after the server has deleted the account.
+  export never sign out; only the explicit discard action does. Normal sign-out attempts global
+  revocation. When the server cannot be reached but Supabase still clears this browser's session,
+  the player is told that other sessions may remain signed in. When the session cannot be ended at
+  all (for example an expired token while offline), the failure toast offers an explicit
+  "Sign out on this device only" action (`signOutThisDevice`), which removes only this browser's
+  copy of the owner's session and discloses that the server session stays active. Account deletion
+  uses local scope only after the server has deleted the account.
+- **Auth owner fence.** The Supabase client stores its session through
+  `app/utils/supabaseAuthFence.ts` under the SDK's default key. While a sign-out is fenced to an
+  owner, the SDK's own session read and removal throw `SupabaseSessionChangedError` if another
+  account's session is stored, so a session written by another tab mid-sign-out is never revoked
+  or cleared. Any server revocation uses the token read inside the fence.
 - **Removing device data.** `DeviceDataCard` (Settings → Account) is the explicit action,
   distinct from sign-out and from cloud deletion. It registers `requestDeviceDataRemoval` before
   signing out so the progress and preferences session transitions retain no copy for that owner,
@@ -957,12 +972,14 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   request. Removal and discard confirmations belong to the authenticated owner that opened them
   and are invalidated when that owner changes. Incomplete backup cleanup reports failure but blocks
   new guest writes only while the removed owner still occupies active storage. Account deletion uses
-  the same removal for the captured deleted account and checks identity before sign-out and reset.
-  The SDK sign-out remains asynchronous and needs an atomic owner fence before this deletion flow
-  can be considered safe for an in-flight account switch.
-  Unparseable active bytes have no provable owner: explicit removal quarantines them before
-  releasing the active key, then reports incomplete removal because the opaque copy remains. If
-  quarantine cannot be verified, removal fails and the active write barrier stays in place.
+  the same removal for the captured deleted account and checks identity before sign-out and reset;
+  both sign out through the auth owner fence. If sign-out succeeded but cleanup was incomplete, the
+  card keeps a retry bound to the removed owner until it succeeds or that owner signs in again.
+  If the server cannot be reached, the confirmation offers the disclosed device-only sign-out.
+  Malformed active bytes that name the removing owner are deleted. Bytes with no provable owner are
+  quarantined before the active key is released, and a quarantine-prefixed marker keeps that
+  owner's later removals incomplete while the quarantined copy exists. If quarantine cannot be
+  verified, removal fails and the active write barrier stays in place.
 
 ### Files
 
@@ -1001,8 +1018,9 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   `app/stores/tarkov/storageQuota.ts` — per-account recovery copies, export-only superseded progress,
   and redundancy-only storage cleanup
 - `app/composables/useSignOut.ts`, `app/shell/SignOutConfirmModal.vue`,
-  `app/stores/tarkov/deviceData.ts`, `app/features/settings/DeviceDataCard.vue` — confirmed
-  sign-out for memory-only changes and explicit device-data removal
+  `app/stores/tarkov/deviceData.ts`, `app/features/settings/DeviceDataCard.vue`,
+  `app/utils/supabaseAuthFence.ts` — confirmed sign-out for memory-only changes, owner-fenced and
+  device-only sign-out, and explicit device-data removal
 - `app/server/api/profile/[userId]/[mode].get.ts`,
   `app/server/api/streamer/[userId]/[mode]/kappa.get.ts`, `app/server/api/team/members.ts` —
   mode-aware sharing and team routes
@@ -1032,8 +1050,11 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   session reset clears both, and a disposed controller cannot publish status for the next session.
 - An account recovery copy is restored or synchronized only while its owner is signed in, and
   automatic cleanup never removes a recovery copy or a legacy backup with unique content.
-- Sign-out never requires cloud connectivity, and memory-only changes are discarded only after
+- Sign-out never requires cloud connectivity: an unconfirmed revocation is disclosed, and a
+  device-only sign-out is always an explicit choice. Memory-only changes are discarded only after
   the player explicitly confirms the discard action.
+- Sign-out never revokes or clears a session stored for an account other than the one it was
+  started for; the auth storage fence enforces this inside the Supabase SDK.
 - Legacy `user_system.team` / `team_id` values are used only when neither persistent mode-specific
   team ID exists. They must never make a PvP team appear as the active PvE team or vice versa.
 - Team creation maps both the `team_memberships_user_mode_unique` SQLSTATE `23505` conflict and

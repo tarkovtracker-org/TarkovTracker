@@ -13,6 +13,12 @@ export const STORAGE_KEYS = {
   progressSupersededPrefix: `${STORAGE_PREFIX}progress_superseded_`,
   /** Opaque, ownerless preservation for active progress that cannot be parsed. */
   progressQuarantinePrefix: `${STORAGE_PREFIX}progress_quarantine_`,
+  /**
+   * `${prefix}${userId}` names the quarantine created while removing that owner's device data,
+   * so later removals stay incomplete while it exists. Shares the quarantine prefix so
+   * diagnostics exclude it with the quarantined bytes.
+   */
+  progressQuarantineRemovalMarkerPrefix: `${STORAGE_PREFIX}progress_quarantine_removal_`,
   adminLastPurge: `${STORAGE_PREFIX}tt:admin:last-purge`,
   cachePurgeAt: `${STORAGE_PREFIX}tt:cache:last-purge`,
   cachePurgeCheckAt: `${STORAGE_PREFIX}tt:cache:last-check`,

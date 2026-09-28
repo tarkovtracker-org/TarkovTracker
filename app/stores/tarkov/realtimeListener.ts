@@ -1,10 +1,17 @@
 import { useToastI18n } from '@/composables/useToastI18n';
+import { blockAccountRecoveryRetentionForOwner } from '@/stores/tarkov/accountRecovery';
 import { maybeNotifyApiUpdate } from '@/stores/tarkov/apiUpdateNotifier';
 import { detectDataConflicts } from '@/stores/tarkov/conflictDetection';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
-import { progressStorageSerializer } from '@/stores/tarkov/localStorage';
+import {
+  cloneStateSnapshot,
+  progressStorageSerializer,
+  setActiveProgressWritesBlocked,
+} from '@/stores/tarkov/localStorage';
 import { coerceGameMode, mergeProgressData, toProgressEpoch } from '@/stores/tarkov/progressMerge';
 import { readWithProgressFreshness } from '@/stores/tarkov/progressPersistence';
+import { hasUnsavedProgressChanges } from '@/stores/tarkov/progressSaveStatus';
+import { saveSupersededProgressCopy } from '@/stores/tarkov/supersededProgress';
 import {
   getLastLocalSyncTime,
   isLikelySelfOriginUpdate,
@@ -35,6 +42,29 @@ import {
 import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 const SYNC_RESUME_DELAY_MS = 1000;
+const mayHaveUnacknowledgedLocalChanges = (): boolean =>
+  (getRegisteredSyncController()?.hasPendingChanges?.() ?? true) || hasUnsavedProgressChanges();
+/**
+ * A remote reset received while local changes await acknowledgement supersedes them (see
+ * `CONTEXT.md`): keep them export-only before the reset replaces them. If that cannot be
+ * saved, active writes stay blocked so the stored pre-reset copy is not overwritten.
+ */
+const archiveProgressDisplacedByRemoteReset = (
+  ownerId: string,
+  mode: GameMode,
+  local: UserState,
+  remoteProgress: UserProgressData
+): void => {
+  if (toProgressEpoch(remoteProgress) <= toProgressEpoch(local[mode])) return;
+  if (!hasMaterializedProgress(local[mode]) || !mayHaveUnacknowledgedLocalChanges()) return;
+  const seasonNumber = mode === 'seasonal' ? (local.seasonalSeasonNumber ?? null) : null;
+  if (saveSupersededProgressCopy(ownerId, mode, seasonNumber, cloneStateSnapshot(local[mode]))) {
+    return;
+  }
+  logger.error('[TarkovStore] Could not retain progress displaced by a remote reset', { mode });
+  blockAccountRecoveryRetentionForOwner(ownerId);
+  setActiveProgressWritesBlocked(true);
+};
 export type SyncControllerHandle = {
   hasPendingChanges?: () => boolean;
   captureRemoteMerge?: () => RemoteStateMerge;
@@ -418,6 +448,9 @@ async function runSetupRealtimeListener(
     if (!remote) return;
     const { mode, progress: remoteProgress, updateTime } = remote;
     const localState = sanitizeOwnedUserState(tarkovStore.$state);
+    if (currentUserId) {
+      archiveProgressDisplacedByRemoteReset(currentUserId, mode, localState, remoteProgress);
+    }
     const merged = mergeProgressData(localState[mode], remoteProgress, true);
     const nextProgress = reconcile(
       { [mode]: remoteProgress },

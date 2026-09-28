@@ -2,6 +2,7 @@ import { defaultState, type UserProgressData, type UserState } from '@/stores/pr
 import {
   parsePersistedProgressState,
   cloneStateSnapshot,
+  isLocalStorageInaccessible,
   isUnparseableProgressStorageValue,
   preserveUnparseableActiveProgress,
   safeGetItem,
@@ -176,6 +177,8 @@ const readRecoveryStorage = (ownerId: string): { ok: boolean; raw: string | null
   try {
     return { ok: true, raw: localStorage.getItem(recoveryKey(ownerId)) };
   } catch (error) {
+    // Fully blocked storage holds no copy to protect, and every write fails as well.
+    if (isLocalStorageInaccessible()) return { ok: true, raw: null };
     logger.error('[AccountRecovery] Could not read the account recovery copy', error);
     return { ok: false, raw: null };
   }

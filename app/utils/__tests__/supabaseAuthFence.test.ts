@@ -1,0 +1,86 @@
+// @vitest-environment happy-dom
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  createOwnerFencedAuthStorage,
+  isSupabaseSessionChangedError,
+  supabaseAuthStorageKey,
+} from '@/utils/supabaseAuthFence';
+const KEY = 'sb-project-auth-token';
+const session = (userId: string) => JSON.stringify({ access_token: 'a', user: { id: userId } });
+describe('owner-fenced Supabase auth storage', () => {
+  afterEach(() => {
+    localStorage.clear();
+    vi.restoreAllMocks();
+  });
+  it('derives the same storage key as the Supabase client default', () => {
+    expect(supabaseAuthStorageKey('https://project.supabase.co')).toBe(KEY);
+  });
+  it('passes every operation through while no owner is fenced', () => {
+    const { storage } = createOwnerFencedAuthStorage(KEY, localStorage);
+    storage.setItem(KEY, session('user-2'));
+    expect(storage.getItem(KEY)).toBe(session('user-2'));
+    storage.removeItem(KEY);
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+  it('refuses to read or remove another account session while an owner is fenced', async () => {
+    const fence = createOwnerFencedAuthStorage(KEY, localStorage);
+    localStorage.setItem(KEY, session('user-2'));
+    await fence.withOwnerFence('user-1', async () => {
+      expect(() => fence.storage.getItem(KEY)).toThrow(
+        expect.objectContaining({ name: 'SupabaseSessionChangedError' })
+      );
+      expect(() => fence.storage.removeItem(KEY)).toThrow();
+      expect(() => fence.removeFencedSession()).toThrow();
+    });
+    expect(localStorage.getItem(KEY)).toBe(session('user-2'));
+    // The fence ends with the operation.
+    expect(fence.storage.getItem(KEY)).toBe(session('user-2'));
+  });
+  it('lets the fenced owner, unrelated keys, and unreadable values through', async () => {
+    const fence = createOwnerFencedAuthStorage(KEY, localStorage);
+    localStorage.setItem(`${KEY}-code-verifier`, 'verifier');
+    await fence.withOwnerFence('user-1', async () => {
+      localStorage.setItem(KEY, session('user-1'));
+      expect(fence.storage.getItem(KEY)).toBe(session('user-1'));
+      fence.removeFencedSession();
+      expect(localStorage.getItem(KEY)).toBeNull();
+      localStorage.setItem(KEY, 'not-json');
+      expect(fence.storage.getItem(KEY)).toBe('not-json');
+      fence.storage.removeItem(`${KEY}-code-verifier`);
+    });
+    expect(localStorage.getItem(`${KEY}-code-verifier`)).toBeNull();
+  });
+  it('keeps the fence until the outermost same-owner operation ends', async () => {
+    const fence = createOwnerFencedAuthStorage(KEY, localStorage);
+    let releaseOuter!: () => void;
+    const outer = fence.withOwnerFence(
+      'user-1',
+      () => new Promise<void>((resolve) => (releaseOuter = resolve))
+    );
+    await fence.withOwnerFence('user-1', async () => undefined);
+    localStorage.setItem(KEY, session('user-2'));
+    expect(() => fence.storage.getItem(KEY)).toThrow();
+    await expect(fence.withOwnerFence('user-2', async () => undefined)).rejects.toSatisfy(
+      isSupabaseSessionChangedError
+    );
+    releaseOuter();
+    await outer;
+    expect(fence.storage.getItem(KEY)).toBe(session('user-2'));
+  });
+  it('requires a fence before removing the session directly', () => {
+    const fence = createOwnerFencedAuthStorage(KEY, localStorage);
+    localStorage.setItem(KEY, session('user-1'));
+    expect(() => fence.removeFencedSession()).toThrow('requires an owner fence');
+    expect(localStorage.getItem(KEY)).toBe(session('user-1'));
+  });
+  it('falls back to memory storage when browser storage is unavailable', () => {
+    const blocked = vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    const { storage } = createOwnerFencedAuthStorage(KEY);
+    storage.setItem(KEY, session('user-1'));
+    expect(storage.getItem(KEY)).toBe(session('user-1'));
+    blocked.mockRestore();
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+});

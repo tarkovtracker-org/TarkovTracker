@@ -3,12 +3,13 @@
     :key="confirmationOwner ?? 'closed'"
     v-model:open="confirmOpen"
     :dismissible="!signingOut"
+    :close="!signingOut"
   >
-    <template #header>
-      <div class="flex items-center gap-2">
+    <template #title>
+      <span class="flex items-center gap-2 text-lg font-semibold">
         <UIcon name="i-mdi-content-save-alert-outline" class="text-error-400 h-5 w-5" />
-        <h3 class="text-lg font-semibold">{{ t('sign_out_confirm.title') }}</h3>
-      </div>
+        {{ t('sign_out_confirm.title') }}
+      </span>
     </template>
     <template #body>
       <div class="space-y-3 text-sm">

@@ -4,32 +4,51 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { resetCloudSaveStatus, setCloudSaveStatus } from '@/stores/tarkov/progressSaveStatus';
-const { calls, deviceData, exportProgress, exportSupersededProgress, signOutNow, toastAdd, user } =
-  vi.hoisted(() => {
-    const order: string[] = [];
-    return {
-      calls: order,
-      deviceData: {
-        requestDeviceDataRemoval: vi.fn(() => order.push('request')),
-        clearDeviceDataRemoval: vi.fn(() => order.push('clear')),
-        removeAccountDeviceData: vi.fn(() => {
-          order.push('remove');
-          return true;
-        }),
-      },
-      signOutNow: vi.fn(async () => {
-        order.push('signOut');
+const {
+  calls,
+  deviceData,
+  exportProgress,
+  exportSupersededProgress,
+  lastFailure,
+  signOutNow,
+  signOutThisDevice,
+  toastAdd,
+  user,
+} = vi.hoisted(() => {
+  const order: string[] = [];
+  return {
+    calls: order,
+    deviceData: {
+      requestDeviceDataRemoval: vi.fn(() => order.push('request')),
+      clearDeviceDataRemoval: vi.fn(() => order.push('clear')),
+      removeAccountDeviceData: vi.fn(() => {
+        order.push('remove');
         return true;
       }),
-      exportProgress: vi.fn(async () => undefined),
-      exportSupersededProgress: vi.fn(async () => undefined),
-      toastAdd: vi.fn(),
-      user: { id: 'user-1' as string | null, loggedIn: true },
-    };
-  });
+    },
+    signOutNow: vi.fn(async (_owner?: string | null, _options?: unknown) => {
+      order.push('signOut');
+      return true;
+    }),
+    signOutThisDevice: vi.fn(async (_owner: string | null) => {
+      order.push('signOutThisDevice');
+      return true;
+    }),
+    lastFailure: { value: null as 'session_changed' | 'revocation_unavailable' | null },
+    exportProgress: vi.fn(async () => undefined),
+    exportSupersededProgress: vi.fn(async () => undefined),
+    toastAdd: vi.fn(),
+    user: { id: 'user-1' as string | null, loggedIn: true },
+  };
+});
 const reactiveUser = reactive(user);
-vi.mock('@/stores/tarkov/deviceData', () => deviceData);
-vi.mock('@/composables/useSignOut', () => ({ useSignOut: () => ({ signOutNow }) }));
+vi.mock('@/stores/tarkov/deviceData', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/stores/tarkov/deviceData')>()),
+  ...deviceData,
+}));
+vi.mock('@/composables/useSignOut', () => ({
+  useSignOut: () => ({ signOutNow, signOutThisDevice, lastFailure }),
+}));
 vi.mock('@/composables/useDataBackup', () => ({
   useDataBackup: () => ({ exportProgress, exportSupersededProgress }),
 }));
@@ -52,9 +71,12 @@ const mountCard = async () => {
           props: ['open'],
           emits: ['update:open'],
           template:
-            '<div v-if="open"><button data-testid="modal-dismiss" @click="$emit(\'update:open\', false)">Dismiss</button><slot name="header" /><slot name="body" /><slot name="footer" :close="() => {}" /></div>',
+            '<div v-if="open"><button data-testid="modal-dismiss" @click="$emit(\'update:open\', false)">Dismiss</button><slot name="title" /><slot name="body" /><slot name="footer" :close="() => {}" /></div>',
         },
-        UAlert: { props: ['title'], template: '<p v-bind="$attrs">{{ title }}</p>' },
+        UAlert: {
+          props: ['title'],
+          template: '<div v-bind="$attrs"><p>{{ title }}</p><slot name="actions" /></div>',
+        },
         UIcon: true,
         UButton: {
           props: ['disabled'],
@@ -67,10 +89,13 @@ const mountCard = async () => {
   });
 };
 describe('DeviceDataCard', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     localStorage.clear();
     vi.clearAllMocks();
     calls.length = 0;
+    lastFailure.value = null;
+    const { clearIncompleteDeviceDataRemoval } = await import('@/stores/tarkov/deviceData');
+    clearIncompleteDeviceDataRemoval('user-1');
     deviceData.removeAccountDeviceData.mockImplementation(() => {
       calls.push('remove');
       return true;
@@ -218,6 +243,81 @@ describe('DeviceDataCard', () => {
     expect(wrapper.find('[data-testid="device-data-confirm"]').exists()).toBe(false);
     expect(deviceData.removeAccountDeviceData).not.toHaveBeenCalled();
     wrapper.unmount();
+  });
+  it('signs out the confirmed owner explicitly, without the device-only toast fallback', async () => {
+    const wrapper = await mountCard();
+    await wrapper.get('[data-testid="device-data-remove"]').trigger('click');
+    await wrapper.get('[data-testid="device-data-confirm"]').trigger('click');
+    await flushPromises();
+    expect(signOutNow).toHaveBeenCalledWith('user-1', { offerDeviceOnlyFallback: false });
+  });
+  it('keeps a retry bound to the signed-out owner when cleanup fails after sign-out', async () => {
+    deviceData.removeAccountDeviceData.mockReturnValue(false);
+    signOutNow.mockImplementation(async () => {
+      reactiveUser.id = null;
+      reactiveUser.loggedIn = false;
+      return true;
+    });
+    const wrapper = await mountCard();
+    await wrapper.get('[data-testid="device-data-remove"]').trigger('click');
+    await wrapper.get('[data-testid="device-data-confirm"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('[data-testid="device-data-remove"]').attributes('disabled')).toBeDefined();
+    expect(wrapper.find('[data-testid="device-data-remove-incomplete"]').exists()).toBe(true);
+    toastAdd.mockClear();
+    // The retry runs the real owner-scoped removal for the captured owner, not the signed-in one.
+    await wrapper.get('[data-testid="device-data-retry-removal"]').trigger('click');
+    await flushPromises();
+    expect(toastAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'settings.device_data.removed', color: 'success' })
+    );
+    expect(wrapper.find('[data-testid="device-data-remove-incomplete"]').exists()).toBe(false);
+  });
+  it('hides the pending retry while the removed owner is signed in again', async () => {
+    const { markDeviceDataRemovalIncomplete } = await import('@/stores/tarkov/deviceData');
+    markDeviceDataRemovalIncomplete('user-1');
+    const wrapper = await mountCard();
+    expect(wrapper.find('[data-testid="device-data-remove-incomplete"]').exists()).toBe(false);
+    reactiveUser.id = 'user-2';
+    await nextTick();
+    expect(wrapper.find('[data-testid="device-data-remove-incomplete"]').exists()).toBe(true);
+  });
+  it('offers a disclosed device-only sign-out when the server cannot be reached', async () => {
+    signOutNow.mockImplementation(async () => {
+      calls.push('signOut');
+      lastFailure.value = 'revocation_unavailable';
+      return false;
+    });
+    const wrapper = await mountCard();
+    await wrapper.get('[data-testid="device-data-remove"]').trigger('click');
+    expect(wrapper.find('[data-testid="device-data-confirm-device-only"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="device-data-confirm"]').trigger('click');
+    await flushPromises();
+    expect(deviceData.removeAccountDeviceData).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-testid="device-data-revocation-unavailable"]').exists()).toBe(true);
+    await wrapper.get('[data-testid="device-data-confirm-device-only"]').trigger('click');
+    await flushPromises();
+    expect(signOutThisDevice).toHaveBeenCalledWith('user-1');
+    expect(calls).toEqual([
+      'request',
+      'signOut',
+      'clear',
+      'request',
+      'signOutThisDevice',
+      'remove',
+      'clear',
+    ]);
+  });
+  it('does not offer the device-only path when a different account took over', async () => {
+    signOutNow.mockImplementation(async () => {
+      lastFailure.value = 'session_changed';
+      return false;
+    });
+    const wrapper = await mountCard();
+    await wrapper.get('[data-testid="device-data-remove"]').trigger('click');
+    await wrapper.get('[data-testid="device-data-confirm"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="device-data-confirm-device-only"]').exists()).toBe(false);
   });
   it('clears owner-scoped export controls when the current account signs out', async () => {
     const wrapper = await mountCard();

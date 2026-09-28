@@ -4,7 +4,17 @@ import { hasSupabaseAuthSessionHint } from '@/utils/clientStorage';
 import { logger } from '@/utils/logger';
 import { installRealtimeVisibility } from '@/utils/realtimeVisibility';
 import { shouldUseOfflineSupabaseFallback } from '@/utils/runtimeConfig';
+import {
+  createOwnerFencedAuthStorage,
+  SupabaseSessionChangedError,
+  supabaseAuthStorageKey,
+} from '@/utils/supabaseAuthFence';
 import { hydrateUserFromSession } from '@/utils/userHydration';
+/**
+ * `signed_out_locally`: this browser's session ended, but the server did not confirm
+ * revocation (for example while offline), so other sessions may remain active.
+ */
+type SupabaseSignOutOutcome = 'signed_out' | 'signed_out_locally';
 type OAuthProvider = 'twitch' | 'discord' | 'google' | 'github';
 type SupabaseUser = {
   id: string | null;
@@ -221,7 +231,11 @@ const buildStub = () => {
       });
       throw new Error('Supabase not configured - login unavailable in offline mode');
     },
-    signOut: async (_expectedUserId?: string, _scope?: 'global' | 'local') => {},
+    signOut: async (
+      _expectedUserId?: string,
+      _scope?: 'global' | 'local'
+    ): Promise<SupabaseSignOutOutcome> => 'signed_out',
+    signOutThisDevice: async (_expectedUserId: string): Promise<void> => {},
     ready: async (): Promise<Session | null> => null,
   };
 };
@@ -251,6 +265,7 @@ export default defineNuxtPlugin({
     }
     const user = createSupabaseUserState();
     const stub = buildStub();
+    let authStorage: ReturnType<typeof createOwnerFencedAuthStorage> | null = null;
     let initPromise: Promise<void> | null = null;
     let readySessionPromise: Promise<Session | null> | null = null;
     let supabaseClient: SupabaseClient | null = null;
@@ -321,12 +336,17 @@ export default defineNuxtPlugin({
     const createSupabaseClient = async (): Promise<SupabaseClient> => {
       try {
         const { createClient } = await import('@supabase/supabase-js');
+        const authStorageKey = supabaseAuthStorageKey(supabaseUrl);
+        const fencedStorage = createOwnerFencedAuthStorage(authStorageKey);
         const client = createClient(supabaseUrl, supabaseKey, {
           auth: {
             detectSessionInUrl: !hasCodeQueryParam,
             flowType: 'pkce',
+            storage: fencedStorage.storage,
+            storageKey: authStorageKey,
           },
         });
+        authStorage = fencedStorage;
         if (client.realtime) {
           const disposeVisibility = installRealtimeVisibility(client.realtime);
           if (import.meta.hot) import.meta.hot.dispose(disposeVisibility);
@@ -483,28 +503,84 @@ export default defineNuxtPlugin({
       if (error) throw error;
       return data;
     };
-    const signOut = async (expectedUserId?: string, scope: 'global' | 'local' = 'global') => {
-      await ensureClientInitialized();
-      if (!supabaseClient) {
-        logger.debug('[Supabase] signOut skipped because client is not initialized');
-        return;
-      }
-      if (expectedUserId) {
-        // Recheck after initialization so a different session present now is never signed out.
-        // The SDK may still change sessions between this check and signOut; this is not atomic.
-        const { data, error } = await supabaseClient.auth.getSession();
-        if (error) throw error;
-        if (user.id !== expectedUserId || data.session?.user.id !== expectedUserId) {
-          throw new Error('Supabase session changed before sign-out');
-        }
-      }
+    /** The owner's session has ended in this tab once hydration no longer names it. */
+    const endedLocally = (ownerId: string | null): boolean =>
+      ownerId !== null && user.id !== ownerId;
+    const assertSignOutOwner = (expectedUserId?: string): void => {
+      if (expectedUserId && user.id !== expectedUserId) throw new SupabaseSessionChangedError();
+    };
+    const withSignOutFence = <T>(
+      ownerId: string | null,
+      operation: () => Promise<T>
+    ): Promise<T> =>
+      ownerId && authStorage ? authStorage.withOwnerFence(ownerId, operation) : operation();
+    const runSdkSignOut = async (
+      client: SupabaseClient,
+      scope: 'global' | 'local',
+      ownerId: string | null
+    ): Promise<SupabaseSignOutOutcome> => {
       signOutOwnsChannelTeardown = true;
       try {
-        const { error } = await supabaseClient.auth.signOut({ scope });
-        if (error) throw error;
+        const { error } = await client.auth.signOut({ scope });
+        // The SDK clears this browser's session even when the server cannot be reached.
+        if (error && !endedLocally(ownerId)) throw error;
+        await removeAllRealtimeChannels();
+        if (!error) return 'signed_out';
+        logger.warn('[Supabase] Server sign-out was not confirmed; signed out locally', error);
+        return 'signed_out_locally';
+      } finally {
+        signOutOwnsChannelTeardown = false;
+      }
+    };
+    /**
+     * Signs out the session owned by `expectedUserId` (default: the hydrated user). The owner
+     * fence makes the SDK refuse to revoke or clear any other account's stored session.
+     */
+    const signOut = async (
+      expectedUserId?: string,
+      scope: 'global' | 'local' = 'global'
+    ): Promise<SupabaseSignOutOutcome> => {
+      await ensureClientInitialized();
+      const client = supabaseClient;
+      if (!client) {
+        logger.debug('[Supabase] signOut skipped because client is not initialized');
+        return 'signed_out';
+      }
+      assertSignOutOwner(expectedUserId);
+      const ownerId = expectedUserId ?? user.id;
+      return await withSignOutFence(ownerId, () => runSdkSignOut(client, scope, ownerId));
+    };
+    const clearFencedSessionLocally = async (client: SupabaseClient): Promise<void> => {
+      authStorage?.removeFencedSession();
+      signOutOwnsChannelTeardown = true;
+      try {
+        // With the stored session gone, this makes no request; it clears SDK state and
+        // emits SIGNED_OUT to this and other tabs.
+        const { error } = await client.auth.signOut({ scope: 'local' });
+        if (error) logger.warn('[Supabase] Local sign-out cleanup reported an error', error);
         await removeAllRealtimeChannels();
       } finally {
         signOutOwnsChannelTeardown = false;
+      }
+    };
+    /**
+     * Explicit fallback when the server cannot be reached to end the session: removes only
+     * this browser's copy of `expectedUserId`'s session. The server session is not revoked.
+     */
+    const signOutThisDevice = async (expectedUserId: string): Promise<void> => {
+      await ensureClientInitialized();
+      const client = supabaseClient;
+      if (!client) return;
+      assertSignOutOwner(expectedUserId);
+      try {
+        await withSignOutFence(expectedUserId, () => clearFencedSessionLocally(client));
+      } finally {
+        // Hydrate whatever is stored now if the removed session is still displayed.
+        if (user.id === expectedUserId) {
+          await refreshFromStoredSession().catch((error: unknown) => {
+            logger.warn('[Supabase] Could not re-read the session after local sign-out', error);
+          });
+        }
       }
     };
     const api = reactive({
@@ -513,6 +589,7 @@ export default defineNuxtPlugin({
       isOfflineMode: false,
       signInWithOAuth,
       signOut,
+      signOutThisDevice,
       ready,
     });
     if (oauthCallbackCode) {

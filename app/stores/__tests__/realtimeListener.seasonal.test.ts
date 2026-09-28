@@ -334,6 +334,44 @@ describe('seasonal progress realtime synchronization', () => {
       registerSyncControllerGetter(() => null);
     }
   });
+  it('keeps pending local progress export-only when a live remote reset replaces it', async () => {
+    const { setupRealtimeListener, registerSyncControllerGetter } =
+      await import('@/stores/tarkov/realtimeListener');
+    const { listSupersededProgressCopies } = await import('@/stores/tarkov/supersededProgress');
+    localStorage.clear();
+    let pending = true;
+    registerSyncControllerGetter(() => ({
+      pause: vi.fn(),
+      resume: vi.fn(),
+      hasPendingChanges: () => pending,
+    }));
+    const emitReset = (updatedAt: string, epoch: number) =>
+      handlers.get('user_game_mode_progress')?.({
+        new: {
+          game_mode: 'pvp',
+          season_number: 0,
+          progress_data: { ...structuredClone(defaultState.pvp), progressEpoch: epoch },
+          updated_at: updatedAt,
+        },
+      });
+    try {
+      await setupRealtimeListener(store);
+      Object.assign(state.pvp, { level: 30, displayName: 'offline edit' });
+      emitReset('2026-09-06T12:00:00Z', 1);
+      expect(state.pvp.progressEpoch).toBe(1);
+      const copies = listSupersededProgressCopies(supabaseContext.user.id);
+      expect(copies).toHaveLength(1);
+      expect(copies[0]).toMatchObject({ mode: 'pvp', progress: { level: 30 } });
+      // Acknowledged progress is already cloud-saved, so a later reset keeps no extra copy.
+      pending = false;
+      state.pvp.level = 12;
+      emitReset('2026-09-06T12:01:00Z', 2);
+      expect(listSupersededProgressCopies(supabaseContext.user.id)).toHaveLength(1);
+    } finally {
+      registerSyncControllerGetter(() => null);
+      localStorage.clear();
+    }
+  });
   it('ignores late progress events while the shared transport is suspended', async () => {
     vi.useFakeTimers();
     const page = Object.assign(new EventTarget(), { visibilityState: 'hidden' as const });

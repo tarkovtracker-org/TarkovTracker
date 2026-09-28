@@ -37,15 +37,42 @@
         >
           {{ t('settings.device_data.remove_button') }}
         </UButton>
+        <UAlert
+          v-if="showsIncompleteRemoval"
+          icon="i-mdi-alert-circle"
+          color="error"
+          variant="subtle"
+          role="alert"
+          :title="t('settings.device_data.remove_incomplete')"
+          data-testid="device-data-remove-incomplete"
+        >
+          <template #actions>
+            <UButton
+              color="error"
+              variant="solid"
+              size="sm"
+              :loading="retryingRemoval"
+              data-testid="device-data-retry-removal"
+              @click="handleRetryRemoval"
+            >
+              {{ t('settings.device_data.retry_removal') }}
+            </UButton>
+          </template>
+        </UAlert>
       </div>
     </template>
   </GenericCard>
-  <UModal :key="confirmationOwner ?? 'closed'" v-model:open="confirmOpen" :dismissible="!removing">
-    <template #header>
-      <div class="flex items-center gap-2">
+  <UModal
+    :key="confirmationOwner ?? 'closed'"
+    v-model:open="confirmOpen"
+    :dismissible="!removing"
+    :close="!removing"
+  >
+    <template #title>
+      <span class="flex items-center gap-2 text-lg font-semibold">
         <UIcon name="i-mdi-alert" class="text-error-400 h-5 w-5" />
-        <h3 class="text-lg font-semibold">{{ t('settings.device_data.confirm_title') }}</h3>
-      </div>
+        {{ t('settings.device_data.confirm_title') }}
+      </span>
     </template>
     <template #body>
       <div class="space-y-3 text-sm">
@@ -57,6 +84,15 @@
           variant="subtle"
           :title="t('settings.device_data.pending_warning')"
           data-testid="device-data-pending-warning"
+        />
+        <UAlert
+          v-if="deviceOnlyAvailable"
+          icon="i-mdi-cloud-off-outline"
+          color="warning"
+          variant="subtle"
+          role="alert"
+          :title="t('settings.device_data.revocation_unavailable')"
+          data-testid="device-data-revocation-unavailable"
         />
       </div>
     </template>
@@ -74,8 +110,19 @@
           {{ t('progress_save_status.export_button') }}
         </UButton>
         <UButton
-          color="error"
+          v-if="deviceOnlyAvailable"
+          color="warning"
+          variant="soft"
           class="ml-auto"
+          :loading="removing"
+          data-testid="device-data-confirm-device-only"
+          @click="deviceOnlyRemovalAction"
+        >
+          {{ t('settings.device_data.confirm_device_only_button') }}
+        </UButton>
+        <UButton
+          color="error"
+          :class="deviceOnlyAvailable ? undefined : 'ml-auto'"
           :loading="removing"
           data-testid="device-data-confirm"
           @click="removalAction"
@@ -92,8 +139,11 @@
   import { useSignOut } from '@/composables/useSignOut';
   import {
     clearDeviceDataRemoval,
+    incompleteDeviceDataRemovalOwner,
+    markDeviceDataRemovalIncomplete,
     removeAccountDeviceData,
     requestDeviceDataRemoval,
+    retryIncompleteDeviceDataRemoval,
   } from '@/stores/tarkov/deviceData';
   import {
     hasPendingCloudChanges,
@@ -105,20 +155,31 @@
   const toast = useToast();
   const { $supabase } = useNuxtApp();
   const { exportProgress, exportSupersededProgress } = useDataBackup();
-  const { signOutNow } = useSignOut();
+  const { signOutNow, signOutThisDevice, lastFailure } = useSignOut();
   const confirmOpen = ref(false);
   const confirmationOwner = ref<string | null>(null);
   const removing = ref(false);
+  const retryingRemoval = ref(false);
+  /** Set when global sign-out could not reach the server and the session is still active. */
+  const deviceOnlyAvailable = ref(false);
   const isLoggedIn = computed(() => Boolean($supabase.user.loggedIn && $supabase.user.id));
   const pendingCloudChanges = computed(
     () => hasPendingCloudChanges() || hasUnsavedProgressChanges()
   );
+  /** The failed removal's owner is signed out; its retry must not run inside its own session. */
+  const showsIncompleteRemoval = computed(
+    () =>
+      incompleteDeviceDataRemovalOwner.value !== null &&
+      incompleteDeviceDataRemovalOwner.value !== $supabase.user.id
+  );
   const closeRemovalConfirmation = () => {
     confirmationOwner.value = null;
     confirmOpen.value = false;
+    deviceOnlyAvailable.value = false;
   };
   const openRemovalConfirmation = () => {
     if (!isLoggedIn.value) return;
+    deviceOnlyAvailable.value = false;
     confirmationOwner.value = $supabase.user.id;
     confirmOpen.value = true;
   };
@@ -160,21 +221,28 @@
       toast.add({ title: t('settings.device_data.superseded_export_error'), color: 'error' });
     }
   };
+  type SignOutMode = 'global' | 'device';
+  const signOutOwner = (userId: string, mode: SignOutMode): Promise<boolean> =>
+    mode === 'device'
+      ? signOutThisDevice(userId)
+      : signOutNow(userId, { offerDeviceOnlyFallback: false });
   /**
    * The removal request is registered before sign-out so the session transition keeps
    * no recovery copy; stored copies are removed again once the transition has run.
    */
   const signOutAndRemove = async (
-    userId: string
+    userId: string,
+    mode: SignOutMode
   ): Promise<'removed' | 'remove_failed' | 'sign_out_failed'> => {
     requestDeviceDataRemoval(userId);
-    if (!(await signOutNow())) {
+    if (!(await signOutOwner(userId, mode))) {
       clearDeviceDataRemoval();
       return 'sign_out_failed';
     }
     await nextTick();
     const removed = removeAccountDeviceData(userId);
     clearDeviceDataRemoval();
+    if (!removed) markDeviceDataRemovalIncomplete(userId);
     return removed ? 'removed' : 'remove_failed';
   };
   const isCurrentLoggedInOwner = (owner: string | null): boolean =>
@@ -187,24 +255,48 @@
     }
     return userId;
   };
-  const removeDeviceData = async (openingOwner: string | null) => {
+  const reportRemovalResult = (result: 'removed' | 'remove_failed') => {
+    confirmOpen.value = false;
+    const removed = result === 'removed';
+    toast.add({
+      title: t(removed ? 'settings.device_data.removed' : 'settings.device_data.remove_error'),
+      color: removed ? 'success' : 'error',
+    });
+  };
+  const removeDeviceData = async (openingOwner: string | null, mode: SignOutMode) => {
     const userId = confirmedRemovalOwner(openingOwner);
     if (!userId) return;
     removing.value = true;
-    const result = await signOutAndRemove(userId).finally(() => {
+    const result = await signOutAndRemove(userId, mode).finally(() => {
       removing.value = false;
     });
-    if (result === 'sign_out_failed') return;
-    if (result === 'remove_failed') {
-      confirmOpen.value = false;
-      toast.add({ title: t('settings.device_data.remove_error'), color: 'error' });
+    if (result === 'sign_out_failed') {
+      deviceOnlyAvailable.value = lastFailure.value === 'revocation_unavailable';
       return;
     }
-    confirmOpen.value = false;
-    toast.add({ title: t('settings.device_data.removed'), color: 'success' });
+    reportRemovalResult(result);
   };
   const removalAction = computed(() => {
     const openingOwner = confirmationOwner.value;
-    return () => removeDeviceData(openingOwner);
+    return () => removeDeviceData(openingOwner, 'global');
   });
+  const deviceOnlyRemovalAction = computed(() => {
+    const openingOwner = confirmationOwner.value;
+    return () => removeDeviceData(openingOwner, 'device');
+  });
+  const handleRetryRemoval = () => {
+    retryingRemoval.value = true;
+    try {
+      const removed = retryIncompleteDeviceDataRemoval();
+      toast.add({
+        title: t(removed ? 'settings.device_data.removed' : 'settings.device_data.remove_error'),
+        color: removed ? 'success' : 'error',
+      });
+    } catch (error) {
+      logger.error('[DeviceData] Retrying device data removal failed:', error);
+      toast.add({ title: t('settings.device_data.remove_error'), color: 'error' });
+    } finally {
+      retryingRemoval.value = false;
+    }
+  };
 </script>

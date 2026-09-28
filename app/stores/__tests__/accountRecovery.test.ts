@@ -313,6 +313,28 @@ describe('account recovery copies', () => {
     expect(isAccountRecoveryRetentionBlocked()).toBe(true);
     getItem.mockRestore();
   });
+  it('does not block sign-in when the browser refuses all storage access', () => {
+    const getItem = vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    const storageAccess = vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    expect(readAccountRecoveryCopy('user-1')).toBeNull();
+    expect(isAccountRecoveryRetentionBlocked()).toBe(false);
+    storageAccess.mockRestore();
+    getItem.mockRestore();
+  });
+  it('still fails closed when only the recovery copy read fails', () => {
+    const key = recoveryKey('user-1');
+    const getItem = vi.spyOn(localStorage, 'getItem').mockImplementation((requestedKey) => {
+      if (requestedKey === key) throw new Error('storage denied');
+      return Storage.prototype.getItem.call(localStorage, requestedKey);
+    });
+    expect(readAccountRecoveryCopy('user-1')).toBeNull();
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+    getItem.mockRestore();
+  });
   it('keeps retention blocked when retry finds no recovery copy', () => {
     blockAccountRecoveryRetentionForOwner('user-1');
     setActiveProgressWritesBlocked(true);

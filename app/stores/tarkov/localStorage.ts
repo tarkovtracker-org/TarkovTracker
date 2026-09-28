@@ -174,6 +174,19 @@ export const safeGetItem = (key: string): string | null => {
     return null;
   }
 };
+/**
+ * True when the browser refuses all access to local storage (for example when site data is
+ * blocked). Nothing can then be stored, read, overwritten, or lost, unlike a single failed read.
+ */
+export const isLocalStorageInaccessible = (): boolean => {
+  if (typeof window === 'undefined') return true;
+  try {
+    void window.localStorage.length;
+    return false;
+  } catch {
+    return true;
+  }
+};
 type StorageWriteResult = { ok: true } | { ok: false; error: unknown };
 let activeProgressWritesBlocked = false;
 type ActiveProgressRetentionGuard = (current: string | null, next: string | null) => boolean;
@@ -252,19 +265,19 @@ export const isUnparseableProgressStorageValue = (raw: string): boolean => {
   }
   return !isLegacyProgressStorageValue(raw) || !parsesProgressForOwner(raw, null);
 };
-const hasOpaqueProgressQuarantine = (raw: string): boolean => {
+const findOpaqueProgressQuarantine = (raw: string): string | null => {
   for (let index = 0; index < localStorage.length; index += 1) {
     const key = localStorage.key(index);
     if (
       key?.startsWith(STORAGE_KEYS.progressQuarantinePrefix) &&
       localStorage.getItem(key) === raw
     ) {
-      return true;
+      return key;
     }
   }
-  return false;
+  return null;
 };
-const writeOpaqueProgressQuarantine = (raw: string): boolean => {
+const writeOpaqueProgressQuarantine = (raw: string): string | null => {
   const token =
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
@@ -272,39 +285,45 @@ const writeOpaqueProgressQuarantine = (raw: string): boolean => {
   for (let attempt = 0; attempt < 16; attempt += 1) {
     const key = `${STORAGE_KEYS.progressQuarantinePrefix}${token}_${attempt}`;
     const existing = localStorage.getItem(key);
-    if (existing === raw) return true;
+    if (existing === raw) return key;
     if (existing !== null) continue;
     localStorage.setItem(key, raw);
-    return localStorage.getItem(key) === raw;
+    return localStorage.getItem(key) === raw ? key : null;
   }
-  return false;
+  return null;
+};
+/** Returns the quarantine key holding `raw`, or `null` when it could not be preserved. */
+const quarantineUnparseableActiveProgress = (raw: string): string | null => {
+  if (typeof window === 'undefined' || !raw) return null;
+  try {
+    if (localStorage.getItem(STORAGE_KEYS.progress) !== raw) return null;
+    if (!isUnparseableProgressStorageValue(raw)) return null;
+    return findOpaqueProgressQuarantine(raw) ?? writeOpaqueProgressQuarantine(raw);
+  } catch (error) {
+    logger.error('[TarkovStore] Could not quarantine unparseable active progress:', error);
+  }
+  return null;
 };
 /**
  * Retains unparseable active bytes in a fresh ownerless slot. Quarantined values are never
  * interpreted as progress and are not overwritten, exported, or pruned as backups.
  */
-export const preserveUnparseableActiveProgress = (raw: string): boolean => {
-  if (typeof window === 'undefined' || !raw) return false;
+export const preserveUnparseableActiveProgress = (raw: string): boolean =>
+  quarantineUnparseableActiveProgress(raw) !== null;
+/**
+ * Explicit device cleanup may release malformed active bytes only after exact quarantine.
+ * Returns the quarantine key once the active slot is released, otherwise `null`.
+ */
+export const quarantineAndRemoveUnparseableActiveProgress = (raw: string): string | null => {
+  const quarantineKey = quarantineUnparseableActiveProgress(raw);
+  if (!quarantineKey) return null;
   try {
-    if (localStorage.getItem(STORAGE_KEYS.progress) !== raw) return false;
-    if (!isUnparseableProgressStorageValue(raw)) return false;
-    if (hasOpaqueProgressQuarantine(raw)) return true;
-    return writeOpaqueProgressQuarantine(raw);
-  } catch (error) {
-    logger.error('[TarkovStore] Could not quarantine unparseable active progress:', error);
-  }
-  return false;
-};
-/** Explicit device cleanup may release malformed active bytes only after exact quarantine. */
-export const quarantineAndRemoveUnparseableActiveProgress = (raw: string): boolean => {
-  if (!preserveUnparseableActiveProgress(raw)) return false;
-  try {
-    if (localStorage.getItem(STORAGE_KEYS.progress) !== raw) return false;
+    if (localStorage.getItem(STORAGE_KEYS.progress) !== raw) return null;
     localStorage.removeItem(STORAGE_KEYS.progress);
-    return localStorage.getItem(STORAGE_KEYS.progress) === null;
+    return localStorage.getItem(STORAGE_KEYS.progress) === null ? quarantineKey : null;
   } catch (error) {
     logger.error('[TarkovStore] Could not remove quarantined active progress:', error);
-    return false;
+    return null;
   }
 };
 /**

@@ -88,6 +88,10 @@
     "error_loading": "Error Loading Tarkov Data",
     "loading": "Loading Tarkov Data",
     "logout_failed": "Unable to log out. Please try again.",
+    "logout_unreachable": "The server could not be reached, so you are still signed in. You can sign out on this device only; the server will not be told, so the session there stays active until it expires or you sign out from another device.",
+    "logout_this_device": "Sign out on this device only",
+    "logout_this_device_done": "Signed out on this device only. The session on the server stays active until it expires or you sign out from another device.",
+    "logout_local_only": "Signed out on this device. The server could not be reached, so your other sessions may still be signed in.",
     "hidden_label": "Hidden",
     "user_label": "User",
     "user_avatar_alt": "User avatar",
@@ -2467,7 +2471,11 @@
       "pending_warning": "Some progress changes have not been saved to the cloud yet. Removing this device's data will permanently discard them. Export your progress first if you want to keep them.",
       "confirm_button": "Remove data and sign out",
       "removed": "This account's data was removed from this device.",
-      "remove_error": "Some account data could not be removed from this device. Try again before using another account here."
+      "remove_error": "Some account data could not be removed from this device. Try again before using another account here.",
+      "remove_incomplete": "Some data from the account you removed is still on this device. Try again before using another account here.",
+      "retry_removal": "Try removing again",
+      "revocation_unavailable": "The server could not be reached, so you are still signed in. You can sign out on this device only and remove the data; the server will not be told, so the session there stays active until it expires or you sign out from another device.",
+      "confirm_device_only_button": "Sign out on this device only and remove data"
     }
   },
   "hideout": {

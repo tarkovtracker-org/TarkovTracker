@@ -69,6 +69,14 @@ export const retryCloudSave = async (): Promise<boolean> => {
     return false;
   }
 };
+/**
+ * Without a running sync controller nothing reaches the cloud, so a signed-in session whose
+ * initial sync failed must stay visibly pending. `retry` restarts sync initialization.
+ */
+export const markCloudSyncUnavailable = (retry: () => Promise<boolean>): void => {
+  status.cloud = { state: 'failed', failure: 'unknown', retryAttempt: 0, nextRetryAt: null };
+  cloudRetryHandler = retry;
+};
 /** Cloud status belongs to the signed-in session; local status survives sign-out. */
 export const resetCloudSaveStatus = (): void => {
   status.cloud = createIdleCloudStatus();

@@ -263,6 +263,17 @@ describe('performReset seasonal', () => {
       syncProgressStateMock.mock.invocationCallOrder[0]!
     );
   });
+  it('keeps no superseded copy for modes that are still at their defaults', async () => {
+    pendingCloudChanges.value = true;
+    const store = createStore();
+    store.$state.pve = structuredClone(defaultState.pve);
+    await performReset('all', store);
+    const retainedModes = saveSupersededProgressCopyMock.mock.calls.map(
+      (call) => (call as unknown[])[1]
+    );
+    expect(retainedModes).toContain('pvp');
+    expect(retainedModes).not.toContain('pve');
+  });
   it('aborts a controllerless idle-status reset when local progress cannot be archived', async () => {
     saveSupersededProgressCopyMock.mockReturnValueOnce(null);
     const store = createStore();

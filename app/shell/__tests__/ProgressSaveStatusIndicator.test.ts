@@ -62,6 +62,15 @@ describe('ProgressSaveStatusIndicator', () => {
   it('stays hidden while nothing is pending', async () => {
     const wrapper = await mountIndicator();
     expect(wrapper.find('[data-testid="progress-save-status"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="progress-save-status-live"]').text()).toBe('');
+  });
+  it('announces status changes through a persistent live region', async () => {
+    const wrapper = await mountIndicator();
+    const live = wrapper.get('[data-testid="progress-save-status-live"]');
+    expect(live.attributes('role')).toBe('status');
+    cloud('failed', { failure: 'offline', retryAttempt: 3 });
+    await wrapper.vm.$nextTick();
+    expect(live.text()).toBe('progress_save_status.cloud_failed_label');
   });
   it('marks pending cloud changes and confirms only the verified local copy', async () => {
     cloud('pending');
