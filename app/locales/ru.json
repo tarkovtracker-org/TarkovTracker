@@ -993,7 +993,25 @@
         "map_complete_tasks_toggle_show": "Показать скрытые",
         "map_complete_tasks_toggle_hide": "Скрыть выполненные",
         "map_hidden_hint": "Карта скрыта — нажмите, чтобы показать",
-        "raid_time_tooltip": "Время рейда в игре"
+        "raid_time_tooltip": "Время рейда в игре",
+        "raid_plan": {
+          "title": "Задания на карте",
+          "summary_all": "Показаны все {total}",
+          "summary_hidden": "{hidden} из {total} скрыты",
+          "choose_quests": "Выберите задания",
+          "show_all": "Показать всё",
+          "popover_description": "Снимите отметку с заданий, которые вы не выполняете в рейде, чтобы удалить их с карты. «Только для вас» скрывает все остальное.",
+          "only": "Только",
+          "show_only_named": "Показать только {name} на карте",
+          "show_only_quest": "Показать только этот квест на карте",
+          "hide_quest": "Скрыть от карты",
+          "show_quest": "Показать на карте",
+          "all_hidden_hint": "Каждый квест на этой карте скрыт. Используйте Показать все, чтобы вернуть его.",
+          "hidden_section_title": "Скрыто с карты ({count})",
+          "hidden_section_description": "По-прежнему отслеживалось, просто не нарисовать на карте.",
+          "hidden_section_expand": "Показать скрытые квесты",
+          "hidden_section_collapse": "Свернуть скрытые квесты"
+        }
       },
       "pinned_tasks_section": "Закреплённые задания",
       "focused_task_section": "Выбранное задание",
