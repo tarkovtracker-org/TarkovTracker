@@ -58,20 +58,25 @@ const frameAncestorsOf = (header: string): string | null => {
   const directive = match?.[1]
     ?.split(';')
     .map((part) => part.trim())
-    .find((part) => part.toLowerCase().startsWith('frame-ancestors'));
+    .find((part) => part.split(/\s+/)[0]?.toLowerCase() === 'frame-ancestors');
   return directive ? directive.slice('frame-ancestors'.length).trim() : null;
 };
+const removesContentSecurityPolicy = (header: string): boolean =>
+  /^!\s*content-security-policy\s*$/i.test(header);
 /**
- * The catch-all block must set a same-origin `frame-ancestors`, and no block may widen it, because
- * Pages applies every matching block to a response.
+ * The catch-all block must set a same-origin `frame-ancestors`, and no block may widen it or
+ * remove the inherited policy, because Pages applies every matching block to a response.
  */
 export const pagesHeadersPreventFraming = (source: string): boolean => {
   const blocks = parsePagesHeaderBlocks(source);
-  const policies = blocks.flatMap((block) =>
-    block.headers.map((header) => ({ pattern: block.pattern, value: frameAncestorsOf(header) }))
+  const headers = blocks.flatMap((block) =>
+    block.headers.map((header) => ({ pattern: block.pattern, header }))
   );
-  const framing = policies.filter((policy) => policy.value !== null);
+  const framing = headers
+    .map(({ pattern, header }) => ({ pattern, value: frameAncestorsOf(header) }))
+    .filter((policy) => policy.value !== null);
   return (
+    !headers.some(({ header }) => removesContentSecurityPolicy(header)) &&
     framing.some((policy) => policy.pattern === '/*') &&
     framing.every((policy) => SAME_ORIGIN_FRAME_ANCESTORS.has(policy.value!))
   );

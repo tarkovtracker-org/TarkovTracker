@@ -911,13 +911,16 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   debounced save, and a manual retry (`retryCloudSave`) or the browser `online` event restarts
   the budget. Every retry first reads the remote snapshot and merges it into the pending changes,
   as a Realtime reconnect does, so changes saved on another device are not overwritten by a stale
-  upload; if that read fails, the retry counts as a failed attempt and uploads nothing. Failures
+  upload; a retry that overlaps a reconnect waits for the newer snapshot. If no snapshot can be
+  merged (the read fails, the socket is suspended, or the account changed), the retry counts as a
+  failed attempt and uploads nothing. Failures
   are classified as `offline`, `rate_limited`, `auth`, or `unknown` so the
   indicator can distinguish a known cause from an unknown one. If the initial authenticated sync
   fails, no controller runs, so `useAppInitialization` marks cloud saving `failed` and its manual
   retry restarts initialization; a successful startup load clears that status. Before any
-  initialization retry, memory-only edits are handed to the startup merge as the newest session
-  snapshot (`preserveUnsavedSessionProgress`), so rehydrating from storage cannot discard them.
+  initialization retry, memory-only edits are handed to the startup merge as the session snapshot
+  (`preserveUnsavedSessionProgress`), so rehydrating from storage cannot discard them. Only the
+  edited modes and metadata get new clocks, so untouched modes still yield to newer remote progress.
 - **Local status.** The progress persist plugin writes through `progressPersistStorage`, because
   `pinia-plugin-persistedstate` swallows storage exceptions. Store and sync writes of the active
   progress key go through `persistActiveProgressValue`, which records `saved` or `failed` (`quota`,
@@ -977,7 +980,9 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   or cleared. Any server revocation uses the token read inside the fence. Browser storage stays the
   session store whenever it can be accessed: if a write fails (for example a full quota), the new
   session is held in memory and the stale persisted session is removed, so a readable session is
-  never hidden behind an empty memory store. Memory-only storage is used only when access is blocked.
+  never hidden behind an empty memory store. A session another tab persists later takes precedence
+  over that memory copy, so the owner fence still sees it. Memory-only storage is used only when
+  access is blocked.
 - **Removing device data.** `DeviceDataCard` (Settings → Account) is the explicit action,
   distinct from sign-out and from cloud deletion. It registers `requestDeviceDataRemoval` before
   signing out so the progress and preferences session transitions retain no copy for that owner,

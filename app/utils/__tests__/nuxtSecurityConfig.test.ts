@@ -107,6 +107,16 @@ describe('nuxtSecurityConfig', () => {
       false,
     ],
     ['directive text outside a header', "/*\n  X-Note: frame-ancestors 'self'\n", false],
+    [
+      'near-miss directive name',
+      "/*\n  Content-Security-Policy: frame-ancestors-extra 'self'\n",
+      false,
+    ],
+    [
+      'inherited policy removed for a sub-route',
+      "/*\n  Content-Security-Policy: frame-ancestors 'self'\n/embed/*\n  ! Content-Security-Policy\n",
+      false,
+    ],
   ])('evaluates the effective Pages framing policy: %s', (_name, source, expected) => {
     expect(pagesHeadersPreventFraming(source)).toBe(expected);
   });

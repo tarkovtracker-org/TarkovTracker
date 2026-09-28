@@ -578,19 +578,38 @@ async function runSetupRealtimeListener(
       handleModeProgressChange({ new: row }, reconcile);
     }
   };
-  const readSnapshot = async (reconcile: RemoteStateMerge, request: number) => {
-    if (snapshotIsStale(request)) return;
+  /** Resolves true only when this request's snapshot was merged. */
+  const readSnapshot = async (reconcile: RemoteStateMerge, request: number): Promise<boolean> => {
+    if (snapshotIsStale(request)) return false;
     const [metadata, modes] = await readProgressSnapshotRows();
-    if (snapshotIsStale(request)) return;
+    if (snapshotIsStale(request)) return false;
     assertSnapshotReadable(metadata.error, modes.error);
     applySnapshotMetadata(metadata.data, reconcile);
     applySnapshotModes(modes.data, reconcile);
+    return true;
   };
-  const runSnapshotRefresh = (): Promise<void> => {
+  let latestRefresh: Promise<boolean> = Promise.resolve(false);
+  const runSnapshotRefresh = (): Promise<boolean> => {
     const request = ++refreshGeneration;
     const read = (reconcile: RemoteStateMerge) => readSnapshot(reconcile, request);
     const controller = getRegisteredSyncController();
-    return controller?.withSnapshot ? controller.withSnapshot(read) : read(captureRemoteMerge());
+    latestRefresh = controller?.withSnapshot
+      ? controller.withSnapshot(read)
+      : read(captureRemoteMerge());
+    return latestRefresh;
+  };
+  /**
+   * A retry waits for any newer refresh that superseded its own, and rejects unless a snapshot
+   * was merged (for example while the socket is suspended), so it never uploads unmerged state.
+   */
+  const refreshBeforeRetry = async (): Promise<void> => {
+    let refresh = runSnapshotRefresh();
+    let merged = await refresh;
+    while (refresh !== latestRefresh) {
+      refresh = latestRefresh;
+      merged = await refresh;
+    }
+    if (!merged) throw new Error('Remote progress snapshot unavailable');
   };
   const owned = { channel, client, topic } satisfies OwnedRealtimeChannel;
   // No await between the claim and the join: `joinProgressChannel` reaches
@@ -599,7 +618,7 @@ async function runSetupRealtimeListener(
     await releaseProgressChannel(owned);
     return;
   }
-  activeSnapshotRefresh = runSnapshotRefresh;
+  activeSnapshotRefresh = refreshBeforeRetry;
   await joinProgressChannel(owned, currentUserId, generation, () => {
     runSnapshotRefresh().catch((error: unknown) => {
       logger.warn('[TarkovStore] Reconnect snapshot failed', error);
