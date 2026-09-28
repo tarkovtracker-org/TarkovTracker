@@ -20,8 +20,11 @@ const toTimestamp = (value: unknown): number | undefined =>
   value <= MAX_CONFIRMATION_TIMESTAMP
     ? Math.trunc(value)
     : undefined;
+/** PostgreSQL `jsonb` rejects lone surrogates, so such a string could block every later sync. */
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 const sanitizeConfirmation = (value: unknown): TaskAvailabilityConfirmation | undefined => {
   if (!isRecord(value) || typeof value.requirements !== 'string') return undefined;
+  if (LONE_SURROGATE.test(value.requirements)) return undefined;
   const timestamp = toTimestamp(value.timestamp);
   return timestamp === undefined ? undefined : { requirements: value.requirements, timestamp };
 };
@@ -56,8 +59,14 @@ export const mergeTaskAvailability = (
   }
   return merged;
 };
-const statusTimestamp = (completion: RawTaskCompletion): number =>
-  isRecord(completion) ? (toTimestamp(completion.timestamp) ?? 0) : 0;
+/**
+ * Status clocks are not capped, so any finite value counts as-is: an out-of-range status clock is
+ * newer than every valid confirmation and retires it rather than reading as absent.
+ */
+const statusTimestamp = (completion: RawTaskCompletion): number => {
+  const value = isRecord(completion) ? completion.timestamp : undefined;
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
+};
 /**
  * A confirmation counts only for the exact requirement signature and only while it is not older
  * than the task's last status change, so a reset, completion, failure or repair on any device

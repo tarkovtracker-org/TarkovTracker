@@ -77,6 +77,23 @@ describe('declared server-side start gates', () => {
       reason: 'other_requirement',
     });
   });
+  it('keeps the upstream discriminator of unsupported and malformed gates while blocking', () => {
+    const task = adaptTask({
+      otherRequirements: [
+        { type: 'futureGate', id: 'x' },
+        { type: 'globalVariable', id: 'bad' },
+        { id: 'untyped' },
+        'garbage',
+      ],
+    });
+    expect(task.otherRequirements).toEqual([
+      { type: 'unknown', upstreamType: 'futureGate' },
+      { type: 'unknown', upstreamType: 'globalVariable' },
+      { type: 'unknown' },
+      { type: 'unknown' },
+    ]);
+    expect(evaluate(task).available).toBe(false);
+  });
   it('omits the field for genuinely absent or empty gates', () => {
     for (const raw of [{}, { otherRequirements: null }, { otherRequirements: [] }]) {
       const task = adaptTask(raw);
@@ -299,7 +316,7 @@ describe('overlay declared-gate normalization', () => {
       },
       []
     );
-    expect(task.otherRequirements).toEqual([{ type: 'unknown' }]);
+    expect(task.otherRequirements).toEqual([{ type: 'unknown', upstreamType: 'future' }]);
     expect(evaluate(task).available).toBe(false);
   });
   it('diagnoses a malformed gate introduced by a task correction', async () => {

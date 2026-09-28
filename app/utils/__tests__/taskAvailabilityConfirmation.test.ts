@@ -65,6 +65,20 @@ describe('task availability confirmations', () => {
     ).toEqual({ a: { requirements: '', timestamp: MAX_CONFIRMATION_TIMESTAMP } });
     expect(nextClock(5)).toBeGreaterThanOrEqual(Date.now() - 1_000);
   });
+  it('lets an out-of-range status clock retire a valid confirmation', () => {
+    const confirmation = { requirements: 'sig', timestamp: 100 };
+    const reset = { complete: false, timestamp: MAX_CONFIRMATION_TIMESTAMP * 10 };
+    expect(isAvailabilityConfirmed(confirmation, reset, 'sig')).toBe(false);
+  });
+  it('drops requirement strings PostgreSQL jsonb would reject', () => {
+    expect(
+      sanitizeTaskAvailabilityMap({
+        lone: { requirements: 'a\uD800b', timestamp: 1 },
+        trail: { requirements: 'a\uDC00', timestamp: 1 },
+        pair: { requirements: 'a\uD83D\uDE00', timestamp: 1 },
+      })
+    ).toEqual({ pair: { requirements: 'a\uD83D\uDE00', timestamp: 1 } });
+  });
   it('never honours a saturated confirmation clock', () => {
     expect(
       isAvailabilityConfirmed(

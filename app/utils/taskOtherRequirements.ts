@@ -28,11 +28,22 @@ const normalizeDialogue = (raw: Record<string, unknown>): TaskOtherRequirement =
   if (!traders.length || !traders.every(isId)) return { type: 'unknown' };
   return { type: 'dialogue', id: raw.id, traders };
 };
-const normalizeOtherRequirement = (raw: unknown): TaskOtherRequirement => {
-  if (!isRecord(raw)) return { type: 'unknown' };
+/** Fails closed while keeping the upstream discriminator for diagnostics and future support. */
+const unsupported = (raw: Record<string, unknown>): TaskOtherRequirement =>
+  isId(raw.type) && raw.type !== 'unknown'
+    ? { type: 'unknown', upstreamType: raw.type }
+    : isId(raw.upstreamType)
+      ? { type: 'unknown', upstreamType: raw.upstreamType }
+      : { type: 'unknown' };
+const normalizeSupported = (raw: Record<string, unknown>): TaskOtherRequirement => {
   if (raw.type === 'globalVariable') return normalizeVariable(raw);
   if (raw.type === 'dialogue') return normalizeDialogue(raw);
   return { type: 'unknown' };
+};
+const normalizeOtherRequirement = (raw: unknown): TaskOtherRequirement => {
+  if (!isRecord(raw)) return { type: 'unknown' };
+  const normalized = normalizeSupported(raw);
+  return normalized.type === 'unknown' ? unsupported(raw) : normalized;
 };
 /** Missing optional gates are absent; malformed or unsupported gates stay explicitly unknown. */
 export const normalizeOtherRequirements = (raw: unknown): TaskOtherRequirement[] => {

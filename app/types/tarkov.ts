@@ -131,7 +131,8 @@ export type TaskOtherRequirement =
       value: number;
     }
   | { type: 'dialogue'; id: string; traders: string[] }
-  | { type: 'unknown' };
+  /** Unsupported or malformed gate; `upstreamType` keeps the original upstream discriminator. */
+  | { type: 'unknown'; upstreamType?: string };
 export interface TaskTraderLevelRequirement {
   id: string;
   trader: { id: string; name: string };
