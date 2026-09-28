@@ -234,6 +234,26 @@ describe('useTaskActions', () => {
     expect(tarkovStore.setStoryObjectiveComplete).toHaveBeenCalledWith('boreas', 'drives');
     expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
   });
+  it('skips prerequisite backfill when the recorded story objective opens the story route', async () => {
+    const task: Task = {
+      id: 'story-routed',
+      taskRequirements: [{ task: { id: 'prior' }, status: ['complete'] }],
+      storyUnlocks: [{ id: 'boreas', name: 'Boreas' }],
+      otherRequirements: [
+        {
+          type: 'storyObjective',
+          id: 's',
+          storyChapter: { id: 'boreas' },
+          objective: { id: 'drives' },
+        },
+      ],
+    };
+    const { actions, tarkovStore } = await setup(task, [task, { id: 'prior' }], {});
+    expect(actions.canMarkTaskAvailable()).toBe(true);
+    actions.markTaskAvailable();
+    expect(tarkovStore.setStoryObjectiveComplete).toHaveBeenCalledWith('boreas', 'drives');
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+  });
   it.each([
     [{ compareMethod: '<', current: 3, required: 2 }, 'trader_level', false],
     [{ compareMethod: '=', current: 4, required: 2 }, 'trader_level', false],

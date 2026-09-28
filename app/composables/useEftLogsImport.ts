@@ -142,7 +142,7 @@ const buildImportTaskSets = (
   }
   return { completed: sets.completed, started: sets.started, failed: sets.failed };
 };
-/** A started or completed task has passed its start gates, so its story objectives were met. */
+/** A started, completed or failed task has passed its start gates, so its story objectives were met. */
 const recordImpliedStoryObjectives = (store: ReturnType<typeof useTarkovStore>, task: Task) => {
   for (const gate of storyObjectiveRequirements(task))
     store.setStoryObjectiveComplete(gate.storyChapter.id, gate.objective.id);
@@ -230,8 +230,10 @@ const applyFailedImports = (
   failed: Set<string>
 ) => {
   for (const taskId of failed) {
-    if (!store.isTaskComplete(taskId))
-      failTaskForProgress({ store, taskId, tasksMap, manual: true });
+    if (store.isTaskComplete(taskId)) continue;
+    failTaskForProgress({ store, taskId, tasksMap, manual: true });
+    // A task can only fail after it started, so its start gates (story objectives) were met.
+    recordImpliedStoryObjectives(store, tasksMap.get(taskId) ?? { id: taskId });
   }
 };
 /** Applies catalog-filtered events to one mode and tracks switches for later restoration. */

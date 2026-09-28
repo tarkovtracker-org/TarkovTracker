@@ -65,8 +65,10 @@ export const normalizeOtherRequirements = (raw: unknown): TaskOtherRequirement[]
   if (!Array.isArray(raw)) return [{ type: 'unknown' }];
   return Array.from(raw, normalizeOtherRequirement);
 };
-/** Confirmation is task-local and bound to the exact supported start requirements, not a counter. */
-/** Server-side gates a player confirms from in-game observation (story gates are tracked progress). */
+/**
+ * Server-side gates a player confirms from in-game observation (story gates are tracked progress).
+ * Confirmation is task-local and bound to the exact supported start requirements, not a counter.
+ */
 const isConfirmable = (requirement: TaskOtherRequirement): boolean =>
   requirement.type === 'globalVariable' || requirement.type === 'dialogue';
 export const hasUnsupportedOtherRequirement = (task: Task): boolean =>

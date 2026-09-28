@@ -2088,7 +2088,10 @@ for agent commands and recovery boundaries.
 adaptation and overlay boundaries. `app/stores/taskServerGates.ts` evaluates global-variable
 comparisons literally, separately from prerequisite edges, and keeps missing or invalid effective
 account values unknown (including `== 0`). Overlay `storyObjective` gates are met by the player's tracked storyline objective
-(not by an in-game confirmation); Mark available and imported EFT starts record that objective.
+(not by an in-game confirmation); Mark available and imported EFT starts, completions and failures
+record that objective. `applyOverlay` turns a story gate whose chapter or objective is absent from
+the mode's story catalog into an unknown gate, and a recorded objective in one of the task's own
+story-unlock chapters opens the story route, so Mark available backfills no prerequisites.
 Trader conversations also require confirmation;
 unsupported or malformed requirements remain blocked as `{ type: 'unknown', upstreamType }`, keeping the
 upstream discriminator. Only published start requirements are

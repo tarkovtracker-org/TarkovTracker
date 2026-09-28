@@ -542,6 +542,26 @@ describe('useEftLogsImport', () => {
     await composable.confirmImport('pvp');
     expect(tarkovStore.setStoryObjectiveComplete).toHaveBeenCalledWith('boreas', 'drives');
   });
+  it('records the story objective a failed import implies', async () => {
+    metadataStore.tasks = [
+      {
+        id: '61604635c725987e815b1a46',
+        otherRequirements: [
+          {
+            type: 'storyObjective',
+            id: 'story',
+            storyChapter: { id: 'boreas' },
+            objective: { id: 'drives' },
+          },
+        ],
+      },
+    ];
+    const failedLog = startedLog().replace('"type": 10', '"type": 11');
+    const composable = await loadComposable();
+    await composable.parseFile(new File([failedLog], 'notifications.log'));
+    await composable.confirmImport('pvp');
+    expect(tarkovStore.setStoryObjectiveComplete).toHaveBeenCalledWith('boreas', 'drives');
+  });
   it('does not record a confirmation for an imported start without server gates', async () => {
     const composable = await loadComposable();
     await composable.parseFile(new File([startedLog()], 'notifications.log'));

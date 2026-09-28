@@ -307,6 +307,28 @@ describe('overlay declared-gate normalization', () => {
     expect(evaluate(task).available).toBe(false);
     expect(evaluate(task, progress({ globalVariables: { counter: 2 } })).available).toBe(true);
   });
+  it.each(['ordinary', 'locale'])(
+    'fails closed on a %s story gate absent from the story catalog',
+    async (scope) => {
+      const gate = (objective: string) => ({
+        type: 'storyObjective',
+        id: `gate-${objective}`,
+        storyChapter: { id: 'boreas' },
+        objective: { id: objective },
+      });
+      const tasks = { target: { otherRequirements: [gate('drives'), gate('missing')] } };
+      const storyChapters = { boreas: { name: 'Boreas', objectives: { drives: {} } } };
+      const overlay =
+        scope === 'locale'
+          ? { storyChapters, locales: { en: { tasks } } }
+          : { storyChapters, tasks };
+      const task = await correct(overlay, [baseTask()]);
+      expect(task.otherRequirements).toEqual([
+        gate('drives'),
+        { type: 'unknown', upstreamType: 'storyObjective' },
+      ]);
+    }
+  );
   it('retains unsupported server gates in additions', async () => {
     const task = await correct(
       {

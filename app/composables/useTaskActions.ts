@@ -234,11 +234,16 @@ export function useTaskActions(
       blocker.type === 'prerequisite' ? (blocker.requirements ?? []) : []
     );
   const taskCompletion = (id: string) => tarkovStore.getCurrentProgressData().taskCompletions?.[id];
+  /** Any completed objective in a story-unlock chapter opens the route, including gates Mark available records. */
+  const recordsStoryUnlock = (currentTask: Task, chapterId: string) =>
+    storyObjectiveRequirements(currentTask).some((gate) => gate.storyChapter.id === chapterId);
   const storyRouteSatisfied = (currentTask: Task) =>
-    (currentTask.storyUnlocks ?? []).some((chapter) =>
-      hasStoryUnlockProgress(chapter.id, {
-        storyChapters: tarkovStore.getCurrentProgressData().storyChapters,
-      })
+    (currentTask.storyUnlocks ?? []).some(
+      (chapter) =>
+        recordsStoryUnlock(currentTask, chapter.id) ||
+        hasStoryUnlockProgress(chapter.id, {
+          storyChapters: tarkovStore.getCurrentProgressData().storyChapters,
+        })
     );
   /**
    * Mark available must either make the task available or change nothing: an unsupported server
