@@ -1189,20 +1189,6 @@ const attemptInitialProgressSync = async (controller: ProgressSyncController) =>
     return null;
   }
 };
-/**
- * One attempt: a failure schedules the controller's retries, which merge remote state first.
- * A recovery copy is retired only after its state reached the cloud.
- */
-const uploadStartupHandoff = async (
-  controller: ProgressSyncController,
-  userId: string,
-  retiresRecoveryCopy: boolean
-) => {
-  const uploaded = await attemptInitialProgressSync(controller);
-  if (uploaded && retiresRecoveryCopy && isCurrentProgressController(controller, userId)) {
-    removeAccountRecoveryCopy(userId);
-  }
-};
 const syncInitialTrackedProgress = async (controller: ProgressSyncController, userId: string) => {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     if (!isCurrentProgressController(controller, userId)) return;
@@ -1941,6 +1927,7 @@ export async function initializeTarkovSync() {
     // Otherwise it stays until the startup upload below succeeds.
     const recoveryCopyAwaitsUpload =
       !cloudHoldsResolvedState && hasAccountRecoveryCopy(currentUserId);
+    let retireRecoveryCopyOnSync = recoveryCopyAwaitsUpload;
     if (cloudHoldsResolvedState) removeAccountRecoveryCopy(currentUserId);
     // Repair failed task states for existing users (runs once after data load)
     // This reapplies valid branch failures and clears stale failed flags
@@ -2000,6 +1987,11 @@ export async function initializeTarkovSync() {
         },
         onSynced: () => {
           recordLocalSyncTime();
+          // The first acknowledged upload carries the recovered state, whichever attempt it was.
+          if (retireRecoveryCopyOnSync && syncController === controller) {
+            retireRecoveryCopyOnSync = false;
+            removeAccountRecoveryCopy(currentUserId);
+          }
           if (typeof BroadcastChannel !== 'undefined') {
             const bc = new BroadcastChannel(`tarkov-progress:${currentUserId}`);
             bc.postMessage('updated');
@@ -2066,7 +2058,9 @@ export async function initializeTarkovSync() {
     if (shouldStartSyncNow) {
       startSync();
       if (hasUnsavedHandoff && syncController) {
-        void uploadStartupHandoff(syncController, currentUserId, recoveryCopyAwaitsUpload);
+        // One attempt: a failure schedules the controller's retries, which merge remote state
+        // first; the recovery copy is retired once any of them is acknowledged.
+        void attemptInitialProgressSync(syncController);
       }
     } else {
       logger.debug('[TarkovStore] Delaying sync until progress exists');

@@ -948,7 +948,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   only after displaced progress is retained for export. Old-season placeholders cannot compete
   with current Seasonal progress. The recovery copy is removed only once the cloud
   holds the resolved state: after a startup load that reconciled a cloud record or migrated local
-  progress, or else after the startup upload of the recovered state succeeds. Copies are read only for their owner and never uploaded for another account. A failed
+  progress, or else once an upload of the recovered state is acknowledged (the first attempt or a
+  scheduled retry). Copies are read only for their owner and never uploaded for another account. A failed
   read of an existing copy blocks sign-in, but a browser that refuses all storage access holds no
   copy to protect, so cloud-only sync still starts there.
 - **Superseded copies.** Before a deliberate reset with pending cloud changes or memory-only local changes, the store keeps each

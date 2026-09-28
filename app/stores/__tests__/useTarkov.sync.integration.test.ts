@@ -2727,11 +2727,11 @@ describe('useTarkov sync integration', () => {
       expect(readRecoveryLevel('user-2')).toBe(2);
     });
     it.each([
-      ['retires', {}, false],
-      ['keeps', null, true],
+      ['retires', true],
+      ['keeps', false],
     ])(
-      '%s a metadata-only recovery copy after its startup upload (upload result %j)',
-      async (_label, uploadResult, retained) => {
+      '%s a metadata-only recovery copy by whether a startup upload is acknowledged',
+      async (_label, acknowledged) => {
         const base = Date.parse('2026-02-25T00:00:00.000Z');
         localStorage.setItem(
           recoveryKey('user-1'),
@@ -2745,12 +2745,16 @@ describe('useTarkov sync integration', () => {
           })
         );
         single.mockResolvedValue({ data: null, error: { code: 'PGRST116', message: 'No rows' } });
-        syncInitialState.mockResolvedValue(uploadResult);
+        syncInitialState.mockResolvedValue(null);
         await initializeTarkovSync();
         await settleBackgroundWork();
         expect(useTarkovStore().pvp.displayName).toBe('recovered');
         expect(syncInitialState).toHaveBeenCalledOnce();
-        expect(localStorage.getItem(recoveryKey('user-1')) !== null).toBe(retained);
+        expect(localStorage.getItem(recoveryKey('user-1'))).not.toBeNull();
+        // A later scheduled retry, not the first attempt, is acknowledged.
+        const options = useSupabaseSyncMock.mock.calls.at(-1)?.[0] as { onSynced: () => void };
+        if (acknowledged) options.onSynced();
+        expect(localStorage.getItem(recoveryKey('user-1')) === null).toBe(acknowledged);
       }
     );
     it('does not fold the transition placeholder into the next owner recovery copy', () => {
