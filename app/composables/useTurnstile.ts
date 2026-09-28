@@ -52,6 +52,8 @@ function loadTurnstileApi(): Promise<TurnstileApi | null> {
       script.src = TURNSTILE_SCRIPT_URL;
       script.async = true;
       const loadTimeout = setTimeout(() => {
+        script.onload = null;
+        script.onerror = null;
         script.remove();
         scriptPromise = null;
         resolvePromise(null);

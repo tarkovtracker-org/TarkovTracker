@@ -4,7 +4,7 @@
 
 This site is primarily a browser application. Its `/api/tarkov/*` routes are internal implementation details, not a supported integration API, and may require browser verification. Use [json.tarkov.dev](https://json.tarkov.dev/) for programmatic game-data integrations. The supported progress API at [api.tarkovtracker.org](https://api.tarkovtracker.org/) is separate.
 
-UI locales (separate from the API `lang` set): `cs`, `de`, `en`, `es`, `fr`, `it`, `ko`, `pl`, `pt`, `ru`, `uk`, `zh`.
+UI locales: `cs`, `de`, `en`, `es`, `fr`, `it`, `ko`, `pl`, `pt`, `ru`, `uk`, `zh`.
 
 Authentication-required areas include `/account`, `/profile`, `/team`, `/settings`, and authenticated team APIs.
 

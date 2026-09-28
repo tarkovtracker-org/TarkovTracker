@@ -20,7 +20,9 @@ import { logger } from '@/utils/logger';
  * server failures surface as regular errors and are never routed through the
  * challenge loop. Expired clearance triggers at most one renewal (generation
  * guarded so concurrent late challenges renew once) and at most one data
- * request retry.
+ * request retry. Only a flow that met a challenge parks its waiters behind the
+ * visible retry UI; any other probe failure rejects its waiters and is not
+ * remembered, so the next caller-initiated request probes again.
  */
 /** Single-flight initial access probe, answered by the server with `{ ok: true }`. */
 export const ACCESS_CHECK_ENDPOINT = '/api/tarkov/access-check';
@@ -40,14 +42,16 @@ const CHALLENGE_MITIGATION_VALUE = 'challenge';
 const STATUS_BODY_SNIPPET_MAX = 100;
 /**
  * Access lifecycle phases as seen by the retry UI.
- * - `idle`: nothing started, or a probe failed before any challenge was seen;
- *   the gate stays hidden so ordinary failures surface through their own UIs.
+ * - `idle`: nothing started, or a flow's probe failed without meeting a
+ *   challenge; the gate stays hidden, the failure reaches the flow's waiters
+ *   through their own UIs, and the next request probes again.
  * - `probing`: a probe is running.
  * - `challenge`: the probe met a Cloudflare challenge; the retry UI shows.
  * - `verifying`: a solved token is being siteverified, followed by a re-probe.
  * - `released`: the probe succeeded; clearance is held by Cloudflare itself.
- * - `blocked` / `rate_limited` / `failed`: terminal failures after a challenge
- *   was seen; the retry UI shows matching failure copy.
+ * - `blocked` / `rate_limited` / `failed`: failures of a flow that met a
+ *   challenge; the retry UI shows matching failure copy and its waiters park
+ *   until the manual retry.
  */
 export type TarkovAccessPhase =
   | 'idle'
@@ -74,7 +78,7 @@ export interface TarkovApiRequestOptions {
   signal?: AbortSignal;
   /** Bounded per attempt, matching the ofetch `timeout` option used elsewhere. */
   timeout?: number;
-  /** Accepted for ofetch parity at disabled pass-through; unused by the gated transport. */
+  /** Transient retries per request, matching ofetch: default 1 for GET, 0 otherwise. */
   retry?: number;
   /** Fetch cache mode; the shared probe forces `no-store`, data requests inherit freshness. */
   cache?: RequestCache;
@@ -231,7 +235,7 @@ export const rawTarkovRequest = async (
     });
   } catch (cause) {
     if (linked.didTimeout()) {
-      const timeoutError = toError(cause);
+      const timeoutError = new Error(`Tarkov API request to ${endpoint} timed out`, { cause });
       timeoutError.name = 'TimeoutError';
       throw timeoutError;
     }
@@ -302,24 +306,50 @@ let releasedGeneration = -1;
 let flowIdCounter = 0;
 let flow: AccessFlow | null = null;
 const gateTokenWaiters = new Map<number, (token: string | null) => void>();
-let retryWaiter: ((next: AccessFlow) => void) | null = null;
+interface RetryWaiter {
+  resume: (next: AccessFlow) => void;
+  abandon: (failure: Error) => void;
+}
+let retryWaiter: RetryWaiter | null = null;
 let retryPromise: Promise<AccessFlow> | null = null;
+const dismissedFlows = new Set<number>();
+/** Latched by a dismissal so later requests fail fast instead of reopening the gate. */
+let dismissedFailure: TarkovAccessError | null = null;
+/** True while a challenged flow's failure waits for the visible manual retry. */
+let parked = false;
+const parkedFailures = new WeakSet<Error>();
+const markParked = (failure: TarkovAccessError): TarkovAccessError => {
+  parked = true;
+  parkedFailures.add(failure);
+  return failure;
+};
 const waitForManualRetry = (): Promise<AccessFlow> => {
-  retryPromise ??= new Promise<AccessFlow>((resolve) => {
-    retryWaiter = resolve;
+  retryPromise ??= new Promise<AccessFlow>((resume, abandon) => {
+    retryWaiter = { resume, abandon };
   });
   return retryPromise;
+};
+const takeRetryWaiter = (): RetryWaiter | null => {
+  const waiter = retryWaiter;
+  retryWaiter = null;
+  retryPromise = null;
+  return waiter;
 };
 const awaitAccessFlow = async (entry: AccessFlow): Promise<number> => {
   try {
     await entry.run;
     return entry.startGeneration;
   } catch (error) {
-    if (!accessState.challengeSeen.value) throw error;
+    if (!(error instanceof Error) || !parkedFailures.has(error)) throw error;
     return awaitAccessFlow(await waitForManualRetry());
   }
 };
 const isAccessCurrent = (): boolean => releasedGeneration === generation;
+const classifyProbeFailure = (status: number): ProbeVerdict => {
+  if (status === 429) return { kind: 'rate_limited', status };
+  if (status >= 500) return { kind: 'failed', status };
+  return { kind: 'blocked', status };
+};
 const probeAccess = async (): Promise<ProbeVerdict> => {
   if (!import.meta.client)
     return { kind: 'failed', error: new Error('Access check is client-only') };
@@ -329,10 +359,7 @@ const probeAccess = async (): Promise<ProbeVerdict> => {
       timeout: ACCESS_CHECK_TIMEOUT_MS,
     });
     if (isChallengeMitigated(response)) return { kind: 'challenge' };
-    if (!response.ok) {
-      if (response.status === 429) return { kind: 'rate_limited', status: response.status };
-      return { kind: 'blocked', status: response.status };
-    }
+    if (!response.ok) return classifyProbeFailure(response.status);
     return { kind: 'released' };
   } catch (cause) {
     return { kind: 'failed', error: toError(cause) };
@@ -364,7 +391,13 @@ const toAccessFailure = (verdict: ProbeVerdict): TarkovAccessError => {
     case 'rate_limited':
       return new TarkovAccessError('rate_limited', 'The access check was rate limited.');
     default:
-      return new TarkovAccessError('failed', 'The access check failed.', verdict.error);
+      return new TarkovAccessError(
+        'failed',
+        verdict.status
+          ? `The access check failed (status ${verdict.status}).`
+          : 'The access check failed.',
+        verdict.error
+      );
   }
 };
 const settleAccessVerdict = (
@@ -379,8 +412,12 @@ const settleAccessVerdict = (
   }
   const failure = toAccessFailure(verdict);
   accessState.lastError.value = failure;
-  accessState.phase.value = reachedChallenge ? verdict.kind : 'idle';
-  return failure;
+  if (!reachedChallenge) {
+    accessState.phase.value = 'idle';
+    return failure;
+  }
+  accessState.phase.value = verdict.kind;
+  return markParked(failure);
 };
 /**
  * Parks the attempt after its one verification token was consumed or lost:
@@ -396,8 +433,18 @@ const parkAccessAttempt = (cause?: Error): TarkovAccessError => {
   accessState.phase.value = 'challenge';
   accessState.lastError.value = failure;
   logger.warn('[TarkovAccess] Security check attempt parked; manual retry is required');
+  return markParked(failure);
+};
+/** Ends a challenged attempt the user dismissed: waiters reject and the gate hides. */
+const dismissAccessAttempt = (): TarkovAccessError => {
+  const failure = new TarkovAccessError('challenge', 'The security check was dismissed.');
+  dismissedFailure = failure;
+  accessState.phase.value = 'idle';
+  accessState.lastError.value = failure;
   return failure;
 };
+const failWithoutToken = (flowId: number): TarkovAccessError =>
+  dismissedFlows.delete(flowId) ? dismissAccessAttempt() : parkAccessAttempt();
 const settleOrThrow = (
   verdict: ProbeVerdict,
   startGeneration: number,
@@ -406,16 +453,24 @@ const settleOrThrow = (
   const failure = settleAccessVerdict(verdict, startGeneration, reachedChallenge);
   if (failure) throw failure;
 };
-const executeAccessFlow = async (flowId: number, startGeneration: number): Promise<void> => {
+/**
+ * A flow resuming parked waiters settles as challenged, so its ordinary
+ * failure keeps the visible retry instead of silently rejecting them.
+ */
+const executeAccessFlow = async (
+  flowId: number,
+  startGeneration: number,
+  resumesParked: boolean
+): Promise<void> => {
   const firstVerdict = await probeAccess();
   if (firstVerdict.kind !== 'challenge') {
-    settleOrThrow(firstVerdict, startGeneration, false);
+    settleOrThrow(firstVerdict, startGeneration, resumesParked);
     return;
   }
   accessState.challengeSeen.value = true;
   accessState.phase.value = 'challenge';
   const token = await waitForGateToken(flowId);
-  if (!token) throw parkAccessAttempt();
+  if (!token) throw failWithoutToken(flowId);
   accessState.phase.value = 'verifying';
   try {
     await verifyAccessToken(token);
@@ -430,16 +485,17 @@ const executeAccessFlow = async (flowId: number, startGeneration: number): Promi
 const settleFlow = (entry: { id: number }): void => {
   if (flow && flow.id === entry.id) flow = null;
 };
-const startAccessFlow = (): AccessFlow => {
+const startAccessFlow = (resumesParked = false): AccessFlow => {
   const flowId = ++flowIdCounter;
   const startGeneration = ++generation;
+  parked = false;
   accessState.attemptEpoch.value = flowId;
   accessState.attemptsExhausted.value = false;
   accessState.lastError.value = null;
   accessState.phase.value = 'probing';
   const run = (async () => {
     try {
-      await executeAccessFlow(flowId, startGeneration);
+      await executeAccessFlow(flowId, startGeneration, resumesParked);
     } finally {
       settleFlow({ id: flowId });
     }
@@ -499,6 +555,15 @@ export const abandonSharedWait = <T>(sharedRun: Promise<T>, signal?: AbortSignal
   });
 };
 /**
+ * Joins the in-flight flow, waits behind a parked flow's manual retry, or
+ * starts a fresh flow when the previous one ended without parking.
+ */
+const joinAccessFlow = (): Promise<number> => {
+  if (dismissedFailure) return Promise.reject(dismissedFailure);
+  if (!flow && parked) return waitForManualRetry().then(awaitAccessFlow);
+  return awaitAccessFlow(flow ?? startAccessFlow());
+};
+/**
  * Ensures the shared probe has released before any data request proceeds.
  * Resolves immediately when disabled, released at the current generation, or
  * joined to an in-flight flow (single-flight). Caller cancellation only ends
@@ -508,12 +573,7 @@ export const ensureTarkovAccess = async (signal?: AbortSignal): Promise<number> 
   if (!isTarkovAccessEnabled()) return 0;
   if (signal?.aborted) throw createAbortError(signal.reason);
   if (isAccessCurrent()) return releasedGeneration;
-  if (!flow && accessState.lastError.value) {
-    if (!accessState.challengeSeen.value) throw accessState.lastError.value;
-    return abandonSharedWait(waitForManualRetry().then(awaitAccessFlow), signal);
-  }
-  const started = flow ?? startAccessFlow();
-  return abandonSharedWait(awaitAccessFlow(started), signal);
+  return abandonSharedWait(joinAccessFlow(), signal);
 };
 /**
  * Renews access for a data request that met a late challenge at its own
@@ -528,22 +588,37 @@ export const renewTarkovAccess = async (
   // A release AT the caller's generation is the initial release, not a renewal;
   // only a strictly newer release means another wait already renewed for us.
   if (releasedGeneration > fromGeneration) return;
-  const joined = flow ?? startAccessFlow();
-  await abandonSharedWait(awaitAccessFlow(joined), signal);
+  await abandonSharedWait(joinAccessFlow(), signal);
 };
 /** Manual retry from the gate UI: never automatic, joins an in-flight flow. */
 export const requestGateRetry = async (signal?: AbortSignal): Promise<void> => {
   if (!isTarkovAccessEnabled()) return;
+  if (signal?.aborted) throw createAbortError(signal.reason);
   if (flow) {
     await abandonSharedWait(flow.run, signal);
     return;
   }
+  dismissedFailure = null;
   if (isAccessCurrent()) return;
-  const retried = startAccessFlow();
-  retryWaiter?.(retried);
-  retryWaiter = null;
-  retryPromise = null;
+  const retried = startAccessFlow(parked);
+  takeRetryWaiter()?.resume(retried);
   await abandonSharedWait(retried.run, signal);
+};
+/**
+ * Closes the gate without clearance: a pending challenge or parked failure
+ * rejects its waiters and the gate hides. Later requests fail fast with the
+ * same error until a manual retry or a page reload.
+ */
+export const dismissTarkovAccessGate = (): void => {
+  const activeFlowId = flow?.id ?? 0;
+  if (gateTokenWaiters.has(activeFlowId)) {
+    dismissedFlows.add(activeFlowId);
+    reportGateWidgetUnavailable();
+    return;
+  }
+  if (flow || !parked) return;
+  parked = false;
+  takeRetryWaiter()?.abandon(dismissAccessAttempt());
 };
 /** Resets module state between tests; production code must not call this. */
 export const resetTarkovAccessForTests = (): void => {
@@ -552,8 +627,10 @@ export const resetTarkovAccessForTests = (): void => {
     resolveToken(null);
   }
   flow = null;
-  retryWaiter = null;
-  retryPromise = null;
+  takeRetryWaiter();
+  dismissedFlows.clear();
+  dismissedFailure = null;
+  parked = false;
   generation = 0;
   browserConfig = null;
   releasedGeneration = -1;
@@ -564,13 +641,44 @@ export const resetTarkovAccessForTests = (): void => {
   accessState.lastError.value = null;
   accessState.challengeSeen.value = false;
 };
+/** ofetch's default transient statuses; challenged responses are never retried here. */
+const TRANSIENT_RETRY_STATUSES = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
+/** Mirrors ofetch: one retry for GET unless `retry` is given, none for payload methods. */
+const resolveRetryBudget = (options: TarkovApiRequestOptions): number => {
+  if (typeof options.retry === 'number') return options.retry;
+  return (options.method ?? 'GET') === 'GET' ? 1 : 0;
+};
+const shouldRetryResponse = (response: Response, retriesLeft: number): boolean =>
+  retriesLeft > 0 &&
+  !isChallengeMitigated(response) &&
+  TRANSIENT_RETRY_STATUSES.has(response.status);
+/**
+ * Keeps the disabled `$fetch` transient retry for the gated transport:
+ * network failures, attempt timeouts and transient statuses retry within the
+ * budget, while caller cancellation never retries.
+ */
+const requestWithTransientRetry = async (
+  endpoint: string,
+  options: TarkovApiRequestOptions,
+  retriesLeft = resolveRetryBudget(options)
+): Promise<Response> => {
+  let response: Response;
+  try {
+    response = await rawTarkovRequest(endpoint, options);
+  } catch (cause) {
+    if (retriesLeft <= 0 || options.signal?.aborted) throw cause;
+    return requestWithTransientRetry(endpoint, options, retriesLeft - 1);
+  }
+  if (!shouldRetryResponse(response, retriesLeft)) return response;
+  return requestWithTransientRetry(endpoint, options, retriesLeft - 1);
+};
 const renewOnceAndRetry = async (
   endpoint: string,
   options: TarkovApiRequestOptions,
   fromGeneration: number
 ): Promise<Response> => {
   await renewTarkovAccess(fromGeneration, options.signal);
-  const retriedResponse = await rawTarkovRequest(endpoint, options);
+  const retriedResponse = await requestWithTransientRetry(endpoint, options);
   if (isChallengeMitigated(retriedResponse)) {
     throw new TarkovAccessError(
       'challenge_exhausted',
@@ -596,7 +704,7 @@ export const tarkovApiFetch = async <T>(
   }
   if (options.signal?.aborted) throw createAbortError(options.signal.reason);
   const fromGeneration = await ensureTarkovAccess(options.signal);
-  let response = await rawTarkovRequest(endpoint, options);
+  let response = await requestWithTransientRetry(endpoint, options);
   if (isChallengeMitigated(response)) {
     response = await renewOnceAndRetry(endpoint, options, fromGeneration);
   }

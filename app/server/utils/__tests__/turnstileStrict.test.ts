@@ -221,18 +221,19 @@ describe('verifyTurnstileTokenStrict', () => {
       })
     ).resolves.toEqual({ ok: false, reason: 'hostname-mismatch' });
   });
-  it('reports Siteverify internal-error as temporary unavailability', async () => {
-    fetchMock.mockResolvedValue(
-      siteverifyResponse({ success: false, 'error-codes': ['internal-error'] })
-    );
-    const { verifyTurnstileTokenStrict, TARKOV_DATA_ACCESS_ACTION } = await loadUtil();
-    await expect(
-      verifyTurnstileTokenStrict({
-        expectedAction: TARKOV_DATA_ACCESS_ACTION,
-        expectedHostnames: ['tarkovtracker.org'],
-        secretKey: 'secret',
-        token: 'token',
-      })
-    ).resolves.toEqual({ ok: false, reason: 'siteverify-unavailable' });
-  });
+  it.each(['internal-error', 'invalid-input-secret', 'missing-input-secret'])(
+    'reports Siteverify %s as service unavailability',
+    async (code) => {
+      fetchMock.mockResolvedValue(siteverifyResponse({ success: false, 'error-codes': [code] }));
+      const { verifyTurnstileTokenStrict, TARKOV_DATA_ACCESS_ACTION } = await loadUtil();
+      await expect(
+        verifyTurnstileTokenStrict({
+          expectedAction: TARKOV_DATA_ACCESS_ACTION,
+          expectedHostnames: ['tarkovtracker.org'],
+          secretKey: 'secret',
+          token: 'token',
+        })
+      ).resolves.toEqual({ ok: false, reason: 'siteverify-unavailable' });
+    }
+  );
 });

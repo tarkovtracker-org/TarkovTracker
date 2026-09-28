@@ -94,8 +94,8 @@ const assertPostMethod = (event: H3Event): void => {
   }
 };
 const assertJsonContentType = (event: H3Event): void => {
-  const contentType = (getRequestHeader(event, 'content-type') ?? '').trim().toLowerCase();
-  if (!contentType.includes('application/json')) {
+  const mediaType = (getRequestHeader(event, 'content-type') ?? '').split(';')[0] ?? '';
+  if (mediaType.trim().toLowerCase() !== 'application/json') {
     throw createError({
       statusCode: 415,
       statusMessage: 'Unsupported Media Type',

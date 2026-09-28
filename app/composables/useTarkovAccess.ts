@@ -1,4 +1,5 @@
 import {
+  dismissTarkovAccessGate,
   ensureTarkovAccess,
   getTarkovAccessState,
   isTarkovAccessEnabled,
@@ -29,6 +30,8 @@ export interface UseTarkovAccessReturn {
   probe: (signal?: AbortSignal) => Promise<number>;
   /** Re-runs the access flow; manual only, never automatic. */
   retry: (signal?: AbortSignal) => Promise<void>;
+  /** Closes the gate without clearance; callers fail fast until a retry or reload. */
+  dismiss: () => void;
   /** Hands a solved widget token to the shared controller (once per attempt). */
   submitToken: (token: string) => void;
   /** Reports that the widget cannot supply a token (script blocked or no key). */
@@ -53,6 +56,9 @@ export function useTarkovAccess(): UseTarkovAccessReturn {
     widgetAction: TARKOV_ACCESS_WIDGET_ACTION,
     probe: (signal?: AbortSignal) => ensureTarkovAccess(signal),
     retry: (signal?: AbortSignal) => requestGateRetry(signal),
+    dismiss: () => {
+      dismissTarkovAccessGate();
+    },
     submitToken: (token: string) => {
       submitGateToken(token);
     },

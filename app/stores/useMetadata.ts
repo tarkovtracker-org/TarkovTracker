@@ -40,7 +40,7 @@ import { buildPrestigeTaskMap } from '@/utils/prestige';
 import { resolveSeasonalPerks } from '@/utils/seasonalPerks';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import { normalizeStoryChapter } from '@/utils/storylineObjectives';
-import { tarkovApiFetch } from '@/utils/tarkovApiFetch';
+import { ensureTarkovAccess, tarkovApiFetch } from '@/utils/tarkovApiFetch';
 import {
   CACHE_CONFIG,
   type CacheType,
@@ -976,8 +976,11 @@ export const useMetadataStore = defineStore('metadata', {
       this.lastCachePurgeCheckAt = now;
       const timeoutMs = CACHE_PURGE_CHECK_TIMEOUT_MS;
       const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+      let timeoutId: number | undefined;
       try {
+        // The purge budget covers the request, not a browser security check.
+        await ensureTarkovAccess();
+        timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
         const response = await tarkovApiFetch<FetchResponse<{ lastPurgeAt: string | null }>>(
           '/api/tarkov/cache-meta',
           { signal: controller.signal }

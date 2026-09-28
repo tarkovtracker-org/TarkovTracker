@@ -171,8 +171,14 @@ const postSiteverifyStrict = async (
     return { unavailable: true };
   }
 };
+// A wrong or missing deployed secret is a service fault, not a bad visitor token.
+const UNAVAILABLE_ERROR_CODES = new Set([
+  'internal-error',
+  'invalid-input-secret',
+  'missing-input-secret',
+]);
 const classifySiteverifyRejection = (errorCodes: string[]): StrictTurnstileFailureReason => {
-  if (errorCodes.includes('internal-error')) return 'siteverify-unavailable';
+  if (errorCodes.some((code) => UNAVAILABLE_ERROR_CODES.has(code))) return 'siteverify-unavailable';
   if (errorCodes.includes(REPLAYED_ERROR_CODE)) return 'replayed-token';
   if (errorCodes.includes(EXPIRED_ERROR_CODE)) return 'expired-token';
   return 'invalid-token';

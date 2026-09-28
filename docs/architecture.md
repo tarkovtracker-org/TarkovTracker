@@ -336,7 +336,12 @@ probe and one renewal per clearance generation. It inspects `cf-mitigated: chall
 before JSON parsing and retries each challenged data request at most once. Caller aborts
 do not cancel other waiters. Existing IndexedDB hits remain independent of verification.
 The root-mounted [`TarkovAccessGate`](../app/components/TarkovAccessGate.vue) can render while
-startup waits; manual retry resumes waiting callers. Cloudflare owns clearance; application
+startup waits. Only a flow that met a challenge parks callers behind the gate's manual retry
+(a failed retry stays parked); dismissing the gate rejects them, and later requests fail fast
+until a manual retry or reload. An ordinary probe
+failure rejects its callers without showing the gate, and the next request probes again.
+Gated GETs keep `$fetch`'s single transient retry. Shared-profile loads start their request budget after access is released.
+Cloudflare owns clearance; application
 verification does not authorize CDN hits. Cache and overlay ordering are unchanged.
 
 All game data is fetched through Nuxt server routes that proxy to `json.tarkov.dev` static data.
@@ -418,7 +423,7 @@ runtimeConfig: {
     trustedIpRanges: process.env.API_TRUSTED_IP_RANGES,
     requireAuth: process.env.API_REQUIRE_AUTH !== 'false',
     publicRoutes:
-      '/api/tarkov/*,/api/tarkov-dev/profile,/api/changelog,/api/contributors,/api/logs/client,/api/profile/*,/api/streamer/*,/api/twitch/*',
+      '/api/tarkov/*,/api/tarkov-dev/profile,/api/changelog,/api/contributors,/api/logs/client,/api/security/tarkov-verify,/api/profile/*,/api/streamer/*,/api/twitch/*',
     trustProxy: resolveTrustProxySetting({
       API_TRUST_PROXY: process.env.API_TRUST_PROXY,
       NITRO_PRESET: process.env.NITRO_PRESET,

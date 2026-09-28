@@ -125,13 +125,23 @@ describe('POST /api/security/tarkov-verify', () => {
     const { default: handler } = await import('@/server/api/security/tarkov-verify.post');
     await expect(handler(event)).rejects.toMatchObject({ statusCode: 405 });
   });
-  it('rejects non-JSON content types with 415', async () => {
+  it.each(['application/x-www-form-urlencoded', 'text/plain;x=application/json', ''])(
+    'rejects non-JSON content type %j with 415',
+    async (contentType) => {
+      mockGetRequestHeader.mockImplementation((_event: unknown, name: string) =>
+        name === 'content-type' ? contentType : undefined
+      );
+      const { default: handler } = await import('@/server/api/security/tarkov-verify.post');
+      await expect(handler(event)).rejects.toMatchObject({ statusCode: 415 });
+      expect(mockReadRawBody).not.toHaveBeenCalled();
+    }
+  );
+  it('accepts a JSON content type with parameters', async () => {
     mockGetRequestHeader.mockImplementation((_event: unknown, name: string) =>
-      name === 'content-type' ? 'application/x-www-form-urlencoded' : undefined
+      name === 'content-type' ? 'Application/JSON; charset=utf-8' : undefined
     );
     const { default: handler } = await import('@/server/api/security/tarkov-verify.post');
-    await expect(handler(event)).rejects.toMatchObject({ statusCode: 415 });
-    expect(mockReadRawBody).not.toHaveBeenCalled();
+    await expect(handler(event)).resolves.toBeDefined();
   });
   it('rejects rate-limited requests with 429 and a Retry-After hint', async () => {
     mockConsumeSharedRateLimitWithReset.mockResolvedValue({

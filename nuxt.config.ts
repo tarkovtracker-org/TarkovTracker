@@ -94,12 +94,13 @@ if (
     '[Config] NUXT_PUBLIC_TURNSTILE_SITE_KEY and NUXT_TURNSTILE_SECRET_KEY must be configured together'
   );
 }
+const TARKOV_ACCESS_SITE_KEY = (process.env.NUXT_PUBLIC_TARKOV_ACCESS_SITE_KEY ?? '').trim();
 const cspRouteRules = buildContentSecurityPolicyRouteRules({
   clientLogSinkUrl,
   clarityInstrumentationKey: IS_PRODUCTION_BUILD ? MICROSOFT_CLARITY_PROJECT_ID : '',
   gaMeasurementId: IS_PRODUCTION_BUILD ? GOOGLE_ANALYTICS_MEASUREMENT_ID : '',
   supabaseUrl: PUBLIC_SUPABASE_URL,
-  turnstileSiteKey: TURNSTILE_SITE_KEY,
+  turnstileSiteKey: TURNSTILE_SITE_KEY || TARKOV_ACCESS_SITE_KEY,
 });
 const webApplicationSchema = {
   '@context': 'https://schema.org',
@@ -219,7 +220,7 @@ export default defineNuxtConfig({
       // the dedicated sitekey/secret/exact-hostname allowlist. The verification endpoint
       // fails closed on incomplete configuration; the probe only tests edge passage.
       tarkovAccessEnabled: process.env.NUXT_PUBLIC_TARKOV_ACCESS_ENABLED === 'true',
-      tarkovAccessSiteKey: (process.env.NUXT_PUBLIC_TARKOV_ACCESS_SITE_KEY ?? '').trim(),
+      tarkovAccessSiteKey: TARKOV_ACCESS_SITE_KEY,
       tarkovDevImportCooldownMinutes: Number(
         process.env.NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES?.trim() || '60'
       ),

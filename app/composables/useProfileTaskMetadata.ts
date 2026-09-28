@@ -2,7 +2,7 @@ import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import { API_GAME_MODES } from '@/utils/constants';
 import { isGameEdition } from '@/utils/editionHelpers';
 import { logger } from '@/utils/logger';
-import { tarkovApiFetch } from '@/utils/tarkovApiFetch';
+import { ensureTarkovAccess, tarkovApiFetch } from '@/utils/tarkovApiFetch';
 import { dedupeTaskObjectiveIds, normalizeTaskObjectives } from '@/utils/taskNormalization';
 import type {
   Task,
@@ -128,7 +128,8 @@ const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: Abo
  * two 12s attempts per envelope plus backoff across the base and translation
  * legs, roughly 55s worst case per route (`docs/systems.md`, retry budget).
  * Aborting earlier leaves the profile with no snapshot and no retry until the
- * mode or language changes.
+ * mode or language changes. The budget starts once Tarkov data access is
+ * released, so an initial browser security check never consumes it.
  */
 const PROFILE_METADATA_TIMEOUT_MS = 60000;
 /** Read another profile mode without changing the application's active metadata. */
@@ -147,11 +148,8 @@ export function useProfileTaskMetadata(mode: Ref<GameMode>, language: Ref<string
     [mode, language],
     async ([gameMode, lang], _, onCleanup) => {
       let current = true;
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
       const controller = new AbortController();
-      const timeoutId = setTimeout(
-        () => controller.abort(new Error('Profile metadata request timed out')),
-        PROFILE_METADATA_TIMEOUT_MS
-      );
       onCleanup(() => {
         current = false;
         controller.abort();
@@ -160,6 +158,11 @@ export function useProfileTaskMetadata(mode: Ref<GameMode>, language: Ref<string
       error.value = null;
       const requestScope = scope.value;
       try {
+        await ensureTarkovAccess(controller.signal);
+        timeoutId = setTimeout(
+          () => controller.abort(new Error('Profile metadata request timed out')),
+          PROFILE_METADATA_TIMEOUT_MS
+        );
         const { failure, ...catalogs } = await loadProfileCatalogs(
           gameMode,
           lang,

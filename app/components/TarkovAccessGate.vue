@@ -22,8 +22,18 @@
             class="mt-2 min-h-16"
           ></div>
         </div>
-        <p v-if="showRetry" class="mt-4 flex justify-end">
+        <p v-if="showActions" class="mt-4 flex justify-end gap-2">
           <UButton
+            color="neutral"
+            variant="ghost"
+            size="sm"
+            data-testid="tarkov-access-gate-dismiss"
+            @click="access.dismiss"
+          >
+            {{ t('tarkov_access.dismiss') }}
+          </UButton>
+          <UButton
+            v-if="showRetry"
             color="primary"
             size="sm"
             data-testid="tarkov-access-gate-retry"
@@ -44,7 +54,8 @@
    * Browser-facing Tarkov access gate. Always mounted at the app root
    * (independent of startup loading state): it only overlays when the shared
    * controller parks on a Cloudflare challenge or a failed verification
-   * attempt, and provides a manual retry that re-runs the access flow.
+   * attempt, and provides a manual retry that re-runs the access flow plus a
+   * dismiss action that releases waiting callers to their own error handling.
    */
   const access = useTarkovAccess();
   const { t } = useI18n();
@@ -88,6 +99,7 @@
       isWidgetEnabled &&
       !access.attemptsExhausted.value
   );
+  const showActions = computed(() => access.phase.value !== 'verifying');
   const showRetry = computed(
     () =>
       (access.phase.value === 'challenge' && access.attemptsExhausted.value) ||
@@ -124,7 +136,8 @@
       if (phase === 'challenge' && !access.widgetAvailable) {
         access.reportWidgetUnavailable();
       }
-    }
+    },
+    { immediate: true }
   );
   const handleRetry = (): void => {
     resetWidget();

@@ -2524,6 +2524,7 @@
     "checking": "Checking site access…",
     "description": "This site is being protected from excessive automated requests. Complete the security check below to load Tarkov game data.",
     "retry": "Try again",
+    "dismiss": "Not now",
     "verification_failed_retry": "The security check did not complete. You can try again.",
     "verifying": "Verifying your browser…",
     "widget_hint": "Complete the check to continue.",
