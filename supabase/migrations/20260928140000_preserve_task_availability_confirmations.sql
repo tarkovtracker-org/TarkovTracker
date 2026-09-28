@@ -50,8 +50,9 @@ AS $$
       AND jsonb_typeof(entry.value->'requirements') = 'string'
       AND jsonb_typeof(entry.value->'timestamp') = 'number'
       AND (entry.value->>'timestamp')::numeric >= 0
-      -- Clients increment this clock, so it must stay within JavaScript's safe integer range.
-      AND (entry.value->>'timestamp')::numeric <= 9007199254740991
+      -- Epoch milliseconds that clients advance with +1: anything after 3000-01-01 is corrupt, and
+      -- the cap keeps every successor persistable (MAX_CONFIRMATION_TIMESTAMP on the client).
+      AND (entry.value->>'timestamp')::numeric <= 32503680000000
     ORDER BY
       entry.key,
       trunc((entry.value->>'timestamp')::numeric) DESC,

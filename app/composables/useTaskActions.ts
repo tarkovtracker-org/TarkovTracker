@@ -1,5 +1,5 @@
 import { useProductAnalytics } from '@/composables/useProductAnalytics';
-import { hasStoryUnlockProgress } from '@/stores/taskAvailability';
+import { hasStoryUnlockProgress, type TaskBlocker } from '@/stores/taskAvailability';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
@@ -66,6 +66,11 @@ const getUncompleteStatusKey = (wasFailed: boolean) =>
   wasFailed ? 'page.tasks.questcard.status_reset_failed' : 'page.tasks.questcard.status_uncomplete';
 const getUncompleteUndoKey = (wasFailed: boolean) =>
   wasFailed ? 'page.tasks.questcard.undo_reset_failed' : 'page.tasks.questcard.undo_uncomplete';
+const UNRESOLVABLE_BLOCKERS: ReadonlySet<TaskBlocker['type']> = new Set([
+  'unknown',
+  'cycle',
+  'global_variable',
+]);
 export function useTaskActions(
   task: () => Task,
   onAction?: (payload: TaskActionPayload) => void
@@ -186,10 +191,13 @@ export function useTaskActions(
   };
   const progressStore = useProgressStore();
   const currentEvaluation = (taskId: string) => progressStore.taskEvaluations?.[taskId]?.self;
-  /** A malformed or cyclic prerequisite chain cannot be settled by recording task statuses. */
-  const hasPrerequisiteDiagnostic = (taskId: string): boolean =>
-    (currentEvaluation(taskId)?.blockers ?? []).some(
-      (blocker) => blocker.reason === 'task_requirement' || blocker.type === 'cycle'
+  /**
+   * Diagnostics (unknown references, malformed data, cycles) and known unmet server values cannot
+   * be resolved by recording statuses, raising levels/traders or confirming a gate.
+   */
+  const hasUnresolvableBlocker = (taskId: string): boolean =>
+    (currentEvaluation(taskId)?.blockers ?? []).some((blocker) =>
+      UNRESOLVABLE_BLOCKERS.has(blocker.type)
     );
   /** Unmet direct prerequisites from the current evaluation, or undefined before one exists. */
   const evaluatedUnmetRequirements = (taskId: string): TaskRequirement[] | undefined =>
@@ -214,7 +222,7 @@ export function useTaskActions(
       !normalizeOtherRequirements(currentTask.otherRequirements).length;
     return (
       gatesConfirmable &&
-      !hasPrerequisiteDiagnostic(currentTask.id) &&
+      !hasUnresolvableBlocker(currentTask.id) &&
       canApplyTaskAvailabilityRequirements(
         currentTask,
         taskCompletion,

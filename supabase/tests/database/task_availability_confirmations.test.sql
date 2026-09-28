@@ -86,11 +86,12 @@ SELECT is(
 SELECT is(
   public.merge_task_availability(
     NULL,
-    '{"safe": {"requirements": "", "timestamp": 9007199254740991},
+    '{"max": {"requirements": "", "timestamp": 32503680000000},
+      "beyond": {"requirements": "", "timestamp": 32503680000001},
       "unsafe": {"requirements": "", "timestamp": 9007199254740992}}'
   ),
-  '{"safe": {"requirements": "", "timestamp": 9007199254740991}}'::jsonb,
-  'rejects clocks outside the JavaScript safe integer range'
+  '{"max": {"requirements": "", "timestamp": 32503680000000}}'::jsonb,
+  'rejects clocks after the client ceiling, leaving successors persistable'
 );
 
 SELECT * FROM finish();

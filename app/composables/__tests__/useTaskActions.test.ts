@@ -192,6 +192,24 @@ describe('useTaskActions', () => {
     );
     expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
   });
+  it.each([
+    { type: 'unknown', taskId: 'missing', reason: 'task_reference' },
+    { type: 'unknown', reason: 'failed_requirement' },
+    { type: 'cycle', taskId: 'target' },
+    { type: 'global_variable', variableId: 'v', current: 0, required: 1 },
+  ] as const)('refuses when the evaluation has an unresolvable %j blocker', async (blocker) => {
+    const task: Task = {
+      id: 'target',
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['t'] }],
+    };
+    const evaluations: TaskEvaluationMap = {
+      target: { self: { available: false, blockers: [{ ...blocker }] } },
+    };
+    const { actions, tarkovStore } = await setup(task, [task], {}, {}, evaluations);
+    expect(actions.canMarkTaskAvailable()).toBe(false);
+    actions.markTaskAvailable();
+    expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
+  });
   it('still refuses when the evaluator reports an ambiguous unmet prerequisite', async () => {
     const requirement = { task: { id: 'prior' }, status: ['active'] };
     const task: Task = {

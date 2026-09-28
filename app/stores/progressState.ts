@@ -21,6 +21,7 @@ import {
   sanitizeManualActivityHistory,
   sanitizeOwnedProgressData,
 } from '@/utils/progressSanitizers';
+import { nextClock } from '@/utils/taskAvailabilityConfirmation';
 import {
   isTaskComplete as isTaskCompletionComplete,
   isTaskFailed as isTaskCompletionFailed,
@@ -277,10 +278,8 @@ const setAvailabilityConfirmation = (state: UserState, taskId: string, requireme
   const statusTs = currentData.taskCompletions?.[taskId]?.timestamp ?? 0;
   const previousTs = currentData.taskAvailability?.[taskId]?.timestamp ?? 0;
   const confirmations = (currentData.taskAvailability ??= {});
-  confirmations[taskId] = {
-    requirements,
-    timestamp: Math.max(Date.now(), statusTs, previousTs + 1),
-  };
+  // `statusTs - 1` so the confirmation may share the status millisecond (it still counts).
+  confirmations[taskId] = { requirements, timestamp: nextClock(statusTs - 1, previousTs) };
 };
 /**
  * A status change must retire the task's current confirmation even when that confirmation carries a
@@ -291,7 +290,7 @@ const setTaskStatus = (state: UserState, taskId: string, completion: TaskComplet
   const timestamp =
     confirmationTs === undefined
       ? completion.timestamp
-      : Math.max(completion.timestamp ?? 0, confirmationTs + 1);
+      : Math.max(completion.timestamp ?? 0, nextClock(confirmationTs));
   updateObjective(state, 'taskCompletions', taskId, { ...completion, timestamp });
 };
 // Simplified actions

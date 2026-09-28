@@ -2116,7 +2116,10 @@ level/faction/trader/prestige/quest gates, and changed requirements invalidate i
 menu clears just the in-game confirmation. Mark available either makes the task available or changes
 nothing: it is withheld for unsupported or malformed server gates and for unmet ambiguous-status or
 malformed prerequisites. A confirmation-only mode counts as progress for sync and startup adoption. Status changes are stamped after the task's confirmation clock, so a
-device whose clock runs ahead cannot keep a confirmation alive past a later reset. An imported EFT
+device whose clock runs ahead cannot keep a confirmation alive past a later reset. Clocks are
+capped at 3000-01-01 (`MAX_CONFIRMATION_TIMESTAMP`, same bound in the migration); a confirmation at
+the cap never counts. Mark available is also withheld while the evaluation reports an unknown
+reference, cycle or known unmet server value, since it could not resolve those. An imported EFT
 log start confirms the task's current gate signature, since the game only starts a task whose gates
 are met. Shared profiles evaluate with the owner's confirmations. Incomplete/reset records are not
 confirmation evidence. Explicit prerequisite backfill

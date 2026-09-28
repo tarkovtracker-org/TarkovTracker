@@ -3,12 +3,21 @@ import type { RawTaskCompletion } from '@/utils/taskStatus';
 type ConfirmationMap = NonNullable<UserProgressData['taskAvailability']>;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
-/** Clocks are incremented (`+ 1`), so only safely representable integers are accepted. */
+/**
+ * Confirmation clocks are epoch milliseconds advanced with `+ 1`. Anything after 3000-01-01 is
+ * corrupt; the migration's `merge_task_availability` uses the same ceiling. Writers clamp to it
+ * (see `nextClock`), so every value they produce stays persistable, and a confirmation at the
+ * ceiling is a saturated clock that can no longer be ordered, so it never counts (fail closed).
+ */
+export const MAX_CONFIRMATION_TIMESTAMP = 32_503_680_000_000;
+/** The next logical clock value after every given clock, clamped to the persistable ceiling. */
+export const nextClock = (...clocks: number[]): number =>
+  Math.min(MAX_CONFIRMATION_TIMESTAMP, Math.max(Date.now(), ...clocks.map((clock) => clock + 1)));
 const toTimestamp = (value: unknown): number | undefined =>
   typeof value === 'number' &&
   Number.isFinite(value) &&
   value >= 0 &&
-  value <= Number.MAX_SAFE_INTEGER
+  value <= MAX_CONFIRMATION_TIMESTAMP
     ? Math.trunc(value)
     : undefined;
 const sanitizeConfirmation = (value: unknown): TaskAvailabilityConfirmation | undefined => {
@@ -60,5 +69,6 @@ export const isAvailabilityConfirmed = (
   signature: string | undefined
 ): boolean => {
   if (!signature || confirmation?.requirements !== signature) return false;
+  if (confirmation.timestamp >= MAX_CONFIRMATION_TIMESTAMP) return false;
   return confirmation.timestamp >= statusTimestamp(completion);
 };

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MAX_CONFIRMATION_TIMESTAMP,
   isAvailabilityConfirmed,
+  nextClock,
   mergeTaskAvailability,
   sanitizeTaskAvailabilityMap,
 } from '@/utils/taskAvailabilityConfirmation';
@@ -44,11 +46,32 @@ describe('task availability confirmations', () => {
     ).toEqual({});
     expect(
       sanitizeTaskAvailabilityMap({
-        a: { requirements: 'x', timestamp: Number.MAX_SAFE_INTEGER + 2 },
+        a: { requirements: 'x', timestamp: MAX_CONFIRMATION_TIMESTAMP + 1 },
       })
     ).toEqual({});
     expect(
-      sanitizeTaskAvailabilityMap({ a: { requirements: 'x', timestamp: Number.MAX_SAFE_INTEGER } })
-    ).toEqual({ a: { requirements: 'x', timestamp: Number.MAX_SAFE_INTEGER } });
+      sanitizeTaskAvailabilityMap({
+        a: { requirements: 'x', timestamp: MAX_CONFIRMATION_TIMESTAMP },
+      })
+    ).toEqual({ a: { requirements: 'x', timestamp: MAX_CONFIRMATION_TIMESTAMP } });
+  });
+  it('clamps successor clocks so every written value stays persistable', () => {
+    // Review #979: a clear after a confirmation at the ceiling must still be storable.
+    expect(nextClock(MAX_CONFIRMATION_TIMESTAMP)).toBe(MAX_CONFIRMATION_TIMESTAMP);
+    expect(
+      sanitizeTaskAvailabilityMap({
+        a: { requirements: '', timestamp: nextClock(MAX_CONFIRMATION_TIMESTAMP) },
+      })
+    ).toEqual({ a: { requirements: '', timestamp: MAX_CONFIRMATION_TIMESTAMP } });
+    expect(nextClock(5)).toBeGreaterThanOrEqual(Date.now() - 1_000);
+  });
+  it('never honours a saturated confirmation clock', () => {
+    expect(
+      isAvailabilityConfirmed(
+        { requirements: 'sig', timestamp: MAX_CONFIRMATION_TIMESTAMP },
+        undefined,
+        'sig'
+      )
+    ).toBe(false);
   });
 });
