@@ -197,6 +197,11 @@ describe('useTaskActions', () => {
     { type: 'unknown', reason: 'failed_requirement' },
     { type: 'cycle', taskId: 'target' },
     { type: 'global_variable', variableId: 'v', current: 0, required: 1 },
+    { type: 'prestige', current: 0, required: 1 },
+    { type: 'trader_unlock', taskId: 'intro' },
+    { type: 'failed_branch', taskId: 'other' },
+    { type: 'disabled', taskId: 'target' },
+    { type: 'faction', reason: 'BEAR' },
   ] as const)('refuses when the evaluation has an unresolvable %j blocker', async (blocker) => {
     const task: Task = {
       id: 'target',
@@ -209,6 +214,26 @@ describe('useTaskActions', () => {
     expect(actions.canMarkTaskAvailable()).toBe(false);
     actions.markTaskAvailable();
     expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
+  });
+  it('allows the blockers Mark available can clear', async () => {
+    const task: Task = {
+      id: 'target',
+      minPlayerLevel: 20,
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['t'] }],
+    };
+    const evaluations: TaskEvaluationMap = {
+      target: {
+        self: {
+          available: false,
+          blockers: [
+            { type: 'player_level', current: 1, required: 20 },
+            { type: 'dialogue', requirementId: 'talk' },
+          ],
+        },
+      },
+    };
+    const { actions } = await setup(task, [task], {}, {}, evaluations);
+    expect(actions.canMarkTaskAvailable()).toBe(true);
   });
   it('still refuses when the evaluator reports an ambiguous unmet prerequisite', async () => {
     const requirement = { task: { id: 'prior' }, status: ['active'] };

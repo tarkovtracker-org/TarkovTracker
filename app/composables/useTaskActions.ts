@@ -66,10 +66,19 @@ const getUncompleteStatusKey = (wasFailed: boolean) =>
   wasFailed ? 'page.tasks.questcard.status_reset_failed' : 'page.tasks.questcard.status_uncomplete';
 const getUncompleteUndoKey = (wasFailed: boolean) =>
   wasFailed ? 'page.tasks.questcard.undo_reset_failed' : 'page.tasks.questcard.undo_uncomplete';
-const UNRESOLVABLE_BLOCKERS: ReadonlySet<TaskBlocker['type']> = new Set([
-  'unknown',
-  'cycle',
-  'global_variable',
+/**
+ * Blockers Mark available can clear: it raises the player level and trader values, records
+ * unambiguous prerequisite statuses and confirms unknown-value or conversation server gates.
+ * Anything else (faction, prestige, trader unlock, failed branch, disabled, known unmet value,
+ * unknown data, cycles, terminal states) would leave the task locked after changing progress.
+ */
+const RESOLVABLE_BLOCKERS: ReadonlySet<TaskBlocker['type']> = new Set([
+  'player_level',
+  'trader_level',
+  'trader_reputation',
+  'prerequisite',
+  'global_variable_unknown',
+  'dialogue',
 ]);
 export function useTaskActions(
   task: () => Task,
@@ -191,13 +200,9 @@ export function useTaskActions(
   };
   const progressStore = useProgressStore();
   const currentEvaluation = (taskId: string) => progressStore.taskEvaluations?.[taskId]?.self;
-  /**
-   * Diagnostics (unknown references, malformed data, cycles) and known unmet server values cannot
-   * be resolved by recording statuses, raising levels/traders or confirming a gate.
-   */
   const hasUnresolvableBlocker = (taskId: string): boolean =>
-    (currentEvaluation(taskId)?.blockers ?? []).some((blocker) =>
-      UNRESOLVABLE_BLOCKERS.has(blocker.type)
+    (currentEvaluation(taskId)?.blockers ?? []).some(
+      (blocker) => !RESOLVABLE_BLOCKERS.has(blocker.type)
     );
   /** Unmet direct prerequisites from the current evaluation, or undefined before one exists. */
   const evaluatedUnmetRequirements = (taskId: string): TaskRequirement[] | undefined =>
