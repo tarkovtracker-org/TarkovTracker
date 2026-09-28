@@ -280,6 +280,23 @@ describe('useTurnstileWidget', () => {
     wrapper.unmount();
     expect(api.remove).not.toHaveBeenCalled();
   });
+  it('re-renders an unrendered widget on reset with a fresh unavailable state', async () => {
+    const render = vi.fn<(element: HTMLElement, options: unknown) => string | undefined>(
+      () => undefined
+    );
+    const api: TurnstileApi = { render, remove: vi.fn(), reset: vi.fn() };
+    setTurnstileApi(api);
+    const { result, wrapper } = await mountHarness();
+    expect(result.unavailable.value).toBe(true);
+    render.mockReturnValueOnce('widget-2');
+    result.reset();
+    await flushMicrotasks();
+    expect(render).toHaveBeenCalledTimes(2);
+    expect(result.unavailable.value).toBe(false);
+    expect(result.ready.value).toBe(true);
+    expect(api.reset).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
   it('marks the widget unavailable when render throws', async () => {
     const renderError = new Error('invalid sitekey');
     const api: TurnstileApi = {

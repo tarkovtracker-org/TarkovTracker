@@ -205,9 +205,18 @@ export function useTurnstileWidget(
       waiters.push(resolveWithCleanup);
     });
   };
+  // A widget that never rendered has nothing to reset: render it again with a fresh budget.
+  const rerenderUnrenderedWidget = (): boolean => {
+    const element = container.value;
+    if (!enabled || widgetId !== undefined || !element) return false;
+    removeWidget();
+    void renderWidget(element);
+    return true;
+  };
   const reset = (): void => {
     latestToken = null;
     solved.value = false;
+    if (rerenderUnrenderedWidget()) return;
     if (api && widgetId !== undefined) {
       try {
         api.reset(widgetId);

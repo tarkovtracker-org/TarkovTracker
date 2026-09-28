@@ -663,7 +663,8 @@ export const dismissTarkovAccessGate = (): void => {
   }
   if (flow || !parked) return;
   parked = false;
-  takeRetryWaiter()?.abandon(dismissAccessAttempt());
+  const failure = dismissAccessAttempt();
+  takeRetryWaiter()?.abandon(failure);
 };
 /** Resets module state between tests; production code must not call this. */
 export const resetTarkovAccessForTests = (): void => {

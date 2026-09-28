@@ -598,6 +598,24 @@ describe('gated transport parity and recovery', () => {
     await requestGateRetry();
     expect(await ensureTarkovAccess()).toBe(2);
   });
+  it('dismisses a re-parked retry that has no parked waiters', async () => {
+    network.mockResolvedValueOnce(challenge());
+    void ensureTarkovAccess().catch(() => {});
+    await flush();
+    dismissTarkovAccessGate();
+    await flush();
+    network.mockResolvedValueOnce(challenge());
+    const retry = requestGateRetry().catch((error: unknown) => error);
+    await flush();
+    reportGateWidgetUnavailable();
+    expect(await retry).toMatchObject({ kind: 'challenge_exhausted' });
+    expect(getTarkovAccessState().phase.value).toBe('challenge');
+    dismissTarkovAccessGate();
+    const state = getTarkovAccessState();
+    expect(state.phase.value).toBe('idle');
+    expect(state.dismissed.value).toBe(true);
+    await expect(ensureTarkovAccess()).rejects.toMatchObject({ kind: 'challenge' });
+  });
   it('dismissal during an open challenge rejects without parking', async () => {
     network.mockResolvedValueOnce(challenge());
     const waiting = ensureTarkovAccess().catch((error: unknown) => error);
