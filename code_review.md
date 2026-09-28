@@ -103,7 +103,7 @@ Hard rules the reviewer must verify for every diff:
 
 ### Environment Variables
 
-- **Where:** `nuxt.config.ts`, `docs/ARCHITECTURE.md` env var map
+- **Where:** `nuxt.config.ts`, `docs/architecture.md` env var map
 - **Check:** One canonical env var name per concept. `NUXT_PUBLIC_*` for
   browser-exposed, `NUXT_*` for server-only. Platform-native names for Supabase
   Edge Functions (`SUPABASE_*`, `STRIPE_*`, `DISCORD_*`). No legacy aliases or
@@ -154,7 +154,7 @@ Hard rules the reviewer must verify for every diff:
   code reads new schema without error).
 - **Env vars:** New env vars must be set in Cloudflare/Supabase before the code
   that uses them deploys. Note any new env vars in the PR description and verify
-  they are documented in `docs/ARCHITECTURE.md`.
+  they are documented in `docs/architecture.md`.
 - **Precompute ordering:** If a precompute payload schema changes, the
   precompute workflow must run and populate KV before the handler change deploys.
   Otherwise handlers must tolerate both old and new payload shapes.

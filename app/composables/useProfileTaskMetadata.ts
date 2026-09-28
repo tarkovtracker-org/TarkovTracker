@@ -125,7 +125,7 @@ const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: Abo
  *
  * A cold cache legitimately needs longer than a single attempt: the proxy allows
  * two 12s attempts per envelope plus backoff across the base and translation
- * legs, roughly 55s worst case per route (`docs/SYSTEMS.md`, retry budget).
+ * legs, roughly 55s worst case per route (`docs/systems.md`, retry budget).
  * Aborting earlier leaves the profile with no snapshot and no retry until the
  * mode or language changes.
  */

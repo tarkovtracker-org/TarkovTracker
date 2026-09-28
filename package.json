@@ -99,7 +99,7 @@
     "lint:blank-lines": "node scripts/lint-blank-lines.mjs",
     "typecheck": "NODE_ENV=development nuxt typecheck && tsc -p scripts/precompute",
     "lint:fix": "NODE_ENV=development nuxt prepare && eslint app shared --fix && pnpm run format:blank-lines",
-    "lint:unused": "knip --reporter compact",
+    "lint:unused": "knip --config .github/knip.json --reporter compact",
     "postinstall": "nuxt prepare",
     "verify:overlay": "tsx --tsconfig scripts/precompute/tsconfig.json scripts/precompute/check-overlay.ts",
     "precompute:tarkov": "tsx --tsconfig scripts/precompute/tsconfig.json scripts/precompute/run.ts",

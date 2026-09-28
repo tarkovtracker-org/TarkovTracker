@@ -1,4 +1,4 @@
-# Co-located git worktrees for parallel PR work (see docs/WORKFLOW_AUTOMATION.md#setup-git-worktree)
+# Co-located git worktrees for parallel PR work (see docs/workflow-automation.md#setup-git-worktree)
 .wt/
 
 # Nuxt dev/build outputs
@@ -11,8 +11,6 @@ coverage
 dist
 test-report.junit.xml
 .wrangler
-.claude/*
-!.claude/CLAUDE.md
 .codegraph
 .codex
 node_modules

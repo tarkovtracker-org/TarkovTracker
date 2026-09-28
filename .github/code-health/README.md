@@ -44,10 +44,10 @@ sync with `main`, and resume correctly.
 5. **Select one slice.** Highest-priority `queued` item whose `dependencies` are all `completed`.
    Set `status: in_progress` before substantial work.
 6. **Deep review.** Trace callers, data flow, tests, lifecycle, and constraints in `AGENTS.md` and
-   `docs/SYSTEMS.md` before changing anything. Identify the underlying cause of complexity.
+   `docs/systems.md` before changing anything. Identify the underlying cause of complexity.
 7. **Implement.** Prefer deletion, consolidation, explicit boundaries, and better types. Preserve
    behavior unless fixing a verified defect; document intentional behavior changes in the PR and in
-   `docs/SYSTEMS.md` when the system is non-obvious.
+   `docs/systems.md` when the system is non-obvious.
 8. **Validate.** Narrow tests first, then the full required set for the touched surfaces (see
    `AGENTS.md` → Required validation). Never weaken tests, gates, thresholds, or Fallow config to
    pass.

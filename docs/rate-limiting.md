@@ -17,7 +17,7 @@ have different enforcers on purpose.
 Related docs:
 
 - External progress API quotas: [`API.md`](./API.md#rate-limits-api-gateway)
-- System architecture: [`ARCHITECTURE.md`](./ARCHITECTURE.md)
+- System architecture: [`architecture.md`](./architecture.md)
 - Incident knobs: [`runbook.md`](./runbook.md)
 
 ---
@@ -290,7 +290,7 @@ Important:
   `Cache-Control: private`), an `updated`-age freshness gate
   (`NUXT_TARKOV_DEV_PROFILE_MAX_UPDATED_AGE_DAYS`, default 7, `0` disables), and optional
   Cloudflare Turnstile verification (production requires paired `NUXT_PUBLIC_TURNSTILE_SITE_KEY`
-  and `NUXT_TURNSTILE_SECRET_KEY` values). See `docs/SYSTEMS.md` §7 for the full flow.
+  and `NUXT_TURNSTILE_SECRET_KEY` values). See `docs/systems.md` §7 for the full flow.
 - Most static game-data routes (`/api/tarkov/*`) are not enrolled in this limiter. They are served
   through `edgeCache` with CDN/WAF abuse protection and have no route-specific rate limit. The
   `/api/tarkov/cache-meta` endpoint is an exception — it queries Supabase directly and relies on its
@@ -473,7 +473,7 @@ Treat these deliberately; do not “make everything fail open” without underst
 | Pages consumers                        | `app/server/api/team/members.ts`, `app/server/api/profile/[userId]/[mode].get.ts`, `app/server/api/tarkov-dev/profile.get.ts`, `app/server/api/logs/client.post.ts` |
 | Account-delete limiter                 | `supabase/functions/account-delete/index.ts`                                                                                                                        |
 | Auth platform limits                   | `supabase/config.toml` `[auth.rate_limit]`                                                                                                                          |
-| External API docs                      | `docs/API.md`                                                                                                                                                       |
+| External API docs                      | `docs/api.md`                                                                                                                                                       |
 
 ---
 

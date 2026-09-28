@@ -74,6 +74,7 @@ jobs:
         continue-on-error: true
         run: |
           gitleaks git . \
+            --config .github/.gitleaks.toml \
             --exit-code 1 \
             --no-banner \
             --redact \

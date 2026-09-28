@@ -52,8 +52,8 @@ Authorization: Bearer <supabase_jwt_token>
 > (see [Progress API Host](#progress-api-host-apitarkovtrackerorg)).
 >
 > These routes are public and pass through the API protection middleware; see
-> [`ARCHITECTURE.md#api-protection`](./ARCHITECTURE.md#api-protection) for access-control configuration and
-> [`RATE_LIMITING.md`](./RATE_LIMITING.md) for rate-limit ownership.
+> [`architecture.md#api-protection`](./architecture.md#api-protection) for access-control configuration and
+> [`rate-limiting.md`](./rate-limiting.md) for rate-limit ownership.
 
 ### GET /api/tarkov/bootstrap
 
@@ -426,7 +426,7 @@ The `returnUrl` host must match the configured app URL host. Mismatched hosts fa
 
 This section covers **external progress API quotas only** (Worker + Durable Object). App mutation
 limits, shared profile limits, Auth limits, and DB hard caps live in a separate ownership map:
-[`RATE_LIMITING.md`](./RATE_LIMITING.md).
+[`rate-limiting.md`](./rate-limiting.md).
 
 Progress API requests (`api.tarkovtracker.org`) are subject to tiered daily quotas keyed by user account (not per token). Daily quotas reset at 00:00 UTC and count authenticated requests admitted for processing.
 
@@ -554,7 +554,7 @@ Pass `cacheBust=1` query parameter to bypass cache.
 
 The `lang` query parameter is validated against `API_SUPPORTED_LANGUAGES` (`app/utils/constants.ts`); codes outside that allowlist fall back to `en` (`getValidatedLanguage` in `app/server/utils/language-helpers.ts`).
 
-`lang` is not forwarded to upstream as a query parameter. `json.tarkov.dev` serves an English base document containing translation keys plus a separate per-language document at `{gameMode}/{endpoint}_{lang}`; the proxy fetches both (plus `_en` as a per-key fallback) and merges them via the base document's `translations` JSONPath list. See [Data fetching pipeline](SYSTEMS.md#2-data-fetching-pipeline).
+`lang` is not forwarded to upstream as a query parameter. `json.tarkov.dev` serves an English base document containing translation keys plus a separate per-language document at `{gameMode}/{endpoint}_{lang}`; the proxy fetches both (plus `_en` as a per-key fallback) and merges them via the base document's `translations` JSONPath list. See [Data fetching pipeline](systems.md#2-data-fetching-pipeline).
 
 **Language codes accepted by `/api/tarkov/*`:**
 
