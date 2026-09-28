@@ -27,8 +27,8 @@ contribution workflow overview (issues, branches, labels, project board), see
 
 ### Coding standards
 
-Coding standards are documented in [`../AGENTS.md`](../AGENTS.md) (Coding Conventions,
-Nuxt / Vue Rules, TypeScript, Error Handling, Localization sections). That file is the canonical
+Coding standards are documented in [`../AGENTS.md`](../AGENTS.md) (Commands,
+Validation, Invariants sections). That file is the canonical
 source — do not duplicate its rules here. Key reminders for new contributors:
 
 - `<script setup lang="ts">` with TypeScript strict
@@ -158,7 +158,7 @@ asks for the following sections. Complete every section:
 5. Your contribution will be in the next release!
 
 > The full review gate (including rate-limit handling and out-of-scope deferrals) is in
-> [`../AGENTS.md`](../AGENTS.md) under "PR Review Gate".
+> [`../AGENTS.md`](../AGENTS.md) under "Review".
 
 For finding and claiming work, see
 [`../.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md) ("How to Find and Claim Work").

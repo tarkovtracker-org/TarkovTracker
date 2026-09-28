@@ -16,7 +16,7 @@ have different enforcers on purpose.
 
 Related docs:
 
-- External progress API quotas: [`API.md`](./API.md#rate-limits-api-gateway)
+- External progress API quotas: [`api.md`](./api.md#rate-limits-api-gateway)
 - System architecture: [`architecture.md`](./architecture.md)
 - Incident knobs: [`runbook.md`](./runbook.md)
 
@@ -236,7 +236,7 @@ See Cloudflare's [Workers Logs documentation](https://developers.cloudflare.com/
 and [Query Builder documentation](https://developers.cloudflare.com/workers/observability/query-builder/)
 for the logging and query controls.
 
-Details and response headers: [`API.md`](./API.md#rate-limits-api-gateway)
+Details and response headers: [`api.md`](./api.md#rate-limits-api-gateway)
 
 Implementation notes:
 
@@ -417,7 +417,7 @@ Checklist for every new limiter:
 2. Choose the enforcer from the ownership matrix
 3. Define key (`userId`, `ip`, `token owner`, etc.)
 4. Define limit + window + fail-open/fail-closed behavior
-5. Document it in this file and, if external, in `API.md`
+5. Document it in this file and, if external, in `api.md`
 6. Avoid inventing a third backend “because it was convenient”
 
 ---

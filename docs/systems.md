@@ -626,7 +626,7 @@ through the `api-gateway` Worker on `api.tarkovtracker.org`. A progress read tou
 layers; this section is the canonical map of those layers so a failure can be located quickly
 instead of guessed at. Rate-limit ownership details live in
 [`rate-limiting.md`](./rate-limiting.md); client-facing quota docs live in
-[`API.md`](./API.md#rate-limits-api-gateway).
+[`api.md`](./api.md#rate-limits-api-gateway).
 
 ### Diagram
 

@@ -331,7 +331,7 @@ Internal modes map to upstream endpoints as `pvp` → `regular`, `pve` → `pve`
 `seasonal` → `pvp-season`.
 
 > Canonical endpoint details: [`systems.md` §1](./systems.md#1-tarkovdev-data-integration) and
-> [`API.md`](./API.md). The table below is a quick map.
+> [`api.md`](./api.md). The table below is a quick map.
 
 | Endpoint                       | Purpose                   | Cache TTL   |
 | ------------------------------ | ------------------------- | ----------- |
