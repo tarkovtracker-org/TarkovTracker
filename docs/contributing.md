@@ -134,6 +134,10 @@ The PR template ([`../.github/pull_request_template.md`](../.github/pull_request
 asks for the following sections. Complete every section:
 
 - **Summary** — a brief description of what the PR does.
+- **Release note** — one or two player-facing sentences (or bullets) for the next release's
+  Highlights and the in-app changelog, or `none` for changes players will not notice. Describe the
+  effect, not the implementation. Notes from contributors without write access are not published
+  automatically; a maintainer adds them to the release.
 - **Changes** — a list of the key changes made.
 - **Type of Change** — mark the relevant option(s): bug fix, new feature, enhancement, refactoring,
   documentation update, dependency update, or other.
@@ -155,7 +159,8 @@ asks for the following sections. Complete every section:
 3. Every inline review thread and every top-level/review-summary comment must have an explicit
    disposition (fixed, rejected with rationale, or deferred to a tracked issue) before merge
 4. Once all reviews complete, all threads are resolved, and CI is green, a maintainer merges
-5. Your contribution will be in the next release!
+5. Your contribution deploys once merged and appears in the next release (with its release note
+   under Highlights)!
 
 > The full review gate (including rate-limit handling and out-of-scope deferrals) is in
 > [`../AGENTS.md`](../AGENTS.md) under "Review".

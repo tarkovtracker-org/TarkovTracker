@@ -443,6 +443,38 @@ in `CHANGELOG.md` or the GitHub release. Reverts of those commits (Git's default
 `workflow`); keep the in-app changelog's internal-scope filter aligned with it. Internal commits
 still deploy normally; they are only left out of versioning. Use a product scope (`app`, `api`, `maps`, …) when a change affects players.
 
+**Release note highlights.** While generating notes, the same plugin reads the `## Release note`
+section of each merged PR (from the `(#123)` suffix of its squash commit, using the release job's
+`GITHUB_TOKEN`; `scripts/release-highlights.mjs`) and lists those sentences under
+`### Highlights` above the generated Features and Bug Fixes in the GitHub release. Highlights are
+not written to `CHANGELOG.md`: semantic-release regenerates notes after the version commit, and
+only that pass adds them, so PR text never enters the committed, secret-scanned file. Empty
+sections and `none` are skipped. A failed PR lookup is logged and skipped, so highlights never block a release. The in-app
+changelog shows the first bullets of each release, so highlights appear there first.
+
+Only a description written by someone with write access and unchanged since merge is published:
+a note is skipped when the PR is not merged, its author lacks current write access (checked with
+the collaborator-permission API; for other contributions, add the highlight to the GitHub release
+by hand), or its GraphQL
+`lastEditedAt` is at or after `mergedAt` (second precision makes an equal time ambiguous). At most
+3 notes per PR and 5 per release are listed, matching the in-app changelog's per-release bullet
+limit. To fix a note after merge, add it to
+the GitHub release by hand rather than editing the PR (an edit after merge also removes a note
+that would otherwise publish). Notes become plain text: link syntax, images, URLs of any scheme,
+and HTML tags are removed (including any `<` that would still open a tag), headings inside HTML
+comments or code fences are ignored, and each note is capped at 280 code points. Only top-level
+bullets are published: wrapped continuation lines, nested list items, and indented code stay
+with their parent bullet. Parsing is bounded before sanitization — PR text within GitHub's body
+limit, each bullet within `MAX_RAW_NOTE` code points, autolink triggers detected per
+whitespace-delimited token — so a long or pathological note cannot stall generation. PR lookups
+run in commit order with bounded concurrency, stopping once the five-highlight cap is
+collectable. PR text never enters `CHANGELOG.md`: highlights attach only when notes are
+regenerated after the version commit, which is authenticated from its generated state (exactly
+`CHANGELOG.md` and `package.json` changed, and the committed manifest already carries the
+release version) rather than its user-controlled subject. A PR reverted within the same release contributes no highlight, and
+neither does its revert, even when the revert has an internal scope; a revert of that revert
+restores the original highlight.
+
 ### 4. PR Checks (`.github/workflows/pr-checks.yml`)
 
 Enhanced PR validation:
