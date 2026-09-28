@@ -519,12 +519,16 @@ async function sanitizeProgressBackupKey(key: string): Promise<string | null> {
     identity.createdAt ?? 'unknown'
   }}`;
 }
+/** Keys named `${prefix}${userId}` keep their prefix with the owner fingerprinted. */
+const OWNER_SUFFIXED_PREFIXES = [
+  STORAGE_KEYS.progressRecoveryPrefix,
+  STORAGE_KEYS.deviceDataRemovalIncompletePrefix,
+];
 async function sanitizeRecoveryKey(key: string): Promise<string | null> {
-  if (!key.startsWith(STORAGE_KEYS.progressRecoveryPrefix)) return null;
-  const owner = key.slice(STORAGE_KEYS.progressRecoveryPrefix.length);
-  return `${STORAGE_KEYS.progressRecoveryPrefix}{owner:${
-    (await fingerprintValue(owner)) ?? 'unknown'
-  }}`;
+  const prefix = OWNER_SUFFIXED_PREFIXES.find((candidate) => key.startsWith(candidate));
+  if (!prefix) return null;
+  const owner = key.slice(prefix.length);
+  return `${prefix}{owner:${(await fingerprintValue(owner)) ?? 'unknown'}}`;
 }
 async function sanitizeSupersededKey(key: string): Promise<string | null> {
   if (!key.startsWith(STORAGE_KEYS.progressSupersededPrefix)) return null;

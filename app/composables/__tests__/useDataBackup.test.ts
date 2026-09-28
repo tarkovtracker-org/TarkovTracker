@@ -572,6 +572,7 @@ describe('useDataBackup', () => {
       localStorage.setItem('sb-localhost-auth-token', 'token-secret');
       localStorage.setItem(`${STORAGE_KEYS.progressBackupPrefix}user-123_1700000009999`, 'backup');
       localStorage.setItem(`${STORAGE_KEYS.progressRecoveryPrefix}user-123`, 'recovery');
+      localStorage.setItem(`${STORAGE_KEYS.deviceDataRemovalIncompletePrefix}user-123`, 'user-123');
       localStorage.setItem(
         `${STORAGE_KEYS.progressQuarantinePrefix}opaque-copy_0`,
         '{opaque malformed bytes}'

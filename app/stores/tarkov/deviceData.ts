@@ -192,6 +192,10 @@ const incompleteRemovalOwners = ref<string[]>(readIncompleteRemovalOwners());
 export const incompleteDeviceDataRemovalOwner = computed(
   () => incompleteRemovalOwners.value[0] ?? null
 );
+/** Another tab may record or clear a marker after this tab's auth transition ran. */
+export const refreshIncompleteDeviceDataRemovals = (): void => {
+  incompleteRemovalOwners.value = readIncompleteRemovalOwners();
+};
 const withoutOwner = (userId: string): string[] =>
   incompleteRemovalOwners.value.filter((owner) => owner !== userId);
 export const markDeviceDataRemovalIncomplete = (userId: string): void => {

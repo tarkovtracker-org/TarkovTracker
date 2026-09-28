@@ -141,6 +141,7 @@
     clearDeviceDataRemoval,
     incompleteDeviceDataRemovalOwner,
     markDeviceDataRemovalIncomplete,
+    refreshIncompleteDeviceDataRemovals,
     removeAccountDeviceData,
     requestDeviceDataRemoval,
     retryIncompleteDeviceDataRemoval,
@@ -200,10 +201,16 @@
     },
     { flush: 'sync' }
   );
-  /** Other tabs report superseded-copy changes only through the storage event. */
+  /** Other tabs report superseded-copy and removal-marker changes only through storage events. */
   const refreshOnSupersededStorageChange = (event: StorageEvent) => {
     if (event.key === null || event.key.startsWith(STORAGE_KEYS.progressSupersededPrefix)) {
       refreshSupersededCopies();
+    }
+    if (
+      event.key === null ||
+      event.key.startsWith(STORAGE_KEYS.deviceDataRemovalIncompletePrefix)
+    ) {
+      refreshIncompleteDeviceDataRemovals();
     }
   };
   onMounted(() => {

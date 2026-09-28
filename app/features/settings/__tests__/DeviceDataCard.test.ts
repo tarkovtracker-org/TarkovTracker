@@ -364,6 +364,21 @@ describe('DeviceDataCard', () => {
     expect(wrapper.find('[data-testid="superseded-progress-export"]').exists()).toBe(true);
     wrapper.unmount();
   });
+  it('shows a removal retry recorded by another tab', async () => {
+    const wrapper = await mountCard();
+    expect(wrapper.find('[data-testid="device-data-remove-incomplete"]').exists()).toBe(false);
+    const { STORAGE_KEYS } = await import('@/utils/storageKeys');
+    const key = `${STORAGE_KEYS.deviceDataRemovalIncompletePrefix}user-9`;
+    Storage.prototype.setItem.call(localStorage, key, 'user-9');
+    window.dispatchEvent(new StorageEvent('storage', { key }));
+    await nextTick();
+    expect(wrapper.find('[data-testid="device-data-remove-incomplete"]').exists()).toBe(true);
+    Storage.prototype.removeItem.call(localStorage, key);
+    window.dispatchEvent(new StorageEvent('storage', { key }));
+    await nextTick();
+    expect(wrapper.find('[data-testid="device-data-remove-incomplete"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
   it('clears owner-scoped export controls when the current account signs out', async () => {
     const wrapper = await mountCard();
     await wrapper.get('[data-testid="device-data-remove"]').trigger('click');
