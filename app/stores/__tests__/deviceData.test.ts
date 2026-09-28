@@ -173,6 +173,48 @@ describe('device data removal', () => {
       ).toBeNull();
     }
   );
+  it('keeps the active slot when the durable quarantine marker cannot be written', () => {
+    const raw = '{malformed';
+    localStorage.setItem(STORAGE_KEYS.progress, raw);
+    const setItem = localStorage.setItem.bind(localStorage);
+    const spy = vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+      if (key.startsWith(STORAGE_KEYS.progressQuarantineRemovalMarkerPrefix)) {
+        throw new DOMException('full', 'QuotaExceededError');
+      }
+      setItem(key, value);
+    });
+    expect(removeAccountDeviceData('user-1')).toBe(false);
+    spy.mockRestore();
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(raw);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(true);
+  });
+  it('removes the owner activity logs and keeps guest and other-account entries', () => {
+    localStorage.setItem(STORAGE_KEYS.activityLogManual, owned('user-1'));
+    localStorage.setItem(LEGACY_STORAGE_KEYS.activityLogManual, owned(null));
+    localStorage.setItem(STORAGE_KEYS.activityLogLastRead, owned('user-1'));
+    localStorage.setItem(LEGACY_STORAGE_KEYS.activityLogLastRead, owned('user-2'));
+    expect(removeAccountDeviceData('user-1')).toBe(true);
+    expect(localStorage.getItem(STORAGE_KEYS.activityLogManual)).toBeNull();
+    expect(localStorage.getItem(STORAGE_KEYS.activityLogLastRead)).toBeNull();
+    expect(localStorage.getItem(LEGACY_STORAGE_KEYS.activityLogManual)).toBe(owned(null));
+    expect(localStorage.getItem(LEGACY_STORAGE_KEYS.activityLogLastRead)).toBe(owned('user-2'));
+  });
+  it('re-reads ownership when another tab replaces a shared key before removal', () => {
+    localStorage.setItem(STORAGE_KEYS.preferences, owned('user-1'));
+    const getItem = localStorage.getItem.bind(localStorage);
+    let replaced = false;
+    const spy = vi.spyOn(localStorage, 'getItem').mockImplementation((key) => {
+      const value = getItem(key);
+      if (key === STORAGE_KEYS.preferences && !replaced) {
+        replaced = true;
+        localStorage.setItem(STORAGE_KEYS.preferences, owned('user-2'));
+      }
+      return value;
+    });
+    expect(removeAccountDeviceData('user-1')).toBe(true);
+    spy.mockRestore();
+    expect(localStorage.getItem(STORAGE_KEYS.preferences)).toBe(owned('user-2'));
+  });
   it('deletes malformed active bytes that name the removing owner without quarantine', () => {
     localStorage.setItem(STORAGE_KEYS.progress, JSON.stringify({ _userId: 'user-1', data: null }));
     expect(removeAccountDeviceData('user-1')).toBe(true);

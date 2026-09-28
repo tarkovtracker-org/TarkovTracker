@@ -32,6 +32,15 @@ export const isDeviceDataRemovalPending = (userId: string | null): boolean =>
 export const clearDeviceDataRemoval = (): void => {
   removalPendingFor = null;
 };
+/** Owner-scoped envelopes outside progress; guest and unscoped values are left in place. */
+const OWNER_SCOPED_KEYS = [
+  STORAGE_KEYS.preferences,
+  LEGACY_STORAGE_KEYS.preferences,
+  STORAGE_KEYS.activityLogManual,
+  LEGACY_STORAGE_KEYS.activityLogManual,
+  STORAGE_KEYS.activityLogLastRead,
+  LEGACY_STORAGE_KEYS.activityLogLastRead,
+];
 const OWNED_BACKUP_PREFIXES = [
   STORAGE_KEYS.progressBackupPrefix,
   LEGACY_STORAGE_KEYS.progressBackupPrefix,
@@ -70,10 +79,12 @@ const quarantineRemainsForOwner = (userId: string): boolean => {
   if (quarantineKey === undefined || readStorageItem(quarantineKey) !== null) return true;
   return !safeRemoveItem(markerKey);
 };
+/** The active slot is released only once the owner's durable marker is confirmed. */
 const quarantineUnattributedActiveProgress = (raw: string, userId: string): RemovalResult => {
-  const quarantineKey = quarantineAndRemoveUnparseableActiveProgress(raw);
-  if (quarantineKey) safeSetItem(removalMarkerKey(userId), quarantineKey);
-  return { complete: false, released: quarantineKey !== null };
+  const released = quarantineAndRemoveUnparseableActiveProgress(raw, (quarantineKey) =>
+    safeSetItem(removalMarkerKey(userId), quarantineKey)
+  );
+  return { complete: false, released };
 };
 const removeOwnedActiveProgress = (userId: string): RemovalResult => {
   const removed = safeRemoveItem(STORAGE_KEYS.progress, userId);
@@ -92,22 +103,29 @@ const removeMalformedActiveProgress = (
   if (envelope?._userId === userId) return removeOwnedActiveProgress(userId);
   return quarantineUnattributedActiveProgress(raw, userId);
 };
+/** Another tab may replace a shared key between the ownership read and the removal. */
+const removeIfUnchanged = (key: string, raw: string, explicitOwner?: string): boolean | null => {
+  if (readStorageItem(key) !== raw) return null;
+  return safeRemoveItem(key, explicitOwner);
+};
 const removeParsedOwnedValue = (
   key: string,
+  raw: string,
   userId: string,
   envelope: ScopedEnvelope,
   explicitProgressRemoval: boolean
-): RemovalResult => {
+): RemovalResult | null => {
   if (!envelope) return { complete: false, released: false };
   if (envelope._userId !== userId) return { complete: true, released: true };
-  const removed = safeRemoveItem(key, explicitProgressRemoval ? userId : undefined);
-  return { complete: removed, released: removed };
+  const removed = removeIfUnchanged(key, raw, explicitProgressRemoval ? userId : undefined);
+  return removed === null ? null : { complete: removed, released: removed };
 };
-const removeIfOwned = (
+/** `null` means the stored value changed during the attempt and ownership must be re-read. */
+const attemptOwnedRemoval = (
   key: string,
   userId: string,
-  explicitProgressRemoval = false
-): RemovalResult => {
+  explicitProgressRemoval: boolean
+): RemovalResult | null => {
   const raw = readStorageItem(key);
   if (raw === undefined) return { complete: false, released: false };
   if (!raw) return { complete: true, released: true };
@@ -116,7 +134,21 @@ const removeIfOwned = (
     explicitProgressRemoval && key === STORAGE_KEYS.progress
       ? removeMalformedActiveProgress(raw, userId, envelope)
       : null;
-  return malformedRemoval ?? removeParsedOwnedValue(key, userId, envelope, explicitProgressRemoval);
+  return (
+    malformedRemoval ?? removeParsedOwnedValue(key, raw, userId, envelope, explicitProgressRemoval)
+  );
+};
+const OWNERSHIP_REREAD_ATTEMPTS = 3;
+const removeIfOwned = (
+  key: string,
+  userId: string,
+  explicitProgressRemoval = false
+): RemovalResult => {
+  for (let attempt = 0; attempt < OWNERSHIP_REREAD_ATTEMPTS; attempt += 1) {
+    const result = attemptOwnedRemoval(key, userId, explicitProgressRemoval);
+    if (result) return result;
+  }
+  return { complete: false, released: false };
 };
 /** Removes every locally stored copy owned by `userId`; other accounts are untouched. */
 export const removeAccountDeviceData = (userId: string): boolean => {
@@ -128,7 +160,9 @@ export const removeAccountDeviceData = (userId: string): boolean => {
   removed = removeSupersededProgressCopies(userId) && removed;
   const activeRemoval = removeIfOwned(STORAGE_KEYS.progress, userId, true);
   removed = activeRemoval.complete && removed;
-  removed = removeIfOwned(STORAGE_KEYS.preferences, userId).complete && removed;
+  for (const key of OWNER_SCOPED_KEYS) {
+    removed = removeIfOwned(key, userId).complete && removed;
+  }
   for (const key of keys ?? []) {
     if (!isRecognizedBackupKey(key)) continue;
     removed = removeIfOwned(key, userId).complete && removed;

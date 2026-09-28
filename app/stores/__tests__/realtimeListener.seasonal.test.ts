@@ -372,6 +372,45 @@ describe('seasonal progress realtime synchronization', () => {
       localStorage.clear();
     }
   });
+  it('holds a live remote reset and sync when its displaced progress cannot be retained', async () => {
+    vi.useFakeTimers();
+    const { setupRealtimeListener, registerSyncControllerGetter } =
+      await import('@/stores/tarkov/realtimeListener');
+    const supersededModule = await import('@/stores/tarkov/supersededProgress');
+    const saveSpy = vi.spyOn(supersededModule, 'saveSupersededProgressCopy').mockReturnValue(null);
+    const pause = vi.fn();
+    const resume = vi.fn();
+    registerSyncControllerGetter(() => ({ pause, resume, hasPendingChanges: () => true }));
+    try {
+      await setupRealtimeListener(store);
+      Object.assign(state.pvp, { level: 30, displayName: 'offline edit' });
+      handlers.get('user_game_mode_progress')?.({
+        new: {
+          game_mode: 'pvp',
+          season_number: 0,
+          progress_data: { ...structuredClone(defaultState.pvp), progressEpoch: 1 },
+          updated_at: '2026-09-06T12:00:00Z',
+        },
+      });
+      expect(state.pvp).toMatchObject({ level: 30, displayName: 'offline edit', progressEpoch: 0 });
+      expect(pause).toHaveBeenCalled();
+      // A later metadata event must not resume the held sync and upload the displaced edits.
+      handlers.get('user_progress')?.({
+        new: { current_game_mode: 'pvp', game_edition: 3, updated_at: '2026-09-06T12:01:00Z' },
+      });
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(resume).not.toHaveBeenCalled();
+    } finally {
+      saveSpy.mockRestore();
+      registerSyncControllerGetter(() => null);
+      vi.useRealTimers();
+      const { resetAccountRecoveryRetentionBlock } =
+        await import('@/stores/tarkov/accountRecovery');
+      const { setActiveProgressWritesBlocked } = await import('@/stores/tarkov/localStorage');
+      resetAccountRecoveryRetentionBlock();
+      setActiveProgressWritesBlocked(false);
+    }
+  });
   it('ignores late progress events while the shared transport is suspended', async () => {
     vi.useFakeTimers();
     const page = Object.assign(new EventTarget(), { visibilityState: 'hidden' as const });

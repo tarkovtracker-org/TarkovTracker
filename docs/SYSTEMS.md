@@ -941,7 +941,9 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
 - **Superseded copies.** Before a deliberate reset with pending cloud changes or memory-only local changes, the store keeps each
   affected mode that differs from its defaults under an owner-scoped export-only key. A remote
   reset delivered over Realtime while local changes await acknowledgement does the same before it
-  replaces the mode; if that copy cannot be saved, active writes stay blocked. Hydration also retains materialized Seasonal
+  replaces the mode. If that copy cannot be saved, the reset is not applied, active writes stay
+  blocked, and sync stays paused for the session so the displaced edits cannot overwrite the reset;
+  the next startup load retries the retention. Hydration also retains materialized Seasonal
   progress stamped for an older season before sanitization clears it. These copies keep their
   original mode and season, are available from Settings → Account for export, and are never loaded
   into the tracker or sent to Supabase. They are removed only with that account's explicit device-data
@@ -967,8 +969,9 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
 - **Removing device data.** `DeviceDataCard` (Settings → Account) is the explicit action,
   distinct from sign-out and from cloud deletion. It registers `requestDeviceDataRemoval` before
   signing out so the progress and preferences session transitions retain no copy for that owner,
-  then `removeAccountDeviceData` deletes the owner's active copies, recovery copy, and legacy
-  backups. Other accounts' data and cloud progress are untouched; the next sign-in clears the
+  then `removeAccountDeviceData` deletes the owner's active copies, recovery copy, preferences,
+  activity-log envelopes, and legacy backups. Each shared key's ownership is re-read immediately
+  before removal, so a value another tab stores for a different account is kept. Other accounts' data and cloud progress are untouched; the next sign-in clears the
   request. Removal and discard confirmations belong to the authenticated owner that opened them
   and are invalidated when that owner changes. Incomplete backup cleanup reports failure but blocks
   new guest writes only while the removed owner still occupies active storage. Account deletion uses
@@ -977,8 +980,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   card keeps a retry bound to the removed owner until it succeeds or that owner signs in again.
   If the server cannot be reached, the confirmation offers the disclosed device-only sign-out.
   Malformed active bytes that name the removing owner are deleted. Bytes with no provable owner are
-  quarantined before the active key is released, and a quarantine-prefixed marker keeps that
-  owner's later removals incomplete while the quarantined copy exists. If quarantine cannot be
+  quarantined, and the active key is released only after a quarantine-prefixed marker is saved;
+  that marker keeps the owner's later removals incomplete while the quarantined copy exists. If quarantine cannot be
   verified, removal fails and the active write barrier stays in place.
 
 ### Files

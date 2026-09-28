@@ -46,24 +46,22 @@ const mayHaveUnacknowledgedLocalChanges = (): boolean =>
   (getRegisteredSyncController()?.hasPendingChanges?.() ?? true) || hasUnsavedProgressChanges();
 /**
  * A remote reset received while local changes await acknowledgement supersedes them (see
- * `CONTEXT.md`): keep them export-only before the reset replaces them. If that cannot be
- * saved, active writes stay blocked so the stored pre-reset copy is not overwritten.
+ * `CONTEXT.md`): keep them export-only before the reset replaces them. Returns `false` when
+ * that copy could not be saved; the caller must then leave the local changes in place.
  */
 const archiveProgressDisplacedByRemoteReset = (
   ownerId: string,
   mode: GameMode,
   local: UserState,
   remoteProgress: UserProgressData
-): void => {
-  if (toProgressEpoch(remoteProgress) <= toProgressEpoch(local[mode])) return;
-  if (!hasMaterializedProgress(local[mode]) || !mayHaveUnacknowledgedLocalChanges()) return;
+): boolean => {
+  if (toProgressEpoch(remoteProgress) <= toProgressEpoch(local[mode])) return true;
+  if (!hasMaterializedProgress(local[mode]) || !mayHaveUnacknowledgedLocalChanges()) return true;
   const seasonNumber = mode === 'seasonal' ? (local.seasonalSeasonNumber ?? null) : null;
-  if (saveSupersededProgressCopy(ownerId, mode, seasonNumber, cloneStateSnapshot(local[mode]))) {
-    return;
-  }
-  logger.error('[TarkovStore] Could not retain progress displaced by a remote reset', { mode });
-  blockAccountRecoveryRetentionForOwner(ownerId);
-  setActiveProgressWritesBlocked(true);
+  return (
+    saveSupersededProgressCopy(ownerId, mode, seasonNumber, cloneStateSnapshot(local[mode])) !==
+    null
+  );
 };
 export type SyncControllerHandle = {
   hasPendingChanges?: () => boolean;
@@ -101,6 +99,11 @@ const channelRelease = createChannelReleaseLatch();
 let listenerGeneration = 0;
 let syncResumeTimer: ReturnType<typeof setTimeout> | null = null;
 let pausedSyncController: SyncControllerHandle | null = null;
+/**
+ * Set when a remote reset could not be applied because the changes it displaces could not be
+ * retained. Sync stays paused so those older changes cannot overwrite the reset in the cloud.
+ */
+let heldForUnretainedRemoteReset = false;
 export const registerSyncControllerGetter = (getter: SyncControllerGetter): void => {
   syncControllerGetter = getter;
 };
@@ -161,9 +164,18 @@ const scheduleSyncResume = (): void => {
   if (syncResumeTimer) clearTimeout(syncResumeTimer);
   syncResumeTimer = setTimeout(() => {
     syncResumeTimer = null;
+    if (heldForUnretainedRemoteReset) return;
     pausedSyncController?.resume();
     pausedSyncController = null;
   }, SYNC_RESUME_DELAY_MS);
+};
+/** Keeps the displaced local changes and the reset both unapplied until the next session. */
+const holdUnretainedRemoteReset = (mode: GameMode, ownerId: string): void => {
+  logger.error('[TarkovStore] Could not retain progress displaced by a remote reset', { mode });
+  blockAccountRecoveryRetentionForOwner(ownerId);
+  setActiveProgressWritesBlocked(true);
+  heldForUnretainedRemoteReset = true;
+  pauseRegisteredSyncController();
 };
 const notifyModeConflict = (
   conflicts: ReturnType<typeof detectDataConflicts>,
@@ -448,8 +460,12 @@ async function runSetupRealtimeListener(
     if (!remote) return;
     const { mode, progress: remoteProgress, updateTime } = remote;
     const localState = sanitizeOwnedUserState(tarkovStore.$state);
-    if (currentUserId) {
-      archiveProgressDisplacedByRemoteReset(currentUserId, mode, localState, remoteProgress);
+    if (
+      currentUserId &&
+      !archiveProgressDisplacedByRemoteReset(currentUserId, mode, localState, remoteProgress)
+    ) {
+      holdUnretainedRemoteReset(mode, currentUserId);
+      return;
     }
     const merged = mergeProgressData(localState[mode], remoteProgress, true);
     const nextProgress = reconcile(
@@ -603,6 +619,7 @@ async function teardownProgressChannel(): Promise<void> {
     clearTimeout(syncResumeTimer);
     syncResumeTimer = null;
   }
+  heldForUnretainedRemoteReset = false;
   if (pausedSyncController) {
     pausedSyncController.resume();
     pausedSyncController = null;

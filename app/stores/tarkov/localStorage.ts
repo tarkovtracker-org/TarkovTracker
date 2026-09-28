@@ -311,19 +311,22 @@ const quarantineUnparseableActiveProgress = (raw: string): string | null => {
 export const preserveUnparseableActiveProgress = (raw: string): boolean =>
   quarantineUnparseableActiveProgress(raw) !== null;
 /**
- * Explicit device cleanup may release malformed active bytes only after exact quarantine.
- * Returns the quarantine key once the active slot is released, otherwise `null`.
+ * Explicit device cleanup may release malformed active bytes only after exact quarantine and
+ * after `confirmRelease` durably records that quarantine. Returns whether the slot was released.
  */
-export const quarantineAndRemoveUnparseableActiveProgress = (raw: string): string | null => {
+export const quarantineAndRemoveUnparseableActiveProgress = (
+  raw: string,
+  confirmRelease: (quarantineKey: string) => boolean
+): boolean => {
   const quarantineKey = quarantineUnparseableActiveProgress(raw);
-  if (!quarantineKey) return null;
+  if (!quarantineKey || !confirmRelease(quarantineKey)) return false;
   try {
-    if (localStorage.getItem(STORAGE_KEYS.progress) !== raw) return null;
+    if (localStorage.getItem(STORAGE_KEYS.progress) !== raw) return false;
     localStorage.removeItem(STORAGE_KEYS.progress);
-    return localStorage.getItem(STORAGE_KEYS.progress) === null ? quarantineKey : null;
+    return localStorage.getItem(STORAGE_KEYS.progress) === null;
   } catch (error) {
     logger.error('[TarkovStore] Could not remove quarantined active progress:', error);
-    return null;
+    return false;
   }
 };
 /**
