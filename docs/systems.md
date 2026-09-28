@@ -910,8 +910,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
 
 - **Cloud status.** `useSupabaseSync` reports `pending` from the first local change until the
   service acknowledges the latest version, `saving` while a write is in flight, `retry_scheduled`
-  after a failure, and `failed` once the bounded schedule (`CLOUD_SAVE_RETRY_DELAYS_MS`, 5 s /
-  15 s / 60 s) is exhausted. Exhaustion keeps the changes pending. After a failed write, edits
+  after a failure, and `failed` once the bounded schedule (`CLOUD_SAVE_RETRY_DELAYS_MS` in
+  `app/stores/tarkov/progressSaveStatus.ts`) is exhausted. Exhaustion keeps the changes pending. After a failed write, edits
   never upload directly: they wait for the scheduled retry, and an edit after exhaustion restarts
   the schedule, as a manual retry (`retryCloudSave`) or the browser `online` event does. A retry
   that could not upload during a pause is re-armed on resume, and edits made during the upload that
@@ -1002,8 +1002,9 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   signing out so the progress and preferences session transitions retain no copy for that owner,
   then `removeAccountDeviceData` deletes the owner's active copies, recovery copy, preferences,
   activity-log envelopes, and legacy backups. Each shared key's ownership is re-read immediately
-  before removal, so a value another tab stores for a different account is kept. A value with no
-  owner envelope cannot be attributed and is likewise kept without marking removal incomplete. Other accounts' data and cloud progress are untouched; the next sign-in clears the
+  before removal, so a value another tab stores for a different account is kept. A well-formed value with no
+  owner envelope cannot be attributed and is likewise kept without marking removal incomplete;
+  malformed active bytes instead follow the quarantine flow below. Other accounts' data and cloud progress are untouched; the next sign-in clears the
   request. Removal and discard confirmations belong to the authenticated owner that opened them
   and are invalidated when that owner changes. Incomplete backup cleanup reports failure but blocks
   new guest writes only while the removed owner still occupies active storage. Account deletion uses
