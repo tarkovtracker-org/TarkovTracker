@@ -977,7 +977,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   signing out so the progress and preferences session transitions retain no copy for that owner,
   then `removeAccountDeviceData` deletes the owner's active copies, recovery copy, preferences,
   activity-log envelopes, and legacy backups. Each shared key's ownership is re-read immediately
-  before removal, so a value another tab stores for a different account is kept. Other accounts' data and cloud progress are untouched; the next sign-in clears the
+  before removal, so a value another tab stores for a different account is kept. A value with no
+  owner envelope cannot be attributed and is likewise kept without marking removal incomplete. Other accounts' data and cloud progress are untouched; the next sign-in clears the
   request. Removal and discard confirmations belong to the authenticated owner that opened them
   and are invalidated when that owner changes. Incomplete backup cleanup reports failure but blocks
   new guest writes only while the removed owner still occupies active storage. Account deletion uses

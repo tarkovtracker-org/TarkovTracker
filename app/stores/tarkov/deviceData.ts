@@ -115,8 +115,8 @@ const removeParsedOwnedValue = (
   envelope: ScopedEnvelope,
   explicitProgressRemoval: boolean
 ): RemovalResult | null => {
-  if (!envelope) return { complete: false, released: false };
-  if (envelope._userId !== userId) return { complete: true, released: true };
+  // A value without an owner envelope cannot be proven to belong to this owner, so it is kept.
+  if (!envelope || envelope._userId !== userId) return { complete: true, released: true };
   const removed = removeIfUnchanged(key, raw, explicitProgressRemoval ? userId : undefined);
   return removed === null ? null : { complete: removed, released: removed };
 };

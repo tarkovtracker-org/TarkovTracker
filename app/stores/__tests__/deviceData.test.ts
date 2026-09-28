@@ -63,6 +63,15 @@ describe('device data removal', () => {
       localStorage.getItem(`${LEGACY_STORAGE_KEYS.progressBackupPrefix}2026-01-02T00:00:00.000Z`)
     ).not.toBeNull();
   });
+  it('keeps values without an owner envelope and still reports removal complete', () => {
+    const unscopedBackup = `${LEGACY_STORAGE_KEYS.progressBackupPrefix}2026-01-03T00:00:00.000Z`;
+    const unscopedProgress = JSON.stringify(structuredClone(defaultState));
+    localStorage.setItem(unscopedBackup, unscopedProgress);
+    localStorage.setItem(STORAGE_KEYS.progress, owned('user-1'));
+    expect(removeAccountDeviceData('user-1')).toBe(true);
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBeNull();
+    expect(localStorage.getItem(unscopedBackup)).toBe(unscopedProgress);
+  });
   it('reports incomplete backup cleanup while allowing guest saves after active removal', () => {
     const activeKey = STORAGE_KEYS.progress;
     const recoveryKey = `${STORAGE_KEYS.progressRecoveryPrefix}user-1`;

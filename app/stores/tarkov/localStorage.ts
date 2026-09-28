@@ -201,9 +201,10 @@ const writeStorageItem = (key: string, value: string): StorageWriteResult => {
   if (typeof window === 'undefined') return { ok: false, error: null };
   try {
     if (key === STORAGE_KEYS.progress) {
-      const current = localStorage.getItem(key);
-      const retained = activeProgressRetentionGuard(current, value);
-      if (activeProgressWritesBlocked || !retained) {
+      if (
+        activeProgressWritesBlocked ||
+        !activeProgressRetentionGuard(localStorage.getItem(key), value)
+      ) {
         return {
           ok: false,
           error: new Error('Progress retention must succeed before active progress can change'),
