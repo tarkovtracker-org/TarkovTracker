@@ -1,4 +1,4 @@
-import { previewAccessHeaders } from './access.mjs';
+import { previewAccessCookieHeaders } from './access.mjs';
 // Bounded startup window for a freshly uploaded Pages deployment. Persistent failure after the
 // window blocks the preview gate; the window never extends for an individual failing check.
 const STARTUP_WINDOW_MS = 5 * 60 * 1000;
@@ -13,12 +13,9 @@ export function previewOrigin() {
   if (url.protocol !== 'https:') throw new Error('Preview URL must be HTTPS.');
   return url.origin;
 }
-async function probeOnce(origin, fetchImpl) {
+async function probeOnce(origin, fetchImpl, headers) {
   try {
-    const response = await fetchImpl(`${origin}/`, {
-      redirect: 'manual',
-      headers: previewAccessHeaders(),
-    });
+    const response = await fetchImpl(`${origin}/`, { redirect: 'manual', headers });
     const type = response.headers.get('content-type') || '';
     return response.status === 200 && type.includes('text/html');
   } catch {
@@ -34,8 +31,8 @@ function startupElapsed(windowMs) {
 function pollDeadline(now, deadline) {
   return now() + POLL_INTERVAL_MS > deadline;
 }
-async function pollAttempt(origin, fetchImpl, now, deadline) {
-  if (await probeOnce(origin, fetchImpl)) return 'ready';
+async function pollAttempt(origin, fetchImpl, now, deadline, headers) {
+  if (await probeOnce(origin, fetchImpl, headers)) return 'ready';
   return pollDeadline(now, deadline) ? 'expired' : 'retry';
 }
 /** Poll until the deployment serves HTML or the startup window closes. */
@@ -43,11 +40,13 @@ export async function waitForDeployment(
   origin,
   { fetchImpl = fetch, now = Date.now, sleep = defaultWait(), windowMs = STARTUP_WINDOW_MS } = {}
 ) {
+  // Polls carry only the Access session; the service token is exchanged once, up front.
+  const headers = await previewAccessCookieHeaders(origin, fetchImpl);
   const deadline = now() + windowMs;
   let attempts = 0;
   while (now() <= deadline) {
     attempts += 1;
-    const outcome = await pollAttempt(origin, fetchImpl, now, deadline);
+    const outcome = await pollAttempt(origin, fetchImpl, now, deadline, headers);
     if (outcome === 'ready') return attempts;
     if (outcome === 'expired') break;
     await sleep(POLL_INTERVAL_MS);

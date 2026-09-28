@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   assertPreviewTarget,
+  previewAccessCookieHeaders,
   previewAccessHeaders,
   previewAccessSession,
   previewGet,
@@ -107,4 +108,33 @@ test('fails when Access issues no session for the service token', async () => {
       /did not issue a preview session/
     );
   });
+});
+test('runner polls exchange the service token once and then send only the session', async () => {
+  await withAccessEnv(async () => {
+    const calls = [];
+    const fetchImpl = async (url, options) => {
+      calls.push({ url, options });
+      return { headers: { getSetCookie: () => ['CF_Authorization=poll-jwt; Path=/; Secure'] } };
+    };
+    const origin = 'https://poll.example';
+    assert.deepEqual(await previewAccessCookieHeaders(origin, fetchImpl), {
+      cookie: 'CF_Authorization=poll-jwt',
+    });
+    assert.deepEqual(await previewAccessCookieHeaders(origin, fetchImpl), {
+      cookie: 'CF_Authorization=poll-jwt',
+    });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].options.redirect, 'manual');
+    assert.equal(calls[0].options.headers['CF-Access-Client-Secret'], 'secret');
+    await assert.rejects(
+      previewAccessCookieHeaders('https://nopoll.example', async () => ({ headers: {} })),
+      /did not issue a preview session/
+    );
+  });
+  assert.deepEqual(
+    await previewAccessCookieHeaders('https://anon.example', async () => {
+      throw new Error('unused');
+    }),
+    {}
+  );
 });

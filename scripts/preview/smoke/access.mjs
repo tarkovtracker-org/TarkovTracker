@@ -35,6 +35,23 @@ export async function previewAccessSession(request, origin, env = process.env) {
   if (!sessions.has(origin)) sessions.set(origin, exchangeServiceToken(request, origin, headers));
   return sessions.get(origin);
 }
+const fetchSessions = new Map();
+async function exchangeServiceTokenWithFetch(origin, fetchImpl, headers) {
+  const response = await fetchImpl(`${origin}/`, { redirect: 'manual', headers });
+  const cookies = response.headers.getSetCookie?.() ?? [];
+  const session = readAccessSessionCookie(cookies.map((value) => ({ name: 'set-cookie', value })));
+  if (!session) throw new Error('Access did not issue a preview session for the service token.');
+  return session;
+}
+/** Fetch-based variant for runner polls: exchanges once per origin, then sends only the session. */
+export async function previewAccessCookieHeaders(origin, fetchImpl = fetch, env = process.env) {
+  const headers = previewAccessHeaders(env);
+  if (!Object.keys(headers).length) return {};
+  if (!fetchSessions.has(origin)) {
+    fetchSessions.set(origin, exchangeServiceTokenWithFetch(origin, fetchImpl, headers));
+  }
+  return { cookie: `${ACCESS_SESSION_COOKIE}=${await fetchSessions.get(origin)}` };
+}
 export async function previewGet(request, url, origin) {
   assertPreviewTarget(url, origin);
   const session = await previewAccessSession(request, origin);
