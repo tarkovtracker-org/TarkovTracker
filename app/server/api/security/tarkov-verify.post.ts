@@ -104,7 +104,10 @@ const assertJsonContentType = (event: H3Event): void => {
   }
 };
 type LimitedBodyRead =
-  { status: 'ok'; text: string } | { status: 'oversize' } | { status: 'unreadable' };
+  | { status: 'ok'; text: string }
+  | { status: 'oversize' }
+  | { status: 'unreadable' }
+  | { status: 'unbounded' };
 type ChunkedBodyRead = { status: 'ok'; text: string } | { status: 'oversize' };
 /**
  * Consumes the reader chunk by chunk; the byte cap is enforced against received bytes,
@@ -126,11 +129,16 @@ const readChunkedText = async (
     text += decoder.decode(value, { stream: true });
   }
 };
-/** Bounded fallback for runtimes that expose the body only as a buffered raw body. */
+/**
+ * Fallback for runtimes that expose the body only as a buffered raw body. Buffering is
+ * bounded only by a declared Content-Length, so a body without one is refused unread.
+ */
 const readRawBufferFallback = async (
   event: H3Event,
-  maxBytes: number
+  maxBytes: number,
+  declaredLength: number
 ): Promise<LimitedBodyRead> => {
+  if (!Number.isFinite(declaredLength)) return { status: 'unbounded' };
   const rawBody = await readRawBody(event, false).catch(() => null);
   if (!rawBody) return { status: 'unreadable' };
   if (rawBody.byteLength > maxBytes) return { status: 'oversize' };
@@ -148,7 +156,7 @@ const readBodyTextWithLimit = async (
   }
   const reader = getRequestWebStream(event)?.getReader();
   if (!reader) {
-    return readRawBufferFallback(event, maxBytes);
+    return readRawBufferFallback(event, maxBytes, declaredLength);
   }
   try {
     return await readChunkedText(reader as ReadableStreamDefaultReader<Uint8Array>, maxBytes);
@@ -168,6 +176,11 @@ const BODY_READ_FAILURE = {
     statusCode: 400,
     statusMessage: 'Bad Request',
     message: 'Verification body is unreadable',
+  },
+  unbounded: {
+    statusCode: 411,
+    statusMessage: 'Length Required',
+    message: 'Verification requires a Content-Length',
   },
 } as const;
 const readVerificationBody = async (event: H3Event): Promise<string> => {

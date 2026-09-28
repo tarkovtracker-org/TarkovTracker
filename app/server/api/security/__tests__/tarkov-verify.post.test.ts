@@ -85,8 +85,9 @@ describe('POST /api/security/tarkov-verify', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetMethod.mockReturnValue('POST');
-    mockGetRequestHeader.mockImplementation((_event: unknown, name: string) =>
-      name === 'content-type' ? 'application/json' : undefined
+    mockGetRequestHeader.mockImplementation(
+      (_event: unknown, name: string) =>
+        ({ 'content-type': 'application/json', 'content-length': '15' })[name]
     );
     mockGetRequestWebStream.mockReturnValue(null);
     mockReadRawBody.mockResolvedValue(Buffer.from(JSON.stringify({ token: 'tok' })));
@@ -137,8 +138,9 @@ describe('POST /api/security/tarkov-verify', () => {
     }
   );
   it('accepts a JSON content type with parameters', async () => {
-    mockGetRequestHeader.mockImplementation((_event: unknown, name: string) =>
-      name === 'content-type' ? 'Application/JSON; charset=utf-8' : undefined
+    mockGetRequestHeader.mockImplementation(
+      (_event: unknown, name: string) =>
+        ({ 'content-type': 'Application/JSON; charset=utf-8', 'content-length': '15' })[name]
     );
     const { default: handler } = await import('@/server/api/security/tarkov-verify.post');
     await expect(handler(event)).resolves.toBeDefined();
@@ -190,6 +192,15 @@ describe('POST /api/security/tarkov-verify', () => {
     );
     const { default: handler } = await import('@/server/api/security/tarkov-verify.post');
     await expect(handler(event)).rejects.toMatchObject({ statusCode: 413 });
+    expect(mockReadRawBody).not.toHaveBeenCalled();
+    expect(mockVerifyTurnstileTokenStrict).not.toHaveBeenCalled();
+  });
+  it('refuses to buffer a fallback body without a declared length', async () => {
+    mockGetRequestHeader.mockImplementation((_event: unknown, name: string) =>
+      name === 'content-type' ? 'application/json' : undefined
+    );
+    const { default: handler } = await import('@/server/api/security/tarkov-verify.post');
+    await expect(handler(event)).rejects.toMatchObject({ statusCode: 411 });
     expect(mockReadRawBody).not.toHaveBeenCalled();
     expect(mockVerifyTurnstileTokenStrict).not.toHaveBeenCalled();
   });

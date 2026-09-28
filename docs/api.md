@@ -56,7 +56,8 @@ calls. Cloudflare must challenge it under the same rule as data endpoints. A per
 returns `{ "ok": true }`; it does not issue clearance.
 
 `POST /api/security/tarkov-verify` accepts JSON `{ "token": "..." }` without login or existing
-clearance. It is size-limited, rate-limited and never cached. The dedicated strict verifier
+clearance. It is size-limited (a runtime that cannot stream the body refuses one without
+`Content-Length` with 411), rate-limited and never cached. The dedicated strict verifier
 checks Siteverify success, exact configured hostname and `tarkov_data_access` action; invalid
 requests/tokens receive 4xx, outages or incomplete configuration receive 503. After success
 the browser must repeat the protected probe. Existing profile-import verification policy is

@@ -16,6 +16,10 @@ const operationsSecret = process.env.TARKOV_OPERATIONS_CLIENT_SECRET;
 if (Boolean(operationsId) !== Boolean(operationsSecret)) {
   throw new Error('Both operations Access credentials are required.');
 }
+// Reusable Access credentials only ever travel to an explicitly configured operations host.
+if (operationsId && !process.env.TARKOV_OPERATIONS_ORIGIN) {
+  throw new Error('TARKOV_OPERATIONS_ORIGIN is required when operations credentials are set.');
+}
 const operationsHeaders: Record<string, string> =
   operationsId && operationsSecret
     ? { 'CF-Access-Client-Id': operationsId, 'CF-Access-Client-Secret': operationsSecret }

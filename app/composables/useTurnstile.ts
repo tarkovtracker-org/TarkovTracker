@@ -218,10 +218,13 @@ export function useTurnstileWidget(
     solved.value = false;
     if (rerenderUnrenderedWidget()) return;
     if (api && widgetId !== undefined) {
+      // Clear a latched error first so a repeat failure transitions `unavailable` again.
+      unavailable.value = false;
       try {
         api.reset(widgetId);
       } catch (error) {
         logger.debug('[Turnstile] Failed to reset widget:', error);
+        unavailable.value = true;
       }
     }
   };

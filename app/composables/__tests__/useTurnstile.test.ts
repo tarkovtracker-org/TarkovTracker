@@ -280,6 +280,30 @@ describe('useTurnstileWidget', () => {
     wrapper.unmount();
     expect(api.remove).not.toHaveBeenCalled();
   });
+  it('clears a latched widget error on reset so a repeat error transitions again', async () => {
+    let options: { 'error-callback'?: () => void } = {};
+    const api: TurnstileApi = {
+      render: vi.fn((_element, renderOptions) => {
+        options = renderOptions as typeof options;
+        return 'widget-1';
+      }),
+      remove: vi.fn(),
+      reset: vi.fn(),
+    };
+    setTurnstileApi(api);
+    const { result, wrapper } = await mountHarness();
+    options['error-callback']?.();
+    expect(result.unavailable.value).toBe(true);
+    result.reset();
+    expect(result.unavailable.value).toBe(false);
+    expect(api.reset).toHaveBeenCalledWith('widget-1');
+    vi.mocked(api.reset).mockImplementationOnce(() => {
+      throw new Error('gone');
+    });
+    result.reset();
+    expect(result.unavailable.value).toBe(true);
+    wrapper.unmount();
+  });
   it('re-renders an unrendered widget on reset with a fresh unavailable state', async () => {
     const render = vi.fn<(element: HTMLElement, options: unknown) => string | undefined>(
       () => undefined

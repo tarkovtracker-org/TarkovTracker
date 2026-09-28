@@ -494,7 +494,8 @@ Browser-clearance settings (all disabled/unset by default):
 - `PREVIEW_ACCESS_CLIENT_ID` / `PREVIEW_ACCESS_CLIENT_SECRET`: trusted smoke-runner secrets,
   never application/build environment variables.
 - `TARKOV_OPERATIONS_ORIGIN` and `TARKOV_OPERATIONS_CLIENT_ID` / `TARKOV_OPERATIONS_CLIENT_SECRET`:
-  overlay-verification runner configuration for an approved Access-protected operations host.
+  overlay-verification runner configuration for an approved Access-protected operations host;
+  credentials are refused unless the origin is set explicitly.
 
 Production and protected staging require distinct reviewed widget configuration; ordinary
 local/preview builds leave the browser gate disabled. See the
