@@ -1,4 +1,9 @@
 import { storeToRefs } from 'pinia';
+import {
+  buildMapTaskVisibilityState,
+  isTaskShownOnMap,
+  type MapTaskVisibilityState,
+} from '@/features/maps/utils/mapTaskVisibility';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
@@ -234,6 +239,15 @@ const getObjectiveLocations = (
   ];
   return { zones: zoneLocations.zones, possibleLocations };
 };
+interface MapObjectiveEntry {
+  taskId: string;
+  objectiveId: string;
+  visibility: MapObjectiveVisibility;
+  mark: MapObjectiveMark | null;
+}
+const collectMapTaskIds = (entries: MapObjectiveEntry[]): string[] => [
+  ...new Set(entries.map((entry) => entry.taskId)),
+];
 export function useMapObjectiveMarks({
   mapId,
   shouldShowCompletedObjectives,
@@ -241,6 +255,8 @@ export function useMapObjectiveMarks({
 }: MapObjectiveMarksOptions): {
   mapObjectiveMarks: ComputedRef<MapObjectiveMark[]>;
   mapObjectiveVisibility: ComputedRef<ReadonlyMap<string, MapObjectiveVisibility>>;
+  mapTaskIds: ComputedRef<string[]>;
+  mapTaskVisibilityState: ComputedRef<MapTaskVisibilityState>;
 } {
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
@@ -248,11 +264,10 @@ export function useMapObjectiveMarks({
   const tarkovStore = useTarkovStore();
   const { objectiveCompletions, tasksCompletions, tasksFailed, unlockedTasks } =
     storeToRefs(progressStore);
-  const mapObjectiveData = computed(() => {
-    const objectiveVisibility = new Map<string, MapObjectiveVisibility>();
-    if (!mapId.value) return { marks: [], objectiveVisibility };
+  const mapObjectiveEntries = computed<MapObjectiveEntry[]>(() => {
+    if (!mapId.value) return [];
     const selectedMapId = mapId.value;
-    const marks: MapObjectiveMark[] = [];
+    const entries: MapObjectiveEntry[] = [];
     const includeTeammates = !preferencesStore.mapTeamAllHidden;
     const teammateIds = includeTeammates
       ? Object.keys(progressStore.visibleTeamStores).filter((id) => id !== 'self')
@@ -285,33 +300,46 @@ export function useMapObjectiveMarks({
         });
         if (users.length === 0) return;
         const pinned = pinnedTaskIds.has(task.id);
-        objectiveVisibility.set(obj.id, {
-          category: mapObjectiveCategory(pinned, users),
-          selfNeedsObjective,
-        });
         const { zones, possibleLocations } = getObjectiveLocations(
           obj,
           selectedMapId,
           objectiveMaps,
           objectiveGps
         );
-        if (zones.length > 0 || possibleLocations.length > 0) {
-          marks.push({
-            id: obj.id,
-            zones,
-            possibleLocations,
-            users,
-            pinned,
-          });
-        }
+        const hasLocation = zones.length > 0 || possibleLocations.length > 0;
+        entries.push({
+          taskId: task.id,
+          objectiveId: obj.id,
+          visibility: { category: mapObjectiveCategory(pinned, users), selfNeedsObjective },
+          mark: hasLocation ? { id: obj.id, zones, possibleLocations, users, pinned } : null,
+        });
       });
     });
-    return { marks, objectiveVisibility };
+    return entries;
   });
-  const mapObjectiveMarks = computed(() => mapObjectiveData.value.marks);
-  const mapObjectiveVisibility = computed(() => mapObjectiveData.value.objectiveVisibility);
+  // Tasks with an active objective on this map, before user hide/focus is applied.
+  const mapTaskIds = computed(() => collectMapTaskIds(mapObjectiveEntries.value));
+  const mapTaskVisibilityState = computed(() =>
+    buildMapTaskVisibilityState(
+      preferencesStore.getMapHiddenTaskIds ?? [],
+      preferencesStore.getMapFocusTaskIds ?? [],
+      mapTaskIds.value
+    )
+  );
+  const shownEntries = computed(() => {
+    const state = mapTaskVisibilityState.value;
+    return mapObjectiveEntries.value.filter((entry) => isTaskShownOnMap(entry.taskId, state));
+  });
+  const mapObjectiveMarks = computed(() =>
+    shownEntries.value.flatMap((entry) => (entry.mark ? [entry.mark] : []))
+  );
+  const mapObjectiveVisibility = computed(
+    () => new Map(shownEntries.value.map((entry) => [entry.objectiveId, entry.visibility]))
+  );
   return {
     mapObjectiveMarks,
     mapObjectiveVisibility,
+    mapTaskIds,
+    mapTaskVisibilityState,
   };
 }

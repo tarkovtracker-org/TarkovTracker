@@ -153,6 +153,9 @@ export interface PreferencesState {
   mapZoneOpacity: number;
   mapTooltipDensity: 'default' | 'compact';
   pinnedTaskIds: string[];
+  // Per-quest map raid planning (#918); persisted locally only, not synced to Supabase
+  mapHiddenTaskIds: string[];
+  mapFocusTaskIds: string[];
   mapShowSelfObjectives: boolean;
   mapShowPinnedObjectives: boolean;
   mapShowTeamObjectives: boolean;
@@ -243,6 +246,8 @@ export const preferencesDefaultState: PreferencesState = {
   mapZoneOpacity: 0.24,
   mapTooltipDensity: 'default',
   pinnedTaskIds: [],
+  mapHiddenTaskIds: [],
+  mapFocusTaskIds: [],
   mapShowSelfObjectives: true,
   mapShowPinnedObjectives: true,
   mapShowTeamObjectives: true,
@@ -637,6 +642,12 @@ export const usePreferencesStore = defineStore('preferences', {
     getPinnedTaskIds: (state) => {
       return state.pinnedTaskIds ?? [];
     },
+    getMapHiddenTaskIds: (state) => {
+      return state.mapHiddenTaskIds ?? [];
+    },
+    getMapFocusTaskIds: (state) => {
+      return state.mapFocusTaskIds ?? [];
+    },
     getMapShowSelfObjectives: (state) => {
       return state.mapShowSelfObjectives ?? true;
     },
@@ -935,6 +946,35 @@ export const usePreferencesStore = defineStore('preferences', {
         this.pinnedTaskIds = current.filter((id) => id !== taskId);
       }
     },
+    toggleMapHiddenTask(taskId: string) {
+      const hidden = this.mapHiddenTaskIds ?? [];
+      if (hidden.includes(taskId)) {
+        this.mapHiddenTaskIds = hidden.filter((id) => id !== taskId);
+        return;
+      }
+      this.mapHiddenTaskIds = [...hidden, taskId];
+      this.mapFocusTaskIds = (this.mapFocusTaskIds ?? []).filter((id) => id !== taskId);
+    },
+    toggleMapFocusTask(taskId: string) {
+      const focused = this.mapFocusTaskIds ?? [];
+      if (focused.includes(taskId)) {
+        this.mapFocusTaskIds = focused.filter((id) => id !== taskId);
+        return;
+      }
+      this.mapFocusTaskIds = [...focused, taskId];
+      this.mapHiddenTaskIds = (this.mapHiddenTaskIds ?? []).filter((id) => id !== taskId);
+    },
+    /** Clears user hide/focus state for the given tasks, or for every task when omitted. */
+    clearMapTaskVisibility(taskIds?: readonly string[]) {
+      if (!taskIds) {
+        this.mapHiddenTaskIds = [];
+        this.mapFocusTaskIds = [];
+        return;
+      }
+      const clearSet = new Set(taskIds);
+      this.mapHiddenTaskIds = (this.mapHiddenTaskIds ?? []).filter((id) => !clearSet.has(id));
+      this.mapFocusTaskIds = (this.mapFocusTaskIds ?? []).filter((id) => !clearSet.has(id));
+    },
     // Skills actions
     setSkillSortMode(mode: SkillSortMode) {
       this.skillSortMode = mode;
@@ -1044,6 +1084,8 @@ export const usePreferencesStore = defineStore('preferences', {
       'mapPanSpeed',
       'mapZoneOpacity',
       'pinnedTaskIds',
+      'mapHiddenTaskIds',
+      'mapFocusTaskIds',
       'taskFilterPresets',
       'skillSortMode',
       'traderSortMode',

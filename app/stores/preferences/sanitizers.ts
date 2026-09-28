@@ -1,3 +1,4 @@
+import { normalizeTaskIdList } from '@/features/maps/utils/mapTaskVisibility';
 import {
   normalizeNeededItemsCardStyle,
   normalizeNeededItemsFilterType,
@@ -164,6 +165,12 @@ const normalizeOptionalNeededItemsCardStyle = (
 export const clonePreferencesSnapshot = <T>(value: T): T => {
   return cloneSerializablePreferencesValue(value) as T;
 };
+const sanitizeMapTaskVisibilityIds = (state: PersistedPreferencesStateWithLegacy): void => {
+  if ('mapHiddenTaskIds' in state)
+    state.mapHiddenTaskIds = normalizeTaskIdList(state.mapHiddenTaskIds);
+  if ('mapFocusTaskIds' in state)
+    state.mapFocusTaskIds = normalizeTaskIdList(state.mapFocusTaskIds);
+};
 export const sanitizePersistedPreferencesState = (
   persistedState: PersistedPreferencesStateWithLegacy = {}
 ): PersistedPreferencesState => {
@@ -249,6 +256,7 @@ export const sanitizePersistedPreferencesState = (
       sanitizedState.neededItemsCardStyle
     );
   }
+  sanitizeMapTaskVisibilityIds(sanitizedState);
   if ('keybindOmnibar' in sanitizedState) {
     sanitizedState.keybindOmnibar = sanitizeKeybind(
       sanitizedState.keybindOmnibar,

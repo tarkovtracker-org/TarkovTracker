@@ -1671,6 +1671,12 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 4. The summary's pinned group follows the pinned-objective preference. Its active group follows the
    self-objective preference. Objectives the player does not still need themselves are dropped, so
    the Team chip never changes required-item summaries.
+5. The raid plan (#918) applies user hide/focus last. `useMapObjectiveMarks` returns `mapTaskIds`
+   (tasks with an active objective on the selected map, before hide/focus) and a
+   `mapTaskVisibilityState`; objectives of tasks that are not shown are removed from both the
+   marks and the objective-visibility map, so the required-items summary follows the raid plan.
+   `MapTaskVisibilityPanel` (inline and fullscreen) and the task-card toggles edit
+   `mapHiddenTaskIds` / `mapFocusTaskIds`.
 
 ### Files
 
@@ -1683,6 +1689,9 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 - `app/features/maps/composables/useMapRequiredItems.ts` — selected-map item/key aggregation.
 - `app/features/tasks/task-objective-equipment.ts` — canonical bring-mode equipment extraction.
 - `app/pages/tasks.vue` — passes filtered tasks and shared visibility into the map components.
+- `app/features/maps/utils/mapTaskVisibility.ts` — hide/focus resolution for the raid plan.
+- `app/features/maps/MapTaskVisibilityPanel.vue` and `app/features/tasks/TaskMapVisibilityToggles.vue`
+  — raid-plan controls on the map and on task cards (via `mapTaskVisibilityKey`).
 
 ### Invariants
 
@@ -1708,6 +1717,15 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 - A group given a title renders its section headings one level down (`h4`) and uses the short
   `required_items` / `required_keys` labels; an untitled standalone group keeps the `h3` level and
   the longer `*_summary` labels.
+- User hide/focus is a separate state from filter-driven visibility (task filters, trader-standing
+  gating from #730): it only removes tasks that already passed every filter, and never changes the
+  task list. Focus wins over hide and applies only when at least one focused task is in the current
+  map's `mapTaskIds`, so a plan made for another map never blanks this one. Hiding and focusing the
+  same task are mutually exclusive; "Show all" clears both for the current map's tasks only.
+- `mapHiddenTaskIds` and `mapFocusTaskIds` persist in user-scoped local preferences storage and are
+  not part of the Supabase `user_preferences` sync payload (no column exists).
+- Jumping to an objective of a hidden or unfocused task reveals that task first so its popup can
+  open.
 - Hovering or clicking an objective marker hit-tests every visible zone and point in container
   pixels. When more than one distinct objective is under the pointer, the popup is a compact stacked
   list (points first, then zones smallest to largest); choosing an entry pins that objective's full

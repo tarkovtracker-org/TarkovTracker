@@ -109,6 +109,10 @@
                 >
                   <div v-show="isMapPanelExpanded" id="tasks-map-panel-content">
                     <template v-if="selectedMapData">
+                      <MapTaskVisibilityPanel
+                        :tasks="mapPlanTasks"
+                        :state="mapTaskVisibilityState"
+                      />
                       <LeafletMapComponent
                         ref="leafletMapRef"
                         :map="selectedMapData"
@@ -472,6 +476,9 @@
               />
             </AppTooltip>
           </div>
+          <div v-if="selectedMapData" class="bg-surface-900 px-4 pt-3">
+            <MapTaskVisibilityPanel :tasks="mapPlanTasks" :state="mapTaskVisibilityState" />
+          </div>
           <div v-if="selectedMapData" class="flex min-h-0 flex-1">
             <LeafletMapComponent
               ref="fullscreenLeafletMapRef"
@@ -512,6 +519,8 @@
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
   import { useTaskNotification } from '@/composables/useTaskNotification';
   import { useTaskRouteSync } from '@/composables/useTaskRouteSync';
+  import MapTaskVisibilityPanel from '@/features/maps/MapTaskVisibilityPanel.vue';
+  import { isTaskShownOnMap } from '@/features/maps/utils/mapTaskVisibility';
   import { useTaskFilters } from '@/features/tasks/composables/useTaskFilters';
   import { useTasksPageEffects } from '@/features/tasks/composables/useTasksPageEffects';
   import MapTaskVisibilityNotice from '@/features/tasks/MapTaskVisibilityNotice.vue';
@@ -519,6 +528,8 @@
     impactEligibleTaskIdsKey,
     isMapViewKey,
     jumpToMapObjectiveKey,
+    type MapTaskVisibilityContext,
+    mapTaskVisibilityKey,
     trackTaskProgressInteractionKey,
   } from '@/features/tasks/task-context';
   import TaskCard from '@/features/tasks/TaskCard.vue';
@@ -682,11 +693,32 @@
   const sourceMapTasks = computed(() =>
     isSearchActive.value ? filteredTasks.value : visibleTasks.value
   );
-  const { mapObjectiveMarks, mapObjectiveVisibility } = useMapObjectiveMarks({
-    mapId: selectedMapId,
-    shouldShowCompletedObjectives,
-    tasks: sourceMapTasks,
+  const { mapObjectiveMarks, mapObjectiveVisibility, mapTaskIds, mapTaskVisibilityState } =
+    useMapObjectiveMarks({
+      mapId: selectedMapId,
+      shouldShowCompletedObjectives,
+      tasks: sourceMapTasks,
+    });
+  const mapPlanTasks = computed(() => {
+    const taskIds = new Set(mapTaskIds.value);
+    return sourceMapTasks.value.filter((task) => taskIds.has(task.id));
   });
+  const mapTaskVisibilityContext = computed<MapTaskVisibilityContext | null>(() => {
+    if (!showMapDisplay.value) return null;
+    return { taskIds: new Set(mapTaskIds.value), state: mapTaskVisibilityState.value };
+  });
+  /** A jump target the user hid or left out of focus is revealed so its popup can open. */
+  const revealObjectiveTaskOnMap = (objectiveId: string) => {
+    const taskId = metadataStore.objectives.find(
+      (objective) => objective.id === objectiveId
+    )?.taskId;
+    if (!taskId || isTaskShownOnMap(taskId, mapTaskVisibilityState.value)) return;
+    if (mapTaskVisibilityState.value.activeFocusTaskIds.size > 0) {
+      preferencesStore.toggleMapFocusTask(taskId);
+      return;
+    }
+    preferencesStore.toggleMapHiddenTask(taskId);
+  };
   const impactEligibleTaskIds = computed<Set<string> | undefined>(() => {
     if (!getRespectTaskFiltersForImpact.value) return undefined;
     const options = buildTaskTypeFilterOptions(preferencesStore, tarkovStore, metadataStore);
@@ -864,6 +896,7 @@
   });
   const handleJumpToMapObjective = async (objectiveId: string) => {
     isMapPanelExpanded.value = true;
+    revealObjectiveTaskOnMap(objectiveId);
     try {
       await jumpToMapObjective(objectiveId);
     } catch (error) {
@@ -1041,6 +1074,7 @@
   };
   provide(jumpToMapObjectiveKey, handleJumpToMapObjective);
   provide(isMapViewKey, showMapDisplay);
+  provide(mapTaskVisibilityKey, mapTaskVisibilityContext);
   provide(impactEligibleTaskIdsKey, impactEligibleTaskIds);
   provide(trackTaskProgressInteractionKey, handleTrackedTaskProgressInteraction);
   const BATCH_SIZE = 8;

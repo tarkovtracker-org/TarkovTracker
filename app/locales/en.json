@@ -993,7 +993,24 @@
         "map_complete_tasks_toggle_show": "Show hidden",
         "map_complete_tasks_toggle_hide": "Hide map-complete",
         "map_hidden_hint": "Map hidden — click to show",
-        "raid_time_tooltip": "Current in-game raid time"
+        "raid_time_tooltip": "Current in-game raid time",
+        "raid_plan": {
+          "title": "Raid plan",
+          "summary_all": "Showing all {total} quests",
+          "summary_hidden": "Showing {shown} of {total} quests",
+          "summary_focus": "Focused on {shown} of {total} quests",
+          "choose_quests": "Choose quests",
+          "show_all": "Show all",
+          "popover_description": "Hide quests to declutter the map, or focus the quests you plan to run this raid. Focus shows only focused quests.",
+          "empty": "No quests have active objectives on this map.",
+          "focus_quest": "Focus on map",
+          "unfocus_quest": "Remove from focus",
+          "hide_quest": "Hide on map",
+          "show_quest": "Show on map",
+          "status_hidden": "Hidden",
+          "status_unfocused": "Not in focus",
+          "all_hidden_hint": "Every quest on this map is hidden."
+        }
       },
       "pinned_tasks_section": "Pinned Tasks",
       "focused_task_section": "Focused Task",

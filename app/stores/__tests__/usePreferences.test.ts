@@ -1478,6 +1478,48 @@ describe('usePreferencesStore', () => {
       expect(store.pinnedTaskIds).toContain('task-1');
     });
   });
+  describe('Actions - Map raid plan', () => {
+    it('defaults to no hidden or focused map tasks', () => {
+      const store = usePreferencesStore();
+      expect(store.getMapHiddenTaskIds).toEqual([]);
+      expect(store.getMapFocusTaskIds).toEqual([]);
+    });
+    it('toggles a task in and out of the hidden set', () => {
+      const store = usePreferencesStore();
+      store.toggleMapHiddenTask('task-1');
+      expect(store.mapHiddenTaskIds).toEqual(['task-1']);
+      store.toggleMapHiddenTask('task-1');
+      expect(store.mapHiddenTaskIds).toEqual([]);
+    });
+    it('keeps hide and focus mutually exclusive per task', () => {
+      const store = usePreferencesStore();
+      store.toggleMapHiddenTask('task-1');
+      store.toggleMapFocusTask('task-1');
+      expect(store.mapFocusTaskIds).toEqual(['task-1']);
+      expect(store.mapHiddenTaskIds).toEqual([]);
+      store.toggleMapHiddenTask('task-1');
+      expect(store.mapHiddenTaskIds).toEqual(['task-1']);
+      expect(store.mapFocusTaskIds).toEqual([]);
+    });
+    it('clears hide/focus state for selected tasks or everything', () => {
+      const store = usePreferencesStore();
+      store.toggleMapHiddenTask('task-1');
+      store.toggleMapFocusTask('task-2');
+      store.toggleMapHiddenTask('task-3');
+      store.clearMapTaskVisibility(['task-1', 'task-2']);
+      expect(store.mapHiddenTaskIds).toEqual(['task-3']);
+      expect(store.mapFocusTaskIds).toEqual([]);
+      store.clearMapTaskVisibility();
+      expect(store.mapHiddenTaskIds).toEqual([]);
+    });
+    it('handles nullish persisted lists', () => {
+      const store = usePreferencesStore();
+      store.$patch({ mapHiddenTaskIds: undefined, mapFocusTaskIds: undefined });
+      expect(store.getMapHiddenTaskIds).toEqual([]);
+      store.toggleMapFocusTask('task-1');
+      expect(store.mapFocusTaskIds).toEqual(['task-1']);
+    });
+  });
   describe('Actions - Skills', () => {
     it('should set skill sort mode', () => {
       const store = usePreferencesStore();
