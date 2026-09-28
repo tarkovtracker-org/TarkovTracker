@@ -148,6 +148,7 @@ export function useTurnstileWidget(
       callback: (token: string) => {
         latestToken = token;
         solved.value = true;
+        unavailable.value = false;
         flushWaiters(token);
       },
       'error-callback': () => {

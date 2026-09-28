@@ -302,6 +302,9 @@ describe('useTurnstileWidget', () => {
     });
     result.reset();
     expect(result.unavailable.value).toBe(true);
+    (options as { callback?: (token: string) => void }).callback?.('recovered');
+    expect(result.unavailable.value).toBe(false);
+    await expect(result.getToken()).resolves.toBe('recovered');
     wrapper.unmount();
   });
   it('re-renders an unrendered widget on reset with a fresh unavailable state', async () => {

@@ -484,7 +484,7 @@ Node.js version: 24.x
 
 ### Environment Variables
 
-Browser-clearance settings (all disabled/unset by default):
+Browser-clearance settings:
 
 - `NUXT_PUBLIC_TARKOV_ACCESS_ENABLED`: explicitly enable browser coordination per environment.
 - `NUXT_PUBLIC_TARKOV_ACCESS_SITE_KEY`: dedicated widget public sitekey.
