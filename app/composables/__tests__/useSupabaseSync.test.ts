@@ -583,6 +583,28 @@ describe('useSupabaseSync', () => {
       expect(sync.saveStatus.value.state).toBe('idle');
       sync.cleanup();
     });
+    it('acknowledges a state saved outside the controller without uploading it again', async () => {
+      const { store, sync } = await createRetryingSync();
+      store.$state.count = 3;
+      store.notifySubscriber();
+      expect(sync.saveStatus.value.state).toBe('pending');
+      sync.acknowledgeExternalSave!({ count: 3 });
+      expect(sync.saveStatus.value.state).toBe('idle');
+      expect(sync.hasPendingChanges!()).toBe(false);
+      await flushSync(5);
+      expect(upsert).not.toHaveBeenCalled();
+      sync.cleanup();
+    });
+    it('keeps an edit that differs from the externally saved state pending', async () => {
+      const { store, sync } = await createRetryingSync();
+      store.$state.count = 4;
+      store.notifySubscriber();
+      sync.acknowledgeExternalSave!({ count: 3 });
+      expect(sync.hasPendingChanges!()).toBe(true);
+      await flushSync(5);
+      expect(upsert).toHaveBeenCalledWith({ count: 4, user_id: 'user-1' });
+      sync.cleanup();
+    });
     it('stops scheduled retries after cleanup', async () => {
       upsert.mockResolvedValue({ error: { message: 'boom' } });
       const { store, sync } = await createRetryingSync();

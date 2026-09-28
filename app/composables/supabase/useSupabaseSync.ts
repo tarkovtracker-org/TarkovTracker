@@ -49,6 +49,8 @@ export interface SupabaseSyncReturn<
   TPayload extends SupabaseSyncPayload = SupabaseSyncPayload,
 > {
   hasPendingChanges?: () => boolean;
+  /** Records `saved` as acknowledged by a write made outside this controller. */
+  acknowledgeExternalSave?: (saved: TState) => void;
   captureRemoteMerge?: () => RemoteStateMerge;
   withSnapshot?: WithRemoteSnapshot;
   isSyncing: Ref<boolean>;
@@ -597,8 +599,25 @@ export function useSupabaseSync<
       schedulePendingSync();
     }
   };
+  const payloadHash = (state: TState, ownerId: string): string | null => {
+    const payload = capturePayload(state);
+    return payload ? hashState(buildSyncPayload(payload, ownerId)) : null;
+  };
+  /** Later saves skip `saved`; the store is acknowledged now only if it still matches it. */
+  const acknowledgeExternalSave = (saved: TState) => {
+    const ownerId = syncOwnerId();
+    const savedHash = ownerId ? payloadHash(saved, ownerId) : null;
+    if (!savedHash) return;
+    lastSyncedHash = savedHash;
+    if (payloadHash(store.$state as TState, ownerId!) !== savedHash) return;
+    pendingState.captureAcknowledgement(snapshotSyncState(store.$state as TState))();
+    debouncedSync.cancel();
+    clearPendingVersion(localVersion);
+    publishSaveStatus();
+  };
   return {
     hasPendingChanges: () => pendingLocalChanges,
+    acknowledgeExternalSave,
     captureRemoteMerge: pendingState.capture,
     withSnapshot,
     isSyncing,

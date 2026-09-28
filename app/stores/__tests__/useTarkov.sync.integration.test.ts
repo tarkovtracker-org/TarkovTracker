@@ -1919,7 +1919,7 @@ describe('useTarkov sync integration', () => {
     expect(options.transform(store.$state)?.pvp_data.manualActivityEpoch).toBe(1);
   });
   it.each(['failure', 'rejection', 'session-reset', 'persistent-failure'])(
-    'bounds the initial progress retry and respects session changes: %s',
+    'makes one direct initial upload and leaves retries to the reconciled controller: %s',
     async (outcome) => {
       single.mockResolvedValue({
         data: null,
@@ -1938,7 +1938,12 @@ describe('useTarkov sync integration', () => {
         expect(syncInitialState).toHaveBeenCalledTimes(1);
         if (outcome === 'session-reset') resetTarkovSync('session changed');
         await vi.advanceTimersByTimeAsync(5000);
-        expect(syncInitialState).toHaveBeenCalledTimes(outcome === 'session-reset' ? 1 : 2);
+        // A second direct attempt would skip the remote merge that controller retries perform.
+        expect(syncInitialState).toHaveBeenCalledTimes(1);
+        const options = useSupabaseSyncMock.mock.calls.at(-1)?.[0] as {
+          reconcileBeforeRetry?: unknown;
+        };
+        expect(options.reconcileBeforeRetry).toEqual(expect.any(Function));
       } finally {
         vi.useRealTimers();
       }

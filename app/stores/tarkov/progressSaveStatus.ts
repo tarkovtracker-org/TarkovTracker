@@ -44,13 +44,15 @@ export const setCloudSaveStatus = (next: CloudSaveStatus): void => {
   }
   status.cloud = { ...next };
 };
+/** `cloudHeld` marks a write of state the cloud already holds: its failure loses no progress. */
 export const recordLocalSave = (
   succeeded: boolean,
-  failure: LocalSaveFailure | null = null
+  failure: LocalSaveFailure | null = null,
+  cloudHeld = false
 ): void => {
   status.local = succeeded ? 'saved' : 'failed';
   status.localFailure = succeeded ? null : (failure ?? 'unknown');
-  unacknowledgedLocalFailure = !succeeded;
+  if (succeeded || !cloudHeld) unacknowledgedLocalFailure = !succeeded;
   if (succeeded) status.localSavedAt = Date.now();
 };
 /** The retry handler belongs to one sync controller; stale owners cannot clear a newer one. */

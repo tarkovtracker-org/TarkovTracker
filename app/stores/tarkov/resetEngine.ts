@@ -29,7 +29,7 @@ type ResetTargetStore = {
 const hasPendingOrUnsavedProgress = (): boolean =>
   hasPendingCloudChanges() || hasUnsavedProgressChanges();
 const hasChangesInResetModes = (
-  resetModes: GameMode[],
+  resetModes: readonly GameMode[],
   state: UserState,
   defaults: UserState
 ): boolean => resetModes.some((mode) => !deepEqual(state[mode], defaults[mode]));
@@ -209,64 +209,97 @@ export const executeWithSyncPause = async <T>(operation: () => Promise<T>): Prom
     controller?.resume();
   }
 };
+const seasonNumberFor = (mode: GameMode, state: UserState): number | null =>
+  mode === GAME_MODES.SEASONAL ? (state.seasonalSeasonNumber ?? null) : null;
+/** Keep a superseded copy of each changed mode; an untouched mode has nothing to supersede. */
+const retainSupersededModes = (
+  ownerId: string,
+  resetModes: readonly GameMode[],
+  state: UserState,
+  freshState: UserState
+): void => {
+  for (const mode of resetModes) {
+    if (deepEqual(state[mode], freshState[mode])) continue;
+    if (!saveSupersededProgressCopy(ownerId, mode, seasonNumberFor(mode, state), state[mode])) {
+      throw new Error('Could not retain pending progress before reset');
+    }
+  }
+};
+const retainBeforeReset = (
+  ownerId: string | null,
+  resetModes: readonly GameMode[],
+  state: UserState,
+  freshState: UserState
+): void => {
+  const retentionOwnerId = ownerIdToRetainBeforeReset(
+    ownerId,
+    Boolean(getRegisteredSyncController()),
+    hasChangesInResetModes(resetModes, state, freshState)
+  );
+  if (retentionOwnerId) retainSupersededModes(retentionOwnerId, resetModes, state, freshState);
+};
+/** The full post-reset state: reset modes (and metadata for `all`) from `freshState`. */
+const buildResetState = (
+  resetAll: boolean,
+  resetModes: readonly GameMode[],
+  current: UserState,
+  freshState: UserState
+): UserState => {
+  const metadata = resetAll ? freshState : current;
+  const modes = GAME_MODE_VALUES.map((mode) => [
+    mode,
+    resetModes.includes(mode) ? freshState[mode] : current[mode],
+  ]);
+  return {
+    ...current,
+    currentGameMode: metadata.currentGameMode,
+    gameEdition: metadata.gameEdition,
+    tarkovUid: metadata.tarkovUid,
+    ...(Object.fromEntries(modes) as Pick<UserState, GameMode>),
+  };
+};
+/** Returns the state the reset RPC saved, or `null` when signed out. */
+const saveRemoteReset = async (
+  userId: string | null,
+  state: UserState
+): Promise<UserState | null> => {
+  if (!userId) return null;
+  const { $supabase } = useNuxtApp();
+  const { error } = await syncProgressState($supabase.client, userId, state);
+  if (error) throw new Error(`Failed to reset remote progress: ${error.message}`);
+  recordLocalSyncTime();
+  return state;
+};
+/** Assigns only reset fields, so edits made to other modes during the RPC are kept. */
+const applyResetToStore = (
+  store: ResetTargetStore,
+  resetAll: boolean,
+  resetModes: readonly GameMode[],
+  freshState: UserState
+): void =>
+  store.$patch((state) => {
+    for (const mode of resetModes) state[mode] = freshState[mode];
+    if (!resetAll) return;
+    state.currentGameMode = freshState.currentGameMode;
+    state.gameEdition = freshState.gameEdition;
+    state.tarkovUid = freshState.tarkovUid;
+  });
 export const performReset = async (mode: ResetMode, store: ResetTargetStore): Promise<void> => {
   const { $supabase } = useNuxtApp();
   const freshState = structuredClone(defaultState);
-  const resetModes = mode === 'all' ? GAME_MODE_VALUES : [mode];
+  const resetAll = mode === 'all';
+  const resetModes: readonly GameMode[] = resetAll ? GAME_MODE_VALUES : [mode];
   const ownerId = $supabase.user.loggedIn ? $supabase.user.id : null;
   const syncController = getRegisteredSyncController();
-  const hasLocalChanges = hasChangesInResetModes(resetModes, store.$state, freshState);
-  const retentionOwnerId = ownerIdToRetainBeforeReset(
-    ownerId,
-    Boolean(syncController),
-    hasLocalChanges
-  );
-  if (retentionOwnerId) {
-    for (const resetMode of resetModes) {
-      // An untouched mode has nothing to supersede.
-      if (deepEqual(store.$state[resetMode], freshState[resetMode])) continue;
-      const seasonNumber =
-        resetMode === 'seasonal' ? (store.$state.seasonalSeasonNumber ?? null) : null;
-      const copy = saveSupersededProgressCopy(
-        retentionOwnerId,
-        resetMode,
-        seasonNumber,
-        store.$state[resetMode]
-      );
-      if (!copy) {
-        throw new Error('Could not retain pending progress before reset');
-      }
-    }
-  }
+  retainBeforeReset(ownerId, resetModes, store.$state, freshState);
   for (const resetMode of resetModes) {
     freshState[resetMode].progressEpoch = getNextProgressEpoch(store.$state[resetMode]);
   }
-  if ($supabase.user.loggedIn && $supabase.user.id) {
-    const nextRemoteState: UserState = {
-      ...store.$state,
-      currentGameMode: mode === 'all' ? freshState.currentGameMode : store.$state.currentGameMode,
-      gameEdition: mode === 'all' ? freshState.gameEdition : store.$state.gameEdition,
-      tarkovUid: mode === 'all' ? freshState.tarkovUid : store.$state.tarkovUid,
-      pvp: resetModes.includes('pvp') ? freshState.pvp : store.$state.pvp,
-      pve: resetModes.includes('pve') ? freshState.pve : store.$state.pve,
-      seasonal: resetModes.includes('seasonal') ? freshState.seasonal : store.$state.seasonal,
-    };
-    const { error } = await syncProgressState($supabase.client, $supabase.user.id, nextRemoteState);
-    if (error) {
-      throw new Error(`Failed to reset remote progress: ${error.message}`);
-    }
-    recordLocalSyncTime();
-  }
-  store.$patch((state) => {
-    if (resetModes.includes('pvp')) state.pvp = freshState.pvp;
-    if (resetModes.includes('pve')) state.pve = freshState.pve;
-    if (resetModes.includes('seasonal')) state.seasonal = freshState.seasonal;
-    if (mode === 'all') {
-      state.currentGameMode = freshState.currentGameMode;
-      state.gameEdition = freshState.gameEdition;
-      state.tarkovUid = freshState.tarkovUid;
-    }
-  });
+  const resetState = buildResetState(resetAll, resetModes, store.$state, freshState);
+  const saved = await saveRemoteReset(ownerId, resetState);
+  applyResetToStore(store, resetAll, resetModes, freshState);
+  // The reset RPC already saved this state; the patch above is not a new cloud change.
+  if (saved) syncController?.acknowledgeExternalSave?.(saved);
   // Only this session's active copy: other accounts' recovery data is not part of a reset.
   clearActiveProgressStorage(ownerId);
 };

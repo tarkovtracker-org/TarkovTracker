@@ -915,7 +915,9 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   never upload directly: they wait for the scheduled retry, and an edit after exhaustion restarts
   the schedule, as a manual retry (`retryCloudSave`) or the browser `online` event does. A retry
   that could not upload during a pause is re-armed on resume, and edits made during the upload that
-  recovers from a failure get their own reconciled retry. Every retry first reads the remote snapshot and merges it into the pending changes,
+  recovers from a failure get their own reconciled retry. The first upload of a deferred or handed-off sync start is
+  one direct attempt; its retries are the controller's reconciled ones. A reset saved by its own RPC
+  is acknowledged to the controller, so it is neither reported pending nor uploaded again. Every retry first reads the remote snapshot and merges it into the pending changes,
   as a Realtime reconnect does, so changes saved on another device are not overwritten by a stale
   upload; a retry that overlaps a reconnect waits for the newer snapshot. If no snapshot can be
   merged (no listener is running, the read fails, the socket is suspended, or the account changed), the retry counts as a
@@ -933,7 +935,9 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
 - **Local status.** The progress persist plugin writes through `progressPersistStorage`, because
   `pinia-plugin-persistedstate` swallows storage exceptions. Store and sync writes of the active
   progress key go through `persistActiveProgressValue`, which records `saved` or `failed` (`quota`,
-  `unavailable`, `unknown`); only the sign-out restore of the previous owner's copy writes directly. A failed local write means the latest changes are memory-only.
+  `unavailable`, `unknown`); only the sign-out restore of the previous owner's copy writes directly. A failed local write means the latest changes are memory-only, except a write of
+  remote state and clocks the cloud already holds, which reports `failed` without marking progress
+  unsaved.
   If active bytes parse as neither a scoped envelope nor legacy progress, replacement first saves
   and reads back the exact bytes under an ownerless quarantine key. Quarantined bytes are never
   hydrated, assigned to an account, included in debug exports, or pruned as backups; if preservation
@@ -1006,8 +1010,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   the same removal for the captured deleted account and checks identity before sign-out and reset;
   both sign out through the auth owner fence. If sign-out succeeded but cleanup was incomplete, the
   card keeps a retry bound to the removed owner until it succeeds or that owner signs in again.
-  Each such owner gets its own stored marker when storage accepts the write, so the retry survives a
-  reload, covers owners recorded by other tabs, and no tab overwrites another's marker; account deletion records incomplete
+  Each such owner gets its own stored marker when storage accepts the write, and stays incomplete
+  until that marker is deleted, so the retry survives a reload, covers owners recorded by other tabs, and no tab overwrites another's marker; account deletion records incomplete
   cleanup the same way.
   If the server cannot be reached, the confirmation offers the disclosed device-only sign-out.
   A removal that throws is reported as incomplete, and the card's superseded-copy list follows

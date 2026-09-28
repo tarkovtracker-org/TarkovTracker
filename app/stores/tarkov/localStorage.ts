@@ -334,10 +334,10 @@ export const quarantineAndRemoveUnparseableActiveProgress = (
  * Writes the active progress envelope and records whether the browser confirmed it.
  * Only this confirmation may be described to the player as a local save.
  */
-export const persistActiveProgressValue = (value: string): boolean => {
+export const persistActiveProgressValue = (value: string, cloudHeld = false): boolean => {
   const result = writeStorageItem(STORAGE_KEYS.progress, value);
   if (result.ok) recordLocalSave(true);
-  else recordLocalSave(false, classifyLocalSaveFailure(result.error));
+  else recordLocalSave(false, classifyLocalSaveFailure(result.error), cloudHeld);
   return result.ok;
 };
 /**
@@ -454,7 +454,8 @@ export const patchStoreState = (
 };
 export const progressStorageSerializer = createProgressStorageSerializer(
   readPersistedProgressState,
+  // Accepted remote state and clocks are already held by the cloud.
   (value) => {
-    persistActiveProgressValue(value);
+    persistActiveProgressValue(value, true);
   }
 );

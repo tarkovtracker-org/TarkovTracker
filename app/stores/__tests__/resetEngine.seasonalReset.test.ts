@@ -8,6 +8,7 @@ import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 const {
   clearProgressStorageMock,
   pendingCloudChanges,
+  registeredController,
   unsavedProgressChanges,
   saveSupersededProgressCopyMock,
   supabaseContext,
@@ -15,6 +16,9 @@ const {
 } = vi.hoisted(() => ({
   clearProgressStorageMock: vi.fn(),
   pendingCloudChanges: { value: false },
+  registeredController: {
+    value: null as { acknowledgeExternalSave: (saved: unknown) => void } | null,
+  },
   unsavedProgressChanges: { value: false },
   saveSupersededProgressCopyMock: vi.fn((): { id: string } | null => ({ id: 'copy-1' })),
   supabaseContext: {
@@ -31,7 +35,7 @@ vi.mock('@/stores/tarkov/localStorage', () => ({
   clearActiveProgressStorage: clearProgressStorageMock,
 }));
 vi.mock('@/stores/tarkov/realtimeListener', () => ({
-  getRegisteredSyncController: () => null,
+  getRegisteredSyncController: () => registeredController.value,
 }));
 vi.mock('@/stores/tarkov/progressSaveStatus', () => ({
   hasPendingCloudChanges: () => pendingCloudChanges.value,
@@ -63,6 +67,7 @@ describe('performReset seasonal', () => {
     syncProgressStateMock.mockResolvedValue({ error: null });
     pendingCloudChanges.value = false;
     unsavedProgressChanges.value = false;
+    registeredController.value = null;
     saveSupersededProgressCopyMock.mockClear();
   });
   it('merges timestamped progress when a visibility-only mode timestamp is newer', () => {
@@ -299,6 +304,16 @@ describe('performReset seasonal', () => {
     expect(store.$state.pvp.level).toBe(42);
     expect(syncProgressStateMock).not.toHaveBeenCalled();
     expect(clearProgressStorageMock).not.toHaveBeenCalled();
+  });
+  it('acknowledges the reset state the RPC saved so it is not reported or uploaded again', async () => {
+    const acknowledgeExternalSave = vi.fn();
+    registeredController.value = { acknowledgeExternalSave };
+    const store = createStore();
+    await performReset('seasonal', store);
+    expect(acknowledgeExternalSave).toHaveBeenCalledOnce();
+    const saved = acknowledgeExternalSave.mock.calls[0]![0] as UserState;
+    expect(saved).toEqual(store.$state);
+    expect(saved).toBe((syncProgressStateMock.mock.calls[0] as unknown[])[2]);
   });
   it('keeps local state intact when the remote reset fails', async () => {
     syncProgressStateMock.mockResolvedValue({ error: { message: 'network down' } });

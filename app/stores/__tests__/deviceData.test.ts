@@ -269,6 +269,28 @@ describe('device data removal', () => {
     clearIncompleteDeviceDataRemoval('user-1');
     expect(incompleteDeviceDataRemovalOwner.value).toBeNull();
   });
+  it('keeps a removal incomplete until its durable marker is deleted', async () => {
+    const {
+      incompleteDeviceDataRemovalOwner,
+      markDeviceDataRemovalIncomplete,
+      retryIncompleteDeviceDataRemoval,
+    } = await import('@/stores/tarkov/deviceData');
+    markDeviceDataRemovalIncomplete('user-1');
+    const markerKey = Object.keys(localStorage).find(
+      (key) => localStorage.getItem(key) === 'user-1'
+    )!;
+    const removeItem = localStorage.removeItem.bind(localStorage);
+    const spy = vi.spyOn(localStorage, 'removeItem').mockImplementation((key: string) => {
+      if (key === markerKey) throw new DOMException('denied', 'SecurityError');
+      removeItem(key);
+    });
+    expect(retryIncompleteDeviceDataRemoval()).toBe(false);
+    expect(incompleteDeviceDataRemovalOwner.value).toBe('user-1');
+    expect(localStorage.getItem(markerKey)).toBe('user-1');
+    spy.mockRestore();
+    expect(retryIncompleteDeviceDataRemoval()).toBe(true);
+    expect(incompleteDeviceDataRemovalOwner.value).toBeNull();
+  });
   it('warns when an incomplete removal cannot be stored for a reload', async () => {
     const { markDeviceDataRemovalIncomplete, incompleteDeviceDataRemovalOwner } =
       await import('@/stores/tarkov/deviceData');

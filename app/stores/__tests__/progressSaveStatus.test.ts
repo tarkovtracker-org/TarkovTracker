@@ -129,6 +129,17 @@ describe('progress save status', () => {
     registerCloudRetryHandler(vi.fn().mockRejectedValue(new Error('boom')));
     await expect(retryCloudSave()).resolves.toBe(false);
   });
+  it('does not count a failed write of cloud-held state as unsaved progress', () => {
+    stubFailingStorage();
+    expect(persistActiveProgressValue('{"data":{}}', true)).toBe(false);
+    expect(progressSaveStatus.local).toBe('failed');
+    expect(hasUnsavedProgressChanges()).toBe(false);
+  });
+  it('keeps an earlier unsaved failure when a cloud-held write also fails', () => {
+    recordLocalSave(false, 'quota');
+    recordLocalSave(false, 'quota', true);
+    expect(hasUnsavedProgressChanges()).toBe(true);
+  });
   it('keeps an unacknowledged failure when cloud idle was already idle', () => {
     resetCloudSaveStatus();
     recordLocalSave(false);

@@ -23,7 +23,6 @@ import {
   recordLocalSyncTime,
   resetSyncTimeline,
 } from '@/stores/tarkov/syncTimeline';
-import { delay } from '@/utils/async';
 import {
   ACTIVE_SEASON_NUMBER,
   GAME_MODES,
@@ -148,9 +147,6 @@ export class ProgressSyncSession {
   isActiveFor(userId: string): boolean {
     return this.controller !== null && this.userId === userId;
   }
-  private owns(controller: ProgressSyncController, userId: string): boolean {
-    return this.controller === controller && this.userId === userId;
-  }
   /** Start syncing once; later calls are no-ops while a controller exists. */
   start(options: ControllerOptions): void {
     if (this.controller) return;
@@ -179,17 +175,11 @@ export class ProgressSyncSession {
         this.start(options);
         // The subscription was created after this mutation (including legacy
         // history adoption), so explicitly persist the snapshot that started it.
-        if (this.controller) void this.syncInitialProgress(this.controller, options.userId);
+        // One attempt: a failure schedules the controller's reconciled retries.
+        this.attemptSync();
       },
       { flush: 'post' }
     );
-  }
-  private async syncInitialProgress(controller: ProgressSyncController, userId: string) {
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      if (!this.owns(controller, userId)) return;
-      if (await attemptSync(controller)) return;
-      await delay(1000);
-    }
   }
   private clearDeferredStart(): void {
     this.stopDeferredStart?.();

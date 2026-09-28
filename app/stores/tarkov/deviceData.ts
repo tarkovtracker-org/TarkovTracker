@@ -4,6 +4,7 @@ import {
   removeAccountRecoveryCopy,
 } from '@/stores/tarkov/accountRecovery';
 import {
+  isLocalStorageInaccessible,
   quarantineAndRemoveUnparseableActiveProgress,
   isUnparseableProgressStorageValue,
   safeRemoveItem,
@@ -204,9 +205,13 @@ export const markDeviceDataRemovalIncomplete = (userId: string): void => {
     logger.warn('[DeviceData] Incomplete removal is retryable only until this page reloads');
   }
 };
+/** The owner stays incomplete until its durable marker is gone; blocked storage holds none. */
 const endIncompleteRemoval = (userId: string): void => {
+  if (!safeRemoveItem(`${INCOMPLETE_PREFIX}${userId}`) && !isLocalStorageInaccessible()) {
+    logger.warn('[DeviceData] Incomplete removal marker could not be cleared');
+    return;
+  }
   incompleteRemovalOwners.value = withoutOwner(userId);
-  safeRemoveItem(`${INCOMPLETE_PREFIX}${userId}`);
 };
 /** The owner signing back in ends the removal intent; nothing is removed from its session. */
 export const clearIncompleteDeviceDataRemoval = (userId: string | null): void => {
