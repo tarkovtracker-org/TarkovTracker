@@ -238,6 +238,21 @@ describe('account recovery copies', () => {
     expect(selected?.modeTimestamps?.pvp).toBe(200);
     expect(listSupersededProgressCopies('user-1')).toHaveLength(0);
   });
+  it('keeps the older mode clock when a newer equal-epoch copy contributes nothing', () => {
+    const progressed = {
+      ...structuredClone(defaultState),
+      pvp: {
+        ...structuredClone(defaultState.pvp),
+        level: 9,
+        taskCompletions: { 'task-a': { complete: true, timestamp: 100 } },
+      },
+    };
+    const handoff = snapshot(100, progressed, { modeTimestamps: { pvp: 100 } });
+    const placeholder = snapshot(200);
+    const selected = selectFreshestOwnerProgressSnapshot(null, placeholder, handoff);
+    expect(selected?.state.pvp.level).toBe(9);
+    expect(selected?.modeTimestamps?.pvp).toBe(100);
+  });
   it('keeps deletions of single-value fields from the newer equal-epoch copy', () => {
     const withFields = (displayName: string | null, skillOffsets: Record<string, number>) => ({
       ...structuredClone(defaultState),

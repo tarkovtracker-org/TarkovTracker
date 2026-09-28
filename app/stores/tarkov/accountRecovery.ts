@@ -1,4 +1,5 @@
 import { defaultState, type UserProgressData, type UserState } from '@/stores/progressState';
+import { deepEqual } from '@/stores/tarkov/deepEqual';
 import {
   parsePersistedProgressState,
   cloneStateSnapshot,
@@ -115,10 +116,13 @@ const archiveDisplacedMode = (
 /**
  * Equal-epoch copies can each hold edits the other lacks (for example two tabs), so they are
  * merged like any other local/remote pair; the newer clock wins fields that need a single value.
+ * A newer copy that contributes nothing, such as a default placeholder, keeps the older clock.
  */
 const mergeEqualEpochModes = (left: ModeCandidate, right: ModeCandidate): ModeCandidate => {
   const [older, newer] = right.clock >= left.clock ? [left, right] : [right, left];
-  return { ...newer, progress: mergePreferringSingleValues(older.progress, newer.progress) };
+  const progress = mergePreferringSingleValues(older.progress, newer.progress);
+  const olderAlone = mergePreferringSingleValues(older.progress, older.progress);
+  return { ...(deepEqual(progress, olderAlone) ? older : newer), progress };
 };
 const preferModeCandidate = (
   winner: ModeCandidate,
