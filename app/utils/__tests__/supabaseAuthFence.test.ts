@@ -133,6 +133,8 @@ describe('owner-fenced Supabase auth storage', () => {
     const removal = fence.withOwnerFence('user-1', async () => fence.removeFencedSession());
     await expect(removal.catch(isSupabaseSessionChangedError)).resolves.toBe(true);
     expect(persisted.get(KEY)).toBe(session('user-2'));
+    persisted.delete(KEY);
+    expect(fence.storage.getItem(KEY)).toBeNull();
     stubbed.mockRestore();
   });
 });

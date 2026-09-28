@@ -983,8 +983,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   or cleared. Any server revocation uses the token read inside the fence. Browser storage stays the
   session store whenever it can be accessed: if a write fails (for example a full quota), the new
   session is held in memory and the stale persisted session is removed, so a readable session is
-  never hidden behind an empty memory store. A session another tab persists later takes precedence
-  over that memory copy, so the owner fence still sees it. Memory-only storage is used only when
+  never hidden behind an empty memory store. A session another tab persists later replaces
+  that memory copy, so the owner fence still sees it and the memory copy cannot resurface. Memory-only storage is used only when
   reads are blocked.
 - **Removing device data.** `DeviceDataCard` (Settings → Account) is the explicit action,
   distinct from sign-out and from cloud deletion. It registers `requestDeviceDataRemoval` before

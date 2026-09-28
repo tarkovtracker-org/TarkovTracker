@@ -40,13 +40,18 @@ const createMemoryStorage = (): AuthStorage => {
  * Keeps a readable persisted session authoritative even when writes fail (for example a full
  * quota). A session that cannot be persisted lives in memory, and the stale persisted copy is
  * removed so a later load cannot resurrect it; removal errors propagate so sign-out fails closed.
- * A session another tab persists afterwards wins over the memory copy, as shared storage would,
- * so the owner fence still sees it.
+ * A session another tab persists afterwards replaces the memory copy, as shared storage would,
+ * so the owner fence still sees it and the memory copy cannot resurface after that removal.
  */
 const createWriteTolerantStorage = (persistent: Storage): AuthStorage => {
   const unsaved = createMemoryStorage();
   return {
-    getItem: (key) => persistent.getItem(key) ?? unsaved.getItem(key),
+    getItem: (key) => {
+      const stored = persistent.getItem(key);
+      if (stored === null) return unsaved.getItem(key);
+      unsaved.removeItem(key);
+      return stored;
+    },
     setItem: (key, value) => {
       try {
         persistent.setItem(key, value);
