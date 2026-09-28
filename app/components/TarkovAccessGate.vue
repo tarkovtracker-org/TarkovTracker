@@ -36,6 +36,7 @@
             v-if="showRetry"
             color="primary"
             size="sm"
+            :disabled="retryCoolingDown"
             data-testid="tarkov-access-gate-retry"
             @click="handleRetry"
           >
@@ -55,6 +56,7 @@
     <UButton
       color="primary"
       size="sm"
+      :disabled="retryCoolingDown"
       data-testid="tarkov-access-dismissed-verify"
       @click="handleVerifyAfterDismiss"
     >
@@ -156,6 +158,21 @@
     },
     { immediate: true }
   );
+  // A rate-limited verification keeps retries disabled for the server's Retry-After delay.
+  const retryCoolingDown = ref(false);
+  let cooldownTimer: ReturnType<typeof setTimeout> | undefined;
+  watch(
+    () => access.retryAvailableAt.value,
+    (availableAt) => {
+      clearTimeout(cooldownTimer);
+      const remaining = availableAt - Date.now();
+      retryCoolingDown.value = remaining > 0;
+      if (remaining > 0)
+        cooldownTimer = setTimeout(() => (retryCoolingDown.value = false), remaining);
+    },
+    { immediate: true }
+  );
+  onBeforeUnmount(() => clearTimeout(cooldownTimer));
   const showDismissedNotice = computed(
     () => access.accessEnabled && access.dismissed.value && !gateVisible.value
   );

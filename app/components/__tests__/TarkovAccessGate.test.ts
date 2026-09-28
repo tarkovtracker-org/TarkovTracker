@@ -409,6 +409,23 @@ describe('TarkovAccessGate', () => {
     expect(fetchAllData).not.toHaveBeenCalled();
     expect(wrapper.find('[data-testid="tarkov-access-dismissed"]').exists()).toBe(false);
   });
+  it('disables retries for the Retry-After delay of a rate-limited verification', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    const wrapper = await mountGate();
+    await startChallengedRequest();
+    network.mockResolvedValueOnce(
+      new Response('{}', { status: 429, headers: { 'Retry-After': '30' } })
+    );
+    await solveWidget();
+    expect(getTarkovAccessState().phase.value).toBe('rate_limited');
+    expect(statusText(wrapper)).toBe('tarkov_access.rate_limited');
+    expect(retryButton(wrapper).attributes('disabled')).toBeDefined();
+    await vi.advanceTimersByTimeAsync(30_000);
+    await settle();
+    expect(retryButton(wrapper).attributes('disabled')).toBeUndefined();
+    wrapper.unmount();
+    vi.useRealTimers();
+  });
   it('dismisses an open challenge without verifying a token', async () => {
     const wrapper = await mountGate();
     const { outcome } = await startChallengedRequest();

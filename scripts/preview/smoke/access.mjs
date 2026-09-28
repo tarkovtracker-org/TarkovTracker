@@ -23,34 +23,48 @@ export function readAccessSessionCookie(headersArray) {
   );
   return header ? header.value.slice(prefix.length).split(';')[0] : '';
 }
+const ACCESS_DENIED_STATUSES = new Set([401, 403]);
+// Access can attach a cookie to a denied response, so the exchange also requires an accepted status.
+function acceptedAccessSession(status, headersArray) {
+  const session = readAccessSessionCookie(headersArray);
+  if (ACCESS_DENIED_STATUSES.has(status) || !session) {
+    throw new Error(`Access did not issue a preview session for the service token (${status}).`);
+  }
+  return session;
+}
+// Failed exchanges are evicted so a later attempt can retry within its own bounded window.
+function cachedExchange(cache, origin, exchange) {
+  if (!cache.has(origin)) {
+    const pending = exchange();
+    cache.set(origin, pending);
+    pending.catch(() => cache.delete(origin));
+  }
+  return cache.get(origin);
+}
 async function exchangeServiceToken(request, origin, headers) {
   const response = await request.get(`${origin}/`, { headers, maxRedirects: 0 });
-  const session = readAccessSessionCookie(response.headersArray());
-  if (!session) throw new Error('Access did not issue a preview session for the service token.');
-  return session;
+  return acceptedAccessSession(response.status(), response.headersArray());
 }
 export async function previewAccessSession(request, origin, env = process.env) {
   const headers = previewAccessHeaders(env);
   if (!Object.keys(headers).length) return '';
-  if (!sessions.has(origin)) sessions.set(origin, exchangeServiceToken(request, origin, headers));
-  return sessions.get(origin);
+  return cachedExchange(sessions, origin, () => exchangeServiceToken(request, origin, headers));
 }
 const fetchSessions = new Map();
 async function exchangeServiceTokenWithFetch(origin, fetchImpl, headers) {
   const response = await fetchImpl(`${origin}/`, { redirect: 'manual', headers });
   const cookies = response.headers.getSetCookie?.() ?? [];
-  const session = readAccessSessionCookie(cookies.map((value) => ({ name: 'set-cookie', value })));
-  if (!session) throw new Error('Access did not issue a preview session for the service token.');
-  return session;
+  const headersArray = cookies.map((value) => ({ name: 'set-cookie', value }));
+  return acceptedAccessSession(response.status, headersArray);
 }
 /** Fetch-based variant for runner polls: exchanges once per origin, then sends only the session. */
 export async function previewAccessCookieHeaders(origin, fetchImpl = fetch, env = process.env) {
   const headers = previewAccessHeaders(env);
   if (!Object.keys(headers).length) return {};
-  if (!fetchSessions.has(origin)) {
-    fetchSessions.set(origin, exchangeServiceTokenWithFetch(origin, fetchImpl, headers));
-  }
-  return { cookie: `${ACCESS_SESSION_COOKIE}=${await fetchSessions.get(origin)}` };
+  const session = await cachedExchange(fetchSessions, origin, () =>
+    exchangeServiceTokenWithFetch(origin, fetchImpl, headers)
+  );
+  return { cookie: `${ACCESS_SESSION_COOKIE}=${session}` };
 }
 export async function previewGet(request, url, origin) {
   assertPreviewTarget(url, origin);

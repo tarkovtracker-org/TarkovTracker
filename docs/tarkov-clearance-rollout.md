@@ -91,7 +91,13 @@ whole-ruleset replacement is authorized.
    still receives that exchange request, so before configuring `PREVIEW_ACCESS_*`: verify
    that Access or an edge request-header rule strips `CF-Access-Client-*` before the origin,
    keep the token limited to preview hosts, short session durations, and rotate it on
-   exposure. Never pass these secrets to the preview build or untrusted PR code.
+   exposure. Also verify on a real preview host that a cookie-only request carrying that
+   session passes the Service Auth policy; Cloudflare does not document session reuse for
+   service tokens. The exchange fails closed on a denied (401/403) or cookie-less response,
+   and readiness retries it within its startup window. If cookie reuse is rejected, keep
+   `PREVIEW_ACCESS_*` unset and route smoke traffic through a trusted proxy instead of
+   forwarding the token to preview code. Never pass these secrets to the preview build or
+   untrusted PR code.
 5. Proposed operations hostname (not provisioned): `tarkov-ops.tarkovtracker.org`, entirely
    behind Access with Service Auth, no bypass policies. Expose only GET
    `/api/tarkov/overlay-status` and `/api/tarkov/tasks-core`; reject every other route.

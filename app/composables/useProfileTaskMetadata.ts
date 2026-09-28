@@ -2,7 +2,7 @@ import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import { API_GAME_MODES } from '@/utils/constants';
 import { isGameEdition } from '@/utils/editionHelpers';
 import { logger } from '@/utils/logger';
-import { ensureTarkovAccess, tarkovApiFetch } from '@/utils/tarkovApiFetch';
+import { ensureTarkovAccess, getTarkovAccessState, tarkovApiFetch } from '@/utils/tarkovApiFetch';
 import { dedupeTaskObjectiveIds, normalizeTaskObjectives } from '@/utils/taskNormalization';
 import type {
   Task,
@@ -144,8 +144,10 @@ export function useProfileTaskMetadata(mode: Ref<GameMode>, language: Ref<string
   } | null>(null);
   const error = shallowRef<Error | null>(null);
   const scope = computed(() => `${mode.value}-${language.value}`);
+  // A dismissed security check fails this load; a later successful verification reloads it.
+  const { recoveryEpoch } = getTarkovAccessState();
   watch(
-    [mode, language],
+    [mode, language, recoveryEpoch],
     async ([gameMode, lang], _, onCleanup) => {
       let current = true;
       let timeoutId: ReturnType<typeof setTimeout> | undefined;

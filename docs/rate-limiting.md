@@ -256,7 +256,8 @@ Implementation notes:
 
 The optional game-data browser flow adds a dedicated per-client Siteverify attempt bucket
 in [`tarkov-verify.post.ts`](../app/server/api/security/tarkov-verify.post.ts), using the
-existing shared limiter. It does not replace the proposed edge rate rule: CDN cache hits
+existing shared limiter; a request without a resolved client address is rejected rather than
+sharing one anonymous bucket. It does not replace the proposed edge rate rule: CDN cache hits
 must count at Cloudflare. The strict verifier fails closed on Siteverify outages; the
 legacy profile-import policy is unchanged. Shared-limiter fallback behavior is unchanged.
 

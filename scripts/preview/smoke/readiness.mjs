@@ -13,8 +13,10 @@ export function previewOrigin() {
   if (url.protocol !== 'https:') throw new Error('Preview URL must be HTTPS.');
   return url.origin;
 }
-async function probeOnce(origin, fetchImpl, headers) {
+async function probeOnce(origin, fetchImpl) {
   try {
+    // Polls carry only the Access session; a failed exchange retries on the next poll.
+    const headers = await previewAccessCookieHeaders(origin, fetchImpl);
     const response = await fetchImpl(`${origin}/`, { redirect: 'manual', headers });
     const type = response.headers.get('content-type') || '';
     return response.status === 200 && type.includes('text/html');
@@ -31,8 +33,8 @@ function startupElapsed(windowMs) {
 function pollDeadline(now, deadline) {
   return now() + POLL_INTERVAL_MS > deadline;
 }
-async function pollAttempt(origin, fetchImpl, now, deadline, headers) {
-  if (await probeOnce(origin, fetchImpl, headers)) return 'ready';
+async function pollAttempt(origin, fetchImpl, now, deadline) {
+  if (await probeOnce(origin, fetchImpl)) return 'ready';
   return pollDeadline(now, deadline) ? 'expired' : 'retry';
 }
 /** Poll until the deployment serves HTML or the startup window closes. */
@@ -40,13 +42,11 @@ export async function waitForDeployment(
   origin,
   { fetchImpl = fetch, now = Date.now, sleep = defaultWait(), windowMs = STARTUP_WINDOW_MS } = {}
 ) {
-  // Polls carry only the Access session; the service token is exchanged once, up front.
-  const headers = await previewAccessCookieHeaders(origin, fetchImpl);
   const deadline = now() + windowMs;
   let attempts = 0;
   while (now() <= deadline) {
     attempts += 1;
-    const outcome = await pollAttempt(origin, fetchImpl, now, deadline, headers);
+    const outcome = await pollAttempt(origin, fetchImpl, now, deadline);
     if (outcome === 'ready') return attempts;
     if (outcome === 'expired') break;
     await sleep(POLL_INTERVAL_MS);

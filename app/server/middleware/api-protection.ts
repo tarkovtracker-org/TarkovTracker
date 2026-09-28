@@ -41,6 +41,10 @@ function routeMatchesPattern(route: string, pattern: string): boolean {
 function isPublicRoute(pathname: string, publicRoutes: string[]): boolean {
   return publicRoutes.some((pattern) => routeMatchesPattern(pathname, pattern));
 }
+// The strict Siteverify relay is public by design and survives API_PUBLIC_ROUTES overrides: it
+// only validates a browser Turnstile token with Cloudflare and mints no application clearance;
+// its strict rate limiting lives in the route handler itself.
+const INVARIANT_PUBLIC_ROUTES = ['/api/security/tarkov-verify'];
 function isAlwaysProtectedRoute(_pathname: string): boolean {
   return false;
 }
@@ -246,10 +250,6 @@ export default defineEventHandler(async (event) => {
     '/api/tarkov-dev/profile',
     '/api/changelog',
     '/api/contributors',
-    // The strict Siteverify relay is public by design: it only validates a browser
-    // Turnstile token with Cloudflare and mints no application clearance; its strict
-    // rate limiting lives in the route handler itself.
-    '/api/security/tarkov-verify',
     '/api/profile/*',
     '/api/streamer/*',
   ];
@@ -258,6 +258,7 @@ export default defineEventHandler(async (event) => {
     configuredPublicRoutesRaw && configuredPublicRoutesRaw.length > 0
       ? parseCommaSeparated(configuredPublicRoutesRaw)
       : defaultPublicRoutes;
+  publicRoutes.push(...INVARIANT_PUBLIC_ROUTES);
   const effectiveAllowedHosts = [...allowedHosts];
   if (allowedHosts.length === 0 && !isDevelopment) {
     effectiveAllowedHosts.push('tarkovtracker.org', 'www.tarkovtracker.org');

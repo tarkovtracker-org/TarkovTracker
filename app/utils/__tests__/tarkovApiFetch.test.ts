@@ -613,6 +613,50 @@ describe('gated transport parity and recovery', () => {
     dismissTarkovAccessGate();
     expect(getTarkovAccessState().phase.value).toBe('released');
   });
+  it('parks a rate-limited verification with the server retry delay', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    network
+      .mockResolvedValueOnce(challenge())
+      .mockResolvedValueOnce(new Response('{}', { status: 429, headers: { 'Retry-After': '42' } }));
+    void ensureTarkovAccess().catch(() => {});
+    await flush();
+    submitGateToken('token');
+    await flush();
+    const state = getTarkovAccessState();
+    expect(state.phase.value).toBe('rate_limited');
+    expect(state.lastError.value).toMatchObject({ kind: 'rate_limited' });
+    expect(state.retryAvailableAt.value).toBe(1_042_000);
+  });
+  it('falls back to a bounded delay without a usable Retry-After', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    network.mockResolvedValueOnce(challenge()).mockResolvedValueOnce(json({}, 429));
+    void ensureTarkovAccess().catch(() => {});
+    await flush();
+    submitGateToken('token');
+    await flush();
+    expect(getTarkovAccessState().retryAvailableAt.value).toBe(60_000);
+  });
+  it('bumps the recovery epoch once at the first release after a dismissal', async () => {
+    network.mockResolvedValueOnce(challenge());
+    void ensureTarkovAccess().catch(() => {});
+    await flush();
+    dismissTarkovAccessGate();
+    await flush();
+    const state = getTarkovAccessState();
+    network.mockResolvedValueOnce(json({}, 503));
+    await requestGateRetry().catch(() => {});
+    await flush();
+    expect(state.recoveryEpoch.value).toBe(0);
+    network.mockResolvedValueOnce(json());
+    await requestGateRetry();
+    await flush();
+    expect(state.recoveryEpoch.value).toBe(1);
+    network.mockResolvedValueOnce(challenge()).mockResolvedValueOnce(json());
+    await renewTarkovAccess(2).catch(() => {});
+    expect(state.recoveryEpoch.value).toBe(1);
+  });
   it('rejects a manual retry for an already cancelled caller without probing', async () => {
     const controller = new AbortController();
     controller.abort();

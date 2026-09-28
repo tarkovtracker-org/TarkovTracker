@@ -156,6 +156,13 @@ describe('POST /api/security/tarkov-verify', () => {
     expect(mockReadRawBody).not.toHaveBeenCalled();
     expect(mockVerifyTurnstileTokenStrict).not.toHaveBeenCalled();
   });
+  it('rejects requests without a resolved client address before rate limiting', async () => {
+    mockGetClientAddress.mockReturnValue(null);
+    const { default: handler } = await import('@/server/api/security/tarkov-verify.post');
+    await expect(handler(event)).rejects.toMatchObject({ statusCode: 403 });
+    expect(mockConsumeSharedRateLimitWithReset).not.toHaveBeenCalled();
+    expect(mockVerifyTurnstileTokenStrict).not.toHaveBeenCalled();
+  });
   it('rejects declared content lengths past the cap with 413 before any read', async () => {
     mockGetRequestHeader.mockImplementation((_event: unknown, name: string) =>
       name === 'content-type'

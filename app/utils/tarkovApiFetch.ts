@@ -292,6 +292,10 @@ const accessState = {
   challengeSeen: ref(false),
   /** True while a dismissal latches; the gate offers a non-modal way back. */
   dismissed: ref(false),
+  /** Epoch ms before which a rate-limited verification should not be retried. */
+  retryAvailableAt: ref(0),
+  /** Bumped by the first release after a dismissal, so consumers it failed can reload. */
+  recoveryEpoch: ref(0),
 };
 interface AccessFlow {
   readonly id: number;
@@ -319,6 +323,8 @@ const dismissedFlows = new Set<number>();
 let dismissedFailure: TarkovAccessError | null = null;
 /** True while a challenged flow's failure waits for the visible manual retry. */
 let parked = false;
+/** Latched by a dismissal until access is next released. */
+let recoveryPending = false;
 const parkedFailures = new WeakSet<Error>();
 const markParked = (failure: TarkovAccessError): TarkovAccessError => {
   parked = true;
@@ -402,6 +408,11 @@ const toAccessFailure = (verdict: ProbeVerdict): TarkovAccessError => {
       );
   }
 };
+const announceRecovery = (): void => {
+  if (!recoveryPending) return;
+  recoveryPending = false;
+  accessState.recoveryEpoch.value += 1;
+};
 const settleAccessVerdict = (
   verdict: ProbeVerdict,
   startGeneration: number,
@@ -410,6 +421,7 @@ const settleAccessVerdict = (
   if (verdict.kind === 'released') {
     releasedGeneration = startGeneration;
     accessState.phase.value = 'released';
+    announceRecovery();
     return null;
   }
   const failure = toAccessFailure(verdict);
@@ -437,10 +449,37 @@ const parkAccessAttempt = (cause?: Error): TarkovAccessError => {
   logger.warn('[TarkovAccess] Security check attempt parked; manual retry is required');
   return markParked(failure);
 };
+const RETRY_AFTER_FALLBACK_SECONDS = 60;
+const RETRY_AFTER_MAX_SECONDS = 300;
+const readRetryAfterMs = (response: Response): number => {
+  const seconds = Number(response.headers.get('retry-after'));
+  const delay = Number.isFinite(seconds) && seconds > 0 ? seconds : RETRY_AFTER_FALLBACK_SECONDS;
+  return Math.min(delay, RETRY_AFTER_MAX_SECONDS) * 1000;
+};
+/**
+ * A rate-limited verification parks with the rate-limit copy and the server's
+ * delay, so the retry UI does not invite an immediate, doomed resubmission.
+ */
+const parkVerificationFailure = (cause: unknown): TarkovAccessError => {
+  if (!(cause instanceof TarkovApiStatusError) || cause.status !== 429) {
+    return parkAccessAttempt(toError(cause));
+  }
+  const failure = new TarkovAccessError(
+    'rate_limited',
+    'Security verification was rate limited.',
+    cause
+  );
+  accessState.retryAvailableAt.value = Date.now() + readRetryAfterMs(cause.response);
+  accessState.attemptsExhausted.value = true;
+  accessState.phase.value = 'rate_limited';
+  accessState.lastError.value = failure;
+  return markParked(failure);
+};
 /** Ends a challenged attempt the user dismissed: waiters reject and the gate hides. */
 const dismissAccessAttempt = (): TarkovAccessError => {
   const failure = new TarkovAccessError('challenge', 'The security check was dismissed.');
   dismissedFailure = failure;
+  recoveryPending = true;
   accessState.dismissed.value = true;
   accessState.phase.value = 'idle';
   accessState.lastError.value = failure;
@@ -479,7 +518,7 @@ const executeAccessFlow = async (
     await verifyAccessToken(token);
     logger.debug('[TarkovAccess] Siteverify accepted the check token; re-probing');
   } catch (cause) {
-    throw parkAccessAttempt(toError(cause));
+    throw parkVerificationFailure(cause);
   }
   const reprobeVerdict = await probeAccess();
   if (reprobeVerdict.kind === 'challenge') throw parkAccessAttempt();
@@ -635,6 +674,9 @@ export const resetTarkovAccessForTests = (): void => {
   dismissedFlows.clear();
   dismissedFailure = null;
   accessState.dismissed.value = false;
+  accessState.retryAvailableAt.value = 0;
+  accessState.recoveryEpoch.value = 0;
+  recoveryPending = false;
   parked = false;
   generation = 0;
   browserConfig = null;

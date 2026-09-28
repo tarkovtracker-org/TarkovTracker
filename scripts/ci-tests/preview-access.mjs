@@ -9,6 +9,7 @@ import {
   protectPreviewBrowser,
   readAccessSessionCookie,
 } from '../preview/smoke/access.mjs';
+import { waitForDeployment } from '../preview/smoke/readiness.mjs';
 test('Access credentials are paired and optional', () => {
   assert.deepEqual(previewAccessHeaders({}), {});
   assert.throws(() => previewAccessHeaders({ PREVIEW_ACCESS_CLIENT_ID: 'id' }));
@@ -44,13 +45,14 @@ const withAccessEnv = async (callback) => {
     else process.env.PREVIEW_ACCESS_CLIENT_SECRET = oldSecret;
   }
 };
-const fakeRequest = (setCookie) => {
+const fakeRequest = (setCookie, status = 200) => {
   const calls = [];
   return {
     calls,
     get: async (url, options) => {
       calls.push({ url, options });
       return {
+        status: () => status,
         headersArray: () => (setCookie ? [{ name: 'Set-Cookie', value: setCookie }] : []),
       };
     },
@@ -114,7 +116,10 @@ test('runner polls exchange the service token once and then send only the sessio
     const calls = [];
     const fetchImpl = async (url, options) => {
       calls.push({ url, options });
-      return { headers: { getSetCookie: () => ['CF_Authorization=poll-jwt; Path=/; Secure'] } };
+      return {
+        status: 200,
+        headers: { getSetCookie: () => ['CF_Authorization=poll-jwt; Path=/; Secure'] },
+      };
     };
     const origin = 'https://poll.example';
     assert.deepEqual(await previewAccessCookieHeaders(origin, fetchImpl), {
@@ -127,7 +132,10 @@ test('runner polls exchange the service token once and then send only the sessio
     assert.equal(calls[0].options.redirect, 'manual');
     assert.equal(calls[0].options.headers['CF-Access-Client-Secret'], 'secret');
     await assert.rejects(
-      previewAccessCookieHeaders('https://nopoll.example', async () => ({ headers: {} })),
+      previewAccessCookieHeaders('https://nopoll.example', async () => ({
+        status: 200,
+        headers: {},
+      })),
       /did not issue a preview session/
     );
   });
@@ -137,4 +145,54 @@ test('runner polls exchange the service token once and then send only the sessio
     }),
     {}
   );
+});
+test('rejects a session cookie attached to a denied Access response', async () => {
+  await withAccessEnv(async () => {
+    await assert.rejects(
+      previewAccessSession(
+        fakeRequest('CF_Authorization=denied; Path=/', 401),
+        'https://denied.example'
+      ),
+      /did not issue a preview session .*401/
+    );
+  });
+});
+test('evicts a failed exchange so the next attempt retries it', async () => {
+  await withAccessEnv(async () => {
+    let attempt = 0;
+    const fetchImpl = async () => {
+      attempt += 1;
+      if (attempt === 1) throw new Error('network down');
+      return { status: 200, headers: { getSetCookie: () => ['CF_Authorization=later; Path=/'] } };
+    };
+    const origin = 'https://flaky.example';
+    await assert.rejects(previewAccessCookieHeaders(origin, fetchImpl), /network down/);
+    assert.deepEqual(await previewAccessCookieHeaders(origin, fetchImpl), {
+      cookie: 'CF_Authorization=later',
+    });
+    assert.equal(attempt, 2);
+  });
+});
+test('readiness retries a transient Access exchange within its window', async () => {
+  await withAccessEnv(async () => {
+    const calls = [];
+    const fetchImpl = async (_url, options) => {
+      calls.push(options.headers);
+      if (calls.length === 1) throw new Error('exchange blip');
+      if (options.headers['CF-Access-Client-Secret']) {
+        return { status: 200, headers: { getSetCookie: () => ['CF_Authorization=ready; Path=/'] } };
+      }
+      return { status: 200, headers: { get: () => 'text/html' } };
+    };
+    let clock = 0;
+    const attempts = await waitForDeployment('https://ready.example', {
+      fetchImpl,
+      now: () => clock,
+      sleep: async (ms) => {
+        clock += ms;
+      },
+    });
+    assert.equal(attempts, 2);
+    assert.deepEqual(calls.at(-1), { cookie: 'CF_Authorization=ready' });
+  });
 });

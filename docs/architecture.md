@@ -338,7 +338,9 @@ do not cancel other waiters. Existing IndexedDB hits remain independent of verif
 The root-mounted [`TarkovAccessGate`](../app/components/TarkovAccessGate.vue) can render while
 startup waits. Only a flow that met a challenge parks callers behind the gate's manual retry
 (a failed retry stays parked); dismissing the gate rejects them, and later requests fail fast
-until its non-modal verify action retries and reloads metadata. An ordinary probe
+until its non-modal verify action retries and reloads metadata; the first release after a
+dismissal also reloads open shared profiles. A rate-limited verification keeps retry disabled
+for the server's `Retry-After` delay. An ordinary probe
 failure rejects its callers without showing the gate, and the next request probes again.
 Gated GETs keep `$fetch`'s single transient retry. Shared-profile loads start their request budget after access is released.
 Cloudflare owns clearance; application
@@ -566,41 +568,41 @@ builds. This is a Vite build-time variable, not Nuxt runtime configuration.
 
 **Server-side (Nuxt private runtime config):**
 
-| Variable                                        | Description                                         | Required   |
-| ----------------------------------------------- | --------------------------------------------------- | ---------- |
-| `NUXT_SUPABASE_SERVICE_KEY`                     | Supabase service role key                           | Yes (prod) |
-| `NUXT_TARKOV_JSON_BASE_URL`                     | Static game-data JSON base URL override             | No         |
-| `NUXT_LOG_SINK_URL`                             | Centralized server log sink (HTTPS)                 | No         |
-| `NUXT_TWITCH_CLIENT_ID`                         | Twitch API client ID                                | No         |
-| `NUXT_GITHUB_CONTRIBUTORS_EXCLUDE`              | Bot accounts excluded from contributors             | No         |
-| `NUXT_GITHUB_TIMEOUT_MS`                        | GitHub API timeout                                  | No         |
-| `NUXT_GITHUB_TOKEN`                             | GitHub API token                                    | No         |
-| `NUXT_CACHE_BYPASS_ENABLED`                     | Enable server-side cache bypass header              | No         |
-| `API_ALLOWED_HOSTS`                             | Allowed origin hosts                                | No         |
-| `API_TRUSTED_IP_RANGES`                         | Trusted IP ranges (CIDR)                            | No         |
-| `API_REQUIRE_AUTH`                              | Require auth for protected routes (default true)    | No         |
-| `API_PUBLIC_ROUTES`                             | Routes exempt from auth                             | No         |
-| `API_TRUST_PROXY`                               | Trust proxy headers (auto-detected on Cloudflare)   | No         |
-| `STRIPE_SECRET_KEY`                             | Stripe API secret key                               | Yes (prod) |
-| `STRIPE_PRICE_SCAV_MONTHLY`                     | Stripe price ID for Scav monthly plan               | Yes (prod) |
-| `STRIPE_PRICE_SCAV_6MONTH`                      | Stripe price ID for Scav 6-month plan               | Yes (prod) |
-| `STRIPE_PRICE_SCAV_YEARLY`                      | Stripe price ID for Scav yearly plan                | Yes (prod) |
-| `STRIPE_PRICE_TIMMY_MONTHLY`                    | Stripe price ID for Timmy monthly plan              | Yes (prod) |
-| `STRIPE_PRICE_TIMMY_6MONTH`                     | Stripe price ID for Timmy 6-month plan              | Yes (prod) |
-| `STRIPE_PRICE_TIMMY_YEARLY`                     | Stripe price ID for Timmy yearly plan               | Yes (prod) |
-| `STRIPE_PRICE_CHAD_MONTHLY`                     | Stripe price ID for Chad monthly plan               | Yes (prod) |
-| `STRIPE_PRICE_CHAD_6MONTH`                      | Stripe price ID for Chad 6-month plan               | Yes (prod) |
-| `STRIPE_PRICE_CHAD_YEARLY`                      | Stripe price ID for Chad yearly plan                | Yes (prod) |
-| `NUXT_ACCOUNT_IP_HASH_SECRET`                   | HMAC secret for account-level IP audit records      | Yes (prod) |
-| `NUXT_TARKOV_DEV_PROFILE_CACHE_TTL_MS`          | Tarkov.dev profile shared-cache TTL in milliseconds | No         |
-| `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_MINUTE` | Per-IP profile-import requests per minute           | No         |
-| `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_HOUR`   | Per-IP profile-import requests per hour             | No         |
-| `NUXT_TARKOV_DEV_PROFILE_MAX_UPDATED_AGE_DAYS`  | Reject older profile snapshots; `0` disables        | No         |
-| `NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE`       | Per-IP team-members requests per minute             | No         |
-| `NUXT_TEAM_MEMBERS_CACHE_TTL_MS`                | Team-members shared-cache TTL in milliseconds       | No         |
-| `NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE`     | Per-IP shared-profile requests per minute           | No         |
-| `NUXT_SHARED_PROFILE_CACHE_TTL_MS`              | Shared-profile shared-cache TTL in milliseconds     | No         |
-| `NUXT_TURNSTILE_SECRET_KEY`                     | Server-side Turnstile secret for profile imports    | No²        |
+| Variable                                        | Description                                                     | Required   |
+| ----------------------------------------------- | --------------------------------------------------------------- | ---------- |
+| `NUXT_SUPABASE_SERVICE_KEY`                     | Supabase service role key                                       | Yes (prod) |
+| `NUXT_TARKOV_JSON_BASE_URL`                     | Static game-data JSON base URL override                         | No         |
+| `NUXT_LOG_SINK_URL`                             | Centralized server log sink (HTTPS)                             | No         |
+| `NUXT_TWITCH_CLIENT_ID`                         | Twitch API client ID                                            | No         |
+| `NUXT_GITHUB_CONTRIBUTORS_EXCLUDE`              | Bot accounts excluded from contributors                         | No         |
+| `NUXT_GITHUB_TIMEOUT_MS`                        | GitHub API timeout                                              | No         |
+| `NUXT_GITHUB_TOKEN`                             | GitHub API token                                                | No         |
+| `NUXT_CACHE_BYPASS_ENABLED`                     | Enable server-side cache bypass header                          | No         |
+| `API_ALLOWED_HOSTS`                             | Allowed origin hosts                                            | No         |
+| `API_TRUSTED_IP_RANGES`                         | Trusted IP ranges (CIDR)                                        | No         |
+| `API_REQUIRE_AUTH`                              | Require auth for protected routes (default true)                | No         |
+| `API_PUBLIC_ROUTES`                             | Routes exempt from auth (the Siteverify relay is always public) | No         |
+| `API_TRUST_PROXY`                               | Trust proxy headers (auto-detected on Cloudflare)               | No         |
+| `STRIPE_SECRET_KEY`                             | Stripe API secret key                                           | Yes (prod) |
+| `STRIPE_PRICE_SCAV_MONTHLY`                     | Stripe price ID for Scav monthly plan                           | Yes (prod) |
+| `STRIPE_PRICE_SCAV_6MONTH`                      | Stripe price ID for Scav 6-month plan                           | Yes (prod) |
+| `STRIPE_PRICE_SCAV_YEARLY`                      | Stripe price ID for Scav yearly plan                            | Yes (prod) |
+| `STRIPE_PRICE_TIMMY_MONTHLY`                    | Stripe price ID for Timmy monthly plan                          | Yes (prod) |
+| `STRIPE_PRICE_TIMMY_6MONTH`                     | Stripe price ID for Timmy 6-month plan                          | Yes (prod) |
+| `STRIPE_PRICE_TIMMY_YEARLY`                     | Stripe price ID for Timmy yearly plan                           | Yes (prod) |
+| `STRIPE_PRICE_CHAD_MONTHLY`                     | Stripe price ID for Chad monthly plan                           | Yes (prod) |
+| `STRIPE_PRICE_CHAD_6MONTH`                      | Stripe price ID for Chad 6-month plan                           | Yes (prod) |
+| `STRIPE_PRICE_CHAD_YEARLY`                      | Stripe price ID for Chad yearly plan                            | Yes (prod) |
+| `NUXT_ACCOUNT_IP_HASH_SECRET`                   | HMAC secret for account-level IP audit records                  | Yes (prod) |
+| `NUXT_TARKOV_DEV_PROFILE_CACHE_TTL_MS`          | Tarkov.dev profile shared-cache TTL in milliseconds             | No         |
+| `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_MINUTE` | Per-IP profile-import requests per minute                       | No         |
+| `NUXT_TARKOV_DEV_PROFILE_RATE_LIMIT_PER_HOUR`   | Per-IP profile-import requests per hour                         | No         |
+| `NUXT_TARKOV_DEV_PROFILE_MAX_UPDATED_AGE_DAYS`  | Reject older profile snapshots; `0` disables                    | No         |
+| `NUXT_TEAM_MEMBERS_RATE_LIMIT_PER_MINUTE`       | Per-IP team-members requests per minute                         | No         |
+| `NUXT_TEAM_MEMBERS_CACHE_TTL_MS`                | Team-members shared-cache TTL in milliseconds                   | No         |
+| `NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE`     | Per-IP shared-profile requests per minute                       | No         |
+| `NUXT_SHARED_PROFILE_CACHE_TTL_MS`              | Shared-profile shared-cache TTL in milliseconds                 | No         |
+| `NUXT_TURNSTILE_SECRET_KEY`                     | Server-side Turnstile secret for profile imports                | No²        |
 
 **Build-time / platform:**
 

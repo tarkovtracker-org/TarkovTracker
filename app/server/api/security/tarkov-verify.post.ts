@@ -227,6 +227,17 @@ const throwVerificationFailure = (reason: StrictTurnstileFailureReason): never =
     message: statusCode === 400 ? 'Invalid verification request' : 'Security verification failed',
   });
 };
+/** A request without a resolved client address must not share one anonymous rate-limit bucket. */
+const requireClientIp = (event: H3Event, config: TarkovVerifyRuntimeConfig): string => {
+  const clientIp = getClientAddress(event, Boolean(config.apiProtection?.trustProxy));
+  if (clientIp) return clientIp;
+  logger.warn('Tarkov verify rejected: client address unavailable');
+  throw createError({
+    statusCode: 403,
+    statusMessage: 'Forbidden',
+    message: 'Security verification failed',
+  });
+};
 /**
  * Consumes the shared strict-verify rate limit ahead of body parsing so the cheapest
  * checks act first. Resolves the client IP once for reuse as the siteverify remoteip.
@@ -235,12 +246,12 @@ const throwVerificationFailure = (reason: StrictTurnstileFailureReason): never =
 const consumeVerificationRateLimit = async (
   event: H3Event,
   config: TarkovVerifyRuntimeConfig
-): Promise<string | null> => {
+): Promise<string> => {
   const rateLimitPerMinute = toPositiveInteger(
     config.tarkovVerifyRateLimitPerMinute,
     DEFAULT_TARKOV_VERIFY_RATE_LIMIT_PER_MINUTE
   );
-  const clientIp = getClientAddress(event, Boolean(config.apiProtection?.trustProxy));
+  const clientIp = requireClientIp(event, config);
   const sharedCacheHandle = createSharedCacheHandle(
     config.public?.appUrl,
     getRateLimiterBinding(event)
@@ -248,7 +259,7 @@ const consumeVerificationRateLimit = async (
   const verdict = await consumeSharedRateLimitWithReset(
     sharedCacheHandle,
     TARKOV_VERIFY_RATE_LIMIT_PREFIX,
-    `tarkov-verify:ip:${clientIp ?? 'unknown'}`,
+    `tarkov-verify:ip:${clientIp}`,
     rateLimitPerMinute,
     TARKOV_VERIFY_RATE_LIMIT_WINDOW_MS,
     logRateLimitCacheError
@@ -290,14 +301,14 @@ export default defineEventHandler(async (event) => {
     });
   }
   assertJsonContentType(event);
-  await consumeVerificationRateLimit(event, typedConfig);
+  const clientIp = await consumeVerificationRateLimit(event, typedConfig);
   const token = extractVerificationToken(await readVerificationBody(event));
   const verification = await verifyTurnstileTokenStrict({
     secretKey: access.secretKey,
     token,
     expectedAction: access.expectedAction,
     expectedHostnames: access.expectedHostnames,
-    remoteIp: getClientAddress(event, Boolean(typedConfig.apiProtection?.trustProxy)),
+    remoteIp: clientIp,
   });
   if (!verification.ok) {
     throwVerificationFailure(verification.reason);
