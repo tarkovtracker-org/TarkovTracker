@@ -52,6 +52,8 @@ export const useTaskBlockerText = () => {
     trader: blocker.trader?.name ?? '',
     task: taskName(blocker.taskId),
     faction: blocker.reason ?? '',
+    objective: blocker.objective?.name ?? '',
+    chapter: (blocker.chapterIds ?? []).map((id) => chapters.value.get(id) ?? id).join(', '),
   });
   return (blocker: TaskBlocker): string =>
     blocker.type === 'prerequisite'

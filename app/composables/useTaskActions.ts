@@ -5,8 +5,9 @@ import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
 import {
-  normalizeOtherRequirements,
+  hasUnsupportedOtherRequirement,
   otherRequirementsSignature,
+  storyObjectiveRequirements,
 } from '@/utils/taskOtherRequirements';
 import {
   applyTaskAvailabilityRequirements,
@@ -79,6 +80,7 @@ const RESOLVABLE_BLOCKERS: ReadonlySet<TaskBlocker['type']> = new Set([
   'prerequisite',
   'global_variable_unknown',
   'dialogue',
+  'story_objective',
 ]);
 export function useTaskActions(
   task: () => Task,
@@ -222,9 +224,7 @@ export function useTaskActions(
    * traders or prerequisites.
    */
   const canMarkTaskAvailable = (currentTask: Task): boolean => {
-    const gatesConfirmable =
-      otherRequirementsSignature(currentTask) !== undefined ||
-      !normalizeOtherRequirements(currentTask.otherRequirements).length;
+    const gatesConfirmable = !hasUnsupportedOtherRequirement(currentTask);
     return (
       gatesConfirmable &&
       !hasUnresolvableBlocker(currentTask.id) &&
@@ -250,6 +250,8 @@ export function useTaskActions(
     });
     ensureTaskMinPlayerLevel(tarkovStore, currentTask);
     ensureTraderRequirements(currentTask);
+    for (const gate of storyObjectiveRequirements(currentTask))
+      tarkovStore.setStoryObjectiveComplete(gate.storyChapter.id, gate.objective.id);
     if (requirements) tarkovStore.confirmTaskAvailability(currentTask.id, requirements);
     emitAction({
       taskId: currentTask.id,

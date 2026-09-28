@@ -35,11 +35,25 @@ const unsupported = (raw: Record<string, unknown>): TaskOtherRequirement =>
     : isId(raw.upstreamType)
       ? { type: 'unknown', upstreamType: raw.upstreamType }
       : { type: 'unknown' };
-const normalizeSupported = (raw: Record<string, unknown>): TaskOtherRequirement => {
-  if (raw.type === 'globalVariable') return normalizeVariable(raw);
-  if (raw.type === 'dialogue') return normalizeDialogue(raw);
-  return { type: 'unknown' };
+const namedRef = (value: unknown): { id: string; name?: string } | undefined => {
+  if (!isRecord(value) || !isId(value.id)) return undefined;
+  return typeof value.name === 'string' ? { id: value.id, name: value.name } : { id: value.id };
 };
+const normalizeStoryObjective = (raw: Record<string, unknown>): TaskOtherRequirement => {
+  const storyChapter = namedRef(raw.storyChapter);
+  const objective = namedRef(raw.objective);
+  if (!isId(raw.id) || !storyChapter || !objective) return { type: 'unknown' };
+  return { type: 'storyObjective', id: raw.id, storyChapter, objective };
+};
+const NORMALIZERS: Record<string, (raw: Record<string, unknown>) => TaskOtherRequirement> = {
+  globalVariable: normalizeVariable,
+  dialogue: normalizeDialogue,
+  storyObjective: normalizeStoryObjective,
+};
+const normalizeSupported = (raw: Record<string, unknown>): TaskOtherRequirement =>
+  Object.hasOwn(NORMALIZERS, String(raw.type))
+    ? NORMALIZERS[String(raw.type)]!(raw)
+    : { type: 'unknown' };
 const normalizeOtherRequirement = (raw: unknown): TaskOtherRequirement => {
   if (!isRecord(raw)) return { type: 'unknown' };
   const normalized = normalizeSupported(raw);
@@ -52,12 +66,24 @@ export const normalizeOtherRequirements = (raw: unknown): TaskOtherRequirement[]
   return Array.from(raw, normalizeOtherRequirement);
 };
 /** Confirmation is task-local and bound to the exact supported start requirements, not a counter. */
+/** Server-side gates a player confirms from in-game observation (story gates are tracked progress). */
+const isConfirmable = (requirement: TaskOtherRequirement): boolean =>
+  requirement.type === 'globalVariable' || requirement.type === 'dialogue';
+export const hasUnsupportedOtherRequirement = (task: Task): boolean =>
+  normalizeOtherRequirements(task.otherRequirements).some(
+    (requirement) => requirement.type === 'unknown'
+  );
 export const otherRequirementsSignature = (task: Task): string | undefined => {
   const requirements = normalizeOtherRequirements(task.otherRequirements);
-  if (!requirements.length || requirements.some((requirement) => requirement.type === 'unknown'))
-    return undefined;
-  return JSON.stringify(requirements);
+  if (requirements.some((requirement) => requirement.type === 'unknown')) return undefined;
+  const confirmable = requirements.filter(isConfirmable);
+  return confirmable.length ? JSON.stringify(confirmable) : undefined;
 };
+/** Story objectives a task's overlay gates name, for Mark available to record. */
+export const storyObjectiveRequirements = (task: Task) =>
+  normalizeOtherRequirements(task.otherRequirements).flatMap((requirement) =>
+    requirement.type === 'storyObjective' ? [requirement] : []
+  );
 export const globalVariableRequirementMet = (
   requirement: Extract<TaskOtherRequirement, { type: 'globalVariable' }>,
   values: Record<string, number> = {}

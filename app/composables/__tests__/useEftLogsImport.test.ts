@@ -27,6 +27,7 @@ const tarkovStore = {
   setTaskObjectiveUncomplete: vi.fn(),
   setTaskUncompleted: vi.fn(),
   confirmTaskAvailability: vi.fn(),
+  setStoryObjectiveComplete: vi.fn(),
   switchGameMode: vi.fn(async (_mode: GameMode) => undefined),
 };
 const mockLogger = {
@@ -501,6 +502,26 @@ describe('useEftLogsImport', () => {
     expect(tarkovStore.setTaskUncompleted.mock.invocationCallOrder[0]!).toBeLessThan(
       tarkovStore.confirmTaskAvailability.mock.invocationCallOrder[0]!
     );
+  });
+  it('records the story objective an imported start implies', async () => {
+    metadataStore.tasks = [
+      {
+        id: '61604635c725987e815b1a46',
+        otherRequirements: [
+          {
+            type: 'storyObjective',
+            id: 'story',
+            storyChapter: { id: 'boreas' },
+            objective: { id: 'drives' },
+          },
+        ],
+      },
+    ];
+    const composable = await loadComposable();
+    await composable.parseFile(new File([startedLog()], 'notifications.log'));
+    await composable.confirmImport('pvp');
+    expect(tarkovStore.setStoryObjectiveComplete).toHaveBeenCalledWith('boreas', 'drives');
+    expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
   });
   it('does not record a confirmation for an imported start without server gates', async () => {
     const composable = await loadComposable();

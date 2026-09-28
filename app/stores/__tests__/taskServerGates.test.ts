@@ -193,6 +193,60 @@ describe('server-side task start gates', () => {
     expect(otherRequirementsSignature(task)).toBeUndefined();
     expect(evaluate(task).available).toBe(false);
   });
+  it('evaluates overlay story-objective gates from tracked story progress', () => {
+    // Pre-merge audit: the live overlay gates four Boreas tasks on a story objective; they must be
+    // unlockable, not permanently unknown.
+    const task: Task = {
+      id: 'target',
+      otherRequirements: [
+        {
+          type: 'storyObjective',
+          id: 'story',
+          storyChapter: { id: 'boreas', name: 'Boreas' },
+          objective: { id: 'drives', name: 'Decode the drives' },
+        },
+      ],
+    };
+    expect(evaluate(task)).toMatchObject({
+      available: false,
+      blockers: [
+        {
+          type: 'story_objective',
+          chapterIds: ['boreas'],
+          objective: { id: 'drives', name: 'Decode the drives' },
+        },
+      ],
+    });
+    const done = { boreas: { objectives: { drives: { complete: true } } } };
+    expect(evaluate(task, { storyChapters: done }).available).toBe(true);
+    expect(
+      evaluate(task, { storyChapters: { boreas: { objectives: { drives: { complete: false } } } } })
+        .available
+    ).toBe(false);
+    // Story gates are tracked progress, not in-game confirmations.
+    expect(otherRequirementsSignature(task)).toBeUndefined();
+    expect(
+      evaluate(task, { confirmations: { target: { requirements: '[]', timestamp: 1_000 } } })
+        .available
+    ).toBe(false);
+  });
+  it('confirms only the confirmable gates of a task that also has a story gate', () => {
+    const task: Task = {
+      id: 'target',
+      otherRequirements: [
+        { type: 'dialogue', id: 'talk', traders: ['t'] },
+        { type: 'storyObjective', id: 's', storyChapter: { id: 'c' }, objective: { id: 'o' } },
+      ],
+    };
+    expect(otherRequirementsSignature(task)).toBe(
+      JSON.stringify([{ type: 'dialogue', id: 'talk', traders: ['t'] }])
+    );
+    const storyDone = { c: { objectives: { o: { complete: true } } } };
+    expect(evaluate(task, { storyChapters: storyDone }).blockers[0]?.type).toBe('dialogue');
+    expect(
+      evaluate(task, { storyChapters: storyDone, confirmations: confirmed(task) }).available
+    ).toBe(true);
+  });
   it('does not infer loyalty gates from variable IDs or pool membership', () => {
     expect(evaluate(gate(), { globalVariables: { counter: 3 } }).available).toBe(true);
   });

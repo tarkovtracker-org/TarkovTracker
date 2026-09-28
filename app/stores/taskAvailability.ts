@@ -45,6 +45,7 @@ export type TaskBlocker = {
     | 'global_variable'
     | 'global_variable_unknown'
     | 'dialogue'
+    | 'story_objective'
     | 'unknown'
     | 'cycle'
     | 'complete'
@@ -59,6 +60,7 @@ export type TaskBlocker = {
   taskId?: string;
   requirements?: TaskRequirement[];
   chapterIds?: string[];
+  objective?: { id: string; name: string };
   reason?: string;
 };
 export type TaskAvailabilityResult = { available: boolean; blockers: TaskBlocker[] };

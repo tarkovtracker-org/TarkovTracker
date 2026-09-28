@@ -30,6 +30,25 @@ const variableBlockers = (
     },
   ];
 };
+/** Tracked story progress decides this gate; an in-game confirmation never bypasses it. */
+const storyObjectiveBlockers = (
+  requirement: Extract<TaskOtherRequirement, { type: 'storyObjective' }>,
+  data: TaskAvailabilityTeamData
+): TaskBlocker[] => {
+  const chapter = data.storyChapters?.[requirement.storyChapter.id];
+  if (chapter?.objectives?.[requirement.objective.id]?.complete === true) return [];
+  return [
+    {
+      type: 'story_objective',
+      requirementId: requirement.id,
+      chapterIds: [requirement.storyChapter.id],
+      objective: {
+        id: requirement.objective.id,
+        name: requirement.objective.name ?? requirement.objective.id,
+      },
+    },
+  ];
+};
 const requirementBlockers = (
   requirement: TaskOtherRequirement,
   data: TaskAvailabilityTeamData,
@@ -37,6 +56,7 @@ const requirementBlockers = (
 ): TaskBlocker[] => {
   if (requirement.type === 'globalVariable') return variableBlockers(requirement, data, confirmed);
   if (requirement.type === 'unknown') return [{ type: 'unknown', reason: 'other_requirement' }];
+  if (requirement.type === 'storyObjective') return storyObjectiveBlockers(requirement, data);
   return confirmed ? [] : [{ type: 'dialogue', requirementId: requirement.id }];
 };
 /** Start gates only: never infer producers, current values, or prerequisite edges from an unlock. */

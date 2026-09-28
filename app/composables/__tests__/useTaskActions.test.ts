@@ -20,6 +20,7 @@ const createTarkovStore = (options: {
   const objectiveCounts = new Map<string, number>(Object.entries(options.objectiveCounts ?? {}));
   return {
     confirmTaskAvailability: vi.fn(),
+    setStoryObjectiveComplete: vi.fn(),
     setTaskComplete: vi.fn(),
     setTaskFailed: vi.fn(),
     setTaskUncompleted: vi.fn(),
@@ -213,6 +214,24 @@ describe('useTaskActions', () => {
     const { actions, tarkovStore } = await setup(task, [task], {}, {}, evaluations);
     expect(actions.canMarkTaskAvailable()).toBe(false);
     actions.markTaskAvailable();
+    expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
+  });
+  it('records the story objective a story-gated task names', async () => {
+    const task: Task = {
+      id: 'story-gated',
+      otherRequirements: [
+        {
+          type: 'storyObjective',
+          id: 's',
+          storyChapter: { id: 'boreas' },
+          objective: { id: 'drives' },
+        },
+      ],
+    };
+    const { actions, tarkovStore } = await setup(task, [task], {});
+    expect(actions.canMarkTaskAvailable()).toBe(true);
+    actions.markTaskAvailable();
+    expect(tarkovStore.setStoryObjectiveComplete).toHaveBeenCalledWith('boreas', 'drives');
     expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
   });
   it('allows the blockers Mark available can clear', async () => {

@@ -328,7 +328,7 @@ const blockerDistance = (blocker: TaskAvailabilityResult['blockers'][number]) =>
 const singleBlockerRank = (
   blocker: TaskAvailabilityResult['blockers'][number]
 ): [number, number] => {
-  if (['prerequisite', 'trader_unlock'].includes(blocker.type))
+  if (['prerequisite', 'trader_unlock', 'story_objective'].includes(blocker.type))
     return [2, blocker.requirements?.length ?? 1];
   return [1, blockerDistance(blocker)];
 };

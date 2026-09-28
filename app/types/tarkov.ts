@@ -131,6 +131,13 @@ export type TaskOtherRequirement =
       value: number;
     }
   | { type: 'dialogue'; id: string; traders: string[] }
+  /** Overlay story gate: met only when the player completed that storyline objective. */
+  | {
+      type: 'storyObjective';
+      id: string;
+      storyChapter: { id: string; name?: string };
+      objective: { id: string; name?: string };
+    }
   /** Unsupported or malformed gate; `upstreamType` keeps the original upstream discriminator. */
   | { type: 'unknown'; upstreamType?: string };
 export interface TaskTraderLevelRequirement {

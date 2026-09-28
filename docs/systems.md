@@ -2087,7 +2087,9 @@ for agent commands and recovery boundaries.
 `app/utils/taskOtherRequirements.ts` preserves and validates the API's `otherRequirements` at
 adaptation and overlay boundaries. `app/stores/taskServerGates.ts` evaluates global-variable
 comparisons literally, separately from prerequisite edges, and keeps missing or invalid effective
-account values unknown (including `== 0`). Trader conversations also require confirmation;
+account values unknown (including `== 0`). Overlay `storyObjective` gates are met by the player's tracked storyline objective
+(not by an in-game confirmation); Mark available and imported EFT starts record that objective.
+Trader conversations also require confirmation;
 unsupported or malformed requirements remain blocked as `{ type: 'unknown', upstreamType }`, keeping the
 upstream discriminator. Only published start requirements are
 consumed, not finish/fail conditions. Unknown server gates remain in the locked list, with an

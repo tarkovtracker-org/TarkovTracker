@@ -20,7 +20,10 @@ import {
 } from '@/utils/eftLogQuestParser';
 import { EftLogRecordSizeError } from '@/utils/eftLogRecordReader';
 import { logger } from '@/utils/logger';
-import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
+import {
+  otherRequirementsSignature,
+  storyObjectiveRequirements,
+} from '@/utils/taskOtherRequirements';
 import {
   applyTaskAvailabilityRequirements,
   applyTaskTraderRequirements,
@@ -206,9 +209,12 @@ const applyStartedImports = (
     const flags = getCompletionFlags(completions[taskId]);
     if (!shouldStartImportedTask(completedTaskIds.has(taskId), flags)) continue;
     store.setTaskUncompleted(taskId);
-    // The game only lets a task start once its server-side start gates are met, so an imported
-    // start confirms the task's current gate signature (after the status write, so it counts).
-    const signature = otherRequirementsSignature(tasksMap.get(taskId) ?? { id: taskId });
+    // The game only lets a task start once its start gates are met, so an imported start records
+    // its story objectives and confirms its gate signature (after the status write, so it counts).
+    const task = tasksMap.get(taskId) ?? { id: taskId };
+    for (const gate of storyObjectiveRequirements(task))
+      store.setStoryObjectiveComplete(gate.storyChapter.id, gate.objective.id);
+    const signature = otherRequirementsSignature(task);
     if (signature) store.confirmTaskAvailability(taskId, signature);
   }
 };
