@@ -4,6 +4,7 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { hasUnconfirmableStatusClock } from '@/utils/taskAvailabilityConfirmation';
 import {
   hasUnsupportedOtherRequirement,
   otherRequirementsSignature,
@@ -82,6 +83,29 @@ const RESOLVABLE_BLOCKERS: ReadonlySet<TaskBlocker['type']> = new Set([
   'dialogue',
   'story_objective',
 ]);
+const RAISING_COMPARISONS = new Set(['>=', '>', '=', '==']);
+/**
+ * Mark available only raises trader values (`applyTaskTraderRequirements`): loyalty up to 4,
+ * reputation never past a strict bound, and nothing for upper bounds or inequality.
+ */
+const raisedTraderTarget = (blocker: TaskBlocker): number | undefined => {
+  const required = blocker.required;
+  if (required === undefined || !RAISING_COMPARISONS.has(blocker.compareMethod ?? '>=')) return;
+  if (blocker.type === 'trader_reputation')
+    return blocker.compareMethod === '>' ? undefined : required;
+  const minimum = required + (blocker.compareMethod === '>' ? 1 : 0);
+  return minimum <= 4 ? minimum : undefined;
+};
+const canRaiseTrader = (blocker: TaskBlocker): boolean => {
+  const target = raisedTraderTarget(blocker);
+  return target !== undefined && (blocker.current ?? 0) < target;
+};
+const canClearBlocker = (blocker: TaskBlocker): boolean => {
+  if (!RESOLVABLE_BLOCKERS.has(blocker.type)) return false;
+  return ['trader_level', 'trader_reputation'].includes(blocker.type)
+    ? canRaiseTrader(blocker)
+    : true;
+};
 export function useTaskActions(
   task: () => Task,
   onAction?: (payload: TaskActionPayload) => void
@@ -203,9 +227,7 @@ export function useTaskActions(
   const progressStore = useProgressStore();
   const currentEvaluation = (taskId: string) => progressStore.taskEvaluations?.[taskId]?.self;
   const hasUnresolvableBlocker = (taskId: string): boolean =>
-    (currentEvaluation(taskId)?.blockers ?? []).some(
-      (blocker) => !RESOLVABLE_BLOCKERS.has(blocker.type)
-    );
+    (currentEvaluation(taskId)?.blockers ?? []).some((blocker) => !canClearBlocker(blocker));
   /** Unmet direct prerequisites from the current evaluation, or undefined before one exists. */
   const evaluatedUnmetRequirements = (taskId: string): TaskRequirement[] | undefined =>
     currentEvaluation(taskId)?.blockers.flatMap((blocker) =>
@@ -224,7 +246,12 @@ export function useTaskActions(
    * traders or prerequisites.
    */
   const canMarkTaskAvailable = (currentTask: Task): boolean => {
-    const gatesConfirmable = !hasUnsupportedOtherRequirement(currentTask);
+    const gatesConfirmable =
+      !hasUnsupportedOtherRequirement(currentTask) &&
+      !(
+        otherRequirementsSignature(currentTask) &&
+        hasUnconfirmableStatusClock(taskCompletion(currentTask.id))
+      );
     return (
       gatesConfirmable &&
       !hasUnresolvableBlocker(currentTask.id) &&

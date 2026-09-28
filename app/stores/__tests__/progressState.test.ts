@@ -125,6 +125,19 @@ describe('task availability confirmations', () => {
     }
   });
 });
+describe('story objective completion clock', () => {
+  it('stamps a completion after an entry another device wrote ahead', () => {
+    const state = createBaseState();
+    const ahead = Date.now() + 3_600_000;
+    state.pvp.storyChapters.boreas = {
+      objectives: { drives: { complete: false, timestamp: ahead } },
+    };
+    actions.setStoryObjectiveComplete.call(state, 'boreas', 'drives');
+    const entry = state.pvp.storyChapters.boreas.objectives!.drives!;
+    expect(entry.complete).toBe(true);
+    expect(entry.timestamp!).toBeGreaterThan(ahead);
+  });
+});
 describe('progressState storyline timestamps', () => {
   it('records timestamps for storyline uncomplete actions', () => {
     const state = createBaseState();

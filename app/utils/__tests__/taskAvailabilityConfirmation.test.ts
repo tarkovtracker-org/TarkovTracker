@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   MAX_CONFIRMATION_TIMESTAMP,
+  hasUnconfirmableStatusClock,
   isAvailabilityConfirmed,
   nextClock,
   mergeTaskAvailability,
@@ -69,6 +70,16 @@ describe('task availability confirmations', () => {
     const confirmation = { requirements: 'sig', timestamp: 100 };
     const reset = { complete: false, timestamp: MAX_CONFIRMATION_TIMESTAMP * 10 };
     expect(isAvailabilityConfirmed(confirmation, reset, 'sig')).toBe(false);
+  });
+  it('drops task ids PostgreSQL jsonb would reject as object keys', () => {
+    expect(
+      sanitizeTaskAvailabilityMap({ 'a\uD800': { requirements: 'sig', timestamp: 1 } })
+    ).toEqual({});
+  });
+  it('flags a status clock no confirmation can follow', () => {
+    expect(hasUnconfirmableStatusClock({ timestamp: MAX_CONFIRMATION_TIMESTAMP })).toBe(true);
+    expect(hasUnconfirmableStatusClock({ timestamp: Date.now() })).toBe(false);
+    expect(hasUnconfirmableStatusClock(undefined)).toBe(false);
   });
   it('drops requirement strings PostgreSQL jsonb would reject', () => {
     expect(

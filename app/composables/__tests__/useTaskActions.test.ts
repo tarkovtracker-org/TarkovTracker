@@ -234,6 +234,41 @@ describe('useTaskActions', () => {
     expect(tarkovStore.setStoryObjectiveComplete).toHaveBeenCalledWith('boreas', 'drives');
     expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
   });
+  it.each([
+    [{ compareMethod: '<', current: 3, required: 2 }, 'trader_level', false],
+    [{ compareMethod: '=', current: 4, required: 2 }, 'trader_level', false],
+    [{ compareMethod: '>=', current: 1, required: 5 }, 'trader_level', false],
+    [{ compareMethod: '>', current: 0, required: 10 }, 'trader_reputation', false],
+    [{ compareMethod: '!=', current: 1, required: 1 }, 'trader_reputation', false],
+    [{ compareMethod: '>=', current: 1, required: 3 }, 'trader_level', true],
+    [{ compareMethod: '>', current: 1, required: 2 }, 'trader_level', true],
+    [{ compareMethod: '>=', current: 0, required: 0.2 }, 'trader_reputation', true],
+  ] as const)(
+    'only offers Mark available for raisable trader blockers: %j %s',
+    async (values, type, expected) => {
+      const task: Task = {
+        id: 'target',
+        otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['t'] }],
+      };
+      const evaluations: TaskEvaluationMap = {
+        target: { self: { available: false, blockers: [{ type, ...values }] } },
+      };
+      const { actions } = await setup(task, [task], {}, {}, evaluations);
+      expect(actions.canMarkTaskAvailable()).toBe(expected);
+    }
+  );
+  it('withholds confirmation behind a corrupt status clock', async () => {
+    const task: Task = {
+      id: 'target',
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['t'] }],
+    };
+    const { actions, tarkovStore } = await setup(task, [task], {
+      taskCompletions: { target: { complete: false, failed: false, timestamp: 4e13 } },
+    });
+    expect(actions.canMarkTaskAvailable()).toBe(false);
+    actions.markTaskAvailable();
+    expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
+  });
   it('allows the blockers Mark available can clear', async () => {
     const task: Task = {
       id: 'target',

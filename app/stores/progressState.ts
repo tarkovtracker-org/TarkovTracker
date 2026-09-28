@@ -475,9 +475,11 @@ export const actions = {
     if (!data.storyChapters[chapterId].objectives) {
       data.storyChapters[chapterId].objectives = {};
     }
+    // A completion the user records now must outrank an entry another device stamped ahead.
+    const previous = data.storyChapters[chapterId].objectives![objectiveId]?.timestamp ?? 0;
     data.storyChapters[chapterId].objectives![objectiveId] = {
       complete: true,
-      timestamp: Date.now(),
+      timestamp: nextClock(previous),
     };
   },
   setStoryObjectiveUncomplete(this: UserState, chapterId: string, objectiveId: string) {

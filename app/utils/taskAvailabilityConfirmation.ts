@@ -34,7 +34,7 @@ export const sanitizeTaskAvailabilityMap = (value: unknown): ConfirmationMap => 
   const sanitized: ConfirmationMap = {};
   for (const [taskId, entry] of Object.entries(value)) {
     const confirmation = sanitizeConfirmation(entry);
-    if (taskId && confirmation) sanitized[taskId] = confirmation;
+    if (taskId && !LONE_SURROGATE.test(taskId) && confirmation) sanitized[taskId] = confirmation;
   }
   return sanitized;
 };
@@ -67,6 +67,9 @@ const statusTimestamp = (completion: RawTaskCompletion): number => {
   const value = isRecord(completion) ? completion.timestamp : undefined;
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
 };
+/** A status clock a confirmation can never follow (corrupt data beyond the ceiling). */
+export const hasUnconfirmableStatusClock = (completion: RawTaskCompletion): boolean =>
+  statusTimestamp(completion) >= MAX_CONFIRMATION_TIMESTAMP;
 /**
  * A confirmation counts only for the exact requirement signature and only while it is not older
  * than the task's last status change, so a reset, completion, failure or repair on any device

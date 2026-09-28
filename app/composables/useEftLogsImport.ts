@@ -142,6 +142,11 @@ const buildImportTaskSets = (
   }
   return { completed: sets.completed, started: sets.started, failed: sets.failed };
 };
+/** A started or completed task has passed its start gates, so its story objectives were met. */
+const recordImpliedStoryObjectives = (store: ReturnType<typeof useTarkovStore>, task: Task) => {
+  for (const gate of storyObjectiveRequirements(task))
+    store.setStoryObjectiveComplete(gate.storyChapter.id, gate.objective.id);
+};
 const applyImportedTaskRequirements = (
   store: ReturnType<typeof useTarkovStore>,
   task: Task,
@@ -149,6 +154,7 @@ const applyImportedTaskRequirements = (
 ) => {
   ensureTaskMinPlayerLevel(store, task);
   if (requireTraders) applyTaskTraderRequirements({ store, task });
+  recordImpliedStoryObjectives(store, task);
 };
 /** Applies completion requirements without overriding explicit imported states or existing completions. */
 const applyCompletedImports = (
@@ -212,8 +218,7 @@ const applyStartedImports = (
     // The game only lets a task start once its start gates are met, so an imported start records
     // its story objectives and confirms its gate signature (after the status write, so it counts).
     const task = tasksMap.get(taskId) ?? { id: taskId };
-    for (const gate of storyObjectiveRequirements(task))
-      store.setStoryObjectiveComplete(gate.storyChapter.id, gate.objective.id);
+    recordImpliedStoryObjectives(store, task);
     const signature = otherRequirementsSignature(task);
     if (signature) store.confirmTaskAvailability(taskId, signature);
   }
