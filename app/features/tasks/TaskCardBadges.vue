@@ -17,6 +17,7 @@
         @click.stop="emit('togglePin')"
       />
     </AppTooltip>
+    <TaskMapVisibilityToggles :task-id="task.id" />
     <AppTooltip
       v-for="req in traderRequirements"
       :key="req.id"
@@ -160,6 +161,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import TaskMapVisibilityToggles from '@/features/tasks/TaskMapVisibilityToggles.vue';
   import type { Task, NormalizedTraderRequirement } from '@/types/tarkov';
   const props = defineProps<{
     task: Task;
