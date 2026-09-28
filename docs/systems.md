@@ -2113,7 +2113,12 @@ rewriting the map. The row sanitizer preserves the key (migration
 It does not set a counter, acknowledge another task's dialogue, or complete candidate contributor
 tasks. It cannot bypass a known unmet value, malformed requirements, or independent
 level/faction/trader/prestige/quest gates, and changed requirements invalidate it. The task's More
-menu clears just the in-game confirmation. Incomplete/reset records are not confirmation evidence. Explicit prerequisite backfill
+menu clears just the in-game confirmation, and Mark available is withheld (and changes nothing) for
+unsupported or malformed gates. Status changes are stamped after the task's confirmation clock, so a
+device whose clock runs ahead cannot keep a confirmation alive past a later reset. An imported EFT
+log start confirms the task's current gate signature, since the game only starts a task whose gates
+are met. Shared profiles evaluate with the owner's confirmations. Incomplete/reset records are not
+confirmation evidence. Explicit prerequisite backfill
 continues for unambiguous completed/failed requirements; active-or-complete and other ambiguous
 status choices no longer fabricate completion histories or flatten alternative ancestors.
 

@@ -282,6 +282,18 @@ const setAvailabilityConfirmation = (state: UserState, taskId: string, requireme
     timestamp: Math.max(Date.now(), statusTs, previousTs + 1),
   };
 };
+/**
+ * A status change must retire the task's current confirmation even when that confirmation carries a
+ * clock from a device that runs ahead, so the status timestamp is advanced past it.
+ */
+const setTaskStatus = (state: UserState, taskId: string, completion: TaskCompletion) => {
+  const confirmationTs = getCurrentData(state).taskAvailability?.[taskId]?.timestamp;
+  const timestamp =
+    confirmationTs === undefined
+      ? completion.timestamp
+      : Math.max(completion.timestamp ?? 0, confirmationTs + 1);
+  updateObjective(state, 'taskCompletions', taskId, { ...completion, timestamp });
+};
 // Simplified actions
 export const actions = {
   switchGameMode(this: UserState, mode: GameMode) {
@@ -369,18 +381,13 @@ export const actions = {
     setAvailabilityConfirmation(this, taskId, requirements);
   },
   setTaskComplete(this: UserState, taskId: string) {
-    updateObjective(this, 'taskCompletions', taskId, createCompletion(true, false, false));
+    setTaskStatus(this, taskId, createCompletion(true, false, false));
   },
   setTaskFailed(this: UserState, taskId: string, failOptions?: { manual?: boolean }) {
-    updateObjective(
-      this,
-      'taskCompletions',
-      taskId,
-      createCompletion(true, true, failOptions?.manual)
-    );
+    setTaskStatus(this, taskId, createCompletion(true, true, failOptions?.manual));
   },
   setTaskUncompleted(this: UserState, taskId: string) {
-    updateObjective(this, 'taskCompletions', taskId, createCompletion(false, false, false));
+    setTaskStatus(this, taskId, createCompletion(false, false, false));
   },
   setTaskObjectiveComplete(this: UserState, objectiveId: string) {
     updateObjective(this, 'taskObjectives', objectiveId, {

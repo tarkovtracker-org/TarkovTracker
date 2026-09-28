@@ -3,7 +3,10 @@ import { hasStoryUnlockProgress } from '@/stores/taskAvailability';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
-import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
+import {
+  normalizeOtherRequirements,
+  otherRequirementsSignature,
+} from '@/utils/taskOtherRequirements';
 import {
   applyTaskAvailabilityRequirements,
   applyTaskTraderRequirements,
@@ -180,6 +183,10 @@ export function useTaskActions(
   const markTaskAvailable = () => {
     const currentTask = task();
     const taskName = getTaskName(currentTask, () => t('common.task', 'Task'));
+    const requirements = otherRequirementsSignature(currentTask);
+    // An unsupported or malformed server gate can never be confirmed; changing prerequisites,
+    // level or traders would alter progress without making the task available.
+    if (!requirements && normalizeOtherRequirements(currentTask.otherRequirements).length) return;
     applyTaskAvailabilityRequirements({
       getCompletion: (id) => tarkovStore.getCurrentProgressData().taskCompletions?.[id],
       skipTaskRequirements: (currentTask.storyUnlocks ?? []).some((chapter) =>
@@ -193,7 +200,6 @@ export function useTaskActions(
     });
     ensureTaskMinPlayerLevel(tarkovStore, currentTask);
     ensureTraderRequirements(currentTask);
-    const requirements = otherRequirementsSignature(currentTask);
     if (requirements) tarkovStore.confirmTaskAvailability(currentTask.id, requirements);
     emitAction({
       taskId: currentTask.id,

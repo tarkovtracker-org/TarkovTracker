@@ -26,6 +26,7 @@ const tarkovStore = {
   setTaskObjectiveComplete: vi.fn(),
   setTaskObjectiveUncomplete: vi.fn(),
   setTaskUncompleted: vi.fn(),
+  confirmTaskAvailability: vi.fn(),
   switchGameMode: vi.fn(async (_mode: GameMode) => undefined),
 };
 const mockLogger = {
@@ -486,6 +487,26 @@ describe('useEftLogsImport', () => {
     await composable.confirmImport('pvp');
     expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith('61604635c725987e815b1a46');
     expect(composable.importState.value).toBe('success');
+  });
+  it('confirms the server gates of an imported start, after its status write', async () => {
+    const gates: Task['otherRequirements'] = [{ type: 'dialogue', id: 'talk', traders: ['t'] }];
+    metadataStore.tasks = [{ id: '61604635c725987e815b1a46', otherRequirements: gates }];
+    const composable = await loadComposable();
+    await composable.parseFile(new File([startedLog()], 'notifications.log'));
+    await composable.confirmImport('pvp');
+    expect(tarkovStore.confirmTaskAvailability).toHaveBeenCalledWith(
+      '61604635c725987e815b1a46',
+      JSON.stringify(gates)
+    );
+    expect(tarkovStore.setTaskUncompleted.mock.invocationCallOrder[0]!).toBeLessThan(
+      tarkovStore.confirmTaskAvailability.mock.invocationCallOrder[0]!
+    );
+  });
+  it('does not record a confirmation for an imported start without server gates', async () => {
+    const composable = await loadComposable();
+    await composable.parseFile(new File([startedLog()], 'notifications.log'));
+    await composable.confirmImport('pvp');
+    expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
   });
   it('does not mark started tasks active when same task is also imported as completed', async () => {
     const composable = await loadComposable();

@@ -145,6 +145,20 @@ describe('useTaskActions', () => {
     expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
     expect(tarkovStore.setTaskFailed).not.toHaveBeenCalled();
   });
+  it('changes nothing for a task whose server gate cannot be confirmed', async () => {
+    const prerequisite: Task = { id: 'prior' };
+    const task: Task = {
+      id: 'unsupported',
+      minPlayerLevel: 40,
+      taskRequirements: [{ task: { id: 'prior' }, status: ['complete'] }],
+      otherRequirements: [{ type: 'unknown' }],
+    };
+    const { actions, tarkovStore } = await setup(task, [task, prerequisite], {});
+    actions.markTaskAvailable();
+    expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+    expect(tarkovStore.setLevel).not.toHaveBeenCalled();
+  });
   it('tracks each task action once with rich analytics metadata', async () => {
     const task: Task = {
       id: 'task-analytics',

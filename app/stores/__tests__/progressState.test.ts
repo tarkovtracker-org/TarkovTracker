@@ -94,6 +94,19 @@ describe('task availability confirmations', () => {
     actions.clearTaskAvailability.call(state, 'task');
     expect(state.pvp.taskAvailability!.task!.timestamp).toBeGreaterThan(first);
   });
+  it('advances a status change past a confirmation stamped by a clock running ahead', () => {
+    const state = createBaseState();
+    const ahead = Date.now() + 3_600_000;
+    state.pvp.taskAvailability = { task: { requirements: 'requirements', timestamp: ahead } };
+    for (const action of [
+      actions.setTaskComplete,
+      actions.setTaskFailed,
+      actions.setTaskUncompleted,
+    ]) {
+      action.call(state, 'task');
+      expect(state.pvp.taskCompletions.task!.timestamp!).toBeGreaterThan(ahead);
+    }
+  });
   it('scopes confirmations to the current mode and retires them on later status changes', () => {
     const state = createBaseState();
     for (const action of [
