@@ -1811,6 +1811,14 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 4. The summary's pinned group follows the pinned-objective preference. Its active group follows the
    self-objective preference. Objectives the player does not still need themselves are dropped, so
    the Team chip never changes required-item summaries.
+5. Quests the user hid from the map (#918) are applied last. `useMapObjectiveMarks` returns
+   `mapTaskIds` (tasks that draw at least one marker in an enabled pinned/self/team category on the
+   selected map, before hiding) and `hiddenTaskIds`; objectives of hidden tasks are removed from
+   both the marks and the objective-visibility map, so the required-items summary follows too.
+   `MapTaskVisibilityPanel` (inline and fullscreen), the task-card toggles, and the marker popup
+   (via `LeafletMap`'s `taskVisibilityActions`) edit the single `mapHiddenTaskIds` list. In map view
+   `tasks.vue` moves hidden map quests out of the main list into the collapsed
+   `MapHiddenTasksSection`, so the list matches the map.
 
 ### Files
 
@@ -1823,6 +1831,10 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 - `app/features/maps/composables/useMapRequiredItems.ts` — selected-map item/key aggregation.
 - `app/features/tasks/task-objective-equipment.ts` — canonical bring-mode equipment extraction.
 - `app/pages/tasks.vue` — passes filtered tasks and shared visibility into the map components.
+- `app/features/maps/utils/mapTaskVisibility.ts` — hidden-quest helpers and popup action type.
+- `app/features/maps/MapTaskVisibilityPanel.vue` and `app/features/tasks/TaskMapVisibilityToggles.vue`
+  — hide / "show only" controls above the map and on task cards (via `mapTaskVisibilityKey`).
+- `app/features/tasks/MapHiddenTasksSection.vue` — collapsed list section for hidden map quests.
 
 ### Invariants
 
@@ -1848,6 +1860,16 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 - A group given a title renders its section headings one level down (`h4`) and uses the short
   `required_items` / `required_keys` labels; an untitled standalone group keeps the `h3` level and
   the longer `*_summary` labels.
+- Hiding a quest is a separate state from filter-driven visibility (task filters, trader-standing
+  gating from #730): it only acts on tasks that already passed every filter. In map view a hidden
+  map quest leaves the main task list for the collapsed hidden section, but it is never dropped from
+  the filtered set; the task opened from a link stays in its own section.
+- There is one state, a hidden list keyed by task ID. "Show only" hides every other quest in the
+  current map's `mapTaskIds` and un-hides the chosen one; quests unlocked later are shown by
+  default. "Show all" un-hides the current map's quests only.
+- `mapHiddenTaskIds` persists in user-scoped local preferences storage and is not part of the
+  Supabase `user_preferences` sync payload (no column exists).
+- Jumping to an objective of a hidden quest un-hides that quest first so its popup can open.
 - Hovering or clicking an objective marker hit-tests every visible zone and point in container
   pixels. When more than one distinct objective is under the pointer, the popup is a compact stacked
   list (points first, then zones smallest to largest); choosing an entry pins that objective's full
