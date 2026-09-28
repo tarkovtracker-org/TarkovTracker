@@ -1291,6 +1291,53 @@ describe('useTarkov sync integration', () => {
     expect(store.pvp.level).toBe(12);
     expect(getLastSyncPayload().p_modes.pvp).toEqual(expect.objectContaining({ level: 12 }));
   });
+  it('keeps preserved snapshot mode clocks when adopting it through real persistence', async () => {
+    const base = Date.parse('2026-09-06T12:00:00Z');
+    vi.spyOn(Date, 'now').mockReturnValue(base + 100_000);
+    const pinia = createPinia().use(piniaPluginPersistedstate);
+    createApp({}).use(pinia);
+    setActivePinia(pinia);
+    const store = useTarkovStore();
+    supabaseContext.user.id = 'user-2';
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({
+        _timestamp: base + 10_000,
+        _metadataTimestamp: base + 10_000,
+        _modeTimestamps: { pvp: base + 10_000, pve: base + 10_000, seasonal: base + 10_000 },
+        _userId: 'user-2',
+        data: { ...structuredClone(defaultState), pvp: progressWithLevel(9) },
+      })
+    );
+    resetTarkovSync('user switched', { preservePersistedStateForUserId: 'user-2' });
+    store.$reset();
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({
+        _timestamp: base + 15_000,
+        _userId: 'user-2',
+        data: structuredClone(defaultState),
+      })
+    );
+    single.mockResolvedValue({
+      data: createRemoteRow({ updated_at: new Date(base + 1_000).toISOString() }),
+      error: null,
+    });
+    modeProgressResult.data = [
+      {
+        game_mode: 'pvp',
+        season_number: 0,
+        progress_data: progressWithLevel(1),
+        progress_updated_at: new Date(base + 1_000).toISOString(),
+      },
+    ];
+    await initializeTarkovSync();
+    await nextTick();
+    expect(store.pvp.level).toBe(9);
+    const persisted = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!);
+    expect(persisted.data.pvp.level).toBe(9);
+    expect(persisted._modeTimestamps.pvp).toBe(base + 10_000);
+  });
   it('restores the previous user snapshot after logout resets the store', async () => {
     const store = useTarkovStore();
     const preservedTimestamp = Date.parse('2026-02-25T00:00:00.000Z');

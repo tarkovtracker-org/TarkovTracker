@@ -1,3 +1,4 @@
+import { applyTaskTransition } from '@shared/utils/taskTransitions';
 import {
   extractUserMetadataDisplayName,
   extractUserMetadataUsername,
@@ -10,8 +11,8 @@ import {
   type LegacyModeProgressRow,
 } from '../../../../app/utils/modeProgressFallback';
 import { getTasks, getHideoutStations } from '../services/tarkov';
-import { logger } from '../utils/logger';
 import { getGameModeSeasonNumber } from '../utils/gameMode';
+import { logger } from '../utils/logger';
 import { getMemoryCache, setMemoryCache } from '../utils/memory-cache';
 import { extractGameModeData, transformProgress } from '../utils/transform';
 import type {
@@ -22,7 +23,6 @@ import type {
   TaskState,
   BatchTaskUpdate,
   TaskCompletion,
-  TarkovTask,
   ApiTaskUpdate,
   ApiUpdateMeta,
   GameMode,
@@ -276,11 +276,6 @@ async function getUserDisplayName(env: Env, userId: string): Promise<string | nu
     return null;
   }
 }
-const toTaskState = (complete: boolean, failed: boolean): TaskState => {
-  if (failed) return 'failed';
-  if (complete) return 'completed';
-  return 'uncompleted';
-};
 const buildApiUpdateMeta = (updates: ApiTaskUpdate[], timestamp: number): ApiUpdateMeta => {
   return {
     id: crypto.randomUUID(),
@@ -288,100 +283,6 @@ const buildApiUpdateMeta = (updates: ApiTaskUpdate[], timestamp: number): ApiUpd
     source: 'api',
     tasks: updates,
   };
-};
-const setTaskCompletion = (
-  taskCompletions: Record<string, TaskCompletion>,
-  taskId: string,
-  complete: boolean,
-  failed: boolean,
-  timestamp: number,
-  updates?: Map<string, TaskState>
-): void => {
-  const previous = taskCompletions[taskId];
-  const prevState = toTaskState(previous?.complete === true, previous?.failed === true);
-  const nextState = toTaskState(complete, failed);
-  taskCompletions[taskId] = { complete, failed, timestamp };
-  if (updates && prevState !== nextState) {
-    updates.set(taskId, nextState);
-  }
-};
-const checkAllRequirementsMet = (
-  dependentTask: TarkovTask,
-  changedTaskId: string,
-  newState: TaskState,
-  taskCompletions: Record<string, TaskCompletion>
-): boolean => {
-  const requirements = dependentTask.taskRequirements ?? [];
-  return requirements.every((requirement) => {
-    if (!requirement?.task?.id) return true;
-    const reqTaskId = requirement.task.id;
-    const requirementStatus = requirement.status ?? [];
-    if (reqTaskId === changedTaskId) {
-      if (requirementStatus.includes('complete') && newState === 'completed') return true;
-      if (requirementStatus.includes('failed') && newState === 'failed') return true;
-      if (
-        requirementStatus.includes('active') &&
-        (newState === 'uncompleted' || newState === 'completed')
-      ) {
-        return true;
-      }
-      return false;
-    }
-    const otherTaskData = taskCompletions[reqTaskId];
-    if (
-      requirementStatus.includes('complete') &&
-      otherTaskData?.complete &&
-      !otherTaskData?.failed
-    ) {
-      return true;
-    }
-    if (
-      requirementStatus.includes('active') &&
-      (otherTaskData?.complete === false ||
-        (otherTaskData?.complete === true && !otherTaskData?.failed))
-    ) {
-      return true;
-    }
-    if (requirementStatus.includes('failed') && otherTaskData?.failed) {
-      return true;
-    }
-    return false;
-  });
-};
-const updateDependentTasks = (
-  changedTaskId: string,
-  newState: TaskState,
-  tasks: TarkovTask[],
-  taskCompletions: Record<string, TaskCompletion>,
-  updateTime: number,
-  updates?: Map<string, TaskState>,
-  protectedTaskIds?: Set<string>
-): void => {
-  for (const dependentTask of tasks) {
-    const requirements = dependentTask.taskRequirements ?? [];
-    if (!requirements.length) continue;
-    let shouldUnlock = false;
-    let shouldLock = false;
-    for (const requirement of requirements) {
-      if (requirement?.task?.id !== changedTaskId) continue;
-      const requirementStatus = requirement.status ?? [];
-      if (!requirementStatus.includes('complete')) continue;
-      if (newState === 'completed') {
-        shouldUnlock = checkAllRequirementsMet(
-          dependentTask,
-          changedTaskId,
-          newState,
-          taskCompletions
-        );
-      } else {
-        shouldLock = true;
-      }
-    }
-    if (shouldUnlock || shouldLock) {
-      if (protectedTaskIds?.has(dependentTask.id)) continue;
-      setTaskCompletion(taskCompletions, dependentTask.id, false, false, updateTime, updates);
-    }
-  }
 };
 /**
  * Handle GET /api/progress - Return player progress
@@ -490,18 +391,13 @@ export async function handleUpdateTask(
   const taskCompletions = (currentData.taskCompletions as Record<string, TaskCompletion>) || {};
   const beforeSnapshot = snapshotCompletions(taskCompletions);
   const updateMap = new Map<string, TaskState>();
-  setTaskCompletion(
-    taskCompletions,
-    taskId,
-    state === 'completed' || state === 'failed',
-    state === 'failed',
-    updateTime,
-    updateMap
-  );
   const tasks = await getTasks(gameMode);
-  if (tasks.length > 0) {
-    updateDependentTasks(taskId, state, tasks, taskCompletions, updateTime, updateMap);
-  }
+  applyTaskTransition(
+    taskCompletions,
+    tasks,
+    { taskId, state },
+    { timestamp: updateTime, updates: updateMap }
+  );
   const changedCompletions = diffCompletions(taskCompletions, beforeSnapshot);
   const set: Record<string, unknown> = {};
   if (updateMap.size > 0) {
@@ -538,25 +434,12 @@ export async function handleUpdateTasks(
   const explicitTaskIds = new Set(updates.map((update) => update.id));
   const tasks = await getTasks(gameMode);
   for (const update of updates) {
-    setTaskCompletion(
+    applyTaskTransition(
       taskCompletions,
-      update.id,
-      update.state === 'completed' || update.state === 'failed',
-      update.state === 'failed',
-      updateTime,
-      updateMap
+      tasks,
+      { taskId: update.id, state: update.state },
+      { timestamp: updateTime, updates: updateMap, protectedTaskIds: explicitTaskIds }
     );
-    if (tasks.length > 0) {
-      updateDependentTasks(
-        update.id,
-        update.state,
-        tasks,
-        taskCompletions,
-        updateTime,
-        updateMap,
-        explicitTaskIds
-      );
-    }
   }
   const changedCompletions = diffCompletions(taskCompletions, beforeSnapshot);
   const set: Record<string, unknown> = {};

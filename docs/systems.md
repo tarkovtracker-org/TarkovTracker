@@ -722,6 +722,10 @@ sequenceDiagram
 - `shared/utils/progressInvalidation.ts` — runtime-independent task/objective invalidation
   (faction, failed-only and failed prerequisites, `failed`-tolerant requirements), shared by the
   app progress store, public profile/streamer views, and the Worker transform
+- `shared/utils/requirementStatus.ts` — runtime-independent task-requirement status predicates,
+  shared by invalidation, app task actions, failed-state repair, and the Worker
+- `shared/utils/taskTransitions.ts` — runtime-independent explicit task-state transitions (dependent
+  lock/unlock) used by Worker task writes
 - `shared/utils/userMetadata.ts` — runtime-independent provider metadata parsing, shared with app
   user hydration through the `@shared` alias in Nuxt and the Worker build/test configuration
 - `docs/rate-limiting.md`, `docs/api.md` — ownership map and client-facing docs
@@ -1031,7 +1035,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   unmaterialized persistent row from its legacy column inside `merge_progress_data`'s row lock
 - `supabase/migrations/20260910050000_add_manual_activity_history_to_progress.sql` — adds
   `manualActivityHistory` to the persisted progress allowlist and its entry/history sanitizers
-- `app/stores/tarkov/progressPersistence.ts`, `app/stores/tarkov/realtimeListener.ts`,
+- `app/stores/tarkov/progressPersistence.ts`, `app/stores/tarkov/startupLoad.ts`,
+  `app/stores/tarkov/syncSession.ts`, `app/stores/tarkov/realtimeListener.ts`,
   `app/stores/useTarkov.ts` — load, merge, write, and realtime flow
 - `app/stores/tarkov/startupOwnership.ts` — monotonic generation invalidating suspended startup runs
   at session teardowns; `app/composables/useAppInitialization.ts` preserves newer-run lifecycle
