@@ -132,6 +132,7 @@ beforeEach(async () => {
   useTurnstileWidgetMock.mockImplementation(() => widget);
 });
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 describe('TarkovAccessGate', () => {
@@ -459,7 +460,6 @@ describe('TarkovAccessGate', () => {
     await settle();
     expect(retryButton(wrapper).attributes('disabled')).toBeUndefined();
     wrapper.unmount();
-    vi.useRealTimers();
   });
   it('dismisses an open challenge without verifying a token', async () => {
     const wrapper = await mountGate();

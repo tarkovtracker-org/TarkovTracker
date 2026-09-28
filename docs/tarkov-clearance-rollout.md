@@ -29,8 +29,10 @@ Live documentation checked 2026-09-28:
 
 ## Proposed edge configuration (not apply-ready)
 
-Dedicated managed Turnstile widget: production hostname restrictions exactly matching the
-approved site hosts; `clearance_level: managed`, `mode: managed`. Use a different widget
+Dedicated managed Turnstile widget: production hostname restrictions listing the approved site
+hosts. A widget hostname also admits its subdomains, so the widget does not isolate exact hosts;
+the exact `NUXT_TARKOV_ACCESS_EXPECTED_HOSTNAMES` Siteverify check does, and clearance behavior on
+any other subdomain must be reviewed before enabling; `clearance_level: managed`, `mode: managed`. Use a different widget
 for staging. Store secrets only in platform secret storage. Retain the profile-import widget.
 Do not change zone Challenge Passage without reviewing its impact on all challenge rules.
 
