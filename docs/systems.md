@@ -917,8 +917,9 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   are classified as `offline`, `rate_limited`, `auth`, or `unknown` so the
   indicator can distinguish a known cause from an unknown one. If the initial authenticated sync
   fails, no controller runs, so `useAppInitialization` marks cloud saving `failed` and its manual
-  retry restarts initialization; a successful startup load clears that status and acknowledges
-  memory-only local changes, since the resolved state was uploaded or already matched the service. Before any
+  retry restarts initialization; a successful startup load clears that status. It also acknowledges
+  memory-only local changes when the cloud now holds them (a cloud record was reconciled or local
+  progress was migrated); otherwise they stay flagged as unsaved. Before any
   initialization retry, memory-only edits are handed to the startup merge as the session snapshot
   (`preserveUnsavedSessionProgress`), so rehydrating from storage cannot discard them. Only the
   edited modes and metadata get new clocks, so untouched modes still yield to newer remote progress.

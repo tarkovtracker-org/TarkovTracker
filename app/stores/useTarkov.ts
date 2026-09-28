@@ -1525,6 +1525,8 @@ export async function initializeTarkovSync() {
         state.seasonal = freshState.seasonal;
       });
     };
+    /** Set when the startup load uploaded local progress to an account with no cloud record. */
+    let migratedLocalState = false;
     const loadData = async (): Promise<{
       hadRemoteData: boolean;
       needsRemoteCleanup: boolean;
@@ -1851,6 +1853,7 @@ export async function initializeTarkovSync() {
           return { hadRemoteData, needsRemoteCleanup, ok: false };
         }
         logger.debug('[TarkovStore] Migration complete');
+        migratedLocalState = true;
         resolvedLocalState = localState;
       } else {
         // SAFETY CHECKS: Before treating as "new user", verify this isn't Issue #71 scenario
@@ -1909,9 +1912,10 @@ export async function initializeTarkovSync() {
     }
     markProgressMetadataHydrated();
     // The startup merge reconciled local changes with the cloud; a previous failed attempt's
-    // unavailable status and any memory-only local failure no longer apply. The sync
-    // controller reports from here on.
-    acknowledgeStartupSync();
+    // unavailable status no longer applies. Memory-only local changes are acknowledged only
+    // when the cloud now holds them. The sync controller reports from here on.
+    if (loadResult.hadRemoteData || migratedLocalState) acknowledgeStartupSync();
+    else resetCloudSaveStatus();
     syncMetadataAfterStartup(tarkovStore, isStartupCurrent);
     if (preservedLocalSnapshot) {
       pendingResetProgressSnapshot = null;

@@ -589,6 +589,21 @@ describe('account recovery copies', () => {
     expect(localStorage.getItem(recoveryKey('user-1'))).toBe(raw);
     expect(isAccountRecoveryRetentionBlocked()).toBe(false);
   });
+  it('reads a default stale-season recovery envelope without an export copy', () => {
+    const raw = JSON.stringify({
+      _timestamp: 10,
+      _userId: 'user-1',
+      data: { ...structuredClone(defaultState), seasonalSeasonNumber: 999 },
+    });
+    localStorage.setItem(recoveryKey('user-1'), raw);
+    const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+      if (key.startsWith(STORAGE_KEYS.progressSupersededPrefix)) throw new Error('full');
+      return Storage.prototype.setItem.call(localStorage, key, value);
+    });
+    expect(readAccountRecoveryCopy('user-1')).not.toBeNull();
+    expect(isAccountRecoveryRetentionBlocked()).toBe(false);
+    setItem.mockRestore();
+  });
   it('keeps a stale-season recovery envelope when its export copy cannot be written', () => {
     const staleSeason = 999;
     const raw = JSON.stringify({

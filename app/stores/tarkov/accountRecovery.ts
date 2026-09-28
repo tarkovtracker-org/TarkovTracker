@@ -20,7 +20,6 @@ import {
 import { saveSupersededProgressCopy } from '@/stores/tarkov/supersededProgress';
 import { GAME_MODE_VALUES, ACTIVE_SEASON_NUMBER, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
-import { hasMaterializedProgress } from '@/utils/modeProgressFallback';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import { parseUserScopedStorage } from '@/utils/userScopedStorage';
 /**
@@ -46,7 +45,7 @@ const staleSeasonalData = (
   const progress = data?.seasonal;
   if (typeof seasonNumber !== 'number') return null;
   if (seasonNumber === ACTIVE_SEASON_NUMBER) return null;
-  if (!hasMaterializedProgress(progress)) return null;
+  if (!hasRetainableModeProgress(progress as UserProgressData)) return null;
   return { seasonNumber, progress: progress as UserProgressData };
 };
 const archiveStaleSeasonalData = (

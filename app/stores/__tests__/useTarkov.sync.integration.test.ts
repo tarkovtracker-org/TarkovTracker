@@ -930,6 +930,32 @@ describe('useTarkov sync integration', () => {
     recordLocalSave(true);
     resetCloudSaveStatus();
   });
+  it('keeps a memory-only handoff unacknowledged when startup uploads nothing', async () => {
+    const { preserveUnsavedSessionProgress } = await import('@/stores/useTarkov');
+    const {
+      hasUnsavedProgressChanges,
+      markCloudSyncUnavailable,
+      recordLocalSave,
+      resetCloudSaveStatus,
+    } = await import('@/stores/tarkov/progressSaveStatus');
+    single
+      .mockResolvedValueOnce({ data: createRemoteRow(), error: null })
+      .mockResolvedValue({ data: null, error: { message: 'legacy unavailable' } });
+    await expect(initializeTarkovSync()).rejects.toThrow('Supabase initial load failed');
+    resetTarkovSync('initial sync failed');
+    markCloudSyncUnavailable(async () => false);
+    recordLocalSave(false, 'quota');
+    useTarkovStore().$patch((state) => {
+      state.pvp.displayName = 'renamed';
+    });
+    single.mockResolvedValue({ data: null, error: { code: 'PGRST116', message: 'No rows' } });
+    preserveUnsavedSessionProgress('user-1');
+    await initializeTarkovSync();
+    expect(useTarkovStore().pvp.displayName).toBe('renamed');
+    expect(hasUnsavedProgressChanges()).toBe(true);
+    recordLocalSave(true);
+    resetCloudSaveStatus();
+  });
   it('lets newer remote progress win for modes the memory-only edits did not touch', async () => {
     const { preserveUnsavedSessionProgress } = await import('@/stores/useTarkov');
     const { recordLocalSave, markCloudSyncUnavailable, resetCloudSaveStatus } =
