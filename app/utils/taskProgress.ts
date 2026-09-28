@@ -211,11 +211,19 @@ const resolvableRequirement = (
 export const canApplyTaskAvailabilityRequirements = (
   task: Task,
   getCompletion: (taskId: string) => RawTaskCompletion,
-  skipTaskRequirements = false
-): boolean =>
-  skipTaskRequirements ||
-  !Array.isArray(task.taskRequirements) ||
-  task.taskRequirements.every((requirement) => resolvableRequirement(requirement, getCompletion));
+  skipTaskRequirements = false,
+  /**
+   * The evaluator's unmet direct prerequisites, when known. It already accepts an active
+   * prerequisite that is itself available, so only what it still reports needs a recordable status.
+   */
+  unmetRequirements?: TaskRequirement[]
+): boolean => {
+  if (skipTaskRequirements || !Array.isArray(task.taskRequirements)) return true;
+  if (unmetRequirements) return unmetRequirements.every(unambiguousRequirement);
+  return task.taskRequirements.every((requirement) =>
+    resolvableRequirement(requirement, getCompletion)
+  );
+};
 export function applyTaskAvailabilityRequirements(options: {
   getCompletion?: (taskId: string) => RawTaskCompletion;
   skipTaskRequirements?: boolean;

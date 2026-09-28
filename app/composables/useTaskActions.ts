@@ -2,6 +2,7 @@ import { useProductAnalytics } from '@/composables/useProductAnalytics';
 import { hasStoryUnlockProgress } from '@/stores/taskAvailability';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
+import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
 import {
   normalizeOtherRequirements,
@@ -16,7 +17,7 @@ import {
   failTaskForProgress,
   uncompleteTaskForProgress,
 } from '@/utils/taskProgress';
-import type { Task } from '@/types/tarkov';
+import type { Task, TaskRequirement } from '@/types/tarkov';
 export type TaskActionPayload = {
   taskId: string;
   taskName: string;
@@ -183,6 +184,18 @@ export function useTaskActions(
       });
     }
   };
+  const progressStore = useProgressStore();
+  const currentEvaluation = (taskId: string) => progressStore.taskEvaluations?.[taskId]?.self;
+  /** A malformed or cyclic prerequisite chain cannot be settled by recording task statuses. */
+  const hasPrerequisiteDiagnostic = (taskId: string): boolean =>
+    (currentEvaluation(taskId)?.blockers ?? []).some(
+      (blocker) => blocker.reason === 'task_requirement' || blocker.type === 'cycle'
+    );
+  /** Unmet direct prerequisites from the current evaluation, or undefined before one exists. */
+  const evaluatedUnmetRequirements = (taskId: string): TaskRequirement[] | undefined =>
+    currentEvaluation(taskId)?.blockers.flatMap((blocker) =>
+      blocker.type === 'prerequisite' ? (blocker.requirements ?? []) : []
+    );
   const taskCompletion = (id: string) => tarkovStore.getCurrentProgressData().taskCompletions?.[id];
   const storyRouteSatisfied = (currentTask: Task) =>
     (currentTask.storyUnlocks ?? []).some((chapter) =>
@@ -201,10 +214,12 @@ export function useTaskActions(
       !normalizeOtherRequirements(currentTask.otherRequirements).length;
     return (
       gatesConfirmable &&
+      !hasPrerequisiteDiagnostic(currentTask.id) &&
       canApplyTaskAvailabilityRequirements(
         currentTask,
         taskCompletion,
-        storyRouteSatisfied(currentTask)
+        storyRouteSatisfied(currentTask),
+        evaluatedUnmetRequirements(currentTask.id)
       )
     );
   };

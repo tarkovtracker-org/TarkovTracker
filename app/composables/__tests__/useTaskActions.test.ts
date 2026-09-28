@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
+import type { TaskEvaluationMap } from '@/stores/taskAvailability';
 import type { Task } from '@/types/tarkov';
 const { trackEventMock, trackTaskActionMock } = vi.hoisted(() => ({
   trackEventMock: vi.fn(),
@@ -73,9 +74,11 @@ const setup = async (
   preferencesOverrides: Partial<{
     getPinnedTaskIds: string[];
     getTasksRequireTraderLevels: boolean;
-  }> = {}
+  }> = {},
+  evaluations: TaskEvaluationMap = {}
 ) => {
   const onAction = vi.fn();
+  const progressStore = { taskEvaluations: evaluations };
   const tarkovStore = createTarkovStore(options);
   const metadataStore = createMetadataStore(tasks, options.traders);
   const togglePinnedTask = vi.fn();
@@ -94,6 +97,9 @@ const setup = async (
   }));
   vi.doMock('@/stores/usePreferences', () => ({
     usePreferencesStore: () => preferencesStore,
+  }));
+  vi.doMock('@/stores/useProgress', () => ({
+    useProgressStore: () => progressStore,
   }));
   vi.doMock('@/composables/useProductAnalytics', () => ({
     useProductAnalytics: () => ({
@@ -157,6 +163,52 @@ describe('useTaskActions', () => {
     actions.markTaskAvailable();
     expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
     expect(tarkovStore.setLevel).not.toHaveBeenCalled();
+  });
+  it('trusts the evaluator for an active prerequisite that is itself available', async () => {
+    // Review #979: the evaluator accepts an available active prerequisite recursively, so only
+    // the server gate is left and Mark available must stay possible.
+    const task: Task = {
+      id: 'target',
+      taskRequirements: [{ task: { id: 'prior' }, status: ['active'] }],
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['t'] }],
+    };
+    const evaluations: TaskEvaluationMap = {
+      target: {
+        self: { available: false, blockers: [{ type: 'dialogue', requirementId: 'talk' }] },
+      },
+    };
+    const { actions, tarkovStore } = await setup(
+      task,
+      [task, { id: 'prior' }],
+      {},
+      {},
+      evaluations
+    );
+    expect(actions.canMarkTaskAvailable()).toBe(true);
+    actions.markTaskAvailable();
+    expect(tarkovStore.confirmTaskAvailability).toHaveBeenCalledWith(
+      'target',
+      JSON.stringify(task.otherRequirements)
+    );
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+  });
+  it('still refuses when the evaluator reports an ambiguous unmet prerequisite', async () => {
+    const requirement = { task: { id: 'prior' }, status: ['active'] };
+    const task: Task = {
+      id: 'target',
+      taskRequirements: [requirement],
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['t'] }],
+    };
+    const evaluations: TaskEvaluationMap = {
+      target: {
+        self: {
+          available: false,
+          blockers: [{ type: 'prerequisite', requirements: [requirement] }],
+        },
+      },
+    };
+    const { actions } = await setup(task, [task, { id: 'prior' }], {}, {}, evaluations);
+    expect(actions.canMarkTaskAvailable()).toBe(false);
   });
   it('keeps a malformed prerequisite entry locked without throwing', async () => {
     const task = {
