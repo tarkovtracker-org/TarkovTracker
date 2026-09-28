@@ -1865,6 +1865,39 @@ checkout stays pinned to the validated SHA. The production build still runs in R
   Those commits never set the version type (including breaking-change markers) and never appear in
   `CHANGELOG.md` or GitHub releases; they still deploy. Unscoped and product-scoped commits keep
   the stock Angular rules, except that `refactor` and `docs` no longer release.
+- Release-note highlights (`scripts/release-highlights.mjs`) are the only release input read from
+  mutable GitHub content. They are additive and fail open: a lookup error, timeout (10 s), missing
+  token, unmerged PR, an unedited description whose author lacks current write access,
+  an edited description whose last editor lacks current write access (check the selected actor's
+  effective collaborator `permission` for `write` or `admin`, including `maintain` and custom
+  roles), or a description edited
+  at or after `mergedAt` (equal second-precision times are ambiguous) skips that note and never
+  blocks or alters versioning. At most 3 notes per PR and 5 per release are published; 5 is the
+  in-app changelog's per-release bullet limit and Highlights are listed first. Trusted commit
+  links retain each highlight's in-range commit identity so the changelog does not repeat those
+  commits in its fallback; SHAs come from release commits, never PR bodies. The CommonMark AST
+  selects a root-level `## Release note(s)` heading through the next root-level `#` or `##`
+  heading. HTML and comment nodes, plus fenced code blocks, are masked by source offsets while
+  preserving line breaks, so fake headings inside raw HTML or examples cannot open or close the
+  section. Notes are reduced to plain text (no link syntax, URLs, HTML, or Markdown emphasis);
+  only top-level bullets are highlights and their wrapped, nested, or indented content stays with
+  the parent bullet. An indented-only block remains one prose note. Parsing is bounded before
+  sanitization — PR text within GitHub's
+  body limit, each bullet within `MAX_RAW_NOTE` code points, autolinks detected per
+  whitespace-delimited token with no superlinear matching — so untrusted text cannot stall the
+  release. Lookups run in commit order with bounded concurrency (`MAX_CONCURRENT_LOOKUPS`
+  requests in flight at most) and stop launching once the release cap is collectable, so a batch
+  cannot trigger GitHub's secondary limits. Highlights are added only when notes are regenerated
+  after the successful prepare step records this run's version commit SHA (`release-highlights.integration.test.mjs`
+  guards that behavior). Release analysis clears any prior proof, and the prepare step sets it only
+  after its commit succeeds. The SHA must still be HEAD, whose subject, two changed generated
+  assets (`CHANGELOG.md` and `package.json`), and committed manifest version must match the
+  release. The process-local preparation proof prevents an ordinary commit with matching authored
+  fields from passing the initial note generation, which supplies `CHANGELOG.md`. PR text reaches the GitHub
+  release but is never committed to `CHANGELOG.md` or seen by
+  the staging secret scan; recovered publications (rebuilt from `CHANGELOG.md`) therefore have
+  none. In-range reverts resolve by parity across all commits before internal-scope commits are
+  dropped, so an internal revert still cancels.
 - Never replace the validated checkout with a newer main commit to make publishing succeed.
 - CI cancellation must not cancel a publisher; only release jobs share `release-main` with
   `cancel-in-progress: false`. Git non-fast-forward protection and semantic-release's upstream

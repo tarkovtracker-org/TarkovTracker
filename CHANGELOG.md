@@ -1,3 +1,12 @@
+## [1.84.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.84.0...v1.84.1) (2026-09-28)
+
+
+### Bug Fixes
+
+* honor E-string backslash escapes in migration preflight ([#957](https://github.com/tarkovtracker-org/TarkovTracker/issues/957)) ([278bd5a](https://github.com/tarkovtracker-org/TarkovTracker/commit/278bd5ab1961981ec09432aaf6554e13817ebe17))
+* **api:** preserve active API task update state ([#966](https://github.com/tarkovtracker-org/TarkovTracker/issues/966)) ([c02fe9b](https://github.com/tarkovtracker-org/TarkovTracker/commit/c02fe9bbd034322476de5e3caed43cc92a937535))
+* **supabase:** revoke excessive client table privileges ([#962](https://github.com/tarkovtracker-org/TarkovTracker/issues/962)) ([f05c233](https://github.com/tarkovtracker-org/TarkovTracker/commit/f05c233a1ddf5a27e06ede937c4a2250d783b28d))
+
 # [1.84.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.83.5...v1.84.0) (2026-09-27)
 
 

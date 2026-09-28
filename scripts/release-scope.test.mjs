@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { versionCommitted } from './release-highlights.mjs';
+import { clearPreparedVersion } from './release-note-state.mjs';
 import {
   analyzeCommits,
   generateNotes,
@@ -19,10 +21,20 @@ const context = (messages) => ({
   })),
   logger: { log: vi.fn() },
   cwd: process.cwd(),
+  env: { GITHUB_TOKEN: 'fixture-token' },
   options: { repositoryUrl: `${repo}.git` },
   lastRelease: { gitTag: 'v1.83.3', version: '1.83.3' },
   nextRelease: { gitTag: 'v1.84.0', version: '1.84.0' },
 });
+vi.mock('./release-highlights.mjs', async (original) => ({
+  ...(await original()),
+  versionCommitted: vi.fn(() => true),
+}));
+vi.mock('./release-note-state.mjs', async (original) => ({
+  ...(await original()),
+  clearPreparedVersion: vi.fn(),
+}));
+afterEach(() => vi.unstubAllGlobals());
 describe('release scope plugin', () => {
   it.each([
     ['fix(ci): honor verified gates (#946)', true],
@@ -64,7 +76,22 @@ describe('release scope plugin', () => {
   ])('releases %j as %s', async (messages, expected) => {
     expect(await analyzeCommits(config, context(messages))).toBe(expected);
   });
-  it('omits internal-scope commits from generated notes', async () => {
+  it('omits internal-scope commits from generated notes and adds PR highlights', async () => {
+    const fetchMock = vi.fn(async (url, init) => {
+      if (url.includes('/collaborators/'))
+        return Response.json({ permission: 'write', role_name: 'maintain' });
+      const { number } = JSON.parse(init.body).variables;
+      const note = number === 943 ? 'Smart Fill now spreads collected items evenly.' : 'none';
+      const pullRequest = {
+        body: `## Release note\n\n${note}\n`,
+        merged: true,
+        mergedAt: 'x',
+        authorAssociation: 'MEMBER',
+        author: { login: 'maintainer' },
+      };
+      return Response.json({ data: { repository: { pullRequest } } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
     const notes = await generateNotes(
       config,
       context([
@@ -77,10 +104,39 @@ describe('release scope plugin', () => {
     expect(notes).toContain('make Smart Fill distribute collected totals');
     expect(notes).toContain('list every objective under the cursor');
     expect(notes).not.toMatch(/Codex|bump nuxt|\*\*ci:\*\*|\*\*deps:\*\*/);
+    expect(notes).toContain(
+      '### Highlights\n\n* Smart Fill now spreads collected items evenly\\. ([#943](https://github.com/tarkovtracker-org/TarkovTracker/pull/943)) ([0000000](https://github.com/tarkovtracker-org/TarkovTracker/commit/0000000000000000000000000000000000000002))'
+    );
+    // Internal-scope commits are filtered before any PR lookup.
+    const numbers = fetchMock.mock.calls
+      .filter(([url]) => url.endsWith('/graphql'))
+      .map(([, init]) => JSON.parse(init.body).variables.number);
+    expect(numbers).toEqual([943, 944]);
+  });
+  it('lets an internal-scope revert cancel the highlight of the change it reverts', async () => {
+    const fetchMock = vi.fn(async () => Response.json({}));
+    vi.stubGlobal('fetch', fetchMock);
+    const run = context(['feat(maps): new layer (#10)']);
+    run.commits.push({
+      hash: 'f'.repeat(40),
+      message: `fix(release): undo layer (#13)\n\nThis reverts commit ${run.commits[0].hash}.`,
+    });
+    await generateNotes(config, run);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('keeps PR text out of pre-commit notes, which become CHANGELOG.md', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    versionCommitted.mockReturnValueOnce(false);
+    const notes = await generateNotes(config, context(['fix(app): keep totals (#943)']));
+    expect(notes).toContain('keep totals');
+    expect(notes).not.toContain('Highlights');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
   it('reports how many commits were ignored', async () => {
     const run = context(['fix(ci): a', 'fix(app): b']);
     await analyzeCommits(config, run);
+    expect(clearPreparedVersion).toHaveBeenCalledWith(run);
     expect(run.logger.log).toHaveBeenCalledWith(
       'Ignoring %d internal-scope commit(s) for this release',
       1
