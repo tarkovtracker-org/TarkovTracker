@@ -490,9 +490,11 @@ export const actions = {
     if (!data.storyChapters[chapterId].objectives) {
       data.storyChapters[chapterId].objectives = {};
     }
+    // An uncompletion must also outrank an entry another device stamped ahead.
+    const previous = data.storyChapters[chapterId].objectives![objectiveId]?.timestamp ?? 0;
     data.storyChapters[chapterId].objectives![objectiveId] = {
       complete: false,
-      timestamp: Date.now(),
+      timestamp: nextClock(previous),
     };
   },
   toggleStoryObjectiveComplete(this: UserState, chapterId: string, objectiveId: string) {

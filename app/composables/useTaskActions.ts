@@ -251,6 +251,8 @@ export function useTaskActions(
    * traders or prerequisites.
    */
   const canMarkTaskAvailable = (currentTask: Task): boolean => {
+    // Without a self evaluation (e.g. self hidden) blockers are unknown, so fail closed.
+    if (!currentEvaluation(currentTask.id)) return false;
     const gatesConfirmable =
       !hasUnsupportedOtherRequirement(currentTask) &&
       !(

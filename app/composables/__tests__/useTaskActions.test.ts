@@ -68,6 +68,12 @@ const createMetadataStore = (
   tasks,
   traders,
 });
+/** A locked self evaluation reporting the task's direct prerequisites, as the evaluator would. */
+const selfEvaluation = (task: Task): TaskEvaluationMap => {
+  const requirements = Array.isArray(task.taskRequirements) ? task.taskRequirements : [];
+  const blockers = requirements.length ? [{ type: 'prerequisite' as const, requirements }] : [];
+  return { [task.id]: { self: { available: false, blockers } } };
+};
 const setup = async (
   task: Task,
   tasks: Task[],
@@ -76,7 +82,7 @@ const setup = async (
     getPinnedTaskIds: string[];
     getTasksRequireTraderLevels: boolean;
   }> = {},
-  evaluations: TaskEvaluationMap = {}
+  evaluations: TaskEvaluationMap = selfEvaluation(task)
 ) => {
   const onAction = vi.fn();
   const progressStore = { taskEvaluations: evaluations };
@@ -277,6 +283,16 @@ describe('useTaskActions', () => {
       expect(actions.canMarkTaskAvailable()).toBe(expected);
     }
   );
+  it('withholds Mark available without a self evaluation', async () => {
+    const task: Task = {
+      id: 'target',
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['t'] }],
+    };
+    const { actions, tarkovStore } = await setup(task, [task], {}, {}, {});
+    expect(actions.canMarkTaskAvailable()).toBe(false);
+    actions.markTaskAvailable();
+    expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
+  });
   it('withholds confirmation behind a corrupt status clock', async () => {
     const task: Task = {
       id: 'target',

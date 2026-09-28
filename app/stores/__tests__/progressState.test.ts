@@ -137,6 +137,17 @@ describe('story objective completion clock', () => {
     expect(entry.complete).toBe(true);
     expect(entry.timestamp!).toBeGreaterThan(ahead);
   });
+  it('stamps an uncompletion after an entry another device wrote ahead', () => {
+    const state = createBaseState();
+    const ahead = Date.now() + 3_600_000;
+    state.pvp.storyChapters.boreas = {
+      objectives: { drives: { complete: true, timestamp: ahead } },
+    };
+    actions.setStoryObjectiveUncomplete.call(state, 'boreas', 'drives');
+    const entry = state.pvp.storyChapters.boreas.objectives!.drives!;
+    expect(entry.complete).toBe(false);
+    expect(entry.timestamp!).toBeGreaterThan(ahead);
+  });
 });
 describe('progressState storyline timestamps', () => {
   it('records timestamps for storyline uncomplete actions', () => {
