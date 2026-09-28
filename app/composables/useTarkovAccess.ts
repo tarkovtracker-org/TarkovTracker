@@ -18,6 +18,8 @@ export interface UseTarkovAccessReturn {
   attemptsExhausted: Readonly<Ref<boolean>>;
   /** True after the first session challenge; it gates the retry-UI visibility. */
   challengeSeen: Readonly<Ref<boolean>>;
+  /** True after a dismissal until the next manual retry. */
+  dismissed: Readonly<Ref<boolean>>;
   /** Whether the feature gate is active in the public runtime config. */
   accessEnabled: boolean;
   /** True when a site key is available, so an actual widget can be rendered. */
@@ -30,7 +32,7 @@ export interface UseTarkovAccessReturn {
   probe: (signal?: AbortSignal) => Promise<number>;
   /** Re-runs the access flow; manual only, never automatic. */
   retry: (signal?: AbortSignal) => Promise<void>;
-  /** Closes the gate without clearance; callers fail fast until a retry or reload. */
+  /** Closes the gate without clearance; callers fail fast until the next manual retry. */
   dismiss: () => void;
   /** Hands a solved widget token to the shared controller (once per attempt). */
   submitToken: (token: string) => void;
@@ -50,6 +52,7 @@ export function useTarkovAccess(): UseTarkovAccessReturn {
     attemptEpoch: state.attemptEpoch,
     attemptsExhausted: state.attemptsExhausted,
     challengeSeen: state.challengeSeen,
+    dismissed: state.dismissed,
     accessEnabled: isTarkovAccessEnabled(),
     widgetSiteKey,
     widgetAvailable: widgetSiteKey.length > 0,

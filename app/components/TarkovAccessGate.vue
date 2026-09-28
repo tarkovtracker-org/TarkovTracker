@@ -45,10 +45,27 @@
       </div>
     </template>
   </UModal>
+  <div
+    v-if="showDismissedNotice"
+    role="status"
+    data-testid="tarkov-access-dismissed"
+    class="bg-surface-900 border-surface-700 fixed right-4 bottom-4 left-4 z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-lg border p-3 shadow-lg sm:left-auto"
+  >
+    <p class="text-surface-200 text-sm">{{ t('tarkov_access.dismissed_notice') }}</p>
+    <UButton
+      color="primary"
+      size="sm"
+      data-testid="tarkov-access-dismissed-verify"
+      @click="handleVerifyAfterDismiss"
+    >
+      {{ t('tarkov_access.verify_now') }}
+    </UButton>
+  </div>
 </template>
 <script setup lang="ts">
   import { useTarkovAccess } from '@/composables/useTarkovAccess';
   import { useTurnstileWidget } from '@/composables/useTurnstile';
+  import { useMetadataStore } from '@/stores/useMetadata';
   import { logger } from '@/utils/logger';
   /**
    * Browser-facing Tarkov access gate. Always mounted at the app root
@@ -139,6 +156,19 @@
     },
     { immediate: true }
   );
+  const showDismissedNotice = computed(
+    () => access.accessEnabled && access.dismissed.value && !gateVisible.value
+  );
+  // Callers already failed while dismissed, so a released retry reloads metadata.
+  const handleVerifyAfterDismiss = async (): Promise<void> => {
+    resetWidget();
+    try {
+      await access.retry();
+      await useMetadataStore().fetchAllData(false);
+    } catch (cause) {
+      logger.debug('[TarkovAccessGate] Access retry after dismissal failed:', cause);
+    }
+  };
   const handleRetry = (): void => {
     resetWidget();
     void access.retry().catch((cause) => {

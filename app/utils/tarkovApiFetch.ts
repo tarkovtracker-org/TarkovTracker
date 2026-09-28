@@ -290,6 +290,8 @@ const accessState = {
   lastError: ref<Error | null>(null),
   /** True after the first challenge of the session; it gates retry-UI visibility. */
   challengeSeen: ref(false),
+  /** True while a dismissal latches; the gate offers a non-modal way back. */
+  dismissed: ref(false),
 };
 interface AccessFlow {
   readonly id: number;
@@ -439,6 +441,7 @@ const parkAccessAttempt = (cause?: Error): TarkovAccessError => {
 const dismissAccessAttempt = (): TarkovAccessError => {
   const failure = new TarkovAccessError('challenge', 'The security check was dismissed.');
   dismissedFailure = failure;
+  accessState.dismissed.value = true;
   accessState.phase.value = 'idle';
   accessState.lastError.value = failure;
   return failure;
@@ -599,6 +602,7 @@ export const requestGateRetry = async (signal?: AbortSignal): Promise<void> => {
     return;
   }
   dismissedFailure = null;
+  accessState.dismissed.value = false;
   if (isAccessCurrent()) return;
   const retried = startAccessFlow(parked);
   takeRetryWaiter()?.resume(retried);
@@ -607,7 +611,7 @@ export const requestGateRetry = async (signal?: AbortSignal): Promise<void> => {
 /**
  * Closes the gate without clearance: a pending challenge or parked failure
  * rejects its waiters and the gate hides. Later requests fail fast with the
- * same error until a manual retry or a page reload.
+ * same error until the gate's non-modal verify action retries.
  */
 export const dismissTarkovAccessGate = (): void => {
   const activeFlowId = flow?.id ?? 0;
@@ -630,6 +634,7 @@ export const resetTarkovAccessForTests = (): void => {
   takeRetryWaiter();
   dismissedFlows.clear();
   dismissedFailure = null;
+  accessState.dismissed.value = false;
   parked = false;
   generation = 0;
   browserConfig = null;

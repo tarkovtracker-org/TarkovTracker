@@ -85,9 +85,13 @@ whole-ruleset replacement is authorized.
    protection or retirement; do not delete deployments without approval.
 4. Configure human Access membership and a dedicated Service Auth policy for the trusted
    preview runner. Missing/invalid service tokens must fail; valid tokens must succeed.
-   `scripts/preview/smoke/access.mjs` scopes credentials to the exact origin and disallows
-   credentialed redirects. Traces are disabled when tokens are present. Never pass these
-   secrets to the preview build or untrusted PR code.
+   `scripts/preview/smoke/access.mjs` sends the service token once per exact origin, without
+   redirects, to obtain the host-scoped `CF_Authorization` session; browser and API smoke
+   traffic carries only that session, and traces are disabled. Preview code is untrusted and
+   still receives that exchange request, so before configuring `PREVIEW_ACCESS_*`: verify
+   that Access or an edge request-header rule strips `CF-Access-Client-*` before the origin,
+   keep the token limited to preview hosts, short session durations, and rotate it on
+   exposure. Never pass these secrets to the preview build or untrusted PR code.
 5. Proposed operations hostname (not provisioned): `tarkov-ops.tarkovtracker.org`, entirely
    behind Access with Service Auth, no bypass policies. Expose only GET
    `/api/tarkov/overlay-status` and `/api/tarkov/tasks-core`; reject every other route.

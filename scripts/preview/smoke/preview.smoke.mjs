@@ -11,8 +11,8 @@ test.beforeAll(async () => {
   test.setTimeout(6 * 60 * 1000);
   await waitForDeployment(origin);
 });
-test.beforeEach(async ({ page }) => {
-  await protectPreviewBrowser(page, origin);
+test.beforeEach(async ({ page, request }) => {
+  await protectPreviewBrowser(page, request, origin);
 });
 const ASSET_PATTERN = /\.(m?js|css)(\?|$)/;
 function failureText(request) {

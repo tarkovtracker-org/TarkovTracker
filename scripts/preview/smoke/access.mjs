@@ -1,4 +1,8 @@
-// Service credentials stay in the trusted runner, never in page JavaScript or global headers.
+// The reusable service token is sent by the trusted runner exactly once per origin, to exchange
+// it for Access's host-scoped, expiring CF_Authorization session. Browser and API smoke traffic
+// carries only that session, never the service token itself.
+const ACCESS_SESSION_COOKIE = 'CF_Authorization';
+const sessions = new Map();
 export function previewAccessHeaders(env = process.env) {
   const id = env.PREVIEW_ACCESS_CLIENT_ID?.trim();
   const secret = env.PREVIEW_ACCESS_CLIENT_SECRET?.trim();
@@ -12,20 +16,44 @@ export function assertPreviewTarget(url, origin) {
     throw new Error('Access credentials are restricted to the exact preview origin.');
   }
 }
+export function readAccessSessionCookie(headersArray) {
+  const prefix = `${ACCESS_SESSION_COOKIE}=`;
+  const header = headersArray.find(
+    ({ name, value }) => name.toLowerCase() === 'set-cookie' && value.startsWith(prefix)
+  );
+  return header ? header.value.slice(prefix.length).split(';')[0] : '';
+}
+async function exchangeServiceToken(request, origin, headers) {
+  const response = await request.get(`${origin}/`, { headers, maxRedirects: 0 });
+  const session = readAccessSessionCookie(response.headersArray());
+  if (!session) throw new Error('Access did not issue a preview session for the service token.');
+  return session;
+}
+export async function previewAccessSession(request, origin, env = process.env) {
+  const headers = previewAccessHeaders(env);
+  if (!Object.keys(headers).length) return '';
+  if (!sessions.has(origin)) sessions.set(origin, exchangeServiceToken(request, origin, headers));
+  return sessions.get(origin);
+}
 export async function previewGet(request, url, origin) {
   assertPreviewTarget(url, origin);
-  return request.get(url, { headers: previewAccessHeaders(), maxRedirects: 0 });
+  const session = await previewAccessSession(request, origin);
+  const headers = session ? { cookie: `${ACCESS_SESSION_COOKIE}=${session}` } : {};
+  return request.get(url, { headers, maxRedirects: 0 });
 }
-export async function protectPreviewBrowser(page, origin) {
-  if (!Object.keys(previewAccessHeaders()).length) return;
-  await page.route(`${origin}/**`, async (route) => {
-    assertPreviewTarget(route.request().url(), origin);
-    // route.continue headers survive redirects. Fetch in the runner instead, with
-    // redirects disabled, so a redirect can never forward service credentials.
-    const response = await route.fetch({
-      headers: { ...route.request().headers(), ...previewAccessHeaders() },
-      maxRedirects: 0,
-    });
-    await route.fulfill({ response });
-  });
+export async function protectPreviewBrowser(page, request, origin) {
+  const session = await previewAccessSession(request, origin);
+  if (!session) return;
+  const { hostname } = new URL(origin);
+  await page.context().addCookies([
+    {
+      name: ACCESS_SESSION_COOKIE,
+      value: session,
+      domain: hostname,
+      path: '/',
+      secure: true,
+      httpOnly: true,
+      sameSite: 'Lax',
+    },
+  ]);
 }

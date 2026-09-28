@@ -18,7 +18,7 @@ export default defineConfig({
   ],
   use: {
     baseURL: process.env.PREVIEW_URL,
-    // Traces can contain service-token request headers; never retain them with Access enabled.
+    // Traces can contain Access session cookies; never retain them with Access enabled.
     trace: process.env.PREVIEW_ACCESS_CLIENT_ID ? 'off' : 'retain-on-failure',
     screenshot: 'only-on-failure',
     ignoreHTTPSErrors: false,

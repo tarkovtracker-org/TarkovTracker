@@ -338,7 +338,7 @@ do not cancel other waiters. Existing IndexedDB hits remain independent of verif
 The root-mounted [`TarkovAccessGate`](../app/components/TarkovAccessGate.vue) can render while
 startup waits. Only a flow that met a challenge parks callers behind the gate's manual retry
 (a failed retry stays parked); dismissing the gate rejects them, and later requests fail fast
-until a manual retry or reload. An ordinary probe
+until its non-modal verify action retries and reloads metadata. An ordinary probe
 failure rejects its callers without showing the gate, and the next request probes again.
 Gated GETs keep `$fetch`'s single transient retry. Shared-profile loads start their request budget after access is released.
 Cloudflare owns clearance; application

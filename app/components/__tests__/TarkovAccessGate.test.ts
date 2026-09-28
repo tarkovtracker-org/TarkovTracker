@@ -14,10 +14,12 @@ import {
   tarkovApiFetch,
   TARKOV_ACCESS_WIDGET_ACTION,
 } from '@/utils/tarkovApiFetch';
-const { config, useTurnstileWidgetMock } = vi.hoisted(() => ({
+const { config, fetchAllData, useTurnstileWidgetMock } = vi.hoisted(() => ({
   config: vi.fn(),
+  fetchAllData: vi.fn(),
   useTurnstileWidgetMock: vi.fn(),
 }));
+vi.mock('@/stores/useMetadata', () => ({ useMetadataStore: () => ({ fetchAllData }) }));
 mockNuxtImport('useRuntimeConfig', () => config);
 mockNuxtImport('useI18n', () => () => ({
   t: (key: string) => key,
@@ -116,6 +118,7 @@ const releaseAfterChallenge = async () => {
   return outcome;
 };
 beforeEach(async () => {
+  fetchAllData.mockReset();
   resetTarkovAccessForTests();
   await flushPromises();
   resetTarkovAccessForTests();
@@ -371,6 +374,40 @@ describe('TarkovAccessGate', () => {
     expect(later.state).toBe('rejected');
     expect(isVisible(wrapper)).toBe(false);
     expect(network).toHaveBeenCalledTimes(1);
+  });
+  it('offers a non-modal verify action after dismissal that reloads metadata', async () => {
+    fetchAllData.mockResolvedValue(undefined);
+    const wrapper = await mountGate();
+    await startChallengedRequest();
+    await dismissButton(wrapper).trigger('click');
+    await settle();
+    const notice = wrapper.find('[data-testid="tarkov-access-dismissed"]');
+    expect(notice.text()).toContain('tarkov_access.dismissed_notice');
+    network.mockResolvedValueOnce(challenge());
+    await wrapper.find('[data-testid="tarkov-access-dismissed-verify"]').trigger('click');
+    await settle();
+    expect(isVisible(wrapper)).toBe(true);
+    expect(wrapper.find('[data-testid="tarkov-access-dismissed"]').exists()).toBe(false);
+    network.mockResolvedValueOnce(json()).mockResolvedValueOnce(json());
+    await solveWidget();
+    expect(getTarkovAccessState().phase.value).toBe('released');
+    expect(fetchAllData).toHaveBeenCalledWith(false);
+    expect(isVisible(wrapper)).toBe(false);
+  });
+  it('logs a failed verify action after dismissal without reloading metadata', async () => {
+    const wrapper = await mountGate();
+    await startChallengedRequest();
+    await dismissButton(wrapper).trigger('click');
+    await settle();
+    network.mockRejectedValueOnce(new TypeError('offline'));
+    await wrapper.find('[data-testid="tarkov-access-dismissed-verify"]').trigger('click');
+    await settle();
+    expect(logger.debug).toHaveBeenCalledWith(
+      '[TarkovAccessGate] Access retry after dismissal failed:',
+      expect.objectContaining({ kind: 'failed' })
+    );
+    expect(fetchAllData).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-testid="tarkov-access-dismissed"]').exists()).toBe(false);
   });
   it('dismisses an open challenge without verifying a token', async () => {
     const wrapper = await mountGate();

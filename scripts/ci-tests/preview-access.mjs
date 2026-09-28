@@ -3,7 +3,10 @@ import { test } from 'node:test';
 import {
   assertPreviewTarget,
   previewAccessHeaders,
+  previewAccessSession,
+  previewGet,
   protectPreviewBrowser,
+  readAccessSessionCookie,
 } from '../preview/smoke/access.mjs';
 test('Access credentials are paired and optional', () => {
   assert.deepEqual(previewAccessHeaders({}), {});
@@ -26,39 +29,82 @@ test('Access target is exact-origin HTTPS', () => {
   );
   assert.throws(() => assertPreviewTarget('http://preview.example/api', 'https://preview.example'));
 });
-test('browser credentials use runner fetch with redirects disabled', async () => {
+const withAccessEnv = async (callback) => {
   const oldId = process.env.PREVIEW_ACCESS_CLIENT_ID;
   const oldSecret = process.env.PREVIEW_ACCESS_CLIENT_SECRET;
   process.env.PREVIEW_ACCESS_CLIENT_ID = 'id';
   process.env.PREVIEW_ACCESS_CLIENT_SECRET = 'secret';
   try {
-    let handler;
-    await protectPreviewBrowser(
-      {
-        route: async (pattern, callback) => {
-          assert.equal(pattern, 'https://preview.example/**');
-          handler = callback;
-        },
-      },
-      'https://preview.example'
-    );
-    let fulfilled = false;
-    await handler({
-      request: () => ({ url: () => 'https://preview.example/', headers: () => ({}) }),
-      fetch: async (options) => {
-        assert.equal(options.maxRedirects, 0);
-        return 'response';
-      },
-      fulfill: async ({ response }) => {
-        assert.equal(response, 'response');
-        fulfilled = true;
-      },
-    });
-    assert.equal(fulfilled, true);
+    await callback();
   } finally {
     if (oldId === undefined) delete process.env.PREVIEW_ACCESS_CLIENT_ID;
     else process.env.PREVIEW_ACCESS_CLIENT_ID = oldId;
     if (oldSecret === undefined) delete process.env.PREVIEW_ACCESS_CLIENT_SECRET;
     else process.env.PREVIEW_ACCESS_CLIENT_SECRET = oldSecret;
   }
+};
+const fakeRequest = (setCookie) => {
+  const calls = [];
+  return {
+    calls,
+    get: async (url, options) => {
+      calls.push({ url, options });
+      return {
+        headersArray: () => (setCookie ? [{ name: 'Set-Cookie', value: setCookie }] : []),
+      };
+    },
+  };
+};
+test('reads only the Access session cookie', () => {
+  assert.equal(
+    readAccessSessionCookie([
+      { name: 'set-cookie', value: 'other=1' },
+      { name: 'Set-Cookie', value: 'CF_Authorization=jwt; Path=/; Secure; HttpOnly' },
+    ]),
+    'jwt'
+  );
+  assert.equal(readAccessSessionCookie([]), '');
+});
+test('skips the exchange without Access credentials', async () => {
+  const request = fakeRequest('');
+  await protectPreviewBrowser({}, request, 'https://none.example');
+  const response = await previewGet(
+    request,
+    'https://none.example/manifest.json',
+    'https://none.example'
+  );
+  assert.equal(request.calls.length, 1);
+  assert.deepEqual(response.headersArray(), []);
+  assert.deepEqual(request.calls[0].options.headers, {});
+});
+test('exchanges the service token once and sends only the session afterwards', async () => {
+  await withAccessEnv(async () => {
+    const origin = 'https://preview.example';
+    const request = fakeRequest('CF_Authorization=jwt; Path=/');
+    const cookies = [];
+    const page = { context: () => ({ addCookies: async (list) => cookies.push(...list) }) };
+    await protectPreviewBrowser(page, request, origin);
+    await previewGet(request, `${origin}/api/tarkov/bootstrap`, origin);
+    assert.equal(request.calls.length, 2);
+    assert.deepEqual(request.calls[0].options, {
+      headers: { 'CF-Access-Client-Id': 'id', 'CF-Access-Client-Secret': 'secret' },
+      maxRedirects: 0,
+    });
+    assert.deepEqual(request.calls[1].options, {
+      headers: { cookie: 'CF_Authorization=jwt' },
+      maxRedirects: 0,
+    });
+    assert.equal(cookies.length, 1);
+    assert.equal(cookies[0].domain, 'preview.example');
+    assert.equal(cookies[0].secure, true);
+    assert.equal(JSON.stringify(cookies).includes('secret'), false);
+  });
+});
+test('fails when Access issues no session for the service token', async () => {
+  await withAccessEnv(async () => {
+    await assert.rejects(
+      previewAccessSession(fakeRequest(''), 'https://nosession.example'),
+      /did not issue a preview session/
+    );
+  });
 });
