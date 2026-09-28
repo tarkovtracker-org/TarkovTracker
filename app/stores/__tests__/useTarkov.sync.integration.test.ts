@@ -950,12 +950,14 @@ describe('useTarkov sync integration', () => {
     });
     single.mockResolvedValue({ data: null, error: { code: 'PGRST116', message: 'No rows' } });
     preserveUnsavedSessionProgress('user-1');
-    syncInitialState.mockClear();
+    syncInitialState.mockClear().mockResolvedValue(null);
     await initializeTarkovSync();
+    await new Promise((resolve) => setTimeout(resolve, 1100));
     expect(useTarkovStore().pvp.displayName).toBe('renamed');
-    // Not acknowledged by the startup load itself; the started controller uploads it.
+    // Not acknowledged by the startup load itself; the started controller uploads it once and
+    // owns any retry, so a failed upload is not repeated outside its reconciled schedule.
     expect(hasUnsavedProgressChanges()).toBe(true);
-    expect(syncInitialState).toHaveBeenCalled();
+    expect(syncInitialState).toHaveBeenCalledOnce();
     recordLocalSave(true);
     resetCloudSaveStatus();
   });

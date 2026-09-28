@@ -2046,9 +2046,8 @@ export async function initializeTarkovSync() {
       loadResult.hadRemoteData || hasProgress(tarkovStore.$state) || hasUnsavedHandoff;
     if (shouldStartSyncNow) {
       startSync();
-      if (hasUnsavedHandoff && syncController) {
-        void syncInitialTrackedProgress(syncController, currentUserId);
-      }
+      // One attempt: a failure schedules the controller's retries, which merge remote state first.
+      if (hasUnsavedHandoff && syncController) void attemptInitialProgressSync(syncController);
     } else {
       logger.debug('[TarkovStore] Delaying sync until progress exists');
       const stopWatch = watch(
