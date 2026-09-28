@@ -4,16 +4,21 @@ import {
   normalizeOtherRequirements,
   otherRequirementsSignature,
 } from '@/utils/taskOtherRequirements';
+import { compareRequirement } from '@/utils/taskRequirements';
+import { isTaskComplete } from '@/utils/taskStatus';
 import type { TaskAvailabilityTeamData, TaskBlocker } from '@/stores/taskAvailability';
-import type { Task, TaskOtherRequirement } from '@/types/tarkov';
+import type { Task, TaskCounterDerivation, TaskOtherRequirement } from '@/types/tarkov';
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
 const confirmedRequirements = (task: Task, data: TaskAvailabilityTeamData): boolean =>
   isAvailabilityConfirmed(
     data.confirmations?.[task.id],
     data.completions[task.id],
     otherRequirementsSignature(task)
   );
-const variableBlockers = (
-  requirement: Extract<TaskOtherRequirement, { type: 'globalVariable' }>,
+type VariableRequirement = Extract<TaskOtherRequirement, { type: 'globalVariable' }>;
+const accountBlockers = (
+  requirement: VariableRequirement,
   data: TaskAvailabilityTeamData,
   confirmed: boolean
 ): TaskBlocker[] => {
@@ -49,6 +54,40 @@ const storyObjectiveBlockers = (
     },
   ];
 };
+/**
+ * Best-effort registry derivation: count completed contributors. It is an estimate, so a player's
+ * in-game confirmation overrides a derived shortfall; an explicit account value never does.
+ */
+const counterBlockers = (
+  requirement: VariableRequirement,
+  counter: TaskCounterDerivation,
+  data: TaskAvailabilityTeamData,
+  confirmed: boolean
+): TaskBlocker[] => {
+  const current = counter.taskIds.filter((id) => isTaskComplete(data.completions[id])).length;
+  if (confirmed || compareRequirement(current, requirement.compareMethod, requirement.value))
+    return [];
+  return [
+    {
+      type: 'task_counter',
+      requirementId: requirement.id,
+      variableId: requirement.variableId,
+      current,
+      required: requirement.value,
+      compareMethod: requirement.compareMethod,
+    },
+  ];
+};
+const hasAccountValue = (requirement: VariableRequirement, data: TaskAvailabilityTeamData) =>
+  isRecord(data.globalVariables) && Object.hasOwn(data.globalVariables, requirement.variableId);
+const variableBlockers = (
+  requirement: VariableRequirement,
+  data: TaskAvailabilityTeamData,
+  confirmed: boolean
+): TaskBlocker[] =>
+  requirement.counter && !hasAccountValue(requirement, data)
+    ? counterBlockers(requirement, requirement.counter, data, confirmed)
+    : accountBlockers(requirement, data, confirmed);
 const requirementBlockers = (
   requirement: TaskOtherRequirement,
   data: TaskAvailabilityTeamData,

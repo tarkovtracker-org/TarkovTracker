@@ -572,9 +572,9 @@ Missing provenance, a different SHA, invalid task payloads or unconsumed section
 combination before its KV write. Previous entries survive failed combinations. Each successful
 entry records language, mode, storage time and overlay identity; envelope validation requires its
 identity to agree with `payload.dataOverlay`. Writes remain per-key, not atomic across the fleet. A verifier exit code of zero can include `propagating` rows within the 14-hour window; post-deployment confirmation requires all 48 rows to be `current`, while pre-deployment approval requires the complete matching precompute manifest.
-The root `progressionCounters: {}` registry published by the overlay is an explicit no-op.
-A populated, malformed or mode-scoped counter registry remains unconsumed and blocks precompute;
-no counter derivation or global-variable unlock is inferred from this compatibility allowance.
+A root `progressionCounters` registry that passes `validProgressionCounters` is consumed (see
+[canonical task progression](#16-canonical-task-progression)). A malformed or mode-nested registry
+remains unconsumed and blocks precompute; it is applied nowhere.
 Only a complete, unfiltered, failure-free run updates `overlay-precompute-manifest-json-v3`.
 The workflow uploads `precompute-manifest.json` even for partial failures, so operators can see
 which entries changed. `/api/tarkov/overlay-status` returns the last complete manifest without caching.
@@ -2100,25 +2100,35 @@ consumed, not finish/fail conditions. Unknown server gates remain in the locked 
 explanation shared by task cards and recommendations.
 
 The [overlay registry](https://github.com/tarkovtracker-org/tarkov-data-overlay/blob/main/docs/GLOBAL_VARIABLES.md)
-currently contains no verified contributor mappings. Its
-[mechanics research](https://github.com/tarkovtracker-org/tarkov-data-overlay/blob/main/docs/GLOBAL_VARIABLE_MECHANICS.md)
-does not establish any trader-tier pool as an exact contributor set. The tracker therefore never
-counts arbitrary trader tasks, assumes missing values are zero, creates synthetic prerequisite
-edges, or shares a value between accounts/modes. The evaluator accepts already-resolved effective
-values, but no automatic account-value feed or verified derivation is supplied by this change.
+is a best-effort mapping from a global variable to the tasks whose completions derive it
+([mechanics research](https://github.com/tarkovtracker-org/tarkov-data-overlay/blob/main/docs/GLOBAL_VARIABLE_MECHANICS.md)).
+`app/server/utils/overlayCounters.ts` validates it against the overlay schema and, for the request's
+mode, applies only `verified`/`complete` entries whose revision is in
+`SUPPORTED_COUNTER_REVISIONS`. It attaches each entry's contributor list to the matching gate as
+`counter: { type: 'distinctTaskCompletions', taskIds }` when every contributor is in the same task
+payload. This runs last in `applyOverlay`, so task corrections cannot supply a derivation.
+`unresolved`/`partial` entries, unsupported revisions and other modes attach nothing.
+
+For a gate carrying `counter`, the evaluator counts that player's completed contributors
+(`task_counter` blocker with current/required on a shortfall). An account without those
+completions reads a known shortfall, not unknown. An explicit effective account value takes
+precedence, and an invalid one stays unknown instead of falling back. Gates without a derivation keep
+the unknown behaviour below. The tracker never assumes other missing values are zero, creates
+synthetic prerequisite edges, or shares a value between accounts/modes.
 
 **Mark available** confirms the selected task's supported server-side start gates from the player's
 in-game observation. Confirmations live in each mode's `taskAvailability` map
 (`{ [taskId]: { requirements, timestamp } }`, `app/utils/taskAvailabilityConfirmation.ts`), never in
 `taskCompletions`: confirming or clearing cannot create an "active" task record or rewrite a status
-another device set. `requirements` is the exact normalized gate signature, and a clear is an empty
-string kept as a tombstone. Sync merges the map per task by the confirmation's own timestamp. A
-confirmation counts only while its signature matches and it is not older than the task's status
-timestamp, so a later reset, completion, failure or progress repair on any device retires it without
-rewriting the map. The row sanitizer preserves the key (migration
+another device set. `requirements` is the exact normalized gate signature (the `counter` derivation is
+excluded from it), and a clear is an empty string kept as a tombstone. Sync merges the map per task by
+the confirmation's own timestamp. A confirmation counts only while its signature matches and it is
+not older than the task's status timestamp, so a later reset, completion, failure or progress repair
+on any device retires it without rewriting the map. The row sanitizer preserves the key (migration
 `20260928140000_preserve_task_availability_confirmations.sql`); a missing key means no confirmations.
 It does not set a counter, acknowledge another task's dialogue, or complete candidate contributor
-tasks. It cannot bypass a known unmet value, malformed requirements, or independent
+tasks. Because a derived count is an estimate, a confirmation overrides a derived shortfall. It cannot
+bypass an explicit known unmet account value, malformed requirements, or independent
 level/faction/trader/prestige/quest gates, and changed requirements invalidate it. The task's More
 menu clears just the in-game confirmation. Mark available either makes the task available or changes
 nothing: it is withheld for unsupported or malformed server gates and for unmet ambiguous-status or

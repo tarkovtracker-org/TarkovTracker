@@ -44,6 +44,7 @@ export type TaskBlocker = {
     | 'prestige'
     | 'global_variable'
     | 'global_variable_unknown'
+    | 'task_counter'
     | 'dialogue'
     | 'story_objective'
     | 'unknown'

@@ -80,6 +80,8 @@ const RESOLVABLE_BLOCKERS: ReadonlySet<TaskBlocker['type']> = new Set([
   'trader_reputation',
   'prerequisite',
   'global_variable_unknown',
+  // A derived trader-tier count is a best-effort estimate that a confirmation overrides.
+  'task_counter',
   'dialogue',
   'story_objective',
 ]);

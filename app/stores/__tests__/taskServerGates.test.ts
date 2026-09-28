@@ -251,3 +251,121 @@ describe('server-side task start gates', () => {
     expect(evaluate(gate(), { globalVariables: { counter: 3 } }).available).toBe(true);
   });
 });
+describe('registry-derived counters', () => {
+  const counter = { type: 'distinctTaskCompletions' as const, taskIds: ['a', 'b', 'c', 'd'] };
+  const derived = (value = 2, compareMethod: RequirementComparison = '>='): Task => ({
+    id: 'target',
+    otherRequirements: [
+      {
+        type: 'globalVariable',
+        id: 'condition',
+        variableId: 'tier',
+        compareMethod,
+        value,
+        counter,
+      },
+    ],
+  });
+  const done = (...ids: string[]) =>
+    Object.fromEntries(ids.map((id) => [id, { complete: true, failed: false }]));
+  it('counts completed contributors against the threshold', () => {
+    expect(evaluate(derived(), { completions: done('a') })).toMatchObject({
+      available: false,
+      blockers: [
+        {
+          type: 'task_counter',
+          requirementId: 'condition',
+          variableId: 'tier',
+          current: 1,
+          required: 2,
+          compareMethod: '>=',
+        },
+      ],
+    });
+    expect(evaluate(derived(), { completions: done('a', 'd') }).available).toBe(true);
+  });
+  it('reports a known zero for a new account instead of treating it as unknown', () => {
+    expect(evaluate(derived(1)).blockers).toEqual([
+      expect.objectContaining({ type: 'task_counter', current: 0, required: 1 }),
+    ]);
+  });
+  it('does not count failed, active, confirmed or non-contributor tasks', () => {
+    const completions = {
+      a: { complete: false, failed: true },
+      b: { complete: false, failed: false },
+      c: { complete: false, failed: false },
+      other: { complete: true, failed: false },
+    };
+    const confirmations = { c: { requirements: 'confirmed', timestamp: 10 } };
+    expect(evaluate(derived(1), { completions, confirmations }).blockers[0]).toMatchObject({
+      current: 0,
+    });
+  });
+  it('compares the derived value with the declared operator', () => {
+    expect(evaluate(derived(0, '=='), { completions: done('a') }).available).toBe(false);
+    expect(evaluate(derived(0, '==')).available).toBe(true);
+  });
+  it('lets an explicit account value take precedence, including an invalid one', () => {
+    expect(
+      evaluate(derived(), { completions: done('a', 'b'), globalVariables: { tier: 0 } }).blockers[0]
+        ?.type
+    ).toBe('global_variable');
+    expect(
+      evaluate(derived(), {
+        completions: done('a', 'b'),
+        globalVariables: { tier: NaN } as Record<string, number>,
+      }).blockers[0]?.type
+    ).toBe('global_variable_unknown');
+    expect(evaluate(derived(), { globalVariables: { tier: 5 } }).available).toBe(true);
+  });
+  it('lets an in-game confirmation override a derived shortfall', () => {
+    const task = derived(3);
+    expect(
+      evaluate(task, { completions: done('a'), confirmations: confirmed(task) }).available
+    ).toBe(true);
+  });
+  it('keeps confirmations valid when a derivation is attached or removed', () => {
+    const plain: Task = {
+      id: 'target',
+      otherRequirements: [
+        {
+          type: 'globalVariable',
+          id: 'condition',
+          variableId: 'tier',
+          compareMethod: '>=',
+          value: 3,
+        },
+      ],
+    };
+    expect(otherRequirementsSignature(derived(3))).toBe(otherRequirementsSignature(plain));
+  });
+  it('still requires independent gates when the derived counter is met', () => {
+    const task = { ...derived(1), minPlayerLevel: 60 };
+    expect(evaluate(task, { completions: done('a') }).available).toBe(false);
+  });
+  it.each([
+    { type: 'sum', taskIds: ['a'] },
+    { type: 'distinctTaskCompletions', taskIds: [] },
+    { type: 'distinctTaskCompletions', taskIds: ['a', 'a'] },
+    { type: 'distinctTaskCompletions', taskIds: ['a', ''] },
+    { type: 'distinctTaskCompletions' },
+    'a,b',
+  ])('drops malformed derivation %j and falls back to an unknown value', (malformed) => {
+    const task = {
+      id: 'target',
+      otherRequirements: [
+        {
+          type: 'globalVariable',
+          id: 'condition',
+          variableId: 'tier',
+          compareMethod: '>=',
+          value: 1,
+          counter: malformed,
+        },
+      ],
+    } as unknown as Task;
+    expect(evaluate(task, { completions: done('a') }).blockers[0]?.type).toBe(
+      'global_variable_unknown'
+    );
+  });
+});

@@ -325,6 +325,24 @@ describe('useTaskActions', () => {
     const { actions } = await setup(task, [task], {}, {}, evaluations);
     expect(actions.canMarkTaskAvailable()).toBe(true);
   });
+  it('allows confirming over a derived trader-tier counter shortfall', async () => {
+    const task: Task = {
+      id: 'target',
+      otherRequirements: [
+        { type: 'globalVariable', id: 'g', variableId: 'tier', compareMethod: '>=', value: 3 },
+      ],
+    };
+    const evaluations: TaskEvaluationMap = {
+      target: {
+        self: {
+          available: false,
+          blockers: [{ type: 'task_counter', variableId: 'tier', current: 1, required: 3 }],
+        },
+      },
+    };
+    const { actions } = await setup(task, [task], {}, {}, evaluations);
+    expect(actions.canMarkTaskAvailable()).toBe(true);
+  });
   it('still refuses when the evaluator reports an ambiguous unmet prerequisite', async () => {
     const requirement = { task: { id: 'prior' }, status: ['active'] };
     const task: Task = {

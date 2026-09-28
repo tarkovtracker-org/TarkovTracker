@@ -122,6 +122,11 @@ export interface TaskPrestigeReference {
  * never a diagnostic, so these values keep a malformed explicit gate distinguishable from no gate.
  */
 export type TaskRequirementDiagnostic = 'prestige_reference' | 'task_requirement';
+/**
+ * Best-effort counter derivation attached server-side from the overlay's progressionCounters
+ * registry: the counter equals the number of completed tasks in `taskIds`.
+ */
+export type TaskCounterDerivation = { type: 'distinctTaskCompletions'; taskIds: string[] };
 export type TaskOtherRequirement =
   | {
       type: 'globalVariable';
@@ -129,6 +134,7 @@ export type TaskOtherRequirement =
       variableId: string;
       compareMethod: RequirementComparison;
       value: number;
+      counter?: TaskCounterDerivation;
     }
   | { type: 'dialogue'; id: string; traders: string[] }
   /** Overlay story gate: met only when the player completed that storyline objective. */

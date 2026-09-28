@@ -1,11 +1,26 @@
 import { compareRequirement } from '@/utils/taskRequirements';
-import type { Task, TaskOtherRequirement, RequirementComparison } from '@/types/tarkov';
+import type {
+  Task,
+  TaskCounterDerivation,
+  TaskOtherRequirement,
+  RequirementComparison,
+} from '@/types/tarkov';
 const comparisons = new Set(['>=', '>', '<=', '<', '=', '==', '!=']);
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 const isId = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 const traderId = (value: unknown): unknown => (isRecord(value) ? value.id : value);
+const uniqueIds = (value: unknown): value is string[] =>
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.every(isId) &&
+  new Set(value).size === value.length;
+/** A malformed derivation is dropped, so the gate falls back to needing an account value. */
+const normalizeCounter = (raw: unknown): TaskCounterDerivation | undefined => {
+  if (!isRecord(raw) || raw.type !== 'distinctTaskCompletions') return undefined;
+  return uniqueIds(raw.taskIds) ? { type: raw.type, taskIds: [...raw.taskIds] } : undefined;
+};
 const normalizeVariable = (raw: Record<string, unknown>): TaskOtherRequirement => {
   const valid = [
     isId(raw.id),
@@ -14,13 +29,22 @@ const normalizeVariable = (raw: Record<string, unknown>): TaskOtherRequirement =
     typeof raw.value === 'number' && Number.isFinite(raw.value),
   ].every(Boolean);
   if (!valid) return { type: 'unknown' };
-  return {
+  const requirement: TaskOtherRequirement = {
     type: 'globalVariable',
     id: raw.id as string,
     variableId: raw.variableId as string,
     compareMethod: raw.compareMethod as RequirementComparison,
     value: raw.value as number,
   };
+  const counter = normalizeCounter(raw.counter);
+  return counter ? { ...requirement, counter } : requirement;
+};
+/** The derivation is tracker metadata, not part of the in-game gate a player confirms. */
+const withoutCounter = (requirement: TaskOtherRequirement): TaskOtherRequirement => {
+  if (requirement.type !== 'globalVariable' || !requirement.counter) return requirement;
+  const gate = { ...requirement };
+  delete gate.counter;
+  return gate;
 };
 const normalizeDialogue = (raw: Record<string, unknown>): TaskOtherRequirement => {
   if (!isId(raw.id) || !Array.isArray(raw.traders)) return { type: 'unknown' };
@@ -79,7 +103,7 @@ export const otherRequirementsSignature = (task: Task): string | undefined => {
   const requirements = normalizeOtherRequirements(task.otherRequirements);
   if (requirements.some((requirement) => requirement.type === 'unknown')) return undefined;
   const confirmable = requirements.filter(isConfirmable);
-  return confirmable.length ? JSON.stringify(confirmable) : undefined;
+  return confirmable.length ? JSON.stringify(confirmable.map(withoutCounter)) : undefined;
 };
 /** Story objectives a task's overlay gates name, for Mark available to record. */
 export const storyObjectiveRequirements = (task: Task) =>
