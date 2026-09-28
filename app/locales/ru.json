@@ -1740,7 +1740,7 @@
     "game_attribution": "Escape from Tarkov и связанный игровой контент и материалы являются товарными знаками и защищены авторским правом Battlestate Games Limited и ее лицензиаров. Все права защищены. TarkovTracker является неофициальным фанатским проектом и не связан с Battlestate Games и не одобрен ею.",
     "tagline": "Отслеживайте свои побеги от заданий Таркова, улучшений в укрытии и требований к предметам в одном месте.",
     "version_release_link": "Просмотреть заметки о выпуске {version} на GitHub",
-    "build_commit_link": "View build commit {commit} on GitHub",
+    "build_commit_link": "Просмотреть сборку коммитов {commit} на GitHub",
     "sections": {
       "explore": "Исследовать",
       "project": "Проект",
