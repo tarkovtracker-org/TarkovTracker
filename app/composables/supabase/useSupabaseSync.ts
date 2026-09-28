@@ -505,12 +505,29 @@ export function useSupabaseSync<
     }
     return enqueueSync();
   };
+  /**
+   * After a failed write, Realtime may have missed remote updates, so only a reconciled retry
+   * uploads. It captures the latest state when it runs, carrying every edit made meanwhile.
+   */
+  const defersToReconciledRetry = (): boolean =>
+    lastFailure !== null && reconcileBeforeRetry !== undefined && retryDelaysMs.length > 0;
+  /** A new edit restarts an exhausted schedule; merges inside a snapshot read do not. */
+  const armReconciledRetry = () => {
+    debouncedSync.cancel();
+    if (retriesExhausted && snapshotDepth === 0) resetRetryBudget();
+    scheduleRetry();
+    publishSaveStatus();
+  };
   const unsubscribe = store.$subscribe((_mutation, state) => {
     // Pausing gates transmission, not change tracking: a user can edit while
     // reconciliation is waiting to resume. The RPC suppresses unchanged writes.
     localVersion += 1;
     pendingLocalChanges = true;
     publishSaveStatus();
+    if (defersToReconciledRetry()) {
+      armReconciledRetry();
+      return;
+    }
     logger.debug(`[Sync] Store state changed for ${table}, triggering debounced sync`);
     void debouncedSync(state as TState).catch((error) => {
       if (isDebounceRejection(error)) return;
@@ -547,6 +564,7 @@ export function useSupabaseSync<
     debouncedSync.cancel();
   };
   const schedulePendingSync = () => {
+    if (defersToReconciledRetry()) return;
     if (!disposed && pendingLocalChanges) {
       void debouncedSync(store.$state as TState).catch((error) => {
         if (!isDebounceRejection(error)) logger.error('[Sync] Resumed sync failed', error);

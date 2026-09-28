@@ -698,13 +698,14 @@ const settleStartupCloudState = (userId: string, cloudHoldsResolvedState: boolea
   removeAccountRecoveryCopy(userId);
   return false;
 };
-/** The first acknowledged upload carries the recovered state, whichever attempt it was. */
+/**
+ * The first acknowledged upload carries the recovered state, whichever attempt it was. A removal
+ * the browser rejects stays pending so a later acknowledged upload retries it.
+ */
 const retireRecoveryCopyOnFirstSync = (userId: string, awaitsUpload: boolean) => {
   let pending = awaitsUpload;
   return () => {
-    if (!pending) return;
-    pending = false;
-    removeAccountRecoveryCopy(userId);
+    if (pending) pending = !removeAccountRecoveryCopy(userId);
   };
 };
 type ProgressSyncStart = {

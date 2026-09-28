@@ -484,6 +484,61 @@ describe('useSupabaseSync', () => {
       expect(sync.hasPendingChanges!()).toBe(true);
       sync.cleanup();
     });
+    it('uploads edits made after a failed save only through the reconciled retry', async () => {
+      const order: string[] = [];
+      const reconcile = vi.fn(async () => {
+        order.push('reconcile');
+      });
+      upsert.mockImplementation(async (payload) => {
+        order.push(`upload:${(payload as { count: number }).count}`);
+        return order.length === 1 ? { error: { message: 'Failed to fetch' } } : { error: null };
+      });
+      const { store, sync } = await createRetryingSync(vi.fn(), reconcile);
+      store.$state.count = 1;
+      store.notifySubscriber();
+      await flushSync(5);
+      store.$state.count = 2;
+      store.notifySubscriber();
+      await vi.advanceTimersByTimeAsync(5);
+      expect(order).toEqual(['upload:1']);
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS[0]);
+      expect(order).toEqual(['upload:1', 'reconcile', 'upload:2']);
+      expect(sync.saveStatus.value.state).toBe('idle');
+      sync.cleanup();
+    });
+    it('restarts a reconciled schedule when an edit follows exhaustion', async () => {
+      upsert.mockResolvedValue({ error: { message: 'boom' } });
+      const reconcile = vi.fn(async () => {});
+      const { store, sync } = await createRetryingSync(vi.fn(), reconcile);
+      store.$state.count = 1;
+      store.notifySubscriber();
+      await flushSync(5);
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS[0] + RETRY_DELAYS[1]);
+      expect(sync.saveStatus.value.state).toBe('failed');
+      expect(upsert).toHaveBeenCalledTimes(3);
+      store.$state.count = 2;
+      store.notifySubscriber();
+      expect(sync.saveStatus.value).toMatchObject({ state: 'retry_scheduled', retryAttempt: 1 });
+      await vi.advanceTimersByTimeAsync(5);
+      expect(upsert).toHaveBeenCalledTimes(3);
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS[0]);
+      expect(reconcile).toHaveBeenCalledTimes(3);
+      expect(upsert).toHaveBeenLastCalledWith({ count: 2, user_id: 'user-1' });
+      sync.cleanup();
+    });
+    it('stays bounded when each reconciled retry reads through a snapshot', async () => {
+      upsert.mockResolvedValue({ error: { message: 'boom' } });
+      let snapshotRead: (() => Promise<void>) | null = null;
+      const { store, sync } = await createRetryingSync(vi.fn(), () => snapshotRead!());
+      snapshotRead = () => sync.withSnapshot!(async () => {});
+      store.$state.count = 1;
+      store.notifySubscriber();
+      await flushSync(5);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(upsert).toHaveBeenCalledTimes(3);
+      expect(sync.saveStatus.value.state).toBe('failed');
+      sync.cleanup();
+    });
     it('stops scheduled retries after cleanup', async () => {
       upsert.mockResolvedValue({ error: { message: 'boom' } });
       const { store, sync } = await createRetryingSync();
