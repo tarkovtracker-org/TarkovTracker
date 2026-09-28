@@ -293,10 +293,7 @@ describe('seasonal progress realtime synchronization', () => {
       await setupRealtimeListener(store);
       createdChannels[0]?.subscribeCallback?.('SUBSCRIBED');
       await Promise.resolve();
-      expect(logger.warn).toHaveBeenCalledWith(
-        '[TarkovStore] Reconnect snapshot barrier failed',
-        failure
-      );
+      expect(logger.warn).toHaveBeenCalledWith('[TarkovStore] Reconnect snapshot failed', failure);
     } finally {
       registerSyncControllerGetter(() => null);
     }
@@ -659,6 +656,24 @@ describe('seasonal progress realtime synchronization', () => {
     expect(logger.warn).toHaveBeenCalledWith('[TarkovStore] Reconnect snapshot failed', failure);
     expect(state.pvp.level).toBe(25);
     expect(createdChannels).toHaveLength(1);
+  });
+  it('rejects a pre-retry reconcile when the remote snapshot cannot be read', async () => {
+    const { cleanupRealtimeListener, reconcileRemoteSnapshot, setupRealtimeListener } =
+      await import('@/stores/tarkov/realtimeListener');
+    await expect(reconcileRemoteSnapshot()).resolves.toBeUndefined();
+    const failure = { message: 'snapshot unavailable' };
+    supabaseContext.client.from.mockImplementation((table: string) => ({
+      select: () => ({
+        eq: () =>
+          table === 'user_progress'
+            ? { single: async () => ({ data: null, error: null }) }
+            : Promise.resolve({ data: null, error: failure }),
+      }),
+    }));
+    await setupRealtimeListener(store);
+    await expect(reconcileRemoteSnapshot()).rejects.toBeTruthy();
+    await cleanupRealtimeListener();
+    await expect(reconcileRemoteSnapshot()).resolves.toBeUndefined();
   });
   it.each([false, true])(
     'uses the newer mode row when a live event arrives during a snapshot (snapshot wins: %s)',

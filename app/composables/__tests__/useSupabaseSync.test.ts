@@ -342,7 +342,10 @@ describe('useSupabaseSync', () => {
   });
   describe('cloud save status and bounded retries', () => {
     const RETRY_DELAYS = [10, 20] as const;
-    const createRetryingSync = async (onSaveStatusChange = vi.fn()) => {
+    const createRetryingSync = async (
+      onSaveStatusChange = vi.fn(),
+      reconcileBeforeRetry?: () => Promise<void>
+    ) => {
       const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
       const store = createMockStore({ count: 0 });
       const sync = useSupabaseSync({
@@ -350,6 +353,7 @@ describe('useSupabaseSync', () => {
         table: 'user_progress',
         debounceMs: 5,
         retryDelaysMs: RETRY_DELAYS,
+        reconcileBeforeRetry,
         onSaveStatusChange,
       });
       return { store, sync, onSaveStatusChange };
@@ -442,6 +446,42 @@ describe('useSupabaseSync', () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(upsert).toHaveBeenCalledTimes(2);
       expect(sync.saveStatus.value.state).toBe('idle');
+      sync.cleanup();
+    });
+    it('merges the remote snapshot before a reconnect retry uploads', async () => {
+      upsert.mockResolvedValueOnce({ error: { message: 'Failed to fetch' } });
+      const order: string[] = [];
+      const reconcile = vi.fn(async () => {
+        order.push('reconcile');
+      });
+      upsert.mockImplementation(async () => {
+        order.push('upload');
+        return { error: null };
+      });
+      const { store, sync } = await createRetryingSync(vi.fn(), reconcile);
+      store.$state.count = 7;
+      store.notifySubscriber();
+      await flushSync(5);
+      order.length = 0;
+      window.dispatchEvent(new Event('online'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(order).toEqual(['reconcile', 'upload']);
+      expect(sync.saveStatus.value.state).toBe('idle');
+      sync.cleanup();
+    });
+    it('does not upload a scheduled retry when the remote snapshot cannot be read', async () => {
+      upsert.mockResolvedValue({ error: { message: 'boom' } });
+      const reconcile = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+      const { store, sync } = await createRetryingSync(vi.fn(), reconcile);
+      store.$state.count = 8;
+      store.notifySubscriber();
+      await flushSync(5);
+      expect(upsert).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS[0]);
+      expect(reconcile).toHaveBeenCalledTimes(1);
+      expect(upsert).toHaveBeenCalledTimes(1);
+      expect(sync.saveStatus.value).toMatchObject({ state: 'retry_scheduled', retryAttempt: 2 });
+      expect(sync.hasPendingChanges!()).toBe(true);
       sync.cleanup();
     });
     it('stops scheduled retries after cleanup', async () => {

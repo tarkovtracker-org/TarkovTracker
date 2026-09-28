@@ -36,6 +36,11 @@ export interface SupabaseSyncConfig<
   onSynced?: () => void;
   /** Delays for automatic retries after a failed write; empty disables them. */
   retryDelaysMs?: readonly number[];
+  /**
+   * Merges changes made elsewhere into the pending state before a retry uploads it; rejects when
+   * the remote state cannot be read, so the retry does not overwrite it with a stale snapshot.
+   */
+  reconcileBeforeRetry?: () => Promise<void>;
   /** Observes cloud save status: pending until the service acknowledges the latest changes. */
   onSaveStatusChange?: (status: CloudSaveStatus) => void;
 }
@@ -185,6 +190,7 @@ export function useSupabaseSync<
   debounceMs = 1000,
   onSynced,
   retryDelaysMs = [],
+  reconcileBeforeRetry,
   onSaveStatusChange,
 }: SupabaseSyncConfig<TState, TPayload>): SupabaseSyncReturn<TState, TPayload> {
   logger.debug(`[Sync] useSupabaseSync initialized for table: ${table}, debounce: ${debounceMs}ms`);
@@ -340,7 +346,7 @@ export function useSupabaseSync<
     retryTimer = null;
     nextRetryAt = null;
     publishSaveStatus();
-    void enqueueSync().catch((error) => {
+    void reconcileThenSync().catch((error) => {
       logger.error(`[Sync] Scheduled retry failed for ${table}:`, error);
     });
   };
@@ -487,6 +493,18 @@ export function useSupabaseSync<
     return result;
   };
   const debouncedSync = debounce(enqueueSync, debounceMs);
+  /** A retry uploads only after the latest remote state was merged into the pending changes. */
+  const reconcileThenSync = async (): Promise<TPayload | null> => {
+    try {
+      await reconcileBeforeRetry?.();
+    } catch (error) {
+      logger.warn(`[Sync] Remote state unavailable before retrying ${table}`, error);
+      handleWriteFailure(error);
+      publishSaveStatus();
+      return null;
+    }
+    return enqueueSync();
+  };
   const unsubscribe = store.$subscribe((_mutation, state) => {
     // Pausing gates transmission, not change tracking: a user can edit while
     // reconciliation is waiting to resume. The RPC suppresses unchanged writes.
@@ -505,7 +523,7 @@ export function useSupabaseSync<
     resetRetryBudget();
     debouncedSync.cancel();
     publishSaveStatus();
-    if (pendingLocalChanges) await enqueueSync();
+    if (pendingLocalChanges) await reconcileThenSync();
     return !pendingLocalChanges;
   };
   const handleOnline = () => {

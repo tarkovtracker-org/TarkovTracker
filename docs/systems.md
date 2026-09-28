@@ -909,7 +909,10 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   after a failure, and `failed` once the bounded schedule (`CLOUD_SAVE_RETRY_DELAYS_MS`, 5 s /
   15 s / 60 s) is exhausted. Exhaustion keeps the changes pending; later edits still attempt a
   debounced save, and a manual retry (`retryCloudSave`) or the browser `online` event restarts
-  the budget. Failures are classified as `offline`, `rate_limited`, `auth`, or `unknown` so the
+  the budget. Every retry first reads the remote snapshot and merges it into the pending changes,
+  as a Realtime reconnect does, so changes saved on another device are not overwritten by a stale
+  upload; if that read fails, the retry counts as a failed attempt and uploads nothing. Failures
+  are classified as `offline`, `rate_limited`, `auth`, or `unknown` so the
   indicator can distinguish a known cause from an unknown one. If the initial authenticated sync
   fails, no controller runs, so `useAppInitialization` marks cloud saving `failed` and its manual
   retry restarts initialization; a successful startup load clears that status. Before any
@@ -971,7 +974,10 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   `app/utils/supabaseAuthFence.ts` under the SDK's default key. While a sign-out is fenced to an
   owner, the SDK's own session read and removal throw `SupabaseSessionChangedError` if another
   account's session is stored, so a session written by another tab mid-sign-out is never revoked
-  or cleared. Any server revocation uses the token read inside the fence.
+  or cleared. Any server revocation uses the token read inside the fence. Browser storage stays the
+  session store whenever it can be accessed: if a write fails (for example a full quota), the new
+  session is held in memory and the stale persisted session is removed, so a readable session is
+  never hidden behind an empty memory store. Memory-only storage is used only when access is blocked.
 - **Removing device data.** `DeviceDataCard` (Settings → Account) is the explicit action,
   distinct from sign-out and from cloud deletion. It registers `requestDeviceDataRemoval` before
   signing out so the progress and preferences session transitions retain no copy for that owner,

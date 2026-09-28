@@ -82,6 +82,7 @@ import {
 } from '@/stores/tarkov/progressSaveStatus';
 import {
   cleanupRealtimeListener,
+  reconcileRemoteSnapshot,
   registerSyncControllerGetter,
   setupRealtimeListener,
 } from '@/stores/tarkov/realtimeListener';
@@ -1973,6 +1974,7 @@ export async function initializeTarkovSync() {
         table: 'user_progress',
         debounceMs: SYNC_DEBOUNCE_MS,
         retryDelaysMs: CLOUD_SAVE_RETRY_DELAYS_MS,
+        reconcileBeforeRetry: reconcileRemoteSnapshot,
         onSaveStatusChange: (status) => {
           if (syncController === controller) setCloudSaveStatus(status);
         },

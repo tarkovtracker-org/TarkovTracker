@@ -104,6 +104,14 @@ let pausedSyncController: SyncControllerHandle | null = null;
  * retained. Sync stays paused so those older changes cannot overwrite the reset in the cloud.
  */
 let heldForUnretainedRemoteReset = false;
+/** Reads and merges the current remote snapshot for the joined channel; rejects if unreadable. */
+let activeSnapshotRefresh: (() => Promise<void>) | null = null;
+/**
+ * Merges the latest remote progress into pending local changes before a retry uploads them.
+ * Without a joined channel there is no snapshot reader, so the retry proceeds as before.
+ */
+export const reconcileRemoteSnapshot = (): Promise<void> =>
+  activeSnapshotRefresh ? activeSnapshotRefresh() : Promise.resolve();
 export const registerSyncControllerGetter = (getter: SyncControllerGetter): void => {
   syncControllerGetter = getter;
 };
@@ -570,17 +578,19 @@ async function runSetupRealtimeListener(
       handleModeProgressChange({ new: row }, reconcile);
     }
   };
-  const refreshSnapshot = async (reconcile: RemoteStateMerge, request: number) => {
+  const readSnapshot = async (reconcile: RemoteStateMerge, request: number) => {
     if (snapshotIsStale(request)) return;
-    try {
-      const [metadata, modes] = await readProgressSnapshotRows();
-      if (snapshotIsStale(request)) return;
-      assertSnapshotReadable(metadata.error, modes.error);
-      applySnapshotMetadata(metadata.data, reconcile);
-      applySnapshotModes(modes.data, reconcile);
-    } catch (error) {
-      logger.warn('[TarkovStore] Reconnect snapshot failed', error);
-    }
+    const [metadata, modes] = await readProgressSnapshotRows();
+    if (snapshotIsStale(request)) return;
+    assertSnapshotReadable(metadata.error, modes.error);
+    applySnapshotMetadata(metadata.data, reconcile);
+    applySnapshotModes(modes.data, reconcile);
+  };
+  const runSnapshotRefresh = (): Promise<void> => {
+    const request = ++refreshGeneration;
+    const read = (reconcile: RemoteStateMerge) => readSnapshot(reconcile, request);
+    const controller = getRegisteredSyncController();
+    return controller?.withSnapshot ? controller.withSnapshot(read) : read(captureRemoteMerge());
   };
   const owned = { channel, client, topic } satisfies OwnedRealtimeChannel;
   // No await between the claim and the join: `joinProgressChannel` reaches
@@ -589,15 +599,10 @@ async function runSetupRealtimeListener(
     await releaseProgressChannel(owned);
     return;
   }
+  activeSnapshotRefresh = runSnapshotRefresh;
   await joinProgressChannel(owned, currentUserId, generation, () => {
-    const request = ++refreshGeneration;
-    const read = (reconcile: RemoteStateMerge) => refreshSnapshot(reconcile, request);
-    const controller = getRegisteredSyncController();
-    const refreshing = controller?.withSnapshot
-      ? controller.withSnapshot(read)
-      : read(captureRemoteMerge());
-    refreshing.catch((error: unknown) => {
-      logger.warn('[TarkovStore] Reconnect snapshot barrier failed', error);
+    runSnapshotRefresh().catch((error: unknown) => {
+      logger.warn('[TarkovStore] Reconnect snapshot failed', error);
     });
   });
 }
@@ -607,6 +612,7 @@ async function runSetupRealtimeListener(
  */
 async function teardownProgressChannel(): Promise<void> {
   listenerGeneration += 1;
+  activeSnapshotRefresh = null;
   if (realtimeChannel) {
     // Remove through the client that created the channel: `$supabase.client` is
     // replaced once background initialization completes.
