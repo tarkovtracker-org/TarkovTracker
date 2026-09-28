@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Focused drift checks for docs/SYSTEMS.md.
+ * Focused drift checks for docs/systems.md.
  *
  * Verifies the most volatile, easily-checkable facts the doc records against
  * the actual codebase so drift is caught automatically in CI. Checks:
@@ -22,7 +22,7 @@
 import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
 import { join, dirname, basename } from 'path';
 const ROOT = process.cwd();
-const SYSTEMS_MD = join(ROOT, 'docs', 'SYSTEMS.md');
+const SYSTEMS_MD = join(ROOT, 'docs', 'systems.md');
 const TARKOV_API_DIR = join(ROOT, 'app', 'server', 'api', 'tarkov');
 const LOCALES_DIR = join(ROOT, 'app', 'locales');
 const WRANGLER_TOML = join(ROOT, 'wrangler.toml');
@@ -49,7 +49,7 @@ function listTarkovHandlers() {
     .map((f) => f.replace(/\.get\.ts$/, ''));
 }
 /**
- * Extract the /api/tarkov/* endpoints from the endpoint table in SYSTEMS.md.
+ * Extract the /api/tarkov/* endpoints from the endpoint table in systems.md.
  * The table rows look like `| `/api/tarkov/bootstrap` | ... |`.
  */
 function extractDocumentedEndpoints(md) {
@@ -111,7 +111,7 @@ function checkEndpoints(md) {
   const documented = extractDocumentedEndpoints(md);
   if (documented.length === 0) {
     fail(
-      'No /api/tarkov/* endpoints found in SYSTEMS.md endpoint table. The endpoint section is required.'
+      'No /api/tarkov/* endpoints found in systems.md endpoint table. The endpoint section is required.'
     );
     return;
   }
@@ -119,7 +119,7 @@ function checkEndpoints(md) {
   for (const endpoint of documented) {
     if (!handlers.has(endpoint)) {
       fail(
-        `SYSTEMS.md documents endpoint "/api/tarkov/${endpoint}" but no handler file ` +
+        `systems.md documents endpoint "/api/tarkov/${endpoint}" but no handler file ` +
           `app/server/api/tarkov/${endpoint}.get.ts exists.`
       );
     }
@@ -128,7 +128,7 @@ function checkEndpoints(md) {
   const undocumented = [...handlers].filter((h) => !documented.includes(h));
   if (undocumented.length > 0) {
     warnings.push(
-      `Handler(s) exist without a SYSTEMS.md endpoint entry: ${undocumented.join(', ')}. ` +
+      `Handler(s) exist without a systems.md endpoint entry: ${undocumented.join(', ')}. ` +
         `Add them to the endpoint table if they are part of the Tarkov.dev data integration.`
     );
   }
@@ -137,13 +137,13 @@ function checkDocumentedPaths(md) {
   const paths = extractDocumentedPaths(md);
   if (paths.length === 0) {
     fail(
-      'No implementation file paths found in SYSTEMS.md. The implementation paths section is required.'
+      'No implementation file paths found in systems.md. The implementation paths section is required.'
     );
     return;
   }
   for (const p of paths) {
     if (!pathExists(p)) {
-      fail(`SYSTEMS.md references path "${p}" but it does not exist on disk.`);
+      fail(`systems.md references path "${p}" but it does not exist on disk.`);
     }
   }
 }
@@ -153,7 +153,7 @@ function checkKvBinding(md) {
   const documentedBinding = bindingMatch ? bindingMatch[1] : null;
   if (!documentedBinding) {
     fail(
-      'Could not find a KV binding name declaration in SYSTEMS.md. The KV binding section is required.'
+      'Could not find a KV binding name declaration in systems.md. The KV binding section is required.'
     );
     return;
   }
@@ -184,7 +184,7 @@ function checkKvBinding(md) {
   const wranglerBindingRe = new RegExp(`binding\\s*=\\s*"${documentedBinding}"`);
   if (!wranglerBindingRe.test(kvText)) {
     fail(
-      `SYSTEMS.md documents KV binding "${documentedBinding}" but wrangler.toml does not ` +
+      `systems.md documents KV binding "${documentedBinding}" but wrangler.toml does not ` +
         `declare it inside a [[kv_namespaces]] block.`
     );
   }
@@ -194,7 +194,7 @@ function checkKvBinding(md) {
     const constRe = new RegExp(`PRECOMPUTED_KV_BINDING\\s*=\\s*['"]${documentedBinding}['"]`);
     if (!constRe.test(source)) {
       fail(
-        `SYSTEMS.md documents KV binding "${documentedBinding}" but ` +
+        `systems.md documents KV binding "${documentedBinding}" but ` +
           `precomputedTarkov.ts does not set PRECOMPUTED_KV_BINDING to that value.`
       );
     }
@@ -203,7 +203,7 @@ function checkKvBinding(md) {
   }
 }
 function checkSupportedLanguages(md) {
-  // SYSTEMS.md does not currently enumerate supported languages. When it does
+  // systems.md does not currently enumerate supported languages. When it does
   // (as a backtick-quoted, comma/space-separated list on a line containing
   // "supported languages" or similar), verify it against app/locales/.
   if (!existsSync(LOCALES_DIR)) {
@@ -232,7 +232,7 @@ function checkSupportedLanguages(md) {
   for (const code of langCodes) {
     if (!localeSet.has(code)) {
       fail(
-        `SYSTEMS.md lists supported language "${code}" but no locale file ` +
+        `systems.md lists supported language "${code}" but no locale file ` +
           `app/locales/${code}.json exists.`
       );
     }
@@ -240,14 +240,14 @@ function checkSupportedLanguages(md) {
   const undocumentedLocales = localeFiles.filter((c) => !langCodes.includes(c));
   if (undocumentedLocales.length > 0) {
     fail(
-      `Locale files exist without a SYSTEMS.md language entry: ${undocumentedLocales.join(', ')}. ` +
+      `Locale files exist without a systems.md language entry: ${undocumentedLocales.join(', ')}. ` +
         `Add them to the supported languages list or remove them from app/locales/.`
     );
   }
 }
 function main() {
   if (!existsSync(SYSTEMS_MD)) {
-    console.error(`SYSTEMS.md not found at ${SYSTEMS_MD}`);
+    console.error(`systems.md not found at ${SYSTEMS_MD}`);
     process.exit(1);
   }
   const md = readText(SYSTEMS_MD);
@@ -261,7 +261,7 @@ function main() {
     console.warn();
   }
   if (errors.length > 0) {
-    console.error('SYSTEMS.md drift detected:');
+    console.error('systems.md drift detected:');
     for (const e of errors) console.error(`  - ${e}`);
     console.error(`\n${errors.length} error(s). Fix the doc or the code in the same PR.`);
     process.exit(1);

@@ -10,7 +10,6 @@ Short, task-oriented guidance for AI coding agents. These docs are linked from r
 
 ## Docs
 
-| File                       | Topic                                                           |
-| -------------------------- | --------------------------------------------------------------- |
-| `codex-analytics-setup.md` | Codex/MCP analytics access setup (GA4, Clarity, Cloudflare)     |
-| `summary/`                 | Generated codebase knowledge base (start at `summary/index.md`) |
+| File                       | Topic                                                       |
+| -------------------------- | ----------------------------------------------------------- |
+| `codex-analytics-setup.md` | Codex/MCP analytics access setup (GA4, Clarity, Cloudflare) |

@@ -33,7 +33,7 @@ or test logic changes make it relevant.
 - Formatting is enforced by the hook and CI `format:check`; do not run the broad format command
   unless the hook was bypassed.
 - Fix Fallow findings instead of suppressing them; keep new functions at cyclomatic 4 or less.
-  Suppression rules: `docs/WORKFLOW_AUTOMATION.md#resolving-findings-instead-of-suppressing-them`.
+  Suppression rules live in the workflow-automation doc (see `docs/README.md`).
 - Mock Supabase and network calls in tests.
 
 ## Invariants
@@ -49,9 +49,7 @@ or test logic changes make it relevant.
   with the database functions and preserve Seasonal history.
 - Secrets stay in runtime env or platform secret stores under canonical names; never commit
   credentials, service-role keys, or generated secret-bearing files.
-- Overlay consumers enforce HTTPS and preserve the cache/adaptation/overlay ordering in
-  `docs/SYSTEMS.md` §1, §3–§4; task patches keep the raw upstream trader requirement shape
-  before adaptation.
+- Overlay consumers enforce HTTPS and preserve the cache/adaptation/overlay ordering in the systems doc; task patches keep the raw upstream trader requirement shape before adaptation.
 - Applied/shared migrations are immutable. Never run remote migration repair, reset, or squash as
   routine cleanup. Inspect production only through the read-only `scripts/prod-db` observer.
 
@@ -60,8 +58,7 @@ or test logic changes make it relevant.
 - `supabase/**`, SQL functions, account/team/token lifecycle, or production DB work:
   `supabase/AGENTS.md`.
 - `workers/api-gateway/**`: `workers/api-gateway/AGENTS.md`.
-- When code changes a non-obvious system, update its section and invariants in `docs/SYSTEMS.md`
-  in the same change.
+- When a change alters documented behavior or invariants, update the owning doc in the same change (behavior only — link code, don't paste it).
 
 ## Review
 
@@ -77,18 +74,20 @@ or test logic changes make it relevant.
   review; another provider or a human substitutes if needed. Unavailable or rate-limited review is
   recorded as incomplete, without retry loops.
 - Record the commit, dirty worktree state, commands, and results in the PR summary. Rerun,
-  batching, and reviewer-rollout rules: `docs/WORKFLOW_AUTOMATION.md#agent-validation-and-review`.
+  batching, and reviewer-rollout rules live in the workflow-automation doc (see `docs/README.md`).
 - Production-readiness and security review requests use the dedicated review/security workflow
   when available and stay read-only. Before merging, resolve all in-scope human and automated
   feedback and verify final checks; do not mix in unrelated fixes.
 
-## Docs — open only the section the task needs
+## Docs — code is truth, docs are orientation
 
-Find the relevant heading first (`grep -n '^#' <file>`; `docs/SYSTEMS.md` alone is ~2,300 lines)
-and read only that section. Search generated files, translations, migration history, `.cubic/`, and
-archives only when the task requires it.
-`docs/ARCHITECTURE.md` (environment map), `docs/SYSTEMS.md` (systems and invariants),
-`docs/API.md`, `docs/RATE_LIMITING.md`, `docs/runbook.md` (deploys, migrations, incidents),
-`docs/WORKFLOW_AUTOMATION.md` and `.github/CONTRIBUTING.md` (CI, hooks, releases, review),
-`SECURITY.md`, `SUPPORT.md`, `CODE_OF_CONDUCT.md`, optional orientation in
-`docs/agent-context/summary/index.md`.
+Hierarchy: executable config and source code outrank this file; this file outranks `docs/`.
+Docs explain behavior in plain English for humans and agents and may lag — verify against code
+before changing behavior.
+
+- One fact, one owner: link the owning file, never restate code, config, or another doc.
+- `docs/README.md` is the index; find the owning doc there, then read only the needed section
+  (`grep -n '^#' <file>`).
+- New docs go flat in `docs/` as `kebab-case.md`. Nest only for 3+ docs or non-`.md` assets.
+- Generated files, Crowdin-owned locales, migration history, and `.cubic/` are not sources —
+  search them only when the task requires it.

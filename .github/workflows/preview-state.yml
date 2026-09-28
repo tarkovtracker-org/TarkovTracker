@@ -6,7 +6,7 @@ name: Preview State
 # here because the job only checks out the default branch and never installs or runs candidate code.
 # This public repository therefore carries a repository-level Actions policy that scopes the event
 # to this workflow (GitHub blocks it by default from 2026-11-02); see "Preview Controller" in
-# docs/WORKFLOW_AUTOMATION.md. Removing that policy silently disables automatic preview state.
+# docs/workflow-automation.md. Removing that policy silently disables automatic preview state.
 on:
   schedule:
     - cron: '17 * * * *'

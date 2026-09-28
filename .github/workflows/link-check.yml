@@ -6,8 +6,8 @@ on:
       - 'docs/**/*.md'
       - '*.md'
       - 'public/llms.txt'
-      - 'lychee.toml'
-      - 'lychee.llms.toml'
+      - '.github/lychee.toml'
+      - '.github/lychee.llms.toml'
       - '.github/workflows/link-check.yml'
   schedule:
     - cron: '0 0 * * 0' # Weekly on Sunday at midnight UTC
@@ -28,11 +28,11 @@ jobs:
       - name: Link Checker
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
-          # Config (accept, retries, exclude_path/exclude) lives in lychee.toml so
+          # Config (accept, retries, exclude_path/exclude) lives in .github/lychee.toml so
           # regexes are not mangled by YAML/shell escaping (see exclude_path for
           # CHANGELOG.md). Only input globs stay here.
           args: >-
-            --config lychee.toml
+            --config .github/lychee.toml
             --verbose
             './docs/**/*.md'
             './*.md'
@@ -42,13 +42,13 @@ jobs:
         if: ${{ success() || failure() }}
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
-          # Dedicated config (lychee.llms.toml) drops the tarkovtracker.org
-          # exclude that lychee.toml uses for docs, so internal links in
+          # Dedicated config (.github/lychee.llms.toml) drops the tarkovtracker.org
+          # exclude that .github/lychee.toml uses for docs, so internal links in
           # llms.txt are actually verified. Runs even if the docs link check
           # above failed, since the two checks are independent. Separate output
           # path so it does not overwrite the docs report.
           args: >-
-            --config lychee.llms.toml
+            --config .github/lychee.llms.toml
             --verbose
             './public/llms.txt'
           output: lychee/out-llms.md

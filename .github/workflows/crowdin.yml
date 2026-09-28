@@ -5,7 +5,7 @@ on:
       - main
     paths:
       - 'app/locales/en.json'
-      - 'crowdin.yml'
+      - '.github/crowdin.yml'
       - '.github/workflows/crowdin.yml'
       - 'scripts/crowdin-pr.sh'
       - 'scripts/github-ci-gate.sh'
@@ -39,6 +39,7 @@ jobs:
         id: crowdin
         uses: crowdin/github-action@0d5670f539973aea2f01abce61a8989934df0025 # v3.0.2
         with:
+          config: '.github/crowdin.yml'
           upload_sources: true
           upload_translations: false
           download_translations: true

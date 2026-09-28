@@ -14,7 +14,7 @@ export const fullJobs = [
   'security',
 ];
 const reducedJobs = ['lint-format', 'systems-drift', 'security'];
-// Agent instruction files (root or nested AGENTS.md/CLAUDE.md, including `.claude/CLAUDE.md`) are
+// Agent instruction files (root or nested AGENTS.md/CLAUDE.md) are
 // documentation. Under `public/` they would ship as site assets, so they stay full.
 function agentInstructionPath(path) {
   return /(?:^|\/)(?:AGENTS|CLAUDE)\.md$/.test(path) && !path.startsWith('public/');
