@@ -5,7 +5,7 @@ type MockTask = {
   name: string;
   wikiLink?: string | null;
 };
-const setup = async (task: MockTask) => {
+const setup = async (task: MockTask, extraProps: Record<string, unknown> = {}) => {
   const metadataStore = {
     objectives: [
       {
@@ -42,6 +42,7 @@ const setup = async (task: MockTask) => {
     props: {
       objectiveId: 'obj-1',
       onClose,
+      ...extraProps,
     },
     global: {
       provide: {
@@ -102,5 +103,22 @@ describe('LeafletObjectiveTooltip', () => {
     await wrapper.get('[data-testid="objective-close-button"]').trigger('click');
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(wrapper.emitted('close')).toHaveLength(1);
+  });
+  it('omits map hide controls unless the page provides them', async () => {
+    const { wrapper } = await setup({ id: 'task-1', name: 'Task' });
+    expect(wrapper.find('[data-testid="objective-hide-task"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="objective-show-only-task"]').exists()).toBe(false);
+  });
+  it('hides the quest or shows only it from the marker popup', async () => {
+    const taskVisibilityActions = { hideTask: vi.fn(), showOnlyTask: vi.fn() };
+    const { wrapper, onClose } = await setup(
+      { id: 'task-1', name: 'Task' },
+      { taskVisibilityActions }
+    );
+    await wrapper.find('[data-testid="objective-show-only-task"]').trigger('click');
+    expect(taskVisibilityActions.showOnlyTask).toHaveBeenCalledWith('task-1');
+    await wrapper.find('[data-testid="objective-hide-task"]').trigger('click');
+    expect(onClose).toHaveBeenCalled();
+    expect(taskVisibilityActions.hideTask).toHaveBeenCalledWith('task-1');
   });
 });

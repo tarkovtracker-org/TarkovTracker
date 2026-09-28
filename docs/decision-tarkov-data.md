@@ -132,6 +132,11 @@ Adding a third SQL implementation would increase drift. Extract one shared pure 
 the app (`app/stores/useProgress.ts`, `app/server/utils/streamerKappa.ts`) and the Worker
 (`workers/api-gateway/src/utils/transform.ts`).**
 
+**Status 2026-09-28:** requirement-status predicates (`shared/utils/requirementStatus.ts`) and
+Worker dependent-task transitions (`shared/utils/taskTransitions.ts`) are also shared. Postgres
+validates state shape only and implements no progression rules. Remaining Phase 3 gap: app
+failed-state repair (`app/stores/tarkov/progressRepair.ts`) still reads legacy `alternatives`.
+
 ### Resolved: interim Worker JSON migration was mode-insensitive
 
 The Worker service, callers, and caches now select distinct `regular` and `pve` JSON data. Shared-profile failure metadata also uses the requested mode and the runtime-configurable Tarkov JSON base URL.
@@ -446,11 +451,11 @@ Use a canary before full rollout because current GET progress p95 CPU is already
 
 ### Phase 3 — shared rules engine
 
-- [ ] Extract one framework-free domain module.
-- [ ] Port frontend invalidation behavior.
+- [x] Extract one framework-free domain module.
+- [x] Port frontend invalidation behavior.
 - [ ] Replace `alternatives` with failure-condition edges.
-- [ ] Replace frontend implementation.
-- [ ] Replace Worker implementation.
+- [x] Replace frontend implementation.
+- [x] Replace Worker implementation.
 - [ ] Reuse engine in shared-profile/streamer paths where applicable.
 
 ### Phase 4 — Worker KV cutover
@@ -534,9 +539,12 @@ The 5–200 character `User-Agent` requirement shipped directly in API version 2
 
 ### Frontend progression
 
-- `app/utils/progressInvalidation.ts`
+- `shared/utils/progressInvalidation.ts`
+- `shared/utils/requirementStatus.ts`
+- `shared/utils/taskTransitions.ts`
 - `app/stores/useProgress.ts`
 - `app/stores/useTarkov.ts`
+- `app/stores/tarkov/progressRepair.ts`
 - `app/stores/tarkov/hideoutPrereqs.ts`
 - `app/stores/tarkov/progressMerge.ts`
 
@@ -544,7 +552,6 @@ The 5–200 character `User-Agent` requirement shipped directly in API version 2
 
 - `workers/api-gateway/src/services/tarkov.ts`
 - `workers/api-gateway/src/utils/memory-cache.ts`
-- `workers/api-gateway/src/utils/invalidation.ts`
 - `workers/api-gateway/src/utils/transform.ts`
 - `workers/api-gateway/src/handlers/progress.ts`
 - `workers/api-gateway/src/handlers/team.ts`

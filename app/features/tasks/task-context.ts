@@ -12,3 +12,10 @@ export const impactEligibleTaskIdsKey: InjectionKey<ComputedRef<Set<string> | un
 export const trackTaskProgressInteractionKey: InjectionKey<TrackTaskProgressInteraction> = Symbol(
   'trackTaskProgressInteraction'
 );
+export interface MapTaskVisibilityContext {
+  /** Tasks that draw at least one marker on the selected map. */
+  taskIds: readonly string[];
+  hiddenTaskIds: ReadonlySet<string>;
+}
+export const mapTaskVisibilityKey: InjectionKey<ComputedRef<MapTaskVisibilityContext | null>> =
+  Symbol('mapTaskVisibility');

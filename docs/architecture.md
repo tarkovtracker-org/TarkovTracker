@@ -152,7 +152,11 @@ TarkovTracker uses a **three-store pattern** with Pinia plus a computed facade:
 
 #### useTarkovStore (User Progress)
 
-**Location:** `app/stores/useTarkov.ts`
+**Location:** `app/stores/useTarkov.ts` (store, mutations, sync lifecycle entry points), with
+`app/stores/tarkov/startupLoad.ts` (startup load and local/remote reconciliation),
+`app/stores/tarkov/syncSession.ts` (the single live sync controller),
+`app/stores/tarkov/progressMigration.ts` and `app/stores/tarkov/progressRepair.ts` (migration and
+repair), and `app/stores/tarkov/progressStorePersist.ts` (localStorage persistence).
 
 Manages isolated progress for persistent PvP, persistent PvE, and numbered Seasonal PvP.
 

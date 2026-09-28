@@ -993,7 +993,25 @@
         "map_complete_tasks_toggle_show": "Show hidden",
         "map_complete_tasks_toggle_hide": "Hide map-complete",
         "map_hidden_hint": "Map hidden — click to show",
-        "raid_time_tooltip": "Current in-game raid time"
+        "raid_time_tooltip": "Current in-game raid time",
+        "raid_plan": {
+          "title": "Quests on map",
+          "summary_all": "Showing all {total}",
+          "summary_hidden": "{hidden} of {total} hidden",
+          "choose_quests": "Choose quests",
+          "show_all": "Show all",
+          "popover_description": "Untick quests you're not running this raid to clear them off the map. \"Only\" hides everything else.",
+          "only": "Only",
+          "show_only_named": "Show only {name} on the map",
+          "show_only_quest": "Show only this quest on the map",
+          "hide_quest": "Hide from map",
+          "show_quest": "Show on map",
+          "all_hidden_hint": "Every quest on this map is hidden. Use Show all to bring them back.",
+          "hidden_section_title": "Hidden from map ({count})",
+          "hidden_section_description": "Still tracked, just not drawn on the map.",
+          "hidden_section_expand": "Show hidden quests",
+          "hidden_section_collapse": "Collapse hidden quests"
+        }
       },
       "pinned_tasks_section": "Pinned Tasks",
       "focused_task_section": "Focused Task",

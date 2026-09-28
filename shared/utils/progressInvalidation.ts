@@ -8,6 +8,12 @@
  * their faction and recorded completions/failures. Tasks that ARE failed are not invalid — they
  * are simply failed; invalidation targets what the failure makes unreachable downstream.
  */
+import {
+  acceptsFailedStatus as acceptsNormalizedFailedStatus,
+  isFailedOnlyStatus,
+  normalizeRequirementStatuses,
+  requiresCompletionOrActive as requiresNormalizedCompletionOrActive,
+} from './requirementStatus';
 export type InvalidationTaskCompletion = { complete?: boolean; failed?: boolean };
 export type InvalidationTaskRequirement = { task?: { id: string }; status?: string[] };
 export type InvalidationTask = {
@@ -30,25 +36,14 @@ export type InvalidationResult = {
   invalidTasks: Record<string, boolean>;
   invalidObjectives: Record<string, boolean>;
 };
-const COMPLETION_OR_ACTIVE_STATUSES = ['complete', 'completed', 'active', 'accept', 'accepted'];
-// Graph snapshots normalize requirement statuses once; the mutable entry point rebuilds per call.
-const normalizeStatuses = (statuses: string[] | undefined): string[] => statuses ?? [];
-const hasAnyStatus = (statuses: string[], values: string[]): boolean =>
-  values.some((value) => statuses.includes(value));
-/** An empty status list means "must be complete or active" (upstream default). */
-const requiresCompletionOrActive = (statuses: string[] | undefined): boolean => {
-  const normalized = normalizeStatuses(statuses);
-  if (normalized.length === 0) return true;
-  return hasAnyStatus(normalized, COMPLETION_OR_ACTIVE_STATUSES);
-};
+// Graph snapshots normalize requirement statuses once; predicates then read them as-is.
+const statusesOf = (statuses: string[] | undefined): string[] => statuses ?? [];
+const requiresCompletionOrActive = (statuses: string[] | undefined): boolean =>
+  requiresNormalizedCompletionOrActive(statusesOf(statuses));
 const acceptsFailedStatus = (statuses: string[] | undefined): boolean =>
-  normalizeStatuses(statuses).includes('failed');
-/** The requirement is satisfied only by a failed prerequisite (e.g. `status: ['failed']`). */
-const isFailedRequirementOnly = (statuses: string[] | undefined): boolean => {
-  const normalized = normalizeStatuses(statuses);
-  if (normalized.length === 0) return false;
-  return normalized.includes('failed') && !hasAnyStatus(normalized, COMPLETION_OR_ACTIVE_STATUSES);
-};
+  acceptsNormalizedFailedStatus(statusesOf(statuses));
+const isFailedRequirementOnly = (statuses: string[] | undefined): boolean =>
+  isFailedOnlyStatus(statusesOf(statuses));
 const isCompleted = (completion: InvalidationTaskCompletion | undefined): boolean =>
   completion?.complete === true && completion?.failed !== true;
 function snapshotTask(task: InvalidationTask): InvalidationTask {
@@ -59,7 +54,7 @@ function snapshotTask(task: InvalidationTask): InvalidationTask {
     alternatives: task.alternatives?.slice(),
     taskRequirements: task.taskRequirements?.map((requirement) => ({
       task: requirement.task ? { id: requirement.task.id } : undefined,
-      status: requirement.status?.map((status) => status.toLowerCase()),
+      status: requirement.status && normalizeRequirementStatuses(requirement.status),
     })),
   };
 }

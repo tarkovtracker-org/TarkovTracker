@@ -66,6 +66,13 @@
             :class="isCompact ? 'h-3 w-3' : 'h-4 w-4'"
           />
         </button>
+        <LeafletObjectiveTaskActions
+          :task-id="taskId"
+          :actions="taskVisibilityActions"
+          :compact="isCompact"
+          :translate="translate"
+          @close="emitClose"
+        />
         <button
           type="button"
           data-testid="objective-close-button"
@@ -94,20 +101,24 @@
 <script setup lang="ts">
   import { useI18n, type Composer } from 'vue-i18n';
   import { useWikiLink } from '@/composables/useWikiLink';
+  import LeafletObjectiveTaskActions from '@/features/maps/LeafletObjectiveTaskActions.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { logger } from '@/utils/logger';
+  import type { MapTaskVisibilityActions } from '@/features/maps/utils/mapTaskVisibility';
   import type { Router } from 'vue-router';
   const props = withDefaults(
     defineProps<{
       objectiveId: string;
       readOnly?: boolean;
       t?: Composer['t'];
+      taskVisibilityActions?: MapTaskVisibilityActions | null;
     }>(),
     {
       readOnly: false,
       t: undefined,
+      taskVisibilityActions: null,
     }
   );
   const emit = defineEmits<{
@@ -156,6 +167,7 @@
     if (!taskId) return null;
     return metadataStore.tasks.find((t) => t.id === taskId) ?? null;
   });
+  const taskId = computed(() => task.value?.id);
   const taskName = computed(() => task.value?.name ?? translate('common.task'));
   const taskTarkovDevUrl = computed(() => {
     if (!task.value?.id) return '';

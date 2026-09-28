@@ -153,6 +153,8 @@ export interface PreferencesState {
   mapZoneOpacity: number;
   mapTooltipDensity: 'default' | 'compact';
   pinnedTaskIds: string[];
+  // Quests the user hid from the Tasks map (#918); persisted locally only, not synced to Supabase
+  mapHiddenTaskIds: string[];
   mapShowSelfObjectives: boolean;
   mapShowPinnedObjectives: boolean;
   mapShowTeamObjectives: boolean;
@@ -243,6 +245,7 @@ export const preferencesDefaultState: PreferencesState = {
   mapZoneOpacity: 0.24,
   mapTooltipDensity: 'default',
   pinnedTaskIds: [],
+  mapHiddenTaskIds: [],
   mapShowSelfObjectives: true,
   mapShowPinnedObjectives: true,
   mapShowTeamObjectives: true,
@@ -637,6 +640,9 @@ export const usePreferencesStore = defineStore('preferences', {
     getPinnedTaskIds: (state) => {
       return state.pinnedTaskIds ?? [];
     },
+    getMapHiddenTaskIds: (state) => {
+      return state.mapHiddenTaskIds ?? [];
+    },
     getMapShowSelfObjectives: (state) => {
       return state.mapShowSelfObjectives ?? true;
     },
@@ -935,6 +941,27 @@ export const usePreferencesStore = defineStore('preferences', {
         this.pinnedTaskIds = current.filter((id) => id !== taskId);
       }
     },
+    toggleMapHiddenTask(taskId: string) {
+      const hidden = this.mapHiddenTaskIds ?? [];
+      this.mapHiddenTaskIds = hidden.includes(taskId)
+        ? hidden.filter((id) => id !== taskId)
+        : [...hidden, taskId];
+    },
+    /** Hides every other quest on the current map and shows this one. */
+    showOnlyMapTask(taskId: string, mapTaskIds: readonly string[]) {
+      const hidden = new Set([...(this.mapHiddenTaskIds ?? []), ...mapTaskIds]);
+      hidden.delete(taskId);
+      this.mapHiddenTaskIds = [...hidden];
+    },
+    /** Shows the given quests again, or every hidden quest when omitted. */
+    clearMapTaskVisibility(taskIds?: readonly string[]) {
+      if (!taskIds) {
+        this.mapHiddenTaskIds = [];
+        return;
+      }
+      const clearSet = new Set(taskIds);
+      this.mapHiddenTaskIds = (this.mapHiddenTaskIds ?? []).filter((id) => !clearSet.has(id));
+    },
     // Skills actions
     setSkillSortMode(mode: SkillSortMode) {
       this.skillSortMode = mode;
@@ -1044,6 +1071,7 @@ export const usePreferencesStore = defineStore('preferences', {
       'mapPanSpeed',
       'mapZoneOpacity',
       'pinnedTaskIds',
+      'mapHiddenTaskIds',
       'taskFilterPresets',
       'skillSortMode',
       'traderSortMode',
