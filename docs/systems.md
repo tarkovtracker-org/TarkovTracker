@@ -2101,14 +2101,19 @@ edges, or shares a value between accounts/modes. The evaluator accepts already-r
 values, but no automatic account-value feed or verified derivation is supplied by this change.
 
 **Mark available** confirms the selected task's supported server-side start gates from the player's
-in-game observation. The confirmation is stored in that mode's task completion record, bound to the
-exact normalized requirements. It does not set a counter, acknowledge another task's dialogue, or
-complete candidate contributor tasks. It cannot bypass a known unmet value, malformed requirements,
-or independent level/faction/trader/prestige/quest gates. Changed requirements invalidate the
-confirmation; reset, completion, failure and progress repair clear it. The task's More menu can
-clear just the in-game confirmation without altering objectives or prerequisite history. Sanitization and timestamped
-sync preserve confirmations without resurrecting one after a newer reset from an older client.
-Existing incomplete/reset records are not confirmation evidence. Explicit prerequisite backfill
+in-game observation. Confirmations live in each mode's `taskAvailability` map
+(`{ [taskId]: { requirements, timestamp } }`, `app/utils/taskAvailabilityConfirmation.ts`), never in
+`taskCompletions`: confirming or clearing cannot create an "active" task record or rewrite a status
+another device set. `requirements` is the exact normalized gate signature, and a clear is an empty
+string kept as a tombstone. Sync merges the map per task by the confirmation's own timestamp. A
+confirmation counts only while its signature matches and it is not older than the task's status
+timestamp, so a later reset, completion, failure or progress repair on any device retires it without
+rewriting the map. The row sanitizer preserves the key (migration
+`20260928140000_preserve_task_availability_confirmations.sql`); a missing key means no confirmations.
+It does not set a counter, acknowledge another task's dialogue, or complete candidate contributor
+tasks. It cannot bypass a known unmet value, malformed requirements, or independent
+level/faction/trader/prestige/quest gates, and changed requirements invalidate it. The task's More
+menu clears just the in-game confirmation. Incomplete/reset records are not confirmation evidence. Explicit prerequisite backfill
 continues for unambiguous completed/failed requirements; active-or-complete and other ambiguous
 status choices no longer fabricate completion histories or flatten alternative ancestors.
 

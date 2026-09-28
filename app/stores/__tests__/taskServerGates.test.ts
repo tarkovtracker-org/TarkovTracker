@@ -20,10 +20,9 @@ const evaluate = (task: Task, overrides: Partial<TaskAvailabilityTeamData> = {})
   buildTaskEvaluations([task], new Map([['self', data(overrides)]]), {
     requireTraderLevels: false,
   })[task.id]!.self!;
-const confirmation = (task: Task) => ({
-  complete: false,
-  failed: false,
-  availabilityRequirements: otherRequirementsSignature(task),
+/** A confirmation stamped after any status change the test sets up. */
+const confirmed = (task: Task, timestamp = 1_000) => ({
+  [task.id]: { requirements: otherRequirementsSignature(task) ?? '', timestamp },
 });
 describe('server-side task start gates', () => {
   it('does not treat missing account values or task completions as counter zero', () => {
@@ -69,12 +68,12 @@ describe('server-side task start gates', () => {
   });
   it('keeps a confirmation task-local, mode/user-local and tied to the exact requirements', () => {
     const task = gate();
-    const confirmed = data({ completions: { target: confirmation(task) } });
+    const confirmedData = data({ confirmations: confirmed(task) });
     const sibling = { ...task, id: 'sibling' };
     const results = buildTaskEvaluations(
       [task, sibling],
       new Map([
-        ['self', confirmed],
+        ['self', confirmedData],
         ['teammate', data({ mode: 'pve' })],
       ]),
       { requireTraderLevels: false }
@@ -82,7 +81,7 @@ describe('server-side task start gates', () => {
     expect(results.target!.self!.available).toBe(true);
     expect(results.target!.teammate!.available).toBe(false);
     expect(results.sibling!.self!.available).toBe(false);
-    expect(evaluate(gate('>=', 5), confirmed).available).toBe(false);
+    expect(evaluate(gate('>=', 5), confirmedData).available).toBe(false);
   });
   it('never leaks confirmation into downstream active-status requirements', () => {
     const prerequisite: Task = { ...gate(), id: 'prior', minPlayerLevel: 25 };
@@ -90,12 +89,12 @@ describe('server-side task start gates', () => {
       id: 'target',
       taskRequirements: [{ task: { id: 'prior' }, status: ['active'] }],
     };
-    const confirmed = data({ completions: { prior: confirmation(prerequisite) } });
+    const confirmedData = data({ confirmations: confirmed(prerequisite) });
     // The confirmed prerequisite is still level-blocked, so the dependent stays blocked.
     expect(
       buildTaskEvaluations(
         [prerequisite, dependent],
-        new Map([['self', { ...confirmed, level: 1 }]]),
+        new Map([['self', { ...confirmedData, level: 1 }]]),
         { requireTraderLevels: false }
       ).target!.self!.available
     ).toBe(false);
@@ -103,7 +102,7 @@ describe('server-side task start gates', () => {
     expect(
       buildTaskEvaluations(
         [prerequisite, dependent],
-        new Map([['self', { ...confirmed, level: 50 }]]),
+        new Map([['self', { ...confirmedData, level: 50 }]]),
         { requireTraderLevels: false }
       ).target!.self!.available
     ).toBe(true);
@@ -116,16 +115,47 @@ describe('server-side task start gates', () => {
   });
   it('never bypasses a known unmet value, independent gates or terminal state', () => {
     const task = gate();
-    const completions = { target: confirmation(task) };
-    expect(evaluate(task, { completions, globalVariables: { counter: 0 } }).available).toBe(false);
-    expect(evaluate({ ...task, minPlayerLevel: 60 }, { completions }).available).toBe(false);
-    expect(evaluate({ ...task, disabled: true }, { completions }).available).toBe(false);
+    const confirmations = confirmed(task);
+    expect(evaluate(task, { confirmations, globalVariables: { counter: 0 } }).available).toBe(
+      false
+    );
+    expect(evaluate({ ...task, minPlayerLevel: 60 }, { confirmations }).available).toBe(false);
+    expect(evaluate({ ...task, disabled: true }, { confirmations }).available).toBe(false);
+    for (const status of [{ failed: true }, { complete: true }])
+      expect(
+        evaluate(task, {
+          confirmations,
+          completions: { target: { complete: false, failed: false, timestamp: 1, ...status } },
+        }).available
+      ).toBe(false);
+  });
+  it('retires a confirmation once the task status changes after it, on any device', () => {
+    const task = gate();
+    const reset = { target: { complete: false, failed: false, timestamp: 2_000 } };
+    expect(evaluate(task, { confirmations: confirmed(task, 1_000) }).available).toBe(true);
     expect(
-      evaluate(task, { completions: { target: { ...confirmation(task), failed: true } } }).available
+      evaluate(task, { confirmations: confirmed(task, 1_000), completions: reset }).available
     ).toBe(false);
     expect(
-      evaluate(task, { completions: { target: { ...confirmation(task), complete: true } } })
-        .available
+      evaluate(task, { confirmations: confirmed(task, 2_000), completions: reset }).available
+    ).toBe(true);
+  });
+  it('never unlocks a downstream active requirement from a cleared confirmation', () => {
+    // Review #979: confirm then clear used to leave an incomplete record that read as active.
+    const prerequisite: Task = { ...gate(), id: 'prior', minPlayerLevel: 60 };
+    const dependent: Task = {
+      id: 'dep',
+      taskRequirements: [{ task: { id: 'prior' }, status: ['active'] }],
+    };
+    const cleared = { prior: { requirements: '', timestamp: 3_000 } };
+    expect(
+      buildTaskEvaluations(
+        [prerequisite, dependent],
+        new Map([['self', data({ confirmations: cleared, level: 10 })]]),
+        {
+          requireTraderLevels: false,
+        }
+      ).dep!.self!.available
     ).toBe(false);
   });
   it.each([{}, { complete: false }, { complete: false, failed: false }, false])(
@@ -158,7 +188,7 @@ describe('server-side task start gates', () => {
       otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['trader'] }],
     };
     expect(evaluate(task).blockers[0]?.type).toBe('dialogue');
-    expect(evaluate(task, { completions: { target: confirmation(task) } }).available).toBe(true);
+    expect(evaluate(task, { confirmations: confirmed(task) }).available).toBe(true);
     task.otherRequirements!.push({ type: 'unknown' });
     expect(otherRequirementsSignature(task)).toBeUndefined();
     expect(evaluate(task).available).toBe(false);

@@ -442,7 +442,9 @@
   import { HOT_WHEELS_TASK_ID } from '@/utils/constants';
   import { getExclusiveEditionsForTask } from '@/utils/editionHelpers';
   import { getQueryString } from '@/utils/routeHelpers';
+  import { isAvailabilityConfirmed } from '@/utils/taskAvailabilityConfirmation';
   import { countIncompleteSuccessors, resolveImpactTeamIds } from '@/utils/taskImpact';
+  import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
   import { compareRequirement, getTaskTraderRequirements } from '@/utils/taskRequirements';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
   import type { ActionButtonState } from '@/features/tasks/types';
@@ -1022,12 +1024,14 @@
     // No objectives yet - show skeleton while loading or not yet hydrated
     return metadataStore.tasksObjectivesPending || !metadataStore.tasksObjectivesHydrated;
   });
-  const hasAvailabilityConfirmation = computed(() =>
-    Boolean(
-      tarkovStore.getCurrentProgressData().taskCompletions?.[props.task.id]
-        ?.availabilityRequirements
-    )
-  );
+  const hasAvailabilityConfirmation = computed(() => {
+    const progress = tarkovStore.getCurrentProgressData();
+    return isAvailabilityConfirmed(
+      progress.taskAvailability?.[props.task.id],
+      progress.taskCompletions?.[props.task.id],
+      otherRequirementsSignature(props.task)
+    );
+  });
   const openOverflowMenu = (event: MouseEvent) => {
     taskContextMenu.value?.open(event);
   };

@@ -20,29 +20,40 @@ const createProgressData = (
   storyChapters,
 });
 describe('mergeProgressData availability confirmation', () => {
-  it('preserves the newer confirmation and never resurrects it after an old-client reset', () => {
-    const confirmed = createProgressData({});
-    confirmed.taskCompletions.task = {
-      complete: false,
-      failed: false,
-      availabilityRequirements: 'requirements',
-      timestamp: 10,
-    };
-    const stale = createProgressData({});
-    stale.taskCompletions.task = { complete: false, timestamp: 5 };
-    expect(mergeProgressData(confirmed, stale).taskCompletions.task?.availabilityRequirements).toBe(
+  const withConfirmation = (requirements: string, timestamp: number) => {
+    const data = createProgressData({});
+    data.taskAvailability = { task: { requirements, timestamp } };
+    return data;
+  };
+  it('keeps the newest confirmation on its own clock and never resurrects a newer clear', () => {
+    const confirmed = withConfirmation('requirements', 10);
+    const cleared = withConfirmation('', 20);
+    for (const [a, b] of [
+      [confirmed, cleared],
+      [cleared, confirmed],
+    ] as const)
+      expect(mergeProgressData(a, b).taskAvailability?.task).toEqual({
+        requirements: '',
+        timestamp: 20,
+      });
+    const older = withConfirmation('', 5);
+    expect(mergeProgressData(older, confirmed).taskAvailability?.task?.requirements).toBe(
       'requirements'
     );
-    expect(mergeProgressData(stale, confirmed).taskCompletions.task?.availabilityRequirements).toBe(
-      'requirements'
-    );
-    stale.taskCompletions.task.timestamp = 20;
-    expect(mergeProgressData(confirmed, stale).taskCompletions.task?.availabilityRequirements).toBe(
-      ''
-    );
-    expect(mergeProgressData(stale, confirmed).taskCompletions.task?.availabilityRequirements).toBe(
-      ''
-    );
+  });
+  it('never lets a stale confirmation or clear discard another client completion', () => {
+    // Review #979: a stale client that confirms or clears later must not rewrite task status.
+    const completedElsewhere = createProgressData({});
+    completedElsewhere.taskCompletions.task = { complete: true, failed: false, timestamp: 200 };
+    const staleClient = withConfirmation('', 300);
+    for (const [a, b] of [
+      [staleClient, completedElsewhere],
+      [completedElsewhere, staleClient],
+    ] as const) {
+      const merged = mergeProgressData(a, b);
+      expect(merged.taskCompletions.task).toMatchObject({ complete: true, failed: false });
+      expect(merged.taskAvailability?.task).toEqual({ requirements: '', timestamp: 300 });
+    }
   });
 });
 describe('mergeProgressData story chapters', () => {

@@ -50,6 +50,7 @@ const defaultProgressData: UserProgressData = {
   xpOffset: 0,
   taskObjectives: {},
   taskCompletions: {},
+  taskAvailability: {},
   hideoutParts: {},
   hideoutModules: {},
   traders: {},
@@ -161,6 +162,7 @@ const getCurrentData = (state: UserState): UserProgressData => {
       displayName: null,
       xpOffset: 0,
       taskCompletions: {},
+      taskAvailability: {},
       taskObjectives: {},
       hideoutParts: {},
       hideoutModules: {},
@@ -233,7 +235,6 @@ export const getters = {
 // Helper functions for common operations
 const createCompletion = (complete: boolean, failed = false, manual?: boolean) => {
   const completion: TaskCompletion = {
-    availabilityRequirements: '',
     complete,
     failed,
     timestamp: Date.now(),
@@ -265,6 +266,21 @@ const updateObjective = <Key extends ProgressObjectKey>(
     ...(existing && typeof existing === 'object' ? existing : {}),
     ...updates,
   } as ProgressObjectEntry<Key>;
+};
+/**
+ * The timestamp is kept strictly after the task's status timestamp so a confirmation made right
+ * after a status change (same millisecond) is still honoured, and never behind the previous
+ * confirmation so the newest user intent wins a merge.
+ */
+const setAvailabilityConfirmation = (state: UserState, taskId: string, requirements: string) => {
+  const currentData = getCurrentData(state);
+  const statusTs = currentData.taskCompletions?.[taskId]?.timestamp ?? 0;
+  const previousTs = currentData.taskAvailability?.[taskId]?.timestamp ?? 0;
+  const confirmations = (currentData.taskAvailability ??= {});
+  confirmations[taskId] = {
+    requirements,
+    timestamp: Math.max(Date.now(), statusTs, previousTs + 1),
+  };
 };
 // Simplified actions
 export const actions = {
@@ -346,27 +362,11 @@ export const actions = {
     });
   },
   clearTaskAvailability(this: UserState, taskId: string) {
-    const currentData = getCurrentData(this);
-    const existing = currentData.taskCompletions?.[taskId];
-    // Clearing only the confirmation must not rewrite task status: preserve the existing
-    // terminal flags so a stale clear cannot discard another client's completion on merge.
-    updateObjective(this, 'taskCompletions', taskId, {
-      ...(typeof existing === 'object' && existing !== null
-        ? {
-            complete: existing.complete === true,
-            failed: existing.failed === true,
-            ...(typeof existing.manual === 'boolean' ? { manual: existing.manual } : {}),
-          }
-        : { complete: false, failed: false }),
-      availabilityRequirements: '',
-      timestamp: Date.now(),
-    });
+    // Only the confirmation store changes: a stale clear can never rewrite task status.
+    setAvailabilityConfirmation(this, taskId, '');
   },
   confirmTaskAvailability(this: UserState, taskId: string, requirements: string) {
-    updateObjective(this, 'taskCompletions', taskId, {
-      ...createCompletion(false, false, false),
-      availabilityRequirements: requirements,
-    });
+    setAvailabilityConfirmation(this, taskId, requirements);
   },
   setTaskComplete(this: UserState, taskId: string) {
     updateObjective(this, 'taskCompletions', taskId, createCompletion(true, false, false));

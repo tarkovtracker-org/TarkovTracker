@@ -1,3 +1,4 @@
+import { isAvailabilityConfirmed } from '@/utils/taskAvailabilityConfirmation';
 import {
   globalVariableRequirementMet,
   normalizeOtherRequirements,
@@ -5,12 +6,12 @@ import {
 } from '@/utils/taskOtherRequirements';
 import type { TaskAvailabilityTeamData, TaskBlocker } from '@/stores/taskAvailability';
 import type { Task, TaskOtherRequirement } from '@/types/tarkov';
-const confirmedRequirements = (task: Task, data: TaskAvailabilityTeamData): boolean => {
-  const completion = data.completions[task.id];
-  if (!completion || typeof completion !== 'object') return false;
-  const signature = otherRequirementsSignature(task);
-  return signature !== undefined && completion.availabilityRequirements === signature;
-};
+const confirmedRequirements = (task: Task, data: TaskAvailabilityTeamData): boolean =>
+  isAvailabilityConfirmed(
+    data.confirmations?.[task.id],
+    data.completions[task.id],
+    otherRequirementsSignature(task)
+  );
 const variableBlockers = (
   requirement: Extract<TaskOtherRequirement, { type: 'globalVariable' }>,
   data: TaskAvailabilityTeamData,

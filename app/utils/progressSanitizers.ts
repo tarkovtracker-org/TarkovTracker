@@ -12,6 +12,7 @@ import {
   MAX_SKILL_LEVEL,
   type GameMode,
 } from '@/utils/constants';
+import { sanitizeTaskAvailabilityMap } from '@/utils/taskAvailabilityConfirmation';
 import type { ApiTaskUpdate, ApiUpdateMeta, UserState } from '@/stores/progressState';
 type UserProgressData = UserState['pvp'];
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -71,9 +72,6 @@ export const sanitizeTaskCompletionMap = (value: unknown): UserProgressData['tas
     }
     if (typeof completion.manual === 'boolean') {
       normalized.manual = completion.manual;
-    }
-    if (typeof completion.availabilityRequirements === 'string') {
-      normalized.availabilityRequirements = completion.availabilityRequirements;
     }
     const timestamp = toFiniteNumber(completion.timestamp);
     if (timestamp !== null) {
@@ -229,6 +227,7 @@ export const createDefaultOwnedProgressData = (): UserProgressData => ({
   xpOffset: 0,
   taskObjectives: {},
   taskCompletions: {},
+  taskAvailability: {},
   hideoutParts: {},
   hideoutModules: {},
   traders: {},
@@ -431,6 +430,7 @@ export const sanitizeOwnedProgressData = (value: unknown): UserProgressData => {
   );
   sanitized.storyChapters = sanitizeStoryChaptersMap(value.storyChapters);
   sanitized.taskCompletions = sanitizeTaskCompletionMap(value.taskCompletions);
+  sanitized.taskAvailability = sanitizeTaskAvailabilityMap(value.taskAvailability);
   sanitized.taskObjectives = sanitizeObjectiveProgressMap(value.taskObjectives);
   sanitized.traders = sanitizeTraderMap(value.traders);
   sanitized.apiUpdateHistory = sanitizeApiUpdateHistory(value.apiUpdateHistory);
@@ -508,6 +508,7 @@ export const sanitizeTeammateProgressData = (value: unknown): Partial<UserProgre
     skills: sanitizeNumberMap(value.skills),
     storyChapters: sanitizeStoryChaptersMap(value.storyChapters),
     taskCompletions: sanitizeTaskCompletionMap(value.taskCompletions),
+    taskAvailability: sanitizeTaskAvailabilityMap(value.taskAvailability),
     taskObjectives: sanitizeObjectiveProgressMap(value.taskObjectives),
     traders: sanitizeTraderMap(value.traders),
   };

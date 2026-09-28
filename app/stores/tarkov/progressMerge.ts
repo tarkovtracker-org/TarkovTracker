@@ -12,6 +12,7 @@ import {
   sanitizeManualActivityHistory,
   sanitizeOwnedProgressData,
 } from '@/utils/progressSanitizers';
+import { mergeTaskAvailability } from '@/utils/taskAvailabilityConfirmation';
 import type { ManualActivityEntry, TaskCompletion } from '@/types/progress';
 import type { RawTaskCompletion } from '@/utils/taskStatus';
 const API_UPDATE_HISTORY_LIMIT = 50;
@@ -203,7 +204,7 @@ const normalizeTaskCompletionEntry = (
 ): TaskCompletion | undefined => {
   if (completion === null || completion === undefined) return undefined;
   if (typeof completion === 'boolean') {
-    return { complete: completion, failed: false, availabilityRequirements: '' };
+    return { complete: completion, failed: false };
   }
   const normalized: TaskCompletion = {
     complete: completion.complete === true,
@@ -215,13 +216,7 @@ const normalizeTaskCompletionEntry = (
   if (typeof completion.manual === 'boolean') {
     normalized.manual = completion.manual;
   }
-  return {
-    ...normalized,
-    availabilityRequirements:
-      typeof completion.availabilityRequirements === 'string'
-        ? completion.availabilityRequirements
-        : '',
-  };
+  return normalized;
 };
 export const normalizeTaskCompletionsMap = (
   taskCompletions: Record<string, RawTaskCompletion> | undefined
@@ -419,6 +414,7 @@ export function mergeProgressData(
     hideoutModules: mergeHideoutModules(local.hideoutModules, remote.hideoutModules),
     hideoutParts: mergeCountableObjects(local.hideoutParts, remote.hideoutParts, preferNewerCount),
     storyChapters: mergeStoryChapterProgress(local.storyChapters, remote.storyChapters),
+    taskAvailability: mergeTaskAvailability(local.taskAvailability, remote.taskAvailability),
     traders: {
       ...local.traders,
       ...remote.traders,

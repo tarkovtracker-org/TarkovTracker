@@ -21,6 +21,8 @@ import type {
 } from '@/types/tarkov';
 export type TaskAvailabilityTeamData = {
   completions: Record<string, RawTaskCompletion>;
+  /** In-game availability confirmations, kept apart from task status. */
+  confirmations?: UserProgressData['taskAvailability'];
   /** Already-resolved account values; missing keys are unknown, never zero. */
   globalVariables?: Record<string, number>;
   faction: string;

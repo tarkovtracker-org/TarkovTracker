@@ -2,6 +2,7 @@ import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import TaskCard from '@/features/tasks/TaskCard.vue';
+import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import type { TaskEvaluationMap } from '@/stores/taskAvailability';
 import type { UserProgressData } from '@/types/progress';
 import type { Task } from '@/types/tarkov';
@@ -200,10 +201,19 @@ describe('TaskCard appearance and expansion controls', () => {
     tarkovStoreMock.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
   });
   it('offers a task-local confirmation reset without touching objectives', async () => {
+    const gated: Partial<Task> = {
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['trader'] }],
+    };
     tarkovStoreMock.getCurrentProgressData.mockReturnValue({
-      taskCompletions: { 'task-1': { availabilityRequirements: 'requirements' } },
+      taskCompletions: {},
+      taskAvailability: {
+        'task-1': {
+          requirements: otherRequirementsSignature({ id: 'task-1', ...gated } as Task)!,
+          timestamp: 10,
+        },
+      },
     });
-    const wrapper = await mountTaskCard();
+    const wrapper = await mountTaskCard(gated);
     const reset = wrapper
       .findAll('button')
       .find((button) => button.text() === 'page.tasks.questcard.clear_availability_confirmation');

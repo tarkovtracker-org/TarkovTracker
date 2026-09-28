@@ -8,17 +8,27 @@ import {
   sanitizeOwnedUserState,
 } from '@/utils/progressSanitizers';
 describe('sanitizeOwnedProgressData', () => {
-  it('preserves string availability confirmations and rejects malformed ones', () => {
+  it('keeps confirmations in their own map and drops malformed ones', () => {
     const result = sanitizeOwnedProgressData({
-      taskCompletions: {
-        confirmed: { complete: false, availabilityRequirements: 'requirements' },
-        cleared: { complete: false, availabilityRequirements: '' },
-        invalid: { complete: false, availabilityRequirements: true },
+      taskCompletions: { task: { complete: false, availabilityRequirements: 'legacy' } },
+      taskAvailability: {
+        confirmed: { requirements: 'requirements', timestamp: 10.7 },
+        cleared: { requirements: '', timestamp: 20 },
+        noClock: { requirements: 'requirements' },
+        negative: { requirements: 'requirements', timestamp: -1 },
+        wrongType: { requirements: true, timestamp: 1 },
+        notObject: 'requirements',
       },
     });
-    expect(result.taskCompletions.confirmed?.availabilityRequirements).toBe('requirements');
-    expect(result.taskCompletions.cleared?.availabilityRequirements).toBe('');
-    expect(result.taskCompletions.invalid?.availabilityRequirements).toBeUndefined();
+    expect(result.taskAvailability).toEqual({
+      confirmed: { requirements: 'requirements', timestamp: 10 },
+      cleared: { requirements: '', timestamp: 20 },
+    });
+    expect(result.taskCompletions.task).toEqual({ complete: false });
+  });
+  it('defaults to no confirmations', () => {
+    expect(sanitizeOwnedProgressData({}).taskAvailability).toEqual({});
+    expect(sanitizeOwnedProgressData({ taskAvailability: [] }).taskAvailability).toEqual({});
   });
   it('drops legacy tarkov.dev payloads while preserving canonical fields', () => {
     const result = sanitizeOwnedProgressData({
@@ -53,6 +63,7 @@ describe('sanitizeOwnedProgressData', () => {
       skillOffsets: { Endurance: 3 },
       skills: { Endurance: 10 },
       storyChapters: {},
+      taskAvailability: {},
       taskCompletions: {
         task: { complete: true, timestamp: 1000 },
       },

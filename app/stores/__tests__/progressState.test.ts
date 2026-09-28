@@ -64,35 +64,37 @@ describe('progressState getters task completion compatibility', () => {
   });
 });
 describe('task availability confirmations', () => {
-  it('clears only the confirmation and preserves task and objective history', () => {
+  it('confirms and clears without touching task status or objectives', () => {
+    // Review #979: confirming must not create a completion record that reads as active, and a
+    // clear must not rewrite (and so on merge override) another device's status.
     const state = createBaseState();
     state.pvp.taskObjectives.objective = { count: 2, complete: false };
     actions.confirmTaskAvailability.call(state, 'task', 'requirements');
+    expect(state.pvp.taskCompletions.task).toBeUndefined();
+    expect(state.pvp.taskAvailability?.task?.requirements).toBe('requirements');
     actions.clearTaskAvailability.call(state, 'task');
-    expect(state.pvp.taskCompletions.task).toMatchObject({
-      complete: false,
-      failed: false,
-      availabilityRequirements: '',
-    });
+    expect(state.pvp.taskCompletions.task).toBeUndefined();
+    expect(state.pvp.taskAvailability?.task?.requirements).toBe('');
     expect(state.pvp.taskObjectives.objective).toEqual({ count: 2, complete: false });
   });
-  it('preserves terminal flags on clear so a stale client cannot discard a completion', () => {
+  it('leaves an existing completion untouched when clearing', () => {
     const state = createBaseState();
-    state.pvp.taskCompletions.task = {
-      complete: true,
-      failed: false,
-      manual: true,
-      timestamp: 10,
-    };
+    const completion = { complete: true, failed: false, manual: true, timestamp: 10 };
+    state.pvp.taskCompletions.task = { ...completion };
     actions.clearTaskAvailability.call(state, 'task');
-    expect(state.pvp.taskCompletions.task).toMatchObject({
-      complete: true,
-      failed: false,
-      manual: true,
-      availabilityRequirements: '',
-    });
+    expect(state.pvp.taskCompletions.task).toEqual(completion);
   });
-  it('scopes confirmation to the current mode and clears it on reset, completion and failure', () => {
+  it('stamps confirmations after the status clock and after the previous confirmation', () => {
+    const state = createBaseState();
+    const future = Date.now() + 60_000;
+    state.pvp.taskCompletions.task = { complete: false, failed: false, timestamp: future };
+    actions.confirmTaskAvailability.call(state, 'task', 'requirements');
+    const first = state.pvp.taskAvailability!.task!.timestamp;
+    expect(first).toBeGreaterThanOrEqual(future);
+    actions.clearTaskAvailability.call(state, 'task');
+    expect(state.pvp.taskAvailability!.task!.timestamp).toBeGreaterThan(first);
+  });
+  it('scopes confirmations to the current mode and retires them on later status changes', () => {
     const state = createBaseState();
     for (const action of [
       actions.setTaskUncompleted,
@@ -100,14 +102,13 @@ describe('task availability confirmations', () => {
       actions.setTaskFailed,
     ]) {
       actions.confirmTaskAvailability.call(state, 'task', 'requirements');
-      expect(state.pvp.taskCompletions.task).toMatchObject({
-        complete: false,
-        failed: false,
-        availabilityRequirements: 'requirements',
-      });
-      expect(state.pve.taskCompletions.task).toBeUndefined();
+      expect(state.pve.taskAvailability?.task).toBeUndefined();
+      const confirmedAt = state.pvp.taskAvailability!.task!.timestamp;
+      vi.useFakeTimers();
+      vi.setSystemTime(confirmedAt + 5);
       action.call(state, 'task');
-      expect(state.pvp.taskCompletions.task?.availabilityRequirements).toBe('');
+      expect(state.pvp.taskCompletions.task!.timestamp!).toBeGreaterThan(confirmedAt);
+      vi.useRealTimers();
     }
   });
 });
