@@ -993,7 +993,25 @@
         "map_complete_tasks_toggle_show": "Mostra nascoste",
         "map_complete_tasks_toggle_hide": "Nascondi complete per mappa",
         "map_hidden_hint": "Mappa nascosta — clicca per mostrare",
-        "raid_time_tooltip": "Orario di incursione corrente"
+        "raid_time_tooltip": "Orario di incursione corrente",
+        "raid_plan": {
+          "title": "Missioni sulla mappa",
+          "summary_all": "Mostrando tutti gli {total}",
+          "summary_hidden": "{hidden} di {total} nascosto",
+          "choose_quests": "Scegli missioni",
+          "show_all": "Mostra tutto",
+          "popover_description": "Untick missioni che non stai eseguendo questo raid per cancellarli dalla mappa. \"Unicamente\" nasconde tutto il resto.",
+          "only": "Solo",
+          "show_only_named": "Mostra solo {name} sulla mappa",
+          "show_only_quest": "Mostra solo questa missione sulla mappa",
+          "hide_quest": "Nascondi dalla mappa",
+          "show_quest": "Mostra sulla mappa",
+          "all_hidden_hint": "Ogni missione su questa mappa è nascosta. Usa Mostra tutti per riportarli.",
+          "hidden_section_title": "Nascosto dalla mappa ({count})",
+          "hidden_section_description": "Ancora tracciato, solo non disegnato sulla mappa.",
+          "hidden_section_expand": "Mostra missioni nascoste",
+          "hidden_section_collapse": "Comprimi missioni nascoste"
+        }
       },
       "pinned_tasks_section": "Missioni in evidenza",
       "focused_task_section": "Missioni focus",

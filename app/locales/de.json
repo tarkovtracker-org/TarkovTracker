@@ -993,7 +993,25 @@
         "map_complete_tasks_toggle_show": "Ausgeblendete anzeigen",
         "map_complete_tasks_toggle_hide": "Kartenziel-erledigte ausblenden",
         "map_hidden_hint": "Karte versteckt — klicke zum Anzeigen",
-        "raid_time_tooltip": "Aktuelle Schlachtzugszeit im Spiel"
+        "raid_time_tooltip": "Aktuelle Schlachtzugszeit im Spiel",
+        "raid_plan": {
+          "title": "Quests auf Karte",
+          "summary_all": "Zeige alle {total}",
+          "summary_hidden": "{hidden} von {total} versteckt",
+          "choose_quests": "Quests auswählen",
+          "show_all": "Alle anzeigen",
+          "popover_description": "Trenne Quests, die du diesen Schlachtzug nicht ausführst, um ihn von der Karte zu entfernen. \"Nur das\" versteckt alles andere.",
+          "only": "Nur",
+          "show_only_named": "Nur {name} auf der Karte anzeigen",
+          "show_only_quest": "Nur diese Quest auf der Karte anzeigen",
+          "hide_quest": "Auf Karte ausblenden",
+          "show_quest": "Auf Karte anzeigen",
+          "all_hidden_hint": "Jede Quest auf dieser Karte ist ausgeblendet. Benutze \"Alle anzeigen\" um sie wieder zu bringen.",
+          "hidden_section_title": "Versteckt auf der Karte ({count})",
+          "hidden_section_description": "Noch verfolgt, einfach nicht auf der Karte gezeichnet.",
+          "hidden_section_expand": "Versteckte Quests anzeigen",
+          "hidden_section_collapse": "Versteckte Quests einklappen"
+        }
       },
       "pinned_tasks_section": "Angeheftete Aufgaben",
       "focused_task_section": "Fokussierte Aufgabe",
