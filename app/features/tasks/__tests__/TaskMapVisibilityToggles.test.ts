@@ -17,14 +17,14 @@ const mockPreferencesStore = {
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => mockPreferencesStore,
 }));
-const mountToggles = (taskId: string, hidden: string[] = []) =>
+const mountToggles = (taskId: string, hidden: string[] = [], focus: string[] = []) =>
   mount(TaskMapVisibilityToggles, {
     props: { taskId },
     global: {
       provide: {
         [mapTaskVisibilityKey as symbol]: computed(() => ({
-          taskIds: new Set(['task-a']),
-          state: buildMapTaskVisibilityState(hidden, [], ['task-a']),
+          taskIds: new Set(['task-a', 'task-b']),
+          state: buildMapTaskVisibilityState(hidden, focus, ['task-a', 'task-b']),
         })),
       },
       stubs: {
@@ -59,5 +59,13 @@ describe('TaskMapVisibilityToggles', () => {
     expect(wrapper.find('[data-testid="task-map-hide-toggle"]').attributes('aria-label')).toBe(
       'page.tasks.map.raid_plan.show_quest'
     );
+  });
+  it('adds an out-of-focus quest to focus when shown during active focus', async () => {
+    const wrapper = mountToggles('task-a', ['task-a'], ['task-b']);
+    const hideToggle = wrapper.find('[data-testid="task-map-hide-toggle"]');
+    expect(hideToggle.attributes('aria-label')).toBe('page.tasks.map.raid_plan.show_quest');
+    await hideToggle.trigger('click');
+    expect(mockPreferencesStore.toggleMapFocusTask).toHaveBeenCalledWith('task-a');
+    expect(mockPreferencesStore.toggleMapHiddenTask).not.toHaveBeenCalled();
   });
 });

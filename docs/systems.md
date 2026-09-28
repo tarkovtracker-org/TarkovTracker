@@ -1672,7 +1672,7 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
    self-objective preference. Objectives the player does not still need themselves are dropped, so
    the Team chip never changes required-item summaries.
 5. The raid plan (#918) applies user hide/focus last. `useMapObjectiveMarks` returns `mapTaskIds`
-   (tasks with an active objective on the selected map, before hide/focus) and a
+   (tasks that draw at least one marker on the selected map, before hide/focus) and a
    `mapTaskVisibilityState`; objectives of tasks that are not shown are removed from both the
    marks and the objective-visibility map, so the required-items summary follows the raid plan.
    `MapTaskVisibilityPanel` (inline and fullscreen) and the task-card toggles edit
@@ -1690,6 +1690,7 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 - `app/features/tasks/task-objective-equipment.ts` — canonical bring-mode equipment extraction.
 - `app/pages/tasks.vue` — passes filtered tasks and shared visibility into the map components.
 - `app/features/maps/utils/mapTaskVisibility.ts` — hide/focus resolution for the raid plan.
+- `app/features/maps/composables/useMapTaskReveal.ts` — reveals a jump target after any map switch.
 - `app/features/maps/MapTaskVisibilityPanel.vue` and `app/features/tasks/TaskMapVisibilityToggles.vue`
   — raid-plan controls on the map and on task cards (via `mapTaskVisibilityKey`).
 
@@ -1724,8 +1725,10 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
   same task are mutually exclusive; "Show all" clears both for the current map's tasks only.
 - `mapHiddenTaskIds` and `mapFocusTaskIds` persist in user-scoped local preferences storage and are
   not part of the Supabase `user_preferences` sync payload (no column exists).
-- Jumping to an objective of a hidden or unfocused task reveals that task first so its popup can
-  open.
+- Jumping to an objective of a hidden or unfocused task reveals that task once it is on the
+  displayed map (after any map switch), using the destination map's focus state, so its popup can
+  open. Revealing an unfocused task adds it to focus; revealing a hidden task un-hides it. The
+  task-card "Show on map" action follows the same rule.
 - Hovering or clicking an objective marker hit-tests every visible zone and point in container
   pixels. When more than one distinct objective is under the pointer, the popup is a compact stacked
   list (points first, then zones smallest to largest); choosing an entry pins that objective's full

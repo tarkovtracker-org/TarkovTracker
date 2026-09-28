@@ -18,17 +18,18 @@
         data-testid="task-map-hide-toggle"
         size="xs"
         variant="ghost"
-        :color="isHidden ? 'warning' : 'neutral'"
-        :icon="isHidden ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'"
+        :color="isShown ? 'neutral' : 'warning'"
+        :icon="isShown ? 'i-mdi-eye-outline' : 'i-mdi-eye-off-outline'"
         class="shrink-0"
         :aria-label="hideLabel"
-        :aria-pressed="isHidden"
-        @click.stop="preferencesStore.toggleMapHiddenTask(taskId)"
+        :aria-pressed="!isShown"
+        @click.stop="toggleShown"
       />
     </AppTooltip>
   </template>
 </template>
 <script setup lang="ts">
+  import { getMapTaskUserVisibility } from '@/features/maps/utils/mapTaskVisibility';
   import { mapTaskVisibilityKey } from '@/features/tasks/task-context';
   import { usePreferencesStore } from '@/stores/usePreferences';
   const props = defineProps<{
@@ -44,15 +45,27 @@
   const isFocused = computed(
     () => context.value?.state.activeFocusTaskIds.has(props.taskId) ?? false
   );
-  const isHidden = computed(() => context.value?.state.hiddenTaskIds.has(props.taskId) ?? false);
+  const visibility = computed(() =>
+    context.value ? getMapTaskUserVisibility(props.taskId, context.value.state) : 'visible'
+  );
+  const isShown = computed(() => visibility.value === 'visible');
+  // While focus is active, showing an out-of-focus quest means adding it to the focus set;
+  // clearing it from the hidden set alone would have no visible effect.
+  const toggleShown = () => {
+    if (visibility.value === 'unfocused') {
+      preferencesStore.toggleMapFocusTask(props.taskId);
+      return;
+    }
+    preferencesStore.toggleMapHiddenTask(props.taskId);
+  };
   const focusLabel = computed(() =>
     isFocused.value
       ? t('page.tasks.map.raid_plan.unfocus_quest')
       : t('page.tasks.map.raid_plan.focus_quest')
   );
   const hideLabel = computed(() =>
-    isHidden.value
-      ? t('page.tasks.map.raid_plan.show_quest')
-      : t('page.tasks.map.raid_plan.hide_quest')
+    isShown.value
+      ? t('page.tasks.map.raid_plan.hide_quest')
+      : t('page.tasks.map.raid_plan.show_quest')
   );
 </script>

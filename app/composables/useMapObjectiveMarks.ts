@@ -246,7 +246,7 @@ interface MapObjectiveEntry {
   mark: MapObjectiveMark | null;
 }
 const collectMapTaskIds = (entries: MapObjectiveEntry[]): string[] => [
-  ...new Set(entries.map((entry) => entry.taskId)),
+  ...new Set(entries.filter((entry) => entry.mark).map((entry) => entry.taskId)),
 ];
 export function useMapObjectiveMarks({
   mapId,
@@ -317,7 +317,9 @@ export function useMapObjectiveMarks({
     });
     return entries;
   });
-  // Tasks with an active objective on this map, before user hide/focus is applied.
+  // Tasks that draw at least one marker on this map, before user hide/focus is applied. Tasks
+  // without a drawable objective here (e.g. global quests) are excluded so focusing cannot blank
+  // the map.
   const mapTaskIds = computed(() => collectMapTaskIds(mapObjectiveEntries.value));
   const mapTaskVisibilityState = computed(() =>
     buildMapTaskVisibilityState(

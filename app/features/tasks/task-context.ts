@@ -14,7 +14,7 @@ export const trackTaskProgressInteractionKey: InjectionKey<TrackTaskProgressInte
   'trackTaskProgressInteraction'
 );
 export interface MapTaskVisibilityContext {
-  /** Tasks with an active objective on the selected map. */
+  /** Tasks that draw at least one marker on the selected map. */
   taskIds: ReadonlySet<string>;
   state: MapTaskVisibilityState;
 }

@@ -519,8 +519,8 @@
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
   import { useTaskNotification } from '@/composables/useTaskNotification';
   import { useTaskRouteSync } from '@/composables/useTaskRouteSync';
+  import { useMapTaskReveal } from '@/features/maps/composables/useMapTaskReveal';
   import MapTaskVisibilityPanel from '@/features/maps/MapTaskVisibilityPanel.vue';
-  import { isTaskShownOnMap } from '@/features/maps/utils/mapTaskVisibility';
   import { useTaskFilters } from '@/features/tasks/composables/useTaskFilters';
   import { useTasksPageEffects } from '@/features/tasks/composables/useTasksPageEffects';
   import MapTaskVisibilityNotice from '@/features/tasks/MapTaskVisibilityNotice.vue';
@@ -707,18 +707,6 @@
     if (!showMapDisplay.value) return null;
     return { taskIds: new Set(mapTaskIds.value), state: mapTaskVisibilityState.value };
   });
-  /** A jump target the user hid or left out of focus is revealed so its popup can open. */
-  const revealObjectiveTaskOnMap = (objectiveId: string) => {
-    const taskId = metadataStore.objectives.find(
-      (objective) => objective.id === objectiveId
-    )?.taskId;
-    if (!taskId || isTaskShownOnMap(taskId, mapTaskVisibilityState.value)) return;
-    if (mapTaskVisibilityState.value.activeFocusTaskIds.size > 0) {
-      preferencesStore.toggleMapFocusTask(taskId);
-      return;
-    }
-    preferencesStore.toggleMapHiddenTask(taskId);
-  };
   const impactEligibleTaskIds = computed<Set<string> | undefined>(() => {
     if (!getRespectTaskFiltersForImpact.value) return undefined;
     const options = buildTaskTypeFilterOptions(preferencesStore, tarkovStore, metadataStore);
@@ -896,7 +884,7 @@
   });
   const handleJumpToMapObjective = async (objectiveId: string) => {
     isMapPanelExpanded.value = true;
-    revealObjectiveTaskOnMap(objectiveId);
+    requestObjectiveTaskReveal(objectiveId);
     try {
       await jumpToMapObjective(objectiveId);
     } catch (error) {
@@ -1055,6 +1043,11 @@
     tasks,
     visibleTasks,
   });
+  const { requestTaskReveal } = useMapTaskReveal({ mapTaskIds, mapTaskVisibilityState });
+  const requestObjectiveTaskReveal = (objectiveId: string) => {
+    const objective = metadataStore.objectives.find((entry) => entry.id === objectiveId);
+    requestTaskReveal(objective?.taskId ?? null);
+  };
   const graphVisibleTaskIds = computed(() => new Set(visibleTasks.value.map((task) => task.id)));
   const {
     pinnedTask,

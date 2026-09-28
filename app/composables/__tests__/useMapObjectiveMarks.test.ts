@@ -123,6 +123,21 @@ describe('useMapObjectiveMarks', () => {
       mapFocusTaskIds.value = ['task-b'];
       expect(result.mapObjectiveMarks.value.map((mark) => mark.id)).toEqual(['obj-b']);
     });
+    it('leaves tasks without a marker on this map out of mapTaskIds', async () => {
+      const { useMapObjectiveMarks } = await setup();
+      unlockedTasks.value = { 'task-a': { self: true }, 'task-global': { self: true } };
+      const result = useMapObjectiveMarks({
+        mapId: computed(() => 'customs'),
+        shouldShowCompletedObjectives: computed(() => false),
+        tasks: computed(() => [
+          planTasks[0]!,
+          { id: 'task-global', name: 'Global', objectives: [{ id: 'obj-global' }] } as Task,
+        ]),
+      });
+      expect(result.mapTaskIds.value).toEqual(['task-a']);
+      mapFocusTaskIds.value = ['task-global'];
+      expect(result.mapObjectiveMarks.value.map((mark) => mark.id)).toEqual(['obj-a']);
+    });
     it('ignores a focus set that has no task on the current map', async () => {
       const result = await run();
       mapFocusTaskIds.value = ['task-elsewhere'];
