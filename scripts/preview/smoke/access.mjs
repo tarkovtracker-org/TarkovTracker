@@ -53,18 +53,25 @@ export async function previewAccessSession(request, origin, env = process.env) {
   return cachedExchange(sessions, origin, () => exchangeServiceToken(request, origin, headers));
 }
 const fetchSessions = new Map();
-async function exchangeServiceTokenWithFetch(origin, fetchImpl, headers) {
-  const response = await fetchImpl(`${origin}/`, { redirect: 'manual', headers });
+const EXCHANGE_TIMEOUT_MS = 15000;
+async function exchangeServiceTokenWithFetch(origin, fetchImpl, headers, timeoutMs) {
+  const signal = AbortSignal.timeout(timeoutMs);
+  const response = await fetchImpl(`${origin}/`, { redirect: 'manual', headers, signal });
   const cookies = response.headers.getSetCookie?.() ?? [];
   const headersArray = cookies.map((value) => ({ name: 'set-cookie', value }));
   return acceptedAccessSession(response.status, headersArray);
 }
-/** Fetch-based variant for runner polls: exchanges once per origin, then sends only the session. */
-export async function previewAccessCookieHeaders(origin, fetchImpl = fetch, env = process.env) {
+/** Fetch-based variant for runner polls: a bounded exchange per origin, then only the session. */
+export async function previewAccessCookieHeaders(
+  origin,
+  fetchImpl = fetch,
+  env = process.env,
+  timeoutMs = EXCHANGE_TIMEOUT_MS
+) {
   const headers = previewAccessHeaders(env);
   if (!Object.keys(headers).length) return {};
   const session = await cachedExchange(fetchSessions, origin, () =>
-    exchangeServiceTokenWithFetch(origin, fetchImpl, headers)
+    exchangeServiceTokenWithFetch(origin, fetchImpl, headers, timeoutMs)
   );
   return { cookie: `${ACCESS_SESSION_COOKIE}=${session}` };
 }

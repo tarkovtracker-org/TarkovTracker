@@ -3,6 +3,8 @@ import { previewAccessCookieHeaders } from './access.mjs';
 // window blocks the preview gate; the window never extends for an individual failing check.
 const STARTUP_WINDOW_MS = 5 * 60 * 1000;
 const POLL_INTERVAL_MS = 5000;
+// Every attempt is aborted within this bound, so one stalled request cannot consume the window.
+const ATTEMPT_TIMEOUT_MS = 15000;
 export function requiredEnv(name) {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`${name} is required for preview smoke tests.`);
@@ -13,11 +15,17 @@ export function previewOrigin() {
   if (url.protocol !== 'https:') throw new Error('Preview URL must be HTTPS.');
   return url.origin;
 }
-async function probeOnce(origin, fetchImpl) {
+async function probeOnce(origin, fetchImpl, attemptTimeoutMs) {
   try {
     // Polls carry only the Access session; a failed exchange retries on the next poll.
-    const headers = await previewAccessCookieHeaders(origin, fetchImpl);
-    const response = await fetchImpl(`${origin}/`, { redirect: 'manual', headers });
+    const headers = await previewAccessCookieHeaders(
+      origin,
+      fetchImpl,
+      process.env,
+      attemptTimeoutMs
+    );
+    const signal = AbortSignal.timeout(attemptTimeoutMs);
+    const response = await fetchImpl(`${origin}/`, { redirect: 'manual', headers, signal });
     const type = response.headers.get('content-type') || '';
     return response.status === 200 && type.includes('text/html');
   } catch {
@@ -33,20 +41,26 @@ function startupElapsed(windowMs) {
 function pollDeadline(now, deadline) {
   return now() + POLL_INTERVAL_MS > deadline;
 }
-async function pollAttempt(origin, fetchImpl, now, deadline) {
-  if (await probeOnce(origin, fetchImpl)) return 'ready';
+async function pollAttempt(origin, fetchImpl, now, deadline, attemptTimeoutMs) {
+  if (await probeOnce(origin, fetchImpl, attemptTimeoutMs)) return 'ready';
   return pollDeadline(now, deadline) ? 'expired' : 'retry';
 }
 /** Poll until the deployment serves HTML or the startup window closes. */
 export async function waitForDeployment(
   origin,
-  { fetchImpl = fetch, now = Date.now, sleep = defaultWait(), windowMs = STARTUP_WINDOW_MS } = {}
+  {
+    fetchImpl = fetch,
+    now = Date.now,
+    sleep = defaultWait(),
+    windowMs = STARTUP_WINDOW_MS,
+    attemptTimeoutMs = ATTEMPT_TIMEOUT_MS,
+  } = {}
 ) {
   const deadline = now() + windowMs;
   let attempts = 0;
   while (now() <= deadline) {
     attempts += 1;
-    const outcome = await pollAttempt(origin, fetchImpl, now, deadline);
+    const outcome = await pollAttempt(origin, fetchImpl, now, deadline, attemptTimeoutMs);
     if (outcome === 'ready') return attempts;
     if (outcome === 'expired') break;
     await sleep(POLL_INTERVAL_MS);

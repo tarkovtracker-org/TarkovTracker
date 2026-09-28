@@ -225,3 +225,33 @@ test('re-exchanges a cached session before Access can expire it', async () => {
     }
   });
 });
+test('readiness aborts a stalled attempt and keeps polling', async () => {
+  await withAccessEnv(async () => {
+    let calls = 0;
+    const fetchImpl = (_url, options) => {
+      calls += 1;
+      if (calls === 1) {
+        return new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => reject(options.signal.reason));
+        });
+      }
+      if (options.headers['CF-Access-Client-Secret']) {
+        return Promise.resolve({
+          status: 200,
+          headers: { getSetCookie: () => ['CF_Authorization=unstalled; Path=/'] },
+        });
+      }
+      return Promise.resolve({ status: 200, headers: { get: () => 'text/html' } });
+    };
+    let clock = 0;
+    const attempts = await waitForDeployment('https://stalled.example', {
+      fetchImpl,
+      now: () => clock,
+      sleep: async (ms) => {
+        clock += ms;
+      },
+      attemptTimeoutMs: 20,
+    });
+    assert.equal(attempts, 2);
+  });
+});
