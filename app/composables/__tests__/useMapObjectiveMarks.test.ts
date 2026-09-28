@@ -11,7 +11,6 @@ const objectiveGPS = ref<Record<string, Array<{ objectiveID: string; x: number; 
 const mapTeamAllHidden = ref(false);
 const pinnedTaskIds = ref<string[]>([]);
 const mapHiddenTaskIds = ref<string[]>([]);
-const mapFocusTaskIds = ref<string[]>([]);
 const mapShowSelfObjectives = ref(true);
 const completedObjectiveIds = ref<Set<string>>(new Set());
 const completedTaskIds = ref<Set<string>>(new Set());
@@ -28,7 +27,6 @@ const setup = async () => {
   mapTeamAllHidden.value = false;
   pinnedTaskIds.value = [];
   mapHiddenTaskIds.value = [];
-  mapFocusTaskIds.value = [];
   mapShowSelfObjectives.value = true;
   completedObjectiveIds.value = new Set();
   completedTaskIds.value = new Set();
@@ -63,9 +61,6 @@ const setup = async () => {
       },
       get getMapHiddenTaskIds() {
         return mapHiddenTaskIds.value;
-      },
-      get getMapFocusTaskIds() {
-        return mapFocusTaskIds.value;
       },
       get getMapShowSelfObjectives() {
         return mapShowSelfObjectives.value;
@@ -102,7 +97,7 @@ const objectiveWithLocation = (id: string, mapId: string) => ({
   ],
 });
 describe('useMapObjectiveMarks', () => {
-  describe('user hide/focus (#918)', () => {
+  describe('user-hidden quests (#918)', () => {
     const planTasks: Task[] = [
       { id: 'task-a', name: 'A', objectives: [objectiveWithLocation('obj-a', 'customs')] },
       { id: 'task-b', name: 'B', objectives: [objectiveWithLocation('obj-b', 'customs')] },
@@ -122,11 +117,7 @@ describe('useMapObjectiveMarks', () => {
       expect(result.mapObjectiveMarks.value.map((mark) => mark.id)).toEqual(['obj-b']);
       expect(result.mapObjectiveVisibility.value.has('obj-a')).toBe(false);
       expect(result.mapTaskIds.value).toEqual(['task-a', 'task-b']);
-    });
-    it('shows only focused tasks while focus is active', async () => {
-      const result = await run();
-      mapFocusTaskIds.value = ['task-b'];
-      expect(result.mapObjectiveMarks.value.map((mark) => mark.id)).toEqual(['obj-b']);
+      expect([...result.hiddenTaskIds.value]).toEqual(['task-a']);
     });
     it('leaves tasks without a marker on this map out of mapTaskIds', async () => {
       const { useMapObjectiveMarks } = await setup();
@@ -140,20 +131,11 @@ describe('useMapObjectiveMarks', () => {
         ]),
       });
       expect(result.mapTaskIds.value).toEqual(['task-a']);
-      mapFocusTaskIds.value = ['task-global'];
-      expect(result.mapObjectiveMarks.value.map((mark) => mark.id)).toEqual(['obj-a']);
     });
     it('leaves tasks drawn only in a disabled marker category out of mapTaskIds', async () => {
       const result = await run();
       mapShowSelfObjectives.value = false;
       expect(result.mapTaskIds.value).toEqual([]);
-      mapFocusTaskIds.value = ['task-a'];
-      expect(result.mapTaskVisibilityState.value.activeFocusTaskIds.size).toBe(0);
-    });
-    it('ignores a focus set that has no task on the current map', async () => {
-      const result = await run();
-      mapFocusTaskIds.value = ['task-elsewhere'];
-      expect(result.mapObjectiveMarks.value).toHaveLength(2);
     });
   });
   it('marks a pinned task objective as pinned:true and an unpinned one as pinned:false', async () => {

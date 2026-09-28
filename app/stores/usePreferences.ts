@@ -153,9 +153,8 @@ export interface PreferencesState {
   mapZoneOpacity: number;
   mapTooltipDensity: 'default' | 'compact';
   pinnedTaskIds: string[];
-  // Per-quest map raid planning (#918); persisted locally only, not synced to Supabase
+  // Quests the user hid from the Tasks map (#918); persisted locally only, not synced to Supabase
   mapHiddenTaskIds: string[];
-  mapFocusTaskIds: string[];
   mapShowSelfObjectives: boolean;
   mapShowPinnedObjectives: boolean;
   mapShowTeamObjectives: boolean;
@@ -247,7 +246,6 @@ export const preferencesDefaultState: PreferencesState = {
   mapTooltipDensity: 'default',
   pinnedTaskIds: [],
   mapHiddenTaskIds: [],
-  mapFocusTaskIds: [],
   mapShowSelfObjectives: true,
   mapShowPinnedObjectives: true,
   mapShowTeamObjectives: true,
@@ -645,9 +643,6 @@ export const usePreferencesStore = defineStore('preferences', {
     getMapHiddenTaskIds: (state) => {
       return state.mapHiddenTaskIds ?? [];
     },
-    getMapFocusTaskIds: (state) => {
-      return state.mapFocusTaskIds ?? [];
-    },
     getMapShowSelfObjectives: (state) => {
       return state.mapShowSelfObjectives ?? true;
     },
@@ -948,32 +943,24 @@ export const usePreferencesStore = defineStore('preferences', {
     },
     toggleMapHiddenTask(taskId: string) {
       const hidden = this.mapHiddenTaskIds ?? [];
-      if (hidden.includes(taskId)) {
-        this.mapHiddenTaskIds = hidden.filter((id) => id !== taskId);
-        return;
-      }
-      this.mapHiddenTaskIds = [...hidden, taskId];
-      this.mapFocusTaskIds = (this.mapFocusTaskIds ?? []).filter((id) => id !== taskId);
+      this.mapHiddenTaskIds = hidden.includes(taskId)
+        ? hidden.filter((id) => id !== taskId)
+        : [...hidden, taskId];
     },
-    toggleMapFocusTask(taskId: string) {
-      const focused = this.mapFocusTaskIds ?? [];
-      if (focused.includes(taskId)) {
-        this.mapFocusTaskIds = focused.filter((id) => id !== taskId);
-        return;
-      }
-      this.mapFocusTaskIds = [...focused, taskId];
-      this.mapHiddenTaskIds = (this.mapHiddenTaskIds ?? []).filter((id) => id !== taskId);
+    /** Hides every other quest on the current map and shows this one. */
+    showOnlyMapTask(taskId: string, mapTaskIds: readonly string[]) {
+      const hidden = new Set([...(this.mapHiddenTaskIds ?? []), ...mapTaskIds]);
+      hidden.delete(taskId);
+      this.mapHiddenTaskIds = [...hidden];
     },
-    /** Clears user hide/focus state for the given tasks, or for every task when omitted. */
+    /** Shows the given quests again, or every hidden quest when omitted. */
     clearMapTaskVisibility(taskIds?: readonly string[]) {
       if (!taskIds) {
         this.mapHiddenTaskIds = [];
-        this.mapFocusTaskIds = [];
         return;
       }
       const clearSet = new Set(taskIds);
       this.mapHiddenTaskIds = (this.mapHiddenTaskIds ?? []).filter((id) => !clearSet.has(id));
-      this.mapFocusTaskIds = (this.mapFocusTaskIds ?? []).filter((id) => !clearSet.has(id));
     },
     // Skills actions
     setSkillSortMode(mode: SkillSortMode) {
@@ -1085,7 +1072,6 @@ export const usePreferencesStore = defineStore('preferences', {
       'mapZoneOpacity',
       'pinnedTaskIds',
       'mapHiddenTaskIds',
-      'mapFocusTaskIds',
       'taskFilterPresets',
       'skillSortMode',
       'traderSortMode',

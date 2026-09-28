@@ -1,7 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computed } from 'vue';
-import { buildMapTaskVisibilityState } from '@/features/maps/utils/mapTaskVisibility';
 import { mapTaskVisibilityKey } from '@/features/tasks/task-context';
 import TaskMapVisibilityToggles from '@/features/tasks/TaskMapVisibilityToggles.vue';
 vi.mock('vue-i18n', async (importOriginal) => ({
@@ -11,20 +10,20 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 const mockPreferencesStore = {
-  toggleMapFocusTask: vi.fn(),
+  showOnlyMapTask: vi.fn(),
   toggleMapHiddenTask: vi.fn(),
 };
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => mockPreferencesStore,
 }));
-const mountToggles = (taskId: string, hidden: string[] = [], focus: string[] = []) =>
+const mountToggles = (taskId: string, hidden: string[] = []) =>
   mount(TaskMapVisibilityToggles, {
     props: { taskId },
     global: {
       provide: {
         [mapTaskVisibilityKey as symbol]: computed(() => ({
-          taskIds: new Set(['task-a', 'task-b']),
-          state: buildMapTaskVisibilityState(hidden, focus, ['task-a', 'task-b']),
+          taskIds: ['task-a', 'task-b'],
+          hiddenTaskIds: new Set(hidden),
         })),
       },
       stubs: {
@@ -47,25 +46,22 @@ describe('TaskMapVisibilityToggles', () => {
     const wrapper = mountToggles('task-elsewhere');
     expect(wrapper.find('button').exists()).toBe(false);
   });
-  it('toggles focus and hide for a task on the map', async () => {
+  it('hides a task or shows only it', async () => {
     const wrapper = mountToggles('task-a');
-    await wrapper.find('[data-testid="task-map-focus-toggle"]').trigger('click');
+    await wrapper.find('[data-testid="task-map-show-only"]').trigger('click');
     await wrapper.find('[data-testid="task-map-hide-toggle"]').trigger('click');
-    expect(mockPreferencesStore.toggleMapFocusTask).toHaveBeenCalledWith('task-a');
+    expect(mockPreferencesStore.showOnlyMapTask).toHaveBeenCalledWith('task-a', [
+      'task-a',
+      'task-b',
+    ]);
     expect(mockPreferencesStore.toggleMapHiddenTask).toHaveBeenCalledWith('task-a');
   });
-  it('labels a hidden task with the show action', () => {
+  it('offers only the show action for a hidden task', async () => {
     const wrapper = mountToggles('task-a', ['task-a']);
-    expect(wrapper.find('[data-testid="task-map-hide-toggle"]').attributes('aria-label')).toBe(
-      'page.tasks.map.raid_plan.show_quest'
-    );
-  });
-  it('adds an out-of-focus quest to focus when shown during active focus', async () => {
-    const wrapper = mountToggles('task-a', ['task-a'], ['task-b']);
+    expect(wrapper.find('[data-testid="task-map-show-only"]').exists()).toBe(false);
     const hideToggle = wrapper.find('[data-testid="task-map-hide-toggle"]');
     expect(hideToggle.attributes('aria-label')).toBe('page.tasks.map.raid_plan.show_quest');
     await hideToggle.trigger('click');
-    expect(mockPreferencesStore.toggleMapFocusTask).toHaveBeenCalledWith('task-a');
-    expect(mockPreferencesStore.toggleMapHiddenTask).not.toHaveBeenCalled();
+    expect(mockPreferencesStore.toggleMapHiddenTask).toHaveBeenCalledWith('task-a');
   });
 });

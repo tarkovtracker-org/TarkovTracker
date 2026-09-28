@@ -1,9 +1,4 @@
 import { storeToRefs } from 'pinia';
-import {
-  buildMapTaskVisibilityState,
-  isTaskShownOnMap,
-  type MapTaskVisibilityState,
-} from '@/features/maps/utils/mapTaskVisibility';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
@@ -263,7 +258,7 @@ export function useMapObjectiveMarks({
   mapObjectiveMarks: ComputedRef<MapObjectiveMark[]>;
   mapObjectiveVisibility: ComputedRef<ReadonlyMap<string, MapObjectiveVisibility>>;
   mapTaskIds: ComputedRef<string[]>;
-  mapTaskVisibilityState: ComputedRef<MapTaskVisibilityState>;
+  hiddenTaskIds: ComputedRef<ReadonlySet<string>>;
 } {
   const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
@@ -324,11 +319,9 @@ export function useMapObjectiveMarks({
     });
     return entries;
   });
-  // Tasks that draw at least one marker in an enabled category on this map, before user
-  // hide/focus is applied. Tasks without a drawable objective here (e.g. global quests) are
-  // excluded so focusing cannot blank the map.
-  // Mirrors LeafletMap's category gate so a quest drawn only in a disabled category cannot
-  // activate focus and blank the map.
+  // Tasks that draw at least one marker in an enabled category on this map, before the user's
+  // hidden list is applied. Mirrors LeafletMap's category gate, so quests without a drawable
+  // marker here (e.g. global quests) never get hide controls or count toward "show only".
   const categoryEnabled = computed<Record<MapObjectiveCategory, boolean>>(() => ({
     self: preferencesStore.getMapShowSelfObjectives ?? true,
     pinned: preferencesStore.getMapShowPinnedObjectives ?? true,
@@ -337,17 +330,12 @@ export function useMapObjectiveMarks({
   const mapTaskIds = computed(() =>
     collectMapTaskIds(mapObjectiveEntries.value, categoryEnabled.value)
   );
-  const mapTaskVisibilityState = computed(() =>
-    buildMapTaskVisibilityState(
-      preferencesStore.getMapHiddenTaskIds ?? [],
-      preferencesStore.getMapFocusTaskIds ?? [],
-      mapTaskIds.value
-    )
+  const hiddenTaskIds = computed<ReadonlySet<string>>(
+    () => new Set(preferencesStore.getMapHiddenTaskIds ?? [])
   );
-  const shownEntries = computed(() => {
-    const state = mapTaskVisibilityState.value;
-    return mapObjectiveEntries.value.filter((entry) => isTaskShownOnMap(entry.taskId, state));
-  });
+  const shownEntries = computed(() =>
+    mapObjectiveEntries.value.filter((entry) => !hiddenTaskIds.value.has(entry.taskId))
+  );
   const mapObjectiveMarks = computed(() =>
     shownEntries.value.flatMap((entry) => (entry.mark ? [entry.mark] : []))
   );
@@ -358,6 +346,6 @@ export function useMapObjectiveMarks({
     mapObjectiveMarks,
     mapObjectiveVisibility,
     mapTaskIds,
-    mapTaskVisibilityState,
+    hiddenTaskIds,
   };
 }

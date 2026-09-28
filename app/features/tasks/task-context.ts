@@ -1,6 +1,5 @@
 import type { ComputedRef, InjectionKey, Ref } from '#imports';
 import type { DashboardFocusProgressInteraction } from '@/composables/useDashboardFocusAnalytics';
-import type { MapTaskVisibilityState } from '@/features/maps/utils/mapTaskVisibility';
 export type JumpToMapObjective = (objectiveId: string) => void | Promise<void>;
 export type TrackTaskProgressInteraction = (
   taskId: string,
@@ -15,8 +14,8 @@ export const trackTaskProgressInteractionKey: InjectionKey<TrackTaskProgressInte
 );
 export interface MapTaskVisibilityContext {
   /** Tasks that draw at least one marker on the selected map. */
-  taskIds: ReadonlySet<string>;
-  state: MapTaskVisibilityState;
+  taskIds: readonly string[];
+  hiddenTaskIds: ReadonlySet<string>;
 }
 export const mapTaskVisibilityKey: InjectionKey<ComputedRef<MapTaskVisibilityContext | null>> =
   Symbol('mapTaskVisibility');

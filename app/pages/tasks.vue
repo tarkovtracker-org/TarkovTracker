@@ -111,10 +111,11 @@
                     <template v-if="selectedMapData">
                       <MapTaskVisibilityPanel
                         :tasks="mapPlanTasks"
-                        :state="mapTaskVisibilityState"
+                        :hidden-task-ids="hiddenTaskIds"
                       />
                       <LeafletMapComponent
                         ref="leafletMapRef"
+                        :task-visibility-actions="mapTaskVisibilityActions"
                         :map="selectedMapData"
                         :marks="mapObjectiveMarks"
                         :show-extracts="true"
@@ -177,6 +178,19 @@
               />
             </div>
             <div v-else ref="taskListRef" data-testid="task-list">
+              <MapHiddenTasksSection
+                v-if="hiddenListTasks.length > 0"
+                :count="hiddenListTasks.length"
+                @show-all="showHiddenListTasks"
+              >
+                <div
+                  v-for="task in hiddenListTasks"
+                  :key="`hidden-${task.id}`"
+                  :class="taskCardGapClass"
+                >
+                  <TaskCard :task="task" @on-task-action="handleTaskAction" />
+                </div>
+              </MapHiddenTasksSection>
               <div
                 v-if="focusedTaskInSlice.length > 0"
                 data-testid="focused-task-section"
@@ -307,7 +321,7 @@
                 @toggle="toggleMapTaskVisibilityFilter"
               />
               <div
-                v-if="visibleTaskCount < filteredTasks.length"
+                v-if="hasMoreTasks"
                 ref="loadMoreSentinel"
                 class="flex items-center justify-center py-4"
               >
@@ -477,11 +491,12 @@
             </AppTooltip>
           </div>
           <div v-if="selectedMapData" class="bg-surface-900 px-4 pt-3">
-            <MapTaskVisibilityPanel :tasks="mapPlanTasks" :state="mapTaskVisibilityState" />
+            <MapTaskVisibilityPanel :tasks="mapPlanTasks" :hidden-task-ids="hiddenTaskIds" />
           </div>
           <div v-if="selectedMapData" class="flex min-h-0 flex-1">
             <LeafletMapComponent
               ref="fullscreenLeafletMapRef"
+              :task-visibility-actions="mapTaskVisibilityActions"
               :map="selectedMapData"
               :marks="mapObjectiveMarks"
               :show-extracts="true"
@@ -519,10 +534,14 @@
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
   import { useTaskNotification } from '@/composables/useTaskNotification';
   import { useTaskRouteSync } from '@/composables/useTaskRouteSync';
-  import { useMapTaskReveal } from '@/features/maps/composables/useMapTaskReveal';
   import MapTaskVisibilityPanel from '@/features/maps/MapTaskVisibilityPanel.vue';
+  import {
+    getHiddenMapTaskIds,
+    type MapTaskVisibilityActions,
+  } from '@/features/maps/utils/mapTaskVisibility';
   import { useTaskFilters } from '@/features/tasks/composables/useTaskFilters';
   import { useTasksPageEffects } from '@/features/tasks/composables/useTasksPageEffects';
+  import MapHiddenTasksSection from '@/features/tasks/MapHiddenTasksSection.vue';
   import MapTaskVisibilityNotice from '@/features/tasks/MapTaskVisibilityNotice.vue';
   import {
     impactEligibleTaskIdsKey,
@@ -693,7 +712,7 @@
   const sourceMapTasks = computed(() =>
     isSearchActive.value ? filteredTasks.value : visibleTasks.value
   );
-  const { mapObjectiveMarks, mapObjectiveVisibility, mapTaskIds, mapTaskVisibilityState } =
+  const { mapObjectiveMarks, mapObjectiveVisibility, mapTaskIds, hiddenTaskIds } =
     useMapObjectiveMarks({
       mapId: selectedMapId,
       shouldShowCompletedObjectives,
@@ -705,7 +724,7 @@
   });
   const mapTaskVisibilityContext = computed<MapTaskVisibilityContext | null>(() => {
     if (!showMapDisplay.value) return null;
-    return { taskIds: new Set(mapTaskIds.value), state: mapTaskVisibilityState.value };
+    return { taskIds: mapTaskIds.value, hiddenTaskIds: hiddenTaskIds.value };
   });
   const impactEligibleTaskIds = computed<Set<string> | undefined>(() => {
     if (!getRespectTaskFiltersForImpact.value) return undefined;
@@ -882,9 +901,20 @@
     if (isMapView || !isMapFullscreen.value) return;
     closeMapFullscreen();
   });
+  // Jumping to an objective of a hidden quest shows that quest again so its marker can open.
+  const revealObjectiveTask = (objectiveId: string) => {
+    const taskId = metadataStore.objectives.find((entry) => entry.id === objectiveId)?.taskId;
+    if (taskId && hiddenTaskIds.value.has(taskId)) {
+      preferencesStore.clearMapTaskVisibility([taskId]);
+    }
+  };
+  const mapTaskVisibilityActions: MapTaskVisibilityActions = {
+    hideTask: (taskId) => preferencesStore.toggleMapHiddenTask(taskId),
+    showOnlyTask: (taskId) => preferencesStore.showOnlyMapTask(taskId, mapTaskIds.value),
+  };
   const handleJumpToMapObjective = async (objectiveId: string) => {
     isMapPanelExpanded.value = true;
-    requestObjectiveTaskReveal(objectiveId);
+    revealObjectiveTask(objectiveId);
     try {
       await jumpToMapObjective(objectiveId);
     } catch (error) {
@@ -1043,11 +1073,6 @@
     tasks,
     visibleTasks,
   });
-  const { requestTaskReveal } = useMapTaskReveal({ mapTaskIds, mapTaskVisibilityState });
-  const requestObjectiveTaskReveal = (objectiveId: string) => {
-    const objective = metadataStore.objectives.find((entry) => entry.id === objectiveId);
-    requestTaskReveal(objective?.taskId ?? null);
-  };
   const graphVisibleTaskIds = computed(() => new Set(visibleTasks.value.map((task) => task.id)));
   const {
     pinnedTask,
@@ -1073,11 +1098,27 @@
   const BATCH_SIZE = 8;
   const visibleTaskCount = ref(BATCH_SIZE);
   const loadMoreSentinel = ref<HTMLElement | null>(null);
+  // Quests hidden from the map leave the main list so it matches the map; the task opened from a
+  // link stays in its own section.
+  const hiddenListTaskIds = computed<ReadonlySet<string>>(() => {
+    if (!showMapDisplay.value) return new Set();
+    const hidden = getHiddenMapTaskIds(mapTaskIds.value, hiddenTaskIds.value);
+    return new Set(hidden.filter((taskId) => taskId !== pinnedTask.value?.id));
+  });
+  const listedTasks = computed(() =>
+    filteredTasks.value.filter((task) => !hiddenListTaskIds.value.has(task.id))
+  );
+  const hiddenListTasks = computed(() =>
+    filteredTasks.value.filter((task) => hiddenListTaskIds.value.has(task.id))
+  );
+  const showHiddenListTasks = () => {
+    preferencesStore.clearMapTaskVisibility([...hiddenListTaskIds.value]);
+  };
   const visibleTasksSlice = computed(() => {
     if (!pinnedTask.value) {
-      return filteredTasks.value.slice(0, visibleTaskCount.value);
+      return listedTasks.value.slice(0, visibleTaskCount.value);
     }
-    const remaining = filteredTasks.value.filter((task) => task.id !== pinnedTask.value?.id);
+    const remaining = listedTasks.value.filter((task) => task.id !== pinnedTask.value?.id);
     const sliceCount = Math.max(visibleTaskCount.value - 1, 0);
     return [pinnedTask.value, ...remaining.slice(0, sliceCount)];
   });
@@ -1113,12 +1154,12 @@
     if (!shouldGroupGlobalTasks.value) return [];
     return unpinnedTasksInSlice.value.filter((task) => isGlobalTask(task));
   });
-  const hasMoreTasks = computed(() => visibleTaskCount.value < filteredTasks.value.length);
+  const hasMoreTasks = computed(() => visibleTaskCount.value < listedTasks.value.length);
   const loadMoreTasks = () => {
     if (!hasMoreTasks.value) return;
     visibleTaskCount.value = Math.min(
       visibleTaskCount.value + BATCH_SIZE,
-      filteredTasks.value.length
+      listedTasks.value.length
     );
   };
   const { checkAndLoadMore } = useInfiniteScroll(loadMoreSentinel, loadMoreTasks, {

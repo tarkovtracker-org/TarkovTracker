@@ -695,6 +695,7 @@
     isValidMapSvgConfig,
     isValidMapTileConfig,
   } from '@/utils/mapCoordinates';
+  import type { MapTaskVisibilityActions } from '@/features/maps/utils/mapTaskVisibility';
   import type { TarkovMap } from '@/types/tarkov';
   import type L from 'leaflet';
   const MAP_CONTROLS_HINT_KEY = 'mapControlsHintSeen';
@@ -748,6 +749,7 @@
     height?: number;
     initialView?: MapViewState | null;
     initialFloor?: string;
+    taskVisibilityActions?: MapTaskVisibilityActions | null;
   }
   const props = withDefaults(defineProps<Props>(), {
     marks: () => [],
@@ -761,6 +763,7 @@
     height: undefined,
     initialView: null,
     initialFloor: undefined,
+    taskVisibilityActions: null,
   });
   const emit = defineEmits<{ 'toggle-fullscreen': [] }>();
   const { t } = useI18n({ useScope: 'global' });
@@ -1445,7 +1448,11 @@
     };
   };
   const mountObjectiveTooltip = (objectiveId: string, onClose: () => void) =>
-    mountPopupContent(LeafletObjectiveTooltip, { objectiveId, onClose });
+    mountPopupContent(LeafletObjectiveTooltip, {
+      objectiveId,
+      onClose,
+      taskVisibilityActions: props.taskVisibilityActions,
+    });
   const mountObjectiveStack = (
     objectiveIds: string[],
     onSelect: (objectiveId: string) => void,
