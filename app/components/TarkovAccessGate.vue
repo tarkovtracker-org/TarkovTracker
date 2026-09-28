@@ -176,12 +176,22 @@
   const showDismissedNotice = computed(
     () => access.accessEnabled && access.dismissed.value && !gateVisible.value
   );
-  // Callers already failed while dismissed, so a released retry reloads metadata.
+  // Metadata callers already failed before a recovery, so any recovered release reloads them.
+  watch(
+    () => access.recoveryEpoch.value,
+    (epoch, previousEpoch) => {
+      if (!access.accessEnabled || epoch <= previousEpoch) return;
+      useMetadataStore()
+        .fetchAllData(false)
+        .catch((cause: unknown) => {
+          logger.debug('[TarkovAccessGate] Metadata reload after access recovery failed:', cause);
+        });
+    }
+  );
   const handleVerifyAfterDismiss = async (): Promise<void> => {
     resetWidget();
     try {
       await access.retry();
-      await useMetadataStore().fetchAllData(false);
     } catch (cause) {
       logger.debug('[TarkovAccessGate] Access retry after dismissal failed:', cause);
     }

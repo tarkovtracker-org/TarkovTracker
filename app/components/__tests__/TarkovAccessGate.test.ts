@@ -119,6 +119,7 @@ const releaseAfterChallenge = async () => {
 };
 beforeEach(async () => {
   fetchAllData.mockReset();
+  fetchAllData.mockResolvedValue(undefined);
   resetTarkovAccessForTests();
   await flushPromises();
   resetTarkovAccessForTests();
@@ -393,6 +394,40 @@ describe('TarkovAccessGate', () => {
     expect(getTarkovAccessState().phase.value).toBe('released');
     expect(fetchAllData).toHaveBeenCalledWith(false);
     expect(isVisible(wrapper)).toBe(false);
+  });
+  it('reloads metadata when a later retry recovers from a failed verify action', async () => {
+    const wrapper = await mountGate();
+    await startChallengedRequest();
+    await dismissButton(wrapper).trigger('click');
+    await settle();
+    network.mockResolvedValueOnce(challenge());
+    await wrapper.find('[data-testid="tarkov-access-dismissed-verify"]').trigger('click');
+    await settle();
+    widget.unavailable.value = true;
+    await settle();
+    expect(retryButton(wrapper).exists()).toBe(true);
+    expect(fetchAllData).not.toHaveBeenCalled();
+    widget.unavailable.value = false;
+    network.mockResolvedValueOnce(json());
+    await retryButton(wrapper).trigger('click');
+    await settle();
+    expect(getTarkovAccessState().phase.value).toBe('released');
+    expect(fetchAllData).toHaveBeenCalledTimes(1);
+    expect(fetchAllData).toHaveBeenCalledWith(false);
+  });
+  it('logs a failed metadata reload after access recovery', async () => {
+    fetchAllData.mockRejectedValueOnce(new Error('reload failed'));
+    const wrapper = await mountGate();
+    await startChallengedRequest();
+    await dismissButton(wrapper).trigger('click');
+    await settle();
+    network.mockResolvedValueOnce(json());
+    await wrapper.find('[data-testid="tarkov-access-dismissed-verify"]').trigger('click');
+    await settle();
+    expect(logger.debug).toHaveBeenCalledWith(
+      '[TarkovAccessGate] Metadata reload after access recovery failed:',
+      expect.objectContaining({ message: 'reload failed' })
+    );
   });
   it('logs a failed verify action after dismissal without reloading metadata', async () => {
     const wrapper = await mountGate();

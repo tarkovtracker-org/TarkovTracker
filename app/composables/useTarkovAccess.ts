@@ -22,6 +22,8 @@ export interface UseTarkovAccessReturn {
   dismissed: Readonly<Ref<boolean>>;
   /** Epoch ms before which a rate-limited verification should not be retried. */
   retryAvailableAt: Readonly<Ref<number>>;
+  /** Bumped by the first release after a failed flow. */
+  recoveryEpoch: Readonly<Ref<number>>;
   /** Whether the feature gate is active in the public runtime config. */
   accessEnabled: boolean;
   /** True when a site key is available, so an actual widget can be rendered. */
@@ -56,6 +58,7 @@ export function useTarkovAccess(): UseTarkovAccessReturn {
     challengeSeen: state.challengeSeen,
     dismissed: state.dismissed,
     retryAvailableAt: state.retryAvailableAt,
+    recoveryEpoch: state.recoveryEpoch,
     accessEnabled: isTarkovAccessEnabled(),
     widgetSiteKey,
     widgetAvailable: widgetSiteKey.length > 0,
