@@ -3,8 +3,14 @@ import type { RawTaskCompletion } from '@/utils/taskStatus';
 type ConfirmationMap = NonNullable<UserProgressData['taskAvailability']>;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
+/** Clocks are incremented (`+ 1`), so only safely representable integers are accepted. */
 const toTimestamp = (value: unknown): number | undefined =>
-  typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.trunc(value) : undefined;
+  typeof value === 'number' &&
+  Number.isFinite(value) &&
+  value >= 0 &&
+  value <= Number.MAX_SAFE_INTEGER
+    ? Math.trunc(value)
+    : undefined;
 const sanitizeConfirmation = (value: unknown): TaskAvailabilityConfirmation | undefined => {
   if (!isRecord(value) || typeof value.requirements !== 'string') return undefined;
   const timestamp = toTimestamp(value.timestamp);

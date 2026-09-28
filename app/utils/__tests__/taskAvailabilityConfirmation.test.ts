@@ -42,5 +42,13 @@ describe('task availability confirmations', () => {
     expect(
       sanitizeTaskAvailabilityMap({ a: { requirements: 'x', timestamp: Number.NaN } })
     ).toEqual({});
+    expect(
+      sanitizeTaskAvailabilityMap({
+        a: { requirements: 'x', timestamp: Number.MAX_SAFE_INTEGER + 2 },
+      })
+    ).toEqual({});
+    expect(
+      sanitizeTaskAvailabilityMap({ a: { requirements: 'x', timestamp: Number.MAX_SAFE_INTEGER } })
+    ).toEqual({ a: { requirements: 'x', timestamp: Number.MAX_SAFE_INTEGER } });
   });
 });

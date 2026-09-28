@@ -50,7 +50,8 @@ AS $$
       AND jsonb_typeof(entry.value->'requirements') = 'string'
       AND jsonb_typeof(entry.value->'timestamp') = 'number'
       AND (entry.value->>'timestamp')::numeric >= 0
-      AND (entry.value->>'timestamp')::numeric < 9223372036854775807
+      -- Clients increment this clock, so it must stay within JavaScript's safe integer range.
+      AND (entry.value->>'timestamp')::numeric <= 9007199254740991
     ORDER BY
       entry.key,
       trunc((entry.value->>'timestamp')::numeric) DESC,

@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(9);
+SELECT plan(10);
 
 SELECT is(
   public.sanitize_user_progress_mode_data(
@@ -81,6 +81,16 @@ SELECT is(
   )->'taskAvailability',
   NULL,
   'a newer progress reset replaces the row, including confirmations'
+);
+
+SELECT is(
+  public.merge_task_availability(
+    NULL,
+    '{"safe": {"requirements": "", "timestamp": 9007199254740991},
+      "unsafe": {"requirements": "", "timestamp": 9007199254740992}}'
+  ),
+  '{"safe": {"requirements": "", "timestamp": 9007199254740991}}'::jsonb,
+  'rejects clocks outside the JavaScript safe integer range'
 );
 
 SELECT * FROM finish();
