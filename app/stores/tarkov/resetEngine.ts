@@ -1,8 +1,8 @@
 import { defaultState, type UserProgressData, type UserState } from '@/stores/progressState';
-import { deepEqual } from '@/stores/tarkov/deepEqual';
 import { clearActiveProgressStorage } from '@/stores/tarkov/localStorage';
 import {
   getNextProgressEpoch,
+  hasRetainableModeProgress,
   mergeManualActivityHistory,
   mergePreferringSingleValues,
   mergeProgressData,
@@ -28,11 +28,9 @@ type ResetTargetStore = {
 };
 const hasPendingOrUnsavedProgress = (): boolean =>
   hasPendingCloudChanges() || hasUnsavedProgressChanges();
-const hasChangesInResetModes = (
-  resetModes: readonly GameMode[],
-  state: UserState,
-  defaults: UserState
-): boolean => resetModes.some((mode) => !deepEqual(state[mode], defaults[mode]));
+/** Reset clocks alone (an earlier reset) are not progress worth retaining. */
+const hasChangesInResetModes = (resetModes: readonly GameMode[], state: UserState): boolean =>
+  resetModes.some((mode) => hasRetainableModeProgress(state[mode]));
 const hasControllerlessLocalChanges = (
   syncControllerAvailable: boolean,
   hasLocalChanges: boolean
@@ -211,15 +209,14 @@ export const executeWithSyncPause = async <T>(operation: () => Promise<T>): Prom
 };
 const seasonNumberFor = (mode: GameMode, state: UserState): number | null =>
   mode === GAME_MODES.SEASONAL ? (state.seasonalSeasonNumber ?? null) : null;
-/** Keep a superseded copy of each changed mode; an untouched mode has nothing to supersede. */
+/** Keep a superseded copy of each mode with retainable progress; others have nothing to keep. */
 const retainSupersededModes = (
   ownerId: string,
   resetModes: readonly GameMode[],
-  state: UserState,
-  freshState: UserState
+  state: UserState
 ): void => {
   for (const mode of resetModes) {
-    if (deepEqual(state[mode], freshState[mode])) continue;
+    if (!hasRetainableModeProgress(state[mode])) continue;
     if (!saveSupersededProgressCopy(ownerId, mode, seasonNumberFor(mode, state), state[mode])) {
       throw new Error('Could not retain pending progress before reset');
     }
@@ -228,15 +225,14 @@ const retainSupersededModes = (
 const retainBeforeReset = (
   ownerId: string | null,
   resetModes: readonly GameMode[],
-  state: UserState,
-  freshState: UserState
+  state: UserState
 ): void => {
   const retentionOwnerId = ownerIdToRetainBeforeReset(
     ownerId,
     Boolean(getRegisteredSyncController()),
-    hasChangesInResetModes(resetModes, state, freshState)
+    hasChangesInResetModes(resetModes, state)
   );
-  if (retentionOwnerId) retainSupersededModes(retentionOwnerId, resetModes, state, freshState);
+  if (retentionOwnerId) retainSupersededModes(retentionOwnerId, resetModes, state);
 };
 /** The full post-reset state: reset modes (and metadata for `all`) from `freshState`. */
 const buildResetState = (
@@ -291,7 +287,7 @@ export const performReset = async (mode: ResetMode, store: ResetTargetStore): Pr
   const resetModes: readonly GameMode[] = resetAll ? GAME_MODE_VALUES : [mode];
   const ownerId = $supabase.user.loggedIn ? $supabase.user.id : null;
   const syncController = getRegisteredSyncController();
-  retainBeforeReset(ownerId, resetModes, store.$state, freshState);
+  retainBeforeReset(ownerId, resetModes, store.$state);
   for (const resetMode of resetModes) {
     freshState[resetMode].progressEpoch = getNextProgressEpoch(store.$state[resetMode]);
   }

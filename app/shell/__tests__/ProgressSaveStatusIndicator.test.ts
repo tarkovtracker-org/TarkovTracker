@@ -72,6 +72,13 @@ describe('ProgressSaveStatusIndicator', () => {
     await wrapper.vm.$nextTick();
     expect(live.text()).toBe('progress_save_status.cloud_failed_label');
   });
+  it('does not announce the routine pending state that follows every edit', async () => {
+    const wrapper = await mountIndicator();
+    cloud('pending');
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-testid="progress-save-status"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="progress-save-status-live"]').text()).toBe('');
+  });
   it('marks pending cloud changes and confirms only the verified local copy', async () => {
     cloud('pending');
     const wrapper = await mountIndicator();

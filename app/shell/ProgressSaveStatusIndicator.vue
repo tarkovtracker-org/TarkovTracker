@@ -109,7 +109,10 @@
   } = useProgressSaveStatus();
   const presentation = computed(() => PRESENTATION[kind.value ?? 'cloud_pending']);
   const label = computed(() => t(`progress_save_status.${kind.value ?? 'cloud_pending'}_label`));
-  const announcement = computed(() => (kind.value ? label.value : ''));
+  /** Routine pending saves follow every edit; only warnings are announced. */
+  const announcement = computed(() =>
+    kind.value && kind.value !== 'cloud_pending' ? label.value : ''
+  );
   /** Only a confirmed local write may be described as locally saved. */
   const localNoteKey = computed(() => {
     if (kind.value === 'local_failed') {

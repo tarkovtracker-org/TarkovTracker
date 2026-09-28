@@ -284,6 +284,18 @@ describe('performReset seasonal', () => {
     expect(retainedModes).toContain('pvp');
     expect(retainedModes).not.toContain('pve');
   });
+  it('does not archive or require storage for a mode holding only an earlier reset clock', async () => {
+    saveSupersededProgressCopyMock.mockReturnValue(null);
+    try {
+      const store = createStore();
+      store.$state.pve = { ...structuredClone(defaultState.pve), progressEpoch: 2 };
+      await expect(performReset('pve', store)).resolves.toBeUndefined();
+      expect(saveSupersededProgressCopyMock).not.toHaveBeenCalled();
+      expect(store.$state.pve.progressEpoch).toBe(3);
+    } finally {
+      saveSupersededProgressCopyMock.mockReturnValue({ id: 'copy-1' });
+    }
+  });
   it('aborts a controllerless idle-status reset when local progress cannot be archived', async () => {
     saveSupersededProgressCopyMock.mockReturnValueOnce(null);
     const store = createStore();
