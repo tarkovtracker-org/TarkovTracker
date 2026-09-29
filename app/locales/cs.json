@@ -514,6 +514,9 @@
     "not_available_description": "Interaktivní mapa pro {mapName} ještě není k dispozici. Čekáme na vytvoření kompatibilní mapy.",
     "placeholder": "tato poloha",
     "floors": "Podlahy",
+    "extract_names": {
+      "scav_underboat_hideout": "Hideout Under the Landing Stage"
+    },
     "factions": {
       "pmc": "PMC"
     },
@@ -1043,7 +1046,7 @@
         "of": "z",
         "mark_failed": "Označení se nezdařilo",
         "available_button": "Označit k dispozici",
-        "clear_availability_confirmation": "Clear in-game availability confirmation",
+        "clear_availability_confirmation": "Vymazat potvrzení dostupnosti ve hře",
         "uncomplete_button": "Označit jako nedokončené",
         "reset_item_counts": "Resetovat počet položek",
         "collapse_task": "Sbalit úkol",
@@ -1129,10 +1132,11 @@
         "faction": "K dispozici na {faction} znaků.",
         "trader_unlock": "Odemknout {trader} dokončením {task}.",
         "prestige": "Vyžaduje Prestige {required} (aktuální: {current}).",
-        "global_variable": "Server progression value {comparison} {required} required (current: {current}).",
-        "global_variable_unknown": "Requires server progression {comparison} {required}. Your current value is not available to the tracker. Use Mark available only if this task is available in-game; no counter tasks will be marked complete.",
-        "dialogue": "Requires an in-game trader conversation. Use Mark available only after confirming this task is available in-game.",
-        "story_objective": "Complete the story objective \"{objective}\" ({chapter}).",
+        "global_variable": "Hodnota postupu serveru {comparison} {required} je vyžadována (aktuální: {current}).",
+        "global_variable_unknown": "Vyžaduje vývoj serveru {comparison} {required}. Vaše aktuální hodnota není k dispozici pro tracker. Použít označení k dispozici pouze v případě, že je tento úkol dostupný ve hře; žádné čítače nebudou označeny jako úplné.",
+        "task_counter": "Vyžaduje {comparison} {required} dokončených úkolů od tohoto obchodníka úrovně věrnosti (dokončeno: {current}). Pokud je tento úkol již k dispozici ve hře, použijte známku dostupnou.",
+        "dialogue": "Vyžaduje konverzaci obchodníka ve hře. Použijte známku k dispozici až po potvrzení tohoto úkolu ve hře.",
+        "story_objective": "Dokončete cíl příběhu \"{objective}\" ({chapter}).",
         "unknown": "Data požadavků jsou nedostupná nebo nepodporovaná. Dostupnost nemůže být potvrzena.",
         "cycle": "Předpokladový řetězec obsahuje cyklus. Dostupnost nemůže být potvrzena.",
         "complete": "Tento úkol je dokončen.",

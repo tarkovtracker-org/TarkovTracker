@@ -514,6 +514,9 @@
     "not_available_description": "Интерактивная карта для {mapName} пока недоступна. Мы ждём появления совместимой карты.",
     "placeholder": "этой локации",
     "floors": "Этажи",
+    "extract_names": {
+      "scav_underboat_hideout": "Hideout Under the Landing Stage"
+    },
     "factions": {
       "pmc": "ЧВК"
     },
@@ -1043,7 +1046,7 @@
         "of": "из",
         "mark_failed": "Отметить как проваленное",
         "available_button": "Отметить Доступным",
-        "clear_availability_confirmation": "Clear in-game availability confirmation",
+        "clear_availability_confirmation": "Подтвердите очистку в игре",
         "uncomplete_button": "Отметить Незавершённым",
         "reset_item_counts": "Сбросить счётчики предметов",
         "collapse_task": "Свернуть задачу",
@@ -1129,10 +1132,11 @@
         "faction": "Доступно для {faction} символов.",
         "trader_unlock": "Разблокируйте {trader} , закончив {task}.",
         "prestige": "Requires Prestige {required} (current: {current}).",
-        "global_variable": "Server progression value {comparison} {required} required (current: {current}).",
-        "global_variable_unknown": "Requires server progression {comparison} {required}. Your current value is not available to the tracker. Use Mark available only if this task is available in-game; no counter tasks will be marked complete.",
-        "dialogue": "Requires an in-game trader conversation. Use Mark available only after confirming this task is available in-game.",
-        "story_objective": "Complete the story objective \"{objective}\" ({chapter}).",
+        "global_variable": "Значение прогресса сервера {comparison} {required} требуется (текущее значение: {current}).",
+        "global_variable_unknown": "Требуется прогресс сервера {comparison} {required}. Ваше текущее значение недоступно для трекера. Используйте отметку, только если это задание доступно в игре; никакие счетчики не будут помечены как завершенные.",
+        "task_counter": "Требуется {comparison} {required} завершенных задач из этого уровня лояльности трейдеров (завершено: {current}). Если эта задача уже доступна в игре, используйте метку.",
+        "dialogue": "Требуется внутриигровой разговор. Используйте отметку только после подтверждения этой задачи в игре.",
+        "story_objective": "Завершите цель истории \"{objective}\" ({chapter}).",
         "unknown": "Данные запроса недоступны или не поддерживаются. Доступность не может быть подтверждена.",
         "cycle": "Необходимая цепочка содержит цикл. Доступность не может быть подтверждена.",
         "complete": "Задача выполнена.",

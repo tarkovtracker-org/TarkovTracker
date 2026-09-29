@@ -514,6 +514,9 @@
     "not_available_description": "El mapa interactivo de {mapName} aún no está disponible. Estamos esperando a que se cree un mapa compatible.",
     "placeholder": "esta ubicación",
     "floors": "Pisos",
+    "extract_names": {
+      "scav_underboat_hideout": "Escondido bajo la Etapa de Tierra"
+    },
     "factions": {
       "pmc": "PMC"
     },
@@ -1131,6 +1134,7 @@
         "prestige": "Requiere Prestigio {required} (actual: {current}).",
         "global_variable": "Valor de progresión del servidor {comparison} {required} requerido (actual: {current}).",
         "global_variable_unknown": "Requiere progresión del servidor {comparison} {required}. Tu valor actual no está disponible para el rastreador. Usar Marca disponible sólo si esta tarea está disponible dentro del juego; no se marcarán las tareas contadoras.",
+        "task_counter": "Requiere {comparison} {required} tareas completadas de este nivel de lealtad del trader (completado: {current}). Si esta tarea ya está disponible en el juego, usa la marca disponible.",
         "dialogue": "Requiere una conversación en el juego. Usa la marca disponible sólo después de confirmar que esta tarea está disponible en el juego.",
         "story_objective": "Completa el objetivo de la historia \"{objective}\" ({chapter}).",
         "unknown": "Los datos requeridos no están disponibles o no soportados. No se puede confirmar la disponibilidad.",
