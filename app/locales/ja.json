@@ -514,6 +514,9 @@
     "not_available_description": "{mapName} のインタラクティブマップはまだ利用できません。互換性のあるマップが作成されるのを待っています。",
     "placeholder": "この場所",
     "floors": "階",
+    "extract_names": {
+      "scav_underboat_hideout": "Hideout Under the Landing Stage"
+    },
     "factions": {
       "pmc": "PMC"
     },
@@ -1043,7 +1046,7 @@
         "of": "of",
         "mark_failed": "失敗としてマーク",
         "available_button": "利用可能としてマーク",
-        "clear_availability_confirmation": "Clear in-game availability confirmation",
+        "clear_availability_confirmation": "ゲーム内空室状況の確認をクリア",
         "uncomplete_button": "未完了としてマーク",
         "reset_item_counts": "アイテム数をリセット",
         "collapse_task": "タスクを折りたたむ",
@@ -1129,10 +1132,11 @@
         "faction": "{faction}のキャラクターが利用可能です。",
         "trader_unlock": "{task}を完了して{trader}を解放する。",
         "prestige": "プレステージ{required}が必要（現在: {current}）",
-        "global_variable": "Server progression value {comparison} {required} required (current: {current}).",
-        "global_variable_unknown": "Requires server progression {comparison} {required}. Your current value is not available to the tracker. Use Mark available only if this task is available in-game; no counter tasks will be marked complete.",
-        "dialogue": "Requires an in-game trader conversation. Use Mark available only after confirming this task is available in-game.",
-        "story_objective": "Complete the story objective \"{objective}\" ({chapter}).",
+        "global_variable": "サーバーの進行値 {comparison} {required} が必要です (現在: {current}).",
+        "global_variable_unknown": "サーバーの進行状況 {comparison} {required}が必要です。現在の値はトラッカーでは使用できません。 このタスクがゲーム内で利用可能な場合にのみマークを使用します。カウンタータスクは完了とマークされません。",
+        "task_counter": "このトレーダーのロイヤルティ層から {comparison} {required} タスクを完了する必要があります (完了: {current})。このタスクがすでにゲーム内で利用可能な場合は、マークを使用してください。",
+        "dialogue": "ゲーム内トレーダーの会話が必要です。このタスクがゲーム内で利用可能であることを確認した後にのみ利用可能なマークを使用してください。",
+        "story_objective": "ストーリーの目標 \"{objective}\" ({chapter}) を完了します。",
         "unknown": "条件データが利用できないか、サポートされていません。利用可能かどうか確認できません。",
         "cycle": "前提タスクチェーンがループしています。利用可能かどうか確認できません。",
         "complete": "このタスクは完了しています。",
