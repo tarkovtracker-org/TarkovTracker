@@ -515,7 +515,7 @@
     "placeholder": "этой локации",
     "floors": "Этажи",
     "extract_names": {
-      "scav_underboat_hideout": "Hideout Under the Landing Stage"
+      "scav_underboat_hideout": "Спрятать под Посадкой"
     },
     "factions": {
       "pmc": "ЧВК"
