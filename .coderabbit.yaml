@@ -6,7 +6,7 @@ knowledge_base:
 reviews:
   auto_review:
     enabled: true
-    # Review on open and on `@coderabbitai review` only; per-push reviews exhaust the allowance.
+    # Disable automatic per-push reviews; request follow-up reviews explicitly.
     auto_incremental_review: false
     ignore_title_keywords:
       - 'Crowdin'

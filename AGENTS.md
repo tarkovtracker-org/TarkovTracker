@@ -62,26 +62,30 @@ or test logic changes make it relevant.
 
 ## Review
 
-- Review locally before pushing: run the CodeRabbit CLI on the branch diff
-  (`coderabbit review --base main --agent`; `--committed`/`--uncommitted` to scope) and fix its
-  findings before they reach the PR. The CLI is metered separately from PR reviews. Never run
-  Codex reviews locally.
-- Every push to an open PR can trigger a PR review. Commit locally as often as useful; push a
-  stabilized batch once local checks and the local review pass. Fix all findings from one round,
-  then push them together, never per finding. Merge `main` only for conflicts or right before
-  merge, in the same push as other pending fixes. A rate-limited reviewer does not stop work:
-  continue with local reviews and record the PR review as incomplete.
-- Codex automatic reviews are off and Codex usage is scarce. Request a Codex PR review only when
-  CodeRabbit (PR and CLI) is rate-limited, or as the final pre-merge check of a risky change.
-  Request it only through `node scripts/codex-review.mjs <PR> --request --wait-seconds 600` when
-  posting a request is authorized; never post raw `@codex review` comments. For read-only
-  status/waiting, omit `--request`. Pending, running, unknown, or timed-out reviews mean wait and
-  report the state; never bypass the guard or repost to speed up a review. Reuse completed review
-  evidence for the same commit; completion does not mean findings are resolved.
-- Docs, translations, mechanical formatting: self-review plus deterministic checks. Executable
-  changes: local CodeRabbit review of the stabilized branch diff. Auth, billing, migrations, and
-  concurrency also require independent review before merge (Codex, another provider, or a human).
-  Unavailable or rate-limited review is recorded as incomplete, without retry loops.
+- Docs, translations, and mechanical formatting require self-review and deterministic checks.
+  Executable changes receive one local CodeRabbit review of the stabilized branch diff before
+  pushing when available. Compare against the actual PR base using a freshly fetched remote ref
+  (`coderabbit review --base origin/<base> --agent --committed`). Fix validated findings together;
+  do not treat optional suggestions as mandatory. Never run Codex reviews locally.
+- Commit locally as often as useful; push stabilized batches after relevant checks. Address a
+  whole PR review round before the next correction push, rather than pushing per finding.
+  Reuse review evidence for unchanged inputs; rerun only for substantial new behavior or unresolved
+  significant findings. Update from the PR base when conflicts or integration validation require it.
+- Rate limits do not stop implementation, commits, or useful validated batch pushes. Record missing
+  review as incomplete and enforce required review before merge; do not retry in a loop or enable
+  paid over-limit reviews without authorization. CLI and PR reviews have separate allowances.
+- Automatic Codex reviews should be disabled in the dashboard; repository text does not verify
+  dashboard state. Request Codex only when CodeRabbit PR and CLI reviews are rate-limited, or for
+  the final pre-merge review of a risky change. Use only
+  `node scripts/codex-review.mjs <PR> --request --wait-seconds 600` when posting is authorized;
+  never post raw `@codex review` comments. For read-only status/waiting, omit `--request`.
+  Pending, running, unknown, or timed-out reviews remain incomplete; never bypass the guard or
+  repost to speed up a review. Completion does not mean findings are resolved.
+- CodeRabbit automatic incremental PR reviews are disabled in `.coderabbit.yaml`. After substantial
+  follow-up changes, request `@coderabbitai review` before merge unless recorded local or independent
+  review covers the final changes. Record the reviewed base and head and assess any later delta;
+  an earlier green review alone does not cover new changes. Auth, billing, migrations, and concurrency
+  require independent review before merge from Codex on request, another provider, or a human.
 - Record the commit, dirty worktree state, commands, and results in the PR summary. Rerun,
   batching, and reviewer-rollout rules live in the workflow-automation doc (see `docs/README.md`).
 - Production-readiness and security review requests use the dedicated review/security workflow

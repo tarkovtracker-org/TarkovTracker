@@ -13,7 +13,7 @@ Complete workflow automation setup for TarkovTracker with CI/CD pipelines, quali
 - Pre-commit hooks for code quality
 - Dependency update automation via Dependabot
 - Conservative auto-merge for low-risk Dependabot updates
-- CodeRabbit (local CLI first, then PR) is the routine reviewer. Codex automatic reviews are disabled in the Codex dashboard (2026-09-29); Codex runs only on request, as a fallback or pre-merge check.
+- CodeRabbit is the routine reviewer; Codex is reserved for requested fallback or risky pre-merge reviews. The policy adopted on 2026-09-29 calls for disabling Codex automatic reviews in the dashboard. Verify that setting separately; repository configuration does not prove dashboard state.
 
 ## Agent validation and review
 
@@ -28,27 +28,27 @@ commit, dirty worktree state, commands, and results in the PR summary. Invalidat
 when their inputs change. Batch substantiated corrections; defer unrelated cleanup and optional
 style suggestions.
 
-Documentation, translation, and mechanical formatting changes need deterministic checks and
-self-review. Executable changes receive a local CodeRabbit CLI review of the stabilized branch diff
-before it is pushed. Auth, billing, migration, and concurrency changes also require independent
-review before merge: Codex on request, another provider, or a human. Record missing/rate-limited review as incomplete without retry loops.
-Only substantial behavioral corrections or unresolved significant findings warrant a local rerun.
-
 ### Push cadence
 
-Per-push PR reviews spend shared quotas. Before Codex automatic reviews were disabled, PR #965
-received over 20 Codex reviews across about 45 pushes, each fixing one finding; code reviews used
-about 40% of a weekly Codex allowance. The CodeRabbit CLI is metered separately from CodeRabbit PR
-reviews, so review locally first:
+The root `AGENTS.md` owns review requirements and exceptions. Commit freely while implementing,
+then validate the stabilized diff, run one local review for executable changes when available,
+address validated findings together, and push one batch. Address a whole PR review round before
+pushing the next correction batch. Reuse evidence for unchanged inputs; substantial new behavior
+or unresolved significant findings warrant another review.
 
-1. Commit locally while iterating. Run `coderabbit review --base main --agent` on the stabilized
-   diff and fix its findings. Do not run Codex reviews locally.
-2. Push the batch once local checks and the local review pass. Resolve a whole PR review round
-   before the next push; update from `main` only for conflicts or immediately before merge.
-3. A rate limit on one reviewer does not pause work. Continue with the other local review, record
-   the missing PR review as incomplete, and push the next batch when it is ready.
-4. Request Codex only when CodeRabbit is rate-limited on both PR and CLI, or as the final
-   pre-merge check of a risky change, using the guard below.
+The maintainer reported that PR #965 received over 20 Codex reviews across about 45 pushes and
+consumed about 40% of a weekly Codex allowance. These are reported estimates, not a verified usage
+measurement. Batching pushes and requesting Codex only exceptionally aim to reduce that usage.
+
+CodeRabbit CLI and PR reviews have separate rolling allowances; both are limited. See
+[CodeRabbit's current limits](https://docs.coderabbit.ai/management/plans). Rate limits allow continued
+implementation, local commits, and useful validated batch pushes, with missing review recorded as
+incomplete. Required review still gates merge; do not enable paid over-limit reviews without approval.
+
+TarkovTracker disables CodeRabbit automatic incremental reviews in `.coderabbit.yaml`. After
+substantial follow-up changes, request `@coderabbitai review` before merge unless recorded local or
+independent review covers the final changes. Record the reviewed base and head, and assess later
+changes rather than relying on an earlier green check. Codex requests use the guard below.
 
 ### Codex request deduplication and waiting
 
