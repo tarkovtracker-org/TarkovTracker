@@ -112,16 +112,15 @@ GitHub also offers no atomic head condition on comment creation: a push after th
 can race the POST. The request marker records the observed head; it does not pin the revision the
 bot ultimately reviews. Always inspect fresh exact-head completion and checks before merging.
 
-### Reviewer transition: external verification pending
+### Reviewer settings: external verification pending
 
-1. Verify Codex delivers a review on a representative application PR.
-2. Verify a translation-only PR consumes no automatic review, and a mixed translation/code PR is
-   still reviewed. Use selective review requests until exclusions are demonstrated.
-3. After delivery is established, disable duplicate automatic CodeRabbit, Cubic, and Greptile
-   reviews in their repository/dashboard settings; retain manual access. Record the PR links and
-   observed settings here. Existing settings remain unchanged until that evidence exists.
-4. Check an existing-review revision and unavailable/quota-exhausted behavior: preserve completed
-   review evidence by revision and never report an unavailable review as successful.
+1. Verify automatic Codex reviews are disabled in the repository/dashboard settings.
+2. Keep automatic initial CodeRabbit reviews enabled and incremental reviews disabled as configured
+   in `.coderabbit.yaml`. Verify exclusions on translation-only and mixed translation/code PRs.
+3. Retain manual reviewer access. Record representative PR links and observed dashboard settings;
+   checked-in policy is not proof of integration state.
+4. Verify revision-specific review evidence and unavailable/quota-exhausted behavior. Preserve
+   completed evidence for unchanged inputs and never report unavailable review as successful.
 
 ## GitHub Actions Workflows
 
