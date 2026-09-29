@@ -1,4 +1,5 @@
 import { isGameMode, type GameMode } from '@/utils/constants';
+import { sanitizeTaskAvailabilityMap } from '@/utils/taskAvailabilityConfirmation';
 import type { ApiTaskUpdate, ApiUpdateMeta, UserProgressData } from '@/stores/progressState';
 export const DAY_MS = 24 * 60 * 60 * 1000;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -121,6 +122,7 @@ export const normalizeSharedProgressData = (
     skills,
     storyChapters,
     taskCompletions,
+    taskAvailability: sanitizeTaskAvailabilityMap(value.taskAvailability),
     taskObjectives,
     traders,
     xpOffset:

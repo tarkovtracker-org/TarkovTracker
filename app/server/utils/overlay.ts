@@ -1,3 +1,4 @@
+import { normalizeOtherRequirements } from '@/utils/taskOtherRequirements';
 import {
   hasDeclaredPrestigeLevel,
   isDeclaredGate,
@@ -23,7 +24,8 @@ import {
   normalizeObjectiveList,
 } from './objectiveTypeInferrer';
 import { addFallbackCrafts, addFallbackItems } from './overlayAdditions';
-import { mergeOverlayRecords, scopedOverlay } from './overlayProjectors';
+import { attachCounterDerivations, usableCounterDerivations } from './overlayCounters';
+import { mergeOverlayRecords, overlayEntries, scopedOverlay } from './overlayProjectors';
 import { validateOverlayData, unknownOverlaySections } from './overlayValidation';
 import { TARKOVTRACKER_USER_AGENT } from './userAgent';
 import type { OverlayData, OverlayLocaleData as LocaleOverlayData } from './overlayTypes';
@@ -569,6 +571,9 @@ function applyDeclaredGateNormalization(
   const declared = declaredGateFields(task);
   normalizeDeclaredRequirements(task);
   normalizeDeclaredPrestige(task);
+  const otherRequirements = normalizeOtherRequirements(task.otherRequirements);
+  if (otherRequirements.length) task.otherRequirements = otherRequirements;
+  else delete task.otherRequirements;
   const dropped = declared.filter((field) => task[field] === undefined);
   recordGateDiagnostics(task, [...retained, ...diagnosticsFor(dropped)]);
 }
@@ -585,7 +590,7 @@ function applyPatchedGateNormalization<T extends { id: string }>(
   const record = task as Record<string, unknown>;
   // Diagnostics are derived state: corrections cannot replace the adapter's evidence.
   recordGateDiagnostics(record, recordedGateDiagnostics(original as Record<string, unknown>));
-  if (!patchesDeclaredGates(patch)) return;
+  if (!patchesDeclaredGates(patch) && !patchesField(patch, 'otherRequirements')) return;
   applyDeclaredGateNormalization(record, retainedGateDiagnostics(record, patch));
 }
 /** Re-normalize a corrected upstream task. */
@@ -673,6 +678,34 @@ const chapterTaskIds = (chapter: Record<string, unknown>): string[] => {
 };
 const storyChapterName = (chapter: Record<string, unknown>, id: string) =>
   typeof chapter.name === 'string' ? chapter.name : id;
+type StoryCatalog = Record<string, Record<string, unknown>>;
+const storyCatalog = (overlay: OverlayData, mode: string, locale: string): StoryCatalog =>
+  mergeOverlayRecords(
+    scopedOverlay(overlay, 'storyChapters', mode),
+    overlay.locales?.[locale]?.storyChapters
+  );
+const refId = (value: unknown): unknown => (isPlainObject(value) ? value.id : undefined);
+const catalogHasObjective = (chapters: StoryCatalog, requirement: Record<string, unknown>) => {
+  const chapterId = refId(requirement.storyChapter);
+  if (typeof chapterId !== 'string' || !Object.hasOwn(chapters, chapterId)) return false;
+  const objectiveId = refId(requirement.objective);
+  return overlayEntries(chapters[chapterId]!.objectives).some(({ id }) => id === objectiveId);
+};
+/**
+ * A story gate naming a chapter or objective absent from this mode's catalog can never be met, so
+ * it fails closed as unsupported instead of letting Mark available record a fabricated objective.
+ */
+const resolveStoryGate = (requirement: unknown, chapters: StoryCatalog): unknown =>
+  isPlainObject(requirement) &&
+  requirement.type === 'storyObjective' &&
+  !catalogHasObjective(chapters, requirement)
+    ? { type: 'unknown', upstreamType: 'storyObjective' }
+    : requirement;
+const withResolvedStoryGates = <T extends { id: string }>(task: T, chapters: StoryCatalog): T => {
+  const gates = (task as Record<string, unknown>).otherRequirements;
+  if (!Array.isArray(gates)) return task;
+  return { ...task, otherRequirements: gates.map((gate) => resolveStoryGate(gate, chapters)) };
+};
 const collectStoryUnlocks = (chapters: Record<string, Record<string, unknown>> = {}) => {
   const byTask = new Map<string, Array<{ id: string; name: string }>>();
   for (const [id, chapter] of Object.entries(chapters)) {
@@ -726,10 +759,7 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
     const existingIds = new Set(correctedTasks.map((task) => task.id));
     const dedupedAdditions = addedTasks.filter((task) => !existingIds.has(task.id));
     logger.info(`Overlay tasksAdd: ${dedupedAdditions.length} additions after dedupe`);
-    const chapters = mergeOverlayRecords(
-      scopedOverlay(overlay, 'storyChapters', options.gameMode ?? 'regular'),
-      overlay.locales?.[locale]?.storyChapters
-    );
+    const chapters = storyCatalog(overlay, options.gameMode ?? 'regular', locale);
     const storyUnlocksByTask = collectStoryUnlocks(chapters);
     result.data.tasks = [...correctedTasks, ...dedupedAdditions].map((task) => ({
       ...task,
@@ -757,5 +787,16 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
   if (localeOverlay) {
     applyLocaleOverlays(result.data, localeOverlay);
   }
+  // Last, so a gate injected by any correction, including a locale patch, is checked.
+  if (Array.isArray(result.data.tasks)) {
+    const chapters = storyCatalog(overlay, mode, locale);
+    result.data.tasks = result.data.tasks.map((task) => withResolvedStoryGates(task, chapters));
+  }
+  // Last, so no later task patch can supply or strip a derivation the registry does not declare.
+  if (Array.isArray(result.data.tasks))
+    result.data.tasks = attachCounterDerivations(
+      result.data.tasks,
+      usableCounterDerivations(overlay, mode)
+    );
   return result;
 }

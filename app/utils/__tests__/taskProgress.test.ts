@@ -40,6 +40,43 @@ const createStore = (
 };
 const createTasksMap = (...tasks: Task[]) => new Map(tasks.map((task) => [task.id, task]));
 describe('task progress actions', () => {
+  it('never resurrects a failed ancestor through transitive backfill', () => {
+    const onCompleteRequirement = vi.fn();
+    const onFailRequirement = vi.fn();
+    applyTaskAvailabilityRequirements({
+      getCompletion: (taskId) =>
+        taskId === 'failed-ancestor' ? { complete: true, failed: true } : undefined,
+      task: {
+        id: 'target',
+        taskRequirements: [{ task: { id: 'prior' }, status: ['complete'] }],
+        predecessors: ['failed-ancestor', 'prior', 'healthy-ancestor'],
+      },
+      onCompleteRequirement,
+      onFailRequirement,
+    });
+    expect(onCompleteRequirement).toHaveBeenCalledWith('prior');
+    expect(onCompleteRequirement).toHaveBeenCalledWith('healthy-ancestor');
+    expect(onCompleteRequirement).not.toHaveBeenCalledWith('failed-ancestor');
+    expect(onFailRequirement).not.toHaveBeenCalled();
+  });
+  it.each([['active'], ['active', 'complete'], ['complete', 'failed']])(
+    'does not invent history for alternative status requirement %j',
+    (...statuses) => {
+      const onCompleteRequirement = vi.fn();
+      const onFailRequirement = vi.fn();
+      applyTaskAvailabilityRequirements({
+        task: {
+          id: 'target',
+          taskRequirements: [{ task: { id: 'prior' }, status: statuses }],
+          predecessors: ['ancestor', 'prior'],
+        },
+        onCompleteRequirement,
+        onFailRequirement,
+      });
+      expect(onCompleteRequirement).not.toHaveBeenCalled();
+      expect(onFailRequirement).not.toHaveBeenCalled();
+    }
+  );
   it('completes objectives and fails only incomplete alternatives', () => {
     const task: Task = {
       id: 'main',
