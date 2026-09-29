@@ -62,22 +62,32 @@ or test logic changes make it relevant.
 
 ## Review
 
-- Request Codex reviews only through `node scripts/codex-review.mjs <PR> --request --wait-seconds 600`
-  when posting a review request is authorized. Never post raw `@codex review`
-  comments. For read-only status/waiting, omit `--request`. Pending, running, unknown, or timed-out
-  reviews mean wait and report the state; never bypass the guard or repost to speed up a review.
-  Reuse completed review evidence for the same commit; completion does not mean findings are resolved.
-- Docs, translations, mechanical formatting: self-review plus deterministic checks. Routine
-  executable changes: Codex PR review. Substantial changes (public contracts, persisted state,
-  cross-module behavior, auth, billing, migrations, concurrency): also one local CodeRabbit review
-  of the stabilized branch diff. Auth, billing, migrations, and concurrency require independent
-  review; another provider or a human substitutes if needed. Unavailable or rate-limited review is
-  recorded as incomplete, without retry loops.
+- Review locally before pushing: run the CodeRabbit CLI on the branch diff
+  (`coderabbit review --base main --agent`; `--committed`/`--uncommitted` to scope) and fix its
+  findings before they reach the PR. The CLI is metered separately from PR reviews. Never run
+  Codex reviews locally.
+- Every push to an open PR can trigger a PR review. Commit locally as often as useful; push a
+  stabilized batch once local checks and the local review pass. Fix all findings from one round,
+  then push them together, never per finding. Merge `main` only for conflicts or right before
+  merge, in the same push as other pending fixes. A rate-limited reviewer does not stop work:
+  continue with local reviews and record the PR review as incomplete.
+- Codex automatic reviews are off and Codex usage is scarce. Request a Codex PR review only when
+  CodeRabbit (PR and CLI) is rate-limited, or as the final pre-merge check of a risky change.
+  Request it only through `node scripts/codex-review.mjs <PR> --request --wait-seconds 600` when
+  posting a request is authorized; never post raw `@codex review` comments. For read-only
+  status/waiting, omit `--request`. Pending, running, unknown, or timed-out reviews mean wait and
+  report the state; never bypass the guard or repost to speed up a review. Reuse completed review
+  evidence for the same commit; completion does not mean findings are resolved.
+- Docs, translations, mechanical formatting: self-review plus deterministic checks. Executable
+  changes: local CodeRabbit review of the stabilized branch diff. Auth, billing, migrations, and
+  concurrency also require independent review before merge (Codex, another provider, or a human).
+  Unavailable or rate-limited review is recorded as incomplete, without retry loops.
 - Record the commit, dirty worktree state, commands, and results in the PR summary. Rerun,
   batching, and reviewer-rollout rules live in the workflow-automation doc (see `docs/README.md`).
 - Production-readiness and security review requests use the dedicated review/security workflow
-  when available and stay read-only. Before merging, resolve all in-scope human and automated
-  feedback and verify final checks; do not mix in unrelated fixes.
+  when available and stay read-only; repo risk areas and severity live in `docs/code-review.md`.
+  Before merging, resolve all in-scope human and automated feedback and verify final checks; do
+  not mix in unrelated fixes.
 
 ## Docs — code is truth, docs are orientation
 

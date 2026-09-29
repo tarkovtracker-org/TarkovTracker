@@ -13,7 +13,7 @@ Its validation commands and risk areas override the skill's defaults.
 
 ## Validation Commands
 
-Use the validation requirements in `AGENTS.md` and the commands in `package.json`.
+Use the validation requirements in the root `AGENTS.md` and the commands in `package.json`.
 Run focused checks while correcting the change, then the required checks once the diff stabilizes.
 A READY verdict requires applicable validation and independent review where the root policy requires it.
 Record the validated commit, dirty worktree state, commands, and results. Unavailable checks or reviews
@@ -24,17 +24,10 @@ than assuming the root Vitest suite covers them. Applied migrations remain immut
 
 ## Mandatory Checks
 
-Hard rules the reviewer must verify for every diff:
+Verify every diff against the invariants in the root `AGENTS.md`, plus:
 
-- No SSR-only features (`useAsyncData` SSR options, server-only middleware) — this
-  is a SPA-only project (`ssr: false`).
-- No parent-relative imports — all imports use `@/` aliases (ESLint enforces this).
 - No hex color values in templates — use Tailwind theme tokens.
-- No `<style>` blocks, SCSS, or scoped CSS — Tailwind v4 only.
-- Only `app/locales/en.json` edited for locale changes — non-English files are
-  Crowdin-owned. Never copy English into non-English locales as a fallback.
-- No secrets or credentials in code or config — use `useRuntimeConfig()` for
-  env-driven values.
+- No copying English into non-English locales as a fallback.
 - No new runtime dependencies without justification that existing deps are
   insufficient.
 - No destructive git commands in CI or scripts.
@@ -50,8 +43,6 @@ Hard rules the reviewer must verify for every diff:
   columns without a default or backfill. RLS policy changes must not widen access
   unintentionally. RPC additions must not bypass RLS. Test rollback if a down
   migration exists; if none, note that the migration is irreversible.
-- **Recent context:** `add_api_usage_daily`, `add_user_preferences_tasks_require_trader_levels`,
-  `add_merge_progress_rpc` — verify these don't break existing callers.
 
 ### Cloudflare Workers / Durable Objects
 
