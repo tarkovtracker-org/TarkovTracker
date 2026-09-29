@@ -514,6 +514,9 @@
     "not_available_description": "\"{mapName}\"的互动地图尚不可用。我们正在等待兼容地图的制作。",
     "placeholder": "该地点",
     "floors": "楼层",
+    "extract_names": {
+      "scav_underboat_hideout": "隐藏在降落阶段内"
+    },
     "factions": {
       "pmc": "PMC"
     },
@@ -1043,6 +1046,7 @@
         "of": "/",
         "mark_failed": "标记为失败",
         "available_button": "标记为可接取",
+        "clear_availability_confirmation": "清除游戏内可用性确认",
         "uncomplete_button": "标记为未完成",
         "reset_item_counts": "重置物品计数",
         "collapse_task": "折叠任务",
@@ -1128,6 +1132,11 @@
         "faction": "Available to {faction} characters.",
         "trader_unlock": "Unlock {trader} by completing {task}.",
         "prestige": "Requires Prestige {required} (current: {current}).",
+        "global_variable": "Server progression value {comparison} {required} required (current: {current}).",
+        "global_variable_unknown": "Requires server progression {comparison} {required}. Your current value is not available to the tracker. Use Mark available only if this task is available in-game; no counter tasks will be marked complete.",
+        "task_counter": "Requires {comparison} {required} completed tasks from this trader loyalty tier (completed: {current}). If this task is already available in-game, use Mark available.",
+        "dialogue": "需要游戏内的交易者对话。只有在确认此任务在游戏中可用后才能使用标记。",
+        "story_objective": "Complete the story objective \"{objective}\" ({chapter}).",
         "unknown": "要求数据不可用或不支持。可用性无法确认。",
         "cycle": "必备链包含一个周期。可用性无法确认。",
         "complete": "此任务已完成。",

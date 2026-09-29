@@ -44,6 +44,7 @@ instead of restating it.
 - [`rate-limiting.md`](./rate-limiting.md) — ownership map for API, Edge, Pages, DB, and Auth rate-limit systems.
 - [`runbook.md`](./runbook.md) — required env vars, pre-deploy checks, incident triage and recovery.
 - [`workflow-automation.md`](./workflow-automation.md) — GitHub Actions, pre-commit hooks, Dependabot, releases.
+- [`code-review.md`](./code-review.md) — production-readiness review policy: risk areas, severity calibration, deployment and rollback checks.
 - [`testing-coverage.md`](./testing-coverage.md) — coverage gates and reproduction. Exact floors live in `vitest.config.ts`.
 
 ### Agent-facing

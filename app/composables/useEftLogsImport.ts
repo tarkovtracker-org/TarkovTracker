@@ -21,6 +21,10 @@ import {
 import { EftLogRecordSizeError } from '@/utils/eftLogRecordReader';
 import { logger } from '@/utils/logger';
 import {
+  otherRequirementsSignature,
+  storyObjectiveRequirements,
+} from '@/utils/taskOtherRequirements';
+import {
   applyTaskAvailabilityRequirements,
   applyTaskTraderRequirements,
   ensureTaskMinPlayerLevel,
@@ -138,6 +142,11 @@ const buildImportTaskSets = (
   }
   return { completed: sets.completed, started: sets.started, failed: sets.failed };
 };
+/** A started, completed or failed task has passed its start gates, so its story objectives were met. */
+const recordImpliedStoryObjectives = (store: ReturnType<typeof useTarkovStore>, task: Task) => {
+  for (const gate of storyObjectiveRequirements(task))
+    store.setStoryObjectiveComplete(gate.storyChapter.id, gate.objective.id);
+};
 const applyImportedTaskRequirements = (
   store: ReturnType<typeof useTarkovStore>,
   task: Task,
@@ -145,6 +154,7 @@ const applyImportedTaskRequirements = (
 ) => {
   ensureTaskMinPlayerLevel(store, task);
   if (requireTraders) applyTaskTraderRequirements({ store, task });
+  recordImpliedStoryObjectives(store, task);
 };
 /** Applies completion requirements without overriding explicit imported states or existing completions. */
 const applyCompletedImports = (
@@ -196,14 +206,21 @@ const shouldStartImportedTask = (
 /** Restores active task state for imported starts that are not already successfully completed. */
 const applyStartedImports = (
   store: ReturnType<typeof useTarkovStore>,
+  tasksMap: Map<string, Task>,
   completedTaskIds: Set<string>,
   startedTaskIds: Set<string>
 ) => {
   const completions = store.getCurrentProgressData().taskCompletions ?? {};
   for (const taskId of startedTaskIds) {
     const flags = getCompletionFlags(completions[taskId]);
-    const shouldStart = shouldStartImportedTask(completedTaskIds.has(taskId), flags);
-    if (shouldStart) store.setTaskUncompleted(taskId);
+    if (!shouldStartImportedTask(completedTaskIds.has(taskId), flags)) continue;
+    store.setTaskUncompleted(taskId);
+    // The game only lets a task start once its start gates are met, so an imported start records
+    // its story objectives and confirms its gate signature (after the status write, so it counts).
+    const task = tasksMap.get(taskId) ?? { id: taskId };
+    recordImpliedStoryObjectives(store, task);
+    const signature = otherRequirementsSignature(task);
+    if (signature) store.confirmTaskAvailability(taskId, signature);
   }
 };
 /** Persists explicit failures as manual failures so automatic state repair cannot remove them. */
@@ -213,8 +230,10 @@ const applyFailedImports = (
   failed: Set<string>
 ) => {
   for (const taskId of failed) {
-    if (!store.isTaskComplete(taskId))
-      failTaskForProgress({ store, taskId, tasksMap, manual: true });
+    if (store.isTaskComplete(taskId)) continue;
+    failTaskForProgress({ store, taskId, tasksMap, manual: true });
+    // A task can only fail after it started, so its start gates (story objectives) were met.
+    recordImpliedStoryObjectives(store, tasksMap.get(taskId) ?? { id: taskId });
   }
 };
 /** Applies catalog-filtered events to one mode and tracks switches for later restoration. */
@@ -245,7 +264,7 @@ const applyModeImports = async (
     requireTraders
   );
   applyFailedImports(store, tasksMap, failed);
-  applyStartedImports(store, completed, started);
+  applyStartedImports(store, tasksMap, completed, started);
   return mode;
 };
 /** Restores the original mode after success or failure without losing the original import error. */

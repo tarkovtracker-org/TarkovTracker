@@ -20,6 +20,7 @@ import { recordLocalSyncTime } from '@/stores/tarkov/syncTimeline';
 import { delay } from '@/utils/async';
 import { ACTIVE_SEASON_NUMBER, GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import { mergeTaskAvailability } from '@/utils/taskAvailabilityConfirmation';
 const RESET_SETTLE_DELAY_MS = 100;
 export type ResetMode = GameMode | 'all';
 type ResetTargetStore = {
@@ -125,6 +126,10 @@ const mergeModeHistories = (
   storyChapters: mergeStoryChapterProgress(
     localModeData.storyChapters,
     remoteModeData.storyChapters
+  ),
+  taskAvailability: mergeTaskAvailability(
+    localModeData.taskAvailability,
+    remoteModeData.taskAvailability
   ),
 });
 const resolveModeData = (

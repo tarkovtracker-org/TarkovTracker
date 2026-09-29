@@ -1843,14 +1843,15 @@
         opacity: 1,
         interactive: false,
       });
+      const extractName = extract.nameKey ? t(extract.nameKey, extract.name) : extract.name;
       const extractBadge = document.createElement('div');
-      extractBadge.setAttribute('title', extract.name);
-      extractBadge.setAttribute('aria-label', extract.name);
+      extractBadge.setAttribute('title', extractName);
+      extractBadge.setAttribute('aria-label', extractName);
       extractBadge.className = 'extract-badge';
       extractBadge.style.borderColor = markerColor;
       const extractLabel = document.createElement('span');
       extractLabel.className = 'extract-badge-label';
-      extractLabel.textContent = extract.name;
+      extractLabel.textContent = extractName;
       extractBadge.appendChild(extractLabel);
       const extractIcon = L.divIcon({
         className: 'extract-marker',

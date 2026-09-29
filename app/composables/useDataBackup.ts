@@ -151,6 +151,7 @@ const ALLOWED_PROGRESS_KEYS = new Set([
   'progressEpoch',
   'skillOffsets',
   'storyChapters',
+  'taskAvailability',
 ]);
 const VALID_FACTIONS = new Set<Faction>(['USEC', 'BEAR']);
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -217,6 +218,7 @@ function sanitizeProgressData(
     'skills',
     'skillOffsets',
     'storyChapters',
+    'taskAvailability',
   ] as const;
   for (const field of dictFields) {
     if (raw[field] !== undefined && !isPlainObject(raw[field])) {

@@ -514,6 +514,9 @@
     "not_available_description": "The interactive map for {mapName} is not yet available. We are waiting for a compatible map to be created.",
     "placeholder": "this location",
     "floors": "Floors",
+    "extract_names": {
+      "scav_underboat_hideout": "Ukrycie w fazie lądowania"
+    },
     "factions": {
       "pmc": "PMC"
     },
@@ -1043,6 +1046,7 @@
         "of": "of",
         "mark_failed": "Mark Failed",
         "available_button": "Mark Available",
+        "clear_availability_confirmation": "Wyczyść potwierdzenie dostępności w grze",
         "uncomplete_button": "Mark Uncompleted",
         "reset_item_counts": "Reset item counts",
         "collapse_task": "Zwiń zadanie",
@@ -1128,6 +1132,11 @@
         "faction": "Dostępne dla {faction} znaków.",
         "trader_unlock": "Odblokuj {trader} poprzez ukończenie {task}.",
         "prestige": "Wymaga Prestiżu {required} (obecnie: {current}).",
+        "global_variable": "Wartość postępu serwera {comparison} {required} jest wymagana (obecnie: {current}).",
+        "global_variable_unknown": "Wymaga postępu serwera {comparison} {required}. Twoja bieżąca wartość nie jest dostępna dla trackera. Użyj Oznacz dostępne tylko wtedy, gdy to zadanie jest dostępne w grze; żadne zadania nie zostaną oznaczone jako zakończone.",
+        "task_counter": "Wymaga {comparison} {required} zakończonych zadań od tego poziomu lojalnościowego tradera (zakończono: {current}). Jeśli to zadanie jest już dostępne w grze, użyj Mark dostępny.",
+        "dialogue": "Wymaga rozmowy tradera w grze. Użyj Oznacz dostępne tylko po potwierdzeniu tego zadania jest dostępne w grze.",
+        "story_objective": "Ukończ cel opowieści \"{objective}\" ({chapter}).",
         "unknown": "Dane wymagane są niedostępne lub nieobsługiwane. Dostępność nie może być potwierdzona.",
         "cycle": "Wymagany łańcuch zawiera cykl. Dostępność nie może być potwierdzona.",
         "complete": "To zadanie zostało zakończone.",

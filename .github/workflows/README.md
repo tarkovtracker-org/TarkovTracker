@@ -184,10 +184,9 @@ Workflow-specific secrets are not required for the Gitleaks step anymore. The wo
 
 ## AI Review Bots
 
-Codex is the intended primary reviewer, with one best-effort local CodeRabbit pass for substantial
-behavior changes. Existing automatic provider settings remain unchanged until Codex delivery and
-exclusions are verified on representative PRs. See the reviewer transition checklist in
-`docs/workflow-automation.md`; dashboard settings are not proven by checked-in configuration.
+The root `AGENTS.md` owns review requirements. See
+[workflow automation](../../docs/workflow-automation.md#push-cadence) for batching and reviewer usage.
+Dashboard settings must be verified separately; checked-in documentation does not prove them.
 
 ## Commands
 

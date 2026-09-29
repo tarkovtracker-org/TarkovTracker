@@ -514,6 +514,9 @@
     "not_available_description": "La carte interactive de {mapName} n'est pas encore disponible. Nous attendons la création d'une carte compatible.",
     "placeholder": "cet endroit",
     "floors": "Étages",
+    "extract_names": {
+      "scav_underboat_hideout": "Cachez sous la phase d'atterrissage"
+    },
     "factions": {
       "pmc": "PMC"
     },
@@ -1043,6 +1046,7 @@
         "of": "de",
         "mark_failed": "Marquer comme échouée",
         "available_button": "Disponible",
+        "clear_availability_confirmation": "Effacer la confirmation de disponibilité en jeu",
         "uncomplete_button": "Annuler",
         "reset_item_counts": "Réinitialiser les compteurs d'objets",
         "collapse_task": "Réduire la tâche",
@@ -1128,6 +1132,11 @@
         "faction": "Disponible pour les caractères {faction}.",
         "trader_unlock": "Débloquez {trader} en complétant {task}.",
         "prestige": "Nécessite le Prestige {required} (actuel: {current}).",
+        "global_variable": "Valeur de progression du serveur {comparison} {required} requise (courant: {current}).",
+        "global_variable_unknown": "Nécessite la progression du serveur {comparison} {required}. Votre valeur actuelle n'est pas disponible pour le tracker. Utiliser le marquage disponible uniquement si cette tâche est disponible en jeu; aucune tâche de compteur ne sera marquée comme terminée.",
+        "task_counter": "Nécessite les tâches {comparison} {required} accomplies depuis ce niveau de fidélité du trader (accomplies : {current}). Si cette tâche est déjà disponible en jeu, utilisez Marque disponible.",
+        "dialogue": "Nécessite une conversation de trader en jeu. Utilisez Marque disponible seulement après avoir confirmé que cette tâche est disponible en jeu.",
+        "story_objective": "Complétez l'objectif de l'histoire \"{objective}\" ({chapter}).",
         "unknown": "Les données requises sont indisponibles ou non pris en charge. La disponibilité ne peut pas être confirmée.",
         "cycle": "La chaîne de prérequis contient un cycle. La disponibilité ne peut pas être confirmée.",
         "complete": "Cette tâche est terminée.",

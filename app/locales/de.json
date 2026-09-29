@@ -514,6 +514,9 @@
     "not_available_description": "Die interaktive Karte für {mapName} ist noch nicht verfügbar. Wir warten auf eine kompatible Karte.",
     "placeholder": "diesen Ort",
     "floors": "Stockwerke",
+    "extract_names": {
+      "scav_underboat_hideout": "Verstecke unter der Landingphase"
+    },
     "factions": {
       "pmc": "PMC"
     },
@@ -1043,6 +1046,7 @@
         "of": "von",
         "mark_failed": "Als fehlgeschlagen markieren",
         "available_button": "Als verfügbar markieren",
+        "clear_availability_confirmation": "Lösche In-Game-Verfügbarkeitsbestätigung",
         "uncomplete_button": "Als unvollständig markieren",
         "reset_item_counts": "Gegenstandszähler zurücksetzen",
         "collapse_task": "Aufgabe einklappen",
@@ -1128,6 +1132,11 @@
         "faction": "Verfügbar für {faction} Zeichen.",
         "trader_unlock": "Schalte {trader} frei, indem du {task} abschließt.",
         "prestige": "Benötigt Prestige {required} (aktuell: {current}).",
+        "global_variable": "Serverfortschritt {comparison} {required} erforderlich (aktuell: {current}).",
+        "global_variable_unknown": "Benötigt Serverfortschritt {comparison} {required}. Ihr aktueller Wert ist nicht verfügbar für den Tracker. Nur verfügbare Markierung verwenden, wenn diese Aufgabe im Spiel verfügbar ist; keine Zähler Aufgaben werden als abgeschlossen markiert.",
+        "task_counter": "Benötigt {comparison} {required} erledigte Aufgaben von dieser Händlertreue (erledigt: {current}). Wenn diese Aufgabe bereits im Spiel verfügbar ist, verwenden Sie Mark verfügbar.",
+        "dialogue": "Benötigt eine In-Game-Trader-Unterhaltung. Benutze Markierung nur nach Bestätigung dieser Aufgabe im Spiel.",
+        "story_objective": "Schließe das Ziel \"{objective}\" ab ({chapter}).",
         "unknown": "Anforderungsdaten sind nicht verfügbar oder werden nicht unterstützt. Verfügbarkeit kann nicht bestätigt werden.",
         "cycle": "Die vorausgesetzte Kette enthält einen Zyklus. Die Verfügbarkeit kann nicht bestätigt werden.",
         "complete": "Diese Aufgabe ist abgeschlossen.",

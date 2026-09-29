@@ -552,6 +552,9 @@
     "not_available_description": "The interactive map for {mapName} is not yet available. We are waiting for a compatible map to be created.",
     "placeholder": "this location",
     "floors": "Floors",
+    "extract_names": {
+      "scav_underboat_hideout": "Hideout Under the Landing Stage"
+    },
     "factions": {
       "pmc": "PMC"
     },
@@ -1081,6 +1084,7 @@
         "of": "of",
         "mark_failed": "Mark Failed",
         "available_button": "Mark Available",
+        "clear_availability_confirmation": "Clear in-game availability confirmation",
         "uncomplete_button": "Mark Uncompleted",
         "reset_item_counts": "Reset item counts",
         "collapse_task": "Collapse task",
@@ -1166,6 +1170,11 @@
         "faction": "Available to {faction} characters.",
         "trader_unlock": "Unlock {trader} by completing {task}.",
         "prestige": "Requires Prestige {required} (current: {current}).",
+        "global_variable": "Server progression value {comparison} {required} required (current: {current}).",
+        "global_variable_unknown": "Requires server progression {comparison} {required}. Your current value is not available to the tracker. Use Mark available only if this task is available in-game; no counter tasks will be marked complete.",
+        "task_counter": "Requires {comparison} {required} completed tasks from this trader loyalty tier (completed: {current}). If this task is already available in-game, use Mark available.",
+        "dialogue": "Requires an in-game trader conversation. Use Mark available only after confirming this task is available in-game.",
+        "story_objective": "Complete the story objective \"{objective}\" ({chapter}).",
         "unknown": "Requirement data is unavailable or unsupported. Availability cannot be confirmed.",
         "cycle": "The prerequisite chain contains a cycle. Availability cannot be confirmed.",
         "complete": "This task is completed.",

@@ -1326,6 +1326,29 @@ describe('useDataBackup', () => {
         storyChapters: {},
       },
     };
+    it('restores availability confirmations from a backup', async () => {
+      const backup = structuredClone(validBackup) as typeof validBackup & {
+        pvp: { taskAvailability?: unknown };
+      };
+      backup.pvp.taskAvailability = { task1: { requirements: 'sig', timestamp: 3000 } };
+      const { parseBackupFile, confirmBackupImport } = await loadComposable();
+      await parseBackupFile(createFile(JSON.stringify(backup)));
+      await confirmBackupImport({ pvp: true, pve: false });
+      const patchFn = tarkovStore.$patch.mock.calls[0]![0] as (
+        state: Record<string, unknown>
+      ) => void;
+      const mockState = {
+        currentGameMode: 'pve',
+        pvp: { level: 1, progressEpoch: 5 } as Record<string, unknown>,
+        pve: { level: 1, progressEpoch: 3 },
+        gameEdition: 1,
+        tarkovUid: null,
+      };
+      patchFn(mockState);
+      expect(mockState.pvp.taskAvailability).toEqual({
+        task1: { requirements: 'sig', timestamp: 3000 },
+      });
+    });
     it('patches pvp data only when pvp selected', async () => {
       const { parseBackupFile, confirmBackupImport, importState } = await loadComposable();
       await parseBackupFile(createFile(JSON.stringify(validBackup)));
