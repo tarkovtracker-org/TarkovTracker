@@ -515,7 +515,7 @@
     "placeholder": "this location",
     "floors": "Floors",
     "extract_names": {
-      "scav_underboat_hideout": "Hideout Under the Landing Stage"
+      "scav_underboat_hideout": "Ukrycie w fazie lądowania"
     },
     "factions": {
       "pmc": "PMC"

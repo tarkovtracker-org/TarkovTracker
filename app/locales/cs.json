@@ -515,7 +515,7 @@
     "placeholder": "tato poloha",
     "floors": "Podlahy",
     "extract_names": {
-      "scav_underboat_hideout": "Hideout Under the Landing Stage"
+      "scav_underboat_hideout": "Skrývat ve fázi přistání"
     },
     "factions": {
       "pmc": "PMC"
