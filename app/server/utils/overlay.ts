@@ -24,6 +24,7 @@ import {
   normalizeObjectiveList,
 } from './objectiveTypeInferrer';
 import { addFallbackCrafts, addFallbackItems } from './overlayAdditions';
+import { attachCounterDerivations, usableCounterDerivations } from './overlayCounters';
 import { mergeOverlayRecords, overlayEntries, scopedOverlay } from './overlayProjectors';
 import { validateOverlayData, unknownOverlaySections } from './overlayValidation';
 import { TARKOVTRACKER_USER_AGENT } from './userAgent';
@@ -732,5 +733,11 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
     const chapters = storyCatalog(overlay, mode, locale);
     result.data.tasks = result.data.tasks.map((task) => withResolvedStoryGates(task, chapters));
   }
+  // Last, so no later task patch can supply or strip a derivation the registry does not declare.
+  if (Array.isArray(result.data.tasks))
+    result.data.tasks = attachCounterDerivations(
+      result.data.tasks,
+      usableCounterDerivations(overlay, mode)
+    );
   return result;
 }

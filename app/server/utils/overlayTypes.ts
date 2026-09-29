@@ -22,7 +22,7 @@ export interface OverlayLocaleData {
   storyChapters?: OverlayRecords;
 }
 export interface OverlayData extends OverlaySections {
-  /** Reserved upstream registry; only an empty object is currently consumed as a no-op. */
+  /** Mode-scoped counter registry; validated and applied by `overlayCounters.ts`. */
   progressionCounters?: unknown;
   modes?: Record<string, OverlaySections>;
   locales?: Record<string, OverlayLocaleData>;
