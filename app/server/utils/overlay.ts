@@ -432,7 +432,7 @@ const isValidExtractAddition = (
   [
     nonEmptyString(value.id),
     nonEmptyString(value.name),
-    value.faction === undefined || EXTRACT_FACTIONS.has(value.faction as string),
+    value.faction == null || EXTRACT_FACTIONS.has(value.faction as string),
     validExtractPosition(value.position),
   ].every(Boolean);
 const isExtractMatching = (existing: unknown, id: string, name: string): boolean =>

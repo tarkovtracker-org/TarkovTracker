@@ -27,6 +27,7 @@ const tarkovStore = {
   setTaskObjectiveUncomplete: vi.fn(),
   setTaskUncompleted: vi.fn(),
   confirmTaskAvailability: vi.fn(),
+  isStoryObjectiveComplete: vi.fn(() => false),
   setStoryObjectiveComplete: vi.fn(),
   switchGameMode: vi.fn(async (_mode: GameMode) => undefined),
 };

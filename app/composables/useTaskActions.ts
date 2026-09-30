@@ -8,7 +8,6 @@ import { hasUnconfirmableStatusClock } from '@/utils/taskAvailabilityConfirmatio
 import {
   hasUnsupportedOtherRequirement,
   otherRequirementsSignature,
-  storyObjectiveRequirements,
 } from '@/utils/taskOtherRequirements';
 import {
   applyTaskAvailabilityRequirements,
@@ -17,7 +16,9 @@ import {
   completeTaskForProgress,
   ensureTaskMinPlayerLevel,
   failTaskForProgress,
+  recordImpliedStoryObjectives,
   uncompleteTaskForProgress,
+  type StoryObjectiveRef,
 } from '@/utils/taskProgress';
 import type { Task, TaskRequirement } from '@/types/tarkov';
 export type TaskActionPayload = {
@@ -28,6 +29,8 @@ export type TaskActionPayload = {
   undoKey?: string;
   statusKey?: string;
   wasManualFail?: boolean;
+  /** Story objectives this action newly recorded, released again by its undo. */
+  recordedStoryObjectives?: StoryObjectiveRef[];
 };
 export type UseTaskActionsReturn = {
   markTaskComplete: (isUndo?: boolean) => void;
@@ -122,12 +125,17 @@ export function useTaskActions(
     if (!preferencesStore.getPinnedTaskIds.includes(taskId)) return;
     preferencesStore.togglePinnedTask(taskId);
   };
+  const recordStoryGates = (taskId: string) => {
+    const gatedTask = tasksMap.value.get(taskId);
+    if (gatedTask) recordImpliedStoryObjectives(tarkovStore, gatedTask);
+  };
   const completeTaskForAvailability = (taskId: string) => {
     completeTaskForProgress({
       store: tarkovStore,
       taskId,
       tasksMap: tasksMap.value,
     });
+    recordStoryGates(taskId);
   };
   const failTaskForAvailability = (taskId: string) => {
     failTaskForProgress({
@@ -135,6 +143,7 @@ export function useTaskActions(
       taskId,
       tasksMap: tasksMap.value,
     });
+    recordStoryGates(taskId);
   };
   const ensureTraderRequirements = (currentTask: Task) => {
     if (!preferencesStore.getTasksRequireTraderLevels) return;
@@ -164,6 +173,7 @@ export function useTaskActions(
   const markTaskComplete = (isUndo = false) => {
     const currentTask = task();
     const taskName = getTaskName(currentTask, () => t('common.task', 'Task'));
+    const recordedStoryObjectives = recordImpliedStoryObjectives(tarkovStore, currentTask);
     if (!isUndo) {
       emitAction({
         taskId: currentTask.id,
@@ -173,6 +183,7 @@ export function useTaskActions(
           objective_count: getTaskObjectiveCount(currentTask),
         }),
         statusKey: 'page.tasks.questcard.status_complete',
+        recordedStoryObjectives,
       });
     }
     completeTaskForProgress({
@@ -286,8 +297,7 @@ export function useTaskActions(
     });
     ensureTaskMinPlayerLevel(tarkovStore, currentTask);
     ensureTraderRequirements(currentTask);
-    for (const gate of storyObjectiveRequirements(currentTask))
-      tarkovStore.setStoryObjectiveComplete(gate.storyChapter.id, gate.objective.id);
+    recordImpliedStoryObjectives(tarkovStore, currentTask);
     if (requirements) tarkovStore.confirmTaskAvailability(currentTask.id, requirements);
     emitAction({
       taskId: currentTask.id,
@@ -300,6 +310,7 @@ export function useTaskActions(
   const markTaskFailed = (isUndo = false) => {
     const currentTask = task();
     const taskName = getTaskName(currentTask, () => t('common.task', 'Task'));
+    const recordedStoryObjectives = recordImpliedStoryObjectives(tarkovStore, currentTask);
     if (!isUndo) {
       emitAction({
         taskId: currentTask.id,
@@ -309,6 +320,7 @@ export function useTaskActions(
           was_manual_fail: 'yes',
         }),
         statusKey: 'page.tasks.questcard.status_failed',
+        recordedStoryObjectives,
       });
     }
     failTaskForProgress({

@@ -309,7 +309,8 @@ Reusable security gate called by CI, plus the weekly standalone audit:
 
 - `security-scan` - `pnpm audit --prod --audit-level=critical` (blocking), informational
   all-dependency audit at `high` (a notice, never a failure), schedule-only outdated check,
-  checksum-verified Gitleaks secret detection (blocking)
+  checksum-verified Gitleaks secret detection (blocking), preceded by a canary check that a
+  generated service-role JWT in `wrangler.toml` is still reported (allowlists stay value-exact)
 - `codeql` - CodeQL static analysis; the analysis must succeed, findings are triaged in code scanning
 
 **Triggers:** `workflow_call` from CI (pull requests, main pushes, explicit dispatches including

@@ -96,6 +96,7 @@
   import { delay } from '@/utils/async';
   import { GAME_MODES, LIMITS, type GameMode } from '@/utils/constants';
   import { logger } from '@/utils/logger';
+  import { secureRandomAlphanumeric } from '@/utils/secureRandom';
   import type { CreateTeamResponse } from '@/types/team';
   const { t } = useI18n({ useScope: 'global' });
   const { teamStore } = useTeamStoreWithSupabase();
@@ -122,11 +123,7 @@
   const isLoggedIn = computed(() => $supabase.user.loggedIn);
   const linkVisible = ref(false);
   const generateRandomName = (length: number = LIMITS.RANDOM_NAME_LENGTH) =>
-    Array.from({ length }, () =>
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'.charAt(
-        Math.floor(Math.random() * 62)
-      )
-    ).join('');
+    secureRandomAlphanumeric(length);
   const localUserTeam = computed(() => {
     return getTeamIdFromState(systemStore.$state, getCurrentGameMode());
   });
