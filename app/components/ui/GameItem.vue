@@ -281,9 +281,7 @@
   const { copyToClipboard } = useCopyToClipboard();
   const { toWikiUrl } = useWikiLink();
   const itemPageUrl = computed(() => (props.itemId ? buildItemPageUrl(props.itemId) : undefined));
-  const safeDevLink = computed(() =>
-    props.devLink ? (toTrustedGameLinkUrl(props.devLink) ?? itemPageUrl.value) : undefined
-  );
+  const safeDevLink = computed(() => toTrustedGameLinkUrl(props.devLink) ?? itemPageUrl.value);
   const safeWikiLink = computed(() => toWikiUrl(props.wikiLink));
   const safeTaskWikiLink = computed(() => toWikiUrl(props.taskWikiLink));
   const formatNumber = useLocaleNumberFormatter();

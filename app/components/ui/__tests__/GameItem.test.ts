@@ -105,10 +105,20 @@ describe('GameItem', () => {
     expect(hrefs).toEqual(['https://tarkov.dev/item/test-item']);
     wrapper.unmount();
   });
+  it('keeps the ID-derived tarkov.dev URL when the adapter dropped the link', () => {
+    const wrapper = mount(GameItem, {
+      props: { itemId: 'test-item' },
+      global: {
+        stubs: { ...defaultStubs, AppTooltip: { template: '<div><slot /></div>' } },
+      },
+    });
+    expect(wrapper.get('a').attributes('href')).toBe('https://tarkov.dev/item/test-item');
+    wrapper.unmount();
+  });
   it('does not open context menu when no links are available', async () => {
     const wrapper = mount(GameItem, {
       props: {
-        itemId: 'test-item',
+        src: 'https://assets.tarkov.dev/test-item-icon.webp',
         simpleMode: true,
         isVisible: true,
       },

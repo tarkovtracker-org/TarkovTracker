@@ -193,10 +193,11 @@
   const formatNumber = useLocaleNumberFormatter();
   const requirementId = computed(() => props.requirement.id);
   const requiredCount = computed(() => props.requirement.count);
-  const devUrl = computed(() => {
-    const { id, link } = props.requirement.item;
-    return link ? (toTrustedGameLinkUrl(link) ?? buildItemPageUrl(id)) : undefined;
-  });
+  const devUrl = computed(
+    () =>
+      toTrustedGameLinkUrl(props.requirement.item.link) ??
+      buildItemPageUrl(props.requirement.item.id)
+  );
   const wikiUrl = computed(() => toWikiUrl(props.requirement.item.wikiLink));
   const currencySymbol = computed(() => getCurrencySymbol(props.requirement.item.id) ?? '');
   const isCurrency = computed(() => currencySymbol.value !== '');
