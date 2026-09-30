@@ -15,8 +15,9 @@ let ownerId: string | null = null;
 let acknowledged: ModeProgressMap = {};
 let generation = 0;
 let ownerEpoch = 0;
-let remoteApplied = 0;
-let expectedProgress: ProgressSyncSnapshot | null = null;
+type PendingWrite = { expected: ProgressSyncSnapshot | null; disturbed: boolean };
+/** Each queued or dispatched write keeps its own expected-echo scope until it settles. */
+const pendingWrites = new Set<PendingWrite>();
 const toWire = (progress: UserProgressData): UserProgressData =>
   JSON.parse(JSON.stringify(progress)) as UserProgressData;
 export const clearAcknowledgedModes = (): void => {
@@ -24,7 +25,7 @@ export const clearAcknowledgedModes = (): void => {
   ownerEpoch += 1;
   ownerId = null;
   acknowledged = {};
-  expectedProgress = null;
+  pendingWrites.clear();
 };
 /** Replacing another owner's baseline invalidates that owner's in-flight acknowledgements. */
 const claimOwner = (userId: string): void => {
@@ -33,7 +34,6 @@ const claimOwner = (userId: string): void => {
   ownerEpoch += 1;
   ownerId = userId;
   acknowledged = {};
-  expectedProgress = null;
 };
 /** Records modes the server holds for `userId`; another owner's baseline is replaced. */
 export const recordAcknowledgedModes = (userId: string, modes: ModeProgressMap): void => {
@@ -50,55 +50,66 @@ export const invalidateAcknowledgedModes = (userId: string, modes: ModeProgressM
     Object.entries(acknowledged).filter(([mode]) => !Object.hasOwn(modes, mode))
   );
 };
-const matchesExpectedProgress = (snapshot: ProgressSyncSnapshot): boolean => {
-  const expected = expectedProgress;
-  return (
-    expected !== null &&
-    Object.entries(snapshot).every(
-      ([key, value]) =>
-        !Object.hasOwn(expected, key) ||
-        deepEqual(expected[key as keyof ProgressSyncSnapshot], value)
-    )
+const matchesWithinScope = (
+  expected: ProgressSyncSnapshot,
+  snapshot: ProgressSyncSnapshot
+): boolean =>
+  Object.entries(snapshot).every(
+    ([key, value]) =>
+      !Object.hasOwn(expected, key) || deepEqual(expected[key as keyof ProgressSyncSnapshot], value)
   );
-};
-const isCompatibleProgressUpdate = (update: RemoteProgressUpdate): boolean =>
-  matchesExpectedProgress(update.remote) && matchesExpectedProgress(update.applied);
+const coversScope = (expected: ProgressSyncSnapshot, snapshot: ProgressSyncSnapshot): boolean =>
+  Object.keys(snapshot).every((key) => Object.hasOwn(expected, key));
+/** Updates that match a write's values, or touch only keys it does not write, leave it current. */
+const isCompatible = (write: PendingWrite, update: RemoteProgressUpdate): boolean =>
+  write.expected !== null &&
+  matchesWithinScope(write.expected, update.remote) &&
+  matchesWithinScope(write.expected, update.applied);
+/** An exact echo of any pending write carries no foreign state, so it disturbs no queued write. */
+const isEcho = (write: PendingWrite, update: RemoteProgressUpdate): boolean =>
+  write.expected !== null &&
+  coversScope(write.expected, update.remote) &&
+  coversScope(write.expected, update.applied) &&
+  isCompatible(write, update);
 const SYNC_METADATA_KEYS: ReadonlySet<string> = new Set([
   'currentGameMode',
   'gameEdition',
   'tarkovUid',
 ]);
 /** Narrows the interruption scope to account metadata plus the modes a sync actually writes. */
-const scopeExpectedProgress = (modes: ModeProgressMap): void => {
-  const expected = expectedProgress;
-  if (!expected) return;
-  expectedProgress = Object.fromEntries(
+const narrowScope = (
+  expected: ProgressSyncSnapshot,
+  modes: ModeProgressMap
+): ProgressSyncSnapshot =>
+  Object.fromEntries(
     Object.entries(expected).filter(
       ([key]) => SYNC_METADATA_KEYS.has(key) || Object.hasOwn(modes, key)
     )
   );
-};
-/** Matching echoes and updates outside the write scope do not supersede the current save. */
+/** Echoes of pending writes and updates outside a write's scope do not supersede it. */
 export const noteRemoteProgressApplied = (update?: RemoteProgressUpdate): void => {
-  if (update && isCompatibleProgressUpdate(update)) return;
-  remoteApplied += 1;
-  expectedProgress = null;
+  const writes = [...pendingWrites];
+  if (update && writes.some((write) => isEcho(write, update))) return;
+  for (const write of writes) {
+    if (!update || !isCompatible(write, update)) write.disturbed = true;
+  }
 };
 /**
  * Starts a multi-request sync and supersedes any older one still in flight. `isCurrent` turns false
  * once a newer sync starts, the baseline is cleared or claimed by another account, or Realtime
- * applies newer progress or metadata; the sync then stops so later requests never replay a stale
- * snapshot. `acknowledge` records a batch only while current.
+ * applies newer progress or metadata within this write's scope; the sync then stops so later
+ * requests never replay a stale snapshot. `acknowledge` records a batch only while current.
  */
 export const beginAcknowledgement = (userId: string, expected?: ProgressSyncSnapshot) => {
   claimOwner(userId);
   generation += 1;
-  expectedProgress = expected
-    ? (JSON.parse(JSON.stringify(expected)) as ProgressSyncSnapshot)
-    : null;
-  const started = { generation, remoteApplied, ownerEpoch };
-  const isUndisturbed = (): boolean =>
-    ownerEpoch === started.ownerEpoch && remoteApplied === started.remoteApplied;
+  const write: PendingWrite = {
+    expected: expected ? (JSON.parse(JSON.stringify(expected)) as ProgressSyncSnapshot) : null,
+    disturbed: false,
+  };
+  pendingWrites.add(write);
+  const started = { generation, ownerEpoch };
+  const isUndisturbed = (): boolean => ownerEpoch === started.ownerEpoch && !write.disturbed;
   const isCurrent = (): boolean => generation === started.generation && isUndisturbed();
   return {
     isCurrent,
@@ -106,7 +117,7 @@ export const beginAcknowledgement = (userId: string, expected?: ProgressSyncSnap
       if (isCurrent()) recordAcknowledgedModes(userId, modes);
     },
     scope: (modes: ModeProgressMap): void => {
-      if (isCurrent()) scopeExpectedProgress(modes);
+      if (write.expected) write.expected = narrowScope(write.expected, modes);
     },
     /**
      * Records a committed atomic write even if a newer local sync started meanwhile; that sync
@@ -115,12 +126,11 @@ export const beginAcknowledgement = (userId: string, expected?: ProgressSyncSnap
     commit: (modes: ModeProgressMap): boolean => {
       if (!isUndisturbed()) return false;
       generation += 1;
-      expectedProgress = null;
       recordAcknowledgedModes(userId, modes);
       return true;
     },
     finish: (): void => {
-      if (isCurrent()) expectedProgress = null;
+      pendingWrites.delete(write);
     },
   };
 };

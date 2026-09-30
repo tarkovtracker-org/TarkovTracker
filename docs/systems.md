@@ -813,8 +813,9 @@ flowchart LR
    acknowledged only after its request succeeds; a newer sync, a session reset, or Realtime applying
    newer progress or account metadata stops the remaining requests so they never replay a stale snapshot; the
    interrupted sync reports a failure, so the controller reconciles and resends from the merged
-   state. An accepted Realtime scope that matches both the current save's captured values and the
-   values applied locally is its expected echo and does not interrupt that save. Once a sync has
+   state. Each queued or dispatched save keeps its own captured values until it settles. An accepted
+   Realtime scope that matches both one pending save's captured values and the values applied
+   locally is that save's echo and interrupts no pending save. Once a sync has
    selected its modes, Realtime changes to modes it omits no longer interrupt it. Remote observations
    also invalidate the controller's last-upload hash, so reverting to an earlier upload still
    reaches the sender's current baseline comparison. One request can still carry several modes, so a stale Seasonal entry is skipped rather

@@ -282,6 +282,27 @@ describe('prestige persistence ordering', () => {
     await syncProgressState(supabaseContext.client, 'user-1', store.$state);
     expect(rpc.mock.calls[2]![1].p_modes).toEqual({});
   });
+  it('dispatches a queued archive after the active batch echoes before its response', async () => {
+    const store = seedLargeProgress();
+    recordAcknowledgedModes('user-1', { seasonal: cloneProgress(store.seasonal) });
+    const pending = pendingRpc();
+    rpc.mockImplementationOnce(async () => {
+      await pending.promise;
+      return { data: null, error: null };
+    });
+    const background = syncProgressState(supabaseContext.client, 'user-1', store.$state);
+    const archive = store.prestigePvP();
+    const pvp = cloneProgress((rpc.mock.calls[0]![1].p_modes as { pvp: typeof store.pvp }).pvp);
+    noteRemoteProgressApplied({ remote: { pvp }, applied: { pvp } });
+    pending.resolve();
+    await Promise.all([background, archive]);
+    expect(rpc.mock.calls.map(([name]) => name)).toEqual([
+      'sync_user_game_mode_progress',
+      'archive_prestige_run_and_reset_progress',
+    ]);
+    expect(store.pvp.level).toBe(1);
+    expect(store.pvp.prestigeLevel).toBe(1);
+  });
   it('cancels a queued archive when its session ends before dispatch', async () => {
     const store = seedLargeProgress();
     const before = cloneProgress(store.$state);
