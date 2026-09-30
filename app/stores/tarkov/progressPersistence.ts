@@ -102,6 +102,8 @@ const toModeBatches = (modes: ModeProgressMap): ModeProgressMap[] => {
   }
   return entries.map(([mode, progress]) => ({ [mode]: progress }));
 };
+/** Unsent modes stay pending, so the controller reconciles and retries instead of acknowledging. */
+const SPLIT_SYNC_INTERRUPTED = { message: 'Progress sync interrupted by newer remote state' };
 /**
  * Sends account metadata plus only the modes the server does not already hold; the RPC keeps
  * any omitted mode as stored. Acknowledged modes become the baseline for the next sync, so after
@@ -111,7 +113,7 @@ export const sendProgressSync = async <TError>(
   client: { rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{ error: TError }> },
   userId: string,
   payload: ProgressSyncPayload
-): Promise<{ error: TError }> => {
+): Promise<{ error: TError | typeof SPLIT_SYNC_INTERRUPTED }> => {
   const modes = selectChangedModes(userId, {
     [GAME_MODES.PVP]: payload.pvp_data,
     [GAME_MODES.PVE]: payload.pve_data,
@@ -120,7 +122,7 @@ export const sendProgressSync = async <TError>(
   const sync = beginAcknowledgement(userId);
   let result: { error: TError } | undefined;
   for (const batch of toModeBatches(modes)) {
-    if (!sync.isCurrent()) break;
+    if (!sync.isCurrent()) return { error: SPLIT_SYNC_INTERRUPTED };
     result = await client.rpc('sync_user_game_mode_progress', {
       p_current_game_mode: payload.current_game_mode,
       p_game_edition: payload.game_edition,

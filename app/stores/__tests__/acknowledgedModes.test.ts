@@ -121,7 +121,7 @@ describe('mode-scoped progress sync', () => {
     const client = { rpc } as ProgressRpcClient;
     const state = withHeavyModes();
     const result = await syncProgressState(client, 'user-1', state);
-    expect(result.error).toBeNull();
+    expect(result.error).toEqual({ message: 'Progress sync interrupted by newer remote state' });
     expect(Object.keys(sentModes(rpc))).toEqual(['pvp']);
     expect(rpc).toHaveBeenCalledTimes(1);
     rpc.mockClear();
