@@ -63,5 +63,6 @@ describe('useMetadataStore mapsWithSvg extracts additions', () => {
     const lighthouse = store.mapsWithSvg.find((m) => m.id === '5704e4dad2720bb55b8b4567');
     expect(lighthouse?.extracts).toHaveLength(1);
     expect(lighthouse?.extracts?.[0]?.id).toBe('SCAV_Underboat_Hideout');
+    expect(lighthouse?.extracts?.[0]?.nameKey).toBe('maps.extract_names.scav_underboat_hideout');
   });
 });
