@@ -47,16 +47,22 @@ export const invalidateAcknowledgedModes = (userId: string, modes: ModeProgressM
     Object.entries(acknowledged).filter(([mode]) => !Object.hasOwn(modes, mode))
   );
 };
-const matchesExpectedProgress = (snapshot: ProgressSyncSnapshot): boolean =>
-  expectedProgress !== null &&
-  Object.entries(snapshot).every(([key, value]) =>
-    deepEqual(expectedProgress?.[key as keyof ProgressSyncSnapshot], value)
+const matchesExpectedProgress = (snapshot: ProgressSyncSnapshot): boolean => {
+  const expected = expectedProgress;
+  return (
+    expected !== null &&
+    Object.entries(snapshot).every(
+      ([key, value]) =>
+        !Object.hasOwn(expected, key) ||
+        deepEqual(expected[key as keyof ProgressSyncSnapshot], value)
+    )
   );
-const isExpectedProgressEcho = (update: RemoteProgressUpdate): boolean =>
+};
+const isCompatibleProgressUpdate = (update: RemoteProgressUpdate): boolean =>
   matchesExpectedProgress(update.remote) && matchesExpectedProgress(update.applied);
-/** Matching save echoes do not supersede their own write; other remote changes require retry. */
+/** Matching echoes and updates outside the write scope do not supersede the current save. */
 export const noteRemoteProgressApplied = (update?: RemoteProgressUpdate): void => {
-  if (update && isExpectedProgressEcho(update)) return;
+  if (update && isCompatibleProgressUpdate(update)) return;
   remoteApplied += 1;
   expectedProgress = null;
 };

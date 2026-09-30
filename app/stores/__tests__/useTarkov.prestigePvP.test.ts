@@ -371,11 +371,32 @@ describe('prestige persistence ordering', () => {
     const archive = store.prestigePvP();
     const rejected = expect(archive).rejects.toThrow();
     store.pvp.level = 43;
-    noteRemoteProgressApplied();
+    const pvp = cloneProgress(store.pvp);
+    noteRemoteProgressApplied({ remote: { pvp }, applied: { pvp } });
     pending.resolve();
     await rejected;
     expect(store.pvp.level).toBe(43);
     expect(store.pvp.prestigeLevel).toBe(0);
+  });
+  it('preserves a remote Seasonal update without interrupting the persistent-mode archive', async () => {
+    const store = seedLargeProgress();
+    const pending = pendingRpc();
+    rpc.mockImplementationOnce(async () => {
+      await pending.promise;
+      return { data: null, error: null };
+    });
+    const archive = store.prestigePvP();
+    const seasonal = { ...cloneProgress(store.seasonal), level: 35 };
+    store.seasonal = seasonal;
+    recordAcknowledgedModes('user-1', { seasonal });
+    noteRemoteProgressApplied({ remote: { seasonal }, applied: { seasonal } });
+    pending.resolve();
+    await archive;
+    expect(store.pvp.level).toBe(1);
+    expect(store.pvp.prestigeLevel).toBe(1);
+    expect(cloneProgress(store.seasonal)).toEqual(seasonal);
+    await syncProgressState(supabaseContext.client, 'user-1', store.$state);
+    expect(rpc.mock.calls[1]![1].p_modes).toEqual({});
   });
   it('leaves progress untouched when the archive request throws', async () => {
     const store = seedLargeProgress();
