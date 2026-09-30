@@ -19,7 +19,8 @@ function assertStatusBoundary(workflow) {
   assert.match(checkout, /^ {10}persist-credentials: false$/m);
   const validator = workflowStep(job, 'Require all selected jobs to succeed');
   assert.match(validator, /^ {8}id: validation$/m);
-  assert.match(validator, /^ {8}run: node scripts\/ci\/check-ci-result\.mjs$/m);
+  assert.match(validator, /^ {10}script=scripts\/ci\/check-ci-result\.mjs$/m);
+  assert.match(validator, /^ {10}node "\$script"$/m);
   const report = workflowStep(job, 'Report dispatched CI to branch rules');
   assert.match(report, /^ {8}if: always\(\) && github\.event_name == 'workflow_dispatch'$/m);
   assert.match(report, /^ {10}VALIDATION_OUTCOME: \$\{\{ steps\.validation\.outcome \}\}$/m);
@@ -29,9 +30,10 @@ function assertStatusBoundary(workflow) {
   );
   assert.ok(
     report.includes(
-      'const { reportDispatchedCi } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/report-dispatched-ci.mjs`);'
+      'const moved = `${process.env.GITHUB_WORKSPACE}/scripts/ci/report-dispatched-ci.mjs`;'
     )
   );
+  assert.ok(report.includes('const { reportDispatchedCi } = await import(reporter);'));
   assert.match(
     report,
     /^ {12}await reportDispatchedCi\(\{ github, context, outcome: process\.env\.VALIDATION_OUTCOME \}\);$/m

@@ -343,7 +343,11 @@ jobs:
         env:
           VALIDATION_PLAN: ${{ needs.changes.outputs.plan }}
           CI_NEEDS: ${{ toJSON(needs) }}
-        run: node scripts/ci/check-ci-result.mjs
+        # Fallback keeps the default-branch checkout working until scripts/ci/ lands on it.
+        run: |
+          script=scripts/ci/check-ci-result.mjs
+          [ -f "$script" ] || script=scripts/check-ci-result.mjs
+          node "$script"
       - name: Report dispatched CI to branch rules
         if: always() && github.event_name == 'workflow_dispatch'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
@@ -351,5 +355,8 @@ jobs:
           VALIDATION_OUTCOME: ${{ steps.validation.outcome }}
         with:
           script: |
-            const { reportDispatchedCi } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/report-dispatched-ci.mjs`);
+            const { existsSync } = await import('node:fs');
+            const moved = `${process.env.GITHUB_WORKSPACE}/scripts/ci/report-dispatched-ci.mjs`;
+            const reporter = existsSync(moved) ? moved : `${process.env.GITHUB_WORKSPACE}/scripts/report-dispatched-ci.mjs`;
+            const { reportDispatchedCi } = await import(reporter);
             await reportDispatchedCi({ github, context, outcome: process.env.VALIDATION_OUTCOME });
