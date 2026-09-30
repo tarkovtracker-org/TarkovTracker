@@ -350,6 +350,91 @@ describe('useAppInitialization locale setup', () => {
       headers: { Authorization: 'Bearer fixture-token' },
     });
   });
+  describe('foreground account activity', () => {
+    const foreground = async (visibility = 'visible') => {
+      vi.spyOn(document, 'visibilityState', 'get').mockReturnValue(
+        visibility as DocumentVisibilityState
+      );
+      document.dispatchEvent(new Event('visibilitychange'));
+      await flushPromises();
+    };
+    beforeEach(() => {
+      mockSupabaseUser.loggedIn = true;
+      mockSupabaseUser.id = 'user-1';
+      mockSupabase.client.auth.getSession.mockResolvedValue({
+        data: { session: { access_token: 'fixture-token' } },
+      });
+    });
+    afterEach(() => vi.restoreAllMocks());
+    it('throttles each user for a day and records a returning foreground without timers', async () => {
+      const fetch = vi.fn().mockResolvedValue({ recorded: true });
+      vi.stubGlobal('$fetch', fetch);
+      const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+      const wrapper = await mountWithComposable();
+      await flushPromises();
+      await foreground();
+      expect(fetch).toHaveBeenCalledTimes(1);
+      now.mockReturnValue(86_401_000);
+      await foreground('hidden');
+      expect(fetch).toHaveBeenCalledTimes(1);
+      await foreground();
+      expect(fetch).toHaveBeenCalledTimes(2);
+      mockSupabaseUser.id = 'user-2';
+      await flushPromises();
+      expect(fetch).toHaveBeenCalledTimes(3);
+      mockSupabaseUser.id = 'user-1';
+      await flushPromises();
+      expect(fetch).toHaveBeenCalledTimes(3);
+      wrapper.unmount();
+      now.mockReturnValue(172_801_000);
+      await foreground();
+      expect(fetch).toHaveBeenCalledTimes(3);
+    });
+    it('retries failed and unrecorded requests on foreground', async () => {
+      const fetch = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('offline'))
+        .mockResolvedValueOnce({ recorded: false })
+        .mockResolvedValue({ recorded: true });
+      vi.stubGlobal('$fetch', fetch);
+      const wrapper = await mountWithComposable();
+      await flushPromises();
+      await foreground();
+      await foreground();
+      await foreground();
+      expect(fetch).toHaveBeenCalledTimes(3);
+      wrapper.unmount();
+    });
+    it('does not send a stale session token after an account switch', async () => {
+      const pending = Promise.withResolvers<{ data: { session: { access_token: string } } }>();
+      mockSupabase.client.auth.getSession.mockReturnValueOnce(pending.promise);
+      const fetch = vi.fn().mockResolvedValue({ recorded: true });
+      vi.stubGlobal('$fetch', fetch);
+      const wrapper = await mountWithComposable();
+      await flushPromises();
+      mockSupabaseUser.id = 'user-2';
+      await flushPromises();
+      pending.resolve({ data: { session: { access_token: 'stale-token' } } });
+      await flushPromises();
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch.mock.calls[0]?.[1].headers.Authorization).toBe('Bearer fixture-token');
+      wrapper.unmount();
+    });
+    it('deduplicates pending requests and cancels session reads after disposal', async () => {
+      const pending = Promise.withResolvers<{ data: { session: { access_token: string } } }>();
+      mockSupabase.client.auth.getSession.mockReturnValueOnce(pending.promise);
+      const fetch = vi.fn();
+      vi.stubGlobal('$fetch', fetch);
+      const wrapper = await mountWithComposable();
+      await flushPromises();
+      await foreground();
+      expect(mockSupabase.client.auth.getSession).toHaveBeenCalledTimes(1);
+      wrapper.unmount();
+      pending.resolve({ data: { session: { access_token: 'stale-token' } } });
+      await flushPromises();
+      expect(fetch).not.toHaveBeenCalled();
+    });
+  });
   it.each(['throw', 'failed read'])(
     'keeps sync usable when optional supporter status fails: %s',
     async (outcome) => {

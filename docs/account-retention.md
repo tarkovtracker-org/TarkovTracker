@@ -1,90 +1,77 @@
 # Account retention
 
-## Status and public policy
+## Public policy and billing eligibility
 
-The public retention policy defines eligibility for routine inactivity cleanup. Automatic cleanup
-and a dedicated account activity timestamp are **not implemented**. This documentation change does
-not enable deletion, deploy database changes, or authorize a production deletion batch.
+The English policy source is `page.account_retention` in
+[`app/locales/en.json`](../app/locales/en.json), rendered by
+[`AccountRetentionPolicy.vue`](../app/components/AccountRetentionPolicy.vue) in the Terms,
+Privacy Policy, and supporter page before payment options. These protections concern intentional
+inactivity cleanup while the service operates, with the public qualifications for service closure,
+data loss, and non-excludable rights. Have qualified counsel review the wording before publication.
 
-The English source for the public rules is `page.account_retention` in
-[`app/locales/en.json`](../app/locales/en.json), rendered consistently by
-[`AccountRetentionPolicy.vue`](../app/components/AccountRetentionPolicy.vue) in the Terms of Service,
-Privacy Policy, and supporter page. The supporter page displays the disclosure before payment
-options. Retention protection concerns intentional inactivity cleanup while the service operates;
-it is not a guarantee of storage, data recovery, or continued service. Statutory rights remain
-unaffected. Have qualified counsel review the wording for applicable jurisdictions before publication.
+Qualifying contributions exclude fully refunded payments. A refund preserves eligibility from
+other valid contributions. Any chargeback revokes all supporter benefits and retention history,
+including earlier contributions. The durable disqualification prevents delayed billing events
+or remaining historical payments from reinstating benefits. It does not itself delete an account.
 
-## Activity tracking design
+Trusted billing evidence lives in `supporters`; see the
+[Stripe webhook](../supabase/functions/stripe-webhook/index.ts) and
+[retention helpers](../supabase/functions/_shared/stripeRetention.ts). Dates alone do not grant
+benefits. Unknown legacy support history is protected from automated deletion until verified.
+Cancelled renewals retain protection until paid access ends; past-due grace is bounded and cannot
+restart on every webhook. Former subscribers use the later of activity and access end. Calendar
+intervals, rather than fixed day counts, determine eligibility.
 
-Add a server-controlled `last_active_at` account timestamp. Use database time and monotonic updates;
-clients must never choose the timestamp or the target account. Record authenticated site use and
-successful authenticated API use, including requests that do not change progress. Public profile
-views, failed authentication, rejected requests, billing webhooks, and maintenance must not renew
-account activity.
+## Activity and cleanup implementation
 
-- Extend [`account/activity.post.ts`](../app/server/api/account/activity.post.ts) to record activity
-  independently of IP auditing. It must work even when IP hashing is unavailable.
-- Call it at authenticated app startup and when the app returns to the foreground; throttle
-  heartbeat writes to at most once per account per day. Do not keep a hidden tab active with a timer.
-- Record successful authenticated API reads and writes in the gateway. Ensure unchanged writes
-  count as use without changing the progress freshness clock.
-- Advance account activity when user-driven progress, preferences, or archive mutations persist.
-  Keep maintenance and compatibility backfills from manufacturing user activity.
-- Preserve the distinction between account activity and mode progress freshness. The existing
-  [`progress_updated_at` trigger](../supabase/migrations/20260906234500_track_mode_progress_freshness.sql)
-  already records progress changes and intentionally leaves identical progress unchanged.
+The [retention migration](../supabase/migrations/20260930003202_automate_inactive_account_cleanup.sql)
+owns the server activity clock, eligibility calculation, transactional cleanup, and weekly schedule.
+The [activity endpoint](../app/server/api/account/activity.post.ts) records authenticated use even
+when IP hashing is unavailable. [App initialization](../app/composables/useAppInitialization.ts)
+records startup and foreground use, with a per-account daily throttle and no hidden-tab timer.
+Clients cannot supply the timestamp or target account.
 
-Existing accounts need not wait a new retention period if reliable historical evidence establishes
-inactivity. Assess the latest available account creation, sign-in, authenticated app activity,
-session activity, user-data mutation, and successful API-use timestamps. Treat creation as the
-baseline for unused accounts. Administrative rewrites may conservatively postpone cleanup; they
-must not be mistaken for evidence that a user changed data. Missing, conflicting, or incomplete
-evidence requires review rather than an assumption of inactivity. Persist a durable activity clock
-before source telemetry ages out: API usage currently has a
-[`180-day retention job`](../supabase/migrations/20260807130000_add_usage_and_rate_limit_retention.sql).
+Database triggers record sign-ins, saved progress, preferences, archives, and existing authenticated
+API accounting. API quota-admitted requests count conservatively even if a later handler rejects
+input; throttled-only requests do not. Billing changes cancel pending cleanup without manufacturing
+account activity. Public profile views do not renew the viewed account. Account activity remains
+separate from mode progress freshness, which intentionally ignores unchanged progress.
 
-## Support eligibility and subscription end
+Eligibility uses the newest trustworthy creation, sign-in, session, durable activity, and existing
+account-data/API timestamps. A separate daily snapshot preserves historical activity before
+short-lived telemetry is pruned; snapshots never manufacture a new activity date. Administrative rewrites may conservatively postpone cleanup. No
+historical rows are rewritten by the migration. A missing supporter verification marker is an
+uncertainty hold, not a new benefit or proof of never supporting.
 
-Resolve support from trusted server records, not client flags or editable user metadata. Preserve
-ever-supported history independently of current billing status. Protect uncertain support history
-until reconciled; a missing or false flag alone does not establish that a user never contributed.
-Contributions must be attributable to the account to receive account-specific protection.
+Each weekly bounded batch first marks eligible accounts pending. Deletion requires at least 30 days
+pending plus a fresh eligibility check under the account lock. Activity or billing changes cancel
+pending status. This rollout recovery window is additional to the public eligibility period; an
+email notification system is not implemented. Failed accounts roll back independently and yield
+priority to other candidates on subsequent runs.
 
-Match the documented active-subscription rule to server billing state, including any granted
-past-due grace period. A canceled renewal remains protected until paid access ends. Record the
-actual end of subscription access as a durable timestamp; `supporters.updated_at` is not a billing
-period-end timestamp and `expires_at` must be verified against webhook behavior before reuse.
+Deletion reuses the existing claim/fencing audit, transfers populated owned teams to a remaining
+member, and removes Auth identity and dependent account data transactionally. Existing deletion
+jobs remain with their original workflow. Accounts owning Storage objects or buckets are held:
+Storage bytes require API deletion and must not be orphaned by deleting SQL metadata. Payment,
+security, deletion-audit, and limited backup records may have separate lawful retention requirements.
+Auth deletion does not immediately invalidate an already issued JWT; account foreign keys prevent
+recreation of account-owned data.
 
-For former subscribers, compute eligibility from the later of last activity and the most recent
-end of subscription access, then apply the public one-year period. For one-time contributors, use
-the public inactivity period measured from the later of last activity and the recorded contribution
-date. A new contribution or renewed subscription cancels pending cleanup. Use calendar intervals
-for months and years, not fixed day counts.
+## Rollout and operations
 
-## Cleanup implementation and rollout
+Deployment is separate from PR approval. Apply the new migration before deploying the activity
+endpoint and billing webhook. Applying it installs the weekly schedule; the initial pending window
+prevents immediate deletion of historical accounts. Confirm deployed billing history and candidate
+evidence before that window ends. Legacy uncertain payment histories need authoritative Stripe
+reconciliation; do not convert unknown history to false in bulk.
 
-1. Implement a read-only candidate report first. Show counts by retention category, evidence gaps,
-   dependent data, and estimated removable payload size. Keep user identifiers out of public reports.
-2. Review candidate evidence and support history before scheduling deletion. Introduce a notice
-   and recovery window for existing accounts; do not promise delivery that cannot be verified.
-3. Queue inactivity candidates separately from user-requested deletions. A retention candidate must
-   remain cancelable when activity or support resumes.
-4. Recheck activity, support, subscription access end, and the cutoff immediately before destructive
-   work. Serialize activity and billing changes with the transition to deletion so a returning user
-   or renewal cannot race a stale candidate snapshot. Fail closed on lookup errors or uncertainty.
-5. Reuse the claim, retry, and fencing model in the
-   [account-deletion lifecycle](../supabase/functions/_shared/account-deletion-lifecycle.ts), but do
-   not run the current reconciler on inactivity candidates without the new eligibility guards.
-6. Delete Auth identity and account-owned progress, retained seasons, archives, preferences, tokens,
-   links, and dependent records. Audit actual foreign-key cascades, storage objects, and team
-   ownership first; do not delete other members' data through an unreviewed team-owner cascade.
-7. Distinguish account removal from necessary legal, payment, security, and limited backup records
-   described in the Privacy Policy. Reconcile partial failures with bounded batches and audit logs.
-8. Test cutoff boundaries, unknown history, active and canceled subscriptions, grace expiry,
-   activity/renewal races, dependent cleanup, and retry behavior. Obtain independent review before
-   enabling the workflow and explicit operator approval for deployment and a concrete deletion batch.
+Use `private.account_retention_deadline(uuid)` for restricted candidate assessment and
+`private.account_retention` for pending/error inspection. They are inaccessible to ordinary clients.
+Monitor the Cron job and the account-deletion audit after each run. To pause, disable the named
+`inactive-account-cleanup` Cron job; preserve pending evidence and audit rows. Resume only after
+investigating unexpected eligibility, failures, or missing support evidence. Production writes,
+deployment, and deletion require explicit operator approval.
 
-Removing accounts does not retire the older progress layout. `user_progress` still carries account
+Removing inactive accounts does not retire the older `user_progress` layout. It still carries
 metadata and PvP/PvE compatibility copies; see the
-[game-mode storage system](./systems.md#7-game-mode-and-seasonal-progress-storage). Removing those
-copies requires a separate compatibility and backfill project.
+[game-mode storage system](./systems.md#7-game-mode-and-seasonal-progress-storage).

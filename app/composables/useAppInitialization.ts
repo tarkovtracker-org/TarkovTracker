@@ -73,7 +73,9 @@ export function useAppInitialization() {
   let migrationAttempted = false;
   let syncRetryTimer: ReturnType<typeof setTimeout> | null = null;
   let syncRetryAttempts = 0;
-  let accountActivityRecordedForUserId: string | null = null;
+  const activityRecordedAt = new Map<string, number>();
+  const activityRequests = new Map<string, number>();
+  let disposed = false;
   let supporterLoadedForUserId: string | null = null;
   let authChangeToken = 0;
   const cancelSyncRetry = () => {
@@ -141,7 +143,6 @@ export function useAppInitialization() {
     migrationAttempted = false;
     cancelSyncRetry();
     syncRetryAttempts = 0;
-    accountActivityRecordedForUserId = null;
     supporterLoadedForUserId = null;
     supporter.reset();
     if (!loggedIn) activityLogStore.migrateLegacyManualEntries();
@@ -166,29 +167,65 @@ export function useAppInitialization() {
       logger.error('[useAppInitialization] Failed to load supporter status:', error);
     }
   };
-  const recordAccountActivityIfNeeded = async (expectedUserId?: string, expectedToken?: number) => {
-    const authenticatedUserId = getAuthenticatedUserId();
-    if (expectedUserId && authenticatedUserId !== expectedUserId) return;
-    if (expectedToken !== undefined && expectedToken !== authChangeToken) return;
-    if (!authenticatedUserId || accountActivityRecordedForUserId === authenticatedUserId) return;
-    try {
-      const { data } = await $supabase.client.auth.getSession();
-      const token = data.session?.access_token;
-      if (!token) return;
-      const response = await $fetch<AccountActivityResponse>('/api/account/activity', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.recorded && getAuthenticatedUserId() === authenticatedUserId) {
-        accountActivityRecordedForUserId = authenticatedUserId;
-      }
-    } catch (error) {
-      logger.warn('[useAppInitialization] Failed to record account activity:', {
-        userId: authenticatedUserId,
-        error,
-      });
+  const isCurrentActivityRequest = (userId: string, token: number) =>
+    !disposed && getAuthenticatedUserId() === userId && authChangeToken === token;
+  const isActivityThrottled = (userId: string, token: number) =>
+    Date.now() - (activityRecordedAt.get(userId) ?? -Infinity) < 86_400_000 ||
+    activityRequests.get(userId) === token;
+  const markRecordedActivity = (
+    response: AccountActivityResponse,
+    userId: string,
+    token: number
+  ) => {
+    if (response.recorded && isCurrentActivityRequest(userId, token)) {
+      activityRecordedAt.set(userId, Date.now());
     }
   };
+  const sendAccountActivity = async (userId: string, authToken: number) => {
+    const { data } = await $supabase.client.auth.getSession();
+    if (!isCurrentActivityRequest(userId, authToken)) return;
+    const token = data.session?.access_token;
+    if (!token) return;
+    const response = await $fetch<AccountActivityResponse>('/api/account/activity', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    markRecordedActivity(response, userId, authToken);
+  };
+  const finishActivityRequest = (userId: string, token: number) => {
+    if (activityRequests.get(userId) === token) activityRequests.delete(userId);
+  };
+  const tryAccountActivity = async (userId: string, token: number) => {
+    activityRequests.set(userId, token);
+    try {
+      await sendAccountActivity(userId, token);
+    } catch (error) {
+      logger.warn('[useAppInitialization] Failed to record account activity:', { userId, error });
+    } finally {
+      finishActivityRequest(userId, token);
+    }
+  };
+  const canRecordActivity = (userId: string, token: number) =>
+    isCurrentActivityRequest(userId, token) && !isActivityThrottled(userId, token);
+  const recordAccountActivityIfNeeded = async (expectedUserId?: string, expectedToken?: number) => {
+    const userId = getAuthenticatedUserId();
+    if (!userId) return;
+    if (isStaleInitialization(expectedUserId, expectedToken)) return;
+    const token = authChangeToken;
+    if (!canRecordActivity(userId, token)) return;
+    await tryAccountActivity(userId, token);
+  };
+  const recordForegroundActivity = () => {
+    if (document.visibilityState !== 'visible') return;
+    const userId = getAuthenticatedUserId();
+    if (userId) void recordAccountActivityIfNeeded(userId, authChangeToken);
+  };
+  if (import.meta.client) document.addEventListener('visibilitychange', recordForegroundActivity);
+  onScopeDispose(() => {
+    disposed = true;
+    if (import.meta.client)
+      document.removeEventListener('visibilitychange', recordForegroundActivity);
+  });
   const startSyncIfNeeded = async (expectedUserId?: string, expectedToken?: number) => {
     const authenticatedUserId = getAuthenticatedUserId();
     if (expectedUserId && authenticatedUserId !== expectedUserId) return;
