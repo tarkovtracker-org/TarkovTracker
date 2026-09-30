@@ -2,7 +2,6 @@
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
   "autoImports": true,
   "entry": [
-    "scripts/measure-pageload.mjs",
     "scripts/prod-db.mjs",
     "scripts/stripe-import-test.mjs",
     "scripts/precompute/__tests__/*.test.ts",
