@@ -811,7 +811,9 @@ flowchart LR
    Each entry keeps at most the first 20 valid task updates in input order (the gateway lists the
    requested tasks before cascaded dependents) and records the pre-truncation total as `taskCount`
    only when updates were dropped. The gateway, client, and database apply the same rules
-   (`shared/utils/apiTaskUpdates.ts`), so a client sync cannot flip a stored entry.
+   (`shared/utils/apiTaskUpdates.ts`), so a client sync cannot flip a stored entry. When a sync
+   resends an entry with the same id and timestamp but a smaller or missing `taskCount` (for example
+   from a client built before the cap), the database keeps the larger stored count.
 3. Realtime listens to both the account row and normalized rows. A normalized event is applied only
    when its mode is supported and its season equals the active season. The long-lived system and team
    listeners run in detached scopes so route unmounts cannot orphan their channels. The team store

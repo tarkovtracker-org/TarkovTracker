@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(11);
+SELECT plan(13);
 
 CREATE TEMP TABLE cap_fixture ON COMMIT DROP AS
 SELECT jsonb_agg(
@@ -130,6 +130,52 @@ SELECT is(
    WHERE user_id = '00000000-0000-0000-0000-000000000992'),
   '[["second-write", 20, 25], ["first-write", 20, 30]]'::jsonb,
   'the legacy history trigger carries taskCount through to the mirrored row'
+);
+
+SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000990', true);
+SET LOCAL ROLE authenticated;
+SELECT public.sync_user_game_mode_progress('pvp', 1, NULL,
+  jsonb_build_object('pvp', jsonb_build_object(
+    'level', 10,
+    'lastApiUpdate', jsonb_build_object('at', 1780000000000, 'id', 'history-batch', 'source', 'api',
+      'tasks', (SELECT jsonb_agg(value ORDER BY ordinality)
+                FROM jsonb_array_elements((SELECT tasks FROM cap_fixture)) WITH ORDINALITY
+                WHERE ordinality <= 20)),
+    'apiUpdateHistory', jsonb_build_array(
+      jsonb_build_object('at', 1780000000000, 'id', 'history-batch', 'source', 'api',
+        'tasks', (SELECT jsonb_agg(value ORDER BY ordinality)
+                  FROM jsonb_array_elements((SELECT tasks FROM cap_fixture)) WITH ORDINALITY
+                  WHERE ordinality <= 20))
+    )
+  )),
+  NULL);
+RESET ROLE;
+
+SELECT is(
+  (SELECT jsonb_build_array(
+     progress_data->'lastApiUpdate'->'taskCount',
+     progress_data->'apiUpdateHistory'->0->'taskCount')
+   FROM public.user_game_mode_progress
+   WHERE user_id = '00000000-0000-0000-0000-000000000990' AND game_mode = 'pvp'),
+  '[25, 25]'::jsonb,
+  'a client sync that omits taskCount keeps the stored count for the same entry'
+);
+
+UPDATE public.user_progress
+SET pvp_data = pvp_data || jsonb_build_object(
+  'apiUpdateHistory', jsonb_build_array(
+    jsonb_build_object('at', 1780000000000, 'id', 'first-write', 'source', 'api',
+      'tasks', pvp_data->'apiUpdateHistory'->1->'tasks')
+  )
+)
+WHERE user_id = '00000000-0000-0000-0000-000000000992';
+
+SELECT is(
+  (SELECT entry->'taskCount'
+   FROM public.user_progress, jsonb_array_elements(pvp_data->'apiUpdateHistory') AS entry
+   WHERE user_id = '00000000-0000-0000-0000-000000000992' AND entry->>'id' = 'first-write'),
+  '30'::jsonb,
+  'the legacy history trigger keeps the stored count when a resent entry omits it'
 );
 
 SELECT * FROM finish();
