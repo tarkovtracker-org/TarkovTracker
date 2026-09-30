@@ -1,25 +1,36 @@
 import { defaultState, type UserProgressData, type UserState } from '@/stores/progressState';
+import {
+  blockAccountRecoveryRetentionForOwner,
+  preserveForeignActiveCopy,
+} from '@/stores/tarkov/accountRecovery';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
 import {
   clearActiveProgressStorage,
   cloneStateSnapshot,
   patchStoreState,
+  persistActiveProgressValue,
   progressStorageSerializer,
   readPersistedProgressState,
   safeGetItem,
-  safeSetItem,
+  setActiveProgressWritesBlocked,
   type PersistedProgressSnapshot,
 } from '@/stores/tarkov/localStorage';
-import { coerceGameMode, hasProgress, toProgressEpoch } from '@/stores/tarkov/progressMerge';
+import {
+  coerceGameMode,
+  hasProgress,
+  hasRetainableModeProgress,
+  toProgressEpoch,
+} from '@/stores/tarkov/progressMerge';
 import {
   loadModeProgress,
   syncProgressState,
   type ModeProgressClient,
 } from '@/stores/tarkov/progressPersistence';
 import { getStoryProgressScore, resolveInitialSyncState } from '@/stores/tarkov/resetEngine';
+import { saveSupersededProgressCopy } from '@/stores/tarkov/supersededProgress';
 import { recordLocalSyncTime } from '@/stores/tarkov/syncTimeline';
 import { delay } from '@/utils/async';
-import { GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
+import { GAME_MODES, GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { hasMaterializedProgress } from '@/utils/modeProgressFallback';
 import {
@@ -40,6 +51,8 @@ const LOAD_RETRY_DELAY_MS = 500;
 const NO_ROWS_ERROR_CODE = 'PGRST116';
 export type StartupLoadResult = {
   hadRemoteData: boolean;
+  /** Local progress was uploaded to an account with no cloud record. */
+  migratedLocalState: boolean;
   needsRemoteCleanup: boolean;
   ok: boolean;
 };
@@ -81,8 +94,13 @@ type RemoteProgress = {
   modes: ModeProgressResult;
   state: UserState;
 };
-type Resolution = { state: UserState | null; needsRemoteCleanup: boolean };
-const FAILED: StartupLoadResult = { hadRemoteData: false, needsRemoteCleanup: false, ok: false };
+type Resolution = { state: UserState | null; needsRemoteCleanup: boolean; migrated?: boolean };
+const FAILED: StartupLoadResult = {
+  hadRemoteData: false,
+  migratedLocalState: false,
+  needsRemoteCleanup: false,
+  ok: false,
+};
 /** Thrown when a newer startup or auth change supersedes this one; never an active failure. */
 class StartupSuperseded extends Error {}
 const ensureCurrent = (ctx: StartupLoadContext): void => {
@@ -165,12 +183,19 @@ const adoptStoredProgress = (ctx: StartupLoadContext, local: LocalProgress): Loc
   ctx.preservedSnapshot
     ? adoptPreservedSnapshot(ctx, local, ctx.preservedSnapshot)
     : adoptPersistedProgress(ctx, local);
-const discardForeignProgress = (ctx: StartupLoadContext, storedUserId: string | null): void => {
-  if (!storedUserId || storedUserId === ctx.userId) return;
-  logger.warn('[TarkovStore] Local progress belongs to a different user; clearing');
+/** Returns false when another account's active copy could not be retained as its recovery copy. */
+const discardForeignProgress = (ctx: StartupLoadContext, storedUserId: string | null): boolean => {
+  if (!storedUserId || storedUserId === ctx.userId) return true;
+  logger.warn('[TarkovStore] Local progress belongs to a different user; retaining it');
+  if (!preserveForeignActiveCopy(ctx.userId)) {
+    setActiveProgressWritesBlocked(true);
+    return false;
+  }
+  setActiveProgressWritesBlocked(false);
   clearActiveProgressStorage();
   resetStoreToDefault(ctx.store);
   ctx.notifyLocalIgnored('other_account');
+  return true;
 };
 const discardUnpersistedProgress = (
   ctx: StartupLoadContext,
@@ -182,10 +207,10 @@ const discardUnpersistedProgress = (
   ctx.notifyLocalIgnored('unsaved');
   return { ...local, state: ctx.store.$state, hasProgress: hasProgress(ctx.store.$state) };
 };
-const resolveLocalProgress = (ctx: StartupLoadContext): LocalProgress => {
+const resolveLocalProgress = (ctx: StartupLoadContext): LocalProgress | null => {
   const meta = readLocalMeta(ctx.preservedSnapshot);
   const shouldPersistSanitized = hasDeprecatedTarkovDevProfileData(ctx.store.$state);
-  discardForeignProgress(ctx, meta?.storedUserId ?? null);
+  if (!discardForeignProgress(ctx, meta?.storedUserId ?? null)) return null;
   const state = sanitizeOwnedUserState(ctx.store.$state);
   patchIfChanged(ctx.store, state);
   const local = { meta, state, hasProgress: hasProgress(state), shouldPersistSanitized };
@@ -373,6 +398,35 @@ const resolveAgainstRemote = (local: LocalProgress, remote: RemoteProgress): Use
     }
   );
 };
+const wasDisplacedByRemote = (
+  mode: GameMode,
+  local: UserState,
+  remote: UserState,
+  resolved: UserState
+): boolean =>
+  hasRetainableModeProgress(local[mode]) &&
+  toProgressEpoch(remote[mode]) > toProgressEpoch(local[mode]) &&
+  toProgressEpoch(resolved[mode]) === toProgressEpoch(remote[mode]);
+const archiveModeCopy = (userId: string, local: UserState, mode: GameMode): boolean => {
+  const seasonNumber = mode === GAME_MODES.SEASONAL ? (local.seasonalSeasonNumber ?? null) : null;
+  if (saveSupersededProgressCopy(userId, mode, seasonNumber, cloneStateSnapshot(local[mode]))) {
+    return true;
+  }
+  blockAccountRecoveryRetentionForOwner(userId);
+  setActiveProgressWritesBlocked(true);
+  logger.error('[TarkovStore] Could not retain progress displaced by a remote reset', { mode });
+  return false;
+};
+/** Keep a copy of each local mode a newer remote reset replaced; false blocks the startup. */
+const archiveDisplacedProgress = (
+  userId: string,
+  local: UserState,
+  remote: UserState,
+  resolved: UserState
+): boolean =>
+  GAME_MODE_VALUES.filter((mode) => wasDisplacedByRemote(mode, local, remote, resolved)).every(
+    (mode) => archiveModeCopy(userId, local, mode)
+  );
 const remoteHadDeprecatedData = (remote: RemoteProgress): boolean =>
   hasDeprecatedTarkovDevProfileData(remoteModePayloads(remote.row, remote.modes));
 /** Merge this user's own local progress with remote; upload when the result differs. */
@@ -382,6 +436,7 @@ const mergeWithRemote = async (
   remote: RemoteProgress
 ): Promise<Resolution | null> => {
   const resolved = resolveAgainstRemote(local, remote);
+  if (!archiveDisplacedProgress(ctx.userId, local.state, remote.state, resolved)) return null;
   let needsRemoteCleanup = remoteHadDeprecatedData(remote);
   if (deepEqual(resolved, remote.state)) {
     logger.debug('[TarkovStore] Startup sync resolved to existing remote state');
@@ -430,7 +485,7 @@ const uploadLocalProgress = async (
   const failure = '[TarkovStore] Error migrating local data to Supabase:';
   if (!(await upload(ctx, local.state, failure))) return null;
   logger.debug('[TarkovStore] Migration complete');
-  return { state: local.state, needsRemoteCleanup: false };
+  return { state: local.state, needsRemoteCleanup: false, migrated: true };
 };
 /**
  * Issue #71: linking a second OAuth provider can race into a false "no data" read. A
@@ -481,7 +536,7 @@ const persistLocalOwnership = (
     ctx.userId,
     timestamp ?? Date.now()
   );
-  if (!safeSetItem(STORAGE_KEYS.progress, serialized)) {
+  if (!persistActiveProgressValue(serialized)) {
     logger.warn('[TarkovStore] Could not persist local ownership metadata');
   }
 };
@@ -491,6 +546,7 @@ const needsOwnershipPersist = (local: LocalProgress, resolved: UserState | null)
 };
 const loadStartupProgress = async (ctx: StartupLoadContext): Promise<StartupLoadResult> => {
   const local = resolveLocalProgress(ctx);
+  if (!local) return FAILED;
   logger.debug('[TarkovStore] Initial load starting...', {
     userId: ctx.userId,
     hasLocalProgress: local.hasProgress,
@@ -505,6 +561,7 @@ const loadStartupProgress = async (ctx: StartupLoadContext): Promise<StartupLoad
   logger.debug('[TarkovStore] Initial load complete');
   return {
     hadRemoteData: loaded.hadRemoteData,
+    migratedLocalState: resolution.migrated === true,
     needsRemoteCleanup: resolution.needsRemoteCleanup,
     ok: true,
   };

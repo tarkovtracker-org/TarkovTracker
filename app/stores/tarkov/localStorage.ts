@@ -1,7 +1,7 @@
 import { migrateToGameModeStructure, type UserState } from '@/stores/progressState';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
-import { clearProgressStorage } from '@/utils/clientStorage';
-import { GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
+import { classifyLocalSaveFailure, recordLocalSave } from '@/stores/tarkov/progressSaveStatus';
+import { ACTIVE_SEASON_NUMBER, GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import {
   hasDeprecatedTarkovDevProfileData,
@@ -16,6 +16,8 @@ export type PersistedProgressSnapshot = {
   timestamp: number | null;
   metadataTimestamp?: number;
   modeTimestamps?: Partial<Record<GameMode, number>>;
+  /** Original season attached to the seasonal payload before migration/sanitization. */
+  seasonalSourceSeasonNumber?: number;
 };
 const metadataKeys = ['currentGameMode', 'gameEdition', 'tarkovUid'] as const;
 const sameMetadata = (left: Partial<UserState>, right: Partial<UserState>) =>
@@ -28,8 +30,16 @@ type RemoteProgressSnapshot = {
   updatedAtByMode: Partial<Record<GameMode, number>>;
   metadataTimestamp?: number;
 };
-const retainedModeTimestamp = (previous: PersistedProgressSnapshot, mode: GameMode): number =>
-  previous.modeTimestamps?.[mode] ?? previous.timestamp ?? 0;
+const retainedModeTimestamp = (previous: PersistedProgressSnapshot, mode: GameMode): number => {
+  if (
+    mode === 'seasonal' &&
+    previous.seasonalSourceSeasonNumber !== undefined &&
+    previous.seasonalSourceSeasonNumber !== ACTIVE_SEASON_NUMBER
+  ) {
+    return 0;
+  }
+  return previous.modeTimestamps?.[mode] ?? previous.timestamp ?? 0;
+};
 const nextModeTimestamp = (
   previous: PersistedProgressSnapshot | null,
   state: UserState,
@@ -112,6 +122,7 @@ export const createProgressStorageSerializer = (
       storedUserId: userId,
       timestamp,
       modeTimestamps,
+      seasonalSourceSeasonNumber: state.seasonalSeasonNumber ?? ACTIVE_SEASON_NUMBER,
       hadDeprecatedProgressData: false,
     };
     return JSON.stringify({
@@ -163,19 +174,201 @@ export const safeGetItem = (key: string): string | null => {
     return null;
   }
 };
-export const safeSetItem = (key: string, value: string): boolean => {
-  if (typeof window === 'undefined') return false;
+/**
+ * True when the browser refuses all access to local storage (for example when site data is
+ * blocked). Nothing can then be stored, read, overwritten, or lost, unlike a single failed read.
+ */
+export const isLocalStorageInaccessible = (): boolean => {
+  if (typeof window === 'undefined') return true;
   try {
-    localStorage.setItem(key, value);
+    void window.localStorage.length;
+    return false;
+  } catch {
     return true;
+  }
+};
+type StorageWriteResult = { ok: true } | { ok: false; error: unknown };
+let activeProgressWritesBlocked = false;
+type ActiveProgressRetentionGuard = (current: string | null, next: string | null) => boolean;
+let activeProgressRetentionGuard: ActiveProgressRetentionGuard = (current) => !current;
+export const setActiveProgressWritesBlocked = (blocked: boolean): void => {
+  activeProgressWritesBlocked = blocked;
+};
+export const setActiveProgressRetentionGuard = (guard: ActiveProgressRetentionGuard): void => {
+  activeProgressRetentionGuard = guard;
+};
+const writeStorageItem = (key: string, value: string): StorageWriteResult => {
+  if (typeof window === 'undefined') return { ok: false, error: null };
+  try {
+    if (key === STORAGE_KEYS.progress) {
+      if (
+        activeProgressWritesBlocked ||
+        !activeProgressRetentionGuard(localStorage.getItem(key), value)
+      ) {
+        return {
+          ok: false,
+          error: new Error('Progress retention must succeed before active progress can change'),
+        };
+      }
+    }
+    localStorage.setItem(key, value);
+    return { ok: true };
   } catch (error) {
     logger.error(`[TarkovStore] Failed to write localStorage key "${key}":`, error);
+    return { ok: false, error };
+  }
+};
+export const safeSetItem = (key: string, value: string): boolean => writeStorageItem(key, value).ok;
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value && typeof value === 'object' && !Array.isArray(value));
+const hasEnvelopeMetadata = (data: Record<string, unknown>): boolean =>
+  ['_userId', '_timestamp', '_metadataTimestamp', '_modeTimestamps'].some((key) => key in data);
+const hasLegacyProgressFields = (data: Record<string, unknown>): boolean =>
+  Object.keys(defaultState).some((key) => key in data) ||
+  Object.keys(defaultState.pvp).some((key) => key in data);
+const parsesProgressForOwner = (raw: string, userId: string | null): boolean => {
+  try {
+    return parsePersistedProgressState(raw, userId) !== null;
+  } catch {
     return false;
   }
 };
-export const safeRemoveItem = (key: string): boolean => {
+const isLegacyProgressStorageValue = (raw: string): boolean => {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return isRecord(parsed) && !hasEnvelopeMetadata(parsed) && hasLegacyProgressFields(parsed);
+  } catch {
+    return false;
+  }
+};
+const hasInvalidScopedOwnerId = (raw: string): boolean => {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return (
+      isRecord(parsed) &&
+      'data' in parsed &&
+      (!Object.hasOwn(parsed, '_userId') ||
+        (parsed._userId !== null &&
+          (typeof parsed._userId !== 'string' || parsed._userId.length === 0)))
+    );
+  } catch {
+    return false;
+  }
+};
+export const isUnparseableProgressStorageValue = (raw: string): boolean => {
+  if (hasInvalidScopedOwnerId(raw)) return true;
+  const wrapped = parseUserScopedStorage<unknown>(raw);
+  if (wrapped) {
+    if (!isRecord(wrapped.data) || !hasLegacyProgressFields(wrapped.data)) {
+      return true;
+    }
+    return !parsesProgressForOwner(raw, wrapped._userId);
+  }
+  return !isLegacyProgressStorageValue(raw) || !parsesProgressForOwner(raw, null);
+};
+const findOpaqueProgressQuarantine = (raw: string): string | null => {
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (
+      key?.startsWith(STORAGE_KEYS.progressQuarantinePrefix) &&
+      localStorage.getItem(key) === raw
+    ) {
+      return key;
+    }
+  }
+  return null;
+};
+const writeOpaqueProgressQuarantine = (raw: string): string | null => {
+  const token =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    const key = `${STORAGE_KEYS.progressQuarantinePrefix}${token}_${attempt}`;
+    const existing = localStorage.getItem(key);
+    if (existing === raw) return key;
+    if (existing !== null) continue;
+    localStorage.setItem(key, raw);
+    return localStorage.getItem(key) === raw ? key : null;
+  }
+  return null;
+};
+/** Returns the quarantine key holding `raw`, or `null` when it could not be preserved. */
+const quarantineUnparseableActiveProgress = (raw: string): string | null => {
+  if (typeof window === 'undefined' || !raw) return null;
+  try {
+    if (localStorage.getItem(STORAGE_KEYS.progress) !== raw) return null;
+    if (!isUnparseableProgressStorageValue(raw)) return null;
+    return findOpaqueProgressQuarantine(raw) ?? writeOpaqueProgressQuarantine(raw);
+  } catch (error) {
+    logger.error('[TarkovStore] Could not quarantine unparseable active progress:', error);
+  }
+  return null;
+};
+/**
+ * Retains unparseable active bytes in a fresh ownerless slot. Quarantined values are never
+ * interpreted as progress and are not overwritten, exported, or pruned as backups.
+ */
+export const preserveUnparseableActiveProgress = (raw: string): boolean =>
+  quarantineUnparseableActiveProgress(raw) !== null;
+/**
+ * Explicit device cleanup may release malformed active bytes only after exact quarantine and
+ * after `confirmRelease` durably records that quarantine. Returns whether the slot was released.
+ */
+export const quarantineAndRemoveUnparseableActiveProgress = (
+  raw: string,
+  confirmRelease: (quarantineKey: string) => boolean
+): boolean => {
+  const quarantineKey = quarantineUnparseableActiveProgress(raw);
+  if (!quarantineKey || !confirmRelease(quarantineKey)) return false;
+  try {
+    if (localStorage.getItem(STORAGE_KEYS.progress) !== raw) return false;
+    localStorage.removeItem(STORAGE_KEYS.progress);
+    return localStorage.getItem(STORAGE_KEYS.progress) === null;
+  } catch (error) {
+    logger.error('[TarkovStore] Could not remove quarantined active progress:', error);
+    return false;
+  }
+};
+/**
+ * Writes the active progress envelope and records whether the browser confirmed it.
+ * Only this confirmation may be described to the player as a local save.
+ */
+export const persistActiveProgressValue = (value: string, cloudHeld = false): boolean => {
+  const result = writeStorageItem(STORAGE_KEYS.progress, value);
+  if (result.ok) recordLocalSave(true);
+  else recordLocalSave(false, classifyLocalSaveFailure(result.error), cloudHeld);
+  return result.ok;
+};
+/**
+ * Storage adapter for the progress persist plugin. The plugin swallows storage
+ * exceptions, so writes go through `persistActiveProgressValue` to surface them.
+ */
+export const progressPersistStorage = {
+  getItem: (key: string): string | null => safeGetItem(key),
+  setItem: (key: string, value: string): void => {
+    if (key === STORAGE_KEYS.progress) persistActiveProgressValue(value);
+    else safeSetItem(key, value);
+  },
+};
+export const safeRemoveItem = (key: string, explicitOwnerRemoval?: string): boolean => {
   if (typeof window === 'undefined') return false;
   try {
+    if (key === STORAGE_KEYS.progress) {
+      const current = localStorage.getItem(key);
+      const currentOwner = current
+        ? (parseUserScopedStorage<unknown>(current)?._userId ?? null)
+        : null;
+      const explicitRemoval = Boolean(
+        explicitOwnerRemoval && currentOwner === explicitOwnerRemoval
+      );
+      if (
+        !explicitRemoval &&
+        (activeProgressWritesBlocked || !activeProgressRetentionGuard(current, null))
+      ) {
+        return false;
+      }
+    }
     localStorage.removeItem(key);
     return true;
   } catch (error) {
@@ -183,27 +376,18 @@ export const safeRemoveItem = (key: string): boolean => {
     return false;
   }
 };
-export const clearProgressStorageSafely = () => {
-  try {
-    clearProgressStorage();
-  } catch (error) {
-    logger.error('[TarkovStore] Failed to clear progress storage:', error);
-  }
-};
-export const clearActiveProgressStorage = () => {
+/**
+ * `resetOwner` marks a deliberate reset of that owner's own progress: its retention was already
+ * decided before the reset, so the active copy is removed without keeping a recovery copy.
+ * Write barriers still apply.
+ */
+export const clearActiveProgressStorage = (resetOwner?: string | null) => {
   if (typeof window === 'undefined') return;
-  safeRemoveItem(STORAGE_KEYS.progress);
+  const explicitOwner = resetOwner && !activeProgressWritesBlocked ? resetOwner : undefined;
+  safeRemoveItem(STORAGE_KEYS.progress, explicitOwner);
   safeRemoveItem(LEGACY_STORAGE_KEYS.progress);
 };
-export const backupProgressStorageValue = (rawValue: string, storedUserId: string | null) => {
-  if (typeof window === 'undefined') return;
-  const ownerKey = storedUserId || 'anonymous';
-  const backupKey = `${STORAGE_KEYS.progressBackupPrefix}${ownerKey}_${Date.now()}`;
-  if (safeSetItem(backupKey, rawValue) && import.meta.dev) {
-    logger.debug(`[TarkovStore] Data backed up to ${backupKey}`);
-  }
-};
-const parsePersistedProgressState = (
+export const parsePersistedProgressState = (
   rawValue: string | null | undefined,
   userId: string | null
 ): PersistedProgressSnapshot | null => {
@@ -223,6 +407,7 @@ const parsePersistedProgressState = (
       timestamp: wrapped._timestamp ?? null,
       metadataTimestamp: wrapped._metadataTimestamp,
       modeTimestamps: wrapped._modeTimestamps,
+      seasonalSourceSeasonNumber: wrapped.data.seasonalSeasonNumber ?? ACTIVE_SEASON_NUMBER,
     };
   }
   try {
@@ -232,6 +417,7 @@ const parsePersistedProgressState = (
       state: sanitizeOwnedUserState(migrateToGameModeStructure(parsed)),
       storedUserId: null,
       timestamp: null,
+      seasonalSourceSeasonNumber: parsed.seasonalSeasonNumber ?? ACTIVE_SEASON_NUMBER,
     };
   } catch {
     return null;
@@ -268,7 +454,8 @@ export const patchStoreState = (
 };
 export const progressStorageSerializer = createProgressStorageSerializer(
   readPersistedProgressState,
+  // Accepted remote state and clocks are already held by the cloud.
   (value) => {
-    safeSetItem(STORAGE_KEYS.progress, value);
+    persistActiveProgressValue(value, true);
   }
 );

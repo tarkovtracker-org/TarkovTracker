@@ -1,32 +1,66 @@
 <script setup lang="ts">
   import LoginRequiredAlert from '@/components/ui/LoginRequiredAlert.vue';
-  import { useActivityLogStore } from '@/stores/useActivityLogStore';
-  import { usePreferencesStore } from '@/stores/usePreferences';
-  import { useSystemStore } from '@/stores/useSystemStore';
-  import { resetTarkovSync, useTarkovStore } from '@/stores/useTarkov';
-  import { useTeamStore } from '@/stores/useTeamStore';
-  import { clearUserScopedAppStorage } from '@/utils/clientStorage';
+  import {
+    recordDeviceDataRemovalOutcome,
+    removeAccountDeviceData,
+    requestDeviceDataRemoval,
+  } from '@/stores/tarkov/deviceData';
+  import { resetTarkovSync } from '@/stores/useTarkov';
   import { logger } from '@/utils/logger';
   import { refreshSupabaseSession } from '@/utils/supabaseAuth';
+  import { isSupabaseSessionChangedError } from '@/utils/supabaseAuthFence';
   defineOptions({
     inheritAttrs: false,
   });
   const { $supabase } = useNuxtApp();
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
-  const activityLogStore = useActivityLogStore();
-  const preferencesStore = usePreferencesStore();
-  const systemStore = useSystemStore();
-  const teamStore = useTeamStore();
-  const tarkovStore = useTarkovStore();
   const showConfirmationDialog = ref(false);
   const showSuccessDialog = ref(false);
+  const confirmationOwner = ref<string | null>(null);
+  const deletedAccountOwner = ref<string | null>(null);
+  let accountRevision = 0;
+  let confirmationRevision = 0;
+  let deletedAccountRevision = 0;
   const confirmationText = ref('');
   const confirmationError = ref(false);
   const deleteError = ref('');
   const isDeleting = ref(false);
+  const clearDeletionConfirmation = (): void => {
+    showConfirmationDialog.value = false;
+    confirmationOwner.value = null;
+    confirmationText.value = '';
+    confirmationError.value = false;
+    deleteError.value = '';
+  };
+  watch(
+    () => $supabase.user.id,
+    () => {
+      accountRevision += 1;
+      if (!isDeleting.value) clearDeletionConfirmation();
+    },
+    { flush: 'sync' }
+  );
+  const ownsDeletionSession = (owner: string | null, revision: number): boolean =>
+    Boolean(owner) && $supabase.user.id === owner && accountRevision === revision;
+  const assertDeletionSession = (owner: string | null, revision: number): void => {
+    if (!ownsDeletionSession(owner, revision))
+      throw new Error(t('settings.account_data.session_changed'));
+  };
+  const assertRefreshedDeletionOwner = (
+    session: NonNullable<Awaited<ReturnType<typeof refreshSupabaseSession>>>,
+    owner: string | null
+  ): void => {
+    if (session.user.id !== owner) throw new Error(t('settings.account_data.session_changed'));
+  };
+  const canResetDeletedSession = (owner: string, revision: number): boolean =>
+    ownsDeletionSession(owner, revision) ||
+    ($supabase.user.id === null && accountRevision === revision + 1);
   const accountIdCopied = ref(false);
   const cleanupScheduled = ref(false);
+  const deviceCleanupFailed = ref(false);
+  const sessionEndFailed = ref(false);
+  const isRetryingDeviceCleanup = ref(false);
   const showUsername = ref(false);
   const showEmail = ref(false);
   const showAccountId = ref(false);
@@ -124,6 +158,25 @@
       confirmationText.value.trim().toUpperCase() === confirmationPhrase.value.trim().toUpperCase()
     );
   });
+  const openDeletionConfirmation = (): void => {
+    if (!isLoggedIn.value || !$supabase.user.id) return;
+    clearDeletionConfirmation();
+    confirmationOwner.value = $supabase.user.id;
+    confirmationRevision = accountRevision;
+    showConfirmationDialog.value = true;
+  };
+  const completeDeletion = (
+    owner: string,
+    revision: number,
+    data: { cleanupScheduled?: boolean; message?: string }
+  ): void => {
+    deletedAccountOwner.value = owner;
+    deletedAccountRevision = revision;
+    clearDeletionConfirmation();
+    cleanupScheduled.value = Boolean(data.cleanupScheduled);
+    if (data.cleanupScheduled) logger.info('Account deleted, cleanup scheduled:', data.message);
+    showSuccessDialog.value = true;
+  };
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return 'Unknown';
     return new Date(dateString).toLocaleDateString();
@@ -143,15 +196,29 @@
       logger.error('Failed to copy account ID:', error);
     }
   };
-  const deleteAccount = async () => {
+  const deleteAccount = async (openingOwner: string | null, openingRevision: number) => {
+    if (openingOwner !== confirmationOwner.value || openingRevision !== confirmationRevision)
+      return;
+    if (
+      !showConfirmationDialog.value ||
+      !openingOwner ||
+      !ownsDeletionSession(openingOwner, openingRevision)
+    ) {
+      clearDeletionConfirmation();
+      return;
+    }
     if (!canDelete.value) {
       confirmationError.value = true;
       return;
     }
     isDeleting.value = true;
     deleteError.value = '';
+    const requestedOwner = openingOwner;
+    const requestedRevision = openingRevision;
     try {
+      assertDeletionSession(requestedOwner, requestedRevision);
       const { data: sessionData, error: sessionError } = await $supabase.client.auth.getSession();
+      assertDeletionSession(requestedOwner, requestedRevision);
       if (sessionError) {
         logger.error('Session error:', sessionError);
         throw new Error(`Session error: ${sessionError.message}`);
@@ -171,7 +238,17 @@
       if (!refreshedSession) {
         throw new Error('Unable to verify your session. Please refresh the page and try again.');
       }
-      const { data, error } = await $supabase.client.functions.invoke('account-delete');
+      assertDeletionSession(requestedOwner, requestedRevision);
+      assertRefreshedDeletionOwner(refreshedSession, requestedOwner);
+      const { data, error } = await $supabase.client.functions.invoke('account-delete', {
+        headers: { Authorization: `Bearer ${refreshedSession.access_token}` },
+      });
+      if (data?.success && !ownsDeletionSession(requestedOwner, requestedRevision)) {
+        deviceCleanupFailed.value = !forgetAccountOnDevice(requestedOwner);
+        completeDeletion(requestedOwner, requestedRevision, data);
+        return;
+      }
+      assertDeletionSession(requestedOwner, requestedRevision);
       if (error) {
         logger.error('Edge function error:', error);
         let errorMessage = 'Failed to delete account. Please try again.';
@@ -242,44 +319,93 @@
         throw new Error(errorMessage);
       }
       if (data?.success) {
-        showConfirmationDialog.value = false;
-        if (data.cleanupScheduled) {
-          logger.info('Account deleted, cleanup scheduled:', data.message);
-          cleanupScheduled.value = true;
-        } else {
-          cleanupScheduled.value = false;
-        }
-        showSuccessDialog.value = true;
+        deviceCleanupFailed.value = !forgetAccountOnDevice(requestedOwner);
+        completeDeletion(requestedOwner, requestedRevision, data);
       } else {
         throw new Error('Failed to delete account.');
       }
     } catch (error) {
       logger.error('Account deletion error:', error);
-      deleteError.value = (error as Error).message || 'Failed to delete account. Please try again.';
+      if (!ownsDeletionSession(requestedOwner, requestedRevision)) {
+        clearDeletionConfirmation();
+        toast.add({ title: t('settings.account_data.session_changed'), color: 'warning' });
+      } else {
+        deleteError.value =
+          (error as Error).message || 'Failed to delete account. Please try again.';
+      }
     } finally {
       isDeleting.value = false;
     }
   };
+  const deletionAction = computed(() => {
+    const openingOwner = confirmationOwner.value;
+    const openingRevision = confirmationRevision;
+    return () => deleteAccount(openingOwner, openingRevision);
+  });
   const resetClientState = () => {
     resetTarkovSync('account deleted');
-    preferencesStore.resetToDefaults();
-    activityLogStore.resetForSession();
-    systemStore.$reset();
-    teamStore.$reset();
-    tarkovStore.$reset();
-    clearUserScopedAppStorage(localStorage, { includeAuthSessions: true });
   };
-  const redirectToHome = async () => {
-    showSuccessDialog.value = false;
+  /** A deleted account keeps no recovery copy on this device; other accounts keep theirs. */
+  const forgetAccountOnDevice = (userId: string | null): boolean => {
+    if (!userId) return false;
+    let removed = false;
+    try {
+      removed = removeAccountDeviceData(userId);
+      if (!removed) logger.warn('Some deleted account data could not be removed from this device.');
+    } catch (error) {
+      logger.error('Failed to remove deleted account data from this device:', error);
+    }
+    recordDeviceDataRemovalOutcome(userId, removed);
+    return removed;
+  };
+  /** The deleted account has no server session left; clear this browser's copy directly. */
+  const endDeletedSession = async (owner: string): Promise<void> => {
+    try {
+      await $supabase.signOut(owner, 'local');
+    } catch (error) {
+      if (isSupabaseSessionChangedError(error) || $supabase.user.id !== owner) return;
+      logger.warn('Local sign-out of the deleted account failed; clearing this device', error);
+      await $supabase.signOutThisDevice(owner);
+    }
+  };
+  const signOutDeletedSession = async (owner: string, revision: number): Promise<void> => {
+    if (!ownsDeletionSession(owner, revision)) return;
+    requestDeviceDataRemoval(owner);
+    await endDeletedSession(owner);
+  };
+  const resetDeletedSession = (owner: string, revision: number): void => {
+    if (canResetDeletedSession(owner, revision)) resetClientState();
+  };
+  const redirectToHome = async (allowRemainingDeviceData = false) => {
+    const deletedUserId = deletedAccountOwner.value;
+    if (!deletedUserId) return;
+    // A may sign out and sign back in while deletion is in flight. If the deleted account is
+    // current at redirect time, fence the sign-out against that current session revision.
+    const revision = $supabase.user.id === deletedUserId ? accountRevision : deletedAccountRevision;
     logger.info('Signing out user and redirecting to dashboard...');
     try {
-      await $supabase.signOut();
+      await signOutDeletedSession(deletedUserId, revision);
       logger.info('Successfully signed out, performing hard reload...');
     } catch (error) {
       logger.error('Failed to sign out and redirect:', error);
+    }
+    // Never leave while this browser still holds the deleted account's session.
+    sessionEndFailed.value = $supabase.user.id === deletedUserId;
+    if (sessionEndFailed.value) return;
+    deviceCleanupFailed.value = !forgetAccountOnDevice(deletedUserId);
+    if (deviceCleanupFailed.value && !allowRemainingDeviceData) return;
+    resetDeletedSession(deletedUserId, revision);
+    showSuccessDialog.value = false;
+    window.location.href = '/';
+  };
+  const retryDeviceCleanup = async () => {
+    const deletedUserId = deletedAccountOwner.value;
+    if (!deletedUserId) return;
+    isRetryingDeviceCleanup.value = true;
+    try {
+      deviceCleanupFailed.value = !forgetAccountOnDevice(deletedUserId);
     } finally {
-      resetClientState();
-      window.location.href = '/';
+      isRetryingDeviceCleanup.value = false;
     }
   };
 </script>
@@ -455,7 +581,7 @@
                   :loading="isDeleting"
                   :disabled="isDeleting"
                   class="px-6 py-3 font-semibold shadow-lg transition-all hover:scale-105 hover:shadow-xl"
-                  @click="showConfirmationDialog = true"
+                  @click="openDeletionConfirmation"
                 >
                   {{ $t('settings.account.begin_deletion') }}
                 </UButton>
@@ -466,7 +592,7 @@
       </template>
     </GenericCard>
   </div>
-  <UModal v-model:open="showConfirmationDialog" prevent-close>
+  <UModal :key="confirmationOwner ?? 'closed'" v-model:open="showConfirmationDialog" prevent-close>
     <template #title>
       <div class="text-error-500 light:text-error-800 flex items-center text-xl font-medium">
         <UIcon name="i-mdi-alert-circle" class="text-error-500 light:text-error-800 mr-2 h-6 w-6" />
@@ -568,7 +694,7 @@
           :loading="isDeleting"
           :disabled="!canDelete || isDeleting"
           class="ml-3"
-          @click="deleteAccount"
+          @click="deletionAction"
         >
           {{ $t('settings.account_data.delete_forever') }}
         </UButton>
@@ -587,26 +713,68 @@
     </template>
     <template #description>
       <span class="sr-only">
-        {{ $t('settings.account_data.delete_success_sr_only') }}
+        {{
+          $t(
+            deviceCleanupFailed
+              ? 'settings.account_data.delete_success_cleanup_failed_sr_only'
+              : 'settings.account_data.delete_success_sr_only'
+          )
+        }}
       </span>
     </template>
     <template #body>
       <div class="space-y-3">
         <div class="text-base">
-          {{ $t('settings.account_data.delete_success_description') }}
+          {{
+            $t(
+              $supabase.user.id === deletedAccountOwner
+                ? 'settings.account_data.delete_success_description'
+                : 'settings.account_data.other_session_deleted_description'
+            )
+          }}
         </div>
         <div v-if="cleanupScheduled" class="text-surface-400 text-sm">
           <UIcon name="i-mdi-information" class="mr-1 inline h-4 w-4" />
           {{ $t('settings.account_data.cleanup_pending') }}
         </div>
-        <div class="text-surface-400 text-sm">
+        <div v-if="deviceCleanupFailed" class="text-error-400 text-sm" role="alert">
+          {{ $t('settings.account_data.device_cleanup_failed') }}
+        </div>
+        <div v-if="sessionEndFailed" class="text-error-400 text-sm" role="alert">
+          {{ $t('settings.account_data.session_end_failed') }}
+        </div>
+        <div v-if="!deviceCleanupFailed" class="text-surface-400 text-sm">
           {{ $t('settings.account_data.redirect_message') }}
         </div>
       </div>
     </template>
     <template #footer>
       <div class="flex justify-end">
-        <UButton color="primary" variant="solid" @click="redirectToHome">
+        <UButton
+          v-if="deviceCleanupFailed"
+          color="neutral"
+          variant="outline"
+          :loading="isRetryingDeviceCleanup"
+          :disabled="isRetryingDeviceCleanup"
+          @click="retryDeviceCleanup"
+        >
+          {{ $t('settings.account_data.retry_device_cleanup') }}
+        </UButton>
+        <UButton
+          v-if="deviceCleanupFailed"
+          color="warning"
+          variant="solid"
+          :disabled="isRetryingDeviceCleanup"
+          @click="redirectToHome(true)"
+        >
+          {{ $t('settings.account_data.continue_with_device_data_remaining') }}
+        </UButton>
+        <UButton
+          color="primary"
+          variant="solid"
+          :disabled="deviceCleanupFailed || isRetryingDeviceCleanup"
+          @click="redirectToHome()"
+        >
           {{ $t('settings.account_data.go_to_dashboard') }}
         </UButton>
       </div>

@@ -33,9 +33,17 @@ const waitForWatchCallback = async () => {
   await Promise.resolve();
   await Promise.resolve();
 };
+const idleSaveStatus = () => ({
+  state: 'idle' as const,
+  failure: null,
+  retryAttempt: 0,
+  nextRetryAt: null,
+});
 const createSyncController = () => ({
   isSyncing: ref(false),
   isPaused: ref(false),
+  saveStatus: ref(idleSaveStatus()),
+  retryNow: vi.fn().mockResolvedValue(true),
   cleanup: vi.fn(),
   pause: vi.fn(),
   resume: vi.fn(),
@@ -85,6 +93,8 @@ describe('preferences sync plugin', () => {
     vi.mocked(useSupabaseSync).mockReturnValue({
       isSyncing: ref(false),
       isPaused: ref(false),
+      saveStatus: ref(idleSaveStatus()),
+      retryNow: vi.fn().mockResolvedValue(true),
       cleanup: vi.fn(),
       pause: vi.fn(),
       resume: vi.fn(),
@@ -133,6 +143,8 @@ describe('preferences sync plugin', () => {
     vi.mocked(useSupabaseSync).mockReturnValue({
       isSyncing: ref(false),
       isPaused: ref(false),
+      saveStatus: ref(idleSaveStatus()),
+      retryNow: vi.fn().mockResolvedValue(true),
       cleanup: vi.fn(),
       pause: vi.fn(),
       resume: vi.fn(),
@@ -207,6 +219,8 @@ describe('preferences sync plugin', () => {
     vi.mocked(useSupabaseSync).mockReturnValue({
       isSyncing: ref(false),
       isPaused: ref(false),
+      saveStatus: ref(idleSaveStatus()),
+      retryNow: vi.fn().mockResolvedValue(true),
       cleanup,
       pause: vi.fn(),
       resume: vi.fn(),
@@ -261,6 +275,8 @@ describe('preferences sync plugin', () => {
     vi.mocked(useSupabaseSync).mockReturnValue({
       isSyncing: ref(false),
       isPaused: ref(false),
+      saveStatus: ref(idleSaveStatus()),
+      retryNow: vi.fn().mockResolvedValue(true),
       cleanup: vi.fn(),
       pause: vi.fn(),
       resume: vi.fn(),
@@ -296,6 +312,8 @@ describe('preferences sync plugin', () => {
     vi.mocked(useSupabaseSync).mockReturnValue({
       isSyncing: ref(false),
       isPaused: ref(false),
+      saveStatus: ref(idleSaveStatus()),
+      retryNow: vi.fn().mockResolvedValue(true),
       cleanup,
       pause: vi.fn(),
       resume: vi.fn(),
