@@ -17,12 +17,16 @@ export const clearAcknowledgedModes = (): void => {
   ownerId = null;
   acknowledged = {};
 };
+/** Replacing another owner's baseline invalidates that owner's in-flight acknowledgements. */
+const claimOwner = (userId: string): void => {
+  if (ownerId === userId) return;
+  generation += 1;
+  ownerId = userId;
+  acknowledged = {};
+};
 /** Records modes the server holds for `userId`; another owner's baseline is replaced. */
 export const recordAcknowledgedModes = (userId: string, modes: ModeProgressMap): void => {
-  if (ownerId !== userId) {
-    ownerId = userId;
-    acknowledged = {};
-  }
+  claimOwner(userId);
   for (const mode of GAME_MODE_VALUES) {
     const progress = modes[mode];
     if (progress) acknowledged[mode] = toWire(progress);
@@ -30,9 +34,10 @@ export const recordAcknowledgedModes = (userId: string, modes: ModeProgressMap):
 };
 /**
  * Starts a multi-request sync: the returned callback records each acknowledged batch and returns
- * `false` once the baseline was cleared (sign-out, account switch, reload), so the sync stops.
+ * `false` once the baseline was cleared or claimed by another account, so the sync stops.
  */
 export const beginAcknowledgement = (userId: string) => {
+  claimOwner(userId);
   const started = generation;
   return (modes: ModeProgressMap): boolean => {
     if (generation !== started) return false;

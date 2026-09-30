@@ -100,4 +100,12 @@ describe('mode-scoped progress sync', () => {
     await syncProgressState(client, 'user-1', withHeavyModes());
     expect(rpc).toHaveBeenCalledTimes(4);
   });
+  it('stops a split sync when another account claims the baseline', async () => {
+    const rpc = vi.fn().mockImplementation(async () => {
+      recordAcknowledgedModes('user-2', {});
+      return { error: null };
+    });
+    await syncProgressState({ rpc } as ProgressRpcClient, 'user-1', withHeavyModes());
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
 });
