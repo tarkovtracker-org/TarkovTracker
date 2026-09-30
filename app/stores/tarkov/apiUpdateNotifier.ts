@@ -55,7 +55,7 @@ const formatApiUpdateDescription = (
     const state = translate(`toast.api_updated.state.${update.state}`);
     return `${taskName} -> ${state}`;
   });
-  const remaining = total - previewLimit;
+  const remaining = total - formatted.length;
   const suffix = remaining > 0 ? translate('toast.api_updated.more', { count: remaining }) : '';
   return `${label}: ${formatted.join(', ')}${suffix}.`;
 };

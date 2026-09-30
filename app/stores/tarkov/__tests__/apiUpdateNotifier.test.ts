@@ -48,4 +48,17 @@ describe('maybeNotifyApiUpdate', () => {
     });
     expect(description).toBe('Task updated: task-a -> completed.');
   });
+  it('counts every update not shown when fewer than the preview limit are stored', () => {
+    const { description } = notify({
+      at: 1_000,
+      id: 'partial',
+      source: 'api',
+      taskCount: 30,
+      tasks: [
+        { id: 'task-a', state: 'completed' },
+        { id: 'task-b', state: 'failed' },
+      ],
+    });
+    expect(description).toBe('Tasks updated: task-a -> completed, task-b -> failed, +28 more.');
+  });
 });

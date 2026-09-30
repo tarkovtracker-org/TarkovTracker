@@ -112,7 +112,8 @@
   };
   const getRemainingTaskCount = (entryMeta: unknown): number => {
     if (!entryMeta || typeof entryMeta !== 'object') return 0;
-    return Math.max(0, countApiTaskUpdates(entryMeta as ApiUpdateMeta) - 3);
+    const shown = Math.min(3, getEntryTasks(entryMeta).length);
+    return Math.max(0, countApiTaskUpdates(entryMeta as ApiUpdateMeta) - shown);
   };
   const getStateLabel = (state: ApiTaskUpdate['state']): string => {
     const icons: Record<ApiTaskUpdate['state'], string> = {
