@@ -88,6 +88,10 @@
     "error_loading": "Błąd wczytywania danych Tarkova",
     "loading": "Wczytywanie danych Tarkova",
     "logout_failed": "Nie udało się wylogować. Spróbuj ponownie.",
+    "logout_unreachable": "Serwer nie może zostać osiągnięty, więc nadal jesteś zalogowany. Możesz wylogować się tylko na tym urządzeniu; serwer nie zostanie poinformowany, więc sesja pozostanie aktywna, dopóki nie wygaśnie, lub wylogujesz się z innego urządzenia.",
+    "logout_this_device": "Wyloguj się tylko na tym urządzeniu",
+    "logout_this_device_done": "Wylogowano tylko na tym urządzeniu. Sesja na serwerze pozostaje aktywna, dopóki nie wygaśnie, lub wylogujesz się z innego urządzenia.",
+    "logout_local_only": "Wylogowano na tym urządzeniu. Serwer nie może zostać osiągnięty, więc twoje inne sesje mogą być nadal zalogowane.",
     "hidden_label": "Ukryte",
     "user_label": "Użytkownik",
     "user_avatar_alt": "Awatar użytkownika",
@@ -99,6 +103,40 @@
     "login_aria": "Log in to your account",
     "switch_to_light_theme": "Przełącz na jasny motyw",
     "switch_to_dark_theme": "Przełącz na ciemny motyw"
+  },
+  "progress_save_status": {
+    "indicator_aria": "Status zapisu postępów: {status}",
+    "cloud_pending_label": "Zapisywanie postępu w chmurze",
+    "cloud_retrying_label": "Ponownie próbowano zapisać w chmurze",
+    "cloud_failed_label": "Zapisanie w chmurze nie powiodło się",
+    "local_failed_label": "Postęp nie zapisany w tej przeglądarce",
+    "cloud_pending_description": "Twoje ostatnie zmiany postępu nie zostały jeszcze zapisane w chmurze.",
+    "cloud_retrying_description": "Zapisywanie najnowszych zmian w chmurze nie powiodło się. Możesz nadal śledzić podczas kolejnej próby automatycznie.",
+    "cloud_failed_description": "Automatyczne próby zapisania najnowszych zmian w chmurze zostały zatrzymane. Zmiany wciąż czekają na zapisanie i w każdej chwili możesz śledzić i ponowić próbę.",
+    "local_failed_description": "Twoje najnowsze zmiany nie mogły zostać zapisane w tej przeglądarce. Możesz nadal śledzić, ale zmiany, które nie zostały zapisane gdzie indziej, mogą zostać utracone po przeładowaniu, zamknięciu tej karty lub wylogowaniu.",
+    "local_saved_note": "Te zmiany są zapisywane w tej przeglądarce.",
+    "cloud_also_pending_note": "Nie zostały one również zapisane w chmurze. Eksportuj swoje postępy, aby zachować kopię.",
+    "retry_scheduled": "Automatyczna ponowna próba {attempt} z {total} jest zaplanowana.",
+    "cause_offline": "Powod: to urządzenie wydaje się być offline.",
+    "cause_rate_limited": "Powod: usługa w chmurze tymczasowo ogranicza oszczędności.",
+    "cause_auth": "Powód: Twoja sesja logowania nie mogła zostać zweryfikowana.",
+    "cause_quota": "Powod: pamięć tej przeglądarki dla TarkovTracker jest pełna.",
+    "cause_unavailable": "Powod: ta przeglądarka blokuje przechowywanie witryny, na przykład ze względu na ustawienia prywatności.",
+    "cause_unknown": "Przyczyna tego niepowodzenia nie jest znana.",
+    "quota_guidance": "Wyczyszczenie danych tej witryny lub przeładowanie może usunąć Twoją jedyną kopię tych zmian. Eksportuj swoje postępy przed usunięciem jakichkolwiek danych.",
+    "retry_button": "Ponów próbę zapisu w chmurze",
+    "retry_succeeded": "Twoje zmiany postępu zostały zapisane w chmurze.",
+    "retry_failed": "Zapisanie w chmurze nie powiodło się. Twoje zmiany nadal czekają na zapisanie.",
+    "export_button": "Postęp eksportu",
+    "export_hint": "Eksportuj pobieranie bieżącego postępu jako plik kopii zapasowej, nawet jeśli zapisanie nie powiodło się."
+  },
+  "sign_out_confirm": {
+    "title": "Wylogować się z niezapisanymi zmianami?",
+    "risk": "Twoje najnowsze zmiany postępu nie są zapisywane w tej przeglądarce ani w chmurze. Jeśli wylogujesz się teraz, zostaną utracone.",
+    "options": "Możesz zostać zalogowany i ponowić próbę zapisania lub wyeksportować bieżący postęp przed podjęciem decyzji.",
+    "stay_signed_in": "Zostań zalogowany",
+    "discard_and_sign_out": "Wyloguj się i odrzuć zmiany",
+    "retry_succeeded": "Twoje zmiany zostały zapisane w chmurze. Możesz się bezpiecznie wylogować."
   },
   "omnibar": {
     "title": "Search",
@@ -2179,10 +2217,17 @@
       "delete_forever": "Delete Account Forever",
       "delete_success_title": "Account Deleted Successfully",
       "delete_success_sr_only": "Your account deletion is complete, and you will be redirected to the dashboard.",
+      "delete_success_cleanup_failed_sr_only": "Twoje konto zostało usunięte, ale niektóre dane pozostają na tym urządzeniu. Możesz spróbować ponownie oczyścić je lub kontynuować z tymi danymi pozostającymi tutaj.",
       "delete_success_description": "Your account and all associated data have been permanently deleted.",
+      "other_session_deleted_description": "Konto, które rozpoczęło usuwanie zostało usunięte. Twoje obecne konto jest nadal zalogowane i nie zostało zmienione.",
       "cleanup_pending": "Some data cleanup is still in progress and will complete shortly.",
+      "device_cleanup_failed": "Niektóre usunięte dane konta pozostają na tym urządzeniu. Spróbuj ponownie oczyścić lub kontynuuj i zostaw te dane tutaj.",
+      "session_end_failed": "Ta przeglądarka jest nadal zalogowana do usuniętego konta. Wybierz przejdź do pulpitu nawigacyjnego, aby spróbować wylogować się ponownie.",
+      "retry_device_cleanup": "Spróbuj ponownie oczyścić urządzenie",
+      "continue_with_device_data_remaining": "Kontynuuj z pozostałymi danymi",
       "redirect_message": "Thank you for using TarkovTracker. You will be redirected to the dashboard.",
-      "go_to_dashboard": "Go to Dashboard"
+      "go_to_dashboard": "Go to Dashboard",
+      "session_changed": "Twoje zalogowane konto uległo zmianie. W tej sesji nie zostaną podjęte żadne dalsze działania."
     },
     "discord_link": {
       "title": "Discord Account",
@@ -2440,6 +2485,25 @@
         "verification_failed": "Weryfikacja człowieka nie powiodła się. Odśwież stronę i spróbuj ponownie.",
         "fetch_failed": "Nie można pobrać profilu Tarkov.dev. Otwórz profil na Tarkov.dev, a następnie spróbuj ponownie."
       }
+    },
+    "device_data": {
+      "title": "Dane na tym urządzeniu",
+      "description": "Wylogowanie utrzymuje postęp zapisany na tym koncie w tej przeglądarce, więc zmiany, które nie osiągnęły poziomu chmury mogą się zsynchronizować, gdy się zalogujesz. Postępy przesiedlone w wyniku resetowania lub sezonowego przewracania są utrzymywane oddzielnie dla wywozu. Usunięcie danych tego urządzenia usuwa postęp tego konta, kopie odzyskiwania i preferencje z tej przeglądarki i wyloguje cię.",
+      "cloud_unaffected": "Postęp w chmurze nie został usunięty. Dane innych kont na tym urządzeniu nie są naruszone.",
+      "superseded_available": "Zmiana postępu {count} z resetowania lub sezonowego przewracania są tutaj utrzymywane tylko do eksportu. Nie zostaną one przywrócone lub zsynchronizowane automatycznie.",
+      "superseded_export": "Postęp eksportu zastąpionego",
+      "superseded_export_error": "Nie można wyeksportować zastąpionego postępu",
+      "remove_button": "Usuń dane tego konta z tego urządzenia",
+      "confirm_title": "Usunąć dane tego konta z tego urządzenia?",
+      "confirm_description": "Postęp tego konta, kopie odzyskiwania, zastąpione postępy eksportu i preferencje zostaną usunięte z tej przeglądarki. Zostaniesz wylogowany. Postęp w chmurze pozostaje dostępny po ponownym zalogowaniu.",
+      "pending_warning": "Niektóre zmiany postępu nie zostały jeszcze zapisane w chmurze. Usunięcie danych tego urządzenia spowoduje ich trwałe odrzucenie. Eksportuj najpierw swoje postępy, jeśli chcesz je utrzymać.",
+      "confirm_button": "Usuń dane i wyloguj się",
+      "removed": "Dane tego konta zostały usunięte z tego urządzenia.",
+      "remove_error": "Niektóre dane konta nie mogły zostać usunięte z tego urządzenia. Spróbuj ponownie przed użyciem innego konta tutaj.",
+      "remove_incomplete": "Niektóre dane z konta, które usunąłeś, są nadal na tym urządzeniu. Spróbuj ponownie przed użyciem innego konta tutaj.",
+      "retry_removal": "Spróbuj usunąć ponownie",
+      "revocation_unavailable": "Serwer nie może zostać osiągnięty, więc nadal jesteś zalogowany. Możesz wylogować się tylko na tym urządzeniu i usunąć dane; serwer nie zostanie poinformowany, więc sesja pozostanie aktywna, dopóki nie wygaśnie, lub wylogujesz się z innego urządzenia.",
+      "confirm_device_only_button": "Wyloguj się tylko na tym urządzeniu i usuń dane"
     }
   },
   "hideout": {
@@ -2527,6 +2591,22 @@
       "approve": "Zatwierdź",
       "deny": "Odmów"
     }
+  },
+  "tarkov_access": {
+    "title": "Sprawdź swoją przeglądarkę",
+    "checking": "Sprawdzanie dostępu do witryny…",
+    "description": "Ta strona jest chroniona przed nadmiernymi zautomatyzowanymi żądaniami. Uzupełnij poniższą kontrolę bezpieczeństwa, aby załadować dane gry Tarkov.",
+    "retry": "Spróbuj ponownie",
+    "dismiss": "Nie teraz",
+    "dismissed_notice": "Dane gry są wstrzymane do czasu zakończenia kontroli bezpieczeństwa.",
+    "verify_now": "Sprawdź teraz",
+    "verification_failed_retry": "Kontrola bezpieczeństwa nie została zakończona. Możesz spróbować ponownie.",
+    "verifying": "Weryfikowanie przeglądarki…",
+    "widget_hint": "Zakończ sprawdzanie, aby kontynuować.",
+    "failed": "Ładowanie danych Tarkov jest obecnie niedostępne. Możesz spróbować ponownie.",
+    "blocked": "Dostęp do danych Tarkov jest obecnie zablokowany dla Twojej sieci. Możesz spróbować ponownie lub wrócić później.",
+    "rate_limited": "Zbyt wiele kontroli w krótkim czasie. Poczekaj chwilę, a następnie spróbuj ponownie.",
+    "widget_unavailable": "Kontrola bezpieczeństwa nie mogła się załadować. Możesz spróbować ponownie."
   },
   "analytics_consent": {
     "eyebrow": "Analytics",
