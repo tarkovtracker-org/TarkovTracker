@@ -1,3 +1,4 @@
+import type { ApiTaskUpdateEntry } from '@shared/utils/apiTaskUpdates';
 export interface TaskObjective {
   count?: number;
   complete?: boolean;
@@ -28,15 +29,13 @@ export interface HideoutModule {
   complete?: boolean;
   timestamp?: number;
 }
-export interface ApiTaskUpdate {
-  id: string;
-  state: 'completed' | 'failed' | 'uncompleted';
-}
+export type ApiTaskUpdate = ApiTaskUpdateEntry;
 export interface ApiUpdateMeta {
   id: string;
   at: number;
   source: 'api';
   tasks?: ApiTaskUpdate[];
+  taskCount?: number;
 }
 export interface TraderProgress {
   level: number;

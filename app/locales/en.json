@@ -216,6 +216,7 @@
         "plural": "Tasks updated"
       },
       "state": {
+        "active": "active",
         "completed": "completed",
         "failed": "failed",
         "uncompleted": "uncompleted"
