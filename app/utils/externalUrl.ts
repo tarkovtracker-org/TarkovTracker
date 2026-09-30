@@ -16,14 +16,14 @@ function parseUrl(value: unknown): URL | undefined {
   }
 }
 /**
- * Return the URL when it is an HTTPS, credential-free link to a trusted game-data
+ * Return the canonical URL when it is an HTTPS, credential-free link to a trusted game-data
  * host; otherwise undefined so callers fall back to an ID-derived URL.
  */
 export function toTrustedGameLinkUrl(value: unknown): string | undefined {
   const parsed = parseUrl(value);
   if (!parsed || parsed.protocol !== 'https:') return undefined;
   if (parsed.username || parsed.password) return undefined;
-  return TRUSTED_GAME_LINK_HOSTS.has(parsed.hostname) ? (value as string) : undefined;
+  return TRUSTED_GAME_LINK_HOSTS.has(parsed.hostname) ? parsed.href : undefined;
 }
 /**
  * Whether a URL is safe to open in a new browsing context (http/https only).
