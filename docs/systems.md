@@ -808,6 +808,10 @@ flowchart LR
    reads resolve the active Seasonal number through the database before selecting a row. Persisted
    `lastApiUpdate` and `apiUpdateHistory` retain task states `active`, `completed`, `failed`, and
    `uncompleted`; malformed entries and unknown states are stripped by the database sanitizer.
+   Each entry keeps at most the first 20 valid task updates in input order (the gateway lists the
+   requested tasks before cascaded dependents) and records the pre-truncation total as `taskCount`
+   only when updates were dropped. The gateway, client, and database apply the same rules
+   (`shared/utils/apiTaskUpdates.ts`), so a client sync cannot flip a stored entry.
 3. Realtime listens to both the account row and normalized rows. A normalized event is applied only
    when its mode is supported and its season equals the active season. The long-lived system and team
    listeners run in detached scopes so route unmounts cannot orphan their channels. The team store
@@ -1075,7 +1079,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
 - `pvp` and `pve` always use season `0`; `seasonal` always uses a positive season.
 - Persisted API task-update metadata accepts only `active`, `completed`, `failed`, and
   `uncompleted`. Its sanitizer strips malformed entries and unknown states; enabling a new producer
-  requires aligned application/gateway consumers and a verified database rollout first.
+  requires aligned application/gateway consumers and a verified database rollout first. The
+  per-entry task cap and `taskCount` rules must stay identical across those three layers.
 - Browser roles never need table maintenance privileges (`TRUNCATE`, `REFERENCES`, `TRIGGER`,
   `MAINTAIN`) on account, progress, team, billing, or audit tables. Explicit forward revokes preserve
   existing row and column access, including token-note updates. Billing events remain server-only;

@@ -94,6 +94,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { countApiTaskUpdates } from '@shared/utils/apiTaskUpdates';
   import { useActivityLogStore } from '@/stores/useActivityLogStore';
   import { useMetadataStore } from '@/stores/useMetadata';
   import type { ApiTaskUpdate, ApiUpdateMeta } from '@/stores/progressState';
@@ -110,10 +111,12 @@
     return meta.tasks;
   };
   const getRemainingTaskCount = (entryMeta: unknown): number => {
-    return Math.max(0, getEntryTasks(entryMeta).length - 3);
+    if (!entryMeta || typeof entryMeta !== 'object') return 0;
+    return Math.max(0, countApiTaskUpdates(entryMeta as ApiUpdateMeta) - 3);
   };
   const getStateLabel = (state: ApiTaskUpdate['state']): string => {
     const icons: Record<ApiTaskUpdate['state'], string> = {
+      active: '▶',
       completed: '✓',
       failed: '✗',
       uncompleted: '○',

@@ -1,3 +1,4 @@
+import { capApiTaskUpdates, isApiTaskUpdateEntry } from '@shared/utils/apiTaskUpdates';
 import {
   defaultState,
   type ApiTaskUpdate,
@@ -251,17 +252,8 @@ export const normalizeTaskCompletionsMap = (
   }
   return migrated;
 };
-const API_TASK_STATES = ['completed', 'failed', 'uncompleted'] as const;
-const isApiTaskState = (state: unknown): state is ApiTaskUpdate['state'] => {
-  return API_TASK_STATES.includes(state as ApiTaskUpdate['state']);
-};
-export const normalizeApiTaskUpdates = (updates: ApiUpdateMeta['tasks']): ApiTaskUpdate[] => {
-  if (!Array.isArray(updates)) return [];
-  return updates.filter(
-    (update): update is ApiTaskUpdate =>
-      Boolean(update) && typeof update.id === 'string' && isApiTaskState(update.state)
-  );
-};
+export const normalizeApiTaskUpdates = (updates: ApiUpdateMeta['tasks']): ApiTaskUpdate[] =>
+  Array.isArray(updates) ? updates.filter(isApiTaskUpdateEntry) : [];
 export const normalizeApiUpdateMetaEntry = (value: unknown): ApiUpdateMeta | null => {
   if (!value || typeof value !== 'object') return null;
   const candidate = value as Partial<ApiUpdateMeta>;
@@ -274,12 +266,13 @@ export const normalizeApiUpdateMetaEntry = (value: unknown): ApiUpdateMeta | nul
   ) {
     return null;
   }
-  const tasks = normalizeApiTaskUpdates(candidate.tasks);
+  const { tasks, taskCount } = capApiTaskUpdates(candidate.tasks, candidate.taskCount);
   return {
     at: candidate.at,
     id: candidate.id,
     source: 'api',
     ...(tasks.length ? { tasks } : {}),
+    ...(taskCount !== undefined ? { taskCount } : {}),
   };
 };
 const normalizeApiUpdateHistoryEntries = (value: unknown): ApiUpdateMeta[] => {
