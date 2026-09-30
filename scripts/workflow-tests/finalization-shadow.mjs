@@ -76,7 +76,6 @@ test('opt-in finalization selects only deployable revisions', () => {
     ['app/locales/fr.json'],
     ['supabase/migrations/example.sql'],
     ['workers/api-gateway/src/index.ts'],
-    ['.github/workflows/ci.yml'],
     ['pnpm-lock.yaml'],
     ['README.md', 'app/components/Task.vue'],
     [],
@@ -88,6 +87,12 @@ test('opt-in finalization selects only deployable revisions', () => {
   }
   assert.equal(
     validateShadowEvidence(evidence(['README.md', 'docs/guide.md'])).previewRequired,
+    false
+  );
+  assert.equal(
+    validateShadowEvidence(
+      evidence(['.github/workflows/ci.yml', 'scripts/ci/validate-changes.mjs'])
+    ).previewRequired,
     false
   );
 });
@@ -325,9 +330,9 @@ test('shadow workflow cannot deploy, publish statuses, or pass secrets to candid
   assert.doesNotMatch(jobBlock(workflow, 'build'), /write-manifest|buildManifest/);
   assert.match(jobBlock(workflow, 'verify'), /sealShadowArtifact/);
   assert.match(jobBlock(workflow, 'verify'), /always\(\) && needs\.plan\.result == 'success'/);
-  assert.match(jobBlock(workflow, 'verify'), /Recheck documentation-only result/);
+  assert.match(jobBlock(workflow, 'verify'), /Recheck not-applicable result/);
   assert.match(
-    workflowStep(jobBlock(workflow, 'verify'), 'Recheck documentation-only result'),
+    workflowStep(jobBlock(workflow, 'verify'), 'Recheck not-applicable result'),
     /recheckShadow/
   );
   assert.match(jobBlock(workflow, 'verify'), /extractZip\(await downloadArtifact/);

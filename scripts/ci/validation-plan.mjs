@@ -54,17 +54,63 @@ function isAutomationPath(path) {
 function touchesWorkflows(paths) {
   return paths.length === 0 || paths.some(isAutomationPath);
 }
-// The preview decision is independent of the full/reduced test split: only a change set made of
-// known documentation paths needs no deployable preview. Translations, configuration, dependencies,
-// executable code, forced full runs, and unknown or unreadable diffs all require one.
-function requiresPreview(paths, categories, forceFull) {
+// The preview decision is independent of the full/reduced test split: it asks whether the change
+// can reach what Cloudflare Pages serves. Documentation, GitHub configuration, repository scripts,
+// and tests are never build inputs (`pnpm run build` is only `nuxt build`, and `nuxt.config.ts`
+// imports nothing from these locations), so a change set made only of them needs no deployable
+// preview; the controller then publishes `Preview Result: success` as not applicable instead of
+// requiring a deployment. The one exception is the preview pipeline under `scripts/preview/`:
+// the candidate's profile and manifest steps run inside `Validate`, so deploying the candidate is
+// what proves that path end to end. Everything else requires one: the app, `public/`, `shared/`,
+// Supabase, Workers, build and dependency configuration, Markdown under `public/`, any unknown
+// path, forced full runs, and unreadable diffs. Keep this list in sync with the build graph — when
+// the build starts consuming one of these locations, remove it from `inertPrefixes`/
+// `inertRootFiles`, or add it to `deployablePath`, in the same change.
+const inertPrefixes = ['.cubic/', '.github/', '.husky/', '.vscode/', 'docs/', 'scripts/', 'tests/'];
+const inertRootFiles = new Set([
+  '.coderabbit.yaml',
+  '.fallowrc.json',
+  '.gitignore',
+  '.markdownlint.json',
+  '.markdownlintignore',
+  '.prettierignore',
+  '.prettierrc',
+  '.releaserc.json',
+  'commitlint.config.js',
+  'eslint.config.mjs',
+  'socket.yml',
+  'vitest.config.ts',
+]);
+/** Never inert: `public/` is what Pages serves, and the preview pipeline produces the artifact
+ * a deployment verifies — its candidate-side profile and manifest steps run inside `Validate`. */
+function deployablePath(path) {
+  return path.startsWith('public/') || path.startsWith('scripts/preview/');
+}
+function markdownPath(path) {
+  return /\.(?:md|markdown)$/i.test(path);
+}
+function inertLocation(path) {
+  if (inertPrefixes.some((prefix) => path.startsWith(prefix))) return true;
+  return inertRootFiles.has(path);
+}
+function inertContent(path) {
+  // Markdown is read by humans and agents; nothing in the build graph loads it.
+  if (markdownPath(path)) return true;
+  return inertLocation(path);
+}
+function inertPath(path) {
+  if (typeof path !== 'string' || unsafePath(path)) return false;
+  if (deployablePath(path)) return false;
+  return inertContent(path);
+}
+function requiresPreview(paths, forceFull) {
   if (forceFull || paths.length === 0) return true;
-  return [...categories].some((category) => category !== 'docs');
+  return !paths.every(inertPath);
 }
 export function classifyPaths(paths, { forceFull = false, reason } = {}) {
   const categories = new Set(paths.map(pathCategory));
   const full = requiresFullValidation(paths, categories, forceFull);
-  const previewRequired = requiresPreview(paths, categories, forceFull);
+  const previewRequired = requiresPreview(paths, forceFull);
   return {
     full,
     docs: categories.has('docs'),

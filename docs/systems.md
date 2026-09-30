@@ -2187,9 +2187,11 @@ executable changes select full validation. Local input includes
 committed and dirty paths; CI input is the explicit revision diff. Renames contribute both paths.
 Pull requests receive the selected jobs; the classifier also reports `workflows` so workflow
 linting runs only for non-Markdown automation paths and unreadable diffs, and an independent
-`previewRequired` decision (`preview` output): only a change set made entirely of known
-documentation paths needs no deployable preview. Translations, configuration, dependencies,
-executable code, and unknown or unreadable paths require one, so translation-only pull requests
+`previewRequired` decision (`preview` output): only a change set that cannot reach the deployed
+Pages output needs no deployable preview — Markdown outside `public/`, `.github/`, `docs/`,
+`tests/`, repository tooling configuration, and `scripts/` apart from `scripts/preview/`.
+Translations, build configuration, dependencies, application code, `public/`, `shared/`,
+Supabase, Workers, and unknown or unreadable paths require one, so translation-only pull requests
 keep the reduced test selection but add the `validate` build job. The `security` job (reusable
 `.github/workflows/security.yml`: production dependency audit at the critical threshold, Gitleaks,
 CodeQL) is selected on every CI run. See
@@ -2643,7 +2645,7 @@ PR update → CI (selected validation + security + preview build + manifest + ar
 | ------------------------------------------------------------------ | ------------------------------------------ |
 | Validation running, deployable draft, fork awaiting approval       | pending, with reason                       |
 | Preview-required PR has successful CI but no dispatch yet          | pending, waiting for a maintainer request  |
-| Successful CI and verified documentation-only scope                | success: not applicable                    |
+| Successful CI and a change set with no deployable paths            | success: not applicable                    |
 | Current deployment and smoke tests succeed                         | success, with digest/profile marker        |
 | Validation, artifact verification, deployment, or smoke tests fail | failure                                    |
 | Revision or attempt becomes obsolete                               | no success is published for that candidate |
@@ -2659,7 +2661,7 @@ Artifact claims still bind to the test merge. When GitHub has not computed it ye
 retries and leaves the required result pending. A regenerated test merge is the same candidate only
 when both commits have the current base and head as parents and identical trees. A dispatched branch
 build associated with a PR can satisfy that PR only if its Git tree matches the test-merge tree
-and its base is current main, including when the change is documentation-only. The comparison is
+and its base is current main, including when the change set has no deployable paths. The comparison is
 repeated before deployment and final success. An hourly state-only reconciliation re-evaluates a head
 with no result, or whose latest result is pending only because the test merge was not ready, once
 GitHub has computed the test merge; other pending reasons are left alone.
