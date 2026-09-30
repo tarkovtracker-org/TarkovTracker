@@ -20,7 +20,7 @@ Complete workflow automation setup for TarkovTracker with CI/CD pipelines, quali
 `package.json` defines commands; the root `AGENTS.md` defines required validation and review, and
 path-scoped `supabase/AGENTS.md` and `workers/api-gateway/AGENTS.md` add area-specific rules.
 [`code-review.md`](./code-review.md) supplements that contract with risk areas, without requiring
-the full suite for unrelated changes. Worktree setup and the shared CI setup action use `scripts/ensure-pnpm.sh` to
+the full suite for unrelated changes. Worktree setup and the shared CI setup action use `scripts/setup/ensure-pnpm.sh` to
 verify pnpm against `packageManager`, preparing its complete integrity-qualified pin even when the installed version matches.
 
 Run focused checks while implementing, then required checks after the diff stabilizes. Record the
@@ -52,7 +52,7 @@ changes rather than relying on an earlier green check. Codex requests use the gu
 
 ### Codex request deduplication and waiting
 
-Agents must use `node scripts/codex-review.mjs <PR> --wait-seconds 600` to inspect and wait for
+Agents must use `node scripts/codex-review/codex-review.mjs <PR> --wait-seconds 600` to inspect and wait for
 reviews. Add `--request` only when authorized to post a review request. Use `--repo owner/name`
 when the PR belongs to another repository. Do not post raw `@codex review` comments or issue a
 second request because a polling window expired. Batch corrections before requesting a review.
@@ -177,7 +177,7 @@ above; `.github/zizmor.yml` records the accepted findings with their justificati
 Node tooling, so both are pinned in the workflow step rather than `package.json`. To update either,
 change the version and the `SHA256` value to the `digest` GitHub records for the release asset.
 The four Vitest shards, dedicated Deno tests, Supabase validation, Worker validation, and production
-build retain their existing commands and environment behavior. Tests in `scripts/ci-tests/` use
+build retain their existing commands and environment behavior. Tests in `scripts/workflow-tests/` use
 Node's built-in runner via `pnpm run test:workflow`; their filenames deliberately avoid Vitest discovery.
 
 #### Local validation selection
@@ -205,7 +205,7 @@ Link validation remains in the existing Link Check workflow for applicable docum
 The reduced selection covers only root `.md` files, Markdown under `docs/` and `.github/`, agent
 instruction files named `AGENTS.md` or `CLAUDE.md` at any depth outside `public/`, and
 Crowdin-owned `app/locales/*.json` translations. The source locale `app/locales/en.json` selects
-full validation: application code and Vitest fixtures consume it, and `scripts/crowdin-pr.sh` draws
+full validation: application code and Vitest fixtures consume it, and `scripts/ci/crowdin-pr.sh` draws
 the same translation-only boundary. `DESIGN.md`, generated code, scripts, dependencies,
 configuration, public assets, and unknown paths select full validation. Renames include both paths
 and deletions remain visible. Empty diffs, missing refs, malformed arguments, and Git errors
@@ -228,7 +228,7 @@ Non-English formatting exclusions and Crowdin ownership remain intact.
 2. Done: the classifier invocation no longer passes `--shadow`; pull requests receive path selection
    while push and dispatch events retain `--full`. Required-check settings were not changed. Roll
    back by restoring `--shadow` in the `Classify changes` step and inverting the `--shadow`
-   assertion in `scripts/ci-tests/workflows.mjs` in the same change (workflow edits select full
+   assertion in `scripts/workflow-tests/workflows.mjs` in the same change (workflow edits select full
    validation, so `test:workflow` runs on the rollback itself); the flag remains supported.
 3. Release deduplication is handled separately in [PR #805](https://github.com/tarkovtracker-org/TarkovTracker/pull/805).
    Path selection does not change release triggers, validation, or main-run cancellation.
@@ -237,12 +237,12 @@ Non-English formatting exclusions and Crowdin ownership remain intact.
 The initial observations come from the pre-rollout baseline collected on 2026-09-06, which was
 archived in git history once the rollout completed (recorded 2026-09-16; no report file remains
 in-tree).
-The read-only `scripts/workflow-metrics.mjs` collector samples the preceding 20 merged PRs and emits
+The read-only `scripts/ci/workflow-metrics.mjs` collector samples the preceding 20 merged PRs and emits
 per-PR CI and release timings as JSON. Run it with authenticated `gh` and save stdout to a report:
 
 ```bash
-node scripts/workflow-metrics.mjs --before <rollout-ISO-time>
-node scripts/workflow-metrics.mjs --after <rollout-ISO-time> --count 20
+node scripts/ci/workflow-metrics.mjs --before <rollout-ISO-time>
+node scripts/ci/workflow-metrics.mjs --after <rollout-ISO-time> --count 20
 ```
 
 The follow-up selects the first 20 merges after the boundary; record the actual rollout timestamp.
@@ -263,7 +263,7 @@ local and configured Git exclusions, while retaining force-tracked files), and k
 `--gate new-only` behavior and configured severities. New error findings fail; inherited findings
 and warning-only findings do not. No persistent finding baseline is maintained.
 
-`scripts/fallow-audit.mjs` creates a temporary local clone and two analysis commits. Both contain
+`scripts/checks/fallow-audit.mjs` creates a temporary local clone and two analysis commits. Both contain
 a physical copy of the current generated `.nuxt` context; the second contains the current source
 tree. This prevents Fallow's internal base snapshot from symlinking the generated tsconfig and
 resolving its relative `@/` aliases against the wrong directory. Dependencies are linked from the
@@ -275,8 +275,8 @@ Use `--format json` for structured findings. Each run uses fresh analysis withou
 The report's Git IDs belong to the temporary analysis commits; the original source base and HEAD
 are printed on stderr. Invalid refs and setup/analyzer failures exit nonzero instead of skipping the gate.
 
-Regression checks live in `scripts/fallow-audit.test.mjs` and run with the regular test suite or
-`pnpm exec vitest run scripts/fallow-audit.test.mjs`.
+Regression checks live in `scripts/checks/fallow-audit.test.mjs` and run with the regular test suite or
+`pnpm exec vitest run scripts/checks/fallow-audit.test.mjs`.
 
 ##### Resolving findings instead of suppressing them
 
@@ -317,7 +317,7 @@ Reusable security gate called by CI, plus the weekly standalone audit:
 Crowdin and release staging) and the weekly schedule (Sunday 00:00 UTC). The former push and
 pull_request triggers were removed so each revision is scanned once, inside the gated run.
 `CI Result` requires the call's success: scanner errors, cancellation, or a missing result fail the
-aggregate. The trusted aggregate contract (`scripts/validation-plan.mjs`) landed in a compatibility
+aggregate. The trusted aggregate contract (`scripts/ci/validation-plan.mjs`) landed in a compatibility
 change first (an absent `security` job was tolerated, a reported non-success failed); the
 activation change made the job mandatory.
 
@@ -379,10 +379,10 @@ administrator must verify the deployed ruleset's empty bypass list during rollou
 changes. GitHub hides that list from callers without ruleset write access; automation does not
 request administrative permissions merely to inspect it.
 
-**Version-bump commit:** `scripts/release-commit.mjs` prepares the bumped `package.json` and
+**Version-bump commit:** `scripts/release/release-commit.mjs` prepares the bumped `package.json` and
 `CHANGELOG.md` as `chore(release): <version>` with no skip marker. The plugin supports the
 main-only release workflow. It stages only these generated assets and rejects unrelated staged
-files. `scripts/release-commit.sh` pushes the new commit to
+files. `scripts/release/release-commit.sh` pushes the new commit to
 `wip/release-<version>-<run-id>-<attempt>` using the built-in `GITHUB_TOKEN`.
 An explicit `workflow_dispatch` starts full CI on that branch; the job has `actions: write`. After
 that exact CI run and its `CI Result` pass, the trusted Release job dispatches one preview from
@@ -446,7 +446,7 @@ to the platform's branch settings.
 - `BREAKING CHANGE:` → major version bump
 - `refactor:`, `docs:`, `chore:`, `ci:`, `test:`, `style:`, `build:` → no release
 
-**Internal scopes never release.** `scripts/release-scope.mjs` wraps the commit analyzer and
+**Internal scopes never release.** `scripts/release/release-scope.mjs` wraps the commit analyzer and
 release-notes generator (the copies `semantic-release` depends on) and drops commits whose scope is
 internal before either runs, so `fix(ci):` or `feat(preview):` neither bumps the version nor appears
 in `CHANGELOG.md` or the GitHub release. Reverts of those commits (Git's default
@@ -459,7 +459,7 @@ still deploy normally; they are only left out of versioning. Use a product scope
 
 **Release note highlights.** While generating notes, the same plugin reads the `## Release note`
 section of each merged PR (from the `(#123)` suffix of its squash commit, using the release job's
-`GITHUB_TOKEN`; `scripts/release-highlights.mjs`) and lists those sentences under
+`GITHUB_TOKEN`; `scripts/release/release-highlights.mjs`) and lists those sentences under
 `### Highlights` above the generated Features and Bug Fixes in the GitHub release. Highlights are
 not written to `CHANGELOG.md`: semantic-release regenerates notes after the version commit, and
 only that pass adds them, so PR text never enters the committed, secret-scanned file. Empty
@@ -768,7 +768,7 @@ Ordered rollout (verify `Preview Result` enforcement; apply the ruleset only if 
    ```
 
 2. The trusted aggregate compatibility change (`optionalJobs` tolerance in
-   `scripts/validation-plan.mjs`) and the preview controller/manifest pipeline are already on
+   `scripts/ci/validation-plan.mjs`) and the preview controller/manifest pipeline are already on
    `main`.
 3. The operator created a Pages-only token and stored it in both protected GitHub environments;
    the repository secret was removed on 2026-09-23. This had to precede the bootstrap merge because
@@ -828,13 +828,13 @@ pre-commit becomes a silent no-op. After `git worktree add`, from the worktree
 root:
 
 ```bash
-bash scripts/setup-worktree.sh
+bash scripts/setup/setup-worktree.sh
 ```
 
 That runs `pnpm install --frozen-lockfile` and `pnpm exec husky`. If install is
 impossible, format staged paths yourself before committing (for example
 `prettier --write` on touched markdown, `eslint --fix` on touched app files, and
-`node scripts/lint-blank-lines.mjs --fix` on supported source/config files).
+`node scripts/checks/lint-blank-lines.mjs --fix` on supported source/config files).
 
 ### Hooks
 
@@ -1112,7 +1112,7 @@ pnpm run lint:fix
 **Development:**
 
 - `.github/labeler.yml` - Auto-labeling rules
-- `scripts/setup-dev-environment.sh` - Setup automation
+- `scripts/setup/setup-dev-environment.sh` - Setup automation
 
 ## Additional Resources
 

@@ -40,8 +40,8 @@ jobs:
             const { pathToFileURL } = require('node:url');
             const { copyFile } = require('node:fs/promises');
             const gatePath = `${process.env.RUNNER_TEMP}/release-gate.mjs`;
-            await copyFile(`${process.env.GITHUB_WORKSPACE}/scripts/release-gate.mjs`, gatePath);
-            await copyFile(`${process.env.GITHUB_WORKSPACE}/scripts/release-recovery.mjs`, `${process.env.RUNNER_TEMP}/release-recovery.mjs`);
+            await copyFile(`${process.env.GITHUB_WORKSPACE}/scripts/release/release-gate.mjs`, gatePath);
+            await copyFile(`${process.env.GITHUB_WORKSPACE}/scripts/release/release-recovery.mjs`, `${process.env.RUNNER_TEMP}/release-recovery.mjs`);
             const { releaseEligibility } = await import(pathToFileURL(gatePath));
             const result = await releaseEligibility({ github, context, allowRecovery: Number(process.env.GITHUB_RUN_ATTEMPT) > 1 });
             core.info(result.reason);
