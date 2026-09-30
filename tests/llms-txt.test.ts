@@ -86,7 +86,7 @@ describe('public/llms.txt', () => {
     const internalLine = nonEmptyLines(llmsTxt).find((l) => l.includes('`/api/tarkov/*`'));
     expect(internalLine, 'missing internal Tarkov route note').toBeDefined();
     expect(internalLine).toContain('not a supported integration API');
-    expect(internalLine).toContain('https://json.tarkov.dev/');
+    expect(internalLine).toContain('`json.tarkov.dev`');
     expect(internalLine).toContain('https://api.tarkovtracker.org/');
   });
   it('lists /profile among auth-required areas', () => {
