@@ -3,6 +3,7 @@ import {
   invalidateAcknowledgedModes,
   selectChangedModes,
   type ModeProgressMap,
+  type ProgressSyncSnapshot,
 } from '@/stores/tarkov/acknowledgedModes';
 import { buildUpsertPayload } from '@/stores/tarkov/progressMerge';
 import {
@@ -124,6 +125,47 @@ const enqueueProgressSync = <T>(userId: string, send: () => Promise<T>): Promise
     if (progressSyncQueues.get(userId) === settled) progressSyncQueues.delete(userId);
   });
   return result;
+};
+type ProgressMutation<TResult> = {
+  expected: ProgressSyncSnapshot;
+  modes: ModeProgressMap;
+  send: () => PromiseLike<TResult>;
+  canContinue: () => boolean;
+  onSuccess: () => void;
+};
+const sendProgressMutation = async <TResult extends { error: unknown }>(
+  userId: string,
+  mutation: ProgressMutation<TResult>,
+  sync: ProgressAcknowledgement
+): Promise<TResult | { error: typeof SPLIT_SYNC_INTERRUPTED }> => {
+  const isCurrent = () => sync.isCurrent() && mutation.canContinue();
+  if (!isCurrent()) return { error: SPLIT_SYNC_INTERRUPTED };
+  invalidateAcknowledgedModes(userId, mutation.modes);
+  let result: TResult;
+  try {
+    result = await mutation.send();
+  } finally {
+    invalidateAcknowledgedModes(userId, mutation.modes);
+  }
+  if (!isCurrent()) return { error: SPLIT_SYNC_INTERRUPTED };
+  if (result.error) return result;
+  sync.acknowledge(mutation.modes);
+  mutation.onSuccess();
+  return result;
+};
+/** Atomic progress RPCs supersede older splits and settle before later account writes. */
+export const executeProgressMutation = <TResult extends { error: unknown }>(
+  userId: string,
+  mutation: ProgressMutation<TResult>
+): Promise<TResult | { error: typeof SPLIT_SYNC_INTERRUPTED }> => {
+  const sync = beginAcknowledgement(userId, mutation.expected);
+  return enqueueProgressSync(userId, async () => {
+    try {
+      return await sendProgressMutation(userId, mutation, sync);
+    } finally {
+      sync.finish();
+    }
+  });
 };
 const sendModeBatch = async <TError>(
   client: ProgressSyncClient<TError>,

@@ -858,7 +858,9 @@ flowchart LR
 8. Prestige is a PvP-only concept and Seasonal PvP does not support it, so the archive RPC accepts
    only `pvp` (and `pve`, which the UI still gates off) and never writes the Seasonal row. The store
    rejects a Seasonal prestige before any request, and the settings card reports prestige as
-   unavailable in Seasonal PvP.
+   unavailable in Seasonal PvP. Prestige archives use the same account write queue as background
+   syncs, supersede older splits, and acknowledge only the persistent modes the transaction writes.
+   A cancelled session cannot dispatch a queued archive or apply its result to another account.
 9. EFT log import restores explicit quest notification states in PvP, PvE, and active Seasonal
    PvP. Message types 10/11/12 identify started/failed/completed tasks; rewards, backend requests,
    diagnostics, and group-member snapshots do not establish additional player progress. See

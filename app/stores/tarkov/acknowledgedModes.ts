@@ -2,7 +2,7 @@ import { deepEqual } from '@/stores/tarkov/deepEqual';
 import { GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 export type ModeProgressMap = Partial<Record<GameMode, UserProgressData>>;
-type ProgressSyncSnapshot = Partial<
+export type ProgressSyncSnapshot = Partial<
   Pick<UserState, GameMode | 'currentGameMode' | 'gameEdition' | 'tarkovUid'>
 >;
 type RemoteProgressUpdate = { remote: ProgressSyncSnapshot; applied: ProgressSyncSnapshot };
