@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(13);
+SELECT plan(14);
 
 CREATE TEMP TABLE cap_fixture ON COMMIT DROP AS
 SELECT jsonb_agg(
@@ -176,6 +176,22 @@ SELECT is(
    WHERE user_id = '00000000-0000-0000-0000-000000000992' AND entry->>'id' = 'first-write'),
   '30'::jsonb,
   'the legacy history trigger keeps the stored count when a resent entry omits it'
+);
+
+SELECT is(
+  (SELECT jsonb_agg(entry.value->'taskCount' ORDER BY entry.ordinality)
+   FROM jsonb_array_elements(
+     public.carry_api_update_task_counts(
+       jsonb_build_object('apiUpdateHistory', (
+         SELECT jsonb_agg(jsonb_build_object('id', 'e' || n, 'at', n, 'source', 'api', 'taskCount', 30))
+         FROM generate_series(1, 51) AS n)),
+       jsonb_build_object('apiUpdateHistory', (
+         SELECT jsonb_agg(jsonb_build_object('id', 'e' || n, 'at', n, 'source', 'api') ORDER BY n)
+         FROM generate_series(50, 51) AS n))
+     )->'apiUpdateHistory'
+   ) WITH ORDINALITY AS entry(value, ordinality)),
+  '[30, null]'::jsonb,
+  'taskCount carry-over scans only the first 50 stored history entries'
 );
 
 SELECT * FROM finish();

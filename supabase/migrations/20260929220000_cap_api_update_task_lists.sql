@@ -6,7 +6,9 @@
 -- user_progress history trigger rebuilds entries through merge_api_update_history before the row
 -- sanitizer runs, so it must carry taskCount through for the sanitizer to keep it. Clients built
 -- before this change resend capped entries without taskCount, so both history merges keep the
--- largest count already stored for the same entry id and timestamp.
+-- largest count already stored for the same entry id and timestamp. The carry-over scans at most
+-- the 50 history entries a sanitized row can hold on each side, so a direct RPC call with oversized
+-- arrays stays bounded.
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '30s';
 
@@ -203,14 +205,15 @@ AS $$
   FROM (
     SELECT max((candidate.value->>'taskCount')::numeric) AS task_count
     FROM (
-      SELECT value
+      SELECT history.value
       FROM jsonb_array_elements(
         CASE
           WHEN jsonb_typeof(existing->'apiUpdateHistory') = 'array'
           THEN existing->'apiUpdateHistory'
           ELSE '[]'::jsonb
         END
-      )
+      ) WITH ORDINALITY AS history(value, ordinality)
+      WHERE history.ordinality <= 50
       UNION ALL
       SELECT existing->'lastApiUpdate'
     ) AS candidate
@@ -248,7 +251,11 @@ AS $$
         (
           SELECT COALESCE(
             jsonb_agg(
-              public.carry_api_update_task_count(entry.value, existing)
+              CASE
+                WHEN entry.ordinality <= 50
+                THEN public.carry_api_update_task_count(entry.value, existing)
+                ELSE entry.value
+              END
               ORDER BY entry.ordinality
             ),
             '[]'::jsonb
