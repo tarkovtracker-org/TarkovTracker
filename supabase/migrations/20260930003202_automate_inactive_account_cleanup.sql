@@ -70,7 +70,7 @@ REVOKE ALL ON private.account_retention FROM PUBLIC, anon, authenticated;
 CREATE FUNCTION public.record_account_activity(p_user_id uuid)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 BEGIN
-  PERFORM 1 FROM auth.users WHERE id = p_user_id FOR UPDATE;
+  PERFORM 1 FROM auth.users WHERE id = p_user_id FOR KEY SHARE;
   IF NOT FOUND THEN RETURN; END IF;
   INSERT INTO private.account_retention(user_id, last_active_at)
   VALUES (p_user_id, clock_timestamp())
@@ -115,7 +115,7 @@ CREATE TRIGGER retain_sign_in_activity AFTER UPDATE OF last_sign_in_at ON auth.u
 CREATE FUNCTION private.guard_api_activity_owner()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 BEGIN
-  PERFORM 1 FROM auth.users WHERE id = NEW.user_id FOR UPDATE;
+  PERFORM 1 FROM auth.users WHERE id = NEW.user_id FOR KEY SHARE;
   IF NOT FOUND THEN RETURN NULL; END IF;
   RETURN NEW;
 END;
@@ -147,6 +147,7 @@ BEGIN
   IF NEW.stripe_customer_id IS NOT NULL THEN
     PERFORM pg_advisory_xact_lock(hashtext('supporter-chargeback'), hashtext(NEW.stripe_customer_id));
   END IF;
+  -- Serialize cross-customer chargeback attribution with supporter creation, including its FK check.
   PERFORM 1 FROM auth.users WHERE id = NEW.user_id FOR UPDATE;
   NEW.supporter_disqualified_at := coalesce(NEW.supporter_disqualified_at,
     (SELECT min(disqualified_at) FROM private.supporter_chargebacks
@@ -256,7 +257,7 @@ CREATE FUNCTION private.delete_inactive_account(p_user_id uuid)
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' SET lock_timeout = '2s' AS $$
 DECLARE v_claim record; v_pending timestamptz; v_deadline timestamptz;
 BEGIN
-  -- Each activity/billing writer takes this same account lock before recording evidence.
+  -- Each activity/billing writer takes a conflicting account row lock before recording evidence.
   PERFORM 1 FROM auth.users WHERE id = p_user_id FOR UPDATE;
   IF NOT FOUND THEN RETURN false; END IF;
   SELECT pending_since INTO v_pending FROM private.account_retention WHERE user_id = p_user_id FOR UPDATE;
@@ -296,6 +297,7 @@ BEGIN
     SELECT u.id FROM auth.users u
     LEFT JOIN private.account_retention r ON r.user_id = u.id
     WHERE private.account_retention_deadline(u.id) < clock_timestamp()
+      AND (r.pending_since IS NULL OR r.pending_since <= clock_timestamp() - interval '30 days')
       AND NOT EXISTS (SELECT 1 FROM public.account_deletion_jobs j WHERE j.user_id = u.id)
       AND NOT EXISTS (SELECT 1 FROM storage.objects o WHERE o.owner_id = u.id::text)
       AND NOT EXISTS (SELECT 1 FROM storage.buckets b WHERE b.owner_id = u.id::text)
@@ -332,6 +334,7 @@ REVOKE ALL ON FUNCTION private.track_account_mutation(), private.track_account_s
   private.account_retention_deadline(uuid), private.prepare_inactive_account_teams(uuid),
   private.delete_inactive_account(uuid), private.run_inactive_account_cleanup(integer)
   FROM PUBLIC, anon, authenticated;
+GRANT USAGE ON SCHEMA private TO service_role;
 GRANT EXECUTE ON FUNCTION private.snapshot_account_activity(), private.account_retention_deadline(uuid),
   private.run_inactive_account_cleanup(integer) TO service_role;
 

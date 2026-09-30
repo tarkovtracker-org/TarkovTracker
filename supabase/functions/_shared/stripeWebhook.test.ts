@@ -644,3 +644,66 @@ describe('stored subscription grace preservation', () => {
     }
   );
 });
+describe('rejected guest checkout retained history', () => {
+  it.each([true, false])(
+    'preserves existing support history %s without granting a refunded guest payment',
+    async (has_ever_supported) => {
+      const harness = createHarness(
+        {
+          ...supporter,
+          stripe_customer_id: null,
+          has_ever_supported,
+          retention_history_verified: false,
+          status: 'active',
+          tier: 'chad',
+        },
+        resourcesForPayments(),
+        { discord: true }
+      );
+      harness.roles.add('tier');
+      if (has_ever_supported) harness.roles.add('supporter');
+      await harness.dispatch('checkout.session.completed', { ...session, customer: null });
+      expect(harness.current()).toMatchObject({
+        status: has_ever_supported ? 'expired' : 'cancelled',
+        tier: 'supporter',
+        has_ever_supported,
+        retention_history_verified: false,
+        last_contribution_at: contributionAt,
+      });
+      expect(harness.roles.has('tier')).toBe(false);
+      expect(harness.roles.has('supporter')).toBe(has_ever_supported);
+      expect(harness.fetch.mock.calls.some(([url]) => url.includes('/charges?'))).toBe(false);
+    }
+  );
+  it('holds missing guest history instead of inventing revoked or verified evidence', async () => {
+    const harness = createHarness(
+      {
+        ...supporter,
+        stripe_customer_id: null,
+        has_ever_supported: undefined,
+        retention_history_verified: false,
+      },
+      resourcesForPayments()
+    );
+    await expect(
+      harness.dispatch('checkout.session.completed', { ...session, customer: null })
+    ).rejects.toThrow('Unable to verify preserved');
+    expect(harness.writes).toHaveLength(0);
+  });
+  it('still removes all support for a disqualified guest regardless of retained history', async () => {
+    const harness = createHarness(
+      {
+        ...supporter,
+        stripe_customer_id: null,
+        supporter_disqualified_at: '2026-09-29T12:00:00Z',
+      },
+      resourcesForPayments(),
+      { discord: true }
+    );
+    harness.roles.add('supporter');
+    harness.roles.add('tier');
+    await harness.dispatch('checkout.session.completed', { ...session, customer: null });
+    expect(harness.current()).toMatchObject({ status: 'cancelled', has_ever_supported: false });
+    expect(harness.roles.size).toBe(0);
+  });
+});

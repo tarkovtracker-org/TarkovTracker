@@ -277,9 +277,19 @@ async function rejectEligiblePaymentGrant(
   preserveLiveSubscription: boolean
 ): Promise<void> {
   if (preserveLiveSubscription && (await hasVerifiedLiveSubscription(supporter))) return;
-  const count = customerId ? await getCustomerPaymentCount(customerId, '') : 0;
+  const count = await getRejectedPaymentHistoryCount(customerId, supporter);
   if (count === null) throw new Error('Unable to verify preserved Stripe contribution history');
-  await revokeSupporter(supporter, count === 0, reason);
+  await revokeSupporter(supporter, count === 0, reason, !customerId);
+}
+/** A guest payment supplies no customer-wide evidence for erasing retained support. */
+async function getRejectedPaymentHistoryCount(
+  customerId: string | null,
+  supporter: SupporterRow
+): Promise<number | null> {
+  if (customerId) return await getCustomerPaymentCount(customerId, '');
+  if (supporter.has_ever_supported === true) return 1;
+  if (supporter.has_ever_supported === false) return 0;
+  return null;
 }
 async function hasVerifiedLiveSubscription(supporter: SupporterRow): Promise<boolean> {
   if (!canVerifyLiveSubscription(supporter)) return false;
@@ -973,14 +983,20 @@ async function revokeSupporter(
   // deno-lint-ignore no-explicit-any
   supporter: any,
   fullRevoke: boolean,
-  reason: string
+  reason: string,
+  preserveHistoryVerification = false
 ): Promise<void> {
   const disqualifiedAt = supporterDisqualificationDate(
     supporter.supporter_disqualified_at ?? null,
     reason === 'chargeback',
     new Date()
   );
-  const history = supporterRevocationEvidence(fullRevoke, disqualifiedAt);
+  const history = {
+    ...supporterRevocationEvidence(fullRevoke, disqualifiedAt),
+    ...(preserveHistoryVerification
+      ? { retention_history_verified: supporter.retention_history_verified }
+      : {}),
+  };
   fullRevoke = !history.has_ever_supported;
   const updates = fullRevoke
     ? {

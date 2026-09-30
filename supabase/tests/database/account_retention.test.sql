@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(81);
+SELECT plan(86);
 
 -- Each fixture has old Auth history; remove provisioning's freshly-created progress
 -- so eligibility tests measure the intended activity and billing evidence.
@@ -11,7 +11,7 @@ FROM (VALUES
   (1004, 'former_recent'), (1005, 'former_old'), (1006, 'ended_recent'),
   (1007, 'refunded'), (1008, 'unknown'), (1009, 'charged_back'),
   (1010, 'delete_owner'), (1011, 'successor'), (1012, 'signed_in'),
-  (1013, 'preferences'), (1014, 'api_user'), (1015, 'telemetry'), (1016, 'before_checkout'), (1017, 'unknown_customer'), (1018, 'repeat_grace')
+  (1013, 'preferences'), (1014, 'api_user'), (1015, 'telemetry'), (1016, 'before_checkout'), (1017, 'unknown_customer'), (1018, 'repeat_grace'), (1022, 'batch_wait'), (1023, 'batch_next')
 ) AS fixtures(n, name);
 CREATE FUNCTION pg_temp.retention_user(p_name text) RETURNS uuid LANGUAGE sql AS $$
   SELECT user_id FROM retention_fixture WHERE name = p_name;
@@ -139,6 +139,22 @@ SELECT ok((SELECT pending_since IS NOT NULL FROM private.account_retention
   WHERE user_id = pg_temp.retention_user('inactive')), 'cleanup queues eligible account');
 SELECT is(private.delete_inactive_account(pg_temp.retention_user('inactive')), false,
   'new queue cannot bypass thirty-day grace');
+-- Waiting accounts must not repeatedly consume a limited weekly batch.
+UPDATE auth.users SET created_at = now() - interval '5 years'
+WHERE id = pg_temp.retention_user('batch_wait');
+UPDATE auth.users SET created_at = now() - interval '4 years'
+WHERE id = pg_temp.retention_user('batch_next');
+UPDATE private.account_retention SET pending_since = NULL
+WHERE user_id = pg_temp.retention_user('batch_next');
+SELECT is(private.run_inactive_account_cleanup(1)->>'queued', '1',
+  'small cleanup batch starts a new candidate while older accounts await grace');
+SELECT ok((SELECT pending_since IS NOT NULL FROM private.account_retention
+  WHERE user_id = pg_temp.retention_user('batch_next')),
+  'new candidate enters pending state without waiting for older grace to finish');
+SELECT ok((SELECT pending_since > now() - interval '1 minute' FROM private.account_retention
+  WHERE user_id = pg_temp.retention_user('batch_wait')),
+  'waiting candidate retains its initial recovery window');
+
 UPDATE private.account_retention SET pending_since = now() - interval '29 days'
 WHERE user_id = pg_temp.retention_user('inactive');
 SELECT is(private.delete_inactive_account(pg_temp.retention_user('inactive')), false,
@@ -284,6 +300,12 @@ CROSS JOIN (VALUES ('public.record_account_activity(uuid)'), ('private.account_r
 SELECT ok(has_function_privilege('service_role', signature, 'EXECUTE'), 'service role can execute ' || signature)
 FROM (VALUES ('public.record_account_activity(uuid)'), ('private.account_retention_deadline(uuid)'),
   ('private.run_inactive_account_cleanup(integer)'), ('private.snapshot_account_activity()')) functions(signature);
+SELECT ok(has_schema_privilege('service_role', 'private', 'USAGE'),
+  'service role can resolve private retention functions');
+SET LOCAL ROLE service_role;
+SELECT lives_ok($$SELECT private.account_retention_deadline('00000000-0000-0000-0000-000000001003'::uuid)$$,
+  'service role can execute a private retention assessment');
+RESET ROLE;
 SELECT table_privs_are('private', 'account_retention', 'anon', ARRAY[]::text[], 'anon has no private retention privileges');
 SELECT table_privs_are('private', 'account_retention', 'authenticated', ARRAY[]::text[], 'authenticated has no private retention privileges');
 SELECT * FROM finish();

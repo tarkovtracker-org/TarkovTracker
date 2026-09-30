@@ -47,7 +47,8 @@ historical rows are rewritten by the migration. A missing supporter verification
 uncertainty hold, not a new benefit or proof of never supporting.
 
 Each weekly bounded batch first marks eligible accounts pending. Deletion requires at least 30 days
-pending plus a fresh eligibility check under the account lock. Activity or billing changes cancel
+pending plus a fresh eligibility check under the account lock. Waiting accounts leave batch
+capacity available for other eligible accounts. Activity or billing changes cancel
 pending status. This rollout recovery window is additional to the public eligibility period; an
 email notification system is not implemented. Failed accounts roll back independently and yield
 priority to other candidates on subsequent runs.
