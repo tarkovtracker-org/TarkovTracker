@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(74);
+SELECT plan(78);
 
 -- Each fixture has old Auth history; remove provisioning's freshly-created progress
 -- so eligibility tests measure the intended activity and billing evidence.
@@ -102,6 +102,18 @@ SET LOCAL ROLE authenticated;
 SELECT throws_ok($$SELECT public.disqualify_supporter_customer('cus_client_attempt')$$,
   '42501', NULL, 'ordinary clients cannot disqualify supporter customers');
 RESET ROLE;
+
+SELECT public.disqualify_supporter_account(pg_temp.retention_user('former_old'), 'ch_retention_guest');
+SELECT is(public.supporter_benefits_disqualified(pg_temp.retention_user('former_old')), true,
+  'customerless chargeback disqualifies attributed account');
+SELECT is((SELECT has_ever_supported FROM public.supporters WHERE user_id = pg_temp.retention_user('former_old')),
+  false, 'customerless chargeback removes prior supporter history');
+UPDATE public.supporters SET has_ever_supported = true, status = 'active', stripe_customer_id = 'cus_after_guest'
+WHERE user_id = pg_temp.retention_user('former_old');
+SELECT is((SELECT has_ever_supported FROM public.supporters WHERE user_id = pg_temp.retention_user('former_old')),
+  false, 'customerless denial survives later customer checkout');
+SELECT ok(NOT has_function_privilege('authenticated', 'public.disqualify_supporter_account(uuid,text)', 'EXECUTE'),
+  'clients cannot disqualify other accounts through customerless RPC');
 
 -- No account can be removed on its first eligibility pass.
 SELECT private.run_inactive_account_cleanup(100);

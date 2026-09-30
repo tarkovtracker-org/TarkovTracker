@@ -15,6 +15,7 @@ import {
 } from '../_shared/stripeBilling.ts';
 import {
   checkoutContributionDate,
+  confirmSubscriptionExpiration,
   hasVerifiedRevokedHistory,
   getStripeBillingUserId,
   isSupporterDisqualified,
@@ -674,7 +675,11 @@ async function expireDeletedSubscription(
     .select('user_id');
   if (error)
     throw new Error(`Failed to expire subscription for ${supporter.user_id}: ${error.message}`);
-  return Boolean(updated?.length);
+  return await confirmSubscriptionExpiration(
+    Boolean(updated?.length),
+    () => findSupporterBy('user_id', supporter.user_id),
+    subscription.id
+  );
 }
 async function removeDeletedSubscriptionRoles(supporter: SupporterRow): Promise<void> {
   const discordUserId = await resolveDiscordUserIdForSupporter(supporter);
@@ -1062,7 +1067,7 @@ async function recordCustomerDisqualification(
 // deno-lint-ignore no-explicit-any
 async function handleChargeDisputeCreated(dispute: any): Promise<void> {
   const customerId = await resolveDisputeCustomerId(dispute);
-  if (!customerId) return;
+  if (!customerId) return await handleCustomerlessChargeback(dispute);
   await recordCustomerDisqualification(customerId, null);
   const supporter = await findSupporterBy('stripe_customer_id', customerId);
   if (supporter) await revokeSupporter(supporter, true, 'chargeback');
@@ -1070,6 +1075,17 @@ async function handleChargeDisputeCreated(dispute: any): Promise<void> {
   await recordCustomerDisqualification(customerId, userId);
   await revokeAttributedChargeback(userId);
   console.warn(`[stripe-webhook] Disqualified Stripe customer on chargeback: ${customerId}`);
+}
+async function handleCustomerlessChargeback(dispute: { charge?: unknown }): Promise<void> {
+  const userId = await resolveDisputedChargeUserId(dispute);
+  const chargeId = getStripeReferenceId(dispute.charge);
+  if (!userId || !chargeId) return;
+  const { error } = await supabase.rpc('disqualify_supporter_account', {
+    p_user_id: userId,
+    p_charge_id: chargeId,
+  });
+  if (error) throw new Error(`Failed to disqualify account ${userId}: ${error.message}`);
+  await revokeAttributedChargeback(userId);
 }
 async function revokeAttributedChargeback(userId: string | null): Promise<void> {
   if (!userId) return;

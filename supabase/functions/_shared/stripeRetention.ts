@@ -138,3 +138,16 @@ export function getStripeBillingUserId(value: unknown): string | null {
     ? value
     : null;
 }
+/** A lost expiration fence retries only while the same subscription still owns the row. */
+export async function confirmSubscriptionExpiration(
+  updated: boolean,
+  lookup: () => Promise<{ stripe_subscription_id?: unknown } | null>,
+  subscriptionId: string
+): Promise<boolean> {
+  if (updated) return true;
+  const latest = await lookup();
+  if (latest?.stripe_subscription_id === subscriptionId) {
+    throw new Error('Subscription expiration lost its update fence; will retry');
+  }
+  return false;
+}

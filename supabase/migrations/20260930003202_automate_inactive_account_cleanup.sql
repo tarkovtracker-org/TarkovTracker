@@ -34,6 +34,19 @@ $$;
 REVOKE ALL ON FUNCTION public.disqualify_supporter_customer(text, uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.disqualify_supporter_customer(text, uuid) TO service_role;
 
+-- Customerless historical payments still carry an authenticated account reference.
+CREATE FUNCTION public.disqualify_supporter_account(p_user_id uuid, p_charge_id text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+BEGIN
+  IF p_user_id IS NULL OR p_charge_id IS NULL OR length(p_charge_id) NOT BETWEEN 4 AND 100 THEN
+    RAISE EXCEPTION 'Invalid account chargeback reference';
+  END IF;
+  PERFORM public.disqualify_supporter_customer('charge:' || p_charge_id, p_user_id);
+END;
+$$;
+REVOKE ALL ON FUNCTION public.disqualify_supporter_account(uuid, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.disqualify_supporter_account(uuid, text) TO service_role;
+
 CREATE FUNCTION public.supporter_benefits_disqualified(p_user_id uuid)
 RETURNS boolean LANGUAGE sql SECURITY DEFINER SET search_path = '' AS $$
   SELECT EXISTS (SELECT 1 FROM private.supporter_chargebacks WHERE user_id = p_user_id)

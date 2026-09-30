@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   checkoutContributionDate,
+  confirmSubscriptionExpiration,
   hasVerifiedRevokedHistory,
   getStripeBillingUserId,
   isSupporterDisqualified,
@@ -238,5 +239,32 @@ describe('trusted Stripe billing user attribution', () => {
     for (const value of [undefined, null, 123, '', 'user-1', '12345678']) {
       expect(getStripeBillingUserId(value)).toBeNull();
     }
+  });
+});
+describe('subscription expiration fence', () => {
+  it('accepts a successful update without another lookup', async () => {
+    const lookup = vi.fn();
+    await expect(confirmSubscriptionExpiration(true, lookup, 'sub_old')).resolves.toBe(true);
+    expect(lookup).not.toHaveBeenCalled();
+  });
+  it('retries a lost fence for the same subscription', async () => {
+    const lookup = vi.fn().mockResolvedValue({ stripe_subscription_id: 'sub_old' });
+    await expect(confirmSubscriptionExpiration(false, lookup, 'sub_old')).rejects.toThrow(
+      'will retry'
+    );
+  });
+  it.each([null, { stripe_subscription_id: 'sub_new' }])(
+    'skips role cleanup after the subscription was replaced or removed',
+    async (row) => {
+      const lookup = vi.fn().mockResolvedValue(row);
+      await expect(confirmSubscriptionExpiration(false, lookup, 'sub_old')).resolves.toBe(false);
+      expect(lookup).toHaveBeenCalledOnce();
+    }
+  );
+  it('propagates lookup failure so expiration is retried', async () => {
+    const lookup = vi.fn().mockRejectedValue(new Error('database unavailable'));
+    await expect(confirmSubscriptionExpiration(false, lookup, 'sub_old')).rejects.toThrow(
+      'database unavailable'
+    );
   });
 });

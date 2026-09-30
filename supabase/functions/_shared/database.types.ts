@@ -1040,6 +1040,10 @@ export type Database = {
         }
         Returns: number
       }
+      disqualify_supporter_account: {
+        Args: { p_user_id: string; p_charge_id: string }
+        Returns: undefined
+      }
       disqualify_supporter_customer: {
         Args: { p_customer_id: string; p_user_id?: string }
         Returns: undefined
