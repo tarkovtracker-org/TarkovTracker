@@ -802,16 +802,18 @@ flowchart LR
    clients, and upserts each normalized row. The caller passes the season number its bundle was
    built for; the function writes the Seasonal row only when that number equals the database's
    active season, so a cached client from a previous season cannot upload stale Seasonal state. A
-   client sync carries only the modes that differ from the copy the server last loaded, acknowledged,
-   or delivered through Realtime for this session (`app/stores/tarkov/acknowledgedModes.ts`); an
-   omitted mode is kept as stored. A multi-mode sync over half the payload cap is sent as one request per mode, and each
-   mode is acknowledged only after its request succeeds; a session reset stops the remaining
-   requests. One request can still carry several modes, so a stale Seasonal entry is skipped rather
-   than raising: persistent PvP and PvE from the same request still commit. The RPC rejects payloads
-   larger than 512 KiB and allows at most 60 direct client syncs per user per minute. API gateway
-   reads resolve the active Seasonal number through the database before selecting a row. Persisted
-   `lastApiUpdate` and `apiUpdateHistory` retain task states `active`, `completed`, `failed`, and
-   `uncompleted`; malformed entries and unknown states are stripped by the database sanitizer.
+   client sync carries only the modes that differ from the copy the server last loaded,
+   acknowledged, or delivered through Realtime for this session
+   (`app/stores/tarkov/acknowledgedModes.ts`); an omitted mode is kept as stored. A multi-mode sync
+   over half the payload cap is sent as one request per mode, and each mode is acknowledged only
+   after its request succeeds; a session reset stops the remaining requests, and a pending mode that
+   Realtime updated meanwhile is skipped. One request can still carry several modes, so a stale
+   Seasonal entry is skipped rather than raising: persistent PvP and PvE from the same request still
+   commit. The RPC rejects payloads larger than 512 KiB and allows at most 60 direct client syncs
+   per user per minute. API gateway reads resolve the active Seasonal number through the database
+   before selecting a row. Persisted `lastApiUpdate` and `apiUpdateHistory` retain task states
+   `active`, `completed`, `failed`, and `uncompleted`; malformed entries and unknown states are
+   stripped by the database sanitizer.
 3. Realtime listens to both the account row and normalized rows. A normalized event is applied only
    when its mode is supported and its season equals the active season. The long-lived system and team
    listeners run in detached scopes so route unmounts cannot orphan their channels. The team store

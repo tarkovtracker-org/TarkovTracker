@@ -10,6 +10,7 @@ export type ModeProgressMap = Partial<Record<GameMode, UserProgressData>>;
 let ownerId: string | null = null;
 let acknowledged: ModeProgressMap = {};
 let generation = 0;
+const revisions: Partial<Record<GameMode, number>> = {};
 const toWire = (progress: UserProgressData): UserProgressData =>
   JSON.parse(JSON.stringify(progress)) as UserProgressData;
 export const clearAcknowledgedModes = (): void => {
@@ -29,20 +30,31 @@ export const recordAcknowledgedModes = (userId: string, modes: ModeProgressMap):
   claimOwner(userId);
   for (const mode of GAME_MODE_VALUES) {
     const progress = modes[mode];
-    if (progress) acknowledged[mode] = toWire(progress);
+    if (!progress) continue;
+    acknowledged[mode] = toWire(progress);
+    revisions[mode] = (revisions[mode] ?? 0) + 1;
   }
 };
 /**
- * Starts a multi-request sync: the returned callback records each acknowledged batch and returns
- * `false` once the baseline was cleared or claimed by another account, so the sync stops.
+ * Starts a multi-request sync. `acknowledge` records each acknowledged batch and returns `false`
+ * once the baseline was cleared or claimed by another account, so the sync stops. `unchanged` drops
+ * modes acknowledged elsewhere (Realtime) since the sync began, so a stale snapshot never overwrites
+ * newer server progress; the store merge that follows schedules the next sync.
  */
 export const beginAcknowledgement = (userId: string) => {
   claimOwner(userId);
   const started = generation;
-  return (modes: ModeProgressMap): boolean => {
-    if (generation !== started) return false;
-    recordAcknowledgedModes(userId, modes);
-    return true;
+  const startRevisions = { ...revisions };
+  const isUnchanged = (mode: string): boolean =>
+    revisions[mode as GameMode] === startRevisions[mode as GameMode];
+  return {
+    unchanged: (modes: ModeProgressMap): ModeProgressMap =>
+      Object.fromEntries(Object.entries(modes).filter(([mode]) => isUnchanged(mode))),
+    acknowledge: (modes: ModeProgressMap): boolean => {
+      if (generation !== started) return false;
+      recordAcknowledgedModes(userId, modes);
+      return true;
+    },
   };
 };
 /** Modes whose progress differs from what the server is known to hold; unknown modes differ. */

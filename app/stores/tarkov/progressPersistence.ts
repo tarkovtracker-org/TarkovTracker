@@ -117,9 +117,10 @@ export const sendProgressSync = async <TError>(
     [GAME_MODES.PVE]: payload.pve_data,
     [GAME_MODES.SEASONAL]: payload.seasonal_data,
   });
-  const acknowledge = beginAcknowledgement(userId);
+  const sync = beginAcknowledgement(userId);
   let result: { error: TError } | undefined;
-  for (const batch of toModeBatches(modes)) {
+  for (const planned of toModeBatches(modes)) {
+    const batch = sync.unchanged(planned);
     result = await client.rpc('sync_user_game_mode_progress', {
       p_current_game_mode: payload.current_game_mode,
       p_game_edition: payload.game_edition,
@@ -127,7 +128,7 @@ export const sendProgressSync = async <TError>(
       p_tarkov_uid: payload.tarkov_uid,
       p_modes: batch,
     });
-    if (result.error || !acknowledge(batch)) return result;
+    if (result.error || !sync.acknowledge(batch)) return result;
   }
   return result as { error: TError };
 };

@@ -108,4 +108,22 @@ describe('mode-scoped progress sync', () => {
     await syncProgressState({ rpc } as ProgressRpcClient, 'user-1', withHeavyModes());
     expect(rpc).toHaveBeenCalledTimes(1);
   });
+  it('skips a pending split mode that Realtime acknowledged during the sync', async () => {
+    const remotePve = { ...withHeavyModes().pve, level: 30 };
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    rpc.mockImplementationOnce(async () => {
+      recordAcknowledgedModes('user-1', { pve: remotePve });
+      return { error: null };
+    });
+    const client = { rpc } as ProgressRpcClient;
+    const state = withHeavyModes();
+    await syncProgressState(client, 'user-1', state);
+    const batches = rpc.mock.calls.map((call) =>
+      Object.keys((call[1] as { p_modes: object }).p_modes)
+    );
+    expect(batches).toEqual([['pvp'], [], ['seasonal']]);
+    rpc.mockClear();
+    await syncProgressState(client, 'user-1', state);
+    expect(sentModes(rpc)).toEqual({ pve: expect.objectContaining({ level: 1 }) });
+  });
 });
