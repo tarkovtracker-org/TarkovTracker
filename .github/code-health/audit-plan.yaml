@@ -632,7 +632,7 @@ queue:
     notes: null
   - id: CH-026
     area: Blank-line lint tooling
-    paths: [scripts/lint-blank-lines.mjs, scripts/lint-blank-lines.test.mjs]
+    paths: [scripts/checks/lint-blank-lines.mjs, scripts/checks/lint-blank-lines.test.mjs]
     status: queued
     priority: P2
     dependencies: []
@@ -750,9 +750,9 @@ queue:
       [
         .github/workflows/,
         nuxt.config.ts,
-        scripts/validation-plan.mjs,
-        scripts/validation-tools.mjs,
-        scripts/check-ci-result.mjs,
+        scripts/ci/validation-plan.mjs,
+        scripts/ci/validation-tools.mjs,
+        scripts/ci/check-ci-result.mjs,
       ]
     status: blocked
     priority: P3
@@ -815,7 +815,7 @@ queue:
     metrics_before: null
     metrics_after: null
     pr: null
-    notes: scripts/check-systems-drift.mjs reads PRECOMPUTED_KV_BINDING by regex — do not remove blindly.
+    notes: scripts/checks/check-systems-drift.mjs reads PRECOMPUTED_KV_BINDING by regex — do not remove blindly.
   - id: CH-038
     area: Storyline feature
     paths:

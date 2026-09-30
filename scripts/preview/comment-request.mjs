@@ -1,4 +1,4 @@
-import { classifyPaths } from '../validation-plan.mjs';
+import { classifyPaths } from '../ci/validation-plan.mjs';
 import {
   ciResultCheck,
   findLatestPullRun,

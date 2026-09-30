@@ -7,8 +7,8 @@ on:
       - 'app/locales/en.json'
       - '.github/crowdin.yml'
       - '.github/workflows/crowdin.yml'
-      - 'scripts/crowdin-pr.sh'
-      - 'scripts/github-ci-gate.sh'
+      - 'scripts/ci/crowdin-pr.sh'
+      - 'scripts/ci/github-ci-gate.sh'
   schedule:
     - cron: '17 4 * * 1'
   workflow_dispatch:
@@ -35,7 +35,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Preserve trusted merge gate
-        run: cp scripts/crowdin-pr.sh scripts/github-ci-gate.sh "$RUNNER_TEMP/"
+        run: cp scripts/ci/crowdin-pr.sh scripts/ci/github-ci-gate.sh "$RUNNER_TEMP/"
       - name: Synchronize Crowdin translations
         id: crowdin
         uses: crowdin/github-action@0d5670f539973aea2f01abce61a8989934df0025 # v3.0.2
