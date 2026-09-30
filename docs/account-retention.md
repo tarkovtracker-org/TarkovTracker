@@ -17,9 +17,12 @@ or remaining historical payments from reinstating benefits. It does not itself d
 Trusted billing evidence lives in `supporters`; see the
 [Stripe webhook](../supabase/functions/stripe-webhook/index.ts) and
 [retention helpers](../supabase/functions/_shared/stripeRetention.ts). Dates alone do not grant
-benefits. Unknown legacy support history is protected from automated deletion until verified.
+benefits. Benefit grants verify the specific current checkout or invoice payment. Historical
+support eligibility is tracked separately. Unknown legacy support history is protected from
+automated deletion until verified.
 Cancelled renewals retain protection until paid access ends; past-due grace is bounded and cannot
-restart on every webhook. Former subscribers use the later of activity and access end. Calendar
+restart on every webhook. Former subscribers use the later of activity and access end, including
+the latest expired grace period when an earlier subscription end is already recorded. Calendar
 intervals, rather than fixed day counts, determine eligibility.
 
 ## Activity and cleanup implementation

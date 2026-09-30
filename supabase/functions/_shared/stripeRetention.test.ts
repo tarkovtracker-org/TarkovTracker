@@ -14,6 +14,12 @@ import {
   subscriptionEndDate,
   subscriptionEndEvidence,
   subscriptionGraceDate,
+  hasPaidStripeSubscriptionEpisode,
+  isPreservedStripeSubscriptionGrace,
+  stripeCheckoutPaymentCount,
+  stripeInvoicePaymentCount,
+  withFreshStripeRoleGrant,
+  type StripeEvidenceLookup,
 } from './stripeRetention.ts';
 const now = new Date('2026-09-29T12:00:00.000Z');
 const paidAt = new Date('2026-09-28T12:00:00.000Z');
@@ -266,5 +272,212 @@ describe('subscription expiration fence', () => {
     await expect(confirmSubscriptionExpiration(false, lookup, 'sub_old')).rejects.toThrow(
       'database unavailable'
     );
+  });
+});
+describe('invoice payment evidence', () => {
+  function lookupFor(resources: Record<string, unknown>): StripeEvidenceLookup {
+    return <T>(path: string): Promise<T | null> =>
+      Promise.resolve((resources[path] as T | undefined) ?? null);
+  }
+  const retained = {
+    id: 'ch_1',
+    status: 'succeeded',
+    disputed: false,
+    refunded: false,
+    amount: 100,
+    amount_refunded: 20,
+  };
+  it.each(['charge', 'payment_intent'])('resolves paid invoice payment type %s', async (type) => {
+    const lookup = lookupFor({
+      '/invoices/in_1': { id: 'in_1', amount_paid: 100 },
+      '/invoice_payments?invoice=in_1&status=paid&limit=100': {
+        data: [
+          {
+            id: 'inpay_1',
+            invoice: 'in_1',
+            status: 'paid',
+            payment: { type, charge: 'ch_1', payment_intent: 'pi_1' },
+          },
+        ],
+        has_more: false,
+      },
+      '/payment_intents/pi_1': { latest_charge: 'ch_1' },
+      '/charges/ch_1': retained,
+    });
+    await expect(stripeInvoicePaymentCount('in_1', lookup)).resolves.toBe(1);
+  });
+  it('retries unsupported or missing invoice payment evidence', async () => {
+    for (const data of [
+      [],
+      [{ id: 'inpay_1', invoice: 'in_1', status: 'paid', payment: { type: 'unknown' } }],
+    ]) {
+      const lookup = lookupFor({
+        '/invoices/in_1': { id: 'in_1', amount_paid: 100 },
+        '/invoice_payments?invoice=in_1&status=paid&limit=100': { data, has_more: false },
+      });
+      await expect(stripeInvoicePaymentCount('in_1', lookup)).resolves.toBeNull();
+    }
+  });
+  it('holds incomplete invoice pagination even after finding a valid charge', async () => {
+    const lookup = vi.fn(<T>(path: string): Promise<T | null> => {
+      if (path === '/invoices/in_1') return Promise.resolve({ id: 'in_1', amount_paid: 100 } as T);
+      if (path === '/charges/ch_1') return Promise.resolve(retained as T);
+      return Promise.resolve({
+        data: [
+          {
+            id: 'inpay_1',
+            invoice: 'in_1',
+            status: 'paid',
+            payment: { type: 'charge', charge: 'ch_1' },
+          },
+        ],
+        has_more: true,
+      } as T);
+    });
+    await expect(stripeInvoicePaymentCount('in_1', lookup)).resolves.toBeNull();
+    expect(
+      lookup.mock.calls.filter(([path]) => path.startsWith('/invoice_payments?'))
+    ).toHaveLength(5);
+  });
+  it('refreshes a subscription checkout to find its own missing invoice', async () => {
+    const lookup = lookupFor({
+      '/checkout/sessions/cs_1': { id: 'cs_1', invoice: 'in_1' },
+      '/invoices/in_1': { id: 'in_1', amount_paid: 100, charge: 'ch_1' },
+      '/charges/ch_1': retained,
+    });
+    await expect(
+      stripeCheckoutPaymentCount({ id: 'cs_1', mode: 'subscription' }, lookup)
+    ).resolves.toBe(1);
+    await expect(
+      stripeCheckoutPaymentCount({ id: 'cs_unknown', mode: 'subscription' }, lookup)
+    ).resolves.toBeNull();
+  });
+  it('holds missing charge reversal fields rather than guessing no payment', async () => {
+    const lookup = lookupFor({
+      '/invoices/in_1': { id: 'in_1', amount_paid: 100, charge: 'ch_1' },
+      '/charges/ch_1': { ...retained, disputed: undefined },
+    });
+    await expect(stripeInvoicePaymentCount('in_1', lookup)).resolves.toBeNull();
+  });
+});
+describe('fresh Stripe Discord role grant guard', () => {
+  it.each(['checkout', 'subscription'])(
+    'removes roles when a chargeback completes during the %s grant',
+    async () => {
+      let supporter = { supporter_disqualified_at: null as string | null };
+      const roles = new Set<string>();
+      let startGrant!: () => void;
+      let resumeGrant!: () => void;
+      const started = new Promise<void>((resolve) => {
+        startGrant = resolve;
+      });
+      const resume = new Promise<void>((resolve) => {
+        resumeGrant = resolve;
+      });
+      const grant = async () => {
+        startGrant();
+        await resume;
+        roles.add('tier');
+        roles.add('supporter');
+      };
+      const revoke = vi.fn(() => Promise.resolve(roles.clear()));
+      const pending = withFreshStripeRoleGrant(() => Promise.resolve(supporter), grant, revoke);
+      await started;
+      supporter = { supporter_disqualified_at: now.toISOString() };
+      await revoke();
+      resumeGrant();
+      await pending;
+      expect(roles.size).toBe(0);
+      expect(revoke).toHaveBeenCalledTimes(2);
+    }
+  );
+  it.each([null, { has_ever_supported: false }, { supporter_disqualified_at: now.toISOString() }])(
+    'denies grants after deletion, full refund, or chargeback',
+    async (supporter) => {
+      const grant = vi.fn(async () => {});
+      const revoke = vi.fn(async () => {});
+      await withFreshStripeRoleGrant(() => Promise.resolve(supporter), grant, revoke);
+      expect(grant).not.toHaveBeenCalled();
+      expect(revoke).toHaveBeenCalledOnce();
+    }
+  );
+  it('propagates failed denial lookups before or after grant for webhook retry', async () => {
+    for (const after of [false, true]) {
+      const lookup = vi.fn(() => Promise.resolve({ supporter_disqualified_at: null }));
+      if (after) lookup.mockResolvedValueOnce({ supporter_disqualified_at: null });
+      lookup.mockRejectedValueOnce(new Error('denial lookup unavailable'));
+      const grant = vi.fn(async () => {});
+      const revoke = vi.fn(async () => {});
+      await expect(withFreshStripeRoleGrant(lookup, grant, revoke)).rejects.toThrow(
+        'denial lookup unavailable'
+      );
+      expect(grant).toHaveBeenCalledTimes(after ? 1 : 0);
+      expect(revoke).not.toHaveBeenCalled();
+    }
+  });
+  it('propagates failed role removal for webhook retry', async () => {
+    await expect(
+      withFreshStripeRoleGrant(
+        () => Promise.resolve({ supporter_disqualified_at: now.toISOString() }),
+        async () => {},
+        () => Promise.reject(new Error('Discord unavailable'))
+      )
+    ).rejects.toThrow('Discord unavailable');
+  });
+});
+describe('verified subscription grace preservation', () => {
+  const paidGrace = {
+    type: 'subscription',
+    status: 'past_due',
+    stripe_subscription_id: 'sub_1',
+    has_ever_supported: true,
+    retention_history_verified: true,
+    expires_at: '2026-10-01T12:00:00.000Z',
+  };
+  const pastDue = { id: 'sub_1', status: 'past_due' };
+  it('preserves only verified same-episode bounded future grace', () => {
+    expect(isPreservedStripeSubscriptionGrace(paidGrace, pastDue, now, 7)).toBe(true);
+    for (const patch of [
+      { type: 'one_time' },
+      { stripe_subscription_id: null },
+      { status: 'active' },
+      { has_ever_supported: false },
+      { retention_history_verified: false },
+      { expires_at: null },
+      { expires_at: 'invalid' },
+      { expires_at: '2099-01-01T00:00:00Z' },
+      { expires_at: now.toISOString() },
+      { expires_at: paidAt.toISOString() },
+    ]) {
+      expect(isPreservedStripeSubscriptionGrace({ ...paidGrace, ...patch }, pastDue, now, 7)).toBe(
+        false
+      );
+    }
+    expect(
+      isPreservedStripeSubscriptionGrace(paidGrace, { ...pastDue, id: 'sub_other' }, now, 7)
+    ).toBe(false);
+    expect(
+      isPreservedStripeSubscriptionGrace(paidGrace, { ...pastDue, status: 'active' }, now, 7)
+    ).toBe(false);
+  });
+  it('requires the existing bounded deadline to reuse an expired paid episode', () => {
+    expect(
+      hasPaidStripeSubscriptionEpisode(
+        { ...paidGrace, status: 'expired', expires_at: paidAt.toISOString() },
+        'sub_1',
+        now,
+        7
+      )
+    ).toBe(true);
+    for (const expires_at of [null, 'invalid', '2099-01-01T00:00:00Z']) {
+      expect(
+        hasPaidStripeSubscriptionEpisode(
+          { ...paidGrace, status: 'expired', expires_at },
+          'sub_1',
+          now,
+          7
+        )
+      ).toBe(false);
+    }
   });
 });

@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(78);
+SELECT plan(81);
 
 -- Each fixture has old Auth history; remove provisioning's freshly-created progress
 -- so eligibility tests measure the intended activity and billing evidence.
@@ -11,7 +11,7 @@ FROM (VALUES
   (1004, 'former_recent'), (1005, 'former_old'), (1006, 'ended_recent'),
   (1007, 'refunded'), (1008, 'unknown'), (1009, 'charged_back'),
   (1010, 'delete_owner'), (1011, 'successor'), (1012, 'signed_in'),
-  (1013, 'preferences'), (1014, 'api_user'), (1015, 'telemetry'), (1016, 'before_checkout'), (1017, 'unknown_customer')
+  (1013, 'preferences'), (1014, 'api_user'), (1015, 'telemetry'), (1016, 'before_checkout'), (1017, 'unknown_customer'), (1018, 'repeat_grace')
 ) AS fixtures(n, name);
 CREATE FUNCTION pg_temp.retention_user(p_name text) RETURNS uuid LANGUAGE sql AS $$
   SELECT user_id FROM retention_fixture WHERE name = p_name;
@@ -47,6 +47,24 @@ SELECT ok(private.account_retention_deadline(pg_temp.retention_user('former_old'
   'former supporter becomes eligible after a year');
 SELECT ok(private.account_retention_deadline(pg_temp.retention_user('ended_recent')) > now(),
   'subscription end anchors former supporter retention');
+-- A previous cancellation's durable end must not hide a later subscription's grace end.
+INSERT INTO public.supporters(user_id, type, status, has_ever_supported,
+  retention_history_verified, last_contribution_at, subscription_ended_at, expires_at, updated_at)
+VALUES (pg_temp.retention_user('repeat_grace'), 'subscription', 'past_due', true, true,
+  now() - interval '13 months', now() - interval '2 years', now() - interval '11 months', now() - interval '2 years');
+SELECT is(private.account_retention_deadline(pg_temp.retention_user('repeat_grace')),
+  now() - interval '11 months' + interval '1 year',
+  'later expired grace anchors a full year despite a prior subscription end');
+UPDATE public.supporters SET status = 'expired'
+WHERE user_id = pg_temp.retention_user('repeat_grace');
+SELECT is(private.account_retention_deadline(pg_temp.retention_user('repeat_grace')),
+  now() - interval '11 months' + interval '1 year',
+  'expired state preserves the later access-end anchor');
+INSERT INTO private.account_retention(user_id, pending_since)
+VALUES (pg_temp.retention_user('repeat_grace'), now() - interval '35 days');
+SELECT is(private.delete_inactive_account(pg_temp.retention_user('repeat_grace')), false,
+  'queued former subscriber cannot be deleted before a year after latest grace');
+
 SELECT ok(private.account_retention_deadline(pg_temp.retention_user('refunded')) < now(),
   'verified refunded account ignores old contribution and subscription dates');
 SELECT is(private.account_retention_deadline(pg_temp.retention_user('unknown')), NULL::timestamptz,

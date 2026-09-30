@@ -215,9 +215,9 @@ RETURNS timestamptz LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = '' 
       greatest(s.last_contribution_at,
         CASE WHEN s.has_ever_supported AND s.last_contribution_at IS NULL THEN s.updated_at END,
         s.subscription_ended_at,
-        CASE WHEN s.has_ever_supported AND s.subscription_ended_at IS NULL
-          AND s.type = 'subscription' AND s.status <> 'active'
-          THEN greatest(s.expires_at, s.updated_at) END
+        CASE WHEN s.has_ever_supported AND s.type = 'subscription' AND s.status <> 'active'
+          THEN greatest(s.expires_at,
+            CASE WHEN s.subscription_ended_at IS NULL THEN s.updated_at END) END
       ) AS support_anchor
     FROM auth.users u
     LEFT JOIN public.supporters s ON s.user_id = u.id
