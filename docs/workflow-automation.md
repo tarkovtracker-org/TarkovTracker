@@ -136,8 +136,11 @@ active**: documentation-only and translation-only pull requests run the reduced 
 i18n when locales change, systems drift); every other change set runs every job. The job also emits
 `workflows`, which enables workflow linting in `Lint & Format` for non-Markdown automation paths and
 unreadable diffs. The classifier additionally emits an independent `preview` decision (`previewRequired`): only
-known documentation-only change sets need no deployable preview; translations, configuration,
-dependencies, executable changes, and unknown or unreadable paths require one, so a
+change sets that cannot reach the deployed Pages output need no deployable preview — Markdown
+documentation outside `public/` plus the `.github/`, `docs/`, `tests/` and repository tooling
+configuration paths, and `scripts/` apart from its preview pipeline, all owned by
+`scripts/ci/validation-plan.mjs`; translations, configuration,
+dependencies, executable changes, Supabase, Workers, and unknown or unreadable paths require one, so a
 translation-only PR keeps the reduced test selection but still runs `Validate`. `CI Result`
 evaluates the job outcomes against the plan and fails on missing
 classifier data, selected failures/cancellations, or unexpected skips. Systems drift and the
@@ -674,8 +677,8 @@ still-current candidate; any failed stage publishes failure, and a controller cr
 failure on the candidate revision.
 
 **Defaults:** preview-required changes stay pending until explicitly previewed; drafts stay pending;
-documentation-only PRs receive `success: not applicable`; fork PRs need both an explicit dispatch
-and environment approval. A previous success is reused only for the same revision, artifact digest,
+change sets with no deployable paths receive `success: not applicable`; fork PRs need both an
+explicit dispatch and environment approval. A previous success is reused only for the same revision, artifact digest,
 and profile version (`[preview <digest12> v1]` marker).
 
 **Manual preview:** `gh workflow run preview.yml --ref main -f run_id=<ci-run-id>`. Use the
@@ -700,8 +703,8 @@ A fork with a live maintainer opt-in uses the `preview` environment without a se
 an explicit fork dispatch without one retains `preview-fork` approval or an administrator override.
 Repeating a request for an already validated deployment reuses its evidence. Each new head or base
 still requires fresh CI, artifact verification, deployment, and smoke tests.
-Documentation-only commands acknowledge the opt-in and skip the immediate deployment; later
-executable revisions can then refresh after their own successful CI.
+Commands on a revision without deployable changes acknowledge the opt-in and skip the immediate
+deployment; later deployable revisions can then refresh after their own successful CI.
 
 For pull requests, `Preview Result` is published on the validated head commit only. GitHub
 regenerates the test-merge commit (new SHA, same parents and tree) when a merge is attempted, so a
@@ -717,12 +720,12 @@ becomes available after the event retry. One required context appears per PR.
 **Late-build shadow:** `gh workflow run finalization-shadow.yml --ref main -f pull_request=<pr-number> -f ci_run_id=<ci-run-id>`.
 Only a maintain/admin actor can request this non-authoritative rehearsal. It checks the current
 PR, base, test merge, CI run and attempt, then builds a deployable candidate in an isolated
-credential-free container unless the PR is docs-only. A trusted host step rejects links and special
+credential-free container unless the PR has no deployable changes. A trusted host step rejects links and special
 files before upload; a fresh trusted runner seals the output as
 `pages-preview-shadow`. The shadow does not deploy, publish `CI Result`/`Preview Result`, or change
 merge behavior. Ordinary PR CI continues to build and upload `pages-preview`. Re-dispatch after a
 push or base change; dispatch from `main` so the trusted default-branch workflow definition runs.
-Docs-only requests recheck the revision before finishing. Fork runs without a CI API base snapshot
+Requests without deployable changes recheck the revision before finishing. Fork runs without a CI API base snapshot
 fail closed in the shadow; the existing protected `preview-fork` deployment path is unaffected.
 
 **Trusted automation:** Crowdin translation merges and release staging request one preview after

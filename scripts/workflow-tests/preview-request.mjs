@@ -461,6 +461,22 @@ test('documentation-only commands accept persistent intent without deploying the
   assert.match(message, /Automatic previews enabled/);
   assert.match(message, /This revision does not require a preview/);
 });
+test('automation-only commands report that the revision needs no preview either', async () => {
+  const f = fixture({
+    files: [
+      { filename: '.github/workflows/ci.yml' },
+      { filename: 'scripts/ci/validate-changes.mjs' },
+    ],
+  });
+  const result = await requestPreviewFromComment(f);
+  assert.equal(result.enabled, true);
+  assert.equal(result.previewRequired, false);
+  assert.deepEqual(f.calls, []);
+  assert.match(
+    previewRequestMessage(result, 'https://github.com/example/tracker/actions'),
+    /This revision does not require a preview/
+  );
+});
 test('public outsider commands do not trigger one permission request per author', async () => {
   const comments = Array.from({ length: 500 }, (_, id) =>
     comment(id + 1, '/preview', {

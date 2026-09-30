@@ -10,7 +10,9 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 vi.mock('@/composables/useWikiLink', () => ({
-  useWikiLink: () => ({ toWikiUrl: (url: string | null | undefined) => url }),
+  useWikiLink: () => ({
+    toWikiUrl: (url: string | null | undefined) => (url?.startsWith('https://') ? url : undefined),
+  }),
 }));
 vi.mock('@/utils/formatters', () => ({
   useLocaleNumberFormatter: () => (value: number) => String(value),
@@ -92,10 +94,31 @@ describe('GameItem', () => {
     await flushPromises();
     expect(openMock).toHaveBeenCalledTimes(1);
   });
+  it('falls back to the ID-derived tarkov.dev URL for an untrusted devLink', () => {
+    const wrapper = mount(GameItem, {
+      props: { itemId: 'test-item', devLink: 'javascript:alert(1)', wikiLink: 'data:text/html,x' },
+      global: {
+        stubs: { ...defaultStubs, AppTooltip: { template: '<div><slot /></div>' } },
+      },
+    });
+    const hrefs = wrapper.findAll('a').map((link) => link.attributes('href'));
+    expect(hrefs).toEqual(['https://tarkov.dev/item/test-item']);
+    wrapper.unmount();
+  });
+  it('keeps the ID-derived tarkov.dev URL when the adapter dropped the link', () => {
+    const wrapper = mount(GameItem, {
+      props: { itemId: 'test-item' },
+      global: {
+        stubs: { ...defaultStubs, AppTooltip: { template: '<div><slot /></div>' } },
+      },
+    });
+    expect(wrapper.get('a').attributes('href')).toBe('https://tarkov.dev/item/test-item');
+    wrapper.unmount();
+  });
   it('does not open context menu when no links are available', async () => {
     const wrapper = mount(GameItem, {
       props: {
-        itemId: 'test-item',
+        src: 'https://assets.tarkov.dev/test-item-icon.webp',
         simpleMode: true,
         isVisible: true,
       },

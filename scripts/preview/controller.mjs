@@ -551,7 +551,7 @@ function notApplicable() {
   return {
     action: 'skip',
     state: 'success',
-    description: 'Not applicable: documentation-only change set with successful CI.',
+    description: 'Not applicable: no deployable changes with successful CI.',
   };
 }
 function deploymentDecision(common, earlier, manifest, requiresApproval, headSha) {

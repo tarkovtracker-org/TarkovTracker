@@ -15,6 +15,7 @@
           <div class="bg-surface-800 relative h-16 w-16 shrink-0 overflow-hidden rounded">
             <GameItem
               :src="itemInfo.image512pxLink || itemInfo.iconLink"
+              :item-id="itemInfo.id"
               :item-name="itemInfo.name"
               :wiki-link="itemInfo.wikiLink"
               :dev-link="itemInfo.link"

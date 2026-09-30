@@ -77,7 +77,8 @@ test('only explicit documentation and translation paths receive reduced validati
   assert.equal(classifyPaths(['app/locales/english.json']).locales, true);
   assert.equal(classifyPaths(['README.md'], { forceFull: true }).full, true);
 });
-test('only known documentation-only change sets need no preview; everything else requires one', () => {
+test('only change sets that cannot reach the deployed app skip the preview', () => {
+  // Reduced validation and no preview: documentation-only change sets.
   for (const paths of [
     ['README.md'],
     ['docs/a.md', '.github/CONTRIBUTING.md'],
@@ -86,6 +87,22 @@ test('only known documentation-only change sets need no preview; everything else
   ]) {
     assert.equal(classifyPaths(paths).previewRequired, false, paths.join());
     assert.ok(!classifyPaths(paths).jobs.includes('validate'), paths.join());
+  }
+  // Full validation without a preview: automation, tooling, and tests that never ship.
+  for (const paths of [
+    ['.github/workflows/ci.yml'],
+    ['scripts/workflow-tests/dispatched-status.mjs'],
+    ['scripts/ci/README.md'],
+    ['docs/eft-log-reference/audit_2026-08-29_signatures.json'],
+    ['tests/test-setup.ts'],
+    ['.coderabbit.yaml'],
+    ['supabase/README.md'],
+    ['README.md', '.github/workflows/ci.yml'],
+  ]) {
+    const plan = classifyPaths(paths);
+    assert.equal(plan.previewRequired, false, paths.join());
+    assert.equal(plan.full, true, paths.join());
+    assert.ok(plan.jobs.includes('validate'), paths.join());
   }
   for (const paths of [
     ['app/locales/fr.json'],
@@ -97,7 +114,14 @@ test('only known documentation-only change sets need no preview; everything else
     ['pnpm-lock.yaml'],
     ['app/a.ts'],
     ['README.md', 'app/a.ts'],
-    ['docs/script.sh'],
+    ['scripts/preview/profile.mjs'],
+    ['scripts/preview/build-profile.mjs'],
+    ['scripts/preview/write-manifest.mjs'],
+    ['scripts/preview/README.md'],
+    ['public/llms.txt'],
+    ['public/AGENTS.md'],
+    ['supabase/migrations/a.sql'],
+    ['workers/api-gateway/src/index.ts'],
     ['DESIGN.md'],
     ['unknown'],
     ['../docs/a.md'],

@@ -81,7 +81,7 @@
     <ContextMenu ref="contextMenu">
       <template #default="{ close }">
         <ContextMenuItem
-          v-if="activeItem?.wikiLink"
+          v-if="activeWikiUrl"
           icon="/img/logos/wikilogo.webp"
           :label="
             t('page.tasks.questcard.view_task_on_wiki', {
@@ -121,6 +121,7 @@
 </template>
 <script setup lang="ts">
   import { useWikiLink } from '@/composables/useWikiLink';
+  import { toTrustedGameLinkUrl } from '@/utils/externalUrl';
   import { logger } from '@/utils/logger';
   import { openExternalUrl } from '@/utils/redirect';
   import {
@@ -183,7 +184,7 @@
   const getItemCount = (itemId?: string) =>
     itemId && props.counts ? (props.counts[itemId] ?? 0) : 0;
   const getPrimaryTooltip = (item: TarkovItem) =>
-    item.wikiLink
+    toTrustedGameLinkUrl(item.wikiLink)
       ? t('common.view_on_wiki', 'View on Wiki')
       : t('common.view_on_tarkov_dev', 'View on Tarkov.dev');
   const openPrimaryLink = (item: TarkovItem) => {
@@ -201,10 +202,10 @@
       openExternalUrl(getKeyDevUrl(activeItem.value));
     }
   };
+  const activeWikiUrl = computed(() => toWikiUrl(activeItem.value?.wikiLink));
   const openWikiLink = () => {
-    const url = toWikiUrl(activeItem.value?.wikiLink);
-    if (url) {
-      openExternalUrl(url);
+    if (activeWikiUrl.value) {
+      openExternalUrl(activeWikiUrl.value);
     }
   };
   const copyItemName = async () => {

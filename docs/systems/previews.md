@@ -60,7 +60,7 @@ PR update → CI (selected validation + security + preview build + manifest + ar
 | ------------------------------------------------------------------ | ------------------------------------------ |
 | Validation running, deployable draft, fork awaiting approval       | pending, with reason                       |
 | Preview-required PR has successful CI but no dispatch yet          | pending, waiting for a maintainer request  |
-| Successful CI and verified documentation-only scope                | success: not applicable                    |
+| Successful CI and a change set with no deployable paths            | success: not applicable                    |
 | Current deployment and smoke tests succeed                         | success, with digest/profile marker        |
 | Validation, artifact verification, deployment, or smoke tests fail | failure                                    |
 | Revision or attempt becomes obsolete                               | no success is published for that candidate |
@@ -76,7 +76,7 @@ Artifact claims still bind to the test merge. When GitHub has not computed it ye
 retries and leaves the required result pending. A regenerated test merge is the same candidate only
 when both commits have the current base and head as parents and identical trees. A dispatched branch
 build associated with a PR can satisfy that PR only if its Git tree matches the test-merge tree
-and its base is current main, including when the change is documentation-only. The comparison is
+and its base is current main, including when the change set has no deployable paths. The comparison is
 repeated before deployment and final success. An hourly state-only reconciliation re-evaluates a head
 with no result, or whose latest result is pending only because the test merge was not ready, once
 GitHub has computed the test merge; other pending reasons are left alone.
