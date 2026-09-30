@@ -275,6 +275,14 @@ export const normalizeApiUpdateMetaEntry = (value: unknown): ApiUpdateMeta | nul
     ...(taskCount !== undefined ? { taskCount } : {}),
   };
 };
+/** Newer entry wins (ties favor `incoming`); the same entry keeps its largest known `taskCount`. */
+const pickApiUpdate = (current: ApiUpdateMeta, incoming: ApiUpdateMeta): ApiUpdateMeta => {
+  if (current.id !== incoming.id || current.at !== incoming.at) {
+    return incoming.at >= current.at ? incoming : current;
+  }
+  const taskCount = Math.max(current.taskCount ?? 0, incoming.taskCount ?? 0);
+  return normalizeApiUpdateMetaEntry({ ...incoming, taskCount }) ?? incoming;
+};
 const normalizeApiUpdateHistoryEntries = (value: unknown): ApiUpdateMeta[] => {
   if (!Array.isArray(value)) return [];
   const deduped = new Map<string, ApiUpdateMeta>();
@@ -282,9 +290,7 @@ const normalizeApiUpdateHistoryEntries = (value: unknown): ApiUpdateMeta[] => {
     const normalized = normalizeApiUpdateMetaEntry(entry);
     if (!normalized) continue;
     const existing = deduped.get(normalized.id);
-    if (!existing || normalized.at >= existing.at) {
-      deduped.set(normalized.id, normalized);
-    }
+    deduped.set(normalized.id, existing ? pickApiUpdate(existing, normalized) : normalized);
   }
   return Array.from(deduped.values())
     .sort((a, b) => b.at - a.at)
@@ -387,7 +393,7 @@ export function mergeProgressData(
     const normalizedRemote = normalizeApiUpdateMetaEntry(remoteUpdate);
     if (!normalizedLocal) return normalizedRemote ?? undefined;
     if (!normalizedRemote) return normalizedLocal;
-    return normalizedRemote.at >= normalizedLocal.at ? normalizedRemote : normalizedLocal;
+    return pickApiUpdate(normalizedLocal, normalizedRemote);
   };
   const mergedState: UserProgressData = {
     ...local,
