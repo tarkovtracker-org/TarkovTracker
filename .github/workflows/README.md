@@ -33,9 +33,9 @@ Lighthouse scope detection runs independently of PR metadata installation and co
 
 ### Crowdin Sync (`.github/crowdin.yml`)
 
-**Triggers:** English source, Crowdin config, or sync workflow changes on `main`; weekly on
-Mondays at 04:17 UTC; manual dispatch on `main`. Runs are serialized without cancelling an active
-sync. Every run uploads `app/locales/en.json` to the Crowdin `main` branch so translators see new
+**Triggers:** English source, Crowdin config, sync workflow, `scripts/crowdin-pr.sh`, or
+`scripts/github-ci-gate.sh` changes on `main`; weekly on Mondays at 04:17 UTC; manual dispatch on
+`main`. Runs are serialized without cancelling an active sync. Every run uploads `app/locales/en.json` to the Crowdin `main` branch so translators see new
 strings immediately. Push runs stop there; only the weekly schedule and manual dispatch download
 translations to `app/locales/%two_letters_code%.json` (preserving the directory hierarchy) and open
 or merge the locale PR. Untranslated strings use the English fallback until then; dispatch the
