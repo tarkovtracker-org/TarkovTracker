@@ -1,5 +1,6 @@
 import { createError, defineEventHandler, readBody } from 'h3';
 import Stripe from 'stripe';
+import { adminSupabaseFetch, normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
 import { createLogger } from '@/server/utils/logger';
 import {
   validateCheckoutBody,
@@ -10,6 +11,7 @@ import {
   SupporterCustomerLookupUnavailableError,
 } from '@/server/utils/supporterCustomerLookup';
 import type { SupporterBillingState } from '@/server/utils/supporterCustomerLookup';
+import type { H3Event } from 'h3';
 const logger = createLogger('StripeCheckout');
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event);
@@ -29,9 +31,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, message: 'Authentication required' });
   }
   const email = authUser?.email;
-  const stripe = new Stripe(stripeSecretKey);
   const rawBody = await readBody(event);
   const { mode, tier, interval, amount } = validateCheckoutBody(rawBody);
+  await requireSupporterBenefitsAvailable(event, userId);
+  const stripe = new Stripe(stripeSecretKey);
   const appUrl = (config.public.appUrl as string) || 'https://tarkovtracker.org';
   // Reuse the existing Stripe Customer for returning supporters so refund and
   // dispute lookups against stripe_customer_id keep matching after re-subscribe.
@@ -139,4 +142,33 @@ export default defineEventHandler(async (event) => {
 });
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+async function getSupporterDisqualification(event: H3Event, userId: string): Promise<boolean> {
+  const config = useRuntimeConfig(event);
+  const supabaseUrl = normalizeSupabaseUrl(config.supabaseUrl);
+  const serviceKey = config.supabaseServiceKey as string;
+  if (!supabaseUrl || !serviceKey) throw new Error('Supporter eligibility is not configured');
+  const result = await adminSupabaseFetch<boolean>(
+    supabaseUrl,
+    serviceKey,
+    '/rest/v1/rpc/supporter_benefits_disqualified',
+    { method: 'POST', body: JSON.stringify({ p_user_id: userId }) }
+  );
+  if (typeof result !== 'boolean') throw new Error('Invalid supporter eligibility response');
+  return result;
+}
+async function requireSupporterBenefitsAvailable(event: H3Event, userId: string) {
+  let disqualified: boolean;
+  try {
+    disqualified = await getSupporterDisqualification(event, userId);
+  } catch (error) {
+    logger.error('[Stripe Checkout] Supporter eligibility unavailable', { userId, error });
+    throw createError({ statusCode: 503, message: 'Unable to verify supporter eligibility' });
+  }
+  if (disqualified) {
+    throw createError({
+      statusCode: 403,
+      message: 'Supporter benefits are unavailable for this account',
+    });
+  }
 }

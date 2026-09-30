@@ -60,6 +60,14 @@ or test logic changes make it relevant.
 - `workers/api-gateway/**`: `workers/api-gateway/AGENTS.md`.
 - When a change alters documented behavior or invariants, update the owning doc in the same change (behavior only — link code, don't paste it).
 
+## Preview authorization
+
+Implementation and production-readiness work authorize agents to commit and push in-scope
+feature-branch changes, post `/preview`, deploy previews through the trusted workflow, and run
+preview smoke tests without asking the user again. Preserve workflow access checks, artifact
+validation, and fork environment protections. Production deployments, destructive actions, and
+merges require separate explicit authorization.
+
 ## Review
 
 - Docs, translations, and mechanical formatting require self-review and deterministic checks.
