@@ -150,10 +150,66 @@ describe('seasonal progress realtime synchronization', () => {
   afterEach(async () => {
     releaseDeferredRemovals();
     const { cleanupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    const { clearAcknowledgedModes } = await import('@/stores/tarkov/acknowledgedModes');
     await cleanupRealtimeListener();
+    clearAcknowledgedModes();
     resetSyncTimeline();
     vi.clearAllMocks();
   });
+  it.each(['mode reset', 'metadata'])(
+    'acknowledges a direct save when its matching %s echo precedes the RPC response',
+    async (scope) => {
+      const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+      const { syncProgressState } = await import('@/stores/tarkov/progressPersistence');
+      const { recordAcknowledgedModes } = await import('@/stores/tarkov/acknowledgedModes');
+      await setupRealtimeListener(store);
+      const userId = supabaseContext.user.id;
+      recordAcknowledgedModes(userId, {
+        pvp: state.pvp,
+        pve: state.pve,
+        seasonal: state.seasonal,
+      });
+      const desired = structuredClone(state);
+      if (scope === 'mode reset') desired.pvp.progressEpoch = 1;
+      else {
+        desired.currentGameMode = 'pve';
+        desired.gameEdition = 4;
+      }
+      let finish!: () => void;
+      const rpc = vi.fn(
+        (_name: string, _args: Record<string, unknown>) =>
+          new Promise<{ error: null }>((resolve) => {
+            finish = () => resolve({ error: null });
+          })
+      );
+      const save = syncProgressState({ rpc }, userId, desired);
+      const args = rpc.mock.calls[0]![1] as { p_modes: Partial<UserState> };
+      if (scope === 'mode reset') {
+        handlers.get('user_game_mode_progress')?.({
+          new: {
+            game_mode: 'pvp',
+            season_number: 0,
+            progress_data: args.p_modes.pvp,
+            updated_at: '2026-09-06T12:00:00Z',
+          },
+        });
+      } else {
+        handlers.get('user_progress')?.({
+          new: {
+            current_game_mode: 'pve',
+            game_edition: 4,
+            tarkov_uid: null,
+            updated_at: '2026-09-06T12:00:00Z',
+          },
+        });
+      }
+      finish();
+      expect((await save).error).toBeNull();
+      expect(state.pvp.progressEpoch).toBe(desired.pvp.progressEpoch);
+      expect(state.currentGameMode).toBe(desired.currentGameMode);
+      expect(state.gameEdition).toBe(desired.gameEdition);
+    }
+  );
   it('accepts the SDK message reference without treating it as a snapshot reconciler', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
     await setupRealtimeListener(store);
@@ -172,6 +228,50 @@ describe('seasonal progress realtime synchronization', () => {
     }
     expect(state.pvp.level).toBe(12);
     expect(state.gameEdition).toBe(2);
+  });
+  it('advances the sync baseline to accepted remote progress so a later revert is sent', async () => {
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    const {
+      beginAcknowledgement,
+      clearAcknowledgedModes,
+      recordAcknowledgedModes,
+      selectChangedModes,
+    } = await import('@/stores/tarkov/acknowledgedModes');
+    const userId = supabaseContext.user.id;
+    const original = structuredClone(state.pvp);
+    recordAcknowledgedModes(userId, { pvp: original });
+    await setupRealtimeListener(store);
+    const inFlight = beginAcknowledgement(userId);
+    handlers.get('user_game_mode_progress')?.({
+      new: {
+        game_mode: 'pvp',
+        season_number: 0,
+        progress_data: { ...structuredClone(original), level: 8 },
+        updated_at: '2026-09-06T12:00:00Z',
+      },
+    });
+    expect(state.pvp.level).toBe(8);
+    expect(inFlight.isCurrent()).toBe(false);
+    expect(Object.keys(selectChangedModes(userId, { pvp: original }))).toEqual(['pvp']);
+    clearAcknowledgedModes();
+  });
+  it('stops an in-flight split sync when Realtime applies newer account metadata', async () => {
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    const { beginAcknowledgement, clearAcknowledgedModes } =
+      await import('@/stores/tarkov/acknowledgedModes');
+    await setupRealtimeListener(store);
+    const inFlight = beginAcknowledgement(supabaseContext.user.id);
+    handlers.get('user_progress')?.({
+      new: {
+        current_game_mode: 'pve',
+        game_edition: 4,
+        tarkov_uid: null,
+        updated_at: '2026-09-06T12:00:00Z',
+      },
+    });
+    expect(state.currentGameMode).toBe('pve');
+    expect(inFlight.isCurrent()).toBe(false);
+    clearAcknowledgedModes();
   });
   it('keeps historical progress freshness unknown after a newer mode event with a null clock', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
