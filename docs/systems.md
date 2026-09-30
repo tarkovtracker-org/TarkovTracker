@@ -804,10 +804,11 @@ flowchart LR
    active season, so a cached client from a previous season cannot upload stale Seasonal state. A
    client sync carries only the modes that differ from the copy the server last loaded or
    acknowledged for this session (`app/stores/tarkov/acknowledgedModes.ts`); an omitted mode is kept
-   as stored. One request can still carry several modes, so a stale Seasonal entry is skipped rather
-   than raising: persistent PvP and PvE from the same request still commit. The RPC rejects payloads
-   larger than 512 KiB and allows at most 60 direct client syncs per user per minute. API gateway
-   reads resolve the active Seasonal number through the database before selecting a row. Persisted
+   as stored. A multi-mode sync over half the payload cap is sent as one request per mode, and each
+   mode is acknowledged only after its request succeeds. One request can still carry several modes,
+   so a stale Seasonal entry is skipped rather than raising: persistent PvP and PvE from the same
+   request still commit. The RPC rejects payloads larger than 512 KiB and allows at most 60 direct
+   client syncs per user per minute. API gateway reads resolve the active Seasonal number through the database before selecting a row. Persisted
    `lastApiUpdate` and `apiUpdateHistory` retain task states `active`, `completed`, `failed`, and
    `uncompleted`; malformed entries and unknown states are stripped by the database sanitizer.
 3. Realtime listens to both the account row and normalized rows. A normalized event is applied only

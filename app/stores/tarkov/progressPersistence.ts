@@ -1,4 +1,8 @@
-import { recordAcknowledgedModes, selectChangedModes } from '@/stores/tarkov/acknowledgedModes';
+import {
+  recordAcknowledgedModes,
+  selectChangedModes,
+  type ModeProgressMap,
+} from '@/stores/tarkov/acknowledgedModes';
 import { buildUpsertPayload } from '@/stores/tarkov/progressMerge';
 import {
   ACTIVE_SEASON_NUMBER,
@@ -87,9 +91,19 @@ export type ProgressSyncPayload = {
   pve_data: UserProgressData;
   seasonal_data: UserProgressData;
 };
+/** Half the RPC's 512 KiB `p_modes` cap; a larger multi-mode sync sends one mode per request. */
+const SINGLE_REQUEST_MODES_LIMIT = 256 * 1024;
+const toModeBatches = (modes: ModeProgressMap): ModeProgressMap[] => {
+  const entries = Object.entries(modes);
+  if (entries.length < 2 || JSON.stringify(modes).length <= SINGLE_REQUEST_MODES_LIMIT) {
+    return [modes];
+  }
+  return entries.map(([mode, progress]) => ({ [mode]: progress }));
+};
 /**
  * Sends account metadata plus only the modes the server does not already hold; the RPC keeps
- * any omitted mode as stored. Acknowledged modes become the baseline for the next sync.
+ * any omitted mode as stored. Acknowledged modes become the baseline for the next sync, so after
+ * a failed split request only the unacknowledged modes are resent.
  */
 export const sendProgressSync = async <TError>(
   client: { rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{ error: TError }> },
@@ -101,15 +115,19 @@ export const sendProgressSync = async <TError>(
     [GAME_MODES.PVE]: payload.pve_data,
     [GAME_MODES.SEASONAL]: payload.seasonal_data,
   });
-  const result = await client.rpc('sync_user_game_mode_progress', {
-    p_current_game_mode: payload.current_game_mode,
-    p_game_edition: payload.game_edition,
-    p_seasonal_season_number: ACTIVE_SEASON_NUMBER,
-    p_tarkov_uid: payload.tarkov_uid,
-    p_modes: modes,
-  });
-  if (!result.error) recordAcknowledgedModes(userId, modes);
-  return result;
+  let result: { error: TError } | undefined;
+  for (const batch of toModeBatches(modes)) {
+    result = await client.rpc('sync_user_game_mode_progress', {
+      p_current_game_mode: payload.current_game_mode,
+      p_game_edition: payload.game_edition,
+      p_seasonal_season_number: ACTIVE_SEASON_NUMBER,
+      p_tarkov_uid: payload.tarkov_uid,
+      p_modes: batch,
+    });
+    if (result.error) return result;
+    recordAcknowledgedModes(userId, batch);
+  }
+  return result as { error: TError };
 };
 export const syncProgressState = async (
   client: ProgressRpcClient,

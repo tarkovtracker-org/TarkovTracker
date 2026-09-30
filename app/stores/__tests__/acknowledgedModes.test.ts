@@ -7,6 +7,18 @@ const withPvpLevel = (level: number): UserState => {
   state.pvp.level = level;
   return state;
 };
+const withHeavyModes = (): UserState => {
+  const state = structuredClone(defaultState);
+  const objectives = Object.fromEntries(
+    Array.from({ length: 2500 }, (_, i) => [
+      `objective-${i}`.padEnd(40, 'x'),
+      { complete: true, count: 1 },
+    ])
+  );
+  state.pvp.taskObjectives = objectives;
+  state.pve.taskObjectives = structuredClone(objectives);
+  return state;
+};
 const sentModes = (rpc: ReturnType<typeof vi.fn>): Record<string, unknown> =>
   (rpc.mock.calls.at(-1)?.[1] as { p_modes: Record<string, unknown> }).p_modes;
 describe('mode-scoped progress sync', () => {
@@ -52,5 +64,28 @@ describe('mode-scoped progress sync', () => {
     recordAcknowledgedModes('user-1', { pvp: state.pvp, pve: state.pve, seasonal: state.seasonal });
     await syncProgressState({ rpc } as ProgressRpcClient, 'user-2', state);
     expect(Object.keys(sentModes(rpc))).toEqual(['pvp', 'pve', 'seasonal']);
+  });
+  it('splits a sync of several large modes into one request per mode', async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    await syncProgressState({ rpc } as ProgressRpcClient, 'user-1', withHeavyModes());
+    const batches = rpc.mock.calls.map((call) =>
+      Object.keys((call[1] as { p_modes: object }).p_modes)
+    );
+    expect(batches).toEqual([['pvp'], ['pve'], ['seasonal']]);
+  });
+  it('resends only the unacknowledged modes after a split request fails', async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    rpc.mockResolvedValueOnce({ error: null }).mockResolvedValueOnce({ error: { message: 'x' } });
+    const client = { rpc } as ProgressRpcClient;
+    const state = withHeavyModes();
+    const first = await syncProgressState(client, 'user-1', state);
+    expect(first.error).toEqual({ message: 'x' });
+    expect(rpc).toHaveBeenCalledTimes(2);
+    rpc.mockClear();
+    await syncProgressState(client, 'user-1', state);
+    const batches = rpc.mock.calls.map((call) =>
+      Object.keys((call[1] as { p_modes: object }).p_modes)
+    );
+    expect(batches).toEqual([['pve', 'seasonal']]);
   });
 });
