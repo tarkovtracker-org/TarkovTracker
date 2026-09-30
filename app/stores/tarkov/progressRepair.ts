@@ -6,6 +6,7 @@ import { GAME_MODE_VALUES, MANUAL_FAIL_TASK_IDS, type GameMode } from '@/utils/c
 import { logger } from '@/utils/logger';
 import { nextClock } from '@/utils/taskAvailabilityConfirmation';
 import { storyObjectiveRequirements } from '@/utils/taskOtherRequirements';
+import { provesStartGates } from '@/utils/taskProgress';
 import type { UserProgressData } from '@/stores/progressState';
 import type { TaskCompletion, TaskObjective } from '@/types/progress';
 import type { Task, TaskObjective as TaskObjectiveDefinition } from '@/types/tarkov';
@@ -246,14 +247,19 @@ const markTaskStoryGates = (modeData: UserProgressData, task: Task): number =>
     0
   );
 /**
- * A completed task passed its start gates, so the story objectives it was gated on are met. Backfills
- * progress recorded before a gate existed or on a path that did not record it; never unmarks.
+ * A task whose state proves it passed its start gates (see `provesStartGates`) had its story
+ * objectives met. Backfills progress recorded before a gate existed or on a path that did not
+ * record it; never unmarks.
  */
 const repairModeStoryGates: ModeRepair = (modeData, tasks) => {
   let repaired = 0;
-  for (const [taskId, completion] of Object.entries(modeData.taskCompletions ?? {})) {
-    const task = tasks.get(taskId);
-    if (isSuccessful(completion) && task) repaired += markTaskStoryGates(modeData, task);
+  for (const task of tasks.values()) {
+    const proven = provesStartGates(
+      task,
+      modeData.taskCompletions?.[task.id],
+      modeData.taskAvailability?.[task.id]
+    );
+    if (proven) repaired += markTaskStoryGates(modeData, task);
   }
   return repaired;
 };

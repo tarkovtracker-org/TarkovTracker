@@ -5,7 +5,11 @@ import {
   isFailedOnlyRequirement,
   normalizeRequirementStatuses,
 } from '@shared/utils/requirementStatus';
-import { storyObjectiveRequirements } from '@/utils/taskOtherRequirements';
+import { isAvailabilityConfirmed } from '@/utils/taskAvailabilityConfirmation';
+import {
+  otherRequirementsSignature,
+  storyObjectiveRequirements,
+} from '@/utils/taskOtherRequirements';
 import { getTaskTraderRequirements } from '@/utils/taskRequirements';
 import {
   isTaskComplete,
@@ -13,6 +17,7 @@ import {
   isTaskActive,
   type RawTaskCompletion,
 } from '@/utils/taskStatus';
+import type { TaskAvailabilityConfirmation } from '@/types/progress';
 import type { Task, TaskObjective, TaskRequirement } from '@/types/tarkov';
 type TaskObjectiveProgressStore = {
   getObjectiveCount: (objectiveId: string) => number;
@@ -186,25 +191,36 @@ export function recordImpliedStoryObjectives(
     store.setStoryObjectiveComplete(chapterId, objectiveId);
   return recorded;
 }
+const isManuallyFailed = (completion: RawTaskCompletion): boolean =>
+  isTaskFailed(completion) && typeof completion === 'object' && completion?.manual === true;
+/**
+ * Whether a task's recorded state proves it passed its start gates: completed, manually failed, or
+ * confirmed available (Mark available or an imported start). Automatic branch failures prove nothing.
+ */
+export const provesStartGates = (
+  task: Task,
+  completion: RawTaskCompletion,
+  confirmation: TaskAvailabilityConfirmation | undefined
+): boolean =>
+  isTaskComplete(completion) ||
+  isManuallyFailed(completion) ||
+  isAvailabilityConfirmed(confirmation, completion, otherRequirementsSignature(task));
 const storyObjectiveKey = ({ chapterId, objectiveId }: StoryObjectiveRef) =>
   `${chapterId}\u0000${objectiveId}`;
 /**
- * Undo the story objectives an action recorded, except those another completed task still implies:
- * those remain met, and the load-time repair would record them again.
+ * Undo the story objectives an action recorded, except those another task still proves met (see
+ * `provesStartGates`): those remain met, and the load-time repair would record them again.
  */
 export function releaseRecordedStoryObjectives(options: {
   store: { setStoryObjectiveUncomplete: (chapterId: string, objectiveId: string) => void };
   recorded: readonly StoryObjectiveRef[];
   tasks: readonly Task[];
-  isTaskComplete: (taskId: string) => boolean;
+  provesStartGates: (task: Task) => boolean;
 }): void {
-  const { store, recorded, tasks, isTaskComplete: complete } = options;
+  const { store, recorded, tasks, provesStartGates: proves } = options;
   if (!recorded.length) return;
   const stillImplied = new Set(
-    tasks
-      .filter((task) => complete(task.id))
-      .flatMap(impliedStoryObjectives)
-      .map(storyObjectiveKey)
+    tasks.filter(proves).flatMap(impliedStoryObjectives).map(storyObjectiveKey)
   );
   for (const ref of recorded)
     if (!stillImplied.has(storyObjectiveKey(ref)))

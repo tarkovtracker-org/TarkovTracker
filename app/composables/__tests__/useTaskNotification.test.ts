@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { effectScope } from 'vue';
+import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
+import type { UserProgressData } from '@/stores/progressState';
 import type { Task } from '@/types/tarkov';
 const createTarkovStore = (options: {
   isTaskComplete?: (taskId: string) => boolean;
+  progressData?: Partial<UserProgressData>;
   objectiveCounts?: Record<string, number>;
   playerLevel?: number;
 }) => {
@@ -22,6 +25,7 @@ const createTarkovStore = (options: {
     playerLevel: vi.fn(() => options.playerLevel ?? 1),
     setLevel: vi.fn(),
     isTaskComplete: vi.fn((taskId: string) => options.isTaskComplete?.(taskId) ?? false),
+    getCurrentProgressData: vi.fn(() => options.progressData ?? {}),
     // Manual activity-log entries live in the synced progress blob (issue #445).
     getManualActivityHistory: vi.fn(() => manualActivityHistory),
     addManualActivityEntries: vi.fn((entries: unknown[]) => {
@@ -115,11 +119,16 @@ describe('useTaskNotification', () => {
       stop();
     }
   );
-  it('keeps a released story objective another completed task still implies', async () => {
-    const { notification, tarkovStore, stop } = await setup(
-      [tourGated('fil'), tourGated('aquarius')],
-      { isTaskComplete: (taskId) => taskId === 'aquarius' }
-    );
+  const aquarius = tourGated('aquarius');
+  aquarius.otherRequirements = [
+    ...(aquarius.otherRequirements ?? []),
+    { type: 'dialogue', id: 'd', traders: ['t'] },
+  ];
+  const aquariusSignature = otherRequirementsSignature(aquarius) ?? '';
+  const undoCompleteWith = async (progressData: Partial<UserProgressData>) => {
+    const { notification, tarkovStore, stop } = await setup([tourGated('fil'), aquarius], {
+      progressData,
+    });
     notification.onTaskAction({
       action: 'complete',
       taskId: 'fil',
@@ -128,8 +137,27 @@ describe('useTaskNotification', () => {
       recordedStoryObjectives: recorded,
     });
     notification.undoLastAction();
-    expect(tarkovStore.setStoryObjectiveUncomplete).not.toHaveBeenCalled();
     stop();
+    return tarkovStore.setStoryObjectiveUncomplete;
+  };
+  it.each<[string, Partial<UserProgressData>]>([
+    ['completed', { taskCompletions: { aquarius: { complete: true, failed: false } } }],
+    [
+      'manually failed',
+      { taskCompletions: { aquarius: { complete: true, failed: true, manual: true } } },
+    ],
+    [
+      'confirmed available',
+      { taskAvailability: { aquarius: { requirements: aquariusSignature, timestamp: 1 } } },
+    ],
+  ])('keeps a released story objective a %s task still implies', async (_state, progressData) => {
+    expect(await undoCompleteWith(progressData)).not.toHaveBeenCalled();
+  });
+  it('releases a story objective only an automatically failed task shares', async () => {
+    const release = await undoCompleteWith({
+      taskCompletions: { aquarius: { complete: true, failed: true } },
+    });
+    expect(release).toHaveBeenCalledWith('tour', 'talk');
   });
   it('leaves story objectives alone when the action recorded none', async () => {
     const { notification, tarkovStore, stop } = await setup([tourGated('fil')]);

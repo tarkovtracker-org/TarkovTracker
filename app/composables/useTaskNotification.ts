@@ -2,7 +2,7 @@ import { useActionHistoryStore } from '@/stores/useActionHistoryStore';
 import { useActivityLogStore } from '@/stores/useActivityLogStore';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
-import { releaseRecordedStoryObjectives } from '@/utils/taskProgress';
+import { provesStartGates, releaseRecordedStoryObjectives } from '@/utils/taskProgress';
 import type { TaskActionPayload } from '@/composables/useTaskActions';
 import type { Task, TaskObjective } from '@/types/tarkov';
 interface TaskNotificationReturn {
@@ -187,6 +187,14 @@ export function useTaskNotification(): TaskNotificationReturn {
         );
       },
     };
+  const taskProvesStartGates = (task: Task) => {
+    const data = tarkovStore.getCurrentProgressData();
+    return provesStartGates(
+      task,
+      data?.taskCompletions?.[task.id],
+      data?.taskAvailability?.[task.id]
+    );
+  };
   /** Register a reversible action in the global undo store for actions we can revert. */
   const registerUndo = (event: TaskActionPayload, description: string) => {
     const handler = undoHandlers[event.action];
@@ -199,7 +207,7 @@ export function useTaskNotification(): TaskNotificationReturn {
           store: tarkovStore,
           recorded: event.recordedStoryObjectives ?? [],
           tasks: tasks.value ?? [],
-          isTaskComplete: (id) => tarkovStore.isTaskComplete(id),
+          provesStartGates: taskProvesStartGates,
         }),
     };
     actionHistoryStore.pushAction({

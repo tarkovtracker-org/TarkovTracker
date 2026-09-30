@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { repairCompletedProgress } from '@/stores/tarkov/progressRepair';
+import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import type { UserProgressData } from '@/stores/progressState';
 import type { Task } from '@/types/tarkov';
 const progress = (overrides: Partial<UserProgressData>): UserProgressData =>
@@ -28,7 +29,7 @@ describe('story gate repair', () => {
     expect(pvp.storyChapters.tour?.objectives?.talk?.complete).toBe(true);
     expect(repairCompletedProgress({ pvp }, [gated('fil')])).toBe(0);
   });
-  it('ignores failed and uncompleted tasks', () => {
+  it('ignores automatically failed and unconfirmed open tasks', () => {
     const pvp = progress({
       taskCompletions: {
         failed: { complete: true, failed: true },
@@ -37,6 +38,27 @@ describe('story gate repair', () => {
     });
     expect(repairCompletedProgress({ pvp }, [gated('failed'), gated('open')])).toBe(0);
     expect(pvp.storyChapters.tour).toBeUndefined();
+  });
+  it('records the story objective of a manually failed task', () => {
+    const pvp = progress({
+      taskCompletions: { fil: { complete: true, failed: true, manual: true } },
+    });
+    expect(repairCompletedProgress({ pvp }, [gated('fil')])).toBe(1);
+    expect(pvp.storyChapters.tour?.objectives?.talk?.complete).toBe(true);
+  });
+  it('records the story objective of a task confirmed available', () => {
+    const base = gated('fil');
+    const task: Task = {
+      ...base,
+      otherRequirements: [
+        ...(base.otherRequirements ?? []),
+        { type: 'dialogue', id: 'd', traders: ['t'] },
+      ],
+    };
+    const requirements = otherRequirementsSignature(task) ?? '';
+    const pvp = progress({ taskAvailability: { fil: { requirements, timestamp: 1 } } });
+    expect(repairCompletedProgress({ pvp }, [task])).toBe(1);
+    expect(pvp.storyChapters.tour?.objectives?.talk?.complete).toBe(true);
   });
   it('outranks an unmark stamped ahead so the repair survives a merge', () => {
     const ahead = Date.now() + 60_000;
