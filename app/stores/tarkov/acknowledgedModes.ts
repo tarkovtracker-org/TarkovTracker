@@ -38,12 +38,14 @@ export const noteRemoteProgressApplied = (): void => {
   remoteApplied += 1;
 };
 /**
- * Starts a multi-request sync. `isCurrent` turns false once the baseline is cleared or claimed by
- * another account, or Realtime applies newer progress or metadata; the sync then stops so later
- * requests never replay a stale snapshot. `acknowledge` records a batch only while current.
+ * Starts a multi-request sync and supersedes any older one still in flight. `isCurrent` turns false
+ * once a newer sync starts, the baseline is cleared or claimed by another account, or Realtime
+ * applies newer progress or metadata; the sync then stops so later requests never replay a stale
+ * snapshot. `acknowledge` records a batch only while current.
  */
 export const beginAcknowledgement = (userId: string) => {
   claimOwner(userId);
+  generation += 1;
   const started = { generation, remoteApplied };
   const isCurrent = (): boolean =>
     generation === started.generation && remoteApplied === started.remoteApplied;

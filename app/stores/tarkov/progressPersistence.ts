@@ -103,7 +103,7 @@ const toModeBatches = (modes: ModeProgressMap): ModeProgressMap[] => {
   return entries.map(([mode, progress]) => ({ [mode]: progress }));
 };
 /** Unsent modes stay pending, so the controller reconciles and retries instead of acknowledging. */
-const SPLIT_SYNC_INTERRUPTED = { message: 'Progress sync interrupted by newer remote state' };
+const SPLIT_SYNC_INTERRUPTED = { message: 'Progress sync superseded by newer state' };
 /**
  * Sends account metadata plus only the modes the server does not already hold; the RPC keeps
  * any omitted mode as stored. Acknowledged modes become the baseline for the next sync, so after

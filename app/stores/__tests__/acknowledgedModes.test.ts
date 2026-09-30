@@ -121,7 +121,7 @@ describe('mode-scoped progress sync', () => {
     const client = { rpc } as ProgressRpcClient;
     const state = withHeavyModes();
     const result = await syncProgressState(client, 'user-1', state);
-    expect(result.error).toEqual({ message: 'Progress sync interrupted by newer remote state' });
+    expect(result.error).toEqual({ message: 'Progress sync superseded by newer state' });
     expect(Object.keys(sentModes(rpc))).toEqual(['pvp']);
     expect(rpc).toHaveBeenCalledTimes(1);
     rpc.mockClear();
@@ -130,5 +130,21 @@ describe('mode-scoped progress sync', () => {
       Object.keys((call[1] as { p_modes: object }).p_modes)
     );
     expect(batches).toEqual([['pvp'], ['pve'], ['seasonal']]);
+  });
+  it('stops an older split sync when a newer same-user sync starts', async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    const client = { rpc } as ProgressRpcClient;
+    let newer: Promise<unknown> | undefined;
+    rpc.mockImplementationOnce(async () => {
+      newer = syncProgressState(client, 'user-1', withPvpLevel(9));
+      return { error: null };
+    });
+    const older = await syncProgressState(client, 'user-1', withHeavyModes());
+    await newer;
+    expect(older.error).toEqual({ message: 'Progress sync superseded by newer state' });
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(sentModes(rpc)).toEqual(
+      expect.objectContaining({ pvp: expect.objectContaining({ level: 9 }) })
+    );
   });
 });
