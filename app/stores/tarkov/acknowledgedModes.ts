@@ -60,6 +60,21 @@ const matchesExpectedProgress = (snapshot: ProgressSyncSnapshot): boolean => {
 };
 const isCompatibleProgressUpdate = (update: RemoteProgressUpdate): boolean =>
   matchesExpectedProgress(update.remote) && matchesExpectedProgress(update.applied);
+const SYNC_METADATA_KEYS: ReadonlySet<string> = new Set([
+  'currentGameMode',
+  'gameEdition',
+  'tarkovUid',
+]);
+/** Narrows the interruption scope to account metadata plus the modes a sync actually writes. */
+const scopeExpectedProgress = (modes: ModeProgressMap): void => {
+  const expected = expectedProgress;
+  if (!expected) return;
+  expectedProgress = Object.fromEntries(
+    Object.entries(expected).filter(
+      ([key]) => SYNC_METADATA_KEYS.has(key) || Object.hasOwn(modes, key)
+    )
+  );
+};
 /** Matching echoes and updates outside the write scope do not supersede the current save. */
 export const noteRemoteProgressApplied = (update?: RemoteProgressUpdate): void => {
   if (update && isCompatibleProgressUpdate(update)) return;
@@ -85,6 +100,9 @@ export const beginAcknowledgement = (userId: string, expected?: ProgressSyncSnap
     isCurrent,
     acknowledge: (modes: ModeProgressMap): void => {
       if (isCurrent()) recordAcknowledgedModes(userId, modes);
+    },
+    scope: (modes: ModeProgressMap): void => {
+      if (isCurrent()) scopeExpectedProgress(modes);
     },
     finish: (): void => {
       if (isCurrent()) expectedProgress = null;

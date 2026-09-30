@@ -335,6 +335,34 @@ describe('mode-scoped progress sync', () => {
     );
     expect(batches).toEqual([['pvp'], ['pve'], ['seasonal']]);
   });
+  it('keeps a single-mode sync when Realtime updates a mode it does not write', async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    const client = { rpc } as ProgressRpcClient;
+    const baseline = withPvpLevel(5);
+    acknowledgeState('user-1', baseline);
+    rpc.mockImplementationOnce(async () => {
+      const pve = { ...structuredClone(baseline.pve), level: 30 };
+      noteRemoteProgressApplied({ remote: { pve }, applied: { pve } });
+      return { error: null };
+    });
+    const result = await syncProgressState(client, 'user-1', withPvpLevel(6));
+    expect(result.error).toBeNull();
+    expect(sentModes(rpc)).toEqual({ pvp: expect.objectContaining({ level: 6 }) });
+    await syncProgressState(client, 'user-1', withPvpLevel(6));
+    expect(sentModes(rpc)).toEqual({});
+  });
+  it('stops a sync when Realtime changes a mode it writes', async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    const client = { rpc } as ProgressRpcClient;
+    acknowledgeState('user-1', withPvpLevel(5));
+    rpc.mockImplementationOnce(async () => {
+      const pvp = structuredClone(withPvpLevel(7).pvp);
+      noteRemoteProgressApplied({ remote: { pvp }, applied: { pvp } });
+      return { error: null };
+    });
+    const result = await syncProgressState(client, 'user-1', withPvpLevel(6));
+    expect(result.error).toEqual({ message: 'Progress sync superseded by newer state' });
+  });
   it('stops an older split sync when a newer same-user sync starts', async () => {
     const rpc = vi.fn().mockResolvedValue({ error: null });
     const client = { rpc } as ProgressRpcClient;

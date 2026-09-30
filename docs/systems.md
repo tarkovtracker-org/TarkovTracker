@@ -814,7 +814,8 @@ flowchart LR
    newer progress or account metadata stops the remaining requests so they never replay a stale snapshot; the
    interrupted sync reports a failure, so the controller reconciles and resends from the merged
    state. An accepted Realtime scope that matches both the current save's captured values and the
-   values applied locally is its expected echo and does not interrupt that save. Remote observations
+   values applied locally is its expected echo and does not interrupt that save. Once a sync has
+   selected its modes, Realtime changes to modes it omits no longer interrupt it. Remote observations
    also invalidate the controller's last-upload hash, so reverting to an earlier upload still
    reaches the sender's current baseline comparison. One request can still carry several modes, so a stale Seasonal entry is skipped rather
    than raising: persistent PvP and PvE from the same request still commit. The RPC rejects payloads

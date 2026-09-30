@@ -203,6 +203,8 @@ const sendProgressBatches = async <TError>(
     [GAME_MODES.PVE]: payload.pve_data,
     [GAME_MODES.SEASONAL]: payload.seasonal_data,
   });
+  // Realtime changes to omitted modes cannot be overwritten by this sync, so they do not stop it.
+  sync.scope(modes);
   let result: ProgressSyncResult<TError> = { error: SPLIT_SYNC_INTERRUPTED };
   for (const batch of toModeBatches(modes)) {
     result = await sendModeBatch(client, userId, payload, batch, sync);
