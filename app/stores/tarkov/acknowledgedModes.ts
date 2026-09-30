@@ -10,7 +10,7 @@ export type ModeProgressMap = Partial<Record<GameMode, UserProgressData>>;
 let ownerId: string | null = null;
 let acknowledged: ModeProgressMap = {};
 let generation = 0;
-const revisions: Partial<Record<GameMode, number>> = {};
+let remoteApplied = 0;
 const toWire = (progress: UserProgressData): UserProgressData =>
   JSON.parse(JSON.stringify(progress)) as UserProgressData;
 export const clearAcknowledgedModes = (): void => {
@@ -30,30 +30,27 @@ export const recordAcknowledgedModes = (userId: string, modes: ModeProgressMap):
   claimOwner(userId);
   for (const mode of GAME_MODE_VALUES) {
     const progress = modes[mode];
-    if (!progress) continue;
-    acknowledged[mode] = toWire(progress);
-    revisions[mode] = (revisions[mode] ?? 0) + 1;
+    if (progress) acknowledged[mode] = toWire(progress);
   }
 };
+/** Realtime changed the store; the controller resends from the merged state after it resumes. */
+export const noteRemoteProgressApplied = (): void => {
+  remoteApplied += 1;
+};
 /**
- * Starts a multi-request sync. `acknowledge` records each acknowledged batch and returns `false`
- * once the baseline was cleared or claimed by another account, so the sync stops. `unchanged` drops
- * modes acknowledged elsewhere (Realtime) since the sync began, so a stale snapshot never overwrites
- * newer server progress; the store merge that follows schedules the next sync.
+ * Starts a multi-request sync. `isCurrent` turns false once the baseline is cleared or claimed by
+ * another account, or Realtime applies newer progress or metadata; the sync then stops so later
+ * requests never replay a stale snapshot. `acknowledge` records a batch only while current.
  */
 export const beginAcknowledgement = (userId: string) => {
   claimOwner(userId);
-  const started = generation;
-  const startRevisions = { ...revisions };
-  const isUnchanged = (mode: string): boolean =>
-    revisions[mode as GameMode] === startRevisions[mode as GameMode];
+  const started = { generation, remoteApplied };
+  const isCurrent = (): boolean =>
+    generation === started.generation && remoteApplied === started.remoteApplied;
   return {
-    unchanged: (modes: ModeProgressMap): ModeProgressMap =>
-      Object.fromEntries(Object.entries(modes).filter(([mode]) => isUnchanged(mode))),
-    acknowledge: (modes: ModeProgressMap): boolean => {
-      if (generation !== started) return false;
-      recordAcknowledgedModes(userId, modes);
-      return true;
+    isCurrent,
+    acknowledge: (modes: ModeProgressMap): void => {
+      if (isCurrent()) recordAcknowledgedModes(userId, modes);
     },
   };
 };

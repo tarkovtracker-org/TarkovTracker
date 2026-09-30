@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defaultState, type UserState } from '@/stores/progressState';
-import { clearAcknowledgedModes, recordAcknowledgedModes } from '@/stores/tarkov/acknowledgedModes';
+import {
+  clearAcknowledgedModes,
+  noteRemoteProgressApplied,
+  recordAcknowledgedModes,
+} from '@/stores/tarkov/acknowledgedModes';
 import { syncProgressState, type ProgressRpcClient } from '@/stores/tarkov/progressPersistence';
 const withPvpLevel = (level: number): UserState => {
   const state = structuredClone(defaultState);
@@ -108,22 +112,23 @@ describe('mode-scoped progress sync', () => {
     await syncProgressState({ rpc } as ProgressRpcClient, 'user-1', withHeavyModes());
     expect(rpc).toHaveBeenCalledTimes(1);
   });
-  it('skips a pending split mode that Realtime acknowledged during the sync', async () => {
-    const remotePve = { ...withHeavyModes().pve, level: 30 };
+  it('stops a split sync once Realtime applies newer progress', async () => {
     const rpc = vi.fn().mockResolvedValue({ error: null });
     rpc.mockImplementationOnce(async () => {
-      recordAcknowledgedModes('user-1', { pve: remotePve });
+      noteRemoteProgressApplied();
       return { error: null };
     });
     const client = { rpc } as ProgressRpcClient;
     const state = withHeavyModes();
+    const result = await syncProgressState(client, 'user-1', state);
+    expect(result.error).toBeNull();
+    expect(Object.keys(sentModes(rpc))).toEqual(['pvp']);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    rpc.mockClear();
     await syncProgressState(client, 'user-1', state);
     const batches = rpc.mock.calls.map((call) =>
       Object.keys((call[1] as { p_modes: object }).p_modes)
     );
-    expect(batches).toEqual([['pvp'], [], ['seasonal']]);
-    rpc.mockClear();
-    await syncProgressState(client, 'user-1', state);
-    expect(sentModes(rpc)).toEqual({ pve: expect.objectContaining({ level: 1 }) });
+    expect(batches).toEqual([['pvp'], ['pve'], ['seasonal']]);
   });
 });

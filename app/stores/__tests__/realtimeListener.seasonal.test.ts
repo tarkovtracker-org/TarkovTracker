@@ -175,12 +175,17 @@ describe('seasonal progress realtime synchronization', () => {
   });
   it('advances the sync baseline to accepted remote progress so a later revert is sent', async () => {
     const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
-    const { clearAcknowledgedModes, recordAcknowledgedModes, selectChangedModes } =
-      await import('@/stores/tarkov/acknowledgedModes');
+    const {
+      beginAcknowledgement,
+      clearAcknowledgedModes,
+      recordAcknowledgedModes,
+      selectChangedModes,
+    } = await import('@/stores/tarkov/acknowledgedModes');
     const userId = supabaseContext.user.id;
     const original = structuredClone(state.pvp);
     recordAcknowledgedModes(userId, { pvp: original });
     await setupRealtimeListener(store);
+    const inFlight = beginAcknowledgement(userId);
     handlers.get('user_game_mode_progress')?.({
       new: {
         game_mode: 'pvp',
@@ -190,7 +195,26 @@ describe('seasonal progress realtime synchronization', () => {
       },
     });
     expect(state.pvp.level).toBe(8);
+    expect(inFlight.isCurrent()).toBe(false);
     expect(Object.keys(selectChangedModes(userId, { pvp: original }))).toEqual(['pvp']);
+    clearAcknowledgedModes();
+  });
+  it('stops an in-flight split sync when Realtime applies newer account metadata', async () => {
+    const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+    const { beginAcknowledgement, clearAcknowledgedModes } =
+      await import('@/stores/tarkov/acknowledgedModes');
+    await setupRealtimeListener(store);
+    const inFlight = beginAcknowledgement(supabaseContext.user.id);
+    handlers.get('user_progress')?.({
+      new: {
+        current_game_mode: 'pve',
+        game_edition: 4,
+        tarkov_uid: null,
+        updated_at: '2026-09-06T12:00:00Z',
+      },
+    });
+    expect(state.currentGameMode).toBe('pve');
+    expect(inFlight.isCurrent()).toBe(false);
     clearAcknowledgedModes();
   });
   it('keeps historical progress freshness unknown after a newer mode event with a null clock', async () => {

@@ -105,7 +105,7 @@ const toModeBatches = (modes: ModeProgressMap): ModeProgressMap[] => {
 /**
  * Sends account metadata plus only the modes the server does not already hold; the RPC keeps
  * any omitted mode as stored. Acknowledged modes become the baseline for the next sync, so after
- * a failed split request only the unacknowledged modes are resent.
+ * a failed or interrupted split only the unacknowledged modes are resent.
  */
 export const sendProgressSync = async <TError>(
   client: { rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{ error: TError }> },
@@ -119,8 +119,8 @@ export const sendProgressSync = async <TError>(
   });
   const sync = beginAcknowledgement(userId);
   let result: { error: TError } | undefined;
-  for (const planned of toModeBatches(modes)) {
-    const batch = sync.unchanged(planned);
+  for (const batch of toModeBatches(modes)) {
+    if (!sync.isCurrent()) break;
     result = await client.rpc('sync_user_game_mode_progress', {
       p_current_game_mode: payload.current_game_mode,
       p_game_edition: payload.game_edition,
@@ -128,7 +128,8 @@ export const sendProgressSync = async <TError>(
       p_tarkov_uid: payload.tarkov_uid,
       p_modes: batch,
     });
-    if (result.error || !sync.acknowledge(batch)) return result;
+    if (result.error) return result;
+    sync.acknowledge(batch);
   }
   return result as { error: TError };
 };

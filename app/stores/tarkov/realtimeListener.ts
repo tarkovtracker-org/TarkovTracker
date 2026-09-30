@@ -1,6 +1,9 @@
 import { useToastI18n } from '@/composables/useToastI18n';
 import { blockAccountRecoveryRetentionForOwner } from '@/stores/tarkov/accountRecovery';
-import { recordAcknowledgedModes } from '@/stores/tarkov/acknowledgedModes';
+import {
+  noteRemoteProgressApplied,
+  recordAcknowledgedModes,
+} from '@/stores/tarkov/acknowledgedModes';
 import { maybeNotifyApiUpdate } from '@/stores/tarkov/apiUpdateNotifier';
 import { detectDataConflicts } from '@/stores/tarkov/conflictDetection';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
@@ -458,6 +461,7 @@ async function runSetupRealtimeListener(
       isLikelySelfOrigin,
     });
     pauseRegisteredSyncController();
+    noteRemoteProgressApplied();
     tarkovStore.$patch((state) => {
       state.currentGameMode = nextState.currentGameMode;
       state.gameEdition = nextState.gameEdition;
@@ -511,6 +515,7 @@ async function runSetupRealtimeListener(
       toastI18n
     );
     pauseRegisteredSyncController();
+    noteRemoteProgressApplied();
     tarkovStore.$patch((state) => {
       state[mode] = nextProgress;
     });
