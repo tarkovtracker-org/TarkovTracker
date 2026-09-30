@@ -13,14 +13,14 @@ Complete workflow automation setup for TarkovTracker with CI/CD pipelines, quali
 - Pre-commit hooks for code quality
 - Dependency update automation via Dependabot
 - Conservative auto-merge for low-risk Dependabot updates
-- Codex is the intended primary PR reviewer. GitHub App delivery and exclusions must be verified before disabling existing automatic providers; dashboard state is not inferred from repository configuration.
+- CodeRabbit is the routine reviewer; Codex is reserved for requested fallback or risky pre-merge reviews. The policy adopted on 2026-09-29 calls for disabling Codex automatic reviews in the dashboard. Verify that setting separately; repository configuration does not prove dashboard state.
 
 ## Agent validation and review
 
 `package.json` defines commands; the root `AGENTS.md` defines required validation and review, and
 path-scoped `supabase/AGENTS.md` and `workers/api-gateway/AGENTS.md` add area-specific rules.
-`code_review.md` supplements that contract with risk areas, without requiring the full suite for
-unrelated changes. Worktree setup and the shared CI setup action use `scripts/ensure-pnpm.sh` to
+[`code-review.md`](./code-review.md) supplements that contract with risk areas, without requiring
+the full suite for unrelated changes. Worktree setup and the shared CI setup action use `scripts/ensure-pnpm.sh` to
 verify pnpm against `packageManager`, preparing its complete integrity-qualified pin even when the installed version matches.
 
 Run focused checks while implementing, then required checks after the diff stabilizes. Record the
@@ -28,13 +28,27 @@ commit, dirty worktree state, commands, and results in the PR summary. Invalidat
 when their inputs change. Batch substantiated corrections; defer unrelated cleanup and optional
 style suggestions.
 
-Documentation, translation, and mechanical formatting changes need deterministic checks and
-self-review. Routine executable changes also receive Codex PR review. Substantial behavior changes
-(public contracts, persisted state, cross-module behavior, auth, billing, migrations, concurrency)
-also receive one best-effort local CodeRabbit review of the complete branch diff after it stabilizes.
-Auth, billing, migration, and concurrency changes require independent review; another provider or
-human substitutes if needed. Record missing/rate-limited review as incomplete without retry loops.
-Only substantial behavioral corrections or unresolved significant findings warrant a local rerun.
+### Push cadence
+
+The root `AGENTS.md` owns review requirements and exceptions. Commit freely while implementing,
+then validate the stabilized diff, run one local review for executable changes when available,
+address validated findings together, and push one batch. Address a whole PR review round before
+pushing the next correction batch. Reuse evidence for unchanged inputs; substantial new behavior
+or unresolved significant findings warrant another review.
+
+The maintainer reported that PR #965 received over 20 Codex reviews across about 45 pushes and
+consumed about 40% of a weekly Codex allowance. These are reported estimates, not a verified usage
+measurement. Batching pushes and requesting Codex only exceptionally aim to reduce that usage.
+
+CodeRabbit CLI and PR reviews have separate rolling allowances; both are limited. See
+[CodeRabbit's current limits](https://docs.coderabbit.ai/management/plans). Rate limits allow continued
+implementation, local commits, and useful validated batch pushes, with missing review recorded as
+incomplete. Required review still gates merge; do not enable paid over-limit reviews without approval.
+
+TarkovTracker disables CodeRabbit automatic incremental reviews in `.coderabbit.yaml`. After
+substantial follow-up changes, request `@coderabbitai review` before merge unless recorded local or
+independent review covers the final changes. Record the reviewed base and head, and assess later
+changes rather than relying on an earlier green check. Codex requests use the guard below.
 
 ### Codex request deduplication and waiting
 
@@ -98,16 +112,15 @@ GitHub also offers no atomic head condition on comment creation: a push after th
 can race the POST. The request marker records the observed head; it does not pin the revision the
 bot ultimately reviews. Always inspect fresh exact-head completion and checks before merging.
 
-### Reviewer transition: external verification pending
+### Reviewer settings: external verification pending
 
-1. Verify Codex delivers a review on a representative application PR.
-2. Verify a translation-only PR consumes no automatic review, and a mixed translation/code PR is
-   still reviewed. Use selective review requests until exclusions are demonstrated.
-3. After delivery is established, disable duplicate automatic CodeRabbit, Cubic, and Greptile
-   reviews in their repository/dashboard settings; retain manual access. Record the PR links and
-   observed settings here. Existing settings remain unchanged until that evidence exists.
-4. Check an existing-review revision and unavailable/quota-exhausted behavior: preserve completed
-   review evidence by revision and never report an unavailable review as successful.
+1. Verify automatic Codex reviews are disabled in the repository/dashboard settings.
+2. Keep automatic initial CodeRabbit reviews enabled and incremental reviews disabled as configured
+   in `.coderabbit.yaml`. Verify exclusions on translation-only and mixed translation/code PRs.
+3. Retain manual reviewer access. Record representative PR links and observed dashboard settings;
+   checked-in policy is not proof of integration state.
+4. Verify revision-specific review evidence and unavailable/quota-exhausted behavior. Preserve
+   completed evidence for unchanged inputs and never report unavailable review as successful.
 
 ## GitHub Actions Workflows
 

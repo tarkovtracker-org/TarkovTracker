@@ -1,3 +1,17 @@
+# [1.85.0](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.84.1...v1.85.0) (2026-09-29)
+
+
+### Bug Fixes
+
+* **app:** gate server-variable tasks until confirmed available in-game ([#979](https://github.com/tarkovtracker-org/TarkovTracker/issues/979)) ([09a5b34](https://github.com/tarkovtracker-org/TarkovTracker/commit/09a5b344fe2790d400923f5329a02bf26d080f18))
+
+
+### Features
+
+* **tasks:** derive trader-tier counters from the overlay registry ([#981](https://github.com/tarkovtracker-org/TarkovTracker/issues/981)) ([be9ab5e](https://github.com/tarkovtracker-org/TarkovTracker/commit/be9ab5e7b2d380c89d541ffffb1ef2cf3560d07f))
+* **maps:** hide quests from the Tasks map (raid planning) ([#968](https://github.com/tarkovtracker-org/TarkovTracker/issues/968)) ([3952819](https://github.com/tarkovtracker-org/TarkovTracker/commit/39528194e12d10c1384eead0b4480dcbf484cb3f)), closes [#730](https://github.com/tarkovtracker-org/TarkovTracker/issues/730) [#918](https://github.com/tarkovtracker-org/TarkovTracker/issues/918) [#918](https://github.com/tarkovtracker-org/TarkovTracker/issues/918)
+* **maps:** support overlay extract additions and add Lighthouse landing stage extract ([#980](https://github.com/tarkovtracker-org/TarkovTracker/issues/980)) ([f1233dc](https://github.com/tarkovtracker-org/TarkovTracker/commit/f1233dc1d47c82e33bf77d813bff3d56f420cb67))
+
 ## [1.84.1](https://github.com/tarkovtracker-org/TarkovTracker/compare/v1.84.0...v1.84.1) (2026-09-28)
 
 

@@ -117,6 +117,7 @@
             >
               <ProfileSharingCard />
               <DiscordLinkCard />
+              <DeviceDataCard />
               <AccountDeletionCard />
               <div v-if="isAdmin" class="flex justify-center pt-4">
                 <NuxtLink
@@ -180,6 +181,7 @@
   import ApiTokensCard from '@/features/settings/ApiTokensCard.vue';
   import DataManagementCard from '@/features/settings/DataManagementCard.vue';
   import DebugStateCard from '@/features/settings/DebugStateCard.vue';
+  import DeviceDataCard from '@/features/settings/DeviceDataCard.vue';
   import DiscordLinkCard from '@/features/settings/DiscordLinkCard.vue';
   import DisplayNameCard from '@/features/settings/DisplayNameCard.vue';
   import ExperienceCard from '@/features/settings/ExperienceCard.vue';

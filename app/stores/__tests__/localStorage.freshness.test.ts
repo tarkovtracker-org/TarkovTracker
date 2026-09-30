@@ -1,10 +1,69 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
 import { defaultState } from '@/stores/progressState';
-import { createProgressStorageSerializer } from '@/stores/tarkov/localStorage';
+import {
+  createProgressStorageSerializer,
+  parsePersistedProgressState,
+  progressPersistStorage,
+} from '@/stores/tarkov/localStorage';
 import { resolveInitialSyncState } from '@/stores/tarkov/resetEngine';
+import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 import { parseUserScopedStorage } from '@/utils/userScopedStorage';
 describe('local mode freshness', () => {
+  it('keeps the original seasonal source across migration and resets stale clocks to zero', () => {
+    const staleSeasonal = {
+      ...structuredClone(defaultState),
+      seasonalSeasonNumber: 999,
+      seasonal: { ...defaultState.seasonal, level: 17 },
+    };
+    const raw = JSON.stringify({
+      _timestamp: 1_000,
+      _modeTimestamps: { pvp: 1_000, pve: 1_000, seasonal: 1_000 },
+      _userId: 'user-1',
+      data: staleSeasonal,
+    });
+    const parsed = parsePersistedProgressState(raw, 'user-1')!;
+    expect(parsed.seasonalSourceSeasonNumber).toBe(999);
+    expect(parsed.state.seasonalSeasonNumber).toBe(ACTIVE_SEASON_NUMBER);
+    expect(parsed.state.seasonal.level).toBe(defaultState.seasonal.level);
+    const serializer = createProgressStorageSerializer(() => null);
+    serializer.reset(parsed);
+    const saved = parseUserScopedStorage(serializer.serialize(parsed.state, 'user-1', 1_001))!;
+    expect(saved._modeTimestamps?.seasonal).toBe(0);
+  });
+  it('records legacy seasonal source provenance before sanitizing it', () => {
+    const raw = JSON.stringify({
+      ...structuredClone(defaultState),
+      seasonalSeasonNumber: 999,
+      seasonal: { ...defaultState.seasonal, level: 17 },
+    });
+    const parsed = parsePersistedProgressState(raw, null)!;
+    expect(parsed.seasonalSourceSeasonNumber).toBe(999);
+    expect(parsed.state.seasonalSeasonNumber).toBe(ACTIVE_SEASON_NUMBER);
+    expect(parsed.state.seasonal.level).toBe(defaultState.seasonal.level);
+  });
+  it('defaults missing season metadata to the active season in snapshots and legacy data', () => {
+    const stateWithoutSeason = structuredClone(defaultState);
+    delete stateWithoutSeason.seasonalSeasonNumber;
+    const serializer = createProgressStorageSerializer(() => null);
+    const wrapped = serializer.serialize(stateWithoutSeason, 'user-1', 10);
+    expect(parsePersistedProgressState(wrapped, 'user-1')?.seasonalSourceSeasonNumber).toBe(
+      ACTIVE_SEASON_NUMBER
+    );
+    const legacy = JSON.stringify(stateWithoutSeason);
+    expect(parsePersistedProgressState(legacy, null)?.seasonalSourceSeasonNumber).toBe(
+      ACTIVE_SEASON_NUMBER
+    );
+  });
+  it('does not write through the persistence adapter when window is unavailable', () => {
+    vi.stubGlobal('window', undefined);
+    try {
+      progressPersistStorage.setItem('non-progress-key', 'value');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect(localStorage.getItem('non-progress-key')).toBeNull();
+  });
   it('timestamps only changed modes and ignores other tabs overwriting storage', () => {
     const stored = {
       state: structuredClone(defaultState),

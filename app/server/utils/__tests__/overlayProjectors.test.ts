@@ -438,14 +438,45 @@ it('keeps a sparse craft addition empty rather than inventing an output item', (
     expect.objectContaining({ id: 'sparse', rewardItems: [], unlockState: 'unknown' }),
   ]);
 });
+const counterEntry = (overrides: Record<string, unknown> = {}) => ({
+  revision: '1.1.0',
+  verification: 'verified',
+  coverage: 'complete',
+  derivation: { type: 'distinctTaskCompletions', taskIds: ['a', 'b'] },
+  proof: ['https://example.com/proof'],
+  ...overrides,
+});
 it.each([
   [{}, []],
+  [{ regular: {} }, []],
+  [{ pve: { counter: counterEntry() } }, []],
+  [{ pve: { counter: counterEntry({ verification: 'unresolved', coverage: 'partial' }) } }, []],
+  [{ pve: { counter: counterEntry({ revision: '9.9.9' }) } }, []],
   [null, ['progressionCounters']],
   [[], ['progressionCounters']],
   ['invalid', ['progressionCounters']],
   [{ regular: { counter: { revision: '1' } } }, ['progressionCounters']],
-  [{ regular: {} }, ['progressionCounters']],
-])('only consumes the empty root counter registry: %j', (progressionCounters, expected) => {
+  [{ pvp: { counter: counterEntry() } }, ['progressionCounters']],
+  [{ pve: { counter: counterEntry({ extra: true }) } }, ['progressionCounters']],
+  [{ pve: { counter: counterEntry({ verification: 'maybe' }) } }, ['progressionCounters']],
+  [{ pve: { counter: counterEntry({ proof: [] }) } }, ['progressionCounters']],
+  [{ pve: { counter: counterEntry({ proof: ['ftp://x'] }) } }, ['progressionCounters']],
+  [
+    { pve: { counter: counterEntry({ derivation: { type: 'sum', taskIds: ['a'] } }) } },
+    ['progressionCounters'],
+  ],
+  [
+    {
+      pve: {
+        counter: counterEntry({
+          derivation: { type: 'distinctTaskCompletions', taskIds: ['a', 'a'] },
+        }),
+      },
+    },
+    ['progressionCounters'],
+  ],
+  [{ pve: { ' ': counterEntry() } }, ['progressionCounters']],
+])('consumes only a valid counter registry: %j', (progressionCounters, expected) => {
   expect(unknownOverlaySections({ ...overlay, progressionCounters })).toEqual(expected);
 });
 it('keeps unknown and misplaced empty sections unconsumed', () => {

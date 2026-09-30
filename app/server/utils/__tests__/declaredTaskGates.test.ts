@@ -44,6 +44,75 @@ afterEach(() => {
   vi.resetModules();
   vi.unstubAllGlobals();
 });
+describe('declared server-side start gates', () => {
+  const requirement = {
+    id: 'condition',
+    type: 'globalVariable',
+    variableId: 'counter',
+    compareMethod: '==',
+    value: 0,
+  };
+  it('preserves raw IDs, comparison and threshold independently of prerequisite edges', () => {
+    const task = adaptTask({ otherRequirements: [requirement] });
+    expect(task.otherRequirements).toEqual([requirement]);
+    expect(task.taskRequirements).toBeUndefined();
+    expect(evaluate(task).available).toBe(false);
+    expect(evaluate(task, progress({ globalVariables: { counter: 0 } })).available).toBe(true);
+  });
+  it.each([
+    false,
+    'condition',
+    {},
+    [null],
+    [{ ...requirement, variableId: '' }],
+    [{ ...requirement, compareMethod: 'unsupported' }],
+    [{ ...requirement, value: '0' }],
+    [{ ...requirement, value: Infinity }],
+    [{ ...requirement, id: '' }],
+    [{ type: 'future' }],
+  ])('keeps malformed declared gate %j blocked', (otherRequirements) => {
+    const task = adaptTask({ otherRequirements });
+    expect(evaluate(task).blockers).toContainEqual({
+      type: 'unknown',
+      reason: 'other_requirement',
+    });
+  });
+  it('keeps the upstream discriminator of unsupported and malformed gates while blocking', () => {
+    const task = adaptTask({
+      otherRequirements: [
+        { type: 'futureGate', id: 'x' },
+        { type: 'globalVariable', id: 'bad' },
+        { id: 'untyped' },
+        'garbage',
+      ],
+    });
+    expect(task.otherRequirements).toEqual([
+      { type: 'unknown', upstreamType: 'futureGate' },
+      { type: 'unknown', upstreamType: 'globalVariable' },
+      { type: 'unknown' },
+      { type: 'unknown' },
+    ]);
+    expect(evaluate(task).available).toBe(false);
+  });
+  it('omits the field for genuinely absent or empty gates', () => {
+    for (const raw of [{}, { otherRequirements: null }, { otherRequirements: [] }]) {
+      const task = adaptTask(raw);
+      expect(task.otherRequirements).toBeUndefined();
+      expect(evaluate(task).available).toBe(true);
+    }
+  });
+  it('adapts dialogue references without silently opening conversation-gated tasks', () => {
+    const task = adaptTask({
+      otherRequirements: [
+        { type: 'dialogue', id: 'talk', traders: ['trader1', { id: 'trader2' }] },
+      ],
+    });
+    expect(task.otherRequirements).toEqual([
+      { type: 'dialogue', id: 'talk', traders: ['trader1', 'trader2'] },
+    ]);
+    expect(evaluate(task).blockers[0]?.type).toBe('dialogue');
+  });
+});
 describe('malformed declared prerequisite collections', () => {
   it('blocks with an unknown diagnostic instead of discarding a non-array collection', () => {
     const task = adaptTask({ taskRequirements: { task: 'missing', status: ['complete'] } });
@@ -223,6 +292,55 @@ describe('overlay declared-gate normalization', () => {
     }) as unknown as Record<string, unknown>;
   const baseTask = (raw: Record<string, unknown> = {}) =>
     adaptTask(raw) as unknown as Record<string, unknown>;
+  it.each(['ordinary', 'locale'])('normalizes a server gate in %s patches', async (scope) => {
+    const gate = {
+      type: 'globalVariable',
+      id: 'condition',
+      variableId: 'counter',
+      compareMethod: '>',
+      value: 1,
+    };
+    const tasks = { target: { otherRequirements: [gate] } };
+    const overlay = scope === 'locale' ? { locales: { en: { tasks } } } : { tasks };
+    const task = await correct(overlay, [baseTask()]);
+    expect(task.otherRequirements).toEqual([gate]);
+    expect(evaluate(task).available).toBe(false);
+    expect(evaluate(task, progress({ globalVariables: { counter: 2 } })).available).toBe(true);
+  });
+  it.each(['ordinary', 'locale'])(
+    'fails closed on a %s story gate absent from the story catalog',
+    async (scope) => {
+      const gate = (objective: string) => ({
+        type: 'storyObjective',
+        id: `gate-${objective}`,
+        storyChapter: { id: 'boreas' },
+        objective: { id: objective },
+      });
+      const tasks = { target: { otherRequirements: [gate('drives'), gate('missing')] } };
+      const storyChapters = { boreas: { name: 'Boreas', objectives: { drives: {} } } };
+      const overlay =
+        scope === 'locale'
+          ? { storyChapters, locales: { en: { tasks } } }
+          : { storyChapters, tasks };
+      const task = await correct(overlay, [baseTask()]);
+      expect(task.otherRequirements).toEqual([
+        gate('drives'),
+        { type: 'unknown', upstreamType: 'storyObjective' },
+      ]);
+    }
+  );
+  it('retains unsupported server gates in additions', async () => {
+    const task = await correct(
+      {
+        tasksAdd: {
+          added: { id: 'added', name: 'Added', otherRequirements: [{ type: 'future' }] },
+        },
+      },
+      []
+    );
+    expect(task.otherRequirements).toEqual([{ type: 'unknown', upstreamType: 'future' }]);
+    expect(evaluate(task).available).toBe(false);
+  });
   it('diagnoses a malformed gate introduced by a task correction', async () => {
     // deepMerge treats an object patch over an existing array as an id-keyed patch map, so the
     // reachable case is a correction that declares a gate the adapted task does not carry.

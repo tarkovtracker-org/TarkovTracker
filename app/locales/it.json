@@ -514,6 +514,9 @@
     "not_available_description": "La mappa interattiva di {mapName} non è disponibile. Siamo in attesa di una versione compatibile.",
     "placeholder": "questa posizione",
     "floors": "Piani",
+    "extract_names": {
+      "scav_underboat_hideout": "Nascondigli sotto la fase di atterraggio"
+    },
     "factions": {
       "pmc": "PMC"
     },
@@ -1043,6 +1046,7 @@
         "of": "di",
         "mark_failed": "Fallita",
         "available_button": "Disponibile",
+        "clear_availability_confirmation": "Cancella conferma disponibilità in-game",
         "uncomplete_button": "Non completata",
         "reset_item_counts": "Resetta conteggio oggetti",
         "collapse_task": "Comprimi attività",
@@ -1128,6 +1132,11 @@
         "faction": "Available to {faction} characters.",
         "trader_unlock": "Unlock {trader} by completing {task}.",
         "prestige": "Richiede Prestigio {required} (attuale: {current}).",
+        "global_variable": "Valore di progressione del server {comparison} {required} richiesto (attuale: {current}).",
+        "global_variable_unknown": "Richiede progressione del server {comparison} {required}. Il tuo valore attuale non è disponibile per il tracker. Usa Segna disponibile solo se questa attività è disponibile durante il gioco; nessuna attività contatore sarà segnata completa.",
+        "task_counter": "Richiede {comparison} {required} attività completate da questo livello fedeltà trader (completato: {current}). Se questa attività è già disponibile nel gioco, usa Mark disponibile.",
+        "dialogue": "Richiede una conversazione nel trader di gioco. Usa Mark disponibile solo dopo aver confermato che questa attività è disponibile in gioco.",
+        "story_objective": "Completa l'obiettivo della storia \"{objective}\" ({chapter}).",
         "unknown": "I dati di requisito non sono disponibili o non supportati. La disponibilità non può essere confermata.",
         "cycle": "La catena prerequisito contiene un ciclo. La disponibilità non può essere confermata.",
         "complete": "Questa attività è completata.",

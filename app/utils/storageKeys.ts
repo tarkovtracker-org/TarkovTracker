@@ -7,6 +7,23 @@ export const STORAGE_KEYS = {
   analyticsConsent: `${STORAGE_PREFIX}analytics_consent`,
   dashboardFocusAttribution: `${STORAGE_PREFIX}dashboard_focus_attribution`,
   progressBackupPrefix: `${STORAGE_PREFIX}progress_backup_`,
+  /** One account recovery copy per owner: `${prefix}${userId}` (see `CONTEXT.md`). */
+  progressRecoveryPrefix: `${STORAGE_PREFIX}progress_recovery_`,
+  /** Export-only progress displaced by a reset or Seasonal rollover. */
+  progressSupersededPrefix: `${STORAGE_PREFIX}progress_superseded_`,
+  /** Opaque, ownerless preservation for active progress that cannot be parsed. */
+  progressQuarantinePrefix: `${STORAGE_PREFIX}progress_quarantine_`,
+  /**
+   * `${prefix}${userId}` names the quarantine created while removing that owner's device data,
+   * so later removals stay incomplete while it exists. Shares the quarantine prefix so
+   * diagnostics exclude it with the quarantined bytes.
+   */
+  progressQuarantineRemovalMarkerPrefix: `${STORAGE_PREFIX}progress_quarantine_removal_`,
+  /**
+   * `${prefix}${userId}` marks an explicit device-data removal that left that owner's data
+   * behind, so a reload can still retry it. One key per owner keeps tabs from overwriting others.
+   */
+  deviceDataRemovalIncompletePrefix: `${STORAGE_PREFIX}device_data_removal_incomplete_`,
   adminLastPurge: `${STORAGE_PREFIX}tt:admin:last-purge`,
   cachePurgeAt: `${STORAGE_PREFIX}tt:cache:last-purge`,
   cachePurgeCheckAt: `${STORAGE_PREFIX}tt:cache:last-check`,

@@ -438,7 +438,7 @@ precompute refuses to publish payloads with unconsumed sections.
 
 | Sections                               | Consumer and identity rules                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `tasks`, `tasksAdd`, `traders`, `maps` | Task routes; existing task IDs win over synthetic additions; maps support locale patches.                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `tasks`, `tasksAdd`, `traders`, `maps` | Task routes; existing task IDs win over synthetic additions; maps support locale patches. A map's `extractsAdd` appends well-formed extracts (non-empty `id`/`name`, known faction, finite position) whose ID or name is not already present, then is removed from the response; the client applies the same rule to `app/data/maps.json` `extractsAdd`, whose `nameKey` resolves the label through i18n.                                                                                                                                                    |
 | `items`, `itemsAdd`                    | Both item routes; adapt additions only when an ID is absent upstream, then apply explicit patches and locales.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `hideout`, `craftsAdd`                 | Hideout; attach adapted crafts to station ID/level and deduplicate craft IDs globally. Null/absent task unlocks stay `unlockState: unknown`.                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `prestige`                             | Prestige route; patch/append raw conditions by ID before adaptation resolves tasks from upstream plus missing, enabled `tasksAdd` IDs. Array condition patches replace arrays. Locale task/prestige corrections apply before resolution.                                                                                                                                                                                                                                                                                                                     |
@@ -572,9 +572,9 @@ Missing provenance, a different SHA, invalid task payloads or unconsumed section
 combination before its KV write. Previous entries survive failed combinations. Each successful
 entry records language, mode, storage time and overlay identity; envelope validation requires its
 identity to agree with `payload.dataOverlay`. Writes remain per-key, not atomic across the fleet. A verifier exit code of zero can include `propagating` rows within the 14-hour window; post-deployment confirmation requires all 48 rows to be `current`, while pre-deployment approval requires the complete matching precompute manifest.
-The root `progressionCounters: {}` registry published by the overlay is an explicit no-op.
-A populated, malformed or mode-scoped counter registry remains unconsumed and blocks precompute;
-no counter derivation or global-variable unlock is inferred from this compatibility allowance.
+A root `progressionCounters` registry that passes `validProgressionCounters` is consumed (see
+[canonical task progression](#16-canonical-task-progression)). A malformed or mode-nested registry
+remains unconsumed and blocks precompute; it is applied nowhere.
 Only a complete, unfiltered, failure-free run updates `overlay-precompute-manifest-json-v3`.
 The workflow uploads `precompute-manifest.json` even for partial failures, so operators can see
 which entries changed. `/api/tarkov/overlay-status` returns the last complete manifest without caching.
@@ -902,6 +902,127 @@ flowchart LR
    select the character sessions they intend to restore. Missing logs, objective handovers, XP,
    skills, and hideout progress cannot be reconstructed from these quest notifications.
 
+### Save status and recovery
+
+The reliability policy and vocabulary live in `CONTEXT.md`. Local persistence and cloud
+acknowledgement are separate facts, tracked in `app/stores/tarkov/progressSaveStatus.ts` and
+shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
+
+- **Cloud status.** `useSupabaseSync` reports `pending` from the first local change until the
+  service acknowledges the latest version, `saving` while a write is in flight, `retry_scheduled`
+  after a failure, and `failed` once the bounded schedule (`CLOUD_SAVE_RETRY_DELAYS_MS` in
+  `app/stores/tarkov/progressSaveStatus.ts`) is exhausted. Exhaustion keeps the changes pending. After a failed write, edits
+  never upload directly: they wait for the scheduled retry, and an edit after exhaustion restarts
+  the schedule, as a manual retry (`retryCloudSave`) or the browser `online` event does. A retry
+  that could not upload during a pause is re-armed on resume, and edits made during the upload that
+  recovers from a failure get their own reconciled retry. The first upload of a deferred or handed-off sync start is
+  one direct attempt; its retries are the controller's reconciled ones. A reset saved by its own RPC
+  is acknowledged to the controller, so it is neither reported pending nor uploaded again. Every retry first reads the remote snapshot and merges it into the pending changes,
+  as a Realtime reconnect does, so changes saved on another device are not overwritten by a stale
+  upload; a retry that overlaps a reconnect waits for the newer snapshot. If no snapshot can be
+  merged (no listener is running, the read fails, the socket is suspended, or the account changed), the retry counts as a
+  failed attempt and uploads nothing. Failures
+  are classified as `offline`, `rate_limited`, `auth`, or `unknown` so the
+  indicator can distinguish a known cause from an unknown one. If the initial authenticated sync
+  fails, no controller runs, so `useAppInitialization` marks cloud saving `failed` when local
+  progress may be waiting (tracked progress, a failed local save, or a recovery copy that exists,
+  cannot be read, or is blocked; otherwise it is only a load failure), and its manual retry restarts initialization; a successful startup load clears that status. It also acknowledges
+  memory-only local changes when the cloud now holds them (a cloud record was reconciled or local
+  progress was migrated); otherwise sync starts and uploads them. Before any
+  initialization retry, memory-only edits are handed to the startup merge as the session snapshot
+  (`preserveUnsavedSessionProgress`), so rehydrating from storage cannot discard them. Only the
+  edited modes and metadata get new clocks, so untouched modes still yield to newer remote progress.
+- **Local status.** The progress persist plugin writes through `progressPersistStorage`, because
+  `pinia-plugin-persistedstate` swallows storage exceptions. Store and sync writes of the active
+  progress key go through `persistActiveProgressValue`, which records `saved` or `failed` (`quota`,
+  `unavailable`, `unknown`); only the sign-out restore of the previous owner's copy writes directly. A failed local write means the latest changes are memory-only, except a write of
+  remote state and clocks the cloud already holds, which reports `failed` without marking progress
+  unsaved.
+  If active bytes parse as neither a scoped envelope nor legacy progress, replacement first saves
+  and reads back the exact bytes under an ownerless quarantine key. Quarantined bytes are never
+  hydrated, assigned to an account, included in debug exports, or pruned as backups; if preservation
+  fails, replacement is rejected and the active value remains untouched.
+- **Indicator.** Memory-only changes outrank cloud warnings. Warnings offer an export of the
+  current in-memory progress (`useDataBackup().exportProgress`), which needs no successful save;
+  cloud warnings also offer a manual retry. Guidance never recommends reloading or clearing site
+  data as a fix.
+- **Account recovery copies.** `app/stores/tarkov/accountRecovery.ts` keeps at most one copy per
+  owner under `v2_progress_recovery_<userId>`. The active-progress retention guard saves the
+  previous owner's copy before any guest or other-account state replaces it, so a session
+  transition keeps it whether or not the sync controller still reports pending changes. Sign-in retains any other account's active copy before it is
+  cleared, including the hydration-time owner mismatch that previously created throwaway
+  `progress_backup_*` keys. Hydration before the session is known leaves an owned copy in place
+  rather than treating it as another account's. At sign-in recovery, active storage, and session
+  handoff copies are composed using independent metadata and mode clocks before the normal startup
+  merge. Copies of a mode at the same reset epoch are merged, so edits held by only one of them
+  survive; the newer copy's single-value fields (including deletions) win, as in the startup merge. Higher reset epochs take precedence
+  only after displaced progress is retained for export. Old-season placeholders cannot compete
+  with current Seasonal progress. The recovery copy is removed only once the cloud
+  holds the resolved state: after a startup load that reconciled a cloud record or migrated local
+  progress, or else once an upload of the recovered state is acknowledged (the first attempt or a
+  scheduled retry). Copies are read only for their owner and never uploaded for another account. A failed
+  read of an existing copy blocks sign-in, but a browser that refuses all storage access holds no
+  copy to protect, so cloud-only sync still starts there.
+- **Superseded copies.** Before a deliberate reset with pending cloud changes or memory-only local changes, the store keeps each
+  affected mode that differs from its defaults under an owner-scoped export-only key. A remote
+  reset delivered over Realtime while local changes await acknowledgement does the same before it
+  replaces the mode. If that copy cannot be saved, the reset is not applied, active writes stay
+  blocked, and sync stays paused for the session so the displaced edits cannot overwrite the reset;
+  the next startup load retries the retention. A deliberate reset clears the owner's active copy
+  without creating an account recovery copy of the pre-reset progress. Hydration also retains non-default Seasonal
+  progress stamped for an older season before sanitization clears it. These copies keep their
+  original mode and season, are available from Settings → Account for export, and are never loaded
+  into the tracker or sent to Supabase. They are removed only with that account's explicit device-data
+  removal.
+- **Storage pressure.** `relieveProgressStoragePressure` removes only legacy backups that are
+  byte-identical to the active copy, a recovery copy, or a newer backup. Session transitions and
+  deliberate resets do not delete account recovery copies or unique legacy backups automatically.
+- **Sign-out.** Every sign-out entry point uses `useSignOut`. It signs out immediately unless the
+  changes are memory-only (local save failed and cloud changes pending); then
+  `SignOutConfirmModal` explains the loss risk and defaults to staying signed in. Retry and
+  export never sign out; only the explicit discard action does. Normal sign-out attempts global
+  revocation. When the server cannot be reached but Supabase still clears this browser's session,
+  the player is told that other sessions may remain signed in. When the session cannot be ended at
+  all (for example an expired token while offline), the failure toast offers an explicit
+  "Sign out on this device only" action (`signOutThisDevice`), which removes only this browser's
+  copy of the owner's session and discloses that the server session stays active. Account deletion
+  uses local scope only after the server has deleted the account.
+- **Auth owner fence.** The Supabase client stores its session through
+  `app/utils/supabaseAuthFence.ts` under the SDK's default key. While a sign-out is fenced to an
+  owner, the SDK's own session read and removal throw `SupabaseSessionChangedError` if another
+  account's session is stored, so a session written by another tab mid-sign-out is never revoked
+  or cleared. Any server revocation uses the token read inside the fence. Browser storage stays the
+  session store whenever it can be accessed: if a write fails (for example a full quota), the new
+  session is held in memory and the stale persisted session is removed, so a readable session is
+  never hidden behind an empty memory store. A session another tab persists later replaces
+  that memory copy, so the owner fence still sees it and the memory copy cannot resurface. Memory-only storage is used only when
+  reads are blocked.
+- **Removing device data.** `DeviceDataCard` (Settings → Account) is the explicit action,
+  distinct from sign-out and from cloud deletion. It registers `requestDeviceDataRemoval` before
+  signing out so the progress and preferences session transitions retain no copy for that owner,
+  then `removeAccountDeviceData` deletes the owner's active copies, recovery copy, preferences,
+  activity-log envelopes, and legacy backups. Each shared key's ownership is re-read immediately
+  before removal, so a value another tab stores for a different account is kept. A well-formed value with no
+  owner envelope cannot be attributed and is likewise kept without marking removal incomplete;
+  malformed active bytes instead follow the quarantine flow below. Other accounts' data and cloud progress are untouched; the next sign-in clears the
+  request. Removal and discard confirmations belong to the authenticated owner that opened them
+  and are invalidated when that owner changes. Incomplete backup cleanup reports failure but blocks
+  new guest writes only while the removed owner still occupies active storage. Account deletion uses
+  the same removal for the captured deleted account and checks identity before sign-out and reset;
+  both sign out through the auth owner fence. If sign-out succeeded but cleanup was incomplete, the
+  card keeps a retry bound to the removed owner until it succeeds or that owner signs in again.
+  Each such owner gets its own stored marker when storage accepts the write, and stays incomplete
+  until that marker is deleted, so the retry survives a reload, covers owners recorded by other tabs, and no tab overwrites another's marker; account deletion records incomplete
+  cleanup the same way.
+  If the server cannot be reached, the confirmation offers the disclosed device-only sign-out.
+  A removal that throws is reported as incomplete, and the card's superseded-copy list follows
+  changes made in other tabs. After account deletion, a failed local sign-out falls back to the
+  device-only sign-out; the card does not redirect while the deleted account's session remains.
+  Malformed active bytes that name the removing owner are deleted. Bytes with no provable owner are
+  quarantined, and the active key is released only after a quarantine-prefixed marker is saved;
+  that marker keeps the owner's later removals incomplete while the quarantined copy exists. If quarantine cannot be
+  verified, removal fails and the active write barrier stays in place.
+
 ### Files
 
 - `supabase/migrations/20260804043342_normalize_game_mode_progress_and_add_seasonal.sql` — schema,
@@ -933,6 +1054,16 @@ flowchart LR
 - `app/features/team/TeamDangerZone.vue`, `app/features/team/useTeamInviteLink.ts` — resolved active
   team actions and mode-scoped invite links
 - `app/composables/useDataBackup.ts` — season-aware native backups
+- `app/stores/tarkov/progressSaveStatus.ts`, `app/composables/useProgressSaveStatus.ts`,
+  `app/shell/ProgressSaveStatusIndicator.vue` — truthful local/cloud save status, bounded cloud
+  retry, manual retry, and export guidance
+- `app/stores/tarkov/accountRecovery.ts`, `app/stores/tarkov/supersededProgress.ts`,
+  `app/stores/tarkov/storageQuota.ts` — per-account recovery copies, export-only superseded progress,
+  and redundancy-only storage cleanup
+- `app/composables/useSignOut.ts`, `app/shell/SignOutConfirmModal.vue`,
+  `app/stores/tarkov/deviceData.ts`, `app/features/settings/DeviceDataCard.vue`,
+  `app/utils/supabaseAuthFence.ts` — confirmed sign-out for memory-only changes, owner-fenced and
+  device-only sign-out, and explicit device-data removal
 - `app/server/api/profile/[userId]/[mode].get.ts`,
   `app/server/api/streamer/[userId]/[mode]/kappa.get.ts`, `app/server/api/team/members.ts` —
   mode-aware sharing and team routes
@@ -950,6 +1081,23 @@ flowchart LR
   existing row and column access, including token-note updates. Billing events remain server-only;
   supporters and admin audit logs expose only their RLS-filtered authenticated reads. New-table
   default privileges require a separate creating-role audit; these revokes do not change defaults.
+- The UI may call progress locally saved only after `persistActiveProgressValue` confirms the
+  write. A cloud failure is never evidence of a local save, and exhausting cloud retries never
+  clears the pending state or discards the changes.
+- Active progress replacement and removal must check the latest persisted envelope owner and
+  confirm retention of a foreign owner's recovery copy first. This guard also covers guest
+  hydration after a reload, when no in-memory transition barrier exists; failed retention blocks
+  writes and removal while resetting visible session state. Explicit removal of that same owner's
+  device data is the only bypass.
+- Cloud save status and the manual retry handler belong to the current sync controller; a
+  session reset clears both, and a disposed controller cannot publish status for the next session.
+- An account recovery copy is restored or synchronized only while its owner is signed in, and
+  automatic cleanup never removes a recovery copy or a legacy backup with unique content.
+- Sign-out never requires cloud connectivity: an unconfirmed revocation is disclosed, and a
+  device-only sign-out is always an explicit choice. Memory-only changes are discarded only after
+  the player explicitly confirms the discard action.
+- Sign-out never revokes or clears a session stored for an account other than the one it was
+  started for; the auth storage fence enforces this inside the Supabase SDK.
 - Legacy `user_system.team` / `team_id` values are used only when neither persistent mode-specific
   team ID exists. They must never make a PvP team appear as the active PvE team or vice versa.
 - Team creation maps both the `team_memberships_user_mode_unique` SQLSTATE `23505` conflict and
@@ -2082,6 +2230,75 @@ for agent commands and recovery boundaries.
 
 ## 16. Canonical task progression
 
+### Server-side start requirements
+
+`app/utils/taskOtherRequirements.ts` preserves and validates the API's `otherRequirements` at
+adaptation and overlay boundaries. `app/stores/taskServerGates.ts` evaluates global-variable
+comparisons literally, separately from prerequisite edges, and keeps missing or invalid effective
+account values unknown (including `== 0`). Overlay `storyObjective` gates are met by the player's tracked storyline objective
+(not by an in-game confirmation); Mark available and imported EFT starts, completions and failures
+record that objective. Completing or uncompleting an objective stamps a clock after the entry's
+existing one, so a newer device clock cannot override the latest change. `applyOverlay` turns a story gate whose chapter or objective is absent from
+the mode's story catalog into an unknown gate, and a recorded objective in one of the task's own
+story-unlock chapters opens the story route, so Mark available backfills no prerequisites.
+Trader conversations also require confirmation;
+unsupported or malformed requirements remain blocked as `{ type: 'unknown', upstreamType }`, keeping the
+upstream discriminator. Only published start requirements are
+consumed, not finish/fail conditions. Unknown server gates remain in the locked list, with an
+explanation shared by task cards and recommendations.
+
+The [overlay registry](https://github.com/tarkovtracker-org/tarkov-data-overlay/blob/main/docs/GLOBAL_VARIABLES.md)
+is a best-effort mapping from a global variable to the tasks whose completions derive it
+([mechanics research](https://github.com/tarkovtracker-org/tarkov-data-overlay/blob/main/docs/GLOBAL_VARIABLE_MECHANICS.md)).
+`app/server/utils/overlayCounters.ts` validates it against the overlay schema and, for the request's
+mode, applies only `verified`/`complete` entries whose revision is in
+`SUPPORTED_COUNTER_REVISIONS`. It attaches each entry's contributor list to the matching gate as
+`counter: { type: 'distinctTaskCompletions', taskIds }` when every contributor is in the same task
+payload. This runs last in `applyOverlay`, so task corrections cannot supply a derivation.
+`unresolved`/`partial` entries, unsupported revisions and other modes attach nothing.
+
+For a gate carrying `counter`, the evaluator counts that player's completed contributors
+(`task_counter` blocker with current/required on a shortfall). An account without those
+completions reads a known shortfall, not unknown. An explicit effective account value takes
+precedence, and an invalid one stays unknown instead of falling back. Gates without a derivation keep
+the unknown behaviour below. The tracker never assumes other missing values are zero, creates
+synthetic prerequisite edges, or shares a value between accounts/modes.
+
+**Mark available** confirms the selected task's supported server-side start gates from the player's
+in-game observation. Confirmations live in each mode's `taskAvailability` map
+(`{ [taskId]: { requirements, timestamp } }`, `app/utils/taskAvailabilityConfirmation.ts`), never in
+`taskCompletions`: confirming or clearing cannot create an "active" task record or rewrite a status
+another device set. `requirements` is the exact normalized gate signature (the `counter` derivation is
+excluded from it), and a clear is an empty string kept as a tombstone. Sync merges the map per task by
+the confirmation's own timestamp. A confirmation counts only while its signature matches and it is
+not older than the task's status timestamp, so a later reset, completion, failure or progress repair
+on any device retires it without rewriting the map. The row sanitizer preserves the key (migration
+`20260928140000_preserve_task_availability_confirmations.sql`); a missing key means no confirmations.
+It does not set a counter, acknowledge another task's dialogue, or complete candidate contributor
+tasks. Because a derived count is an estimate, a confirmation overrides a derived shortfall. It cannot
+bypass an explicit known unmet account value, malformed requirements, or independent
+level/faction/trader/prestige/quest gates, and changed requirements invalidate it. The task's More
+menu clears just the in-game confirmation. Mark available either makes the task available or changes
+nothing: it is withheld for unsupported or malformed server gates and for unmet ambiguous-status or
+malformed prerequisites. A confirmation-only mode counts as progress for sync and startup adoption. Status changes are stamped after the task's confirmation clock, so a
+device whose clock runs ahead cannot keep a confirmation alive past a later reset. Clocks are
+capped at 3000-01-01 (`MAX_CONFIRMATION_TIMESTAMP`, same bound in the migration); a confirmation at
+the cap never counts. Mark available is offered only while every current blocker is one it can
+clear (player level, trader level/reputation, unambiguous prerequisites, unknown-value or
+conversation server gates) and never before the player's own evaluation exists (for example while
+the player's own progress is hidden). An imported EFT
+log start confirms the task's current gate signature, since the game only starts a task whose gates
+are met. Shared profiles evaluate with the owner's confirmations. Incomplete/reset records are not
+confirmation evidence. Explicit prerequisite backfill
+continues for unambiguous completed/failed requirements; active-or-complete and other ambiguous
+status choices no longer fabricate completion histories or flatten alternative ancestors.
+
+This is additive to `tasks-core-json-v3`: old cached payloads that discarded `otherRequirements`
+cannot be repaired in the evaluator. Before claiming the fix is live, verify a successful full
+precompute refresh using this revision and refreshed edge/browser task payloads containing the new
+field. No production precompute or cache purge is performed by opening the PR. Unknown gates that
+are not published upstream cannot be reconstructed from the public task catalog.
+
 Hideout cards evaluate the declared trader comparison against current loyalty (legacy default `>=`). Completed-module enforcement retains a build if the current stored loyalty satisfies the comparison (including legacy values above the normal range), or if any valid loyalty level at or below it satisfies that comparison, so advancing past an upper-bound or equality requirement cannot erase built modules or their parts. Lower-bound loyalty downgrades still revoke dependent builds. Disabled trader gating bypasses both checks. Optional profile chapter and prestige normalization run inside their optional request boundaries: malformed catalogs show a partial failure without discarding successful task catalogs. Overlay promotion requires a nonempty editions catalog as well as complete provenance, and forced edition refreshes forward `cacheBust=1` to bypass the worker overlay cache.
 
 Isolated profile catalogs normalize and qualify duplicate objective IDs and build the same task predecessor graph as active metadata, without mutating active progress. EFT completion imports apply trader implications only when the trader-gating preference captured at confirmation is enabled; task completion and player-level implications remain authoritative. Shared profiles project legacy objective keys through the duplicate-ID mapping without modifying stored progress; explicit task-qualified values take precedence.
@@ -2382,6 +2599,13 @@ are forgeable by write collaborators, so the evidence binds to the controller ru
 `target_url`. That run must report path `.github/workflows/preview.yml`, event
 `workflow_dispatch`, branch `main`, and this repository; its `Publish preview result` job must
 succeed and it must retain a `preview-deployment-<sha>` artifact for the exact candidate.
+
+Cloudflare Pages serves static SPA responses outside the Pages Function routes, so runtime route
+rules alone cannot provide browser response headers for those documents. Keep the static
+`public/_headers` frame-ancestor policy in the uploaded build output alongside the runtime app
+CSP; `frame-src` remains an independent directive for permitted embedded content. The build-time
+check requires the `/*` block to set a same-origin `frame-ancestors` and rejects any block that
+widens it, because Pages applies every matching block.
 
 ### Flow
 

@@ -109,7 +109,20 @@
       ],
       "minZoom": 1,
       "maxZoom": 6
-    }
+    },
+    "extractsAdd": [
+      {
+        "id": "SCAV_Underboat_Hideout",
+        "name": "Hideout Under the Landing Stage",
+        "nameKey": "maps.extract_names.scav_underboat_hideout",
+        "faction": "scav",
+        "position": {
+          "x": 143.13,
+          "y": 0.73,
+          "z": -159.34
+        }
+      }
+    ]
   },
   "openworld": {
     "unavailable": true

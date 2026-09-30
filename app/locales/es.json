@@ -514,6 +514,9 @@
     "not_available_description": "El mapa interactivo de {mapName} aún no está disponible. Estamos esperando a que se cree un mapa compatible.",
     "placeholder": "esta ubicación",
     "floors": "Pisos",
+    "extract_names": {
+      "scav_underboat_hideout": "Escondido bajo la Etapa de Tierra"
+    },
     "factions": {
       "pmc": "PMC"
     },
@@ -1043,6 +1046,7 @@
         "of": "de",
         "mark_failed": "Marcar como fallida",
         "available_button": "Marcar como disponible",
+        "clear_availability_confirmation": "Borrar confirmación de disponibilidad en el juego",
         "uncomplete_button": "Marcar como no completado",
         "reset_item_counts": "Restablecer conteos de objetos",
         "collapse_task": "Colapsar tarea",
@@ -1128,6 +1132,11 @@
         "faction": "Disponible para caracteres {faction}.",
         "trader_unlock": "Desbloquea {trader} completando {task}.",
         "prestige": "Requiere Prestigio {required} (actual: {current}).",
+        "global_variable": "Valor de progresión del servidor {comparison} {required} requerido (actual: {current}).",
+        "global_variable_unknown": "Requiere progresión del servidor {comparison} {required}. Tu valor actual no está disponible para el rastreador. Usar Marca disponible sólo si esta tarea está disponible dentro del juego; no se marcarán las tareas contadoras.",
+        "task_counter": "Requiere {comparison} {required} tareas completadas de este nivel de lealtad del trader (completado: {current}). Si esta tarea ya está disponible en el juego, usa la marca disponible.",
+        "dialogue": "Requiere una conversación en el juego. Usa la marca disponible sólo después de confirmar que esta tarea está disponible en el juego.",
+        "story_objective": "Completa el objetivo de la historia \"{objective}\" ({chapter}).",
         "unknown": "Los datos requeridos no están disponibles o no soportados. No se puede confirmar la disponibilidad.",
         "cycle": "La cadena de prerrequisitos contiene un ciclo. La disponibilidad no puede ser confirmada.",
         "complete": "Esta tarea se ha completado.",

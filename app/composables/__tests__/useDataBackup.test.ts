@@ -1,6 +1,8 @@
+// @vitest-environment happy-dom
+import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
-import { STORAGE_KEYS } from '@/utils/storageKeys';
+import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 const { mockLogger, preferencesStore, supabaseUser } = vi.hoisted(() => ({
   mockLogger: {
@@ -36,6 +38,7 @@ const { mockLogger, preferencesStore, supabaseUser } = vi.hoisted(() => ({
     providers: ['discord'],
   },
 }));
+mockNuxtImport('useNuxtApp', () => () => ({ $supabase: { user: supabaseUser } }));
 const tarkovStore = {
   $state: {
     currentGameMode: 'pvp',
@@ -167,7 +170,7 @@ vi.mock('@/composables/useAnalyticsConsent', () => ({
 vi.mock('@/utils/logger', () => ({
   logger: mockLogger,
 }));
-vi.stubGlobal('useRuntimeConfig', () => ({
+mockNuxtImport('useRuntimeConfig', () => () => ({
   public: { appVersion: '1.8.2' },
 }));
 const createFile = (text: string): File =>
@@ -475,6 +478,79 @@ describe('useDataBackup', () => {
       }
     });
   });
+  describe('exportSupersededProgress', () => {
+    it('requires a signed-in owner and an available copy', async () => {
+      const { exportSupersededProgress } = await loadComposable();
+      await expect(exportSupersededProgress()).rejects.toThrow('No superseded progress');
+      supabaseUser.id = '';
+      await expect(exportSupersededProgress()).rejects.toThrow('Sign in');
+    });
+    it('downloads only the current owner copies without owner identifiers', async () => {
+      const { saveSupersededProgressCopy } = await import('@/stores/tarkov/supersededProgress');
+      saveSupersededProgressCopy('user-123', 'pvp', null, tarkovStore.$state.pvp, 100);
+      saveSupersededProgressCopy('foreign-owner', 'pve', null, tarkovStore.$state.pve, 200);
+      const originalCreate = URL.createObjectURL;
+      const originalRevoke = URL.revokeObjectURL;
+      const captured: Blob[] = [];
+      URL.createObjectURL = vi.fn((blob: Blob) => {
+        captured.push(blob);
+        return 'blob:retained-progress';
+      });
+      URL.revokeObjectURL = vi.fn();
+      const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+      try {
+        const { exportSupersededProgress } = await loadComposable();
+        await exportSupersededProgress();
+        const payload = JSON.parse(await captured[0]!.text());
+        expect(payload._format).toBe('tarkovtracker-superseded-progress');
+        expect(payload.copies).toHaveLength(1);
+        expect(payload.copies[0]).toMatchObject({ mode: 'pvp', supersededAt: 100 });
+        expect(payload.copies[0]).not.toHaveProperty('ownerId');
+        expect(JSON.stringify(payload)).not.toContain('foreign-owner');
+      } finally {
+        URL.createObjectURL = originalCreate;
+        URL.revokeObjectURL = originalRevoke;
+        click.mockRestore();
+      }
+    });
+  });
+  it('redacts malformed and anonymous retained-copy storage keys in debug exports', async () => {
+    const keys = [
+      STORAGE_KEYS.progressBackupPrefix + 'anonymous',
+      LEGACY_STORAGE_KEYS.progressBackupPrefix + 'legacy-owner_123',
+      STORAGE_KEYS.progressBackupPrefix,
+      STORAGE_KEYS.progressRecoveryPrefix,
+      STORAGE_KEYS.progressSupersededPrefix,
+      STORAGE_KEYS.progressSupersededPrefix + 'private-owner',
+    ];
+    for (const key of keys) localStorage.setItem(key, '{}');
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    const captured: Blob[] = [];
+    URL.createObjectURL = vi.fn((blob: Blob) => {
+      captured.push(blob);
+      return 'blob:debug';
+    });
+    URL.revokeObjectURL = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    try {
+      const { exportDebugSnapshot } = await loadComposable();
+      await exportDebugSnapshot();
+      const payload = JSON.parse(await captured[0]!.text());
+      const exportedKeys = payload.storage.localStorageKeys as string[];
+      expect(exportedKeys.some((key) => key.includes('owner:anonymous,createdAt:unknown'))).toBe(
+        true
+      );
+      expect(exportedKeys.some((key) => key.includes('owner:unknown'))).toBe(true);
+      expect(exportedKeys.some((key) => key.includes('copy:unknown'))).toBe(true);
+      expect(exportedKeys.join(' ')).not.toContain('private-owner');
+      expect(exportedKeys.join(' ')).not.toContain('legacy-owner');
+    } finally {
+      URL.createObjectURL = originalCreate;
+      URL.revokeObjectURL = originalRevoke;
+      click.mockRestore();
+    }
+  });
   describe('exportDebugSnapshot', () => {
     it('exports a sanitized debug snapshot without auth secrets or player identifiers', async () => {
       localStorage.setItem(
@@ -495,6 +571,16 @@ describe('useDataBackup', () => {
       );
       localStorage.setItem('sb-localhost-auth-token', 'token-secret');
       localStorage.setItem(`${STORAGE_KEYS.progressBackupPrefix}user-123_1700000009999`, 'backup');
+      localStorage.setItem(`${STORAGE_KEYS.progressRecoveryPrefix}user-123`, 'recovery');
+      localStorage.setItem(`${STORAGE_KEYS.deviceDataRemovalIncompletePrefix}user-123`, 'user-123');
+      localStorage.setItem(
+        `${STORAGE_KEYS.progressQuarantinePrefix}opaque-copy_0`,
+        '{opaque malformed bytes}'
+      );
+      localStorage.setItem(
+        `${STORAGE_KEYS.progressSupersededPrefix}user-123_1700000009999_abcd`,
+        'superseded'
+      );
       sessionStorage.setItem(STORAGE_KEYS.sessionDataMigrated, 'true');
       window.history.replaceState({}, '', '/settings?tab=data#debug');
       let backupBlob: Blob | null = null;
@@ -565,6 +651,8 @@ describe('useDataBackup', () => {
         );
         expect(debugJson.storage.authStorageKeyCount).toBe(1);
         expect(debugJson.storage.localStorageKeys).not.toContain('sb-localhost-auth-token');
+        expect(debugJson.storage.localStorageKeys.join('\n')).not.toContain('user-123');
+        expect(debugJson.storage.localStorageKeys.join('\n')).not.toContain('progress_quarantine');
         const progressSnapshot = debugJson.storage.progress;
         expect(progressSnapshot).not.toBeNull();
         if (!progressSnapshot) {
@@ -577,6 +665,7 @@ describe('useDataBackup', () => {
         expect(debugJson.storage.progressBackups[0]!.storageKey).toContain('{owner:');
         expect(debugText).not.toContain('player@example.com');
         expect(debugText).not.toContain('token-secret');
+        expect(debugText).not.toContain('{opaque malformed bytes}');
         expect(debugText).not.toContain('user-123');
         expect(debugText).not.toContain('teammate-1');
         expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:test-debug-url');
@@ -1237,6 +1326,29 @@ describe('useDataBackup', () => {
         storyChapters: {},
       },
     };
+    it('restores availability confirmations from a backup', async () => {
+      const backup = structuredClone(validBackup) as typeof validBackup & {
+        pvp: { taskAvailability?: unknown };
+      };
+      backup.pvp.taskAvailability = { task1: { requirements: 'sig', timestamp: 3000 } };
+      const { parseBackupFile, confirmBackupImport } = await loadComposable();
+      await parseBackupFile(createFile(JSON.stringify(backup)));
+      await confirmBackupImport({ pvp: true, pve: false });
+      const patchFn = tarkovStore.$patch.mock.calls[0]![0] as (
+        state: Record<string, unknown>
+      ) => void;
+      const mockState = {
+        currentGameMode: 'pve',
+        pvp: { level: 1, progressEpoch: 5 } as Record<string, unknown>,
+        pve: { level: 1, progressEpoch: 3 },
+        gameEdition: 1,
+        tarkovUid: null,
+      };
+      patchFn(mockState);
+      expect(mockState.pvp.taskAvailability).toEqual({
+        task1: { requirements: 'sig', timestamp: 3000 },
+      });
+    });
     it('patches pvp data only when pvp selected', async () => {
       const { parseBackupFile, confirmBackupImport, importState } = await loadComposable();
       await parseBackupFile(createFile(JSON.stringify(validBackup)));

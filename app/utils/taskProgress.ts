@@ -184,6 +184,46 @@ const alreadyMeetsStatus = (completion: RawTaskCompletion, statuses?: string[]):
   );
 };
 const requiredTaskId = (requirement: TaskRequirement) => requirement?.task?.id;
+const completionOnlyRequirement = (requirement: TaskRequirement): boolean =>
+  (requirement.status ?? []).every((status) =>
+    ['complete', 'completed'].includes(status.toLowerCase())
+  );
+/** Non-object entries are malformed declared gates, never an unambiguous requirement. */
+const unambiguousRequirement = (requirement: TaskRequirement): boolean =>
+  Boolean(requirement && typeof requirement === 'object') &&
+  (completionOnlyRequirement(requirement) || isFailedOnlyRequirement(requirement.status));
+const resolvableRequirement = (
+  requirement: TaskRequirement,
+  getCompletion: (taskId: string) => RawTaskCompletion
+): boolean => {
+  const taskId = requiredTaskId(requirement);
+  if (!taskId) return false;
+  return (
+    alreadyMeetsStatus(getCompletion(taskId), requirement.status) ||
+    unambiguousRequirement(requirement)
+  );
+};
+/**
+ * Mark available can only settle a task's direct prerequisites when each unmet one names a single
+ * status to record; an unmet active/mixed-status or malformed entry leaves the task locked, so the
+ * action must not change any progress for it.
+ */
+export const canApplyTaskAvailabilityRequirements = (
+  task: Task,
+  getCompletion: (taskId: string) => RawTaskCompletion,
+  skipTaskRequirements = false,
+  /**
+   * The evaluator's unmet direct prerequisites, when known. It already accepts an active
+   * prerequisite that is itself available, so only what it still reports needs a recordable status.
+   */
+  unmetRequirements?: TaskRequirement[]
+): boolean => {
+  if (skipTaskRequirements || !Array.isArray(task.taskRequirements)) return true;
+  if (unmetRequirements) return unmetRequirements.every(unambiguousRequirement);
+  return task.taskRequirements.every((requirement) =>
+    resolvableRequirement(requirement, getCompletion)
+  );
+};
 export function applyTaskAvailabilityRequirements(options: {
   getCompletion?: (taskId: string) => RawTaskCompletion;
   skipTaskRequirements?: boolean;
@@ -208,14 +248,18 @@ export function applyTaskAvailabilityRequirements(options: {
     if (alreadyMeetsStatus(getCompletion(requirementTaskId), requirement.status)) return;
     if (isFailedOnlyRequirement(requirement.status)) {
       onFailRequirement(requirementTaskId);
-    } else {
+    } else if (completionOnlyRequirement(requirement)) {
       onCompleteRequirement(requirementTaskId);
     }
-    handledRequirementTaskIds.add(requirementTaskId);
   });
+  // Flattened graph ancestors cannot identify a historical route through alternative statuses.
+  if (!taskRequirements.every(unambiguousRequirement)) return;
   predecessors.forEach((predecessorId) => {
     if (!predecessorId) return;
     if (handledRequirementTaskIds.has(predecessorId)) return;
+    // Transitive inference never resurrects a failed task: only the task the player confirmed
+    // available can justify flipping its own direct gates.
+    if (isTaskFailed(getCompletion(predecessorId))) return;
     onCompleteRequirement(predecessorId);
   });
 }

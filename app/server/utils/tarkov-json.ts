@@ -4,6 +4,7 @@ import { useRuntimeConfig } from '#imports';
 import { createLogger } from '@/server/utils/logger';
 import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
 import { buildSkillImageUrl } from '@/utils/tarkovUrls';
+import { normalizeOtherRequirements } from '@/utils/taskOtherRequirements';
 import {
   isValidTraderLevel,
   normalizeTraderRequirements,
@@ -831,6 +832,7 @@ function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
       ? raw.taskRequirements.map((requirement) => adaptTaskRequirement(requirement, context))
       : undefined,
     // Dropping a declared gate above must stay observable, or a malformed gate reads as no gate.
+    otherRequirements: onlyIfPopulated(normalizeOtherRequirements(raw.otherRequirements)),
     requirementDiagnostics: onlyIfPopulated(taskRequirementDiagnostics(raw)),
     objectives: [],
     failConditions: [],
