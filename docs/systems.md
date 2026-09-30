@@ -2239,7 +2239,12 @@ account values unknown (including `== 0`). Overlay `storyObjective` gates are me
 (not by an in-game confirmation). A task that is available, started, completed or failed has passed its
 start gates, so Mark available, Mark complete, Mark failed, the prerequisites Mark available
 completes, and imported EFT starts, completions and failures all record that objective
-(`recordImpliedStoryObjectives`); uncompleting a task leaves it recorded. Completing or uncompleting an objective stamps a clock after the entry's
+(`recordImpliedStoryObjectives`). The completed-task repair (`repairCompletedProgress`) backfills the
+objective for every successfully completed gated task on each progress and task-catalog load,
+stamped past any unmark, so the two cannot disagree. It never unmarks, and failed tasks do not
+count because a branch failure does not prove the task was started. Undoing Mark complete or Mark
+failed releases only the objectives that action newly recorded, unless another completed task still
+implies them; a manual uncomplete leaves them recorded. Completing or uncompleting an objective stamps a clock after the entry's
 existing one, so a newer device clock cannot override the latest change. `applyOverlay` turns a story gate whose chapter or objective is absent from
 the mode's story catalog into an unknown gate, and a recorded objective in one of the task's own
 story-unlock chapters opens the story route, so Mark available backfills no prerequisites.

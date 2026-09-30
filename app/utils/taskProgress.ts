@@ -161,13 +161,54 @@ const applyTraderMinimum = (
   if (store.getTraderReputation(requirement.trader.id) < requirement.value)
     store.setTraderReputation(requirement.trader.id, requirement.value);
 };
-/** A started, completed or failed task has passed its start gates, so its story objectives were met. */
+export type StoryObjectiveRef = { chapterId: string; objectiveId: string };
+type StoryObjectiveStore = {
+  isStoryObjectiveComplete: (chapterId: string, objectiveId: string) => boolean;
+  setStoryObjectiveComplete: (chapterId: string, objectiveId: string) => void;
+};
+const impliedStoryObjectives = (task: Task): StoryObjectiveRef[] =>
+  storyObjectiveRequirements(task).map((gate) => ({
+    chapterId: gate.storyChapter.id,
+    objectiveId: gate.objective.id,
+  }));
+/**
+ * A started, completed or failed task has passed its start gates, so its story objectives were met.
+ * Returns the objectives this call newly recorded, so an undo can release exactly those.
+ */
 export function recordImpliedStoryObjectives(
-  store: { setStoryObjectiveComplete: (chapterId: string, objectiveId: string) => void },
+  store: StoryObjectiveStore,
   task: Task
-): void {
-  for (const gate of storyObjectiveRequirements(task))
-    store.setStoryObjectiveComplete(gate.storyChapter.id, gate.objective.id);
+): StoryObjectiveRef[] {
+  const recorded = impliedStoryObjectives(task).filter(
+    ({ chapterId, objectiveId }) => !store.isStoryObjectiveComplete(chapterId, objectiveId)
+  );
+  for (const { chapterId, objectiveId } of recorded)
+    store.setStoryObjectiveComplete(chapterId, objectiveId);
+  return recorded;
+}
+const storyObjectiveKey = ({ chapterId, objectiveId }: StoryObjectiveRef) =>
+  `${chapterId}\u0000${objectiveId}`;
+/**
+ * Undo the story objectives an action recorded, except those another completed task still implies:
+ * those remain met, and the load-time repair would record them again.
+ */
+export function releaseRecordedStoryObjectives(options: {
+  store: { setStoryObjectiveUncomplete: (chapterId: string, objectiveId: string) => void };
+  recorded: readonly StoryObjectiveRef[];
+  tasks: readonly Task[];
+  isTaskComplete: (taskId: string) => boolean;
+}): void {
+  const { store, recorded, tasks, isTaskComplete: complete } = options;
+  if (!recorded.length) return;
+  const stillImplied = new Set(
+    tasks
+      .filter((task) => complete(task.id))
+      .flatMap(impliedStoryObjectives)
+      .map(storyObjectiveKey)
+  );
+  for (const ref of recorded)
+    if (!stillImplied.has(storyObjectiveKey(ref)))
+      store.setStoryObjectiveUncomplete(ref.chapterId, ref.objectiveId);
 }
 /** Completion proves lower bounds, never that earned progress should be reduced. */
 export function applyTaskTraderRequirements(options: {
