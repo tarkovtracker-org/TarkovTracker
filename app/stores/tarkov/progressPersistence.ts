@@ -147,9 +147,9 @@ const sendProgressMutation = async <TResult extends { error: unknown }>(
   } finally {
     invalidateAcknowledgedModes(userId, mutation.modes);
   }
-  if (!isCurrent()) return { error: SPLIT_SYNC_INTERRUPTED };
+  if (!mutation.canContinue()) return { error: SPLIT_SYNC_INTERRUPTED };
   if (result.error) return result;
-  sync.acknowledge(mutation.modes);
+  if (!sync.commit(mutation.modes)) return { error: SPLIT_SYNC_INTERRUPTED };
   mutation.onSuccess();
   return result;
 };

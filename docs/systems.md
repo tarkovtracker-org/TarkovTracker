@@ -867,6 +867,8 @@ flowchart LR
    rejects a Seasonal prestige before any request, and the settings card reports prestige as
    unavailable in Seasonal PvP. Prestige archives use the same account write queue as background
    syncs, supersede older splits, and acknowledge only the persistent modes the transaction writes.
+   A committed archive is applied even if a newer local sync started while it was in flight; that
+   sync captured pre-archive state, so it is superseded before dispatch and resent from merged state.
    Remote changes outside the transaction's write scope, such as Seasonal progress, do not interrupt it.
    A cancelled session cannot dispatch a queued archive or apply its result to another account.
 9. EFT log import restores explicit quest notification states in PvP, PvE, and active Seasonal

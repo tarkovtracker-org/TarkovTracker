@@ -14,12 +14,14 @@ type RemoteProgressUpdate = { remote: ProgressSyncSnapshot; applied: ProgressSyn
 let ownerId: string | null = null;
 let acknowledged: ModeProgressMap = {};
 let generation = 0;
+let ownerEpoch = 0;
 let remoteApplied = 0;
 let expectedProgress: ProgressSyncSnapshot | null = null;
 const toWire = (progress: UserProgressData): UserProgressData =>
   JSON.parse(JSON.stringify(progress)) as UserProgressData;
 export const clearAcknowledgedModes = (): void => {
   generation += 1;
+  ownerEpoch += 1;
   ownerId = null;
   acknowledged = {};
   expectedProgress = null;
@@ -28,6 +30,7 @@ export const clearAcknowledgedModes = (): void => {
 const claimOwner = (userId: string): void => {
   if (ownerId === userId) return;
   generation += 1;
+  ownerEpoch += 1;
   ownerId = userId;
   acknowledged = {};
   expectedProgress = null;
@@ -93,9 +96,10 @@ export const beginAcknowledgement = (userId: string, expected?: ProgressSyncSnap
   expectedProgress = expected
     ? (JSON.parse(JSON.stringify(expected)) as ProgressSyncSnapshot)
     : null;
-  const started = { generation, remoteApplied };
-  const isCurrent = (): boolean =>
-    generation === started.generation && remoteApplied === started.remoteApplied;
+  const started = { generation, remoteApplied, ownerEpoch };
+  const isUndisturbed = (): boolean =>
+    ownerEpoch === started.ownerEpoch && remoteApplied === started.remoteApplied;
+  const isCurrent = (): boolean => generation === started.generation && isUndisturbed();
   return {
     isCurrent,
     acknowledge: (modes: ModeProgressMap): void => {
@@ -103,6 +107,17 @@ export const beginAcknowledgement = (userId: string, expected?: ProgressSyncSnap
     },
     scope: (modes: ModeProgressMap): void => {
       if (isCurrent()) scopeExpectedProgress(modes);
+    },
+    /**
+     * Records a committed atomic write even if a newer local sync started meanwhile; that sync
+     * captured pre-write state, so it is superseded instead. Remote or owner changes still refuse.
+     */
+    commit: (modes: ModeProgressMap): boolean => {
+      if (!isUndisturbed()) return false;
+      generation += 1;
+      expectedProgress = null;
+      recordAcknowledgedModes(userId, modes);
+      return true;
     },
     finish: (): void => {
       if (isCurrent()) expectedProgress = null;

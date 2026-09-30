@@ -398,6 +398,27 @@ describe('prestige persistence ordering', () => {
     await syncProgressState(supabaseContext.client, 'user-1', store.$state);
     expect(rpc.mock.calls[1]![1].p_modes).toEqual({});
   });
+  it('applies a dispatched archive and supersedes a direct sync started during it', async () => {
+    const store = seedLargeProgress();
+    const pending = pendingRpc();
+    rpc.mockImplementationOnce(async () => {
+      await pending.promise;
+      return { data: null, error: null };
+    });
+    const archive = store.prestigePvP();
+    store.pve.level = 28;
+    const direct = syncProgressState(supabaseContext.client, 'user-1', store.$state);
+    pending.resolve();
+    const [, directResult] = await Promise.all([archive, direct]);
+    expect(store.pvp.level).toBe(1);
+    expect(store.pvp.prestigeLevel).toBe(1);
+    expect(directResult.error).toEqual({ message: 'Progress sync superseded by newer state' });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    await syncProgressState(supabaseContext.client, 'user-1', store.$state);
+    const sent = rpc.mock.calls[1]![1].p_modes as Record<string, { level: number }>;
+    expect(sent).not.toHaveProperty('pvp');
+    expect(sent.pve!.level).toBe(28);
+  });
   it('leaves progress untouched when the archive request throws', async () => {
     const store = seedLargeProgress();
     const before = cloneProgress(store.$state);
