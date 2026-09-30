@@ -88,6 +88,10 @@
     "error_loading": "Error al cargar datos de Tarkov",
     "loading": "Cargando datos de Tarkov",
     "logout_failed": "No se pudo cerrar sesión. Inténtalo de nuevo.",
+    "logout_unreachable": "No se pudo acceder al servidor, por lo que aún estás conectado. Sólo puedes cerrar sesión en este dispositivo; el servidor no se contará, así que la sesión allí permanece activa hasta que caduque o cierre la sesión desde otro dispositivo.",
+    "logout_this_device": "Cerrar sesión sólo en este dispositivo",
+    "logout_this_device_done": "Sólo se ha cerrado la sesión en este dispositivo. La sesión en el servidor permanece activa hasta que caduque o cierre la sesión en otro dispositivo.",
+    "logout_local_only": "Se ha cerrado la sesión en este dispositivo. El servidor no ha podido ser alcanzado, por lo que es posible que sus otras sesiones todavía estén conectadas.",
     "hidden_label": "Oculto",
     "user_label": "Usuario",
     "user_avatar_alt": "Avatar de usuario",
@@ -99,6 +103,40 @@
     "login_aria": "Inicia sesión en tu cuenta",
     "switch_to_light_theme": "Cambiar a tema claro",
     "switch_to_dark_theme": "Cambiar a tema oscuro"
+  },
+  "progress_save_status": {
+    "indicator_aria": "Estado del progreso guardado: {status}",
+    "cloud_pending_label": "Guardando progreso en la nube",
+    "cloud_retrying_label": "Guardar en la nube reintentando",
+    "cloud_failed_label": "Error al guardar la nube",
+    "local_failed_label": "Progreso no guardado en este navegador",
+    "cloud_pending_description": "Sus últimos cambios de progreso aún no han sido guardados en la nube.",
+    "cloud_retrying_description": "Ha fallado guardar sus últimos cambios de progreso en la nube. Puede seguir rastreando mientras otro intento se ejecuta automáticamente.",
+    "cloud_failed_description": "Los intentos automáticos de guardar los últimos cambios de progreso en la nube se han detenido. Los cambios todavía están esperando a ser guardados, y puede seguir rastreando y reintentarlo en cualquier momento.",
+    "local_failed_description": "No se han podido guardar los últimos cambios de progreso en este navegador. Puede seguir rastreando, pero los cambios que no se guardan en otros lugares pueden perderse si recarga, cierra esta pestaña o cierra la sesión.",
+    "local_saved_note": "Estos cambios se guardan en este navegador.",
+    "cloud_also_pending_note": "Tampoco se han guardado en la nube. Exporta tu progreso para guardar una copia.",
+    "retry_scheduled": "Se ha programado el reintento automático {attempt} de {total}.",
+    "cause_offline": "Causa: este dispositivo parece estar desconectado.",
+    "cause_rate_limited": "Causa: el servicio en la nube limita temporalmente los ahorros.",
+    "cause_auth": "Causa: su sesión de inicio de sesión no pudo ser verificada.",
+    "cause_quota": "Causa: el almacenamiento de este navegador para TarkovTracker está lleno.",
+    "cause_unavailable": "Causa: este navegador está bloqueando el almacenamiento del sitio, por ejemplo debido a la configuración de privacidad.",
+    "cause_unknown": "La causa de este fracaso es desconocida.",
+    "quota_guidance": "Limpiar los datos de este sitio o recargar podría eliminar su única copia de estos cambios. Exportar su progreso antes de eliminar cualquier dato.",
+    "retry_button": "Reintentar la nube guardada",
+    "retry_succeeded": "Sus cambios de progreso fueron guardados en la nube.",
+    "retry_failed": "No se ha podido guardar la nube. Los cambios aún están esperando a ser guardados.",
+    "export_button": "Progreso de exportación",
+    "export_hint": "Exportar descarga su progreso actual como un archivo de copia de seguridad, incluso cuando el guardado ha fallado."
+  },
+  "sign_out_confirm": {
+    "title": "¿Cerrar sesión con cambios no guardados?",
+    "risk": "Sus últimos cambios de progreso no se guardan en este navegador o en la nube. Si cierra sesión ahora, se perderán.",
+    "options": "Puede permanecer conectado y volver a intentar guardar, o exportar su progreso actual antes de decidir.",
+    "stay_signed_in": "Permanecer conectado",
+    "discard_and_sign_out": "Cerrar sesión y descartar cambios",
+    "retry_succeeded": "Los cambios se han guardado en la nube. Puede cerrar sesión de forma segura."
   },
   "omnibar": {
     "title": "Buscar",
@@ -2179,10 +2217,17 @@
       "delete_forever": "Eliminar cuenta para siempre",
       "delete_success_title": "Cuenta eliminada correctamente",
       "delete_success_sr_only": "La eliminación de tu cuenta se ha completado y serás redirigido al panel.",
+      "delete_success_cleanup_failed_sr_only": "Su cuenta fue eliminada, pero algunos datos permanecen en este dispositivo. Puede volver a intentar limpiar o continuar con los datos que quedan aquí.",
       "delete_success_description": "Tu cuenta y todos los datos asociados se han eliminado permanentemente.",
+      "other_session_deleted_description": "La cuenta que comenzó esta eliminación fue eliminada. Su cuenta actual todavía está conectada y no ha cambiado.",
       "cleanup_pending": "La limpieza de algunos datos aún está en curso y finalizará en breve.",
+      "device_cleanup_failed": "Algunos datos borrados de la cuenta permanecen en este dispositivo. Vuelva a intentar limpiar, o continúe y deje esos datos aquí.",
+      "session_end_failed": "Este navegador todavía está conectado a la cuenta eliminada. Seleccione Ir al panel de control para intentar cerrar sesión de nuevo.",
+      "retry_device_cleanup": "Reintentar limpieza del dispositivo",
+      "continue_with_device_data_remaining": "Continuar con los datos restantes",
       "redirect_message": "Gracias por usar TarkovTracker. Serás redirigido al panel.",
-      "go_to_dashboard": "Ir al panel"
+      "go_to_dashboard": "Ir al panel",
+      "session_changed": "Tu cuenta de inicio de sesión ha cambiado. No se tomarán más medidas en esta sesión."
     },
     "discord_link": {
       "title": "Discord Account",
@@ -2440,6 +2485,25 @@
         "verification_failed": "Falló la verificación humana. Recarga la página e inténtalo de nuevo.",
         "fetch_failed": "No se puede obtener el perfil de Tarkov.dev. Abra el perfil en Tarkov.dev, y vuelva a intentarlo."
       }
+    },
+    "device_data": {
+      "title": "Datos en este dispositivo",
+      "description": "El inicio de sesión mantiene el progreso guardado de esta cuenta en este navegador, para que los cambios que no hayan llegado a la nube aún puedan sincronizarse cuando inicie sesión de nuevo. El progreso desplazado por un reinicio o un rollover estacional se mantiene por separado para su exportación. Eliminar los datos de este dispositivo borra el progreso de esta cuenta, las copias de recuperación y las preferencias de este navegador y te desconecta.",
+      "cloud_unaffected": "Tu progreso en la nube no se ha eliminado. Los datos de otras cuentas en este dispositivo no se verán afectados.",
+      "superseded_available": "Cambios de progreso {count} desde un reinicio o rollover estacional se mantienen aquí solo para exportación. No serán restaurados o sincronizados automáticamente.",
+      "superseded_export": "Exportar progreso superado",
+      "superseded_export_error": "No se pudo exportar el progreso superado",
+      "remove_button": "Eliminar los datos de esta cuenta de este dispositivo",
+      "confirm_title": "¿Eliminar los datos de esta cuenta de este dispositivo?",
+      "confirm_description": "El progreso de esta cuenta, las copias de recuperación, las exportaciones de progreso superadas y las preferencias serán eliminadas de este navegador, y usted será desconectado. Su progreso en la nube permanece disponible cuando inicie sesión de nuevo.",
+      "pending_warning": "Algunos cambios de progreso aún no se han guardado en la nube. Eliminar los datos de este dispositivo los descartará permanentemente. Exporta tu progreso primero si quieres mantenerlos.",
+      "confirm_button": "Eliminar datos y cerrar sesión",
+      "removed": "Los datos de esta cuenta fueron removidos de este dispositivo.",
+      "remove_error": "Algunos datos de la cuenta no se pudieron eliminar de este dispositivo. Inténtalo de nuevo antes de usar otra cuenta aquí.",
+      "remove_incomplete": "Algunos datos de la cuenta que eliminaste todavía están en este dispositivo. Inténtalo de nuevo antes de usar otra cuenta aquí.",
+      "retry_removal": "Intenta eliminar de nuevo",
+      "revocation_unavailable": "No se pudo acceder al servidor, por lo que aún estás conectado. Sólo puedes cerrar sesión en este dispositivo y eliminar los datos; el servidor no se contará, así que la sesión allí permanece activa hasta que caduque o cierre la sesión desde otro dispositivo.",
+      "confirm_device_only_button": "Cerrar sesión sólo en este dispositivo y eliminar datos"
     }
   },
   "hideout": {
@@ -2527,6 +2591,22 @@
       "approve": "Approve",
       "deny": "Deny"
     }
+  },
+  "tarkov_access": {
+    "title": "Verifique su navegador",
+    "checking": "Comprobando acceso al sitio…",
+    "description": "Este sitio está protegido contra peticiones automatizadas excesivas. Completa la verificación de seguridad a continuación para cargar los datos del juego Tarkov.",
+    "retry": "Intentar de nuevo",
+    "dismiss": "No ahora",
+    "dismissed_notice": "Los datos del juego se detienen hasta que completes la comprobación de seguridad.",
+    "verify_now": "Verificar ahora",
+    "verification_failed_retry": "La comprobación de seguridad no se completó. Puede intentarlo de nuevo.",
+    "verifying": "Verificando tu navegador…",
+    "widget_hint": "Complete la comprobación para continuar.",
+    "failed": "La carga de datos de Tarkov no está disponible actualmente. Puede intentarlo de nuevo.",
+    "blocked": "El acceso a los datos de Tarkov está actualmente bloqueado para su red. Puede intentarlo de nuevo o volver más tarde.",
+    "rate_limited": "Demasiadas comprobaciones en poco tiempo. Espere un momento y vuelva a intentarlo.",
+    "widget_unavailable": "No se pudo cargar la comprobación de seguridad. Puede intentarlo de nuevo."
   },
   "analytics_consent": {
     "eyebrow": "Analítica",
