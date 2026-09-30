@@ -5,13 +5,19 @@
 - **Purpose:** durable architecture record and resumable implementation plan for the Tarkov data and progress system.
 - **Decision status:** target architecture agreed; Phase 0 deployment safeguards completed.
 - **Interim state:** direct Worker JSON fetching remains an interim compatibility path, not the intended end state.
-- **Status 2026-09-25:** Phase-3 items verified resolved (original text below preserved): shared
-  `shared/utils/progressInvalidation.ts` is imported by both the app
-  (`app/stores/useProgress.ts`, `app/server/utils/streamerKappa.ts`) and the Worker
-  (`workers/api-gateway/src/utils/transform.ts`); `scripts/precompute/precompute.ts` applies the
-  overlay before projection and guards with `assertLooksLikeTasksCore`; client writes are hardened
-  via `20260830130000_harden_client_progress_access.sql` (direct client writes revoked, sync RPC
-  enforced). See in-place statuses below.
+- **Reading this record:** the defect and data-flow sections describe the 2026-07-18 baseline and
+  are preserved as history; dated status notes record what has since changed. The phase checklists
+  are the current target status. Data-layer terms (raw, adapted, overlay-corrected,
+  application-derived) and the split between Tarkov.dev game data and TarkovTracker's public API
+  are defined in [Game data](./systems/game-data.md#data-layers-and-contracts).
+- **Resolved historical defects:** malformed overlay projections in KV (overlay now runs before
+  projection), browser/Worker invalidation drift (one shared engine), mode-insensitive Worker JSON,
+  and direct client progress writes (revoked by
+  `20260830130000_harden_client_progress_access.sql`).
+- **Open architecture targets:** the canonical builder and immutable release publication (Phases
+  1–2), branch edges compiled from `failConditions` instead of the internal `alternatives` field
+  (Phase 3), Worker KV cutover (Phase 4), and Supabase request consolidation (Phase 5). The Phase 6
+  checklist has not been re-audited against the hardening migration.
 
 ## Executive decision
 
@@ -32,7 +38,10 @@ Do not make Supabase the primary runtime store for globally static game definiti
 
 ---
 
-## Current data flow
+## Baseline data flow (2026-07-18)
+
+Preserved as recorded when the decision was made; the status notes and checklists below record
+later changes, including the removal of direct browser `user_progress` upserts.
 
 ### Frontend metadata
 
@@ -137,6 +146,12 @@ Worker dependent-task transitions (`shared/utils/taskTransitions.ts`) are also s
 validates state shape only and implements no progression rules. Remaining Phase 3 gap: app
 failed-state repair (`app/stores/tarkov/progressRepair.ts`) still reads legacy `alternatives`.
 
+**Status 2026-09-30:** the engine is shared, but its branch input is not. The browser, team,
+shared-profile and streamer paths pass tasks through `useGraphBuilder().processTaskData`, which
+derives `alternatives` from completion-triggered `failConditions`; the Worker passes tasks without
+that field, so the engine's alternative-branch invalidation does not apply to API responses. Compiling
+explicit failure edges (Phase 3) closes this gap.
+
 ### Resolved: interim Worker JSON migration was mode-insensitive
 
 The Worker service, callers, and caches now select distinct `regular` and `pve` JSON data. Shared-profile failure metadata also uses the requested mode and the runtime-configurable Tarkov JSON base URL.
@@ -146,6 +161,11 @@ The remaining limitation is architectural rather than mode correctness: the Work
 ### P0: branch semantics depend on removed `alternatives`
 
 The upstream `alternatives` field no longer exists. Branch relationships are represented by `taskStatus` failure conditions. Compile explicit branch/failure edges from `failConditions` and remove runtime dependence on `alternatives`.
+
+**Status 2026-09-30: partially resolved — upstream no longer supplies `alternatives`; the app
+derives it internally from `failConditions` (`app/composables/useGraphBuilder.ts`). The
+target of explicit compiled edges, and removal of the derived field from repair and task actions,
+remains open.**
 
 ### Resolved: API usage User-Agent migration deployed and constrained
 
@@ -456,7 +476,9 @@ Use a canary before full rollout because current GET progress p95 CPU is already
 - [ ] Replace `alternatives` with failure-condition edges.
 - [x] Replace frontend implementation.
 - [x] Replace Worker implementation.
-- [ ] Reuse engine in shared-profile/streamer paths where applicable.
+- [x] Reuse engine in shared-profile/streamer paths where applicable. Shared profiles
+      (`app/features/profile/ProfileProgression.vue`) and streamer Kappa metrics
+      (`app/server/utils/streamerKappa.ts`) call `computeInvalidProgress`.
 
 ### Phase 4 — Worker KV cutover
 
