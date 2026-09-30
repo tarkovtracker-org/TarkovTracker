@@ -1,6 +1,6 @@
 // Default-branch, read-only planner for an opt-in final build rehearsal. This does not publish a
 // merge result: candidate-controlled CI jobs are useful evidence, but not an authenticated gate.
-import { classifyPaths } from '../validation-plan.mjs';
+import { classifyPaths } from '../ci/validation-plan.mjs';
 import { lstatSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildManifest, digestDirectory } from './manifest.mjs';

@@ -87,65 +87,64 @@
     "design:lint": "design.md lint DESIGN.md",
     "deps": "taze --r --I",
     "dev": "nuxt dev",
-    "lint:fallow": "node scripts/fallow-audit.mjs",
+    "lint:fallow": "node scripts/checks/fallow-audit.mjs",
     "format": "pnpm run format:prettier && NODE_ENV=development nuxt prepare && eslint app shared --fix && pnpm run format:blank-lines",
-    "format:blank-lines": "node scripts/lint-blank-lines.mjs --fix",
+    "format:blank-lines": "node scripts/checks/lint-blank-lines.mjs --fix",
     "format:check": "pnpm run format:check:prettier && pnpm run lint:blank-lines",
-    "format:check:prettier": "node scripts/format-files.mjs --check",
-    "format:prettier": "node scripts/format-files.mjs --write",
+    "format:check:prettier": "node scripts/checks/format-files.mjs --check",
+    "format:prettier": "node scripts/checks/format-files.mjs --write",
     "generate": "nuxt generate",
-    "i18n:check": "node scripts/lint-i18n.mjs",
-    "i18n:translate": "node scripts/translate-i18n.mjs",
+    "i18n:check": "node scripts/checks/lint-i18n.mjs",
     "lint": "pnpm run design:lint && NODE_ENV=development nuxt prepare && eslint app shared --max-warnings=0 && pnpm run lint:blank-lines",
-    "lint:blank-lines": "node scripts/lint-blank-lines.mjs",
+    "lint:blank-lines": "node scripts/checks/lint-blank-lines.mjs",
     "typecheck": "NODE_ENV=development nuxt typecheck && tsc -p scripts/precompute",
     "lint:fix": "NODE_ENV=development nuxt prepare && eslint app shared --fix && pnpm run format:blank-lines",
     "lint:unused": "knip --config .github/knip.json --reporter compact",
     "postinstall": "nuxt prepare",
     "verify:overlay": "tsx --tsconfig scripts/precompute/tsconfig.json scripts/precompute/check-overlay.ts",
     "precompute:tarkov": "tsx --tsconfig scripts/precompute/tsconfig.json scripts/precompute/run.ts",
-    "prod-db:test": "vitest run scripts/prod-db.test.mjs",
+    "prod-db:test": "vitest run scripts/ops/prod-db.test.mjs",
     "prepare": "husky || true",
     "preview": "nuxt preview",
-    "setup": "bash scripts/setup-dev-environment.sh",
-    "supabase:check": "bash scripts/check-supabase-db.sh",
+    "setup": "bash scripts/setup/setup-dev-environment.sh",
+    "supabase:check": "bash scripts/checks/check-supabase-db.sh",
     "supabase:types": "supabase gen types typescript --linked > supabase/functions/_shared/database.types.ts",
-    "systems:check": "node scripts/check-systems-drift.mjs",
+    "systems:check": "node scripts/checks/check-systems-drift.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
     "test:api-gateway": "vitest --config workers/api-gateway/vitest.config.ts",
     "validate:openapi": "pnpm --filter api-gateway run validate:openapi",
-    "validate:changes": "node scripts/validate-changes.mjs",
-    "test:workflow": "node --test scripts/ci-tests/*.mjs scripts/codex-review*-tests.mjs"
+    "validate:changes": "node scripts/ci/validate-changes.mjs",
+    "test:workflow": "node --test scripts/workflow-tests/*.mjs scripts/codex-review/*-tests.mjs"
   },
   "type": "module",
   "lint-staged": {
     "shared/**/*.{js,ts,tsx}": [
       "prettier --write",
       "eslint --fix",
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "app/**/*.{js,ts,tsx}": [
       "prettier --write",
       "eslint --fix",
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "app/**/*.vue": [
       "prettier --write",
       "eslint --fix",
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "app/**/*.{css,md}": [
       "prettier --write",
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "app/locales/en.json": [
       "prettier --write",
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "app/locales/*.json": [
-      "node scripts/lint-i18n.mjs"
+      "node scripts/checks/lint-i18n.mjs"
     ],
     "**/*.{md,markdown}": [
       "prettier --write"
@@ -156,72 +155,72 @@
     "./nuxt.config.ts": [
       "prettier --write",
       "eslint --fix",
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "app/app.config.ts": [
       "prettier --write",
       "eslint --fix",
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "./vitest*.ts": [
       "prettier --write",
       "eslint --fix",
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "./*.{js,mjs,cjs}": [
       "prettier --write",
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "!(app)/**/*.{js,mjs,cjs}": [
       "prettier --write",
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "tests/**/*.{ts,tsx}": [
       "prettier --write",
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "./*.json": [
       "prettier --write",
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "!(app|scripts|supabase|workers|.cubic)/**/*.json": [
       "prettier --write",
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "app/**/!(*locales)/*.json": [
       "prettier --write",
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "scripts/**/*.json": [
       "prettier --write",
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "scripts/**/*.mjs": [
       "prettier --write",
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "supabase/**/*.json": [
       "prettier --write",
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "workers/**/*.json": [
       "prettier --write",
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "scripts/**/*.{sh,ts,tsx}": [
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "supabase/**/*.{sh,ts,tsx}": [
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "workers/**/*.{sh,ts,tsx}": [
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     ".cubic/**/*.json": [
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "**/*.{yaml,yml}": [
-      "node scripts/lint-blank-lines.mjs --fix"
+      "node scripts/checks/lint-blank-lines.mjs --fix"
     ]
   }
 }
