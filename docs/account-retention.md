@@ -63,10 +63,12 @@ recreation of account-owned data.
 
 ## Rollout and operations
 
-Deployment is separate from PR approval. Apply the new migration before deploying the activity
-endpoint and billing webhook. Applying it installs the weekly schedule; the initial pending window
-prevents immediate deletion of historical accounts. Confirm deployed billing history and candidate
-evidence before that window ends. Legacy uncertain payment histories need authoritative Stripe
+Release and verify this change through the [deployment runbook](./runbook.md#deployment).
+Confirm the retention migration and changed billing webhook deployed successfully after merge.
+Checkout fails closed until its new eligibility RPC is available, so monitor the independent backend
+and frontend rollouts. Applying the migration installs the weekly schedule; the initial pending
+window prevents immediate deletion of historical accounts. Confirm deployed billing history and
+candidate evidence before that window ends. Legacy uncertain payment histories need authoritative Stripe
 reconciliation; do not convert unknown history to false in bulk.
 
 Use `private.account_retention_deadline(uuid)` for restricted candidate assessment and
