@@ -915,7 +915,7 @@ test('a manual same-repo dispatch owns its authorization and survives a later st
     /revoked or superseded/
   );
 });
-test('drafts, documentation-only scope and production runs never deploy', async (t) => {
+test('drafts, non-deployable scope and production runs never deploy', async (t) => {
   const draft = await plan(t, workflowRunContext(), { pull: pullFixture({ draft: true }) });
   assert.equal(draft.decision.action, 'skip');
   assert.equal(draft.decision.state, 'pending');
@@ -927,7 +927,17 @@ test('drafts, documentation-only scope and production runs never deploy', async 
   assert.equal(docs.decision.action, 'skip');
   assert.equal(docs.decision.state, 'success');
   assert.match(docs.decision.description, /Not applicable/);
-  // A rename out of the documentation set requires a preview even when the new path is Markdown.
+  // Repository automation and tooling changes never reach the deployed app either.
+  const automation = await plan(t, workflowRunContext(), {
+    files: [
+      { filename: '.github/workflows/ci.yml' },
+      { filename: 'scripts/ci/validate-changes.mjs' },
+    ],
+  });
+  assert.equal(automation.decision.action, 'skip');
+  assert.equal(automation.decision.state, 'success');
+  assert.match(automation.decision.description, /Not applicable/);
+  // A rename out of the non-deployable set requires a preview even when the new path is Markdown.
   const renamed = await plan(t, workflowRunContext(), {
     files: [{ filename: 'docs/a.md', previous_filename: 'app/a.ts' }],
   });
