@@ -21,6 +21,10 @@ import {
   type PersistedPreferencesStateWithLegacy,
 } from '@/stores/preferences/sanitizers';
 import {
+  isDeviceDataRemovalPending,
+  registerDeviceDataRemovalCleanup,
+} from '@/stores/tarkov/deviceData';
+import {
   isValidPrimaryView,
   type TaskPrimaryView,
   type TaskSecondaryView,
@@ -359,6 +363,7 @@ export const clearPendingResetPreferencesSnapshot = (userId?: string | null): vo
     pendingResetPreferencesSnapshot = null;
   }
 };
+registerDeviceDataRemovalCleanup(clearPendingResetPreferencesSnapshot);
 const serializePersistedPreferencesSnapshot = (
   state: PersistedPreferencesState,
   userId: string | null,
@@ -1113,14 +1118,16 @@ export const resetPreferencesStoreForSessionTransition = (
 ): void => {
   const preferencesStore = usePreferencesStore();
   const preservedState = getPreservedPreferencesStorageValue(previousUserId);
-  pendingResetPreferencesSnapshot = previousUserId
-    ? readPersistedPreferencesSnapshot(previousUserId)
-    : null;
+  pendingResetPreferencesSnapshot =
+    previousUserId && !isDeviceDataRemovalPending(previousUserId)
+      ? readPersistedPreferencesSnapshot(previousUserId)
+      : null;
   preferencesStore.resetToDefaults();
   if (!import.meta.client) {
     return;
   }
-  if (preservedState) {
+  // An explicit device-data removal keeps no preferences copy for the previous owner.
+  if (preservedState && !isDeviceDataRemovalPending(previousUserId)) {
     localStorage.setItem(STORAGE_KEYS.preferences, preservedState);
     return;
   }

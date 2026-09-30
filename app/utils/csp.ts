@@ -132,6 +132,7 @@ export const buildContentSecurityPolicy = (options: ContentSecurityPolicyOptions
     `connect-src ${getConnectSrcSources(options).join(' ')}`,
     `img-src ${getImgSrcSources(options).join(' ')}`,
     `frame-src ${getFrameSrcSources(options).join(' ')}`,
+    "frame-ancestors 'self'",
     `style-src ${getStyleSrcSources().join(' ')}`,
     `font-src ${getFontSrcSources().join(' ')}`,
   ].join('; ');

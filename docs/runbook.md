@@ -111,6 +111,14 @@ Prepare and deploy each rollover in two releases during the no-write gap between
 
 ## Deployment
 
+### Internal game-data browser verification
+
+Application support is disabled by default and does not itself enforce CDN access.
+Use the [browser-clearance rollout and rollback procedure](./tarkov-clearance-rollout.md)
+for staging, alias closure, Access-protected automation, exact production approval and
+readback evidence. **Disable the edge challenge rule before removing frontend recovery.**
+Production deployment, Cloudflare mutations and merge require separate approval.
+
 Merging to `main` deploys everything automatically. Three integrations do the work — none of them
 GitHub Actions — and each surfaces as a check on the merge commit:
 

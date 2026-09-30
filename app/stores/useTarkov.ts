@@ -10,14 +10,37 @@ import {
   type UserState,
 } from '@/stores/progressState';
 import {
+  hasAccountRecoveryCopy,
+  isAccountRecoveryRetentionBlocked,
+  mayHoldAccountRecoveryCopy,
+  markAccountRecoveryRetentionBlocked,
+  preserveForeignActiveCopy,
+  readAccountRecoveryCopy,
+  removeAccountRecoveryCopy,
+  retryBlockedAccountRecoveryRetention,
+  saveAccountRecoveryCopy,
+  selectFreshestOwnerProgressSnapshot,
+} from '@/stores/tarkov/accountRecovery';
+import {
+  clearDeviceDataRemoval,
+  clearIncompleteDeviceDataRemoval,
+  isDeviceDataRemovalPending,
+  registerDeviceDataRemovalCleanup,
+  removeAccountDeviceData,
+} from '@/stores/tarkov/deviceData';
+import {
   enforceHideoutPrereqs,
   notifyHideoutPrereqEnforcement,
 } from '@/stores/tarkov/hideoutPrereqs';
 import {
-  clearProgressStorageSafely,
+  clearActiveProgressStorage,
   cloneStateSnapshot,
   getPreservedProgressStorageValue,
+  parsePersistedProgressState,
+  progressStorageSerializer,
+  readPersistedProgressState,
   safeSetItem,
+  setActiveProgressWritesBlocked,
 } from '@/stores/tarkov/localStorage';
 import {
   markProgressMetadataHydrated,
@@ -42,6 +65,11 @@ import {
 } from '@/stores/tarkov/progressMigration';
 import { syncProgressState } from '@/stores/tarkov/progressPersistence';
 import { repairCompletedProgress, repairFailedProgress } from '@/stores/tarkov/progressRepair';
+import {
+  acknowledgeStartupSync,
+  hasUnsavedProgressChanges,
+  resetCloudSaveStatus,
+} from '@/stores/tarkov/progressSaveStatus';
 import { progressStorePersist } from '@/stores/tarkov/progressStorePersist';
 import {
   registerSyncControllerGetter,
@@ -59,8 +87,9 @@ import { recordLocalSyncTime } from '@/stores/tarkov/syncTimeline';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { GAME_MODES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import { sanitizeOwnedUserState } from '@/utils/progressSanitizers';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
-import { getCurrentSupabaseUserId } from '@/utils/userScopedStorage';
+import { getCurrentSupabaseUserId, parseUserScopedStorage } from '@/utils/userScopedStorage';
 export type { PrestigeRunRecord } from '@/stores/tarkov/prestige';
 type TarkovStoreInstance = UserState & {
   $state: UserState;
@@ -107,7 +136,7 @@ const persistOnlineReset = async (
   const freshState = buildOnlineResetState(store);
   const { error } = await syncProgressState(client, userId, freshState);
   throwSyncError(error, 'Failed to reset online profile');
-  clearProgressStorage();
+  clearActiveProgressStorage(userId);
   patchProgressState(store, freshState);
 };
 const persistPrestigeLevel = async (
@@ -406,6 +435,7 @@ type TarkovStore = ReturnType<typeof useTarkovStore>;
 // ============================================================================
 const progressSync = new ProgressSyncSession();
 registerSyncControllerGetter(progressSync.getController);
+registerDeviceDataRemovalCleanup((userId) => progressSync.dropPreservedSnapshotFor(userId));
 registerTarkovMetadataHooks({
   getCurrentGameMode: () => useTarkovStore().getCurrentGameMode(),
   repairCompletedTaskObjectives: () => {
@@ -492,26 +522,100 @@ export function resetTarkovSync(
   progressSync.preserveSnapshot(options);
   progressSync.reset(reason);
 }
+/**
+ * Memory-only edits made while sync was unavailable exist only in the store. Before a retry
+ * reruns the startup load, which rehydrates from storage, hand them over as the session
+ * snapshot for `userId` so the startup merge keeps them. The serializer's clocks mark only the
+ * edited modes and metadata as new, so untouched modes still yield to newer remote progress.
+ */
+export function preserveUnsavedSessionProgress(userId: string): void {
+  if (!hasUnsavedProgressChanges() || getCurrentSupabaseUserId() !== userId) return;
+  const state = cloneStateSnapshot(sanitizeOwnedUserState(useTarkovStore().$state));
+  const snapshot = parsePersistedProgressState(
+    progressStorageSerializer.serialize(state, userId, Date.now()),
+    userId
+  );
+  if (snapshot) progressSync.handOffSnapshot(userId, snapshot);
+}
+/**
+ * Whether local progress may be waiting for the cloud when initialization fails: tracked
+ * progress, a failed local save, or a recovery copy that exists, is unreadable, or is blocked. A
+ * default account has nothing to save.
+ */
+export function mayHoldUnsyncedProgress(userId: string): boolean {
+  return (
+    hasProgress(useTarkovStore().$state) ||
+    hasUnsavedProgressChanges() ||
+    mayHoldAccountRecoveryCopy(userId)
+  );
+}
+/**
+ * Unacknowledged changes stay recoverable for their owner after sign-out, even if another
+ * account or a guest session later overwrites the active copy. An explicit device-data
+ * removal for that owner retains nothing.
+ */
+const retainPreviousOwnerCopy = (preservedState: string | null, previousUserId: string | null) => {
+  if (isDeviceDataRemovalPending(previousUserId)) return true;
+  if (!preservedState || !previousUserId) return true;
+  if (parseUserScopedStorage<unknown>(preservedState)?._userId !== previousUserId) return true;
+  if (!progressSync.mayHaveUnacknowledgedChanges()) return true;
+  const retained = saveAccountRecoveryCopy(preservedState, previousUserId);
+  setActiveProgressWritesBlocked(!retained);
+  return retained;
+};
+/** Returns `true` when the previous owner's active copy was restored for a guest session. */
+const restorePreviousOwnerCopy = (
+  preservedState: string | null,
+  previousUserId: string | null,
+  currentUserId: string | null
+): boolean => {
+  if (isDeviceDataRemovalPending(previousUserId)) {
+    removeAccountDeviceData(previousUserId as string);
+    return false;
+  }
+  return (
+    Boolean(preservedState && currentUserId === null) &&
+    safeSetItem(STORAGE_KEYS.progress, preservedState as string)
+  );
+};
+const resetSessionMemory = (reason: string | undefined, userId: string | null) => {
+  resetProgressMetadataHydration();
+  resetTarkovSync(reason, { preservePersistedStateForUserId: userId });
+  useTarkovStore().$reset();
+};
+/** Retains the previous owner's copy, or blocks active-copy writes when that is impossible. */
+const retainForSessionTransition = (
+  preservedState: string | null,
+  previousUserId: string | null
+): boolean => {
+  if (!retryBlockedAccountRecoveryRetention() || isAccountRecoveryRetentionBlocked()) {
+    setActiveProgressWritesBlocked(true);
+    return false;
+  }
+  if (retainPreviousOwnerCopy(preservedState, previousUserId)) return true;
+  markAccountRecoveryRetentionBlocked();
+  setActiveProgressWritesBlocked(true);
+  return false;
+};
 export function resetTarkovStoreForSessionTransition(
   previousUserId: string | null = null,
   reason?: string
 ) {
   const preservedState = getPreservedProgressStorageValue(previousUserId);
   const currentUserId = getCurrentSupabaseUserId();
-  resetProgressMetadataHydration();
-  resetTarkovSync(reason, {
-    preservePersistedStateForUserId: previousUserId,
-  });
-  useTarkovStore().$reset();
+  if (!retainForSessionTransition(preservedState, previousUserId)) {
+    resetSessionMemory(reason, previousUserId);
+    return;
+  }
+  setActiveProgressWritesBlocked(false);
+  resetSessionMemory(reason, previousUserId);
   if (!import.meta.client) {
     return;
   }
-  if (preservedState && currentUserId === null) {
-    if (safeSetItem(STORAGE_KEYS.progress, preservedState)) {
-      return;
-    }
-  }
-  clearProgressStorageSafely();
+  if (restorePreviousOwnerCopy(preservedState, previousUserId, currentUserId)) return;
+  // Only the active copy is cleared: recovery copies belong to their owners. The reset above
+  // may have persisted a default placeholder for the new owner; it is not their progress.
+  clearActiveProgressStorage(currentUserId);
 }
 /** Returns false when a sync for `userId` is already running; resets a sync owned by another user. */
 const claimSyncStartup = (userId: string): boolean => {
@@ -568,19 +672,90 @@ const persistPostLoadChanges = async (
     throw error;
   }
 };
+const failBlockedRetention = (toastI18n: ReturnType<typeof useToastI18n>): never => {
+  setActiveProgressWritesBlocked(true);
+  toastI18n.showLoadFailed();
+  throw new Error('Account recovery retention is blocked');
+};
+/**
+ * Retain another account's active copy, then pick the freshest of this user's recovery copy,
+ * persisted copy, and handed-off snapshot. Throws while retention is blocked.
+ */
+const selectStartupSnapshot = (userId: string, toastI18n: ReturnType<typeof useToastI18n>) => {
+  // A new sign-in ends any device-data removal requested for the previous session.
+  clearDeviceDataRemoval();
+  clearIncompleteDeviceDataRemoval(userId);
+  if (!retryBlockedAccountRecoveryRetention() || !preserveForeignActiveCopy(userId)) {
+    failBlockedRetention(toastI18n);
+  }
+  const snapshot = selectFreshestOwnerProgressSnapshot(
+    readAccountRecoveryCopy(userId),
+    readPersistedProgressState(userId),
+    progressSync.preservedSnapshotFor(userId)
+  );
+  if (isAccountRecoveryRetentionBlocked()) failBlockedRetention(toastI18n);
+  return snapshot;
+};
+type StartupCloudState = {
+  /** A recovery copy holds changes the cloud has not acknowledged yet. */
+  awaitsUpload: boolean;
+  /** The recovery copy must be retired by the next acknowledged upload. */
+  retirementPending: boolean;
+};
+/**
+ * The startup merge reconciled local changes with the cloud; a previous failed attempt's
+ * unavailable status no longer applies. Memory-only local changes are acknowledged only when
+ * the cloud now holds them, which also retires the recovery copy. A removal the browser rejects
+ * stays pending for the next acknowledged upload.
+ */
+const settleStartupCloudState = (
+  userId: string,
+  cloudHoldsResolvedState: boolean
+): StartupCloudState => {
+  if (!cloudHoldsResolvedState) {
+    resetCloudSaveStatus();
+    const awaitsUpload = hasAccountRecoveryCopy(userId);
+    return { awaitsUpload, retirementPending: awaitsUpload };
+  }
+  acknowledgeStartupSync();
+  return { awaitsUpload: false, retirementPending: !removeAccountRecoveryCopy(userId) };
+};
+/**
+ * The first acknowledged upload carries the recovered state, whichever attempt it was. A removal
+ * the browser rejects stays pending so a later acknowledged upload retries it.
+ */
+const retireRecoveryCopyOnFirstSync = (userId: string, retirementPending: boolean) => {
+  let pending = retirementPending;
+  return () => {
+    if (pending) pending = !removeAccountRecoveryCopy(userId);
+  };
+};
+type ProgressSyncStart = {
+  hadRemoteData: boolean;
+  /** Memory-only or recovered changes the startup load did not upload. */
+  hasUnsavedHandoff: boolean;
+  onSynced: () => void;
+};
+const shouldStartSyncNow = (store: TarkovStore, start: ProgressSyncStart): boolean =>
+  start.hadRemoteData || hasProgress(store.$state) || start.hasUnsavedHandoff;
 const startProgressSync = (
   store: TarkovStore,
   userId: string,
-  hadRemoteData: boolean,
+  start: ProgressSyncStart,
   isStartupCurrent: StartupOwnershipGuard
 ): void => {
   const { $supabase } = useNuxtApp();
-  const options = { store, client: $supabase.client, userId, hadRemoteData };
-  if (hadRemoteData || hasProgress(store.$state)) {
-    if (isStartupCurrent()) progressSync.start(options);
+  const { hadRemoteData, onSynced } = start;
+  const options = { store, client: $supabase.client, userId, hadRemoteData, onSynced };
+  if (!shouldStartSyncNow(store, start)) {
+    progressSync.startWhenProgressExists(options, isStartupCurrent);
     return;
   }
-  progressSync.startWhenProgressExists(options, isStartupCurrent);
+  if (!isStartupCurrent()) return;
+  progressSync.start(options);
+  // Handed-off changes have no other path to the cloud; a failed attempt schedules the
+  // controller's retries, which merge remote state first.
+  if (start.hasUnsavedHandoff) progressSync.attemptSync();
 };
 export async function initializeTarkovSync() {
   const tarkovStore = useTarkovStore();
@@ -595,7 +770,7 @@ export async function initializeTarkovSync() {
   if (!claimSyncStartup(userId)) return;
   const isStartupCurrent = beginOwnedStartup(userId);
   logger.debug('[TarkovStore] Setting up Supabase sync and listener');
-  const preservedSnapshot = progressSync.preservedSnapshotFor(userId);
+  const preservedSnapshot = selectStartupSnapshot(userId, toastI18n);
   // Load completes BEFORE sync starts, so empty local state never overwrites server data.
   const loadResult = await loadInitialProgress({
     store: tarkovStore,
@@ -613,13 +788,22 @@ export async function initializeTarkovSync() {
     throw new Error('Supabase initial load failed');
   }
   markProgressMetadataHydrated();
+  const startupCloudState = settleStartupCloudState(
+    userId,
+    loadResult.hadRemoteData || loadResult.migratedLocalState
+  );
   syncMetadataAfterStartup(tarkovStore, isStartupCurrent);
   if (preservedSnapshot) progressSync.consumePreservedSnapshot();
   if (applyPostLoadRepairs(tarkovStore) > 0 || loadResult.needsRemoteCleanup) {
     await persistPostLoadChanges(tarkovStore, userId, isStartupCurrent);
     if (!isStartupCurrent()) return;
   }
-  startProgressSync(tarkovStore, userId, loadResult.hadRemoteData, isStartupCurrent);
+  const syncStart = {
+    hadRemoteData: loadResult.hadRemoteData,
+    hasUnsavedHandoff: hasUnsavedProgressChanges() || startupCloudState.awaitsUpload,
+    onSynced: retireRecoveryCopyOnFirstSync(userId, startupCloudState.retirementPending),
+  };
+  startProgressSync(tarkovStore, userId, syncStart, isStartupCurrent);
   // MULTI-DEVICE CONFLICT RESOLUTION: awaited so initialization does not report success before
   // Realtime acknowledges the channel; failed or stalled joins reject to the app init boundary.
   if (!isStartupCurrent()) return;

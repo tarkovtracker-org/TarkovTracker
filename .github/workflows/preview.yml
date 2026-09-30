@@ -202,6 +202,8 @@ jobs:
           EXPECTED_DIGEST: ${{ needs.deploy.outputs.digest }}
           EXPECTED_PREVIEW_BRANCH: ${{ needs.deploy.outputs.preview_branch }}
           SMOKE_REPORT_DIR: ${{ runner.temp }}/smoke-report
+          PREVIEW_ACCESS_CLIENT_ID: ${{ secrets.PREVIEW_ACCESS_CLIENT_ID }}
+          PREVIEW_ACCESS_CLIENT_SECRET: ${{ secrets.PREVIEW_ACCESS_CLIENT_SECRET }}
         run: pnpm exec playwright test --config scripts/preview/smoke/playwright.config.mjs
       - name: Retain smoke evidence
         if: always()

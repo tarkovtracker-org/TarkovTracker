@@ -3,10 +3,23 @@ import { flushPromises } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { effectScope, ref } from 'vue';
 import { useProfileTaskMetadata } from '@/composables/useProfileTaskMetadata';
+import { getTarkovAccessState } from '@/utils/tarkovApiFetch';
 import { projectDuplicateObjectiveProgress } from '@/utils/taskNormalization';
 import { createDeferred } from '@/utils/test-helpers';
 import type { GameMode } from '@/utils/constants';
+const { accessGate } = vi.hoisted(() => ({
+  accessGate: { pending: null as Promise<number> | null },
+}));
+vi.mock('@/utils/tarkovApiFetch', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/utils/tarkovApiFetch')>();
+  return {
+    ...actual,
+    ensureTarkovAccess: (signal?: AbortSignal) =>
+      accessGate.pending ?? actual.ensureTarkovAccess(signal),
+  };
+});
 afterEach(() => {
+  accessGate.pending = null;
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
@@ -30,6 +43,7 @@ describe('profile mode metadata', () => {
     vi.stubGlobal('$fetch', fetch);
     const scope = effectScope();
     const result = scope.run(() => useProfileTaskMetadata(mode, ref('de')))!;
+    await flushPromises();
     const firstSignal = fetch.mock.calls[0]![1].signal;
     mode.value = 'pve';
     await flushPromises();
@@ -93,6 +107,61 @@ describe('profile mode metadata', () => {
     expect(result.error.value?.message).toBe('Profile metadata request timed out');
     expect(result.loading.value).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
+    scope.stop();
+  });
+  it('starts the request budget only after a slow security check releases access', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const clearance = createDeferred<number>();
+    accessGate.pending = clearance.promise;
+    const fetch = vi.fn((url: string) => {
+      if (url.includes('tasks-')) return Promise.resolve({ data: { tasks: [{ id: 'task' }] } });
+      if (url.includes('prestige')) return Promise.resolve({ data: { prestige: [] } });
+      return Promise.resolve({ data: { editions: [], storyChapters: [] } });
+    });
+    vi.stubGlobal('$fetch', fetch);
+    const scope = effectScope();
+    const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pve'), ref('en')))!;
+    await vi.advanceTimersByTimeAsync(120000);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(result.loading.value).toBe(true);
+    expect(result.error.value).toBeNull();
+    accessGate.pending = null;
+    clearance.resolve(1);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(result.tasks.value).toEqual([expect.objectContaining({ id: 'task' })]);
+    expect(result.error.value).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+    scope.stop();
+  });
+  it('surfaces a failed access check without starting catalog requests', async () => {
+    accessGate.pending = Promise.reject(new Error('The access check failed.'));
+    const fetch = vi.fn();
+    vi.stubGlobal('$fetch', fetch);
+    const scope = effectScope();
+    const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pve'), ref('en')))!;
+    await flushPromises();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(result.error.value?.message).toBe('The access check failed.');
+    expect(result.loading.value).toBe(false);
+    scope.stop();
+  });
+  it('reloads after access recovers from a failed security check', async () => {
+    accessGate.pending = Promise.reject(new Error('The security check was dismissed.'));
+    const fetch = vi.fn((url: string) => {
+      if (url.includes('tasks-')) return Promise.resolve({ data: { tasks: [{ id: 'task' }] } });
+      if (url.includes('prestige')) return Promise.resolve({ data: { prestige: [] } });
+      return Promise.resolve({ data: { editions: [], storyChapters: [] } });
+    });
+    vi.stubGlobal('$fetch', fetch);
+    const scope = effectScope();
+    const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pve'), ref('en')))!;
+    await flushPromises();
+    expect(result.error.value?.message).toBe('The security check was dismissed.');
+    accessGate.pending = null;
+    getTarkovAccessState().recoveryEpoch.value += 1;
+    await flushPromises();
+    expect(result.error.value).toBeNull();
+    expect(result.tasks.value).toEqual([expect.objectContaining({ id: 'task' })]);
     scope.stop();
   });
 });

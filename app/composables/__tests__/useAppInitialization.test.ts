@@ -39,6 +39,8 @@ vi.mock('@/composables/useSupporter', () => ({ useSupporter: () => mockSupporter
 const mockInitializeTarkovSync = vi.fn(async () => {});
 const mockResetTarkovStoreForSessionTransition = vi.fn();
 const mockResetTarkovSync = vi.fn();
+const mockPreserveUnsavedSessionProgress = vi.fn();
+const mockMayHoldUnsyncedProgress = vi.fn((_userId: string) => true);
 const mockMigrateDataIfNeeded = vi.fn(async () => {});
 const mockActivityLogResetForSession = vi.fn();
 const mockActivityLogMigrateLegacyManualEntries = vi.fn();
@@ -76,6 +78,9 @@ vi.mock('@/composables/useToastI18n', () => ({
 }));
 vi.mock('@/stores/useTarkov', () => ({
   initializeTarkovSync: () => mockInitializeTarkovSync(),
+  mayHoldUnsyncedProgress: (userId: string) => mockMayHoldUnsyncedProgress(userId),
+  preserveUnsavedSessionProgress: (...args: unknown[]) =>
+    mockPreserveUnsavedSessionProgress(...args),
   resetTarkovStoreForSessionTransition: (...args: unknown[]) =>
     mockResetTarkovStoreForSessionTransition(...args),
   resetTarkovSync: (...args: unknown[]) => mockResetTarkovSync(...args),
@@ -468,11 +473,55 @@ describe('useAppInitialization locale setup', () => {
       expect(mockShowLoadFailed).toHaveBeenCalledTimes(1);
       await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS);
       expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(2);
+      expect(mockPreserveUnsavedSessionProgress).toHaveBeenCalledWith('user-1');
       expect(mockActivityLogMigrateLegacyManualEntries).toHaveBeenCalledTimes(1);
       expect(mockShowLoadFailed).toHaveBeenCalledTimes(1);
       await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS * 2);
       expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(2);
       expect(mockResetTarkovSync).toHaveBeenCalledTimes(1);
+      wrapper.unmount();
+    });
+    it('keeps cloud saving visibly unavailable and retryable after initial sync fails', async () => {
+      vi.useFakeTimers();
+      const { progressSaveStatus, resetCloudSaveStatus, retryCloudSave } =
+        await import('@/stores/tarkov/progressSaveStatus');
+      resetCloudSaveStatus();
+      mockInitializeTarkovSync.mockRejectedValueOnce(new Error('offline'));
+      mockSupabaseUser.loggedIn = true;
+      mockSupabaseUser.id = 'user-1';
+      const wrapper = await mountWithComposable();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(progressSaveStatus.cloud.state).toBe('failed');
+      mockInitializeTarkovSync.mockImplementationOnce(async () => {
+        // A successful startup load clears the unavailable status (see initializeTarkovSync).
+        resetCloudSaveStatus();
+      });
+      expect(mockPreserveUnsavedSessionProgress).not.toHaveBeenCalled();
+      await expect(retryCloudSave()).resolves.toBe(true);
+      expect(mockPreserveUnsavedSessionProgress).toHaveBeenCalledWith('user-1');
+      expect(mockPreserveUnsavedSessionProgress.mock.invocationCallOrder[0]).toBeLessThan(
+        mockInitializeTarkovSync.mock.invocationCallOrder[1]!
+      );
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(SYNC_RETRY_DELAY_MS * 2);
+      // The manual retry replaced the scheduled one.
+      expect(mockInitializeTarkovSync).toHaveBeenCalledTimes(2);
+      wrapper.unmount();
+    });
+    it('reports a read-only initial sync failure as a load failure, not a failed save', async () => {
+      vi.useFakeTimers();
+      const { progressSaveStatus, resetCloudSaveStatus } =
+        await import('@/stores/tarkov/progressSaveStatus');
+      resetCloudSaveStatus();
+      mockMayHoldUnsyncedProgress.mockReturnValueOnce(false);
+      mockInitializeTarkovSync.mockRejectedValueOnce(new Error('offline'));
+      mockSupabaseUser.loggedIn = true;
+      mockSupabaseUser.id = 'user-1';
+      const wrapper = await mountWithComposable();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mockMayHoldUnsyncedProgress).toHaveBeenCalledWith('user-1');
+      expect(mockShowLoadFailed).toHaveBeenCalledTimes(1);
+      expect(progressSaveStatus.cloud.state).toBe('idle');
       wrapper.unmount();
     });
     it('stops retrying after the bounded number of attempts', async () => {

@@ -2,6 +2,7 @@ import { logger } from '@/utils/logger';
 import { TURNSTILE_SCRIPT_URL } from '@/utils/turnstileKeys';
 type TurnstileRenderOptions = {
   sitekey: string;
+  action?: string;
   callback: (token: string) => void;
   'error-callback': () => void;
   'expired-callback': () => void;
@@ -20,8 +21,16 @@ export interface UseTurnstileWidgetReturn {
   ready: Readonly<Ref<boolean>>;
   /** True once the widget has issued a usable token; false until the challenge is solved. */
   solved: Readonly<Ref<boolean>>;
+  /** True when the widget cannot ever supply a token: script load gave up or render failed. */
+  unavailable: Readonly<Ref<boolean>>;
   getToken: () => Promise<string | null>;
   reset: () => void;
+}
+export interface TurnstileWidgetOptions {
+  /** Explicit site key; defaults to the public config `turnstileSiteKey`. */
+  siteKey?: string;
+  /** Explicit action bound at render time; omitted when absent. */
+  action?: string;
 }
 export const TOKEN_WAIT_TIMEOUT_MS = 8000;
 export const SCRIPT_LOAD_RETRY_MS = 5000;
@@ -42,12 +51,21 @@ function loadTurnstileApi(): Promise<TurnstileApi | null> {
       const script = document.createElement('script');
       script.src = TURNSTILE_SCRIPT_URL;
       script.async = true;
+      const loadTimeout = setTimeout(() => {
+        script.onload = null;
+        script.onerror = null;
+        script.remove();
+        scriptPromise = null;
+        resolvePromise(null);
+      }, SCRIPT_LOAD_RETRY_MS);
       script.onload = () => {
+        clearTimeout(loadTimeout);
         const loadedApi = readTurnstileApi();
         if (!loadedApi) scriptPromise = null;
         resolvePromise(loadedApi);
       };
       script.onerror = () => {
+        clearTimeout(loadTimeout);
         logger.warn('[Turnstile] Failed to load the Turnstile script');
         scriptPromise = null;
         resolvePromise(null);
@@ -57,13 +75,22 @@ function loadTurnstileApi(): Promise<TurnstileApi | null> {
   }
   return scriptPromise;
 }
-export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurnstileWidgetReturn {
+export function useTurnstileWidget(
+  container: Ref<HTMLElement | null>,
+  options?: TurnstileWidgetOptions
+): UseTurnstileWidgetReturn {
   const config = useRuntimeConfig();
   const siteKey =
-    typeof config.public.turnstileSiteKey === 'string' ? config.public.turnstileSiteKey.trim() : '';
+    typeof options?.siteKey === 'string'
+      ? options.siteKey.trim()
+      : typeof config.public.turnstileSiteKey === 'string'
+        ? config.public.turnstileSiteKey.trim()
+        : '';
   const enabled = siteKey.length > 0;
   const ready = ref(!enabled);
   const solved = ref(!enabled);
+  /** Set when the script failed to load past the retry budget or render raised. */
+  const unavailable = ref(!enabled);
   let api: TurnstileApi | null = null;
   let widgetId: string | undefined;
   let latestToken: string | null = null;
@@ -81,6 +108,7 @@ export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurns
     scriptLoadAttempts = 0;
     ready.value = !enabled;
     solved.value = !enabled;
+    unavailable.value = !enabled;
     latestToken = null;
     flushWaiters(null);
     if (retryTimer) {
@@ -102,7 +130,10 @@ export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurns
     const loadedApi = await loadTurnstileApi();
     if (generation !== renderGeneration || container.value !== element) return;
     if (!loadedApi) {
-      if (scriptLoadAttempts >= MAX_SCRIPT_LOAD_ATTEMPTS) return;
+      if (scriptLoadAttempts >= MAX_SCRIPT_LOAD_ATTEMPTS) {
+        unavailable.value = true;
+        return;
+      }
       retryTimer = setTimeout(() => {
         retryTimer = null;
         const currentContainer = container.value;
@@ -112,31 +143,39 @@ export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurns
     }
     scriptLoadAttempts = 0;
     api = loadedApi;
+    const renderOptions: TurnstileRenderOptions = {
+      sitekey: siteKey,
+      callback: (token: string) => {
+        latestToken = token;
+        solved.value = true;
+        unavailable.value = false;
+        flushWaiters(token);
+      },
+      'error-callback': () => {
+        unavailable.value = true;
+        latestToken = null;
+        solved.value = false;
+        flushWaiters(null);
+      },
+      'expired-callback': () => {
+        latestToken = null;
+        solved.value = false;
+      },
+      appearance: 'always',
+      'refresh-expired': 'auto',
+      size: 'flexible',
+      theme: 'auto',
+    };
+    if (options?.action) {
+      renderOptions.action = options.action;
+    }
     try {
-      widgetId = api.render(element, {
-        sitekey: siteKey,
-        callback: (token: string) => {
-          latestToken = token;
-          solved.value = true;
-          flushWaiters(token);
-        },
-        'error-callback': () => {
-          latestToken = null;
-          solved.value = false;
-          flushWaiters(null);
-        },
-        'expired-callback': () => {
-          latestToken = null;
-          solved.value = false;
-        },
-        appearance: 'always',
-        'refresh-expired': 'auto',
-        size: 'flexible',
-        theme: 'auto',
-      });
+      widgetId = api.render(element, renderOptions);
       ready.value = widgetId !== undefined;
+      unavailable.value = widgetId === undefined;
     } catch (error) {
       logger.warn('[Turnstile] Failed to render widget:', error);
+      unavailable.value = true;
     }
   };
   if (enabled) {
@@ -167,16 +206,28 @@ export function useTurnstileWidget(container: Ref<HTMLElement | null>): UseTurns
       waiters.push(resolveWithCleanup);
     });
   };
+  // A widget that never rendered has nothing to reset: render it again with a fresh budget.
+  const rerenderUnrenderedWidget = (): boolean => {
+    const element = container.value;
+    if (!enabled || widgetId !== undefined || !element) return false;
+    removeWidget();
+    void renderWidget(element);
+    return true;
+  };
   const reset = (): void => {
     latestToken = null;
     solved.value = false;
+    if (rerenderUnrenderedWidget()) return;
     if (api && widgetId !== undefined) {
+      // Clear a latched error first so a repeat failure transitions `unavailable` again.
+      unavailable.value = false;
       try {
         api.reset(widgetId);
       } catch (error) {
         logger.debug('[Turnstile] Failed to reset widget:', error);
+        unavailable.value = true;
       }
     }
   };
-  return { enabled, getToken, ready, reset, solved };
+  return { enabled, getToken, ready, reset, solved, unavailable };
 }

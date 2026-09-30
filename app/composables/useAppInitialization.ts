@@ -1,10 +1,16 @@
 import { useSupporter } from '@/composables/useSupporter';
 import { useToastI18n } from '@/composables/useToastI18n';
+import {
+  hasPendingCloudChanges,
+  markCloudSyncUnavailable,
+} from '@/stores/tarkov/progressSaveStatus';
 import { useActivityLogStore } from '@/stores/useActivityLogStore';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import {
   initializeTarkovSync,
+  mayHoldUnsyncedProgress,
+  preserveUnsavedSessionProgress,
   resetTarkovStoreForSessionTransition,
   resetTarkovSync,
   useTarkovStore,
@@ -102,24 +108,46 @@ export function useAppInitialization() {
     cancelSyncRetry();
     syncRetryTimer = setTimeout(() => {
       syncRetryTimer = null;
-      void runAuthenticatedInitialization(expectedUserId, expectedToken);
+      void retryAuthenticatedInitialization(expectedUserId, expectedToken);
     }, SYNC_RETRY_DELAY_MS);
     syncRetryAttempts += 1;
   };
   const handleSyncFailure = (expectedUserId?: string, expectedToken?: number) => {
-    if (isStaleInitialization(expectedUserId, expectedToken) || !getAuthenticatedUserId()) return;
+    const userId = getAuthenticatedUserId();
+    if (isStaleInitialization(expectedUserId, expectedToken) || !userId) return;
     // A failure after the sync controller or realtime listener was created
     // leaves them partially initialized; the same-user guard inside
     // initializeTarkovSync would then skip listener setup on the retry and
     // disconnect cross-device updates. Tear the machinery down so the retry
     // starts from a clean slate.
     resetTarkovSync('initial sync failed');
+    // A failed load is not a failed save unless local progress may be waiting for the cloud.
+    if (mayHoldUnsyncedProgress(userId)) {
+      markCloudSyncUnavailable(() => retrySyncNow(expectedUserId, expectedToken));
+    }
     reportSyncFailure();
     if (syncRetryAttempts >= SYNC_RETRY_MAX_ATTEMPTS) {
       showLoadFailed();
       return;
     }
     scheduleSyncRetry(expectedUserId, expectedToken);
+  };
+  /** Manual retry from the save indicator: restart initialization now with a fresh budget. */
+  const retrySyncNow = async (expectedUserId?: string, expectedToken?: number) => {
+    cancelSyncRetry();
+    syncRetryAttempts = 0;
+    await retryAuthenticatedInitialization(expectedUserId, expectedToken);
+    return !hasPendingCloudChanges();
+  };
+  /** A retry must not let the startup load rehydrate over edits held only in memory. */
+  const retryAuthenticatedInitialization = async (
+    expectedUserId?: string,
+    expectedToken?: number
+  ) => {
+    if (expectedUserId && !isStaleInitialization(expectedUserId, expectedToken)) {
+      preserveUnsavedSessionProgress(expectedUserId);
+    }
+    await runAuthenticatedInitialization(expectedUserId, expectedToken);
   };
   const runAuthenticatedInitialization = async (
     expectedUserId?: string,
