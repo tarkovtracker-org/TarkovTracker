@@ -804,12 +804,19 @@ flowchart LR
    active season, so a cached client from a previous season cannot upload stale Seasonal state. A
    client sync carries only the modes that differ from the copy the server last loaded,
    acknowledged, or delivered through Realtime for this session
-   (`app/stores/tarkov/acknowledgedModes.ts`); an omitted mode is kept as stored. A multi-mode sync
-   over half the payload cap is sent as one request per mode, and each mode is acknowledged only
-   after its request succeeds; a newer sync, a session reset, or Realtime applying newer progress or
-   account metadata stops the remaining requests so they never replay a stale snapshot; the
+   (`app/stores/tarkov/acknowledgedModes.ts`); an omitted mode is kept as stored. Background and
+   direct saves share an account queue in `app/stores/tarkov/progressPersistence.ts`, and compare
+   their captured snapshot with the baseline only after preceding writes settle. Dispatched modes
+   remain unacknowledged until a current request succeeds, so a revert cannot match an obsolete
+   baseline while an older write is still pending, including across a same-account session reset.
+   A multi-mode sync over half the payload cap is sent as one request per mode, and each mode is
+   acknowledged only after its request succeeds; a newer sync, a session reset, or Realtime applying
+   newer progress or account metadata stops the remaining requests so they never replay a stale snapshot; the
    interrupted sync reports a failure, so the controller reconciles and resends from the merged
-   state. One request can still carry several modes, so a stale Seasonal entry is skipped rather
+   state. An accepted Realtime scope that matches both the current save's captured values and the
+   values applied locally is its expected echo and does not interrupt that save. Remote observations
+   also invalidate the controller's last-upload hash, so reverting to an earlier upload still
+   reaches the sender's current baseline comparison. One request can still carry several modes, so a stale Seasonal entry is skipped rather
    than raising: persistent PvP and PvE from the same request still commit. The RPC rejects payloads
    larger than 512 KiB and allows at most 60 direct client syncs per user per minute. API gateway
    reads resolve the active Seasonal number through the database before selecting a row. Persisted

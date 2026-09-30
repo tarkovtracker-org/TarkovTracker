@@ -455,13 +455,13 @@ async function runSetupRealtimeListener(
       updatedAtByMode: {},
       metadataTimestamp: updateTime,
     });
+    noteRemoteProgressApplied({ remote: remoteMetadata, applied: metadata });
     if (shouldIgnoreLegacyMetadataUpdate(updateTime, nextState, localState)) return;
     const isLikelySelfOrigin = isLikelySelfOriginUpdate(updateTime);
     logger.debug('[TarkovStore] Remote metadata update detected, applying changes', {
       isLikelySelfOrigin,
     });
     pauseRegisteredSyncController();
-    noteRemoteProgressApplied();
     tarkovStore.$patch((state) => {
       state.currentGameMode = nextState.currentGameMode;
       state.gameEdition = nextState.gameEdition;
@@ -505,6 +505,10 @@ async function runSetupRealtimeListener(
     });
     // The server now holds this copy, so a later local revert to the old copy is still sent.
     recordAcknowledgedModes(currentUserId, { [mode]: remoteProgress });
+    noteRemoteProgressApplied({
+      remote: { [mode]: remoteProgress },
+      applied: { [mode]: nextProgress },
+    });
     if (shouldIgnoreModeProgressUpdate(mode, updateTime, nextProgress, localState[mode])) return;
     const conflicts = detectDataConflicts(localState[mode], remoteProgress);
     const apiUpdateHandled = maybeNotifyApiUpdate(
@@ -515,7 +519,6 @@ async function runSetupRealtimeListener(
       toastI18n
     );
     pauseRegisteredSyncController();
-    noteRemoteProgressApplied();
     tarkovStore.$patch((state) => {
       state[mode] = nextProgress;
     });

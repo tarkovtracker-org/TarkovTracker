@@ -1,7 +1,11 @@
 import { deepEqual } from '@/stores/tarkov/deepEqual';
 import { GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
-import type { UserProgressData } from '@/stores/progressState';
+import type { UserProgressData, UserState } from '@/stores/progressState';
 export type ModeProgressMap = Partial<Record<GameMode, UserProgressData>>;
+type ProgressSyncSnapshot = Partial<
+  Pick<UserState, GameMode | 'currentGameMode' | 'gameEdition' | 'tarkovUid'>
+>;
+type RemoteProgressUpdate = { remote: ProgressSyncSnapshot; applied: ProgressSyncSnapshot };
 /**
  * Per-mode progress the server is known to hold for one account: loaded at startup or
  * acknowledged by a sync. A sync sends only modes that differ, so unchanged modes are never
@@ -11,12 +15,14 @@ let ownerId: string | null = null;
 let acknowledged: ModeProgressMap = {};
 let generation = 0;
 let remoteApplied = 0;
+let expectedProgress: ProgressSyncSnapshot | null = null;
 const toWire = (progress: UserProgressData): UserProgressData =>
   JSON.parse(JSON.stringify(progress)) as UserProgressData;
 export const clearAcknowledgedModes = (): void => {
   generation += 1;
   ownerId = null;
   acknowledged = {};
+  expectedProgress = null;
 };
 /** Replacing another owner's baseline invalidates that owner's in-flight acknowledgements. */
 const claimOwner = (userId: string): void => {
@@ -24,6 +30,7 @@ const claimOwner = (userId: string): void => {
   generation += 1;
   ownerId = userId;
   acknowledged = {};
+  expectedProgress = null;
 };
 /** Records modes the server holds for `userId`; another owner's baseline is replaced. */
 export const recordAcknowledgedModes = (userId: string, modes: ModeProgressMap): void => {
@@ -33,9 +40,25 @@ export const recordAcknowledgedModes = (userId: string, modes: ModeProgressMap):
     if (progress) acknowledged[mode] = toWire(progress);
   }
 };
-/** Realtime changed the store; the controller resends from the merged state after it resumes. */
-export const noteRemoteProgressApplied = (): void => {
+/** A dispatched write can still commit after supersession or a same-account session reset. */
+export const invalidateAcknowledgedModes = (userId: string, modes: ModeProgressMap): void => {
+  if (ownerId !== userId) return;
+  acknowledged = Object.fromEntries(
+    Object.entries(acknowledged).filter(([mode]) => !Object.hasOwn(modes, mode))
+  );
+};
+const matchesExpectedProgress = (snapshot: ProgressSyncSnapshot): boolean =>
+  expectedProgress !== null &&
+  Object.entries(snapshot).every(([key, value]) =>
+    deepEqual(expectedProgress?.[key as keyof ProgressSyncSnapshot], value)
+  );
+const isExpectedProgressEcho = (update: RemoteProgressUpdate): boolean =>
+  matchesExpectedProgress(update.remote) && matchesExpectedProgress(update.applied);
+/** Matching save echoes do not supersede their own write; other remote changes require retry. */
+export const noteRemoteProgressApplied = (update?: RemoteProgressUpdate): void => {
+  if (update && isExpectedProgressEcho(update)) return;
   remoteApplied += 1;
+  expectedProgress = null;
 };
 /**
  * Starts a multi-request sync and supersedes any older one still in flight. `isCurrent` turns false
@@ -43,9 +66,12 @@ export const noteRemoteProgressApplied = (): void => {
  * applies newer progress or metadata; the sync then stops so later requests never replay a stale
  * snapshot. `acknowledge` records a batch only while current.
  */
-export const beginAcknowledgement = (userId: string) => {
+export const beginAcknowledgement = (userId: string, expected?: ProgressSyncSnapshot) => {
   claimOwner(userId);
   generation += 1;
+  expectedProgress = expected
+    ? (JSON.parse(JSON.stringify(expected)) as ProgressSyncSnapshot)
+    : null;
   const started = { generation, remoteApplied };
   const isCurrent = (): boolean =>
     generation === started.generation && remoteApplied === started.remoteApplied;
@@ -53,6 +79,9 @@ export const beginAcknowledgement = (userId: string) => {
     isCurrent,
     acknowledge: (modes: ModeProgressMap): void => {
       if (isCurrent()) recordAcknowledgedModes(userId, modes);
+    },
+    finish: (): void => {
+      if (isCurrent()) expectedProgress = null;
     },
   };
 };

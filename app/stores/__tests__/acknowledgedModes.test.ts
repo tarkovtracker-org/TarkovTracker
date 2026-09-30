@@ -5,7 +5,21 @@ import {
   noteRemoteProgressApplied,
   recordAcknowledgedModes,
 } from '@/stores/tarkov/acknowledgedModes';
-import { syncProgressState, type ProgressRpcClient } from '@/stores/tarkov/progressPersistence';
+import { buildUpsertPayload } from '@/stores/tarkov/progressMerge';
+import {
+  sendProgressSync,
+  syncProgressState,
+  type ProgressRpcClient,
+} from '@/stores/tarkov/progressPersistence';
+const deferred = () => {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+};
+const acknowledgeState = (userId: string, state: UserState): void =>
+  recordAcknowledgedModes(userId, { pvp: state.pvp, pve: state.pve, seasonal: state.seasonal });
 const withPvpLevel = (level: number): UserState => {
   const state = structuredClone(defaultState);
   state.pvp.level = level;
@@ -27,6 +41,196 @@ const sentModes = (rpc: ReturnType<typeof vi.fn>): Record<string, unknown> =>
   (rpc.mock.calls.at(-1)?.[1] as { p_modes: Record<string, unknown> }).p_modes;
 describe('mode-scoped progress sync', () => {
   afterEach(() => clearAcknowledgedModes());
+  it('persists a revert while an older upload and a direct reset overlap', async () => {
+    const baseline = withPvpLevel(5);
+    recordAcknowledgedModes('user-1', {
+      pvp: baseline.pvp,
+      pve: baseline.pve,
+      seasonal: baseline.seasonal,
+    });
+    const server = structuredClone(baseline);
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const rpc = vi.fn(async (_name: string, args: Record<string, unknown>) => {
+      if (rpc.mock.calls.length === 1) await pending;
+      Object.assign(server, args.p_modes);
+      return { error: null };
+    });
+    const client = { rpc } as ProgressRpcClient;
+    const older = syncProgressState(client, 'user-1', withPvpLevel(8));
+    const reverted = structuredClone(baseline);
+    reverted.pve.progressEpoch = 1;
+    const newer = syncProgressState(client, 'user-1', reverted);
+    const callsBeforeRelease = rpc.mock.calls.length;
+    release();
+    const [olderResult, newerResult] = await Promise.all([older, newer]);
+    expect(callsBeforeRelease).toBe(1);
+    expect(olderResult.error).toEqual({ message: 'Progress sync superseded by newer state' });
+    expect(newerResult.error).toBeNull();
+    expect(server.pvp.level).toBe(5);
+    expect(server.pve.progressEpoch).toBe(1);
+    expect(sentModes(rpc)).toEqual({ pvp: reverted.pvp, pve: reverted.pve });
+    await syncProgressState(client, 'user-1', reverted);
+    expect(sentModes(rpc)).toEqual({});
+  });
+  it('drops superseded queued saves without dispatching their stale snapshots', async () => {
+    acknowledgeState('user-1', withPvpLevel(5));
+    const pending = deferred();
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    rpc.mockImplementationOnce(async () => {
+      await pending.promise;
+      return { error: null };
+    });
+    const client = { rpc } as ProgressRpcClient;
+    const older = syncProgressState(client, 'user-1', withPvpLevel(6));
+    const superseded = syncProgressState(client, 'user-1', withPvpLevel(7));
+    const latest = syncProgressState(client, 'user-1', withPvpLevel(8));
+    pending.resolve();
+    const results = await Promise.all([older, superseded, latest]);
+    expect(results.map((result) => result.error)).toEqual([
+      { message: 'Progress sync superseded by newer state' },
+      { message: 'Progress sync superseded by newer state' },
+      null,
+    ]);
+    expect(rpc.mock.calls.map((call) => call[1].p_modes.pvp.level)).toEqual([6, 8]);
+  });
+  it.each(['realtime', 'same-account restart'])(
+    'invalidates a baseline reloaded during an outstanding write: %s',
+    async (event) => {
+      const baseline = withPvpLevel(5);
+      acknowledgeState('user-1', baseline);
+      const pending = deferred();
+      const rpc = vi.fn().mockResolvedValue({ error: null });
+      rpc.mockImplementationOnce(async () => {
+        await pending.promise;
+        return { error: null };
+      });
+      const client = { rpc } as ProgressRpcClient;
+      const older = syncProgressState(client, 'user-1', withPvpLevel(8));
+      if (event === 'realtime') noteRemoteProgressApplied();
+      else clearAcknowledgedModes();
+      acknowledgeState('user-1', baseline);
+      const newer = syncProgressState(client, 'user-1', baseline);
+      pending.resolve();
+      const [olderResult, newerResult] = await Promise.all([older, newer]);
+      expect(olderResult.error).toEqual({ message: 'Progress sync superseded by newer state' });
+      expect(newerResult.error).toBeNull();
+      expect(sentModes(rpc)).toEqual({ pvp: baseline.pvp });
+    }
+  );
+  it('drops a queued save if its session resets before dispatch', async () => {
+    const pending = deferred();
+    const rpc = vi.fn(async () => {
+      await pending.promise;
+      return { error: null };
+    });
+    const client = { rpc } as ProgressRpcClient;
+    const older = syncProgressState(client, 'user-1', withPvpLevel(6));
+    const queued = syncProgressState(client, 'user-1', withPvpLevel(7));
+    clearAcknowledgedModes();
+    pending.resolve();
+    const results = await Promise.all([older, queued]);
+    expect(
+      results.every((result) => result.error?.message === 'Progress sync superseded by newer state')
+    ).toBe(true);
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+  it('does not block or invalidate another account when an old request settles', async () => {
+    const baseline = withPvpLevel(5);
+    acknowledgeState('user-1', baseline);
+    const pending = deferred();
+    const oldRpc = vi.fn(async () => {
+      await pending.promise;
+      return { error: null };
+    });
+    const older = syncProgressState({ rpc: oldRpc }, 'user-1', withPvpLevel(8));
+    clearAcknowledgedModes();
+    acknowledgeState('user-2', baseline);
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    const client = { rpc } as ProgressRpcClient;
+    const newerResult = await syncProgressState(client, 'user-2', baseline);
+    expect(newerResult.error).toBeNull();
+    expect(sentModes(rpc)).toEqual({});
+    pending.resolve();
+    expect((await older).error).toEqual({ message: 'Progress sync superseded by newer state' });
+    await syncProgressState(client, 'user-2', baseline);
+    expect(sentModes(rpc)).toEqual({});
+  });
+  it.each(['error', 'rejection'])(
+    'continues the account queue after an RPC %s',
+    async (failure) => {
+      const baseline = withPvpLevel(5);
+      acknowledgeState('user-1', baseline);
+      const pending = deferred();
+      const rpc = vi.fn().mockResolvedValue({ error: null });
+      rpc.mockImplementationOnce(async () => {
+        await pending.promise;
+        if (failure === 'rejection') throw new Error('offline');
+        return { error: { message: 'AbortError: request aborted' } };
+      });
+      const client = { rpc } as ProgressRpcClient;
+      const older = syncProgressState(client, 'user-1', withPvpLevel(8));
+      const newer = syncProgressState(client, 'user-1', baseline);
+      pending.resolve();
+      const [olderResult, newerResult] = await Promise.all([older, newer]);
+      expect(olderResult.error).not.toBeNull();
+      if (failure === 'error') {
+        expect(olderResult.error).toEqual({ message: 'Progress sync superseded by newer state' });
+      }
+      expect(newerResult.error).toBeNull();
+      expect(sentModes(rpc)).toEqual({ pvp: baseline.pvp });
+    }
+  );
+  it('captures the wire snapshot before a save waits in the account queue', async () => {
+    const pending = deferred();
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    rpc.mockImplementationOnce(async () => {
+      await pending.promise;
+      return { error: null };
+    });
+    const client = { rpc } as ProgressRpcClient;
+    const older = syncProgressState(client, 'user-1', withPvpLevel(6));
+    const payload = buildUpsertPayload('user-1', withPvpLevel(7));
+    const newer = sendProgressSync(client, 'user-1', payload);
+    payload.pvp_data.level = 9;
+    pending.resolve();
+    await Promise.all([older, newer]);
+    expect(sentModes(rpc).pvp).toEqual(expect.objectContaining({ level: 7 }));
+  });
+  it('continues a split save after a delayed matching echo from an earlier batch', async () => {
+    let firstMode!: UserState['pvp'];
+    const rpc = vi.fn(async (_name: string, args: Record<string, unknown>) => {
+      const modes = args.p_modes as Partial<UserState>;
+      if (modes.pvp) firstMode = modes.pvp;
+      if (modes.pve) {
+        noteRemoteProgressApplied({ remote: { pvp: firstMode }, applied: { pvp: firstMode } });
+      }
+      return { error: null };
+    });
+    const result = await syncProgressState({ rpc }, 'user-1', withHeavyModes());
+    expect(result.error).toBeNull();
+    expect(rpc.mock.calls.map((call) => Object.keys(call[1].p_modes as object))).toEqual([
+      ['pvp'],
+      ['pve'],
+      ['seasonal'],
+    ]);
+  });
+  it.each(['remote', 'applied'])(
+    'interrupts a save when the %s scope differs from its expected echo',
+    async (scope) => {
+      const rpc = vi.fn(async (_name: string, args: Record<string, unknown>) => {
+        const pvp = (args.p_modes as Partial<UserState>).pvp!;
+        const update = { remote: { pvp }, applied: { pvp } };
+        update[scope as 'remote' | 'applied'] = { pvp: { ...pvp, level: 9 } };
+        noteRemoteProgressApplied(update);
+        return { error: null };
+      });
+      const result = await syncProgressState({ rpc }, 'user-1', withPvpLevel(5));
+      expect(result.error).toEqual({ message: 'Progress sync superseded by newer state' });
+    }
+  );
   it('sends every mode when the server copy is unknown', async () => {
     const rpc = vi.fn().mockResolvedValue({ error: null });
     await syncProgressState({ rpc } as ProgressRpcClient, 'user-1', withPvpLevel(5));

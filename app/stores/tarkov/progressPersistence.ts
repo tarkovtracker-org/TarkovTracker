@@ -1,5 +1,6 @@
 import {
   beginAcknowledgement,
+  invalidateAcknowledgedModes,
   selectChangedModes,
   type ModeProgressMap,
 } from '@/stores/tarkov/acknowledgedModes';
@@ -104,25 +105,37 @@ const toModeBatches = (modes: ModeProgressMap): ModeProgressMap[] => {
 };
 /** Unsent modes stay pending, so the controller reconciles and retries instead of acknowledging. */
 const SPLIT_SYNC_INTERRUPTED = { message: 'Progress sync superseded by newer state' };
-/**
- * Sends account metadata plus only the modes the server does not already hold; the RPC keeps
- * any omitted mode as stored. Acknowledged modes become the baseline for the next sync, so after
- * a failed or interrupted split only the unacknowledged modes are resent.
- */
-export const sendProgressSync = async <TError>(
-  client: { rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{ error: TError }> },
-  userId: string,
-  payload: ProgressSyncPayload
-): Promise<{ error: TError | typeof SPLIT_SYNC_INTERRUPTED }> => {
-  const modes = selectChangedModes(userId, {
-    [GAME_MODES.PVP]: payload.pvp_data,
-    [GAME_MODES.PVE]: payload.pve_data,
-    [GAME_MODES.SEASONAL]: payload.seasonal_data,
+type ProgressSyncResult<TError> = { error: TError | typeof SPLIT_SYNC_INTERRUPTED };
+type ProgressSyncClient<TError> = {
+  rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{ error: TError }>;
+};
+type ProgressAcknowledgement = ReturnType<typeof beginAcknowledgement>;
+/** Keep an outstanding account write ordered even across sign-out and same-account startup. */
+const progressSyncQueues = new Map<string, Promise<void>>();
+const enqueueProgressSync = <T>(userId: string, send: () => Promise<T>): Promise<T> => {
+  const previous = progressSyncQueues.get(userId);
+  const result = previous ? previous.then(send) : send();
+  const settled = result.then(
+    () => {},
+    () => {}
+  );
+  progressSyncQueues.set(userId, settled);
+  void settled.then(() => {
+    if (progressSyncQueues.get(userId) === settled) progressSyncQueues.delete(userId);
   });
-  const sync = beginAcknowledgement(userId);
-  let result: { error: TError } | undefined;
-  for (const batch of toModeBatches(modes)) {
-    if (!sync.isCurrent()) return { error: SPLIT_SYNC_INTERRUPTED };
+  return result;
+};
+const sendModeBatch = async <TError>(
+  client: ProgressSyncClient<TError>,
+  userId: string,
+  payload: ProgressSyncPayload,
+  batch: ModeProgressMap,
+  sync: ProgressAcknowledgement
+): Promise<ProgressSyncResult<TError>> => {
+  if (!sync.isCurrent()) return { error: SPLIT_SYNC_INTERRUPTED };
+  invalidateAcknowledgedModes(userId, batch);
+  let result: { error: TError };
+  try {
     result = await client.rpc('sync_user_game_mode_progress', {
       p_current_game_mode: payload.current_game_mode,
       p_game_edition: payload.game_edition,
@@ -130,10 +143,59 @@ export const sendProgressSync = async <TError>(
       p_tarkov_uid: payload.tarkov_uid,
       p_modes: batch,
     });
+  } finally {
+    // Realtime or a fresh same-account startup may have seeded a baseline during the request.
+    // An uncertain/stale result must not leave that copy looking acknowledged.
+    invalidateAcknowledgedModes(userId, batch);
+  }
+  return sync.isCurrent() ? result : { error: SPLIT_SYNC_INTERRUPTED };
+};
+const sendProgressBatches = async <TError>(
+  client: ProgressSyncClient<TError>,
+  userId: string,
+  payload: ProgressSyncPayload,
+  sync: ProgressAcknowledgement
+): Promise<ProgressSyncResult<TError>> => {
+  const modes = selectChangedModes(userId, {
+    [GAME_MODES.PVP]: payload.pvp_data,
+    [GAME_MODES.PVE]: payload.pve_data,
+    [GAME_MODES.SEASONAL]: payload.seasonal_data,
+  });
+  let result: ProgressSyncResult<TError> = { error: SPLIT_SYNC_INTERRUPTED };
+  for (const batch of toModeBatches(modes)) {
+    result = await sendModeBatch(client, userId, payload, batch, sync);
+    if (!sync.isCurrent()) return { error: SPLIT_SYNC_INTERRUPTED };
     if (result.error) return result;
     sync.acknowledge(batch);
   }
-  return result as { error: TError };
+  return result;
+};
+/**
+ * Sends account metadata plus only the modes the server does not already hold; the RPC keeps
+ * any omitted mode as stored. Acknowledged modes become the baseline for the next sync, so after
+ * a failed or interrupted split only the unacknowledged modes are resent.
+ */
+export const sendProgressSync = async <TError>(
+  client: ProgressSyncClient<TError>,
+  userId: string,
+  payload: ProgressSyncPayload
+): Promise<ProgressSyncResult<TError>> => {
+  const snapshot = JSON.parse(JSON.stringify(payload)) as ProgressSyncPayload;
+  const sync = beginAcknowledgement(userId, {
+    pvp: snapshot.pvp_data,
+    pve: snapshot.pve_data,
+    seasonal: snapshot.seasonal_data,
+    currentGameMode: snapshot.current_game_mode,
+    gameEdition: snapshot.game_edition,
+    tarkovUid: snapshot.tarkov_uid,
+  });
+  return enqueueProgressSync(userId, async () => {
+    try {
+      return await sendProgressBatches(client, userId, snapshot, sync);
+    } finally {
+      sync.finish();
+    }
+  });
 };
 export const syncProgressState = async (
   client: ProgressRpcClient,
