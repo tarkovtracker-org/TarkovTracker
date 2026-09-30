@@ -3,6 +3,7 @@ import {
   type SupabaseSyncConfig,
   type SupabaseSyncReturn,
 } from '@/composables/supabase/useSupabaseSync';
+import { clearAcknowledgedModes } from '@/stores/tarkov/acknowledgedModes';
 import { resetApiUpdateState } from '@/stores/tarkov/apiUpdateNotifier';
 import { isDeviceDataRemovalPending } from '@/stores/tarkov/deviceData';
 import {
@@ -11,6 +12,7 @@ import {
   type PersistedProgressSnapshot,
 } from '@/stores/tarkov/localStorage';
 import { hasProgress, toProgressEpoch } from '@/stores/tarkov/progressMerge';
+import { sendProgressSync } from '@/stores/tarkov/progressPersistence';
 import {
   CLOUD_SAVE_RETRY_DELAYS_MS,
   registerCloudRetryHandler,
@@ -23,12 +25,7 @@ import {
   recordLocalSyncTime,
   resetSyncTimeline,
 } from '@/stores/tarkov/syncTimeline';
-import {
-  ACTIVE_SEASON_NUMBER,
-  GAME_MODES,
-  GAME_MODE_VALUES,
-  type GameMode,
-} from '@/utils/constants';
+import { GAME_MODES, GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { sanitizeOwnedUserState } from '@/utils/progressSanitizers';
 import type { LocalIgnoredReason } from '@/composables/useToastI18n';
@@ -73,20 +70,14 @@ const toSyncPayload = (
     seasonal_data: state.seasonal,
   };
 };
-const sendSyncPayload = async (client: SyncRpcClient, payload: UserProgressSyncPayload) => {
+const sendSyncPayload = async (
+  client: SyncRpcClient,
+  userId: string,
+  payload: UserProgressSyncPayload
+) => {
   const finish = beginLocalSync();
   try {
-    const result = await client.rpc('sync_user_game_mode_progress', {
-      p_current_game_mode: payload.current_game_mode,
-      p_game_edition: payload.game_edition,
-      p_seasonal_season_number: ACTIVE_SEASON_NUMBER,
-      p_tarkov_uid: payload.tarkov_uid,
-      p_modes: {
-        [GAME_MODES.PVP]: payload.pvp_data,
-        [GAME_MODES.PVE]: payload.pve_data,
-        [GAME_MODES.SEASONAL]: payload.seasonal_data,
-      },
-    });
+    const result = await sendProgressSync(client, userId, payload);
     finish(!result.error);
     return result;
   } catch (error) {
@@ -127,7 +118,8 @@ const createProgressSyncController = (
       broadcastProgressUpdate(options.userId);
     },
     transform: (userState: UserState) => toSyncPayload(userState, options.hadRemoteData),
-    sync: (payload: UserProgressSyncPayload) => sendSyncPayload(options.client, payload),
+    sync: (payload: UserProgressSyncPayload) =>
+      sendSyncPayload(options.client, options.userId, payload),
   });
 type PendingResetSnapshot = { snapshot: PersistedProgressSnapshot | null; userId: string | null };
 /**
@@ -233,6 +225,7 @@ export class ProgressSyncSession {
     resetSyncTimeline();
     progressStorageSerializer.reset();
     resetApiUpdateState();
+    clearAcknowledgedModes();
   }
 }
 const attemptSync = async (controller: ProgressSyncController) => {

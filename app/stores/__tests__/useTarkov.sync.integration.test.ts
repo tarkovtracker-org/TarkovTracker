@@ -1654,19 +1654,12 @@ describe('useTarkov sync integration', () => {
     expect(getLastSyncPayload()).toEqual(
       expect.objectContaining({
         p_current_game_mode: 'pve',
-        p_modes: expect.objectContaining({
-          pvp: expect.objectContaining({
-            level: 1,
-            progressEpoch: 3,
-          }),
+        p_modes: {
           pve: expect.objectContaining({
             level: 8,
             progressEpoch: 0,
           }),
-          seasonal: expect.objectContaining({
-            level: 1,
-          }),
-        }),
+        },
       })
     );
     expect(store.pvp.level).toBe(1);

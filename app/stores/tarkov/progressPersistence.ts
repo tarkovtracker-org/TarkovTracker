@@ -1,3 +1,4 @@
+import { recordAcknowledgedModes, selectChangedModes } from '@/stores/tarkov/acknowledgedModes';
 import { buildUpsertPayload } from '@/stores/tarkov/progressMerge';
 import {
   ACTIVE_SEASON_NUMBER,
@@ -78,24 +79,45 @@ const normalizePersistenceError = (error: unknown): SupabaseError => ({
   code: getPersistenceErrorCode(error),
   message: getPersistenceErrorMessage(error),
 });
+export type ProgressSyncPayload = {
+  current_game_mode: GameMode;
+  game_edition: UserState['gameEdition'];
+  tarkov_uid: number | null;
+  pvp_data: UserProgressData;
+  pve_data: UserProgressData;
+  seasonal_data: UserProgressData;
+};
+/**
+ * Sends account metadata plus only the modes the server does not already hold; the RPC keeps
+ * any omitted mode as stored. Acknowledged modes become the baseline for the next sync.
+ */
+export const sendProgressSync = async <TError>(
+  client: { rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{ error: TError }> },
+  userId: string,
+  payload: ProgressSyncPayload
+): Promise<{ error: TError }> => {
+  const modes = selectChangedModes(userId, {
+    [GAME_MODES.PVP]: payload.pvp_data,
+    [GAME_MODES.PVE]: payload.pve_data,
+    [GAME_MODES.SEASONAL]: payload.seasonal_data,
+  });
+  const result = await client.rpc('sync_user_game_mode_progress', {
+    p_current_game_mode: payload.current_game_mode,
+    p_game_edition: payload.game_edition,
+    p_seasonal_season_number: ACTIVE_SEASON_NUMBER,
+    p_tarkov_uid: payload.tarkov_uid,
+    p_modes: modes,
+  });
+  if (!result.error) recordAcknowledgedModes(userId, modes);
+  return result;
+};
 export const syncProgressState = async (
   client: ProgressRpcClient,
   userId: string,
   state: UserState
 ): Promise<{ error: SupabaseError | null }> => {
   try {
-    const payload = buildUpsertPayload(userId, state);
-    return await client.rpc('sync_user_game_mode_progress', {
-      p_current_game_mode: payload.current_game_mode,
-      p_game_edition: payload.game_edition,
-      p_seasonal_season_number: ACTIVE_SEASON_NUMBER,
-      p_tarkov_uid: payload.tarkov_uid,
-      p_modes: {
-        [GAME_MODES.PVP]: payload.pvp_data,
-        [GAME_MODES.PVE]: payload.pve_data,
-        [GAME_MODES.SEASONAL]: payload.seasonal_data,
-      },
-    });
+    return await sendProgressSync(client, userId, buildUpsertPayload(userId, state));
   } catch (error) {
     const normalizedError = normalizePersistenceError(error);
     logger.error(
