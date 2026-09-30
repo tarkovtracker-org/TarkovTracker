@@ -85,8 +85,9 @@ flowchart LR
 
 - The browser must never call `json.tarkov.dev` directly. All static game data flows through
   `/api/tarkov/*`.
-- Every endpoint handler returns its payload through `edgeCache()`; no handler fetches upstream
-  outside the cache wrapper.
+- Every handler that fetches upstream game data returns its payload through `edgeCache()`; no
+  handler fetches upstream outside the cache wrapper. The operational routes (`access-check`,
+  `cache-meta`, `overlay-status`) fetch nothing upstream and do not use it.
 - Only `json.tarkov.dev` static endpoints are used for upstream game data. The `api.tarkov.dev`
   GraphQL playground is deprecated and must not be called by TarkovTracker code.
 - Overlay is applied only by endpoints that call `applyOverlay()` in their handler. Adding a new
