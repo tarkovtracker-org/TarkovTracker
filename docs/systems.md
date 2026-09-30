@@ -230,6 +230,8 @@ replaces the key with the translated string.
   `toTrustedGameLinkUrl` (`app/utils/externalUrl.ts`: HTTPS, no credentials, allowlisted host).
   Client link helpers (`tarkovKeyHelpers`, `useWikiLink`, `GameItem`) re-check the same way, because
   overlays and older cached payloads bypass the adapters, and fall back to ID-derived tarkov.dev URLs.
+  Link UI renders from the sanitized URL, so a rejected wiki link hides its action instead of leaving a
+  dead anchor.
 
 ---
 

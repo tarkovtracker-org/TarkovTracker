@@ -143,7 +143,7 @@
         "
       />
       <ContextMenuItem
-        v-if="requirement.item.wikiLink"
+        v-if="wikiUrl"
         icon="/img/logos/wikilogo.webp"
         :label="$t('common.view_on_wiki')"
         @click="
@@ -162,6 +162,7 @@
   import { toTrustedGameLinkUrl } from '@/utils/externalUrl';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { openExternalUrl } from '@/utils/redirect';
+  import { buildItemPageUrl } from '@/utils/tarkovUrls';
   import type ContextMenuType from '@/components/ui/ContextMenu.vue';
   const ContextMenu = defineAsyncComponent(() => import('@/components/ui/ContextMenu.vue'));
   const ContextMenuItem = defineAsyncComponent(() => import('@/components/ui/ContextMenuItem.vue'));
@@ -192,7 +193,11 @@
   const formatNumber = useLocaleNumberFormatter();
   const requirementId = computed(() => props.requirement.id);
   const requiredCount = computed(() => props.requirement.count);
-  const devUrl = computed(() => toTrustedGameLinkUrl(props.requirement.item.link));
+  const devUrl = computed(() => {
+    const { id, link } = props.requirement.item;
+    return link ? (toTrustedGameLinkUrl(link) ?? buildItemPageUrl(id)) : undefined;
+  });
+  const wikiUrl = computed(() => toWikiUrl(props.requirement.item.wikiLink));
   const currencySymbol = computed(() => getCurrencySymbol(props.requirement.item.id) ?? '');
   const isCurrency = computed(() => currencySymbol.value !== '');
   const showPartialCount = computed(() => !isCurrency.value && requiredCount.value > 1);
@@ -299,7 +304,7 @@
     }
   };
   const openWiki = (): void => {
-    const url = toWikiUrl(props.requirement.item.wikiLink);
+    const url = wikiUrl.value;
     if (url) {
       openExternalUrl(url);
     }
