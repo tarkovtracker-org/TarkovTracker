@@ -1,5 +1,5 @@
 import {
-  recordAcknowledgedModes,
+  beginAcknowledgement,
   selectChangedModes,
   type ModeProgressMap,
 } from '@/stores/tarkov/acknowledgedModes';
@@ -93,9 +93,11 @@ export type ProgressSyncPayload = {
 };
 /** Half the RPC's 512 KiB `p_modes` cap; a larger multi-mode sync sends one mode per request. */
 const SINGLE_REQUEST_MODES_LIMIT = 256 * 1024;
+const byteLength = (value: unknown): number =>
+  new TextEncoder().encode(JSON.stringify(value)).length;
 const toModeBatches = (modes: ModeProgressMap): ModeProgressMap[] => {
   const entries = Object.entries(modes);
-  if (entries.length < 2 || JSON.stringify(modes).length <= SINGLE_REQUEST_MODES_LIMIT) {
+  if (entries.length < 2 || byteLength(modes) <= SINGLE_REQUEST_MODES_LIMIT) {
     return [modes];
   }
   return entries.map(([mode, progress]) => ({ [mode]: progress }));
@@ -115,6 +117,7 @@ export const sendProgressSync = async <TError>(
     [GAME_MODES.PVE]: payload.pve_data,
     [GAME_MODES.SEASONAL]: payload.seasonal_data,
   });
+  const acknowledge = beginAcknowledgement(userId);
   let result: { error: TError } | undefined;
   for (const batch of toModeBatches(modes)) {
     result = await client.rpc('sync_user_game_mode_progress', {
@@ -124,8 +127,7 @@ export const sendProgressSync = async <TError>(
       p_tarkov_uid: payload.tarkov_uid,
       p_modes: batch,
     });
-    if (result.error) return result;
-    recordAcknowledgedModes(userId, batch);
+    if (result.error || !acknowledge(batch)) return result;
   }
   return result as { error: TError };
 };

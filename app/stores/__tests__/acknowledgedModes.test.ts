@@ -88,4 +88,16 @@ describe('mode-scoped progress sync', () => {
     );
     expect(batches).toEqual([['pve', 'seasonal']]);
   });
+  it('stops a split sync when the session resets between requests', async () => {
+    const rpc = vi.fn().mockImplementation(async () => {
+      clearAcknowledgedModes();
+      return { error: null };
+    });
+    const client = { rpc } as ProgressRpcClient;
+    await syncProgressState(client, 'user-1', withHeavyModes());
+    expect(rpc).toHaveBeenCalledTimes(1);
+    rpc.mockResolvedValue({ error: null });
+    await syncProgressState(client, 'user-1', withHeavyModes());
+    expect(rpc).toHaveBeenCalledTimes(4);
+  });
 });

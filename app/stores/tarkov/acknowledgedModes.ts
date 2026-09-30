@@ -9,9 +9,11 @@ export type ModeProgressMap = Partial<Record<GameMode, UserProgressData>>;
  */
 let ownerId: string | null = null;
 let acknowledged: ModeProgressMap = {};
+let generation = 0;
 const toWire = (progress: UserProgressData): UserProgressData =>
   JSON.parse(JSON.stringify(progress)) as UserProgressData;
 export const clearAcknowledgedModes = (): void => {
+  generation += 1;
   ownerId = null;
   acknowledged = {};
 };
@@ -25,6 +27,18 @@ export const recordAcknowledgedModes = (userId: string, modes: ModeProgressMap):
     const progress = modes[mode];
     if (progress) acknowledged[mode] = toWire(progress);
   }
+};
+/**
+ * Starts a multi-request sync: the returned callback records each acknowledged batch and returns
+ * `false` once the baseline was cleared (sign-out, account switch, reload), so the sync stops.
+ */
+export const beginAcknowledgement = (userId: string) => {
+  const started = generation;
+  return (modes: ModeProgressMap): boolean => {
+    if (generation !== started) return false;
+    recordAcknowledgedModes(userId, modes);
+    return true;
+  };
 };
 /** Modes whose progress differs from what the server is known to hold; unknown modes differ. */
 export const selectChangedModes = (userId: string, modes: ModeProgressMap): ModeProgressMap => {
