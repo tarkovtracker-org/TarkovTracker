@@ -191,17 +191,21 @@ const isMapExtractPresent = (existing: MapExtract[], addition: MapExtract): bool
     (ext) =>
       (addition.id && ext.id === addition.id) || (addition.name && ext.name === addition.name)
   );
+const withStaticNameKey = (extract: MapExtract, additions: MapExtract[]): MapExtract => {
+  if (extract.nameKey) return extract;
+  const nameKey = additions.find((add) => isMapExtractPresent([extract], add))?.nameKey;
+  return nameKey ? { ...extract, nameKey } : extract;
+};
 const resolveMergedMapExtracts = (
   baseExtracts?: MapExtract[],
   additions?: MapExtract[]
 ): MapExtract[] | undefined => {
   if (!additions || additions.length === 0) return baseExtracts;
-  const current = baseExtracts ?? [];
+  const current = (baseExtracts ?? []).map((extract) => withStaticNameKey(extract, additions));
   const missing = additions.reduce<MapExtract[]>(
     (added, add) => (isMapExtractPresent([...current, ...added], add) ? added : [...added, add]),
     []
   );
-  if (missing.length === 0) return baseExtracts;
   return [...current, ...missing];
 };
 const beginTaskCoreRefresh = (state: Pick<MetadataState, 'tasksCoreRefreshing'>): symbol => {
