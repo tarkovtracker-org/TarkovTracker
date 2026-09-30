@@ -23,8 +23,8 @@ if [ ! -x "${VENV_PYTHON}" ]; then
 fi
 if [ -x "${VENV_PYTHON}" ] && "${VENV_PYTHON}" -m pip --version >/dev/null 2>&1; then
   if ! "${VENV_PYTHON}" -m pip show analytics-mcp >/dev/null 2>&1; then
-    "${VENV_PYTHON}" -m pip install --upgrade pip >/dev/null
-    "${VENV_PYTHON}" -m pip install analytics-mcp >/dev/null
+    "${VENV_PYTHON}" -m pip install --only-binary :all: --upgrade pip >/dev/null
+    "${VENV_PYTHON}" -m pip install --only-binary :all: analytics-mcp >/dev/null
   fi
   if "${VENV_PYTHON}" -c 'import analytics_mcp.server' >/dev/null 2>&1; then
     export MCP_PYTHON_BIN="${VENV_PYTHON}"
@@ -32,7 +32,7 @@ if [ -x "${VENV_PYTHON}" ] && "${VENV_PYTHON}" -m pip --version >/dev/null 2>&1;
 fi
 if [ -z "${MCP_PYTHON_BIN:-}" ]; then
   python3 -m pip show analytics-mcp >/dev/null 2>&1 || \
-    python3 -m pip install --user --break-system-packages analytics-mcp >/dev/null
+    python3 -m pip install --only-binary :all: --user --break-system-packages analytics-mcp >/dev/null
   MCP_PYTHON_BIN="python3"
 fi
 exec "${MCP_PYTHON_BIN}" -c '

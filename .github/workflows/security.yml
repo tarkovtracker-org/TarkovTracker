@@ -53,10 +53,10 @@ jobs:
           checksum_entry_path="$RUNNER_TEMP/gitleaks_checksum.txt"
           install_dir="$RUNNER_TEMP/gitleaks"
           mkdir -p "$install_dir"
-          curl -sSfL \
+          curl --proto '=https' --tlsv1.2 -sSfL \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}" \
             -o "$archive_path"
-          curl -sSfL \
+          curl --proto '=https' --tlsv1.2 -sSfL \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_checksums.txt" \
             -o "$checksums_path"
           awk -v archive="$archive" '$2 == archive { print }' "$checksums_path" > "$checksum_entry_path"
