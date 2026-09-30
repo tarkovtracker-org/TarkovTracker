@@ -319,10 +319,14 @@ export type Database = {
           discord_user_id: string | null
           expires_at: string | null
           has_ever_supported: boolean
+          last_contribution_at: string | null
+          retention_history_verified: boolean
           started_at: string
           status: string
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
+          subscription_ended_at: string | null
+          supporter_disqualified_at: string | null
           tier: string
           type: string
           updated_at: string
@@ -333,10 +337,14 @@ export type Database = {
           discord_user_id?: string | null
           expires_at?: string | null
           has_ever_supported?: boolean
+          last_contribution_at?: string | null
+          retention_history_verified?: boolean
           started_at?: string
           status?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          subscription_ended_at?: string | null
+          supporter_disqualified_at?: string | null
           tier?: string
           type: string
           updated_at?: string
@@ -347,10 +355,14 @@ export type Database = {
           discord_user_id?: string | null
           expires_at?: string | null
           has_ever_supported?: boolean
+          last_contribution_at?: string | null
+          retention_history_verified?: boolean
           started_at?: string
           status?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          subscription_ended_at?: string | null
+          supporter_disqualified_at?: string | null
           tier?: string
           type?: string
           updated_at?: string
@@ -1027,6 +1039,22 @@ export type Database = {
           p_user_id: string
         }
         Returns: number
+      }
+      disqualify_supporter_account: {
+        Args: { p_user_id: string; p_charge_id: string }
+        Returns: undefined
+      }
+      disqualify_supporter_customer: {
+        Args: { p_customer_id: string; p_user_id?: string }
+        Returns: undefined
+      }
+      supporter_benefits_disqualified: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
+      record_account_activity: {
+        Args: { p_user_id: string }
+        Returns: undefined
       }
       record_api_usage: {
         Args: {

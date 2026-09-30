@@ -4,7 +4,7 @@
       class="prose prose-gray prose-invert light:prose-headings:text-surface-50 mx-auto max-w-4xl"
     >
       <h1 class="text-surface-50 mb-2 text-4xl font-bold">Privacy Policy</h1>
-      <p class="text-surface-400 mb-12 text-sm">Last Updated: August 10, 2026</p>
+      <p class="text-surface-400 mb-12 text-sm">Last Updated: September 29, 2026</p>
       <div class="space-y-12">
         <!-- INTRODUCTION -->
         <section>
@@ -413,32 +413,9 @@
             </li>
           </ul>
           <h3 class="mt-6 mb-3 text-xl font-semibold">6.3 Inactive Account Purging</h3>
-          <p class="mb-4 leading-relaxed">
-            To keep the Service performant and manage storage for active users, we reserve the right
-            to delete accounts and associated data after an extended period of inactivity:
-          </p>
-          <ul class="mb-4 ml-6 list-disc space-y-2">
-            <li class="leading-relaxed">
-              <strong>Standard accounts:</strong>
-              Data may be deleted after an extended period (for example, 6 or more consecutive
-              months) with no login activity.
-            </li>
-            <li class="leading-relaxed">
-              <strong>Supporter accounts:</strong>
-              As a supporter perk, data may be retained for a longer period before an inactive
-              account becomes eligible for deletion. This extended retention applies while your
-              supporter status or paid retention window is active.
-            </li>
-          </ul>
-          <p class="mb-4 leading-relaxed">
-            Where feasible, we will make reasonable efforts to notify you via the email associated
-            with your account before deletion. These retention windows and practices may change over
-            time; any changes will be reflected in this Privacy Policy.
-          </p>
-          <p class="leading-relaxed">
-            You can export a complete backup of your profile and progress data at any time from the
-            Service settings (JSON export). We encourage you to keep your own backup if you expect a
-            long period of inactivity, as deletion is permanent and cannot be reversed.
+          <AccountRetentionPolicy />
+          <p class="mt-4 leading-relaxed">
+            {{ t('page.account_retention.notice') }}
           </p>
         </section>
         <!-- YOUR RIGHTS AND CHOICES -->
@@ -821,9 +798,8 @@
               or service discontinuation is possible
             </li>
             <li class="leading-relaxed">
-              <strong>No Liability:</strong>
-              We are not liable for damages resulting from data breaches, unauthorized access, data
-              loss, or other privacy-related incidents
+              <strong>{{ t('page.account_retention.liability_label') }}</strong>
+              {{ t('page.account_retention.liability') }}
             </li>
           </ul>
           <p class="mb-4 leading-relaxed">
@@ -871,6 +847,8 @@
   </UContainer>
 </template>
 <script setup lang="ts">
+  import AccountRetentionPolicy from '@/components/AccountRetentionPolicy.vue';
+  const { t } = useI18n({ useScope: 'global' });
   useSeoMeta({
     title: 'Privacy Policy',
     description: 'TarkovTracker privacy policy and data handling practices.',
