@@ -249,6 +249,9 @@ Implementation notes:
 - The daily quota DO fails open when unavailable — the abuse gate still protects Supabase,
   and daily quotas are product entitlements, not database-integrity boundaries
 - Usage observability goes to `public.api_usage_daily` (not a limiter itself)
+- Usage-counter updates use table-specific autovacuum tuning in
+  [`20260930150001_tune_api_usage_daily_autovacuum.sql`](../supabase/migrations/20260930150001_tune_api_usage_daily_autovacuum.sql)
+  to reclaim obsolete row versions sooner. API accounting and retention behavior stay the same.
 
 ---
 
