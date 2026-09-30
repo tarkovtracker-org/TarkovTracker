@@ -814,6 +814,12 @@ flowchart LR
    reads resolve the active Seasonal number through the database before selecting a row. Persisted
    `lastApiUpdate` and `apiUpdateHistory` retain task states `active`, `completed`, `failed`, and
    `uncompleted`; malformed entries and unknown states are stripped by the database sanitizer.
+   Each entry keeps at most the first 20 valid task updates in input order (the gateway lists the
+   requested tasks before cascaded dependents) and records the pre-truncation total as `taskCount`
+   only when updates were dropped. The gateway, client, and database apply the same rules
+   (`shared/utils/apiTaskUpdates.ts`), so a client sync cannot flip a stored entry. When a sync
+   resends an entry with the same id and timestamp but a smaller or missing `taskCount` (for example
+   from a client built before the cap), the database keeps the larger stored count.
 3. Realtime listens to both the account row and normalized rows. A normalized event is applied only
    when its mode is supported and its season equals the active season. The long-lived system and team
    listeners run in detached scopes so route unmounts cannot orphan their channels. The team store
@@ -1081,7 +1087,8 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
 - `pvp` and `pve` always use season `0`; `seasonal` always uses a positive season.
 - Persisted API task-update metadata accepts only `active`, `completed`, `failed`, and
   `uncompleted`. Its sanitizer strips malformed entries and unknown states; enabling a new producer
-  requires aligned application/gateway consumers and a verified database rollout first.
+  requires aligned application/gateway consumers and a verified database rollout first. The
+  per-entry task cap and `taskCount` rules must stay identical across those three layers.
 - Browser roles never need table maintenance privileges (`TRUNCATE`, `REFERENCES`, `TRIGGER`,
   `MAINTAIN`) on account, progress, team, billing, or audit tables. Explicit forward revokes preserve
   existing row and column access, including token-note updates. Billing events remain server-only;
@@ -1481,7 +1488,7 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
 
 ## 9. Production database observer
 
-**Summary.** `scripts/prod-db` is the canonical production inspection interface for agents and
+**Summary.** `scripts/ops/prod-db` is the canonical production inspection interface for agents and
 humans. It uses Supabase CLI inspection commands for database telemetry and a restricted SQL
 library for schema and bounded data-shape reports. The wrapper normalizes every result to JSON so
 callers do not depend on Supabase CLI presentation formatting. It never applies migrations or
@@ -1491,7 +1498,7 @@ accepts arbitrary SQL.
 
 ```mermaid
 flowchart LR
-    Agent[Pi or developer] --> Observer[scripts/prod-db]
+    Agent[Pi or developer] --> Observer[scripts/ops/prod-db]
     Observer -->|allowlisted reports| CLI[Supabase CLI inspect db]
     Observer -->|schema and bounded shape queries| SQL[restricted SQL library]
     CLI --> DB[(observer role)]
@@ -1505,7 +1512,7 @@ flowchart LR
 
 1. The caller selects an allowlisted operation such as `table-stats`, `outliers`, `locks`, or
    `vacuum`.
-2. `scripts/prod-db.mjs` selects the primary direct database target or local target and invokes
+2. `scripts/ops/prod-db.mjs` selects the primary direct database target or local target and invokes
    the Supabase CLI with JSON output, then strips CLI connection noise and normalizes the result.
 3. Every report captures observation metadata, including `captured_at`, observer application name,
    database statistics reset time, statement statistics reset time, and I/O statistics reset time.
@@ -1556,9 +1563,9 @@ flowchart LR
 
 ### Files
 
-- `scripts/prod-db` — stable executable entrypoint.
-- `scripts/prod-db.mjs` — allowlist, SQL validation, Supabase CLI adapter, redaction, and preflight.
-- `scripts/prod-db.test.mjs` — local integration tests for the observer contract.
+- `scripts/ops/prod-db` — stable executable entrypoint.
+- `scripts/ops/prod-db.mjs` — allowlist, SQL validation, Supabase CLI adapter, redaction, and preflight.
+- `scripts/ops/prod-db.test.mjs` — local integration tests for the observer contract.
 - `.env.example` — observer environment variable documentation.
 - `docs/runbook.md` — role provisioning and operational usage.
 
@@ -1897,7 +1904,7 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 
 ## 13. Fallow audit snapshots
 
-**Summary.** Local and CI `lint:fallow` commands use `scripts/fallow-audit.mjs` to create a
+**Summary.** Local and CI `lint:fallow` commands use `scripts/checks/fallow-audit.mjs` to create a
 disposable clone with two analysis commits. The merge-base source and current working source
 both receive physical copies of the same generated `.nuxt` context, so relative aliases resolve
 consistently in Fallow's base snapshot. Installed dependencies are linked into the clone.
@@ -1920,7 +1927,7 @@ See [the workflow guide](workflow-automation.md#fallow-changed-file-gate) for us
 ## 14. Release validation and publication
 
 Release runs on a weekly schedule or explicit dispatch on `main`, batching every commit since the
-previous tag; deploys never wait for it. `scripts/release-gate.mjs` takes the run's trigger commit
+previous tag; deploys never wait for it. `scripts/release/release-gate.mjs` takes the run's trigger commit
 as the candidate, requires the newest same-repository main CI run (push or dispatch of
 `.github/workflows/ci.yml`) for that exact SHA to have succeeded, and checks current main before
 setup and immediately before publishing, reusing CI's test shards and database validation. The
@@ -1931,12 +1938,12 @@ checkout stays pinned to the validated SHA. The production build still runs in R
 - Only `schedule` and `workflow_dispatch` runs on `refs/heads/main` can publish. Fork, PR, staging
   branch, unsuccessful, unfinished, or superseded CI cannot authorize publication; when several
   trusted CI runs exist for the candidate, the newest decides.
-- `scripts/release-scope.mjs` removes commits whose header scope (or the header wrapped by any
+- `scripts/release/release-scope.mjs` removes commits whose header scope (or the header wrapped by any
   number of `Revert "…"` / `revert:` prefixes) is in `INTERNAL_SCOPES` before both commit analysis and note generation.
   Those commits never set the version type (including breaking-change markers) and never appear in
   `CHANGELOG.md` or GitHub releases; they still deploy. Unscoped and product-scoped commits keep
   the stock Angular rules, except that `refactor` and `docs` no longer release.
-- Release-note highlights (`scripts/release-highlights.mjs`) are the only release input read from
+- Release-note highlights (`scripts/release/release-highlights.mjs`) are the only release input read from
   mutable GitHub content. They are additive and fail open: a lookup error, timeout (10 s), missing
   token, unmerged PR, an unedited description whose author lacks current write access,
   an edited description whose last editor lacks current write access (check the selected actor's
@@ -1988,7 +1995,7 @@ checkout stays pinned to the validated SHA. The production build still runs in R
   CI Result job, so automation cannot promote the commit.
 - Release version commits pass explicitly dispatched CI on a temporary `wip/release-*` branch and
   receive an Actions-owned preview (§19) before the identical SHA advances main; the embedded
-  version makes them deployable changes. `scripts/github-ci-gate.sh` waits for the exact dispatched
+  version makes them deployable changes. `scripts/ci/github-ci-gate.sh` waits for the exact dispatched
   CI run and its `CI Result`, requests one preview, then waits for the authoritative `Preview Result`
   on the same SHA; gate waits are bounded to 60 minutes, and the containing Release and Crowdin
   workflows are bounded to 90 minutes. Ordinary
@@ -2014,7 +2021,7 @@ checkout stays pinned to the validated SHA. The production build still runs in R
 
 ### Crowdin automatic merges
 
-`.github/workflows/crowdin.yml` uses `scripts/crowdin-pr.sh`, preserved from trusted main before
+`.github/workflows/crowdin.yml` uses `scripts/ci/crowdin-pr.sh`, preserved from trusted main before
 synchronization, to bind translation validation and merging to one immutable PR head. Its full tree
 diff against captured main permits only regular non-English locale JSON files. Dependency setup and
 project checks run after that checkout. The built-in job token synchronizes translations, updates a
@@ -2176,9 +2183,9 @@ requirement settings. Grouped-by-item sorting and smart-fill distribution keep t
 
 ## 15. CI validation selection
 
-`scripts/validation-plan.mjs` classifies Git paths and validates aggregate outcomes;
-`scripts/validate-changes.mjs` exposes local execution and CI outputs;
-`scripts/check-ci-result.mjs` enforces outcomes in `.github/workflows/ci.yml`.
+`scripts/ci/validation-plan.mjs` classifies Git paths and validates aggregate outcomes;
+`scripts/ci/validate-changes.mjs` exposes local execution and CI outputs;
+`scripts/ci/check-ci-result.mjs` enforces outcomes in `.github/workflows/ci.yml`.
 
 The selection reduces checks only for explicitly recognized documentation paths and Crowdin-owned
 translation files. `DESIGN.md`, the source locale `app/locales/en.json`, unknown inputs, and
@@ -2213,7 +2220,7 @@ CodeQL) is selected on every CI run. See
 
 ### Agent review request coordination
 
-`scripts/codex-review.mjs` checks live GitHub review evidence before an agent requests Codex review.
+`scripts/codex-review/codex-review.mjs` checks live GitHub review evidence before an agent requests Codex review.
 Read-only inspection is the default; authorized requests require `--request`. Local worktrees
 share request serialization and durable intent through their Git common directory, using
 case-insensitive repository identity for new and existing intents. Existing
@@ -2550,7 +2557,7 @@ CI splits the suite across four coverage shards. The `VITEST_SHARD` variable —
 argument alone — selects sharded coverage mode, which drops the global and per-file thresholds
 because one shard exercises only part of the suite; the unsharded `test:coverage` run enforces
 them. The `Test (shard N/4)` check names and the shard command are contract: branch protection and
-`dependabot-auto-merge.yml` require those names, and `scripts/ci-tests/workflows.mjs` asserts the
+`dependabot-auto-merge.yml` require those names, and `scripts/workflow-tests/workflows.mjs` asserts the
 command.
 
 A component loaded through `defineAsyncComponent` starts its dynamic import when Vue first renders
@@ -2568,7 +2575,7 @@ the loader never reaches a real import.
 - Unhandled errors fail the suite. Do not restore `--dangerouslyIgnoreUnhandledErrors`; fix the
   lifecycle that produced the error instead.
 - Shard count, shard command, and the `Test (shard N/4)` check names stay stable. Changing them
-  requires updating branch protection and `scripts/ci-tests/workflows.mjs` together.
+  requires updating branch protection and `scripts/workflow-tests/workflows.mjs` together.
 - Coverage thresholds apply only to the unsharded run, and `VITEST_SHARD` decides that. A sharded
   invocation must set it or the run enforces thresholds it cannot satisfy.
 - A test mounting a `defineAsyncComponent` must not let the real module load, or must settle the
@@ -2581,7 +2588,7 @@ the loader never reaches a real import.
 - `vitest.config.ts` — pool, isolation, bounded workers, coverage thresholds, shard mode
 - `package.json` — `test`, `test:coverage`, and `test:api-gateway` scripts
 - `.github/workflows/ci.yml` — the four shard jobs and the Deno test step
-- `scripts/ci-tests/workflows.mjs` — asserts the shard command and required check names
+- `scripts/workflow-tests/workflows.mjs` — asserts the shard command and required check names
 - `tests/test-setup.ts` — shared fetch stubs, console filtering, auto-unmount
 
 ## 19. Actions-owned Cloudflare previews
@@ -2806,6 +2813,6 @@ deploys nor publishes required statuses. Ordinary CI still builds/uploads `pages
 - `scripts/preview/controller.mjs`, `scripts/preview/github-api.mjs`, `scripts/preview/archive.mjs` — verification and reporting
 - `scripts/preview/deployment.mjs`, `scripts/preview/verify-deployment.mjs` — deployment record evidence
 - `scripts/preview/smoke/preview.smoke.mjs`, `scripts/preview/smoke/readiness.mjs` — smoke suite
-- `scripts/github-ci-gate.sh`, `scripts/release-recovery.mjs` — dual-gate waits for automation
+- `scripts/ci/github-ci-gate.sh`, `scripts/release/release-recovery.mjs` — dual-gate waits for automation
 - `wrangler.toml` — isolated `[env.preview.vars]`
-- `scripts/ci-tests/preview.mjs`, `scripts/ci-tests/preview-workflow.mjs`, `scripts/ci-tests/security.mjs` — regression tests
+- `scripts/workflow-tests/preview.mjs`, `scripts/workflow-tests/preview-workflow.mjs`, `scripts/workflow-tests/security.mjs` — regression tests

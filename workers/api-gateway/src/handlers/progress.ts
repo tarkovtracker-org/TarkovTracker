@@ -1,3 +1,4 @@
+import { capApiTaskUpdates } from '@shared/utils/apiTaskUpdates';
 import { applyTaskTransition } from '@shared/utils/taskTransitions';
 import {
   extractUserMetadataDisplayName,
@@ -276,12 +277,20 @@ async function getUserDisplayName(env: Env, userId: string): Promise<string | nu
     return null;
   }
 }
+const orderRequestedFirst = (
+  updateMap: Map<string, TaskState>,
+  requestedIds: readonly string[]
+): ApiTaskUpdate[] => {
+  const requested = new Set(requestedIds.filter((id) => updateMap.has(id)));
+  const ordered = [...requested, ...[...updateMap.keys()].filter((id) => !requested.has(id))];
+  return ordered.map((id) => ({ id, state: updateMap.get(id) as TaskState }));
+};
 const buildApiUpdateMeta = (updates: ApiTaskUpdate[], timestamp: number): ApiUpdateMeta => {
   return {
     id: crypto.randomUUID(),
     at: timestamp,
     source: 'api',
-    tasks: updates,
+    ...capApiTaskUpdates(updates),
   };
 };
 /**
@@ -401,10 +410,7 @@ export async function handleUpdateTask(
   const changedCompletions = diffCompletions(taskCompletions, beforeSnapshot);
   const set: Record<string, unknown> = {};
   if (updateMap.size > 0) {
-    set.lastApiUpdate = buildApiUpdateMeta(
-      Array.from(updateMap.entries()).map(([id, taskState]) => ({ id, state: taskState })),
-      updateTime
-    );
+    set.lastApiUpdate = buildApiUpdateMeta(orderRequestedFirst(updateMap, [taskId]), updateTime);
   }
   await mergeProgressData(
     env,
@@ -445,7 +451,10 @@ export async function handleUpdateTasks(
   const set: Record<string, unknown> = {};
   if (updateMap.size > 0) {
     set.lastApiUpdate = buildApiUpdateMeta(
-      Array.from(updateMap.entries()).map(([id, taskState]) => ({ id, state: taskState })),
+      orderRequestedFirst(
+        updateMap,
+        updates.map((update) => update.id)
+      ),
       updateTime
     );
   }

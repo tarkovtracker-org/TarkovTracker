@@ -316,7 +316,7 @@ These show up in Supabase logs / query performance and are expected. Do not trea
 directory.` until the deployed file lands. That check runs on `main` pushes and is skipped on pull
   requests, so the breakage only becomes visible after merge. If an out-of-band apply is unavoidable,
   merge the exact deployed file immediately afterwards and record the revision, version list, and file
-  hashes; `scripts/prod-db migration-history` shows `missing_locally` for exactly this condition. The
+  hashes; `scripts/ops/prod-db migration-history` shows `missing_locally` for exactly this condition. The
   fix is always to land the deployed file, never `migration repair --status reverted`, which would
   falsify applied history and let a later push re-run the SQL.
 - `migration list` compares **timestamps only**. Matching rows do not detect edited SQL or schema
@@ -580,7 +580,7 @@ Supabase CLI 2.117.0 authenticated using its existing authorized session; `proje
 explicit `link --project-ref knptqelvsodccnoehmbj`, and `migration list --linked` all succeeded.
 A missing observer `PROD_DB_URL` does not mean the CLI cannot inspect the project. Keep the
 observer's restricted credential boundary intact; this recovery uses separately authorized CLI
-access, not broader credentials passed to `scripts/prod-db`.
+access, not broader credentials passed to `scripts/ops/prod-db`.
 
 Recovery procedure and evidence:
 
@@ -656,7 +656,7 @@ in the same integration run against the merge commit — there is no manual SQL 
 
 ## Production database observer
 
-The repository-owned `scripts/prod-db` command is the canonical read-only production inspection
+The repository-owned `scripts/ops/prod-db` command is the canonical read-only production inspection
 interface for agents and developers. It uses the Supabase CLI for the built-in inspection reports
 and a restricted SQL library for schema and bounded data-shape reports. It always emits normalized
 JSON and never applies migrations.
@@ -673,16 +673,16 @@ CLI, supplies it through a temporary mode-`0600` `PGPASSFILE`, removes the file 
 and redacts the password from command failures.
 
 ```bash
-PROD_DB_TARGET=local scripts/prod-db health
+PROD_DB_TARGET=local scripts/ops/prod-db health
 chmod 600 "${PROD_DB_ENV_FILE:-.env}"
-scripts/prod-db canary
-scripts/prod-db table-stats
-scripts/prod-db preflight --migration supabase/migrations/20260807_example.sql
+scripts/ops/prod-db canary
+scripts/ops/prod-db table-stats
+scripts/ops/prod-db preflight --migration supabase/migrations/20260807_example.sql
 ```
 
 Store `PROD_DB_URL=postgresql://pi_prod_observer:...@...:5432/postgres?sslmode=verify-full` in the
 mode-`0600`, gitignored repository-root `.env` alongside the other local development secrets, so the
-password does not enter shell history. `scripts/prod-db` loads only `PROD_DB_*` keys from `.env`;
+password does not enter shell history. `scripts/ops/prod-db` loads only `PROD_DB_*` keys from `.env`;
 unrelated file keys are ignored. Already-exported environment variables take precedence and remain
 inherited by the observer child process, apart from the credential variables stripped by the wrapper.
 Keep the invoking environment free of privileged credentials. Export `PROD_DB_ENV_FILE` in the
