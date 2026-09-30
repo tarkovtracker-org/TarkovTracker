@@ -3,7 +3,7 @@
 Scheduled every 12 hours by `precompute-tarkov-data.yml`: fetches Tarkov.dev data, runs the same
 adapt/overlay pipeline as the API, and writes the result to Cloudflare KV. TypeScript run with
 `tsx` because it imports the app's server code. See the precompute section of
-[`docs/systems.md`](../../docs/systems.md).
+[`docs/systems/overlay-and-precompute.md`](../../docs/systems/overlay-and-precompute.md).
 
 | File                | What it does                                                         | Run by                     |
 | ------------------- | -------------------------------------------------------------------- | -------------------------- |

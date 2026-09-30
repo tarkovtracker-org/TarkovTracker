@@ -4,7 +4,7 @@ run-name: Preview CI ${{ inputs.run_id }}
 # executed, installed, or used as Wrangler configuration. The controller verifies CI evidence and
 # the preview artifact's claims against live GitHub state, uploads only after an explicit trusted
 # dispatch, smoke-tests the unique deployment URL, and publishes the authoritative `Preview Result`
-# status. See docs/systems.md §19. Automatic status refresh lives in preview-state.yml so
+# status. See docs/systems/previews.md. Automatic status refresh lives in preview-state.yml so
 # ordinary pull requests never instantiate skipped deployment or smoke-test jobs.
 on:
   workflow_dispatch:

@@ -151,7 +151,7 @@ test-merge commit only if both Git trees match, the base is still current main, 
 remains unchanged. It retries briefly while GitHub calculates the test merge, and a later failed
 dispatch supersedes an earlier merge-commit success. Other dispatched runs report only on their
 own exact SHA. See the Crowdin invariant in
-[systems.md §14](systems.md#14-release-validation-and-publication).
+[release publication spec](systems/ci-and-release.md#release-validation-and-publication).
 
 #### Preview build artifact
 
@@ -396,7 +396,7 @@ Automation confirms each accepted dispatch creates a new CI run on the requested
 compare the checked-out commit with its parent, so dispatching main does not compare main with itself.
 
 The dispatched CI status-reporting invariant and trusted-code boundary are defined in
-[systems.md §14](systems.md#14-release-validation-and-publication).
+[release publication spec](systems/ci-and-release.md#release-validation-and-publication).
 
 After rechecking main and the policy, an ordinary non-forced push promotes the identical SHA to
 main using `GITHUB_TOKEN`. A concurrent main advance rejects promotion rather than rebasing
@@ -611,7 +611,7 @@ maintainer request or trusted merge automation
 dispatch uploads the validated artifact. Cloudflare-managed preview builds are disabled while automatic production deployments
 for `main` remain enabled. The live ruleset requires both `CI Result` and `Preview Result`;
 rollout verifies that enforcement. The design, result contract, and invariants are specified in
-[systems.md §19](systems.md#19-actions-owned-cloudflare-previews).
+[previews spec](systems/previews.md).
 
 **Triggers:** `preview-state.yml` receives `workflow_run` for completed CI and metadata-only
 `pull_request_target` events (`ready_for_review`, `converted_to_draft`, `auto_merge_enabled`,

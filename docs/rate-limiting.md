@@ -303,7 +303,7 @@ Important:
   `Cache-Control: private`), an `updated`-age freshness gate
   (`NUXT_TARKOV_DEV_PROFILE_MAX_UPDATED_AGE_DAYS`, default 7, `0` disables), and optional
   Cloudflare Turnstile verification (production requires paired `NUXT_PUBLIC_TURNSTILE_SITE_KEY`
-  and `NUXT_TURNSTILE_SECRET_KEY` values). See `docs/systems.md` §7 for the full flow.
+  and `NUXT_TURNSTILE_SECRET_KEY` values). See `docs/systems/imports.md` for the full flow.
 - Most static game-data routes (`/api/tarkov/*`) are not enrolled in this limiter. They are served
   through `edgeCache` with CDN/WAF abuse protection and have no route-specific rate limit. The
   `/api/tarkov/cache-meta` endpoint is an exception — it queries Supabase directly and relies on its

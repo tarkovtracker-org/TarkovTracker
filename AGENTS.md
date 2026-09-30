@@ -49,7 +49,7 @@ or test logic changes make it relevant.
   with the database functions and preserve Seasonal history.
 - Secrets stay in runtime env or platform secret stores under canonical names; never commit
   credentials, service-role keys, or generated secret-bearing files.
-- Overlay consumers enforce HTTPS and preserve the cache/adaptation/overlay ordering in the systems doc; task patches keep the raw upstream trader requirement shape before adaptation.
+- Overlay consumers enforce HTTPS and preserve the cache/adaptation/overlay ordering in the systems spec (`docs/systems/`); task patches keep the raw upstream trader requirement shape before adaptation.
 - Applied/shared migrations are immutable. Never run remote migration repair, reset, or squash as
   routine cleanup. Inspect production only through the read-only `scripts/ops/prod-db` observer.
 
