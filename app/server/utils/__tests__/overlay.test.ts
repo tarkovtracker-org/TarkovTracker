@@ -586,10 +586,12 @@ describe('applyMapExtractAdditions', () => {
         { id: 'bad-faction', name: 'Bad Faction', faction: 'raider' },
         { id: 'bad-position', name: 'Bad Position', position: { x: 'bad', z: 0 } },
         { id: 'ok', name: 'Ok', faction: 'pmc', position: { x: 1, y: 2, z: 3 } },
+        { id: 'generic', name: 'Generic', faction: null },
       ],
     };
     expect(applyMapExtractAdditions(map).extracts).toEqual([
       { id: 'ok', name: 'Ok', faction: 'pmc', position: { x: 1, y: 2, z: 3 } },
+      { id: 'generic', name: 'Generic', faction: null },
     ]);
   });
   it('deduplicates additions against earlier additions', () => {
