@@ -12,7 +12,12 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 const makeItem = (id: string, name: string): TarkovItem =>
-  ({ id, name, iconLink: `https://img/${id}.png`, wikiLink: `https://wiki/${id}` }) as TarkovItem;
+  ({
+    id,
+    name,
+    iconLink: `https://img/${id}.png`,
+    wikiLink: `https://escapefromtarkov.fandom.com/wiki/${id}`,
+  }) as TarkovItem;
 // Render the popover trigger and content inline so we can assert on both.
 const UPopoverStub = defineComponent({
   template: '<div><slot /><slot name="content" /></div>',
@@ -44,7 +49,16 @@ describe('AcceptedItemsPopover', () => {
     const links = wrapper.findAll('a');
     expect(links).toHaveLength(3);
     expect(links.map((l) => l.text())).toEqual(['Item A', 'Item B', 'Item C']);
-    expect(links[0]?.attributes('href')).toBe('https://wiki/a');
+    expect(links[0]?.attributes('href')).toBe('https://escapefromtarkov.fandom.com/wiki/a');
+  });
+  it('never renders an untrusted upstream link as an href', () => {
+    const evil = {
+      ...makeItem('evil', 'Evil'),
+      wikiLink: 'javascript:alert(1)',
+      link: 'data:text/html,x',
+    };
+    const wrapper = mountPopover({ items: [makeItem('a', 'Item A'), evil] });
+    expect(wrapper.findAll('a')[1]?.attributes('href')).toBe('https://tarkov.dev/item/evil');
   });
   it('reflects open state via v-model', async () => {
     const open = ref(false);

@@ -134,7 +134,7 @@
       </template>
       <div class="border-surface-700 my-1 border-t" />
       <ContextMenuItem
-        v-if="requirement.item.link"
+        v-if="devUrl"
         icon="/img/logos/tarkovdevlogo.webp"
         :label="$t('common.view_on_tarkov_dev')"
         @click="
@@ -159,6 +159,7 @@
   import { useWikiLink } from '@/composables/useWikiLink';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { getCurrencySymbol } from '@/utils/constants';
+  import { toTrustedGameLinkUrl } from '@/utils/externalUrl';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { openExternalUrl } from '@/utils/redirect';
   import type ContextMenuType from '@/components/ui/ContextMenu.vue';
@@ -191,6 +192,7 @@
   const formatNumber = useLocaleNumberFormatter();
   const requirementId = computed(() => props.requirement.id);
   const requiredCount = computed(() => props.requirement.count);
+  const devUrl = computed(() => toTrustedGameLinkUrl(props.requirement.item.link));
   const currencySymbol = computed(() => getCurrencySymbol(props.requirement.item.id) ?? '');
   const isCurrency = computed(() => currencySymbol.value !== '');
   const showPartialCount = computed(() => !isCurrency.value && requiredCount.value > 1);
@@ -292,8 +294,8 @@
     }
   });
   const openTarkovDev = (): void => {
-    if (props.requirement.item.link) {
-      openExternalUrl(props.requirement.item.link);
+    if (devUrl.value) {
+      openExternalUrl(devUrl.value);
     }
   };
   const openWiki = (): void => {

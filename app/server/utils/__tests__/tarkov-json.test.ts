@@ -530,6 +530,50 @@ describe('tarkov JSON adapters', () => {
       items: expect.arrayContaining([expect.objectContaining({ id: 'item1', name: 'Salewa' })]),
     });
   });
+  it('drops untrusted links from full item catalog entries', () => {
+    const [item] = adaptItemsResponse({
+      items: {
+        evil: { id: 'evil', link: 'javascript:alert(1)', wikiLink: 'data:text/html,x' },
+      },
+    }).data.items;
+    expect(item).not.toHaveProperty('link');
+    expect(item).not.toHaveProperty('wikiLink');
+  });
+  it('drops untrusted item and task links at the adapter boundary', () => {
+    const payload = {
+      tasks: {
+        task1: {
+          ...tasksPayload.tasks.task1,
+          wikiLink: 'javascript:alert(1)',
+          objectives: [
+            {
+              id: 'objective1',
+              type: 'giveItem',
+              items: [
+                {
+                  id: 'safe',
+                  link: 'https://tarkov.dev/item/safe',
+                  wikiLink: 'https://escapefromtarkov.fandom.com/wiki/Safe',
+                  properties: { defaultPreset: { id: 'preset', iconLink: 'icon.webp', name: 7 } },
+                },
+                { id: 'evil', link: 'data:text/html,x', wikiLink: 'javascript:alert(1)' },
+              ],
+            },
+          ],
+        },
+      },
+    };
+    const objectives = adaptTaskObjectivesResponse(payload, { hideoutPayload, tradersPayload }).data
+      .tasks[0]?.objectives?.[0]?.items;
+    expect(objectives?.[0]).toMatchObject({
+      link: 'https://tarkov.dev/item/safe',
+      wikiLink: 'https://escapefromtarkov.fandom.com/wiki/Safe',
+      properties: { defaultPreset: { id: 'preset', iconLink: 'icon.webp' } },
+    });
+    expect(objectives?.[1]).toEqual({ id: 'evil' });
+    const core = adaptTasksCoreResponse(payload, mapsPayload, tradersPayload).data.tasks[0];
+    expect(core).not.toHaveProperty('wikiLink');
+  });
   it('splits trader requirements by requirementType (level vs reputation)', () => {
     const tasks = adaptTasksCoreResponse(tasksPayload, mapsPayload, tradersPayload).data.tasks;
     expect(tasks[0]?.traderLevelRequirements).toEqual([

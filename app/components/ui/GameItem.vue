@@ -75,15 +75,12 @@
       </div>
       <!-- Hover action buttons - covers entire row -->
       <div
-        v-if="showActions && (props.devLink || props.wikiLink)"
+        v-if="showActions && (safeDevLink || props.wikiLink)"
         class="absolute inset-0 flex items-center justify-center gap-2 rounded bg-black/80 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
       >
-        <AppTooltip
-          v-if="props.devLink"
-          :text="t('common.view_on_tarkov_dev', 'View on Tarkov.dev')"
-        >
+        <AppTooltip v-if="safeDevLink" :text="t('common.view_on_tarkov_dev', 'View on Tarkov.dev')">
           <a
-            :href="props.devLink"
+            :href="safeDevLink"
             target="_blank"
             rel="noopener noreferrer"
             class="text-surface-200 inline-flex items-center justify-center rounded p-1.5 transition-colors hover:bg-white/20 hover:text-white"
@@ -145,7 +142,7 @@
             "
           />
           <div
-            v-if="props.wikiLink || props.devLink || props.itemName"
+            v-if="props.wikiLink || safeDevLink || props.itemName"
             class="border-surface-700 my-1 border-t"
           />
         </template>
@@ -160,7 +157,7 @@
           "
         />
         <ContextMenuItem
-          v-if="props.itemName && props.devLink"
+          v-if="props.itemName && safeDevLink"
           icon="/img/logos/tarkovdevlogo.webp"
           :label="t('common.view_on_tarkov_dev', 'View on Tarkov.dev')"
           @click="
@@ -179,7 +176,7 @@
             "
           />
           <ContextMenuItem
-            v-if="props.devLink"
+            v-if="safeDevLink"
             icon="/img/logos/tarkovdevlogo.webp"
             :label="t('common.view_on_tarkov_dev', 'View on Tarkov.dev')"
             @click="
@@ -189,7 +186,7 @@
           />
         </template>
         <div
-          v-if="props.itemName && (props.wikiLink || props.devLink)"
+          v-if="props.itemName && (props.wikiLink || safeDevLink)"
           class="border-surface-700 my-1 border-t"
         />
         <ContextMenuItem
@@ -208,6 +205,7 @@
 <script setup lang="ts">
   import { useWikiLink } from '@/composables/useWikiLink';
   import ItemCountControls from '@/features/neededitems/ItemCountControls.vue';
+  import { toTrustedGameLinkUrl } from '@/utils/externalUrl';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
   import { openExternalUrl } from '@/utils/redirect';
@@ -281,6 +279,7 @@
   const { t } = useI18n({ useScope: 'global' });
   const { copyToClipboard } = useCopyToClipboard();
   const { toWikiUrl } = useWikiLink();
+  const safeDevLink = computed(() => toTrustedGameLinkUrl(props.devLink));
   const formatNumber = useLocaleNumberFormatter();
   const BACKGROUND_CLASS_MAP = {
     violet: 'bg-rarity-violet',
@@ -380,8 +379,8 @@
   };
   // Action methods
   const openTarkovDevLink = () => {
-    if (props.devLink) {
-      openExternalUrl(props.devLink);
+    if (safeDevLink.value) {
+      openExternalUrl(safeDevLink.value);
     }
   };
   const openWikiLink = () => {
@@ -397,7 +396,7 @@
     }
   };
   const handleContextMenu = (event: MouseEvent) => {
-    if (props.devLink || props.wikiLink || props.itemName || props.taskWikiLink) {
+    if (safeDevLink.value || props.wikiLink || props.itemName || props.taskWikiLink) {
       event.preventDefault();
       event.stopPropagation();
       contextMenuOpened.value = true;
