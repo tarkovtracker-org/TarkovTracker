@@ -24,6 +24,7 @@ instead of restating it.
 | Understand rate limits / abuse controls by layer                                  | [`rate-limiting.md`](./rate-limiting.md)                |
 | Deploy, configure env vars, or handle an incident                                 | [`runbook.md`](./runbook.md)                            |
 | Understand CI/CD, hooks, and releases                                             | [`workflow-automation.md`](./workflow-automation.md)    |
+| Find what a file in `scripts/` does and what runs it                              | [`/scripts/README.md`](../scripts/README.md)            |
 | Check test-coverage gates and reproduction                                        | [`testing-coverage.md`](./testing-coverage.md)          |
 | Follow the visual/design system                                                   | [`/DESIGN.md`](../DESIGN.md)                            |
 | Work as (or configure) an AI agent                                                | [`AGENTS.md`](../AGENTS.md)                             |
@@ -46,6 +47,7 @@ instead of restating it.
 - [`runbook.md`](./runbook.md) — required env vars, pre-deploy checks, incident triage and recovery.
 - [`tarkov-clearance-rollout.md`](./tarkov-clearance-rollout.md) — proposed game-data browser verification infrastructure, approval gates, acceptance evidence and edge-first rollback.
 - [`workflow-automation.md`](./workflow-automation.md) — GitHub Actions, pre-commit hooks, Dependabot, releases.
+- [`/scripts/README.md`](../scripts/README.md) — what each repository script does and what runs it.
 - [`code-review.md`](./code-review.md) — production-readiness review policy: risk areas, severity calibration, deployment and rollback checks.
 - [`testing-coverage.md`](./testing-coverage.md) — coverage gates and reproduction. Exact floors live in `vitest.config.ts`.
 

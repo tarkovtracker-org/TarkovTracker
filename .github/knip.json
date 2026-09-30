@@ -21,7 +21,7 @@
   "ignoreExportsUsedInFile": true,
   "workspaces": {
     ".": {
-      "entry": ["app/i18n.config.ts", "scripts/stripe-import-test.mjs"]
+      "entry": ["app/i18n.config.ts"]
     },
     "workers/api-gateway": {
       "entry": ["src/**/__tests__/**/*.test.ts"],
