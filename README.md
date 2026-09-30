@@ -121,7 +121,7 @@ The short version: this README gets you running; the `docs/` folder explains how
 | Report a security vulnerability                   | [`SECURITY.md`](SECURITY.md)                                   |
 | Find where to get help                            | [`SUPPORT.md`](SUPPORT.md)                                     |
 | Read the code of conduct                          | [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)                     |
-| Understand the systems (caching, data, overlay)   | [`docs/systems.md`](docs/systems.md)                           |
+| Understand the systems (caching, data, overlay)   | [`docs/systems/`](docs/systems/README.md)                      |
 | Understand the full architecture & data flow      | [`docs/architecture.md`](docs/architecture.md)                 |
 | Read the Tarkov data architecture decision        | [`docs/decision-tarkov-data.md`](docs/decision-tarkov-data.md) |
 | Use or extend the HTTP/API surface                | [`docs/api.md`](docs/api.md)                                   |
@@ -145,7 +145,7 @@ public/      Static assets
 ```
 
 See [`docs/architecture.md`](docs/architecture.md) for the full module map and
-[`docs/systems.md`](docs/systems.md) for how the non-obvious systems (Tarkov.dev integration,
+[`docs/systems/`](docs/systems/README.md) for how the non-obvious systems (Tarkov.dev integration,
 multi-layer caching, overlay corrections, precompute) actually work.
 
 ### License

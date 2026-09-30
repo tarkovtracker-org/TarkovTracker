@@ -20,7 +20,7 @@
 #   pnpm exec fallow health --hotspots --targets      (churn x complexity x fan-in)
 #   pnpm exec fallow health --complexity --sort severity
 #   pnpm exec fallow dupes / dead-code
-#   wc -l on production files; git log churn; AGENTS.md + docs/systems.md invariants
+#   wc -l on production files; git log churn; AGENTS.md + docs/systems/ invariants
 program:
   baseline_commit: ade5cf11
   baseline_date: '2026-09-17'
@@ -217,7 +217,7 @@ queue:
       dual-flag tasks/objectives across faction, prerequisite, and alternative entry points.
       Completed tasks still stop propagation; failed tasks still block strict dependents; tolerant
       dependents remain reachable. This intentionally changes invalid flags in both app and API,
-      not the recorded completion/failure state. docs/systems.md documents the invariant.
+      not the recorded completion/failure state. docs/systems/ documents the invariant.
       Negative reproduction: 10 shared cases and 3 transform cases fail before the guard; afterward
       all 21 shared and 5 transform cases pass, including cycles and empty catalogs. Original focused
       shared suite had 7 cases; worker transform suite had 2. Full pnpm run test passed 332 files /
@@ -298,7 +298,7 @@ queue:
     pr: null
     notes: >-
       High fan-in: split by responsibility (fetch orchestration vs. mode/season selection vs.
-      repair) behind the existing store API; likely 2 dependent slices. Read docs/systems.md
+      repair) behind the existing store API; likely 2 dependent slices. Read docs/systems/
       store sections first.
   - id: CH-003
     area: Metadata store fetch/cache pipeline
@@ -378,7 +378,7 @@ queue:
     metrics_before: { file_loc: 1495, handler_lines: 1226 }
     metrics_after: null
     pr: null
-    notes: Separate data assembly from template rendering; HTTPS/cache invariants in docs/systems.md.
+    notes: Separate data assembly from template rendering; HTTPS/cache invariants in docs/systems/.
   - id: CH-009
     area: Server overlay pipeline
     paths:
@@ -398,7 +398,7 @@ queue:
     metrics_before: { hotspot: 39.4, file_loc: 702 }
     metrics_after: null
     pr: null
-    notes: Preserve cache/adaptation/overlay ordering invariant (docs/systems.md).
+    notes: Preserve cache/adaptation/overlay ordering invariant (docs/systems/).
   - id: CH-010
     area: Tarkov JSON adaptation (tarkov-json.ts)
     paths: [app/server/utils/tarkov-json.ts, app/server/utils/tarkov-sanitization.ts]
@@ -683,7 +683,7 @@ queue:
     pr: null
     notes: >-
       Verify with a data probe (tasks-core payload) that `alternatives` is never present before
-      deleting; update docs/systems.md sections that mention the invariant; intentional behavior
+      deleting; update docs/systems/ sections that mention the invariant; intentional behavior
       change must be documented.
   - id: CH-029
     area: Team store
@@ -1020,7 +1020,7 @@ queue:
         workers/api-gateway/src/openapi.ts,
         app/stores/useProgress.ts,
         docs/api.md,
-        docs/systems.md,
+        docs/systems/,
         shared/utils/__tests__/progressInvalidation.test.ts,
         workers/api-gateway/src/__tests__/transform.test.ts,
       ]
@@ -1046,4 +1046,4 @@ queue:
       "cannot be completed" (then add objective completion state to InvalidationInput, skip
       completed objectives in markInvalid, thread taskObjectives through transformProgress and
       useProgress.invalidProgressByTeam, add a regression case, and document the intentional public
-      API behavior change). Either way update docs/systems.md invariants for the shared helper.
+      API behavior change). Either way update docs/systems/ invariants for the shared helper.

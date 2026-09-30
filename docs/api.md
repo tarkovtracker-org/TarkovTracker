@@ -572,7 +572,7 @@ Pass `cacheBust=1` query parameter to bypass cache.
 
 The `lang` query parameter is validated against `API_SUPPORTED_LANGUAGES` (`app/utils/constants.ts`); codes outside that allowlist fall back to `en` (`getValidatedLanguage` in `app/server/utils/language-helpers.ts`).
 
-`lang` is not forwarded to upstream as a query parameter. `json.tarkov.dev` serves an English base document containing translation keys plus a separate per-language document at `{gameMode}/{endpoint}_{lang}`; the proxy fetches both (plus `_en` as a per-key fallback) and merges them via the base document's `translations` JSONPath list. See [Data fetching pipeline](systems.md#2-data-fetching-pipeline).
+`lang` is not forwarded to upstream as a query parameter. `json.tarkov.dev` serves an English base document containing translation keys plus a separate per-language document at `{gameMode}/{endpoint}_{lang}`; the proxy fetches both (plus `_en` as a per-key fallback) and merges them via the base document's `translations` JSONPath list. See [Data fetching pipeline](systems/game-data.md#data-fetching-pipeline).
 
 **Language codes accepted by `/api/tarkov/*`:**
 

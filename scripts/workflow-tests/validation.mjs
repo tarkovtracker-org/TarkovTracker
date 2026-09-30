@@ -20,7 +20,7 @@ test('only explicit documentation and translation paths receive reduced validati
     ['README.md'],
     ['docs/topic.markdown'],
     ['.github/CONTRIBUTING.md'],
-    ['docs/systems.md'],
+    ['docs/systems/game-data.md'],
     ['supabase/AGENTS.md', 'supabase/CLAUDE.md'],
     ['workers/api-gateway/AGENTS.md'],
   ]) {

@@ -6,7 +6,7 @@ tooling, or a person or agent by hand. Every folder has its own README listing e
 does, and what runs it. If a file's **Run by** entry names nothing, it is a removal candidate.
 
 Behavior is documented in [`docs/workflow-automation.md`](../docs/workflow-automation.md) (CI,
-hooks, previews, releases) and [`docs/systems.md`](../docs/systems.md) (precompute, drift checks).
+hooks, previews, releases) and [`docs/systems/`](../docs/systems/README.md) (precompute, drift checks).
 
 ## Folders
 

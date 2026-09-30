@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Focused drift checks for docs/systems.md.
+ * Focused drift checks for the systems spec in docs/systems/.
  *
  * Verifies the most volatile, easily-checkable facts the doc records against
  * the actual codebase so drift is caught automatically in CI. Checks:
@@ -22,7 +22,7 @@
 import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
 import { join, dirname, basename } from 'path';
 const ROOT = process.cwd();
-const SYSTEMS_MD = join(ROOT, 'docs', 'systems.md');
+const SYSTEMS_DIR = join(ROOT, 'docs', 'systems');
 const TARKOV_API_DIR = join(ROOT, 'app', 'server', 'api', 'tarkov');
 const LOCALES_DIR = join(ROOT, 'app', 'locales');
 const WRANGLER_TOML = join(ROOT, 'wrangler.toml');
@@ -49,7 +49,7 @@ function listTarkovHandlers() {
     .map((f) => f.replace(/\.get\.ts$/, ''));
 }
 /**
- * Extract the /api/tarkov/* endpoints from the endpoint table in systems.md.
+ * Extract the /api/tarkov/* endpoints from the endpoint table in the systems spec.
  * The table rows look like `| `/api/tarkov/bootstrap` | ... |`.
  */
 function extractDocumentedEndpoints(md) {
@@ -111,7 +111,7 @@ function checkEndpoints(md) {
   const documented = extractDocumentedEndpoints(md);
   if (documented.length === 0) {
     fail(
-      'No /api/tarkov/* endpoints found in systems.md endpoint table. The endpoint section is required.'
+      'No /api/tarkov/* endpoints found in the systems spec endpoint table. The endpoint section is required.'
     );
     return;
   }
@@ -119,7 +119,7 @@ function checkEndpoints(md) {
   for (const endpoint of documented) {
     if (!handlers.has(endpoint)) {
       fail(
-        `systems.md documents endpoint "/api/tarkov/${endpoint}" but no handler file ` +
+        `Systems spec documents endpoint "/api/tarkov/${endpoint}" but no handler file ` +
           `app/server/api/tarkov/${endpoint}.get.ts exists.`
       );
     }
@@ -128,7 +128,7 @@ function checkEndpoints(md) {
   const undocumented = [...handlers].filter((h) => !documented.includes(h));
   if (undocumented.length > 0) {
     warnings.push(
-      `Handler(s) exist without a systems.md endpoint entry: ${undocumented.join(', ')}. ` +
+      `Handler(s) exist without a systems spec endpoint entry: ${undocumented.join(', ')}. ` +
         `Add them to the endpoint table if they are part of the Tarkov.dev data integration.`
     );
   }
@@ -137,13 +137,13 @@ function checkDocumentedPaths(md) {
   const paths = extractDocumentedPaths(md);
   if (paths.length === 0) {
     fail(
-      'No implementation file paths found in systems.md. The implementation paths section is required.'
+      'No implementation file paths found in the systems spec. The implementation paths section is required.'
     );
     return;
   }
   for (const p of paths) {
     if (!pathExists(p)) {
-      fail(`systems.md references path "${p}" but it does not exist on disk.`);
+      fail(`Systems spec references path "${p}" but it does not exist on disk.`);
     }
   }
 }
@@ -153,7 +153,7 @@ function checkKvBinding(md) {
   const documentedBinding = bindingMatch ? bindingMatch[1] : null;
   if (!documentedBinding) {
     fail(
-      'Could not find a KV binding name declaration in systems.md. The KV binding section is required.'
+      'Could not find a KV binding name declaration in the systems spec. The KV binding section is required.'
     );
     return;
   }
@@ -184,7 +184,7 @@ function checkKvBinding(md) {
   const wranglerBindingRe = new RegExp(`binding\\s*=\\s*"${documentedBinding}"`);
   if (!wranglerBindingRe.test(kvText)) {
     fail(
-      `systems.md documents KV binding "${documentedBinding}" but wrangler.toml does not ` +
+      `Systems spec documents KV binding "${documentedBinding}" but wrangler.toml does not ` +
         `declare it inside a [[kv_namespaces]] block.`
     );
   }
@@ -194,7 +194,7 @@ function checkKvBinding(md) {
     const constRe = new RegExp(`PRECOMPUTED_KV_BINDING\\s*=\\s*['"]${documentedBinding}['"]`);
     if (!constRe.test(source)) {
       fail(
-        `systems.md documents KV binding "${documentedBinding}" but ` +
+        `Systems spec documents KV binding "${documentedBinding}" but ` +
           `precomputedTarkov.ts does not set PRECOMPUTED_KV_BINDING to that value.`
       );
     }
@@ -203,7 +203,7 @@ function checkKvBinding(md) {
   }
 }
 function checkSupportedLanguages(md) {
-  // systems.md does not currently enumerate supported languages. When it does
+  // The systems spec does not currently enumerate supported languages. When it does
   // (as a backtick-quoted, comma/space-separated list on a line containing
   // "supported languages" or similar), verify it against app/locales/.
   if (!existsSync(LOCALES_DIR)) {
@@ -232,7 +232,7 @@ function checkSupportedLanguages(md) {
   for (const code of langCodes) {
     if (!localeSet.has(code)) {
       fail(
-        `systems.md lists supported language "${code}" but no locale file ` +
+        `Systems spec lists supported language "${code}" but no locale file ` +
           `app/locales/${code}.json exists.`
       );
     }
@@ -240,17 +240,25 @@ function checkSupportedLanguages(md) {
   const undocumentedLocales = localeFiles.filter((c) => !langCodes.includes(c));
   if (undocumentedLocales.length > 0) {
     fail(
-      `Locale files exist without a systems.md language entry: ${undocumentedLocales.join(', ')}. ` +
+      `Locale files exist without a systems spec language entry: ${undocumentedLocales.join(', ')}. ` +
         `Add them to the supported languages list or remove them from app/locales/.`
     );
   }
 }
+function readSystemsSpec() {
+  if (!existsSync(SYSTEMS_DIR) || !statSync(SYSTEMS_DIR).isDirectory()) return null;
+  const files = readdirSync(SYSTEMS_DIR)
+    .filter((f) => f.endsWith('.md'))
+    .sort();
+  if (files.length === 0) return null;
+  return files.map((f) => readText(join(SYSTEMS_DIR, f))).join('\n');
+}
 function main() {
-  if (!existsSync(SYSTEMS_MD)) {
-    console.error(`systems.md not found at ${SYSTEMS_MD}`);
+  const md = readSystemsSpec();
+  if (md === null) {
+    console.error(`systems spec not found in ${SYSTEMS_DIR}`);
     process.exit(1);
   }
-  const md = readText(SYSTEMS_MD);
   checkEndpoints(md);
   checkDocumentedPaths(md);
   checkKvBinding(md);
@@ -261,7 +269,7 @@ function main() {
     console.warn();
   }
   if (errors.length > 0) {
-    console.error('systems.md drift detected:');
+    console.error('Systems spec drift detected:');
     for (const e of errors) console.error(`  - ${e}`);
     console.error(`\n${errors.length} error(s). Fix the doc or the code in the same PR.`);
     process.exit(1);

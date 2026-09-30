@@ -565,7 +565,7 @@ deployed function sources in the same change.
 The database change alone does not cover the handler behavior: the deployed handlers filter cooldown
 reads on `server_verified = true`, and the preserved pre-containment rows are `server_verified = false`
 with possibly forged timestamps, so the older handlers would trust that history again. See the
-`team_events` invariants in `docs/systems.md`.
+`team_events` invariants in `docs/systems/teams.md`.
 
 ### Atomic-leave checkout recovery (`20260912085904`)
 

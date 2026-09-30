@@ -80,4 +80,4 @@ deployment, and deletion require explicit operator approval.
 
 Removing inactive accounts does not retire the older `user_progress` layout. It still carries
 metadata and PvP/PvE compatibility copies; see the
-[game-mode storage system](./systems.md#7-game-mode-and-seasonal-progress-storage).
+[game-mode storage system](./systems/progress-storage.md#game-mode-and-seasonal-progress-storage).

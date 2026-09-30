@@ -35,7 +35,7 @@ Full procedure: `docs/runbook.md#database-migrations`.
 ## Production database
 
 Inspect production only through the read-only `scripts/ops/prod-db` observer
-(`docs/runbook.md#production-database-observer`, `docs/systems.md` §9), using a dedicated observer
+(`docs/runbook.md#production-database-observer`, `docs/systems/prod-db-observer.md`), using a dedicated observer
 role; never supply `service_role`, `postgres`, migration, or Management API credentials.
 
 ## Account lifecycle
