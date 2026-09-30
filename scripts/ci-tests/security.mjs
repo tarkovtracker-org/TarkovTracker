@@ -28,8 +28,9 @@ test('security is a reusable workflow with only the weekly schedule as a standal
   assert.match(canary, /"role":"service_role"/);
   assert.match(
     canary,
-    /gitleaks dir "\$canary_dir" --config \.github\/\.gitleaks\.toml --exit-code 1/
+    /gitleaks dir "\$canary_dir" --config \.github\/\.gitleaks\.toml --exit-code 42 .*\|\| status=\$\?/
   );
+  assert.match(canary, /if \[ "\$status" -ne 42 \]; then/);
   assert.ok(
     scan.indexOf('Verify Gitleaks detects a canary secret') < scan.indexOf('- name: Gitleaks scan'),
     'canary check runs before the repository scan'

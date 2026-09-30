@@ -80,8 +80,11 @@ jobs:
           payload="$(b64url '{"iss":"supabase","ref":"canaryprojectref0000","role":"service_role","iat":1700000000,"exp":2000000000}')"
           signature="$(head -c 32 /dev/urandom | base64 -w0 | tr '+/' '-_' | tr -d '=')"
           printf 'SUPABASE_ANON_KEY = "%s.%s.%s"\n' "$header" "$payload" "$signature" > "$canary_dir/wrangler.toml"
-          if gitleaks dir "$canary_dir" --config .github/.gitleaks.toml --exit-code 1 --no-banner --redact; then
-            echo "::error::Gitleaks did not report a service-role JWT canary in wrangler.toml; detection rules or allowlists are too broad."
+          # A distinct findings exit code keeps scan errors (exit 1) from counting as detection.
+          status=0
+          gitleaks dir "$canary_dir" --config .github/.gitleaks.toml --exit-code 42 --no-banner --redact || status=$?
+          if [ "$status" -ne 42 ]; then
+            echo "::error::Gitleaks canary exited $status, expected 42; the service-role JWT in wrangler.toml was not reported or the scan failed."
             exit 1
           fi
       - name: Gitleaks scan
