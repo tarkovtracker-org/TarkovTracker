@@ -88,6 +88,10 @@
     "error_loading": "Tarkovデータの読み込みエラー",
     "loading": "Tarkovデータを読み込み中",
     "logout_failed": "ログアウトできません。もう一度やり直してください。",
+    "logout_unreachable": "サーバーに接続できませんでした。ログインしています。 このデバイスでのみサインアウトできます。 サーバーには伝えられないため、セッションが期限切れになるまで、または別のデバイスからサインアウトするまで、セッションはアクティブになります。",
+    "logout_this_device": "この端末でのみサインアウトする",
+    "logout_this_device_done": "このデバイスでのみサインアウトします。サーバー上のセッションは、有効期限が切れるか、別のデバイスからサインアウトするまで有効です。",
+    "logout_local_only": "このデバイスでサインアウトしました。サーバーに接続できなかったため、他のセッションでもサインインできます。",
     "hidden_label": "非表示",
     "user_label": "ユーザー",
     "user_avatar_alt": "ユーザーのアバター",
@@ -99,6 +103,40 @@
     "login_aria": "アカウントにログイン",
     "switch_to_light_theme": "ライトテーマに切り替える",
     "switch_to_dark_theme": "ダークテーマに切り替える"
+  },
+  "progress_save_status": {
+    "indicator_aria": "進行状況の保存状態: {status}",
+    "cloud_pending_label": "進行状況をクラウドに保存しています",
+    "cloud_retrying_label": "クラウドセーブ再試行中",
+    "cloud_failed_label": "クラウドの保存に失敗しました",
+    "local_failed_label": "進行状況はこのブラウザに保存されていません",
+    "cloud_pending_description": "最新の進捗状況の変更はまだクラウドに保存されていません。",
+    "cloud_retrying_description": "最新の進捗状況をクラウドに保存できませんでした。別の試行が自動的に実行される間、追跡を続けることができます。",
+    "cloud_failed_description": "クラウドに最新の進行状況の変更を保存する自動試行は停止しました。 変更はまだ保存されるのを待っており、いつでも追跡して再試行することができます。",
+    "local_failed_description": "最新の進捗状況をこのブラウザに保存できませんでした。 追跡を続けることはできますが、再読み込み、このタブを閉じたり、サインアウトしたりすると、他の場所で保存されていない変更が失われる可能性があります。",
+    "local_saved_note": "これらの変更はこのブラウザに保存されます。",
+    "cloud_also_pending_note": "クラウドにも保存されていません。コピーを保存するために進行状況をエクスポートしてください。",
+    "retry_scheduled": "{attempt} の {total} の自動再試行が予定されています。",
+    "cause_offline": "原因: このデバイスはオフラインのようです。",
+    "cause_rate_limited": "原因: クラウドサービスは一時的に保存を制限しています。",
+    "cause_auth": "原因: サインインセッションが確認できませんでした。",
+    "cause_quota": "原因: このブラウザの TarkovTracker のストレージ容量がいっぱいです。",
+    "cause_unavailable": "原因: このブラウザはプライバシー設定などによりサイトのストレージをブロックしています。",
+    "cause_unknown": "この失敗の原因は不明である。",
+    "quota_guidance": "このサイトのデータを消去するか、または再読み込みすると、これらの変更の唯一のコピーが削除される可能性があります。データを削除する前に進行状況をエクスポートしてください。",
+    "retry_button": "クラウドセーブを再試行する",
+    "retry_succeeded": "進捗状況の変更はクラウドに保存されました。",
+    "retry_failed": "クラウドセーブは成功しませんでした。変更が保存されるのを待っています。",
+    "export_button": "進行状況をエクスポート",
+    "export_hint": "保存に失敗した場合でも、現在の進行状況をバックアップファイルとしてエクスポートします。"
+  },
+  "sign_out_confirm": {
+    "title": "保存されていない変更でサインアウトしますか？",
+    "risk": "最新の進捗状況の変更は、このブラウザまたはクラウドに保存されません。今すぐサインアウトすると、それらは失われます。",
+    "options": "サインインを続けて保存を再試行するか、現在の進行状況をエクスポートしてから決めることができます。",
+    "stay_signed_in": "サインインを続ける",
+    "discard_and_sign_out": "サインアウトして変更を破棄する",
+    "retry_succeeded": "変更内容はクラウドに保存されました。安全にサインアウトできます。"
   },
   "omnibar": {
     "title": "検索",
@@ -2179,10 +2217,17 @@
       "delete_forever": "Delete Account Forever",
       "delete_success_title": "Account Deleted Successfully",
       "delete_success_sr_only": "Your account deletion is complete, and you will be redirected to the dashboard.",
+      "delete_success_cleanup_failed_sr_only": "アカウントが削除されましたが、一部のデータはこの端末に残っています。クリーンアップを再試行するか、ここに残っているデータを続行することができます。",
       "delete_success_description": "Your account and all associated data have been permanently deleted.",
+      "other_session_deleted_description": "この削除を開始したアカウントは削除されました。現在のアカウントはまだサインインしており、変更されていません。",
       "cleanup_pending": "Some data cleanup is still in progress and will complete shortly.",
+      "device_cleanup_failed": "削除されたアカウントデータはこのデバイス上に残ります。クリーンアップを再試行するか、データをここに残します。",
+      "session_end_failed": "このブラウザはまだ削除されたアカウントにサインインしています。ダッシュボードへ移動を選択して、再度ログアウトを試してください。",
+      "retry_device_cleanup": "デバイスのクリーンアップを再試行する",
+      "continue_with_device_data_remaining": "残りのデータで続ける",
       "redirect_message": "Thank you for using TarkovTracker. You will be redirected to the dashboard.",
-      "go_to_dashboard": "Go to Dashboard"
+      "go_to_dashboard": "Go to Dashboard",
+      "session_changed": "サインインしたアカウントが変更されました。このセッションではこれ以上の操作は行われません。"
     },
     "discord_link": {
       "title": "Discord Account",
@@ -2440,6 +2485,25 @@
         "verification_failed": "Human verification failed. Reload the page and try again.",
         "fetch_failed": "Unable to fetch the Tarkov.dev profile. Open the profile on Tarkov.dev, then try again."
       }
+    },
+    "device_data": {
+      "title": "このデバイス上のデータ",
+      "description": "サインアウトすると、このアカウントの進行状況がこのブラウザに保存されます。 クラウドに到達していない変更はサインイン時に同期することができます リセットまたは季節ロールオーバーによって変位された進行状況は、エクスポートのために別々に保持されます。 このデバイスのデータを削除すると、このアカウントの進行状況、リカバリコピー、および設定がブラウザから削除され、サインアウトします。",
+      "cloud_unaffected": "クラウドの進行状況は削除されていません。このデバイス上の他のアカウントのデータは影響を受けません。",
+      "superseded_available": "{count} 進捗状況のリセットまたは季節のロールオーバーからの変更は、エクスポートのみここで保持されます。これらは自動的に復元または同期されません。",
+      "superseded_export": "エクスポートが進行状況に取って代わっています",
+      "superseded_export_error": "進行状況をエクスポートできませんでした",
+      "remove_button": "この端末からこのアカウントのデータを削除します",
+      "confirm_title": "このアカウントのデータをこのデバイスから削除しますか？",
+      "confirm_description": "このアカウントの進行状況、リカバリコピー、優先される進行状況エクスポート、および設定はこのブラウザから削除され、サインアウトされます。 クラウドの進行状況は、再度ログインすると利用可能です。",
+      "pending_warning": "いくつかの進捗状況の変更はまだクラウドに保存されていません。 この端末のデータを削除すると永久に破棄されます。保存したい場合は、まず進捗状況をエクスポートしてください。",
+      "confirm_button": "データを削除してサインアウト",
+      "removed": "このアカウントのデータはこのデバイスから削除されました。",
+      "remove_error": "一部のアカウントデータをこのデバイスから削除できませんでした。ここで別のアカウントを使用する前にもう一度お試しください。",
+      "remove_incomplete": "削除したアカウントの一部のデータはこのデバイス上にあります。ここで別のアカウントを使用する前にもう一度お試しください。",
+      "retry_removal": "もう一度削除してください",
+      "revocation_unavailable": "サーバーに接続できませんでした。ログインしています。 このデバイスでサインアウトしてデータを削除することができます。 サーバーには伝えられないため、セッションが期限切れになるまで、または別のデバイスからサインアウトするまで、セッションはアクティブになります。",
+      "confirm_device_only_button": "この端末でのみサインアウトしてデータを削除する"
     }
   },
   "hideout": {
@@ -2527,6 +2591,22 @@
       "approve": "Approve",
       "deny": "Deny"
     }
+  },
+  "tarkov_access": {
+    "title": "ブラウザを確認する",
+    "checking": "Checking site access…",
+    "description": "このサイトは過度の自動化リクエストから保護されています。以下のセキュリティチェックを完了して、Tarkovゲームデータをロードしてください。",
+    "retry": "再試行",
+    "dismiss": "今はしない",
+    "dismissed_notice": "セキュリティチェックを完了するまでゲームデータは一時停止されます。",
+    "verify_now": "今すぐ確認",
+    "verification_failed_retry": "セキュリティチェックが完了していません。もう一度やり直してください。",
+    "verifying": "Verifying your browser…",
+    "widget_hint": "続行するにはチェックを完了してください。",
+    "failed": "Tarkovデータの読み込みは現在利用できません。もう一度やり直すことができます。",
+    "blocked": "Tarkovデータへのアクセスは現在ブロックされています。再試行するか、後で再度お試しください。",
+    "rate_limited": "短時間でチェックが多すぎます。しばらく待ってから、もう一度やり直してください。",
+    "widget_unavailable": "セキュリティーチェックを読み込めませんでした。もう一度やり直してください。"
   },
   "analytics_consent": {
     "eyebrow": "Analytics",
