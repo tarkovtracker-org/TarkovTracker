@@ -24,6 +24,17 @@ test('security is a reusable workflow with only the weekly schedule as a standal
   assert.doesNotMatch(informational, /exit 1/);
   assert.match(workflowStep(scan, 'Fail on Gitleaks findings'), /exit 1/);
   assert.match(workflowStep(scan, 'Install Gitleaks CLI'), /sha256sum --check --strict/);
+  const canary = workflowStep(scan, 'Verify Gitleaks detects a canary secret');
+  assert.match(canary, /"role":"service_role"/);
+  assert.match(
+    canary,
+    /gitleaks dir "\$canary_dir" --config \.github\/\.gitleaks\.toml --exit-code 42 .*\|\| status=\$\?/
+  );
+  assert.match(canary, /if \[ "\$status" -ne 42 \]; then/);
+  assert.ok(
+    scan.indexOf('Verify Gitleaks detects a canary secret') < scan.indexOf('- name: Gitleaks scan'),
+    'canary check runs before the repository scan'
+  );
   const codeql = jobBlock(security, 'codeql');
   assert.match(permissionsBlock(codeql, '    '), /^ {6}security-events: write$/m);
   assert.match(codeql, /github\/codeql-action\/analyze@[a-f0-9]{40}/);
@@ -47,4 +58,20 @@ test('CI calls the security workflow for every event and gates CI Result on it',
   assert.match(workflowEvent(ci, 'push'), /^ {4}branches: \[main\]$/m);
   workflowEvent(ci, 'workflow_dispatch');
   assert.match(workflowEvent(ci, 'pull_request'), /branches: \[main\]/);
+});
+test('Gitleaks extends the default rules and allowlists only the exact public anon JWT', () => {
+  const config = read('.github/.gitleaks.toml');
+  const extend = config.slice(config.indexOf('[extend]'), config.indexOf('[['));
+  assert.match(extend, /^useDefault = true$/m);
+  const jwt = config.split('[[allowlists]]').find((block) => /targetRules = \["jwt"\]/.test(block));
+  assert.ok(jwt, 'missing jwt allowlist');
+  assert.match(jwt, /^condition = "AND"$/m);
+  assert.match(jwt, /^regexTarget = "secret"$/m);
+  const anonKey = read('wrangler.toml').match(/SUPABASE_ANON_KEY = "(eyJ[^"]+)"/)?.[1];
+  assert.ok(anonKey, 'missing public anon key in wrangler.toml');
+  assert.equal(JSON.parse(Buffer.from(anonKey.split('.')[1], 'base64url')).role, 'anon');
+  assert.ok(
+    jwt.includes(`'''^${anonKey.replaceAll('.', '\\.')}$'''`),
+    'allowlist must pin the anon key'
+  );
 });
