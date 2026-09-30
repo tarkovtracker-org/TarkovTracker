@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { classifyPaths } from '../validation-plan.mjs';
+import { classifyPaths } from '../ci/validation-plan.mjs';
 import { extractZip } from './archive.mjs';
 import { digestDirectory, manifestShapeErrors } from './manifest.mjs';
 import { readPreviewRequest } from './request-authorization.mjs';

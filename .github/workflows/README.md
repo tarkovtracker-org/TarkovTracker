@@ -33,8 +33,8 @@ Lighthouse scope detection runs independently of PR metadata installation and co
 
 ### Crowdin Sync (`.github/crowdin.yml`)
 
-**Triggers:** English source, Crowdin config, sync workflow, `scripts/crowdin-pr.sh`, or
-`scripts/github-ci-gate.sh` changes on `main`; weekly on Mondays at 04:17 UTC; manual dispatch on
+**Triggers:** English source, Crowdin config, sync workflow, `scripts/ci/crowdin-pr.sh`, or
+`scripts/ci/github-ci-gate.sh` changes on `main`; weekly on Mondays at 04:17 UTC; manual dispatch on
 `main`. Runs are serialized without cancelling an active sync. Every run uploads `app/locales/en.json` to the Crowdin `main` branch so translators see new
 strings immediately. Push runs stop there; only the weekly schedule and manual dispatch download
 translations to `app/locales/%two_letters_code%.json` (preserving the directory hierarchy) and open
@@ -48,7 +48,7 @@ The job grants contents/pull-request write, actions write, and checks read permi
 GitHub token is required. Explicit `workflow_dispatch` starts CI on `locales` before merging and
 on `main` afterward. No write token is passed to dependency installation or project validation.
 
-When new translations are synchronized, `scripts/crowdin-pr.sh` verifies an open, non-draft,
+When new translations are synchronized, `scripts/ci/crowdin-pr.sh` verifies an open, non-draft,
 same-repository `locales` PR targeting `main`. If the branch is behind, it asks GitHub to merge main
 into it using an expected-head guard and waits for the new head; conflicts fail closed. The gate
 explicitly starts CI for the validated candidate. It then captures the candidate head SHA, fetches that exact commit,
@@ -128,7 +128,7 @@ current main, install through the shared `setup-project` action, build, recheck,
 The workflow reuses CI's test shards and database checks. It rejects other refs and events, failed
 or unfinished CI, a moved main, and automation-skip directives before publishing. Releases batch
 every commit since the previous tag; conventional commits outside internal scopes determine
-whether a version is warranted (`scripts/release-scope.mjs`). Publication is serialized without
+whether a version is warranted (`scripts/release/release-scope.mjs`). Publication is serialized without
 cancelling an active release. See `docs/workflow-automation.md` for details.
 
 ### PR Checks (`pr-checks.yml`)

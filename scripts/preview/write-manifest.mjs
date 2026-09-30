@@ -5,7 +5,7 @@
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { gitExecutable } from '../validation-tools.mjs';
+import { gitExecutable } from '../ci/validation-tools.mjs';
 import { buildManifest, digestDirectory, manifestShapeErrors } from './manifest.mjs';
 import { MANIFEST_FILE } from './profile.mjs';
 const env = process.env;

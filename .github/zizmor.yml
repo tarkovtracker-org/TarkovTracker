@@ -13,7 +13,7 @@ rules:
       # against live GitHub state, and never installs or executes candidate code. Deployment lives
       # in the explicit-dispatch workflow; see docs/systems.md §19.
       - preview-state.yml
-  # `./.github/actions/...` is the form the workflow fixtures in scripts/ci-tests assert on; the
+  # `./.github/actions/...` is the form the workflow fixtures in scripts/workflow-tests assert on; the
   # `$/` alias is equivalent for a same-repository composite action and offers no security gain.
   self-repository:
     disable: true
