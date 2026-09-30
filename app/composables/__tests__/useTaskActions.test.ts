@@ -240,6 +240,47 @@ describe('useTaskActions', () => {
     expect(tarkovStore.setStoryObjectiveComplete).toHaveBeenCalledWith('boreas', 'drives');
     expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
   });
+  const tourGated = (id: string, taskRequirements: Task['taskRequirements'] = []): Task => ({
+    id,
+    taskRequirements,
+    otherRequirements: [
+      {
+        type: 'storyObjective',
+        id: `overlay.${id}.tour.talk-to-therapist`,
+        storyChapter: { id: 'tour' },
+        objective: { id: 'talk-to-therapist' },
+      },
+    ],
+  });
+  it.each(['markTaskComplete', 'markTaskFailed'] as const)(
+    '%s records the story objective the task was gated on',
+    async (action) => {
+      const task = tourGated('first-in-line');
+      const { actions, tarkovStore } = await setup(task, [task], {});
+      actions[action]();
+      expect(tarkovStore.setStoryObjectiveComplete).toHaveBeenCalledWith(
+        'tour',
+        'talk-to-therapist'
+      );
+    }
+  );
+  it('records story gates of prerequisites Mark available completes', async () => {
+    const prior = tourGated('first-in-line');
+    const task: Task = {
+      id: 'follow-up',
+      taskRequirements: [{ task: { id: prior.id }, status: ['complete'] }],
+    };
+    const { actions, tarkovStore } = await setup(task, [task, prior], {});
+    actions.markTaskAvailable();
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith(prior.id);
+    expect(tarkovStore.setStoryObjectiveComplete).toHaveBeenCalledWith('tour', 'talk-to-therapist');
+  });
+  it('leaves story progress alone when Mark complete is undone', async () => {
+    const task = tourGated('first-in-line');
+    const { actions, tarkovStore } = await setup(task, [task], { isTaskComplete: true });
+    actions.markTaskUncomplete();
+    expect(tarkovStore.setStoryObjectiveComplete).not.toHaveBeenCalled();
+  });
   it('skips prerequisite backfill when the recorded story objective opens the story route', async () => {
     const task: Task = {
       id: 'story-routed',

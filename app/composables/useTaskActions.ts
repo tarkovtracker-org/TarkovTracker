@@ -8,7 +8,6 @@ import { hasUnconfirmableStatusClock } from '@/utils/taskAvailabilityConfirmatio
 import {
   hasUnsupportedOtherRequirement,
   otherRequirementsSignature,
-  storyObjectiveRequirements,
 } from '@/utils/taskOtherRequirements';
 import {
   applyTaskAvailabilityRequirements,
@@ -17,6 +16,7 @@ import {
   completeTaskForProgress,
   ensureTaskMinPlayerLevel,
   failTaskForProgress,
+  recordImpliedStoryObjectives,
   uncompleteTaskForProgress,
 } from '@/utils/taskProgress';
 import type { Task, TaskRequirement } from '@/types/tarkov';
@@ -122,12 +122,17 @@ export function useTaskActions(
     if (!preferencesStore.getPinnedTaskIds.includes(taskId)) return;
     preferencesStore.togglePinnedTask(taskId);
   };
+  const recordStoryGates = (taskId: string) => {
+    const gatedTask = tasksMap.value.get(taskId);
+    if (gatedTask) recordImpliedStoryObjectives(tarkovStore, gatedTask);
+  };
   const completeTaskForAvailability = (taskId: string) => {
     completeTaskForProgress({
       store: tarkovStore,
       taskId,
       tasksMap: tasksMap.value,
     });
+    recordStoryGates(taskId);
   };
   const failTaskForAvailability = (taskId: string) => {
     failTaskForProgress({
@@ -135,6 +140,7 @@ export function useTaskActions(
       taskId,
       tasksMap: tasksMap.value,
     });
+    recordStoryGates(taskId);
   };
   const ensureTraderRequirements = (currentTask: Task) => {
     if (!preferencesStore.getTasksRequireTraderLevels) return;
@@ -183,6 +189,7 @@ export function useTaskActions(
     unpinTaskIfPinned(currentTask.id);
     ensureTaskMinPlayerLevel(tarkovStore, currentTask);
     ensureTraderRequirements(currentTask);
+    recordImpliedStoryObjectives(tarkovStore, currentTask);
     if (isUndo) {
       emitAction({
         taskId: currentTask.id,
@@ -286,8 +293,7 @@ export function useTaskActions(
     });
     ensureTaskMinPlayerLevel(tarkovStore, currentTask);
     ensureTraderRequirements(currentTask);
-    for (const gate of storyObjectiveRequirements(currentTask))
-      tarkovStore.setStoryObjectiveComplete(gate.storyChapter.id, gate.objective.id);
+    recordImpliedStoryObjectives(tarkovStore, currentTask);
     if (requirements) tarkovStore.confirmTaskAvailability(currentTask.id, requirements);
     emitAction({
       taskId: currentTask.id,
@@ -317,6 +323,7 @@ export function useTaskActions(
       tasksMap: tasksMap.value,
       manual: true,
     });
+    recordImpliedStoryObjectives(tarkovStore, currentTask);
     unpinTaskIfPinned(currentTask.id);
     if (isUndo) {
       emitAction({

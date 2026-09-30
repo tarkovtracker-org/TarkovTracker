@@ -20,16 +20,14 @@ import {
 } from '@/utils/eftLogQuestParser';
 import { EftLogRecordSizeError } from '@/utils/eftLogRecordReader';
 import { logger } from '@/utils/logger';
-import {
-  otherRequirementsSignature,
-  storyObjectiveRequirements,
-} from '@/utils/taskOtherRequirements';
+import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import {
   applyTaskAvailabilityRequirements,
   applyTaskTraderRequirements,
   ensureTaskMinPlayerLevel,
   completeTaskForProgress,
   failTaskForProgress,
+  recordImpliedStoryObjectives,
 } from '@/utils/taskProgress';
 import { getCompletionFlags } from '@/utils/taskStatus';
 import type { Task } from '@/types/tarkov';
@@ -141,11 +139,6 @@ const buildImportTaskSets = (
     sets[event.status][event.mode].add(event.questId);
   }
   return { completed: sets.completed, started: sets.started, failed: sets.failed };
-};
-/** A started, completed or failed task has passed its start gates, so its story objectives were met. */
-const recordImpliedStoryObjectives = (store: ReturnType<typeof useTarkovStore>, task: Task) => {
-  for (const gate of storyObjectiveRequirements(task))
-    store.setStoryObjectiveComplete(gate.storyChapter.id, gate.objective.id);
 };
 const applyImportedTaskRequirements = (
   store: ReturnType<typeof useTarkovStore>,

@@ -5,6 +5,7 @@ import {
   isFailedOnlyRequirement,
   normalizeRequirementStatuses,
 } from '@shared/utils/requirementStatus';
+import { storyObjectiveRequirements } from '@/utils/taskOtherRequirements';
 import { getTaskTraderRequirements } from '@/utils/taskRequirements';
 import {
   isTaskComplete,
@@ -160,6 +161,14 @@ const applyTraderMinimum = (
   if (store.getTraderReputation(requirement.trader.id) < requirement.value)
     store.setTraderReputation(requirement.trader.id, requirement.value);
 };
+/** A started, completed or failed task has passed its start gates, so its story objectives were met. */
+export function recordImpliedStoryObjectives(
+  store: { setStoryObjectiveComplete: (chapterId: string, objectiveId: string) => void },
+  task: Task
+): void {
+  for (const gate of storyObjectiveRequirements(task))
+    store.setStoryObjectiveComplete(gate.storyChapter.id, gate.objective.id);
+}
 /** Completion proves lower bounds, never that earned progress should be reduced. */
 export function applyTaskTraderRequirements(options: {
   store: TaskTraderProgressStore;
