@@ -3,6 +3,7 @@ import { $fetch } from 'ofetch';
 import { useRuntimeConfig } from '#imports';
 import { createLogger } from '@/server/utils/logger';
 import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
+import { toTrustedGameLinkUrl } from '@/utils/externalUrl';
 import { buildSkillImageUrl } from '@/utils/tarkovUrls';
 import { normalizeOtherRequirements } from '@/utils/taskOtherRequirements';
 import {
@@ -550,6 +551,28 @@ function adaptCategoryRef(value: unknown, context: AdapterContext) {
     normalizedName: typeof raw.normalizedName === 'string' ? raw.normalizedName : undefined,
   });
 }
+const ITEM_STRING_FIELDS = [
+  'shortName',
+  'name',
+  'normalizedName',
+  'image512pxLink',
+  'image8xLink',
+  'gridImageLink',
+  'baseImageLink',
+  'iconLink',
+  'backgroundColor',
+] as const;
+function adaptItemFields(raw: JsonRecord, id: string): JsonRecord {
+  const fields: JsonRecord = {
+    id: typeof raw.id === 'string' ? raw.id : id,
+    link: toTrustedGameLinkUrl(raw.link),
+    wikiLink: toTrustedGameLinkUrl(raw.wikiLink),
+  };
+  for (const key of ITEM_STRING_FIELDS) {
+    if (typeof raw[key] === 'string') fields[key] = raw[key];
+  }
+  return fields;
+}
 function adaptItemRef(value: unknown, context: AdapterContext): TarkovItem {
   const id = stringId(value) ?? '';
   const raw = readRecordRef(value, context.itemsById, context.questItemsById);
@@ -559,57 +582,28 @@ function adaptItemRef(value: unknown, context: AdapterContext): TarkovItem {
     rawProperties.defaultPreset = adaptItemRef(rawProperties.defaultPreset, context);
   }
   return compactObject({
-    id: typeof raw.id === 'string' ? raw.id : id,
-    shortName: typeof raw.shortName === 'string' ? raw.shortName : undefined,
-    name: typeof raw.name === 'string' ? raw.name : undefined,
-    normalizedName: typeof raw.normalizedName === 'string' ? raw.normalizedName : undefined,
-    link: typeof raw.link === 'string' ? raw.link : undefined,
-    wikiLink: typeof raw.wikiLink === 'string' ? raw.wikiLink : undefined,
-    image512pxLink: typeof raw.image512pxLink === 'string' ? raw.image512pxLink : undefined,
-    image8xLink: typeof raw.image8xLink === 'string' ? raw.image8xLink : undefined,
-    gridImageLink: typeof raw.gridImageLink === 'string' ? raw.gridImageLink : undefined,
-    baseImageLink: typeof raw.baseImageLink === 'string' ? raw.baseImageLink : undefined,
-    iconLink: typeof raw.iconLink === 'string' ? raw.iconLink : undefined,
-    backgroundColor: typeof raw.backgroundColor === 'string' ? raw.backgroundColor : undefined,
+    ...adaptItemFields(raw, id),
     properties: rawProperties,
   }) as TarkovItem;
+}
+const DEFAULT_PRESET_STRING_FIELDS = ['iconLink', 'image512pxLink', 'backgroundColor'] as const;
+function adaptObjectiveDefaultPreset(properties: unknown, context: AdapterContext) {
+  const ref = isRecord(properties) ? properties.defaultPreset : undefined;
+  const raw = isRecord(ref) ? ref : readRecordRef(ref, context.itemsById);
+  if (!raw) return undefined;
+  const preset: JsonRecord = { id: stringId(raw) };
+  for (const key of DEFAULT_PRESET_STRING_FIELDS) {
+    if (typeof raw[key] === 'string') preset[key] = raw[key];
+  }
+  return compactObject(preset);
 }
 function adaptObjectiveItemRef(value: unknown, context: AdapterContext): TarkovItem {
   const id = stringId(value) ?? '';
   const raw = readRecordRef(value, context.itemsById, context.questItemsById);
   if (!raw) return { id };
-  const rawProperties = isRecord(raw.properties) ? raw.properties : undefined;
-  const rawDefaultPreset = isRecord(rawProperties?.defaultPreset)
-    ? rawProperties.defaultPreset
-    : readRecordRef(rawProperties?.defaultPreset, context.itemsById);
-  const defaultPreset = rawDefaultPreset
-    ? compactObject({
-        id: stringId(rawDefaultPreset),
-        iconLink:
-          typeof rawDefaultPreset.iconLink === 'string' ? rawDefaultPreset.iconLink : undefined,
-        image512pxLink:
-          typeof rawDefaultPreset.image512pxLink === 'string'
-            ? rawDefaultPreset.image512pxLink
-            : undefined,
-        backgroundColor:
-          typeof rawDefaultPreset.backgroundColor === 'string'
-            ? rawDefaultPreset.backgroundColor
-            : undefined,
-      })
-    : undefined;
+  const defaultPreset = adaptObjectiveDefaultPreset(raw.properties, context);
   return compactObject({
-    id: typeof raw.id === 'string' ? raw.id : id,
-    shortName: typeof raw.shortName === 'string' ? raw.shortName : undefined,
-    name: typeof raw.name === 'string' ? raw.name : undefined,
-    normalizedName: typeof raw.normalizedName === 'string' ? raw.normalizedName : undefined,
-    link: typeof raw.link === 'string' ? raw.link : undefined,
-    wikiLink: typeof raw.wikiLink === 'string' ? raw.wikiLink : undefined,
-    image512pxLink: typeof raw.image512pxLink === 'string' ? raw.image512pxLink : undefined,
-    image8xLink: typeof raw.image8xLink === 'string' ? raw.image8xLink : undefined,
-    gridImageLink: typeof raw.gridImageLink === 'string' ? raw.gridImageLink : undefined,
-    baseImageLink: typeof raw.baseImageLink === 'string' ? raw.baseImageLink : undefined,
-    iconLink: typeof raw.iconLink === 'string' ? raw.iconLink : undefined,
-    backgroundColor: typeof raw.backgroundColor === 'string' ? raw.backgroundColor : undefined,
+    ...adaptItemFields(raw, id),
     properties: defaultPreset ? { defaultPreset } : undefined,
   }) as TarkovItem;
 }
@@ -641,6 +635,8 @@ function adaptItem(raw: JsonRecord, context: AdapterContext, lite = false): Tark
   return compactObject({
     ...raw,
     ...base,
+    link: base.link,
+    wikiLink: base.wikiLink,
     categories,
     category: categories?.[0],
     containsItems,
@@ -750,7 +746,7 @@ function adaptTaskRef(value: unknown, context: AdapterContext) {
   return compactObject({
     id,
     name: typeof raw?.name === 'string' ? raw.name : undefined,
-    wikiLink: typeof raw?.wikiLink === 'string' ? raw.wikiLink : undefined,
+    wikiLink: toTrustedGameLinkUrl(raw?.wikiLink),
   });
 }
 function adaptTaskRequirement(raw: unknown, context: AdapterContext) {
@@ -825,7 +821,7 @@ function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
     lightkeeperRequired:
       typeof raw.lightkeeperRequired === 'boolean' ? raw.lightkeeperRequired : undefined,
     experience: typeof raw.experience === 'number' ? raw.experience : undefined,
-    wikiLink: typeof raw.wikiLink === 'string' ? raw.wikiLink : undefined,
+    wikiLink: toTrustedGameLinkUrl(raw.wikiLink),
     minPlayerLevel: typeof raw.minPlayerLevel === 'number' ? raw.minPlayerLevel : undefined,
     requiredPrestige: resolveRequiredPrestige(raw.requiredPrestige),
     taskRequirements: Array.isArray(raw.taskRequirements)
