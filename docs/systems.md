@@ -802,9 +802,9 @@ flowchart LR
    clients, and upserts each normalized row. The caller passes the season number its bundle was
    built for; the function writes the Seasonal row only when that number equals the database's
    active season, so a cached client from a previous season cannot upload stale Seasonal state. A
-   client sync carries only the modes that differ from the copy the server last loaded or
-   acknowledged for this session (`app/stores/tarkov/acknowledgedModes.ts`); an omitted mode is kept
-   as stored. A multi-mode sync over half the payload cap is sent as one request per mode, and each
+   client sync carries only the modes that differ from the copy the server last loaded, acknowledged,
+   or delivered through Realtime for this session (`app/stores/tarkov/acknowledgedModes.ts`); an
+   omitted mode is kept as stored. A multi-mode sync over half the payload cap is sent as one request per mode, and each
    mode is acknowledged only after its request succeeds; a session reset stops the remaining
    requests. One request can still carry several modes, so a stale Seasonal entry is skipped rather
    than raising: persistent PvP and PvE from the same request still commit. The RPC rejects payloads

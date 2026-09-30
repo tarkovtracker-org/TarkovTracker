@@ -1,5 +1,6 @@
 import { useToastI18n } from '@/composables/useToastI18n';
 import { blockAccountRecoveryRetentionForOwner } from '@/stores/tarkov/accountRecovery';
+import { recordAcknowledgedModes } from '@/stores/tarkov/acknowledgedModes';
 import { maybeNotifyApiUpdate } from '@/stores/tarkov/apiUpdateNotifier';
 import { detectDataConflicts } from '@/stores/tarkov/conflictDetection';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
@@ -498,6 +499,8 @@ async function runSetupRealtimeListener(
         [mode]: remote.progressTime,
       },
     });
+    // The server now holds this copy, so a later local revert to the old copy is still sent.
+    recordAcknowledgedModes(currentUserId, { [mode]: remoteProgress });
     if (shouldIgnoreModeProgressUpdate(mode, updateTime, nextProgress, localState[mode])) return;
     const conflicts = detectDataConflicts(localState[mode], remoteProgress);
     const apiUpdateHandled = maybeNotifyApiUpdate(
