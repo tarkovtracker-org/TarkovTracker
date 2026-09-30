@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(9);
+SELECT plan(11);
 
 CREATE TEMP TABLE cap_fixture ON COMMIT DROP AS
 SELECT jsonb_agg(
@@ -102,6 +102,34 @@ SELECT ok(
    FROM public.user_game_mode_progress
    WHERE user_id = '00000000-0000-0000-0000-000000000990' AND game_mode = 'pvp'),
   'authenticated progress sync persists capped apiUpdateHistory entries'
+);
+
+INSERT INTO auth.users (id, email)
+VALUES ('00000000-0000-0000-0000-000000000992', 'api-task-cap-gateway@example.invalid');
+SELECT public.merge_progress_data('00000000-0000-0000-0000-000000000992', 'pvp_data', NULL, NULL,
+  jsonb_build_object('level', 5, 'lastApiUpdate', jsonb_build_object(
+    'at', 1780000000000, 'id', 'first-write', 'source', 'api', 'taskCount', 30,
+    'tasks', (SELECT jsonb_agg(value ORDER BY ordinality)
+              FROM jsonb_array_elements((SELECT tasks FROM cap_fixture)) WITH ORDINALITY
+              WHERE ordinality <= 20))));
+SELECT public.merge_progress_data('00000000-0000-0000-0000-000000000992', 'pvp_data', NULL, NULL,
+  jsonb_build_object('lastApiUpdate', jsonb_build_object(
+    'at', 1780000000001, 'id', 'second-write', 'source', 'api', 'tasks', (SELECT tasks FROM cap_fixture))));
+
+SELECT is(
+  (SELECT jsonb_agg(jsonb_build_array(entry->>'id', jsonb_array_length(entry->'tasks'), entry->'taskCount'))
+   FROM public.user_game_mode_progress,
+     jsonb_array_elements(progress_data->'apiUpdateHistory') AS entry
+   WHERE user_id = '00000000-0000-0000-0000-000000000992' AND game_mode = 'pvp'),
+  '[["second-write", 20, 25], ["first-write", 20, 30]]'::jsonb,
+  'API writes keep capped entries and earlier counts in normalized progress'
+);
+SELECT is(
+  (SELECT jsonb_agg(jsonb_build_array(entry->>'id', jsonb_array_length(entry->'tasks'), entry->'taskCount'))
+   FROM public.user_progress, jsonb_array_elements(pvp_data->'apiUpdateHistory') AS entry
+   WHERE user_id = '00000000-0000-0000-0000-000000000992'),
+  '[["second-write", 20, 25], ["first-write", 20, 30]]'::jsonb,
+  'the legacy history trigger carries taskCount through to the mirrored row'
 );
 
 SELECT * FROM finish();
