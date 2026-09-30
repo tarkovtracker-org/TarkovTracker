@@ -9,6 +9,9 @@ describe('toTrustedGameLinkUrl', () => {
   ])('keeps trusted link %s unchanged', (url) => {
     expect(toTrustedGameLinkUrl(url)).toBe(url);
   });
+  it('returns the canonical URL so an anchor cannot resolve it against the app host', () => {
+    expect(toTrustedGameLinkUrl('https:tarkov.dev/item/abc')).toBe('https://tarkov.dev/item/abc');
+  });
   it.each([
     'javascript:alert(1)',
     'JaVaScRiPt:alert(1)',

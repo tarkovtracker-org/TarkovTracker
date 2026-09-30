@@ -63,7 +63,7 @@ import {
   reconcileStoryObjectiveIds,
   type StoryIdChanges,
 } from '@/stores/tarkov/progressMigration';
-import { syncProgressState } from '@/stores/tarkov/progressPersistence';
+import { executeProgressMutation, syncProgressState } from '@/stores/tarkov/progressPersistence';
 import { repairCompletedProgress, repairFailedProgress } from '@/stores/tarkov/progressRepair';
 import {
   acknowledgeStartupSync,
@@ -165,7 +165,7 @@ const syncProgressIfLoggedIn = async (store: TarkovStoreInstance, errorMessage: 
   }
 };
 const archivePrestigeRun = async (store: TarkovStoreInstance, mode: GameMode) => {
-  const { $supabase } = useNuxtApp();
+  const { $supabase, userId } = requirePrestigeSession();
   const currentPrestige = clampPrestigeLevel(store[mode].prestigeLevel ?? 0);
   if (currentPrestige >= 6) throw new Error('Maximum prestige level reached.');
   const nextPrestige = currentPrestige + 1;
@@ -176,7 +176,7 @@ const archivePrestigeRun = async (store: TarkovStoreInstance, mode: GameMode) =>
   const currentGameMode = store.$state.currentGameMode;
   const gameEdition = store.$state.gameEdition;
   const tarkovUid = store.$state.tarkovUid;
-  const { error } = await $supabase.client.rpc('archive_prestige_run_and_reset_progress', {
+  const args = {
     p_archived_progress: archivedProgress,
     p_created_at: new Date().toISOString(),
     p_current_game_mode: currentGameMode,
@@ -188,12 +188,21 @@ const archivePrestigeRun = async (store: TarkovStoreInstance, mode: GameMode) =>
     p_pvp_data: nextState.pvp,
     p_summary: buildPrestigeRunSummary(archivedProgress),
     p_tarkov_uid: tarkovUid,
+  };
+  const modes = { pvp: nextState.pvp, pve: nextState.pve };
+  const { error } = await executeProgressMutation(userId, {
+    modes,
+    expected: { ...modes, currentGameMode, gameEdition, tarkovUid },
+    send: () => $supabase.client.rpc('archive_prestige_run_and_reset_progress', args),
+    canContinue: () => $supabase.user.loggedIn && $supabase.user.id === userId,
+    onSuccess: () => {
+      recordLocalSyncTime();
+      store.$patch((state) => {
+        state[mode] = resetModeData;
+      });
+    },
   });
   throwSyncError(error, 'Failed to update prestige progress');
-  recordLocalSyncTime();
-  store.$patch((state) => {
-    state[mode] = resetModeData;
-  });
 };
 // ============================================================================
 // Store Definition

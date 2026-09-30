@@ -65,6 +65,55 @@ describe('useSupabaseSync', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+  it.each(['realtime', 'snapshot'])(
+    'persists a revert to an earlier upload after a %s observation',
+    async (observation) => {
+      const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+      const store = createMockStore({ count: 5 });
+      const sync = useSupabaseSync({ store, table: 'test_table' });
+      await sync.syncToSupabase();
+      if (observation === 'realtime') {
+        Object.assign(store.$state, sync.captureRemoteMerge!()({ count: 8 }));
+      } else {
+        await sync.withSnapshot!(async (reconcile) => {
+          Object.assign(store.$state, reconcile({ count: 8 }));
+        });
+      }
+      expect(store.$state.count).toBe(8);
+      store.$state.count = 5;
+      store.notifySubscriber();
+      await sync.syncToSupabase();
+      expect(upsert).toHaveBeenCalledTimes(2);
+      expect(upsert).toHaveBeenLastCalledWith({ count: 5, user_id: 'user-1' });
+      expect(sync.hasPendingChanges!()).toBe(false);
+      sync.cleanup();
+    }
+  );
+  it('invalidates an external-save hash when a pending snapshot is finally applied', async () => {
+    const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+    const store = createMockStore({ reset: 5, other: 5 });
+    const sync = useSupabaseSync({ store, table: 'test_table' });
+    await sync.syncToSupabase();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const snapshot = sync.withSnapshot!(async (reconcile) => {
+      await gate;
+      Object.assign(store.$state, reconcile({ other: 8 }));
+    });
+    await Promise.resolve();
+    store.$state.reset = 0;
+    sync.acknowledgeExternalSave!({ reset: 0, other: 5 });
+    release();
+    await snapshot;
+    store.$state.other = 5;
+    store.notifySubscriber();
+    await sync.syncToSupabase();
+    expect(upsert).toHaveBeenCalledTimes(2);
+    expect(upsert).toHaveBeenLastCalledWith({ reset: 0, other: 5, user_id: 'user-1' });
+    sync.cleanup();
+  });
   it.each(['paused', 'signed-out', 'disposed'])(
     'does not transform a gated %s save',
     async (gate) => {

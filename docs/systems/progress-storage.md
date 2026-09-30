@@ -33,7 +33,23 @@ flowchart LR
    clients, and upserts each normalized row. The caller passes the season number its bundle was
    built for; the function writes the Seasonal row only when that number equals the database's
    active season, so a cached client from a previous season cannot upload stale Seasonal state. A
-   client sync always carries every mode in one payload, so a stale Seasonal entry is skipped rather
+   client sync carries only the modes that differ from the copy the server last loaded,
+   acknowledged, or delivered through Realtime for this session
+   (`app/stores/tarkov/acknowledgedModes.ts`); an omitted mode is kept as stored. Background and
+   direct saves share an account queue in `app/stores/tarkov/progressPersistence.ts`, and compare
+   their captured snapshot with the baseline only after preceding writes settle. Dispatched modes
+   remain unacknowledged until a current request succeeds, so a revert cannot match an obsolete
+   baseline while an older write is still pending, including across a same-account session reset.
+   A multi-mode sync over half the payload cap is sent as one request per mode, and each mode is
+   acknowledged only after its request succeeds; a newer sync, a session reset, or Realtime applying
+   newer progress or account metadata stops the remaining requests so they never replay a stale snapshot; the
+   interrupted sync reports a failure, so the controller reconciles and resends from the merged
+   state. Each queued or dispatched save keeps its own captured values until it settles. An accepted
+   Realtime scope that matches both one pending save's captured values and the values applied
+   locally is that save's echo and interrupts no pending save. Once a sync has
+   selected its modes, Realtime changes to modes it omits no longer interrupt it. Remote observations
+   also invalidate the controller's last-upload hash, so reverting to an earlier upload still
+   reaches the sender's current baseline comparison. One request can still carry several modes, so a stale Seasonal entry is skipped rather
    than raising: persistent PvP and PvE from the same request still commit. The RPC rejects payloads
    larger than 512 KiB and allows at most 60 direct client syncs per user per minute. API gateway
    reads resolve the active Seasonal number through the database before selecting a row. Persisted
@@ -73,7 +89,12 @@ flowchart LR
 7. Prestige is a PvP-only concept and Seasonal PvP does not support it, so the archive RPC accepts
    only `pvp` (and `pve`, which the UI still gates off) and never writes the Seasonal row. The store
    rejects a Seasonal prestige before any request, and the settings card reports prestige as
-   unavailable in Seasonal PvP.
+   unavailable in Seasonal PvP. Prestige archives use the same account write queue as background
+   syncs, supersede older splits, and acknowledge only the persistent modes the transaction writes.
+   A committed archive is applied even if a newer local sync started while it was in flight; that
+   sync captured pre-archive state, so it is superseded before dispatch and resent from merged state.
+   Remote changes outside the transaction's write scope, such as Seasonal progress, do not interrupt it.
+   A cancelled session cannot dispatch a queued archive or apply its result to another account.
 
 Teams, save status and recovery, and progress imports build on this storage; see
 [teams](./teams.md), [progress sync and recovery](./progress-sync.md), and
