@@ -1,4 +1,5 @@
 <script setup lang="ts">
+  import AccountRetentionPolicy from '@/components/AccountRetentionPolicy.vue';
   import { useScrollRoot } from '@/composables/useScrollRoot';
   const { t } = useI18n({ useScope: 'global' });
   const { getScrollContainer } = useScrollRoot();
@@ -6,7 +7,7 @@
     title: 'Terms of Service',
     description: 'TarkovTracker terms of service and usage guidelines.',
   });
-  const lastUpdated = 'September 16, 2026';
+  const lastUpdated = 'September 29, 2026';
   const ACTIVE_SECTION_OFFSET = 160;
   const toc = [
     { id: 'acceptance', title: '1. Acceptance of Terms' },
@@ -432,6 +433,10 @@
                 progress data will be removed from active systems, though some data may be retained
                 in backups for a limited period.
               </p>
+              <AccountRetentionPolicy />
+              <p class="mt-4 mb-4 leading-relaxed">
+                {{ t('page.account_retention.notice') }}
+              </p>
               <h3 class="mt-6 mb-3 text-xl font-semibold">7.4 Third-Party Data Sharing</h3>
               <p class="leading-relaxed">
                 We do not sell, rent, or trade your personal information to third parties for
@@ -699,13 +704,7 @@
                 <li class="leading-relaxed">Violation of these Terms</li>
                 <li class="leading-relaxed">Fraudulent, abusive, or illegal activity</li>
                 <li class="leading-relaxed">
-                  Extended inactivity. We reserve the right to delete accounts and associated data
-                  after an extended period with no login activity (for example, 6 or more
-                  consecutive months for standard accounts, and a longer window for active
-                  supporters or accounts within a paid supporter retention window). Where feasible,
-                  we will make reasonable efforts to notify you in advance via the email associated
-                  with your account, and you may export a full backup of your profile data at any
-                  time from the Service settings
+                  {{ t('page.account_retention.terms_summary') }}
                 </li>
                 <li class="leading-relaxed">Technical or security concerns</li>
                 <li class="leading-relaxed">Discontinuation of the Service</li>
@@ -836,9 +835,7 @@
                   status is active, including one-time contributors
                 </li>
                 <li class="leading-relaxed">
-                  If and when we delete inactive accounts, a longer data-retention window than
-                  standard accounts before an inactive supporter account becomes eligible for
-                  deletion (as described in Section 13 and the Privacy Policy)
+                  {{ t('page.account_retention.perk_summary') }}
                 </li>
                 <li class="leading-relaxed">
                   Other perks we may offer, adjust, or discontinue from time to time

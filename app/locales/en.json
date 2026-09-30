@@ -877,7 +877,7 @@
       "one_time_perks_heading": "Includes supporter perks",
       "one_time_fee_transparency": "Stripe fees (2.9% + $0.30) are shown before you pay.",
       "perk_api_rate_limit": "Higher daily API read and write quotas",
-      "perk_data_retention": "Longer retention if inactive accounts are purged, while supporter status is active",
+      "perk_data_retention": "One-year inactivity window after any recorded support; active subscriptions are exempt from inactivity cleanup",
       "login_required_warning": "You must be logged in to receive supporter perks.",
       "price_to_us": "Goes to us",
       "price_per_month_suffix": "/mo",
@@ -1794,6 +1794,24 @@
         "play": "Play video: {title}"
       },
       "official_guide_label": "TarkovTracker.org Guide"
+    },
+    "account_retention": {
+      "title": "Account retention and service availability",
+      "scope": "These rules apply to routine account deletion for inactivity while TarkovTracker operates. They define when an account may become eligible for cleanup, not a scheduled deletion date.",
+      "standard": "No qualifying support: an account may be deleted after six consecutive months without recorded account activity.",
+      "previous_supporter": "Previous supporter: an account with a qualifying contribution recorded against it, including a one-time contribution or previous subscription, may become eligible for deletion one year after the later of its last recorded account activity and its most recent recorded contribution.",
+      "active_subscriber": "Active qualifying subscription: an account is exempt from routine inactivity deletion while its supporter subscription remains active, even if the account is not used.",
+      "subscription_end": "Canceling renewal does not end this exemption while paid subscription access continues. After subscription access ends, including any billing grace period we grant, an account becomes eligible for inactivity deletion no earlier than one year after the later of its last recorded activity and the end of its most recent subscription access period.",
+      "activity": "We assess inactivity using available records of sign-ins, authenticated site or API use, and saved account-data changes. Viewing a public profile without signing in does not count as activity for that account.",
+      "exceptions": "Fully refunded contributions do not qualify for supporter retention; other valid contributions may still qualify. A chargeback immediately removes all supporter benefits and supporter retention history, including benefits from earlier contributions. Accounts with a chargeback follow the standard six-month inactivity rule. These protections apply only to routine inactivity cleanup. They do not prevent deletion you request, action for abuse or security reasons, deletion required by law, or deletion when the Service is discontinued.",
+      "no_guarantee": "Supporting TarkovTracker does not purchase permanent storage, a backup service, or guaranteed availability or recovery. Data may be lost through failures, security incidents, or third-party outages, and the Service may be suspended or shut down. The retention policy does not guarantee that data will remain available for any particular period.",
+      "backup": "Export your progress from Settings and keep your own backup. Export and recovery may be unavailable during an outage or after data is lost or deleted.",
+      "rights": "Nothing in this policy excludes or limits rights or remedies that cannot lawfully be excluded or limited.",
+      "notice": "Where feasible, we will make reasonable efforts to notify affected users before routine inactivity deletion. Material changes to this policy will be communicated in accordance with the Terms of Service and applicable law.",
+      "terms_summary": "Routine inactivity cleanup follows the account-retention rules in Section 7.3, including the exemption for active subscribers and the one-year window for previous supporters.",
+      "perk_summary": "Protection from routine inactivity deletion under the account-retention rules in Section 7.3, including one-time contributors and previous subscribers",
+      "liability": "Any exclusion or limitation of liability for data loss or privacy-related incidents applies only to the extent permitted by applicable law. Nothing in this Policy excludes or limits rights or remedies that cannot lawfully be excluded or limited.",
+      "liability_label": "Limits permitted by law:"
     }
   },
   "footer": {

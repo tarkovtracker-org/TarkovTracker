@@ -46,11 +46,18 @@ describe('POST /api/account/activity', () => {
   it('requires authentication', async () => {
     const { default: handler } = await import('@/server/api/account/activity.post');
     await expect(handler(makeEvent(null))).rejects.toMatchObject({ statusCode: 401 });
+    expect(mockAdminSupabaseFetch).not.toHaveBeenCalled();
   });
-  it('requires the private IP hashing secret', async () => {
+  it('records durable activity without the private IP hashing secret', async () => {
     runtimeConfig.accountIpHashSecret = '';
     const { default: handler } = await import('@/server/api/account/activity.post');
-    await expect(handler(makeEvent('user-1'))).rejects.toMatchObject({ statusCode: 500 });
+    await expect(handler(makeEvent('user-1'))).resolves.toEqual({ recorded: true });
+    expect(mockAdminSupabaseFetch).toHaveBeenCalledExactlyOnceWith(
+      'https://test.supabase.co',
+      'service-key',
+      '/rest/v1/rpc/record_account_activity',
+      { method: 'POST', body: JSON.stringify({ p_user_id: 'user-1' }) }
+    );
   });
   it('stores a keyed hash rather than the raw IP address', async () => {
     const { default: handler } = await import('@/server/api/account/activity.post');
@@ -62,7 +69,7 @@ describe('POST /api/account/activity', () => {
       '/rest/v1/account_ip_audit?on_conflict=user_id,ip_hash',
       expect.objectContaining({ method: 'POST' })
     );
-    const [, , , init] = mockAdminSupabaseFetch.mock.calls[0] as [
+    const [, , , init] = mockAdminSupabaseFetch.mock.calls[1] as [
       string,
       string,
       string,
@@ -73,10 +80,29 @@ describe('POST /api/account/activity', () => {
     expect(payload.ip_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(JSON.stringify(payload)).not.toContain('203.0.113.22');
   });
-  it('does not persist activity when no valid client address is available', async () => {
+  it('records durable activity when no valid client address is available', async () => {
     mockGetClientAddress.mockReturnValue(null);
     const { default: handler } = await import('@/server/api/account/activity.post');
-    await expect(handler(makeEvent('user-1'))).resolves.toEqual({ recorded: false });
+    await expect(handler(makeEvent('user-1'))).resolves.toEqual({ recorded: true });
+    expect(mockAdminSupabaseFetch).toHaveBeenCalledTimes(1);
+  });
+  it.each(['supabaseUrl', 'supabaseServiceKey'] as const)('requires %s', async (key) => {
+    runtimeConfig[key] = '';
+    const { default: handler } = await import('@/server/api/account/activity.post');
+    await expect(handler(makeEvent('user-1'))).rejects.toMatchObject({ statusCode: 500 });
     expect(mockAdminSupabaseFetch).not.toHaveBeenCalled();
+  });
+  it('fails when durable recording fails without writing an audit', async () => {
+    mockAdminSupabaseFetch.mockRejectedValueOnce(new Error('database offline'));
+    const { default: handler } = await import('@/server/api/account/activity.post');
+    await expect(handler(makeEvent('user-1'))).rejects.toThrow('database offline');
+    expect(mockAdminSupabaseFetch).toHaveBeenCalledTimes(1);
+  });
+  it('returns durable success when optional audit fails', async () => {
+    mockAdminSupabaseFetch
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('audit offline'));
+    const { default: handler } = await import('@/server/api/account/activity.post');
+    await expect(handler(makeEvent('user-1'))).resolves.toEqual({ recorded: true });
   });
 });

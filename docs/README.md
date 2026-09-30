@@ -42,6 +42,7 @@ instead of restating it.
 - [`eft-log-reference/`](./eft-log-reference/) — privacy-normalized reference for EFT (and Arena) local log events: what data the game writes, where, and in which builds. Historical evidence base for the EFT logs import feature.
 - [`api.md`](./api.md) — endpoint reference, caching, supported languages, game modes.
 - [`rate-limiting.md`](./rate-limiting.md) — ownership map for API, Edge, Pages, DB, and Auth rate-limit systems.
+- [`account-retention.md`](./account-retention.md) — inactivity policy, activity tracking design, and cleanup rollout requirements.
 - [`runbook.md`](./runbook.md) — required env vars, pre-deploy checks, incident triage and recovery.
 - [`tarkov-clearance-rollout.md`](./tarkov-clearance-rollout.md) — proposed game-data browser verification infrastructure, approval gates, acceptance evidence and edge-first rollback.
 - [`workflow-automation.md`](./workflow-automation.md) — GitHub Actions, pre-commit hooks, Dependabot, releases.
