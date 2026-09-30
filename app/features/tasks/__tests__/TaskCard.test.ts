@@ -2,6 +2,7 @@ import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import TaskCard from '@/features/tasks/TaskCard.vue';
+import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import type { TaskActionPayload } from '@/composables/useTaskActions';
 import type { TaskEvaluationMap } from '@/stores/taskAvailability';
 import type { UserProgressData } from '@/types/progress';
@@ -26,6 +27,7 @@ const progressStoreMock = {
   visibleTeamStores: { self: {} } as Record<string, Record<string, never>>,
 };
 const tarkovStoreMock = {
+  clearTaskAvailability: vi.fn(),
   getCurrentProgressData: vi.fn((): Partial<UserProgressData> => ({ taskCompletions: {} })),
   getObjectiveCount: vi.fn(() => 0),
   getPMCFaction: vi.fn(() => 'USEC'),
@@ -53,6 +55,7 @@ const taskFilteringMock = {
 };
 const useTaskActionsMock = {
   markTaskActive: vi.fn(),
+  canMarkTaskAvailable: vi.fn(() => true),
   markTaskAvailable: vi.fn(),
   markTaskComplete: vi.fn(),
   markTaskFailed: vi.fn(),
@@ -150,10 +153,12 @@ const TaskCardRewardsStub = {
   template: '<div data-testid="task-card-rewards" />',
 };
 const ContextMenuStub = {
-  template: '<div><slot /></div>',
+  setup: () => ({ close: vi.fn() }),
+  template: '<div><slot :close="close" /></div>',
 };
 const ContextMenuItemStub = {
-  template: '<button><slot /></button>',
+  props: ['label'],
+  template: '<button>{{ label }}</button>',
 };
 const AppTooltipStub = {
   template: '<span><slot /></span>',
@@ -217,9 +222,32 @@ describe('TaskCard appearance and expansion controls', () => {
     tarkovStoreMock.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
     tarkovStoreMock.getObjectiveCount.mockReturnValue(0);
   });
+  it('offers a task-local confirmation reset without touching objectives', async () => {
+    const gated: Partial<Task> = {
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['trader'] }],
+    };
+    tarkovStoreMock.getCurrentProgressData.mockReturnValue({
+      taskCompletions: {},
+      taskAvailability: {
+        'task-1': {
+          requirements: otherRequirementsSignature({ id: 'task-1', ...gated } as Task)!,
+          timestamp: 10,
+        },
+      },
+    });
+    const wrapper = await mountTaskCard(gated);
+    const reset = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'page.tasks.questcard.clear_availability_confirmation');
+    expect(reset).toBeDefined();
+    await reset!.trigger('click');
+    expect(tarkovStoreMock.clearTaskAvailability).toHaveBeenCalledWith('task-1');
+    expect(tarkovStoreMock.setObjectiveCount).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
   it('emits the failed-card class contract: dark surface with pale light-mode companions', async () => {
     // This asserts the emitted class names only; the resolved per-theme rendering is
-    // covered by the browser contrast audit (SYSTEMS.md §17) and the light:+token
+    // covered by the browser contrast audit (systems.md §17) and the light:+token
     // wiring is guarded by tailwindTheme.test.ts.
     taskState.failed = true;
     const wrapper = await mountTaskCard();

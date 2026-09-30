@@ -1,5 +1,6 @@
 import { isGameEdition } from '@/utils/editionHelpers';
 import { isPlainObject } from './deepMerge';
+import { validProgressionCounters } from './overlayCounters';
 import { mergeOverlayRecords, overlayEntries, scopedOverlay } from './overlayProjectors';
 import type { OverlayData, OverlayRecords } from './overlayTypes';
 const OVERLAY_SECTION_OWNERS = {
@@ -220,13 +221,11 @@ const scopedUnknownSections = (
       ? [`${prefix}.${scope}`]
       : unknownSectionNames(sections, `${prefix}.${scope}.`, allowed)
   );
-// Only the published empty root registry is a no-op. Populated registries still
-// require an actual consumer before precompute may certify them.
-const emptyCounterRegistry = (value: unknown): boolean =>
-  isPlainObject(value) && Object.keys(value).length === 0;
+// A valid registry is consumed by `overlayCounters.ts`; a malformed one is applied nowhere and
+// stays unconsumed so precompute refuses to certify it.
 export const unknownOverlaySections = (overlay: OverlayData): string[] => {
   const rootNames = new Set([...sectionNames, '$meta', 'modes', 'locales']);
-  if (emptyCounterRegistry(overlay.progressionCounters)) rootNames.add('progressionCounters');
+  if (validProgressionCounters(overlay.progressionCounters)) rootNames.add('progressionCounters');
   const localeNames = new Set(['tasks', 'items', 'traders', 'maps', 'prestige', 'storyChapters']);
   return [
     ...unknownSectionNames(overlay, '', rootNames),

@@ -695,6 +695,7 @@
     isValidMapSvgConfig,
     isValidMapTileConfig,
   } from '@/utils/mapCoordinates';
+  import type { MapTaskVisibilityActions } from '@/features/maps/utils/mapTaskVisibility';
   import type { TarkovMap } from '@/types/tarkov';
   import type L from 'leaflet';
   const MAP_CONTROLS_HINT_KEY = 'mapControlsHintSeen';
@@ -748,6 +749,7 @@
     height?: number;
     initialView?: MapViewState | null;
     initialFloor?: string;
+    taskVisibilityActions?: MapTaskVisibilityActions | null;
   }
   const props = withDefaults(defineProps<Props>(), {
     marks: () => [],
@@ -761,6 +763,7 @@
     height: undefined,
     initialView: null,
     initialFloor: undefined,
+    taskVisibilityActions: null,
   });
   const emit = defineEmits<{ 'toggle-fullscreen': [] }>();
   const { t } = useI18n({ useScope: 'global' });
@@ -1445,7 +1448,11 @@
     };
   };
   const mountObjectiveTooltip = (objectiveId: string, onClose: () => void) =>
-    mountPopupContent(LeafletObjectiveTooltip, { objectiveId, onClose });
+    mountPopupContent(LeafletObjectiveTooltip, {
+      objectiveId,
+      onClose,
+      taskVisibilityActions: props.taskVisibilityActions,
+    });
   const mountObjectiveStack = (
     objectiveIds: string[],
     onSelect: (objectiveId: string) => void,
@@ -1836,14 +1843,15 @@
         opacity: 1,
         interactive: false,
       });
+      const extractName = extract.nameKey ? t(extract.nameKey, extract.name) : extract.name;
       const extractBadge = document.createElement('div');
-      extractBadge.setAttribute('title', extract.name);
-      extractBadge.setAttribute('aria-label', extract.name);
+      extractBadge.setAttribute('title', extractName);
+      extractBadge.setAttribute('aria-label', extractName);
       extractBadge.className = 'extract-badge';
       extractBadge.style.borderColor = markerColor;
       const extractLabel = document.createElement('span');
       extractLabel.className = 'extract-badge-label';
-      extractLabel.textContent = extract.name;
+      extractLabel.textContent = extractName;
       extractBadge.appendChild(extractLabel);
       const extractIcon = L.divIcon({
         className: 'extract-marker',

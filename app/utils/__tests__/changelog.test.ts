@@ -75,6 +75,15 @@ describe('public changelog text', () => {
     expect(releaseBullets('', 'v2 launch')).toEqual(['V2 launch.']);
     expect(releaseBullets(null, '')).toEqual([]);
   });
+  it('decodes only Highlights text while preserving its literal Markdown punctuation', () => {
+    const highlight = 'PvE\\_mode computes 2 \\* 3, \\[label\\] &amp; &lt;value&gt; and &amp;lt;.';
+    const body = `### Highlights\n\n* ${highlight}\n\n### Bug Fixes\n\n* **app:** update PvE_mode with 2 * 3`;
+    expect(extractReleaseBullets(body)).toEqual([highlight, '**app:** update PvE_mode with 2 * 3']);
+    expect(releaseBullets(body, '')).toEqual([
+      'PvE_mode computes 2 * 3, [label] & <value> and &lt;.',
+      'Update PvEmode with 2 3.',
+    ]);
+  });
   it('pairs each release entry with the full commit SHAs it links', () => {
     const other = 'ce67df4f5bc7aa72d28d4b18d68ef6a6ef6ab288';
     expect(

@@ -94,12 +94,13 @@ if (
     '[Config] NUXT_PUBLIC_TURNSTILE_SITE_KEY and NUXT_TURNSTILE_SECRET_KEY must be configured together'
   );
 }
+const TARKOV_ACCESS_SITE_KEY = (process.env.NUXT_PUBLIC_TARKOV_ACCESS_SITE_KEY ?? '').trim();
 const cspRouteRules = buildContentSecurityPolicyRouteRules({
   clientLogSinkUrl,
   clarityInstrumentationKey: IS_PRODUCTION_BUILD ? MICROSOFT_CLARITY_PROJECT_ID : '',
   gaMeasurementId: IS_PRODUCTION_BUILD ? GOOGLE_ANALYTICS_MEASUREMENT_ID : '',
   supabaseUrl: PUBLIC_SUPABASE_URL,
-  turnstileSiteKey: TURNSTILE_SITE_KEY,
+  turnstileSiteKey: TURNSTILE_SITE_KEY || TARKOV_ACCESS_SITE_KEY,
 });
 const webApplicationSchema = {
   '@context': 'https://schema.org',
@@ -173,6 +174,14 @@ export default defineNuxtConfig({
     tarkovDevProfileMaxUpdatedAgeDays: Number(
       process.env.NUXT_TARKOV_DEV_PROFILE_MAX_UPDATED_AGE_DAYS?.trim() || '7'
     ),
+    // Tarkov data browser-clearance handoff (app/server/utils/tarkovAccessConfig.ts):
+    // disabled by default. The secret and the exact hostname allowlist are per-deployment
+    // settings — keep them in the Pages env/dashboard, never commit them. See
+    // .env.example and wrangler.toml for the commented deployment wiring.
+    tarkovAccessSecretKey: (process.env.NUXT_TARKOV_ACCESS_SECRET_KEY ?? '').trim(),
+    tarkovAccessExpectedHostnames: (process.env.NUXT_TARKOV_ACCESS_EXPECTED_HOSTNAMES ?? '').trim(),
+    tarkovVerifyRateLimitPerMinute:
+      Number(process.env.NUXT_TARKOV_VERIFY_RATE_LIMIT_PER_MINUTE || '10') || 10,
     turnstileSecretKey: TURNSTILE_SECRET_KEY,
     // API protection configuration (server-only)
     apiProtection: {
@@ -187,7 +196,7 @@ export default defineNuxtConfig({
       // e.g., "/api/tarkov/*" for public data endpoints
       publicRoutes:
         process.env.API_PUBLIC_ROUTES?.trim() ||
-        '/api/tarkov/*,/api/tarkov-dev/profile,/api/changelog,/api/contributors,/api/logs/client,/api/profile/*,/api/streamer/*,/api/twitch/*',
+        '/api/tarkov/*,/api/tarkov-dev/profile,/api/changelog,/api/contributors,/api/logs/client,/api/security/tarkov-verify,/api/profile/*,/api/streamer/*,/api/twitch/*',
       // Whether to trust proxy headers (X-Forwarded-For, etc.)
       // ONLY enable this if the server is behind a trusted proxy like Cloudflare
       trustProxy: resolveTrustProxySetting({
@@ -207,6 +216,11 @@ export default defineNuxtConfig({
       supabaseUrl: PUBLIC_SUPABASE_URL,
       clientLogSinkUrl,
       turnstileSiteKey: TURNSTILE_SITE_KEY,
+      // Tarkov data browser-clearance gate: disabled default. Never flip the flag without
+      // the dedicated sitekey/secret/exact-hostname allowlist. The verification endpoint
+      // fails closed on incomplete configuration; the probe only tests edge passage.
+      tarkovAccessEnabled: process.env.NUXT_PUBLIC_TARKOV_ACCESS_ENABLED === 'true',
+      tarkovAccessSiteKey: TARKOV_ACCESS_SITE_KEY,
       tarkovDevImportCooldownMinutes: Number(
         process.env.NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES?.trim() || '60'
       ),

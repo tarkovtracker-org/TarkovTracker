@@ -1,3 +1,4 @@
+import { taskServerGateBlockers } from '@/stores/taskServerGates';
 import { resolveTraderUnlockTaskIds, type GameMode } from '@/utils/constants';
 import {
   compareRequirement,
@@ -20,6 +21,10 @@ import type {
 } from '@/types/tarkov';
 export type TaskAvailabilityTeamData = {
   completions: Record<string, RawTaskCompletion>;
+  /** In-game availability confirmations, kept apart from task status. */
+  confirmations?: UserProgressData['taskAvailability'];
+  /** Already-resolved account values; missing keys are unknown, never zero. */
+  globalVariables?: Record<string, number>;
   faction: string;
   level: number;
   mode: GameMode;
@@ -37,12 +42,18 @@ export type TaskBlocker = {
     | 'faction'
     | 'trader_unlock'
     | 'prestige'
+    | 'global_variable'
+    | 'global_variable_unknown'
+    | 'task_counter'
+    | 'dialogue'
+    | 'story_objective'
     | 'unknown'
     | 'cycle'
     | 'complete'
     | 'failed'
     | 'disabled';
   requirementId?: string;
+  variableId?: string;
   current?: number;
   required?: number;
   compareMethod?: RequirementComparison;
@@ -50,6 +61,7 @@ export type TaskBlocker = {
   taskId?: string;
   requirements?: TaskRequirement[];
   chapterIds?: string[];
+  objective?: { id: string; name: string };
   reason?: string;
 };
 export type TaskAvailabilityResult = { available: boolean; blockers: TaskBlocker[] };
@@ -306,6 +318,7 @@ const createTeamEvaluator = (
       ...failedBranchBlockers(task, data, tasksById),
       ...traderBlockers(task),
       ...prestigeBlockers(task),
+      ...taskServerGateBlockers(task, data),
       ...prerequisiteBlockers(task),
       ...unlockBlockers(task)
     );

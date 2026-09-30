@@ -4,6 +4,7 @@ const baseOptions = {
   isOurFaction: true,
   isFailed: false,
   isLocked: false,
+  canMarkAvailable: () => true,
   isComplete: false,
   isActive: true,
   showHotWheelsFail: false,

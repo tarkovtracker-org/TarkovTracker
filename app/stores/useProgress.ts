@@ -40,6 +40,7 @@ const createTaskAvailabilityTeamData = (
     level,
     faction: currentData.pmcFaction ?? 'USEC',
     completions: currentData.taskCompletions ?? {},
+    confirmations: currentData.taskAvailability ?? {},
     traders: currentData.traders ?? {},
     prestigeLevel: currentData.prestigeLevel,
     storyChapters: currentData.storyChapters,

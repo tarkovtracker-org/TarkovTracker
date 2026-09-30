@@ -123,6 +123,37 @@ describe('changelog endpoint', () => {
     ]);
     expect(requests().some((url) => url.endsWith(`/commits/${shaB}`))).toBe(false);
   });
+  it('does not repeat commits represented by release highlights', async () => {
+    const repo = 'https://github.com/owner/repo';
+    const shas = Array.from({ length: 6 }, (_, i) => String(i + 1).repeat(40));
+    const highlights = shas
+      .slice(0, 5)
+      .map(
+        (sha, i) =>
+          `* Highlight ${i + 1}. ([#${i + 1}](${repo}/pull/${i + 1})) ([${sha.slice(0, 7)}](${repo}/commit/${sha}))`
+      )
+      .join('\n');
+    mocks.query.mockReturnValue({ limit: 10, releases: 1 });
+    mocks.fetch.mockImplementation(async (url: string) => {
+      if (url.includes('/releases?'))
+        return json([release('v2', '2026-09-05', `### Highlights\n\n${highlights}`)]);
+      if (url.includes('/commits?'))
+        return json(shas.map((sha, i) => commit(sha, '2026-09-04', `fix(app): change ${i + 1}`)));
+      return json({});
+    });
+    const response = await (await loadHandler())(event);
+    expect(response.items[0]?.bullets).toEqual([
+      { text: 'Highlight 1.' },
+      { text: 'Highlight 2.' },
+      { text: 'Highlight 3.' },
+      { text: 'Highlight 4.' },
+      { text: 'Highlight 5.' },
+    ]);
+    expect(response.items[1]?.bullets).toEqual([{ text: 'Fixed change 6.' }]);
+    expect(
+      requests().some((url) => shas.slice(0, 5).some((sha) => url.endsWith(`/commits/${sha}`)))
+    ).toBe(false);
+  });
   it('keeps release entries past the bullet cap available through commits', async () => {
     const repo = 'https://github.com/owner/repo';
     const shas = Array.from({ length: 6 }, (_, i) => String(i + 1).repeat(40));

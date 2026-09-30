@@ -314,6 +314,8 @@ const finalRanks = new Map<string, number>([
   ['faction', 5],
   ['disabled', 5],
   ['unknown', 6],
+  ['global_variable_unknown', 6],
+  ['dialogue', 6],
   ['cycle', 6],
 ]);
 const distanceTarget = (blocker: TaskAvailabilityResult['blockers'][number]) => {
@@ -332,7 +334,7 @@ const blockerDistance = (blocker: TaskAvailabilityResult['blockers'][number]) =>
 const singleBlockerRank = (
   blocker: TaskAvailabilityResult['blockers'][number]
 ): [number, number] => {
-  if (['prerequisite', 'trader_unlock'].includes(blocker.type))
+  if (['prerequisite', 'trader_unlock', 'story_objective'].includes(blocker.type))
     return [2, blocker.requirements?.length ?? 1];
   return [1, blockerDistance(blocker)];
 };

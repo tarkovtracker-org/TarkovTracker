@@ -88,6 +88,10 @@
     "error_loading": "Errore caricamento dati Tarkov",
     "loading": "Caricamento dati Tarkov",
     "logout_failed": "Impossibile disconnettersi. Riprova.",
+    "logout_unreachable": "Il server non può essere raggiunto, quindi si è ancora effettuato l'accesso. Puoi uscire solo su questo dispositivo; il server non verrà raccontato, quindi la sessione rimane attiva fino a quando scade o si esce da un altro dispositivo.",
+    "logout_this_device": "Esci solo su questo dispositivo",
+    "logout_this_device_done": "Esci solo su questo dispositivo. La sessione sul server rimane attiva fino alla scadenza o esci da un altro dispositivo.",
+    "logout_local_only": "Disconnesso su questo dispositivo. Il server non può essere raggiunto, quindi le altre sessioni potrebbero essere ancora autenticate.",
     "hidden_label": "Nascosto",
     "user_label": "Utente",
     "user_avatar_alt": "Avatar utente",
@@ -99,6 +103,40 @@
     "login_aria": "Accedi al tuo account",
     "switch_to_light_theme": "Passa al tema chiaro",
     "switch_to_dark_theme": "Passa al tema scuro"
+  },
+  "progress_save_status": {
+    "indicator_aria": "Stato salvataggio avanzamento: {status}",
+    "cloud_pending_label": "Salvataggio dei progressi nel cloud",
+    "cloud_retrying_label": "Riprova il salvataggio del cloud",
+    "cloud_failed_label": "Salvataggio cloud non riuscito",
+    "local_failed_label": "Progresso non salvato in questo browser",
+    "cloud_pending_description": "Le tue ultime modifiche di avanzamento non sono state ancora salvate nel cloud.",
+    "cloud_retrying_description": "Salvataggio delle ultime modifiche al cloud non riuscito. È possibile tenere traccia mentre un altro tentativo viene eseguito automaticamente.",
+    "cloud_failed_description": "I tentativi automatici di salvare i tuoi ultimi progressi nel cloud si sono fermati. Le modifiche sono ancora in attesa di essere salvate, e puoi continuare a tenere traccia e riprovare in qualsiasi momento.",
+    "local_failed_description": "Le tue ultime modifiche di avanzamento non possono essere salvate in questo browser. È possibile mantenere il monitoraggio, ma i cambiamenti che non vengono salvati altrove possono essere persi se si ricarica, si chiude questa scheda o si esce .",
+    "local_saved_note": "Queste modifiche sono salvate in questo browser.",
+    "cloud_also_pending_note": "Non sono stati salvati nel cloud. Esporta i tuoi progressi per conservare una copia.",
+    "retry_scheduled": "La riprova automatica {attempt} di {total} è programmata.",
+    "cause_offline": "Causa: questo dispositivo sembra essere offline.",
+    "cause_rate_limited": "Causa: il servizio cloud sta limitando temporaneamente i salvataggi.",
+    "cause_auth": "Causa: la sessione di accesso non può essere verificata.",
+    "cause_quota": "Causa: questo browser di archiviazione per TarkovTracker è pieno.",
+    "cause_unavailable": "Causa: questo browser sta bloccando l'archiviazione del sito, ad esempio a causa delle impostazioni di privacy.",
+    "cause_unknown": "La causa di questo fallimento è sconosciuta.",
+    "quota_guidance": "Eliminare i dati di questo sito o ricaricare potrebbe rimuovere l'unica copia di queste modifiche. Esporta i tuoi progressi prima di rimuovere i dati.",
+    "retry_button": "Riprova il salvataggio cloud",
+    "retry_succeeded": "I tuoi progressi sono stati salvati nel cloud.",
+    "retry_failed": "Il salvataggio del cloud non è riuscito. Le modifiche sono ancora in attesa di essere salvate.",
+    "export_button": "Esporta progresso",
+    "export_hint": "Esporta i download dei tuoi progressi attuali come file di backup, anche quando il salvataggio non è riuscito."
+  },
+  "sign_out_confirm": {
+    "title": "Disconnettersi con modifiche non salvate?",
+    "risk": "Le tue ultime modifiche di avanzamento non vengono salvate in questo browser o nel cloud. Se esci ora, andranno perse.",
+    "options": "Puoi continuare ad accedere e riprovare a salvare, o esportare i tuoi progressi attuali prima di decidere.",
+    "stay_signed_in": "Rimani connesso",
+    "discard_and_sign_out": "Disconnetti e scarta le modifiche",
+    "retry_succeeded": "Le modifiche sono state salvate nel cloud. È possibile uscire in modo sicuro."
   },
   "omnibar": {
     "title": "Cerca",
@@ -514,6 +552,9 @@
     "not_available_description": "La mappa interattiva di {mapName} non è disponibile. Siamo in attesa di una versione compatibile.",
     "placeholder": "questa posizione",
     "floors": "Piani",
+    "extract_names": {
+      "scav_underboat_hideout": "Nascondigli sotto la fase di atterraggio"
+    },
     "factions": {
       "pmc": "PMC"
     },
@@ -993,7 +1034,25 @@
         "map_complete_tasks_toggle_show": "Mostra nascoste",
         "map_complete_tasks_toggle_hide": "Nascondi complete per mappa",
         "map_hidden_hint": "Mappa nascosta — clicca per mostrare",
-        "raid_time_tooltip": "Orario di incursione corrente"
+        "raid_time_tooltip": "Orario di incursione corrente",
+        "raid_plan": {
+          "title": "Missioni sulla mappa",
+          "summary_all": "Mostrando tutti gli {total}",
+          "summary_hidden": "{hidden} di {total} nascosto",
+          "choose_quests": "Scegli missioni",
+          "show_all": "Mostra tutto",
+          "popover_description": "Untick missioni che non stai eseguendo questo raid per cancellarli dalla mappa. \"Unicamente\" nasconde tutto il resto.",
+          "only": "Solo",
+          "show_only_named": "Mostra solo {name} sulla mappa",
+          "show_only_quest": "Mostra solo questa missione sulla mappa",
+          "hide_quest": "Nascondi dalla mappa",
+          "show_quest": "Mostra sulla mappa",
+          "all_hidden_hint": "Ogni missione su questa mappa è nascosta. Usa Mostra tutti per riportarli.",
+          "hidden_section_title": "Nascosto dalla mappa ({count})",
+          "hidden_section_description": "Ancora tracciato, solo non disegnato sulla mappa.",
+          "hidden_section_expand": "Mostra missioni nascoste",
+          "hidden_section_collapse": "Comprimi missioni nascoste"
+        }
       },
       "pinned_tasks_section": "Missioni in evidenza",
       "focused_task_section": "Missioni focus",
@@ -1025,6 +1084,7 @@
         "of": "di",
         "mark_failed": "Fallita",
         "available_button": "Disponibile",
+        "clear_availability_confirmation": "Cancella conferma disponibilità in-game",
         "uncomplete_button": "Non completata",
         "reset_item_counts": "Resetta conteggio oggetti",
         "collapse_task": "Comprimi attività",
@@ -1110,6 +1170,11 @@
         "faction": "Available to {faction} characters.",
         "trader_unlock": "Unlock {trader} by completing {task}.",
         "prestige": "Richiede Prestigio {required} (attuale: {current}).",
+        "global_variable": "Valore di progressione del server {comparison} {required} richiesto (attuale: {current}).",
+        "global_variable_unknown": "Richiede progressione del server {comparison} {required}. Il tuo valore attuale non è disponibile per il tracker. Usa Segna disponibile solo se questa attività è disponibile durante il gioco; nessuna attività contatore sarà segnata completa.",
+        "task_counter": "Richiede {comparison} {required} attività completate da questo livello fedeltà trader (completato: {current}). Se questa attività è già disponibile nel gioco, usa Mark disponibile.",
+        "dialogue": "Richiede una conversazione nel trader di gioco. Usa Mark disponibile solo dopo aver confermato che questa attività è disponibile in gioco.",
+        "story_objective": "Completa l'obiettivo della storia \"{objective}\" ({chapter}).",
         "unknown": "I dati di requisito non sono disponibili o non supportati. La disponibilità non può essere confermata.",
         "cycle": "La catena prerequisito contiene un ciclo. La disponibilità non può essere confermata.",
         "complete": "Questa attività è completata.",
@@ -1740,7 +1805,7 @@
     "game_attribution": "Escape from Tarkov e i contenuti e materiali correlati al gioco sono marchi registrati e opere protette da copyright di Battlestate Games Limited e dei suoi licenziatari. Tutti i diritti riservati. TarkovTracker è un progetto fan non ufficiale e non è affiliato né approvato da Battlestate Games.",
     "tagline": "Traccia le tue missioni di Escape from Tarkov, gli aggiornamenti rifugio e gli oggetti di cui hai bisogno in un unico posto.",
     "version_release_link": "Visualizza le note di rilascio per la versione {version} su GitHub",
-    "build_commit_link": "View build commit {commit} on GitHub",
+    "build_commit_link": "Visualizza il commit di build {commit} su GitHub",
     "sections": {
       "explore": "Esplora",
       "project": "Progetto",
@@ -2152,10 +2217,17 @@
       "delete_forever": "Elimina definitivamente l'account",
       "delete_success_title": "Account eliminato con successo",
       "delete_success_sr_only": "L'eliminazione del tuo account è completa e sarai reindirizzato alla dashboard.",
+      "delete_success_cleanup_failed_sr_only": "Il tuo account è stato eliminato, ma alcuni dati rimangono su questo dispositivo. Puoi riprovare a pulire o continuare con quei dati rimasti qui.",
       "delete_success_description": "Il tuo account e tutti i dati associati sono stati eliminati definitivamente.",
+      "other_session_deleted_description": "L'account che ha avviato questa cancellazione è stato eliminato. Il tuo account corrente è ancora connesso e non è stato modificato.",
       "cleanup_pending": "Alcune operazioni di pulizia dei dati sono ancora in corso e saranno completate a breve.",
+      "device_cleanup_failed": "Alcuni dati dell'account cancellati rimangono su questo dispositivo. Riprova a pulire, o continua e lascia i dati qui.",
+      "session_end_failed": "Questo browser è ancora connesso all'account eliminato. Selezionare Vai alla dashboard per provare a uscire di nuovo.",
+      "retry_device_cleanup": "Riprova la pulizia del dispositivo",
+      "continue_with_device_data_remaining": "Continua con i dati rimanenti",
       "redirect_message": "Grazie per aver usato TarkovTracker. Sarai reindirizzato alla dashboard.",
-      "go_to_dashboard": "Vai alla Dashboard"
+      "go_to_dashboard": "Vai alla Dashboard",
+      "session_changed": "Il tuo account firmato è cambiato. In questa sessione non verranno intraprese ulteriori azioni."
     },
     "discord_link": {
       "title": "Account Discord",
@@ -2413,6 +2485,25 @@
         "verification_failed": "Verifica umana non riuscita. Ricarica la pagina e riprova.",
         "fetch_failed": "Impossibile recuperare il profilo Tarkov.dev. Apri il profilo su Tarkov.dev, quindi riprova."
       }
+    },
+    "device_data": {
+      "title": "Dati su questo dispositivo",
+      "description": "La disconnessione mantiene i progressi salvati di questo account in questo browser, quindi le modifiche che non hanno raggiunto il cloud possono essere sincronizzate quando accedi. Il progresso spostato da un ripristino o il ribaltamento stagionale è tenuto separatamente per l'esportazione. Rimuovere i dati di questo dispositivo elimina l'avanzamento, le copie di recupero e le preferenze di questo account da questo browser e si firma fuori.",
+      "cloud_unaffected": "Il progresso del cloud non è stato eliminato. I dati degli altri account su questo dispositivo non sono stati modificati.",
+      "superseded_available": "{count} progress change(s) from a reset or Seasonal rollover are retained here for export only. They will not be restored or synced automatically.",
+      "superseded_export": "Avanzamento dell'esportazione superato",
+      "superseded_export_error": "Impossibile esportare i progressi superati",
+      "remove_button": "Rimuovi i dati di questo account da questo dispositivo",
+      "confirm_title": "Rimuovere i dati di questo account da questo dispositivo?",
+      "confirm_description": "L'avanzamento, le copie di recupero di questo account, le esportazioni di progressi superate e le preferenze verranno eliminate da questo browser e sarai disconnesso. I tuoi progressi nel cloud rimangono disponibili quando accedi di nuovo.",
+      "pending_warning": "Alcuni cambiamenti di avanzamento non sono stati ancora salvati nel cloud. La rimozione dei dati di questo dispositivo li scarterà permanentemente. Esporta i tuoi progressi prima se vuoi conservarli.",
+      "confirm_button": "Rimuovere i dati e uscire",
+      "removed": "I dati di questo account sono stati rimossi da questo dispositivo.",
+      "remove_error": "Alcuni dati dell'account non possono essere rimossi da questo dispositivo. Riprova prima di usare un altro account qui.",
+      "remove_incomplete": "Alcuni dati dell'account che hai rimosso sono ancora su questo dispositivo. Riprova prima di usare un altro account qui.",
+      "retry_removal": "Prova a rimuovere di nuovo",
+      "revocation_unavailable": "Il server non può essere raggiunto, quindi si è ancora effettuato l'accesso. È possibile uscire solo su questo dispositivo e rimuovere i dati; il server non verrà raccontato, quindi la sessione rimane attiva fino a quando scade o si esce da un altro dispositivo.",
+      "confirm_device_only_button": "Esci solo su questo dispositivo e rimuovi i dati"
     }
   },
   "hideout": {
@@ -2500,6 +2591,22 @@
       "approve": "Approva",
       "deny": "Rifiuta"
     }
+  },
+  "tarkov_access": {
+    "title": "Verifica il tuo browser",
+    "checking": "Controllo accesso al sito…",
+    "description": "Questo sito è protetto da eccessive richieste automatizzate. Completa il controllo di sicurezza qui sotto per caricare i dati del gioco Tarkov.",
+    "retry": "Riprova",
+    "dismiss": "Non ora",
+    "dismissed_notice": "I dati di gioco sono in pausa fino a quando non si completa il controllo di sicurezza.",
+    "verify_now": "Verifica ora",
+    "verification_failed_retry": "Il controllo di sicurezza non è stato completato. Puoi riprovare.",
+    "verifying": "Verifica del browser…",
+    "widget_hint": "Completa il controllo per continuare.",
+    "failed": "Caricamento dei dati Tarkov non è al momento disponibile. Puoi riprovare.",
+    "blocked": "L'accesso ai dati Tarkov è attualmente bloccato per la tua rete. Puoi riprovare o tornare più tardi.",
+    "rate_limited": "Troppi controlli in breve tempo. Attendi un momento, quindi riprova.",
+    "widget_unavailable": "Il controllo di sicurezza non può essere caricato. Puoi riprovare."
   },
   "analytics_consent": {
     "eyebrow": "Analytics",

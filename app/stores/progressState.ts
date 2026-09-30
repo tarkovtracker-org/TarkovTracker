@@ -21,6 +21,7 @@ import {
   sanitizeManualActivityHistory,
   sanitizeOwnedProgressData,
 } from '@/utils/progressSanitizers';
+import { nextClock } from '@/utils/taskAvailabilityConfirmation';
 import {
   isTaskActive as isTaskCompletionActive,
   isTaskComplete as isTaskCompletionComplete,
@@ -51,6 +52,7 @@ const defaultProgressData: UserProgressData = {
   xpOffset: 0,
   taskObjectives: {},
   taskCompletions: {},
+  taskAvailability: {},
   hideoutParts: {},
   hideoutModules: {},
   traders: {},
@@ -162,6 +164,7 @@ const getCurrentData = (state: UserState): UserProgressData => {
       displayName: null,
       xpOffset: 0,
       taskCompletions: {},
+      taskAvailability: {},
       taskObjectives: {},
       hideoutParts: {},
       hideoutModules: {},
@@ -269,6 +272,31 @@ const updateObjective = <Key extends ProgressObjectKey>(
     ...updates,
   } as ProgressObjectEntry<Key>;
 };
+/**
+ * The timestamp is kept strictly after the task's status timestamp so a confirmation made right
+ * after a status change (same millisecond) is still honoured, and never behind the previous
+ * confirmation so the newest user intent wins a merge.
+ */
+const setAvailabilityConfirmation = (state: UserState, taskId: string, requirements: string) => {
+  const currentData = getCurrentData(state);
+  const statusTs = currentData.taskCompletions?.[taskId]?.timestamp ?? 0;
+  const previousTs = currentData.taskAvailability?.[taskId]?.timestamp ?? 0;
+  const confirmations = (currentData.taskAvailability ??= {});
+  // `statusTs - 1` so the confirmation may share the status millisecond (it still counts).
+  confirmations[taskId] = { requirements, timestamp: nextClock(statusTs - 1, previousTs) };
+};
+/**
+ * A status change must retire the task's current confirmation even when that confirmation carries a
+ * clock from a device that runs ahead, so the status timestamp is advanced past it.
+ */
+const setTaskStatus = (state: UserState, taskId: string, completion: TaskCompletion) => {
+  const confirmationTs = getCurrentData(state).taskAvailability?.[taskId]?.timestamp;
+  const timestamp =
+    confirmationTs === undefined
+      ? completion.timestamp
+      : Math.max(completion.timestamp ?? 0, nextClock(confirmationTs));
+  updateObjective(state, 'taskCompletions', taskId, { ...completion, timestamp });
+};
 // Simplified actions
 export const actions = {
   switchGameMode(this: UserState, mode: GameMode) {
@@ -348,22 +376,24 @@ export const actions = {
       count: Math.max(0, count),
     });
   },
+  clearTaskAvailability(this: UserState, taskId: string) {
+    // Only the confirmation store changes: a stale clear can never rewrite task status.
+    setAvailabilityConfirmation(this, taskId, '');
+  },
+  confirmTaskAvailability(this: UserState, taskId: string, requirements: string) {
+    setAvailabilityConfirmation(this, taskId, requirements);
+  },
   setTaskComplete(this: UserState, taskId: string) {
-    updateObjective(this, 'taskCompletions', taskId, createCompletion(true, false, false, false));
+    setTaskStatus(this, taskId, createCompletion(true, false, false, false));
   },
   setTaskActive(this: UserState, taskId: string) {
-    updateObjective(this, 'taskCompletions', taskId, createCompletion(false, false, true, false));
+    setTaskStatus(this, taskId, createCompletion(false, false, true, false));
   },
   setTaskFailed(this: UserState, taskId: string, failOptions?: { manual?: boolean }) {
-    updateObjective(
-      this,
-      'taskCompletions',
-      taskId,
-      createCompletion(true, true, false, failOptions?.manual)
-    );
+    setTaskStatus(this, taskId, createCompletion(true, true, false, failOptions?.manual));
   },
   setTaskUncompleted(this: UserState, taskId: string) {
-    updateObjective(this, 'taskCompletions', taskId, createCompletion(false, false, false, false));
+    setTaskStatus(this, taskId, createCompletion(false, false, false, false));
   },
   setTaskObjectiveComplete(this: UserState, objectiveId: string) {
     updateObjective(this, 'taskObjectives', objectiveId, {
@@ -452,9 +482,11 @@ export const actions = {
     if (!data.storyChapters[chapterId].objectives) {
       data.storyChapters[chapterId].objectives = {};
     }
+    // A completion the user records now must outrank an entry another device stamped ahead.
+    const previous = data.storyChapters[chapterId].objectives![objectiveId]?.timestamp ?? 0;
     data.storyChapters[chapterId].objectives![objectiveId] = {
       complete: true,
-      timestamp: Date.now(),
+      timestamp: nextClock(previous),
     };
   },
   setStoryObjectiveUncomplete(this: UserState, chapterId: string, objectiveId: string) {
@@ -465,9 +497,11 @@ export const actions = {
     if (!data.storyChapters[chapterId].objectives) {
       data.storyChapters[chapterId].objectives = {};
     }
+    // An uncompletion must also outrank an entry another device stamped ahead.
+    const previous = data.storyChapters[chapterId].objectives![objectiveId]?.timestamp ?? 0;
     data.storyChapters[chapterId].objectives![objectiveId] = {
       complete: false,
-      timestamp: Date.now(),
+      timestamp: nextClock(previous),
     };
   },
   toggleStoryObjectiveComplete(this: UserState, chapterId: string, objectiveId: string) {

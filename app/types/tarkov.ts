@@ -122,6 +122,30 @@ export interface TaskPrestigeReference {
  * never a diagnostic, so these values keep a malformed explicit gate distinguishable from no gate.
  */
 export type TaskRequirementDiagnostic = 'prestige_reference' | 'task_requirement';
+/**
+ * Best-effort counter derivation attached server-side from the overlay's progressionCounters
+ * registry: the counter equals the number of completed tasks in `taskIds`.
+ */
+export type TaskCounterDerivation = { type: 'distinctTaskCompletions'; taskIds: string[] };
+export type TaskOtherRequirement =
+  | {
+      type: 'globalVariable';
+      id: string;
+      variableId: string;
+      compareMethod: RequirementComparison;
+      value: number;
+      counter?: TaskCounterDerivation;
+    }
+  | { type: 'dialogue'; id: string; traders: string[] }
+  /** Overlay story gate: met only when the player completed that storyline objective. */
+  | {
+      type: 'storyObjective';
+      id: string;
+      storyChapter: { id: string; name?: string };
+      objective: { id: string; name?: string };
+    }
+  /** Unsupported or malformed gate; `upstreamType` keeps the original upstream discriminator. */
+  | { type: 'unknown'; upstreamType?: string };
 export interface TaskTraderLevelRequirement {
   id: string;
   trader: { id: string; name: string };
@@ -262,6 +286,7 @@ export interface Task {
   trader?: { id: string; name?: string; normalizedName?: string; imageLink?: string };
   objectives?: TaskObjective[];
   taskRequirements?: TaskRequirement[];
+  otherRequirements?: TaskOtherRequirement[];
   storyUnlocks?: Array<{ id: string; name: string }>;
   minPlayerLevel?: number;
   requiredPrestige?: TaskPrestigeReference;
@@ -320,6 +345,8 @@ export interface MapExtract {
   top?: number;
   /** Bottom boundary for multi-floor extracts */
   bottom?: number;
+  /** i18n key for tracker-supplied extracts, which have no upstream localized name */
+  nameKey?: string;
 }
 export interface MapSvgConfig {
   file: string;
@@ -612,6 +639,7 @@ export interface StaticMapData {
     unavailable?: boolean;
     svg?: MapSvgConfig;
     tile?: MapTileConfig;
+    extractsAdd?: MapExtract[];
   };
 }
 // Store Types

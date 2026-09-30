@@ -20,6 +20,7 @@
       </NuxtErrorBoundary>
     </NuxtLayout>
     <div id="modals"></div>
+    <TarkovAccessGate />
   </UApp>
 </template>
 <script setup lang="ts">

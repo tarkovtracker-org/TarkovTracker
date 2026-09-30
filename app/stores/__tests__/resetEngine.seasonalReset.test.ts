@@ -5,8 +5,22 @@ import { defaultState, type UserState } from '@/stores/progressState';
 import { mergeProgressData } from '@/stores/tarkov/progressMerge';
 import { performReset, resolveInitialSyncState } from '@/stores/tarkov/resetEngine';
 import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
-const { clearProgressStorageMock, supabaseContext, syncProgressStateMock } = vi.hoisted(() => ({
+const {
+  clearProgressStorageMock,
+  pendingCloudChanges,
+  registeredController,
+  unsavedProgressChanges,
+  saveSupersededProgressCopyMock,
+  supabaseContext,
+  syncProgressStateMock,
+} = vi.hoisted(() => ({
   clearProgressStorageMock: vi.fn(),
+  pendingCloudChanges: { value: false },
+  registeredController: {
+    value: null as { acknowledgeExternalSave: (saved: unknown) => void } | null,
+  },
+  unsavedProgressChanges: { value: false },
+  saveSupersededProgressCopyMock: vi.fn((): { id: string } | null => ({ id: 'copy-1' })),
   supabaseContext: {
     client: {},
     user: { id: 'user-1' as string | null, loggedIn: true },
@@ -17,11 +31,18 @@ mockNuxtImport('useNuxtApp', () => () => ({ $supabase: supabaseContext }));
 vi.mock('@/stores/tarkov/progressPersistence', () => ({
   syncProgressState: syncProgressStateMock,
 }));
-vi.mock('@/utils/clientStorage', () => ({
-  clearProgressStorage: clearProgressStorageMock,
+vi.mock('@/stores/tarkov/localStorage', () => ({
+  clearActiveProgressStorage: clearProgressStorageMock,
 }));
 vi.mock('@/stores/tarkov/realtimeListener', () => ({
-  getRegisteredSyncController: () => null,
+  getRegisteredSyncController: () => registeredController.value,
+}));
+vi.mock('@/stores/tarkov/progressSaveStatus', () => ({
+  hasPendingCloudChanges: () => pendingCloudChanges.value,
+  hasUnsavedProgressChanges: () => unsavedProgressChanges.value,
+}));
+vi.mock('@/stores/tarkov/supersededProgress', () => ({
+  saveSupersededProgressCopy: saveSupersededProgressCopyMock,
 }));
 const createStore = () => {
   const state: UserState = structuredClone(defaultState);
@@ -44,6 +65,10 @@ describe('performReset seasonal', () => {
     supabaseContext.user.loggedIn = true;
     supabaseContext.user.id = 'user-1';
     syncProgressStateMock.mockResolvedValue({ error: null });
+    pendingCloudChanges.value = false;
+    unsavedProgressChanges.value = false;
+    registeredController.value = null;
+    saveSupersededProgressCopyMock.mockClear();
   });
   it('merges timestamped progress when a visibility-only mode timestamp is newer', () => {
     const local = structuredClone(defaultState);
@@ -202,6 +227,105 @@ describe('performReset seasonal', () => {
     expect(syncedState.pve.level).toBe(21);
     expect(syncedState.currentGameMode).toBe(store.$state.currentGameMode);
     expect(syncedState.gameEdition).toBe(store.$state.gameEdition);
+  });
+  it('retains affected owner progress before a reset with pending cloud changes', async () => {
+    pendingCloudChanges.value = true;
+    const store = createStore();
+    const displacedProgress = structuredClone(store.$state.seasonal);
+    await performReset('seasonal', store);
+    expect(saveSupersededProgressCopyMock).toHaveBeenCalledWith(
+      'user-1',
+      'seasonal',
+      ACTIVE_SEASON_NUMBER,
+      displacedProgress
+    );
+  });
+  it('archives controllerless unsaved changes before resetting a mode', async () => {
+    unsavedProgressChanges.value = true;
+    const store = createStore();
+    const displacedProgress = structuredClone(store.$state.pvp);
+    await performReset('pvp', store);
+    expect(saveSupersededProgressCopyMock).toHaveBeenCalledWith(
+      'user-1',
+      'pvp',
+      null,
+      displacedProgress
+    );
+  });
+  it('archives authenticated local changes when no sync controller can confirm acknowledgement', async () => {
+    const store = createStore();
+    const displacedProgress = structuredClone(store.$state.pvp);
+    await performReset('pvp', store);
+    expect(pendingCloudChanges.value).toBe(false);
+    expect(unsavedProgressChanges.value).toBe(false);
+    expect(saveSupersededProgressCopyMock).toHaveBeenCalledWith(
+      'user-1',
+      'pvp',
+      null,
+      displacedProgress
+    );
+    expect(saveSupersededProgressCopyMock.mock.invocationCallOrder[0]).toBeLessThan(
+      syncProgressStateMock.mock.invocationCallOrder[0]!
+    );
+  });
+  it('clears only the owner active copy as a deliberate reset, not an owner change', async () => {
+    const store = createStore();
+    await performReset('pvp', store);
+    expect(clearProgressStorageMock).toHaveBeenCalledWith('user-1');
+  });
+  it('keeps no superseded copy for modes that are still at their defaults', async () => {
+    pendingCloudChanges.value = true;
+    const store = createStore();
+    store.$state.pve = structuredClone(defaultState.pve);
+    await performReset('all', store);
+    const retainedModes = saveSupersededProgressCopyMock.mock.calls.map(
+      (call) => (call as unknown[])[1]
+    );
+    expect(retainedModes).toContain('pvp');
+    expect(retainedModes).not.toContain('pve');
+  });
+  it('does not archive or require storage for a mode holding only an earlier reset clock', async () => {
+    saveSupersededProgressCopyMock.mockReturnValue(null);
+    try {
+      const store = createStore();
+      store.$state.pve = { ...structuredClone(defaultState.pve), progressEpoch: 2 };
+      await expect(performReset('pve', store)).resolves.toBeUndefined();
+      expect(saveSupersededProgressCopyMock).not.toHaveBeenCalled();
+      expect(store.$state.pve.progressEpoch).toBe(3);
+    } finally {
+      saveSupersededProgressCopyMock.mockReturnValue({ id: 'copy-1' });
+    }
+  });
+  it('aborts a controllerless idle-status reset when local progress cannot be archived', async () => {
+    saveSupersededProgressCopyMock.mockReturnValueOnce(null);
+    const store = createStore();
+    await expect(performReset('pvp', store)).rejects.toThrow(
+      'Could not retain pending progress before reset'
+    );
+    expect(store.$state.pvp.level).toBe(42);
+    expect(syncProgressStateMock).not.toHaveBeenCalled();
+    expect(clearProgressStorageMock).not.toHaveBeenCalled();
+  });
+  it('aborts a controllerless reset when its unsaved copy cannot be retained', async () => {
+    unsavedProgressChanges.value = true;
+    saveSupersededProgressCopyMock.mockReturnValueOnce(null);
+    const store = createStore();
+    await expect(performReset('pvp', store)).rejects.toThrow(
+      'Could not retain pending progress before reset'
+    );
+    expect(store.$state.pvp.level).toBe(42);
+    expect(syncProgressStateMock).not.toHaveBeenCalled();
+    expect(clearProgressStorageMock).not.toHaveBeenCalled();
+  });
+  it('acknowledges the reset state the RPC saved so it is not reported or uploaded again', async () => {
+    const acknowledgeExternalSave = vi.fn();
+    registeredController.value = { acknowledgeExternalSave };
+    const store = createStore();
+    await performReset('seasonal', store);
+    expect(acknowledgeExternalSave).toHaveBeenCalledOnce();
+    const saved = acknowledgeExternalSave.mock.calls[0]![0] as UserState;
+    expect(saved).toEqual(store.$state);
+    expect(saved).toBe((syncProgressStateMock.mock.calls[0] as unknown[])[2]);
   });
   it('keeps local state intact when the remote reset fails', async () => {
     syncProgressStateMock.mockResolvedValue({ error: { message: 'network down' } });

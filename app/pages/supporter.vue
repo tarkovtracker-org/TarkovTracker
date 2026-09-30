@@ -10,6 +10,23 @@
         </p>
       </header>
       <SupporterStatusBanner />
+      <section
+        aria-labelledby="account-retention-title"
+        class="border-surface-700/50 bg-surface-900/60 text-surface-300 rounded-2xl border p-5 sm:p-6"
+      >
+        <h2 id="account-retention-title" class="text-surface-50 mb-4 text-lg font-semibold">
+          {{ t('page.account_retention.title') }}
+        </h2>
+        <AccountRetentionPolicy />
+        <nav class="mt-4 flex flex-wrap gap-4">
+          <NuxtLink to="/terms-of-service#privacy" class="text-link underline">
+            {{ t('common.terms_of_service') }}
+          </NuxtLink>
+          <NuxtLink to="/privacy" class="text-link underline">
+            {{ t('common.privacy_policy') }}
+          </NuxtLink>
+        </nav>
+      </section>
       <div id="tiers" class="flex justify-center">
         <SupporterBillingToggle v-model="interval" />
       </div>
@@ -22,6 +39,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import AccountRetentionPolicy from '@/components/AccountRetentionPolicy.vue';
   import { useSupporter } from '@/composables/useSupporter';
   import SupporterAltPayments from '@/features/supporter/SupporterAltPayments.vue';
   import SupporterBillingToggle from '@/features/supporter/SupporterBillingToggle.vue';

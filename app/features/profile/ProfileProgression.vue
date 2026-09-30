@@ -769,6 +769,7 @@
             level: profileLevel.value,
             faction: modeFaction.value,
             completions: taskCompletions.value,
+            confirmations: modeData.value.taskAvailability ?? {},
             traders: modeData.value.traders ?? {},
             prestigeLevel: modeData.value.prestigeLevel,
             storyChapters: modeData.value.storyChapters,

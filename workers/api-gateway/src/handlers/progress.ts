@@ -1,3 +1,4 @@
+import { setTaskState } from '@shared/utils/taskTransitions';
 import {
   extractUserMetadataDisplayName,
   extractUserMetadataUsername,
@@ -260,12 +261,6 @@ async function getUserDisplayName(env: Env, userId: string): Promise<string | nu
     return null;
   }
 }
-const toTaskState = (complete: boolean, failed: boolean, active?: boolean): TaskState => {
-  if (failed) return 'failed';
-  if (complete) return 'completed';
-  if (active === true) return 'active';
-  return 'uncompleted';
-};
 const buildApiUpdateMeta = (updates: ApiTaskUpdate[], timestamp: number): ApiUpdateMeta => {
   return {
     id: crypto.randomUUID(),
@@ -273,27 +268,6 @@ const buildApiUpdateMeta = (updates: ApiTaskUpdate[], timestamp: number): ApiUpd
     source: 'api',
     tasks: updates,
   };
-};
-const setTaskCompletion = (
-  taskCompletions: Record<string, TaskCompletion>,
-  taskId: string,
-  complete: boolean,
-  failed: boolean,
-  active: boolean,
-  timestamp: number,
-  updates?: Map<string, TaskState>
-): void => {
-  const previous = taskCompletions[taskId];
-  const prevState = toTaskState(
-    previous?.complete === true,
-    previous?.failed === true,
-    previous?.active
-  );
-  const nextState = toTaskState(complete, failed, active);
-  taskCompletions[taskId] = { complete, failed, active, timestamp };
-  if (updates && prevState !== nextState) {
-    updates.set(taskId, nextState);
-  }
 };
 /**
  * Handle GET /api/progress - Return player progress
@@ -401,15 +375,7 @@ export async function handleUpdateTask(
   const currentData = await fetchCurrentProgressData(env, token.user_id, gameMode);
   const taskCompletions = (currentData.taskCompletions as Record<string, TaskCompletion>) || {};
   const updateMap = new Map<string, TaskState>();
-  setTaskCompletion(
-    taskCompletions,
-    taskId,
-    state === 'completed' || state === 'failed',
-    state === 'failed',
-    state === 'active',
-    updateTime,
-    updateMap
-  );
+  setTaskState(taskCompletions, taskId, state, { timestamp: updateTime, updates: updateMap });
   const changedCompletions = { [taskId]: taskCompletions[taskId] };
   const set: Record<string, unknown> = {};
   if (updateMap.size > 0) {
@@ -443,15 +409,10 @@ export async function handleUpdateTasks(
   const taskCompletions = (currentData.taskCompletions as Record<string, TaskCompletion>) || {};
   const updateMap = new Map<string, TaskState>();
   for (const update of updates) {
-    setTaskCompletion(
-      taskCompletions,
-      update.id,
-      update.state === 'completed' || update.state === 'failed',
-      update.state === 'failed',
-      update.state === 'active',
-      updateTime,
-      updateMap
-    );
+    setTaskState(taskCompletions, update.id, update.state, {
+      timestamp: updateTime,
+      updates: updateMap,
+    });
   }
   const changedCompletions = Object.fromEntries(
     [...new Set(updates.map((update) => update.id))].map((id) => [id, taskCompletions[id]])

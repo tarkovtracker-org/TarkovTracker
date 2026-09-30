@@ -4,6 +4,8 @@ type TaskActionOptions = {
   isOurFaction: boolean;
   isFailed: boolean;
   isLocked: boolean;
+  /** Evaluated only for locked tasks. */
+  canMarkAvailable: () => boolean;
   isComplete: boolean;
   isActive: boolean;
   showHotWheelsFail: boolean;
@@ -14,7 +16,11 @@ const TASK_ACTION_RULES: Array<{
 }> = [
   { matches: ({ isOurFaction }) => !isOurFaction, state: 'none' },
   { matches: ({ isFailed }) => isFailed, state: 'complete' },
-  { matches: ({ isLocked }) => isLocked, state: 'locked' },
+  {
+    matches: ({ isLocked, canMarkAvailable }) => isLocked && canMarkAvailable(),
+    state: 'locked',
+  },
+  { matches: ({ isLocked }) => isLocked, state: 'none' },
   { matches: ({ isComplete }) => isComplete, state: 'complete' },
   {
     matches: ({ showHotWheelsFail, isActive }) => showHotWheelsFail && isActive,

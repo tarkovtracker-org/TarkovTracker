@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { resolveTaskActionButtonState } from '@/features/tasks/types';
 const computeActionButtonState = (
-  options: Omit<Parameters<typeof resolveTaskActionButtonState>[0], 'isActive'> & {
+  options: Omit<
+    Parameters<typeof resolveTaskActionButtonState>[0],
+    'isActive' | 'canMarkAvailable'
+  > & {
     isActive?: boolean;
+    canMarkAvailable?: () => boolean;
   }
-) => resolveTaskActionButtonState({ isActive: false, ...options });
+) => resolveTaskActionButtonState({ isActive: false, canMarkAvailable: () => true, ...options });
 describe('TaskCard action button state', () => {
   it('uses complete-state actions when task is failed', () => {
     const state = computeActionButtonState({
@@ -56,5 +60,26 @@ describe('TaskCard action button state', () => {
       showHotWheelsFail: false,
     });
     expect(state).toBe('active');
+  });
+  it('hides actions for locked tasks that cannot be marked available', () => {
+    const state = computeActionButtonState({
+      isOurFaction: true,
+      isFailed: false,
+      isLocked: true,
+      canMarkAvailable: () => false,
+      isComplete: false,
+      showHotWheelsFail: false,
+    });
+    expect(state).toBe('none');
+  });
+  it('offers mark available for locked tasks that can be marked available', () => {
+    const state = computeActionButtonState({
+      isOurFaction: true,
+      isFailed: false,
+      isLocked: true,
+      isComplete: false,
+      showHotWheelsFail: false,
+    });
+    expect(state).toBe('locked');
   });
 });

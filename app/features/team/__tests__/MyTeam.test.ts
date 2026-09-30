@@ -258,7 +258,12 @@ describe('MyTeam store interactions', () => {
   describe('team name generation', () => {
     it('calls createTeam with display name and random suffix', async () => {
       setupMembershipQueries('team-123');
-      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+      const randomSpy = vi
+        .spyOn(crypto, 'getRandomValues')
+        .mockImplementation((array: ArrayBufferView<ArrayBuffer>) => {
+          (array as unknown as Uint8Array).fill(0);
+          return array;
+        });
       mockEdgeFunctions.createTeam.mockResolvedValue({
         team: { id: 'team-123', ownerId: mockSupabaseUser.id, joinCode: 'JOIN1' },
       } as CreateTeamResponse);

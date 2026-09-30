@@ -2,6 +2,7 @@ import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import { API_GAME_MODES } from '@/utils/constants';
 import { isGameEdition } from '@/utils/editionHelpers';
 import { logger } from '@/utils/logger';
+import { ensureTarkovAccess, getTarkovAccessState, tarkovApiFetch } from '@/utils/tarkovApiFetch';
 import { dedupeTaskObjectiveIds, normalizeTaskObjectives } from '@/utils/taskNormalization';
 import type {
   Task,
@@ -96,14 +97,14 @@ const mergeProfileTasks = (
 const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: AbortSignal) => {
   const query = { gameMode: API_GAME_MODES[gameMode], lang };
   const options = { query, signal: signal };
-  const progressionRequest = $fetch<ProgressionResponse>('/api/tarkov/editions', options);
+  const progressionRequest = tarkovApiFetch<ProgressionResponse>('/api/tarkov/editions', options);
   const [coreResult, objectivesResult, chaptersResult, editionsResult, prestigeResult] =
     await Promise.allSettled([
-      $fetch<{ data: TarkovTasksCoreQueryResult }>('/api/tarkov/tasks-core', options),
-      $fetch<{ data: { tasks: Task[] } }>('/api/tarkov/tasks-objectives', options),
+      tarkovApiFetch<{ data: TarkovTasksCoreQueryResult }>('/api/tarkov/tasks-core', options),
+      tarkovApiFetch<{ data: { tasks: Task[] } }>('/api/tarkov/tasks-objectives', options),
       progressionRequest.then(optionalChapters),
       progressionRequest.then(optionalEditions),
-      $fetch<{ data: { prestige: PrestigeLevel[] } }>('/api/tarkov/prestige', options).then(
+      tarkovApiFetch<{ data: { prestige: PrestigeLevel[] } }>('/api/tarkov/prestige', options).then(
         optionalPrestige
       ),
     ]);
@@ -125,9 +126,10 @@ const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: Abo
  *
  * A cold cache legitimately needs longer than a single attempt: the proxy allows
  * two 12s attempts per envelope plus backoff across the base and translation
- * legs, roughly 55s worst case per route (`docs/SYSTEMS.md`, retry budget).
+ * legs, roughly 55s worst case per route (`docs/systems.md`, retry budget).
  * Aborting earlier leaves the profile with no snapshot and no retry until the
- * mode or language changes.
+ * mode or language changes. The budget starts once Tarkov data access is
+ * released, so an initial browser security check never consumes it.
  */
 const PROFILE_METADATA_TIMEOUT_MS = 60000;
 /** Read another profile mode without changing the application's active metadata. */
@@ -142,15 +144,14 @@ export function useProfileTaskMetadata(mode: Ref<GameMode>, language: Ref<string
   } | null>(null);
   const error = shallowRef<Error | null>(null);
   const scope = computed(() => `${mode.value}-${language.value}`);
+  // A failed access check fails this load; the next release of access reloads it.
+  const { recoveryEpoch } = getTarkovAccessState();
   watch(
-    [mode, language],
+    [mode, language, recoveryEpoch],
     async ([gameMode, lang], _, onCleanup) => {
       let current = true;
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
       const controller = new AbortController();
-      const timeoutId = setTimeout(
-        () => controller.abort(new Error('Profile metadata request timed out')),
-        PROFILE_METADATA_TIMEOUT_MS
-      );
       onCleanup(() => {
         current = false;
         controller.abort();
@@ -159,6 +160,11 @@ export function useProfileTaskMetadata(mode: Ref<GameMode>, language: Ref<string
       error.value = null;
       const requestScope = scope.value;
       try {
+        await ensureTarkovAccess(controller.signal);
+        timeoutId = setTimeout(
+          () => controller.abort(new Error('Profile metadata request timed out')),
+          PROFILE_METADATA_TIMEOUT_MS
+        );
         const { failure, ...catalogs } = await loadProfileCatalogs(
           gameMode,
           lang,

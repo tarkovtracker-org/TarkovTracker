@@ -472,6 +472,21 @@ describe('usePreferencesStore', () => {
       clearPendingResetPreferencesSnapshot('user-1');
       expect(readPendingResetPreferencesSnapshot('user-1')).toBeNull();
     });
+    it('keeps no preferences copy when device data removal is pending', async () => {
+      const deviceData = await import('@/stores/tarkov/deviceData');
+      localStorageMock.setItem(
+        STORAGE_KEYS.preferences,
+        serializeUserScopedStorage({ localeOverride: 'de' }, 'user-1', 1234)
+      );
+      currentUserId.value = 'user-1';
+      usePreferencesStore();
+      currentUserId.value = null;
+      deviceData.requestDeviceDataRemoval('user-1');
+      resetPreferencesStoreForSessionTransition('user-1');
+      expect(readPendingResetPreferencesSnapshot('user-1')).toBeNull();
+      deviceData.clearDeviceDataRemoval();
+      expect(localStorageMock.getItem(STORAGE_KEYS.preferences)).toBeNull();
+    });
     it('rewrites preserved logout storage without the legacy task key', () => {
       localStorageMock.setItem(
         STORAGE_KEYS.preferences,
@@ -1476,6 +1491,49 @@ describe('usePreferencesStore', () => {
       store.$patch({ pinnedTaskIds: undefined });
       store.togglePinnedTask('task-1');
       expect(store.pinnedTaskIds).toContain('task-1');
+    });
+  });
+  describe('Actions - Map hidden quests', () => {
+    it('defaults to no hidden map tasks', () => {
+      const store = usePreferencesStore();
+      expect(store.getMapHiddenTaskIds).toEqual([]);
+    });
+    it('toggles a task in and out of the hidden list', () => {
+      const store = usePreferencesStore();
+      store.toggleMapHiddenTask('task-1');
+      expect(store.mapHiddenTaskIds).toEqual(['task-1']);
+      store.toggleMapHiddenTask('task-1');
+      expect(store.mapHiddenTaskIds).toEqual([]);
+    });
+    it('shows only one quest by hiding the rest of the map', () => {
+      const store = usePreferencesStore();
+      store.toggleMapHiddenTask('other-map');
+      store.toggleMapHiddenTask('task-2');
+      store.showOnlyMapTask('task-2', ['task-1', 'task-2', 'task-3']);
+      expect([...store.mapHiddenTaskIds].sort()).toEqual(['other-map', 'task-1', 'task-3']);
+    });
+    it('clears hidden state for selected tasks or everything', () => {
+      const store = usePreferencesStore();
+      store.toggleMapHiddenTask('task-1');
+      store.toggleMapHiddenTask('task-2');
+      store.toggleMapHiddenTask('task-3');
+      store.clearMapTaskVisibility(['task-1', 'task-2']);
+      expect(store.mapHiddenTaskIds).toEqual(['task-3']);
+      store.clearMapTaskVisibility();
+      expect(store.mapHiddenTaskIds).toEqual([]);
+    });
+    it('handles a nullish persisted list', () => {
+      const store = usePreferencesStore();
+      store.$patch({ mapHiddenTaskIds: undefined });
+      expect(store.getMapHiddenTaskIds).toEqual([]);
+      store.clearMapTaskVisibility(['task-1']);
+      expect(store.mapHiddenTaskIds).toEqual([]);
+      store.$patch({ mapHiddenTaskIds: undefined });
+      store.showOnlyMapTask('task-1', ['task-1', 'task-2']);
+      expect(store.mapHiddenTaskIds).toEqual(['task-2']);
+      store.$patch({ mapHiddenTaskIds: undefined });
+      store.toggleMapHiddenTask('task-1');
+      expect(store.mapHiddenTaskIds).toEqual(['task-1']);
     });
   });
   describe('Actions - Skills', () => {

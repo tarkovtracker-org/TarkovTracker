@@ -88,6 +88,10 @@
     "error_loading": "加载塔科夫数据时出错",
     "loading": "正在加载塔科夫数据",
     "logout_failed": "无法登出，请重试。",
+    "logout_unreachable": "无法连接到服务器，所以您仍在登录。 您只能登出此设备； 服务器将不会被通知，因此会话仍在运行，直到它过期或您从另一个设备登出。",
+    "logout_this_device": "仅在此设备上登出",
+    "logout_this_device_done": "仅在此设备上登出。服务器上的会话仍然有效，直到它过期或您从另一个设备上登出。",
+    "logout_local_only": "在此设备上登出。服务器无法达到，所以您的其他会话仍然可以登录。",
     "hidden_label": "已隐藏",
     "user_label": "用户",
     "user_avatar_alt": "用户头像",
@@ -99,6 +103,40 @@
     "login_aria": "登入你的账户",
     "switch_to_light_theme": "切换到亮色主题",
     "switch_to_dark_theme": "切换到暗色主题"
+  },
+  "progress_save_status": {
+    "indicator_aria": "Progress save status: {status}",
+    "cloud_pending_label": "保存进度到云端",
+    "cloud_retrying_label": "云保存重试",
+    "cloud_failed_label": "云保存失败",
+    "local_failed_label": "进度未保存在本浏览器",
+    "cloud_pending_description": "您的最新进度更改尚未保存到云端。",
+    "cloud_retrying_description": "保存您的最新进度更改到云端失败。您可以在另一次尝试自动运行时继续跟踪。",
+    "cloud_failed_description": "自动尝试将您的最新进度更改保存到云端已经停止。 更改仍在等待保存，您可以随时继续跟踪和重试.",
+    "local_failed_description": "您的最新进度更改无法保存在此浏览器。 您可以继续跟踪，但如果您重新加载、关闭此标签或注销，其他地方未保存的更改可能会丢失。",
+    "local_saved_note": "这些更改已保存在此浏览器。",
+    "cloud_also_pending_note": "他们也没有保存到云端。导出进度以保存一份副本。",
+    "retry_scheduled": "Automatic retry {attempt} of {total} is scheduled.",
+    "cause_offline": "原因：此设备似乎处于离线状态。",
+    "cause_rate_limited": "原因：云服务暂时限制了节省。",
+    "cause_auth": "原因：无法验证您的登录会话。",
+    "cause_quota": "原因：此浏览器的 TarkovTracker 存储空间已满。",
+    "cause_unavailable": "原因：这个浏览器正在屏蔽网站存储，例如由于隐私设置。",
+    "cause_unknown": "这一失败的原因不明。",
+    "quota_guidance": "清除该站点的数据或重新加载可以删除您唯一的这些更改的副本。在移除任何数据之前导出您的进度。",
+    "retry_button": "重试云保存",
+    "retry_succeeded": "您的进度更改已保存到云端。",
+    "retry_failed": "云保存未成功。您的更改仍在等待保存。",
+    "export_button": "导出进度",
+    "export_hint": "即使保存失败，导出当前进度作为备份文件。"
+  },
+  "sign_out_confirm": {
+    "title": "使用未保存的更改登出？",
+    "risk": "您的最新进度更改不会保存在此浏览器或云端。如果您现在注销，它们将丢失。",
+    "options": "您可以在决定之前保持登录并重试保存，或导出当前进度。",
+    "stay_signed_in": "保持登录",
+    "discard_and_sign_out": "登出并放弃更改",
+    "retry_succeeded": "您的更改已保存到云端。您可以安全登出。"
   },
   "omnibar": {
     "title": "搜索",
@@ -514,6 +552,9 @@
     "not_available_description": "\"{mapName}\"的互动地图尚不可用。我们正在等待兼容地图的制作。",
     "placeholder": "该地点",
     "floors": "楼层",
+    "extract_names": {
+      "scav_underboat_hideout": "隐藏在降落阶段内"
+    },
     "factions": {
       "pmc": "PMC"
     },
@@ -993,7 +1034,25 @@
         "map_complete_tasks_toggle_show": "显示隐藏项",
         "map_complete_tasks_toggle_hide": "隐藏地图已完成",
         "map_hidden_hint": "隐藏地图 - 点击显示",
-        "raid_time_tooltip": "当前游戏内搜查时间"
+        "raid_time_tooltip": "当前游戏内搜查时间",
+        "raid_plan": {
+          "title": "在地图上的任务",
+          "summary_all": "Showing all {total}",
+          "summary_hidden": "{hidden} of {total} hidden",
+          "choose_quests": "选择任务",
+          "show_all": "显示全部",
+          "popover_description": "取消勾选你没有运行这次突击来清除它们。\"只能隐藏其他一切。",
+          "only": "仅限",
+          "show_only_named": "Show only {name} on the map",
+          "show_only_quest": "仅在地图上显示此任务",
+          "hide_quest": "从地图隐藏",
+          "show_quest": "在地图上显示",
+          "all_hidden_hint": "此地图上的每一个任务都是隐藏的。使用显示所有来将它们带回来。",
+          "hidden_section_title": "Hidden from map ({count})",
+          "hidden_section_description": "仍在跟踪，只需在地图上绘制。",
+          "hidden_section_expand": "显示隐藏任务",
+          "hidden_section_collapse": "收起隐藏的任务"
+        }
       },
       "pinned_tasks_section": "已固定任务",
       "focused_task_section": "当前聚焦任务",
@@ -1025,6 +1084,7 @@
         "of": "/",
         "mark_failed": "标记为失败",
         "available_button": "标记为可接取",
+        "clear_availability_confirmation": "清除游戏内可用性确认",
         "uncomplete_button": "标记为未完成",
         "reset_item_counts": "重置物品计数",
         "collapse_task": "折叠任务",
@@ -1110,6 +1170,11 @@
         "faction": "Available to {faction} characters.",
         "trader_unlock": "Unlock {trader} by completing {task}.",
         "prestige": "Requires Prestige {required} (current: {current}).",
+        "global_variable": "Server progression value {comparison} {required} required (current: {current}).",
+        "global_variable_unknown": "Requires server progression {comparison} {required}. Your current value is not available to the tracker. Use Mark available only if this task is available in-game; no counter tasks will be marked complete.",
+        "task_counter": "Requires {comparison} {required} completed tasks from this trader loyalty tier (completed: {current}). If this task is already available in-game, use Mark available.",
+        "dialogue": "需要游戏内的交易者对话。只有在确认此任务在游戏中可用后才能使用标记。",
+        "story_objective": "Complete the story objective \"{objective}\" ({chapter}).",
         "unknown": "要求数据不可用或不支持。可用性无法确认。",
         "cycle": "必备链包含一个周期。可用性无法确认。",
         "complete": "此任务已完成。",
@@ -2152,10 +2217,17 @@
       "delete_forever": "永久删除账户",
       "delete_success_title": "账户已成功删除",
       "delete_success_sr_only": "你的账户删除已完成，你将被重定向到总览面板。",
+      "delete_success_cleanup_failed_sr_only": "您的帐户已被删除，但设备上仍有一些数据。您可以重新尝试清理或继续使用留在这里的数据。",
       "delete_success_description": "你的账户及其所有相关数据已被永久删除。",
+      "other_session_deleted_description": "开始删除的账户已被删除。您的当前账户仍在登录，未被更改。",
       "cleanup_pending": "部分数据清理仍在进行中，稍后将完成。",
+      "device_cleanup_failed": "此设备上还有一些已删除的账户数据。重试清理或继续并将该数据留在这里。",
+      "session_end_failed": "此浏览器仍然登录到已删除的帐户。选择到仪表盘尝试重新登录。",
+      "retry_device_cleanup": "重试设备清理",
+      "continue_with_device_data_remaining": "继续处理剩余数据",
       "redirect_message": "感谢使用 TarkovTracker。你将被重定向到总览面板。",
-      "go_to_dashboard": "前往总览面板"
+      "go_to_dashboard": "前往总览面板",
+      "session_changed": "您的登录帐户已更改。本次会议将不再采取进一步行动。"
     },
     "discord_link": {
       "title": "Discord Account",
@@ -2413,6 +2485,25 @@
         "verification_failed": "人类验证失败。重新加载页面然后重试。",
         "fetch_failed": "无法获取Tarkov.dev 配置文件。打开Tarkov.dev上的配置文件，然后重试。"
       }
+    },
+    "device_data": {
+      "title": "此设备上的数据",
+      "description": "登出将此帐户保存到此浏览器中的进度 所以尚未达到云端的更改可以在您重新登录时同步。 因重置或季节性滚动而移除的进度将单独保存以供出口。 移除此设备的数据会删除此账户的进度、恢复副本和首选项，并从此浏览器中标记您。",
+      "cloud_unaffected": "您的云进度没有被删除。其他账户在此设备上的数据不受影响。",
+      "superseded_available": "{count} progress change(s) from a reset or Seasonal rollover are retained here for export only. They will not be restored or synced automatically.",
+      "superseded_export": "导出替代进度",
+      "superseded_export_error": "无法导出被取代的进度",
+      "remove_button": "从此设备中删除此帐户的数据",
+      "confirm_title": "从此设备中删除此帐户的数据吗？",
+      "confirm_description": "此帐户的进度、 恢复副本、 替代进度导出、 首选项将从此浏览器中删除，您将被注销。 当您再次登录时，您的云进度仍然有效。",
+      "pending_warning": "一些进度更改尚未保存到云端。 移除此设备的数据将永久丢弃它们。如果您想保留它们，请先导出您的进度。",
+      "confirm_button": "移除数据并注销",
+      "removed": "此帐户的数据已从此设备中删除。",
+      "remove_error": "某些帐户数据无法从此设备中删除。请在这里使用另一个帐户之前重试。",
+      "remove_incomplete": "您移除的帐户中的一些数据仍然在此设备上。请在这里使用另一个帐户之前重试。",
+      "retry_removal": "尝试重新删除",
+      "revocation_unavailable": "无法连接到服务器，所以您仍在登录。 您只能登出此设备并移除数据; 服务器将不会被通知，因此会话仍在运行，直到它过期或您从另一个设备登出。",
+      "confirm_device_only_button": "仅在此设备上登出并移除数据"
     }
   },
   "hideout": {
@@ -2500,6 +2591,22 @@
       "approve": "Approve",
       "deny": "Deny"
     }
+  },
+  "tarkov_access": {
+    "title": "验证您的浏览器",
+    "checking": "正在检查站点访问权限…",
+    "description": "此站点不会被过多的自动化请求。请在下面完成安全检查以载入Tarkov游戏数据。",
+    "retry": "重试",
+    "dismiss": "暂不",
+    "dismissed_notice": "游戏数据暂停，直到您完成安全检查。",
+    "verify_now": "立即验证",
+    "verification_failed_retry": "安全检查未完成。您可以再试一次。",
+    "verifying": "验证您的浏览器…",
+    "widget_hint": "完成检查以继续。",
+    "failed": "加载Tarkov数据当前不可用。您可以再试一次。",
+    "blocked": "Tarkov数据访问目前已被阻止。您可以重试或稍后再试。",
+    "rate_limited": "在短时间内检查太多。等一会儿，然后再试一次。",
+    "widget_unavailable": "无法加载安全检查。您可以再试一次。"
   },
   "analytics_consent": {
     "eyebrow": "分析",

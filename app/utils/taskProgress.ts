@@ -1,3 +1,15 @@
+import {
+  acceptsActiveStatus,
+  acceptsCompletionStatus,
+  acceptsFailedStatus,
+  isFailedOnlyRequirement,
+  normalizeRequirementStatuses,
+} from '@shared/utils/requirementStatus';
+import { isAvailabilityConfirmed } from '@/utils/taskAvailabilityConfirmation';
+import {
+  otherRequirementsSignature,
+  storyObjectiveRequirements,
+} from '@/utils/taskOtherRequirements';
 import { getTaskTraderRequirements } from '@/utils/taskRequirements';
 import {
   isTaskComplete,
@@ -5,6 +17,7 @@ import {
   isTaskActive,
   type RawTaskCompletion,
 } from '@/utils/taskStatus';
+import type { TaskAvailabilityConfirmation } from '@/types/progress';
 import type { Task, TaskObjective, TaskRequirement } from '@/types/tarkov';
 type TaskObjectiveProgressStore = {
   getObjectiveCount: (objectiveId: string) => number;
@@ -28,18 +41,6 @@ type TaskTraderProgressStore = {
   setTraderLevel: (traderId: string, level: number) => void;
   setTraderReputation: (traderId: string, reputation: number) => void;
 };
-const normalizeStatuses = (statuses?: string[]) =>
-  (statuses ?? []).map((status) => status.toLowerCase());
-const hasAnyStatus = (statuses: string[], values: string[]) =>
-  values.some((value) => statuses.includes(value));
-export function isFailedOnlyRequirement(statuses?: string[]): boolean {
-  const normalized = normalizeStatuses(statuses);
-  if (normalized.length === 0) return false;
-  return (
-    normalized.includes('failed') &&
-    !hasAnyStatus(normalized, ['complete', 'completed', 'active', 'accept', 'accepted'])
-  );
-}
 const getPositiveObjectiveCount = (objective: TaskObjective) => {
   const count = objective.count ?? 0;
   return count > 0 ? count : undefined;
@@ -165,6 +166,68 @@ const applyTraderMinimum = (
   if (store.getTraderReputation(requirement.trader.id) < requirement.value)
     store.setTraderReputation(requirement.trader.id, requirement.value);
 };
+export type StoryObjectiveRef = { chapterId: string; objectiveId: string };
+type StoryObjectiveStore = {
+  isStoryObjectiveComplete: (chapterId: string, objectiveId: string) => boolean;
+  setStoryObjectiveComplete: (chapterId: string, objectiveId: string) => void;
+};
+const impliedStoryObjectives = (task: Task): StoryObjectiveRef[] =>
+  storyObjectiveRequirements(task).map((gate) => ({
+    chapterId: gate.storyChapter.id,
+    objectiveId: gate.objective.id,
+  }));
+/**
+ * A started, completed or failed task has passed its start gates, so its story objectives were met.
+ * Returns the objectives this call newly recorded, so an undo can release exactly those.
+ */
+export function recordImpliedStoryObjectives(
+  store: StoryObjectiveStore,
+  task: Task
+): StoryObjectiveRef[] {
+  const recorded = impliedStoryObjectives(task).filter(
+    ({ chapterId, objectiveId }) => !store.isStoryObjectiveComplete(chapterId, objectiveId)
+  );
+  for (const { chapterId, objectiveId } of recorded)
+    store.setStoryObjectiveComplete(chapterId, objectiveId);
+  return recorded;
+}
+const isManuallyFailed = (completion: RawTaskCompletion): boolean =>
+  isTaskFailed(completion) && typeof completion === 'object' && completion?.manual === true;
+/**
+ * Whether a task's recorded state proves it passed its start gates: completed, accepted, manually
+ * failed, or confirmed available (Mark available or an imported start). Automatic branch failures
+ * prove nothing.
+ */
+export const provesStartGates = (
+  task: Task,
+  completion: RawTaskCompletion,
+  confirmation: TaskAvailabilityConfirmation | undefined
+): boolean =>
+  isTaskComplete(completion) ||
+  isTaskActive(completion) ||
+  isManuallyFailed(completion) ||
+  isAvailabilityConfirmed(confirmation, completion, otherRequirementsSignature(task));
+const storyObjectiveKey = ({ chapterId, objectiveId }: StoryObjectiveRef) =>
+  `${chapterId}\u0000${objectiveId}`;
+/**
+ * Undo the story objectives an action recorded, except those another task still proves met (see
+ * `provesStartGates`): those remain met, and the load-time repair would record them again.
+ */
+export function releaseRecordedStoryObjectives(options: {
+  store: { setStoryObjectiveUncomplete: (chapterId: string, objectiveId: string) => void };
+  recorded: readonly StoryObjectiveRef[];
+  tasks: readonly Task[];
+  provesStartGates: (task: Task) => boolean;
+}): void {
+  const { store, recorded, tasks, provesStartGates: proves } = options;
+  if (!recorded.length) return;
+  const stillImplied = new Set(
+    tasks.filter(proves).flatMap(impliedStoryObjectives).map(storyObjectiveKey)
+  );
+  for (const ref of recorded)
+    if (!stillImplied.has(storyObjectiveKey(ref)))
+      store.setStoryObjectiveUncomplete(ref.chapterId, ref.objectiveId);
+}
 /** Completion proves lower bounds, never that earned progress should be reduced. */
 export function applyTaskTraderRequirements(options: {
   store: TaskTraderProgressStore;
@@ -177,19 +240,58 @@ export function applyTaskTraderRequirements(options: {
   }
 }
 const completedStatusMet = (completion: RawTaskCompletion, values: string[]) =>
-  (!values.length || hasAnyStatus(values, ['complete', 'completed'])) && isTaskComplete(completion);
+  (!values.length || acceptsCompletionStatus(values)) && isTaskComplete(completion);
 const activeStatusMet = (completion: RawTaskCompletion, values: string[]) =>
-  hasAnyStatus(values, ['active', 'accept', 'accepted']) &&
-  (isTaskActive(completion) || isTaskComplete(completion));
+  acceptsActiveStatus(values) && (isTaskActive(completion) || isTaskComplete(completion));
 const alreadyMeetsStatus = (completion: RawTaskCompletion, statuses?: string[]): boolean => {
-  const values = normalizeStatuses(statuses);
+  const values = normalizeRequirementStatuses(statuses);
   return (
     completedStatusMet(completion, values) ||
-    (values.includes('failed') && isTaskFailed(completion)) ||
+    (acceptsFailedStatus(values) && isTaskFailed(completion)) ||
     activeStatusMet(completion, values)
   );
 };
 const requiredTaskId = (requirement: TaskRequirement) => requirement?.task?.id;
+const completionOnlyRequirement = (requirement: TaskRequirement): boolean =>
+  (requirement.status ?? []).every((status) =>
+    ['complete', 'completed'].includes(status.toLowerCase())
+  );
+/** Non-object entries are malformed declared gates, never an unambiguous requirement. */
+const unambiguousRequirement = (requirement: TaskRequirement): boolean =>
+  Boolean(requirement && typeof requirement === 'object') &&
+  (completionOnlyRequirement(requirement) || isFailedOnlyRequirement(requirement.status));
+const resolvableRequirement = (
+  requirement: TaskRequirement,
+  getCompletion: (taskId: string) => RawTaskCompletion
+): boolean => {
+  const taskId = requiredTaskId(requirement);
+  if (!taskId) return false;
+  return (
+    alreadyMeetsStatus(getCompletion(taskId), requirement.status) ||
+    unambiguousRequirement(requirement)
+  );
+};
+/**
+ * Mark available can only settle a task's direct prerequisites when each unmet one names a single
+ * status to record; an unmet active/mixed-status or malformed entry leaves the task locked, so the
+ * action must not change any progress for it.
+ */
+export const canApplyTaskAvailabilityRequirements = (
+  task: Task,
+  getCompletion: (taskId: string) => RawTaskCompletion,
+  skipTaskRequirements = false,
+  /**
+   * The evaluator's unmet direct prerequisites, when known. It already accepts an active
+   * prerequisite that is itself available, so only what it still reports needs a recordable status.
+   */
+  unmetRequirements?: TaskRequirement[]
+): boolean => {
+  if (skipTaskRequirements || !Array.isArray(task.taskRequirements)) return true;
+  if (unmetRequirements) return unmetRequirements.every(unambiguousRequirement);
+  return task.taskRequirements.every((requirement) =>
+    resolvableRequirement(requirement, getCompletion)
+  );
+};
 export function applyTaskAvailabilityRequirements(options: {
   getCompletion?: (taskId: string) => RawTaskCompletion;
   skipTaskRequirements?: boolean;
@@ -214,14 +316,18 @@ export function applyTaskAvailabilityRequirements(options: {
     if (alreadyMeetsStatus(getCompletion(requirementTaskId), requirement.status)) return;
     if (isFailedOnlyRequirement(requirement.status)) {
       onFailRequirement(requirementTaskId);
-    } else {
+    } else if (completionOnlyRequirement(requirement)) {
       onCompleteRequirement(requirementTaskId);
     }
-    handledRequirementTaskIds.add(requirementTaskId);
   });
+  // Flattened graph ancestors cannot identify a historical route through alternative statuses.
+  if (!taskRequirements.every(unambiguousRequirement)) return;
   predecessors.forEach((predecessorId) => {
     if (!predecessorId) return;
     if (handledRequirementTaskIds.has(predecessorId)) return;
+    // Transitive inference never resurrects a failed task: only the task the player confirmed
+    // available can justify flipping its own direct gates.
+    if (isTaskFailed(getCompletion(predecessorId))) return;
     onCompleteRequirement(predecessorId);
   });
 }

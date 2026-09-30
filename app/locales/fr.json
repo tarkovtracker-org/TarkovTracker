@@ -88,6 +88,10 @@
     "error_loading": "Erreur de chargement des données Tarkov",
     "loading": "Chargement des données Tarkov",
     "logout_failed": "Échec de la déconnexion. Veuillez réessayer.",
+    "logout_unreachable": "Le serveur n'a pas pu être atteint, vous êtes toujours connecté. Vous ne pouvez vous déconnecter que sur cet appareil; le serveur ne sera pas informé, donc la session reste active jusqu'à ce qu'elle expire ou que vous vous déconnectiez d'un autre appareil.",
+    "logout_this_device": "Se déconnecter de cet appareil uniquement",
+    "logout_this_device_done": "Déconnecté sur cet appareil uniquement. La session sur le serveur reste active jusqu'à ce qu'elle expire ou que vous vous déconnectiez d'un autre appareil.",
+    "logout_local_only": "Déconnecté sur cet appareil. Le serveur n'a pas pu être atteint, vos autres sessions peuvent donc être encore connectées.",
     "hidden_label": "Masqué",
     "user_label": "Utilisateur",
     "user_avatar_alt": "Avatar de l'utilisateur",
@@ -99,6 +103,40 @@
     "login_aria": "Connectez-vous à votre compte",
     "switch_to_light_theme": "Basculer vers le thème clair",
     "switch_to_dark_theme": "Basculer vers le thème sombre"
+  },
+  "progress_save_status": {
+    "indicator_aria": "Statut de la sauvegarde d'avancement : {status}",
+    "cloud_pending_label": "Enregistrement de la progression vers le cloud",
+    "cloud_retrying_label": "Réessayer la sauvegarde dans le Cloud",
+    "cloud_failed_label": "Échec de la sauvegarde dans le Cloud",
+    "local_failed_label": "Progression non enregistrée dans ce navigateur",
+    "cloud_pending_description": "Vos dernières modifications de progression n'ont pas encore été enregistrées dans le cloud.",
+    "cloud_retrying_description": "L'enregistrement de vos dernières modifications de progression dans le cloud a échoué. Vous pouvez continuer à suivre pendant qu'une autre tentative s'exécute automatiquement.",
+    "cloud_failed_description": "Tentatives automatiques pour enregistrer vos dernières modifications de progression dans le cloud se sont arrêtées. Les modifications sont toujours en attente d'être enregistrées, et vous pouvez continuer à suivre et réessayer à tout moment.",
+    "local_failed_description": "Vos dernières modifications de progression n'ont pas pu être enregistrées dans ce navigateur. Vous pouvez continuer à suivre, mais les modifications qui ne sont pas enregistrées ailleurs peuvent être perdues si vous rechargez, fermez cet onglet ou déconnectez.",
+    "local_saved_note": "Ces modifications sont enregistrées dans ce navigateur.",
+    "cloud_also_pending_note": "Ils n'ont pas non plus été sauvegardés dans le cloud. Exportez votre progression pour en conserver une copie.",
+    "retry_scheduled": "La tentative automatique {attempt} de {total} est planifiée.",
+    "cause_offline": "Cause: cet appareil semble être hors ligne.",
+    "cause_rate_limited": "Cause: le service cloud limite temporairement les économies.",
+    "cause_auth": "Cause: votre session de connexion n'a pas pu être vérifiée.",
+    "cause_quota": "Cause: le stockage de ce navigateur pour TarkovTracker est plein.",
+    "cause_unavailable": "Cause: ce navigateur bloque le stockage du site, par exemple en raison des paramètres de confidentialité.",
+    "cause_unknown": "La cause de cet échec est inconnue.",
+    "quota_guidance": "Effacer les données de ce site ou le rechargement pourrait supprimer votre seule copie de ces modifications. Exportez votre progression avant de supprimer des données.",
+    "retry_button": "Réessayer la sauvegarde du cloud",
+    "retry_succeeded": "Vos modifications de progression ont été enregistrées dans le cloud.",
+    "retry_failed": "La sauvegarde du cloud n'a pas réussi. Vos modifications sont toujours en attente d'être enregistrées.",
+    "export_button": "Progression de l'export",
+    "export_hint": "Exporter les téléchargements de votre progression actuelle en tant que fichier de sauvegarde, même lorsque l'enregistrement a échoué."
+  },
+  "sign_out_confirm": {
+    "title": "Se déconnecter avec des modifications non enregistrées ?",
+    "risk": "Vos dernières modifications de progression ne sont pas enregistrées dans ce navigateur ou dans le cloud. Si vous vous déconnectez maintenant, elles seront perdues.",
+    "options": "Vous pouvez rester connecté et réessayer de sauvegarder, ou exporter votre progression actuelle avant de décider.",
+    "stay_signed_in": "Rester connecté",
+    "discard_and_sign_out": "Se déconnecter et annuler les modifications",
+    "retry_succeeded": "Vos modifications ont été enregistrées sur le cloud. Vous pouvez vous déconnecter en toute sécurité."
   },
   "omnibar": {
     "title": "Recherche",
@@ -514,6 +552,9 @@
     "not_available_description": "La carte interactive de {mapName} n'est pas encore disponible. Nous attendons la création d'une carte compatible.",
     "placeholder": "cet endroit",
     "floors": "Étages",
+    "extract_names": {
+      "scav_underboat_hideout": "Cachez sous la phase d'atterrissage"
+    },
     "factions": {
       "pmc": "PMC"
     },
@@ -993,7 +1034,25 @@
         "map_complete_tasks_toggle_show": "Afficher masquées",
         "map_complete_tasks_toggle_hide": "Masquer terminées carte",
         "map_hidden_hint": "Carte masquée - cliquez pour afficher",
-        "raid_time_tooltip": "Temps de raid actuel en jeu"
+        "raid_time_tooltip": "Temps de raid actuel en jeu",
+        "raid_plan": {
+          "title": "Quêtes sur la carte",
+          "summary_all": "Affichage de tous les {total}",
+          "summary_hidden": "{hidden} sur {total} masqué",
+          "choose_quests": "Choisir les quêtes",
+          "show_all": "Afficher tout",
+          "popover_description": "Décochez les quêtes que vous n'utilisez pas ce raid pour les éliminer de la carte. « Seulement» masque tout le reste.",
+          "only": "Seulement",
+          "show_only_named": "Afficher seulement {name} sur la carte",
+          "show_only_quest": "Ne montrer que cette quête sur la carte",
+          "hide_quest": "Cacher de la carte",
+          "show_quest": "Afficher sur la carte",
+          "all_hidden_hint": "Chaque quête de cette carte est masquée. Utilisez Show all pour les ramener.",
+          "hidden_section_title": "Masqué sur la carte ({count})",
+          "hidden_section_description": "Toujours suivi, tout simplement pas dessiné sur la carte.",
+          "hidden_section_expand": "Afficher les quêtes cachées",
+          "hidden_section_collapse": "Réduire les quêtes cachées"
+        }
       },
       "pinned_tasks_section": "Quêtes épinglées",
       "focused_task_section": "Quête ciblée",
@@ -1025,6 +1084,7 @@
         "of": "de",
         "mark_failed": "Marquer comme échouée",
         "available_button": "Disponible",
+        "clear_availability_confirmation": "Effacer la confirmation de disponibilité en jeu",
         "uncomplete_button": "Annuler",
         "reset_item_counts": "Réinitialiser les compteurs d'objets",
         "collapse_task": "Réduire la tâche",
@@ -1110,6 +1170,11 @@
         "faction": "Disponible pour les caractères {faction}.",
         "trader_unlock": "Débloquez {trader} en complétant {task}.",
         "prestige": "Nécessite le Prestige {required} (actuel: {current}).",
+        "global_variable": "Valeur de progression du serveur {comparison} {required} requise (courant: {current}).",
+        "global_variable_unknown": "Nécessite la progression du serveur {comparison} {required}. Votre valeur actuelle n'est pas disponible pour le tracker. Utiliser le marquage disponible uniquement si cette tâche est disponible en jeu; aucune tâche de compteur ne sera marquée comme terminée.",
+        "task_counter": "Nécessite les tâches {comparison} {required} accomplies depuis ce niveau de fidélité du trader (accomplies : {current}). Si cette tâche est déjà disponible en jeu, utilisez Marque disponible.",
+        "dialogue": "Nécessite une conversation de trader en jeu. Utilisez Marque disponible seulement après avoir confirmé que cette tâche est disponible en jeu.",
+        "story_objective": "Complétez l'objectif de l'histoire \"{objective}\" ({chapter}).",
         "unknown": "Les données requises sont indisponibles ou non pris en charge. La disponibilité ne peut pas être confirmée.",
         "cycle": "La chaîne de prérequis contient un cycle. La disponibilité ne peut pas être confirmée.",
         "complete": "Cette tâche est terminée.",
@@ -2152,10 +2217,17 @@
       "delete_forever": "Supprimer le compte définitivement",
       "delete_success_title": "Compte supprimé avec succès",
       "delete_success_sr_only": "La suppression de votre compte est terminée et vous serez redirigé vers le tableau de bord.",
+      "delete_success_cleanup_failed_sr_only": "Votre compte a été supprimé, mais certaines données restent sur cet appareil. Vous pouvez recommencer le nettoyage ou continuer avec ces données ici.",
       "delete_success_description": "Votre compte et toutes les données associées ont été supprimés définitivement.",
+      "other_session_deleted_description": "Le compte qui a commencé cette suppression a été supprimé. Votre compte actuel est toujours connecté et n'a pas été modifié.",
       "cleanup_pending": "Le nettoyage de certaines données est encore en cours et sera terminé sous peu.",
+      "device_cleanup_failed": "Certaines données de compte supprimées restent sur cet appareil. Réessayez le nettoyage, ou continuez et laissez ces données ici.",
+      "session_end_failed": "Ce navigateur est toujours connecté au compte supprimé. Sélectionnez Aller au tableau de bord pour essayer de vous déconnecter à nouveau.",
+      "retry_device_cleanup": "Réessayer le nettoyage de l'appareil",
+      "continue_with_device_data_remaining": "Continuer avec les données restantes",
       "redirect_message": "Merci d'utiliser TarkovTracker. Vous serez redirigé vers le tableau de bord.",
-      "go_to_dashboard": "Aller au tableau de bord"
+      "go_to_dashboard": "Aller au tableau de bord",
+      "session_changed": "Votre compte connecté a été modifié. Aucune autre action ne sera entreprise dans cette session."
     },
     "discord_link": {
       "title": "Compte Discord",
@@ -2413,6 +2485,25 @@
         "verification_failed": "Échec de la vérification humaine. Rechargez la page et réessayez.",
         "fetch_failed": "Impossible de récupérer le profil Tarkov.dev. Ouvrez le profil sur Tarkov.dev, puis réessayez."
       }
+    },
+    "device_data": {
+      "title": "Données sur cet appareil",
+      "description": "La déconnexion conserve la progression de ce compte dans ce navigateur, de sorte que les changements qui n'ont pas encore atteint le cloud peuvent être synchronisés lorsque vous vous reconnectez. Les progrès déplacés par une remise à zéro ou un renouvellement saisonnier sont maintenus séparément pour l'exportation. La suppression des données de cet appareil supprime la progression, les copies de récupération et les préférences de ce compte de ce navigateur et vous déconnecte.",
+      "cloud_unaffected": "Votre progression dans le cloud n'est pas supprimée. Les données des autres comptes sur cet appareil ne sont pas affectées.",
+      "superseded_available": "Les changements de progression {count} depuis une réinitialisation ou un renouvellement saisonnier sont conservés ici uniquement pour l'exportation. Ils ne seront pas restaurés ou synchronisés automatiquement.",
+      "superseded_export": "Progression de l'exportation remplacée",
+      "superseded_export_error": "Impossible d'exporter la progression remplacée",
+      "remove_button": "Supprimer les données de ce compte de cet appareil",
+      "confirm_title": "Supprimer les données de ce compte de cet appareil ?",
+      "confirm_description": "La progression de ce compte, les copies de récupération, les exportations de progression remplacées et les préférences seront supprimées de ce navigateur, et vous serez déconnecté. Votre progression sur le cloud reste disponible lorsque vous vous reconnectez.",
+      "pending_warning": "Certaines modifications de progression n'ont pas encore été enregistrées dans le cloud. La suppression des données de cet appareil les supprimera définitivement. Exportez d'abord votre progression si vous voulez les conserver.",
+      "confirm_button": "Supprimer les données et se déconnecter",
+      "removed": "Les données de ce compte ont été supprimées de cet appareil.",
+      "remove_error": "Certaines données de compte n'ont pas pu être supprimées de cet appareil. Réessayez avant d'utiliser un autre compte ici.",
+      "remove_incomplete": "Certaines données du compte que vous avez supprimé sont toujours sur cet appareil. Réessayez avant d'utiliser un autre compte ici.",
+      "retry_removal": "Essayez de supprimer à nouveau",
+      "revocation_unavailable": "Le serveur n'a pas pu être atteint, vous êtes toujours connecté. Vous pouvez vous déconnecter de cet appareil uniquement et supprimer les données ; le serveur ne sera pas informé, donc la session reste active jusqu'à ce qu'elle expire ou que vous vous déconnectiez d'un autre appareil.",
+      "confirm_device_only_button": "Se déconnecter de cet appareil uniquement et supprimer les données"
     }
   },
   "hideout": {
@@ -2500,6 +2591,22 @@
       "approve": "Approuver",
       "deny": "Refuser"
     }
+  },
+  "tarkov_access": {
+    "title": "Vérifiez votre navigateur",
+    "checking": "Vérification de l'accès au site…",
+    "description": "Ce site est protégé contre les requêtes automatisées excessives. Complétez la vérification de sécurité ci-dessous pour charger les données du jeu Tarkov.",
+    "retry": "Actualiser",
+    "dismiss": "Pas maintenant",
+    "dismissed_notice": "Les données du jeu sont suspendues jusqu'à ce que vous ayez terminé la vérification de sécurité.",
+    "verify_now": "Vérifier maintenant",
+    "verification_failed_retry": "La vérification de sécurité n'est pas terminée. Vous pouvez réessayer.",
+    "verifying": "Vérification de votre navigateur…",
+    "widget_hint": "Complétez la vérification pour continuer.",
+    "failed": "Le chargement des données de Tarkov est actuellement indisponible. Vous pouvez réessayer.",
+    "blocked": "L'accès aux données de Tarkov est actuellement bloqué pour votre réseau. Vous pouvez réessayer ou revenir plus tard.",
+    "rate_limited": "Trop de vérifications en un court laps de temps. Attendez un instant, puis réessayez.",
+    "widget_unavailable": "La vérification de sécurité n'a pas pu être chargée. Vous pouvez réessayer."
   },
   "analytics_consent": {
     "eyebrow": "Analytique",

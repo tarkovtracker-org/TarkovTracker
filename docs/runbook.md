@@ -2,7 +2,7 @@
 
 ## Required Environment Variables
 
-Canonical variable map (owner): [`ARCHITECTURE.md` §Environment Variables](./ARCHITECTURE.md#environment-variables).
+Canonical variable map (owner): [`architecture.md` §Environment Variables](./architecture.md#environment-variables).
 Naming: `NUXT_*` = Nuxt private (server-only), `NUXT_PUBLIC_*` = Nuxt public (browser-exposed).
 
 **Nuxt app (Cloudflare Pages):** see the canonical map for `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
@@ -19,7 +19,7 @@ See the canonical map for `STRIPE_SECRET_KEY` and the nine `STRIPE_PRICE_*` IDs 
 ### Stripe webhook (Supabase Edge Function `stripe-webhook`)
 
 Set these in Supabase Dashboard → Project Settings → Edge Functions (canonical definitions in
-[`ARCHITECTURE.md` §Environment Variables](./ARCHITECTURE.md#environment-variables) and
+[`architecture.md` §Environment Variables](./architecture.md#environment-variables) and
 `supabase/functions/.env.example`):
 
 - `STRIPE_WEBHOOK_SECRET` (Stripe Dashboard → Webhooks → Signing secret)
@@ -110,6 +110,14 @@ Prepare and deploy each rollover in two releases during the no-write gap between
    deployment order is uncontrolled. Do not delete the previous season's rows.
 
 ## Deployment
+
+### Internal game-data browser verification
+
+Application support is disabled by default and does not itself enforce CDN access.
+Use the [browser-clearance rollout and rollback procedure](./tarkov-clearance-rollout.md)
+for staging, alias closure, Access-protected automation, exact production approval and
+readback evidence. **Disable the edge challenge rule before removing frontend recovery.**
+Production deployment, Cloudflare mutations and merge require separate approval.
 
 Merging to `main` deploys everything automatically. Three integrations do the work — none of them
 GitHub Actions — and each surfaces as a check on the merge commit:
@@ -557,7 +565,7 @@ deployed function sources in the same change.
 The database change alone does not cover the handler behavior: the deployed handlers filter cooldown
 reads on `server_verified = true`, and the preserved pre-containment rows are `server_verified = false`
 with possibly forged timestamps, so the older handlers would trust that history again. See the
-`team_events` invariants in `docs/SYSTEMS.md`.
+`team_events` invariants in `docs/systems.md`.
 
 ### Atomic-leave checkout recovery (`20260912085904`)
 
@@ -784,7 +792,7 @@ Pi access. Do not make production role provisioning or the canary an automatic m
    - `NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE`
    - For `/api/tarkov-dev/profile`, add or tighten a Cloudflare rule; the app route also has a fixed per-IP limiter.
    - Cache API-backed shared rate limits are best-effort under concurrent bursts; use Cloudflare or Durable Objects for hard enforcement.
-   - Full ownership map (Worker DO vs Edge mutation limits vs Pages vs Auth): [`RATE_LIMITING.md`](./RATE_LIMITING.md).
+   - Full ownership map (Worker DO vs Edge mutation limits vs Pages vs Auth): [`rate-limiting.md`](./rate-limiting.md).
 3. If API protection blocks valid traffic, update `API_ALLOWED_HOSTS` and redeploy.
 
 ### Combined task cache contract rollout (v2 to v3)

@@ -363,6 +363,15 @@
           "
         />
         <ContextMenuItem
+          v-if="hasAvailabilityConfirmation"
+          icon="i-mdi-lock-reset"
+          :label="t('page.tasks.questcard.clear_availability_confirmation')"
+          @click="
+            tarkovStore.clearTaskAvailability(task.id);
+            close();
+          "
+        />
+        <ContextMenuItem
           v-if="preferencesStore.getEnableManualTaskFail && isOurFaction && !isFailed"
           icon="i-mdi-close-circle"
           :label="t('page.tasks.questcard.mark_failed')"
@@ -397,6 +406,7 @@
   </UCard>
 </template>
 <script setup lang="ts">
+  import { isFailedOnlyRequirement } from '@shared/utils/requirementStatus';
   import ContextMenu from '@/components/ui/ContextMenu.vue';
   import ContextMenuItem from '@/components/ui/ContextMenuItem.vue';
   import { useSharedBreakpoints } from '@/composables/useSharedBreakpoints';
@@ -435,8 +445,9 @@
   import { HOT_WHEELS_TASK_ID } from '@/utils/constants';
   import { getExclusiveEditionsForTask } from '@/utils/editionHelpers';
   import { getQueryString } from '@/utils/routeHelpers';
+  import { isAvailabilityConfirmed } from '@/utils/taskAvailabilityConfirmation';
   import { countIncompleteSuccessors, resolveImpactTeamIds } from '@/utils/taskImpact';
-  import { isFailedOnlyRequirement } from '@/utils/taskProgress';
+  import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
   import { compareRequirement, getTaskTraderRequirements } from '@/utils/taskRequirements';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
   import type { GameEdition, Task } from '@/types/tarkov';
@@ -556,6 +567,7 @@
     markTaskUncomplete,
     markTaskAvailable,
     markTaskFailed,
+    canMarkTaskAvailable,
   } = useTaskActions(
     () => props.task,
     (payload) => emit('on-task-action', payload)
@@ -932,6 +944,7 @@
       isOurFaction: isOurFaction.value,
       isFailed: isFailed.value,
       isLocked: isLocked.value,
+      canMarkAvailable: canMarkTaskAvailable,
       isComplete: isComplete.value,
       isActive: isActive.value,
       showHotWheelsFail: showHotWheelsFail.value,
@@ -1028,6 +1041,14 @@
     if (taskObjectives.value.length > 0) return false;
     // No objectives yet - show skeleton while loading or not yet hydrated
     return metadataStore.tasksObjectivesPending || !metadataStore.tasksObjectivesHydrated;
+  });
+  const hasAvailabilityConfirmation = computed(() => {
+    const progress = tarkovStore.getCurrentProgressData();
+    return isAvailabilityConfirmed(
+      progress.taskAvailability?.[props.task.id],
+      progress.taskCompletions?.[props.task.id],
+      otherRequirementsSignature(props.task)
+    );
   });
   const openOverflowMenu = (event: MouseEvent) => {
     taskContextMenu.value?.open(event);

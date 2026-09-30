@@ -1,16 +1,7 @@
 import { isTaskAvailableForEdition } from '@/utils/editionHelpers';
+import type { TaskCompletion } from '@/types/progress';
 import type { GameEdition, Task } from '@/types/tarkov';
-export type RawTaskCompletion =
-  | {
-      complete?: boolean;
-      failed?: boolean;
-      active?: boolean;
-      timestamp?: number;
-      manual?: boolean;
-    }
-  | boolean
-  | null
-  | undefined;
+export type RawTaskCompletion = TaskCompletion | boolean | null | undefined;
 export type TaskStatusResult = 'completed' | 'failed' | 'incomplete';
 export interface TaskRelevanceOptions {
   faction: string;
