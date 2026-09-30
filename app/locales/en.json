@@ -2592,6 +2592,22 @@
       "deny": "Deny"
     }
   },
+  "tarkov_access": {
+    "title": "Verify your browser",
+    "checking": "Checking site access…",
+    "description": "This site is being protected from excessive automated requests. Complete the security check below to load Tarkov game data.",
+    "retry": "Try again",
+    "dismiss": "Not now",
+    "dismissed_notice": "Game data is paused until you complete the security check.",
+    "verify_now": "Verify now",
+    "verification_failed_retry": "The security check did not complete. You can try again.",
+    "verifying": "Verifying your browser…",
+    "widget_hint": "Complete the check to continue.",
+    "failed": "Loading Tarkov data is currently unavailable. You can try again.",
+    "blocked": "Access to Tarkov data is currently blocked for your network. You can try again or come back later.",
+    "rate_limited": "Too many checks in a short time. Wait a moment, then try again.",
+    "widget_unavailable": "The security check could not load. You can try again."
+  },
   "analytics_consent": {
     "eyebrow": "Analytics",
     "title": "Help make Tarkov Tracker better",

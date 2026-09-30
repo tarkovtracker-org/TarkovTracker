@@ -254,6 +254,19 @@ Implementation notes:
 
 ### C. Pages / Nitro shared app endpoints
 
+The optional game-data browser flow adds a dedicated per-client Siteverify attempt bucket
+in [`tarkov-verify.post.ts`](../app/server/api/security/tarkov-verify.post.ts), using the
+existing shared limiter; a request without a resolved client address is rejected rather than
+sharing one anonymous bucket. It does not replace the proposed edge rate rule: CDN cache hits
+must count at Cloudflare. The strict verifier fails closed on Siteverify outages; the
+legacy profile-import policy is unchanged. Shared-limiter fallback behavior is unchanged.
+
+The data WAF/rate proposal is **not active**. The Free-plan ten-second counting window and
+lack of hostname expressions require a reviewed plan/isolation decision; no production
+threshold is selected from the old sampled per-minute peak. Measurements, cache counting,
+rule ordering and activation gates are owned by the
+[rollout proposal](./tarkov-clearance-rollout.md#rate-limiting-decision-gate).
+
 Used for browser/app read endpoints served by Cloudflare Pages Functions.
 
 ```mermaid

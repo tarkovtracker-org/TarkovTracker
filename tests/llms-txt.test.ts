@@ -1,10 +1,8 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
 import { SUPPORTED_LOCALES } from '@/utils/locales';
 const LLMS_TXT_PATH = join(process.cwd(), 'public', 'llms.txt');
-const TARKOV_API_DIR = join(process.cwd(), 'app', 'server', 'api', 'tarkov');
 const TOP_LEVEL_API_DIR = join(process.cwd(), 'app', 'server', 'api');
 const llmsTxt = readFileSync(LLMS_TXT_PATH, 'utf8');
 const HYPERLINK_RE = /^- \[([^\]]+)\]\(([^)]+)\)(?::\s*(.*))?$/;
@@ -84,12 +82,12 @@ describe('public/llms.txt', () => {
       expect(localeLine, `locale "${locale}" missing from llms.txt`).toContain(`\`${locale}\``);
     }
   });
-  it('declares every API-supported language', () => {
-    const langLine = nonEmptyLines(llmsTxt).find((l) => l.includes('Supported `lang` values:'));
-    expect(langLine, 'missing API lang line').toBeDefined();
-    for (const lang of API_SUPPORTED_LANGUAGES) {
-      expect(langLine, `API lang "${lang}" missing from llms.txt`).toContain(`\`${lang}\``);
-    }
+  it('marks internal Tarkov routes as unsupported and points integrations elsewhere', () => {
+    const internalLine = nonEmptyLines(llmsTxt).find((l) => l.includes('`/api/tarkov/*`'));
+    expect(internalLine, 'missing internal Tarkov route note').toBeDefined();
+    expect(internalLine).toContain('not a supported integration API');
+    expect(internalLine).toContain('https://json.tarkov.dev/');
+    expect(internalLine).toContain('https://api.tarkovtracker.org/');
   });
   it('lists /profile among auth-required areas', () => {
     const authLine = nonEmptyLines(llmsTxt).find((l) =>
@@ -113,20 +111,25 @@ describe('public/llms.txt', () => {
       );
     }
   });
-  it('advertises every public API handler that exists on disk', () => {
-    const tarkovHandlers = getHandlers(TARKOV_API_DIR);
+  it('advertises every public top-level feed that exists on disk', () => {
     const topLevelHandlers = getHandlers(TOP_LEVEL_API_DIR);
     const sections = splitSections(llmsTxt);
-    const apiSection = sections.find((s) => s.heading === 'Public JSON APIs');
-    expect(apiSection, 'missing Public JSON APIs section').toBeDefined();
+    const feedSection = sections.find((s) => s.heading === 'Public JSON Feeds');
+    expect(feedSection, 'missing Public JSON Feeds section').toBeDefined();
     const advertised = new Set(
-      listItems(apiSection!).map((l) => parseLink(l)?.url.split('/').at(-1))
+      listItems(feedSection!).map((l) => parseLink(l)?.url.split('/').at(-1))
     );
-    for (const handler of tarkovHandlers) {
-      expect(advertised.has(handler), `tarkov handler "${handler}" not advertised`).toBe(true);
-    }
     for (const handler of topLevelHandlers) {
       expect(advertised.has(handler), `top-level handler "${handler}" not advertised`).toBe(true);
+    }
+  });
+  it('never links internal Tarkov data routes', () => {
+    for (const section of splitSections(llmsTxt)) {
+      for (const item of listItems(section)) {
+        expect(parseLink(item)?.url, `internal route advertised: ${item}`).not.toContain(
+          '/api/tarkov/'
+        );
+      }
     }
   });
 });
