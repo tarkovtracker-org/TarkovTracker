@@ -2180,9 +2180,11 @@ executable changes select full validation. Local input includes
 committed and dirty paths; CI input is the explicit revision diff. Renames contribute both paths.
 Pull requests receive the selected jobs; the classifier also reports `workflows` so workflow
 linting runs only for non-Markdown automation paths and unreadable diffs, and an independent
-`previewRequired` decision (`preview` output): only a change set made entirely of known
-documentation paths needs no deployable preview. Translations, configuration, dependencies,
-executable code, and unknown or unreadable paths require one, so translation-only pull requests
+`previewRequired` decision (`preview` output): only a change set that cannot reach the deployed
+Pages output needs no deployable preview — Markdown outside `public/`, `.github/`, `docs/`,
+`tests/`, repository tooling configuration, and `scripts/` apart from `scripts/preview/`.
+Translations, build configuration, dependencies, application code, `public/`, `shared/`,
+Supabase, Workers, and unknown or unreadable paths require one, so translation-only pull requests
 keep the reduced test selection but add the `validate` build job. The `security` job (reusable
 `.github/workflows/security.yml`: production dependency audit at the critical threshold, Gitleaks,
 CodeQL) is selected on every CI run. See
