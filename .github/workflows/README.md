@@ -172,8 +172,8 @@ introduce a new pinned SHA.
 
 Dependabot PRs always change manifests, so they receive full CI. `Main CI freshness` requires
 successful `CI Result` and `Preview Result` from GitHub Actions on an up-to-date branch, with no
-bypass actors. The preview controller reports success without deployment for verified documentation-only
-changes; preview-required changes stay pending until an explicit validated deployment passes.
+bypass actors. The preview controller reports success without deployment for verified change sets with no
+deployable paths; preview-required changes stay pending until an explicit validated deployment passes.
 Reduced CI runs can skip jobs by design without leaving a PR blocked on a missing context. External
 Codecov/Security gates remain unchanged; Codecov statuses default to success when no report exists.
 

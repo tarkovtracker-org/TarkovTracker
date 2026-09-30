@@ -14,6 +14,7 @@
       <div class="bg-surface-900 relative h-16 w-16 shrink-0 overflow-hidden rounded">
         <GameItem
           :src="groupedItem.item.image512pxLink || groupedItem.item.iconLink"
+          :item-id="groupedItem.item.id"
           :item-name="groupedItem.item.name"
           :wiki-link="groupedItem.item.wikiLink"
           :dev-link="groupedItem.item.link"

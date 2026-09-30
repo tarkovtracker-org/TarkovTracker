@@ -1,11 +1,7 @@
 import { usePreferencesStore } from '@/stores/usePreferences';
+import { toTrustedGameLinkUrl } from '@/utils/externalUrl';
 import { rewriteWikiUrl } from '@/utils/wikiLink';
-interface WikiLinkRewriter {
-  (url: string): string;
-  (url: string | undefined): string | undefined;
-  (url: string | null): string | null;
-  (url: string | null | undefined): string | null | undefined;
-}
+type WikiLinkRewriter = (url: string | null | undefined) => string | undefined;
 /**
  * Reactive wiki link helper. Wraps a raw wiki URL and rewrites fandom.com
  * links to the antifandom.com mirror when the user has enabled the preference.
@@ -14,15 +10,11 @@ interface WikiLinkRewriter {
 export function useWikiLink(): { toWikiUrl: WikiLinkRewriter } {
   const preferencesStore = usePreferencesStore();
   /**
-   * Rewrite a wiki URL to the antifandom.com mirror when the preference is on,
-   * preserving the nullability of the input for safe `:href` bindings.
+   * Rewrite a wiki URL to the antifandom.com mirror when the preference is on.
+   * Untrusted or malformed URLs return undefined so they never reach an `:href`.
    */
-  function toWikiUrl(url: string): string;
-  function toWikiUrl(url: string | undefined): string | undefined;
-  function toWikiUrl(url: string | null): string | null;
-  function toWikiUrl(url: string | null | undefined): string | null | undefined;
-  function toWikiUrl(url: string | null | undefined): string | null | undefined {
-    return rewriteWikiUrl(url, preferencesStore.getWikiUseAntifandom);
+  function toWikiUrl(url: string | null | undefined): string | undefined {
+    return rewriteWikiUrl(toTrustedGameLinkUrl(url), preferencesStore.getWikiUseAntifandom);
   }
   return { toWikiUrl };
 }
