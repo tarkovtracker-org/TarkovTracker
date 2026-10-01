@@ -1,12 +1,17 @@
 import { Unzip, UnzipInflate, UnzipPassThrough, type UnzipFile } from 'fflate';
 import {
+  createEftLogImportBudget,
+  type EftLogImportBudget,
+  type EftLogImportLimits,
+} from '@/utils/eftLogImportBudget';
+import {
   createEftLogFileParser,
   isEftImportLogFileName,
   type EftParsedLogFile,
 } from '@/utils/eftLogQuestParser';
 // ZIP input chunks are smaller because DEFLATE can expand one chunk by roughly 1,000 times.
 const RAW_CHUNK_BYTES = 256 * 1024;
-const ZIP_CHUNK_BYTES = 16 * 1024;
+const ZIP_CHUNK_BYTES = 1024;
 export class EftLogArchiveError extends Error {
   constructor() {
     super('Invalid or incomplete EFT log archive.');
@@ -19,6 +24,8 @@ export interface EftLogReadProgress {
 }
 interface ReadOptions {
   signal: AbortSignal;
+  /** Internal overrides for bounded regression fixtures; the UI uses automatic defaults. */
+  limits?: Partial<EftLogImportLimits>;
   onProgress: (progress: EftLogReadProgress) => void;
 }
 /** Reads bounded slices with backpressure instead of loading a complete file into memory. */
@@ -39,11 +46,13 @@ async function readChunks(
   }
 }
 /** Decodes split UTF-8 sequences and releases text after each parser batch. */
-function createLogDecoder(name: string) {
+function createLogDecoder(name: string, budget: EftLogImportBudget, signal: AbortSignal) {
   const decoder = new TextDecoder();
-  const parser = createEftLogFileParser(name);
+  const parser = createEftLogFileParser(name, budget);
   return {
     push(chunk: Uint8Array, final: boolean): void {
+      signal.throwIfAborted();
+      budget.charge('expandedBytes', chunk.byteLength);
       parser.push(decoder.decode(chunk, { stream: !final }));
     },
     finish: parser.finish,
@@ -65,8 +74,13 @@ function checkZipEntrySize(entry: UnzipFile, bytesRead: number): void {
   }
 }
 /** Streams one supported archive entry into parsed evidence, checking its actual decoded size. */
-function startZipLog(entry: UnzipFile, finish: (file: EftParsedLogFile) => void): void {
-  const decoder = createLogDecoder(entry.name);
+function startZipLog(
+  entry: UnzipFile,
+  finish: (file: EftParsedLogFile) => void,
+  budget: EftLogImportBudget,
+  signal: AbortSignal
+): void {
+  const decoder = createLogDecoder(entry.name, budget, signal);
   let bytesRead = 0;
   entry.ondata = (error, chunk, final) => {
     if (error) throw error;
@@ -94,15 +108,16 @@ async function checkZipEnd(file: File, signal: AbortSignal): Promise<void> {
 async function readZip(
   file: File,
   onChunk: (bytes: number) => void,
-  signal: AbortSignal
+  signal: AbortSignal,
+  budget: EftLogImportBudget
 ): Promise<{ files: EftParsedLogFile[]; scanned: number }> {
   await checkZipEnd(file, signal);
   const files: EftParsedLogFile[] = [];
   let scanned = 0;
-  const finish = (source: EftParsedLogFile) => {
-    files.push(source);
-  };
+  const active = new Set<UnzipFile>();
   const unzip = new Unzip((entry) => {
+    signal.throwIfAborted();
+    budget.entry(entry.name);
     scanned++;
     if (!isEftImportLogFileName(entry.name)) {
       discardZipEntry(unzip, entry);
@@ -112,28 +127,43 @@ async function readZip(
     // resolves the decoder from that registry inside entry.start(), so restore both first.
     unzip.register(UnzipInflate);
     unzip.register(UnzipPassThrough);
-    startZipLog(entry, finish);
+    active.add(entry);
+    startZipLog(
+      entry,
+      (source) => {
+        active.delete(entry);
+        files.push(source);
+      },
+      budget,
+      signal
+    );
   });
-  await readChunks(
-    file,
-    ZIP_CHUNK_BYTES,
-    (chunk, final) => unzip.push(chunk, final),
-    onChunk,
-    signal
-  );
+  try {
+    await readChunks(
+      file,
+      ZIP_CHUNK_BYTES,
+      (chunk, final) => unzip.push(chunk, final),
+      onChunk,
+      signal
+    );
+  } finally {
+    for (const entry of active) entry.terminate();
+    active.clear();
+  }
   return { files, scanned };
 }
 /** Reads a raw log through the same incremental UTF-8/record parser as archive entries. */
 async function readRaw(
   file: File,
   onChunk: (bytes: number) => void,
-  signal: AbortSignal
+  signal: AbortSignal,
+  budget: EftLogImportBudget
 ): Promise<EftParsedLogFile> {
-  const decoder = createLogDecoder(file.webkitRelativePath || file.name);
+  const decoder = createLogDecoder(file.webkitRelativePath || file.name, budget, signal);
   await readChunks(file, RAW_CHUNK_BYTES, decoder.push, onChunk, signal);
   return decoder.finish();
 }
-/** Identifies supported sources without imposing a file-count, file-size, or aggregate-byte cap. */
+/** Identifies supported sources before reading their contents. */
 function isSupportedSource(file: File): boolean {
   return (
     file.name.toLowerCase().endsWith('.zip') ||
@@ -142,7 +172,11 @@ function isSupportedSource(file: File): boolean {
 }
 /** Processes sources sequentially, retaining parsed evidence instead of complete log text. */
 export async function readEftLogSources(files: File[], options: ReadOptions) {
+  options.signal.throwIfAborted();
+  const budget = createEftLogImportBudget(options.limits);
+  for (const file of files) budget.entry(file.webkitRelativePath || file.name);
   const selected = files.filter(isSupportedSource);
+  for (const file of selected) budget.charge('inputBytes', file.size);
   const totalBytes = selected.reduce((total, file) => total + file.size, 0);
   let bytesRead = 0;
   let scanned = files.length - selected.length;
@@ -155,13 +189,14 @@ export async function readEftLogSources(files: File[], options: ReadOptions) {
   for (const file of selected) {
     options.signal.throwIfAborted();
     if (file.name.toLowerCase().endsWith('.zip')) {
-      const archive = await readZip(file, onChunk, options.signal);
+      const archive = await readZip(file, onChunk, options.signal, budget);
       scanned += archive.scanned;
       for (const source of archive.files) sources.push(source);
     } else {
-      sources.push(await readRaw(file, onChunk, options.signal));
+      sources.push(await readRaw(file, onChunk, options.signal, budget));
       scanned++;
     }
   }
+  options.signal.throwIfAborted();
   return { sources, scanned };
 }
