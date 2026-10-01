@@ -12,6 +12,7 @@ import {
   progressStorageSerializer,
   setActiveProgressWritesBlocked,
 } from '@/stores/tarkov/localStorage';
+import { isAcknowledgedMetadataEcho } from '@/stores/tarkov/metadataEchoes';
 import {
   coerceGameMode,
   hasRetainableModeProgress,
@@ -433,12 +434,11 @@ async function runSetupRealtimeListener(
   logger.debug('[TarkovStore] Setting up realtime listener for multi-device sync');
   const handleProgressChange = (
     payload: { new: unknown; old: unknown },
-    reconcile = captureRemoteMerge()
+    reconcile?: RemoteStateMerge
   ) => {
     if (!isCurrentRealtimeUser()) return;
     const remoteData = payload.new as LegacyProgressMetadata;
     const updateTime = parseRealtimeUpdateTime(remoteData.updated_at);
-    if (!acceptLegacyMetadataUpdate(updateTime)) return;
     const localState = sanitizeOwnedUserState(tarkovStore.$state);
     const remoteState = buildLegacyMetadataState(remoteData, localState);
     const remoteMetadata = {
@@ -446,7 +446,11 @@ async function runSetupRealtimeListener(
       gameEdition: remoteState.gameEdition,
       tarkovUid: remoteState.tarkovUid,
     };
-    const metadata = reconcile(remoteMetadata);
+    // Retired writes can arrive after HTTP has advanced the controller's baseline. Ignore their
+    // exact metadata tuples before capture/reconciliation, freshness persistence, or store effects.
+    if (isAcknowledgedMetadataEcho(remoteData.metadata_write_id, remoteMetadata)) return;
+    if (!acceptLegacyMetadataUpdate(updateTime)) return;
+    const metadata = (reconcile ?? captureRemoteMerge())(remoteMetadata);
     const nextState = { ...localState, ...metadata } as UserState;
     progressStorageSerializer.acceptRemote({
       state: localState,

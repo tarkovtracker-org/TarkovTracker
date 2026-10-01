@@ -13,6 +13,7 @@ import {
   clearActiveProgressStorage,
   setActiveProgressWritesBlocked,
   progressPersistStorage,
+  progressStorageSerializer,
 } from '@/stores/tarkov/localStorage';
 import { syncProgressState, type ProgressRpcClient } from '@/stores/tarkov/progressPersistence';
 import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
@@ -551,6 +552,136 @@ const expectNoFollowOnSessionActivity = (
   expect(after.userFilters).toEqual(baseline.userFilters);
 };
 describe('useTarkov sync integration', () => {
+  it.each([
+    { scenario: 'foreign-transaction', reset: false, owner: 'user-1', edition: 1, marker: '999' },
+    { scenario: 'changed-value', reset: false, owner: 'user-1', edition: 2, marker: '100' },
+    { scenario: 'session-reset', reset: true, owner: 'user-1', edition: 1, marker: '100' },
+    { scenario: 'new-owner', reset: true, owner: 'user-2', edition: 1, marker: '100' },
+  ])(
+    'applies unrecognized metadata with the real controller: $scenario',
+    async ({ reset, owner, edition, marker }) => {
+      const actual = await vi.importActual<typeof import('@/composables/supabase/useSupabaseSync')>(
+        '@/composables/supabase/useSupabaseSync'
+      );
+      useSupabaseSyncMock.mockImplementation(
+        (options) =>
+          actual.useSupabaseSync(
+            options as Parameters<typeof actual.useSupabaseSync>[0]
+          ) as unknown as ReturnType<typeof useSupabaseSyncMock>
+      );
+      single.mockResolvedValue({ data: createRemoteRow({ tarkov_uid: 7 }), error: null });
+      await initializeTarkovSync();
+      const store = useTarkovStore();
+      rpc.mockResolvedValue({
+        data: { tarkov_uid: 1001, metadata_write_id: '100', tarkov_uid_conflict: false },
+        error: null,
+      });
+      store.setTarkovUid(1001);
+      store.pvp.level = 2;
+      await nextTick();
+      const controller = useSupabaseSyncMock.mock.results.at(-1)?.value as ReturnType<
+        typeof actual.useSupabaseSync
+      >;
+      expect(await controller.syncToSupabase()).not.toBeNull();
+      expect(controller.hasPendingChanges?.()).toBe(false);
+      if (reset) {
+        resetTarkovSync();
+        supabaseContext.user.id = owner;
+        single.mockResolvedValue({
+          data: createRemoteRow({
+            user_id: owner,
+            tarkov_uid: 1001,
+            pvp_data: { ...store.pvp, level: 2 },
+          }),
+          error: null,
+        });
+        rpc.mockResolvedValue({
+          data: { tarkov_uid: 1001, metadata_write_id: '200', tarkov_uid_conflict: false },
+          error: null,
+        });
+        await initializeTarkovSync();
+      }
+      getRealtimeCallback()?.({
+        new: {
+          ...createRemoteRow({
+            user_id: owner,
+            tarkov_uid: 7,
+            game_edition: edition,
+            updated_at: new Date(Date.now() + 1000).toISOString(),
+          }),
+          metadata_write_id: marker,
+        },
+        old: null,
+      });
+      expect(store.tarkovUid).toBe(7);
+      controller.cleanup();
+    }
+  );
+  it.each([false, true])(
+    'keeps acknowledged metadata through delayed WAL with the real controller: queued=%s',
+    async (queued) => {
+      const actual = await vi.importActual<typeof import('@/composables/supabase/useSupabaseSync')>(
+        '@/composables/supabase/useSupabaseSync'
+      );
+      useSupabaseSyncMock.mockImplementation(
+        (options) =>
+          actual.useSupabaseSync(
+            options as Parameters<typeof actual.useSupabaseSync>[0]
+          ) as unknown as ReturnType<typeof useSupabaseSyncMock>
+      );
+      single.mockResolvedValue({ data: createRemoteRow({ tarkov_uid: 7 }), error: null });
+      await initializeTarkovSync();
+      const store = useTarkovStore();
+      const controller = useSupabaseSyncMock.mock.results.at(-1)?.value as ReturnType<
+        typeof actual.useSupabaseSync
+      >;
+      const firstStarted = Promise.withResolvers<undefined>();
+      const firstReply = Promise.withResolvers<{ data: unknown; error: null }>();
+      rpc.mockImplementationOnce(async () => {
+        firstStarted.resolve(undefined);
+        return firstReply.promise;
+      });
+      store.setTarkovUid(1001);
+      store.pvp.level = 2;
+      await nextTick();
+      const firstSave = controller.syncToSupabase();
+      await firstStarted.promise;
+      let secondSave: ReturnType<typeof controller.syncToSupabase> | undefined;
+      if (queued) {
+        rpc.mockResolvedValue({
+          data: { tarkov_uid: 2002, metadata_write_id: '200', tarkov_uid_conflict: false },
+          error: null,
+        });
+        store.setTarkovUid(2002);
+        await nextTick();
+        secondSave = controller.syncToSupabase();
+      }
+      firstReply.resolve({
+        data: { tarkov_uid: 1001, metadata_write_id: '100', tarkov_uid_conflict: false },
+        error: null,
+      });
+      expect(await Promise.all([firstSave, secondSave])).not.toContain(null);
+      const expectedUid = queued ? 2002 : 1001;
+      const capture = vi.spyOn(controller, 'captureRemoteMerge');
+      const patches = vi.spyOn(store, '$patch');
+      const serializer = vi.spyOn(progressStorageSerializer, 'acceptRemote');
+      for (const uid of [7, 1001]) {
+        getRealtimeCallback()?.({
+          new: {
+            ...createRemoteRow({ tarkov_uid: uid, updated_at: new Date().toISOString() }),
+            metadata_write_id: '100',
+          },
+          old: null,
+        });
+        expect(store.tarkovUid).toBe(expectedUid);
+      }
+      expect(capture).not.toHaveBeenCalled();
+      expect(patches).not.toHaveBeenCalled();
+      expect(serializer).not.toHaveBeenCalled();
+      expect(controller.hasPendingChanges?.()).toBe(false);
+      controller.cleanup();
+    }
+  );
   it('keeps a queued UID visible through delayed metadata from the completed relink', async () => {
     single.mockResolvedValue({ data: createRemoteRow({ tarkov_uid: 7 }), error: null });
     await initializeTarkovSync();
