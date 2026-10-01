@@ -187,12 +187,18 @@ Teams, save status and recovery, and progress imports build on this storage; see
 - Task-completion sanitizers and timestamp merges preserve explicit `active: true` and
   `active: false` without manufacturing the property on legacy incomplete entries. No migration or
   bulk rewrite backfills ambiguous rows.
+- Full-mode saves from older clients retain an existing acceptance flag when their nonterminal
+  task entry omits `active` and has the same timestamp. Older legacy entries retain the newer
+  stored task status and timestamp. Newer legacy status writes and
+  progress reset epochs keep their precedence; legacy-only entries remain unknown.
 - Seasonal PvP has no prestige. `archive_prestige_run_and_reset_progress` rejects any mode outside
   `pvp`/`pve`, `user_prestige_runs` keeps its `mode IN ('pvp','pve')` constraint, and no Seasonal
   progress is written through a prestige.
 - Tarkov.dev profile imports can target Seasonal through the verified `pvp-season` source. EFT-log
   imports can target Seasonal using the verified notification formats and active-season guards
   specified in [EFT log import](./imports.md#eft-log-import); unresolved-mode events require an explicit destination choice.
+- Task acceptance records the manual activity action `active`; the database entry sanitizer
+  preserves it through sync so acceptance history survives reloads and other devices.
 - Manual activity-log entries live in the selected mode's progress blob as `manualActivityHistory`,
   next to `apiUpdateHistory`, and never in a standalone browser store. They share the progress
   lifecycle: the client and persisted sanitizers accept them, `mergeProgressData` unions them by
