@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(10);
+SELECT plan(15);
 
 SELECT is(
   public.sanitize_user_progress_mode_data(
@@ -92,6 +92,102 @@ SELECT is(
   ),
   '{"max": {"requirements": "", "timestamp": 32503680000000}}'::jsonb,
   'rejects clocks after the client ceiling, leaving successors persistable'
+);
+
+SELECT is(
+  public.merge_task_availability(
+    NULL,
+    jsonb_build_object(
+      'ok', jsonb_build_object('requirements', repeat('r', 4096), 'timestamp', 1),
+      'long', jsonb_build_object('requirements', repeat('r', 4097), 'timestamp', 1),
+      repeat('k', 64), jsonb_build_object('requirements', '', 'timestamp', 1),
+      repeat('k', 65), jsonb_build_object('requirements', '', 'timestamp', 1)
+    )
+  ) ?& ARRAY['ok', repeat('k', 64)]
+  AND NOT public.merge_task_availability(
+    NULL,
+    jsonb_build_object(
+      'long', jsonb_build_object('requirements', repeat('r', 4097), 'timestamp', 1),
+      repeat('k', 65), jsonb_build_object('requirements', '', 'timestamp', 1)
+    )
+  ) ?| ARRAY['long', repeat('k', 65)],
+  true,
+  'drops over-long task ids and requirements'
+);
+
+SELECT is(
+  (
+    SELECT count(*)
+    FROM jsonb_object_keys(
+      public.merge_task_availability(
+        (
+          SELECT jsonb_object_agg('s' || n, jsonb_build_object('requirements', 'sig', 'timestamp', n))
+          FROM generate_series(1, 700) AS n
+        ),
+        (
+          SELECT jsonb_object_agg('i' || n, jsonb_build_object('requirements', 'sig', 'timestamp', 1000 + n))
+          FROM generate_series(1, 700) AS n
+        )
+      )
+    )
+  ),
+  1000::bigint,
+  'caps the merged map at 1000 entries'
+);
+
+SELECT is(
+  public.merge_task_availability(
+    (
+      SELECT jsonb_object_agg('s' || n, jsonb_build_object('requirements', 'sig', 'timestamp', n))
+      FROM generate_series(1, 700) AS n
+    ),
+    (
+      SELECT jsonb_object_agg('i' || n, jsonb_build_object('requirements', 'sig', 'timestamp', 1000 + n))
+      FROM generate_series(1, 700) AS n
+    )
+  ) ?& ARRAY['i1', 's401'] AND NOT public.merge_task_availability(
+    (
+      SELECT jsonb_object_agg('s' || n, jsonb_build_object('requirements', 'sig', 'timestamp', n))
+      FROM generate_series(1, 700) AS n
+    ),
+    (
+      SELECT jsonb_object_agg('i' || n, jsonb_build_object('requirements', 'sig', 'timestamp', 1000 + n))
+      FROM generate_series(1, 700) AS n
+    )
+  ) ? 's400',
+  true,
+  'keeps the newest confirmations when trimming'
+);
+
+SELECT is(
+  (
+    SELECT sum(octet_length(entry.key) + octet_length(entry.value->>'requirements'))
+    FROM jsonb_each(
+      public.merge_manual_activity_progress(
+        jsonb_build_object('taskAvailability', (
+          SELECT jsonb_object_agg('s' || n, jsonb_build_object('requirements', repeat('r', 4000), 'timestamp', n))
+          FROM generate_series(1, 60) AS n
+        )),
+        jsonb_build_object('taskAvailability', (
+          SELECT jsonb_object_agg('i' || n, jsonb_build_object('requirements', repeat('r', 4000), 'timestamp', 100 + n))
+          FROM generate_series(1, 60) AS n
+        ))
+      )->'taskAvailability'
+    ) AS entry
+  ) <= 262144,
+  true,
+  'bounds the merged map size across same-epoch writes'
+);
+
+SELECT ok(
+  public.merge_manual_activity_progress(
+    jsonb_build_object('taskAvailability', (
+      SELECT jsonb_object_agg('s' || n, jsonb_build_object('requirements', repeat('r', 4000), 'timestamp', n))
+      FROM generate_series(1, 60) AS n
+    )),
+    '{"taskAvailability": {"new": {"requirements": "sig", "timestamp": 1000}}}'
+  )->'taskAvailability' ? 'new',
+  'a new confirmation evicts the oldest once the map is full'
 );
 
 SELECT * FROM finish();

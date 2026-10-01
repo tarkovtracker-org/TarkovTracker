@@ -99,4 +99,35 @@ describe('task availability confirmations', () => {
       )
     ).toBe(false);
   });
+  it('drops over-long task ids and requirement strings', () => {
+    const emoji = '\uD83D\uDE00';
+    expect(
+      Object.keys(
+        sanitizeTaskAvailabilityMap({
+          ok: { requirements: emoji.repeat(4096), timestamp: 1 },
+          long: { requirements: 'r'.repeat(4097), timestamp: 1 },
+          ['k'.repeat(64)]: { requirements: '', timestamp: 1 },
+          ['k'.repeat(65)]: { requirements: '', timestamp: 1 },
+        })
+      ).sort()
+    ).toEqual(['k'.repeat(64), 'ok']);
+  });
+  it('keeps only the newest confirmations within the entry and byte budget', () => {
+    const entries = (prefix: string, count: number, start: number, requirements = 'sig') =>
+      Object.fromEntries(
+        Array.from({ length: count }, (_, i) => [
+          `${prefix}${i}`,
+          { requirements, timestamp: start + i },
+        ])
+      );
+    const merged = mergeTaskAvailability(entries('s', 700, 0), entries('i', 700, 1000));
+    expect(Object.keys(merged)).toHaveLength(1000);
+    expect(merged).toHaveProperty('i0');
+    expect(merged).toHaveProperty('s400');
+    expect(merged).not.toHaveProperty('s399');
+    const large = sanitizeTaskAvailabilityMap(entries('x', 100, 0, 'r'.repeat(4000)));
+    expect(Object.keys(large)).toHaveLength(65);
+    expect(large).toHaveProperty('x99');
+    expect(large).not.toHaveProperty('x34');
+  });
 });

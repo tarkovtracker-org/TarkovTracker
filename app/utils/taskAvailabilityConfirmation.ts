@@ -20,23 +20,50 @@ const toTimestamp = (value: unknown): number | undefined =>
   value <= MAX_CONFIRMATION_TIMESTAMP
     ? Math.trunc(value)
     : undefined;
+/** Map bounds shared with `merge_task_availability` (migration 20261001190000). */
+const MAX_TASK_ID_LENGTH = 64;
+const MAX_REQUIREMENTS_LENGTH = 4096;
+const MAX_CONFIRMATIONS = 1000;
+const MAX_CONFIRMATION_BYTES = 262_144;
+const encoder = new TextEncoder();
+/** Code-point length above `max`, as PostgreSQL `char_length` counts, without spreading huge strings. */
+const exceedsLength = (value: string, max: number): boolean =>
+  value.length > max && (value.length > 2 * max || [...value].length > max);
 /** PostgreSQL `jsonb` rejects lone surrogates, so such a string could block every later sync. */
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 const sanitizeConfirmation = (value: unknown): TaskAvailabilityConfirmation | undefined => {
   if (!isRecord(value) || typeof value.requirements !== 'string') return undefined;
+  if (exceedsLength(value.requirements, MAX_REQUIREMENTS_LENGTH)) return undefined;
   if (LONE_SURROGATE.test(value.requirements)) return undefined;
   const timestamp = toTimestamp(value.timestamp);
   return timestamp === undefined ? undefined : { requirements: value.requirements, timestamp };
 };
+const isValidTaskId = (taskId: string): boolean =>
+  taskId.length > 0 && !exceedsLength(taskId, MAX_TASK_ID_LENGTH) && !LONE_SURROGATE.test(taskId);
+const newestFirst = (
+  [leftId, left]: [string, TaskAvailabilityConfirmation],
+  [rightId, right]: [string, TaskAvailabilityConfirmation]
+): number => right.timestamp - left.timestamp || (leftId < rightId ? -1 : Number(leftId > rightId));
+/** Keeps the newest entries within the entry and byte budget, like the database merge. */
+const boundConfirmations = (entries: [string, TaskAvailabilityConfirmation][]): ConfirmationMap => {
+  const bounded: ConfirmationMap = {};
+  let bytes = 0;
+  for (const [taskId, confirmation] of entries.sort(newestFirst).slice(0, MAX_CONFIRMATIONS)) {
+    bytes += encoder.encode(taskId).length + encoder.encode(confirmation.requirements).length;
+    if (bytes > MAX_CONFIRMATION_BYTES) break;
+    bounded[taskId] = confirmation;
+  }
+  return bounded;
+};
 /** Drops malformed entries; a clear (empty `requirements`) is kept as a merge tombstone. */
 export const sanitizeTaskAvailabilityMap = (value: unknown): ConfirmationMap => {
   if (!isRecord(value)) return {};
-  const sanitized: ConfirmationMap = {};
+  const entries: [string, TaskAvailabilityConfirmation][] = [];
   for (const [taskId, entry] of Object.entries(value)) {
     const confirmation = sanitizeConfirmation(entry);
-    if (taskId && !LONE_SURROGATE.test(taskId) && confirmation) sanitized[taskId] = confirmation;
+    if (confirmation && isValidTaskId(taskId)) entries.push([taskId, confirmation]);
   }
-  return sanitized;
+  return boundConfirmations(entries);
 };
 const newerConfirmation = (
   local: TaskAvailabilityConfirmation | undefined,
@@ -52,12 +79,12 @@ export const mergeTaskAvailability = (
 ): ConfirmationMap => {
   const safeLocal = sanitizeTaskAvailabilityMap(local);
   const safeRemote = sanitizeTaskAvailabilityMap(remote);
-  const merged: ConfirmationMap = {};
+  const merged: [string, TaskAvailabilityConfirmation][] = [];
   for (const taskId of new Set([...Object.keys(safeLocal), ...Object.keys(safeRemote)])) {
     const winner = newerConfirmation(safeLocal[taskId], safeRemote[taskId]);
-    if (winner) merged[taskId] = { ...winner };
+    if (winner) merged.push([taskId, { ...winner }]);
   }
-  return merged;
+  return boundConfirmations(merged);
 };
 /**
  * Status clocks are not capped, so any finite value counts as-is: an out-of-range status clock is
