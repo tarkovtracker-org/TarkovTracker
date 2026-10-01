@@ -49,13 +49,21 @@ event count, so the separate evidence ceilings deliberately reject unusually den
 rather than allow unlimited objects/strings. Splitting such histories into recent-session imports
 is the practical tradeoff. No per-log 32 MiB cap is restored.
 
-ZIP input slices are 1 KiB to keep the unavoidable synchronous DEFLATE allocation before an
-output callback around a MiB rather than tens of MiB. Expanded-byte and evidence checks stop
-further decoding, parsing, and retention on that callback; they cannot preempt fflate inside a
-slice. Ignored entries are never inflated. Selected input bytes and entry counts also bound work
-on archives dominated by irrelevant members. The existing unfinished-record ceiling remains a
-separate guard. Cancellation/error paths terminate active members and discard local evidence.
-Tests use small generated fixtures and internal lowered budgets, never crash/OOM payloads.
+ZIP compressed inflation slices are 1 KiB to keep the unavoidable synchronous DEFLATE allocation
+before an output callback around a MiB rather than tens of MiB. Filesystem reads and progress
+updates use 256 KiB chunks independently; actual expanded output is charged before entering a
+reusable 256 KiB decoding/parser buffer. This avoids rescanning/copying an unfinished record for
+every small compressed slice. The buffer is released at member completion. Inflation yields to
+UI work after a slice whenever expanded work reaches 256 KiB, and checks cancellation before
+each slice; a single inflation burst can exceed that yield threshold. The existing 8 Mi-character
+unfinished-record ceiling remains a separate guard.
+
+Budget checks cannot preempt fflate inside a slice. Ignored entries are never inflated. Selected
+input bytes and entry counts also bound work on archives dominated by irrelevant members.
+Cancellation/error paths terminate active members and discard local evidence. Tests use small
+generated fixtures and internal lowered budgets, never crash/OOM payloads. Instrumented stored-ZIP
+fixtures count boundary-search characters and filesystem/progress calls independently of timing;
+compressed fixtures verify the 1 KiB inflation and 256 KiB decoded-batch bounds.
 
 ## Refreshing the docs
 

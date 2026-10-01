@@ -11,7 +11,7 @@ import {
 } from '@/utils/eftLogQuestParser';
 // ZIP input chunks are smaller because DEFLATE can expand one chunk by roughly 1,000 times.
 const RAW_CHUNK_BYTES = 256 * 1024;
-const ZIP_CHUNK_BYTES = 1024;
+const ZIP_INFLATE_BYTES = 1024;
 export class EftLogArchiveError extends Error {
   constructor() {
     super('Invalid or incomplete EFT log archive.');
@@ -32,7 +32,7 @@ interface ReadOptions {
 async function readChunks(
   file: File,
   chunkSize: number,
-  consume: (chunk: Uint8Array, final: boolean) => void,
+  consume: (chunk: Uint8Array, final: boolean) => void | Promise<void>,
   onChunk: (bytes: number) => void,
   signal: AbortSignal
 ): Promise<void> {
@@ -41,21 +41,43 @@ async function readChunks(
     const end = Math.min(offset + chunkSize, file.size);
     const chunk = new Uint8Array(await file.slice(offset, end).arrayBuffer());
     signal.throwIfAborted();
-    consume(chunk, end === file.size);
+    await consume(chunk, end === file.size);
     onChunk(chunk.byteLength);
   }
 }
-/** Decodes split UTF-8 sequences and releases text after each parser batch. */
+/** Batches small inflation outputs so the record reader cannot rescan a large pending record per KiB. */
 function createLogDecoder(name: string, budget: EftLogImportBudget, signal: AbortSignal) {
   const decoder = new TextDecoder();
   const parser = createEftLogFileParser(name, budget);
+  let pending: Uint8Array<ArrayBuffer> | null = null;
+  let buffered = 0;
+  const flush = (final: boolean): void => {
+    signal.throwIfAborted();
+    parser.push(decoder.decode(pending?.subarray(0, buffered), { stream: !final }));
+    buffered = 0;
+    if (final) pending = null;
+  };
+  const append = (chunk: Uint8Array): void => {
+    pending ??= new Uint8Array(RAW_CHUNK_BYTES);
+    for (let offset = 0; offset < chunk.byteLength;) {
+      const length = Math.min(RAW_CHUNK_BYTES - buffered, chunk.byteLength - offset);
+      pending.set(chunk.subarray(offset, offset + length), buffered);
+      buffered += length;
+      offset += length;
+      if (buffered === RAW_CHUNK_BYTES) flush(false);
+    }
+  };
   return {
     push(chunk: Uint8Array, final: boolean): void {
       signal.throwIfAborted();
       budget.charge('expandedBytes', chunk.byteLength);
-      parser.push(decoder.decode(chunk, { stream: !final }));
+      if (chunk.byteLength) append(chunk);
+      if (final) flush(true);
     },
-    finish: parser.finish,
+    finish(): EftParsedLogFile {
+      signal.throwIfAborted();
+      return parser.finish();
+    },
   };
 }
 /** Consumes ignored ZIP entries without inflation or fflate's deferred-entry buffering. */
@@ -78,7 +100,8 @@ function startZipLog(
   entry: UnzipFile,
   finish: (file: EftParsedLogFile) => void,
   budget: EftLogImportBudget,
-  signal: AbortSignal
+  signal: AbortSignal,
+  onExpanded: (bytes: number) => void
 ): void {
   const decoder = createLogDecoder(entry.name, budget, signal);
   let bytesRead = 0;
@@ -86,6 +109,7 @@ function startZipLog(
     if (error) throw error;
     bytesRead += chunk.byteLength;
     decoder.push(chunk, final);
+    onExpanded(chunk.byteLength);
     if (!final) return;
     checkZipEntrySize(entry, bytesRead);
     finish(decoder.finish());
@@ -115,6 +139,7 @@ async function readZip(
   const files: EftParsedLogFile[] = [];
   let scanned = 0;
   const active = new Set<UnzipFile>();
+  let expandedSinceYield = 0;
   const unzip = new Unzip((entry) => {
     signal.throwIfAborted();
     budget.entry(entry.name);
@@ -135,17 +160,25 @@ async function readZip(
         files.push(source);
       },
       budget,
-      signal
+      signal,
+      (bytes) => {
+        expandedSinceYield += bytes;
+      }
     );
   });
+  const inflate = async (chunk: Uint8Array, final: boolean): Promise<void> => {
+    for (let offset = 0; offset < chunk.byteLength; offset += ZIP_INFLATE_BYTES) {
+      signal.throwIfAborted();
+      const end = Math.min(offset + ZIP_INFLATE_BYTES, chunk.byteLength);
+      unzip.push(chunk.subarray(offset, end), final && end === chunk.byteLength);
+      if (expandedSinceYield < RAW_CHUNK_BYTES) continue;
+      expandedSinceYield = 0;
+      // Let UI cancellation run after bounded expanded work, even for very compressible input.
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
+  };
   try {
-    await readChunks(
-      file,
-      ZIP_CHUNK_BYTES,
-      (chunk, final) => unzip.push(chunk, final),
-      onChunk,
-      signal
-    );
+    await readChunks(file, RAW_CHUNK_BYTES, inflate, onChunk, signal);
   } finally {
     for (const entry of active) entry.terminate();
     active.clear();
