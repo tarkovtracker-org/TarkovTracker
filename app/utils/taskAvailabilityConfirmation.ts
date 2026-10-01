@@ -55,16 +55,19 @@ const boundConfirmations = (entries: [string, TaskAvailabilityConfirmation][]): 
   }
   return bounded;
 };
-/** Drops malformed entries; a clear (empty `requirements`) is kept as a merge tombstone. */
-export const sanitizeTaskAvailabilityMap = (value: unknown): ConfirmationMap => {
-  if (!isRecord(value)) return {};
+/** Validates candidates without evicting a possible per-task merge winner. */
+const validatedConfirmations = (value: unknown): [string, TaskAvailabilityConfirmation][] => {
+  if (!isRecord(value)) return [];
   const entries: [string, TaskAvailabilityConfirmation][] = [];
   for (const [taskId, entry] of Object.entries(value)) {
     const confirmation = sanitizeConfirmation(entry);
     if (confirmation && isValidTaskId(taskId)) entries.push([taskId, confirmation]);
   }
-  return boundConfirmations(entries);
+  return entries;
 };
+/** Drops malformed entries; a clear (empty `requirements`) is kept as a merge tombstone. */
+export const sanitizeTaskAvailabilityMap = (value: unknown): ConfirmationMap =>
+  boundConfirmations(validatedConfirmations(value));
 const newerConfirmation = (
   local: TaskAvailabilityConfirmation | undefined,
   remote: TaskAvailabilityConfirmation | undefined
@@ -77,8 +80,8 @@ export const mergeTaskAvailability = (
   local: UserProgressData['taskAvailability'],
   remote: UserProgressData['taskAvailability']
 ): ConfirmationMap => {
-  const safeLocal = sanitizeTaskAvailabilityMap(local);
-  const safeRemote = sanitizeTaskAvailabilityMap(remote);
+  const safeLocal = Object.fromEntries(validatedConfirmations(local));
+  const safeRemote = Object.fromEntries(validatedConfirmations(remote));
   const merged: [string, TaskAvailabilityConfirmation][] = [];
   for (const taskId of new Set([...Object.keys(safeLocal), ...Object.keys(safeRemote)])) {
     const winner = newerConfirmation(safeLocal[taskId], safeRemote[taskId]);

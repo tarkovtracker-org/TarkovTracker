@@ -8,6 +8,65 @@ import {
   sanitizeTaskAvailabilityMap,
 } from '@/utils/taskAvailabilityConfirmation';
 describe('task availability confirmations', () => {
+  it('selects duplicate winners before byte eviction, without resurrecting older values', () => {
+    const remote = Object.fromEntries(
+      Array.from({ length: 66 }, (_, i) => [
+        `s${i + 1}`,
+        { requirements: 'r'.repeat(4000), timestamp: i + 1 },
+      ])
+    );
+    const local = { s1: { requirements: 'old', timestamp: 0 } };
+    const expected = sanitizeTaskAvailabilityMap(remote);
+    expect(expected).not.toHaveProperty('s1');
+    expect(Object.keys(expected)).toHaveLength(65);
+    expect(mergeTaskAvailability(local, remote)).toEqual(expected);
+    expect(mergeTaskAvailability(remote, local)).toEqual(expected);
+    expect(mergeTaskAvailability(expected, remote)).toEqual(expected);
+    expect(mergeTaskAvailability(remote, remote)).toEqual(expected);
+  });
+  it('applies remote tie precedence before byte eviction, including clear tombstones', () => {
+    const oversized = Object.fromEntries(
+      Array.from({ length: 66 }, (_, i) => [
+        `s${i + 1}`,
+        { requirements: 'r'.repeat(4000), timestamp: i + 1 },
+      ])
+    );
+    const clear = { s1: { requirements: '', timestamp: 1 } };
+    expect(mergeTaskAvailability(clear, oversized)).not.toHaveProperty('s1');
+    const cleared = mergeTaskAvailability(oversized, clear);
+    expect(cleared.s1).toEqual(clear.s1);
+    expect(Object.keys(cleared)).toHaveLength(66);
+    expect(mergeTaskAvailability(cleared, cleared)).toEqual(cleared);
+  });
+  it('bounds count after duplicate winners and orders equal clocks by task id', () => {
+    const remote = Object.fromEntries(
+      Array.from({ length: 1001 }, (_, i) => [
+        `t${String(i).padStart(4, '0')}`,
+        { requirements: 'remote', timestamp: 1 },
+      ])
+    );
+    const local = { t1000: { requirements: 'old', timestamp: 0 } };
+    const expected = sanitizeTaskAvailabilityMap(remote);
+    expect(Object.keys(expected)).toHaveLength(1000);
+    expect(expected).toHaveProperty('t0999');
+    expect(expected).not.toHaveProperty('t1000');
+    expect(mergeTaskAvailability(local, remote)).toEqual(expected);
+    expect(mergeTaskAvailability(remote, local)).toEqual(expected);
+    expect(mergeTaskAvailability(remote, remote)).toEqual(expected);
+  });
+  it('uses task id order for equal clocks at the byte boundary', () => {
+    const input = Object.fromEntries(
+      Array.from({ length: 66 }, (_, i) => [
+        `s${String(i + 1).padStart(2, '0')}`,
+        { requirements: 'r'.repeat(4000), timestamp: 1 },
+      ]).reverse()
+    );
+    const merged = mergeTaskAvailability(input, input);
+    expect(Object.keys(merged)).toHaveLength(65);
+    expect(merged).toHaveProperty('s65');
+    expect(merged).not.toHaveProperty('s66');
+    expect(sanitizeTaskAvailabilityMap(input)).toEqual(merged);
+  });
   it('honours only the exact signature and not an older confirmation than the status', () => {
     const confirmation = { requirements: 'sig', timestamp: 100 };
     expect(isAvailabilityConfirmed(confirmation, undefined, 'sig')).toBe(true);

@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(15);
+SELECT plan(19);
 
 SELECT is(
   public.sanitize_user_progress_mode_data(
@@ -181,13 +181,52 @@ SELECT is(
 
 SELECT ok(
   (
+    SELECT NOT public.merge_task_availability('{"s1":{"requirements":"old","timestamp":0}}', entries) ? 's1'
+      AND NOT public.merge_task_availability(entries, '{"s1":{"requirements":"old","timestamp":0}}') ? 's1'
+    FROM (
+      SELECT jsonb_object_agg('s' || n, jsonb_build_object('requirements', repeat('r', 4000), 'timestamp', n)) AS entries
+      FROM generate_series(1, 66) AS n
+    ) AS fixture
+  ),
+  'selects duplicate winners before eviction in either input order'
+);
+
+SELECT ok(
+  (
+    SELECT merged ? 's65' AND NOT merged ? 's66'
+    FROM (
+      SELECT public.merge_task_availability(NULL, jsonb_object_agg('s' || lpad(n::text, 2, '0'),
+        jsonb_build_object('requirements', repeat('r', 4000), 'timestamp', 1))) AS merged
+      FROM generate_series(1, 66) AS n
+    ) AS fixture
+  ),
+  'orders equal clocks by task id at the byte boundary'
+);
+
+CREATE TEMP TABLE full_confirmations AS
+SELECT (
+  SELECT jsonb_object_agg('s' || n, jsonb_build_object('requirements', repeat('r', 4000), 'timestamp', n))
+  FROM generate_series(1, 65) AS n
+) || jsonb_build_object('s66', jsonb_build_object('requirements', repeat('r', 1955), 'timestamp', 66)) AS entries;
+
+SELECT is(
+  (SELECT sum(octet_length(entry.key) + octet_length(entry.value->>'requirements'))
+   FROM full_confirmations, jsonb_each(entries) AS entry),
+  262144::bigint,
+  'the eviction fixture starts exactly at the byte budget'
+);
+
+SELECT ok(
+  (SELECT public.merge_task_availability(NULL, entries) ? 's1' FROM full_confirmations),
+  'the oldest confirmation fits before the new entry'
+);
+
+SELECT ok(
+  (
     SELECT merged ? 'new' AND NOT merged ? 's1'
     FROM (
       SELECT public.merge_manual_activity_progress(
-        jsonb_build_object('taskAvailability', (
-          SELECT jsonb_object_agg('s' || n, jsonb_build_object('requirements', repeat('r', 4000), 'timestamp', n))
-          FROM generate_series(1, 66) AS n
-        )),
+        jsonb_build_object('taskAvailability', (SELECT entries FROM full_confirmations)),
         '{"taskAvailability": {"new": {"requirements": "sig", "timestamp": 1000}}}'
       )->'taskAvailability' AS merged
     ) AS result

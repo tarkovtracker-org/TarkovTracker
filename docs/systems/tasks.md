@@ -56,9 +56,10 @@ the confirmation's own timestamp. A confirmation counts only while its signature
 not older than the task's status timestamp, so a later reset, completion, failure or progress repair
 on any device retires it without rewriting the map. The row sanitizer preserves the key (migration
 `20260928140000_preserve_task_availability_confirmations.sql`); a missing key means no confirmations.
-Every merge bounds the map (task ids up to 64 characters, signatures up to 4096, the newest 1000
-entries within 256 KiB), so same-epoch writes cannot grow it past the sync payload limit
-(`20261001190000_bound_task_availability_confirmations.sql`).
+Every merge selects per-task timestamp winners before applying the
+[map bounds](../../supabase/migrations/20261001190000_bound_task_availability_confirmations.sql),
+so same-epoch writes cannot grow it past the sync payload limit or restore an older duplicate
+when a newer winner is evicted.
 It does not set a counter, acknowledge another task's dialogue, or complete candidate contributor
 tasks. Because a derived count is an estimate, a confirmation overrides a derived shortfall. It cannot
 bypass an explicit known unmet account value, malformed requirements, or independent
