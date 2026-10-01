@@ -42,7 +42,8 @@ export const kebabCase = (name) =>
 /** Maps component file -> registered names from `.nuxt/components.d.ts`. */
 export function parseComponentMap(text) {
   const map = new Map();
-  const pattern = /^export const (\w+): typeof import\("([^"]+\.vue)"\)\['default'\]/gm;
+  const pattern =
+    /^export const (\w+): (?:LazyComponent<)?typeof import\("([^"]+\.vue)"\)\['default'\]/gm;
   for (const [, name, file] of text.matchAll(pattern))
     append(map, normalizeGenerated(file), [name]);
   return map;
@@ -79,14 +80,28 @@ const runnerFor = (path) => {
     : 'vitest';
 };
 const gatewayRelative = (files) => files.map((file) => file.replace('workers/api-gateway/', ''));
+// Relative operands cannot become runner options. Keep filenames out of shell syntax entirely.
+const testOperands = (files) => files.map((file) => `./${file}`);
 const runnerCommands = {
-  vitest: (files) => `pnpm exec vitest run ${files.join(' ')}`,
-  gateway: (files) =>
-    `pnpm exec vitest run --config workers/api-gateway/vitest.config.ts ${gatewayRelative(files).join(' ')}`,
-  node: (files) => `node --test ${files.join(' ')}`,
-  deno: (files) => `deno test ${files.join(' ')}`,
+  vitest: (files) => ({
+    executable: 'pnpm',
+    args: ['exec', 'vitest', 'run', ...testOperands(files)],
+  }),
+  gateway: (files) => ({
+    executable: 'pnpm',
+    args: [
+      'exec',
+      'vitest',
+      'run',
+      '--config',
+      'workers/api-gateway/vitest.config.ts',
+      ...testOperands(gatewayRelative(files)),
+    ],
+  }),
+  node: (files) => ({ executable: 'node', args: ['--test', '--', ...testOperands(files)] }),
+  deno: (files) => ({ executable: 'deno', args: ['test', '--', ...testOperands(files)] }),
 };
-/** Groups test files into one command per runner. */
+/** Groups test files into shell-independent executable/argv records; never executed by the brief. */
 export function testCommands(tests) {
   const groups = new Map();
   for (const test of tests) append(groups, runnerFor(test), [test]);
@@ -307,6 +322,7 @@ const listed = (items) =>
 const section = (title, items) =>
   items.length ? [`## ${title}`, ...items.map((item) => `- ${item}`), ''] : [];
 const code = (command) => `\`${command}\``;
+const commandRecord = (command) => JSON.stringify(command);
 const textOnlyLine = (items) =>
   items.length
     ? [`- text-only consumers, UNVERIFIED (${items.length}): ${listed(items).join(', ')}`]
@@ -322,10 +338,13 @@ function broaderTests({ transitive, broaderCommands }) {
   if (!transitive.length) return [];
   const summary = `broader: ${transitive.length} tests reach a target transitively`;
   if (transitive.length > maxBroaderTests) return [`${summary} (list: --format json)`];
-  return [summary, ...broaderCommands.map(code)];
+  return [summary, ...broaderCommands.map(commandRecord)];
 }
 const testLines = (tests) => [
-  ...tests.commands.map(code),
+  ...(tests.commands.length || tests.broaderCommands.length
+    ? ['Executable/argv records (JSON data; do not paste into a shell or join arguments):']
+    : []),
+  ...tests.commands.map(commandRecord),
   `${tests.direct.length} import or text-match a target; ${tests.nearby.length} sit beside a target or consumer`,
   ...broaderTests(tests),
 ];

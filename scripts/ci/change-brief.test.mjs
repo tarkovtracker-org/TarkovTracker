@@ -90,7 +90,7 @@ const fakeIo = ({ reports = {}, grepFiles = [], grepLines = [], generated = true
 describe('generated Nuxt declarations', () => {
   it('maps component files to registered and lazy names', () => {
     const map = parseComponentMap(componentsDts);
-    expect(map.get('app/components/ui/GameItem.vue')).toEqual(['GameItem']);
+    expect(map.get('app/components/ui/GameItem.vue')).toEqual(['GameItem', 'LazyGameItem']);
     expect(map.get('app/features/neededitems/NeededItemRow.vue')).toEqual(['NeededItemRow']);
   });
   it('maps auto-import modules to exposed names and ignores framework modules', () => {
@@ -130,11 +130,49 @@ describe('path helpers', () => {
         'scripts/ci/e.test.mjs',
       ])
     ).toEqual([
-      'pnpm exec vitest run app/a.test.ts scripts/ci/e.test.mjs',
-      'pnpm exec vitest run --config workers/api-gateway/vitest.config.ts src/__tests__/b.test.ts',
-      'node --test scripts/workflow-tests/c.mjs',
-      'deno test supabase/functions/_shared/d.deno.test.ts',
+      {
+        executable: 'pnpm',
+        args: ['exec', 'vitest', 'run', './app/a.test.ts', './scripts/ci/e.test.mjs'],
+      },
+      {
+        executable: 'pnpm',
+        args: [
+          'exec',
+          'vitest',
+          'run',
+          '--config',
+          'workers/api-gateway/vitest.config.ts',
+          './src/__tests__/b.test.ts',
+        ],
+      },
+      { executable: 'node', args: ['--test', '--', './scripts/workflow-tests/c.mjs'] },
+      { executable: 'deno', args: ['test', '--', './supabase/functions/_shared/d.deno.test.ts'] },
     ]);
+  });
+  it('preserves inert filenames as separate arguments instead of shell text', () => {
+    const paths = [
+      'app/space name.test.ts',
+      "app/single'quote.test.ts",
+      'app/double"quote.test.ts',
+      'app/$(inert).test.ts',
+      'app/semi;and&pipe|.test.ts',
+      '-leading.test.ts',
+    ];
+    expect(testCommands(paths)).toEqual([
+      { executable: 'pnpm', args: ['exec', 'vitest', 'run', ...paths.map((path) => `./${path}`)] },
+    ]);
+    for (const prefix of [
+      'workers/api-gateway/',
+      'scripts/workflow-tests/',
+      'supabase/functions/',
+    ]) {
+      const filename = "space 'quote' $(inert);&-file";
+      const extension = prefix === 'supabase/functions/' ? '.deno.test.ts' : '.test.mjs';
+      const [command] = testCommands([`${prefix}${filename}${extension}`]);
+      const operand = prefix === 'workers/api-gateway/' ? '' : prefix;
+      expect(command.args.at(-1)).toBe(`./${operand}${filename}${extension}`);
+      expect(typeof command.executable).toBe('string');
+    }
   });
 });
 describe('validationFor', () => {
@@ -168,6 +206,25 @@ describe('validationFor', () => {
   });
 });
 describe('buildBrief', () => {
+  it('finds lazy-only templates in PascalCase and kebab-case', async () => {
+    const io = fakeIo({ reports: { 'app/components/ui/GameItem.vue': trace([]) } });
+    const templates = new Map([
+      ['app/pages/lazy.vue', '<LazyGameItem />'],
+      ['app/pages/kebab.vue', '<lazy-game-item />'],
+      ['app/pages/unrelated.vue', '<OtherComponent />'],
+    ]);
+    io.grepFiles = (args) => {
+      const pattern = new RegExp(`\\b(?:${args[2]})\\b`);
+      return [...templates].filter(([, text]) => pattern.test(text)).map(([file]) => file);
+    };
+    const brief = await buildBrief(io, { targets: [{ file: 'app/components/ui/GameItem.vue' }] });
+    expect(brief.targets[0].textOnlyConsumers).toEqual([
+      'app/pages/lazy.vue',
+      'app/pages/kebab.vue',
+    ]);
+    expect(renderBrief(brief)).toContain('UNVERIFIED');
+    expect(brief.uncertainty[0]).toMatch(/component auto-registration.*Confirm each/);
+  });
   it('adds component consumers Fallow cannot see and labels them unverified', async () => {
     const io = fakeIo({
       reports: {
@@ -192,7 +249,7 @@ describe('buildBrief', () => {
     expect(io.calls.find((call) => call.kind === 'files').args).toEqual([
       '-w',
       '-E',
-      'GameItem|game-item',
+      'GameItem|LazyGameItem|game-item|lazy-game-item',
     ]);
     expect(brief.uncertainty[0]).toMatch(/component auto-registration.*Confirm each/);
     expect(brief.tests.direct).toEqual(['app/components/ui/__tests__/GameItem.test.ts']);
@@ -226,8 +283,21 @@ describe('buildBrief', () => {
     expect(brief.docs).toEqual([{ file: 'docs/systems/progress-storage.md', lines: [146] }]);
     expect(brief.tests.commands).toEqual([]);
     expect(brief.tests.broaderCommands).toEqual([
-      'pnpm exec vitest run --config workers/api-gateway/vitest.config.ts src/__tests__/gameMode.test.ts',
+      {
+        executable: 'pnpm',
+        args: [
+          'exec',
+          'vitest',
+          'run',
+          '--config',
+          'workers/api-gateway/vitest.config.ts',
+          './src/__tests__/gameMode.test.ts',
+        ],
+      },
     ]);
+    const text = renderBrief(brief);
+    expect(text).toContain('Executable/argv records (JSON data; do not paste into a shell');
+    expect(text).toContain(JSON.stringify(brief.tests.broaderCommands[0]));
     expect(brief.validation.scoped[0]).toMatch(/^workers\/api-gateway\/AGENTS\.md checks/);
     expect(brief.uncertainty).toEqual([]);
   });

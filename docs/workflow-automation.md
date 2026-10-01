@@ -40,6 +40,14 @@ and config, doc anchors, scoped `AGENTS.md` files, and the CI path classifier. T
 consumers, owning docs, scoped instructions, candidate tests grouped by runner, and the required
 checks.
 
+Candidate test entries are JSON records with `executable` and `args`, including in text output.
+They are data to review, not shell commands to paste or concatenate. Pass arguments separately
+to a runner that does not use a shell; Windows command shims such as `pnpm.cmd` need a trusted
+platform-specific launcher. Relative file operands start with `./` to avoid runner options;
+Node and Deno also receive `--`. Vitest keeps its positional file filters. No tests are executed
+by the brief. This preserves spaces, quotes, and shell metacharacters without choosing POSIX,
+PowerShell, or cmd quoting rules.
+
 The brief is advisory. It does not replace any required check, and CI stays authoritative.
 Its Uncertainty section names what it cannot prove:
 
@@ -48,6 +56,11 @@ Its Uncertainty section names what it cannot prove:
 - Auto-imports are reported only where text hits appear that Fallow missed.
 - Runtime string lookups are never in any graph: i18n keys, Supabase RPC and table names, KV
   keys, and upstream field names.
+
+Coverage limits: scoped instructions come from tracked files; generated declarations are checked
+for presence, not freshness. Fallow subprocesses currently have no timeout or output cap.
+Path-reference seeds are limited to 60; some rendered lists remain uncapped. Unit tests inject
+I/O, so they do not by themselves verify Git, generated declarations, or Fallow at runtime.
 
 The brief was benchmarked on three past fixes: season validation (`f2ad088f`), a
 component/composable change (`a9828505`), and preview tooling (`1676ddda`). In each, it surfaced
