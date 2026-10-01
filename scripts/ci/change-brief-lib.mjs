@@ -92,7 +92,7 @@ export function testCommands(tests) {
   for (const test of tests) append(groups, runnerFor(test), [test]);
   return [...groups].map(([runner, files]) => runnerCommands[runner](files));
 }
-const typedChange = (paths) => paths.some((path) => /\.(?:ts|vue)$/.test(path));
+const typedChange = (paths) => paths.some((path) => /\.(?:[cm]?tsx?|vue)$/.test(path));
 // Required local checks, in the order AGENTS.md lists them; CI remains authoritative.
 const validationRules = [
   { command: 'pnpm run lint', applies: (plan) => plan.full },

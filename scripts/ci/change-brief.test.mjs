@@ -149,6 +149,12 @@ describe('validationFor', () => {
       'pnpm run format:check',
     ]);
   });
+  it('selects typecheck for every TypeScript extension', () => {
+    for (const path of ['app/a.tsx', 'shared/b.mts', 'shared/c.cts']) {
+      expect(validationFor([path]).commands).toContain('pnpm run typecheck');
+    }
+    expect(validationFor(['scripts/ci/x.mjs']).commands).not.toContain('pnpm run typecheck');
+  });
   it('selects reduced checks for documentation and adds scoped checks for affected areas', () => {
     const validation = validationFor(['docs/api.md'], ['docs/api.md', 'supabase/migrations/x.sql']);
     expect(validation.full).toBe(false);
