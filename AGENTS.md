@@ -21,6 +21,8 @@ boundaries and user changes.
 - Lint `pnpm run lint` | Blank lines `pnpm run lint:blank-lines` | Typecheck `pnpm run typecheck`
 - Fallow `pnpm run lint:fallow` (`--base <ref>`, `--format json`; same command locally and in CI)
 - i18n `pnpm run i18n:check` | OpenAPI `pnpm run validate:openapi` | Deps `pnpm run deps`
+- Brief `pnpm run brief --file <path>` (`--symbol <file:export>`, `--base <ref>`): consumers, docs,
+  tests, and checks before editing; advisory, read its Uncertainty section
 
 Prefer the single-file Vitest command from `package.json`; run the full suite only when executable
 or test logic changes make it relevant.

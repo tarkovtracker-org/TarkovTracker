@@ -28,6 +28,37 @@ commit, dirty worktree state, commands, and results in the PR summary. Invalidat
 when their inputs change. Batch substantiated corrections; defer unrelated cleanup and optional
 style suggestions.
 
+### Discovery brief
+
+Before editing, `pnpm run brief` answers "what uses this, what owns it, and what must I run?"
+in one call. Point it at a target with `--file <path>` or `--symbol <file:export>` (both
+repeatable), or at a diff with `--base <ref>`, which briefs the local changes against the merge
+base. Add `--format json` for the uncapped lists.
+It combines `fallow inspect` (import graph, symbol references, transitive impact), the
+generated `.nuxt/components.d.ts` and `.nuxt/imports.d.ts`, path-literal references in workflows
+and config, doc anchors, scoped `AGENTS.md` files, and the CI path classifier. The output lists
+consumers, owning docs, scoped instructions, candidate tests grouped by runner, and the required
+checks.
+
+The brief is advisory. It does not replace any required check, and CI stays authoritative.
+Its Uncertainty section names what it cannot prove:
+
+- Fallow does not see Vue template usage of auto-registered components, so the brief adds those
+  consumers from a name text match and labels them UNVERIFIED.
+- Auto-imports are reported only where text hits appear that Fallow missed.
+- Runtime string lookups are never in any graph: i18n keys, Supabase RPC and table names, KV
+  keys, and upstream field names.
+
+The brief was benchmarked on three past fixes: season validation (`f2ad088f`), a
+component/composable change (`a9828505`), and preview tooling (`1676ddda`). In each, it surfaced
+every file the real fix touched or re-tested that consumes a starting file, along with the owning
+doc and the scoped `AGENTS.md`: 5/5, 11/11, and 6/6. A scripted grep-and-read proxy of the
+previous workflow used 23–31 tool calls and returned 68–93 KB. With confirmation reads excluded,
+it still used 4–6 calls and 8–12 KB. That proxy missed the gateway `AGENTS.md` and a consumer's
+test. The brief took one call, under 1.2 s, and returned 1.7–3.8 KB. Fallow alone missed four of
+the component's consumers; the generated-declaration match recovered them. These numbers measure
+discovery context, not end-to-end task time.
+
 ### Push cadence
 
 The root `AGENTS.md` owns review requirements and exceptions. Commit freely while implementing,
