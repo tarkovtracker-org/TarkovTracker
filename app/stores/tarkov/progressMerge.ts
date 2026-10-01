@@ -1,3 +1,4 @@
+import { capApiTaskUpdates, isApiTaskUpdateEntry } from '@shared/utils/apiTaskUpdates';
 import {
   defaultState,
   type ApiTaskUpdate,
@@ -254,17 +255,8 @@ export const normalizeTaskCompletionsMap = (
   }
   return migrated;
 };
-const API_TASK_STATES = ['active', 'completed', 'failed', 'uncompleted'] as const;
-const isApiTaskState = (state: unknown): state is ApiTaskUpdate['state'] => {
-  return API_TASK_STATES.includes(state as ApiTaskUpdate['state']);
-};
-export const normalizeApiTaskUpdates = (updates: ApiUpdateMeta['tasks']): ApiTaskUpdate[] => {
-  if (!Array.isArray(updates)) return [];
-  return updates.filter(
-    (update): update is ApiTaskUpdate =>
-      Boolean(update) && typeof update.id === 'string' && isApiTaskState(update.state)
-  );
-};
+export const normalizeApiTaskUpdates = (updates: ApiUpdateMeta['tasks']): ApiTaskUpdate[] =>
+  Array.isArray(updates) ? updates.filter(isApiTaskUpdateEntry) : [];
 export const normalizeApiUpdateMetaEntry = (value: unknown): ApiUpdateMeta | null => {
   if (!value || typeof value !== 'object') return null;
   const candidate = value as Partial<ApiUpdateMeta>;
@@ -277,13 +269,22 @@ export const normalizeApiUpdateMetaEntry = (value: unknown): ApiUpdateMeta | nul
   ) {
     return null;
   }
-  const tasks = normalizeApiTaskUpdates(candidate.tasks);
+  const { tasks, taskCount } = capApiTaskUpdates(candidate.tasks, candidate.taskCount);
   return {
     at: candidate.at,
     id: candidate.id,
     source: 'api',
     ...(tasks.length ? { tasks } : {}),
+    ...(taskCount !== undefined ? { taskCount } : {}),
   };
+};
+/** Newer entry wins (ties favor `incoming`); the same entry keeps its largest known `taskCount`. */
+const pickApiUpdate = (current: ApiUpdateMeta, incoming: ApiUpdateMeta): ApiUpdateMeta => {
+  if (current.id !== incoming.id || current.at !== incoming.at) {
+    return incoming.at >= current.at ? incoming : current;
+  }
+  const taskCount = Math.max(current.taskCount ?? 0, incoming.taskCount ?? 0);
+  return normalizeApiUpdateMetaEntry({ ...incoming, taskCount }) ?? incoming;
 };
 const normalizeApiUpdateHistoryEntries = (value: unknown): ApiUpdateMeta[] => {
   if (!Array.isArray(value)) return [];
@@ -292,9 +293,7 @@ const normalizeApiUpdateHistoryEntries = (value: unknown): ApiUpdateMeta[] => {
     const normalized = normalizeApiUpdateMetaEntry(entry);
     if (!normalized) continue;
     const existing = deduped.get(normalized.id);
-    if (!existing || normalized.at >= existing.at) {
-      deduped.set(normalized.id, normalized);
-    }
+    deduped.set(normalized.id, existing ? pickApiUpdate(existing, normalized) : normalized);
   }
   return Array.from(deduped.values())
     .sort((a, b) => b.at - a.at)
@@ -407,7 +406,7 @@ export function mergeProgressData(
     const normalizedRemote = normalizeApiUpdateMetaEntry(remoteUpdate);
     if (!normalizedLocal) return normalizedRemote ?? undefined;
     if (!normalizedRemote) return normalizedLocal;
-    return normalizedRemote.at >= normalizedLocal.at ? normalizedRemote : normalizedLocal;
+    return pickApiUpdate(normalizedLocal, normalizedRemote);
   };
   const mergedState: UserProgressData = {
     ...local,

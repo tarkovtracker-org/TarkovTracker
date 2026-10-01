@@ -589,11 +589,20 @@ export function useSupabaseSync<
     isPaused.value = false;
     schedulePendingSync();
   };
+  const captureRemoteMerge = (): RemoteStateMerge => {
+    const reconcile = pendingState.capture();
+    return (...args) => {
+      // Clear at observation time: an external save may restore the hash while a read awaits.
+      // Even a revert to that save must reach the sender's current per-mode comparison.
+      lastSyncedHash = null;
+      return reconcile(...args);
+    };
+  };
   const withSnapshot: WithRemoteSnapshot = async (read) => {
     snapshotDepth += 1;
     try {
       await syncQueue;
-      return await read(pendingState.capture());
+      return await read(captureRemoteMerge());
     } finally {
       snapshotDepth -= 1;
       schedulePendingSync();
@@ -618,7 +627,7 @@ export function useSupabaseSync<
   return {
     hasPendingChanges: () => pendingLocalChanges,
     acknowledgeExternalSave,
-    captureRemoteMerge: pendingState.capture,
+    captureRemoteMerge,
     withSnapshot,
     isSyncing,
     isPaused,

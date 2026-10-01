@@ -2,7 +2,7 @@
   "branches": ["main"],
   "plugins": [
     [
-      "./scripts/release-scope.mjs",
+      "./scripts/release/release-scope.mjs",
       {
         "preset": "angular",
         "releaseRules": [
@@ -40,7 +40,7 @@
         "npmPublish": false
       }
     ],
-    "./scripts/release-commit.mjs",
+    "./scripts/release/release-commit.mjs",
     "@semantic-release/github"
   ]
 }

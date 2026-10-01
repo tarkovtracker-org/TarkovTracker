@@ -115,21 +115,21 @@ feature. PRs that bundle unrelated changes may be asked to split or be closed.
 
 The short version: this README gets you running; the `docs/` folder explains how things work.
 
-| You want to…                                      | Read                                                                    |
-| ------------------------------------------------- | ----------------------------------------------------------------------- |
-| Get started                                       | This README                                                             |
-| Report a security vulnerability                   | [`SECURITY.md`](SECURITY.md)                                            |
-| Find where to get help                            | [`SUPPORT.md`](SUPPORT.md)                                              |
-| Read the code of conduct                          | [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)                              |
-| Understand the systems (caching, data, overlay)   | [`docs/systems.md`](docs/systems.md)                                    |
-| Understand the full architecture & data flow      | [`docs/architecture.md`](docs/architecture.md)                          |
-| Read the Tarkov data architecture decision        | [`docs/decision-tarkov-data.md`](docs/decision-tarkov-data.md)          |
-| Use or extend the HTTP/API surface                | [`docs/api.md`](docs/api.md)                                            |
-| Understand rate limits / abuse controls           | [`docs/rate-limiting.md`](docs/rate-limiting.md)                        |
-| Deploy, configure env vars, or handle an incident | [`docs/runbook.md`](docs/runbook.md)                                    |
-| Understand CI/CD, hooks, and releases             | [`docs/workflow-automation.md`](docs/workflow-automation.md)            |
-| Contribute (issues, branches, PRs, labels)        | [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md)                    |
-| Work as (or configure) an AI agent                | [`AGENTS.md`](AGENTS.md) + [`docs/agent-context/`](docs/agent-context/) |
+| You want to…                                      | Read                                                           |
+| ------------------------------------------------- | -------------------------------------------------------------- |
+| Get started                                       | This README                                                    |
+| Report a security vulnerability                   | [`SECURITY.md`](SECURITY.md)                                   |
+| Find where to get help                            | [`SUPPORT.md`](SUPPORT.md)                                     |
+| Read the code of conduct                          | [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)                     |
+| Understand the systems (caching, data, overlay)   | [`docs/systems/`](docs/systems/README.md)                      |
+| Understand the full architecture & data flow      | [`docs/architecture.md`](docs/architecture.md)                 |
+| Read the Tarkov data architecture decision        | [`docs/decision-tarkov-data.md`](docs/decision-tarkov-data.md) |
+| Use or extend the HTTP/API surface                | [`docs/api.md`](docs/api.md)                                   |
+| Understand rate limits / abuse controls           | [`docs/rate-limiting.md`](docs/rate-limiting.md)               |
+| Deploy, configure env vars, or handle an incident | [`docs/runbook.md`](docs/runbook.md)                           |
+| Understand CI/CD, hooks, and releases             | [`docs/workflow-automation.md`](docs/workflow-automation.md)   |
+| Contribute (issues, branches, PRs, labels)        | [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md)           |
+| Work as (or configure) an AI agent                | [`AGENTS.md`](AGENTS.md)                                       |
 
 Start at [`docs/README.md`](docs/README.md) if you are not sure which doc you need.
 
@@ -145,7 +145,7 @@ public/      Static assets
 ```
 
 See [`docs/architecture.md`](docs/architecture.md) for the full module map and
-[`docs/systems.md`](docs/systems.md) for how the non-obvious systems (Tarkov.dev integration,
+[`docs/systems/`](docs/systems/README.md) for how the non-obvious systems (Tarkov.dev integration,
 multi-layer caching, overlay corrections, precompute) actually work.
 
 ### License

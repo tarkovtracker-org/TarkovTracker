@@ -10,7 +10,7 @@
         >
           <span class="truncate">{{ taskName }}</span>
           <UIcon
-            v-if="task?.wikiLink"
+            v-if="taskWikiUrl"
             name="i-mdi-open-in-new"
             class="h-3.5 w-3.5 shrink-0"
             aria-hidden="true"
@@ -173,11 +173,12 @@
     if (!task.value?.id) return '';
     return `https://tarkov.dev/task/${task.value.id}`;
   });
-  const taskTitleComponent = computed(() => (task.value?.wikiLink ? 'a' : 'div'));
+  const taskWikiUrl = computed(() => toWikiUrl(task.value?.wikiLink));
+  const taskTitleComponent = computed(() => (taskWikiUrl.value ? 'a' : 'div'));
   const taskTitleProps = computed(() => {
-    if (task.value?.wikiLink) {
+    if (taskWikiUrl.value) {
       return {
-        href: toWikiUrl(task.value.wikiLink),
+        href: taskWikiUrl.value,
         target: '_blank',
         rel: 'noopener noreferrer',
       };
@@ -186,7 +187,7 @@
   });
   const taskTitleClass = computed(() => {
     const base = 'flex min-w-0 max-w-full items-center gap-1 text-sm leading-snug font-semibold';
-    if (task.value?.wikiLink) {
+    if (taskWikiUrl.value) {
       return `${base} text-link hover:text-link-hover no-underline`;
     }
     return `${base} text-gray-100`;

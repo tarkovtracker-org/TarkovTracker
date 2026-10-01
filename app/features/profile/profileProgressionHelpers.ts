@@ -1,22 +1,11 @@
+import { capApiTaskUpdates } from '@shared/utils/apiTaskUpdates';
 import { isGameMode, type GameMode } from '@/utils/constants';
 import { sanitizeTaskAvailabilityMap } from '@/utils/taskAvailabilityConfirmation';
-import type { ApiTaskUpdate, ApiUpdateMeta, UserProgressData } from '@/stores/progressState';
+import type { ApiUpdateMeta, UserProgressData } from '@/stores/progressState';
 export const DAY_MS = 24 * 60 * 60 * 1000;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object');
-const isApiTaskUpdate = (value: unknown): value is ApiTaskUpdate => {
-  if (!isRecord(value)) {
-    return false;
-  }
-  return (
-    typeof value.id === 'string' &&
-    (value.state === 'active' ||
-      value.state === 'completed' ||
-      value.state === 'failed' ||
-      value.state === 'uncompleted')
-  );
-};
 export const normalizeMode = (value: unknown): GameMode | null => {
   if (Array.isArray(value)) {
     return normalizeMode(value[0]);
@@ -61,14 +50,13 @@ const normalizeApiUpdateMeta = (value: unknown): ApiUpdateMeta | undefined => {
   if (value.source !== 'api') {
     return undefined;
   }
-  const tasks = Array.isArray(value.tasks)
-    ? value.tasks.filter((task): task is ApiTaskUpdate => isApiTaskUpdate(task))
-    : undefined;
+  const { tasks, taskCount } = capApiTaskUpdates(value.tasks, value.taskCount);
   return {
     at: value.at,
     id: value.id,
     source: 'api',
-    tasks,
+    tasks: Array.isArray(value.tasks) ? tasks : undefined,
+    ...(taskCount !== undefined ? { taskCount } : {}),
   };
 };
 export const normalizeSharedProgressData = (

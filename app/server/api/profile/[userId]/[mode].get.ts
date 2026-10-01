@@ -1,3 +1,4 @@
+import { capApiTaskUpdates, type ApiTaskUpdateEntry } from '@shared/utils/apiTaskUpdates';
 import {
   createError,
   defineEventHandler,
@@ -94,15 +95,12 @@ type SanitizedTrader = {
   level: number;
   reputation: number;
 };
-type SanitizedApiTaskUpdate = {
-  id: string;
-  state: 'active' | 'completed' | 'failed' | 'uncompleted';
-};
 type SanitizedApiUpdateMeta = {
   id: string;
   at: number;
   source: 'api';
-  tasks?: SanitizedApiTaskUpdate[];
+  tasks?: ApiTaskUpdateEntry[];
+  taskCount?: number;
 };
 type SanitizedProgressData = Partial<{
   displayName: string;
@@ -151,6 +149,8 @@ const toCleanString = (value: unknown, maxLength = 128): string | null => {
   }
   return trimmed.slice(0, maxLength);
 };
+const cleanApiTaskUpdate = (task: unknown): unknown =>
+  isRecord(task) ? { id: toCleanString(task.id, 128), state: task.state } : null;
 const sanitizeApiUpdateMeta = (value: unknown): SanitizedApiUpdateMeta | null => {
   if (!isRecord(value)) {
     return null;
@@ -165,28 +165,15 @@ const sanitizeApiUpdateMeta = (value: unknown): SanitizedApiUpdateMeta | null =>
     at: Math.max(0, Math.trunc(at)),
     source: 'api',
   };
-  if (Array.isArray(value.tasks)) {
-    const tasks: SanitizedApiTaskUpdate[] = [];
-    for (const task of value.tasks) {
-      if (!isRecord(task)) {
-        continue;
-      }
-      const taskId = toCleanString(task.id, 128);
-      const state = task.state;
-      if (
-        !taskId ||
-        (state !== 'active' &&
-          state !== 'completed' &&
-          state !== 'failed' &&
-          state !== 'uncompleted')
-      ) {
-        continue;
-      }
-      tasks.push({ id: taskId, state });
-    }
-    if (tasks.length > 0) {
-      sanitized.tasks = tasks;
-    }
+  const { tasks, taskCount } = capApiTaskUpdates(
+    Array.isArray(value.tasks) ? value.tasks.map(cleanApiTaskUpdate) : [],
+    value.taskCount
+  );
+  if (tasks.length > 0) {
+    sanitized.tasks = tasks;
+  }
+  if (taskCount !== undefined) {
+    sanitized.taskCount = taskCount;
   }
   return sanitized;
 };

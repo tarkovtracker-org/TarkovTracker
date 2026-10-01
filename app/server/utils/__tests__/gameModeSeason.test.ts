@@ -24,12 +24,15 @@ describe('database season resolution', () => {
       expect.objectContaining({ method: 'POST', redirect: 'manual', body: '{}' })
     );
   });
-  it.each([null, false, '2', [], {}, 0, -1, 1.5])('rejects invalid season %j', async (value) => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(value)));
-    await expect(resolveGameModeSeason('seasonal', config)).rejects.toMatchObject({
-      statusCode: 503,
-    });
-  });
+  it.each([null, true, false, '2', [2], [], {}, 0, -1, 1.5])(
+    'rejects invalid season %j',
+    async (value) => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(value)));
+      await expect(resolveGameModeSeason('seasonal', config)).rejects.toMatchObject({
+        statusCode: 503,
+      });
+    }
+  );
   it.each([302, 403, 500])('fails closed on HTTP %i', async (status) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status })));
     await expect(resolveGameModeSeason('seasonal', config)).rejects.toMatchObject({

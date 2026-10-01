@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { classifyPaths } from '../validation-plan.mjs';
+import { classifyPaths } from '../ci/validation-plan.mjs';
 import { extractZip } from './archive.mjs';
 import { digestDirectory, manifestShapeErrors } from './manifest.mjs';
 import { readPreviewRequest } from './request-authorization.mjs';
@@ -551,7 +551,7 @@ function notApplicable() {
   return {
     action: 'skip',
     state: 'success',
-    description: 'Not applicable: documentation-only change set with successful CI.',
+    description: 'Not applicable: no deployable changes with successful CI.',
   };
 }
 function deploymentDecision(common, earlier, manifest, requiresApproval, headSha) {

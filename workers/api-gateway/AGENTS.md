@@ -16,5 +16,5 @@ Focused tests: `pnpm run test:api-gateway`.
 
 - Routes authenticate and enforce quota before decoding or validating input. Validation errors
   retain rate-limit headers (`docs/api.md#rate-limits-api-gateway`).
-- Public progress clients send a 5–200 character `User-Agent` (`docs/systems.md` §6).
+- Public progress clients send a 5–200 character `User-Agent` (`docs/systems/progress-api.md`).
 - Rate-limit ownership and fail behavior: `docs/rate-limiting.md` (section B).

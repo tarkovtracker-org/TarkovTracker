@@ -56,6 +56,7 @@
               :image-item="imageItem"
               :src="imageItem.image512pxLink"
               :is-visible="true"
+              :item-id="item?.id"
               :item-name="item?.name ?? null"
               :wiki-link="item?.wikiLink ?? null"
               :dev-link="item?.link ?? null"

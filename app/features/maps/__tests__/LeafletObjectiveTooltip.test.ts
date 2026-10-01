@@ -94,6 +94,15 @@ describe('LeafletObjectiveTooltip', () => {
     expect(wrapper.find('a[href="https://tarkov.dev/task/task-2"]').exists()).toBe(true);
     expect(wrapper.find('a[href*="escapefromtarkov.fandom.com/wiki/"]').exists()).toBe(false);
   });
+  it('renders the task title as plain text when the wiki link is untrusted', async () => {
+    const { wrapper } = await setup({
+      id: 'task-3',
+      name: 'Untrusted Wiki Task',
+      wikiLink: 'javascript:alert(1)',
+    });
+    const hrefs = wrapper.findAll('a').map((link) => link.attributes('href'));
+    expect(hrefs).toEqual(['https://tarkov.dev/task/task-3']);
+  });
   it('emits close when the tooltip close button is clicked', async () => {
     const { onClose, wrapper } = await setup({
       id: 'task-3',

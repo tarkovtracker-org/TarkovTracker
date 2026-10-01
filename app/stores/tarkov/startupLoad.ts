@@ -3,6 +3,7 @@ import {
   blockAccountRecoveryRetentionForOwner,
   preserveForeignActiveCopy,
 } from '@/stores/tarkov/accountRecovery';
+import { clearAcknowledgedModes, recordAcknowledgedModes } from '@/stores/tarkov/acknowledgedModes';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
 import {
   clearActiveProgressStorage,
@@ -291,6 +292,24 @@ const toRemoteState = (
     ...remoteModePayloads(row, modes),
   } as UserState);
 };
+/**
+ * The loaded server copy is the sync baseline, so startup writes send only the modes they change.
+ * A mode still holding deprecated data stays unacknowledged so its cleanup rewrite is sent.
+ */
+const acknowledgeRemoteModes = (
+  userId: string,
+  row: UserProgressRow | null,
+  modes: ModeProgressResult,
+  state: UserState | null
+): void => {
+  clearAcknowledgedModes();
+  if (!state) return;
+  const payloads = remoteModePayloads(row, modes);
+  const clean = GAME_MODE_VALUES.filter(
+    (mode) => !hasDeprecatedTarkovDevProfileData(payloads[mode])
+  );
+  recordAcknowledgedModes(userId, Object.fromEntries(clean.map((mode) => [mode, state[mode]])));
+};
 type RemoteLoad =
   { ok: false } | { ok: true; hadRemoteData: boolean; remote: RemoteProgress | null };
 const loadRemoteProgress = async (ctx: StartupLoadContext): Promise<RemoteLoad> => {
@@ -307,6 +326,7 @@ const loadRemoteProgress = async (ctx: StartupLoadContext): Promise<RemoteLoad> 
   const row = account.row ? await withLegacyPayloads(ctx, account.row, modes) : null;
   if (account.row && !row) return { ok: false };
   const state = toRemoteState(row, modes);
+  acknowledgeRemoteModes(ctx.userId, row, modes, state);
   return { ok: true, hadRemoteData: Boolean(account.row), remote: state && { row, modes, state } };
 };
 const progressScore = (state: UserState): number =>

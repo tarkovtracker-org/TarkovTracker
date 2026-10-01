@@ -1,3 +1,4 @@
+import { toTrustedGameLinkUrl } from '@/utils/externalUrl';
 import { buildItemImageUrl, buildItemPageUrl } from '@/utils/tarkovUrls';
 import type { TarkovItem } from '@/types/tarkov';
 const BACKGROUND_CLASS_MAP: Record<string, string> & { default: string } = {
@@ -18,5 +19,7 @@ export const getKeyPreviewSrc = (key: TarkovItem): string =>
 export const getKeyBackgroundClass = (key: TarkovItem): string =>
   BACKGROUND_CLASS_MAP[(key.backgroundColor || 'default').toLowerCase()] ??
   BACKGROUND_CLASS_MAP.default;
-export const getKeyDevUrl = (key: TarkovItem): string => key.link || buildItemPageUrl(key.id);
-export const getKeyPrimaryUrl = (key: TarkovItem): string => key.wikiLink || getKeyDevUrl(key);
+export const getKeyDevUrl = (key: TarkovItem): string =>
+  toTrustedGameLinkUrl(key.link) ?? buildItemPageUrl(key.id);
+export const getKeyPrimaryUrl = (key: TarkovItem): string =>
+  toTrustedGameLinkUrl(key.wikiLink) ?? getKeyDevUrl(key);

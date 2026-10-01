@@ -1,5 +1,9 @@
 import { useToastI18n } from '@/composables/useToastI18n';
 import { blockAccountRecoveryRetentionForOwner } from '@/stores/tarkov/accountRecovery';
+import {
+  noteRemoteProgressApplied,
+  recordAcknowledgedModes,
+} from '@/stores/tarkov/acknowledgedModes';
 import { maybeNotifyApiUpdate } from '@/stores/tarkov/apiUpdateNotifier';
 import { detectDataConflicts } from '@/stores/tarkov/conflictDetection';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
@@ -451,6 +455,7 @@ async function runSetupRealtimeListener(
       updatedAtByMode: {},
       metadataTimestamp: updateTime,
     });
+    noteRemoteProgressApplied({ remote: remoteMetadata, applied: metadata });
     if (shouldIgnoreLegacyMetadataUpdate(updateTime, nextState, localState)) return;
     const isLikelySelfOrigin = isLikelySelfOriginUpdate(updateTime);
     logger.debug('[TarkovStore] Remote metadata update detected, applying changes', {
@@ -497,6 +502,12 @@ async function runSetupRealtimeListener(
       updatedAtByMode: {
         [mode]: remote.progressTime,
       },
+    });
+    // The server now holds this copy, so a later local revert to the old copy is still sent.
+    recordAcknowledgedModes(currentUserId, { [mode]: remoteProgress });
+    noteRemoteProgressApplied({
+      remote: { [mode]: remoteProgress },
+      applied: { [mode]: nextProgress },
     });
     if (shouldIgnoreModeProgressUpdate(mode, updateTime, nextProgress, localState[mode])) return;
     const conflicts = detectDataConflicts(localState[mode], remoteProgress);

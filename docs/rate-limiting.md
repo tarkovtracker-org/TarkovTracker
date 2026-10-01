@@ -249,6 +249,9 @@ Implementation notes:
 - The daily quota DO fails open when unavailable — the abuse gate still protects Supabase,
   and daily quotas are product entitlements, not database-integrity boundaries
 - Usage observability goes to `public.api_usage_daily` (not a limiter itself)
+- Usage-counter updates use table-specific autovacuum tuning in
+  [`20260930150001_tune_api_usage_daily_autovacuum.sql`](../supabase/migrations/20260930150001_tune_api_usage_daily_autovacuum.sql)
+  to reclaim obsolete row versions sooner. API accounting and retention behavior stay the same.
 
 ---
 
@@ -303,7 +306,7 @@ Important:
   `Cache-Control: private`), an `updated`-age freshness gate
   (`NUXT_TARKOV_DEV_PROFILE_MAX_UPDATED_AGE_DAYS`, default 7, `0` disables), and optional
   Cloudflare Turnstile verification (production requires paired `NUXT_PUBLIC_TURNSTILE_SITE_KEY`
-  and `NUXT_TURNSTILE_SECRET_KEY` values). See `docs/systems.md` §7 for the full flow.
+  and `NUXT_TURNSTILE_SECRET_KEY` values). See `docs/systems/imports.md` for the full flow.
 - Most static game-data routes (`/api/tarkov/*`) are not enrolled in this limiter. They are served
   through `edgeCache` with CDN/WAF abuse protection and have no route-specific rate limit. The
   `/api/tarkov/cache-meta` endpoint is an exception — it queries Supabase directly and relies on its

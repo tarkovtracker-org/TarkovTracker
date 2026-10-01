@@ -49,9 +49,9 @@ or test logic changes make it relevant.
   with the database functions and preserve Seasonal history.
 - Secrets stay in runtime env or platform secret stores under canonical names; never commit
   credentials, service-role keys, or generated secret-bearing files.
-- Overlay consumers enforce HTTPS and preserve the cache/adaptation/overlay ordering in the systems doc; task patches keep the raw upstream trader requirement shape before adaptation.
+- Overlay consumers enforce HTTPS and preserve the cache/adaptation/overlay ordering in the systems spec (`docs/systems/`); task patches keep the raw upstream trader requirement shape before adaptation.
 - Applied/shared migrations are immutable. Never run remote migration repair, reset, or squash as
-  routine cleanup. Inspect production only through the read-only `scripts/prod-db` observer.
+  routine cleanup. Inspect production only through the read-only `scripts/ops/prod-db` observer.
 
 ## Scoped rules — read before editing
 
@@ -85,7 +85,7 @@ merges require separate explicit authorization.
 - Automatic Codex reviews should be disabled in the dashboard; repository text does not verify
   dashboard state. Request Codex only when CodeRabbit PR and CLI reviews are rate-limited, or for
   the final pre-merge review of a risky change. Use only
-  `node scripts/codex-review.mjs <PR> --request --wait-seconds 600` when posting is authorized;
+  `node scripts/codex-review/codex-review.mjs <PR> --request --wait-seconds 600` when posting is authorized;
   never post raw `@codex review` comments. For read-only status/waiting, omit `--request`.
   Pending, running, unknown, or timed-out reviews remain incomplete; never bypass the guard or
   repost to speed up a review. Completion does not mean findings are resolved.

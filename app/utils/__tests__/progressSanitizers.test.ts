@@ -1,3 +1,4 @@
+import { API_UPDATE_TASK_LIMIT } from '@shared/utils/apiTaskUpdates';
 import { describe, expect, it } from 'vitest';
 import { ACTIVE_SEASON_NUMBER, MAX_SKILL_LEVEL } from '@/utils/constants';
 import {
@@ -119,6 +120,37 @@ describe('sanitizeOwnedProgressData', () => {
     });
     expect(result.apiUpdateHistory).toEqual([{ at: millisecondAt, id: 'sync-1', source: 'api' }]);
     expect(result.lastApiUpdate).toEqual({ at: millisecondAt, id: 'sync-1', source: 'api' });
+  });
+  it('keeps active API task updates and caps each entry at the shared task limit', () => {
+    const tasks = Array.from({ length: 25 }, (_, index) => ({
+      id: `task-${index}`,
+      state: index === 0 ? 'active' : 'completed',
+    }));
+    const result = sanitizeOwnedProgressData({
+      apiUpdateHistory: [{ at: 2, id: 'batch', source: 'api', tasks }],
+      lastApiUpdate: {
+        at: 3,
+        id: 'capped',
+        source: 'api',
+        taskCount: 300,
+        tasks: [{ id: '', state: 'completed' }, ...tasks.slice(0, 2)],
+      },
+    });
+    expect(result.apiUpdateHistory?.find((entry) => entry.id === 'batch')).toEqual({
+      at: 2,
+      id: 'batch',
+      source: 'api',
+      tasks: tasks.slice(0, API_UPDATE_TASK_LIMIT),
+      taskCount: 25,
+    });
+    expect(result.lastApiUpdate).toEqual({
+      at: 3,
+      id: 'capped',
+      source: 'api',
+      tasks: tasks.slice(0, 2),
+      taskCount: 300,
+    });
+    expect(sanitizeOwnedProgressData(result).apiUpdateHistory).toEqual(result.apiUpdateHistory);
   });
   it('returns the default sanitized state for nullish input', () => {
     const nullResult = sanitizeOwnedProgressData(null);
