@@ -203,7 +203,7 @@
     { icon: 'i-mdi-api', label: t('page.supporter.perk_api_rate_limit') },
     {
       icon: 'i-mdi-calendar-clock',
-      label: t('page.supporter.perk_data_retention'),
+      label: t('page.supporter.perk_one_time_retention'),
     },
   ]);
   const baseAmount = computed(() => numericAmount.value || ONE_TIME_BASE);
