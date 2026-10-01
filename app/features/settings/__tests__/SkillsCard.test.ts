@@ -18,6 +18,7 @@ const i18n = createI18n({
     es: {},
     fr: {},
     it: {},
+    ja: {},
     ru: {},
     uk: {},
     zh: {},
