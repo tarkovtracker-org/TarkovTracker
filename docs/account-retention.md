@@ -4,7 +4,7 @@
 
 The English policy source is `page.account_retention` in
 [`app/locales/en.json`](../app/locales/en.json), rendered by
-[`AccountRetentionPolicy.vue`](../app/components/AccountRetentionPolicy.vue) in the Terms,
+[`AccountRetentionPolicy.vue`](../app/components/AccountRetentionPolicy.vue) in the Terms and
 Privacy Policy. The [supporter page](../app/pages/supporter.vue) presents brief benefit and policy
 summaries with links to the full Terms and Privacy Policy. These protections concern intentional
 inactivity cleanup while the service operates, with the public qualifications for service closure,
