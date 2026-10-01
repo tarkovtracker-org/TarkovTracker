@@ -43,23 +43,25 @@ function cachedExchange(cache, origin, exchange, now = Date.now) {
   pending.catch(() => cache.delete(origin));
   return pending;
 }
-async function exchangeServiceToken(request, origin, headers) {
-  const response = await request.get(`${origin}/`, { headers, maxRedirects: 0 });
-  return acceptedAccessSession(response.status(), response.headersArray());
-}
-export async function previewAccessSession(request, origin, env = process.env) {
-  const headers = previewAccessHeaders(env);
-  if (!Object.keys(headers).length) return '';
-  return cachedExchange(sessions, origin, () => exchangeServiceToken(request, origin, headers));
-}
-const fetchSessions = new Map();
 const EXCHANGE_TIMEOUT_MS = 15000;
 async function exchangeServiceTokenWithFetch(origin, fetchImpl, headers, timeoutMs) {
   const signal = AbortSignal.timeout(timeoutMs);
-  const response = await fetchImpl(`${origin}/`, { redirect: 'manual', headers, signal });
-  const cookies = response.headers.getSetCookie?.() ?? [];
-  const headersArray = cookies.map((value) => ({ name: 'set-cookie', value }));
-  return acceptedAccessSession(response.status, headersArray);
+  let response;
+  try {
+    response = await fetchImpl(`${origin}/`, { redirect: 'manual', headers, signal });
+  } catch {
+    // Transport diagnostics can contain reusable credentials. Never retain the original error
+    // (including its cause) in Playwright reports or runner poll logs.
+    throw new Error('Preview Access session exchange failed.');
+  }
+  try {
+    const cookies = response.headers.getSetCookie?.() ?? [];
+    const headersArray = cookies.map((value) => ({ name: 'set-cookie', value }));
+    return acceptedAccessSession(response.status, headersArray);
+  } finally {
+    // Only headers are needed. Cancel rather than consume a potentially stalled response body.
+    void response.body?.cancel().catch(() => {});
+  }
 }
 /** Fetch-based variant for runner polls: a bounded exchange per origin, then only the session. */
 export async function previewAccessCookieHeaders(
@@ -70,19 +72,24 @@ export async function previewAccessCookieHeaders(
 ) {
   const headers = previewAccessHeaders(env);
   if (!Object.keys(headers).length) return {};
-  const session = await cachedExchange(fetchSessions, origin, () =>
+  const session = await cachedExchange(sessions, origin, () =>
     exchangeServiceTokenWithFetch(origin, fetchImpl, headers, timeoutMs)
   );
   return { cookie: `${ACCESS_SESSION_COOKIE}=${session}` };
 }
+// Keep reusable credentials out of Playwright's instrumented request client entirely.
+export async function previewAccessSession(origin, env = process.env, fetchImpl = fetch) {
+  const headers = await previewAccessCookieHeaders(origin, fetchImpl, env);
+  return headers.cookie?.slice(`${ACCESS_SESSION_COOKIE}=`.length) ?? '';
+}
 export async function previewGet(request, url, origin) {
   assertPreviewTarget(url, origin);
-  const session = await previewAccessSession(request, origin);
+  const session = await previewAccessSession(origin);
   const headers = session ? { cookie: `${ACCESS_SESSION_COOKIE}=${session}` } : {};
   return request.get(url, { headers, maxRedirects: 0 });
 }
 export async function protectPreviewBrowser(page, request, origin) {
-  const session = await previewAccessSession(request, origin);
+  const session = await previewAccessSession(origin);
   if (!session) return;
   const { hostname } = new URL(origin);
   await page.context().addCookies([
