@@ -1100,7 +1100,7 @@ export type Database = {
           p_seasonal_season_number?: number | null
           p_tarkov_uid: number | null
         }
-        Returns: undefined
+        Returns: Json
       }
       transfer_team_ownership: {
         Args: {

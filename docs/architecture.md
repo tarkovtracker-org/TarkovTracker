@@ -175,6 +175,9 @@ Manages isolated progress for persistent PvP, persistent PvE, and numbered Seaso
 
 - A linked tarkov.dev account is represented by a single persisted `tarkovUid`.
 - The app does **not** persist a long-lived "linked mode" or "imported mode" field.
+- A Tarkov UID is linked to at most one account. An import reports success only after the cloud save
+  accepts it; a UID already linked elsewhere is reported and not linked, while the imported progress
+  is still saved.
 - Unlinking a tarkov.dev account clears only the saved `tarkovUid`; it does not roll back imported
   progress, profile, skill, level, edition, or prestige fields.
 - Refetching a linked profile asks for a profile mode because PvP, PvE, and Seasonal profile JSON

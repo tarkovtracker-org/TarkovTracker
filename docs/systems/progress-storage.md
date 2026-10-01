@@ -32,7 +32,11 @@ flowchart LR
    concurrent account-row updates, updates account metadata, mirrors persistent PvP/PvE for older
    clients, and upserts each normalized row. The caller passes the season number its bundle was
    built for; the function writes the Seasonal row only when that number equals the database's
-   active season, so a cached client from a previous season cannot upload stale Seasonal state. A
+   active season, so a cached client from a previous season cannot upload stale Seasonal state. The
+   Tarkov UID link is applied last in its own savepoint: a UID another account owns keeps the stored
+   link, still commits the progress, and is returned as `tarkov_uid_conflict`; the client then drops
+   the UID locally and tells the user (migration
+   `20261001200000_decouple_tarkov_uid_link_from_progress_sync.sql`). A
    client sync carries only the modes that differ from the copy the server last loaded,
    acknowledged, or delivered through Realtime for this session
    (`app/stores/tarkov/acknowledgedModes.ts`); an omitted mode is kept as stored. Background and

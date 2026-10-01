@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { defaultState } from '@/stores/progressState';
 import {
   loadModeProgress,
+  onTarkovUidConflict,
   syncProgressState,
   type ModeProgressClient,
   type ProgressRpcClient,
@@ -15,6 +16,35 @@ describe('progress persistence error handling', () => {
       'sync_user_game_mode_progress',
       expect.objectContaining({ p_seasonal_season_number: ACTIVE_SEASON_NUMBER })
     );
+  });
+  it('reports a UID the server kept unlinked while still resolving the sync', async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { tarkov_uid: 7, tarkov_uid_conflict: true },
+      error: null,
+    });
+    const listener = vi.fn();
+    const stop = onTarkovUidConflict(listener);
+    const result = await syncProgressState({ rpc } as ProgressRpcClient, 'user-1', {
+      ...defaultState,
+      tarkovUid: 1001,
+    });
+    stop();
+    expect(result.error).toBeNull();
+    expect(listener).toHaveBeenCalledWith('user-1', { rejectedUid: 1001, storedUid: 7 });
+  });
+  it('does not report a conflict for an accepted link', async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { tarkov_uid: 1001, tarkov_uid_conflict: false },
+      error: null,
+    });
+    const listener = vi.fn();
+    const stop = onTarkovUidConflict(listener);
+    await syncProgressState({ rpc } as ProgressRpcClient, 'user-2', {
+      ...defaultState,
+      tarkovUid: 1001,
+    });
+    stop();
+    expect(listener).not.toHaveBeenCalled();
   });
   it('uses only active mode timestamps when establishing startup freshness', async () => {
     const query = Promise.resolve({

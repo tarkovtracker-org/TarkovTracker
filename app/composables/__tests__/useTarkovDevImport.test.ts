@@ -27,6 +27,8 @@ const mockLogger = {
 };
 const tarkovStore = {
   getCurrentGameMode: vi.fn<() => GameMode>(() => 'pvp'),
+  getTarkovUid: vi.fn<() => number | null>(),
+  saveProgressNow: vi.fn<() => Promise<boolean>>(),
   setDisplayName: vi.fn(),
   setGameEdition: vi.fn(),
   setLevel: vi.fn(),
@@ -94,6 +96,12 @@ describe('useTarkovDevImport', () => {
     vi.resetAllMocks();
     vi.stubGlobal('$fetch', mockFetch);
     tarkovStore.getCurrentGameMode.mockReturnValue('pvp');
+    let linkedUid: number | null = null;
+    tarkovStore.setTarkovUid.mockImplementation((uid: number | null) => {
+      linkedUid = uid;
+    });
+    tarkovStore.getTarkovUid.mockImplementation(() => linkedUid);
+    tarkovStore.saveProgressNow.mockResolvedValue(true);
     mockGetImportCooldownRemainingMs.mockReturnValue(0);
     mockUseRuntimeConfig.mockReturnValue({
       public: { tarkovDevImportCooldownMinutes: 60 },
@@ -328,6 +336,32 @@ describe('useTarkovDevImport', () => {
     expect(mockRecordImportCompletion).toHaveBeenCalledWith(8560316, 'seasonal', 60 * 60_000);
     expect(tarkovStore.switchGameMode).toHaveBeenNthCalledWith(2, 'pvp');
     expect(composable.importState.value).toBe('success');
+  });
+  it('reports a UID owned by another account instead of success', async () => {
+    mockFetch.mockResolvedValue({ aid: 8560316 });
+    mockParseTarkovDevProfile.mockReturnValue({
+      data: createImportData({ tarkovUid: 8560316 }),
+      ok: true,
+    });
+    tarkovStore.saveProgressNow.mockImplementation(async () => {
+      tarkovStore.setTarkovUid(null);
+      return true;
+    });
+    const composable = await loadComposable();
+    await composable.parseProfileUrl('https://tarkov.dev/players/pve/8560316');
+    await composable.confirmImport('pve');
+    expect(composable.importState.value).toBe('error');
+    expect(composable.importErrorCode.value).toBe('tarkov_uid_conflict');
+    expect(mockRecordImportCompletion).not.toHaveBeenCalled();
+  });
+  it('does not report success before the import is saved', async () => {
+    mockParseTarkovDevProfile.mockReturnValue({ data: createImportData(), ok: true });
+    tarkovStore.saveProgressNow.mockResolvedValue(false);
+    const composable = await loadComposable();
+    await composable.parseFile(createFile('{"aid":123}'));
+    await composable.confirmImport('pvp');
+    expect(composable.importState.value).toBe('error');
+    expect(composable.importErrorCode.value).toBe('save_failed');
   });
   it('does not record a cooldown for file imports', async () => {
     mockParseTarkovDevProfile.mockReturnValue({

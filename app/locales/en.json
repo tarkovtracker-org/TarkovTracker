@@ -233,6 +233,10 @@
       "title": "Cloud progress synced",
       "description": "Synced progress from another tab/device and merged {count} local differences."
     },
+    "tarkov_uid_conflict": {
+      "title": "Tarkov profile not linked",
+      "description": "Tarkov UID {uid} is already linked to another TarkovTracker account, so it was not linked to this one. Your progress was still saved. Unlink it from the other account, or import your own profile."
+    },
     "load_failed": {
       "title": "Unable to load progress",
       "description": "We detected an issue loading your account data. Please refresh the page or contact support if this persists."
@@ -2502,7 +2506,9 @@
         "profile_not_generated": "Tarkov.dev has no snapshot for this profile yet. Open the profile page on Tarkov.dev once, let it load, then fetch again.",
         "rate_limited": "Too many import attempts. Wait about {minutes} min, then try again.",
         "verification_failed": "Human verification failed. Reload the page and try again.",
-        "fetch_failed": "Unable to fetch the Tarkov.dev profile. Open the profile on Tarkov.dev, then try again."
+        "fetch_failed": "Unable to fetch the Tarkov.dev profile. Open the profile on Tarkov.dev, then try again.",
+        "tarkov_uid_conflict": "This Tarkov profile is already linked to another TarkovTracker account, so it was not linked here. The imported progress was saved. Unlink it from the other account, then import again.",
+        "save_failed": "The profile was imported on this device, but it could not be saved to your account yet. Check your connection; the import stays on this device until it syncs."
       }
     },
     "device_data": {

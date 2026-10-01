@@ -16,6 +16,7 @@ import {
 } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { hasMaterializedProgress } from '@/utils/modeProgressFallback';
+import { isRecord, sanitizeTarkovUid } from '@/utils/progressSanitizers';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 type SupabaseError = { code?: string; message: string };
 export type ProgressRpcClient = {
@@ -108,7 +109,23 @@ const toModeBatches = (modes: ModeProgressMap): ModeProgressMap[] => {
 const SPLIT_SYNC_INTERRUPTED = { message: 'Progress sync superseded by newer state' };
 type ProgressSyncResult<TError> = { error: TError | typeof SPLIT_SYNC_INTERRUPTED };
 type ProgressSyncClient<TError> = {
-  rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{ error: TError }>;
+  rpc: (
+    name: string,
+    args: Record<string, unknown>
+  ) => PromiseLike<{ data?: unknown; error: TError }>;
+};
+/** The sync RPC kept `storedUid` because another account already owns `rejectedUid`. */
+type TarkovUidConflict = { rejectedUid: number; storedUid: number | null };
+type TarkovUidConflictListener = (userId: string, conflict: TarkovUidConflict) => void;
+const tarkovUidConflictListeners = new Set<TarkovUidConflictListener>();
+export const onTarkovUidConflict = (listener: TarkovUidConflictListener): (() => void) => {
+  tarkovUidConflictListeners.add(listener);
+  return () => tarkovUidConflictListeners.delete(listener);
+};
+const reportTarkovUidConflict = (userId: string, data: unknown, rejectedUid: number | null) => {
+  if (rejectedUid === null || !isRecord(data) || data.tarkov_uid_conflict !== true) return;
+  const conflict = { rejectedUid, storedUid: sanitizeTarkovUid(data.tarkov_uid) };
+  for (const listener of tarkovUidConflictListeners) listener(userId, conflict);
 };
 type ProgressAcknowledgement = ReturnType<typeof beginAcknowledgement>;
 /** Keep an outstanding account write ordered even across sign-out and same-account startup. */
@@ -176,7 +193,7 @@ const sendModeBatch = async <TError>(
 ): Promise<ProgressSyncResult<TError>> => {
   if (!sync.isCurrent()) return { error: SPLIT_SYNC_INTERRUPTED };
   invalidateAcknowledgedModes(userId, batch);
-  let result: { error: TError };
+  let result: { data?: unknown; error: TError };
   try {
     result = await client.rpc('sync_user_game_mode_progress', {
       p_current_game_mode: payload.current_game_mode,
@@ -190,6 +207,8 @@ const sendModeBatch = async <TError>(
     // An uncertain/stale result must not leave that copy looking acknowledged.
     invalidateAcknowledgedModes(userId, batch);
   }
+  // The link outcome is server state, so it is reported even when this sync was superseded.
+  reportTarkovUidConflict(userId, result.data, payload.tarkov_uid);
   return sync.isCurrent() ? result : { error: SPLIT_SYNC_INTERRUPTED };
 };
 const sendProgressBatches = async <TError>(
