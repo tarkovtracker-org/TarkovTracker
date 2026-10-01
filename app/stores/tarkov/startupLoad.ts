@@ -308,7 +308,11 @@ const acknowledgeRemoteModes = (
   const clean = GAME_MODE_VALUES.filter(
     (mode) => !hasDeprecatedTarkovDevProfileData(payloads[mode])
   );
-  recordAcknowledgedModes(userId, Object.fromEntries(clean.map((mode) => [mode, state[mode]])));
+  recordAcknowledgedModes(
+    userId,
+    Object.fromEntries(clean.map((mode) => [mode, state[mode]])),
+    state
+  );
 };
 type RemoteLoad =
   { ok: false } | { ok: true; hadRemoteData: boolean; remote: RemoteProgress | null };
@@ -394,8 +398,9 @@ const logStartupMerge = (local: UserState, remote: UserState): void =>
   });
 const upload = async (ctx: StartupLoadContext, state: UserState, failure: string) => {
   recordLocalSyncTime();
-  const { error } = await syncProgressState(ctx.client, ctx.userId, state);
+  const { error, tarkovUidConflict } = await syncProgressState(ctx.client, ctx.userId, state);
   ensureCurrent(ctx);
+  if (tarkovUidConflict) state.tarkovUid = tarkovUidConflict.storedUid;
   if (error) logger.error(failure, error);
   return !error;
 };

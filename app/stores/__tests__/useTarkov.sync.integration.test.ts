@@ -14,6 +14,7 @@ import {
   setActiveProgressWritesBlocked,
   progressPersistStorage,
 } from '@/stores/tarkov/localStorage';
+import { syncProgressState, type ProgressRpcClient } from '@/stores/tarkov/progressPersistence';
 import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
 import {
   initializeTarkovSync,
@@ -123,7 +124,7 @@ const {
   type RemoteRow = ReturnType<typeof createRemoteRow>;
   type SupabaseErrorLike = { code?: string; message: string } | null;
   type SingleResult = { data: RemoteRow | null; error: SupabaseErrorLike };
-  type RpcResult = { error: SupabaseErrorLike };
+  type RpcResult = { data?: unknown; error: SupabaseErrorLike };
   type SyncRpcArgs = {
     p_current_game_mode: string;
     p_game_edition: number;
@@ -299,6 +300,7 @@ vi.mock('@/composables/supabase/useSupabaseSync', () => ({
 }));
 vi.mock('@/composables/useToastI18n', () => ({
   useToastI18n: () => ({
+    showTarkovUidConflict: vi.fn(),
     showApiUpdated,
     showHideoutUpdated: vi.fn(),
     showLoadFailed,
@@ -549,6 +551,139 @@ const expectNoFollowOnSessionActivity = (
   expect(after.userFilters).toEqual(baseline.userFilters);
 };
 describe('useTarkov sync integration', () => {
+  it('keeps the requested UID visible when the interim metadata echo arrives before an accepted RPC reply', async () => {
+    single.mockResolvedValue({ data: createRemoteRow({ tarkov_uid: 7 }), error: null });
+    await initializeTarkovSync();
+    const store = useTarkovStore();
+    store.setTarkovUid(1001);
+    const deferred = Promise.withResolvers<{ data: unknown; error: null }>();
+    const pending = syncProgressState(
+      { rpc: () => deferred.promise } as ProgressRpcClient,
+      'user-1',
+      store.$state
+    );
+    getRealtimeCallback()?.({
+      new: createRemoteRow({
+        tarkov_uid: 7,
+        updated_at: new Date(Date.now() + 1000).toISOString(),
+      }),
+      old: null,
+    });
+    expect(store.tarkovUid).toBe(1001);
+    deferred.resolve({ data: { tarkov_uid: 1001, tarkov_uid_conflict: false }, error: null });
+    expect((await pending).error).toBeNull();
+    expect(store.tarkovUid).toBe(1001);
+  });
+  it('keeps a newer UID edit when an older link is rejected', async () => {
+    await initializeTarkovSync();
+    const store = useTarkovStore();
+    store.setTarkovUid(1001);
+    const deferred = Promise.withResolvers<{ data: unknown; error: null }>();
+    const pending = syncProgressState(
+      { rpc: () => deferred.promise } as ProgressRpcClient,
+      'user-1',
+      store.$state
+    );
+    store.setTarkovUid(2002);
+    deferred.resolve({ data: { tarkov_uid: null, tarkov_uid_conflict: true }, error: null });
+    await pending;
+    expect(store.tarkovUid).toBe(2002);
+  });
+  it('persists the corrected UID when migrating guest progress to a new account', async () => {
+    const data = structuredClone(defaultState);
+    data.tarkovUid = 1001;
+    data.pvp.level = 12;
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({ _userId: null, _timestamp: Date.now(), data })
+    );
+    const pinia = createPinia().use(piniaPluginPersistedstate);
+    createApp({}).use(pinia);
+    setActivePinia(pinia);
+    single.mockResolvedValue({ data: null, error: { code: 'PGRST116', message: 'No rows' } });
+    rpc.mockResolvedValue({ data: { tarkov_uid: null, tarkov_uid_conflict: true }, error: null });
+    await initializeTarkovSync();
+    await nextTick();
+    const envelope = JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!);
+    expect(envelope._userId).toBe('user-1');
+    expect(envelope.data.tarkovUid).toBeNull();
+    expect(useTarkovStore().tarkovUid).toBeNull();
+    expect(useTarkovStore().pvp.level).toBe(12);
+  });
+  it.each(['logout', 'same-account-reset', 'A-B-A'])(
+    'ignores delayed UID conflicts after %s',
+    async (transition) => {
+      await initializeTarkovSync();
+      const store = useTarkovStore();
+      store.setTarkovUid(1001);
+      let resolve!: (value: { data: unknown; error: null }) => void;
+      const client = {
+        rpc: vi.fn(
+          () =>
+            new Promise<{ data: unknown; error: null }>((done) => {
+              resolve = done;
+            })
+        ),
+      };
+      const pending = syncProgressState(client as ProgressRpcClient, 'user-1', store.$state);
+      resetTarkovSync('abandoned owner');
+      if (transition === 'logout') {
+        supabaseContext.user.loggedIn = false;
+        supabaseContext.user.id = '';
+      } else {
+        if (transition === 'A-B-A') {
+          supabaseContext.user.id = 'user-2';
+          resetTarkovSync('switch back');
+          supabaseContext.user.id = 'user-1';
+        }
+        await initializeTarkovSync();
+      }
+      store.setTarkovUid(1001);
+      resolve({ data: { tarkov_uid: null, tarkov_uid_conflict: true }, error: null });
+      await pending;
+      expect(store.tarkovUid).toBe(1001);
+    }
+  );
+  it('keeps a startup UID correction in the merged store and persisted envelope', async () => {
+    const data = structuredClone(defaultState);
+    data.tarkovUid = 1001;
+    data.pvp.level = 12;
+    localStorage.setItem(
+      STORAGE_KEYS.progress,
+      JSON.stringify({
+        _userId: 'user-1',
+        _timestamp: Date.now(),
+        _modeTimestamps: { pvp: Date.now(), pve: 0, seasonal: 0 },
+        data,
+      })
+    );
+    const pinia = createPinia().use(piniaPluginPersistedstate);
+    createApp({}).use(pinia);
+    setActivePinia(pinia);
+    single.mockResolvedValue({ data: createRemoteRow({ updated_at: null }), error: null });
+    modeProgressResult.data = [
+      {
+        game_mode: 'pve',
+        season_number: 0,
+        progress_data: progressWithLevel(8),
+        progress_updated_at: new Date(Date.now() + 1000).toISOString(),
+      },
+    ];
+    rpc.mockResolvedValue({ data: { tarkov_uid: null, tarkov_uid_conflict: true }, error: null });
+    await initializeTarkovSync();
+    const store = useTarkovStore();
+    expect(store.tarkovUid).toBeNull();
+    expect(store.pvp.level).toBe(12);
+    expect(store.pve.level).toBe(8);
+    await nextTick();
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.progress)!).data.tarkovUid).toBeNull();
+    await syncProgressState(
+      supabaseContext.client as unknown as ProgressRpcClient,
+      'user-1',
+      store.$state
+    );
+    expect(getLastSyncPayload().p_tarkov_uid).toBeNull();
+  });
   beforeEach(() => {
     resetTarkovSync('test setup');
     resetAccountRecoveryRetentionBlock();

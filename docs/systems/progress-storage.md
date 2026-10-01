@@ -35,7 +35,12 @@ flowchart LR
    active season, so a cached client from a previous season cannot upload stale Seasonal state. The
    Tarkov UID link is applied last in its own savepoint: a UID another account owns keeps the stored
    link, still commits the progress, and is returned as `tarkov_uid_conflict`; the client then drops
-   the UID locally and tells the user (migration
+   the UID locally and tells the user. Conflict outcomes also correct startup's merged snapshot
+   before it is assigned or persisted. Session reset removes the conflict listener; request ownership
+   and live identity fence delayed replies, including a later session for the same account.
+   Split saves recognize the known stored-UID metadata echo until the link settles, then use the
+   stored link for any remaining batches. Imports wait for persistence with controls disabled and
+   ignore completions from an abandoned preview or session (migration
    `20261001200000_decouple_tarkov_uid_link_from_progress_sync.sql`). A
    client sync carries only the modes that differ from the copy the server last loaded,
    acknowledged, or delivered through Realtime for this session

@@ -1,5 +1,6 @@
 import { useSkillCalculation } from '@/composables/useSkillCalculation';
 import { useXpCalculation } from '@/composables/useXpCalculation';
+import { captureStartupOwnership } from '@/stores/tarkov/startupOwnership';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { isGameMode, type GameMode } from '@/utils/constants';
@@ -13,6 +14,7 @@ import {
   resolveTarkovDevProfileSource,
   type TarkovDevProfileSource,
 } from '@/utils/tarkovDevProfileSource';
+import { getCurrentSupabaseUserId } from '@/utils/userScopedStorage';
 export type ImportState = 'idle' | 'loading' | 'preview' | 'success' | 'error';
 export type ImportErrorCode =
   | 'cooldown_active'
@@ -24,6 +26,7 @@ export type ImportErrorCode =
   | 'tarkov_uid_conflict'
   | 'save_failed';
 export interface UseTarkovDevImportReturn {
+  isImporting: Ref<boolean>;
   importState: Ref<ImportState>;
   previewData: Ref<TarkovDevImportResult | null>;
   importError: Ref<string | null>;
@@ -94,12 +97,14 @@ function classifyProfileUrlError(error: unknown): CodedImportError {
   return rule?.(readErrorCode(data), data) ?? { code: 'fetch_failed', meta: null };
 }
 export function useTarkovDevImport(): UseTarkovDevImportReturn {
+  const { $supabase } = useNuxtApp();
   const tarkovStore = useTarkovStore();
   const metadataStore = useMetadataStore();
   const runtimeConfig = useRuntimeConfig();
   const { setTotalSkillLevel } = useSkillCalculation();
   const { setTotalXP } = useXpCalculation();
   const importState = ref<ImportState>('idle');
+  const isImporting = ref(false);
   const previewData = ref<TarkovDevImportResult | null>(null);
   const importError = ref<string | null>(null);
   const importErrorCode = ref<ImportErrorCode | null>(null);
@@ -284,10 +289,13 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
   }
   async function runImport(
     data: TarkovDevImportResult,
+    isCurrent: () => boolean,
     editionOverride?: number | null
   ): Promise<void> {
+    if (!isCurrent()) return;
     applyImportData(data, editionOverride);
     const saveError = await saveImport(data.tarkovUid);
+    if (!isCurrent()) return;
     if (saveError) {
       setCodedError('Failed to save import data', saveError, null);
       return;
@@ -305,15 +313,17 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
   async function importIntoMode(
     data: TarkovDevImportResult,
     targetMode: GameMode,
+    isCurrent: () => boolean,
+    ownsSession: () => boolean,
     editionOverride?: number | null
   ): Promise<void> {
     const originalMode = tarkovStore.getCurrentGameMode();
-    if (targetMode === originalMode) return runImport(data, editionOverride);
+    if (targetMode === originalMode) return runImport(data, isCurrent, editionOverride);
     try {
       await tarkovStore.switchGameMode(targetMode);
-      await runImport(data, editionOverride);
+      await runImport(data, isCurrent, editionOverride);
     } finally {
-      await restoreGameMode(originalMode);
+      if (ownsSession()) await restoreGameMode(originalMode);
     }
   }
   async function confirmImport(
@@ -321,16 +331,30 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     editionOverride?: number | null
   ): Promise<void> {
     const data = previewData.value;
+    if (isImporting.value) return;
     if (!data || !isGameMode(targetMode)) return;
+    const requestId = profileUrlRequestId;
+    const ownerId = getCurrentSupabaseUserId();
+    const ownsGeneration = captureStartupOwnership();
+    const ownsSession = () =>
+      ownsGeneration() &&
+      getCurrentSupabaseUserId() === ownerId &&
+      $supabase.user.loggedIn === (ownerId !== null);
+    const isCurrent = () => ownsSession() && isCurrentRequest(requestId);
+    isImporting.value = true;
     try {
-      await importIntoMode(data, targetMode, editionOverride);
+      await importIntoMode(data, targetMode, isCurrent, ownsSession, editionOverride);
     } catch (e) {
+      if (!isCurrent()) return;
       importState.value = 'error';
       importError.value = 'Failed to apply import data';
       logger.error('[TarkovDevImport] Import error:', e);
+    } finally {
+      isImporting.value = false;
     }
   }
   return {
+    isImporting,
     importState,
     previewData,
     importError,

@@ -543,6 +543,8 @@ export function resetTarkovSync(
   options?: { preservePersistedStateForUserId?: string | null }
 ) {
   invalidateStartupOwnership();
+  stopTarkovUidConflictWatch?.();
+  stopTarkovUidConflictWatch = null;
   progressSync.preserveSnapshot(options);
   progressSync.reset(reason);
 }
@@ -701,10 +703,12 @@ let stopTarkovUidConflictWatch: (() => void) | null = null;
 const watchTarkovUidConflicts = (
   store: TarkovStore,
   ownerId: string,
-  toastI18n: ReturnType<typeof useToastI18n>
+  toastI18n: ReturnType<typeof useToastI18n>,
+  isCurrent: StartupOwnershipGuard
 ): void => {
   stopTarkovUidConflictWatch?.();
   stopTarkovUidConflictWatch = onTarkovUidConflict((userId, conflict) => {
+    if (!isCurrent()) return;
     if (userId !== ownerId || store.$state.tarkovUid !== conflict.rejectedUid) return;
     store.setTarkovUid(conflict.storedUid);
     toastI18n.showTarkovUidConflict(conflict.rejectedUid);
@@ -806,8 +810,8 @@ export async function initializeTarkovSync() {
     return;
   }
   if (!claimSyncStartup(userId)) return;
-  watchTarkovUidConflicts(tarkovStore, userId, toastI18n);
   const isStartupCurrent = beginOwnedStartup(userId);
+  watchTarkovUidConflicts(tarkovStore, userId, toastI18n, isStartupCurrent);
   logger.debug('[TarkovStore] Setting up Supabase sync and listener');
   const preservedSnapshot = selectStartupSnapshot(userId, toastI18n);
   // Load completes BEFORE sync starts, so empty local state never overwrites server data.

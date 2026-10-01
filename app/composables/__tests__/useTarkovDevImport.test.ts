@@ -1,8 +1,16 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { invalidateStartupOwnership } from '@/stores/tarkov/startupOwnership';
 import type { GameMode } from '@/utils/constants';
 import type { TarkovDevImportResult } from '@/utils/tarkovDevProfileParser';
+const { importSession } = vi.hoisted(() => ({
+  importSession: { userId: 'user-1', loggedIn: true },
+}));
+mockNuxtImport('useNuxtApp', () => () => ({ $supabase: { user: importSession } }));
+vi.mock('@/utils/userScopedStorage', () => ({
+  getCurrentSupabaseUserId: () => importSession.userId,
+}));
 const mockFetch = vi.fn();
 const mockParseTarkovDevProfile = vi.fn();
 const mockSetTotalSkillLevel = vi.fn();
@@ -92,7 +100,72 @@ const loadComposable = async () => {
   return module.useTarkovDevImport();
 };
 describe('useTarkovDevImport', () => {
+  it.each(['account-switch', 'same-account-reset', 'logout-before-auth-watcher'])(
+    'does not finish or restore modes after %s',
+    async (transition) => {
+      mockParseTarkovDevProfile.mockReturnValue({ data: createImportData(), ok: true });
+      let resolve!: (saved: boolean) => void;
+      tarkovStore.saveProgressNow.mockImplementation(
+        () =>
+          new Promise<boolean>((done) => {
+            resolve = done;
+          })
+      );
+      const composable = await loadComposable();
+      await composable.parseFile(createFile('{}'));
+      const pending = composable.confirmImport('pve');
+      await Promise.resolve();
+      if (transition === 'account-switch') importSession.userId = 'user-2';
+      else if (transition === 'same-account-reset') invalidateStartupOwnership();
+      else importSession.loggedIn = false;
+      resolve(true);
+      await pending;
+      expect(composable.importState.value).toBe('preview');
+      expect(tarkovStore.switchGameMode).toHaveBeenCalledTimes(1);
+      expect(mockRecordImportCompletion).not.toHaveBeenCalled();
+    }
+  );
+  it.each(['cancel', 'new-preview'])(
+    'ignores a pending save completion after %s',
+    async (action) => {
+      mockParseTarkovDevProfile.mockReturnValue({ data: createImportData(), ok: true });
+      let resolve!: (saved: boolean) => void;
+      tarkovStore.saveProgressNow.mockImplementation(
+        () =>
+          new Promise<boolean>((done) => {
+            resolve = done;
+          })
+      );
+      const composable = await loadComposable();
+      await composable.parseFile(createFile('{}'));
+      const pending = composable.confirmImport('pvp');
+      if (action === 'cancel') composable.reset();
+      else await composable.parseFile(createFile('{}'));
+      resolve(true);
+      await pending;
+      expect(composable.importState.value).toBe(action === 'cancel' ? 'idle' : 'preview');
+    }
+  );
+  it('only confirms a preview once while its save is pending', async () => {
+    mockParseTarkovDevProfile.mockReturnValue({ data: createImportData(), ok: true });
+    let resolve!: (saved: boolean) => void;
+    tarkovStore.saveProgressNow.mockImplementation(
+      () =>
+        new Promise<boolean>((done) => {
+          resolve = done;
+        })
+    );
+    const composable = await loadComposable();
+    await composable.parseFile(createFile('{}'));
+    const pending = composable.confirmImport('pvp');
+    const duplicate = composable.confirmImport('pvp');
+    expect(tarkovStore.saveProgressNow).toHaveBeenCalledTimes(1);
+    resolve(true);
+    await Promise.all([pending, duplicate]);
+  });
   beforeEach(() => {
+    importSession.userId = 'user-1';
+    importSession.loggedIn = true;
     vi.resetAllMocks();
     vi.stubGlobal('$fetch', mockFetch);
     tarkovStore.getCurrentGameMode.mockReturnValue('pvp');

@@ -15,7 +15,13 @@ let ownerId: string | null = null;
 let acknowledged: ModeProgressMap = {};
 let generation = 0;
 let ownerEpoch = 0;
-type PendingWrite = { expected: ProgressSyncSnapshot | null; disturbed: boolean };
+let acknowledgedUid: number | null | undefined;
+type PendingWrite = {
+  expected: ProgressSyncSnapshot | null;
+  previousUid: number | null | undefined;
+  uidSettled: boolean;
+  disturbed: boolean;
+};
 /** Each queued or dispatched write keeps its own expected-echo scope until it settles. */
 const pendingWrites = new Set<PendingWrite>();
 const toWire = (progress: UserProgressData): UserProgressData =>
@@ -25,6 +31,7 @@ export const clearAcknowledgedModes = (): void => {
   ownerEpoch += 1;
   ownerId = null;
   acknowledged = {};
+  acknowledgedUid = undefined;
   pendingWrites.clear();
 };
 /** Replacing another owner's baseline invalidates that owner's in-flight acknowledgements. */
@@ -34,10 +41,16 @@ const claimOwner = (userId: string): void => {
   ownerEpoch += 1;
   ownerId = userId;
   acknowledged = {};
+  acknowledgedUid = undefined;
 };
 /** Records modes the server holds for `userId`; another owner's baseline is replaced. */
-export const recordAcknowledgedModes = (userId: string, modes: ModeProgressMap): void => {
+export const recordAcknowledgedModes = (
+  userId: string,
+  modes: ModeProgressMap,
+  metadata?: Pick<UserState, 'tarkovUid'>
+): void => {
   claimOwner(userId);
+  if (metadata) acknowledgedUid = metadata.tarkovUid;
   for (const mode of GAME_MODE_VALUES) {
     const progress = modes[mode];
     if (progress) acknowledged[mode] = toWire(progress);
@@ -60,11 +73,20 @@ const matchesWithinScope = (
   );
 const coversScope = (expected: ProgressSyncSnapshot, snapshot: ProgressSyncSnapshot): boolean =>
   Object.keys(snapshot).every((key) => Object.hasOwn(expected, key));
+/** The RPC writes metadata with the stored UID before attempting the requested link. */
+const withoutInterimUid = (
+  write: PendingWrite,
+  snapshot: ProgressSyncSnapshot
+): ProgressSyncSnapshot => {
+  if (write.uidSettled) return snapshot;
+  if (write.previousUid === undefined || snapshot.tarkovUid !== write.previousUid) return snapshot;
+  return { ...snapshot, tarkovUid: write.expected?.tarkovUid };
+};
 /** Updates that match a write's values, or touch only keys it does not write, leave it current. */
 const isCompatible = (write: PendingWrite, update: RemoteProgressUpdate): boolean =>
   write.expected !== null &&
-  matchesWithinScope(write.expected, update.remote) &&
-  matchesWithinScope(write.expected, update.applied);
+  matchesWithinScope(write.expected, withoutInterimUid(write, update.remote)) &&
+  matchesWithinScope(write.expected, withoutInterimUid(write, update.applied));
 /** An exact echo of any pending write carries no foreign state, so it disturbs no queued write. */
 const isEcho = (write: PendingWrite, update: RemoteProgressUpdate): boolean =>
   write.expected !== null &&
@@ -88,7 +110,11 @@ const narrowScope = (
   );
 /** Echoes of pending writes and updates outside a write's scope do not supersede it. */
 export const noteRemoteProgressApplied = (update?: RemoteProgressUpdate): void => {
+  if (update?.remote.tarkovUid !== undefined) acknowledgedUid = update.remote.tarkovUid;
   const writes = [...pendingWrites];
+  for (const write of writes) {
+    if (update?.remote.tarkovUid === write.expected?.tarkovUid) write.uidSettled = true;
+  }
   if (update && writes.some((write) => isEcho(write, update))) return;
   for (const write of writes) {
     if (!update || !isCompatible(write, update)) write.disturbed = true;
@@ -105,6 +131,8 @@ export const beginAcknowledgement = (userId: string, expected?: ProgressSyncSnap
   generation += 1;
   const write: PendingWrite = {
     expected: expected ? (JSON.parse(JSON.stringify(expected)) as ProgressSyncSnapshot) : null,
+    previousUid: acknowledgedUid,
+    uidSettled: false,
     disturbed: false,
   };
   pendingWrites.add(write);
@@ -113,6 +141,12 @@ export const beginAcknowledgement = (userId: string, expected?: ProgressSyncSnap
   const isCurrent = (): boolean => generation === started.generation && isUndisturbed();
   return {
     isCurrent,
+    isOwned: (): boolean => ownerEpoch === started.ownerEpoch,
+    acceptUid: (uid: number | null): void => {
+      write.uidSettled = true;
+      if (write.expected) write.expected.tarkovUid = uid;
+      if (ownerEpoch === started.ownerEpoch) acknowledgedUid = uid;
+    },
     acknowledge: (modes: ModeProgressMap): void => {
       if (isCurrent()) recordAcknowledgedModes(userId, modes);
     },

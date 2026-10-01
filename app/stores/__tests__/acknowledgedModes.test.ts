@@ -40,6 +40,77 @@ const withHeavyModes = (): UserState => {
 const sentModes = (rpc: ReturnType<typeof vi.fn>): Record<string, unknown> =>
   (rpc.mock.calls.at(-1)?.[1] as { p_modes: Record<string, unknown> }).p_modes;
 describe('mode-scoped progress sync', () => {
+  it.each(['before-reply', 'after-reply'])(
+    'continues split linking through interim and final metadata echoes: %s',
+    async (finalTiming) => {
+      recordAcknowledgedModes('user-1', {}, { tarkovUid: 7 });
+      const state = withHeavyModes();
+      state.tarkovUid = 1001;
+      const pending = deferred();
+      const echo = (tarkovUid: number | null) => {
+        const metadata = {
+          currentGameMode: state.currentGameMode,
+          gameEdition: state.gameEdition,
+          tarkovUid,
+        };
+        noteRemoteProgressApplied({ remote: metadata, applied: metadata });
+      };
+      const rpc = vi.fn(async () => {
+        if (rpc.mock.calls.length === 1) {
+          echo(7);
+          if (finalTiming === 'before-reply') echo(1001);
+          await pending.promise;
+        }
+        return { data: { tarkov_uid: 1001, tarkov_uid_conflict: false }, error: null };
+      });
+      const save = syncProgressState({ rpc } as ProgressRpcClient, 'user-1', state);
+      pending.resolve();
+      expect((await save).error).toBeNull();
+      if (finalTiming === 'after-reply') echo(1001);
+      expect(rpc.mock.calls.length).toBe(3);
+    }
+  );
+  it('carries a UID conflict through split batches without resubmitting the rejected UID', async () => {
+    recordAcknowledgedModes('user-1', {}, { tarkovUid: null });
+    const state = withHeavyModes();
+    state.tarkovUid = 1001;
+    const rpc = vi.fn(async (_name: string, args: Record<string, unknown>) => {
+      const metadata = {
+        currentGameMode: state.currentGameMode,
+        gameEdition: state.gameEdition,
+        tarkovUid: null,
+      };
+      noteRemoteProgressApplied({ remote: metadata, applied: metadata });
+      return {
+        data: { tarkov_uid: null, tarkov_uid_conflict: args.p_tarkov_uid === 1001 },
+        error: null,
+      };
+    });
+    const result = await syncProgressState({ rpc } as ProgressRpcClient, 'user-1', state);
+    expect(result.error).toBeNull();
+    expect(result.tarkovUidConflict).toEqual({ rejectedUid: 1001, storedUid: null });
+    expect(rpc.mock.calls.map((call) => call[1].p_tarkov_uid)).toEqual([1001, null, null]);
+  });
+  it('stops a split if the old UID returns after the final link echo', async () => {
+    recordAcknowledgedModes('user-1', {}, { tarkovUid: 7 });
+    const state = withHeavyModes();
+    state.tarkovUid = 1001;
+    const rpc = vi.fn(async () => {
+      for (const tarkovUid of [1001, 7]) {
+        const metadata = {
+          currentGameMode: state.currentGameMode,
+          gameEdition: state.gameEdition,
+          tarkovUid,
+        };
+        noteRemoteProgressApplied({ remote: metadata, applied: metadata });
+      }
+      return { data: { tarkov_uid: 1001, tarkov_uid_conflict: false }, error: null };
+    });
+    expect(
+      (await syncProgressState({ rpc } as ProgressRpcClient, 'user-1', state)).error
+    ).not.toBeNull();
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
   afterEach(() => clearAcknowledgedModes());
   it('persists a revert while an older upload and a direct reset overlap', async () => {
     const baseline = withPvpLevel(5);
