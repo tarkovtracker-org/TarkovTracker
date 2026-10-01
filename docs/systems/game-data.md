@@ -97,6 +97,28 @@ flowchart LR
   respectively. The upstream endpoint catalog is the authority for supported slugs.
 - Language is validated with `getValidatedLanguage()` and defaults to `en`.
 
+### Data layers and contracts
+
+Game data passes through four layers; each consumer should state which one it reads.
+
+- **Raw** — the upstream `json.tarkov.dev` payload, fetched by `app/server/utils/tarkov-json.ts`.
+  Overlay task patches keep this shape for trader requirements (see
+  [Overlay](./overlay-and-precompute.md#behavior-details)).
+- **Adapted** — the client shapes in `app/types/tarkov.ts`, produced by the adapters in
+  `tarkov-json.ts` (`app/server/utils/__tests__/tarkov-json.test.ts`).
+- **Overlay-corrected** — adapted data after `applyOverlay()` (`app/server/utils/overlay.ts`,
+  `app/server/utils/__tests__/overlay.test.ts`); this is what `/api/tarkov/*` serves for overlay
+  endpoints.
+- **Application-derived** — fields TarkovTracker computes after loading, not served by upstream.
+  Task `alternatives` is one: upstream removed the field, and
+  `app/composables/useGraphBuilder.ts` derives it from completion-triggered `failConditions`
+  (`app/composables/__tests__/useGraphBuilder.test.ts`). The API gateway reads tasks without this
+  derivation; see [the data decision record](../decision-tarkov-data.md) for the open target.
+
+Tarkov.dev game data is not TarkovTracker's public API. The `/api/tarkov/*` routes proxy game data
+for the app; the public progress API on `api.tarkovtracker.org` is a separate contract defined by
+`workers/api-gateway/src/openapi.ts` and described in [API](../api.md).
+
 ### Prestige, editions, fleet verification, and cache bundle scope
 
 Prestige and progression-catalog responses await overlay refresh before creating downstream cache entries. Story chapters normalize missing/nonfinite order to zero, and prestige rows fall back to chapter names/IDs when requirement labels are absent.
