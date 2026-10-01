@@ -179,7 +179,7 @@ export class ProgressSyncSession {
   }
   /** Capture (or clear) the persisted snapshot a following startup for `userId` may adopt. */
   preserveSnapshot(options?: { preservePersistedStateForUserId?: string | null }): void {
-    if (!options) {
+    if (!options || !Object.hasOwn(options, 'preservePersistedStateForUserId')) {
       this.pendingResetSnapshot = null;
       return;
     }
@@ -211,7 +211,7 @@ export class ProgressSyncSession {
     this.shownLocalIgnoreReasons.delete(reason);
   }
   /** Tear down the controller, watcher, realtime channel, and per-session sync state. */
-  reset(reason?: string): void {
+  reset(reason?: string, preserveStorageBaselineForUserId?: string): void {
     if (this.controller) {
       logger.debug(`[TarkovStore] Clearing Supabase sync${reason ? ` (${reason})` : ''}`);
       this.controller.cleanup();
@@ -223,7 +223,11 @@ export class ProgressSyncSession {
     this.userId = null;
     this.shownLocalIgnoreReasons.clear();
     resetSyncTimeline();
-    progressStorageSerializer.reset();
+    if (preserveStorageBaselineForUserId) {
+      progressStorageSerializer.retainBaseline(preserveStorageBaselineForUserId);
+    } else {
+      progressStorageSerializer.reset();
+    }
     resetApiUpdateState();
     clearAcknowledgedModes();
   }

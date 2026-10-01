@@ -134,6 +134,9 @@ export const createProgressStorageSerializer = (
     });
   };
   return {
+    retainBaseline: (userId: string) => {
+      if (previous?.storedUserId !== userId) previous = readPrevious(userId);
+    },
     reset: (snapshot: PersistedProgressSnapshot | null = null) => {
       previous = snapshot ? cloneStateSnapshot(snapshot) : null;
     },

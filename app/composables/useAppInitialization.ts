@@ -120,7 +120,7 @@ export function useAppInitialization() {
     // initializeTarkovSync would then skip listener setup on the retry and
     // disconnect cross-device updates. Tear the machinery down so the retry
     // starts from a clean slate.
-    resetTarkovSync('initial sync failed');
+    resetTarkovSync('initial sync failed', { preserveStorageBaselineForUserId: userId });
     // A failed load is not a failed save unless local progress may be waiting for the cloud.
     if (mayHoldUnsyncedProgress(userId)) {
       markCloudSyncUnavailable(() => retrySyncNow(expectedUserId, expectedToken));

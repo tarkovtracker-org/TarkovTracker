@@ -525,11 +525,14 @@ const syncMetadataAfterStartup = (
  */
 export function resetTarkovSync(
   reason?: string,
-  options?: { preservePersistedStateForUserId?: string | null }
+  options?: {
+    preservePersistedStateForUserId?: string | null;
+    preserveStorageBaselineForUserId?: string;
+  }
 ) {
   invalidateStartupOwnership();
   progressSync.preserveSnapshot(options);
-  progressSync.reset(reason);
+  progressSync.reset(reason, options?.preserveStorageBaselineForUserId);
 }
 /**
  * Memory-only edits made while sync was unavailable exist only in the store. Before a retry

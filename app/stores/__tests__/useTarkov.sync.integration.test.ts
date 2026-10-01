@@ -998,6 +998,48 @@ describe('useTarkov sync integration', () => {
     recordLocalSave(true);
     resetCloudSaveStatus();
   });
+  it('keeps retry clocks when another tab saves before a memory-only edit', async () => {
+    const { preserveUnsavedSessionProgress } = await import('@/stores/useTarkov');
+    const { recordLocalSave, markCloudSyncUnavailable, resetCloudSaveStatus } =
+      await import('@/stores/tarkov/progressSaveStatus');
+    const baseline = {
+      pvp: progressWithLevel(5),
+      pve: progressWithLevel(3),
+      gameEdition: 1,
+    };
+    seedOwnedEnvelope('user-1', baseline);
+    single
+      .mockResolvedValueOnce({ data: createRemoteRow(), error: null })
+      .mockResolvedValue({ data: null, error: { message: 'legacy unavailable' } });
+    await expect(initializeTarkovSync()).rejects.toThrow('Supabase initial load failed');
+    resetTarkovSync('initial sync failed', { preserveStorageBaselineForUserId: 'user-1' });
+    markCloudSyncUnavailable(async () => false);
+    const newer = {
+      ...baseline,
+      gameEdition: 2,
+      pve: {
+        ...baseline.pve,
+        displayName: 'Other tab',
+        pmcFaction: 'BEAR' as const,
+        xpOffset: 1234,
+        skillOffsets: { endurance: 3 },
+      },
+    };
+    seedOwnedEnvelope('user-1', newer, Date.now() - 1000);
+    recordLocalSave(false, 'quota');
+    useTarkovStore().$patch((state) => {
+      state.pvp.level = 42;
+    });
+    single.mockResolvedValue({ data: createRemoteRow(), error: null });
+    preserveUnsavedSessionProgress('user-1');
+    preserveUnsavedSessionProgress('user-1');
+    await initializeTarkovSync();
+    expect(useTarkovStore().pvp.level).toBe(42);
+    expect(useTarkovStore().gameEdition).toBe(2);
+    expect(useTarkovStore().pve).toMatchObject(newer.pve);
+    recordLocalSave(true);
+    resetCloudSaveStatus();
+  });
   it('does not replace the store from memory for another account or without unsaved edits', async () => {
     const { preserveUnsavedSessionProgress } = await import('@/stores/useTarkov');
     const { recordLocalSave } = await import('@/stores/tarkov/progressSaveStatus');

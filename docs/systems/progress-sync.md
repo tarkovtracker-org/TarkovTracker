@@ -32,6 +32,10 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   initialization retry, memory-only edits are handed to the startup merge as the session snapshot
   (`preserveUnsavedSessionProgress`), so rehydrating from storage cannot discard them. Only the
   edited modes and metadata get new clocks, so untouched modes still yield to newer remote progress.
+  Failed initialization retains this tab's serializer baseline for the same account before another
+  tab can change shared storage. Retrying compares memory-only edits with that baseline rather than
+  treating another tab's newer envelope as the source of this tab's stale values. Session transitions
+  still clear the baseline.
 - **Local status.** The progress persist plugin writes through `progressPersistStorage`, because
   `pinia-plugin-persistedstate` swallows storage exceptions. Store and sync writes of the active
   progress key go through `persistActiveProgressValue`, which records `saved` or `failed` (`quota`,

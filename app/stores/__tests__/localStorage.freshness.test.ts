@@ -10,6 +10,30 @@ import { resolveInitialSyncState } from '@/stores/tarkov/resetEngine';
 import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
 import { parseUserScopedStorage } from '@/utils/userScopedStorage';
 describe('local mode freshness', () => {
+  it('retains the same-account baseline across repeated failures and isolates other accounts', () => {
+    const state = structuredClone(defaultState);
+    const readPrevious = vi.fn((userId: string | null) => ({
+      state: structuredClone(state),
+      storedUserId: userId,
+      timestamp: 10,
+      hadDeprecatedProgressData: false,
+    }));
+    const serializer = createProgressStorageSerializer(readPrevious);
+    serializer.retainBaseline('user-1');
+    state.pve.displayName = 'Other tab';
+    serializer.retainBaseline('user-1');
+    const local = structuredClone(defaultState);
+    local.pvp.level = 42;
+    const saved = parseUserScopedStorage<typeof local>(serializer.serialize(local, 'user-1', 30))!;
+    expect(saved._modeTimestamps).toEqual({ pvp: 30, pve: 10, seasonal: 10 });
+    expect(saved._metadataTimestamp).toBe(10);
+    expect(readPrevious).toHaveBeenCalledTimes(1);
+    serializer.retainBaseline('user-2');
+    expect(readPrevious).toHaveBeenLastCalledWith('user-2');
+    serializer.reset();
+    serializer.retainBaseline('user-2');
+    expect(readPrevious).toHaveBeenCalledTimes(3);
+  });
   it('keeps the original seasonal source across migration and resets stale clocks to zero', () => {
     const staleSeasonal = {
       ...structuredClone(defaultState),
