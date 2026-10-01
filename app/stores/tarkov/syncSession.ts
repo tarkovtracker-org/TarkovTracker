@@ -211,7 +211,7 @@ export class ProgressSyncSession {
     this.shownLocalIgnoreReasons.delete(reason);
   }
   /** Tear down the controller, watcher, realtime channel, and per-session sync state. */
-  reset(reason?: string, preserveStorageBaselineForUserId?: string): void {
+  reset(reason?: string, baseline?: { userId: string; state: UserState }): void {
     if (this.controller) {
       logger.debug(`[TarkovStore] Clearing Supabase sync${reason ? ` (${reason})` : ''}`);
       this.controller.cleanup();
@@ -223,8 +223,8 @@ export class ProgressSyncSession {
     this.userId = null;
     this.shownLocalIgnoreReasons.clear();
     resetSyncTimeline();
-    if (preserveStorageBaselineForUserId) {
-      progressStorageSerializer.retainBaseline(preserveStorageBaselineForUserId);
+    if (baseline) {
+      progressStorageSerializer.retainBaseline(baseline.userId, baseline.state);
     } else {
       progressStorageSerializer.reset();
     }

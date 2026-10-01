@@ -35,7 +35,11 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
   Failed initialization retains this tab's serializer baseline for the same account before another
   tab can change shared storage. Retrying compares memory-only edits with that baseline rather than
   treating another tab's newer envelope as the source of this tab's stale values. Session transitions
-  still clear the baseline.
+  still clear the baseline. If no owned persisted baseline exists, this tab retains its current
+  state under that account with unknown (zero) clocks. Only subsequent edits advance them; a later
+  shared-storage write cannot become this tab's comparison baseline. When composing copies,
+  an empty mode with a zero clock stays at zero instead of borrowing another mode's edit time
+  from the envelope. Unknown clocks on copies with retained progress still use their write time.
 - **Local status.** The progress persist plugin writes through `progressPersistStorage`, because
   `pinia-plugin-persistedstate` swallows storage exceptions. Store and sync writes of the active
   progress key go through `persistActiveProgressValue`, which records `saved` or `failed` (`quota`,

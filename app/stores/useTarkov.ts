@@ -532,7 +532,11 @@ export function resetTarkovSync(
 ) {
   invalidateStartupOwnership();
   progressSync.preserveSnapshot(options);
-  progressSync.reset(reason, options?.preserveStorageBaselineForUserId);
+  const userId = options?.preserveStorageBaselineForUserId;
+  progressSync.reset(
+    reason,
+    userId ? { userId, state: sanitizeOwnedUserState(useTarkovStore().$state) } : undefined
+  );
 }
 /**
  * Memory-only edits made while sync was unavailable exist only in the store. Before a retry
