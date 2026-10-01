@@ -668,6 +668,85 @@ describe('api-gateway', () => {
     expect(taskCompletions?.['task-dependent']?.complete).toBe(true);
     expect(taskCompletions?.['task-dependent']?.failed).toBe(false);
   });
+  it('lists explicit batch tasks before cascaded dependents in lastApiUpdate', async () => {
+    let mergePayload: MergeRpcPayload | null = null;
+    const task = (id: string, requires?: string) => ({
+      id,
+      name: id,
+      factionName: 'Any',
+      objectives: [],
+      taskRequirements: requires ? [{ task: requires, status: ['complete'] }] : [],
+    });
+    const fetchMock = createBaseFetchMock({
+      onMerge: (payload) => {
+        mergePayload = payload;
+      },
+      tasks: [task('task-a'), task('task-dependent', 'task-a'), task('task-b')],
+      userProgress: {
+        user_id: 'user-1',
+        game_edition: 1,
+        pvp_data: {
+          taskCompletions: { 'task-dependent': { complete: true, failed: false, timestamp: 1 } },
+        },
+        pve_data: null,
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(
+      buildRequest('/progress/tasks', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          { id: 'task-a', state: 'completed' },
+          { id: 'task-b', state: 'completed' },
+        ]),
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(200);
+    const payload = mergePayload as unknown as MergeRpcPayload;
+    const lastApiUpdate = payload.p_set?.lastApiUpdate as { tasks: unknown[]; taskCount?: number };
+    expect(lastApiUpdate.tasks).toEqual([
+      { id: 'task-a', state: 'completed' },
+      { id: 'task-b', state: 'completed' },
+      { id: 'task-dependent', state: 'uncompleted' },
+    ]);
+    expect(lastApiUpdate.taskCount).toBeUndefined();
+  });
+  it('caps lastApiUpdate tasks and records the total count', async () => {
+    let mergePayload: MergeRpcPayload | null = null;
+    const ids = Array.from({ length: 25 }, (_, index) => `task-${index}`);
+    const fetchMock = createBaseFetchMock({
+      onMerge: (payload) => {
+        mergePayload = payload;
+      },
+      tasks: ids.map((id) => ({
+        id,
+        name: id,
+        factionName: 'Any',
+        objectives: [],
+        taskRequirements: [],
+      })),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await worker.fetch(
+      buildRequest('/progress/tasks', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer PVP_abc123', 'Content-Type': 'application/json' },
+        body: JSON.stringify(ids.map((id) => ({ id, state: 'completed' }))),
+      }),
+      BASE_ENV
+    );
+    expect(res.status).toBe(200);
+    const payload = mergePayload as unknown as MergeRpcPayload;
+    const lastApiUpdate = payload.p_set?.lastApiUpdate as {
+      tasks: Array<{ id: string }>;
+      taskCount?: number;
+    };
+    expect(lastApiUpdate.tasks.map((entry) => entry.id)).toEqual(ids.slice(0, 20));
+    expect(lastApiUpdate.taskCount).toBe(25);
+    expect(Object.keys(payload.p_task_completions ?? {})).toHaveLength(25);
+  });
   it('skips lastApiUpdate for idempotent batch task updates', async () => {
     let mergePayload: MergeRpcPayload | null = null;
     const fetchMock = createBaseFetchMock({

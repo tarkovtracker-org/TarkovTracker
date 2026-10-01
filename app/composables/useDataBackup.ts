@@ -5,6 +5,7 @@ import {
   type UserState,
 } from '@/stores/progressState';
 import { cloneStateSnapshot } from '@/stores/tarkov/localStorage';
+import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
 import {
   getPersistedPreferencesState,
   preferencesDefaultState,
@@ -124,6 +125,7 @@ export type BackupImportTargetModes = {
 };
 export interface UseDataBackupReturn {
   exportProgress: () => Promise<void>;
+  exportSupersededProgress: () => Promise<void>;
   exportError: Ref<string | null>;
   exportDebugSnapshot: () => Promise<void>;
   debugExportError: Ref<string | null>;
@@ -149,6 +151,7 @@ const ALLOWED_PROGRESS_KEYS = new Set([
   'progressEpoch',
   'skillOffsets',
   'storyChapters',
+  'taskAvailability',
 ]);
 const VALID_FACTIONS = new Set<Faction>(['USEC', 'BEAR']);
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -215,6 +218,7 @@ function sanitizeProgressData(
     'skills',
     'skillOffsets',
     'storyChapters',
+    'taskAvailability',
   ] as const;
   for (const field of dictFields) {
     if (raw[field] !== undefined && !isPlainObject(raw[field])) {
@@ -489,29 +493,68 @@ function getStorageKeys(storage: Storage | null): string[] {
 function isSupabaseAuthStorageKey(key: string): boolean {
   return key.endsWith('-auth-token') || key.endsWith('-code-verifier');
 }
-async function sanitizeStorageKey(key: string): Promise<string> {
-  if (
+type ProgressBackupIdentity = { prefix: string; owner: string; createdAt: number | null };
+function getProgressBackupIdentity(key: string): ProgressBackupIdentity | null {
+  const prefix =
     key.startsWith(STORAGE_KEYS.progressBackupPrefix) ||
     key.startsWith(LEGACY_STORAGE_KEYS.progressBackupPrefix)
-  ) {
-    const prefix = key.startsWith(STORAGE_KEYS.progressBackupPrefix)
-      ? STORAGE_KEYS.progressBackupPrefix
-      : LEGACY_STORAGE_KEYS.progressBackupPrefix;
-    const suffix = key.slice(prefix.length);
-    const separatorIndex = suffix.lastIndexOf('_');
-    const owner = separatorIndex >= 0 ? suffix.slice(0, separatorIndex) : suffix;
-    const createdAtRaw = separatorIndex >= 0 ? suffix.slice(separatorIndex + 1) : '';
-    const ownerFingerprint =
-      owner === 'anonymous' ? 'anonymous' : ((await fingerprintValue(owner)) ?? 'unknown');
-    const createdAt = Number.parseInt(createdAtRaw, 10);
-    return `${prefix}{owner:${ownerFingerprint},createdAt:${
-      Number.isFinite(createdAt) ? createdAt : 'unknown'
-    }}`;
-  }
-  return key;
+      ? key.startsWith(STORAGE_KEYS.progressBackupPrefix)
+        ? STORAGE_KEYS.progressBackupPrefix
+        : LEGACY_STORAGE_KEYS.progressBackupPrefix
+      : null;
+  if (!prefix) return null;
+  const suffix = key.slice(prefix.length);
+  const separatorIndex = suffix.lastIndexOf('_');
+  const owner = separatorIndex >= 0 ? suffix.slice(0, separatorIndex) : suffix;
+  const createdAtRaw = separatorIndex >= 0 ? suffix.slice(separatorIndex + 1) : '';
+  const createdAt = Number.parseInt(createdAtRaw, 10);
+  return { prefix, owner, createdAt: Number.isFinite(createdAt) ? createdAt : null };
+}
+async function sanitizeProgressBackupKey(key: string): Promise<string | null> {
+  const identity = getProgressBackupIdentity(key);
+  if (!identity) return null;
+  const ownerFingerprint =
+    identity.owner === 'anonymous'
+      ? 'anonymous'
+      : ((await fingerprintValue(identity.owner)) ?? 'unknown');
+  return `${identity.prefix}{owner:${ownerFingerprint},createdAt:${
+    identity.createdAt ?? 'unknown'
+  }}`;
+}
+/** Keys named `${prefix}${userId}` keep their prefix with the owner fingerprinted. */
+const OWNER_SUFFIXED_PREFIXES = [
+  STORAGE_KEYS.progressRecoveryPrefix,
+  STORAGE_KEYS.deviceDataRemovalIncompletePrefix,
+];
+async function sanitizeRecoveryKey(key: string): Promise<string | null> {
+  const prefix = OWNER_SUFFIXED_PREFIXES.find((candidate) => key.startsWith(candidate));
+  if (!prefix) return null;
+  const owner = key.slice(prefix.length);
+  return `${prefix}{owner:${(await fingerprintValue(owner)) ?? 'unknown'}}`;
+}
+async function sanitizeSupersededKey(key: string): Promise<string | null> {
+  if (!key.startsWith(STORAGE_KEYS.progressSupersededPrefix)) return null;
+  const suffix = key.slice(STORAGE_KEYS.progressSupersededPrefix.length);
+  const separatorIndex = suffix.indexOf('_');
+  const owner = separatorIndex >= 0 ? suffix.slice(0, separatorIndex) : suffix;
+  const copyId = separatorIndex >= 0 ? suffix.slice(separatorIndex + 1) : 'unknown';
+  return `${STORAGE_KEYS.progressSupersededPrefix}{owner:${
+    (await fingerprintValue(owner)) ?? 'unknown'
+  },copy:${copyId}}`;
+}
+async function sanitizeStorageKey(key: string): Promise<string> {
+  const backupKey = await sanitizeProgressBackupKey(key);
+  if (backupKey) return backupKey;
+  const recoveryKey = await sanitizeRecoveryKey(key);
+  if (recoveryKey) return recoveryKey;
+  const supersededKey = await sanitizeSupersededKey(key);
+  return supersededKey ?? key;
 }
 async function sanitizeStorageKeys(storage: Storage | null): Promise<string[]> {
-  const keys = getStorageKeys(storage).filter((key) => !isSupabaseAuthStorageKey(key));
+  const keys = getStorageKeys(storage).filter(
+    (key) =>
+      !isSupabaseAuthStorageKey(key) && !key.startsWith(STORAGE_KEYS.progressQuarantinePrefix)
+  );
   return await Promise.all(keys.map((key) => sanitizeStorageKey(key)));
 }
 async function buildProgressBackupSnapshots(
@@ -524,18 +567,13 @@ async function buildProgressBackupSnapshots(
   );
   return await Promise.all(
     backupKeys.map(async (key) => {
-      const prefix = key.startsWith(STORAGE_KEYS.progressBackupPrefix)
-        ? STORAGE_KEYS.progressBackupPrefix
-        : LEGACY_STORAGE_KEYS.progressBackupPrefix;
-      const suffix = key.slice(prefix.length);
-      const separatorIndex = suffix.lastIndexOf('_');
-      const owner = separatorIndex >= 0 ? suffix.slice(0, separatorIndex) : suffix;
-      const createdAtRaw = separatorIndex >= 0 ? suffix.slice(separatorIndex + 1) : '';
-      const createdAt = Number.parseInt(createdAtRaw, 10);
+      const identity = getProgressBackupIdentity(key);
+      if (!identity) throw new Error('Progress backup key is not recognized');
       return {
         storageKey: await sanitizeStorageKey(key),
-        ownerFingerprint: owner === 'anonymous' ? 'anonymous' : await fingerprintValue(owner),
-        createdAt: Number.isFinite(createdAt) ? createdAt : null,
+        ownerFingerprint:
+          identity.owner === 'anonymous' ? 'anonymous' : await fingerprintValue(identity.owner),
+        createdAt: identity.createdAt,
       };
     })
   );
@@ -728,6 +766,18 @@ export function useDataBackup(): UseDataBackupReturn {
       throw error instanceof Error ? error : new Error(detail);
     }
   }
+  async function exportSupersededProgress(): Promise<void> {
+    const ownerId = $supabase.user.id;
+    if (!ownerId) throw new Error('Sign in to export superseded progress');
+    const copies = listSupersededProgressCopies(ownerId);
+    if (copies.length === 0) throw new Error('No superseded progress copies are available');
+    await downloadJsonFile('tarkovtracker-superseded-progress', {
+      _format: 'tarkovtracker-superseded-progress',
+      _version: 1,
+      exportedAt: Date.now(),
+      copies: copies.map(({ ownerId: _ownerId, ...copy }) => copy),
+    });
+  }
   async function exportDebugSnapshot(): Promise<void> {
     debugExportError.value = null;
     try {
@@ -884,6 +934,7 @@ export function useDataBackup(): UseDataBackupReturn {
   }
   return {
     exportProgress,
+    exportSupersededProgress,
     exportError,
     exportDebugSnapshot,
     debugExportError,

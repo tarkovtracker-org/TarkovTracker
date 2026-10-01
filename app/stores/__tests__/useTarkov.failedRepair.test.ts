@@ -1,5 +1,6 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { describe, expect, it } from 'vitest';
+import { repairModeFailedTasks } from '@/stores/tarkov/progressRepair';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
 import type { UserProgressData } from '@/stores/progressState';
@@ -30,13 +31,11 @@ const createTask = (id: string, overrides: Partial<Task> = {}): Task => ({
 });
 describe('useTarkovStore failed-state repair', () => {
   it('keeps manually failed tasks during stale-failure cleanup', () => {
-    setActivePinia(createPinia());
-    const store = useTarkovStore();
     const gameModeData = createProgressData({
       'task-manual': { complete: true, failed: true, manual: true },
     });
     const tasksMap = new Map<string, Task>([['task-manual', createTask('task-manual')]]);
-    const repairedCount = store.repairGameModeFailedTasks(gameModeData, tasksMap);
+    const repairedCount = repairModeFailedTasks(gameModeData, tasksMap);
     expect(repairedCount).toBe(0);
     expect(gameModeData.taskCompletions['task-manual']).toMatchObject({
       complete: true,
@@ -45,13 +44,11 @@ describe('useTarkovStore failed-state repair', () => {
     });
   });
   it('clears stale non-manual failed tasks with no valid fail source', () => {
-    setActivePinia(createPinia());
-    const store = useTarkovStore();
     const gameModeData = createProgressData({
       'task-stale': { complete: true, failed: true },
     });
     const tasksMap = new Map<string, Task>([['task-stale', createTask('task-stale')]]);
-    const repairedCount = store.repairGameModeFailedTasks(gameModeData, tasksMap);
+    const repairedCount = repairModeFailedTasks(gameModeData, tasksMap);
     expect(repairedCount).toBe(1);
     expect(gameModeData.taskCompletions['task-stale']).toMatchObject({
       complete: false,
@@ -59,9 +56,16 @@ describe('useTarkovStore failed-state repair', () => {
       manual: false,
     });
   });
+  it('stamps a repaired reset after a confirmation from a clock running ahead', () => {
+    const gameModeData = createProgressData({
+      'task-stale': { complete: true, failed: true },
+    });
+    const ahead = Date.now() + 3_600_000;
+    gameModeData.taskAvailability = { 'task-stale': { requirements: 'sig', timestamp: ahead } };
+    repairModeFailedTasks(gameModeData, new Map([['task-stale', createTask('task-stale')]]));
+    expect(gameModeData.taskCompletions['task-stale']!.timestamp!).toBeGreaterThan(ahead);
+  });
   it('does not retroactively fail completed one-way alternative chains', () => {
-    setActivePinia(createPinia());
-    const store = useTarkovStore();
     const gameModeData = createProgressData({
       'task-source': { complete: true, failed: false, timestamp: 2000 },
       'task-target': { complete: true, failed: false, timestamp: 1000 },
@@ -83,7 +87,7 @@ describe('useTarkovStore failed-state repair', () => {
         }),
       ],
     ]);
-    const repairedCount = store.repairGameModeFailedTasks(gameModeData, tasksMap);
+    const repairedCount = repairModeFailedTasks(gameModeData, tasksMap);
     expect(repairedCount).toBe(0);
     expect(gameModeData.taskCompletions['task-source']).toMatchObject({
       complete: true,
@@ -95,8 +99,6 @@ describe('useTarkovStore failed-state repair', () => {
     });
   });
   it('unfails a task that was completed before its fail-condition trigger fired', () => {
-    setActivePinia(createPinia());
-    const store = useTarkovStore();
     const gameModeData = createProgressData({
       'skier-prereq': { complete: true, failed: true, manual: false, timestamp: 1000 },
       'price-of-independence': { complete: true, failed: false, timestamp: 2000 },
@@ -121,7 +123,7 @@ describe('useTarkovStore failed-state repair', () => {
         }),
       ],
     ]);
-    const repairedCount = store.repairGameModeFailedTasks(gameModeData, tasksMap);
+    const repairedCount = repairModeFailedTasks(gameModeData, tasksMap);
     expect(repairedCount).toBe(1);
     expect(gameModeData.taskCompletions['skier-prereq']).toMatchObject({
       complete: false,
@@ -133,8 +135,6 @@ describe('useTarkovStore failed-state repair', () => {
     });
   });
   it('unfails a completed task with one-way failCondition when timestamps are missing', () => {
-    setActivePinia(createPinia());
-    const store = useTarkovStore();
     const gameModeData = createProgressData({
       'task-no-ts': { complete: true, failed: true, manual: false },
       'task-trigger': { complete: true, failed: false },
@@ -155,7 +155,7 @@ describe('useTarkovStore failed-state repair', () => {
         }),
       ],
     ]);
-    const repairedCount = store.repairGameModeFailedTasks(gameModeData, tasksMap);
+    const repairedCount = repairModeFailedTasks(gameModeData, tasksMap);
     expect(repairedCount).toBe(1);
     expect(gameModeData.taskCompletions['task-no-ts']).toMatchObject({
       complete: false,
@@ -163,8 +163,6 @@ describe('useTarkovStore failed-state repair', () => {
     });
   });
   it('keeps a non-completed task failed when timestamps are missing', () => {
-    setActivePinia(createPinia());
-    const store = useTarkovStore();
     const gameModeData = createProgressData({
       'task-never-done': { complete: false, failed: true, manual: false },
       'task-trigger': { complete: true, failed: false },
@@ -180,7 +178,7 @@ describe('useTarkovStore failed-state repair', () => {
       ],
       ['task-trigger', createTask('task-trigger')],
     ]);
-    const repairedCount = store.repairGameModeFailedTasks(gameModeData, tasksMap);
+    const repairedCount = repairModeFailedTasks(gameModeData, tasksMap);
     expect(repairedCount).toBe(0);
     expect(gameModeData.taskCompletions['task-never-done']).toMatchObject({
       complete: false,
@@ -188,8 +186,6 @@ describe('useTarkovStore failed-state repair', () => {
     });
   });
   it('keeps a completed task failed for mutual failConditions without timestamps', () => {
-    setActivePinia(createPinia());
-    const store = useTarkovStore();
     const gameModeData = createProgressData({
       'task-a': { complete: true, failed: true, manual: false },
       'task-b': { complete: true, failed: false },
@@ -210,7 +206,7 @@ describe('useTarkovStore failed-state repair', () => {
         }),
       ],
     ]);
-    const repairedCount = store.repairGameModeFailedTasks(gameModeData, tasksMap);
+    const repairedCount = repairModeFailedTasks(gameModeData, tasksMap);
     expect(repairedCount).toBe(0);
     expect(gameModeData.taskCompletions['task-a']).toMatchObject({
       complete: true,
@@ -218,8 +214,6 @@ describe('useTarkovStore failed-state repair', () => {
     });
   });
   it('fails the older task when both sides of a mutual alternative are complete', () => {
-    setActivePinia(createPinia());
-    const store = useTarkovStore();
     const gameModeData = createProgressData({
       'task-a': { complete: true, failed: false, timestamp: 1000 },
       'task-b': { complete: true, failed: false, timestamp: 2000 },
@@ -240,7 +234,7 @@ describe('useTarkovStore failed-state repair', () => {
         }),
       ],
     ]);
-    const repairedCount = store.repairGameModeFailedTasks(gameModeData, tasksMap);
+    const repairedCount = repairModeFailedTasks(gameModeData, tasksMap);
     expect(repairedCount).toBe(1);
     expect(gameModeData.taskCompletions['task-a']).toMatchObject({
       complete: true,
@@ -265,9 +259,7 @@ describe('useTarkovStore failed-state repair', () => {
       }),
       taskObjectives: { 'objective-1': { complete: true, count: 3 } },
     };
-    const result = store.repairFailedTaskStates();
-    expect(result.seasonalRepaired).toBe(0);
-    expect(result.seasonalCleared).toBe(1);
+    expect(store.repairFailedTaskStates()).toBe(1);
     expect(store.seasonal.taskObjectives['objective-1']).toMatchObject({
       complete: false,
       count: 0,

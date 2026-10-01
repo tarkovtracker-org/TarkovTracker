@@ -33,7 +33,7 @@ or test logic changes make it relevant.
 - Formatting is enforced by the hook and CI `format:check`; do not run the broad format command
   unless the hook was bypassed.
 - Fix Fallow findings instead of suppressing them; keep new functions at cyclomatic 4 or less.
-  Suppression rules: `docs/WORKFLOW_AUTOMATION.md#resolving-findings-instead-of-suppressing-them`.
+  Suppression rules live in the workflow-automation doc (see `docs/README.md`).
 - Mock Supabase and network calls in tests.
 
 ## Invariants
@@ -49,41 +49,67 @@ or test logic changes make it relevant.
   with the database functions and preserve Seasonal history.
 - Secrets stay in runtime env or platform secret stores under canonical names; never commit
   credentials, service-role keys, or generated secret-bearing files.
-- Overlay consumers enforce HTTPS and preserve the cache/adaptation/overlay ordering in
-  `docs/SYSTEMS.md` §1, §3–§4; task patches keep the raw upstream trader requirement shape
-  before adaptation.
+- Overlay consumers enforce HTTPS and preserve the cache/adaptation/overlay ordering in the systems spec (`docs/systems/`); task patches keep the raw upstream trader requirement shape before adaptation.
 - Applied/shared migrations are immutable. Never run remote migration repair, reset, or squash as
-  routine cleanup. Inspect production only through the read-only `scripts/prod-db` observer.
+  routine cleanup. Inspect production only through the read-only `scripts/ops/prod-db` observer.
 
 ## Scoped rules — read before editing
 
 - `supabase/**`, SQL functions, account/team/token lifecycle, or production DB work:
   `supabase/AGENTS.md`.
 - `workers/api-gateway/**`: `workers/api-gateway/AGENTS.md`.
-- When code changes a non-obvious system, update its section and invariants in `docs/SYSTEMS.md`
-  in the same change.
+- When a change alters documented behavior or invariants, update the owning doc in the same change (behavior only — link code, don't paste it).
+
+## Preview authorization
+
+Implementation and production-readiness work authorize agents to commit and push in-scope
+feature-branch changes, post `/preview`, deploy previews through the trusted workflow, and run
+preview smoke tests without asking the user again. Preserve workflow access checks, artifact
+validation, and fork environment protections. Production deployments, destructive actions, and
+merges require separate explicit authorization.
 
 ## Review
 
-- Docs, translations, mechanical formatting: self-review plus deterministic checks. Routine
-  executable changes: Codex PR review. Substantial changes (public contracts, persisted state,
-  cross-module behavior, auth, billing, migrations, concurrency): also one local CodeRabbit review
-  of the stabilized branch diff. Auth, billing, migrations, and concurrency require independent
-  review; another provider or a human substitutes if needed. Unavailable or rate-limited review is
-  recorded as incomplete, without retry loops.
+- Docs, translations, and mechanical formatting require self-review and deterministic checks.
+  Executable changes receive one local CodeRabbit review of the stabilized branch diff before
+  pushing when available. Compare against the actual PR base using a freshly fetched remote ref
+  (`coderabbit review --base origin/<base> --agent --committed`). Fix validated findings together;
+  do not treat optional suggestions as mandatory. Never run Codex reviews locally.
+- Commit locally as often as useful; push stabilized batches after relevant checks. Address a
+  whole PR review round before the next correction push, rather than pushing per finding.
+  Reuse review evidence for unchanged inputs; rerun only for substantial new behavior or unresolved
+  significant findings. Update from the PR base when conflicts or integration validation require it.
+- Rate limits do not stop implementation, commits, or useful validated batch pushes. Record missing
+  review as incomplete and enforce required review before merge; do not retry in a loop or enable
+  paid over-limit reviews without authorization. CLI and PR reviews have separate allowances.
+- Automatic Codex reviews should be disabled in the dashboard; repository text does not verify
+  dashboard state. Request Codex only when CodeRabbit PR and CLI reviews are rate-limited, or for
+  the final pre-merge review of a risky change. Use only
+  `node scripts/codex-review/codex-review.mjs <PR> --request --wait-seconds 600` when posting is authorized;
+  never post raw `@codex review` comments. For read-only status/waiting, omit `--request`.
+  Pending, running, unknown, or timed-out reviews remain incomplete; never bypass the guard or
+  repost to speed up a review. Completion does not mean findings are resolved.
+- CodeRabbit automatic incremental PR reviews are disabled in `.coderabbit.yaml`. After substantial
+  follow-up changes, request `@coderabbitai review` before merge unless recorded local or independent
+  review covers the final changes. Record the reviewed base and head and assess any later delta;
+  an earlier green review alone does not cover new changes. Auth, billing, migrations, and concurrency
+  require independent review before merge from Codex on request, another provider, or a human.
 - Record the commit, dirty worktree state, commands, and results in the PR summary. Rerun,
-  batching, and reviewer-rollout rules: `docs/WORKFLOW_AUTOMATION.md#agent-validation-and-review`.
+  batching, and reviewer-rollout rules live in the workflow-automation doc (see `docs/README.md`).
 - Production-readiness and security review requests use the dedicated review/security workflow
-  when available and stay read-only. Before merging, resolve all in-scope human and automated
-  feedback and verify final checks; do not mix in unrelated fixes.
+  when available and stay read-only; repo risk areas and severity live in `docs/code-review.md`.
+  Before merging, resolve all in-scope human and automated feedback and verify final checks; do
+  not mix in unrelated fixes.
 
-## Docs — open only the section the task needs
+## Docs — code is truth, docs are orientation
 
-Find the relevant heading first (`grep -n '^#' <file>`; `docs/SYSTEMS.md` alone is ~2,300 lines)
-and read only that section. Search generated files, translations, migration history, `.cubic/`, and
-archives only when the task requires it.
-`docs/ARCHITECTURE.md` (environment map), `docs/SYSTEMS.md` (systems and invariants),
-`docs/API.md`, `docs/RATE_LIMITING.md`, `docs/runbook.md` (deploys, migrations, incidents),
-`docs/WORKFLOW_AUTOMATION.md` and `.github/CONTRIBUTING.md` (CI, hooks, releases, review),
-`SECURITY.md`, `SUPPORT.md`, `CODE_OF_CONDUCT.md`, optional orientation in
-`docs/agent-context/summary/index.md`.
+Hierarchy: executable config and source code outrank this file; this file outranks `docs/`.
+Docs explain behavior in plain English for humans and agents and may lag — verify against code
+before changing behavior.
+
+- One fact, one owner: link the owning file, never restate code, config, or another doc.
+- `docs/README.md` is the index; find the owning doc there, then read only the needed section
+  (`grep -n '^#' <file>`).
+- New docs go flat in `docs/` as `kebab-case.md`. Nest only for 3+ docs or non-`.md` assets.
+- Generated files, Crowdin-owned locales, migration history, and `.cubic/` are not sources —
+  search them only when the task requires it.

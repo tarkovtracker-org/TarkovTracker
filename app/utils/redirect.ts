@@ -1,5 +1,7 @@
+import { isWebUrl } from '@/utils/externalUrl';
 type RedirectInput = string | null | undefined | Array<string | null>;
 export function openExternalUrl(url: string): void {
+  if (!isWebUrl(url)) return;
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 function getRedirectCandidate(redirect: RedirectInput): string | null {

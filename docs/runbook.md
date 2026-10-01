@@ -2,7 +2,7 @@
 
 ## Required Environment Variables
 
-Canonical variable map (owner): [`ARCHITECTURE.md` §Environment Variables](./ARCHITECTURE.md#environment-variables).
+Canonical variable map (owner): [`architecture.md` §Environment Variables](./architecture.md#environment-variables).
 Naming: `NUXT_*` = Nuxt private (server-only), `NUXT_PUBLIC_*` = Nuxt public (browser-exposed).
 
 **Nuxt app (Cloudflare Pages):** see the canonical map for `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
@@ -19,7 +19,7 @@ See the canonical map for `STRIPE_SECRET_KEY` and the nine `STRIPE_PRICE_*` IDs 
 ### Stripe webhook (Supabase Edge Function `stripe-webhook`)
 
 Set these in Supabase Dashboard → Project Settings → Edge Functions (canonical definitions in
-[`ARCHITECTURE.md` §Environment Variables](./ARCHITECTURE.md#environment-variables) and
+[`architecture.md` §Environment Variables](./architecture.md#environment-variables) and
 `supabase/functions/.env.example`):
 
 - `STRIPE_WEBHOOK_SECRET` (Stripe Dashboard → Webhooks → Signing secret)
@@ -110,6 +110,14 @@ Prepare and deploy each rollover in two releases during the no-write gap between
    deployment order is uncontrolled. Do not delete the previous season's rows.
 
 ## Deployment
+
+### Internal game-data browser verification
+
+Application support is disabled by default and does not itself enforce CDN access.
+Use the [browser-clearance rollout and rollback procedure](./tarkov-clearance-rollout.md)
+for staging, alias closure, Access-protected automation, exact production approval and
+readback evidence. **Disable the edge challenge rule before removing frontend recovery.**
+Production deployment, Cloudflare mutations and merge require separate approval.
 
 Merging to `main` deploys everything automatically. Three integrations do the work — none of them
 GitHub Actions — and each surfaces as a check on the merge commit:
@@ -308,7 +316,7 @@ These show up in Supabase logs / query performance and are expected. Do not trea
 directory.` until the deployed file lands. That check runs on `main` pushes and is skipped on pull
   requests, so the breakage only becomes visible after merge. If an out-of-band apply is unavoidable,
   merge the exact deployed file immediately afterwards and record the revision, version list, and file
-  hashes; `scripts/prod-db migration-history` shows `missing_locally` for exactly this condition. The
+  hashes; `scripts/ops/prod-db migration-history` shows `missing_locally` for exactly this condition. The
   fix is always to land the deployed file, never `migration repair --status reverted`, which would
   falsify applied history and let a later push re-run the SQL.
 - `migration list` compares **timestamps only**. Matching rows do not detect edited SQL or schema
@@ -557,7 +565,7 @@ deployed function sources in the same change.
 The database change alone does not cover the handler behavior: the deployed handlers filter cooldown
 reads on `server_verified = true`, and the preserved pre-containment rows are `server_verified = false`
 with possibly forged timestamps, so the older handlers would trust that history again. See the
-`team_events` invariants in `docs/SYSTEMS.md`.
+`team_events` invariants in `docs/systems/teams.md`.
 
 ### Atomic-leave checkout recovery (`20260912085904`)
 
@@ -572,7 +580,7 @@ Supabase CLI 2.117.0 authenticated using its existing authorized session; `proje
 explicit `link --project-ref knptqelvsodccnoehmbj`, and `migration list --linked` all succeeded.
 A missing observer `PROD_DB_URL` does not mean the CLI cannot inspect the project. Keep the
 observer's restricted credential boundary intact; this recovery uses separately authorized CLI
-access, not broader credentials passed to `scripts/prod-db`.
+access, not broader credentials passed to `scripts/ops/prod-db`.
 
 Recovery procedure and evidence:
 
@@ -605,6 +613,30 @@ and repeat linked history/dry-run checks. Pull-request previews intentionally sk
 so a green PR alone does not establish that the production integration has recovered. Do not
 roll back to the pre-atomic leave handler or apply unrelated account-deletion migrations.
 
+### Atomic team-kick rollout (`20260926090000`)
+
+PR #938 (fix for #864) ships the atomic `kick_team` RPC in migration
+`20260926090000_atomic_team_kick.sql` together with the rewritten `team-kick` handler sources in
+one change, mirroring the atomic-leave unit rule: never separate the migration from the handler
+sources it requires. The rollout is database-first: after the merge, the Supabase GitHub
+integration applies the migration and deploys the edge functions (including `team-kick`) together
+in the same integration run against the merge commit — there is no manual SQL step:
+
+- **Do not apply the migration out of band** (no dashboard SQL editor, no `db push`) from PR #938's
+  branch or any unmerged revision — see "Deploy migrations only from a revision that is already
+  merged to `main`" above. Deploying the handler sources without the migration (or the migration
+  without the required handler sources) breaks the RPC-version parity the atomic-leave recovery
+  had to restore.
+- The pre-merge state is already safe: the deployed `team-kick` (non-atomic, direct DELETE +
+  event INSERT) never referenced `kick_team`, so the migration and the handler deploy land in the
+  same integration run on the merge commit with no regression window.
+- PR checks report `Supabase Preview` as `skipping` (per-PR preview databases are intentionally
+  disabled), so validation is: green `Supabase DB` job on the PR, then after merge confirm on the
+  merge commit that `Supabase Preview` succeeded, `supabase migration list --linked` shows
+  `20260926090000` applied remotely (no blank REMOTE rows) and the `team-kick` function shows a
+  new version in the Supabase dashboard. A blank REMOTE row is the pending case; the fallback is
+  the manual `db push` block in "Deployment", not a hand-written apply of the migration.
+
 ### Reconcile migration `20260630075121_reconcile_prod_schema_drift`
 
 - Captures schema changes that were previously made directly in the dashboard (teams
@@ -624,7 +656,7 @@ roll back to the pre-atomic leave handler or apply unrelated account-deletion mi
 
 ## Production database observer
 
-The repository-owned `scripts/prod-db` command is the canonical read-only production inspection
+The repository-owned `scripts/ops/prod-db` command is the canonical read-only production inspection
 interface for agents and developers. It uses the Supabase CLI for the built-in inspection reports
 and a restricted SQL library for schema and bounded data-shape reports. It always emits normalized
 JSON and never applies migrations.
@@ -641,32 +673,38 @@ CLI, supplies it through a temporary mode-`0600` `PGPASSFILE`, removes the file 
 and redacts the password from command failures.
 
 ```bash
-PROD_DB_TARGET=local scripts/prod-db health
+PROD_DB_TARGET=local scripts/ops/prod-db health
 chmod 600 "${PROD_DB_ENV_FILE:-.env}"
-scripts/prod-db canary
-scripts/prod-db table-stats
-scripts/prod-db preflight --migration supabase/migrations/20260807_example.sql
+scripts/ops/prod-db canary
+scripts/ops/prod-db table-stats
+scripts/ops/prod-db preflight --migration supabase/migrations/20260807_example.sql
 ```
 
 Store `PROD_DB_URL=postgresql://pi_prod_observer:...@...:5432/postgres?sslmode=verify-full` in the
 mode-`0600`, gitignored repository-root `.env` alongside the other local development secrets, so the
-password does not enter shell history. `scripts/prod-db` loads only `PROD_DB_*` keys from `.env`;
+password does not enter shell history. `scripts/ops/prod-db` loads only `PROD_DB_*` keys from `.env`;
 unrelated file keys are ignored. Already-exported environment variables take precedence and remain
 inherited by the observer child process, apart from the credential variables stripped by the wrapper.
 Keep the invoking environment free of privileged credentials. Export `PROD_DB_ENV_FILE` in the
 invoking shell to select a different file (for example, `export PROD_DB_ENV_FILE=/path/to/observer.env`);
 setting this selector inside `.env` is unsupported. The command fails if the selected file cannot be
 read; an absent default `.env` is allowed. Values are literal:
-no shell or variable expansion occurs. Use absolute certificate paths in `sslrootcert`, not `$HOME`
-or `${HOME}`. An inline environment
+no shell or variable expansion occurs. The wrapper rejects relative or missing certificate paths
+before invoking the CLI. Use absolute certificate paths in `sslrootcert`, not `$HOME` or
+`${HOME}`. An inline environment
 assignment remains supported for non-interactive automation whose secret store masks command input.
 
 Available reports include `health`, `schema`, `migration-history`, `db-stats`, `table-stats`,
 `index-stats`, `traffic`, `outliers`, `calls`, `locks`, `blocking`, `long-running`, `vacuum`,
 `bloat`, `role-stats`, bounded `sample`, `distribution`, and `count`. `sample` excludes columns
 matching the sensitive-column policy and is capped at 20 rows; `distribution` is capped at 50
-groups. `EXPLAIN ANALYZE`, arbitrary SQL, writes, DDL, migration commands, and unbounded row access
-are not supported.
+groups. The schema report exposes catalog ACL entries, PUBLIC grants, observer-effective privileges
+through inherited roles, privileges effective for existing `anon`, `authenticated`, and `service_role`
+roles, per-role schema `USAGE`, relation owners, and row-level-security flags. A privilege counts as
+effective only when the role can also use the relation's schema. Column-level ACL entries and
+the per-column privileges they make effective are listed separately. Health shows schema usage and read
+access to the migration `version` and `statements` columns. `EXPLAIN ANALYZE`, arbitrary SQL,
+writes, DDL, migration commands, and unbounded row access are not supported.
 
 `migration-history` reads applied version identifiers from `supabase_migrations.schema_migrations`
 and compares them with `supabase/migrations` in the current checkout. It reports `missing_locally`
@@ -688,7 +726,8 @@ guaranteed to describe the same environment as the observer credential.
 `canary` is the first production validation command. It runs only health and telemetry reports:
 `db-stats`, `role-stats`, `table-stats`, `index-stats`, and `outliers`. It does not sample rows,
 run distributions, or execute migration preflight. Before collecting telemetry it rejects
-privileged or write-capable roles, persistent-object creation privileges, disabled default
+privileged or write-capable roles, persistent-object creation privileges, read access to stored
+migration `statements`, disabled default
 read-only transactions, and unbounded statement or lock timeouts. Every report includes an
 `observation` object with capture time, observer application name, database statistics reset time,
 statement statistics reset time, and I/O statistics reset time. These reset times are required to
@@ -698,9 +737,12 @@ interpret cumulative counters.
 then combines that information with production table/index, traffic, vacuum, query, lock, and
 blocking reports. The result is evidence-only and must be reviewed by a human before a migration is
 merged. It does not execute the migration. If the parser sees dynamic SQL, unsupported statements,
-quoted identifiers, multiple statements, or any unclassified syntax, it returns
-`assessment: incomplete`, `risk: unknown`, and `requires_manual_review: true`; it never treats an
-unrecognized migration as safe.
+quoted identifiers, malformed literals or comments, multiple statements, or any unclassified syntax,
+it returns `assessment: incomplete`, `risk: unknown`, and `requires_manual_review: true`; it never
+treats an unrecognized migration as safe. The only multi-statement exception is a migration made
+entirely of table-level `GRANT`/`REVOKE` statements, optionally wrapped in one `BEGIN`/`COMMIT`
+pair. Privilege names such as `UPDATE` and `DELETE` in those statements are not data changes, and
+the explicit transaction is still reported as transaction control.
 
 Provision the observer role out of band through the Supabase SQL editor or approved database
 operation. Grant only `CONNECT`, required schema/catalog visibility, and `pg_monitor`; Supabase CLI
@@ -750,7 +792,7 @@ Pi access. Do not make production role provisioning or the canary an automatic m
    - `NUXT_SHARED_PROFILE_RATE_LIMIT_PER_MINUTE`
    - For `/api/tarkov-dev/profile`, add or tighten a Cloudflare rule; the app route also has a fixed per-IP limiter.
    - Cache API-backed shared rate limits are best-effort under concurrent bursts; use Cloudflare or Durable Objects for hard enforcement.
-   - Full ownership map (Worker DO vs Edge mutation limits vs Pages vs Auth): [`RATE_LIMITING.md`](./RATE_LIMITING.md).
+   - Full ownership map (Worker DO vs Edge mutation limits vs Pages vs Auth): [`rate-limiting.md`](./rate-limiting.md).
 3. If API protection blocks valid traffic, update `API_ALLOWED_HOSTS` and redeploy.
 
 ### Combined task cache contract rollout (v2 to v3)

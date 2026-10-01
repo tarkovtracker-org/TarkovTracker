@@ -1,3 +1,4 @@
+import type { ApiTaskUpdateEntry } from '@shared/utils/apiTaskUpdates';
 type RequiredEnv = Pick<
   CloudflareEnv,
   'API_GATEWAY_LIMITER' | 'SUPABASE_URL' | 'SUPABASE_ANON_KEY' | 'SUPABASE_SERVICE_ROLE_KEY'
@@ -32,7 +33,8 @@ export interface ApiUpdateMeta {
   id: string;
   at: number;
   source: 'api';
-  tasks?: ApiTaskUpdate[];
+  tasks?: ApiTaskUpdateEntry[];
+  taskCount?: number;
 }
 // Request body for batch task update
 export interface BatchTaskUpdate {

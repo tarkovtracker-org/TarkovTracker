@@ -61,12 +61,7 @@
   </div>
 </template>
 <script setup lang="ts">
-  import {
-    cleanText,
-    extractReleaseBullets,
-    normalizeCommitMessage,
-    toSentence,
-  } from '@/utils/changelog';
+  import { cleanText, normalizeCommitMessage, releaseBullets } from '@/utils/changelog';
   import { logger } from '@/utils/logger';
   import type { ChangelogBullet, ChangelogItem, ChangelogResponse } from '@/types/changelog';
   const PANEL_ID = 'dashboard-changelog-panel';
@@ -237,11 +232,10 @@
       .map((release) => {
         const date = String(release.published_at || release.created_at || '').slice(0, 10);
         const label = cleanText(String(release.name || release.tag_name || ''));
-        const rawBullets = extractReleaseBullets(release.body as string | null | undefined);
-        const bullets = rawBullets.map(toSentence).filter(Boolean).slice(0, 5);
-        if (!bullets.length && label) {
-          bullets.push(toSentence(label));
-        }
+        const bullets = releaseBullets(release.body as string | null | undefined, label).slice(
+          0,
+          5
+        );
         return { date, label: label || undefined, bullets };
       })
       .filter((item) => item.date && item.bullets.length);

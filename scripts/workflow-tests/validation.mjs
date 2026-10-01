@@ -1,0 +1,239 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import {
+  classifyPaths,
+  parseNameStatus,
+  collectChanges,
+  aggregateResults,
+  fullJobs,
+} from '../ci/validation-plan.mjs';
+import { gitExecutable } from '../ci/validation-tools.mjs';
+const cli = resolve('scripts/ci/validate-changes.mjs');
+const reducedDocsJobs = ['lint-format', 'systems-drift', 'security'];
+const reducedPreviewJobs = ['lint-format', 'systems-drift', 'security', 'validate'];
+test('only explicit documentation and translation paths receive reduced validation', () => {
+  for (const paths of [
+    ['README.md'],
+    ['docs/topic.markdown'],
+    ['.github/CONTRIBUTING.md'],
+    ['docs/systems/game-data.md'],
+    ['supabase/AGENTS.md', 'supabase/CLAUDE.md'],
+    ['workers/api-gateway/AGENTS.md'],
+  ]) {
+    assert.equal(classifyPaths(paths).full, false, paths.join());
+    assert.deepEqual(classifyPaths(paths).jobs, reducedDocsJobs);
+  }
+  // Translations keep the reduced test selection but gain the preview build.
+  for (const paths of [['app/locales/fr.json'], ['README.md', 'app/locales/cs.json']]) {
+    assert.equal(classifyPaths(paths).full, false, paths.join());
+    assert.deepEqual(classifyPaths(paths).jobs, reducedPreviewJobs);
+  }
+  for (const path of [
+    'DESIGN.md',
+    'app/locales/en.json',
+    'app/locales/nested/fr.json',
+    'app/test.ts',
+    'workers/a.ts',
+    'supabase/migrations/a.sql',
+    'scripts/precompute/run.ts',
+    'package.json',
+    'pnpm-lock.yaml',
+    'vitest.config.ts',
+    '.github/workflows/ci.yml',
+    'public/llms.txt',
+    'public/AGENTS.md',
+    'supabase/README.md',
+    'workers/api-gateway/NOTAGENTS.md',
+    'supabase/AGENTS.md.orig',
+    'app/types/generated.d.ts',
+    'unknown',
+    '../docs/a.md',
+    'docs/script.sh',
+  ]) {
+    assert.equal(classifyPaths([path]).full, true, path);
+    assert.deepEqual(classifyPaths([path]).jobs, [
+      'fallow',
+      'lint-format',
+      'typecheck',
+      'test',
+      'validate',
+      'supabase-db',
+      'systems-drift',
+      'workers',
+      'security',
+    ]);
+  }
+  assert.equal(classifyPaths([]).full, true);
+  assert.equal(classifyPaths(['README.md', 'app/a.ts']).full, true);
+  assert.equal(classifyPaths(['README.md']).i18n, false);
+  assert.equal(classifyPaths(['app/locales/de.json']).i18n, true);
+  // The source locale is not a translation: full validation, including i18n, with no reduction.
+  assert.equal(classifyPaths(['app/locales/en.json']).i18n, true);
+  assert.equal(classifyPaths(['app/locales/en.json']).locales, false);
+  assert.equal(classifyPaths(['app/locales/english.json']).locales, true);
+  assert.equal(classifyPaths(['README.md'], { forceFull: true }).full, true);
+});
+test('only change sets that cannot reach the deployed app skip the preview', () => {
+  // Reduced validation and no preview: documentation-only change sets.
+  for (const paths of [
+    ['README.md'],
+    ['docs/a.md', '.github/CONTRIBUTING.md'],
+    ['docs/renamed-from.md', 'docs/renamed-to.md'],
+    ['docs/deleted.md'],
+  ]) {
+    assert.equal(classifyPaths(paths).previewRequired, false, paths.join());
+    assert.ok(!classifyPaths(paths).jobs.includes('validate'), paths.join());
+  }
+  // Full validation without a preview: automation, tooling, and tests that never ship.
+  for (const paths of [
+    ['.github/workflows/ci.yml'],
+    ['scripts/workflow-tests/dispatched-status.mjs'],
+    ['scripts/ci/README.md'],
+    ['docs/eft-log-reference/audit_2026-08-29_signatures.json'],
+    ['tests/test-setup.ts'],
+    ['.coderabbit.yaml'],
+    ['supabase/README.md'],
+    ['README.md', '.github/workflows/ci.yml'],
+  ]) {
+    const plan = classifyPaths(paths);
+    assert.equal(plan.previewRequired, false, paths.join());
+    assert.equal(plan.full, true, paths.join());
+    assert.ok(plan.jobs.includes('validate'), paths.join());
+  }
+  for (const paths of [
+    ['app/locales/fr.json'],
+    ['README.md', 'app/locales/fr.json'],
+    ['app/locales/en.json'],
+    ['nuxt.config.ts'],
+    ['wrangler.toml'],
+    ['package.json'],
+    ['pnpm-lock.yaml'],
+    ['app/a.ts'],
+    ['README.md', 'app/a.ts'],
+    ['scripts/preview/profile.mjs'],
+    ['scripts/preview/build-profile.mjs'],
+    ['scripts/preview/write-manifest.mjs'],
+    ['scripts/preview/README.md'],
+    ['public/llms.txt'],
+    ['public/AGENTS.md'],
+    ['supabase/migrations/a.sql'],
+    ['workers/api-gateway/src/index.ts'],
+    ['DESIGN.md'],
+    ['unknown'],
+    ['../docs/a.md'],
+    [],
+  ]) {
+    assert.equal(classifyPaths(paths).previewRequired, true, paths.join());
+    assert.ok(classifyPaths(paths).jobs.includes('validate'), paths.join());
+  }
+  // Forced full runs (pushes, dispatches, unreadable diffs) always build the deployable output.
+  assert.equal(classifyPaths(['README.md'], { forceFull: true }).previewRequired, true);
+});
+test('name-status parser includes both rename paths and deletions without splitting filenames', () => {
+  assert.deepEqual(parseNameStatus('R100\0app/a.ts\0docs/a.md\0D\0file with\nnewline.md\0'), [
+    'app/a.ts',
+    'docs/a.md',
+    'file with\nnewline.md',
+  ]);
+  for (const bad of ['M\0', 'R100\0one\0', 'M\0truncated', 'invalid\0path\0'])
+    assert.throws(() => parseNameStatus(bad));
+});
+function assertSelectedJobFailures(plan, needs) {
+  for (const result of ['failure', 'cancelled', 'skipped', undefined]) {
+    for (const job of plan.jobs) {
+      assert.ok(
+        aggregateResults(plan, { ...needs, [job]: { result } }).length,
+        `${job}: ${result}`
+      );
+    }
+  }
+}
+function assertPreviewPlanShape(plan, needs) {
+  assert.ok(aggregateResults({ ...plan, previewRequired: undefined }, needs).length);
+  assert.ok(aggregateResults({ ...plan, previewRequired: 'true' }, needs).length);
+  if (plan.previewRequired && !plan.full) {
+    const stripped = { ...plan, jobs: plan.jobs.filter((job) => job !== 'validate') };
+    assert.ok(aggregateResults(stripped, needs).length);
+  }
+}
+test('aggregate fails closed on selected failures, cancellations, unexpected skips and missing data', () => {
+  for (const paths of [['app/a.ts'], ['README.md']]) {
+    const plan = classifyPaths(paths);
+    const needs = {
+      changes: { result: 'success' },
+      ...Object.fromEntries(
+        fullJobs.map((job) => [job, { result: plan.jobs.includes(job) ? 'success' : 'skipped' }])
+      ),
+    };
+    assert.deepEqual(aggregateResults(plan, needs), []);
+    assertSelectedJobFailures(plan, needs);
+    assert.ok(aggregateResults(plan, { ...needs, changes: { result: 'failure' } }).length);
+    // A job unknown to the trusted aggregator fails closed even when it reports success.
+    assert.ok(aggregateResults(plan, { ...needs, unknown: { result: 'success' } }).length);
+    // The integrated security gate is always selected: scanner errors, cancellation, an
+    // unexpected skip, or a missing result fail the aggregate for reduced and full plans alike.
+    assert.ok(plan.jobs.includes('security'));
+    for (const result of ['failure', 'cancelled', 'skipped', undefined]) {
+      const errors = aggregateResults(plan, { ...needs, security: { result } });
+      assert.ok(
+        errors.some((error) => error.startsWith('security: expected success')),
+        result
+      );
+    }
+    const { security: _omitted, ...withoutSecurity } = needs;
+    assert.ok(aggregateResults(plan, withoutSecurity).some((error) => /^security:/.test(error)));
+    assert.ok(aggregateResults(undefined, needs).length);
+    assert.ok(aggregateResults({ ...plan, jobs: [] }, needs).length);
+    // A plan must carry a boolean previewRequired and exactly the jobs that decision selects:
+    // a preview-required plan without the validate job can never publish a deployable preview.
+    assertPreviewPlanShape(plan, needs);
+    if (!plan.full)
+      assert.ok(aggregateResults(plan, { ...needs, test: { result: 'success' } }).length);
+  }
+});
+test('local classifier includes committed, staged, unstaged and untracked paths; CI ignores dirt', (t) => {
+  const cwd = mkdtempSync(join(tmpdir(), 'validation-git-'));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  const git = (...args) => execFileSync(gitExecutable(), args, { cwd, encoding: 'utf8' }).trim();
+  git('init', '-q');
+  git('config', 'user.email', 'test@example.invalid');
+  git('config', 'user.name', 'Test');
+  writeFileSync(join(cwd, 'README.md'), 'base');
+  git('add', '.');
+  git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'base');
+  const base = git('rev-parse', 'HEAD');
+  mkdirSync(join(cwd, 'docs'));
+  writeFileSync(join(cwd, 'docs/a.md'), 'committed');
+  git('add', '.');
+  git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'docs');
+  writeFileSync(join(cwd, 'staged.ts'), 'staged');
+  git('add', 'staged.ts');
+  writeFileSync(join(cwd, 'README.md'), 'unstaged');
+  writeFileSync(join(cwd, 'untracked.ts'), 'untracked');
+  assert.deepEqual(collectChanges({ cwd, base }).paths.sort(), [
+    'README.md',
+    'docs/a.md',
+    'staged.ts',
+    'untracked.ts',
+  ]);
+  assert.deepEqual(collectChanges({ cwd, base, local: false }).paths, ['docs/a.md']);
+  assert.ok(collectChanges({ cwd, base: 'missing-ref' }).error);
+  const explain = (...args) =>
+    JSON.parse(
+      execFileSync(process.execPath, [cli, '--explain', '--base', base, ...args], {
+        cwd,
+        encoding: 'utf8',
+        env: { ...process.env, GITHUB_OUTPUT: '' },
+      })
+    );
+  assert.equal(explain().full, true);
+  assert.equal(explain('--mode', 'ci').full, false);
+  assert.equal(explain('--mode', 'ci', '--shadow').full, true);
+  assert.equal(explain('--mode', 'ci', '--shadow').proposed.full, false);
+  assert.equal(explain('--mode', 'ci', '--bad-option').full, true);
+  assert.equal(explain('--mode', 'full').full, true);
+});

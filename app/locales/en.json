@@ -88,6 +88,10 @@
     "error_loading": "Error Loading Tarkov Data",
     "loading": "Loading Tarkov Data",
     "logout_failed": "Unable to log out. Please try again.",
+    "logout_unreachable": "The server could not be reached, so you are still signed in. You can sign out on this device only; the server will not be told, so the session there stays active until it expires or you sign out from another device.",
+    "logout_this_device": "Sign out on this device only",
+    "logout_this_device_done": "Signed out on this device only. The session on the server stays active until it expires or you sign out from another device.",
+    "logout_local_only": "Signed out on this device. The server could not be reached, so your other sessions may still be signed in.",
     "hidden_label": "Hidden",
     "user_label": "User",
     "user_avatar_alt": "User avatar",
@@ -99,6 +103,40 @@
     "login_aria": "Log in to your account",
     "switch_to_light_theme": "Switch to light theme",
     "switch_to_dark_theme": "Switch to dark theme"
+  },
+  "progress_save_status": {
+    "indicator_aria": "Progress save status: {status}",
+    "cloud_pending_label": "Saving progress to the cloud",
+    "cloud_retrying_label": "Cloud save retrying",
+    "cloud_failed_label": "Cloud save failed",
+    "local_failed_label": "Progress not saved in this browser",
+    "cloud_pending_description": "Your latest progress changes have not been saved to the cloud yet.",
+    "cloud_retrying_description": "Saving your latest progress changes to the cloud failed. You can keep tracking while another attempt runs automatically.",
+    "cloud_failed_description": "Automatic attempts to save your latest progress changes to the cloud have stopped. The changes are still waiting to be saved, and you can keep tracking and retry at any time.",
+    "local_failed_description": "Your latest progress changes could not be saved in this browser. You can keep tracking, but changes that are not saved elsewhere may be lost if you reload, close this tab, or sign out.",
+    "local_saved_note": "These changes are saved in this browser.",
+    "cloud_also_pending_note": "They have not been saved to the cloud either. Export your progress to keep a copy.",
+    "retry_scheduled": "Automatic retry {attempt} of {total} is scheduled.",
+    "cause_offline": "Cause: this device appears to be offline.",
+    "cause_rate_limited": "Cause: the cloud service is temporarily limiting saves.",
+    "cause_auth": "Cause: your sign-in session could not be verified.",
+    "cause_quota": "Cause: this browser's storage for TarkovTracker is full.",
+    "cause_unavailable": "Cause: this browser is blocking site storage, for example because of privacy settings.",
+    "cause_unknown": "The cause of this failure is unknown.",
+    "quota_guidance": "Clearing this site's data or reloading could remove your only copy of these changes. Export your progress before removing any data.",
+    "retry_button": "Retry cloud save",
+    "retry_succeeded": "Your progress changes were saved to the cloud.",
+    "retry_failed": "Cloud save did not succeed. Your changes are still waiting to be saved.",
+    "export_button": "Export progress",
+    "export_hint": "Export downloads your current progress as a backup file, even when saving has failed."
+  },
+  "sign_out_confirm": {
+    "title": "Sign out with unsaved changes?",
+    "risk": "Your latest progress changes are not saved in this browser or to the cloud. If you sign out now, they will be lost.",
+    "options": "You can stay signed in and retry saving, or export your current progress before deciding.",
+    "stay_signed_in": "Stay signed in",
+    "discard_and_sign_out": "Sign out and discard changes",
+    "retry_succeeded": "Your changes were saved to the cloud. You can sign out safely."
   },
   "omnibar": {
     "title": "Search",
@@ -178,6 +216,7 @@
         "plural": "Tasks updated"
       },
       "state": {
+        "active": "active",
         "completed": "completed",
         "failed": "failed",
         "uncompleted": "uncompleted"
@@ -514,6 +553,9 @@
     "not_available_description": "The interactive map for {mapName} is not yet available. We are waiting for a compatible map to be created.",
     "placeholder": "this location",
     "floors": "Floors",
+    "extract_names": {
+      "scav_underboat_hideout": "Hideout Under the Landing Stage"
+    },
     "factions": {
       "pmc": "PMC"
     },
@@ -568,7 +610,8 @@
       "go_to_in_task_list": "Go to objective in task list",
       "complete": "Complete objective",
       "uncomplete": "Uncomplete objective",
-      "objective_unavailable": "Objective unavailable."
+      "objective_unavailable": "Objective unavailable.",
+      "stacked_objectives": "{count} objectives here"
     }
   },
   "page": {
@@ -835,7 +878,7 @@
       "one_time_perks_heading": "Includes supporter perks",
       "one_time_fee_transparency": "Stripe fees (2.9% + $0.30) are shown before you pay.",
       "perk_api_rate_limit": "Higher daily API read and write quotas",
-      "perk_data_retention": "Longer retention if inactive accounts are purged, while supporter status is active",
+      "perk_data_retention": "One-year inactivity window after any recorded support; active subscriptions are exempt from inactivity cleanup",
       "login_required_warning": "You must be logged in to receive supporter perks.",
       "price_to_us": "Goes to us",
       "price_per_month_suffix": "/mo",
@@ -992,7 +1035,25 @@
         "map_complete_tasks_toggle_show": "Show hidden",
         "map_complete_tasks_toggle_hide": "Hide map-complete",
         "map_hidden_hint": "Map hidden — click to show",
-        "raid_time_tooltip": "Current in-game raid time"
+        "raid_time_tooltip": "Current in-game raid time",
+        "raid_plan": {
+          "title": "Quests on map",
+          "summary_all": "Showing all {total}",
+          "summary_hidden": "{hidden} of {total} hidden",
+          "choose_quests": "Choose quests",
+          "show_all": "Show all",
+          "popover_description": "Untick quests you're not running this raid to clear them off the map. \"Only\" hides everything else.",
+          "only": "Only",
+          "show_only_named": "Show only {name} on the map",
+          "show_only_quest": "Show only this quest on the map",
+          "hide_quest": "Hide from map",
+          "show_quest": "Show on map",
+          "all_hidden_hint": "Every quest on this map is hidden. Use Show all to bring them back.",
+          "hidden_section_title": "Hidden from map ({count})",
+          "hidden_section_description": "Still tracked, just not drawn on the map.",
+          "hidden_section_expand": "Show hidden quests",
+          "hidden_section_collapse": "Collapse hidden quests"
+        }
       },
       "pinned_tasks_section": "Pinned Tasks",
       "focused_task_section": "Focused Task",
@@ -1024,6 +1085,7 @@
         "of": "of",
         "mark_failed": "Mark Failed",
         "available_button": "Mark Available",
+        "clear_availability_confirmation": "Clear in-game availability confirmation",
         "uncomplete_button": "Mark Uncompleted",
         "reset_item_counts": "Reset item counts",
         "collapse_task": "Collapse task",
@@ -1109,6 +1171,11 @@
         "faction": "Available to {faction} characters.",
         "trader_unlock": "Unlock {trader} by completing {task}.",
         "prestige": "Requires Prestige {required} (current: {current}).",
+        "global_variable": "Server progression value {comparison} {required} required (current: {current}).",
+        "global_variable_unknown": "Requires server progression {comparison} {required}. Your current value is not available to the tracker. Use Mark available only if this task is available in-game; no counter tasks will be marked complete.",
+        "task_counter": "Requires {comparison} {required} completed tasks from this trader loyalty tier (completed: {current}). If this task is already available in-game, use Mark available.",
+        "dialogue": "Requires an in-game trader conversation. Use Mark available only after confirming this task is available in-game.",
+        "story_objective": "Complete the story objective \"{objective}\" ({chapter}).",
         "unknown": "Requirement data is unavailable or unsupported. Availability cannot be confirmed.",
         "cycle": "The prerequisite chain contains a cycle. Availability cannot be confirmed.",
         "complete": "This task is completed.",
@@ -1890,6 +1957,24 @@
           "description": "Movement speed is decreased by 1%. Buying items at Therapist is 5% cheaper."
         }
       }
+    },
+    "account_retention": {
+      "title": "Account retention and service availability",
+      "scope": "These rules apply to routine account deletion for inactivity while TarkovTracker operates. They define when an account may become eligible for cleanup, not a scheduled deletion date.",
+      "standard": "No qualifying support: an account may be deleted after six consecutive months without recorded account activity.",
+      "previous_supporter": "Previous supporter: an account with a qualifying contribution recorded against it, including a one-time contribution or previous subscription, may become eligible for deletion one year after the later of its last recorded account activity and its most recent recorded contribution.",
+      "active_subscriber": "Active qualifying subscription: an account is exempt from routine inactivity deletion while its supporter subscription remains active, even if the account is not used.",
+      "subscription_end": "Canceling renewal does not end this exemption while paid subscription access continues. After subscription access ends, including any billing grace period we grant, an account becomes eligible for inactivity deletion no earlier than one year after the later of its last recorded activity and the end of its most recent subscription access period.",
+      "activity": "We assess inactivity using available records of sign-ins, authenticated site or API use, and saved account-data changes. Viewing a public profile without signing in does not count as activity for that account.",
+      "exceptions": "Fully refunded contributions do not qualify for supporter retention; other valid contributions may still qualify. A chargeback immediately removes all supporter benefits and supporter retention history, including benefits from earlier contributions. Accounts with a chargeback follow the standard six-month inactivity rule. These protections apply only to routine inactivity cleanup. They do not prevent deletion you request, action for abuse or security reasons, deletion required by law, or deletion when the Service is discontinued.",
+      "no_guarantee": "Supporting TarkovTracker does not purchase permanent storage, a backup service, or guaranteed availability or recovery. Data may be lost through failures, security incidents, or third-party outages, and the Service may be suspended or shut down. The retention policy does not guarantee that data will remain available for any particular period.",
+      "backup": "Export your progress from Settings and keep your own backup. Export and recovery may be unavailable during an outage or after data is lost or deleted.",
+      "rights": "Nothing in this policy excludes or limits rights or remedies that cannot lawfully be excluded or limited.",
+      "notice": "Where feasible, we will make reasonable efforts to notify affected users before routine inactivity deletion. Material changes to this policy will be communicated in accordance with the Terms of Service and applicable law.",
+      "terms_summary": "Routine inactivity cleanup follows the account-retention rules in Section 7.3, including the exemption for active subscribers and the one-year window for previous supporters.",
+      "perk_summary": "Protection from routine inactivity deletion under the account-retention rules in Section 7.3, including one-time contributors and previous subscribers",
+      "liability": "Any exclusion or limitation of liability for data loss or privacy-related incidents applies only to the extent permitted by applicable law. Nothing in this Policy excludes or limits rights or remedies that cannot lawfully be excluded or limited.",
+      "liability_label": "Limits permitted by law:"
     }
   },
   "footer": {
@@ -1901,6 +1986,7 @@
     "game_attribution": "Escape from Tarkov and related game content and materials are trademarks and copyrighted works of Battlestate Games Limited and its licensors. All rights reserved. TarkovTracker is an unofficial fan project and is not affiliated with or endorsed by Battlestate Games.",
     "tagline": "Track your Escape from Tarkov quests, hideout upgrades, and item requirements in one place.",
     "version_release_link": "View the release notes for version {version} on GitHub",
+    "build_commit_link": "View build commit {commit} on GitHub",
     "sections": {
       "explore": "Explore",
       "project": "Project",
@@ -2313,10 +2399,17 @@
       "delete_forever": "Delete Account Forever",
       "delete_success_title": "Account Deleted Successfully",
       "delete_success_sr_only": "Your account deletion is complete, and you will be redirected to the dashboard.",
+      "delete_success_cleanup_failed_sr_only": "Your account was deleted, but some data remains on this device. You can retry cleanup or continue with that data left here.",
       "delete_success_description": "Your account and all associated data have been permanently deleted.",
+      "other_session_deleted_description": "The account that started this deletion was deleted. Your current account is still signed in and was not changed.",
       "cleanup_pending": "Some data cleanup is still in progress and will complete shortly.",
+      "device_cleanup_failed": "Some deleted account data remains on this device. Retry cleanup, or continue and leave that data here.",
+      "session_end_failed": "This browser is still signed in to the deleted account. Select Go to dashboard to try signing out again.",
+      "retry_device_cleanup": "Retry device cleanup",
+      "continue_with_device_data_remaining": "Continue with data remaining",
       "redirect_message": "Thank you for using TarkovTracker. You will be redirected to the dashboard.",
-      "go_to_dashboard": "Go to Dashboard"
+      "go_to_dashboard": "Go to Dashboard",
+      "session_changed": "Your signed-in account changed. No further action will be taken in this session."
     },
     "discord_link": {
       "title": "Discord Account",
@@ -2574,6 +2667,25 @@
         "verification_failed": "Human verification failed. Reload the page and try again.",
         "fetch_failed": "Unable to fetch the Tarkov.dev profile. Open the profile on Tarkov.dev, then try again."
       }
+    },
+    "device_data": {
+      "title": "Data on this device",
+      "description": "Signing out keeps this account's saved progress in this browser, so changes that have not reached the cloud yet can sync when you sign back in. Progress displaced by a reset or Seasonal rollover is kept separately for export. Removing this device's data deletes this account's progress, recovery copies, and preferences from this browser and signs you out.",
+      "cloud_unaffected": "Your cloud progress is not deleted. Other accounts' data on this device is not affected.",
+      "superseded_available": "{count} progress change(s) from a reset or Seasonal rollover are retained here for export only. They will not be restored or synced automatically.",
+      "superseded_export": "Export superseded progress",
+      "superseded_export_error": "Could not export superseded progress",
+      "remove_button": "Remove this account's data from this device",
+      "confirm_title": "Remove this account's data from this device?",
+      "confirm_description": "This account's progress, recovery copies, superseded progress exports, and preferences will be deleted from this browser, and you will be signed out. Your cloud progress stays available when you sign in again.",
+      "pending_warning": "Some progress changes have not been saved to the cloud yet. Removing this device's data will permanently discard them. Export your progress first if you want to keep them.",
+      "confirm_button": "Remove data and sign out",
+      "removed": "This account's data was removed from this device.",
+      "remove_error": "Some account data could not be removed from this device. Try again before using another account here.",
+      "remove_incomplete": "Some data from the account you removed is still on this device. Try again before using another account here.",
+      "retry_removal": "Try removing again",
+      "revocation_unavailable": "The server could not be reached, so you are still signed in. You can sign out on this device only and remove the data; the server will not be told, so the session there stays active until it expires or you sign out from another device.",
+      "confirm_device_only_button": "Sign out on this device only and remove data"
     }
   },
   "hideout": {
@@ -2661,6 +2773,22 @@
       "approve": "Approve",
       "deny": "Deny"
     }
+  },
+  "tarkov_access": {
+    "title": "Verify your browser",
+    "checking": "Checking site access…",
+    "description": "This site is being protected from excessive automated requests. Complete the security check below to load Tarkov game data.",
+    "retry": "Try again",
+    "dismiss": "Not now",
+    "dismissed_notice": "Game data is paused until you complete the security check.",
+    "verify_now": "Verify now",
+    "verification_failed_retry": "The security check did not complete. You can try again.",
+    "verifying": "Verifying your browser…",
+    "widget_hint": "Complete the check to continue.",
+    "failed": "Loading Tarkov data is currently unavailable. You can try again.",
+    "blocked": "Access to Tarkov data is currently blocked for your network. You can try again or come back later.",
+    "rate_limited": "Too many checks in a short time. Wait a moment, then try again.",
+    "widget_unavailable": "The security check could not load. You can try again."
   },
   "analytics_consent": {
     "eyebrow": "Analytics",

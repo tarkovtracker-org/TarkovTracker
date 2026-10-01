@@ -53,10 +53,10 @@ jobs:
           checksum_entry_path="$RUNNER_TEMP/gitleaks_checksum.txt"
           install_dir="$RUNNER_TEMP/gitleaks"
           mkdir -p "$install_dir"
-          curl -sSfL \
+          curl --proto '=https' --tlsv1.2 -sSfL \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}" \
             -o "$archive_path"
-          curl -sSfL \
+          curl --proto '=https' --tlsv1.2 -sSfL \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_checksums.txt" \
             -o "$checksums_path"
           awk -v archive="$archive" '$2 == archive { print }' "$checksums_path" > "$checksum_entry_path"
@@ -69,11 +69,30 @@ jobs:
           echo "$install_dir" >> "$GITHUB_PATH"
         env:
           GITLEAKS_VERSION: 8.30.1
+      - name: Verify Gitleaks detects a canary secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          b64url() { printf '%s' "$1" | base64 -w0 | tr '+/' '-_' | tr -d '='; }
+          canary_dir="$RUNNER_TEMP/gitleaks-canary"
+          mkdir -p "$canary_dir"
+          header="$(b64url '{"alg":"HS256","typ":"JWT"}')"
+          payload="$(b64url '{"iss":"supabase","ref":"canaryprojectref0000","role":"service_role","iat":1700000000,"exp":2000000000}')"
+          signature="$(head -c 32 /dev/urandom | base64 -w0 | tr '+/' '-_' | tr -d '=')"
+          printf 'SUPABASE_ANON_KEY = "%s.%s.%s"\n' "$header" "$payload" "$signature" > "$canary_dir/wrangler.toml"
+          # A distinct findings exit code keeps scan errors (exit 1) from counting as detection.
+          status=0
+          gitleaks dir "$canary_dir" --config .github/.gitleaks.toml --exit-code 42 --no-banner --redact || status=$?
+          if [ "$status" -ne 42 ]; then
+            echo "::error::Gitleaks canary exited $status, expected 42; the service-role JWT in wrangler.toml was not reported or the scan failed."
+            exit 1
+          fi
       - name: Gitleaks scan
         id: gitleaks
         continue-on-error: true
         run: |
           gitleaks git . \
+            --config .github/.gitleaks.toml \
             --exit-code 1 \
             --no-banner \
             --redact \

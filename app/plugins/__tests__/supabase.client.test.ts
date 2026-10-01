@@ -84,6 +84,9 @@ const createClientMock = (initialUserId: string) => {
     error: null,
   });
   const signOut = vi.fn().mockResolvedValue({ error: null });
+  const getSession = vi.fn().mockResolvedValue({
+    data: { session: createSession(initialUserId) },
+  });
   const removeAllChannels = vi.fn().mockResolvedValue([]);
   mockCreateClient.mockReturnValue({
     removeAllChannels,
@@ -93,11 +96,7 @@ const createClientMock = (initialUserId: string) => {
       getChannels: vi.fn(() => []),
     },
     auth: {
-      getSession: vi.fn().mockResolvedValue({
-        data: {
-          session: createSession(initialUserId),
-        },
-      }),
+      getSession,
       onAuthStateChange: vi.fn((callback: MockAuthStateChangeCallback) => {
         authStateChangeCallback = callback;
         return stubAuthSubscription();
@@ -108,11 +107,19 @@ const createClientMock = (initialUserId: string) => {
   });
   return {
     getAuthStateChangeCallback: () => authStateChangeCallback,
+    getSession,
     removeAllChannels,
     signInWithOAuth,
     signOut,
   };
 };
+const sessionChanged = { name: 'SupabaseSessionChangedError' };
+type CreatedAuthOptions = {
+  storage: { getItem: (key: string) => string | null };
+  storageKey: string;
+};
+const createdAuthOptions = (): CreatedAuthOptions =>
+  (mockCreateClient.mock.calls.at(-1)?.[2] as { auth: CreatedAuthOptions }).auth;
 describe('supabase plugin', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -159,10 +166,11 @@ describe('supabase plugin', () => {
       'https://test.supabase.co',
       'test-anon-key',
       expect.objectContaining({
-        auth: {
+        auth: expect.objectContaining({
           detectSessionInUrl: true,
           flowType: 'pkce',
-        },
+          storageKey: 'sb-test-auth-token',
+        }),
       })
     );
   });
@@ -345,10 +353,11 @@ describe('supabase plugin', () => {
         'https://test.supabase.co',
         'test-anon-key',
         expect.objectContaining({
-          auth: {
+          auth: expect.objectContaining({
             detectSessionInUrl: false,
             flowType: 'pkce',
-          },
+            storageKey: 'sb-test-auth-token',
+          }),
         })
       );
     } finally {
@@ -415,10 +424,11 @@ describe('supabase plugin', () => {
         'https://test.supabase.co',
         'test-anon-key',
         expect.objectContaining({
-          auth: {
+          auth: expect.objectContaining({
             detectSessionInUrl: false,
             flowType: 'pkce',
-          },
+            storageKey: 'sb-test-auth-token',
+          }),
         })
       );
     } finally {
@@ -581,6 +591,126 @@ describe('supabase plugin', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(removeAllChannels).toHaveBeenCalledTimes(2);
   });
+  it('uses the requested local scope only when the current session still belongs to the deleted owner', async () => {
+    const { signOut, getSession } = createClientMock('user-1');
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    await flushPlugin();
+    getSession.mockResolvedValueOnce({ data: { session: createSession('user-1') }, error: null });
+    await result?.provide.supabase.signOut('user-1', 'local');
+    expect(signOut).toHaveBeenCalledOnce();
+    expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
+  });
+  it('does not sign out a new account that arrives before sign-out starts', async () => {
+    const { getAuthStateChangeCallback, removeAllChannels, signOut } = createClientMock('user-1');
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    await flushPlugin();
+    getAuthStateChangeCallback()?.('SIGNED_IN', createSession('user-2'));
+    await expect(result?.provide.supabase.signOut('user-1')).rejects.toMatchObject(sessionChanged);
+    expect(signOut).not.toHaveBeenCalled();
+    expect(removeAllChannels).not.toHaveBeenCalled();
+    expect(result?.provide.supabase.user.id).toBe('user-2');
+  });
+  it('fences the SDK session read so another account stored mid-sign-out is never revoked', async () => {
+    const { removeAllChannels, signOut } = createClientMock('user-1');
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    await flushPlugin();
+    const authOptions = createdAuthOptions();
+    const foreignSession = JSON.stringify(createSession('user-2'));
+    signOut.mockImplementationOnce(async () => {
+      // Another tab stores user-2 after the plugin's owner check but before the SDK reads it.
+      localStorage.setItem(authOptions.storageKey, foreignSession);
+      authOptions.storage.getItem(authOptions.storageKey);
+      return { error: null };
+    });
+    await expect(result?.provide.supabase.signOut('user-1')).rejects.toMatchObject(sessionChanged);
+    expect(localStorage.getItem(authOptions.storageKey)).toBe(foreignSession);
+    expect(removeAllChannels).not.toHaveBeenCalled();
+  });
+  it('reports a local-only sign-out when the SDK cleared the session but revocation failed', async () => {
+    const { getAuthStateChangeCallback, removeAllChannels, signOut } = createClientMock('user-1');
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    await flushPlugin();
+    await result?.provide.supabase.ready();
+    signOut.mockImplementationOnce(async () => {
+      getAuthStateChangeCallback()?.('SIGNED_OUT', null);
+      return { error: new Error('Failed to fetch') };
+    });
+    await expect(result?.provide.supabase.signOut('user-1')).resolves.toBe('signed_out_locally');
+    expect(signOut).toHaveBeenCalledWith({ scope: 'global' });
+    expect(removeAllChannels).toHaveBeenCalledOnce();
+    expect(result?.provide.supabase.user.loggedIn).toBe(false);
+  });
+  it('removes only the owner session on an explicit device-only sign-out', async () => {
+    const { getAuthStateChangeCallback, signOut } = createClientMock('user-1');
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    await flushPlugin();
+    await result?.provide.supabase.ready();
+    const authOptions = createdAuthOptions();
+    localStorage.setItem(authOptions.storageKey, JSON.stringify(createSession('user-1')));
+    signOut.mockImplementationOnce(async () => {
+      expect(authOptions.storage.getItem(authOptions.storageKey)).toBeNull();
+      getAuthStateChangeCallback()?.('SIGNED_OUT', null);
+      return { error: null };
+    });
+    await result?.provide.supabase.signOutThisDevice('user-1');
+    expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
+    expect(localStorage.getItem(authOptions.storageKey)).toBeNull();
+    expect(result?.provide.supabase.user.loggedIn).toBe(false);
+  });
+  it('keeps another account session when a device-only sign-out finds it stored', async () => {
+    const { getSession, signOut } = createClientMock('user-1');
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    await flushPlugin();
+    await result?.provide.supabase.ready();
+    const authOptions = createdAuthOptions();
+    const foreignSession = JSON.stringify(createSession('user-2'));
+    localStorage.setItem(authOptions.storageKey, foreignSession);
+    getSession.mockResolvedValue({ data: { session: createSession('user-2') }, error: null });
+    await expect(result?.provide.supabase.signOutThisDevice('user-1')).rejects.toMatchObject(
+      sessionChanged
+    );
+    expect(signOut).not.toHaveBeenCalled();
+    expect(localStorage.getItem(authOptions.storageKey)).toBe(foreignSession);
+    expect(result?.provide.supabase.user.id).toBe('user-2');
+  });
+  it('uses global sign-out by default and propagates a revocation error without local fallback', async () => {
+    const { removeAllChannels, signOut } = createClientMock('user-1');
+    const offlineError = new Error('Failed to fetch');
+    signOut.mockResolvedValueOnce({ error: offlineError });
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    await flushPlugin();
+    await expect(result?.provide.supabase.signOut()).rejects.toBe(offlineError);
+    expect(signOut).toHaveBeenCalledOnce();
+    expect(signOut).toHaveBeenCalledWith({ scope: 'global' });
+    expect(removeAllChannels).not.toHaveBeenCalled();
+  });
+  it('rejects when the SDK could not end a session that is still active', async () => {
+    const { removeAllChannels, signOut } = createClientMock('user-1');
+    const plugin = (await import('@/plugins/supabase.client')).default;
+    const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
+      SupabasePluginProvide | undefined;
+    await flushPlugin();
+    await result?.provide.supabase.ready();
+    const refreshError = new Error('refresh failed while offline');
+    signOut.mockResolvedValueOnce({ error: refreshError });
+    await expect(result?.provide.supabase.signOut('user-1')).rejects.toBe(refreshError);
+    expect(removeAllChannels).not.toHaveBeenCalled();
+    expect(result?.provide.supabase.user.id).toBe('user-1');
+  });
   it('logs realtime cleanup failures after signOut without rejecting', async () => {
     const cleanupError = new Error('realtime cleanup failed');
     const { removeAllChannels, signOut } = createClientMock('user-1');
@@ -589,7 +719,7 @@ describe('supabase plugin', () => {
     const result = (await plugin.setup?.({} as Parameters<NonNullable<typeof plugin.setup>>[0])) as
       SupabasePluginProvide | undefined;
     await flushPlugin();
-    await expect(result?.provide.supabase.signOut()).resolves.toBeUndefined();
+    await expect(result?.provide.supabase.signOut()).resolves.toBe('signed_out');
     expect(loggerMock.warn).toHaveBeenCalledWith(
       '[Supabase] Failed to remove realtime channels after sign-out',
       cleanupError
@@ -667,7 +797,7 @@ describe('supabase plugin', () => {
     await expect(fullClient.auth.signOut()).resolves.toEqual({ error: null });
     expect(fullClient.auth.onAuthStateChange()).toBeDefined();
     await expect(supabase?.ready()).resolves.toBeNull();
-    await expect(supabase?.signOut()).resolves.toBeUndefined();
+    await expect(supabase?.signOut()).resolves.toBe('signed_out');
     await expect(supabase?.signInWithOAuth('github')).rejects.toThrow(
       'Supabase not configured - login unavailable in offline mode'
     );

@@ -91,6 +91,86 @@ describe('changelog endpoint', () => {
       'Cache-Control': 'public, max-age=300, s-maxage=300',
     });
   });
+  it('hides internal-only releases and does not repeat released commits', async () => {
+    const repo = 'https://github.com/owner/repo';
+    const shaA = 'a'.repeat(40);
+    const shaB = 'b'.repeat(40);
+    const shaC = 'c'.repeat(40);
+    const entry = (scope: string, subject: string, sha: string) =>
+      `* **${scope}:** ${subject} ([#9](${repo}/issues/9)) ([${sha.slice(0, 7)}](${repo}/commit/${sha}))`;
+    mocks.query.mockReturnValue({ limit: 5, releases: 2 });
+    mocks.fetch.mockImplementation(async (url: string) => {
+      if (url.includes('/releases?'))
+        return json([
+          release('v3', '2026-09-06', `### Bug Fixes\n\n${entry('ci', 'guard reviews', shaA)}`),
+          release('v2', '2026-09-05', `### Features\n\n${entry('maps', 'add filters', shaB)}`),
+        ]);
+      if (url.includes('/commits?'))
+        return json([
+          commit(shaA, '2026-09-06', 'fix(ci): guard reviews'),
+          commit(shaB, '2026-09-05', 'feat(maps): add filters'),
+          commit(shaC, '2026-09-04', 'fix(app): stale item totals'),
+        ]);
+      return json({ stats: { additions: 1, deletions: 0 } });
+    });
+    const response = await (await loadHandler())(event);
+    expect(response.items.map(({ label, bullets }) => ({ label, bullets }))).toEqual([
+      { label: 'v2', bullets: [{ text: 'Add filters.' }] },
+      {
+        label: undefined,
+        bullets: [{ text: 'Fixed stale item totals.', stats: { additions: 1, deletions: 0 } }],
+      },
+    ]);
+    expect(requests().some((url) => url.endsWith(`/commits/${shaB}`))).toBe(false);
+  });
+  it('does not repeat commits represented by release highlights', async () => {
+    const repo = 'https://github.com/owner/repo';
+    const shas = Array.from({ length: 6 }, (_, i) => String(i + 1).repeat(40));
+    const highlights = shas
+      .slice(0, 5)
+      .map(
+        (sha, i) =>
+          `* Highlight ${i + 1}. ([#${i + 1}](${repo}/pull/${i + 1})) ([${sha.slice(0, 7)}](${repo}/commit/${sha}))`
+      )
+      .join('\n');
+    mocks.query.mockReturnValue({ limit: 10, releases: 1 });
+    mocks.fetch.mockImplementation(async (url: string) => {
+      if (url.includes('/releases?'))
+        return json([release('v2', '2026-09-05', `### Highlights\n\n${highlights}`)]);
+      if (url.includes('/commits?'))
+        return json(shas.map((sha, i) => commit(sha, '2026-09-04', `fix(app): change ${i + 1}`)));
+      return json({});
+    });
+    const response = await (await loadHandler())(event);
+    expect(response.items[0]?.bullets).toEqual([
+      { text: 'Highlight 1.' },
+      { text: 'Highlight 2.' },
+      { text: 'Highlight 3.' },
+      { text: 'Highlight 4.' },
+      { text: 'Highlight 5.' },
+    ]);
+    expect(response.items[1]?.bullets).toEqual([{ text: 'Fixed change 6.' }]);
+    expect(
+      requests().some((url) => shas.slice(0, 5).some((sha) => url.endsWith(`/commits/${sha}`)))
+    ).toBe(false);
+  });
+  it('keeps release entries past the bullet cap available through commits', async () => {
+    const repo = 'https://github.com/owner/repo';
+    const shas = Array.from({ length: 6 }, (_, i) => String(i + 1).repeat(40));
+    const body = shas
+      .map((sha, i) => `* **app:** change ${i + 1} ([${sha.slice(0, 7)}](${repo}/commit/${sha}))`)
+      .join('\n');
+    mocks.query.mockReturnValue({ limit: 5, releases: 1 });
+    mocks.fetch.mockImplementation(async (url: string) => {
+      if (url.includes('/releases?')) return json([release('v2', '2026-09-05', body)]);
+      if (url.includes('/commits?'))
+        return json(shas.map((sha, i) => commit(sha, '2026-09-04', `fix(app): change ${i + 1}`)));
+      return json({});
+    });
+    const response = await (await loadHandler())(event);
+    expect(response.items[0]?.bullets).toHaveLength(5);
+    expect(response.items[1]?.bullets).toEqual([{ text: 'Fixed change 6.' }]);
+  });
   it('groups useful commits by day, aggregates available stats and exposes pagination', async () => {
     mocks.query.mockReturnValue({ limit: 1 });
     mocks.fetch.mockImplementation(async (url: string) => {

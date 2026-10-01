@@ -40,6 +40,7 @@ import { buildPrestigeTaskMap } from '@/utils/prestige';
 import { resolveSeasonalPerks } from '@/utils/seasonalPerks';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import { normalizeStoryChapter } from '@/utils/storylineObjectives';
+import { ensureTarkovAccess, tarkovApiFetch } from '@/utils/tarkovApiFetch';
 import {
   CACHE_CONFIG,
   type CacheType,
@@ -56,6 +57,7 @@ import type {
   HideoutStation,
   NeededItemHideoutModule,
   NeededItemTaskObjective,
+  MapExtract,
   ObjectiveGPSInfo,
   ObjectiveMapInfo,
   PlayerLevel,
@@ -184,6 +186,28 @@ const deriveStaticMapKey = (mapName: string, normalizedName?: string): string =>
   const lower = mapName.toLowerCase();
   return MAP_NAME_MAPPING[lower] ?? lower.replace(/[\s+-]/g, '');
 };
+const isMapExtractPresent = (existing: MapExtract[], addition: MapExtract): boolean =>
+  existing.some(
+    (ext) =>
+      (addition.id && ext.id === addition.id) || (addition.name && ext.name === addition.name)
+  );
+const withStaticNameKey = (extract: MapExtract, additions: MapExtract[]): MapExtract => {
+  if (extract.nameKey) return extract;
+  const nameKey = additions.find((add) => isMapExtractPresent([extract], add))?.nameKey;
+  return nameKey ? { ...extract, nameKey } : extract;
+};
+const resolveMergedMapExtracts = (
+  baseExtracts?: MapExtract[],
+  additions?: MapExtract[]
+): MapExtract[] | undefined => {
+  if (!additions || additions.length === 0) return baseExtracts;
+  const current = (baseExtracts ?? []).map((extract) => withStaticNameKey(extract, additions));
+  const missing = additions.reduce<MapExtract[]>(
+    (added, add) => (isMapExtractPresent([...current, ...added], add) ? added : [...added, add]),
+    []
+  );
+  return [...current, ...missing];
+};
 const beginTaskCoreRefresh = (state: Pick<MetadataState, 'tasksCoreRefreshing'>): symbol => {
   const token = Symbol('taskCoreRefresh');
   getPromiseStore(state).taskCoreRefreshes.add(token);
@@ -304,7 +328,7 @@ const fetchProgressionCatalog = async (
   language: string,
   forceRefresh: boolean
 ): Promise<ProgressionCatalog> => {
-  const response = await $fetch<{ data: CachedEditions }>('/api/tarkov/editions', {
+  const response = await tarkovApiFetch<{ data: CachedEditions }>('/api/tarkov/editions', {
     query: {
       lang: language,
       gameMode: mode,
@@ -496,9 +520,11 @@ export const useMetadataStore = defineStore('metadata', {
           const mergedIds = maps.map((map) => map.id);
           // Check for unavailable before svg check (unavailable maps may not have svg)
           const unavailable = staticData?.unavailable;
+          const extracts = resolveMergedMapExtracts(primaryMap.extracts, staticData?.extractsAdd);
           if (staticData?.svg || staticData?.tile) {
             return {
               ...primaryMap,
+              extracts,
               svg: staticData?.svg,
               tile: staticData?.tile,
               unavailable,
@@ -512,6 +538,7 @@ export const useMetadataStore = defineStore('metadata', {
           }
           return {
             ...primaryMap,
+            extracts,
             unavailable,
             mergedIds,
           };
@@ -881,7 +908,7 @@ export const useMetadataStore = defineStore('metadata', {
         const effectiveQueryParams = forceRefresh
           ? { ...queryParams, cacheBust: '1' }
           : queryParams;
-        const response = await $fetch<FetchResponse<T>>(endpoint, {
+        const response = await tarkovApiFetch<FetchResponse<T>>(endpoint, {
           query: effectiveQueryParams,
         });
         if (isFetchError(response)) {
@@ -975,9 +1002,12 @@ export const useMetadataStore = defineStore('metadata', {
       this.lastCachePurgeCheckAt = now;
       const timeoutMs = CACHE_PURGE_CHECK_TIMEOUT_MS;
       const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+      let timeoutId: number | undefined;
       try {
-        const response = await $fetch<FetchResponse<{ lastPurgeAt: string | null }>>(
+        // The purge budget covers the request, not a browser security check.
+        await ensureTarkovAccess();
+        timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+        const response = await tarkovApiFetch<FetchResponse<{ lastPurgeAt: string | null }>>(
           '/api/tarkov/cache-meta',
           { signal: controller.signal }
         );
@@ -1278,7 +1308,7 @@ export const useMetadataStore = defineStore('metadata', {
             ? API_GAME_MODES[GAME_MODES.PVP]
             : API_GAME_MODES[GAME_MODES.PVE];
         try {
-          const response = await $fetch<FetchResponse<TarkovTaskObjectivesQueryResult>>(
+          const response = await tarkovApiFetch<FetchResponse<TarkovTaskObjectivesQueryResult>>(
             '/api/tarkov/tasks-objectives',
             {
               query: {

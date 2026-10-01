@@ -62,6 +62,8 @@ describe('nuxt.config CSP', () => {
       supabaseUrl: 'https://db.example.com/auth/v1',
     });
     expect(getDirectiveSources(csp, 'default-src')).toEqual(["'self'"]);
+    expect(getDirectiveSources(csp, 'frame-ancestors')).toEqual(["'self'"]);
+    expect(getDirectiveSources(csp, 'frame-src')).toContain('https://www.youtube-nocookie.com');
     expect(getDirectiveSources(csp, 'script-src')).toContain("'unsafe-inline'");
     expect(getDirectiveSources(csp, 'script-src')).toContain(
       'https://static.cloudflareinsights.com'

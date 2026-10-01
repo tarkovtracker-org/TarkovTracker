@@ -10,6 +10,7 @@ const runtimeConfig = {
   supabaseUrl: 'https://test.supabase.co',
 } as Record<string, unknown> & { public: { appUrl: string } };
 const mockReadBody = vi.fn();
+const mockAdminSupabaseFetch = vi.fn();
 const mockGetSupporterBillingState = vi.fn();
 const mockCreateCheckoutSession = vi.fn();
 const mockLoggerError = vi.fn();
@@ -31,6 +32,10 @@ vi.mock('stripe', () => {
   }
   return { default: StripeMock };
 });
+vi.mock('@/server/utils/adminSupabase', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/server/utils/adminSupabase')>()),
+  adminSupabaseFetch: (...args: unknown[]) => mockAdminSupabaseFetch(...args),
+}));
 vi.mock('@/server/utils/logger', () => ({
   createLogger: () => ({
     debug: vi.fn(),
@@ -71,6 +76,9 @@ function firstSessionArgs(): CheckoutSessionArgs {
 describe('POST /api/stripe/checkout', () => {
   beforeEach(() => {
     mockReadBody.mockReset();
+    mockAdminSupabaseFetch.mockReset().mockResolvedValue(false);
+    runtimeConfig.supabaseUrl = 'https://test.supabase.co';
+    runtimeConfig.supabaseServiceKey = 'service-key';
     mockGetSupporterBillingState.mockReset();
     mockCreateCheckoutSession.mockReset();
     mockLoggerError.mockReset();
@@ -95,6 +103,52 @@ describe('POST /api/stripe/checkout', () => {
     mockReadBody.mockResolvedValue({ mode: 'nonsense' });
     const { default: handler } = await import('@/server/api/stripe/checkout.post');
     await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 400 });
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+  });
+  it.each(['payment', 'subscription'])(
+    'blocks disqualified %s checkout before Stripe calls',
+    async (mode) => {
+      mockAdminSupabaseFetch.mockResolvedValue(true);
+      mockReadBody.mockResolvedValue({
+        mode,
+        tier: 'scav',
+        interval: 'monthly',
+        amount: 10,
+        userId: 'victim',
+      });
+      const { default: handler } = await import('@/server/api/stripe/checkout.post');
+      await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({
+        statusCode: 403,
+        message: 'Supporter benefits are unavailable for this account',
+      });
+      expect(mockAdminSupabaseFetch).toHaveBeenCalledWith(
+        'https://test.supabase.co',
+        'service-key',
+        '/rest/v1/rpc/supporter_benefits_disqualified',
+        { method: 'POST', body: JSON.stringify({ p_user_id: 'user-1' }) }
+      );
+      expect(mockGetSupporterBillingState).not.toHaveBeenCalled();
+      expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+    }
+  );
+  it.each(['error', 'null', 'invalid'])(
+    'fails closed on %s disqualification response',
+    async (outcome) => {
+      if (outcome === 'error')
+        mockAdminSupabaseFetch.mockRejectedValue(new Error('database offline'));
+      else mockAdminSupabaseFetch.mockResolvedValue(outcome === 'null' ? null : 'false');
+      mockReadBody.mockResolvedValue({ mode: 'payment', amount: 10 });
+      const { default: handler } = await import('@/server/api/stripe/checkout.post');
+      await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 503 });
+      expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+    }
+  );
+  it.each(['supabaseUrl', 'supabaseServiceKey'])('fails closed without %s', async (key) => {
+    runtimeConfig[key] = '';
+    mockReadBody.mockResolvedValue({ mode: 'payment', amount: 10 });
+    const { default: handler } = await import('@/server/api/stripe/checkout.post');
+    await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 503 });
+    expect(mockAdminSupabaseFetch).not.toHaveBeenCalled();
     expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
   });
   it('creates a one-time payment session and reuses an existing customer', async () => {

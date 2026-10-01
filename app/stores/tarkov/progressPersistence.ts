@@ -1,3 +1,10 @@
+import {
+  beginAcknowledgement,
+  invalidateAcknowledgedModes,
+  selectChangedModes,
+  type ModeProgressMap,
+  type ProgressSyncSnapshot,
+} from '@/stores/tarkov/acknowledgedModes';
 import { buildUpsertPayload } from '@/stores/tarkov/progressMerge';
 import {
   ACTIVE_SEASON_NUMBER,
@@ -46,9 +53,11 @@ const isMissingProgressFreshness = (error: SupabaseError | null): boolean =>
   /\bprogress_updated_at\b/.test(error.message);
 /** Retry only the additive freshness column; all other read failures stay visible. */
 export const readWithProgressFreshness = async <T extends { error: SupabaseError | null }>(
-  read: (includeFreshness: boolean) => PromiseLike<T>
+  read: (includeFreshness: boolean) => PromiseLike<T>,
+  canContinue: () => boolean = () => true
 ): Promise<T> => {
   const result = await read(true);
+  if (!canContinue()) return result;
   if (isMissingProgressFreshness(result.error)) {
     return await read(false);
   }
@@ -76,24 +85,169 @@ const normalizePersistenceError = (error: unknown): SupabaseError => ({
   code: getPersistenceErrorCode(error),
   message: getPersistenceErrorMessage(error),
 });
+export type ProgressSyncPayload = {
+  current_game_mode: GameMode;
+  game_edition: UserState['gameEdition'];
+  tarkov_uid: number | null;
+  pvp_data: UserProgressData;
+  pve_data: UserProgressData;
+  seasonal_data: UserProgressData;
+};
+/** Half the RPC's 512 KiB `p_modes` cap; a larger multi-mode sync sends one mode per request. */
+const SINGLE_REQUEST_MODES_LIMIT = 256 * 1024;
+const byteLength = (value: unknown): number =>
+  new TextEncoder().encode(JSON.stringify(value)).length;
+const toModeBatches = (modes: ModeProgressMap): ModeProgressMap[] => {
+  const entries = Object.entries(modes);
+  if (entries.length < 2 || byteLength(modes) <= SINGLE_REQUEST_MODES_LIMIT) {
+    return [modes];
+  }
+  return entries.map(([mode, progress]) => ({ [mode]: progress }));
+};
+/** Unsent modes stay pending, so the controller reconciles and retries instead of acknowledging. */
+const SPLIT_SYNC_INTERRUPTED = { message: 'Progress sync superseded by newer state' };
+type ProgressSyncResult<TError> = { error: TError | typeof SPLIT_SYNC_INTERRUPTED };
+type ProgressSyncClient<TError> = {
+  rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{ error: TError }>;
+};
+type ProgressAcknowledgement = ReturnType<typeof beginAcknowledgement>;
+/** Keep an outstanding account write ordered even across sign-out and same-account startup. */
+const progressSyncQueues = new Map<string, Promise<void>>();
+const enqueueProgressSync = <T>(userId: string, send: () => Promise<T>): Promise<T> => {
+  const previous = progressSyncQueues.get(userId);
+  const result = previous ? previous.then(send) : send();
+  const settled = result.then(
+    () => {},
+    () => {}
+  );
+  progressSyncQueues.set(userId, settled);
+  void settled.then(() => {
+    if (progressSyncQueues.get(userId) === settled) progressSyncQueues.delete(userId);
+  });
+  return result;
+};
+type ProgressMutation<TResult> = {
+  expected: ProgressSyncSnapshot;
+  modes: ModeProgressMap;
+  send: () => PromiseLike<TResult>;
+  canContinue: () => boolean;
+  onSuccess: () => void;
+};
+const sendProgressMutation = async <TResult extends { error: unknown }>(
+  userId: string,
+  mutation: ProgressMutation<TResult>,
+  sync: ProgressAcknowledgement
+): Promise<TResult | { error: typeof SPLIT_SYNC_INTERRUPTED }> => {
+  const isCurrent = () => sync.isCurrent() && mutation.canContinue();
+  if (!isCurrent()) return { error: SPLIT_SYNC_INTERRUPTED };
+  invalidateAcknowledgedModes(userId, mutation.modes);
+  let result: TResult;
+  try {
+    result = await mutation.send();
+  } finally {
+    invalidateAcknowledgedModes(userId, mutation.modes);
+  }
+  if (!mutation.canContinue()) return { error: SPLIT_SYNC_INTERRUPTED };
+  if (result.error) return result;
+  if (!sync.commit(mutation.modes)) return { error: SPLIT_SYNC_INTERRUPTED };
+  mutation.onSuccess();
+  return result;
+};
+/** Atomic progress RPCs supersede older splits and settle before later account writes. */
+export const executeProgressMutation = <TResult extends { error: unknown }>(
+  userId: string,
+  mutation: ProgressMutation<TResult>
+): Promise<TResult | { error: typeof SPLIT_SYNC_INTERRUPTED }> => {
+  const sync = beginAcknowledgement(userId, mutation.expected);
+  return enqueueProgressSync(userId, async () => {
+    try {
+      return await sendProgressMutation(userId, mutation, sync);
+    } finally {
+      sync.finish();
+    }
+  });
+};
+const sendModeBatch = async <TError>(
+  client: ProgressSyncClient<TError>,
+  userId: string,
+  payload: ProgressSyncPayload,
+  batch: ModeProgressMap,
+  sync: ProgressAcknowledgement
+): Promise<ProgressSyncResult<TError>> => {
+  if (!sync.isCurrent()) return { error: SPLIT_SYNC_INTERRUPTED };
+  invalidateAcknowledgedModes(userId, batch);
+  let result: { error: TError };
+  try {
+    result = await client.rpc('sync_user_game_mode_progress', {
+      p_current_game_mode: payload.current_game_mode,
+      p_game_edition: payload.game_edition,
+      p_seasonal_season_number: ACTIVE_SEASON_NUMBER,
+      p_tarkov_uid: payload.tarkov_uid,
+      p_modes: batch,
+    });
+  } finally {
+    // Realtime or a fresh same-account startup may have seeded a baseline during the request.
+    // An uncertain/stale result must not leave that copy looking acknowledged.
+    invalidateAcknowledgedModes(userId, batch);
+  }
+  return sync.isCurrent() ? result : { error: SPLIT_SYNC_INTERRUPTED };
+};
+const sendProgressBatches = async <TError>(
+  client: ProgressSyncClient<TError>,
+  userId: string,
+  payload: ProgressSyncPayload,
+  sync: ProgressAcknowledgement
+): Promise<ProgressSyncResult<TError>> => {
+  const modes = selectChangedModes(userId, {
+    [GAME_MODES.PVP]: payload.pvp_data,
+    [GAME_MODES.PVE]: payload.pve_data,
+    [GAME_MODES.SEASONAL]: payload.seasonal_data,
+  });
+  // Realtime changes to omitted modes cannot be overwritten by this sync, so they do not stop it.
+  sync.scope(modes);
+  let result: ProgressSyncResult<TError> = { error: SPLIT_SYNC_INTERRUPTED };
+  for (const batch of toModeBatches(modes)) {
+    result = await sendModeBatch(client, userId, payload, batch, sync);
+    if (!sync.isCurrent()) return { error: SPLIT_SYNC_INTERRUPTED };
+    if (result.error) return result;
+    sync.acknowledge(batch);
+  }
+  return result;
+};
+/**
+ * Sends account metadata plus only the modes the server does not already hold; the RPC keeps
+ * any omitted mode as stored. Acknowledged modes become the baseline for the next sync, so after
+ * a failed or interrupted split only the unacknowledged modes are resent.
+ */
+export const sendProgressSync = async <TError>(
+  client: ProgressSyncClient<TError>,
+  userId: string,
+  payload: ProgressSyncPayload
+): Promise<ProgressSyncResult<TError>> => {
+  const snapshot = JSON.parse(JSON.stringify(payload)) as ProgressSyncPayload;
+  const sync = beginAcknowledgement(userId, {
+    pvp: snapshot.pvp_data,
+    pve: snapshot.pve_data,
+    seasonal: snapshot.seasonal_data,
+    currentGameMode: snapshot.current_game_mode,
+    gameEdition: snapshot.game_edition,
+    tarkovUid: snapshot.tarkov_uid,
+  });
+  return enqueueProgressSync(userId, async () => {
+    try {
+      return await sendProgressBatches(client, userId, snapshot, sync);
+    } finally {
+      sync.finish();
+    }
+  });
+};
 export const syncProgressState = async (
   client: ProgressRpcClient,
   userId: string,
   state: UserState
 ): Promise<{ error: SupabaseError | null }> => {
   try {
-    const payload = buildUpsertPayload(userId, state);
-    return await client.rpc('sync_user_game_mode_progress', {
-      p_current_game_mode: payload.current_game_mode,
-      p_game_edition: payload.game_edition,
-      p_seasonal_season_number: ACTIVE_SEASON_NUMBER,
-      p_tarkov_uid: payload.tarkov_uid,
-      p_modes: {
-        [GAME_MODES.PVP]: payload.pvp_data,
-        [GAME_MODES.PVE]: payload.pve_data,
-        [GAME_MODES.SEASONAL]: payload.seasonal_data,
-      },
-    });
+    return await sendProgressSync(client, userId, buildUpsertPayload(userId, state));
   } catch (error) {
     const normalizedError = normalizePersistenceError(error);
     logger.error(
@@ -131,7 +285,8 @@ const latestModeTimestamp = (byMode: Partial<Record<GameMode, number>>): number 
 };
 export const loadModeProgress = async (
   client: ModeProgressClient,
-  userId: string
+  userId: string,
+  canContinue: () => boolean = () => true
 ): Promise<{
   data: Partial<Record<GameMode, UserProgressData>>;
   updatedAt?: number;
@@ -139,17 +294,19 @@ export const loadModeProgress = async (
   error: SupabaseError | null;
 }> => {
   try {
-    const { data: rows, error } = await readWithProgressFreshness((includeFreshness) =>
-      client
-        .from('user_game_mode_progress')
-        .select(
-          includeFreshness
-            ? 'game_mode,season_number,progress_data,progress_updated_at'
-            : 'game_mode,season_number,progress_data'
-        )
-        .eq('user_id', userId)
-        .in('game_mode', GAME_MODE_VALUES)
-        .in('season_number', [0, ACTIVE_SEASON_NUMBER])
+    const { data: rows, error } = await readWithProgressFreshness(
+      (includeFreshness) =>
+        client
+          .from('user_game_mode_progress')
+          .select(
+            includeFreshness
+              ? 'game_mode,season_number,progress_data,progress_updated_at'
+              : 'game_mode,season_number,progress_data'
+          )
+          .eq('user_id', userId)
+          .in('game_mode', GAME_MODE_VALUES)
+          .in('season_number', [0, ACTIVE_SEASON_NUMBER]),
+      canContinue
     );
     if (error) return { data: {}, error };
     const loadedRows = rows ?? [];

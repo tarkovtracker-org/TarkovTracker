@@ -1,0 +1,9 @@
+project_id_env: CROWDIN_PROJECT_ID
+api_token_env: CROWDIN_PERSONAL_TOKEN
+# Config lives in .github/; resolve source/translation paths from the repo root.
+base_path: '..'
+preserve_hierarchy: true
+files:
+  - source: /app/locales/en.json
+    translation: /app/locales/%two_letters_code%.json
+    update_option: update_as_unapproved

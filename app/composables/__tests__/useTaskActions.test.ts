@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
+import type { TaskEvaluationMap } from '@/stores/taskAvailability';
 import type { Task } from '@/types/tarkov';
 const { trackEventMock, trackTaskActionMock } = vi.hoisted(() => ({
   trackEventMock: vi.fn(),
@@ -12,12 +13,18 @@ const createTarkovStore = (options: {
   isTaskFailed?: boolean;
   taskCompletions?: Record<string, unknown>;
   storyChapters?: Record<string, { complete: boolean }>;
+  completeStoryObjectives?: string[];
   traderLevels?: Record<string, number>;
   traderReputations?: Record<string, number>;
   traders?: Array<{ id: string; name: string; normalizedName: string }>;
 }) => {
   const objectiveCounts = new Map<string, number>(Object.entries(options.objectiveCounts ?? {}));
   return {
+    confirmTaskAvailability: vi.fn(),
+    isStoryObjectiveComplete: vi.fn((chapterId: string, objectiveId: string) =>
+      (options.completeStoryObjectives ?? []).includes(`${chapterId}/${objectiveId}`)
+    ),
+    setStoryObjectiveComplete: vi.fn(),
     setTaskComplete: vi.fn(),
     setTaskFailed: vi.fn(),
     setTaskUncompleted: vi.fn(),
@@ -65,6 +72,12 @@ const createMetadataStore = (
   tasks,
   traders,
 });
+/** A locked self evaluation reporting the task's direct prerequisites, as the evaluator would. */
+const selfEvaluation = (task: Task): TaskEvaluationMap => {
+  const requirements = Array.isArray(task.taskRequirements) ? task.taskRequirements : [];
+  const blockers = requirements.length ? [{ type: 'prerequisite' as const, requirements }] : [];
+  return { [task.id]: { self: { available: false, blockers } } };
+};
 const setup = async (
   task: Task,
   tasks: Task[],
@@ -72,9 +85,11 @@ const setup = async (
   preferencesOverrides: Partial<{
     getPinnedTaskIds: string[];
     getTasksRequireTraderLevels: boolean;
-  }> = {}
+  }> = {},
+  evaluations: TaskEvaluationMap = selfEvaluation(task)
 ) => {
   const onAction = vi.fn();
+  const progressStore = { taskEvaluations: evaluations };
   const tarkovStore = createTarkovStore(options);
   const metadataStore = createMetadataStore(tasks, options.traders);
   const togglePinnedTask = vi.fn();
@@ -93,6 +108,9 @@ const setup = async (
   }));
   vi.doMock('@/stores/usePreferences', () => ({
     usePreferencesStore: () => preferencesStore,
+  }));
+  vi.doMock('@/stores/useProgress', () => ({
+    useProgressStore: () => progressStore,
   }));
   vi.doMock('@/composables/useProductAnalytics', () => ({
     useProductAnalytics: () => ({
@@ -122,6 +140,314 @@ const setup = async (
   };
 };
 describe('useTaskActions', () => {
+  it('confirms only the selected server-gated task without inventing counter contributors', async () => {
+    const task: Task = {
+      id: 'gated',
+      otherRequirements: [
+        {
+          type: 'globalVariable',
+          id: 'gate',
+          variableId: 'counter',
+          compareMethod: '>=',
+          value: 3,
+        },
+      ],
+    };
+    const { actions, tarkovStore } = await setup(task, [task, { id: 'possible-contributor' }], {});
+    actions.markTaskAvailable();
+    expect(tarkovStore.confirmTaskAvailability).toHaveBeenCalledWith(
+      task.id,
+      JSON.stringify(task.otherRequirements)
+    );
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+    expect(tarkovStore.setTaskFailed).not.toHaveBeenCalled();
+  });
+  it('changes nothing when an unmet prerequisite has an ambiguous status', async () => {
+    const task: Task = {
+      id: 'ambiguous',
+      minPlayerLevel: 40,
+      taskRequirements: [{ task: { id: 'prior' }, status: ['active', 'complete'] }],
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['t'] }],
+    };
+    const { actions, tarkovStore } = await setup(task, [task, { id: 'prior' }], {});
+    expect(actions.canMarkTaskAvailable()).toBe(false);
+    actions.markTaskAvailable();
+    expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
+    expect(tarkovStore.setLevel).not.toHaveBeenCalled();
+  });
+  it('trusts the evaluator for an active prerequisite that is itself available', async () => {
+    // Review #979: the evaluator accepts an available active prerequisite recursively, so only
+    // the server gate is left and Mark available must stay possible.
+    const task: Task = {
+      id: 'target',
+      taskRequirements: [{ task: { id: 'prior' }, status: ['active'] }],
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['t'] }],
+    };
+    const evaluations: TaskEvaluationMap = {
+      target: {
+        self: { available: false, blockers: [{ type: 'dialogue', requirementId: 'talk' }] },
+      },
+    };
+    const { actions, tarkovStore } = await setup(
+      task,
+      [task, { id: 'prior' }],
+      {},
+      {},
+      evaluations
+    );
+    expect(actions.canMarkTaskAvailable()).toBe(true);
+    actions.markTaskAvailable();
+    expect(tarkovStore.confirmTaskAvailability).toHaveBeenCalledWith(
+      'target',
+      JSON.stringify(task.otherRequirements)
+    );
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+  });
+  it.each([
+    { type: 'unknown', taskId: 'missing', reason: 'task_reference' },
+    { type: 'unknown', reason: 'failed_requirement' },
+    { type: 'cycle', taskId: 'target' },
+    { type: 'global_variable', variableId: 'v', current: 0, required: 1 },
+    { type: 'prestige', current: 0, required: 1 },
+    { type: 'trader_unlock', taskId: 'intro' },
+    { type: 'failed_branch', taskId: 'other' },
+    { type: 'disabled', taskId: 'target' },
+    { type: 'faction', reason: 'BEAR' },
+  ] as const)('refuses when the evaluation has an unresolvable %j blocker', async (blocker) => {
+    const task: Task = {
+      id: 'target',
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['t'] }],
+    };
+    const evaluations: TaskEvaluationMap = {
+      target: { self: { available: false, blockers: [{ ...blocker }] } },
+    };
+    const { actions, tarkovStore } = await setup(task, [task], {}, {}, evaluations);
+    expect(actions.canMarkTaskAvailable()).toBe(false);
+    actions.markTaskAvailable();
+    expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
+  });
+  it('records the story objective a story-gated task names', async () => {
+    const task: Task = {
+      id: 'story-gated',
+      otherRequirements: [
+        {
+          type: 'storyObjective',
+          id: 's',
+          storyChapter: { id: 'boreas' },
+          objective: { id: 'drives' },
+        },
+      ],
+    };
+    const { actions, tarkovStore } = await setup(task, [task], {});
+    expect(actions.canMarkTaskAvailable()).toBe(true);
+    actions.markTaskAvailable();
+    expect(tarkovStore.setStoryObjectiveComplete).toHaveBeenCalledWith('boreas', 'drives');
+    expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
+  });
+  const tourGated = (id: string, taskRequirements: Task['taskRequirements'] = []): Task => ({
+    id,
+    taskRequirements,
+    otherRequirements: [
+      {
+        type: 'storyObjective',
+        id: `overlay.${id}.tour.talk-to-therapist`,
+        storyChapter: { id: 'tour' },
+        objective: { id: 'talk-to-therapist' },
+      },
+    ],
+  });
+  it.each(['markTaskComplete', 'markTaskFailed'] as const)(
+    '%s records the story objective the task was gated on',
+    async (action) => {
+      const task = tourGated('first-in-line');
+      const { actions, tarkovStore } = await setup(task, [task], {});
+      actions[action]();
+      expect(tarkovStore.setStoryObjectiveComplete).toHaveBeenCalledWith(
+        'tour',
+        'talk-to-therapist'
+      );
+    }
+  );
+  it('reports only the story objectives Mark complete newly recorded', async () => {
+    const task = tourGated('first-in-line');
+    const fresh = await setup(task, [task], {});
+    fresh.actions.markTaskComplete();
+    expect(fresh.onAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recordedStoryObjectives: [{ chapterId: 'tour', objectiveId: 'talk-to-therapist' }],
+      })
+    );
+    const known = await setup(task, [task], {
+      completeStoryObjectives: ['tour/talk-to-therapist'],
+    });
+    known.actions.markTaskComplete();
+    expect(known.tarkovStore.setStoryObjectiveComplete).not.toHaveBeenCalled();
+    expect(known.onAction).toHaveBeenCalledWith(
+      expect.objectContaining({ recordedStoryObjectives: [] })
+    );
+  });
+  it('records story gates of prerequisites Mark available completes', async () => {
+    const prior = tourGated('first-in-line');
+    const task: Task = {
+      id: 'follow-up',
+      taskRequirements: [{ task: { id: prior.id }, status: ['complete'] }],
+    };
+    const { actions, tarkovStore } = await setup(task, [task, prior], {});
+    actions.markTaskAvailable();
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith(prior.id);
+    expect(tarkovStore.setStoryObjectiveComplete).toHaveBeenCalledWith('tour', 'talk-to-therapist');
+  });
+  it('leaves story progress alone when a task is manually uncompleted', async () => {
+    const task = tourGated('first-in-line');
+    const { actions, tarkovStore } = await setup(task, [task], { isTaskComplete: true });
+    actions.markTaskUncomplete();
+    expect(tarkovStore.setStoryObjectiveComplete).not.toHaveBeenCalled();
+  });
+  it('skips prerequisite backfill when the recorded story objective opens the story route', async () => {
+    const task: Task = {
+      id: 'story-routed',
+      taskRequirements: [{ task: { id: 'prior' }, status: ['complete'] }],
+      storyUnlocks: [{ id: 'boreas', name: 'Boreas' }],
+      otherRequirements: [
+        {
+          type: 'storyObjective',
+          id: 's',
+          storyChapter: { id: 'boreas' },
+          objective: { id: 'drives' },
+        },
+      ],
+    };
+    const { actions, tarkovStore } = await setup(task, [task, { id: 'prior' }], {});
+    expect(actions.canMarkTaskAvailable()).toBe(true);
+    actions.markTaskAvailable();
+    expect(tarkovStore.setStoryObjectiveComplete).toHaveBeenCalledWith('boreas', 'drives');
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+  });
+  it.each([
+    [{ compareMethod: '<', current: 3, required: 2 }, 'trader_level', false],
+    [{ compareMethod: '=', current: 4, required: 2 }, 'trader_level', false],
+    [{ compareMethod: '>=', current: 1, required: 5 }, 'trader_level', false],
+    [{ compareMethod: '>', current: 0, required: 10 }, 'trader_reputation', false],
+    [{ compareMethod: '!=', current: 1, required: 1 }, 'trader_reputation', false],
+    [{ compareMethod: '>=', current: 1, required: 3 }, 'trader_level', true],
+    [{ compareMethod: '>', current: 1, required: 2 }, 'trader_level', true],
+    [{ compareMethod: '>=', current: 0, required: 0.2 }, 'trader_reputation', true],
+  ] as const)(
+    'only offers Mark available for raisable trader blockers: %j %s',
+    async (values, type, expected) => {
+      const task: Task = {
+        id: 'target',
+        otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['t'] }],
+      };
+      const evaluations: TaskEvaluationMap = {
+        target: { self: { available: false, blockers: [{ type, ...values }] } },
+      };
+      const { actions } = await setup(task, [task], {}, {}, evaluations);
+      expect(actions.canMarkTaskAvailable()).toBe(expected);
+    }
+  );
+  it('withholds Mark available without a self evaluation', async () => {
+    const task: Task = {
+      id: 'target',
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['t'] }],
+    };
+    const { actions, tarkovStore } = await setup(task, [task], {}, {}, {});
+    expect(actions.canMarkTaskAvailable()).toBe(false);
+    actions.markTaskAvailable();
+    expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
+  });
+  it('withholds confirmation behind a corrupt status clock', async () => {
+    const task: Task = {
+      id: 'target',
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['t'] }],
+    };
+    const { actions, tarkovStore } = await setup(task, [task], {
+      taskCompletions: { target: { complete: false, failed: false, timestamp: 4e13 } },
+    });
+    expect(actions.canMarkTaskAvailable()).toBe(false);
+    actions.markTaskAvailable();
+    expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
+  });
+  it('allows the blockers Mark available can clear', async () => {
+    const task: Task = {
+      id: 'target',
+      minPlayerLevel: 20,
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['t'] }],
+    };
+    const evaluations: TaskEvaluationMap = {
+      target: {
+        self: {
+          available: false,
+          blockers: [
+            { type: 'player_level', current: 1, required: 20 },
+            { type: 'dialogue', requirementId: 'talk' },
+          ],
+        },
+      },
+    };
+    const { actions } = await setup(task, [task], {}, {}, evaluations);
+    expect(actions.canMarkTaskAvailable()).toBe(true);
+  });
+  it('allows confirming over a derived trader-tier counter shortfall', async () => {
+    const task: Task = {
+      id: 'target',
+      otherRequirements: [
+        { type: 'globalVariable', id: 'g', variableId: 'tier', compareMethod: '>=', value: 3 },
+      ],
+    };
+    const evaluations: TaskEvaluationMap = {
+      target: {
+        self: {
+          available: false,
+          blockers: [{ type: 'task_counter', variableId: 'tier', current: 1, required: 3 }],
+        },
+      },
+    };
+    const { actions } = await setup(task, [task], {}, {}, evaluations);
+    expect(actions.canMarkTaskAvailable()).toBe(true);
+  });
+  it('still refuses when the evaluator reports an ambiguous unmet prerequisite', async () => {
+    const requirement = { task: { id: 'prior' }, status: ['active'] };
+    const task: Task = {
+      id: 'target',
+      taskRequirements: [requirement],
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['t'] }],
+    };
+    const evaluations: TaskEvaluationMap = {
+      target: {
+        self: {
+          available: false,
+          blockers: [{ type: 'prerequisite', requirements: [requirement] }],
+        },
+      },
+    };
+    const { actions } = await setup(task, [task, { id: 'prior' }], {}, {}, evaluations);
+    expect(actions.canMarkTaskAvailable()).toBe(false);
+  });
+  it('keeps a malformed prerequisite entry locked without throwing', async () => {
+    const task = {
+      id: 'malformed',
+      taskRequirements: [null],
+      otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['t'] }],
+    } as unknown as Task;
+    const { actions, tarkovStore } = await setup(task, [task], {});
+    expect(() => actions.markTaskAvailable()).not.toThrow();
+    expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
+  });
+  it('changes nothing for a task whose server gate cannot be confirmed', async () => {
+    const prerequisite: Task = { id: 'prior' };
+    const task: Task = {
+      id: 'unsupported',
+      minPlayerLevel: 40,
+      taskRequirements: [{ task: { id: 'prior' }, status: ['complete'] }],
+      otherRequirements: [{ type: 'unknown' }],
+    };
+    const { actions, tarkovStore } = await setup(task, [task, prerequisite], {});
+    actions.markTaskAvailable();
+    expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+    expect(tarkovStore.setLevel).not.toHaveBeenCalled();
+  });
   it('tracks each task action once with rich analytics metadata', async () => {
     const task: Task = {
       id: 'task-analytics',

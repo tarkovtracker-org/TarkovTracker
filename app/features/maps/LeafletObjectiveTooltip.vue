@@ -10,7 +10,7 @@
         >
           <span class="truncate">{{ taskName }}</span>
           <UIcon
-            v-if="task?.wikiLink"
+            v-if="taskWikiUrl"
             name="i-mdi-open-in-new"
             class="h-3.5 w-3.5 shrink-0"
             aria-hidden="true"
@@ -66,6 +66,13 @@
             :class="isCompact ? 'h-3 w-3' : 'h-4 w-4'"
           />
         </button>
+        <LeafletObjectiveTaskActions
+          :task-id="taskId"
+          :actions="taskVisibilityActions"
+          :compact="isCompact"
+          :translate="translate"
+          @close="emitClose"
+        />
         <button
           type="button"
           data-testid="objective-close-button"
@@ -94,20 +101,24 @@
 <script setup lang="ts">
   import { useI18n, type Composer } from 'vue-i18n';
   import { useWikiLink } from '@/composables/useWikiLink';
+  import LeafletObjectiveTaskActions from '@/features/maps/LeafletObjectiveTaskActions.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { logger } from '@/utils/logger';
+  import type { MapTaskVisibilityActions } from '@/features/maps/utils/mapTaskVisibility';
   import type { Router } from 'vue-router';
   const props = withDefaults(
     defineProps<{
       objectiveId: string;
       readOnly?: boolean;
       t?: Composer['t'];
+      taskVisibilityActions?: MapTaskVisibilityActions | null;
     }>(),
     {
       readOnly: false,
       t: undefined,
+      taskVisibilityActions: null,
     }
   );
   const emit = defineEmits<{
@@ -156,16 +167,18 @@
     if (!taskId) return null;
     return metadataStore.tasks.find((t) => t.id === taskId) ?? null;
   });
+  const taskId = computed(() => task.value?.id);
   const taskName = computed(() => task.value?.name ?? translate('common.task'));
   const taskTarkovDevUrl = computed(() => {
     if (!task.value?.id) return '';
     return `https://tarkov.dev/task/${task.value.id}`;
   });
-  const taskTitleComponent = computed(() => (task.value?.wikiLink ? 'a' : 'div'));
+  const taskWikiUrl = computed(() => toWikiUrl(task.value?.wikiLink));
+  const taskTitleComponent = computed(() => (taskWikiUrl.value ? 'a' : 'div'));
   const taskTitleProps = computed(() => {
-    if (task.value?.wikiLink) {
+    if (taskWikiUrl.value) {
       return {
-        href: toWikiUrl(task.value.wikiLink),
+        href: taskWikiUrl.value,
         target: '_blank',
         rel: 'noopener noreferrer',
       };
@@ -174,7 +187,7 @@
   });
   const taskTitleClass = computed(() => {
     const base = 'flex min-w-0 max-w-full items-center gap-1 text-sm leading-snug font-semibold';
-    if (task.value?.wikiLink) {
+    if (taskWikiUrl.value) {
       return `${base} text-link hover:text-link-hover no-underline`;
     }
     return `${base} text-gray-100`;

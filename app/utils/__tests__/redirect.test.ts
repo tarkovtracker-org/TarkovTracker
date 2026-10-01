@@ -7,6 +7,13 @@ describe('openExternalUrl', () => {
     expect(open).toHaveBeenCalledWith('https://example.com', '_blank', 'noopener,noreferrer');
     open.mockRestore();
   });
+  it('refuses script-capable schemes', () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    openExternalUrl('javascript:alert(1)');
+    openExternalUrl('data:text/html,x');
+    expect(open).not.toHaveBeenCalled();
+    open.mockRestore();
+  });
 });
 describe('sanitizeInternalRedirect', () => {
   it('returns valid internal path', () => {

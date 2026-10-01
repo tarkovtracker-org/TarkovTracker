@@ -574,12 +574,39 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     if (!canGroupItem(primaryData)) return null;
     return { id: primaryData.id, data: primaryData, name: primaryData.name };
   };
+  type GroupedNeed = {
+    need: NeededItemTaskObjective | NeededItemHideoutModule;
+    target: GroupTarget;
+  };
+  const isAcceptedRekey = ({ need, target }: GroupedNeed): boolean =>
+    target.id !== getNeededItemData(need)?.id;
+  /**
+   * Needs paired with their combined-view group. A pooled objective re-keyed
+   * under a searched accepted item only joins that group when the item has no
+   * direct needs of its own; otherwise a broad pool (e.g. "sell 75 of any
+   * item") would inflate the searched item's total and Smart Fill targets.
+   */
+  const resolveGroupedNeeds = (
+    needs: (NeededItemTaskObjective | NeededItemHideoutModule)[],
+    suppressionNeeds = needs
+  ): GroupedNeed[] => {
+    const resolved = needs.flatMap((need) => {
+      const target = resolveGroupTarget(need);
+      return target ? [{ need, target }] : [];
+    });
+    const directIds = new Set(
+      suppressionNeeds.flatMap((need) => {
+        const target = resolveGroupTarget(need);
+        return target && target.id === getNeededItemData(need)?.id ? [target.id] : [];
+      })
+    );
+    return resolved.filter((entry) => !isAcceptedRekey(entry) || !directIds.has(entry.target.id));
+  };
+  const groupedNeeds = computed((): GroupedNeed[] => resolveGroupedNeeds(filteredItems.value));
   const groupedItems = computed((): GroupedNeededItem[] => {
     const startedAt = perfDebug.value ? perfNow() : 0;
     const groups = new Map<string, GroupedNeededItemAccumulator>();
-    for (const need of filteredItems.value) {
-      const target = resolveGroupTarget(need);
-      if (!target) continue;
+    for (const { need, target } of groupedNeeds.value) {
       const { id: itemId, data: itemData, name: itemName } = target;
       const existingGroup = groups.get(itemId);
       if (!existingGroup) {
@@ -648,6 +675,17 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   });
   const objectivesByItemId = computed(() => {
     const startedAt = perfDebug.value ? perfNow() : 0;
+    // Keep the modal's Smart Fill targets stable when item progress changes.
+    // Ownership filtering is count-based, so build this from the same view
+    // filters as `filteredItems` except `passesOwnershipToggleFilter`.
+    const modalNeeds = allItems.value
+      .filter(passesCompletionFilter)
+      .filter(passesTypeFilter)
+      .filter(passesFirFilter)
+      .filter(passesSpecialEquipmentFilter)
+      .filter(passesKappaToggleFilter)
+      .filter(passesTeamToggleFilter)
+      .filter(passesSearchFilter);
     const map = new Map<
       string,
       {
@@ -655,9 +693,8 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
         hideoutModules: NeededItemHideoutModule[];
       }
     >();
-    for (const need of filteredItems.value) {
-      const itemId = resolveGroupTarget(need)?.id;
-      if (!itemId) continue;
+    for (const { need, target } of resolveGroupedNeeds(modalNeeds, filteredItems.value)) {
+      const itemId = target.id;
       if (!map.has(itemId)) {
         map.set(itemId, { taskObjectives: [], hideoutModules: [] });
       }
@@ -671,7 +708,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     if (perfDebug.value) {
       logPerf('objectives-by-item-id', {
         groups: map.size,
-        inputItems: filteredItems.value.length,
+        inputItems: modalNeeds.length,
         ms: roundPerfMs(perfNow() - startedAt),
       });
     }

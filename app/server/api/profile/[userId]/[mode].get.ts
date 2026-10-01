@@ -1,3 +1,4 @@
+import { capApiTaskUpdates, type ApiTaskUpdateEntry } from '@shared/utils/apiTaskUpdates';
 import {
   createError,
   defineEventHandler,
@@ -37,6 +38,7 @@ import {
   sanitizeTraderMap,
   toFiniteNumber,
 } from '@/utils/progressSanitizers';
+import { sanitizeTaskAvailabilityMap } from '@/utils/taskAvailabilityConfirmation';
 import type { ApiProtectionConfig } from '@/server/middleware/api-protection';
 const logger = createLogger('SharedProfileApi');
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -92,15 +94,12 @@ type SanitizedTrader = {
   level: number;
   reputation: number;
 };
-type SanitizedApiTaskUpdate = {
-  id: string;
-  state: 'completed' | 'failed' | 'uncompleted';
-};
 type SanitizedApiUpdateMeta = {
   id: string;
   at: number;
   source: 'api';
-  tasks?: SanitizedApiTaskUpdate[];
+  tasks?: ApiTaskUpdateEntry[];
+  taskCount?: number;
 };
 type SanitizedProgressData = Partial<{
   displayName: string;
@@ -117,6 +116,7 @@ type SanitizedProgressData = Partial<{
     { complete?: boolean; objectives?: Record<string, { complete?: boolean; timestamp?: number }> }
   >;
   taskCompletions: Record<string, SanitizedTaskCompletion>;
+  taskAvailability: Record<string, { requirements: string; timestamp: number }>;
   taskObjectives: Record<string, SanitizedObjectiveProgress>;
   traders: Record<string, SanitizedTrader>;
   xpOffset: number;
@@ -148,6 +148,8 @@ const toCleanString = (value: unknown, maxLength = 128): string | null => {
   }
   return trimmed.slice(0, maxLength);
 };
+const cleanApiTaskUpdate = (task: unknown): unknown =>
+  isRecord(task) ? { id: toCleanString(task.id, 128), state: task.state } : null;
 const sanitizeApiUpdateMeta = (value: unknown): SanitizedApiUpdateMeta | null => {
   if (!isRecord(value)) {
     return null;
@@ -162,22 +164,15 @@ const sanitizeApiUpdateMeta = (value: unknown): SanitizedApiUpdateMeta | null =>
     at: Math.max(0, Math.trunc(at)),
     source: 'api',
   };
-  if (Array.isArray(value.tasks)) {
-    const tasks: SanitizedApiTaskUpdate[] = [];
-    for (const task of value.tasks) {
-      if (!isRecord(task)) {
-        continue;
-      }
-      const taskId = toCleanString(task.id, 128);
-      const state = task.state;
-      if (!taskId || (state !== 'completed' && state !== 'failed' && state !== 'uncompleted')) {
-        continue;
-      }
-      tasks.push({ id: taskId, state });
-    }
-    if (tasks.length > 0) {
-      sanitized.tasks = tasks;
-    }
+  const { tasks, taskCount } = capApiTaskUpdates(
+    Array.isArray(value.tasks) ? value.tasks.map(cleanApiTaskUpdate) : [],
+    value.taskCount
+  );
+  if (tasks.length > 0) {
+    sanitized.tasks = tasks;
+  }
+  if (taskCount !== undefined) {
+    sanitized.taskCount = taskCount;
   }
   return sanitized;
 };
@@ -241,6 +236,10 @@ const sanitizeProgressPayload = (
   const storyChapters = sanitizeStoryChaptersMap(value.storyChapters);
   if (Object.keys(storyChapters).length > 0) {
     sanitized.storyChapters = storyChapters;
+  }
+  const taskAvailability = sanitizeTaskAvailabilityMap(value.taskAvailability);
+  if (Object.keys(taskAvailability).length > 0) {
+    sanitized.taskAvailability = taskAvailability;
   }
   const lastApiUpdate = sanitizeApiUpdateMeta(value.lastApiUpdate);
   if (lastApiUpdate) {

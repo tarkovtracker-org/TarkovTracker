@@ -1,0 +1,34 @@
+[extend]
+# Extend the built-in detection rules; without this an allowlist-only
+# config replaces the default rule set and the scan runs with zero rules.
+useDefault = true
+
+# Pre-existing commit allowlist (migrated from the root .gitleaks.toml).
+[[allowlists]]
+description = "Pre-existing allowlisted commit"
+commits = ["1215c8b06de6a7c2011aa6ffee39b598e09a3cc1"]
+
+# The Supabase anon key (role "anon") is intentionally public plaintext config;
+# it is a JWT by format and trips the jwt rule. Allowlist only that exact token in
+# wrangler.toml so any other JWT there (e.g. a service-role key) is still reported.
+# Update the regex when the anon key rotates.
+[[allowlists]]
+description = "Supabase anon key is public config, not a secret"
+targetRules = ["jwt"]
+condition = "AND"
+paths = ['''(^|/)wrangler\.toml$''']
+regexTarget = "secret"
+regexes = ['''^eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtucHRxZWx2c29kY2Nub2VobWJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NTQ2OTMsImV4cCI6MjA3OTAzMDY5M30\.jnlspZYu4J7i7bKfJ0p7j5R_r0YmvJj0ph5uw3XUPeY$''']
+
+# Twitch OAuth client IDs are public identifiers; nuxt.config.ts carries a
+# documented fallback client ID for local/dev builds.
+[[allowlists]]
+description = "Twitch client ID fallback is a public identifier"
+targetRules = ["twitch-api-token"]
+paths = ['''nuxt\.config\.ts''']
+
+# Discord client/application IDs in test fixtures are public identifiers.
+[[allowlists]]
+description = "Discord client IDs in tests are public fixtures"
+targetRules = ["discord-client-id"]
+paths = ['''tests/''']

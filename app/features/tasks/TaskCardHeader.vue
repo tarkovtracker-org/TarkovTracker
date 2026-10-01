@@ -36,11 +36,11 @@
     </AppTooltip>
     <div class="ml-2 flex shrink-0 items-center gap-1.5">
       <AppTooltip
-        v-if="task?.wikiLink && !shouldLinkToWiki"
+        v-if="taskWikiUrl && !shouldLinkToWiki"
         :text="t('common.view_on_wiki', 'View on Wiki')"
       >
         <a
-          :href="toWikiUrl(task.wikiLink)"
+          :href="taskWikiUrl"
           target="_blank"
           rel="noopener noreferrer"
           :class="ICON_BUTTON_CLASS"
@@ -114,7 +114,8 @@
   const factionImage = computed(() => getFactionIconPath(props.task.factionName));
   const tarkovDevTaskUrl = computed(() => `https://tarkov.dev/task/${props.task.id}`);
   const isTasksRoute = computed(() => route.path.startsWith('/tasks'));
-  const shouldLinkToWiki = computed(() => isTasksRoute.value && Boolean(props.task?.wikiLink));
+  const taskWikiUrl = computed(() => toWikiUrl(props.task?.wikiLink));
+  const shouldLinkToWiki = computed(() => isTasksRoute.value && Boolean(taskWikiUrl.value));
   const titleComponent = computed(() => {
     if (shouldLinkToWiki.value) return 'a';
     if (props.task?.id) return 'router-link';
@@ -123,7 +124,7 @@
   const titleProps = computed(() => {
     if (shouldLinkToWiki.value) {
       return {
-        href: toWikiUrl(props.task.wikiLink),
+        href: taskWikiUrl.value,
         target: '_blank',
         rel: 'noopener noreferrer',
       };

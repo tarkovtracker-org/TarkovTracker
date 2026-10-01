@@ -3,6 +3,7 @@ import { testOverlayEditions } from '@/server/utils/__tests__/overlayFixtures';
 import { deepMerge } from '@/server/utils/deepMerge';
 import {
   applyLocaleOverlay,
+  applyMapExtractAdditions,
   applyTaskObjectiveAdditions,
   expandObjectiveAdditions,
   getObjectiveItemIds,
@@ -494,6 +495,157 @@ describe('applyTaskObjectiveAdditions', () => {
     };
     const result = applyTaskObjectiveAdditions(task);
     expect(result).not.toHaveProperty('objectivesAdd');
+  });
+});
+describe('applyMapExtractAdditions', () => {
+  it('adds missing extracts from extractsAdd to map.extracts', () => {
+    const map = {
+      id: '5704e4dad2720bb55b8b4567',
+      name: 'Lighthouse',
+      extracts: [{ id: 'ext-1', name: 'Path to Shoreline', faction: 'all' }],
+      extractsAdd: [
+        {
+          id: 'SCAV_Underboat_Hideout',
+          name: 'Hideout Under the Landing Stage',
+          faction: 'scav',
+          position: { x: 143.13, y: 0.73, z: -159.34 },
+        },
+      ],
+    };
+    const result = applyMapExtractAdditions(map);
+    expect(result.extracts).toHaveLength(2);
+    expect(result.extracts[1]).toEqual({
+      id: 'SCAV_Underboat_Hideout',
+      name: 'Hideout Under the Landing Stage',
+      faction: 'scav',
+      position: { x: 143.13, y: 0.73, z: -159.34 },
+    });
+    expect(result).not.toHaveProperty('extractsAdd');
+  });
+  it('deduplicates when extract id or name already exists in map.extracts', () => {
+    const map = {
+      id: '5704e4dad2720bb55b8b4567',
+      name: 'Lighthouse',
+      extracts: [
+        { id: 'SCAV_Underboat_Hideout', name: 'Hideout Under the Landing Stage', faction: 'scav' },
+      ],
+      extractsAdd: [
+        {
+          id: 'SCAV_Underboat_Hideout',
+          name: 'Hideout Under the Landing Stage (Duplicate ID)',
+        },
+        {
+          id: 'diff-id',
+          name: 'Hideout Under the Landing Stage',
+        },
+      ],
+    };
+    const result = applyMapExtractAdditions(map);
+    expect(result.extracts).toHaveLength(1);
+    expect(result.extracts[0]?.id).toBe('SCAV_Underboat_Hideout');
+    expect(result).not.toHaveProperty('extractsAdd');
+  });
+  it('handles map with undefined extracts by creating extracts array from additions', () => {
+    const map: { id: string; name: string; extracts?: unknown[]; extractsAdd: unknown[] } = {
+      id: '5704e4dad2720bb55b8b4567',
+      name: 'Lighthouse',
+      extractsAdd: [{ id: 'ext-1', name: 'Extract 1' }],
+    };
+    const result = applyMapExtractAdditions(map);
+    expect(result.extracts).toEqual([{ id: 'ext-1', name: 'Extract 1' }]);
+    expect(result).not.toHaveProperty('extractsAdd');
+  });
+  it('returns map unchanged when extractsAdd is absent or empty', () => {
+    const map = {
+      id: 'map-1',
+      name: 'Woods',
+      extracts: [{ id: 'ext-1', name: 'Outskirts' }],
+    };
+    expect(applyMapExtractAdditions(map)).toEqual(map);
+    const mapWithEmpty = {
+      ...map,
+      extractsAdd: [],
+    };
+    expect(applyMapExtractAdditions(mapWithEmpty)).toEqual(mapWithEmpty);
+  });
+  it('skips non-plain-object entries in extractsAdd', () => {
+    const map = {
+      id: 'map-1',
+      extracts: [],
+      extractsAdd: ['invalid', null, 123, { id: 'valid-ext', name: 'Valid Extract' }],
+    };
+    const result = applyMapExtractAdditions(map);
+    expect(result.extracts).toEqual([{ id: 'valid-ext', name: 'Valid Extract' }]);
+  });
+  it('drops additions with missing names, unknown factions or malformed positions', () => {
+    const map = {
+      id: 'map-1',
+      extracts: [],
+      extractsAdd: [
+        { id: 'no-name' },
+        { id: 'bad-faction', name: 'Bad Faction', faction: 'raider' },
+        { id: 'bad-position', name: 'Bad Position', position: { x: 'bad', z: 0 } },
+        { id: 'ok', name: 'Ok', faction: 'pmc', position: { x: 1, y: 2, z: 3 } },
+        { id: 'generic', name: 'Generic', faction: null },
+      ],
+    };
+    expect(applyMapExtractAdditions(map).extracts).toEqual([
+      { id: 'ok', name: 'Ok', faction: 'pmc', position: { x: 1, y: 2, z: 3 } },
+      { id: 'generic', name: 'Generic', faction: null },
+    ]);
+  });
+  it('deduplicates additions against earlier additions', () => {
+    const map = {
+      id: 'map-1',
+      extracts: [],
+      extractsAdd: [
+        { id: 'a', name: 'Alpha' },
+        { id: 'a', name: 'Alpha again' },
+        { id: 'b', name: 'Alpha' },
+      ],
+    };
+    expect(applyMapExtractAdditions(map).extracts).toEqual([{ id: 'a', name: 'Alpha' }]);
+  });
+});
+describe('map overlay integration via applyOverlay', () => {
+  it('applies map extracts additions and strips extractsAdd via applyOverlay', async () => {
+    vi.resetModules();
+    stubOverlayFetch({
+      editions: testOverlayEditions,
+      $meta: { version: 'test', generated: '2026-09-07', sha256: 'test-sha' },
+      maps: {
+        '5704e4dad2720bb55b8b4567': {
+          extractsAdd: [
+            {
+              id: 'SCAV_Underboat_Hideout',
+              name: 'Hideout Under the Landing Stage',
+              faction: 'scav',
+              position: { x: 143.13, y: 0.73, z: -159.34 },
+            },
+          ],
+        },
+      },
+    });
+    const { applyOverlay } = await import('@/server/utils/overlay');
+    const input = {
+      data: {
+        maps: [
+          {
+            id: '5704e4dad2720bb55b8b4567',
+            name: 'Lighthouse',
+            extracts: [{ id: 'ext-1', name: 'Southern Road' }],
+          },
+        ],
+      },
+    };
+    const result = await applyOverlay(input, { gameMode: 'pvp', bypassCache: true });
+    const lighthouse = result.data?.maps?.[0];
+    expect(lighthouse?.extracts).toHaveLength(2);
+    expect(lighthouse?.extracts?.[1]).toMatchObject({
+      id: 'SCAV_Underboat_Hideout',
+      name: 'Hideout Under the Landing Stage',
+    });
+    expect(lighthouse).not.toHaveProperty('extractsAdd');
   });
 });
 describe('canonical progression overlay projection', () => {

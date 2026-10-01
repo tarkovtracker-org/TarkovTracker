@@ -41,6 +41,24 @@ describe('getGameModeSeasonNumber', () => {
       'Failed to fetch active season'
     );
   });
+  it('resolves consecutive seasonal calls to independent fresh values', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(2)))
+      .mockResolvedValueOnce(new Response(JSON.stringify(3)));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(getGameModeSeasonNumber(env, 'seasonal')).resolves.toBe(2);
+    await expect(getGameModeSeasonNumber(env, 'seasonal')).resolves.toBe(3);
+  });
+  it.each([true, false, '2', [2], [], {}, { season: 2 }, null, 0, -1, 1.5])(
+    'rejects a non-numeric or non-positive-integer season %j without coercion',
+    async (value) => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(value))));
+      await expect(getGameModeSeasonNumber(env, 'seasonal')).rejects.toThrow(
+        'Invalid active season'
+      );
+    }
+  );
   it('resolves non-seasonal modes to 0 without a network call', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);

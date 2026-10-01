@@ -1,3 +1,4 @@
+import { capApiTaskUpdates } from '@shared/utils/apiTaskUpdates';
 import {
   MANUAL_ACTIVITY_ACTIONS,
   MANUAL_ACTIVITY_TYPES,
@@ -12,7 +13,8 @@ import {
   MAX_SKILL_LEVEL,
   type GameMode,
 } from '@/utils/constants';
-import type { ApiTaskUpdate, ApiUpdateMeta, UserState } from '@/stores/progressState';
+import { sanitizeTaskAvailabilityMap } from '@/utils/taskAvailabilityConfirmation';
+import type { ApiUpdateMeta, UserState } from '@/stores/progressState';
 type UserProgressData = UserState['pvp'];
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -226,6 +228,7 @@ export const createDefaultOwnedProgressData = (): UserProgressData => ({
   xpOffset: 0,
   taskObjectives: {},
   taskCompletions: {},
+  taskAvailability: {},
   hideoutParts: {},
   hideoutModules: {},
   traders: {},
@@ -238,17 +241,6 @@ export const createDefaultOwnedProgressData = (): UserProgressData => ({
   manualActivityHistory: [],
   manualActivityEpoch: 0,
 });
-const sanitizeApiTaskUpdates = (value: unknown): ApiTaskUpdate[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.filter(
-    (entry): entry is ApiTaskUpdate =>
-      isRecord(entry) &&
-      typeof entry.id === 'string' &&
-      ['completed', 'failed', 'uncompleted'].includes(entry.state as string)
-  );
-};
 export const sanitizeApiUpdateMeta = (value: unknown): ApiUpdateMeta | undefined => {
   if (!isRecord(value)) {
     return undefined;
@@ -257,12 +249,13 @@ export const sanitizeApiUpdateMeta = (value: unknown): ApiUpdateMeta | undefined
   if (value.source !== 'api' || typeof value.id !== 'string' || !value.id || at === null) {
     return undefined;
   }
-  const tasks = sanitizeApiTaskUpdates(value.tasks);
+  const { tasks, taskCount } = capApiTaskUpdates(value.tasks, value.taskCount);
   return {
     at: Math.max(0, Math.trunc(at)),
     id: value.id,
     source: 'api',
     ...(tasks.length > 0 ? { tasks } : {}),
+    ...(taskCount !== undefined ? { taskCount } : {}),
   };
 };
 /** Keep only the newest entry per id, preserving first-seen order of the survivors. */
@@ -428,6 +421,7 @@ export const sanitizeOwnedProgressData = (value: unknown): UserProgressData => {
   );
   sanitized.storyChapters = sanitizeStoryChaptersMap(value.storyChapters);
   sanitized.taskCompletions = sanitizeTaskCompletionMap(value.taskCompletions);
+  sanitized.taskAvailability = sanitizeTaskAvailabilityMap(value.taskAvailability);
   sanitized.taskObjectives = sanitizeObjectiveProgressMap(value.taskObjectives);
   sanitized.traders = sanitizeTraderMap(value.traders);
   sanitized.apiUpdateHistory = sanitizeApiUpdateHistory(value.apiUpdateHistory);
@@ -505,6 +499,7 @@ export const sanitizeTeammateProgressData = (value: unknown): Partial<UserProgre
     skills: sanitizeNumberMap(value.skills),
     storyChapters: sanitizeStoryChaptersMap(value.storyChapters),
     taskCompletions: sanitizeTaskCompletionMap(value.taskCompletions),
+    taskAvailability: sanitizeTaskAvailabilityMap(value.taskAvailability),
     taskObjectives: sanitizeObjectiveProgressMap(value.taskObjectives),
     traders: sanitizeTraderMap(value.traders),
   };

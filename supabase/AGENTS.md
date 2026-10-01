@@ -34,14 +34,14 @@ Full procedure: `docs/runbook.md#database-migrations`.
 
 ## Production database
 
-Inspect production only through the read-only `scripts/prod-db` observer
-(`docs/runbook.md#production-database-observer`, `docs/SYSTEMS.md` §9), using a dedicated observer
+Inspect production only through the read-only `scripts/ops/prod-db` observer
+(`docs/runbook.md#production-database-observer`, `docs/systems/prod-db-observer.md`), using a dedicated observer
 role; never supply `service_role`, `postgres`, migration, or Management API credentials.
 
 ## Account lifecycle
 
-- API token renames update only the owner-scoped `note` (`docs/API.md#active-token-cap`).
+- API token renames update only the owner-scoped `note` (`docs/api.md#active-token-cap`).
 - Team owners disband through the confirmed owner function
-  (`docs/API.md#team-mutation-edge-functions`).
+  (`docs/api.md#team-mutation-edge-functions`).
 - Account deletion jobs use the documented claim/fencing transactions
-  (`docs/RATE_LIMITING.md#d-account-deletion-limiter`).
+  (`docs/rate-limiting.md#d-account-deletion-limiter`).

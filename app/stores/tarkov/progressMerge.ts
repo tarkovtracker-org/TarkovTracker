@@ -1,3 +1,4 @@
+import { capApiTaskUpdates, isApiTaskUpdateEntry } from '@shared/utils/apiTaskUpdates';
 import {
   defaultState,
   type ApiTaskUpdate,
@@ -5,14 +6,17 @@ import {
   type UserProgressData,
   type UserState,
 } from '@/stores/progressState';
+import { deepEqual } from '@/stores/tarkov/deepEqual';
 import { GAME_MODES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import { hasMaterializedProgress } from '@/utils/modeProgressFallback';
 import {
   sanitizeManualActivityEpoch,
   sanitizeManualActivityHistory,
   sanitizeOwnedProgressData,
 } from '@/utils/progressSanitizers';
-import type { ManualActivityEntry } from '@/types/progress';
+import { mergeTaskAvailability } from '@/utils/taskAvailabilityConfirmation';
+import type { ManualActivityEntry, TaskCompletion } from '@/types/progress';
 import type { RawTaskCompletion } from '@/utils/taskStatus';
 const API_UPDATE_HISTORY_LIMIT = 50;
 type CountableEntry = { count?: number; complete?: boolean; timestamp?: number };
@@ -23,23 +27,40 @@ type TimestampedCompletionEntry = { complete?: boolean; timestamp?: number };
 export const coerceGameMode = (mode?: string | null): GameMode => {
   return Object.values(GAME_MODES).includes(mode as GameMode) ? (mode as GameMode) : GAME_MODES.PVP;
 };
+const RESET_CLOCK_KEYS = new Set(['progressEpoch', 'manualActivityEpoch']);
+const DEFAULT_MODE_PROGRESS = defaultState.pvp as unknown as Record<string, unknown>;
+/** True when a mode differs from default progress in anything but its reset clocks. */
+export const hasRetainableModeProgress = (modeData: UserProgressData | undefined): boolean =>
+  hasMaterializedProgress(modeData) &&
+  Object.entries(modeData as UserProgressData).some(
+    ([key, value]) => !RESET_CLOCK_KEYS.has(key) && !deepEqual(value, DEFAULT_MODE_PROGRESS[key])
+  );
 export const hasProgress = (data: unknown): boolean => {
   const state = data as UserState;
   if (!state) return false;
-  const modeHasData = (mode: UserProgressData | undefined) =>
-    mode &&
-    (mode.level > 1 ||
-      (mode.prestigeLevel ?? 0) > 0 ||
-      (mode.progressEpoch ?? 0) > 0 ||
-      (mode.manualActivityHistory?.length ?? 0) > 0 ||
-      sanitizeManualActivityEpoch(mode.manualActivityEpoch) > 0 ||
-      Object.keys(mode.taskCompletions || {}).length > 0 ||
-      Object.keys(mode.taskObjectives || {}).length > 0 ||
-      Object.keys(mode.hideoutParts || {}).length > 0 ||
-      Object.keys(mode.hideoutModules || {}).length > 0 ||
-      Object.keys(mode.storyChapters || {}).length > 0);
-  return Boolean(modeHasData(state.pvp) || modeHasData(state.pve) || modeHasData(state.seasonal));
+  return [state.pvp, state.pve, state.seasonal].some(modeHasData);
 };
+const PROGRESS_MAP_KEYS = [
+  'taskCompletions',
+  'taskObjectives',
+  'hideoutParts',
+  'hideoutModules',
+  'storyChapters',
+  'taskAvailability',
+] as const;
+const hasEntries = (value: object | undefined): boolean => Object.keys(value ?? {}).length > 0;
+const hasCounterProgress = (mode: UserProgressData): boolean =>
+  [
+    mode.level > 1,
+    (mode.prestigeLevel ?? 0) > 0,
+    (mode.progressEpoch ?? 0) > 0,
+    (mode.manualActivityHistory?.length ?? 0) > 0,
+    sanitizeManualActivityEpoch(mode.manualActivityEpoch) > 0,
+  ].some(Boolean);
+/** Any tracked value, including a confirmation-only map, makes a mode worth syncing and adopting. */
+const modeHasData = (mode: UserProgressData | undefined): boolean =>
+  Boolean(mode) &&
+  (hasCounterProgress(mode!) || PROGRESS_MAP_KEYS.some((key) => hasEntries(mode![key])));
 export const buildUpsertPayload = (
   userId: string,
   state: UserState,
@@ -200,16 +221,15 @@ const mergeCountableObjects = <T extends Record<string, CountableEntry>>(
 };
 const normalizeTaskCompletionEntry = (
   completion: RawTaskCompletion
-): { complete?: boolean; failed?: boolean; timestamp?: number; manual?: boolean } | undefined => {
+): TaskCompletion | undefined => {
   if (completion === null || completion === undefined) return undefined;
   if (typeof completion === 'boolean') {
     return { complete: completion, failed: false };
   }
-  const normalized: { complete?: boolean; failed?: boolean; timestamp?: number; manual?: boolean } =
-    {
-      complete: completion.complete === true,
-      failed: completion.failed === true,
-    };
+  const normalized: TaskCompletion = {
+    complete: completion.complete === true,
+    failed: completion.failed === true,
+  };
   if (typeof completion.timestamp === 'number') {
     normalized.timestamp = completion.timestamp;
   }
@@ -232,17 +252,8 @@ export const normalizeTaskCompletionsMap = (
   }
   return migrated;
 };
-const API_TASK_STATES = ['completed', 'failed', 'uncompleted'] as const;
-const isApiTaskState = (state: unknown): state is ApiTaskUpdate['state'] => {
-  return API_TASK_STATES.includes(state as ApiTaskUpdate['state']);
-};
-export const normalizeApiTaskUpdates = (updates: ApiUpdateMeta['tasks']): ApiTaskUpdate[] => {
-  if (!Array.isArray(updates)) return [];
-  return updates.filter(
-    (update): update is ApiTaskUpdate =>
-      Boolean(update) && typeof update.id === 'string' && isApiTaskState(update.state)
-  );
-};
+export const normalizeApiTaskUpdates = (updates: ApiUpdateMeta['tasks']): ApiTaskUpdate[] =>
+  Array.isArray(updates) ? updates.filter(isApiTaskUpdateEntry) : [];
 export const normalizeApiUpdateMetaEntry = (value: unknown): ApiUpdateMeta | null => {
   if (!value || typeof value !== 'object') return null;
   const candidate = value as Partial<ApiUpdateMeta>;
@@ -255,13 +266,22 @@ export const normalizeApiUpdateMetaEntry = (value: unknown): ApiUpdateMeta | nul
   ) {
     return null;
   }
-  const tasks = normalizeApiTaskUpdates(candidate.tasks);
+  const { tasks, taskCount } = capApiTaskUpdates(candidate.tasks, candidate.taskCount);
   return {
     at: candidate.at,
     id: candidate.id,
     source: 'api',
     ...(tasks.length ? { tasks } : {}),
+    ...(taskCount !== undefined ? { taskCount } : {}),
   };
+};
+/** Newer entry wins (ties favor `incoming`); the same entry keeps its largest known `taskCount`. */
+const pickApiUpdate = (current: ApiUpdateMeta, incoming: ApiUpdateMeta): ApiUpdateMeta => {
+  if (current.id !== incoming.id || current.at !== incoming.at) {
+    return incoming.at >= current.at ? incoming : current;
+  }
+  const taskCount = Math.max(current.taskCount ?? 0, incoming.taskCount ?? 0);
+  return normalizeApiUpdateMetaEntry({ ...incoming, taskCount }) ?? incoming;
 };
 const normalizeApiUpdateHistoryEntries = (value: unknown): ApiUpdateMeta[] => {
   if (!Array.isArray(value)) return [];
@@ -270,9 +290,7 @@ const normalizeApiUpdateHistoryEntries = (value: unknown): ApiUpdateMeta[] => {
     const normalized = normalizeApiUpdateMetaEntry(entry);
     if (!normalized) continue;
     const existing = deduped.get(normalized.id);
-    if (!existing || normalized.at >= existing.at) {
-      deduped.set(normalized.id, normalized);
-    }
+    deduped.set(normalized.id, existing ? pickApiUpdate(existing, normalized) : normalized);
   }
   return Array.from(deduped.values())
     .sort((a, b) => b.at - a.at)
@@ -349,7 +367,7 @@ export function mergeProgressData(
   const mergeTaskCompletion = (
     localComp: RawTaskCompletion,
     remoteComp: RawTaskCompletion
-  ): { complete?: boolean; failed?: boolean; timestamp?: number; manual?: boolean } | undefined => {
+  ): TaskCompletion | undefined => {
     const normalizedLocal = normalizeTaskCompletionEntry(localComp);
     const normalizedRemote = normalizeTaskCompletionEntry(remoteComp);
     if (!normalizedLocal) return normalizedRemote;
@@ -375,7 +393,7 @@ export function mergeProgressData(
     const normalizedRemote = normalizeApiUpdateMetaEntry(remoteUpdate);
     if (!normalizedLocal) return normalizedRemote ?? undefined;
     if (!normalizedRemote) return normalizedLocal;
-    return normalizedRemote.at >= normalizedLocal.at ? normalizedRemote : normalizedLocal;
+    return pickApiUpdate(normalizedLocal, normalizedRemote);
   };
   const mergedState: UserProgressData = {
     ...local,
@@ -414,6 +432,7 @@ export function mergeProgressData(
     hideoutModules: mergeHideoutModules(local.hideoutModules, remote.hideoutModules),
     hideoutParts: mergeCountableObjects(local.hideoutParts, remote.hideoutParts, preferNewerCount),
     storyChapters: mergeStoryChapterProgress(local.storyChapters, remote.storyChapters),
+    taskAvailability: mergeTaskAvailability(local.taskAvailability, remote.taskAvailability),
     traders: {
       ...local.traders,
       ...remote.traders,
@@ -457,3 +476,17 @@ export function mergeProgressData(
     Object.entries(mergedState).filter(([, value]) => value !== undefined)
   ) as UserProgressData;
 }
+/**
+ * Merges two copies of one mode where `preferred` is the newer copy: unions progress like
+ * `mergeProgressData`, but takes single-value fields from `preferred` so its deletions stick.
+ */
+export const mergePreferringSingleValues = (
+  other: UserProgressData,
+  preferred: UserProgressData
+): UserProgressData => ({
+  ...mergeProgressData(other, preferred, true),
+  displayName: preferred.displayName,
+  pmcFaction: preferred.pmcFaction,
+  xpOffset: preferred.xpOffset,
+  skillOffsets: preferred.skillOffsets,
+});

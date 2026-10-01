@@ -5,18 +5,19 @@ on:
       - main
     paths:
       - 'app/locales/en.json'
-      - 'crowdin.yml'
+      - '.github/crowdin.yml'
       - '.github/workflows/crowdin.yml'
-      - 'scripts/crowdin-pr.sh'
-      - 'scripts/github-ci-gate.sh'
+      - 'scripts/ci/crowdin-pr.sh'
+      - 'scripts/ci/github-ci-gate.sh'
   schedule:
-    - cron: '17 4 * * *'
+    - cron: '17 4 * * 1'
   workflow_dispatch:
 permissions:
   actions: write
   checks: read
   contents: write
   pull-requests: write
+# Pushes only upload English sources; the weekly schedule and manual dispatch open the locale PR.
 # All triggers share the same Crowdin project and localization branch.
 concurrency:
   group: crowdin-sync
@@ -34,17 +35,18 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Preserve trusted merge gate
-        run: cp scripts/crowdin-pr.sh scripts/github-ci-gate.sh "$RUNNER_TEMP/"
+        run: cp scripts/ci/crowdin-pr.sh scripts/ci/github-ci-gate.sh "$RUNNER_TEMP/"
       - name: Synchronize Crowdin translations
         id: crowdin
         uses: crowdin/github-action@0d5670f539973aea2f01abce61a8989934df0025 # v3.0.2
         with:
+          config: '.github/crowdin.yml'
           upload_sources: true
           upload_translations: false
-          download_translations: true
+          download_translations: ${{ github.event_name != 'push' }}
           crowdin_branch_name: main
           localization_branch_name: locales
-          create_pull_request: true
+          create_pull_request: ${{ github.event_name != 'push' }}
           pull_request_base_branch_name: main
           pull_request_title: 'chore(i18n): update translations from Crowdin'
           pull_request_body: 'Automated translation updates from Crowdin.'
@@ -55,6 +57,7 @@ jobs:
           CROWDIN_PERSONAL_TOKEN: ${{ secrets.CROWDIN_PERSONAL_TOKEN }}
       - name: Resolve Crowdin PR
         id: resolve-pr
+        if: github.event_name != 'push'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ACTION_PR: ${{ steps.crowdin.outputs.pull_request_number }}

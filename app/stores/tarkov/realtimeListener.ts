@@ -1,10 +1,26 @@
 import { useToastI18n } from '@/composables/useToastI18n';
+import { blockAccountRecoveryRetentionForOwner } from '@/stores/tarkov/accountRecovery';
+import {
+  noteRemoteProgressApplied,
+  recordAcknowledgedModes,
+} from '@/stores/tarkov/acknowledgedModes';
 import { maybeNotifyApiUpdate } from '@/stores/tarkov/apiUpdateNotifier';
 import { detectDataConflicts } from '@/stores/tarkov/conflictDetection';
 import { deepEqual } from '@/stores/tarkov/deepEqual';
-import { progressStorageSerializer } from '@/stores/tarkov/localStorage';
-import { coerceGameMode, mergeProgressData, toProgressEpoch } from '@/stores/tarkov/progressMerge';
+import {
+  cloneStateSnapshot,
+  progressStorageSerializer,
+  setActiveProgressWritesBlocked,
+} from '@/stores/tarkov/localStorage';
+import {
+  coerceGameMode,
+  hasRetainableModeProgress,
+  mergeProgressData,
+  toProgressEpoch,
+} from '@/stores/tarkov/progressMerge';
 import { readWithProgressFreshness } from '@/stores/tarkov/progressPersistence';
+import { hasUnsavedProgressChanges } from '@/stores/tarkov/progressSaveStatus';
+import { saveSupersededProgressCopy } from '@/stores/tarkov/supersededProgress';
 import {
   getLastLocalSyncTime,
   isLikelySelfOriginUpdate,
@@ -35,8 +51,30 @@ import {
 import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 const SYNC_RESUME_DELAY_MS = 1000;
+const mayHaveUnacknowledgedLocalChanges = (): boolean =>
+  (getRegisteredSyncController()?.hasPendingChanges?.() ?? true) || hasUnsavedProgressChanges();
+/**
+ * A remote reset received while local changes await acknowledgement supersedes them (see
+ * `CONTEXT.md`): keep them export-only before the reset replaces them. Returns `false` when
+ * that copy could not be saved; the caller must then leave the local changes in place.
+ */
+const archiveProgressDisplacedByRemoteReset = (
+  ownerId: string,
+  mode: GameMode,
+  local: UserState,
+  remoteProgress: UserProgressData
+): boolean => {
+  if (toProgressEpoch(remoteProgress) <= toProgressEpoch(local[mode])) return true;
+  if (!hasRetainableModeProgress(local[mode]) || !mayHaveUnacknowledgedLocalChanges()) return true;
+  const seasonNumber = mode === 'seasonal' ? (local.seasonalSeasonNumber ?? null) : null;
+  return (
+    saveSupersededProgressCopy(ownerId, mode, seasonNumber, cloneStateSnapshot(local[mode])) !==
+    null
+  );
+};
 export type SyncControllerHandle = {
   hasPendingChanges?: () => boolean;
+  acknowledgeExternalSave?: (saved: UserState) => void;
   captureRemoteMerge?: () => RemoteStateMerge;
   withSnapshot?: WithRemoteSnapshot;
   pause: () => void;
@@ -71,6 +109,21 @@ const channelRelease = createChannelReleaseLatch();
 let listenerGeneration = 0;
 let syncResumeTimer: ReturnType<typeof setTimeout> | null = null;
 let pausedSyncController: SyncControllerHandle | null = null;
+/**
+ * Set when a remote reset could not be applied because the changes it displaces could not be
+ * retained. Sync stays paused so those older changes cannot overwrite the reset in the cloud.
+ */
+let heldForUnretainedRemoteReset = false;
+/** Reads and merges the current remote snapshot for the joined channel; rejects if unreadable. */
+let activeSnapshotRefresh: (() => Promise<void>) | null = null;
+/**
+ * Merges the latest remote progress into pending local changes before a retry uploads them.
+ * Without a listener nothing merges changes made elsewhere, so the retry must not upload.
+ */
+export const reconcileRemoteSnapshot = (): Promise<void> =>
+  activeSnapshotRefresh
+    ? activeSnapshotRefresh()
+    : Promise.reject(new Error('Remote progress snapshot reader unavailable'));
 export const registerSyncControllerGetter = (getter: SyncControllerGetter): void => {
   syncControllerGetter = getter;
 };
@@ -131,9 +184,18 @@ const scheduleSyncResume = (): void => {
   if (syncResumeTimer) clearTimeout(syncResumeTimer);
   syncResumeTimer = setTimeout(() => {
     syncResumeTimer = null;
+    if (heldForUnretainedRemoteReset) return;
     pausedSyncController?.resume();
     pausedSyncController = null;
   }, SYNC_RESUME_DELAY_MS);
+};
+/** Keeps the displaced local changes and the reset both unapplied until the next session. */
+const holdUnretainedRemoteReset = (mode: GameMode, ownerId: string): void => {
+  logger.error('[TarkovStore] Could not retain progress displaced by a remote reset', { mode });
+  blockAccountRecoveryRetentionForOwner(ownerId);
+  setActiveProgressWritesBlocked(true);
+  heldForUnretainedRemoteReset = true;
+  pauseRegisteredSyncController();
 };
 const notifyModeConflict = (
   conflicts: ReturnType<typeof detectDataConflicts>,
@@ -393,6 +455,7 @@ async function runSetupRealtimeListener(
       updatedAtByMode: {},
       metadataTimestamp: updateTime,
     });
+    noteRemoteProgressApplied({ remote: remoteMetadata, applied: metadata });
     if (shouldIgnoreLegacyMetadataUpdate(updateTime, nextState, localState)) return;
     const isLikelySelfOrigin = isLikelySelfOriginUpdate(updateTime);
     logger.debug('[TarkovStore] Remote metadata update detected, applying changes', {
@@ -418,6 +481,13 @@ async function runSetupRealtimeListener(
     if (!remote) return;
     const { mode, progress: remoteProgress, updateTime } = remote;
     const localState = sanitizeOwnedUserState(tarkovStore.$state);
+    if (
+      currentUserId &&
+      !archiveProgressDisplacedByRemoteReset(currentUserId, mode, localState, remoteProgress)
+    ) {
+      holdUnretainedRemoteReset(mode, currentUserId);
+      return;
+    }
     const merged = mergeProgressData(localState[mode], remoteProgress, true);
     const nextProgress = reconcile(
       { [mode]: remoteProgress },
@@ -432,6 +502,12 @@ async function runSetupRealtimeListener(
       updatedAtByMode: {
         [mode]: remote.progressTime,
       },
+    });
+    // The server now holds this copy, so a later local revert to the old copy is still sent.
+    recordAcknowledgedModes(currentUserId, { [mode]: remoteProgress });
+    noteRemoteProgressApplied({
+      remote: { [mode]: remoteProgress },
+      applied: { [mode]: nextProgress },
     });
     if (shouldIgnoreModeProgressUpdate(mode, updateTime, nextProgress, localState[mode])) return;
     const conflicts = detectDataConflicts(localState[mode], remoteProgress);
@@ -521,17 +597,38 @@ async function runSetupRealtimeListener(
       handleModeProgressChange({ new: row }, reconcile);
     }
   };
-  const refreshSnapshot = async (reconcile: RemoteStateMerge, request: number) => {
-    if (snapshotIsStale(request)) return;
-    try {
-      const [metadata, modes] = await readProgressSnapshotRows();
-      if (snapshotIsStale(request)) return;
-      assertSnapshotReadable(metadata.error, modes.error);
-      applySnapshotMetadata(metadata.data, reconcile);
-      applySnapshotModes(modes.data, reconcile);
-    } catch (error) {
-      logger.warn('[TarkovStore] Reconnect snapshot failed', error);
+  /** Resolves true only when this request's snapshot was merged. */
+  const readSnapshot = async (reconcile: RemoteStateMerge, request: number): Promise<boolean> => {
+    if (snapshotIsStale(request)) return false;
+    const [metadata, modes] = await readProgressSnapshotRows();
+    if (snapshotIsStale(request)) return false;
+    assertSnapshotReadable(metadata.error, modes.error);
+    applySnapshotMetadata(metadata.data, reconcile);
+    applySnapshotModes(modes.data, reconcile);
+    return true;
+  };
+  let latestRefresh: Promise<boolean> = Promise.resolve(false);
+  const runSnapshotRefresh = (): Promise<boolean> => {
+    const request = ++refreshGeneration;
+    const read = (reconcile: RemoteStateMerge) => readSnapshot(reconcile, request);
+    const controller = getRegisteredSyncController();
+    latestRefresh = controller?.withSnapshot
+      ? controller.withSnapshot(read)
+      : read(captureRemoteMerge());
+    return latestRefresh;
+  };
+  /**
+   * A retry waits for any newer refresh that superseded its own, and rejects unless a snapshot
+   * was merged (for example while the socket is suspended), so it never uploads unmerged state.
+   */
+  const refreshBeforeRetry = async (): Promise<void> => {
+    let refresh = runSnapshotRefresh();
+    let merged = await refresh;
+    while (refresh !== latestRefresh) {
+      refresh = latestRefresh;
+      merged = await refresh;
     }
+    if (!merged) throw new Error('Remote progress snapshot unavailable');
   };
   const owned = { channel, client, topic } satisfies OwnedRealtimeChannel;
   // No await between the claim and the join: `joinProgressChannel` reaches
@@ -540,15 +637,10 @@ async function runSetupRealtimeListener(
     await releaseProgressChannel(owned);
     return;
   }
+  activeSnapshotRefresh = refreshBeforeRetry;
   await joinProgressChannel(owned, currentUserId, generation, () => {
-    const request = ++refreshGeneration;
-    const read = (reconcile: RemoteStateMerge) => refreshSnapshot(reconcile, request);
-    const controller = getRegisteredSyncController();
-    const refreshing = controller?.withSnapshot
-      ? controller.withSnapshot(read)
-      : read(captureRemoteMerge());
-    refreshing.catch((error: unknown) => {
-      logger.warn('[TarkovStore] Reconnect snapshot barrier failed', error);
+    runSnapshotRefresh().catch((error: unknown) => {
+      logger.warn('[TarkovStore] Reconnect snapshot failed', error);
     });
   });
 }
@@ -558,6 +650,7 @@ async function runSetupRealtimeListener(
  */
 async function teardownProgressChannel(): Promise<void> {
   listenerGeneration += 1;
+  activeSnapshotRefresh = null;
   if (realtimeChannel) {
     // Remove through the client that created the channel: `$supabase.client` is
     // replaced once background initialization completes.
@@ -570,6 +663,7 @@ async function teardownProgressChannel(): Promise<void> {
     clearTimeout(syncResumeTimer);
     syncResumeTimer = null;
   }
+  heldForUnretainedRemoteReset = false;
   if (pausedSyncController) {
     pausedSyncController.resume();
     pausedSyncController = null;

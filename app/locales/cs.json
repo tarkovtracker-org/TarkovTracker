@@ -88,6 +88,10 @@
     "error_loading": "Chyba při načítání Tarkov dat",
     "loading": "Načítání Tarkov dat",
     "logout_failed": "Nelze se odhlásit. Zkuste to prosím znovu.",
+    "logout_unreachable": "Nelze se připojit k serveru, takže jste stále přihlášeni. Můžete se odhlásit pouze na toto zařízení; server nebude slyšet, takže relace zůstane aktivní, dokud neuplyne nebo se odhlásíte z jiného zařízení.",
+    "logout_this_device": "Odhlásit se pouze na tomto zařízení",
+    "logout_this_device_done": "Odhlášen pouze na tomto zařízení. Relace na serveru zůstává aktivní, dokud nevyprší platnost nebo se odhlásíte z jiného zařízení.",
+    "logout_local_only": "Odhlášen na tomto zařízení. Server nemohl být dosažen, takže vaše ostatní relace mohou být stále přihlášeny.",
     "hidden_label": "Hidden",
     "user_label": "Uživatel",
     "user_avatar_alt": "Avatar uživatele",
@@ -99,6 +103,40 @@
     "login_aria": "Log in to your account",
     "switch_to_light_theme": "Přepnout na světlý motiv",
     "switch_to_dark_theme": "Přepnout na tmavý motiv"
+  },
+  "progress_save_status": {
+    "indicator_aria": "Stav uložení: {status}",
+    "cloud_pending_label": "Ukládání pokroku do cloudu",
+    "cloud_retrying_label": "Cloudové ukládání se opakuje",
+    "cloud_failed_label": "Uložení do cloudu se nezdařilo",
+    "local_failed_label": "Průběh nebyl uložen v tomto prohlížeči",
+    "cloud_pending_description": "Vaše poslední změny pokroku zatím nebyly uloženy do cloudu.",
+    "cloud_retrying_description": "Uložení posledních změn do cloudu selhalo. Sledování můžete pokračovat automaticky.",
+    "cloud_failed_description": "Automatické pokusy o uložení posledních změn v cloudu byly zastaveny. Změny stále čekají na uložení a můžete sledovat a opakovat pokus kdykoli.",
+    "local_failed_description": "Vaše poslední změny postupu nelze uložit v tomto prohlížeči. Můžete pokračovat ve sledování, ale změny, které nejsou uloženy jinde, mohou být ztraceny, pokud znovu načtete, zavřete tuto záložku nebo odhlásíte.",
+    "local_saved_note": "Tyto změny jsou uloženy v tomto prohlížeči.",
+    "cloud_also_pending_note": "Ani nebyly uloženy do cloudu. Exportujte svůj postup pro uchovávání kopie.",
+    "retry_scheduled": "Automatické opakování {attempt} z {total} je naplánováno.",
+    "cause_offline": "Příčina: toto zařízení se zdá být offline.",
+    "cause_rate_limited": "Příčina: služba oblačnosti dočasně omezuje úspory.",
+    "cause_auth": "Příčina: vaše přihlašovací relace nemohla být ověřena.",
+    "cause_quota": "Příčina: Úložiště tohoto prohlížeče pro TarkovTracker je plné.",
+    "cause_unavailable": "Příčina: tento prohlížeč blokuje úložiště webu například z důvodu nastavení soukromí.",
+    "cause_unknown": "Příčina tohoto selhání není známa.",
+    "quota_guidance": "Vymazání dat tohoto webu nebo opětovné načítání může odstranit vaši jedinou kopii těchto změn. Před odstraněním dat exportujte váš pokrok.",
+    "retry_button": "Opakovat ukládání do cloudu",
+    "retry_succeeded": "Změny vašeho postupu byly uloženy do cloudu.",
+    "retry_failed": "Uložení do cloudu se nezdařilo. Vaše změny stále čekají na uložení.",
+    "export_button": "Exportovat pokrok",
+    "export_hint": "Exportovat aktuální postup stahování jako záložní soubor, i když se uložení nezdařilo."
+  },
+  "sign_out_confirm": {
+    "title": "Odhlásit se s neuloženými změnami?",
+    "risk": "Vaše poslední změny postupu nejsou uloženy v tomto prohlížeči nebo v cloudu. Pokud se nyní odhlásíte, budou ztraceny.",
+    "options": "Můžete zůstat přihlášeni a zkusit znovu uložit nebo exportovat váš aktuální průběh před rozhodnutím.",
+    "stay_signed_in": "Zůstaňte přihlášeni",
+    "discard_and_sign_out": "Odhlásit a zahodit změny",
+    "retry_succeeded": "Vaše změny byly uloženy do cloudu. Můžete se bezpečně odhlásit."
   },
   "omnibar": {
     "title": "Search",
@@ -514,6 +552,9 @@
     "not_available_description": "Interaktivní mapa pro {mapName} ještě není k dispozici. Čekáme na vytvoření kompatibilní mapy.",
     "placeholder": "tato poloha",
     "floors": "Podlahy",
+    "extract_names": {
+      "scav_underboat_hideout": "Skrývat ve fázi přistání"
+    },
     "factions": {
       "pmc": "PMC"
     },
@@ -568,7 +609,8 @@
       "go_to_in_task_list": "Přejít na cíl v seznamu úkolů",
       "complete": "Úplný cíl",
       "uncomplete": "Neúplný cíl",
-      "objective_unavailable": "Cíl není k dispozici."
+      "objective_unavailable": "Cíl není k dispozici.",
+      "stacked_objectives": "Zde jsou {count} cíle"
     }
   },
   "page": {
@@ -992,7 +1034,25 @@
         "map_complete_tasks_toggle_show": "Zobrazit skryté",
         "map_complete_tasks_toggle_hide": "Skrýt mapu kompletní",
         "map_hidden_hint": "Mapa skrytá — klikněte pro zobrazení",
-        "raid_time_tooltip": "Aktuální čas nájezdu ve hře"
+        "raid_time_tooltip": "Aktuální čas nájezdu ve hře",
+        "raid_plan": {
+          "title": "Úkoly na mapě",
+          "summary_all": "Zobrazuji vše {total}",
+          "summary_hidden": "{hidden} z {total} skryto",
+          "choose_quests": "Vybrat úlohy",
+          "show_all": "Zobrazit vše",
+          "popover_description": "Zrušte zaškrtnutí úkolů, které nebudeš spouštět, abys je vymazal z mapy. \"Pouze skryje vše ostatní.",
+          "only": "Pouze",
+          "show_only_named": "Zobrazit pouze {name} na mapě",
+          "show_only_quest": "Zobrazit pouze tento úkol na mapě",
+          "hide_quest": "Skrýt z mapy",
+          "show_quest": "Zobrazit na mapě",
+          "all_hidden_hint": "Každý úkol na této mapě je skrytý. Použijte Zobrazit všechny, abyste je vrátili.",
+          "hidden_section_title": "Skrytý z mapy ({count})",
+          "hidden_section_description": "Stále sledováno, prostě není vykresleno na mapě.",
+          "hidden_section_expand": "Zobrazit skryté úkoly",
+          "hidden_section_collapse": "Sbalit skryté úlohy"
+        }
       },
       "pinned_tasks_section": "Připnuté úkoly",
       "focused_task_section": "Zaměřený úkol",
@@ -1024,6 +1084,7 @@
         "of": "z",
         "mark_failed": "Označení se nezdařilo",
         "available_button": "Označit k dispozici",
+        "clear_availability_confirmation": "Vymazat potvrzení dostupnosti ve hře",
         "uncomplete_button": "Označit jako nedokončené",
         "reset_item_counts": "Resetovat počet položek",
         "collapse_task": "Sbalit úkol",
@@ -1109,6 +1170,11 @@
         "faction": "K dispozici na {faction} znaků.",
         "trader_unlock": "Odemknout {trader} dokončením {task}.",
         "prestige": "Vyžaduje Prestige {required} (aktuální: {current}).",
+        "global_variable": "Hodnota postupu serveru {comparison} {required} je vyžadována (aktuální: {current}).",
+        "global_variable_unknown": "Vyžaduje vývoj serveru {comparison} {required}. Vaše aktuální hodnota není k dispozici pro tracker. Použít označení k dispozici pouze v případě, že je tento úkol dostupný ve hře; žádné čítače nebudou označeny jako úplné.",
+        "task_counter": "Vyžaduje {comparison} {required} dokončených úkolů od tohoto obchodníka úrovně věrnosti (dokončeno: {current}). Pokud je tento úkol již k dispozici ve hře, použijte známku dostupnou.",
+        "dialogue": "Vyžaduje konverzaci obchodníka ve hře. Použijte známku k dispozici až po potvrzení tohoto úkolu ve hře.",
+        "story_objective": "Dokončete cíl příběhu \"{objective}\" ({chapter}).",
         "unknown": "Data požadavků jsou nedostupná nebo nepodporovaná. Dostupnost nemůže být potvrzena.",
         "cycle": "Předpokladový řetězec obsahuje cyklus. Dostupnost nemůže být potvrzena.",
         "complete": "Tento úkol je dokončen.",
@@ -1739,6 +1805,7 @@
     "game_attribution": "Úniky z Tarkov a související herní obsah a materiály jsou ochranné známky a autorská práva díla Battlestate Games Limited a jejích poskytovatelů. Všechna práva vyhrazena. TarkovTracker je neoficiální projekt fanoušků a není spojen s Battlestate nebo potvrzen.",
     "tagline": "Sledujte svůj útěk od Tarkov úkolů, skryjte vylepšení a požadavky na předměty na jednom místě.",
     "version_release_link": "Zobrazit poznámky k vydání pro verzi {version} na GitHubu",
+    "build_commit_link": "Zobrazit sestavení {commit} na GitHubu",
     "sections": {
       "explore": "Prozkoumat",
       "project": "Projekt",
@@ -2150,10 +2217,17 @@
       "delete_forever": "Vymazat účet navždy",
       "delete_success_title": "Účet úspěšně smazán",
       "delete_success_sr_only": "Smazání účtu je dokončeno a budete přesměrováni na nástěnku.",
+      "delete_success_cleanup_failed_sr_only": "Váš účet byl smazán, ale některá data zůstávají na tomto zařízení. Můžete znovu vyčistit nebo pokračovat s těmito daty zde.",
       "delete_success_description": "Váš účet a všechna související data byla trvale smazána.",
+      "other_session_deleted_description": "Účet který zahájil toto odstranění, byl odstraněn. Váš aktuální účet je stále přihlášený a nebyl změněn.",
       "cleanup_pending": "Některá data čištění stále probíhají a brzy budou dokončena.",
+      "device_cleanup_failed": "Některá smazaná data účtu zůstávají na tomto zařízení. Opakujte čištění, nebo pokračujte a nechejte data zde.",
+      "session_end_failed": "Tento prohlížeč je stále přihlášený k odstraněnému účtu. Vyberte Přejít na řídicí panel a zkuste se znovu odhlásit.",
+      "retry_device_cleanup": "Opakovat čištění zařízení",
+      "continue_with_device_data_remaining": "Pokračovat se zbývajícími daty",
       "redirect_message": "Děkujeme, že používáte TarkovTracker. Budete přesměrováni na nástěnku.",
-      "go_to_dashboard": "Přejít na nástěnku"
+      "go_to_dashboard": "Přejít na nástěnku",
+      "session_changed": "Váš podepsaný účet byl změněn. V této relaci nebudou provedeny žádné další akce."
     },
     "discord_link": {
       "title": "Discord Account",
@@ -2411,6 +2485,25 @@
         "verification_failed": "Lidské ověření se nezdařilo. Znovu načtěte stránku a zkuste to znovu.",
         "fetch_failed": "Profil Tarkov.dev nelze načíst. Otevřete profil na Tarkov.dev, zkuste to znovu."
       }
+    },
+    "device_data": {
+      "title": "Data na tomto zařízení",
+      "description": "Odhlášení udržuje pokrok uložený na tomto účtu v tomto prohlížeči, aby změny, které ještě nedosáhly cloudu, mohly být synchronizovány, když se přihlásíte. Pokrok přemístěn resetováním nebo sezonním překlopením je pro vývoz zachován zvlášť. Odstranění dat tohoto zařízení smaže průběh tohoto účtu, obnova kopií a předvolby z tohoto prohlížeče a odhlásí vás.",
+      "cloud_unaffected": "Váš průběh cloudu není odstraněn. Data ostatních účtů na tomto zařízení nejsou dotčena.",
+      "superseded_available": "Změny průběhu {count} z resetování nebo sezónního překlopení jsou zachovány pouze pro export. Nebudou obnoveny ani synchronizovány automaticky.",
+      "superseded_export": "Export nahrazen",
+      "superseded_export_error": "Nelze exportovat nahrazený postup",
+      "remove_button": "Odstranit data tohoto účtu z tohoto zařízení",
+      "confirm_title": "Odstranit data tohoto účtu z tohoto zařízení?",
+      "confirm_description": "Průběh tohoto účtu, obnova kopie, nahrazené exporty pokroku a předvolby budou odstraněny z tohoto prohlížeče a budete odhlášeni. Váš průběh cloudu zůstane k dispozici, jakmile se znovu přihlásíte.",
+      "pending_warning": "Některé změny pokroku zatím nebyly uloženy do cloudu. Odebráním dat tohoto zařízení je trvale zahodíte. Nejprve jej exportujte, pokud chcete zachovat.",
+      "confirm_button": "Odstranit data a odhlásit se",
+      "removed": "Data tohoto účtu byla odstraněna z tohoto zařízení.",
+      "remove_error": "Některá data účtu nelze z tohoto zařízení odstranit. Zkuste to znovu před použitím jiného účtu.",
+      "remove_incomplete": "Některá data z účtu, který jste odstranili, jsou stále na tomto zařízení. Zkuste to znovu před použitím jiného účtu.",
+      "retry_removal": "Zkuste znovu odebrat",
+      "revocation_unavailable": "Nelze se připojit k serveru, takže jste stále přihlášeni. Můžete se odhlásit pouze na tomto zařízení a odstranit data; server nebude slyšet, takže relace zůstane aktivní, dokud neuplyne nebo se odhlásíte z jiného zařízení.",
+      "confirm_device_only_button": "Odhlaste se pouze na tomto zařízení a odstraňte data"
     }
   },
   "hideout": {
@@ -2498,6 +2591,22 @@
       "approve": "Schválit",
       "deny": "Zamítnout"
     }
+  },
+  "tarkov_access": {
+    "title": "Ověřit váš prohlížeč",
+    "checking": "Kontrola přístupu k webu…",
+    "description": "Tato stránka je chráněna před nadměrnými automatizovanými požadavky. Dokončete bezpečnostní kontrolu níže pro načtení herních dat Tarkov.",
+    "retry": "Zkuste to znovu",
+    "dismiss": "Nyní ne",
+    "dismissed_notice": "Herní data jsou pozastavena, dokud nedokončíte bezpečnostní kontrolu.",
+    "verify_now": "Ověřit nyní",
+    "verification_failed_retry": "Bezpečnostní kontrola nebyla dokončena. Můžete to zkusit znovu.",
+    "verifying": "Ověřování vašeho prohlížeče…",
+    "widget_hint": "Pro pokračování dokončete kontrolu.",
+    "failed": "Načítání Tarkov dat je momentálně nedostupné. Můžete to zkusit znovu.",
+    "blocked": "Přístup k datům Tarkov je momentálně zablokován pro vaši síť. Můžete to zkusit znovu nebo se vrátit později.",
+    "rate_limited": "Příliš mnoho kontrol za krátkou dobu. Počkejte chvilku a zkuste to znovu.",
+    "widget_unavailable": "Kontrola zabezpečení se nepodařilo načíst. Můžete to zkusit znovu."
   },
   "analytics_consent": {
     "eyebrow": "Analytici",
