@@ -2116,6 +2116,32 @@ describe('useTarkov sync integration', () => {
     await expect(initializeTarkovSync()).rejects.toThrow('Supabase initial load failed');
     expect(showLocalIgnored).toHaveBeenCalledTimes(1);
   });
+  it('merges historical oversized confirmations before startup eviction', async () => {
+    const local = {
+      ...progressWithLevel(1),
+      taskAvailability: { s1: { requirements: 'old', timestamp: 0 } },
+    };
+    seedOwnedEnvelope('user-1', { pvp: local });
+    useTarkovStore().$patch({ pvp: local });
+    single.mockResolvedValue({
+      data: createRemoteRow({ pvp_data: progressWithLevel(1) }),
+      error: null,
+    });
+    modeProgressResult.data = [
+      modeRow('pvp', {
+        ...progressWithLevel(1),
+        taskAvailability: Object.fromEntries(
+          Array.from({ length: 66 }, (_, i) => [
+            `s${i + 1}`,
+            { requirements: 'r'.repeat(4000), timestamp: i + 1 },
+          ])
+        ),
+      }),
+    ];
+    await initializeTarkovSync();
+    expect(useTarkovStore().pvp.taskAvailability).not.toHaveProperty('s1');
+    expect(Object.keys(useTarkovStore().pvp.taskAvailability ?? {})).toHaveLength(65);
+  });
   it('retries a transient deferred legacy read for an empty normalized placeholder', async () => {
     modeProgressResult.data = [{ game_mode: 'pvp', season_number: 0, progress_data: {} }];
     const row = createRemoteRow({ pvp_data: progressWithTaskState('legacy-task', true) });

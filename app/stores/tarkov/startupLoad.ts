@@ -41,6 +41,7 @@ import {
   sanitizeTarkovUid,
 } from '@/utils/progressSanitizers';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
+import { mergeTaskAvailability } from '@/utils/taskAvailabilityConfirmation';
 import { parseUserScopedStorage } from '@/utils/userScopedStorage';
 import type { LocalIgnoredReason } from '@/composables/useToastI18n';
 import type { StartupOwnershipGuard } from '@/stores/tarkov/startupOwnership';
@@ -399,10 +400,26 @@ const upload = async (ctx: StartupLoadContext, state: UserState, failure: string
   if (error) logger.error(failure, error);
   return !error;
 };
+/** Merge historical confirmations without retaining raw candidates in applied state. */
+const mergeHistoricalConfirmations = (
+  local: UserState,
+  remote: RemoteProgress,
+  resolved: UserState
+): UserState => {
+  const payloads = remoteModePayloads(remote.row, remote.modes);
+  for (const mode of GAME_MODE_VALUES) {
+    if (toProgressEpoch(local[mode]) !== toProgressEpoch(remote.state[mode])) continue;
+    resolved[mode].taskAvailability = mergeTaskAvailability(
+      local[mode].taskAvailability,
+      payloads[mode]?.taskAvailability
+    );
+  }
+  return resolved;
+};
 const resolveAgainstRemote = (local: LocalProgress, remote: RemoteProgress): UserState => {
   const freshness = remoteFreshness(remote);
   const localTimestamp = local.meta?.timestamp ?? null;
-  return resolveInitialSyncState(
+  const resolved = resolveInitialSyncState(
     local.state,
     remote.state,
     local.meta?.metadataTimestamp ?? localTimestamp,
@@ -417,6 +434,7 @@ const resolveAgainstRemote = (local: LocalProgress, remote: RemoteProgress): Use
       ),
     }
   );
+  return mergeHistoricalConfirmations(local.state, remote, resolved);
 };
 const wasDisplacedByRemote = (
   mode: GameMode,

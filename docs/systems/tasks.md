@@ -60,6 +60,8 @@ Every merge selects per-task timestamp winners before applying the
 [map bounds](../../supabase/migrations/20261001190000_bound_task_availability_confirmations.sql),
 so same-epoch writes cannot grow it past the sync payload limit or restore an older duplicate
 when a newer winner is evicted.
+Startup and reconnect merges compare against the raw historical row before eviction; only the
+bounded result is applied. Standalone backup imports still sanitize and bound each imported map.
 It does not set a counter, acknowledge another task's dialogue, or complete candidate contributor
 tasks. Because a derived count is an estimate, a confirmation overrides a derived shortfall. It cannot
 bypass an explicit known unmet account value, malformed requirements, or independent

@@ -9,6 +9,22 @@ import {
   sanitizeOwnedUserState,
 } from '@/utils/progressSanitizers';
 describe('sanitizeOwnedProgressData', () => {
+  it('still bounds oversized confirmation maps during standalone imports', () => {
+    const progress = {
+      level: 1,
+      taskAvailability: Object.fromEntries(
+        Array.from({ length: 66 }, (_, i) => [
+          `s${i + 1}`,
+          { requirements: 'r'.repeat(4000), timestamp: i + 1 },
+        ])
+      ),
+    };
+    const sanitized = sanitizeOwnedProgressData(progress);
+    const state = sanitizeOwnedUserState({ pvp: progress });
+    expect(Object.keys(sanitized.taskAvailability ?? {})).toHaveLength(65);
+    expect(sanitized.taskAvailability).not.toHaveProperty('s1');
+    expect(state.pvp.taskAvailability).toEqual(sanitized.taskAvailability);
+  });
   it('keeps confirmations in their own map and drops malformed ones', () => {
     const result = sanitizeOwnedProgressData({
       taskCompletions: { task: { complete: false, availabilityRequirements: 'legacy' } },
