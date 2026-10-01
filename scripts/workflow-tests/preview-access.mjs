@@ -86,27 +86,109 @@ test('exchanges the service token once and sends only the session afterwards', a
     const request = fakeRequest('CF_Authorization=jwt; Path=/');
     const cookies = [];
     const page = { context: () => ({ addCookies: async (list) => cookies.push(...list) }) };
-    await protectPreviewBrowser(page, request, origin);
-    await previewGet(request, `${origin}/api/tarkov/bootstrap`, origin);
-    assert.equal(request.calls.length, 2);
-    assert.deepEqual(request.calls[0].options, {
-      headers: { 'CF-Access-Client-Id': 'id', 'CF-Access-Client-Secret': 'secret' },
-      maxRedirects: 0,
+    const fetchMock = mock.method(globalThis, 'fetch', async () => ({
+      status: 200,
+      headers: { getSetCookie: () => ['CF_Authorization=jwt; Path=/'] },
+    }));
+    try {
+      await protectPreviewBrowser(page, request, origin);
+    } finally {
+      fetchMock.mock.restore();
+    }
+    const calls = [];
+    const response = await previewGet(
+      request,
+      `${origin}/api/tarkov/bootstrap`,
+      origin,
+      async (url, options) => {
+        calls.push({ url, options });
+        return { status: 200, text: async () => '{"data":true}' };
+      }
+    );
+    assert.equal(fetchMock.mock.callCount(), 1);
+    assert.deepEqual(fetchMock.mock.calls[0].arguments[1].headers, {
+      'CF-Access-Client-Id': 'id',
+      'CF-Access-Client-Secret': 'secret',
     });
-    assert.deepEqual(request.calls[1].options, {
-      headers: { cookie: 'CF_Authorization=jwt' },
-      maxRedirects: 0,
-    });
+    assert.equal(fetchMock.mock.calls[0].arguments[1].redirect, 'manual');
+    assert.equal(request.calls.length, 0);
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].options.headers, { cookie: 'CF_Authorization=jwt' });
+    assert.equal(calls[0].options.redirect, 'manual');
+    assert.ok(calls[0].options.signal instanceof AbortSignal);
+    assert.equal(response.status(), 200);
+    assert.deepEqual(await response.json(), { data: true });
+    await response.dispose();
+    await assert.rejects(response.json(), /Preview response JSON is unavailable or invalid/);
     assert.equal(cookies.length, 1);
     assert.equal(cookies[0].domain, 'preview.example');
     assert.equal(cookies[0].secure, true);
     assert.equal(JSON.stringify(cookies).includes('secret'), false);
   });
 });
+test('authenticated request failures and disposal discard secret-bearing diagnostics', async () => {
+  await withAccessEnv(async () => {
+    const origin = 'https://request-errors.example';
+    await previewAccessSession(origin, process.env, async () => ({
+      status: 200,
+      headers: { getSetCookie: () => ['CF_Authorization=fake-session; Path=/'] },
+    }));
+    const request = fakeRequest('');
+    const diagnostic = () =>
+      new Error('id secret fake-session', { cause: new Error('fake-session') });
+    await assert.rejects(
+      previewGet(request, origin, origin, async () => {
+        throw diagnostic();
+      }),
+      (error) =>
+        error.message === 'Authenticated preview request failed.' && error.cause === undefined
+    );
+    let cancellations = 0;
+    await assert.rejects(
+      previewGet(request, origin, origin, async () => ({
+        status: 200,
+        text: async () => {
+          throw diagnostic();
+        },
+        body: {
+          cancel: async () => {
+            cancellations += 1;
+            throw diagnostic();
+          },
+        },
+      })),
+      /Authenticated preview request failed/
+    );
+    const response = await previewGet(request, origin, origin, async () => ({
+      status: 302,
+      text: async () => 'fake-session invalid JSON',
+      body: {
+        cancel: () => {
+          cancellations += 1;
+          throw diagnostic();
+        },
+      },
+    }));
+    assert.equal(response.status(), 302);
+    await assert.rejects(
+      response.json(),
+      (error) =>
+        error.message === 'Preview response JSON is unavailable or invalid.' &&
+        error.cause === undefined
+    );
+    await response.dispose();
+    await response.dispose();
+    assert.equal(cancellations, 2);
+    assert.equal(request.calls.length, 0);
+  });
+});
 test('fails when Access issues no session for the service token', async () => {
   await withAccessEnv(async () => {
     await assert.rejects(
-      previewAccessSession(fakeRequest(''), 'https://nosession.example'),
+      previewAccessSession('https://nosession.example', process.env, async () => ({
+        status: 200,
+        headers: { getSetCookie: () => [] },
+      })),
       /did not issue a preview session/
     );
   });
@@ -149,10 +231,10 @@ test('runner polls exchange the service token once and then send only the sessio
 test('rejects a session cookie attached to a denied Access response', async () => {
   await withAccessEnv(async () => {
     await assert.rejects(
-      previewAccessSession(
-        fakeRequest('CF_Authorization=denied; Path=/', 401),
-        'https://denied.example'
-      ),
+      previewAccessSession('https://denied.example', process.env, async () => ({
+        status: 401,
+        headers: { getSetCookie: () => ['CF_Authorization=denied; Path=/'] },
+      })),
       /did not issue a preview session .*401/
     );
   });
@@ -166,7 +248,10 @@ test('evicts a failed exchange so the next attempt retries it', async () => {
       return { status: 200, headers: { getSetCookie: () => ['CF_Authorization=later; Path=/'] } };
     };
     const origin = 'https://flaky.example';
-    await assert.rejects(previewAccessCookieHeaders(origin, fetchImpl), /network down/);
+    await assert.rejects(
+      previewAccessCookieHeaders(origin, fetchImpl),
+      /Preview Access session exchange failed/
+    );
     assert.deepEqual(await previewAccessCookieHeaders(origin, fetchImpl), {
       cookie: 'CF_Authorization=later',
     });
@@ -244,14 +329,19 @@ test('readiness aborts a stalled attempt and keeps polling', async () => {
       return Promise.resolve({ status: 200, headers: { get: () => 'text/html' } });
     };
     let clock = 0;
-    const attempts = await waitForDeployment('https://stalled.example', {
-      fetchImpl,
-      now: () => clock,
-      sleep: async (ms) => {
-        clock += ms;
-      },
-      attemptTimeoutMs: 20,
-    });
-    assert.equal(attempts, 2);
+    const keepAlive = setInterval(() => {}, 1000);
+    try {
+      const attempts = await waitForDeployment('https://stalled.example', {
+        fetchImpl,
+        now: () => clock,
+        sleep: async (ms) => {
+          clock += ms;
+        },
+        attemptTimeoutMs: 20,
+      });
+      assert.equal(attempts, 2);
+    } finally {
+      clearInterval(keepAlive);
+    }
   });
 });
