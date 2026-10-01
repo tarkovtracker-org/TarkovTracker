@@ -6,14 +6,14 @@ INSERT INTO auth.users (id, email) VALUES
 
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000961', true);
 SELECT is(
-  public.sync_user_game_mode_progress('pvp', 1, 1001, '{"pvp":{"level":10}}', NULL),
+  public.sync_user_game_mode_progress('pvp', 1, 1001, '{"pvp":{"level":10}}', NULL) - 'metadata_write_id',
   '{"tarkov_uid": 1001, "tarkov_uid_conflict": false}'::jsonb,
   'an unowned UID links and is reported as stored'
 );
 
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000962', true);
 SELECT is(
-  public.sync_user_game_mode_progress('pvp', 1, 1001, '{"pvp":{"level":15}}', NULL),
+  public.sync_user_game_mode_progress('pvp', 1, 1001, '{"pvp":{"level":15}}', NULL) - 'metadata_write_id',
   '{"tarkov_uid": null, "tarkov_uid_conflict": true}'::jsonb,
   'a UID owned by another account is reported as a conflict on first sync'
 );
@@ -30,12 +30,12 @@ SELECT is(
 );
 
 SELECT is(
-  public.sync_user_game_mode_progress('pvp', 1, 1002, '{"pvp":{"level":16}}', NULL),
+  public.sync_user_game_mode_progress('pvp', 1, 1002, '{"pvp":{"level":16}}', NULL) - 'metadata_write_id',
   '{"tarkov_uid": 1002, "tarkov_uid_conflict": false}'::jsonb,
   'a corrected UID links on the next sync'
 );
 SELECT is(
-  public.sync_user_game_mode_progress('pvp', 1, 1001, '{"pvp":{"level":17}}', NULL),
+  public.sync_user_game_mode_progress('pvp', 1, 1001, '{"pvp":{"level":17}}', NULL) - 'metadata_write_id',
   '{"tarkov_uid": 1002, "tarkov_uid_conflict": true}'::jsonb,
   'a conflicting relink keeps the existing link'
 );
@@ -54,7 +54,7 @@ SELECT lives_ok(
 
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000961', true);
 SELECT is(
-  public.sync_user_game_mode_progress('pvp', 1, NULL, '{}', NULL),
+  public.sync_user_game_mode_progress('pvp', 1, NULL, '{}', NULL) - 'metadata_write_id',
   '{"tarkov_uid": null, "tarkov_uid_conflict": false}'::jsonb,
   'unlinking releases the UID'
 );

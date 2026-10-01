@@ -196,6 +196,7 @@ const sendModeBatch = async <TError>(
   sync: ProgressAcknowledgement
 ): Promise<ProgressSyncResult<TError>> => {
   if (!sync.isCurrent()) return { error: SPLIT_SYNC_INTERRUPTED };
+  sync.beginBatch();
   invalidateAcknowledgedModes(userId, batch);
   let result: { data?: unknown; error: TError };
   try {
@@ -217,10 +218,9 @@ const sendModeBatch = async <TError>(
     : undefined;
   if (tarkovUidConflict) {
     payload.tarkov_uid = tarkovUidConflict.storedUid;
-    sync.acceptUid(tarkovUidConflict.storedUid);
   }
   if (isRecord(result.data) && Object.hasOwn(result.data, 'tarkov_uid')) {
-    sync.acceptUid(sanitizeTarkovUid(result.data.tarkov_uid));
+    sync.acceptUid(sanitizeTarkovUid(result.data.tarkov_uid), result.data.metadata_write_id);
   }
   return sync.isCurrent() ? { ...result, tarkovUidConflict } : { error: SPLIT_SYNC_INTERRUPTED };
 };

@@ -551,6 +551,43 @@ const expectNoFollowOnSessionActivity = (
   expect(after.userFilters).toEqual(baseline.userFilters);
 };
 describe('useTarkov sync integration', () => {
+  it('keeps a queued UID visible through delayed metadata from the completed relink', async () => {
+    single.mockResolvedValue({ data: createRemoteRow({ tarkov_uid: 7 }), error: null });
+    await initializeTarkovSync();
+    const store = useTarkovStore();
+    store.setTarkovUid(1001);
+    const firstClient = {
+      rpc: async () => ({
+        data: { tarkov_uid: 1001, metadata_write_id: '100', tarkov_uid_conflict: false },
+        error: null,
+      }),
+    } as ProgressRpcClient;
+    expect((await syncProgressState(firstClient, 'user-1', store.$state)).error).toBeNull();
+    store.setTarkovUid(2002);
+    const reply = Promise.withResolvers<{ data: unknown; error: null }>();
+    const second = syncProgressState(
+      { rpc: () => reply.promise } as ProgressRpcClient,
+      'user-1',
+      store.$state
+    );
+    getRealtimeCallback()?.({
+      new: {
+        ...createRemoteRow({
+          tarkov_uid: 7,
+          updated_at: new Date(Date.now() + 1000).toISOString(),
+        }),
+        metadata_write_id: '100',
+      },
+      old: null,
+    });
+    expect(store.tarkovUid).toBe(2002);
+    reply.resolve({
+      data: { tarkov_uid: 2002, metadata_write_id: '200', tarkov_uid_conflict: false },
+      error: null,
+    });
+    expect((await second).error).toBeNull();
+    expect(store.tarkovUid).toBe(2002);
+  });
   it('keeps the requested UID visible when the interim metadata echo arrives before an accepted RPC reply', async () => {
     single.mockResolvedValue({ data: createRemoteRow({ tarkov_uid: 7 }), error: null });
     await initializeTarkovSync();

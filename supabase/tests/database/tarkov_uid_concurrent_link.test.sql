@@ -25,7 +25,7 @@ CREATE TEMP TABLE uid_race_pids AS
 SELECT w.pid AS winner, c.pid AS claimant
 FROM extensions.dblink('uid_winner', 'SELECT pg_backend_pid()') AS w(pid int),
   extensions.dblink('uid_claimant', 'SELECT pg_backend_pid()') AS c(pid int);
-SELECT is(result, jsonb_build_object('tarkov_uid', uid, 'tarkov_uid_conflict', false),
+SELECT is(result - 'metadata_write_id', jsonb_build_object('tarkov_uid', uid, 'tarkov_uid_conflict', false),
   'the first concurrent claimant links the UID before committing')
 FROM uid_race_fixture, LATERAL extensions.dblink('uid_winner', format(
   'SELECT public.sync_user_game_mode_progress(''pvp'', 2, %s, ''{"pvp":{"level":10}}'', NULL)', uid
@@ -45,7 +45,7 @@ $$;
 SELECT ok(winner = ANY(pg_blocking_pids(claimant)),
   'the second session waits on the uncommitted winning UID claim') FROM uid_race_pids;
 SELECT extensions.dblink_exec('uid_winner', 'COMMIT');
-SELECT is(result, '{"tarkov_uid":null,"tarkov_uid_conflict":true}'::jsonb,
+SELECT is(result - 'metadata_write_id', '{"tarkov_uid":null,"tarkov_uid_conflict":true}'::jsonb,
   'the waiting claimant reports a conflict after the winning claim commits')
 FROM extensions.dblink_get_result('uid_claimant') AS rejected(result jsonb);
 -- Drain the async result before issuing another command on this connection.

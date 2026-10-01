@@ -93,6 +93,7 @@ type RealtimeModeProgress = {
   progressTime: number;
 };
 type LegacyProgressMetadata = {
+  metadata_write_id?: string | null;
   current_game_mode?: string;
   game_edition?: number;
   tarkov_uid?: number | null;
@@ -455,7 +456,11 @@ async function runSetupRealtimeListener(
       updatedAtByMode: {},
       metadataTimestamp: updateTime,
     });
-    noteRemoteProgressApplied({ remote: remoteMetadata, applied: metadata });
+    noteRemoteProgressApplied({
+      remote: remoteMetadata,
+      applied: metadata,
+      metadataWriteId: remoteData.metadata_write_id,
+    });
     if (shouldIgnoreLegacyMetadataUpdate(updateTime, nextState, localState)) return;
     const isLikelySelfOrigin = isLikelySelfOriginUpdate(updateTime);
     logger.debug('[TarkovStore] Remote metadata update detected, applying changes', {
