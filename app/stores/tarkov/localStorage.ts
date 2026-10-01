@@ -16,6 +16,7 @@ export type PersistedProgressSnapshot = {
   timestamp: number | null;
   metadataTimestamp?: number;
   modeTimestamps?: Partial<Record<GameMode, number>>;
+  isSessionHandoff?: boolean;
   /** Original season attached to the seasonal payload before migration/sanitization. */
   seasonalSourceSeasonNumber?: number;
 };
@@ -136,11 +137,15 @@ export const createProgressStorageSerializer = (
   return {
     retainBaseline: (userId: string, state: UserState) => {
       if (previous?.storedUserId === userId) return;
-      previous = readPrevious(userId) ?? {
-        state: cloneStateSnapshot(state),
+      previous = {
+        ...cloneStateSnapshot(
+          readPrevious(userId) ?? {
+            state,
+            timestamp: 0,
+            hadDeprecatedProgressData: false,
+          }
+        ),
         storedUserId: userId,
-        timestamp: 0,
-        hadDeprecatedProgressData: false,
       };
     },
     reset: (snapshot: PersistedProgressSnapshot | null = null) => {

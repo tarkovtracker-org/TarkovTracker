@@ -92,7 +92,7 @@ const latestSnapshotByClock = (
 type ModeCandidate = {
   progress: UserProgressData;
   clock: number;
-  /** Orders equal-epoch copies; unknown clocks on retained progress use the copy's write time. */
+  /** Session handoffs use mode clocks; other unknown clocks use the copy's write time. */
   order: number;
   seasonNumber: number | null;
 };
@@ -101,9 +101,7 @@ const toModeCandidate = (snapshot: PersistedProgressSnapshot, mode: GameMode): M
   return {
     progress: snapshot.state[mode],
     clock,
-    order:
-      clock ||
-      (hasRetainableModeProgress(snapshot.state[mode]) ? validClock(snapshot.timestamp) : 0),
+    order: snapshot.isSessionHandoff ? clock : clock || validClock(snapshot.timestamp),
     seasonNumber: mode === 'seasonal' ? (snapshot.state.seasonalSeasonNumber ?? null) : null,
   };
 };

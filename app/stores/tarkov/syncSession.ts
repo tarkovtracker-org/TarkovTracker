@@ -190,7 +190,7 @@ export class ProgressSyncSession {
   }
   /** Hand `snapshot` to the next startup for `userId`, replacing any captured one. */
   handOffSnapshot(userId: string, snapshot: PersistedProgressSnapshot): void {
-    this.pendingResetSnapshot = { snapshot, userId };
+    this.pendingResetSnapshot = { snapshot: { ...snapshot, isSessionHandoff: true }, userId };
   }
   dropPreservedSnapshotFor(userId: string): void {
     if (this.pendingResetSnapshot?.userId === userId) this.pendingResetSnapshot = null;
