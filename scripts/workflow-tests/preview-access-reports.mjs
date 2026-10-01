@@ -6,7 +6,6 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { unzipSync } from 'fflate';
-
 const root = fileURLToPath(new URL('../../', import.meta.url));
 test('Access exchange failures retain no credentials in real Playwright reports', () => {
   // Keep fixtures under the repo so they resolve the pinned Playwright package.
