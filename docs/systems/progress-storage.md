@@ -141,6 +141,10 @@ Teams, save status and recovery, and progress imports build on this storage; see
 - App `ACTIVE_SEASON` metadata must match the database's `private.active_season_*()` functions;
   the Worker resolves the active Seasonal number through the database instead of carrying a
   second runtime constant.
+- Both season resolvers (Nitro and the Worker's `workers/api-gateway/src/utils/gameMode.ts`) accept
+  the RPC's `SMALLINT` only as a JSON number that is a positive integer
+  (`shared/utils/seasonNumber.ts`); strings, booleans, arrays, objects, null, zero, negatives and
+  fractions are rejected without coercion and fail closed.
 - A missing or unmaterialized normalized persistent-mode row is never treated as absent progress: own
   and teammate hydration, shared profiles and overlays, team summaries, and public progress/team API
   reads fall back to `user_progress`; sharing falls back to the legacy preference. A row counts as
