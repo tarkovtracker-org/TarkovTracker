@@ -180,13 +180,18 @@ SELECT is(
 );
 
 SELECT ok(
-  public.merge_manual_activity_progress(
-    jsonb_build_object('taskAvailability', (
-      SELECT jsonb_object_agg('s' || n, jsonb_build_object('requirements', repeat('r', 4000), 'timestamp', n))
-      FROM generate_series(1, 60) AS n
-    )),
-    '{"taskAvailability": {"new": {"requirements": "sig", "timestamp": 1000}}}'
-  )->'taskAvailability' ? 'new',
+  (
+    SELECT merged ? 'new' AND NOT merged ? 's1'
+    FROM (
+      SELECT public.merge_manual_activity_progress(
+        jsonb_build_object('taskAvailability', (
+          SELECT jsonb_object_agg('s' || n, jsonb_build_object('requirements', repeat('r', 4000), 'timestamp', n))
+          FROM generate_series(1, 66) AS n
+        )),
+        '{"taskAvailability": {"new": {"requirements": "sig", "timestamp": 1000}}}'
+      )->'taskAvailability' AS merged
+    ) AS result
+  ),
   'a new confirmation evicts the oldest once the map is full'
 );
 
