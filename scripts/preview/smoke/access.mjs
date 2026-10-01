@@ -60,7 +60,7 @@ async function exchangeServiceTokenWithFetch(origin, fetchImpl, headers, timeout
     return acceptedAccessSession(response.status, headersArray);
   } finally {
     // Only headers are needed. Cancel rather than consume a potentially stalled response body.
-    void response.body?.cancel().catch(() => {});
+    cancelPreviewResponse(response);
   }
 }
 /** Fetch-based variant for runner polls: a bounded exchange per origin, then only the session. */
@@ -82,10 +82,53 @@ export async function previewAccessSession(origin, env = process.env, fetchImpl 
   const headers = await previewAccessCookieHeaders(origin, fetchImpl, env);
   return headers.cookie?.slice(`${ACCESS_SESSION_COOKIE}=`.length) ?? '';
 }
-export async function previewGet(request, url, origin) {
+function cancelPreviewResponse(response) {
+  try {
+    void response?.body?.cancel().catch(() => {});
+  } catch {
+    // Disposal diagnostics must not retain authenticated request headers either.
+  }
+}
+function bufferedPreviewResponse(status, text) {
+  // The smoke assertions use only status and JSON. Buffer within the request deadline so
+  // response parsing and disposal cannot expose transport errors after this helper returns.
+  return {
+    status: () => status,
+    json: async () => {
+      try {
+        if (text === null) throw new Error();
+        return JSON.parse(text);
+      } catch {
+        throw new Error('Preview response JSON is unavailable or invalid.');
+      }
+    },
+    dispose: async () => {
+      text = null;
+    },
+  };
+}
+async function authenticatedPreviewGet(url, headers, fetchImpl, timeoutMs) {
+  let response;
+  try {
+    response = await fetchImpl(url, {
+      headers,
+      redirect: 'manual',
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return bufferedPreviewResponse(response.status, await response.text());
+  } catch {
+    throw new Error('Authenticated preview request failed.');
+  } finally {
+    cancelPreviewResponse(response);
+  }
+}
+export async function previewGet(request, url, origin, fetchImpl = fetch, timeoutMs = 30000) {
   assertPreviewTarget(url, origin);
   const session = await previewAccessSession(origin);
   const headers = session ? { cookie: `${ACCESS_SESSION_COOKIE}=${session}` } : {};
+  // Even an expiring Access cookie is a credential. Never pass it to the instrumented client:
+  // catching its error afterward cannot remove already recorded Playwright call logs.
+  if (session) return authenticatedPreviewGet(url, headers, fetchImpl, timeoutMs);
   return request.get(url, { headers, maxRedirects: 0 });
 }
 export async function protectPreviewBrowser(page, request, origin) {

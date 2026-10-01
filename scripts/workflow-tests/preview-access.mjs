@@ -95,22 +95,91 @@ test('exchanges the service token once and sends only the session afterwards', a
     } finally {
       fetchMock.mock.restore();
     }
-    await previewGet(request, `${origin}/api/tarkov/bootstrap`, origin);
+    const calls = [];
+    const response = await previewGet(
+      request,
+      `${origin}/api/tarkov/bootstrap`,
+      origin,
+      async (url, options) => {
+        calls.push({ url, options });
+        return { status: 200, text: async () => '{"data":true}' };
+      }
+    );
     assert.equal(fetchMock.mock.callCount(), 1);
     assert.deepEqual(fetchMock.mock.calls[0].arguments[1].headers, {
       'CF-Access-Client-Id': 'id',
       'CF-Access-Client-Secret': 'secret',
     });
     assert.equal(fetchMock.mock.calls[0].arguments[1].redirect, 'manual');
-    assert.equal(request.calls.length, 1);
-    assert.deepEqual(request.calls[0].options, {
-      headers: { cookie: 'CF_Authorization=jwt' },
-      maxRedirects: 0,
-    });
+    assert.equal(request.calls.length, 0);
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].options.headers, { cookie: 'CF_Authorization=jwt' });
+    assert.equal(calls[0].options.redirect, 'manual');
+    assert.ok(calls[0].options.signal instanceof AbortSignal);
+    assert.equal(response.status(), 200);
+    assert.deepEqual(await response.json(), { data: true });
+    await response.dispose();
+    await assert.rejects(response.json(), /Preview response JSON is unavailable or invalid/);
     assert.equal(cookies.length, 1);
     assert.equal(cookies[0].domain, 'preview.example');
     assert.equal(cookies[0].secure, true);
     assert.equal(JSON.stringify(cookies).includes('secret'), false);
+  });
+});
+test('authenticated request failures and disposal discard secret-bearing diagnostics', async () => {
+  await withAccessEnv(async () => {
+    const origin = 'https://request-errors.example';
+    await previewAccessSession(origin, process.env, async () => ({
+      status: 200,
+      headers: { getSetCookie: () => ['CF_Authorization=fake-session; Path=/'] },
+    }));
+    const request = fakeRequest('');
+    const diagnostic = () =>
+      new Error('id secret fake-session', { cause: new Error('fake-session') });
+    await assert.rejects(
+      previewGet(request, origin, origin, async () => {
+        throw diagnostic();
+      }),
+      (error) =>
+        error.message === 'Authenticated preview request failed.' && error.cause === undefined
+    );
+    let cancellations = 0;
+    await assert.rejects(
+      previewGet(request, origin, origin, async () => ({
+        status: 200,
+        text: async () => {
+          throw diagnostic();
+        },
+        body: {
+          cancel: async () => {
+            cancellations += 1;
+            throw diagnostic();
+          },
+        },
+      })),
+      /Authenticated preview request failed/
+    );
+    const response = await previewGet(request, origin, origin, async () => ({
+      status: 302,
+      text: async () => 'fake-session invalid JSON',
+      body: {
+        cancel: () => {
+          cancellations += 1;
+          throw diagnostic();
+        },
+      },
+    }));
+    assert.equal(response.status(), 302);
+    await assert.rejects(
+      response.json(),
+      (error) =>
+        error.message === 'Preview response JSON is unavailable or invalid.' &&
+        error.cause === undefined
+    );
+    await response.dispose();
+    await response.dispose();
+    assert.equal(cancellations, 2);
+    assert.equal(request.calls.length, 0);
   });
 });
 test('fails when Access issues no session for the service token', async () => {
