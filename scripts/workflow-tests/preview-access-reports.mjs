@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -11,8 +12,9 @@ test('Access exchange failures retain no credentials in real Playwright reports'
   // Keep fixtures under the repo so they resolve the pinned Playwright package.
   const fixture = mkdtempSync(path.join(root, '.preview-access-report-'));
   const report = mkdtempSync(path.join(tmpdir(), 'preview-access-report-'));
-  const id = 'synthetic-access-client-unique';
-  const secret = 'synthetic-access-secret-unique';
+  // CI reporters embed the PR diff. Runtime values distinguish transport leaks from source text.
+  const id = `synthetic-access-client-${randomUUID()}`;
+  const secret = `synthetic-access-secret-${randomUUID()}`;
   try {
     const cert = path.join(fixture, 'cert.pem');
     const key = path.join(fixture, 'key.pem');
@@ -41,7 +43,7 @@ test('Access exchange failures retain no credentials in real Playwright reports'
       path.join(fixture, 'playwright.config.mjs'),
       `
       import config from '../scripts/preview/smoke/playwright.config.mjs';
-      export default { ...config, testDir: '.', outputDir: ${JSON.stringify(path.join(report, 'test-results'))}, testMatch: /exchange.smoke.mjs$/, timeout: 10000 };
+      export default { ...config, captureGitInfo: { diff: true }, testDir: '.', outputDir: ${JSON.stringify(path.join(report, 'test-results'))}, testMatch: /exchange.smoke.mjs$/, timeout: 10000 };
     `
     );
     writeFileSync(
