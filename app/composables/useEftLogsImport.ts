@@ -7,6 +7,7 @@ import {
   readEftLogSources,
   type EftLogReadProgress,
 } from '@/utils/eftLogFileReader';
+import { EftLogImportBudgetError } from '@/utils/eftLogImportBudget';
 import { loadEftImportTaskCatalog } from '@/utils/eftLogImportCatalog';
 import {
   hasOutsideSeasonEvents,
@@ -73,6 +74,8 @@ function translateReadError(error: unknown, t: TranslationFn): string | null {
   if (error instanceof EftLogRecordSizeError) {
     return t('settings.log_import.errors.record_too_large', { path: error.path });
   }
+  if (error instanceof EftLogImportBudgetError)
+    return t('settings.log_import.errors.budget_exceeded');
   if (error instanceof EftLogArchiveError) return t('settings.log_import.errors.invalid_archive');
   return null;
 }

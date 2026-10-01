@@ -89,7 +89,12 @@ whole-ruleset replacement is authorized.
    preview runner. Missing/invalid service tokens must fail; valid tokens must succeed.
    `scripts/preview/smoke/access.mjs` sends the service token once per exact origin, without
    redirects, to obtain the host-scoped `CF_Authorization` session; browser and API smoke
-   traffic carries only that session, and traces are disabled. Preview code is untrusted and
+   traffic carries only that session, and traces are disabled. The exchange uses bounded native
+   fetch outside Playwright instrumentation, cancels the response body after reading headers,
+   and replaces transport diagnostics with a fixed error before they reach retained reports.
+   Authenticated API smoke requests also use bounded native fetch outside Playwright instrumentation,
+   preserve status/JSON assertions and manual redirects, and discard transport, JSON parsing, and
+   disposal diagnostics that could contain the session. Preview code is untrusted and
    still receives that exchange request, so before configuring `PREVIEW_ACCESS_*`: verify
    that Access or an edge request-header rule strips `CF-Access-Client-*` before the origin,
    keep the token limited to preview hosts, short session durations, and rotate it on
