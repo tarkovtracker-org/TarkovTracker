@@ -40,6 +40,37 @@ const withHeavyModes = (): UserState => {
 const sentModes = (rpc: ReturnType<typeof vi.fn>): Record<string, unknown> =>
   (rpc.mock.calls.at(-1)?.[1] as { p_modes: Record<string, unknown> }).p_modes;
 describe('mode-scoped progress sync', () => {
+  it('uses the last committed link as the interim UID for a queued relink', async () => {
+    recordAcknowledgedModes('user-1', {}, { tarkovUid: 7 });
+    const older = { ...withPvpLevel(2), tarkovUid: 1001 };
+    const newer = { ...withPvpLevel(3), tarkovUid: 2002 };
+    const pending = deferred();
+    const echo = (state: UserState, tarkovUid: number) => {
+      const metadata = {
+        currentGameMode: state.currentGameMode,
+        gameEdition: state.gameEdition,
+        tarkovUid,
+      };
+      noteRemoteProgressApplied({ remote: metadata, applied: metadata });
+    };
+    const rpc = vi.fn(async (_name: string, args: Record<string, unknown>) => {
+      if (args.p_tarkov_uid === 1001) {
+        echo(older, 7);
+        await pending.promise;
+        echo(older, 1001);
+      } else {
+        echo(newer, 1001);
+        echo(newer, 2002);
+      }
+      return { data: { tarkov_uid: args.p_tarkov_uid, tarkov_uid_conflict: false }, error: null };
+    });
+    const client = { rpc } as ProgressRpcClient;
+    const first = syncProgressState(client, 'user-1', older);
+    const second = syncProgressState(client, 'user-1', newer);
+    pending.resolve();
+    expect((await first).error).not.toBeNull();
+    expect((await second).error).toBeNull();
+  });
   it.each(['before-reply', 'after-reply'])(
     'continues split linking through interim and final metadata echoes: %s',
     async (finalTiming) => {

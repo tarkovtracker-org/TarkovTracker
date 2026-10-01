@@ -145,12 +145,14 @@ export const beginAcknowledgement = (userId: string, expected?: ProgressSyncSnap
     acceptUid: (uid: number | null): void => {
       write.uidSettled = true;
       if (write.expected) write.expected.tarkovUid = uid;
-      if (ownerEpoch === started.ownerEpoch) acknowledgedUid = uid;
+      if (isUndisturbed()) acknowledgedUid = uid;
     },
     acknowledge: (modes: ModeProgressMap): void => {
       if (isCurrent()) recordAcknowledgedModes(userId, modes);
     },
     scope: (modes: ModeProgressMap): void => {
+      write.previousUid = acknowledgedUid;
+      write.uidSettled = false;
       if (write.expected) write.expected = narrowScope(write.expected, modes);
     },
     /**
