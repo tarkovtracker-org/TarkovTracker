@@ -99,7 +99,7 @@ const runnerCommands = {
     ],
   }),
   node: (files) => ({ executable: 'node', args: ['--test', '--', ...testOperands(files)] }),
-  deno: (files) => ({ executable: 'deno', args: ['test', '--', ...testOperands(files)] }),
+  deno: (files) => ({ executable: 'deno', args: ['test', ...testOperands(files)] }),
 };
 /** Groups test files into shell-independent executable/argv records; never executed by the brief. */
 export function testCommands(tests) {

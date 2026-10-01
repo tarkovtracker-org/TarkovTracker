@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   buildBrief,
   isTestPath,
@@ -146,7 +150,7 @@ describe('path helpers', () => {
         ],
       },
       { executable: 'node', args: ['--test', '--', './scripts/workflow-tests/c.mjs'] },
-      { executable: 'deno', args: ['test', '--', './supabase/functions/_shared/d.deno.test.ts'] },
+      { executable: 'deno', args: ['test', './supabase/functions/_shared/d.deno.test.ts'] },
     ]);
   });
   it('preserves inert filenames as separate arguments instead of shell text', () => {
@@ -172,6 +176,41 @@ describe('path helpers', () => {
       const operand = prefix === 'workers/api-gateway/' ? '' : prefix;
       expect(command.args.at(-1)).toBe(`./${operand}${filename}${extension}`);
       expect(typeof command.executable).toBe('string');
+    }
+  });
+  it('keeps Deno file selection before its script-argument delimiter', () => {
+    const [command] = testCommands(['-selected space.deno.test.ts']);
+    expect(command).toEqual({
+      executable: 'deno',
+      args: ['test', './-selected space.deno.test.ts'],
+    });
+  });
+  it.skipIf(!process.env.DENO_EXECUTABLE)('runs only the selected Deno fixture', () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'change-brief-deno-'));
+    const selected = '-selected space.deno.test.ts';
+    const other = 'other.deno.test.ts';
+    writeFileSync(
+      join(cwd, selected),
+      'Deno.test("selected", () => { if (Deno.args.length) throw new Error("unexpected script args"); });'
+    );
+    writeFileSync(
+      join(cwd, other),
+      'Deno.test("unselected", () => { throw new Error("unselected file ran"); });'
+    );
+    try {
+      const [command] = testCommands([selected]);
+      const output = execFileSync(process.env.DENO_EXECUTABLE, command.args, {
+        cwd,
+        encoding: 'utf8',
+        shell: false,
+        timeout: 10000,
+      });
+      expect(output).toContain('1 passed');
+      expect(output).not.toContain('unselected');
+    } finally {
+      unlinkSync(join(cwd, selected));
+      unlinkSync(join(cwd, other));
+      rmdirSync(cwd);
     }
   });
 });

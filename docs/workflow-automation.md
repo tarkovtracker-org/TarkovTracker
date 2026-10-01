@@ -44,9 +44,15 @@ Candidate test entries are JSON records with `executable` and `args`, including 
 They are data to review, not shell commands to paste or concatenate. Pass arguments separately
 to a runner that does not use a shell; Windows command shims such as `pnpm.cmd` need a trusted
 platform-specific launcher. Relative file operands start with `./` to avoid runner options;
-Node and Deno also receive `--`. Vitest keeps its positional file filters. No tests are executed
+Node also receives `--`. Deno keeps file operands before its `--` script-argument delimiter;
+Vitest keeps its positional file filters. No tests are executed
 by the brief. This preserves spaces, quotes, and shell metacharacters without choosing POSIX,
 PowerShell, or cmd quoting rules.
+
+The Deno selection regression can also run against the CI-pinned binary by setting
+`DENO_EXECUTABLE` to its absolute path when running `scripts/ci/change-brief.test.mjs`.
+It uses two inert fixtures and verifies that only the requested file runs with no script arguments;
+without that environment value, the runtime regression is explicitly skipped.
 
 The brief is advisory. It does not replace any required check, and CI stays authoritative.
 Its Uncertainty section names what it cannot prove:
