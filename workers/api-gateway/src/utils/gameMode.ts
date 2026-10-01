@@ -1,3 +1,4 @@
+import { isSeasonNumber } from '@shared/utils/seasonNumber';
 import type { Env, GameMode } from '@/types';
 // Resolved fresh from the database on every seasonal request. Caching the value risks returning a
 // stale season during the rollover window while the write path (merge_progress_data) resolves the
@@ -29,8 +30,8 @@ const getActiveSeasonNumber = async (env: Env): Promise<number> => {
     signal: AbortSignal.timeout(ACTIVE_SEASON_FETCH_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error('Failed to fetch active season');
-  const value = Number(await response.json());
-  if (!Number.isInteger(value) || value <= 0) throw new Error('Invalid active season');
+  const value: unknown = await response.json();
+  if (!isSeasonNumber(value)) throw new Error('Invalid active season');
   return value;
 };
 export const getGameModeSeasonNumber = async (env: Env, gameMode: GameMode): Promise<number> =>

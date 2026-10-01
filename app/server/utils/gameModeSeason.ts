@@ -1,10 +1,9 @@
+import { isSeasonNumber } from '@shared/utils/seasonNumber';
 import { createError } from 'h3';
 import { normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
 import { fetchWithTimeout } from '@/server/utils/fetchWithTimeout';
 import type { GameMode } from '@/utils/constants';
 type SeasonConfig = { supabaseUrl: string; supabaseServiceKey?: string };
-const isSeasonNumber = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isInteger(value) && value > 0;
 const fetchActiveSeason = async (baseUrl: string, serviceKey: string): Promise<number> => {
   const url = normalizeSupabaseUrl(baseUrl);
   if (!url) throw new Error('Invalid Supabase URL');
