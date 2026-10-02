@@ -47,7 +47,7 @@ are forgeable by write collaborators, so the evidence binds to the controller ru
 `workflow_dispatch`, branch `main`, and this repository; its `Publish preview result` job must
 succeed and it must retain a `preview-deployment-<sha>` artifact for the exact candidate.
 
-Cloudflare Pages serves static SPA responses outside the Pages Function routes, so runtime route
+Cloudflare Pages serves prerendered public documents and finite client shells outside the Pages Function routes, so runtime route
 rules alone cannot provide browser response headers for those documents. Keep the static
 `public/_headers` frame-ancestor policy in the uploaded build output alongside the runtime app
 CSP; `frame-src` remains an independent directive for permitted embedded content. The build-time

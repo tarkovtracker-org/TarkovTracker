@@ -7,7 +7,10 @@ describe('supporter policy presentation', () => {
   it('leads with payment options and keeps the canonical policy on legal pages', () => {
     const page = read('app/pages/supporter.vue');
     expect(page).not.toContain('AccountRetentionPolicy');
-    expect(page.indexOf('<SupporterOneTime')).toBeLessThan(
+    expect(read('app/features/client-pages/SupporterPage.client.vue')).toContain(
+      '<SupporterOneTime'
+    );
+    expect(page.indexOf('<SupporterPage')).toBeLessThan(
       page.indexOf('id="supporter-policies-title"')
     );
     for (const legalPage of ['terms-of-service', 'privacy']) {
@@ -23,7 +26,7 @@ describe('supporter policy presentation', () => {
     }
     expect(page).toContain('to="/privacy"');
     expect(page.indexOf('to="/terms-of-service#supporter"')).toBeLessThan(
-      page.indexOf('id="tiers"')
+      page.indexOf('<SupporterPage')
     );
   });
   it('distinguishes retention benefits and preserves material payment qualifications', () => {

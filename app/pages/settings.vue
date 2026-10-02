@@ -270,16 +270,6 @@
     '#settings-skills': 'skills',
   };
   const legacyAccountHashes = new Set(['#settings-account']);
-  const settingsSeoKeys: Record<SettingsTabId, string> = {
-    progression: 'progression',
-    prestige: 'prestige',
-    preferences: 'preferences',
-    account: 'account',
-    imports: 'imports',
-    'backup-restore': 'backup_restore',
-    api: 'api',
-    'streamer-tools': 'streamer_tools',
-  };
   const dataManagementSession = useDataManagementSession();
   const isSettingsTabId = (value: unknown): value is SettingsTabId => {
     return typeof value === 'string' && settingsTabIds.includes(value as SettingsTabId);
@@ -309,18 +299,6 @@
     return canonicalizeTab(resolved);
   };
   const activeTab = ref<SettingsTabId>(resolveTabFromRoute(route.path, route.hash));
-  const settingsSeo = computed(() => {
-    const seoKey = settingsSeoKeys[activeTab.value];
-    return {
-      title: t(`settings.tab_seo.${seoKey}.title`),
-      description: t(`settings.tab_seo.${seoKey}.description`),
-    };
-  });
-  useSeoMeta({
-    title: computed(() => settingsSeo.value.title),
-    description: computed(() => settingsSeo.value.description),
-    robots: 'noindex, nofollow',
-  });
   const settingsTabLabels = computed<Record<SettingsTabId, string>>(() => ({
     progression: t('settings.tabs.progression'),
     prestige: t('common.prestige'),

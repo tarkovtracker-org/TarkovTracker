@@ -27,6 +27,7 @@ export default defineNuxtPlugin((nuxtApp) => {
     '/not-found',
     '/oauth',
     '/privacy',
+    '/resources',
     '/supporter',
     '/terms-of-service',
   ];

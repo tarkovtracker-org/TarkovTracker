@@ -2,7 +2,6 @@
   <div class="flex min-h-[calc(100vh-250px)] overflow-x-hidden">
     <div class="min-w-0 flex-1 px-3 py-6 sm:px-6">
       <div class="mx-auto max-w-350 xl:max-w-400 2xl:max-w-450">
-        <h1 class="sr-only">Tarkov Tracker - Escape from Tarkov Progress Tracker</h1>
         <DashboardNextActions />
         <DashboardMigrationBanner />
         <DashboardChangelog />
@@ -293,7 +292,7 @@
       leave-from-class="translate-x-0 opacity-100"
       leave-to-class="translate-x-4 opacity-0"
     >
-      <div v-if="isDesktopHelpPanelOpen" class="hidden w-[26rem] shrink-0 px-4 py-6 lg:block">
+      <div v-if="isDesktopHelpPanelOpen" class="hidden w-104 shrink-0 px-4 py-6 lg:block">
         <PageHelpPanel page-key="dashboard" mode="docked" />
       </div>
     </Transition>
@@ -332,16 +331,6 @@
   const showLockedTraders = ref(false);
   const highlightedTraderId = ref<string | null>(null);
   const traderHighlightTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
-  // Page metadata
-  useSeoMeta({
-    title: 'Tarkov Tracker - Escape from Tarkov Quest and Hideout Tracker',
-    description:
-      'Track Escape from Tarkov quests, storyline, hideout upgrades, and needed items in one place. Tarkov Tracker supports PvP and PvE progression tracking and team collaboration.',
-    ogTitle: 'Tarkov Tracker - Escape from Tarkov Quest and Hideout Tracker',
-    ogDescription:
-      'Track Escape from Tarkov quests, storyline, hideout upgrades, and needed items in one place. Tarkov Tracker supports PvP and PvE progression tracking and team collaboration.',
-    robots: 'index, follow',
-  });
   // Dashboard statistics composable
   const dashboardStats = useDashboardStats();
   const router = useRouter();

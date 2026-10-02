@@ -251,11 +251,6 @@
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
   import type { HideoutStation } from '@/types/tarkov';
-  useSeoMeta({
-    title: 'Hideout',
-    description:
-      'Track your hideout module upgrades and requirements. See what items you need to complete each station upgrade.',
-  });
   const HideoutHelpDemoCard = defineAsyncComponent(
     () => import('@/features/hideout/HideoutHelpDemoCard.vue')
   );

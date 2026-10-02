@@ -849,8 +849,4 @@
 <script setup lang="ts">
   import AccountRetentionPolicy from '@/components/AccountRetentionPolicy.vue';
   const { t } = useI18n({ useScope: 'global' });
-  useSeoMeta({
-    title: 'Privacy Policy',
-    description: 'TarkovTracker privacy policy and data handling practices.',
-  });
 </script>

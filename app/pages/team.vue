@@ -25,18 +25,8 @@
   import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();
-  const metaTitle = computed(() => {
-    const titleKey = typeof route.meta.titleKey === 'string' ? route.meta.titleKey : 'common.team';
-    return t(titleKey);
-  });
-  const metaDescription = computed(() => t('page.team.meta.description'));
   definePageMeta({
     titleKey: 'common.team',
-  });
-  useSeoMeta({
-    title: metaTitle,
-    description: metaDescription,
-    robots: 'noindex, nofollow',
   });
   const TeamMembers = defineAsyncComponent(() => import('@/features/team/TeamMembers.vue'));
   const TeamOptions = defineAsyncComponent(() => import('@/features/team/TeamOptions.vue'));

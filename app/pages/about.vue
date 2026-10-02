@@ -61,42 +61,8 @@
   import AboutMemberCard from '@/features/about/AboutMemberCard.vue';
   import AboutMembersGroup from '@/features/about/AboutMembersGroup.vue';
   import { membersByGroup } from '@/features/about/teamMembers';
-  import { resolveCanonicalSiteUrl } from '@/utils/runtimeConfig';
   const { t } = useI18n({ useScope: 'global' });
-  const runtimeConfig = useRuntimeConfig();
-  const siteUrl = resolveCanonicalSiteUrl(runtimeConfig.public.appUrl);
   const coreMembers = computed(() => membersByGroup('core'));
   const supportMembers = computed(() => membersByGroup('support'));
   const partnerMembers = computed(() => membersByGroup('partner'));
-  const seoTitle = computed(() => t('page.about.title'));
-  const seoDescription = computed(() => t('page.about.description'));
-  useSeoMeta({
-    title: seoTitle,
-    description: seoDescription,
-    ogTitle: seoTitle,
-    ogDescription: seoDescription,
-    twitterTitle: seoTitle,
-    twitterDescription: seoDescription,
-  });
-  const organizationJsonLd = computed(() => ({
-    '@context': 'https://schema.org',
-    '@type': 'Organization',
-    name: 'TarkovTracker',
-    url: siteUrl,
-    logo: `${siteUrl}/img/logos/tarkovtrackerlogo-light.webp`,
-    sameAs: ['https://github.com/tarkovtracker-org/TarkovTracker'],
-    member: [...coreMembers.value, ...supportMembers.value].map((member) => ({
-      '@type': 'Person',
-      name: member.displayName,
-    })),
-  }));
-  useHead(() => ({
-    script: [
-      {
-        key: 'about-organization-jsonld',
-        type: 'application/ld+json',
-        innerHTML: JSON.stringify(organizationJsonLd.value),
-      },
-    ],
-  }));
 </script>

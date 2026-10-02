@@ -1,16 +1,6 @@
 <template>
   <UContainer class="px-4 py-8">
     <div class="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <header class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <UIcon name="i-mdi-history" class="text-primary-400 h-6 w-6" />
-          <h1 class="text-surface-100 text-2xl font-bold">{{ t('page.changelog.title') }}</h1>
-        </div>
-        <NuxtLink to="/" class="text-surface-400 hover:text-primary-400 transition-colors">
-          <UIcon name="i-mdi-arrow-left" class="mr-1 inline h-4 w-4" />
-          {{ t('page.changelog.back') }}
-        </NuxtLink>
-      </header>
       <div v-if="showInitialLoading" class="text-surface-400 py-12 text-center">
         <UIcon name="i-mdi-loading" class="mb-2 h-8 w-8 animate-spin" />
         <p>{{ t('page.changelog.loading') }}</p>
@@ -120,13 +110,6 @@
     ChangelogStats,
   } from '@/types/changelog';
   const { locale, t } = useI18n({ useScope: 'global' });
-  definePageMeta({
-    layout: 'default',
-  });
-  useSeoMeta({
-    title: computed(() => t('page.changelog.title')),
-    description: computed(() => t('page.changelog.description')),
-  });
   const entries = ref<ChangelogItem[]>([]);
   const error = ref(false);
   const loadMoreError = ref(false);

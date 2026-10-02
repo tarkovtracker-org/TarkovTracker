@@ -12,6 +12,12 @@ export interface ResourceGuideConfig {
   faq: number;
   troubleshooting?: number;
   compatibility?: boolean;
+  shareImage?: {
+    src: string;
+    width: number;
+    height: number;
+    altKey: string;
+  };
 }
 interface ResourceBase {
   slug: string;

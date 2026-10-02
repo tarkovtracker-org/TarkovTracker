@@ -153,14 +153,6 @@
   type CategoryFilterId = 'all' | ResourceCategory;
   const { t } = useI18n({ useScope: 'global' });
   definePageMeta({ layout: 'default' });
-  const subtitleFallback =
-    'Find companion apps, community tools, developer resources, and guides for getting more from TarkovTracker.';
-  useSeoMeta({
-    title: computed(() => t('page.resources.title', 'Resources & Guides')),
-    description: computed(() => t('page.resources.subtitle', subtitleFallback)),
-    ogTitle: computed(() => t('page.resources.title', 'Resources & Guides')),
-    ogDescription: computed(() => t('page.resources.subtitle', subtitleFallback)),
-  });
   const searchInputId = useId();
   const searchQuery = ref('');
   const activeCategory = ref<CategoryFilterId>('all');

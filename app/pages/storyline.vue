@@ -3,9 +3,9 @@
     <div class="mx-auto max-w-350 space-y-4">
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="light:text-surface-50 text-xl font-bold text-white sm:text-2xl">
+          <h2 class="light:text-surface-50 text-xl font-bold text-white sm:text-2xl">
             {{ t('common.storyline', 'Storyline') }}
-          </h1>
+          </h2>
           <p class="text-surface-400 mt-1 text-sm">
             {{ t('page.storyline.subtitle') }}
           </p>
@@ -58,15 +58,6 @@
   import { useTarkovStore } from '@/stores/useTarkov';
   import { toggleStoryChapterWithLinearObjectives } from '@/utils/storylineObjectives';
   const { t } = useI18n({ useScope: 'global' });
-  definePageMeta({
-    layout: 'default',
-  });
-  useSeoMeta({
-    title: () => t('common.storyline', 'Storyline'),
-    description: () => t('page.storyline.subtitle'),
-    ogTitle: () => t('common.storyline', 'Storyline'),
-    ogDescription: () => t('page.storyline.subtitle'),
-  });
   const tarkovStore = useTarkovStore();
   const { chapters, normalizedChapters: storylineChapters } = useStorylineChapters({
     completedObjectiveIds: (chapterId) =>

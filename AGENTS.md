@@ -7,7 +7,7 @@ boundaries and user changes.
 
 ## Project map
 
-- Nuxt 4 SPA (`ssr: false`; no SSR-only fetching or middleware), Vue 3 Composition API, strict
+- Nuxt 4 with prerendered public documents and client-rendered trackers/accounts (no server-side personalized fetching), Vue 3 Composition API, strict
   TypeScript, Pinia, Supabase, Tailwind CSS v4, Vitest, Cloudflare Pages/Workers.
 - `app/`: application, features, stores, composables, shell, server routes; Tarkov.dev proxy in
   `app/server/api/tarkov/`. `supabase/`: migrations, Edge Functions. `workers/api-gateway/`: public

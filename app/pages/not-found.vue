@@ -13,8 +13,4 @@
   definePageMeta({
     layout: 'default',
   });
-  useSeoMeta({
-    title: t('common.page_not_found'),
-    robots: 'noindex, nofollow',
-  });
 </script>

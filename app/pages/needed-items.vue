@@ -214,9 +214,6 @@
   const NeededItemsSettingsDrawer = defineAsyncComponent(
     () => import('@/features/neededitems/NeededItemsSettingsDrawer.vue')
   );
-  definePageMeta({
-    usesWindowScroll: true,
-  });
   const { t } = useI18n({ useScope: 'global' });
   const { trackNeededItemsView } = useProductAnalytics();
   const { close: closeHelp, isOpen: isHelpOpen } = usePageHelpState('needed_items');
@@ -231,10 +228,6 @@
   } = usePageSideRailState({
     helpOpen: isHelpOpen,
     settingsOpen: isSettingsDrawerOpen,
-  });
-  useSeoMeta({
-    title: () => t('common.needed_items'),
-    description: () => t('page.needed_items.meta_description'),
   });
   const props = withDefaults(
     defineProps<{

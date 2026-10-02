@@ -571,19 +571,11 @@
     TaskPrimaryView,
     TaskSecondaryView,
   } from '@/types/taskFilter';
-  definePageMeta({
-    usesWindowScroll: true,
-  });
   const LeafletMapComponent = defineAsyncComponent(() => import('@/features/maps/LeafletMap.vue'));
   const TaskGraphView = defineAsyncComponent(() => import('@/features/tasks/TaskGraphView.vue'));
   const TaskSettingsDrawer = defineAsyncComponent(
     () => import('@/features/tasks/TaskSettingsDrawer.vue')
   );
-  useSeoMeta({
-    title: 'Tasks',
-    description:
-      'Track your Escape from Tarkov quest progress. View quest objectives, rewards, and dependencies for both PVP and PVE game modes.',
-  });
   const { t } = useI18n({ useScope: 'global' });
   const preferencesStore = usePreferencesStore();
   const {

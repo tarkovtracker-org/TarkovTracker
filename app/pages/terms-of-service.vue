@@ -3,10 +3,6 @@
   import { useScrollRoot } from '@/composables/useScrollRoot';
   const { t } = useI18n({ useScope: 'global' });
   const { getScrollContainer } = useScrollRoot();
-  useSeoMeta({
-    title: 'Terms of Service',
-    description: 'TarkovTracker terms of service and usage guidelines.',
-  });
   const lastUpdated = 'September 29, 2026';
   const ACTIVE_SECTION_OFFSET = 160;
   const toc = [
@@ -119,6 +115,9 @@
           class="prose prose-lg prose-invert prose-headings:text-primary-100 prose-a:text-link prose-strong:text-primary-200 light:prose-headings:text-primary-800 light:prose-strong:text-surface-50 max-w-none"
         >
           <div class="terms-content space-y-12 [&>section]:scroll-mt-28">
+            <h1 class="text-surface-50 mb-6 text-3xl font-bold">
+              {{ t('common.terms_of_service') }}
+            </h1>
             <div
               id="top"
               class="border-surface-700/50 mb-8 flex items-center justify-between border-b pb-4"

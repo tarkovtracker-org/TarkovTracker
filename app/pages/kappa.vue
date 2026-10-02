@@ -8,9 +8,9 @@
           <UIcon name="i-mdi-trophy" class="text-kappa h-5 w-5" />
         </span>
         <div>
-          <h1 class="light:text-surface-50 text-2xl font-bold text-white">
+          <h2 class="light:text-surface-50 text-2xl font-bold text-white">
             {{ t('page.kappa.title') }}
-          </h1>
+          </h2>
           <p class="text-surface-400 text-sm">
             {{ t('page.kappa.subtitle') }}
           </p>
@@ -160,9 +160,5 @@
     set: (val: KappaTabKey) => {
       activeTab.value = val;
     },
-  });
-  useSeoMeta({
-    title: () => t('page.kappa.title'),
-    description: () => t('page.kappa.subtitle'),
   });
 </script>

@@ -5,11 +5,6 @@
     middleware: ['admin'],
   });
   const { t } = useI18n({ useScope: 'global' });
-  const metaTitle = computed(() => t('common.admin_panel'));
-  useSeoMeta({
-    title: metaTitle,
-    robots: 'noindex, nofollow',
-  });
   const { $supabase } = useNuxtApp();
   const router = useRouter();
   const { systemStore, hasInitiallyLoaded, loadError } = useSystemStoreWithSupabase();
