@@ -8,7 +8,8 @@ const escapeHtml = (value: string): string =>
 /** Client documents do not run Vue setup; give their initial HTML the same metadata. */
 export default defineNitroPlugin((nitroApp) => {
   nitroApp.hooks.hook('render:html', (html, { event }) => {
-    const path = event.path.split('?')[0] ?? '/';
+    const rawPath = event.path.split(/[?#]/)[0] ?? '/';
+    const path = rawPath.replace(/\/+$/, '') || '/';
     if (PUBLIC_SEO_ROUTES.includes(path)) return;
     const head = createRouteSeoHead(path);
     html.head.push(

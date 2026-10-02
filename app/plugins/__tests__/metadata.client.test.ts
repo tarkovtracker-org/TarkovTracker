@@ -2,7 +2,10 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { reactive } from 'vue';
+import { createApp, reactive, ref } from 'vue';
+import { STORAGE_KEYS } from '@/utils/storageKeys';
+import { serializeUserScopedStorage } from '@/utils/userScopedStorage';
+import { applyPlugins, createNuxtApp } from '#app/nuxt';
 const toastAdd = vi.fn();
 const routeState = reactive({
   path: '/tasks',
@@ -44,16 +47,60 @@ describe('metadata plugin', () => {
   });
   afterEach(() => {
     vi.unstubAllEnvs();
+    localStorage.clear();
+  });
+  it('resolves asynchronous browser locale before the first metadata initialization', async () => {
+    Object.defineProperty(window.navigator, 'language', {
+      configurable: true,
+      value: 'de-DE',
+    });
+    localStorage.setItem(
+      STORAGE_KEYS.preferences,
+      serializeUserScopedStorage({ localeOverride: null }, null)
+    );
+    const locale = ref('en');
+    let finishLocaleLoad!: () => void;
+    const localeLoad = new Promise<void>((resolve) => {
+      finishLocaleLoad = resolve;
+    });
+    const initializedLocales: string[] = [];
+    const setLocale = vi.fn(async (selectedLocale: string) => {
+      await localeLoad;
+      locale.value = selectedLocale;
+    });
+    metadataStoreMock.initialize.mockImplementation(async () => {
+      initializedLocales.push(locale.value);
+    });
+    const metadataPlugin = (await import('@/plugins/metadata.client')).default;
+    const localePlugin = (await import('@/plugins/i18n.client')).default;
+    const vueApp = createApp({ render: () => null });
+    const nuxtApp = createNuxtApp({ vueApp });
+    nuxtApp.provide('i18n', { global: { locale, setLocale } });
+    nuxtApp.provide('supabase', { user: { id: null } });
+    // Supply metadata first to reproduce its normal position before the post i18n plugin.
+    await applyPlugins(nuxtApp, [metadataPlugin, localePlugin]);
+    expect(setLocale).not.toHaveBeenCalled();
+    expect(locale.value).toBe('en');
+    expect(metadataStoreMock.initialize).not.toHaveBeenCalled();
+    const mounted = nuxtApp.hooks.callHook('app:mounted', vueApp);
+    await flushPromises();
+    expect(setLocale).toHaveBeenCalledWith('de');
+    expect(metadataStoreMock.initialize).not.toHaveBeenCalled();
+    finishLocaleLoad();
+    await mounted;
+    await flushPromises();
+    expect(initializedLocales).toEqual(['de']);
+    nuxtApp._scope.stop();
   });
   it('retries metadata initialization after a previous failure', async () => {
     metadataStoreMock.initialize.mockResolvedValue(undefined);
     const plugin = (await import('@/plugins/metadata.client')).default;
     const hooks = new Map<string, () => void>();
-    plugin({
+    plugin.setup?.({
       hook(name: string, callback: () => void) {
         hooks.set(name, callback);
       },
-    } as Parameters<typeof plugin>[0]);
+    } as Parameters<NonNullable<typeof plugin.setup>>[0]);
     hooks.get('app:mounted')?.();
     await flushPromises();
     expect(metadataStoreMock.initialize).toHaveBeenCalled();
@@ -63,11 +110,11 @@ describe('metadata plugin', () => {
     metadataStoreMock.initialize.mockResolvedValue(undefined);
     const plugin = (await import('@/plugins/metadata.client')).default;
     const hooks = new Map<string, () => void>();
-    plugin({
+    plugin.setup?.({
       hook(name: string, callback: () => void) {
         hooks.set(name, callback);
       },
-    } as Parameters<typeof plugin>[0]);
+    } as Parameters<NonNullable<typeof plugin.setup>>[0]);
     await flushPromises();
     expect(metadataStoreMock.initialize).not.toHaveBeenCalled();
     hooks.get('app:mounted')?.();
@@ -79,11 +126,11 @@ describe('metadata plugin', () => {
     metadataStoreMock.initialize.mockResolvedValue(undefined);
     const plugin = (await import('@/plugins/metadata.client')).default;
     const hooks = new Map<string, () => void>();
-    plugin({
+    plugin.setup?.({
       hook(name: string, callback: () => void) {
         hooks.set(name, callback);
       },
-    } as Parameters<typeof plugin>[0]);
+    } as Parameters<NonNullable<typeof plugin.setup>>[0]);
     metadataStoreMock.initialize.mockClear();
     hooks.get('app:mounted')?.();
     await flushPromises();
@@ -99,6 +146,8 @@ describe('metadata plugin', () => {
     ['/not-found'],
     ['/auth/callback'],
     ['/oauth/twitch'],
+    ['/resources'],
+    ['/resources/tarkovmonitor'],
     ['/changelog/2024'],
   ])('skips initialization for skip-list path %s', async (path) => {
     await runPluginForPath(path);
