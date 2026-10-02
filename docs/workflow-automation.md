@@ -41,7 +41,7 @@ consumers, owning docs, scoped instructions, candidate tests grouped by runner, 
 checks.
 
 Candidate test entries are JSON records with `executable` and `args`, including in text output.
-Directly targeted tests and tests in the diff are included even when they have no importers.
+Directly targeted tests and existing tests in the diff are included even when they have no importers.
 They are data to review, not shell commands to paste or concatenate. Pass arguments separately
 to a runner that does not use a shell; Windows command shims such as `pnpm.cmd` need a trusted
 platform-specific launcher. Relative file operands start with `./` to avoid runner options;

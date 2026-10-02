@@ -279,7 +279,8 @@ const nearbyTests = (analyses, testFiles) =>
   );
 /** Changed/targeted tests plus tests that import, text-match, neighbor, or transitively reach targets. */
 function candidateTests(io, analyses, seeds) {
-  const direct = unique([...seeds.filter(isTestPath), ...directTests(analyses)]);
+  const selected = seeds.filter(isTestPath).filter((file) => io.fileExists?.(file) !== false);
+  const direct = unique([...selected, ...directTests(analyses)]);
   const nearby = without(nearbyTests(analyses, io.listFiles().filter(isTestPath)), direct);
   const reached = unique(analyses.flatMap((analysis) => analysis.transitive)).filter(isTestPath);
   return {

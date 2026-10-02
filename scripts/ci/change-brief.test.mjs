@@ -282,6 +282,17 @@ describe('validationFor', () => {
   });
 });
 describe('buildBrief', () => {
+  it('does not recommend running a test deleted by the diff', async () => {
+    const io = fakeIo();
+    io.fileExists = () => false;
+    const brief = await buildBrief(io, {
+      targets: [],
+      changedPaths: ['app/utils/__tests__/removed.test.ts'],
+      base: 'origin/main',
+    });
+    expect(brief.tests.commands).toEqual([]);
+    expect(brief.unanalyzedChanges).toEqual(['app/utils/__tests__/removed.test.ts']);
+  });
   it('includes test targets and changed tests in candidate commands across all runners', async () => {
     for (const file of [
       'app/utils/__tests__/example.test.ts',

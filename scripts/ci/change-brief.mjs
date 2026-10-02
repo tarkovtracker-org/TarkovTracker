@@ -86,6 +86,7 @@ const io = {
   generated,
   grepFiles: (args, specs) => grep(['-l', ...args], specs),
   grepLines: grep,
+  fileExists: existsSync,
   listFiles: () => git(['ls-files', '-z']).split('\0').filter(Boolean),
   instructionFiles: () => git(['ls-files', '-z', '--', '*AGENTS.md']).split('\0').filter(Boolean),
 };
