@@ -249,7 +249,7 @@ export function useStreamerToolsOverlay() {
     if (!result.error) Object.assign(modeVisibility, result.visibility);
     else {
       visibilityError.value = t(
-        'streamer_tools.visibility_load_failed',
+        'settings.profile_sharing.load_failed',
         'Unable to load sharing settings.'
       );
       logger.error('[StreamerToolsOverlay] Failed to load profile visibility:', {

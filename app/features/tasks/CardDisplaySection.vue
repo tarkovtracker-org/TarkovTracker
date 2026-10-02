@@ -56,9 +56,7 @@
       >
         <UCheckbox id="task-settings-collapse-default" v-model="taskCollapseDefaultModel" />
         <span class="text-surface-200 text-sm">
-          {{
-            t('page.tasks.settings.appearance.collapse_by_default', 'Collapse Quests by Default')
-          }}
+          {{ t('settings.interface.tasks.collapse_by_default', 'Collapse Quests by Default') }}
         </span>
       </label>
       <label
@@ -67,7 +65,7 @@
       >
         <UCheckbox id="task-settings-hide-rewards" v-model="hideTaskRewardsModel" />
         <span class="text-surface-200 text-sm">
-          {{ t('page.tasks.settings.appearance.hide_rewards', 'Hide Rewards') }}
+          {{ t('settings.interface.tasks.hide_rewards', 'Hide Rewards') }}
         </span>
       </label>
     </div>

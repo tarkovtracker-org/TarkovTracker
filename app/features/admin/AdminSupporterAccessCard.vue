@@ -30,7 +30,7 @@
     const code = getAdminErrorCode(error);
     return code
       ? t(ADMIN_ERROR_LOCALE_KEYS[code], 'Could not update supporter access.')
-      : t('admin.supporter_override_failed_description');
+      : t('admin.error.supporter_update_failed');
   };
   const applySupporterOverride = async () => {
     if (!canSave.value) return;

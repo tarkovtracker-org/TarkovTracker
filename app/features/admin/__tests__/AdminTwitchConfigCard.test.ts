@@ -138,6 +138,24 @@ describe('AdminTwitchConfigCard', () => {
       expect.objectContaining({ color: 'error', description: 'admin.error.invalid_channel' })
     );
   });
+  it('uses the surviving translated error key for an unclassified save failure', async () => {
+    vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    fetchMock.mockImplementation((url: string) =>
+      url === '/api/twitch/config'
+        ? Promise.resolve({ channel: 'streamer', displayName: 'Streamer', enabled: true })
+        : Promise.reject(new Error('offline'))
+    );
+    const wrapper = mountCard();
+    await flushPromises();
+    await wrapper.find('button').trigger('click');
+    await flushPromises();
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        color: 'error',
+        description: 'admin.error.twitch_config_update_failed',
+      })
+    );
+  });
   it('reports and logs a load failure separately from a save failure', async () => {
     const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const error = new Error('offline');

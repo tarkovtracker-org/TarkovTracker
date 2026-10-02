@@ -73,7 +73,7 @@ describe('TeamMembers', () => {
       mockTeamUrl.value,
       expect.objectContaining({ revealValue: false, shouldNotify: expect.any(Function) })
     );
-    expect(wrapper.find('[aria-live="polite"]').text()).toContain('page.team.members.copied');
+    expect(wrapper.find('[aria-live="polite"]').text()).toContain('page.team.invite.copied');
     mockCopyToClipboard.mockResolvedValueOnce(false);
     await wrapper.find('[data-testid="copy-team-members-invite"]').trigger('click');
     await flushPromises();

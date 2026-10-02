@@ -67,7 +67,7 @@
     if (code) {
       return t(ADMIN_ERROR_LOCALE_KEYS[code], 'Could not update Twitch config.');
     }
-    return t('admin.twitch_config_failed_description', 'Could not update Twitch config.');
+    return t('admin.error.twitch_config_update_failed', 'Could not update Twitch config.');
   };
   const showSaveResult = (saved: TwitchConfigSaveResult): void => {
     if (saved.cacheInvalidated) {

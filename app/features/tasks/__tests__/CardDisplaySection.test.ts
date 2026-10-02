@@ -37,8 +37,8 @@ describe('CardDisplaySection', () => {
     const wrapper = createWrapper();
     expect(wrapper.find('#task-settings-collapse-default').exists()).toBe(true);
     expect(wrapper.find('#task-settings-hide-rewards').exists()).toBe(true);
-    expect(wrapper.text()).toContain('page.tasks.settings.appearance.collapse_by_default');
-    expect(wrapper.text()).toContain('page.tasks.settings.appearance.hide_rewards');
+    expect(wrapper.text()).toContain('settings.interface.tasks.collapse_by_default');
+    expect(wrapper.text()).toContain('settings.interface.tasks.hide_rewards');
   });
   it('associates compact option labels with their checkboxes', () => {
     const wrapper = createWrapper();
