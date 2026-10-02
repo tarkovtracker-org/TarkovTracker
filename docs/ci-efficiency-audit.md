@@ -85,6 +85,12 @@ runner consumption or use summed parallel jobs as wall-clock savings.
 
 ## Prioritized tranche and acceptance
 
+Baseline initial queue delay was 3–4 seconds. Security Scan logs for #1005 and baseline
+main confirm package-cache hits on the same lockfile key; their installs still took
+16.1 and 16.9 seconds and restored 1,482 packages. Cache behavior for the other four
+samples was not individually inspected. Thus this opportunity exists even with a warm
+package cache; cold-cache savings are not measured.
+
 1. Remove unnecessary cache restoration and frozen workspace installation from non-scheduled
    Security Scan setup. Audit commands already copy only package.json and pnpm-lock.yaml to
    a clean temporary directory. Runtime and integrity-verified pnpm activation remain;
@@ -100,6 +106,45 @@ The Security workflow supplies false for CI calls and true for its standalone sc
 
 Acceptance requires a successful candidate Actions run with all security operations present,
 lower measured Security Scan setup/job duration, successful workflow lint and aggregate,
-and no selected-check regression. Historical setup duration is an opportunity, not a claim
-of saved workflow time. Candidate execution measurements and limits will be recorded before
-this PR becomes ready. No manual production dispatches, stress runs, or settings changes.
+and no selected-check regression. No manual production dispatches, stress runs, or settings
+changes were used.
+
+## Candidate execution
+
+[CI 36950472241](https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/36950472241),
+attempt 1 at `0390cd949f394ba251a37bbd27a8d9bacce38e2a`, completed successfully. Security
+Scan took **20 seconds**, including **7 seconds** of project setup. Both audits, Gitleaks
+canary/repository scan, CodeQL, all four test shards, workflow tests, pinned actionlint/online
+zizmor, and CI Result succeeded. Logs show the exact verified pnpm pin, runtime-only input,
+and no package-cache restoration or workspace install in Security Scan.
+
+Against six baseline observations (median Security Scan 45 seconds; median setup 29.5 seconds),
+this one candidate observation is 25 seconds (55.6%) shorter in the scanner and 22.5 seconds
+shorter in setup. That is measured job execution evidence, not a sum of theoretically skipped
+jobs. It corresponds to 0.417 fewer runner minutes for this component against the historical
+median. The small, non-random sample does not establish a statistical effect or a fleet saving.
+
+The full candidate run recorded **185 seconds** from run creation to last job completion,
+**182 seconds** of job span, **3 seconds** initial queue delay, and **19.42 summed runner
+minutes. The baseline-main observation was 206 seconds, 202 seconds, 4 seconds, and 20.53
+minutes respectively. Those whole-run differences include test/cache/scheduling variance
+and are not attributed to this setup change. The scanner was not on the full CI critical path;
+no repeatable wall-clock improvement is claimed.
+
+Docs-only post-change CI and a standalone weekly run have not been measured. Docs PRs use
+the same unconditional Security Scan invocation; the expected component saving there is a
+projection. Weekly installation behavior is preserved by deterministic workflow tests.
+The baseline docs run's measured event-to-completion wall time was 130 seconds, rather than
+the 131-second completion-metadata proxy. Job totals exclude PR Checks and external services.
+
+Local verification: all 221 workflow/Codex-guard tests pass on Linux Node 24.19.0; full Prettier
+patterns, blank lines, design lint, Nuxt prepare, repository ESLint, Fallow, and systems drift
+pass on Node 24.21.0/pnpm 11.14.0. Local actionlint 1.7.12 and checksum-verified offline zizmor
+1.30.1 pass; the candidate CI additionally passed its pinned online tools. Windows wrappers
+required direct formatter invocation; Bash/symlink workflow fixtures passed in Linux instead.
+Commit hooks were replaced by those explicit checks. Local CodeRabbit review remains incomplete:
+automatic approval review rejected third-party code transmission under this task's guarded
+remote-review authorization. No workaround or direct named-agent request was made.
+
+The final evidence-only commit receives normal CI before readiness; its exact head and results
+belong in the PR description to avoid another commit solely to embed its own hash.
