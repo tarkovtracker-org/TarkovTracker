@@ -567,6 +567,7 @@ const needsOwnershipPersist = (local: LocalProgress, resolved: UserState | null)
 const loadStartupProgress = async (ctx: StartupLoadContext): Promise<StartupLoadResult> => {
   const local = resolveLocalProgress(ctx);
   if (!local) return FAILED;
+  progressStorageSerializer.retainBaseline(ctx.userId, local.state);
   logger.debug('[TarkovStore] Initial load starting...', {
     userId: ctx.userId,
     hasLocalProgress: local.hasProgress,

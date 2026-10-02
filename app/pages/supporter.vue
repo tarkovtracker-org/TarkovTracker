@@ -10,36 +10,52 @@
         </p>
       </header>
       <SupporterStatusBanner />
-      <section
-        aria-labelledby="account-retention-title"
-        class="border-surface-700/50 bg-surface-900/60 text-surface-300 rounded-2xl border p-5 sm:p-6"
+      <nav
+        :aria-label="t('page.supporter.policies_title')"
+        class="flex flex-wrap justify-center gap-4 text-sm"
       >
-        <h2 id="account-retention-title" class="text-surface-50 mb-4 text-lg font-semibold">
-          {{ t('page.account_retention.title') }}
-        </h2>
-        <AccountRetentionPolicy />
-        <nav class="mt-4 flex flex-wrap gap-4">
-          <NuxtLink to="/terms-of-service#privacy" class="text-link underline">
-            {{ t('common.terms_of_service') }}
-          </NuxtLink>
-          <NuxtLink to="/privacy" class="text-link underline">
-            {{ t('common.privacy_policy') }}
-          </NuxtLink>
-        </nav>
-      </section>
+        <NuxtLink to="/terms-of-service#supporter" class="text-link underline">
+          {{ t('common.terms_of_service') }}
+        </NuxtLink>
+        <NuxtLink to="/privacy" class="text-link underline">
+          {{ t('common.privacy_policy') }}
+        </NuxtLink>
+      </nav>
       <div id="tiers" class="flex justify-center">
         <SupporterBillingToggle v-model="interval" />
       </div>
+      <p class="text-surface-400 text-center text-sm">
+        {{ t('page.supporter.billing_summary') }}
+      </p>
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <SupporterTierCard v-for="tier in TIERS" :key="tier.id" :tier="tier" :interval="interval" />
       </div>
       <SupporterOneTime />
       <SupporterAltPayments />
+      <section
+        aria-labelledby="supporter-policies-title"
+        class="border-surface-700/50 bg-surface-900/60 text-surface-300 space-y-4 rounded-2xl border p-5 text-sm sm:p-6"
+      >
+        <h2 id="supporter-policies-title" class="text-surface-50 text-lg font-semibold">
+          {{ t('page.supporter.policies_title') }}
+        </h2>
+        <p>{{ t('page.supporter.terms_summary') }}</p>
+        <NuxtLink to="/terms-of-service#refunds" class="text-link inline-block underline">
+          {{ t('page.supporter.payment_terms_link') }}
+        </NuxtLink>
+        <p>{{ t('page.supporter.retention_summary') }}</p>
+        <NuxtLink to="/terms-of-service#privacy" class="text-link inline-block underline">
+          {{ t('page.supporter.retention_terms_link') }}
+        </NuxtLink>
+        <p>{{ t('page.supporter.privacy_summary') }}</p>
+        <NuxtLink to="/privacy" class="text-link inline-block underline">
+          {{ t('common.privacy_policy') }}
+        </NuxtLink>
+      </section>
     </div>
   </div>
 </template>
 <script setup lang="ts">
-  import AccountRetentionPolicy from '@/components/AccountRetentionPolicy.vue';
   import { useSupporter } from '@/composables/useSupporter';
   import SupporterAltPayments from '@/features/supporter/SupporterAltPayments.vue';
   import SupporterBillingToggle from '@/features/supporter/SupporterBillingToggle.vue';
