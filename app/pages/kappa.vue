@@ -7,24 +7,24 @@
       :content="false"
       color="neutral"
       size="md"
-      class="mb-3 w-fit"
+      class="mb-3 w-fit max-w-full"
       :ui="{
         list: 'gap-0 rounded-lg border border-white/[0.08] bg-surface-900/60 p-0.5',
         indicator: 'rounded-md bg-white/[0.08]',
         trigger:
-          'relative px-4 py-2 text-sm font-medium transition-colors rounded-md data-[state=active]:text-white light:data-[state=active]:text-surface-50',
+          'relative px-3 py-2 text-sm font-medium transition-colors rounded-md sm:px-4 data-[state=active]:text-white light:data-[state=active]:text-surface-50',
       }"
     >
       <template #default="{ item }">
         <div class="flex items-center gap-2">
           <UIcon
             :name="item.iconName"
-            class="h-4 w-4"
+            class="hidden h-4 w-4 shrink-0 sm:block"
             :class="item.value === 'kappa' ? 'text-kappa-400' : 'text-lightkeeper-400'"
           />
-          <span>{{ item.label }}</span>
+          <span class="truncate">{{ item.label }}</span>
           <span
-            class="inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums"
+            class="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums"
             :class="
               item.value === 'kappa'
                 ? 'bg-warning-500/20 text-warning-300'

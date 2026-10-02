@@ -6,7 +6,7 @@
         description="Last Updated: September 29, 2026"
         class="mb-12"
       />
-      <div class="space-y-12">
+      <div class="space-y-12 wrap-break-word">
         <!-- INTRODUCTION -->
         <section>
           <h2 class="mb-4 text-2xl font-bold">1. Introduction</h2>
