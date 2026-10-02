@@ -24,10 +24,6 @@ const translations: Record<string, string> = {
   'page.dashboard.focus.heading.closest_unlock': 'Closest unlock: {task}',
   'page.dashboard.focus.heading.continue': 'Continue {task}',
   'page.dashboard.focus.heading.start': 'Start {task}',
-  'page.dashboard.focus.proof.blocked_level_one': 'Closest unlock: only 1 level away.',
-  'page.dashboard.focus.proof.blocked_level_other': 'Closest unlock: only {count} levels away.',
-  'page.dashboard.focus.proof.blocked_trader_unlock':
-    'Closest unlock: finish {task} to unlock {trader}.',
   'page.dashboard.focus.proof.ready_other': 'Best available: {count} objectives left.',
   'page.dashboard.focus.proof.complete': 'No visible work remains in this dashboard scope.',
   'page.dashboard.focus.proof.impact_one': 'Highest payoff: opens 1 follow-up task.',
@@ -40,14 +36,8 @@ const translations: Record<string, string> = {
   'page.dashboard.focus.stat.secondary_empty': 'This is the clearest next step right now.',
   'page.dashboard.focus.stat.status': 'Status',
   'page.dashboard.focus.stat.why': 'Why it won',
-  'page.dashboard.focus.status.level_other': 'Reach level {required} ({count} more levels to go).',
   'page.dashboard.focus.status.ready_other': 'Ready now. {count} objectives left.',
-  'page.dashboard.focus.status.trader_unlock': 'Complete {task} to unlock {trader}.',
   'page.dashboard.focus.summary.blocked_requirement': '{task} is blocked by its requirements.',
-  'page.dashboard.focus.summary.blocked_trader_unlock':
-    '{task} is blocked until a trader unlock is complete.',
-  'page.dashboard.focus.summary.blocked_level_other':
-    '{task} is your closest unlock, but you still need {count} more levels.',
   'page.dashboard.focus.summary.impact':
     '{task} has the biggest downstream payoff in your current queue.',
   'page.dashboard.focus.title.blocked': 'Nothing is ready right now',

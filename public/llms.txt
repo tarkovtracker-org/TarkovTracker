@@ -4,7 +4,7 @@
 
 TarkovTracker is a browser application with optional account sync and team collaboration. Private account, settings, authentication, team, and profile pages are not indexable.
 
-UI locales: `cs`, `de`, `en`, `es`, `fr`, `it`, `ko`, `pl`, `pt`, `ru`, `uk`, `zh`.
+UI locales: `cs`, `de`, `en`, `es`, `fr`, `it`, `ja`, `ko`, `pl`, `pt`, `ru`, `uk`, `zh`.
 
 Authentication-required areas include `/account`, `/profile`, `/team`, `/settings`, and authenticated team APIs.
 

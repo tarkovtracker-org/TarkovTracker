@@ -121,10 +121,13 @@ describe('i18n-ready plugin', () => {
     await runMountHooks();
     expect(setLocale).toHaveBeenCalledWith('de');
   });
-  it('falls back to english when the browser locale is not supported by the UI', async () => {
+  it.each([
+    ['Japanese', 'ja-JP', 'ja'],
+    ['an unsupported language', 'ar-SA', 'en'],
+  ])('initializes %s browser locales correctly', async (_label, language, expected) => {
     Object.defineProperty(window.navigator, 'language', {
       configurable: true,
-      value: 'ja-JP',
+      value: language,
     });
     const setLocale = vi.fn();
     const plugin = (await import('@/plugins/i18n.client')).default;
@@ -143,6 +146,6 @@ describe('i18n-ready plugin', () => {
     } as unknown as Parameters<NonNullable<typeof plugin.setup>>[0]);
     expect(setLocale).not.toHaveBeenCalled();
     await runMountHooks();
-    expect(setLocale).toHaveBeenCalledWith('en');
+    expect(setLocale).toHaveBeenCalledWith(expected);
   });
 });

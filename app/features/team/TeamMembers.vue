@@ -32,7 +32,7 @@
             @click="copyInvite"
           >
             <span aria-live="polite">
-              {{ copied ? $t('page.team.members.copied') : $t('page.team.members.copy_invite') }}
+              {{ copied ? $t('page.team.invite.copied') : $t('page.team.members.copy_invite') }}
             </span>
           </UButton>
         </div>

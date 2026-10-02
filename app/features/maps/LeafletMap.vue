@@ -823,7 +823,7 @@
       },
       {
         key: 'team',
-        label: t('maps.legend.team'),
+        label: t('common.team'),
         color: mapColors.value.TEAM_OBJECTIVE,
         isOn: mapShowTeamObjectives.value,
         toggle: () => {

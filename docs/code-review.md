@@ -88,7 +88,8 @@ Verify every diff against the invariants in the root `AGENTS.md`, plus:
 - **Where:** `app/locales/`, `app/i18n.config.ts`
 - **Check:** Fallback locale is `en`. Missing non-English keys render English
   automatically — do not copy English into non-English files. Key names are
-  snake_case (`pnpm run i18n:check` is fatal for violations). `t('key', 'Fallback')`
+  snake_case. `pnpm run i18n:check` is fatal for naming violations, broken locales, and
+  `en.json` keys unused in `app/`; it never fails on untranslated keys. `t('key', 'Fallback')`
   calls must have fallback strings. New user-facing strings must add the key to
   `en.json` only; Crowdin handles propagation.
 

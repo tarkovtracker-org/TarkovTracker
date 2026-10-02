@@ -64,7 +64,7 @@ describe('about page', () => {
   it('renders team, partners, and help sections with semantic headings', async () => {
     const wrapper = await mountAbout();
     expect(wrapper.get('h1').text()).toBe('page.about.title');
-    expect(wrapper.get('section#team h2').text()).toBe('page.about.team.heading');
+    expect(wrapper.get('section#team h2').text()).toBe('common.team');
     expect(wrapper.get('section#partners h2').text()).toBe('page.about.partners.heading');
     expect(wrapper.get('section#help h2').text()).toBe('page.about.help.heading');
     const groups = wrapper.findAll('[data-testid="member-group"]');

@@ -531,6 +531,44 @@ reconnect, and reload. Verify no saved progress is lost or resurrected, retained
 and resumed saves succeed. Frontend rollback remains compatible with these additive migrations;
 preserve applied migrations.
 
+### Normalized PvP/PvE progress backfill (#1028)
+
+`20261002090000_side_effect_free_mode_progress_backfill.sql` ships the helper only; running it is
+separately approved operational maintenance under the rules above. The helper writes only rows whose
+legacy payload has a numeric level while the normalized row is missing or has none. It never locks
+or rewrites materialized rows; repairing a placeholder takes its row lock. It keeps source timestamps,
+records unknown freshness, and records no
+account activity, so retention deadlines and pending inactivity deletions are unchanged.
+
+1. Measure remaining work per range with the completion gate (read-only):
+
+   ```sql
+   SELECT game_mode, count(*) FROM private.unmaterialized_mode_progress(
+     '00000000-0000-0000-0000-000000000000', '01000000-0000-0000-0000-000000000000')
+   GROUP BY game_mode;
+   ```
+
+2. Run one range per SQL Editor operation so each commits on its own. Start with a two-hex-digit
+   range (`00…`–`01…`) to measure duration, then widen only while it stays well under the timeout.
+   The last range passes `NULL` as the upper bound.
+
+   ```sql
+   BEGIN;
+   SET LOCAL statement_timeout = '60s';
+   SELECT private.backfill_game_mode_progress_range(
+     '00000000-0000-0000-0000-000000000000', '01000000-0000-0000-0000-000000000000');
+   COMMIT;
+   ```
+
+   The transaction-local timeout cannot leak into later maintenance. The helper sets
+   `lock_timeout = '2s'`; a range that meets a live write fails and rolls back whole. If an error
+   leaves the session in an aborted transaction, run `ROLLBACK;` before retrying. Re-run the range
+   later; completed rows are no-ops.
+
+3. Record each completed range in the change log and stop on rising latency, CPU, lock waits, or
+   I/O pressure.
+4. Remove fallback reads only after the gate returns zero rows for both modes across every range.
+
 ### Manual activity history rollout
 
 Apply `20260910050000_add_manual_activity_history_to_progress` and
