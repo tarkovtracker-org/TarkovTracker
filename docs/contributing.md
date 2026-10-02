@@ -9,7 +9,7 @@ contribution workflow overview (issues, branches, labels, project board), see
 
 ### Prerequisites
 
-- **Node.js** >= 24.19.0
+- **Node.js** >= 24.21.0
 - **pnpm** 11.14.0 (via Corepack; matches `packageManager` in `package.json`)
 - **Git**
 
