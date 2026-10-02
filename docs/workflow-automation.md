@@ -52,6 +52,8 @@ computed references and relative fragments still require confirmation.
 Database replay is required for affected SQL paths; Edge Function tests use Deno without an
 automatic database replay. JSON retains every owning-doc anchor. Text caps documents and anchors
 at twelve entries, marking omitted entries and directing readers to JSON for the complete list.
+Generic entrypoints named `index`, `main`, or `mod` use full-path doc matches to avoid unrelated
+field-name references.
 They are data to review, not shell commands to paste or concatenate. Pass arguments separately
 to a runner that does not use a shell; Windows command shims such as `pnpm.cmd` need a trusted
 platform-specific launcher. Relative file operands start with `./` to avoid runner options;

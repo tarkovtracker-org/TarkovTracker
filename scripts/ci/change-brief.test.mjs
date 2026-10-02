@@ -110,6 +110,21 @@ describe('generated Nuxt declarations', () => {
 });
 describe('path helpers', () => {
   it.each([
+    'DeviceDataCard.vue',
+    '__tests__/DeviceDataCard.test.ts',
+    'AccountDeletionCard.vue',
+    '__tests__/AccountDeletionCard.test.ts',
+    '__tests__/AccountDeletionCard.deviceRemoval.test.ts',
+    'ApiTokens.vue',
+    'ApiTokensCard.vue',
+    '__tests__/ApiTokens.test.ts',
+    '__tests__/ApiTokensCard.test.ts',
+  ])('includes lifecycle instructions for the tracked settings file %s', (file) => {
+    expect(
+      scopedInstructions([`app/features/settings/${file}`], ['AGENTS.md', 'supabase/AGENTS.md'])
+    ).toContain('supabase/AGENTS.md');
+  });
+  it.each([
     ['supabase/functions/example/index.ts', false],
     ['supabase/functions/_shared/example.deno.test.ts', false],
     ['supabase/functions/_shared/example.ts', false],
@@ -587,6 +602,38 @@ describe('buildBrief', () => {
     expect(brief.tests.commands[0].executable).toBe('deno');
     expect(brief.validation.scoped).toEqual([]);
   });
+  it.each(['index', 'main', 'mod'])(
+    'uses path-only doc ownership for the generic %s entrypoint',
+    async (name) => {
+      const file = `supabase/functions/team-create/${name}.ts`;
+      const io = fakeIo({ reports: { [file]: trace([]) } });
+      io.grepLines = (args, specs) => {
+        if (!specs.includes('*.md')) return [];
+        const marker = String.fromCharCode(96);
+        const genericTerm = marker + name + marker;
+        const exactPath = args.includes(file) ? [`docs/team.md:20:${file}`] : [];
+        return args.includes(genericTerm)
+          ? [...exactPath, 'docs/unrelated.md:10:unrelated field']
+          : exactPath;
+      };
+      const brief = await buildBrief(io, { targets: [{ file }] });
+      expect(brief.docs).toEqual([{ file: 'docs/team.md', lines: [20] }]);
+    }
+  );
+  it.each(['target', 'diff', 'target-and-diff'])(
+    'includes device-data lifecycle scope for a %s request',
+    async (mode) => {
+      const file = 'app/features/settings/__tests__/DeviceDataCard.test.ts';
+      const io = fakeIo({ reports: { [file]: trace([]) } });
+      io.instructionFiles = () => ['AGENTS.md', 'supabase/AGENTS.md'];
+      const brief = await buildBrief(io, {
+        targets: mode === 'diff' ? [] : [{ file }],
+        changedPaths: mode === 'target' ? [] : [file],
+      });
+      expect(brief.instructions).toContain('supabase/AGENTS.md');
+      expect(brief.tests.direct).toEqual([file]);
+    }
+  );
   it('reports symbol direct consumers, scoped instructions, and path references', async () => {
     const io = fakeIo({
       reports: {
