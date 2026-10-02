@@ -14,7 +14,7 @@ type FilterParamBase<T> = {
 export type FilterParamConfig<T> = FilterParamBase<T> &
   ([T] extends [string] ? Partial<FilterParamCodec<T>> : FilterParamCodec<T>);
 type ResolvedFilterParamConfig<T> = Required<FilterParamBase<T>> & FilterParamCodec<T>;
-type FilterParamConfigs<TMap extends Record<string, unknown>> = {
+export type FilterParamConfigs<TMap extends Record<string, unknown>> = {
   [K in keyof TMap]: FilterParamConfig<TMap[K]>;
 };
 type ResolvedFilterParamConfigs<TMap extends Record<string, unknown>> = {
@@ -94,17 +94,13 @@ const parseQuery = <TMap extends Record<string, unknown>>(
   }
   return { values, hasAnyParam };
 };
-export function useRouteFilters<TMap extends Record<string, unknown>>(
-  options: UseRouteFiltersOptions<TMap>
-): UseRouteFiltersReturn {
-  const route = useRoute();
-  const router = useRouter();
-  const { onRouteToStore, onStoreToRoute, watchSources } = options;
-  const configs = resolveConfigs(options.configs);
-  const isSyncingFromRoute = ref(false);
-  const isSyncingToRoute = ref(false);
-  const hasInitialized = ref(false);
-  const syncRoute = (nextQuery: LocationQueryRaw, useReplace = false) => {
+const createRouteSyncer =
+  (
+    route: ReturnType<typeof useRoute>,
+    router: ReturnType<typeof useRouter>,
+    isSyncingToRoute: Ref<boolean>
+  ) =>
+  (nextQuery: LocationQueryRaw, useReplace = false) => {
     if (isSyncingToRoute.value) return;
     if (normalizeQuery(route.query) === normalizeQuery(nextQuery)) return;
     isSyncingToRoute.value = true;
@@ -117,53 +113,57 @@ export function useRouteFilters<TMap extends Record<string, unknown>>(
         isSyncingToRoute.value = false;
       });
   };
+const createDebounced = (fn: () => void, delayMs: number) => {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  const cancel = () => {
+    if (timeout) clearTimeout(timeout);
+    timeout = null;
+  };
+  const run = () => {
+    cancel();
+    timeout = setTimeout(() => {
+      timeout = null;
+      fn();
+    }, delayMs);
+  };
+  return { run, cancel };
+};
+export function useRouteFilters<TMap extends Record<string, unknown>>(
+  options: UseRouteFiltersOptions<TMap>
+): UseRouteFiltersReturn {
+  const route = useRoute();
+  const { onRouteToStore, onStoreToRoute, watchSources } = options;
+  const configs = resolveConfigs(options.configs);
+  const isSyncingFromRoute = ref(false);
+  const isSyncingToRoute = ref(false);
+  const hasInitialized = ref(false);
+  const syncRoute = createRouteSyncer(route, useRouter(), isSyncingToRoute);
+  const syncStoreToRoute = (useReplace = false) => {
+    syncRoute(buildQuery(route.query, configs, onStoreToRoute()), useReplace);
+  };
   const syncStateFromRoute = () => {
     if (isSyncingToRoute.value) return;
     const { values, hasAnyParam } = parseQuery(route.query, configs);
     if (!hasInitialized.value) {
       hasInitialized.value = true;
-      if (!hasAnyParam) {
-        const storeValues = onStoreToRoute();
-        syncRoute(buildQuery(route.query, configs, storeValues), true);
-        return;
-      }
+      if (!hasAnyParam) return syncStoreToRoute(true);
     }
     isSyncingFromRoute.value = true;
     onRouteToStore(values);
     isSyncingFromRoute.value = false;
   };
-  let syncTimeout: ReturnType<typeof setTimeout> | null = null;
-  const debouncedSyncStateFromRoute = () => {
-    if (syncTimeout) clearTimeout(syncTimeout);
-    syncTimeout = setTimeout(() => {
-      syncTimeout = null;
-      syncStateFromRoute();
-    }, 200);
-  };
-  onBeforeUnmount(() => {
-    if (syncTimeout) {
-      clearTimeout(syncTimeout);
-      syncTimeout = null;
-    }
-  });
-  const queryWatchSources = Object.keys(configs).map((configKey) => {
-    const config = configs[configKey as keyof TMap];
-    return () => route.query[config.key];
-  });
+  const debouncedSync = createDebounced(syncStateFromRoute, 200);
+  onBeforeUnmount(debouncedSync.cancel);
   watch(
-    queryWatchSources,
-    () => {
-      debouncedSyncStateFromRoute();
-    },
+    Object.values(configs).map((config) => () => route.query[config.key]),
+    debouncedSync.run,
     { immediate: true }
   );
   if (watchSources.length > 0) {
     watch(
       watchSources,
       () => {
-        if (isSyncingFromRoute.value) return;
-        const storeValues = onStoreToRoute();
-        syncRoute(buildQuery(route.query, configs, storeValues));
+        if (!isSyncingFromRoute.value) syncStoreToRoute();
       },
       { flush: 'post' }
     );

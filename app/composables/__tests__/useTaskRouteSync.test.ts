@@ -198,4 +198,26 @@ describe('useTaskRouteSync', () => {
     expect(routeState.query.status).toBe('all');
     wrapper.unmount();
   });
+  it('falls back to the first trader and syncs sort params from the route', async () => {
+    applyRouteQuery({ view: 'traders', trader: 'unknown', sort: 'alphabetical', sortDir: 'asc' });
+    const maps = ref<TarkovMap[]>([]);
+    const traders = ref<Trader[]>([
+      { id: 'trader-1', name: 'Trader One' } as Trader,
+      { id: 'trader-2', name: 'Trader Two' } as Trader,
+    ]);
+    const { useTaskRouteSync } = await import('@/composables/useTaskRouteSync');
+    const TestHarness = defineComponent({
+      setup() {
+        useTaskRouteSync({ maps, traders });
+        return () => h('div');
+      },
+    });
+    const wrapper = mount(TestHarness);
+    await flushRouteSync();
+    expect(setTaskTraderView).toHaveBeenCalledWith('trader-1');
+    expect(setTaskSortMode).toHaveBeenCalledWith('alphabetical');
+    expect(setTaskSortDirection).toHaveBeenCalledWith('asc');
+    expect(setTaskMapView).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
 });
