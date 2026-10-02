@@ -35,6 +35,14 @@ const mountPage = async () => {
   });
 };
 describe('supporter return flow', () => {
+  it('cancels return polling when navigating away', async () => {
+    vi.useFakeTimers();
+    const wrapper = await mountPage();
+    expect(fetchStatus).toHaveBeenCalledExactlyOnceWith('test-user');
+    wrapper.unmount();
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(fetchStatus).toHaveBeenCalledTimes(1);
+  });
   it('refreshes the current account once and polls only a still-authenticated account', async () => {
     vi.useFakeTimers();
     const wrapper = await mountPage();

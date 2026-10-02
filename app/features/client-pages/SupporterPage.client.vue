@@ -30,6 +30,7 @@
   const { $supabase } = useNuxtApp();
   const { fetchStatus } = useSupporter();
   const interval = ref<BillingInterval>('monthly');
+  let returnRefreshTimeout: number | undefined;
   const refreshSupporterStatus = () => {
     const userId = $supabase.user?.id;
     if (userId) void fetchStatus(userId);
@@ -37,8 +38,11 @@
   const refreshSupporterStatusAfterReturn = () => {
     if (!$supabase.user?.id) return;
     refreshSupporterStatus();
-    window.setTimeout(refreshSupporterStatus, 3000);
+    returnRefreshTimeout = window.setTimeout(refreshSupporterStatus, 3000);
   };
+  onBeforeUnmount(() => {
+    window.clearTimeout(returnRefreshTimeout);
+  });
   const showThanks = (isOneTime: boolean) => {
     toast.add({
       title: isOneTime
