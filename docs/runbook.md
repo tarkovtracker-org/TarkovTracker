@@ -533,7 +533,8 @@ preserve applied migrations.
 `20261002090000_side_effect_free_mode_progress_backfill.sql` ships the helper only; running it is
 separately approved operational maintenance under the rules above. The helper writes only rows whose
 legacy payload has a numeric level while the normalized row is missing or has none. It never locks
-or rewrites normalized rows, keeps source timestamps, records unknown freshness, and records no
+or rewrites materialized rows; repairing a placeholder takes its row lock. It keeps source timestamps,
+records unknown freshness, and records no
 account activity, so retention deadlines and pending inactivity deletions are unchanged.
 
 1. Measure remaining work per range with the completion gate (read-only):

@@ -171,7 +171,8 @@ Teams, save status and recovery, and progress imports build on this storage; see
   preference is logged and treated as "not shared"; it never discards normalized visibility that
   loaded successfully. Optional operational backfill only fills rows whose `progress_data` carries no
   `level`, so it cannot overwrite a write that landed first and never changes `profile_public` on an
-  existing row. It inserts with `ON CONFLICT DO NOTHING` so normalized rows are never locked, and it
+  existing row. Missing rows use `ON CONFLICT DO NOTHING`; materialized rows are skipped without
+  row locks, while placeholder repairs lock and recheck the level after any concurrent write. It
   never counts as account activity for inactivity cleanup. The fallbacks stay until the gate reports
   zero rows for both modes.
 - `merge_progress_data` seeds an unmaterialized persistent row from its legacy column inside the same
