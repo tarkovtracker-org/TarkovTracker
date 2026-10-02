@@ -8,6 +8,40 @@ import {
   workflowStep,
 } from './helpers/workflow-blocks.mjs';
 const read = (path) => readFileSync(path, 'utf8');
+test('security audits need only the pinned runtime; scheduled outdated checks retain installation', () => {
+  const setup = read('.github/actions/setup-project/action.yml');
+  const steps = setup.replace(/^ {4}- /gm, '      - ');
+  assert.match(setup, /install-dependencies:[\s\S]*?default: 'true'/);
+  // Only an explicit false opts out; omitted or unknown input values keep full setup.
+  const conditions = setup.match(/if: inputs.install-dependencies != 'false'/g) || [];
+  assert.equal(conditions.length, 2);
+  assert.match(
+    setup,
+    /uses: actions\/setup-node@[a-f0-9]{40}[^\n]*\n {6}if: inputs.install-dependencies != 'false'\n[\s\S]*?cache: pnpm/
+  );
+  assert.match(
+    workflowStep(steps, 'Install dependencies'),
+    /if: inputs.install-dependencies != 'false'/
+  );
+  assert.doesNotMatch(workflowStep(steps, 'Activate packageManager'), /if:/);
+  assert.match(
+    workflowStep(steps, 'Activate packageManager'),
+    /bash scripts\/setup\/ensure-pnpm.sh/
+  );
+  const scan = jobBlock(read('.github/workflows/security.yml'), 'security-scan');
+  assert.match(scan, /install-dependencies: \$\{\{ github.event_name == 'schedule' \}\}/);
+  assert.match(
+    workflowStep(scan, 'Check for outdated dependencies'),
+    /if: github.event_name == 'schedule'/
+  );
+  const prepare = workflowStep(scan, 'Prepare pnpm audit workspace');
+  assert.match(prepare, /cp pnpm-lock.yaml package.json "\$audit_dir\/"/);
+  for (const name of ['Audit production dependencies', 'Audit all dependencies (informational)']) {
+    const audit = workflowStep(scan, name);
+    assert.match(audit, /working-directory: \$\{\{ steps.prepare-audit.outputs.audit_dir \}\}/);
+    assert.doesNotMatch(audit, /^\s+if:/m);
+  }
+});
 test('security is a reusable workflow with only the weekly schedule as a standalone trigger', () => {
   const security = read('.github/workflows/security.yml');
   workflowEvent(security, 'workflow_call');
