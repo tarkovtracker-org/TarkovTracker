@@ -153,6 +153,7 @@
   const loginLink = '/login?redirect=/supporter';
   onMounted(async () => {
     try {
+      await $supabase.ready();
       const { data } = await $supabase.client.auth.getUser();
       currentUserId.value = data?.user?.id ?? null;
     } catch (err) {
