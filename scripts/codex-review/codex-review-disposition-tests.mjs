@@ -166,24 +166,23 @@ test('edited or removed request invalidates a persisted disposition', (t) => {
     );
   }
 });
-test('receipt publication is complete, restricted, exclusive and cleans temporary files', (t) => {
-  const context = fixture(t);
-  const path = join(context.stateDirectory, 'receipt.json');
+test('receipt publication is restricted to its owner', (t) => {
+  const path = join(fixture(t).stateDirectory, 'restricted.json');
   publishReceipt(path, { original: true });
-  assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), { original: true });
   const descriptor = openSync(path, 'r');
   try {
     assert.equal(fstatSync(descriptor).mode & 0o777, 0o600);
   } finally {
     closeSync(descriptor);
   }
+});
+test('receipt publication is complete, exclusive and cleans temporary files', (t) => {
+  const context = fixture(t);
+  const path = join(context.stateDirectory, 'receipt.json');
+  publishReceipt(path, { original: true });
+  assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), { original: true });
   assert.throws(() => publishReceipt(path, { replacement: true }), { code: 'EEXIST' });
-  const retained = openSync(path, 'r');
-  try {
-    assert.deepEqual(JSON.parse(readFileSync(retained, 'utf8')), { original: true });
-  } finally {
-    closeSync(retained);
-  }
+  assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), { original: true });
   assert.deepEqual(readdirSync(context.stateDirectory), ['receipt.json']);
 });
 test('disposition flags require complete evidence and cannot combine with a request', () => {
