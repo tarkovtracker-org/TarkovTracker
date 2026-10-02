@@ -13,20 +13,15 @@ Complete workflow automation setup for TarkovTracker with CI/CD pipelines, quali
 - Pre-commit hooks for code quality
 - Dependency update automation via Dependabot
 - Conservative auto-merge for low-risk Dependabot updates
-- CodeRabbit is the routine reviewer; Codex is reserved for requested fallback or risky pre-merge reviews. The policy adopted on 2026-09-29 calls for disabling Codex automatic reviews in the dashboard. Verify that setting separately; repository configuration does not prove dashboard state.
+- CodeRabbit as the routine reviewer; Codex only on request (see Reviewer settings below)
 
 ## Agent validation and review
 
-`package.json` defines commands; the root `AGENTS.md` defines required validation and review, and
-path-scoped `supabase/AGENTS.md` and `workers/api-gateway/AGENTS.md` add area-specific rules.
-[`code-review.md`](./code-review.md) supplements that contract with risk areas, without requiring
-the full suite for unrelated changes. Worktree setup and the shared CI setup action use `scripts/setup/ensure-pnpm.sh` to
-verify pnpm against `packageManager`, preparing its complete integrity-qualified pin even when the installed version matches.
-
-Run focused checks while implementing, then required checks after the diff stabilizes. Record the
-commit, dirty worktree state, commands, and results in the PR summary. Invalidate affected results
-when their inputs change. Batch substantiated corrections; defer unrelated cleanup and optional
-style suggestions.
+`package.json` defines commands; the root `AGENTS.md` (Validation, Workflow and review) and the
+path-scoped `AGENTS.md` files own required validation and review.
+[`code-review.md`](./code-review.md) adds risk areas without requiring the full suite for unrelated changes. Worktree setup and the
+shared CI setup action use `scripts/setup/ensure-pnpm.sh` to verify pnpm against `packageManager`,
+preparing its complete integrity-qualified pin even when the installed version matches.
 
 ### Discovery brief
 
@@ -98,115 +93,29 @@ discovery context, not end-to-end task time.
 
 ### Push cadence
 
-The root `AGENTS.md` owns review requirements and exceptions. Commit freely while implementing,
-then validate the stabilized diff, run one local review for executable changes when available,
-address validated findings together, and push one batch. Address a whole PR review round before
-pushing the next correction batch. Reuse evidence for unchanged inputs; substantial new behavior
-or unresolved significant findings warrant another review.
+Batching pushes and requesting Codex only exceptionally keep reviewer allowances in budget: PR #965
+reportedly drew over 20 Codex reviews across about 45 pushes. CodeRabbit CLI and PR reviews have
+separate rolling [allowances](https://docs.coderabbit.ai/management/plans).
 
-The maintainer reported that PR #965 received over 20 Codex reviews across about 45 pushes and
-consumed about 40% of a weekly Codex allowance. These are reported estimates, not a verified usage
-measurement. Batching pushes and requesting Codex only exceptionally aim to reduce that usage.
-
-CodeRabbit CLI and PR reviews have separate rolling allowances; both are limited. See
-[CodeRabbit's current limits](https://docs.coderabbit.ai/management/plans). Rate limits allow continued
-implementation, local commits, and useful validated batch pushes, with missing review recorded as
-incomplete. Required review still gates merge; do not enable paid over-limit reviews without approval.
-
-TarkovTracker disables CodeRabbit automatic incremental reviews in `.coderabbit.yaml`. After
-substantial follow-up changes, request `@coderabbitai review` before merge unless recorded local or
-independent review covers the final changes. Record the reviewed base and head, and assess later
-changes rather than relying on an earlier green check. Codex requests use the guard below.
+Reviews attach to the PR's own diff. The `Main CI freshness` ruleset (below) blocks merging a behind
+branch until it incorporates current main (`gh pr update-branch <PR>`); that update reruns
+`CI Result` and `Preview Result` on the new head. Reuse review evidence for an unchanged diff after
+assessing integration with changed base code; a conflict-free merge alone does not establish that
+validation inputs or behavior are unchanged. Follow the root review policy for affected checks and
+re-review triggers. Do not pause other merges for freshness. Repo auto-merge is disabled, so a
+maintainer-authorized merge still needs someone to merge once the refreshed checks pass.
 
 ### Codex request deduplication and waiting
 
-Agents must use `node scripts/codex-review/codex-review.mjs <PR> --wait-seconds 600` to inspect and wait for
-reviews. Add `--request` only when authorized to post a review request. Use `--repo owner/name`
-when the PR belongs to another repository. Do not post raw `@codex review` comments or issue a
-second request because a polling window expired. Batch corrections before requesting a review.
-Only observed code-review completion exits successfully; pending, unreviewed, or uncertain status
-exits nonzero. A successful exit confirms review completion, not merge readiness.
-
-Authorized `--request` invocations also collapse original review commands after a verified eyes
-reaction from `chatgpt-codex-connector[bot]` or explicit matching code-review completion. This
-uses GraphQL `minimizeComment` with `RESOLVED` and the original node ID; findings and result
-comments remain visible. Summary-only completion with unknown findings does not authorize
-cleanup. Cosmetic failures warn without changing guard decisions, locks, quiet periods or
-completion evidence. Plain status/wait invocations remain read-only. Add `--collapse-requests`
-when authorized to clean up existing manually posted commands while observing status.
-
-After an authorized request's polling window ends, continue this command-cleanup workflow with
-`node scripts/codex-review/codex-review.mjs <PR> --collapse-requests --wait-seconds 600`.
-Omit `--request`: continuation observes the existing review and collapses commands acknowledged
-or completed later without requesting another review. This also covers eligible manually posted
-commands, which do not need a wrapper marker. Use plain `--wait-seconds 600` for intentionally
-read-only inspection; it does not collapse late acknowledgements or completion.
-
-GitHub's [issue_comment activity types](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#issue_comment)
-do not include reactions, so cleanup uses the existing bounded polling loop rather than inventing
-a reaction event. Commands posted outside that loop, or acknowledged after it ends, require a
-later authorized cleanup invocation. No new background workflow, credential or permission is
-added. A per-invocation cache removes repeat cleanup calls after success. The
-[cleanup regression benchmark](../scripts/codex-review/codex-review-collapse-tests.mjs)
-owns the API budget and local compute measurements. Network latency and token savings are
-unmeasured.
-
-The guard checks live PR review evidence, waits for outstanding requests, and reuses completed
-code reviews for the current commit. Security-review completion alone is not code-review
-completion. A report's top-level security heading or dedicated leading marker identifies a security report; quoted
-security headings inside a code review do not exclude that review. Completion requires an exact full commit identity: abbreviated bot evidence is
-resolved through GitHub's commit endpoint, and ambiguous or unavailable resolution fails closed.
-The PR head, base branch, base SHA, and eligibility are refreshed after collecting evidence;
-head or base changes during collection fail closed. Completion reuse only establishes a review
-for the head commit, not coverage of the current base or diff. After retargeting, independently
-review the current diff through the production-readiness gate before merging. A completed code review can contain findings; the normal feedback-resolution gate
-still applies. Unknown or unavailable status must be reported as incomplete, never treated as
-permission to retry. An unreviewed PR must be quiet for five minutes after creation or its latest
-update before requesting, allowing automatic review to start after opening, pushing, or marking ready.
-This grace period uses the final PR response's GitHub `Date` header, never the local wall clock;
-missing or invalid server time fails closed. Only a literal first-line `@codex review` command
-from a GitHub `OWNER`, `MEMBER`, or `COLLABORATOR` association counts as request evidence;
-prose mentions, fenced examples, indented code, and outsider markers do not. This trusts GitHub's
-association metadata for coordination; it does not grant permission to post a request. Running
-bot activity remains authoritative regardless of who triggered it.
-
-Request invocations share a lock and durable intent in the Git common directory across local
-worktrees. Repository identity is case-insensitive, including previously saved intents under a
-different casing. Intent is saved before posting, so an ambiguous network failure cannot cause the next
-invocation to blindly post again. Inspect GitHub and the recorded intent before manual recovery;
-agents must not delete the guard state to force another request.
-
-A successful post records GitHub's request timestamp, so request/completion ordering never
-compares the local clock with the server clock. When delivery is uncertain, a matching current
-commit completion can retire the local intent; absence of that evidence remains pending.
-SHA-marked requests for older commits do not block the current commit, while unmarked requests
-require a completion of the current commit at or after the request time. Equality is accepted
-because GitHub timestamps have second precision and exact-commit completion is reusable;
-bot activity still marked running continues to block a new request.
-
-The helper recovers a request lock only when complete owner metadata identifies this host and
-a PID confirmed dead (`ESRCH`). Live PIDs, permission errors, foreign hosts, missing or malformed
-metadata, and an interrupted recovery remain blocked. Lock age never authorizes removal.
-For a lock left between directory creation and metadata writing (or an interrupted recovery),
-an operator must inspect the lock, running processes and GitHub request evidence, ensure no
-request invocation can run concurrently, and remove only the confirmed orphaned lock directory
-or its `.recovery` sibling. Preserve all intent files and rerun read-only inspection before an
-authorized request. Agents must report this condition for operator recovery rather than deleting
-uncertain state themselves.
-
-This is a cooperative agent guard, not a GitHub-wide restriction: unrelated clones, other machines,
-and callers that bypass the helper do not share the local lock. Existing GitHub requests are still
-checked, but GitHub comment creation has no atomic deduplication key. A server-side single request
-owner would be needed to eliminate that cross-machine race. The helper itself neither merges PRs
-nor resolves findings.
-
-GitHub also offers no atomic head condition on comment creation: a push after the final PR read
-can race the POST. The request marker records the observed head; it does not pin the revision the
-bot ultimately reviews. Always inspect fresh exact-head completion and checks before merging.
+`scripts/codex-review/codex-review.mjs` deduplicates Codex review requests across local worktrees
+and waits for exact-commit completion. Usage rules live in the root `AGENTS.md`; guard semantics,
+lock recovery, and command cleanup live in
+[`scripts/codex-review/README.md`](../scripts/codex-review/README.md).
 
 ### Reviewer settings: external verification pending
 
-1. Verify automatic Codex reviews are disabled in the repository/dashboard settings.
+1. Verify automatic Codex reviews are disabled in the repository/dashboard settings (policy
+   adopted 2026-09-29; repository configuration does not prove dashboard state).
 2. Keep automatic initial CodeRabbit reviews enabled and incremental reviews disabled as configured
    in `.coderabbit.yaml`. Verify exclusions on translation-only and mixed translation/code PRs.
 3. Retain manual reviewer access. Record representative PR links and observed dashboard settings;

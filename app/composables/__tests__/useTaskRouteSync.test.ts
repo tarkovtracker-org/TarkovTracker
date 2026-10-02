@@ -1,8 +1,9 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { computed, defineComponent, h, isRef, nextTick, reactive, ref } from 'vue';
+import { computed, defineComponent, h, isRef, nextTick, reactive, ref, watch } from 'vue';
 import type { TarkovMap, Trader } from '@/types/tarkov';
+import type { Ref } from 'vue';
 type QueryRecord = Record<string, string | undefined>;
 type RouteState = {
   query: QueryRecord;
@@ -70,6 +71,28 @@ const flushRouteSync = async () => {
   await vi.advanceTimersByTimeAsync(200);
   await nextTick();
 };
+const mountWithTraderFallback = async (traders: Ref<Trader[]>) => {
+  const { useTaskRouteSync } = await import('@/composables/useTaskRouteSync');
+  const TestHarness = defineComponent({
+    setup() {
+      watch(
+        [() => storeState.taskPrimaryView, traders, () => storeState.taskTraderView],
+        ([view, list, selected]) => {
+          if (view !== 'traders' || list.some((t) => t.id === selected)) return;
+          if (list[0]) setTaskTraderView(list[0].id);
+        },
+        { immediate: true }
+      );
+      useTaskRouteSync({ maps: ref<TarkovMap[]>([]), traders });
+      return () => h('div');
+    },
+  });
+  return mount(TestHarness);
+};
+const loadedTraders = [
+  { id: 'trader-1', name: 'One' } as Trader,
+  { id: 'trader-2', name: 'Two' } as Trader,
+];
 describe('useTaskRouteSync', () => {
   beforeEach(async () => {
     vi.useFakeTimers();
@@ -196,6 +219,104 @@ describe('useTaskRouteSync', () => {
     expect(setTaskSecondaryView).not.toHaveBeenCalled();
     expect(storeState.taskSecondaryView).toBe('available');
     expect(routeState.query.status).toBe('all');
+    wrapper.unmount();
+  });
+  it('falls back to the first trader and syncs sort params from the route', async () => {
+    applyRouteQuery({ view: 'traders', trader: 'unknown', sort: 'alphabetical', sortDir: 'asc' });
+    const maps = ref<TarkovMap[]>([]);
+    const traders = ref<Trader[]>([
+      { id: 'trader-1', name: 'Trader One' } as Trader,
+      { id: 'trader-2', name: 'Trader Two' } as Trader,
+    ]);
+    const { useTaskRouteSync } = await import('@/composables/useTaskRouteSync');
+    const TestHarness = defineComponent({
+      setup() {
+        useTaskRouteSync({ maps, traders });
+        return () => h('div');
+      },
+    });
+    const wrapper = mount(TestHarness);
+    await flushRouteSync();
+    expect(setTaskTraderView).toHaveBeenCalledWith('trader-1');
+    expect(setTaskSortMode).toHaveBeenCalledWith('alphabetical');
+    expect(setTaskSortDirection).toHaveBeenCalledWith('asc');
+    expect(setTaskMapView).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('preserves pending trader query until traders load', async () => {
+    applyRouteQuery({ view: 'traders', trader: 'trader-2' });
+    const maps = ref<TarkovMap[]>([]);
+    const traders = ref<Trader[]>([]);
+    const { useTaskRouteSync } = await import('@/composables/useTaskRouteSync');
+    const TestHarness = defineComponent({
+      setup() {
+        useTaskRouteSync({ maps, traders });
+        return () => h('div');
+      },
+    });
+    const wrapper = mount(TestHarness);
+    await flushRouteSync();
+    expect(setTaskTraderView).not.toHaveBeenCalled();
+    expect(routeState.query.trader).toBe('trader-2');
+    expect(loggerMock.debug).toHaveBeenCalledWith(
+      '[useTaskRouteSync] Delaying trader sync until traders loaded.'
+    );
+    traders.value = [
+      { id: 'trader-1', name: 'Trader One' } as Trader,
+      { id: 'trader-2', name: 'Trader Two' } as Trader,
+    ];
+    await nextTick();
+    await flushRouteSync();
+    expect(setTaskTraderView).toHaveBeenCalledWith('trader-2');
+    expect(routeState.query.trader).toBe('trader-2');
+    wrapper.unmount();
+  });
+  it('applies a pending non-first map query once maps load', async () => {
+    applyRouteQuery({ view: 'maps', map: 'map-2' });
+    const maps = ref<TarkovMap[]>([]);
+    const traders = ref<Trader[]>([]);
+    const { useTaskRouteSync } = await import('@/composables/useTaskRouteSync');
+    const TestHarness = defineComponent({
+      setup() {
+        useTaskRouteSync({ maps, traders });
+        return () => h('div');
+      },
+    });
+    const wrapper = mount(TestHarness);
+    await flushRouteSync();
+    maps.value = [
+      { id: 'map-1', name: 'Map One' } as TarkovMap,
+      { id: 'map-2', name: 'Map Two' } as TarkovMap,
+    ];
+    await nextTick();
+    await flushRouteSync();
+    expect(setTaskMapView).toHaveBeenCalledTimes(1);
+    expect(setTaskMapView).toHaveBeenCalledWith('map-2');
+    expect(routeState.query.map).toBe('map-2');
+    wrapper.unmount();
+  });
+  it('keeps a pending trader deep link when another watcher selects a fallback trader', async () => {
+    applyRouteQuery({ view: 'traders', trader: 'trader-2' });
+    const traders = ref<Trader[]>([]);
+    const wrapper = await mountWithTraderFallback(traders);
+    await flushRouteSync();
+    traders.value = loadedTraders;
+    await nextTick();
+    await flushRouteSync();
+    expect(storeState.taskTraderView).toBe('trader-2');
+    expect(routeState.query.trader).toBe('trader-2');
+    wrapper.unmount();
+  });
+  it('syncs the fallback trader to the route when the deep-linked trader is unknown', async () => {
+    applyRouteQuery({ view: 'traders', trader: 'missing' });
+    const traders = ref<Trader[]>([]);
+    const wrapper = await mountWithTraderFallback(traders);
+    await flushRouteSync();
+    traders.value = loadedTraders;
+    await nextTick();
+    await flushRouteSync();
+    expect(storeState.taskTraderView).toBe('trader-1');
+    expect(routeState.query.trader).toBe('trader-1');
     wrapper.unmount();
   });
 });
