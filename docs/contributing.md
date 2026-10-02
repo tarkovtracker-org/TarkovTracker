@@ -79,6 +79,10 @@ source — do not duplicate its rules here. Key reminders for new contributors:
 
 ## Pull request process
 
+For automatic ready-PR previews, draft pauses, stop commands and fork approvals, see the
+[preview system spec](systems/previews.md). Mark an ordinary same-repository PR ready after
+validation; successful current CI requests its preview without another command.
+
 ### Branching strategy
 
 Create a branch named with a type prefix and a short description:

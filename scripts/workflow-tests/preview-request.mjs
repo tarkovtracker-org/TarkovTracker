@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
+import { countApiCalls } from './helpers/api-count.mjs';
 import {
   PreviewRequestDenied,
   requestPreviewFromComment,
   previewRequestMessage,
+  minimizePreviewCommand,
 } from '../preview/comment-request.mjs';
 import {
   previewRolloutStart,
@@ -38,6 +42,8 @@ function fixture(options = {}) {
     head_repository: { full_name: 'example/tracker' },
     status: 'completed',
     conclusion: 'success',
+    run_attempt: 1,
+    updated_at: '2026-09-27T00:00:00Z',
     pull_requests: [{ number: 42, head: { sha: HEAD }, base: { sha: BASE } }],
     ...options.run,
   };
@@ -70,7 +76,7 @@ function fixture(options = {}) {
       },
       checks: { listForRef: 'checks' },
     },
-    paginate: async (endpoint) => {
+    paginate: async (endpoint, params) => {
       if (endpoint === 'files') return options.files ?? [{ filename: 'app/a.ts' }];
       if (endpoint === 'checks') return [check];
       throw new Error(`Unexpected endpoint ${endpoint}`);
@@ -92,10 +98,14 @@ function fixture(options = {}) {
   const originalPaginate = github.paginate;
   github.paginate = async (endpoint, params) => {
     if (endpoint === 'comments') return options.comments ?? [context.payload.comment];
+    if (params.workflow_id === 'preview.yml') return activePreviewRuns(options, params.status);
     return originalPaginate(endpoint, params);
   };
   github.graphql = commentEditTimesGraphql(options.comments ?? [context.payload.comment]);
   return { github, context, calls };
+}
+function activePreviewRuns(options, status) {
+  return (options.previewRuns ?? []).filter((item) => item.status === status);
 }
 test('maintainer command dispatches the current successful PR CI run without an id', async () => {
   const f = fixture();
@@ -112,9 +122,161 @@ test('maintainer command dispatches the current successful PR CI run without an 
       ...REPO,
       workflow_id: 'preview.yml',
       ref: 'main',
-      inputs: { run_id: String(RUN_ID), request_comment_id: '1' },
+      inputs: { run_id: String(RUN_ID), request_comment_id: '1', ci_attempt: '1' },
     },
   ]);
+});
+test('repeated accepted commands preserve active CI previews and terminal failures can retry', async () => {
+  const active = {
+    path: '.github/workflows/preview.yml',
+    event: 'workflow_dispatch',
+    head_branch: 'main',
+    display_title: `Preview CI ${RUN_ID} request 1`,
+    created_at: '2026-09-27T00:00:01Z',
+    status: 'in_progress',
+  };
+  for (const status of ['queued', 'in_progress', 'waiting', 'pending', 'requested']) {
+    const f = fixture({
+      previewRuns: [{ ...active, status }],
+      comments: [comment(1), comment(2)],
+      payload: { comment: comment(2) },
+    });
+    assert.equal((await requestPreviewFromComment(f)).ciRunId, RUN_ID);
+    assert.equal(f.calls.length, 0);
+  }
+  const retry = fixture({
+    previewRuns: [{ ...active, status: 'completed', conclusion: 'failure' }],
+  });
+  await requestPreviewFromComment(retry);
+  assert.equal(retry.calls.length, 1);
+});
+test(
+  'benchmark duplicate manual commands against verified main',
+  { skip: !process.env.PREVIEW_BASELINE_ROOT },
+  async () => {
+    const baseline = await import(
+      pathToFileURL(join(process.env.PREVIEW_BASELINE_ROOT, 'scripts/preview/comment-request.mjs'))
+    );
+    for (const [label, requester] of [
+      ['main', baseline.requestPreviewFromComment],
+      ['candidate', requestPreviewFromComment],
+    ]) {
+      const active = [];
+      const comments = [comment(1)];
+      const f = fixture({ previewRuns: active, comments });
+      const counts = countApiCalls(f.github);
+      await requester(f);
+      active.push({
+        path: '.github/workflows/preview.yml',
+        event: 'workflow_dispatch',
+        head_branch: 'main',
+        display_title: `Preview CI ${RUN_ID} request 1`,
+        created_at: '2026-09-27T00:00:01Z',
+        status: 'in_progress',
+      });
+      const times = [];
+      for (let sample = 0; sample < 20; sample += 1) {
+        const command = comment(sample + 2);
+        comments.push(command);
+        f.context.payload.comment = command;
+        const start = performance.now();
+        await requester(f);
+        times.push(performance.now() - start);
+      }
+      times.sort((a, b) => a - b);
+      console.log(
+        JSON.stringify({
+          benchmark: 'repeated-manual-command',
+          version: label,
+          commands: 21,
+          previewDispatches: f.calls.length,
+          extraCiBuildRequests: 0,
+          apiCalls: counts.total,
+          medianControllerMs: Number(times[10].toFixed(3)),
+          p95ControllerMs: Number(times[18].toFixed(3)),
+        })
+      );
+    }
+  }
+);
+test('collapsing an accepted command uses its original node ID and is cosmetic', async () => {
+  const f = fixture();
+  f.context.payload.comment.node_id = 'IC_original';
+  const warnings = [];
+  const core = { warning: (message) => warnings.push(message) };
+  let mutations = 0;
+  const original = f.github.graphql;
+  f.github.graphql = async (query, params) => {
+    if (!query.includes('mutation')) return original(query, params);
+    assert.match(query, /classifier: RESOLVED/);
+    assert.equal(params.id, 'IC_original');
+    mutations += 1;
+    return { minimizedComment: { isMinimized: true } };
+  };
+  await requestPreviewFromComment(f);
+  await minimizePreviewCommand({ ...f, core });
+  assert.equal(mutations, 1);
+  assert.equal((await readPreviewRequest(f.github, REPO, 42)).commentId, 1);
+  f.github.graphql = async () => {
+    throw new Error('cosmetic denial');
+  };
+  await minimizePreviewCommand({ ...f, core });
+  assert.equal(warnings.length, 1);
+  assert.equal(f.calls.length, 1);
+});
+test('repeated enable commands preserve a bound grant but stop then resume revokes it', async () => {
+  const enabled = [comment(1), comment(2)];
+  const github = authorizationFixture(enabled);
+  assert.equal((await readPreviewRequest(github, REPO, 42, 1)).commentId, 1);
+  enabled.splice(1, 1, comment(2, '/preview stop'), comment(3));
+  assert.equal((await readPreviewRequest(github, REPO, 42, 1)).enabled, false);
+});
+test('stop then resume replaces an active dispatch bound to the revoked grant', async () => {
+  const f = fixture({
+    comments: [comment(1), comment(2, '/preview stop'), comment(3)],
+    payload: { comment: comment(3) },
+    previewRuns: [
+      {
+        path: '.github/workflows/preview.yml',
+        event: 'workflow_dispatch',
+        head_branch: 'main',
+        display_title: `Preview CI ${RUN_ID} request 1`,
+        created_at: '2026-09-27T00:00:01Z',
+        status: 'in_progress',
+      },
+    ],
+  });
+  await requestPreviewFromComment(f);
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.calls[0].inputs.request_comment_id, '3');
+  assert.equal((await readPreviewRequest(f.github, REPO, 42, 1)).enabled, false);
+});
+test('legacy command dispatches and lost original grants cannot suppress a new command', async () => {
+  for (const original of [
+    null,
+    comment(1, '/preview', { lastEditedAt: PREVIEW_OPT_IN_START }),
+    comment(1, '/preview', { user: { type: 'User', login: 'former' } }),
+  ]) {
+    const f = fixture({
+      comments: [original, comment(2)].filter(Boolean),
+      payload: { comment: comment(2) },
+      previewRuns: [
+        {
+          path: '.github/workflows/preview.yml',
+          event: 'workflow_dispatch',
+          head_branch: 'main',
+          display_title: `Preview CI ${RUN_ID}`,
+          created_at: '2026-09-27T00:00:01Z',
+          status: 'in_progress',
+        },
+      ],
+    });
+    f.github.rest.repos.getCollaboratorPermissionLevel = async ({ username }) => ({
+      data: { role_name: username === 'former' ? 'read' : 'maintain' },
+    });
+    await requestPreviewFromComment(f);
+    assert.equal(f.calls[0].inputs.request_comment_id, '2');
+  }
 });
 test('only exact new PR comments from the actor may request a preview', async () => {
   for (const payload of [
