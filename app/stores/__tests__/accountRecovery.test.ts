@@ -27,7 +27,9 @@ import {
 } from '@/stores/tarkov/storageQuota';
 import { listSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
 import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
+import { sanitizeOwnedUserState } from '@/utils/progressSanitizers';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
+import { mergeTaskAvailability } from '@/utils/taskAvailabilityConfirmation';
 import type { PersistedProgressSnapshot } from '@/stores/tarkov/localStorage';
 vi.mock('@/utils/logger', () => ({
   logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
@@ -57,6 +59,16 @@ const progressEnvelope = (
     data: state,
   });
 const recoveryKey = (userId: string) => `${STORAGE_KEYS.progressRecoveryPrefix}${userId}`;
+const historicalState = () => {
+  const state = structuredClone(defaultState);
+  state.pvp.taskAvailability = Object.fromEntries(
+    Array.from({ length: 66 }, (_, index) => [
+      `s${index + 1}`,
+      { requirements: 'x'.repeat(4000), timestamp: 200 + index },
+    ])
+  );
+  return state;
+};
 const snapshot = (
   timestamp: number | null,
   state = structuredClone(defaultState),
@@ -73,6 +85,132 @@ const snapshot = (
   ...clocks,
 });
 describe('account recovery copies', () => {
+  it.each([
+    ['taskCompletions', true],
+    ['taskCompletions', { complete: true }],
+    ['taskCompletions', { complete: true, failed: false }],
+    ['taskObjectives', { count: 3 }],
+    ['hideoutParts', { count: 3 }],
+  ])('retains identical historical bytes with legacy %s %j', (field, value) => {
+    const state = historicalState();
+    const raw = JSON.stringify({
+      _userId: 'user-1',
+      _timestamp: 500,
+      data: { ...state, pvp: { ...state.pvp, [field as string]: { t: value } } },
+    });
+    expect(saveAccountRecoveryCopy(raw, 'user-1')).toBe(true);
+    expect(saveAccountRecoveryCopy(raw, 'user-1')).toBe(true);
+    expect(localStorage.getItem(recoveryKey('user-1'))).toBe(raw);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(false);
+    expect(saveAccountRecoveryCopy(raw, 'user-2')).toBe(false);
+  });
+  it('preserves unchanged historical bytes for every mode and rejects a different owner', () => {
+    const state = historicalState();
+    state.pve.taskAvailability = state.pvp.taskAvailability;
+    state.seasonal.taskAvailability = state.pvp.taskAvailability;
+    const raw = progressEnvelope('user-1', 500, state);
+    expect(saveAccountRecoveryCopy(raw, 'user-1')).toBe(true);
+    expect(localStorage.getItem(recoveryKey('user-1'))).toBe(raw);
+    expect(saveAccountRecoveryCopy(raw, 'user-1')).toBe(true);
+    const restored = readAccountRecoveryCopy('user-1')!;
+    for (const mode of ['pvp', 'pve', 'seasonal'] as const) {
+      expect(Object.keys(restored.state[mode].taskAvailability!)).toHaveLength(65);
+      expect(Object.keys(restored.confirmationCandidates![mode]!)).toHaveLength(66);
+    }
+    expect(readAccountRecoveryCopy('user-2')).toBeNull();
+    expect(saveAccountRecoveryCopy(raw, 'user-2')).toBe(false);
+    expect(localStorage.getItem(recoveryKey('user-2'))).toBeNull();
+  });
+  it('retains original evidence before a bounded same-owner write and after a reload', () => {
+    const state = historicalState();
+    const raw = progressEnvelope('user-1', 500, state);
+    localStorage.setItem(STORAGE_KEYS.progress, raw);
+    const bounded = progressEnvelope('user-1', 600, sanitizeOwnedUserState(state));
+    expect(persistActiveProgressValue(bounded)).toBe(true);
+    expect(localStorage.getItem(recoveryKey('user-1'))).toBe(raw);
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(bounded);
+    resetAccountRecoveryRetentionBlock();
+    const snapshot = selectFreshestOwnerProgressSnapshot(
+      readAccountRecoveryCopy('user-1'),
+      parsePersistedProgressState(localStorage.getItem(STORAGE_KEYS.progress), 'user-1'),
+      null
+    )!;
+    expect(
+      mergeTaskAvailability(snapshot.confirmationCandidates?.pvp, {
+        s1: { requirements: 'old', timestamp: 0 },
+      })
+    ).not.toHaveProperty('s1');
+  });
+  it('blocks replacement on historical quota failure without losing either owner identity or bytes', () => {
+    const state = historicalState();
+    const raw = progressEnvelope('user-1', 500, state);
+    localStorage.setItem(STORAGE_KEYS.progress, raw);
+    const originalSet = localStorage.setItem.bind(localStorage);
+    const spy = vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+      if (key === recoveryKey('user-1')) throw new DOMException('full', 'QuotaExceededError');
+      originalSet(key, value);
+    });
+    expect(
+      persistActiveProgressValue(progressEnvelope('user-1', 600, sanitizeOwnedUserState(state)))
+    ).toBe(false);
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(raw);
+    expect(localStorage.getItem(recoveryKey('user-1'))).toBeNull();
+    expect(retryBlockedAccountRecoveryRetention('user-2')).toBe(false);
+    spy.mockRestore();
+    expect(retryBlockedAccountRecoveryRetention('user-1')).toBe(true);
+    expect(isAccountRecoveryRetentionBlocked()).toBe(false);
+  });
+  it('leaves divergent originals untouched and permits only their owner to reconcile', () => {
+    const recoveryState = historicalState();
+    recoveryState.pve.level = 7;
+    const activeState = historicalState();
+    activeState.pvp.level = 9;
+    const recovery = progressEnvelope('user-1', 500, recoveryState);
+    const active = progressEnvelope('user-1', 600, activeState);
+    localStorage.setItem(recoveryKey('user-1'), recovery);
+    localStorage.setItem(STORAGE_KEYS.progress, active);
+    expect(saveAccountRecoveryCopy(active, 'user-1')).toBe(false);
+    expect(localStorage.getItem(recoveryKey('user-1'))).toBe(recovery);
+    expect(localStorage.getItem(STORAGE_KEYS.progress)).toBe(active);
+    expect(retryBlockedAccountRecoveryRetention('user-2')).toBe(false);
+    expect(retryBlockedAccountRecoveryRetention('user-1')).toBe(true);
+    const composed = selectFreshestOwnerProgressSnapshot(
+      readAccountRecoveryCopy('user-1'),
+      parsePersistedProgressState(active, 'user-1'),
+      null
+    )!;
+    expect(composed.state.pvp.level).toBe(9);
+    expect(composed.state.pve.level).toBe(7);
+    expect(Object.keys(composed.confirmationCandidates!.pvp!)).toHaveLength(66);
+  });
+  it('persists a bounded equal-clock clear instead of retaining unnecessary historical overflow', () => {
+    const state = historicalState();
+    expect(saveAccountRecoveryCopy(progressEnvelope('user-1', 500, state), 'user-1')).toBe(true);
+    const cleared = structuredClone(defaultState);
+    cleared.pvp.taskAvailability = { s1: { requirements: '', timestamp: 200 } };
+    expect(saveAccountRecoveryCopy(progressEnvelope('user-1', 600, cleared), 'user-1')).toBe(true);
+    const persisted = JSON.parse(localStorage.getItem(recoveryKey('user-1'))!);
+    expect(persisted.data.pvp.taskAvailability.s1).toEqual({ requirements: '', timestamp: 200 });
+    expect(Object.keys(persisted.data.pvp.taskAvailability)).toHaveLength(66);
+    expect(persisted).not.toHaveProperty('confirmationCandidates');
+  });
+  it('retains historical winner evidence through recovery serialization before reconciliation', () => {
+    const state = structuredClone(defaultState);
+    state.pvp.taskAvailability = Object.fromEntries(
+      Array.from({ length: 66 }, (_, index) => [
+        `s${index + 1}`,
+        { requirements: 'x'.repeat(4000), timestamp: 200 + index },
+      ])
+    );
+    const original = state.pvp.taskAvailability;
+    const remote = { s1: { requirements: 'old', timestamp: 0 } };
+    const expected = mergeTaskAvailability(original, remote);
+    expect(expected.s1).toBeUndefined();
+    expect(saveAccountRecoveryCopy(progressEnvelope('user-1', 500, state), 'user-1')).toBe(true);
+    // Read only persisted JSON, as after an owner change or a page reload: no transient context.
+    const persisted = JSON.parse(localStorage.getItem(recoveryKey('user-1'))!);
+    expect(mergeTaskAvailability(persisted.data.pvp.taskAvailability, remote)).toEqual(expected);
+  });
   beforeEach(() => {
     localStorage.clear();
     resetAccountRecoveryRetentionBlock();
