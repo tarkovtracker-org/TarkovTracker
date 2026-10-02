@@ -1,5 +1,16 @@
 BEGIN;
-SELECT plan(23);
+SELECT plan(24);
+
+-- PL/pgSQL checks function privileges once per session, so service_role must be the first caller.
+SET LOCAL session_replication_role = replica;
+INSERT INTO auth.users (id, email) VALUES ('00000000-0000-0000-0000-000000001105', 'service-backfill@example.invalid');
+SET LOCAL session_replication_role = origin;
+SET LOCAL ROLE service_role;
+SELECT lives_ok($$
+  INSERT INTO public.user_game_mode_progress (user_id, game_mode, season_number, progress_data)
+  VALUES ('00000000-0000-0000-0000-000000001105', 'pvp', 0, '{"level":3}')
+$$, 'service_role writes still pass the prepare trigger');
+RESET ROLE;
 
 CREATE TEMP TABLE backfill_fixture (name text PRIMARY KEY, user_id uuid NOT NULL);
 INSERT INTO backfill_fixture VALUES

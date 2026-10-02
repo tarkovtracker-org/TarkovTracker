@@ -14,8 +14,9 @@
 -- WHERE re-checks the level after waiting, so a concurrent real save always wins.
 --
 -- The helper sets tarkovtracker.mode_progress_backfill transaction-locally and restores the prior
--- value before returning; an error reverts it with the aborted (sub)transaction. While set, the prepare trigger keeps the source timestamps and records unknown
--- freshness, and track_account_mutation records no activity. Only the owner can run the helper;
+-- value before returning; an error reverts it with the aborted (sub)transaction. While set, the
+-- prepare trigger keeps the source timestamps and records unknown freshness, and
+-- track_account_mutation records no activity. Only the owner can run the helper;
 -- other sessions never observe the setting.
 CREATE OR REPLACE FUNCTION private.mode_progress_backfill_active()
 RETURNS BOOLEAN
@@ -34,7 +35,9 @@ LANGUAGE plpgsql
 SET search_path = ''
 AS $$
 DECLARE
-  v_backfill BOOLEAN := private.mode_progress_backfill_active();
+  -- Inlined: this invoker trigger also runs for service_role, which cannot execute private helpers.
+  v_backfill BOOLEAN :=
+    COALESCE(current_setting('tarkovtracker.mode_progress_backfill', true), '') = 'on';
 BEGIN
   IF TG_OP = 'UPDATE' THEN
     NEW.progress_data := public.merge_manual_activity_progress(OLD.progress_data, NEW.progress_data);
