@@ -1,22 +1,6 @@
 <template>
   <div class="flex min-h-full flex-col px-3 py-6 sm:px-6 lg:px-10 2xl:px-16">
-    <div class="mb-4">
-      <div class="flex items-center gap-3">
-        <span
-          class="bg-kappa/15 border-kappa/25 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border"
-        >
-          <UIcon name="i-mdi-trophy" class="text-kappa h-5 w-5" />
-        </span>
-        <div>
-          <h2 class="light:text-surface-50 text-2xl font-bold text-white">
-            {{ t('page.kappa.title') }}
-          </h2>
-          <p class="text-surface-400 text-sm">
-            {{ t('page.kappa.subtitle') }}
-          </p>
-        </div>
-      </div>
-    </div>
+    <slot name="header" />
     <UTabs
       v-model="activeTabKey"
       :items="tabItems"
@@ -82,7 +66,7 @@
       </div>
       <div
         v-else-if="lgAndUp"
-        class="-mx-3 flex snap-x scrollbar-thin gap-3 overflow-x-auto px-3 pb-2 lg:-mx-10 lg:px-10"
+        class="-mx-3 flex snap-x scroll-px-3 scrollbar-thin gap-3 overflow-x-auto px-3 pb-2 lg:-mx-10 lg:scroll-px-10 lg:px-10"
       >
         <KappaTraderColumn
           v-for="group in groupedByTraderWithoutFence"

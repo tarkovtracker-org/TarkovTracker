@@ -1,14 +1,7 @@
 <template>
   <div class="font-ui px-4 py-6 sm:px-6 lg:px-8">
     <div class="mx-auto w-full max-w-7xl space-y-8">
-      <header class="space-y-2">
-        <h1 class="text-surface-100 text-2xl font-bold sm:text-3xl">
-          {{ $t('common.team') }}
-        </h1>
-        <p class="text-surface-400 max-w-2xl text-sm leading-6 sm:text-base">
-          {{ $t('page.team.page_description') }}
-        </p>
-      </header>
+      <PageHeader :title="t('common.team')" :description="t('page.team.page_description')" />
       <div v-if="route?.query?.team && route?.query?.code">
         <TeamInvite />
       </div>
@@ -22,6 +15,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import PageHeader from '@/components/ui/PageHeader.vue';
   import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();

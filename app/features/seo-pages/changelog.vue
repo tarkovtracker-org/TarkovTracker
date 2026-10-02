@@ -1,25 +1,27 @@
 <template>
-  <div>
-    <PublicPageIntro
-      :title="t('page.changelog.title')"
-      :description="t('page.changelog.description')"
-    />
-    <NuxtLink
-      to="/"
-      class="text-surface-400 hover:text-primary-400 mx-4 inline-flex items-center gap-1 text-sm transition-colors sm:mx-6"
-    >
-      <UIcon name="i-mdi-arrow-left" class="h-4 w-4" />
-      {{ t('page.changelog.back') }}
-    </NuxtLink>
-    <ClientOnly>
-      <ChangelogPage />
-    </ClientOnly>
-  </div>
+  <ClientOnly>
+    <ChangelogPage>
+      <template #header>
+        <PageHeader v-bind="header" />
+      </template>
+    </ChangelogPage>
+    <template #fallback>
+      <UContainer class="px-4 py-6">
+        <div class="mx-auto w-full max-w-3xl">
+          <PageHeader v-bind="header" />
+        </div>
+      </UContainer>
+    </template>
+  </ClientOnly>
 </template>
 <script setup lang="ts">
-  import PublicPageIntro from '@/components/PublicPageIntro.vue';
+  import PageHeader from '@/components/ui/PageHeader.vue';
   import ChangelogPage from '@/pages/changelog.vue';
   const { t } = useI18n({ useScope: 'global' });
+  const header = computed(() => ({
+    title: t('page.changelog.title'),
+    description: t('page.changelog.description'),
+  }));
   definePageMeta({
     layout: 'default',
   });

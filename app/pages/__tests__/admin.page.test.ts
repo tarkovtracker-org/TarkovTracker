@@ -60,6 +60,7 @@ describe('admin page', () => {
         },
       },
     });
+    expect(wrapper.get('h1').text()).toBe('common.admin_panel');
     expect(wrapper.find('[data-testid="cache-card"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="audit-log"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="supporter-card"]').exists()).toBe(true);

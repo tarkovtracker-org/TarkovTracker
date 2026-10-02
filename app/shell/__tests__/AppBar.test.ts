@@ -39,16 +39,9 @@ const mockPreferencesStore = {
   getLocaleOverride: 'en' as string | null,
   setLocaleOverride: vi.fn(),
 };
-const routeState = reactive({
-  name: 'tasks',
-  params: {} as Record<string, unknown>,
-});
 const mockTarkovStore = {
   getCurrentGameMode: vi.fn(() => 'pvp'),
   getDisplayName: vi.fn(() => ''),
-  getModeDisplayName: vi.fn((): string | null => null),
-  getPvEProgressData: vi.fn((): { displayName: string | null } => ({ displayName: null })),
-  getPvPProgressData: vi.fn((): { displayName: string | null } => ({ displayName: null })),
 };
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
@@ -56,22 +49,7 @@ vi.mock('vue-i18n', async (importOriginal) => ({
     availableLocales: ['en', 'de', 'fr'],
     locale: localeRef,
     setLocale,
-    t: (key: string, params?: Record<string, unknown> | string) => {
-      const templates: Record<string, string> = {
-        'common.pve': 'PVE',
-        'common.pvp': 'PVP',
-        'common.seasonal_pvp': 'SEASONAL PVP',
-        'profile.title_with_mode': '{name} Profile {mode}',
-      };
-      if (params && typeof params === 'object' && !Array.isArray(params)) {
-        const template = templates[key] ?? key;
-        return Object.entries(params).reduce(
-          (result, [k, v]) => result.replaceAll(`{${k}}`, String(v)),
-          template
-        );
-      }
-      return templates[key] ?? key;
-    },
+    t: (key: string) => key,
     te: () => false,
   }),
 }));
@@ -147,9 +125,6 @@ vi.mock('@/utils/logger', () => ({
 mockNuxtImport('useNuxtApp', () => () => ({
   $supabase: mockSupabase,
 }));
-mockNuxtImport('useRoute', () => () => ({
-  ...routeState,
-}));
 mockNuxtImport('useSkillCalculation', () => () => mockSkillCalculation);
 mockNuxtImport('useToast', () => () => mockToast);
 const SelectMenuFixedStub = {
@@ -204,8 +179,6 @@ describe('AppBar locale switching', () => {
   beforeEach(async () => {
     windowWidthRef.value = 1280;
     localeRef.value = 'en';
-    routeState.name = 'tasks';
-    routeState.params = {};
     setLocale.mockClear();
     setLocale.mockImplementation(async (value: string) => {
       localeRef.value = value;
@@ -228,10 +201,6 @@ describe('AppBar locale switching', () => {
     mockTarkovStore.getCurrentGameMode.mockReturnValue('pvp');
     mockTarkovStore.getDisplayName.mockClear();
     mockTarkovStore.getDisplayName.mockReturnValue('');
-    mockTarkovStore.getPvEProgressData.mockClear();
-    mockTarkovStore.getPvEProgressData.mockReturnValue({ displayName: null });
-    mockTarkovStore.getPvPProgressData.mockClear();
-    mockTarkovStore.getPvPProgressData.mockReturnValue({ displayName: null });
     mockSupabase.user.id = '';
     mockSupabase.user.displayName = '';
     mockSupabase.user.username = '';
@@ -437,85 +406,6 @@ describe('AppBar supporter badge', () => {
     supporterTierRef.value = 'supporter';
     const wrapper = await mountAppBar();
     expect(wrapper.text()).toContain('common.supporter');
-    wrapper.unmount();
-  });
-});
-describe('AppBar page title', () => {
-  beforeEach(() => {
-    routeState.name = 'tasks';
-    routeState.params = {};
-    mockPreferencesStore.getStreamerMode = false;
-    mockSupabase.user.id = '';
-    mockSupabase.user.displayName = '';
-    mockSupabase.user.loggedIn = false;
-    mockSupabase.user.username = '';
-    mockTarkovStore.getCurrentGameMode.mockReturnValue('pvp');
-    mockTarkovStore.getDisplayName.mockReturnValue('');
-    mockTarkovStore.getModeDisplayName.mockReturnValue(null);
-    mockTarkovStore.getPvEProgressData.mockReturnValue({ displayName: null });
-    mockTarkovStore.getPvPProgressData.mockReturnValue({ displayName: null });
-  });
-  it('renders profile title with username and route mode for own profile routes', async () => {
-    routeState.name = 'profile-userId-mode';
-    routeState.params = { mode: 'pve', userId: 'user-1' };
-    mockSupabase.user.id = 'user-1';
-    mockSupabase.user.username = 'Alpha';
-    const wrapper = await mountAppBar();
-    expect(wrapper.text()).toContain('Alpha Profile PVE');
-    wrapper.unmount();
-  });
-  it.each([
-    ['tasks', 'common.tasks'],
-    ['hideout', 'common.hideout'],
-    ['team', 'common.team'],
-    ['settings', 'common.settings'],
-    ['storyline', 'common.storyline'],
-    ['credits', 'common.credits'],
-    ['needed-items', 'common.needed_items'],
-    ['kappa', 'common.kappa_lightkeeper'],
-  ])('uses the consolidated title for %s', async (routeName, expectedTitle) => {
-    routeState.name = routeName;
-    const wrapper = await mountAppBar();
-    expect(wrapper.text()).toContain(expectedTitle);
-    wrapper.unmount();
-  });
-  it('renders shared profile title from route user id instead of local progress data', async () => {
-    routeState.name = 'profile-userId-mode';
-    routeState.params = { mode: 'pve', userId: 'shared-user' };
-    mockSupabase.user.id = 'viewer-user';
-    mockTarkovStore.getDisplayName.mockReturnValue('ViewerDisplay');
-    mockTarkovStore.getPvEProgressData.mockReturnValue({ displayName: 'ViewerProgress' });
-    const wrapper = await mountAppBar();
-    expect(wrapper.text()).toContain('shared-user Profile PVE');
-    expect(wrapper.text()).not.toContain('ViewerProgress Profile PVE');
-    expect(wrapper.text()).not.toContain('ViewerDisplay Profile PVE');
-    wrapper.unmount();
-  });
-  it('uses non-streamer fallback label for own profile title when no name resolves', async () => {
-    routeState.name = 'profile-userId-mode';
-    routeState.params = { mode: 'pvp', userId: 'user-1' };
-    mockSupabase.user.id = 'user-1';
-    const wrapper = await mountAppBar();
-    expect(wrapper.text()).toContain('app_bar.user_label Profile PVP');
-    expect(wrapper.text()).not.toContain('app_bar.hidden_label Profile PVP');
-    wrapper.unmount();
-  });
-  it('masks own profile title in streamer mode', async () => {
-    routeState.name = 'profile-userId-mode';
-    routeState.params = { mode: 'pvp', userId: 'user-1' };
-    mockPreferencesStore.getStreamerMode = true;
-    mockSupabase.user.displayName = 'AccountName';
-    mockSupabase.user.id = 'user-1';
-    mockSupabase.user.username = 'AccountUsername';
-    mockTarkovStore.getDisplayName.mockReturnValue('OwnDisplayName');
-    mockTarkovStore.getModeDisplayName.mockReturnValue('OwnProgressName');
-    mockTarkovStore.getPvPProgressData.mockReturnValue({ displayName: 'OwnProgressName' });
-    const wrapper = await mountAppBar();
-    expect(wrapper.text()).toContain('app_bar.hidden_label Profile PVP');
-    expect(wrapper.text()).not.toContain('OwnProgressName Profile PVP');
-    expect(wrapper.text()).not.toContain('OwnDisplayName Profile PVP');
-    expect(wrapper.text()).not.toContain('AccountName Profile PVP');
-    expect(wrapper.text()).not.toContain('AccountUsername Profile PVP');
     wrapper.unmount();
   });
 });

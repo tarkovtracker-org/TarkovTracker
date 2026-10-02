@@ -2,6 +2,7 @@
   <div class="flex min-h-full overflow-x-hidden">
     <div class="min-w-0 flex-1 px-3 py-6 sm:px-6">
       <div class="mx-auto max-w-350">
+        <slot name="header" />
         <TaskLoadingState v-if="isLoading" />
         <div v-else>
           <TaskFilterBar

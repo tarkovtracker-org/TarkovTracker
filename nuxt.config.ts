@@ -498,7 +498,9 @@ export default defineNuxtConfig({
   },
   icon: {
     clientBundle: {
-      scan: true,
+      scan: {
+        globInclude: ['**/*.{vue,jsx,tsx,md,mdc,mdx,yml,yaml}', 'app/**/*.ts'],
+      },
     },
   },
   // Pin Nuxt UI to its dark alias block regardless of OS preference. The app's

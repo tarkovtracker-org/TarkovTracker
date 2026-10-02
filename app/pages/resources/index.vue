@@ -1,19 +1,7 @@
 <template>
-  <div class="mx-auto w-full max-w-5xl px-4 py-5 sm:px-6 sm:py-6">
+  <div class="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
     <div class="flex flex-col gap-5">
-      <header class="mx-auto max-w-2xl space-y-2 text-center">
-        <h1 class="light:text-surface-50 text-2xl font-bold tracking-wide text-white sm:text-3xl">
-          {{ t('page.resources.title', 'Resources & Guides') }}
-        </h1>
-        <p class="text-surface-300 text-sm leading-relaxed sm:text-base">
-          {{
-            t(
-              'page.resources.subtitle',
-              'Find companion apps, community tools, developer resources, and guides for getting more from TarkovTracker.'
-            )
-          }}
-        </p>
-      </header>
+      <PageHeader :title="t('page.resources.title')" :description="t('page.resources.subtitle')" />
       <div class="space-y-3">
         <label :for="searchInputId" class="sr-only">
           {{ t('page.resources.search_placeholder', 'Search tools and guides...') }}
@@ -141,6 +129,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import PageHeader from '@/components/ui/PageHeader.vue';
   import ResourceCard from '@/features/resources/ResourceCard.vue';
   import {
     CATEGORY_LABEL_FALLBACKS,

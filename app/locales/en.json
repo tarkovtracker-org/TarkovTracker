@@ -746,7 +746,6 @@
     "changelog": {
       "title": "Changelog",
       "description": "View the latest updates and changes to TarkovTracker.",
-      "back": "Back to Dashboard",
       "loading": "Loading changelog...",
       "error": "Unable to load changelog.",
       "empty": "No changelog entries yet.",
@@ -797,7 +796,6 @@
       "route_unlock_reward": "Reward: {name}"
     },
     "kappa": {
-      "title": "Kappa & Lightkeeper Tracker",
       "subtitle": "Track your progress toward the Kappa container and Lightkeeper quests.",
       "row": {
         "level_met_aria": "Required level {required}, you are level {current}",
@@ -1353,7 +1351,6 @@
       },
       "card": {
         "manageteam": {
-          "title": "Team Members",
           "membercard": {
             "this_is_you": "(This is you)",
             "owner": "Owner",
@@ -1367,11 +1364,7 @@
             "remove_member": "Remove {name} from team"
           }
         },
-        "teamoptions": {
-          "title": "Team Integration Options"
-        },
         "myteam": {
-          "title": "My Team",
           "create_new_team": "Create a new team",
           "create_team_success": "Successfully created a new team.",
           "create_team_error": "Failed to create a new team.",
@@ -1459,7 +1452,6 @@
       "login_options": "Login options"
     },
     "profile": {
-      "title": "User Profile",
       "shared_player": "Shared Player",
       "shared_view": "Shared View",
       "loading_shared_profile": "Loading shared profile...",
@@ -1592,7 +1584,6 @@
       "on_this_page": "On this page",
       "compatibility_label": "Compatibility",
       "guide_not_found": "Guide not found. The resource you are looking for may not have a guide yet.",
-      "guide_title_template": "{name} Guide",
       "meta": {
         "official_guide": "Official guide",
         "maintained_by_team": "Maintained by the TarkovTracker.org team",
@@ -1756,7 +1747,6 @@
       "official_guide_label": "TarkovTracker.org Guide"
     },
     "account_retention": {
-      "title": "Account retention and service availability",
       "scope": "These rules apply to routine account deletion for inactivity while TarkovTracker operates. They define when an account may become eligible for cleanup, not a scheduled deletion date.",
       "standard": "No qualifying support: an account may be deleted after six consecutive months without recorded account activity.",
       "previous_supporter": "Previous supporter: an account with a qualifying contribution recorded against it, including a one-time contribution or previous subscription, may become eligible for deletion one year after the later of its last recorded account activity and its most recent recorded contribution.",
@@ -1797,15 +1787,10 @@
     "brand_name": "TarkovTracker.org",
     "login": "Log In",
     "logout": "Log Out",
-    "ratscanner": "Rat Scanner",
-    "tarkovguru": "Tarkov Guru",
-    "tarkovmonitor": "Tarkov Monitor",
     "resources": "Resources",
     "profile": "Profile",
     "section_navigation": "Navigation",
-    "section_external": "External Tools",
     "account_menu": "Account menu",
-    "edition_label": "Edition",
     "mode_auto": "Auto",
     "auto_level_enabled": "Automatic level calculation is enabled",
     "level_display_auto": "Level {level} (automatic calculation enabled)",
@@ -1816,7 +1801,6 @@
     "xp_settings_link": "View XP and level settings"
   },
   "profile": {
-    "title_with_mode": "{name} Profile {mode}",
     "season_short": "S{season}"
   },
   "streamer_tools": {
@@ -2570,28 +2554,23 @@
       },
       "tasks": {
         "title": "Tarkov Quest Tracker · TarkovTracker.org",
-        "description": "Track Tarkov quests, objectives, rewards, and prerequisites across PvP, PvE, and Seasonal.",
-        "heading": "Tasks"
+        "description": "Track Tarkov quests, objectives, rewards, and prerequisites across PvP, PvE, and Seasonal."
       },
       "hideout": {
         "title": "Tarkov Hideout Tracker · TarkovTracker.org",
-        "description": "Plan hideout upgrades and track module requirements and construction progress.",
-        "heading": "Hideout"
+        "description": "Plan hideout upgrades and track module requirements and construction progress."
       },
       "needed_items": {
         "title": "Tarkov Needed Items Tracker · TarkovTracker.org",
-        "description": "Find the items you still need for quests and hideout upgrades in one list.",
-        "heading": "Needed Items"
+        "description": "Find the items you still need for quests and hideout upgrades in one list."
       },
       "kappa": {
         "title": "Kappa & Lightkeeper Tracker · TarkovTracker.org",
-        "description": "Track Kappa and Lightkeeper quest requirements and your remaining progression.",
-        "heading": "Kappa & Lightkeeper"
+        "description": "Track Kappa and Lightkeeper quest requirements and your remaining progression."
       },
       "storyline": {
         "title": "Tarkov Storyline Tracker · TarkovTracker.org",
-        "description": "Follow Escape from Tarkov storyline quests and track your progression.",
-        "heading": "Storyline"
+        "description": "Follow Escape from Tarkov storyline quests and track your progression."
       },
       "resources": {
         "title": "Escape from Tarkov Tools and Guides",

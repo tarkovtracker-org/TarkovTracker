@@ -1,10 +1,11 @@
 <template>
-  <UContainer class="px-4 py-8">
-    <div
-      class="prose prose-gray prose-invert light:prose-headings:text-surface-50 mx-auto max-w-4xl"
-    >
-      <h1 class="text-surface-50 mb-2 text-4xl font-bold">Privacy Policy</h1>
-      <p class="text-surface-400 mb-12 text-sm">Last Updated: September 29, 2026</p>
+  <UContainer class="px-4 py-6">
+    <div class="mx-auto max-w-4xl">
+      <PageHeader
+        :title="t('common.privacy_policy')"
+        description="Last Updated: September 29, 2026"
+        class="mb-12"
+      />
       <div class="space-y-12">
         <!-- INTRODUCTION -->
         <section>
@@ -848,5 +849,6 @@
 </template>
 <script setup lang="ts">
   import AccountRetentionPolicy from '@/components/AccountRetentionPolicy.vue';
+  import PageHeader from '@/components/ui/PageHeader.vue';
   const { t } = useI18n({ useScope: 'global' });
 </script>

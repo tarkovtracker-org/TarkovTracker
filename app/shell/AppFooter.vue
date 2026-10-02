@@ -116,6 +116,7 @@
     { label: t('common.tasks'), to: '/tasks' },
     { label: t('common.hideout'), to: '/hideout' },
     { label: t('common.needed_items'), to: '/needed-items' },
+    { label: t('common.kappa_lightkeeper'), to: '/kappa' },
     { label: t('common.storyline'), to: '/storyline' },
   ]);
   const projectItems = computed(() => [

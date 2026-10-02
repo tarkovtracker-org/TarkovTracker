@@ -1,6 +1,7 @@
 <template>
-  <UContainer class="px-4 py-8">
+  <UContainer class="px-4 py-6">
     <div class="mx-auto flex w-full max-w-3xl flex-col gap-6">
+      <slot name="header" />
       <div v-if="showInitialLoading" class="text-surface-400 py-12 text-center">
         <UIcon name="i-mdi-loading" class="mb-2 h-8 w-8 animate-spin" />
         <p>{{ t('page.changelog.loading') }}</p>

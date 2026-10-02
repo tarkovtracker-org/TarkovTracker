@@ -1,25 +1,28 @@
 <template>
   <div class="min-h-[calc(100vh-250px)] px-3 py-6 sm:px-6">
     <div class="mx-auto max-w-275 space-y-8">
-      <header class="text-center">
-        <h1 class="light:text-surface-50 text-2xl font-bold text-white sm:text-3xl">
-          {{ t('page.supporter.title') }}
-        </h1>
-        <p class="text-surface-400 mx-auto mt-2 max-w-xl text-sm">
-          {{ t('page.supporter.subtitle') }}
-        </p>
-      </header>
-      <nav
-        :aria-label="t('page.supporter.policies_title')"
-        class="flex flex-wrap justify-center gap-4 text-sm"
-      >
-        <NuxtLink to="/terms-of-service#supporter" class="text-link underline">
-          {{ t('common.terms_of_service') }}
-        </NuxtLink>
-        <NuxtLink to="/privacy" class="text-link underline">
-          {{ t('common.privacy_policy') }}
-        </NuxtLink>
-      </nav>
+      <PageHeader :title="t('page.supporter.title')" :description="t('page.supporter.subtitle')">
+        <template #actions>
+          <nav :aria-label="t('page.supporter.policies_title')" class="flex flex-wrap gap-2">
+            <UButton
+              to="/terms-of-service#supporter"
+              size="sm"
+              color="neutral"
+              variant="link"
+              icon="i-mdi-file-document-outline"
+              :label="t('common.terms_of_service')"
+            />
+            <UButton
+              to="/privacy"
+              size="sm"
+              color="neutral"
+              variant="link"
+              icon="i-mdi-shield-account-outline"
+              :label="t('common.privacy_policy')"
+            />
+          </nav>
+        </template>
+      </PageHeader>
       <ClientOnly>
         <SupporterPage />
       </ClientOnly>
@@ -47,6 +50,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import PageHeader from '@/components/ui/PageHeader.vue';
   import SupporterPage from '@/features/client-pages/SupporterPage.client.vue';
   const { t } = useI18n({ useScope: 'global' });
   definePageMeta({ layout: 'default' });

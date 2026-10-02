@@ -1,14 +1,7 @@
 <template>
-  <UContainer class="px-4 py-10 sm:px-6 sm:py-14">
+  <UContainer class="px-4 py-6 sm:px-6">
     <div class="mx-auto flex w-full max-w-6xl flex-col gap-10">
-      <header class="border-surface-700/60 mx-auto w-full max-w-2xl border-b pb-8 text-center">
-        <h1 class="text-surface-50 text-3xl font-bold tracking-tight sm:text-4xl">
-          {{ t('page.about.title') }}
-        </h1>
-        <p class="text-surface-400 mt-3 text-sm leading-relaxed">
-          {{ t('page.about.intro') }}
-        </p>
-      </header>
+      <PageHeader :title="t('page.about.title')" :description="t('page.about.intro')" />
       <section
         v-if="coreMembers.length || supportMembers.length"
         id="team"
@@ -57,6 +50,7 @@
   </UContainer>
 </template>
 <script setup lang="ts">
+  import PageHeader from '@/components/ui/PageHeader.vue';
   import AboutHelpLinks from '@/features/about/AboutHelpLinks.vue';
   import AboutMemberCard from '@/features/about/AboutMemberCard.vue';
   import AboutMembersGroup from '@/features/about/AboutMembersGroup.vue';
