@@ -1,224 +1,225 @@
 #!/usr/bin/env node
+import { baseCompile } from '@intlify/message-compiler';
 import { readFileSync, readdirSync } from 'fs';
-import { join } from 'path';
-const LOCALES_DIR = join(process.cwd(), 'app', 'locales');
-const LOCALES_UTILS_PATH = join(process.cwd(), 'app', 'utils', 'locales.ts');
+import { join, relative } from 'path';
+const ROOT = process.cwd();
+const APP_DIR = join(ROOT, 'app');
+const LOCALES_DIR = join(APP_DIR, 'locales');
+const LOCALES_UTILS_PATH = join(APP_DIR, 'utils', 'locales.ts');
 const SOURCE_LOCALE = 'en';
 const LOCALE_EXTENSION = '.json';
+const SOURCE_FILE_RE = /\.(vue|ts|tsx|js|mjs|json)$/;
+const SKIPPED_SOURCE_PATH_RE = /(^|\/)(__tests__|locales)(\/|$)|\.test\.[a-z]+$/;
 const SNAKE_CASE_RE = /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/;
-const ENABLED_UNTRANSLATED_PERCENT = 90;
-const DISABLED_TRANSLATED_PERCENT = 30;
+const KEY_TOKEN_RE = /[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)*/g;
+const TEMPLATE_KEY_RE = /`([a-z][\w.]*\$\{[^`]*)`/g;
+const INTERPOLATION_RE = /\$\{[^}]*\}/;
+const compiledMessages = new Map();
 function loadEnabledLocales() {
   const raw = readFileSync(LOCALES_UTILS_PATH, 'utf-8');
   const match = raw.match(/SUPPORTED_LOCALES\s*=\s*\[([\s\S]*?)\]/);
   const codes = match ? [...match[1].matchAll(/'([a-z0-9-]+)'/gi)].map((m) => m[1]) : [];
-  if (!match || codes.length === 0) {
-    console.warn(`i18n check: could not parse SUPPORTED_LOCALES in ${LOCALES_UTILS_PATH}`);
-    return null;
+  if (codes.length === 0) {
+    throw new Error(`Could not parse SUPPORTED_LOCALES in ${LOCALES_UTILS_PATH}`);
   }
-  return new Set(codes);
+  return codes;
 }
-function flatten(obj, prefix = '') {
-  const result = {};
+function isNestedObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+function flatten(obj, prefix = '', result = {}) {
   for (const [key, value] of Object.entries(obj)) {
     const path = prefix ? `${prefix}.${key}` : key;
-    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-      Object.assign(result, flatten(value, path));
-    } else {
-      result[path] = value;
+    result[path] = value;
+    if (isNestedObject(value)) {
+      flatten(value, path, result);
     }
   }
   return result;
 }
-function loadLocale(code) {
-  const filePath = join(LOCALES_DIR, `${code}${LOCALE_EXTENSION}`);
-  const raw = readFileSync(filePath, 'utf-8');
-  return flatten(JSON.parse(raw));
-}
-function checkSnakeCase(keys) {
-  const violations = [];
-  for (const fullKey of keys) {
-    const segments = fullKey.split('.');
-    for (const seg of segments) {
-      if (!SNAKE_CASE_RE.test(seg)) {
-        violations.push({ key: fullKey, segment: seg });
-        break;
-      }
-    }
-  }
-  return violations;
-}
-function readLocaleFiles() {
-  const files = readdirSync(LOCALES_DIR).filter((f) => f.endsWith(LOCALE_EXTENSION));
-  const localeCodes = files.map((f) => f.replace(LOCALE_EXTENSION, ''));
-  if (!localeCodes.includes(SOURCE_LOCALE)) {
-    console.error(
-      `Source locale "${SOURCE_LOCALE}${LOCALE_EXTENSION}" not found in ${LOCALES_DIR}`
+function loadLocale(code, errors) {
+  try {
+    const messages = JSON.parse(
+      readFileSync(join(LOCALES_DIR, `${code}${LOCALE_EXTENSION}`), 'utf-8')
     );
-    process.exit(1);
+    if (!isNestedObject(messages)) throw new Error('locale root must be an object');
+    return flatten(messages);
+  } catch (error) {
+    errors.push(`${code}${LOCALE_EXTENSION}: invalid JSON (${error.message})`);
+    return null;
   }
+}
+function readLocales(errors) {
+  const codes = readdirSync(LOCALES_DIR)
+    .filter((file) => file.endsWith(LOCALE_EXTENSION))
+    .map((file) => file.slice(0, -LOCALE_EXTENSION.length))
+    .sort();
   const locales = {};
-  for (const code of localeCodes) {
-    locales[code] = loadLocale(code);
+  for (const code of codes) {
+    locales[code] = loadLocale(code, errors);
   }
-  return { locales, targetCodes: localeCodes.filter((c) => c !== SOURCE_LOCALE).sort() };
-}
-function reportCaseViolations(keys) {
-  const violations = checkSnakeCase(keys);
-  if (violations.length > 0) {
-    console.log(
-      `\nKey naming violations in ${SOURCE_LOCALE}${LOCALE_EXTENSION} (expected snake_case):\n`
-    );
-    for (const { key, segment } of violations) {
-      console.log(`  ${key}  (segment: "${segment}")`);
-    }
-  }
-  return violations.length;
-}
-function keySyncFor(locales, sourceKeys, code) {
-  const targetKeys = new Set(Object.keys(locales[code]));
-  const missing = [...sourceKeys].filter((k) => !targetKeys.has(k)).sort();
-  const extra = [...targetKeys].filter((k) => !sourceKeys.has(k)).sort();
-  return { missing, extra };
-}
-function printMissing(code, missing) {
-  if (missing.length === 0) {
-    return;
-  }
-  console.log(`\n${code}${LOCALE_EXTENSION}:`);
-  console.log(
-    `  Missing ${missing.length} key(s) (will fall back to ${SOURCE_LOCALE} at runtime):`
-  );
-  for (const k of missing) {
-    console.log(`    - ${k}`);
-  }
-}
-function printExtra(code, extra, withHeader) {
-  if (extra.length === 0) {
-    return;
-  }
-  if (withHeader) {
-    console.log(`\n${code}${LOCALE_EXTENSION}:`);
-  }
-  console.log(`  Extra ${extra.length} key(s) not in ${SOURCE_LOCALE}:`);
-  for (const k of extra) {
-    console.log(`    + ${k}`);
-  }
-}
-function reportKeySync(locales, sourceKeys, targetCodes) {
-  let totalMissing = 0;
-  let totalExtra = 0;
-  for (const code of targetCodes) {
-    const { missing, extra } = keySyncFor(locales, sourceKeys, code);
-    printMissing(code, missing);
-    printExtra(code, extra, missing.length === 0);
-    totalMissing += missing.length;
-    totalExtra += extra.length;
-  }
-  return { totalMissing, totalExtra };
-}
-function englishIdentityPercent(sourceValues, targetValues, sourceKeys) {
-  const merged = { ...sourceValues, ...targetValues };
-  let identical = 0;
-  for (const key of sourceKeys) {
-    if (merged[key] === sourceValues[key]) {
-      identical += 1;
-    }
-  }
-  return sourceKeys.size === 0 ? 0 : (identical / sourceKeys.size) * 100;
-}
-function enabledDriftWarning(code, percent) {
-  if (percent > ENABLED_UNTRANSLATED_PERCENT) {
-    return (
-      `${code}: enabled but ${percent.toFixed(1)}% of values identical to ${SOURCE_LOCALE} ` +
-      `(warn threshold ${ENABLED_UNTRANSLATED_PERCENT}%)`
-    );
-  }
-  return null;
-}
-function disabledDriftWarning(code, percent) {
-  if (percent < DISABLED_TRANSLATED_PERCENT) {
-    return (
-      `${code}: translated (only ${percent.toFixed(1)}% identical to ${SOURCE_LOCALE}) ` +
-      `but not in SUPPORTED_LOCALES`
-    );
-  }
-  return null;
-}
-function driftWarningFor(code, percent, enabled) {
-  return enabled ? enabledDriftWarning(code, percent) : disabledDriftWarning(code, percent);
-}
-function localeDriftWarnings(locales, sourceValues, sourceKeys, targetCodes, enabledLocales) {
-  if (!enabledLocales) {
-    return [];
-  }
-  return targetCodes
-    .map((code) => {
-      const percent = englishIdentityPercent(sourceValues, locales[code], sourceKeys);
-      return driftWarningFor(code, percent, enabledLocales.has(code));
-    })
-    .filter((warning) => warning !== null);
-}
-function printDriftWarnings(warnings) {
-  if (warnings.length === 0) {
-    return;
-  }
-  console.log(`\nLocale drift warnings (non-fatal):`);
-  for (const warning of warnings) {
-    console.log(`  - ${warning}`);
-  }
-}
-function buildSummaryParts(totalMissing, totalExtra, warningCount) {
-  const parts = [];
-  if (totalMissing > 0) {
-    parts.push(`${totalMissing} missing (fallback to ${SOURCE_LOCALE} at runtime)`);
-  }
-  if (totalExtra > 0) {
-    parts.push(`${totalExtra} extra (Crowdin will reconcile on next sync)`);
-  }
-  if (warningCount > 0) {
-    parts.push(`${warningCount} locale drift warning(s)`);
-  }
-  return parts;
-}
-function summarize(parts, targetCount) {
-  console.log('');
-  if (parts.length > 0) {
-    console.log(`i18n check: ${parts.join(', ')} — non-fatal`);
-    return;
-  }
-  console.log(`All ${targetCount} locale(s) are in sync with ${SOURCE_LOCALE}${LOCALE_EXTENSION}`);
+  return locales;
 }
 function assertSupportedLocales(locales, enabledLocales) {
-  const missing = [...(enabledLocales || [])].filter((code) => !Object.hasOwn(locales, code));
+  const missing = enabledLocales.filter((code) => !Object.hasOwn(locales, code));
   if (missing.length > 0) {
-    const filenames = missing.map((code) => `${code}.json`).join(', ');
+    const filenames = missing.map((code) => `${code}${LOCALE_EXTENSION}`).join(', ');
     throw new Error(`Missing supported locale file(s): ${filenames}`);
   }
 }
-function main() {
-  const { locales, targetCodes } = readLocaleFiles();
-  const sourceKeys = new Set(Object.keys(locales[SOURCE_LOCALE]));
-  const sourceValues = locales[SOURCE_LOCALE];
-  const enabledLocales = loadEnabledLocales();
-  assertSupportedLocales(locales, enabledLocales);
-  const caseViolationCount = reportCaseViolations([...sourceKeys]);
-  if (caseViolationCount > 0) {
-    console.log(
-      `i18n check: ${caseViolationCount} naming violation(s) in ${SOURCE_LOCALE}${LOCALE_EXTENSION}`
+function checkSnakeCase(sourceKeys, errors) {
+  for (const key of sourceKeys) {
+    const segment = key.split('.').find((part) => !SNAKE_CASE_RE.test(part));
+    if (segment !== undefined) {
+      errors.push(`${SOURCE_LOCALE}${LOCALE_EXTENSION}: ${key} is not snake_case ("${segment}")`);
+    }
+  }
+}
+function interpolationKeys(node) {
+  // The compiler's Named (4) and List (5) nodes are interpolation, not literal brace text.
+  if (node.type === 4) return [node.key];
+  if (node.type === 5) return [String(node.index)];
+  return [node.body, node.cases, node.items, node.key]
+    .flat()
+    .filter(isNestedObject)
+    .flatMap(interpolationKeys);
+}
+function linkedKeys(node) {
+  if (node.type === 7) return [node.value];
+  return [node.body, node.cases, node.items, node.key]
+    .flat()
+    .filter(isNestedObject)
+    .flatMap(linkedKeys);
+}
+function compileMessage(message) {
+  if (compiledMessages.has(message)) return compiledMessages.get(message);
+  let error = null;
+  const { ast } = baseCompile(message, {
+    onError: (compileError) => {
+      error ??= compileError;
+    },
+  });
+  const result = { error, placeholders: new Set(interpolationKeys(ast)), links: linkedKeys(ast) };
+  compiledMessages.set(message, result);
+  return result;
+}
+function structureError(key, reference) {
+  const parts = key.split('.').slice(0, -1);
+  const parent = parts
+    .map((_, i) => parts.slice(0, i + 1).join('.'))
+    .find(
+      (path) => Object.hasOwn(reference.messages, path) && !isNestedObject(reference.messages[path])
     );
+  return parent ? `${key} nests under ${parent}, which is a message in ${SOURCE_LOCALE}` : null;
+}
+function valueKind(value) {
+  return isNestedObject(value) ? 'group' : 'message';
+}
+function typeError(key, value, reference) {
+  if (!Object.hasOwn(reference.messages, key)) return null;
+  const expected = reference.messages[key];
+  return valueKind(value) !== valueKind(expected)
+    ? `${key} is a ${valueKind(value)} but ${SOURCE_LOCALE} has a ${valueKind(expected)} there`
+    : null;
+}
+function shapeError(key, value, reference) {
+  return structureError(key, reference) ?? typeError(key, value, reference);
+}
+function placeholderError(key, value, reference) {
+  const sourceMessage = reference.messages[key];
+  if (typeof sourceMessage !== 'string') {
+    return null;
+  }
+  const expected = compileMessage(sourceMessage).placeholders;
+  const unknown = [...compileMessage(value).placeholders].filter((name) => !expected.has(name));
+  return unknown.length > 0 ? `${key} uses unknown placeholder(s) {${unknown.join('}, {')}}` : null;
+}
+function stringMessageErrors(key, value, reference) {
+  const syntax = compileMessage(value).error;
+  const errors = syntax ? [`${key} has invalid message syntax: ${syntax.message}`] : [];
+  return [...errors, placeholderError(key, value, reference)].filter(Boolean);
+}
+function messageErrors(key, value, reference) {
+  const shape = shapeError(key, value, reference);
+  if (shape) return [shape];
+  if (isNestedObject(value)) return [];
+  if (typeof value !== 'string') return [`${key} must be a string message or a group`];
+  return stringMessageErrors(key, value, reference);
+}
+function checkLocale(code, messages, reference, errors) {
+  for (const [key, value] of Object.entries(messages)) {
+    for (const error of messageErrors(key, value, reference)) {
+      errors.push(`${code}${LOCALE_EXTENSION}: ${error}`);
+    }
+  }
+}
+function listSourceFiles(dir) {
+  return readdirSync(dir, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && SOURCE_FILE_RE.test(entry.name))
+    .map((entry) => join(entry.parentPath, entry.name))
+    .filter((path) => !SKIPPED_SOURCE_PATH_RE.test(relative(dir, path)));
+}
+function readSource() {
+  return listSourceFiles(APP_DIR)
+    .map((path) => readFileSync(path, 'utf-8'))
+    .join('\n');
+}
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+function templatePattern(template) {
+  const pattern = template.split(INTERPOLATION_RE).map(escapeRegExp).join('[\\w.]+');
+  return new RegExp(`^${pattern}$`);
+}
+function indexSource(text) {
+  const templates = [...text.matchAll(TEMPLATE_KEY_RE)].map((match) => match[1]);
+  return {
+    tokens: new Set(text.match(KEY_TOKEN_RE)),
+    patterns: [...new Set(templates)].map(templatePattern),
+  };
+}
+function mayBeReferenced(key, source) {
+  return source.tokens.has(key) || source.patterns.some((pattern) => pattern.test(key));
+}
+function checkUnusedKeys(messages, errors) {
+  const sourceKeys = Object.keys(messages).filter((key) => !isNestedObject(messages[key]));
+  const links = sourceKeys
+    .map((key) => messages[key])
+    .filter((value) => typeof value === 'string')
+    .flatMap((value) => compileMessage(value).links);
+  const source = indexSource(`${readSource()}\n${links.join('\n')}`);
+  for (const key of sourceKeys) {
+    if (!mayBeReferenced(key, source)) {
+      errors.push(`${SOURCE_LOCALE}${LOCALE_EXTENSION}: ${key} is not used in app/; remove it`);
+    }
+  }
+}
+function checkSource(source, errors) {
+  checkSnakeCase(Object.keys(source), errors);
+  checkUnusedKeys(source, errors);
+  return { messages: source };
+}
+function collectErrors() {
+  const errors = [];
+  const locales = readLocales(errors);
+  assertSupportedLocales(locales, loadEnabledLocales());
+  const source = locales[SOURCE_LOCALE];
+  if (!source) {
+    return errors.length > 0 ? errors : [`${SOURCE_LOCALE}${LOCALE_EXTENSION} not found`];
+  }
+  const reference = checkSource(source, errors);
+  for (const [code, messages] of Object.entries(locales).filter(([, value]) => value)) {
+    checkLocale(code, messages, reference, errors);
+  }
+  return errors;
+}
+function main() {
+  const errors = collectErrors();
+  if (errors.length > 0) {
+    console.error(errors.map((error) => `  - ${error}`).join('\n'));
+    console.error(`\ni18n check: ${errors.length} problem(s)`);
     process.exit(1);
   }
-  const { totalMissing, totalExtra } = reportKeySync(locales, sourceKeys, targetCodes);
-  const warnings = localeDriftWarnings(
-    locales,
-    sourceValues,
-    sourceKeys,
-    targetCodes,
-    enabledLocales
-  );
-  printDriftWarnings(warnings);
-  summarize(buildSummaryParts(totalMissing, totalExtra, warnings.length), targetCodes.length);
-  process.exit(0);
+  console.log('i18n check: all locales are valid; untranslated keys fall back to en');
 }
 main();
