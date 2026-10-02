@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs as parseOptions } from 'node:util';
 import { acquireLock, releaseLock } from './codex-review-lock.mjs';
 import { classifyState, evidenceShas } from './codex-review-state.mjs';
+import { collapseReviewCommands } from './codex-review-collapse.mjs';
 export { classifyState } from './codex-review-state.mjs';
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const POLL_INTERVAL_MS = 30_000;
@@ -49,7 +50,8 @@ function readPull(runGh, endpoint) {
   if (!Number.isFinite(serverTime)) throw new Error('GitHub response has no valid server Date');
   return { pull: parseJson(body.join('\n\n'), 'pull request'), serverTime };
 }
-function fetchState({ repo, pr, runGh, intents }) {
+function fetchState(context) {
+  const { repo, pr, runGh, intents } = context;
   const prefix = `repos/${repo}`;
   const { pull } = readPull(runGh, `${prefix}/pulls/${pr}`);
   const comments = listPages(
@@ -68,10 +70,9 @@ function fetchState({ repo, pr, runGh, intents }) {
   const { pull: refreshed, serverTime } = readPull(runGh, `${prefix}/pulls/${pr}`);
   const changed = changedSnapshot(pull, refreshed);
   if (changed) return changed;
-  return classifyState(
-    { pull: refreshed, comments, reviews, requestedReviewers, intents, resolvedShas },
-    serverTime
-  );
+  const inputs = { pull: refreshed, comments, reviews, requestedReviewers, intents, resolvedShas };
+  if (context.collapseRequests) collapseReviewCommands(context, inputs);
+  return classifyState(inputs, serverTime);
 }
 function baseOf(pull) {
   return pull.base ?? {};
@@ -142,7 +143,7 @@ function persistIntent(directory, repo, pr, sha, createdAt, requestedAt = null) 
   return path;
 }
 function usage() {
-  return 'Usage: node scripts/codex-review/codex-review.mjs PR [--repo owner/name] [--request] [--wait-seconds N]';
+  return 'Usage: node scripts/codex-review/codex-review.mjs PR [--repo owner/name] [--request] [--collapse-requests] [--wait-seconds N]';
 }
 function validateWait(waitSeconds) {
   if (!Number.isSafeInteger(waitSeconds) || waitSeconds < 0 || waitSeconds > 3600) {
@@ -165,6 +166,7 @@ export function parseArgs(argv) {
     options: {
       repo: { type: 'string' },
       request: { type: 'boolean', default: false },
+      'collapse-requests': { type: 'boolean', default: false },
       'wait-seconds': { type: 'string', default: '0' },
     },
   });
@@ -173,6 +175,7 @@ export function parseArgs(argv) {
   validateRepo(values.repo);
   return {
     request: values.request,
+    collapseRequests: values['collapse-requests'],
     repo: values.repo ?? null,
     waitSeconds,
     pr: validatePr(positionals),
@@ -213,13 +216,21 @@ function dependencies(deps) {
     runGit: git,
     now: Date.now,
     sleep: (ms) => new Promise((done) => setTimeout(done, ms)),
+    warn: (message) => console.warn(message),
     ...deps,
   };
 }
 function contextFor(options, deps) {
   const repo = (options.repo ?? commandRepo(deps.runGh)).toLowerCase();
   const gitCommon = deps.gitCommonDir ?? commonGitDir(deps.runGit);
-  return { ...options, ...deps, repo, ...guardPaths(gitCommon) };
+  return {
+    ...options,
+    ...deps,
+    repo,
+    ...guardPaths(gitCommon),
+    collapseRequests: Boolean(options.request || options.collapseRequests),
+    minimizedNodes: new Set(),
+  };
 }
 function observe(context) {
   const intents = readIntents(context.intentDirectory, context.repo, context.pr);

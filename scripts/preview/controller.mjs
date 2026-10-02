@@ -4,6 +4,7 @@ import { classifyPaths } from '../ci/validation-plan.mjs';
 import { extractZip } from './archive.mjs';
 import { digestDirectory, manifestShapeErrors } from './manifest.mjs';
 import { readPreviewRequest } from './request-authorization.mjs';
+import { assertReadinessCi, readinessEligible } from './ready-policy.mjs';
 import {
   ciResultCheck,
   downloadArtifact,
@@ -480,6 +481,7 @@ function decisionIdentity({ candidate, pull }) {
     headBranch: optional(candidate, 'headBranch'),
     headRepo: optional(candidate, 'headRepo'),
     mergeSha: optional(pull, 'merge_commit_sha'),
+    baseSha: pull?.base?.sha ?? null,
   };
 }
 function decisionRun({ candidate, run }) {
@@ -505,12 +507,14 @@ function decisionBase({ candidate, pull, run, fork }) {
 // `state` is filled progressively so an interim outcome (pending/failure) still knows which
 // revision to report on.
 async function evaluate({ github, context, inputs, workspace }, state) {
+  assertInputAuthorization(inputs);
   state.candidate = await resolveCandidate({ github, context, inputs });
   state.pull = await resolvePull(github, context, state.candidate);
   checkPullFreshness(state.pull, state.candidate);
   state.fork = isFork(state.pull, state.candidate, context);
   if (state.pull?.draft) return { ...decisionBase(state), ...draftDecision() };
   state.run = await resolveRun(github, context, state.candidate);
+  assertSelectedAttempt(state.run, inputs);
   checkRunState(state.run, state.candidate);
   await checkCiResult(github, context, state.candidate);
   await requireDispatchMergeProof(github, context, state.candidate, state.pull, state.run);
@@ -519,7 +523,8 @@ async function evaluate({ github, context, inputs, workspace }, state) {
   state.previewRequest = await readPreviewRequest(
     github,
     context.repo,
-    pullRequestNumber(state.pull)
+    pullRequestNumber(state.pull),
+    requestBinding(inputs)
   );
   requireRequestedCommand(inputs, state.previewRequest);
   state.previewAuthorization = commandAuthorization(
@@ -528,7 +533,78 @@ async function evaluate({ github, context, inputs, workspace }, state) {
     state.fork,
     state.previewRequest
   );
+  await authorizeReadiness(github, context, inputs, state);
   return deployDecision({ github, context, state, workspace });
+}
+function requestBinding(inputs) {
+  return Number(inputs?.request_comment_id) || null;
+}
+function assertInputAuthorization(inputs) {
+  if (inputs?.authorization && inputs.authorization !== 'readiness')
+    throw ignore('Unknown preview authorization provenance.');
+}
+function assertSelectedAttempt(run, inputs) {
+  if (inputs?.ci_attempt && String(run.run_attempt) !== inputs.ci_attempt)
+    throw ignore('CI run attempt superseded this request.');
+}
+async function authorizeReadiness(github, context, inputs, state) {
+  if (!readinessRequested(context, inputs, state)) return;
+  assertReadinessAttempt(context, inputs);
+  await requireReadiness(github, context, state);
+  state.previewAuthorization = 'readiness';
+}
+function assertReadinessAttempt(context, inputs) {
+  if ([context.eventName === 'workflow_dispatch', !inputs?.ci_attempt].every(Boolean))
+    throw ignore('Readiness dispatch requires an exact CI attempt.');
+}
+function readinessRequested(context, inputs, state) {
+  if (optional(inputs, 'authorization') === 'readiness') return true;
+  if (context.eventName === 'workflow_dispatch') return false;
+  return [
+    state.candidate.runEvent === 'pull_request',
+    !state.previewRequest,
+    readinessEvent(context),
+    readinessEligible(state.pull, context.repo, state.previewRequest),
+  ].every(Boolean);
+}
+function readinessEvent(context) {
+  return (
+    context.previewReconciliation === true ||
+    context.eventName === 'workflow_run' ||
+    ['ready_for_review', 'reopened', 'auto_merge_enabled'].includes(context.payload.action)
+  );
+}
+async function requireReadiness(github, context, state) {
+  if (!readinessEligible(state.pull, context.repo, state.previewRequest))
+    throw ignore('Automatic readiness authorization is paused or revoked.');
+  try {
+    assertReadinessCi(state.run, state.pull);
+  } catch (error) {
+    throw pending(error.message);
+  }
+  await requireReadinessCiJob(github, context, state.run);
+  const mismatch = await currentPullBaseMismatch(github, context, state.pull);
+  if (mismatch) throw pending(mismatch);
+}
+async function requireReadinessCiJob(github, context, run) {
+  const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRunAttempt, {
+    ...context.repo,
+    run_id: run.id,
+    attempt_number: run.run_attempt,
+    per_page: 100,
+  });
+  const results = jobs.filter((job) => job.name === 'CI Result');
+  if (results.length !== 1 || !readinessCiJobMatches(results[0], run))
+    throw pending('Waiting for successful CI Result from the selected CI attempt.');
+}
+function readinessCiJobMatches(job, run) {
+  return [
+    job.run_id === run.id,
+    job.run_attempt === run.run_attempt,
+    job.head_sha === run.head_sha,
+    job.status === 'completed',
+    job.conclusion === 'success',
+  ].every(Boolean);
 }
 function requireRequestedCommand(inputs, request) {
   const requestedId = optional(inputs, 'request_comment_id');
@@ -544,7 +620,7 @@ function draftDecision() {
   return {
     action: 'skip',
     state: 'pending',
-    description: 'Draft pull request: mark ready, then request a preview after successful CI.',
+    description: 'Draft pull request: previews pause until ready with successful current CI.',
   };
 }
 function notApplicable() {
@@ -584,7 +660,10 @@ function enabledRequest(request) {
  *   Phase 2 re-verifies the same binding before upload.
  * - `standing`: a fork candidate rides the PR's current opt-in into the protected `preview`
  *   environment without an explicit binding. Phase 2 re-verifies the opt-in too.
- * - `dispatch`: no command authorization — a same-repo trusted default-branch workflow dispatch
+ * - `readiness`: a ready, same-repository ordinary PR after current successful PR CI. Its
+ *   dispatch carries explicit provenance and the CI attempt; phase 2 repeats readiness, stop,
+ *   current main and exact CI checks. It cannot become an independent dispatch after a stop.
+ * - `dispatch`: no command authorization - a same-repo trusted default-branch workflow dispatch
  *   (manual or automation-owned) or a fork awaiting manual approval. A later stop cannot revoke
  *   these; revision, CI, artifact and freshness checks still apply.
  */
@@ -705,6 +784,7 @@ function hasMergeIntent(context, state) {
 function hasPreviewIntent(context, state) {
   // Dependabot's dedicated workflow is the sole automatic request owner.
   if (optional(optional(state.pull, 'user'), 'id') === 49699333) return false;
+  if (state.previewAuthorization === 'readiness') return true;
   if (!state.previewRequest) return hasMergeIntent(context, state);
   return [
     state.previewRequest.enabled,
@@ -713,7 +793,11 @@ function hasPreviewIntent(context, state) {
   ].every(Boolean);
 }
 function isPreviewRefreshEvent(context) {
-  return context.eventName === 'workflow_run' || context.payload.action === 'ready_for_review';
+  return (
+    context.previewReconciliation === true ||
+    context.eventName === 'workflow_run' ||
+    ['ready_for_review', 'reopened'].includes(context.payload.action)
+  );
 }
 function requestedPreview(decision) {
   return {
@@ -772,6 +856,8 @@ function refreshContext(context, pull) {
     repo: context.repo,
     serverUrl: context.serverUrl,
     runId: context.runId,
+    // Trusted fallback source, separate from ordinary synchronize events that still wait for CI.
+    previewReconciliation: true,
     eventName: 'pull_request_target',
     payload: { ...context.payload, action: 'synchronize', pull_request: pull },
   };
@@ -887,17 +973,42 @@ function samePreviewRequest(request, expected) {
   ].every(Boolean);
 }
 async function verifyPreviewRequest(github, context, decision) {
+  if (decision.previewAuthorization === 'readiness') {
+    return verifyReadinessRequest(github, context, decision);
+  }
   if (!usesCommandApproval(decision)) return;
-  const request = await readPreviewRequest(github, context.repo, decision.pullRequest);
+  return verifyCommandRequest(github, context, decision);
+}
+async function verifyCommandRequest(github, context, decision) {
+  const request = await readPreviewRequest(
+    github,
+    context.repo,
+    decision.pullRequest,
+    decision.previewRequest?.commentId
+  );
   if (!samePreviewRequest(request, decision.previewRequest))
     throw new Error('Preview request was revoked or superseded; request again.');
+}
+async function verifyReadinessRequest(github, context, decision) {
+  const pull = await getPull(github, context.repo, decision.pullRequest);
+  if (pull.head.sha !== decision.headSha || pull.base.sha !== decision.baseSha)
+    throw new Error('Readiness candidate head or base changed.');
+  const request = await readPreviewRequest(github, context.repo, decision.pullRequest);
+  const run = await getRun(github, context.repo, decision.runId);
+  await requireReadiness(github, context, { pull, previewRequest: request, run });
+  const candidate = candidateFromDecision(decision);
+  checkRunState(run, candidate);
+  await resolvePullRun(github, context, candidate);
+  await checkCiResult(github, context, candidate);
+}
+async function requireFreshDecision(github, context, decision) {
+  const errors = await freshnessErrors(github, context, decision);
+  if (errors.length) throw new Error(`Candidate is obsolete: ${errors.join('; ')}`);
 }
 /** Phase 2: immediately before upload, repeat freshness checks and re-verify the artifact. */
 export async function verifyForDeploy({ github, context, core, decision, destination }) {
   assertDeployablePlan(decision);
-  await verifyPreviewRequest(github, context, decision);
-  const errors = await freshnessErrors(github, context, decision);
-  if (errors.length) throw new Error(`Candidate is obsolete: ${errors.join('; ')}`);
+  await requireFreshDecision(github, context, decision);
   const candidate = candidateFromDecision(decision);
   const pull = decision.pullRequest
     ? await getPull(github, context.repo, decision.pullRequest)
@@ -913,6 +1024,8 @@ export async function verifyForDeploy({ github, context, core, decision, destina
   });
   if (manifest.digest !== decision.digest)
     throw new Error('Artifact digest changed since planning.');
+  await requireFreshDecision(github, context, decision);
+  await verifyPreviewRequest(github, context, decision);
   core.info(`Verified artifact ${manifest.digest} for ${manifest.headSha}.`);
   return manifest;
 }

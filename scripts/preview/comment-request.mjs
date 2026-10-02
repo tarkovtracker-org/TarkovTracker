@@ -4,7 +4,7 @@ import {
   findLatestPullRun,
   getPull,
   listPullPaths,
-  previewDispatchInputs,
+  requestPreviewDispatch,
 } from './github-api.mjs';
 import {
   isPreviewMaintainer,
@@ -113,11 +113,11 @@ async function dispatchCurrentPreview(github, repo, pull, result, request) {
   const check = await ciResultCheck(github, repo, pull.head.sha);
   if (!hasMatchingCi(run, check, pull, repo)) return result;
   // The trusted default-branch controller repeats every revision, CI, and artifact check.
-  await github.rest.actions.createWorkflowDispatch({
-    ...repo,
-    workflow_id: 'preview.yml',
-    ref: 'main',
-    inputs: previewDispatchInputs(run.id, request),
+  await requestPreviewDispatch(github, repo, {
+    runId: run.id,
+    runAttempt: run.run_attempt,
+    runCompletedAt: run.updated_at,
+    previewRequest: request,
   });
   return { ...result, ciRunId: run.id };
 }
@@ -176,4 +176,19 @@ export function previewRequestMessage(request, runs) {
   if (!request.enabled) return disabledPreviewMessage(request);
   if (!request.automatic) return dependabotPreviewMessage(request, runs);
   return automaticPreviewMessage(request, runs);
+}
+/** Minimize only the original accepted command; revocation receipts remain untouched. */
+export async function minimizePreviewCommand({ github, context, core }) {
+  try {
+    await github.graphql(
+      `mutation ResolvePreviewCommand($id: ID!) {
+        minimizeComment(input: { subjectId: $id, classifier: RESOLVED }) {
+          minimizedComment { isMinimized }
+        }
+      }`,
+      { id: context.payload.comment.node_id }
+    );
+  } catch (error) {
+    core.warning(`Could not collapse preview command: ${error.message}`);
+  }
 }
