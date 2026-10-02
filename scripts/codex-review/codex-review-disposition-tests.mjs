@@ -52,7 +52,15 @@ const inputs = () => ({
   comments: [command],
   reviews: [review],
 });
-function fixture(t, { selectedRun = run, interval = [run], lastEditedAt = null } = {}) {
+function fixture(
+  t,
+  {
+    selectedRun = run,
+    interval = [run],
+    intervalPages = [{ total_count: interval.length, workflow_runs: interval }],
+    lastEditedAt = null,
+  } = {}
+) {
   const stateDirectory = mkdtempSync(join(tmpdir(), 'codex-disposition-'));
   t.after(() => rmSync(stateDirectory, { recursive: true, force: true }));
   return {
@@ -77,7 +85,7 @@ function fixture(t, { selectedRun = run, interval = [run], lastEditedAt = null }
         });
       if (args.at(-1).includes('?')) {
         assert.ok(!args.at(-1).includes('branch='), 'branch renames cannot narrow the evidence');
-        return JSON.stringify([{ workflow_runs: interval }]);
+        return JSON.stringify(intervalPages);
       }
       return JSON.stringify(selectedRun);
     },
@@ -131,7 +139,7 @@ test('wrong repository, fork, PR, revision or later run cannot establish request
   }
 });
 test('intervening PR-head evidence fails closed', (t) => {
-  const context = fixture(t, { interval: [run, { ...run, head_sha: head }] });
+  const context = fixture(t, { interval: [run, { ...run, id: 21, head_sha: head }] });
   assert.throws(() => applyRequestDispositions(context, inputs()), /ambiguous/);
 });
 test('unassociated and renamed-branch intervening heads remain ambiguous', (t) => {
@@ -140,15 +148,76 @@ test('unassociated and renamed-branch intervening heads remain ambiguous', (t) =
     { pull_requests: undefined },
     { head_branch: 'renamed-topic' },
   ]) {
-    const context = fixture(t, { interval: [run, { ...run, head_sha: head, ...change }] });
+    const context = fixture(t, { interval: [run, { ...run, id: 21, head_sha: head, ...change }] });
     assert.throws(() => applyRequestDispositions(context, inputs()), /ambiguous/);
   }
 });
 test('identified runs for other pull requests do not prevent disposition', (t) => {
   const context = fixture(t, {
-    interval: [run, { ...run, head_sha: head, pull_requests: [{ number: 45 }] }],
+    interval: [run, { ...run, id: 21, head_sha: head, pull_requests: [{ number: 45 }] }],
   });
   assert.doesNotThrow(() => applyRequestDispositions(context, inputs()));
+});
+test('capped or incomplete workflow searches cannot publish a disposition', (t) => {
+  const runs = Array.from({ length: 1000 }, (_, index) => ({ ...run, id: run.id + index }));
+  const capped = Array.from({ length: 10 }, (_, index) => ({
+    total_count: 1001,
+    workflow_runs: runs.slice(index * 100, (index + 1) * 100),
+  }));
+  for (const intervalPages of [
+    capped,
+    capped.map((page) => ({ ...page, total_count: 1000 })),
+    [{ total_count: 2, workflow_runs: [run] }],
+    [{ total_count: 0, workflow_runs: [] }],
+    [{ total_count: 1 }],
+    [{ workflow_runs: [run] }],
+    [],
+    null,
+  ]) {
+    const context = fixture(t, { intervalPages });
+    const original = inputs();
+    assert.throws(() => applyRequestDispositions(context, original), /workflow-run interval/);
+    assert.deepEqual(readdirSync(context.stateDirectory), [], 'no receipt is published');
+    assert.equal(classifyState(original, Date.parse('2026-10-02T02:00:00Z')).status, 'pending');
+    assert.equal(original.comments[0].body, '@codex review');
+  }
+});
+test('inconsistent counts, duplicate runs or a missing evidence run fail closed', (t) => {
+  const other = { ...run, id: 21 };
+  for (const intervalPages of [
+    [
+      { total_count: 2, workflow_runs: [run] },
+      { total_count: 3, workflow_runs: [other] },
+    ],
+    [
+      { total_count: 2, workflow_runs: [run] },
+      { total_count: 2, workflow_runs: [run] },
+    ],
+    [{ total_count: 1, workflow_runs: [other] }],
+  ]) {
+    const context = fixture(t, { intervalPages });
+    assert.throws(() => applyRequestDispositions(context, inputs()), /workflow-run interval/);
+    assert.deepEqual(readdirSync(context.stateDirectory), []);
+  }
+});
+test('complete multi-page intervals below the search limit permit disposition', (t) => {
+  const runs = Array.from({ length: 999 }, (_, index) => ({ ...run, id: run.id + index }));
+  const intervalPages = Array.from({ length: 10 }, (_, index) => ({
+    total_count: runs.length,
+    workflow_runs: runs.slice(index * 100, (index + 1) * 100),
+  }));
+  assert.doesNotThrow(() => applyRequestDispositions(fixture(t, { intervalPages }), inputs()));
+});
+test('a persisted disposition is rejected when its live workflow search becomes incomplete', (t) => {
+  const intervalPages = [{ total_count: 1, workflow_runs: [run] }];
+  const context = fixture(t, { intervalPages });
+  applyRequestDispositions(context, inputs());
+  intervalPages[0].total_count = 1001;
+  assert.throws(
+    () => applyRequestDispositions({ ...context, retireRequest: undefined }, inputs()),
+    /workflow-run interval/
+  );
+  assert.equal(readdirSync(join(context.stateDirectory, 'dispositions')).length, 1);
 });
 test('a command edited into place after creation cannot use earlier completion', (t) => {
   const context = fixture(t, { lastEditedAt: '2026-10-02T01:07:00Z' });

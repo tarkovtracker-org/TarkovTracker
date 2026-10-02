@@ -99,7 +99,9 @@ edited into place after creation (REST `updated_at` can change for reactions), a
 for that exact SHA, and a same-repository PR Actions run created strictly before the command
 (same-second run timestamps are ambiguous). It exhausts
 run pagination for the interval between that run and the command without a branch filter, so branch
-renames cannot hide evidence. Another PR head or a different-head run with missing PR association
+renames cannot hide evidence. Searches reaching GitHub's 1,000-result limit, missing or inconsistent
+counts, incomplete pages, duplicate runs, or a missing selected evidence run fail closed, including
+when revalidating an existing receipt. Another PR head or a different-head run with missing PR association
 fails closed; an explicitly identified unrelated PR does not block disposition. This does not support fork requests or infer
 a SHA from commit author dates. It cannot run with `--request`.
 

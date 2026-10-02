@@ -4,6 +4,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { isSecurity } from './codex-review-state.mjs';
 const BOT = 'chatgpt-codex-connector[bot]';
 const FULL_SHA = /^[0-9a-f]{40}$/;
+const WORKFLOW_RUN_SEARCH_LIMIT = 1000;
+const INCOMPLETE_INTERVAL =
+  'Historical request workflow-run interval is incomplete or reaches the 1,000-result search limit';
 const associations = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 const prefix = (repo, pr) => `${repo.replaceAll('/', '_')}-${pr}-`;
 const digest = (body) => createHash('sha256').update(body).digest('hex');
@@ -104,13 +107,36 @@ function validateCompletion(reviews, receipt) {
 function verifyInterval(context, receipt, run) {
   const endpoint = `repos/${context.repo}/actions/runs?event=pull_request&created=${encodeURIComponent(`${run.created_at}..${receipt.createdAt}`)}&per_page=100`;
   const pages = JSON.parse(context.runGh(['api', '--paginate', '--slurp', endpoint]));
-  const differentHead = pages
-    .flatMap((page) => page.workflow_runs ?? [])
-    .some((item) => item.head_sha !== receipt.sha && mayBelongToPull(item, context.pr));
+  const runs = readIntervalRuns(pages, run.id);
+  const differentHead = runs.some(
+    (item) => item.head_sha !== receipt.sha && mayBelongToPull(item, context.pr)
+  );
   if (differentHead)
     throw new Error(
       'Historical request revision is ambiguous: another PR head was observed before the request'
     );
+}
+function readIntervalRuns(pages, runId) {
+  if (!Array.isArray(pages)) throw new Error(INCOMPLETE_INTERVAL);
+  const total = pages[0]?.total_count;
+  const complete = [
+    Number.isSafeInteger(total),
+    total > 0,
+    total < WORKFLOW_RUN_SEARCH_LIMIT,
+    pages.every((page) => validIntervalPage(page, total)),
+  ];
+  if (!complete.every(Boolean)) throw new Error(INCOMPLETE_INTERVAL);
+  const runs = pages.flatMap((page) => page.workflow_runs);
+  verifyIntervalRuns(runs, total, runId);
+  return runs;
+}
+function validIntervalPage(page, total) {
+  return [page?.total_count === total, Array.isArray(page?.workflow_runs)].every(Boolean);
+}
+function verifyIntervalRuns(runs, total, runId) {
+  const identifiers = new Set(runs.map((item) => item.id));
+  const complete = [runs.length === total, identifiers.size === total, identifiers.has(runId)];
+  if (!complete.every(Boolean)) throw new Error(INCOMPLETE_INTERVAL);
 }
 function mayBelongToPull(run, pr) {
   if (!Array.isArray(run.pull_requests)) return true;
