@@ -110,6 +110,22 @@ describe('generated Nuxt declarations', () => {
 });
 describe('path helpers', () => {
   it.each([
+    'app/composables/api/useEdgeFunctions.ts',
+    'app/composables/__tests__/useEdgeFunctions.test.ts',
+    'app/composables/useSignOut.ts',
+    'app/composables/__tests__/useSignOut.ownerGuard.test.ts',
+    'app/composables/supabase/useSupabaseListener.ts',
+    'app/composables/__tests__/useSupabaseListener.test.ts',
+    'app/composables/supabase/useSupabaseSync.ts',
+    'app/composables/__tests__/useSupabaseSync.test.ts',
+    'app/stores/__tests__/teamChannelController.test.ts',
+    'app/stores/__tests__/teammate_flow.test.ts',
+  ])('includes lifecycle scope for the tracked helper or test %s', (file) => {
+    expect(scopedInstructions([file], ['AGENTS.md', 'supabase/AGENTS.md'])).toContain(
+      'supabase/AGENTS.md'
+    );
+  });
+  it.each([
     'DeviceDataCard.vue',
     '__tests__/DeviceDataCard.test.ts',
     'AccountDeletionCard.vue',
@@ -624,6 +640,20 @@ describe('buildBrief', () => {
     'includes device-data lifecycle scope for a %s request',
     async (mode) => {
       const file = 'app/features/settings/__tests__/DeviceDataCard.test.ts';
+      const io = fakeIo({ reports: { [file]: trace([]) } });
+      io.instructionFiles = () => ['AGENTS.md', 'supabase/AGENTS.md'];
+      const brief = await buildBrief(io, {
+        targets: mode === 'diff' ? [] : [{ file }],
+        changedPaths: mode === 'target' ? [] : [file],
+      });
+      expect(brief.instructions).toContain('supabase/AGENTS.md');
+      expect(brief.tests.direct).toEqual([file]);
+    }
+  );
+  it.each(['target', 'diff', 'target-and-diff'])(
+    'includes Edge Function lifecycle scope for a %s request',
+    async (mode) => {
+      const file = 'app/composables/__tests__/useEdgeFunctions.test.ts';
       const io = fakeIo({ reports: { [file]: trace([]) } });
       io.instructionFiles = () => ['AGENTS.md', 'supabase/AGENTS.md'];
       const brief = await buildBrief(io, {

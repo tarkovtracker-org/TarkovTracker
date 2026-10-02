@@ -96,7 +96,7 @@ const semanticInstructionScopes = [
       /^app\/server\/api\/(?:account|team|tokens?)(?:\/|$)/,
       /^app\/features\/(?:team\/|settings\/(?:__tests__\/)?(?:ApiToken|AccountDeletion|DeviceData))/,
       /^app\/pages\/(?:(?:account|team|settings)\.|auth\/|oauth\/|__tests__\/(?:account|team|settings|auth-callback)\.)/,
-      /^app\/(?:composables|stores|utils|plugins|middleware|types)\/(?:supabase\/|tarkov\/)?(?:__tests__\/)?(?:useTeam|useTarkov|useApiToken|accountRecovery|deviceData|teamMemberships|team\.|tokenFunctionFallback|supabase|useOAuth|oauthConsent|auth(?:[./]|[A-Z]))/,
+      /^app\/(?:composables|stores|utils|plugins|middleware|types)\/(?:supabase\/|tarkov\/|api\/)?(?:__tests__\/)?(?:useTeam|useTarkov|useApiToken|useEdgeFunctions|useSignOut|useSupabase|accountRecovery|deviceData|team(?:[./]|[A-Z_])|teammate_flow|tokenFunctionFallback|supabase|useOAuth|oauthConsent|auth(?:[./]|[A-Z]))/,
       /^shared\/(?:utils|types)\/(?:__tests__\/)?(?:account|team|token|supabase|oauth|auth(?:[./]|[A-Z]))/,
       /\.sql$/,
       /^scripts\/ops\/prod-db(?:[./]|$)/,
