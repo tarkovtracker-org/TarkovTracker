@@ -51,8 +51,10 @@ security headings inside a code review do not exclude that review. Completion re
 resolved through GitHub's commit endpoint, and ambiguous or unavailable resolution fails closed.
 The PR head, base branch, base SHA, and eligibility are refreshed after collecting evidence;
 head or base changes during collection fail closed. Completion reuse only establishes a review
-for the head commit. Updating from the same base without conflicts keeps that review valid for
-the PR's diff; after retargeting to a different base branch, review the new diff before merging.
+for the head commit. After a base update, review evidence may remain useful for an unchanged diff
+under the root review policy, after assessing integration risks. The guard still requires completion
+for the exact current head; it does not transfer completion from a pre-update commit. After
+retargeting to a different base branch, review the new diff before merging.
 A completed code review can contain findings; the normal feedback-resolution gate still applies.
 Unknown or unavailable status must be reported as incomplete, never treated as permission to retry.
 An unreviewed PR must be quiet for five minutes after creation or its latest

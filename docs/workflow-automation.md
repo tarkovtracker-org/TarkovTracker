@@ -99,9 +99,11 @@ separate rolling [allowances](https://docs.coderabbit.ai/management/plans).
 
 Reviews attach to the PR's own diff. The `Main CI freshness` ruleset (below) blocks merging a behind
 branch until it incorporates current main (`gh pr update-branch <PR>`); that update reruns
-`CI Result` and `Preview Result` on the new head and is not a reason to repeat a code review or
-pause other merges. Repo auto-merge is disabled, so a maintainer-authorized merge still needs
-someone to merge once the refreshed checks pass.
+`CI Result` and `Preview Result` on the new head. Reuse review evidence for an unchanged diff after
+assessing integration with changed base code; a conflict-free merge alone does not establish that
+validation inputs or behavior are unchanged. Follow the root review policy for affected checks and
+re-review triggers. Do not pause other merges for freshness. Repo auto-merge is disabled, so a
+maintainer-authorized merge still needs someone to merge once the refreshed checks pass.
 
 ### Codex request deduplication and waiting
 

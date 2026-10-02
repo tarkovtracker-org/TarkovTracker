@@ -78,11 +78,12 @@ or test logic changes make it relevant.
   optional suggestions stay optional. If review is unavailable or rate-limited, note it in the PR
   and continue; never enable paid over-limit reviews without authorization.
 - Push validated work when useful; batch fixes for one review round into one push when practical.
-- Reviews and validation cover the PR's own diff. Updating from the base without conflicts keeps
-  them valid. The `Main CI freshness` ruleset blocks merging a behind branch; update it
-  (`gh pr update-branch <PR>`) and CI and previews rerun on the new head. Re-review only when the
-  PR diff changes substantially or conflicts were resolved by hand, by requesting
-  `@coderabbitai review` (incremental reviews are off). Do not pause other merges for freshness.
+- Reuse reviews when a base update leaves the reviewed diff unchanged; verify the diff and assess
+  integration with changed base code even after a conflict-free update. Rerun validation whose
+  inputs changed. The `Main CI freshness` ruleset blocks merging a behind branch; update it
+  (`gh pr update-branch <PR>`) and CI and applicable previews rerun on the new head. Request
+  `@coderabbitai review` for substantial diff changes, hand-resolved conflicts, or unresolved
+  integration risks (incremental reviews are off). Do not pause other merges for freshness.
 - Codex only via `node scripts/codex-review/codex-review.mjs <PR> --request --wait-seconds 600`
   (omit `--request` to check status), only when CodeRabbit is rate-limited or for the final review
   of a change that needs independent review (below). Never post raw `@codex review`, repost, or

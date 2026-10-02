@@ -16,7 +16,8 @@ Repo-specific review policy loaded by the `review-production` skill and by CodeR
 Use the validation and review requirements in the root `AGENTS.md` and the commands in
 `package.json`. A READY verdict requires applicable validation and any independent review the root
 policy requires. Unavailable checks or reviews remain incomplete, not passing. Do not rerun checks
-for unchanged validated inputs; a conflict-free update from the base leaves the PR diff unchanged.
+for unchanged validated inputs. After a base update, verify the reviewed diff and assess changed
+base code for integration risks; rerun affected validation even when the merge had no conflicts.
 
 Supabase Edge Functions use Deno; preserve the dedicated Deno tests and database validation rather
 than assuming the root Vitest suite covers them. Applied migrations remain immutable.
