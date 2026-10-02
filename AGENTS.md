@@ -77,13 +77,14 @@ or test logic changes make it relevant.
   and continue; never enable paid over-limit reviews without authorization.
 - Push validated work when useful; batch fixes for one review round into one push when practical.
 - Reviews and validation cover the PR's own diff. Updating from the base without conflicts keeps
-  them valid; the `Main CI freshness` ruleset reruns CI and previews by itself. Re-review only when
-  the PR diff changes substantially or conflicts were resolved by hand, by requesting
+  them valid. The `Main CI freshness` ruleset blocks merging a behind branch; update it
+  (`gh pr update-branch <PR>`) and CI and previews rerun on the new head. Re-review only when the
+  PR diff changes substantially or conflicts were resolved by hand, by requesting
   `@coderabbitai review` (incremental reviews are off). Do not pause other merges for freshness.
 - Codex only via `node scripts/codex-review/codex-review.mjs <PR> --request --wait-seconds 600`
   (omit `--request` to check status), only when CodeRabbit is rate-limited or for the final review
-  of an auth, billing, or migration change. Never post raw `@codex review`, repost, or bypass the
-  guard; never run Codex reviews locally. Pending or unknown review is incomplete.
+  of a change that needs independent review (below). Never post raw `@codex review`, repost, or
+  bypass the guard; never run Codex reviews locally. Pending or unknown review is incomplete.
 - Auth, billing, migrations, and database or Durable Object concurrency control (locks, claims,
   fencing) need one independent review before merge: Codex, another provider, or a human.
 - Merge gate: required checks green, every review thread dispositioned (fixed, rejected with reason,

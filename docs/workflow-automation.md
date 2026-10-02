@@ -29,10 +29,11 @@ Batching pushes and requesting Codex only exceptionally keep reviewer allowances
 reportedly drew over 20 Codex reviews across about 45 pushes. CodeRabbit CLI and PR reviews have
 separate rolling [allowances](https://docs.coderabbit.ai/management/plans).
 
-Reviews attach to the PR's own diff. The `Main CI freshness` ruleset (below) makes a behind branch
-incorporate current main and rerun `CI Result` and `Preview Result`; that rerun is automatic and
-is not a reason to repeat a code review or pause other merges. Repo auto-merge is disabled, so a
-maintainer-authorized merge still needs someone to merge once the refreshed checks pass.
+Reviews attach to the PR's own diff. The `Main CI freshness` ruleset (below) blocks merging a behind
+branch until it incorporates current main (`gh pr update-branch <PR>`); that update reruns
+`CI Result` and `Preview Result` on the new head and is not a reason to repeat a code review or
+pause other merges. Repo auto-merge is disabled, so a maintainer-authorized merge still needs
+someone to merge once the refreshed checks pass.
 
 ### Codex request deduplication and waiting
 
