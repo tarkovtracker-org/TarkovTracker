@@ -122,6 +122,7 @@ test('wrong repository, fork, PR, revision or later run cannot establish request
     { head_sha: head },
     { event: 'workflow_dispatch' },
     { created_at: '2026-10-02T01:07:00Z' },
+    { created_at: command.created_at },
   ]) {
     assert.throws(
       () => applyRequestDispositions(fixture(t, { selectedRun: { ...run, ...change } }), inputs()),

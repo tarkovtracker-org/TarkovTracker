@@ -46,7 +46,7 @@ function validateRun(run, context, receipt) {
     run.head_repository?.full_name?.toLowerCase() === context.repo,
     run.head_sha === receipt.sha,
     run.pull_requests?.some((pull) => pull.number === context.pr),
-    Date.parse(run.created_at) <= Date.parse(receipt.createdAt),
+    Date.parse(run.created_at) < Date.parse(receipt.createdAt),
   ];
   if (!facts.every(Boolean))
     throw new Error('Historical request run does not verify the stated PR revision');

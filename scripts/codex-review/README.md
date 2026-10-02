@@ -96,7 +96,8 @@ node scripts/codex-review/codex-review.mjs <PR> \
 
 The guard verifies an unchanged trusted command, with GraphQL `lastEditedAt: null` to reject commands
 edited into place after creation (REST `updated_at` can change for reactions), authenticated later formal code-review completion
-for that exact SHA, and a same-repository PR Actions run created before the command. It exhausts
+for that exact SHA, and a same-repository PR Actions run created strictly before the command
+(same-second run timestamps are ambiguous). It exhausts
 run pagination for the interval between that run and the command without a branch filter, so branch
 renames cannot hide evidence. Another PR head or a different-head run with missing PR association
 fails closed; an explicitly identified unrelated PR does not block disposition. This does not support fork requests or infer
