@@ -2451,6 +2451,7 @@
       "cleared_logs_toast_description": "Log import can only read quest history still in your Logs folder. Deleted sessions cannot be recovered.",
       "errors": {
         "invalid_archive": "The ZIP archive is incomplete or contains an invalid log entry. No progress was imported.",
+        "budget_exceeded": "The selected logs exceed the safe import budget. Select fewer recent sessions or extract only the relevant log files. No progress was imported.",
         "record_too_large": "An individual log record in {path} is too large to parse safely. No progress was imported. Please report this log format.",
         "apply_import_failed": "Import could not finish. Some progress may already have been imported. Select the same logs again to retry; completed progress is preserved.",
         "no_files_selected": "No files were selected.",

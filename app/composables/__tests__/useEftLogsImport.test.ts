@@ -2,6 +2,7 @@ import { strToU8, zipSync } from 'fflate';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ACTIVE_SEASON } from '@/utils/constants';
 import * as logFileReader from '@/utils/eftLogFileReader';
+import { EftLogImportBudgetError } from '@/utils/eftLogImportBudget';
 import type { Task } from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
 const preferences = { getTasksRequireTraderLevels: true };
@@ -136,6 +137,18 @@ describe('useEftLogsImport', () => {
     const importer = await loadComposable();
     await importer.parseFile(new File(['x'.repeat(9 * 1024 * 1024)], 'notifications.log'));
     expect(importer.importError.value).toBe('settings.log_import.errors.record_too_large');
+    expect(importer.importState.value).toBe('error');
+    expect(importer.isParsing.value).toBe(false);
+    expect(importer.previewData.value).toBeNull();
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+  });
+  it('translates a budget failure without retaining or applying partial evidence', async () => {
+    vi.spyOn(logFileReader, 'readEftLogSources').mockRejectedValueOnce(
+      new EftLogImportBudgetError('evidenceCount')
+    );
+    const importer = await loadComposable();
+    await importer.parseFile(new File([completionLog()], 'notifications.log'));
+    expect(importer.importError.value).toBe('settings.log_import.errors.budget_exceeded');
     expect(importer.importState.value).toBe('error');
     expect(importer.isParsing.value).toBe(false);
     expect(importer.previewData.value).toBeNull();

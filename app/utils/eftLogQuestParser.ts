@@ -1,5 +1,6 @@
 import { ACTIVE_SEASON, GAME_MODES, type GameMode } from '@/utils/constants';
 import { createEftLogRecordReader } from '@/utils/eftLogRecordReader';
+import type { EftLogImportBudget } from '@/utils/eftLogImportBudget';
 const CHAT_MESSAGE_MARKER = 'Got notification | ChatMessageReceived';
 const BACKEND_URL_PATTERN =
   /(?:https?|wss?):\/\/([A-Za-z0-9._-]+\.escapefromtarkov\.com)(\/[A-Za-z0-9_./-]*)?/g;
@@ -305,13 +306,17 @@ function collectUrlModeSignal(
   match: RegExpExecArray,
   timestamp: number,
   timeline: BackendModeSignal[],
-  legacy: BackendModeSignal[]
+  legacy: BackendModeSignal[],
+  budget?: EftLogImportBudget
 ): void {
   const host = match[1]!.toLowerCase();
   const path = (match[2] ?? '').toLowerCase();
   const mode = gatewayMode(host);
-  if (mode) timeline.push({ mode, timestamp: timestamp });
-  else if (isLegacyModeUrl(host, path)) {
+  if (mode) {
+    budget?.retain(0);
+    timeline.push({ mode, timestamp: timestamp });
+  } else if (isLegacyModeUrl(host, path)) {
+    budget?.retain(0);
     legacy.push({ mode: GAME_MODES.PVP, timestamp: timestamp });
   }
 }
@@ -319,24 +324,29 @@ function collectUrlModeSignal(
 function collectDeclaredModeSignal(
   record: LogRecord,
   timeline: BackendModeSignal[],
-  timestamp: number
+  timestamp: number,
+  budget?: EftLogImportBudget
 ): void {
   const declared = declaredRecordMode(record);
-  if (declared) timeline.push({ mode: declared, timestamp });
+  if (declared) {
+    budget?.retain(0);
+    timeline.push({ mode: declared, timestamp });
+  }
 }
 /** Rejects invalid timestamps before collecting declarations and eligible connection URLs. */
 function collectRecordModeSignals(
   record: LogRecord,
   timeline: BackendModeSignal[],
-  legacy: BackendModeSignal[]
+  legacy: BackendModeSignal[],
+  budget?: EftLogImportBudget
 ): void {
   const timestamp = eftLogTimestampMillis(record.timestamp);
   if (timestamp === null) return;
-  collectDeclaredModeSignal(record, timeline, timestamp);
+  collectDeclaredModeSignal(record, timeline, timestamp, budget);
   // Delayed responses and URLs inside JSON chat text are not mode switches.
   if (!isModeSignalRecord(record)) return;
   for (const match of record.message.matchAll(new RegExp(BACKEND_URL_PATTERN))) {
-    collectUrlModeSignal(match, timestamp, timeline, legacy);
+    collectUrlModeSignal(match, timestamp, timeline, legacy, budget);
   }
 }
 /** Builds a session timeline, enabling legacy fallback only without explicit PvP or Seasonal evidence. */
@@ -388,8 +398,17 @@ function resolveEventModeFromTimeline(
   }
   return resolved;
 }
+/** Copies retained substrings so a short identifier cannot pin an entire decoded batch/JSON string.
+ * JSON roundtripping preserves UTF-16 identity, including lone surrogates in event IDs.
+ */
+function copyEvidenceString(value: string): string {
+  return JSON.parse(JSON.stringify(value)) as string;
+}
 /** Extracts quest starts, failures, and completions and counts malformed notification payloads. */
-export function parseEftNotificationLogText(text: string): EftLogTextParseResult {
+export function parseEftNotificationLogText(
+  text: string,
+  budget?: EftLogImportBudget
+): EftLogTextParseResult {
   const completionEvents: EftQuestEvent[] = [];
   const startedEvents: EftQuestEvent[] = [];
   const failedEvents: EftQuestEvent[] = [];
@@ -432,10 +451,12 @@ export function parseEftNotificationLogText(text: string): EftLogTextParseResult
     if (!questId) continue;
     const events = eventBuckets.get(message.type);
     if (!events) continue;
+    const eventKey = buildEventKey(payload, questId, record.timestamp);
+    budget?.retain(eventKey.length + questId.length + record.timestamp.length);
     events.push({
-      eventKey: buildEventKey(payload, questId, record.timestamp),
-      questId,
-      timestamp: record.timestamp,
+      eventKey: copyEvidenceString(eventKey),
+      questId: copyEvidenceString(questId),
+      timestamp: copyEvidenceString(record.timestamp),
       ...(typeof message.dt === 'number' && Number.isFinite(message.dt) && message.dt > 0
         ? { occurredAt: message.dt * 1000 }
         : {}),
@@ -471,21 +492,28 @@ function appendNotificationResult(
   }
 }
 /** Uses the first versioned record header when the path did not identify a build. */
-function updateSourceVersion(source: EftParsedLogFile, text: string): void {
+function updateSourceVersion(
+  source: EftParsedLogFile,
+  text: string,
+  budget?: EftLogImportBudget
+): void {
   if (source.version !== UNKNOWN_LOG_VERSION) return;
-  source.version = /^\d{4}-[^\r\n|]+\|(\d+(?:\.\d+){4})\|/m.exec(text)?.[1] ?? UNKNOWN_LOG_VERSION;
+  const version = /^\d{4}-[^\r\n|]+\|(\d+(?:\.\d+){4})\|/m.exec(text)?.[1];
+  if (!version) return;
+  budget?.charge('evidenceChars', version.length);
+  source.version = copyEvidenceString(version);
 }
 /** Adds only quest notifications and mode signals from a batch of complete records. */
-function appendLogText(source: EftParsedLogFile, text: string): void {
-  updateSourceVersion(source, text);
+function appendLogText(source: EftParsedLogFile, text: string, budget?: EftLogImportBudget): void {
+  updateSourceVersion(source, text, budget);
   for (const record of readLogRecords(text)) {
-    collectRecordModeSignals(record, source.timeline, source.legacy);
+    collectRecordModeSignals(record, source.timeline, source.legacy, budget);
   }
   if (source.notifications)
-    appendNotificationResult(source.notifications, parseEftNotificationLogText(text));
+    appendNotificationResult(source.notifications, parseEftNotificationLogText(text, budget));
 }
 /** Parses complete records once and retains only evidence needed for later version/mode selection. */
-export function createEftLogFileParser(name: string) {
+export function createEftLogFileParser(name: string, budget?: EftLogImportBudget) {
   const source: EftParsedLogFile = {
     name,
     version: extractSessionVersion(name) ?? UNKNOWN_LOG_VERSION,
@@ -493,7 +521,7 @@ export function createEftLogFileParser(name: string) {
     legacy: [],
     notifications: isEftNotificationLogFileName(name) ? parseEftNotificationLogText('') : null,
   };
-  const reader = createEftLogRecordReader((text) => appendLogText(source, text), name);
+  const reader = createEftLogRecordReader((text) => appendLogText(source, text, budget), name);
   return {
     push: reader.push,
     finish: (): EftParsedLogFile => {
