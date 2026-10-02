@@ -274,6 +274,9 @@ function latestCompletion(completed, headSha) {
   if (latest?.result !== 'unknown') return latest;
   // A summary posted seconds after the explicit result adds no findings information.
   const explicit = current.find((item) => item.result !== 'unknown');
+  return explicitSummaryResult(latest, explicit);
+}
+function explicitSummaryResult(latest, explicit) {
   if (!explicit) return latest;
   return latest.at - explicit.at < 60_000 ? explicit : latest;
 }
