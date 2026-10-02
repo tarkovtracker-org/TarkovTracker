@@ -569,6 +569,7 @@ function readinessRequested(context, inputs, state) {
 }
 function readinessEvent(context) {
   return (
+    context.previewReconciliation === true ||
     context.eventName === 'workflow_run' ||
     ['ready_for_review', 'reopened', 'auto_merge_enabled'].includes(context.payload.action)
   );
@@ -793,6 +794,7 @@ function hasPreviewIntent(context, state) {
 }
 function isPreviewRefreshEvent(context) {
   return (
+    context.previewReconciliation === true ||
     context.eventName === 'workflow_run' ||
     ['ready_for_review', 'reopened'].includes(context.payload.action)
   );
@@ -854,6 +856,8 @@ function refreshContext(context, pull) {
     repo: context.repo,
     serverUrl: context.serverUrl,
     runId: context.runId,
+    // Trusted fallback source, separate from ordinary synchronize events that still wait for CI.
+    previewReconciliation: true,
     eventName: 'pull_request_target',
     payload: { ...context.payload, action: 'synchronize', pull_request: pull },
   };

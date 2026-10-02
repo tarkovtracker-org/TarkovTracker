@@ -247,6 +247,8 @@ demonstrate fewer dispatches and commands for sequential events after an active 
 not exactly-once delivery, elapsed CI or token savings. Actions event
 delivery and run-list visibility can still race; concurrency and upload freshness checks remain
 the final controls. A post-merge canary is needed to prove live readiness and comment collapse.
+The trusted hourly fallback retains readiness or standing command authorization when a test merge
+becomes available later; ordinary synchronize events still wait for current successful CI.
 
 ### Files
 

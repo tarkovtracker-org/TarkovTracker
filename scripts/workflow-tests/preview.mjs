@@ -864,7 +864,7 @@ test('automatic requests fail closed when active-run lookup is truncated', async
   assert.equal(result.decision.action, 'wait');
   assert.match(result.core.warnings.join(' '), /search limit/);
 });
-test('automatic requests leave Dependabot and hourly reconciliation to their owners', async (t) => {
+test('Dependabot and ordinary synchronize events do not acquire readiness', async (t) => {
   const pull = { auto_merge: { enabled_by: { login: 'maintainer' } }, user: { id: 49699333 } };
   const bot = await plan(t, workflowRunContext(), { pull });
   assert.deepEqual(bot.state.dispatches, []);
@@ -1904,7 +1904,12 @@ test('hourly reconciliation re-evaluates a head left pending on an unready test 
   };
   await reconcileMissingPreviewStatuses(options);
   assert.deepEqual(statusStates(fake.state.statuses), ['a:pending']);
-  assert.match(fake.state.statuses[0].description, /Comment \/preview/);
+  assert.match(fake.state.statuses[0].description, /Preview enabled: requested/);
+  assert.deepEqual(fake.state.dispatches[0].inputs, {
+    run_id: '900',
+    authorization: 'readiness',
+    ci_attempt: '1',
+  });
   // A newer ordinary pending reason (awaiting a request or deployment) is left alone.
   fake.state.statuses.length = 0;
   fake.state.previewStatuses = [
@@ -1913,6 +1918,36 @@ test('hourly reconciliation re-evaluates a head left pending on an unready test 
   ];
   await reconcileMissingPreviewStatuses(options);
   assert.deepEqual(fake.state.statuses, []);
+});
+test('trusted hourly recovery preserves standing command binding and readiness exclusions', async (t) => {
+  const enabled = fakeGithub(t, { comments: [previewRequestComment()] });
+  const refresh = async (fake) =>
+    reconcileMissingPreviewStatuses({
+      github: fake.github,
+      context: scheduleContext(),
+      core: fakeCore(),
+      workspace: tempDir(t),
+    });
+  await refresh(enabled);
+  assert.equal(enabled.state.dispatches[0].inputs.request_comment_id, '1');
+  for (const [label, options] of Object.entries({
+    draft: { pull: { draft: true } },
+    stop: { comments: [previewRequestComment(2, '/preview stop')] },
+    bot: { pull: { user: { id: 49699333, type: 'Bot' } } },
+    paths: { files: [{ filename: 'docs/contributing.md' }] },
+    staleHead: {
+      pull: { head: { sha: sha('e'), ref: 'feature', repo: { full_name: REPO_NAME } } },
+    },
+    staleBase: { mainSha: sha('e') },
+    fork: {
+      pull: { head: { sha: HEAD, ref: 'feature', repo: { full_name: FORK_NAME } } },
+      run: { head_repository: { full_name: FORK_NAME } },
+    },
+  })) {
+    const fake = fakeGithub(t, options);
+    await refresh(fake);
+    assert.equal(fake.state.dispatches.length, 0, label);
+  }
 });
 test('test-merge lookups fail closed on missing commits and propagate API failures', async (t) => {
   const regenerated = sha('9');
