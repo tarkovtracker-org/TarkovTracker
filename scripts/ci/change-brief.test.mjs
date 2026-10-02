@@ -110,6 +110,37 @@ describe('generated Nuxt declarations', () => {
 });
 describe('path helpers', () => {
   it.each([
+    'app/server/utils/adminSupabase.ts',
+    'app/server/utils/supporterCustomerLookup.ts',
+    'app/server/utils/__tests__/supporterCustomerLookup.test.ts',
+    'app/server/utils/gameModeSeason.ts',
+    'app/server/utils/__tests__/gameModeSeason.test.ts',
+    'app/server/api/admin/supporter.post.ts',
+    'app/server/api/admin/__tests__/api-usage.test.ts',
+    'app/server/api/profile/[userId]/[mode].get.ts',
+    'app/server/api/profile/__tests__/shared-profile.test.ts',
+    'app/server/api/stripe/checkout.post.ts',
+    'app/server/api/stripe/__tests__/portal.test.ts',
+    'app/server/api/twitch/config.get.ts',
+    'app/server/api/twitch/__tests__/config.test.ts',
+    'app/server/api/tarkov/cache-meta.get.ts',
+    'app/server/api/tarkov/__tests__/handlers.test.ts',
+    'app/server/middleware/api-protection.ts',
+    'app/server/middleware/__tests__/api-protection.test.ts',
+  ])('includes production database scope for the tracked server path %s', (file) => {
+    expect(scopedInstructions([file], ['AGENTS.md', 'supabase/AGENTS.md'])).toContain(
+      'supabase/AGENTS.md'
+    );
+  });
+  it.each([
+    'app/server/api/tarkov/tasks-core.get.ts',
+    'app/server/api/tarkov/items.get.ts',
+    'app/server/api/twitch/live.get.ts',
+    'app/server/utils/overlayCounters.ts',
+  ])('keeps non-database server paths outside semantic database scope: %s', (file) => {
+    expect(scopedInstructions([file], ['AGENTS.md', 'supabase/AGENTS.md'])).toEqual(['AGENTS.md']);
+  });
+  it.each([
     'app/composables/api/useEdgeFunctions.ts',
     'app/composables/__tests__/useEdgeFunctions.test.ts',
     'app/composables/useSignOut.ts',

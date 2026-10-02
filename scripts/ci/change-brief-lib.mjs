@@ -93,7 +93,11 @@ const semanticInstructionScopes = [
   {
     instruction: 'supabase/AGENTS.md',
     patterns: [
-      /^app\/server\/api\/(?:account|team|tokens?)(?:\/|$)/,
+      /^app\/server\/api\/(?:account|team|tokens?|admin|profile|stripe)(?:\/|$)/,
+      /^app\/server\/utils\/(?:__tests__\/)?(?:adminSupabase|supporterCustomerLookup|gameModeSeason)(?:[./]|$)/,
+      /^app\/server\/middleware\/(?:__tests__\/)?api-protection(?:[./]|$)/,
+      /^app\/server\/api\/twitch\/(?:config\.get\.ts|__tests__\/config\.test\.ts)$/,
+      /^app\/server\/api\/tarkov\/(?:cache-meta\.get\.ts|__tests__\/handlers\.test\.ts)$/,
       /^app\/features\/(?:team\/|settings\/(?:__tests__\/)?(?:ApiToken|AccountDeletion|DeviceData))/,
       /^app\/pages\/(?:(?:account|team|settings)\.|auth\/|oauth\/|__tests__\/(?:account|team|settings|auth-callback)\.)/,
       /^app\/(?:composables|stores|utils|plugins|middleware|types)\/(?:supabase\/|tarkov\/|api\/)?(?:__tests__\/)?(?:useTeam|useTarkov|useApiToken|useEdgeFunctions|useSignOut|useSupabase|accountRecovery|deviceData|team(?:[./]|[A-Z_])|teammate_flow|tokenFunctionFallback|supabase|useOAuth|oauthConsent|auth(?:[./]|[A-Z]))/,
