@@ -7,7 +7,9 @@ export function readinessEligible(pull, repo, request) {
     readyPull(current),
     sameRepositoryPull(current, repo),
     ordinaryPull(current),
-    request?.enabled !== false,
+    // Any live manual control owns authorization, including a fresh enable after a stop.
+    // A queued readiness run must never borrow that grant; only its bound dispatch may resume.
+    !request,
   ].every(Boolean);
 }
 function readyPull(pull) {

@@ -20,6 +20,8 @@ enable gets a fresh dispatch binding, so revoked work cannot suppress the resume
 State events serialize within their concurrency group instead of cancelling a dispatching job.
 Manual commands use the same active-run lookup. Repeating an enable command preserves a still-live
 original grant; any accepted stop after that grant revokes it even after another enable command.
+Readiness requires no live manual command in both planning and upload verification. A stop followed
+by a fresh enable therefore cannot revive a queued readiness run; the new bound command resumes it.
 Accepted original commands are collapsed with GraphQL `minimizeComment` (`RESOLVED`), using
 their original node ID. They are never edited or deleted. Body-edit metadata continues to authorize
 collapsed commands; stop receipts remain visible, immutable revocation evidence. Minimization

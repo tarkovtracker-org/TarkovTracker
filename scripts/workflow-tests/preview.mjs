@@ -678,6 +678,8 @@ test('readiness dispatch cannot bypass stop, draft, fork or missing attempt prov
   const inputs = { run_id: '900', authorization: 'readiness', ci_attempt: '1' };
   for (const options of [
     { comments: [previewRequestComment(2, '/preview stop')] },
+    { comments: [previewRequestComment(2)] },
+    { comments: [previewRequestComment(2, '/preview stop'), previewRequestComment(3)] },
     { pull: { draft: true } },
     { pull: { head: { sha: HEAD, ref: 'feature', repo: { full_name: FORK_NAME } } } },
     { inputs: { ...inputs, ci_attempt: '' } },
@@ -690,6 +692,8 @@ test('readiness dispatch cannot bypass stop, draft, fork or missing attempt prov
 test('readiness revalidates revocation and exact CI head/base immediately before upload', async (t) => {
   for (const mutate of [
     (s) => s.comments.push(previewRequestComment(2, '/preview stop')),
+    (s) => s.comments.push(previewRequestComment(2)),
+    (s) => s.comments.push(previewRequestComment(2, '/preview stop'), previewRequestComment(3)),
     (s) => {
       s.pull.draft = true;
     },
@@ -727,6 +731,30 @@ test('readiness revalidates revocation and exact CI head/base immediately before
       })
     );
   }
+});
+test('readiness cannot borrow a new manual grant after stop and resume', async (t) => {
+  const context = workflowDispatchContext();
+  const old = await plan(t, context, {
+    inputs: { run_id: '900', authorization: 'readiness', ci_attempt: '1' },
+  });
+  assert.equal(old.decision.action, 'deploy');
+  const comments = [previewRequestComment(2, '/preview stop'), previewRequestComment(3)];
+  old.state.comments.push(...comments);
+  await assert.rejects(
+    verifyForDeploy({
+      ...old,
+      context,
+      destination: join(tempDir(t), 'revoked-ready'),
+    }),
+    /readiness authorization/i
+  );
+  const fresh = await plan(t, context, {
+    comments,
+    inputs: { run_id: '900', request_comment_id: '3', ci_attempt: '1' },
+  });
+  assert.equal(fresh.decision.action, 'deploy');
+  assert.equal(fresh.decision.previewAuthorization, 'request');
+  await verifyForDeploy({ ...fresh, context, destination: join(tempDir(t), 'fresh-command') });
 });
 test('readiness leaves automation owners and non-deployable paths unchanged', async (t) => {
   for (const user of [
