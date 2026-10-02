@@ -67,6 +67,13 @@ cleanup. Cosmetic failures warn without changing guard decisions, locks, quiet p
 completion evidence. Plain status/wait invocations remain read-only. Add `--collapse-requests`
 when authorized to clean up existing manually posted commands while observing status.
 
+After an authorized request's polling window ends, continue this command-cleanup workflow with
+`node scripts/codex-review/codex-review.mjs <PR> --collapse-requests --wait-seconds 600`.
+Omit `--request`: continuation observes the existing review and collapses commands acknowledged
+or completed later without requesting another review. This also covers eligible manually posted
+commands, which do not need a wrapper marker. Use plain `--wait-seconds 600` for intentionally
+read-only inspection; it does not collapse late acknowledgements or completion.
+
 GitHub's [issue_comment activity types](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#issue_comment)
 do not include reactions, so cleanup uses the existing bounded polling loop rather than inventing
 a reaction event. Commands posted outside that loop, or acknowledged after it ends, require a
