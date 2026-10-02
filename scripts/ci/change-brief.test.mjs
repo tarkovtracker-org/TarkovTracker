@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildBrief,
@@ -129,6 +129,10 @@ describe('path helpers', () => {
       'app/server/api/account/activity.post.ts',
       'app/server/api/team/members.ts',
       'app/features/settings/ApiTokens.vue',
+      'app/features/settings/AccountDeletionCard.vue',
+      'app/features/settings/__tests__/AccountDeletionCard.deviceRemoval.test.ts',
+      'app/pages/settings.vue',
+      'app/stores/tarkov/deviceData.ts',
       'app/stores/tarkov/accountRecovery.ts',
       'app/stores/useTeamStore.ts',
       'app/utils/tokenFunctionFallback.ts',
@@ -458,5 +462,31 @@ describe('buildBrief', () => {
     expect(text).not.toContain('app/features/f14.vue');
     expect(text).toMatch(/Never in any graph: runtime string lookups/);
     expect(text).toContain('Advisory only: CI and AGENTS.md remain authoritative.');
+  });
+});
+describe('CLI repository-relative operands', () => {
+  it('normalizes dot prefixes, parent segments, and Windows separators for files and symbols', () => {
+    const file = 'workers/api-gateway/src/utils/gameMode.ts';
+    for (const args of [
+      ['--file', `./${file}`],
+      ['--symbol', `./${file}:getGameModeSeasonNumber`],
+      ['--file', file.replaceAll('/', '\\')],
+      ['--file', 'workers/api-gateway/src/../src/utils/gameMode.ts'],
+      ['--file', resolve(file)],
+    ]) {
+      const output = execFileSync(
+        process.execPath,
+        ['scripts/ci/change-brief.mjs', ...args, '--format', 'json'],
+        { encoding: 'utf8', shell: false, timeout: 20000 }
+      );
+      const brief = JSON.parse(output);
+      expect(brief.instructions).toContain('workers/api-gateway/AGENTS.md');
+      expect(brief.validation.scoped.join('\n')).toContain(
+        'pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run'
+      );
+      expect(brief.targets[0].target).toBe(
+        args[0] === '--symbol' ? `${file}:getGameModeSeasonNumber` : file
+      );
+    }
   });
 });

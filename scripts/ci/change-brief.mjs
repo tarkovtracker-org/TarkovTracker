@@ -2,6 +2,7 @@
 // Discovery brief for a file, exported symbol, or branch diff. See scripts/ci/README.md.
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import {
@@ -90,10 +91,20 @@ const io = {
   listFiles: () => git(['ls-files', '-z']).split('\0').filter(Boolean),
   instructionFiles: () => git(['ls-files', '-z', '--', '*AGENTS.md']).split('\0').filter(Boolean),
 };
+function normalizeFile(file) {
+  const normalized = relative(process.cwd(), resolve(file.replaceAll('\\', '/'))).replaceAll(
+    '\\',
+    '/'
+  );
+  if (!normalized || /^(?:\.\.(?:\/|$)|\/|[a-z]:\/)/i.test(normalized)) {
+    throw new Error('--file and --symbol file paths must resolve inside the repository');
+  }
+  return normalized;
+}
 function parseSymbol(value) {
   const separator = value.lastIndexOf(':');
   if (separator <= 0) throw new Error(`--symbol must be FILE:EXPORT, received ${value}`);
-  return { file: value.slice(0, separator), symbol: value.slice(separator + 1) };
+  return { file: normalizeFile(value.slice(0, separator)), symbol: value.slice(separator + 1) };
 }
 const noDiff = { changedPaths: [], targets: [], notes: [] };
 function diffTargets(base) {
@@ -120,7 +131,10 @@ function readRequest() {
   const { values } = parseArgs({ options: cliOptions });
   if (!['text', 'json'].includes(values.format)) throw new Error('--format must be text or json');
   const diff = diffTargets(values.base);
-  const explicit = [...values.file.map((file) => ({ file })), ...values.symbol.map(parseSymbol)];
+  const explicit = [
+    ...values.file.map((file) => ({ file: normalizeFile(file) })),
+    ...values.symbol.map(parseSymbol),
+  ];
   const targets = [...explicit, ...diff.targets];
   if (!targets.length && !diff.changedPaths.length) {
     throw new Error('Pass --file <path>, --symbol <file:export>, or --base <ref>');

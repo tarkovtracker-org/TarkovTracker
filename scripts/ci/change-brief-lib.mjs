@@ -73,9 +73,9 @@ const semanticInstructionScopes = [
     instruction: 'supabase/AGENTS.md',
     patterns: [
       /^app\/server\/api\/(?:account|team|tokens?)(?:\/|$)/,
-      /^app\/features\/(?:team\/|settings\/(?:__tests__\/)?ApiToken)/,
-      /^app\/pages\/(?:(?:account|team)\.|auth\/|oauth\/|__tests__\/(?:account|team|auth-callback)\.)/,
-      /^app\/(?:composables|stores|utils|plugins|middleware|types)\/(?:supabase\/|tarkov\/)?(?:__tests__\/)?(?:useTeam|useApiToken|accountRecovery|teamMemberships|team\.|tokenFunctionFallback|supabase|useOAuth|oauthConsent|auth(?:[./]|[A-Z]))/,
+      /^app\/features\/(?:team\/|settings\/(?:__tests__\/)?(?:ApiToken|AccountDeletion))/,
+      /^app\/pages\/(?:(?:account|team|settings)\.|auth\/|oauth\/|__tests__\/(?:account|team|settings|auth-callback)\.)/,
+      /^app\/(?:composables|stores|utils|plugins|middleware|types)\/(?:supabase\/|tarkov\/)?(?:__tests__\/)?(?:useTeam|useTarkov|useApiToken|accountRecovery|deviceData|teamMemberships|team\.|tokenFunctionFallback|supabase|useOAuth|oauthConsent|auth(?:[./]|[A-Z]))/,
       /^shared\/(?:utils|types)\/(?:__tests__\/)?(?:account|team|token|supabase|oauth|auth(?:[./]|[A-Z]))/,
       /\.sql$/,
       /^scripts\/ops\/prod-db(?:[./]|$)/,

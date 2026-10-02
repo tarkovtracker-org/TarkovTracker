@@ -34,6 +34,8 @@ Before editing, `pnpm run brief` answers "what uses this, what owns it, and what
 in one call. Point it at a target with `--file <path>` or `--symbol <file:export>` (both
 repeatable), or at a diff with `--base <ref>`, which briefs the local changes against the merge
 base. Add `--format json` for the uncapped lists.
+Explicit file operands resolve inside the repository; dot segments, Windows separators, and
+absolute paths within the checkout are normalized before scope and runner selection.
 It combines `fallow inspect` (import graph, symbol references, transitive impact), the
 generated `.nuxt/components.d.ts` and `.nuxt/imports.d.ts`, path-literal references in workflows
 and config, doc anchors, scoped `AGENTS.md` files, and the CI path classifier. The output lists
@@ -69,8 +71,9 @@ path mappings from the [brief model](../scripts/ci/change-brief-lib.mjs). Confir
 `AGENTS.md` contract for differently named account/team/token code; path mappings do not prove
 semantic coverage. Generated declarations are checked
 for presence, not freshness. Fallow subprocesses currently have no timeout or output cap.
-Path-reference seeds are limited to 60; some rendered lists remain uncapped. Unit tests inject
-I/O, so they do not by themselves verify Git, generated declarations, or Fallow at runtime.
+Path-reference seeds are limited to 60; some rendered lists remain uncapped. Model tests inject
+I/O. CLI regressions exercise operand handling against a checkout; they do not establish
+generated-declaration freshness or complete Fallow coverage.
 
 The brief was benchmarked on three past fixes: season validation (`f2ad088f`), a
 component/composable change (`a9828505`), and preview tooling (`1676ddda`). In each, it surfaced
