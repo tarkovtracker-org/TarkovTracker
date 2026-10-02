@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { gitExecutable } from './validation-tools.mjs';
 let root;
 const environment = Object.fromEntries(
-  Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
+  Object.entries(process.env).filter(([key]) => key === 'GIT_EXECUTABLE' || !key.startsWith('GIT_'))
 );
 const git = (...args) =>
   execFileSync(gitExecutable(), ['-C', root, ...args], {
