@@ -109,12 +109,43 @@ describe('generated Nuxt declarations', () => {
   });
 });
 describe('path helpers', () => {
+  it('matches the actual root, gateway, Deno, and workflow runner naming rules', () => {
+    for (const [file, expected] of [
+      ['app/utils/example.test.tsx', true],
+      ['app/utils/example.spec.cts', true],
+      ['app/utils/__tests__/Helper.vue', false],
+      ['workers/api-gateway/src/handlers/__tests__/nested/example.test.ts', true],
+      ['workers/api-gateway/src/__tests__/example.test.tsx', false],
+      ['workers/api-gateway/src/utils/example.test.ts', false],
+      ['supabase/functions/_shared/example.deno.test.ts', true],
+      ['supabase/functions/_shared/fixtures.ts', false],
+      ['scripts/workflow-tests/security.mjs', true],
+      ['scripts/workflow-tests/helpers/security.mjs', false],
+      ['scripts/codex-review/codex-review-tests.mjs', true],
+      ['scripts/codex-review/helpers/fixture-tests.mjs', false],
+    ]) {
+      expect(isTestPath(file), file).toBe(expected);
+    }
+  });
   it('classifies test files across runners', () => {
     expect(isTestPath('app/components/ui/__tests__/GameItem.test.ts')).toBe(true);
     expect(isTestPath('scripts/workflow-tests/validation.mjs')).toBe(true);
     expect(isTestPath('scripts/codex-review/codex-review-tests.mjs')).toBe(true);
     expect(isTestPath('scripts/workflow-tests/README.md')).toBe(false);
     expect(isTestPath('app/components/ui/GameItem.vue')).toBe(false);
+  });
+  it('excludes helper modules and files outside runner filename patterns', () => {
+    for (const file of [
+      'workers/api-gateway/src/__tests__/cloudflare-workers.ts',
+      'workers/api-gateway/src/__tests__/example.spec.ts',
+      'workers/api-gateway/src/utils/example.test.ts',
+      'app/utils/__tests__/fixtures.ts',
+      'scripts/workflow-tests/helpers/workflow-blocks.mjs',
+      'app/utils/example-tests.mjs',
+    ]) {
+      expect(isTestPath(file)).toBe(false);
+    }
+    expect(isTestPath('app/utils/example.spec.ts')).toBe(true);
   });
   it('collects AGENTS.md files on each ancestor chain', () => {
     expect(
@@ -286,6 +317,76 @@ describe('validationFor', () => {
   });
 });
 describe('buildBrief', () => {
+  it('keeps scoped validation complete and deduplicated for graph chains, test consumers, and cycles', async () => {
+    const seed = 'app/utils/constants.ts';
+    const gateway = 'workers/api-gateway/src/handlers/team.ts';
+    const gatewayTest = 'workers/api-gateway/src/__tests__/team.test.ts';
+    for (const [direct, transitive] of [
+      [[gateway], []],
+      [['app/utils/modeProgressFallback.ts'], [gateway]],
+      [[gatewayTest], []],
+      [
+        [gateway, seed],
+        [seed, gateway, gatewayTest, seed],
+      ],
+    ]) {
+      const io = fakeIo({ reports: { [seed]: trace(direct, transitive) } });
+      const brief = await buildBrief(io, { targets: [{ file: seed }] });
+      expect(
+        brief.instructions.filter((file) => file === 'workers/api-gateway/AGENTS.md')
+      ).toHaveLength(1);
+      expect(brief.validation.scoped).toHaveLength(1);
+      expect(brief.validation.scoped[0]).toContain(
+        'pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run'
+      );
+    }
+  });
+  it('retains scope checks and explicit uncertainty when a graph target is missing', async () => {
+    const missing = 'workers/api-gateway/src/utils/missing.ts';
+    const brief = await buildBrief(fakeIo(), { targets: [{ file: missing }] });
+    expect(brief.instructions).toContain('workers/api-gateway/AGENTS.md');
+    expect(brief.validation.scoped.join('\n')).toContain('--dry-run');
+    expect(
+      brief.uncertainty.some((note) => note.includes(`Fallow could not analyze ${missing}`))
+    ).toBe(true);
+    expect(brief.tests.commands).toEqual([]);
+  });
+  it('omits missing tests from direct, nearby, and transitive candidates', async () => {
+    const source = 'app/components/ui/GameItem.vue';
+    const direct = 'app/components/ui/__tests__/GameItem.test.ts';
+    const transitive = 'app/pages/__tests__/missing.page.test.ts';
+    const io = fakeIo({ reports: { [source]: trace([direct], [transitive]) } });
+    io.fileExists = (file) => ![direct, transitive].includes(file);
+    const brief = await buildBrief(io, { targets: [{ file: source }] });
+    expect(brief.tests.direct).toEqual([]);
+    expect(brief.tests.nearby).toEqual([]);
+    expect(brief.tests.transitive).toEqual([]);
+    expect(brief.tests.commands).toEqual([]);
+    expect(brief.tests.broaderCommands).toEqual([]);
+  });
+  it('adds instructions and required checks for transitive gateway consumers', async () => {
+    const io = fakeIo({
+      reports: {
+        'app/utils/constants.ts': trace(
+          ['app/utils/modeProgressFallback.ts'],
+          ['workers/api-gateway/src/handlers/team.ts']
+        ),
+      },
+    });
+    const brief = await buildBrief(io, { targets: [{ file: 'app/utils/constants.ts' }] });
+    expect(brief.instructions).toContain('workers/api-gateway/AGENTS.md');
+    expect(brief.validation.scoped.join('\n')).toContain(
+      'pnpm --filter api-gateway exec wrangler deploy --config wrangler.toml --dry-run'
+    );
+  });
+  it('finds real test consumers of a targeted gateway helper without running the helper', async () => {
+    const helper = 'workers/api-gateway/src/__tests__/cloudflare-workers.ts';
+    const consumer = 'workers/api-gateway/src/__tests__/example.test.ts';
+    const io = fakeIo({ reports: { [helper]: trace([consumer]) } });
+    const brief = await buildBrief(io, { targets: [{ file: helper }], changedPaths: [helper] });
+    expect(brief.tests.direct).toEqual([consumer]);
+    expect(brief.tests.commands).toEqual(testCommands([consumer]));
+  });
   it('does not recommend running a test deleted by the diff', async () => {
     const io = fakeIo();
     io.fileExists = () => false;

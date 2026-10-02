@@ -44,6 +44,8 @@ checks.
 
 Candidate test entries are JSON records with `executable` and `args`, including in text output.
 Directly targeted tests and existing tests in the diff are included even when they have no importers.
+Runnable candidates follow the runner's filename patterns; helpers are traced to their test consumers.
+Scoped instructions and checks include direct and transitive dependents, including test consumers.
 They are data to review, not shell commands to paste or concatenate. Pass arguments separately
 to a runner that does not use a shell; Windows command shims such as `pnpm.cmd` need a trusted
 platform-specific launcher. Relative file operands start with `./` to avoid runner options;

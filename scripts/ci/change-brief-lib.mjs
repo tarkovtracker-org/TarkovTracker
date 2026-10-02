@@ -3,7 +3,8 @@
 import { classifyPaths } from './validation-plan.mjs';
 const codePattern = /\.(?:[cm]?[jt]sx?|vue)$/;
 const testPattern =
-  /(?:^|\/)__tests__\/|\.(?:test|spec)\.[cm]?[jt]sx?$|^scripts\/workflow-tests\/[^/]+\.mjs$|-tests\.mjs$/;
+  /\.(?:test|spec)\.[cm]?[jt]sx?$|^scripts\/workflow-tests\/[^/]+\.mjs$|^scripts\/codex-review\/[^/]+-tests\.mjs$/;
+const gatewayTestPattern = /^workers\/api-gateway\/src\/(?:.*\/)?__tests__\/.*\.test\.ts$/;
 // Non-JavaScript files that load scripts or reference modules by path (workflows, config, SQL).
 const pathReferenceSpecs = [
   '.github/',
@@ -22,7 +23,10 @@ const maxBroaderTests = 25;
 const alwaysOutsideGraph =
   'Never in any graph: runtime string lookups (i18n keys, Supabase RPC/table names, KV keys, upstream field names).';
 export const isCodePath = (path) => codePattern.test(path);
-export const isTestPath = (path) => isCodePath(path) && testPattern.test(path);
+export const isTestPath = (path) =>
+  path.startsWith('workers/api-gateway/')
+    ? gatewayTestPattern.test(path)
+    : isCodePath(path) && testPattern.test(path);
 const isSourcePath = (path) => !isTestPath(path);
 const stripExtension = (path) => path.replace(/\.[^./]+$/, '');
 const stem = (path) => stripExtension(path.split('/').pop());
@@ -279,10 +283,11 @@ const nearbyTests = (analyses, testFiles) =>
   );
 /** Changed/targeted tests plus tests that import, text-match, neighbor, or transitively reach targets. */
 function candidateTests(io, analyses, seeds) {
-  const selected = seeds.filter(isTestPath).filter((file) => io.fileExists?.(file) !== false);
-  const direct = unique([...selected, ...directTests(analyses)]);
-  const nearby = without(nearbyTests(analyses, io.listFiles().filter(isTestPath)), direct);
-  const reached = unique(analyses.flatMap((analysis) => analysis.transitive)).filter(isTestPath);
+  const existingTest = (file) => isTestPath(file) && io.fileExists?.(file) !== false;
+  const selected = seeds.filter(existingTest);
+  const direct = unique([...selected, ...directTests(analyses).filter(existingTest)]);
+  const nearby = without(nearbyTests(analyses, io.listFiles().filter(existingTest)), direct);
+  const reached = unique(analyses.flatMap((analysis) => analysis.transitive)).filter(existingTest);
   return {
     direct: direct.sort(),
     nearby: nearby.sort(),
@@ -314,8 +319,11 @@ export async function buildBrief(io, { targets, changedPaths = [], base }) {
   const seeds = unique([...changedPaths, ...targets.map((target) => target.file)]);
   const touched = unique([
     ...seeds,
-    ...consumers,
-    ...analyses.flatMap((analysis) => analysis.textOnly),
+    ...analyses.flatMap(({ importers, transitive, textOnly }) => [
+      ...importers,
+      ...transitive,
+      ...textOnly,
+    ]),
   ]);
   const tests = candidateTests(io, analyses, seeds);
   return {
