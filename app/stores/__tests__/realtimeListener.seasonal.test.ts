@@ -304,6 +304,44 @@ describe('seasonal progress realtime synchronization', () => {
     progressStorageSerializer.reset();
   });
   it.each(['live', 'reconnect'])(
+    'merges historical oversized confirmations before %s eviction',
+    async (source) => {
+      const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+      state.pvp.taskAvailability = { s1: { requirements: 'old', timestamp: 0 } };
+      const row = {
+        game_mode: 'pvp',
+        season_number: 0,
+        progress_data: {
+          ...structuredClone(defaultState.pvp),
+          taskAvailability: Object.fromEntries(
+            Array.from({ length: 66 }, (_, i) => [
+              `s${i + 1}`,
+              { requirements: 'r'.repeat(4000), timestamp: i + 1 },
+            ])
+          ),
+        },
+        updated_at: '2026-09-06T12:00:00Z',
+      };
+      supabaseContext.client.from.mockImplementation((table: string) => ({
+        select: () => ({
+          eq: () =>
+            table === 'user_progress'
+              ? { single: async () => ({ data: null, error: null }) }
+              : Promise.resolve({ data: [row], error: null }),
+        }),
+      }));
+      await setupRealtimeListener(store);
+      if (source === 'live') handlers.get('user_game_mode_progress')?.({ new: row });
+      else {
+        createdChannels[0]!.subscribeCallback?.('SUBSCRIBED');
+        await vi.waitFor(() => expect(supabaseContext.client.from).toHaveBeenCalledTimes(2));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      expect(state.pvp.taskAvailability).not.toHaveProperty('s1');
+      expect(Object.keys(state.pvp.taskAvailability ?? {})).toHaveLength(65);
+    }
+  );
+  it.each(['live', 'reconnect'])(
     'ignores visibility-created placeholders during %s updates',
     async (source) => {
       const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');

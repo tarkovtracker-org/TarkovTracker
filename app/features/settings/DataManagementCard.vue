@@ -315,6 +315,8 @@
                 icon="i-mdi-check"
                 color="primary"
                 class="flex-1"
+                :loading="tarkovDevIsImporting"
+                :disabled="tarkovDevIsImporting"
                 @click="handleTarkovDevConfirm"
               >
                 {{ $t('common.confirm_import') }}
@@ -323,6 +325,7 @@
                 variant="soft"
                 color="neutral"
                 class="flex-1"
+                :disabled="tarkovDevIsImporting"
                 @click="resetTarkovDevImport()"
               >
                 {{ $t('common.cancel') }}
@@ -1147,6 +1150,7 @@
   }
   const {
     importState: tarkovDevImportState,
+    isImporting: tarkovDevIsImporting,
     previewData: tarkovDevPreview,
     importError: tarkovDevImportError,
     importErrorCode: tarkovDevImportErrorCode,

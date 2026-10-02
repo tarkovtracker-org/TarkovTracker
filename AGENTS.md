@@ -54,7 +54,9 @@ or test logic changes make it relevant.
 - Overlay consumers enforce HTTPS and preserve the cache/adaptation/overlay ordering in
   `docs/systems/`; task patches keep the raw upstream trader requirement shape before adaptation.
 - Applied/shared migrations are immutable. Never run remote migration repair, reset, or squash as
-  routine cleanup. Inspect production only through the read-only `scripts/ops/prod-db` observer.
+  routine cleanup. Prefer the read-only `scripts/ops/prod-db` observer for production inspection.
+  Agents may collect identity/history and bounded read-only catalog evidence through authenticated
+  Supabase MCP and CLI dry-runs under `docs/runbook.md#database-migrations`; never infer write authority.
 
 ## Scoped rules — read before editing
 

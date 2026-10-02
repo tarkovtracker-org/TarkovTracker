@@ -1,5 +1,6 @@
 import { defaultState, type UserProgressData, type UserState } from '@/stores/progressState';
 import {
+  acknowledgeHistoricalReconciliation,
   blockAccountRecoveryRetentionForOwner,
   preserveForeignActiveCopy,
 } from '@/stores/tarkov/accountRecovery';
@@ -41,6 +42,11 @@ import {
   sanitizeTarkovUid,
 } from '@/utils/progressSanitizers';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
+import {
+  mergeTaskAvailability,
+  taskAvailabilityCandidates,
+  type ConfirmationMap,
+} from '@/utils/taskAvailabilityConfirmation';
 import { parseUserScopedStorage } from '@/utils/userScopedStorage';
 import type { LocalIgnoredReason } from '@/composables/useToastI18n';
 import type { StartupOwnershipGuard } from '@/stores/tarkov/startupOwnership';
@@ -88,6 +94,7 @@ type LocalProgress = {
   state: UserState;
   hasProgress: boolean;
   shouldPersistSanitized: boolean;
+  confirmationCandidates?: PersistedProgressSnapshot['confirmationCandidates'];
 };
 type ModeProgressResult = Awaited<ReturnType<typeof loadModeProgress>>;
 type RemoteProgress = {
@@ -149,6 +156,7 @@ const adoptSnapshot = (
   return {
     ...local,
     state,
+    confirmationCandidates: snapshot.confirmationCandidates,
     hasProgress: hasProgress(state),
     shouldPersistSanitized: local.shouldPersistSanitized || snapshot.hadDeprecatedProgressData,
   };
@@ -308,7 +316,11 @@ const acknowledgeRemoteModes = (
   const clean = GAME_MODE_VALUES.filter(
     (mode) => !hasDeprecatedTarkovDevProfileData(payloads[mode])
   );
-  recordAcknowledgedModes(userId, Object.fromEntries(clean.map((mode) => [mode, state[mode]])));
+  recordAcknowledgedModes(
+    userId,
+    Object.fromEntries(clean.map((mode) => [mode, state[mode]])),
+    state
+  );
 };
 type RemoteLoad =
   { ok: false } | { ok: true; hadRemoteData: boolean; remote: RemoteProgress | null };
@@ -394,15 +406,32 @@ const logStartupMerge = (local: UserState, remote: UserState): void =>
   });
 const upload = async (ctx: StartupLoadContext, state: UserState, failure: string) => {
   recordLocalSyncTime();
-  const { error } = await syncProgressState(ctx.client, ctx.userId, state);
+  const { error, tarkovUidConflict } = await syncProgressState(ctx.client, ctx.userId, state);
   ensureCurrent(ctx);
+  if (tarkovUidConflict) state.tarkovUid = tarkovUidConflict.storedUid;
   if (error) logger.error(failure, error);
   return !error;
+};
+/** Merge historical confirmations without retaining raw candidates in applied state. */
+const mergeHistoricalConfirmations = (
+  local: LocalProgress,
+  remote: RemoteProgress,
+  resolved: UserState
+): UserState => {
+  const payloads = remoteModePayloads(remote.row, remote.modes);
+  for (const mode of GAME_MODE_VALUES) {
+    if (toProgressEpoch(local.state[mode]) !== toProgressEpoch(remote.state[mode])) continue;
+    resolved[mode].taskAvailability = mergeTaskAvailability(
+      local.confirmationCandidates?.[mode] ?? local.state[mode].taskAvailability,
+      payloads[mode]?.taskAvailability
+    );
+  }
+  return resolved;
 };
 const resolveAgainstRemote = (local: LocalProgress, remote: RemoteProgress): UserState => {
   const freshness = remoteFreshness(remote);
   const localTimestamp = local.meta?.timestamp ?? null;
-  return resolveInitialSyncState(
+  const resolved = resolveInitialSyncState(
     local.state,
     remote.state,
     local.meta?.metadataTimestamp ?? localTimestamp,
@@ -417,6 +446,7 @@ const resolveAgainstRemote = (local: LocalProgress, remote: RemoteProgress): Use
       ),
     }
   );
+  return mergeHistoricalConfirmations(local, remote, resolved);
 };
 const wasDisplacedByRemote = (
   mode: GameMode,
@@ -447,6 +477,68 @@ const archiveDisplacedProgress = (
   GAME_MODE_VALUES.filter((mode) => wasDisplacedByRemote(mode, local, remote, resolved)).every(
     (mode) => archiveModeCopy(userId, local, mode)
   );
+const localModeConfirmationEvidence = (local: LocalProgress, mode: GameMode): ConfirmationMap =>
+  local.confirmationCandidates?.[mode] ?? local.state[mode].taskAvailability ?? {};
+const candidateClock = (confirmations: ConfirmationMap, taskId: string): number =>
+  Object.hasOwn(confirmations, taskId) ? confirmations[taskId]!.timestamp : 0;
+/** Missing keys are not deletions in the union RPC; use the existing clear-tombstone semantics. */
+const evictedRemoteConfirmations = (
+  local: ConfirmationMap,
+  remote: unknown,
+  resolved: UserProgressData['taskAvailability']
+): ConfirmationMap =>
+  Object.fromEntries(
+    Object.entries(taskAvailabilityCandidates(remote))
+      .filter(([taskId]) => !Object.hasOwn(resolved ?? {}, taskId))
+      .map(([taskId, confirmation]) => [
+        taskId,
+        {
+          requirements: '',
+          timestamp: Math.max(confirmation.timestamp, candidateClock(local, taskId)),
+        },
+      ])
+  );
+const modeEvictionPass = (
+  local: LocalProgress,
+  remote: RemoteProgress,
+  payload: UserProgressData | null | undefined,
+  resolved: UserState,
+  mode: GameMode
+): UserProgressData | null => {
+  if (toProgressEpoch(local.state[mode]) !== toProgressEpoch(remote.state[mode])) return null;
+  const clears = evictedRemoteConfirmations(
+    localModeConfirmationEvidence(local, mode),
+    payload?.taskAvailability,
+    resolved[mode].taskAvailability
+  );
+  return Object.keys(clears).length ? { ...resolved[mode], taskAvailability: clears } : null;
+};
+const startupEvictionPass = (
+  local: LocalProgress,
+  remote: RemoteProgress,
+  resolved: UserState
+): UserState | null => {
+  const payloads = remoteModePayloads(remote.row, remote.modes);
+  const cleared = cloneStateSnapshot(resolved);
+  let needed = false;
+  for (const mode of GAME_MODE_VALUES) {
+    const progress = modeEvictionPass(local, remote, payloads[mode], resolved, mode);
+    if (progress) {
+      cleared[mode] = progress;
+      needed = true;
+    }
+  }
+  return needed ? cleared : null;
+};
+const uploadReconciledProgress = async (
+  ctx: StartupLoadContext,
+  evictions: UserState | null,
+  resolved: UserState
+): Promise<boolean> => {
+  const failure = '[TarkovStore] Error syncing merged progress to Supabase:';
+  if (evictions && !(await upload(ctx, evictions, failure))) return false;
+  return upload(ctx, resolved, failure);
+};
 const remoteHadDeprecatedData = (remote: RemoteProgress): boolean =>
   hasDeprecatedTarkovDevProfileData(remoteModePayloads(remote.row, remote.modes));
 /** Merge this user's own local progress with remote; upload when the result differs. */
@@ -457,15 +549,16 @@ const mergeWithRemote = async (
 ): Promise<Resolution | null> => {
   const resolved = resolveAgainstRemote(local, remote);
   if (!archiveDisplacedProgress(ctx.userId, local.state, remote.state, resolved)) return null;
+  const evictions = startupEvictionPass(local, remote, resolved);
   let needsRemoteCleanup = remoteHadDeprecatedData(remote);
-  if (deepEqual(resolved, remote.state)) {
+  if (deepEqual(resolved, remote.state) && !evictions) {
     logger.debug('[TarkovStore] Startup sync resolved to existing remote state');
   } else {
     logStartupMerge(local.state, remote.state);
-    const failure = '[TarkovStore] Error syncing merged progress to Supabase:';
-    if (!(await upload(ctx, resolved, failure))) return null;
+    if (!(await uploadReconciledProgress(ctx, evictions, resolved))) return null;
     needsRemoteCleanup = false;
   }
+  acknowledgeHistoricalReconciliation(ctx.userId);
   acceptRemote(ctx, remote, local.state, resolved);
   if (!deepEqual(resolved, local.state)) assignProgress(ctx.store, resolved);
   return { state: resolved, needsRemoteCleanup };
@@ -504,6 +597,9 @@ const uploadLocalProgress = async (
   logger.debug('[TarkovStore] Migrating localStorage data to Supabase');
   const failure = '[TarkovStore] Error migrating local data to Supabase:';
   if (!(await upload(ctx, local.state, failure))) return null;
+  acknowledgeHistoricalReconciliation(ctx.userId);
+  const serialized = progressStorageSerializer.serialize(local.state, ctx.userId, Date.now());
+  persistActiveProgressValue(serialized, true);
   logger.debug('[TarkovStore] Migration complete');
   return { state: local.state, needsRemoteCleanup: false, migrated: true };
 };

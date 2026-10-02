@@ -285,16 +285,17 @@ These show up in Supabase logs / query performance and are expected. Do not trea
   deletions, and renames are a stop condition unless part of an explicitly approved recovery or
   baseline project. Restoring an accidentally edited file to its deployed Git revision is not a new
   schema change; verify the resulting PR has no historical SQL diff.
-- An authorized operator verifies the linked project identity and records the target project, Git SHA,
-  CLI version, time, and sanitized output of these read-only commands before deployment and again
-  after the integration:
+- The implementing agent collects migration evidence directly using available authenticated MCP,
+  the read-only observer, and CLI access. Operator-provided records are not required. Record the
+  verified target project/ref, Git SHA, CLI version, capture time and sanitized results before merge
+  and repeat the relevant checks after integration. When the CLI is linked, use:
 
   ```bash
   git rev-parse HEAD
   pnpm exec supabase --version
   pnpm exec supabase projects list
   pnpm exec supabase migration list --linked
-  pnpm exec supabase db push --linked --dry-run
+  pnpm exec supabase db push --linked --dry-run --skip-vault
   ```
 
   Confirm the remote project ref in `projects list` matches the linked ref stored in the gitignored
@@ -306,9 +307,22 @@ These show up in Supabase logs / query performance and are expected. Do not trea
   unexpected versions or ordering differences and reconcile against deployment records before any
   push. After deployment, expect no pending migrations for the deployed revision. A branch with new
   migrations legitimately has pending versions before deployment; record that exact expected set.
-  Do not give Pi migration/admin credentials for these checks: use operator-provided evidence and the
-  approved read-only observer for supported catalog inspection. If evidence is unavailable, report
-  remote synchronization as unverified rather than assuming it from green CI.
+  If linked CLI access is unavailable, verify the authenticated MCP project URL against the
+  observer's `project_ref`, collect observer/MCP migration history, and run `migration list` and
+  `db push --dry-run --skip-vault` with `--db-url` using the dedicated observer connection. This is
+  equivalent evidence for the verified target; record the transport used rather than claiming a
+  linked command ran. A CLI dry-run checks the pending migration plan, not SQL execution or locks;
+  validate SQL in a disposable database and inspect production catalogs separately.
+
+  Prefer the observer for telemetry and relation inspection. Authenticated MCP may collect bounded,
+  catalog-only SELECT results for function contracts, dependencies, grants and triggers that the
+  observer cannot report. Do not execute mutation routines or read application rows through this
+  exception. Never pass privileged credentials to the observer. Load only the credentials needed
+  for each CLI command, keep passwords out of arguments/logs using `PGPASSFILE`, keep TLS validation
+  enabled, and never use `--debug` with production credentials. Always include `--skip-vault` on a
+  dry-run so configuration cannot update Vault secrets. Inspection does not authorize deployment,
+  migration repair, reset, privilege changes or other remote writes. If required evidence cannot be
+  collected, report the precise gap instead of treating green CI as production clearance.
 
 - **Deploy migrations only from a revision that is already merged to `main`.** Pushing from an
   unmerged branch moves remote history ahead of the checkout, and every later `main` build then fails
@@ -768,11 +782,17 @@ interpret cumulative counters.
 
 `preflight` parses the proposed migration to identify referenced relations and operation classes,
 then combines that information with production table/index, traffic, vacuum, query, lock, and
-blocking reports. The result is evidence-only and must be reviewed by a human before a migration is
-merged. It does not execute the migration. If the parser sees dynamic SQL, unsupported statements,
-quoted identifiers, malformed literals or comments, multiple statements, or any unclassified syntax,
-it returns `assessment: incomplete`, `risk: unknown`, and `requires_manual_review: true`; it never
-treats an unrecognized migration as safe. The only multi-statement exception is a migration made
+blocking reports. The result is evidence-only and must be assessed before a migration is merged.
+The implementing agent may collect and assess this evidence; human review is not mandatory.
+Document migration semantics, deployed function dependencies/contracts and permissions, rolling
+compatibility, lock acquisition and timeout/rollback strategy, together with the independent review
+required by `AGENTS.md`. It does not execute the migration. If the parser sees dynamic SQL,
+unsupported statements, quoted identifiers, malformed literals or comments, multiple statements, or
+any unclassified syntax, it returns `assessment: incomplete`, `risk: unknown`, and `requires_manual_review: true`; it never
+treats an unrecognized migration as safe. An incomplete report requires a documented assessment of
+those unsupported operations using source review, disposable replay and production catalog/telemetry
+evidence; it does not require the user to collect records or perform the assessment. Unresolved
+material risks remain merge blockers. The only multi-statement exception is a migration made
 entirely of table-level `GRANT`/`REVOKE` statements, optionally wrapped in one `BEGIN`/`COMMIT`
 pair. Privilege names such as `UPDATE` and `DELETE` in those statements are not data changes, and
 the explicit transaction is still reported as transaction control.

@@ -796,6 +796,7 @@ export type Database = {
           created_at: string | null
           current_game_mode: string | null
           game_edition: number | null
+          metadata_write_id: string | null
           pve_data: Json | null
           pvp_data: Json | null
           tarkov_uid: number | null
@@ -806,6 +807,7 @@ export type Database = {
           created_at?: string | null
           current_game_mode?: string | null
           game_edition?: number | null
+          metadata_write_id?: string | null
           pve_data?: Json | null
           pvp_data?: Json | null
           tarkov_uid?: number | null
@@ -816,6 +818,7 @@ export type Database = {
           created_at?: string | null
           current_game_mode?: string | null
           game_edition?: number | null
+          metadata_write_id?: string | null
           pve_data?: Json | null
           pvp_data?: Json | null
           tarkov_uid?: number | null
@@ -1100,7 +1103,7 @@ export type Database = {
           p_seasonal_season_number?: number | null
           p_tarkov_uid: number | null
         }
-        Returns: undefined
+        Returns: Json
       }
       transfer_team_ownership: {
         Args: {

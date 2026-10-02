@@ -32,7 +32,16 @@ flowchart LR
    concurrent account-row updates, updates account metadata, mirrors persistent PvP/PvE for older
    clients, and upserts each normalized row. The caller passes the season number its bundle was
    built for; the function writes the Seasonal row only when that number equals the database's
-   active season, so a cached client from a previous season cannot upload stale Seasonal state. A
+   active season, so a cached client from a previous season cannot upload stale Seasonal state. The
+   Tarkov UID link is applied last in its own savepoint: a UID another account owns keeps the stored
+   link, still commits the progress, and is returned as `tarkov_uid_conflict`; the client then drops
+   the UID locally and tells the user. Conflict outcomes also correct startup's merged snapshot
+   before it is assigned or persisted. Session reset removes the conflict listener; request ownership
+   and live identity fence delayed replies, including a later session for the same account.
+   Split saves recognize the known stored-UID metadata echo until the link settles, then use the
+   stored link for any remaining batches. Imports wait for persistence with controls disabled and
+   ignore completions from an abandoned preview or session (migration
+   `20261001200000_decouple_tarkov_uid_link_from_progress_sync.sql`). A
    client sync carries only the modes that differ from the copy the server last loaded,
    acknowledged, or delivered through Realtime for this session
    (`app/stores/tarkov/acknowledgedModes.ts`); an omitted mode is kept as stored. Background and
@@ -61,7 +70,10 @@ flowchart LR
    (`shared/utils/apiTaskUpdates.ts`), so a client sync cannot flip a stored entry. When a sync
    resends an entry with the same id and timestamp but a smaller or missing `taskCount` (for example
    from a client built before the cap), the database keeps the larger stored count.
-3. Realtime listens to both the account row and normalized rows. A normalized event is applied only
+3. Realtime listens to both the account row and normalized rows. Recognized account metadata
+   echoes advance the listener's timestamp watermark before being discarded, so older metadata
+   cannot overwrite acknowledged values. Echoes do not reconcile, persist freshness, or patch state.
+   A normalized event is applied only
    when its mode is supported and its season equals the active season. The long-lived system and team
    listeners run in detached scopes so route unmounts cannot orphan their channels. The team store
    uses one private `team:<id>` channel for membership changes and multiplexed normalized progress

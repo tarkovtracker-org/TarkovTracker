@@ -8,9 +8,12 @@ untested application logic, rather than presentational components. Its original
 
 Run `pnpm install --frozen-lockfile`, then `pnpm run test:coverage`. The unsharded
 run includes all `app/**/*.{ts,vue}` files except the exclusions in
-`vitest.config.ts`. It writes `coverage/coverage-summary.json` and
-`coverage/lcov.info`. Run lint/typecheck separately from coverage: their Nuxt
-preparation can regenerate files while Vitest is reading them.
+`vitest.config.ts`. It writes `coverage/coverage-summary.json`,
+`coverage/lcov.info`, and the Istanbul map `coverage/coverage-final.json`, which
+`pnpm run metrics --coverage coverage` uses for measured CRAP scores
+([codebase metrics](workflow-automation.md#codebase-metrics)). Run
+lint/typecheck separately from coverage: their Nuxt preparation can regenerate
+files while Vitest is reading them.
 
 The baseline at `c4912a817738ece8d868fe2d45af77a425615fa0` on 2026-09-06 passed
 281 files / 2,800 tests: 65.19% lines, 63.07% statements, 60.12% functions and

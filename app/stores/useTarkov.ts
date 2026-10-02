@@ -63,7 +63,11 @@ import {
   reconcileStoryObjectiveIds,
   type StoryIdChanges,
 } from '@/stores/tarkov/progressMigration';
-import { executeProgressMutation, syncProgressState } from '@/stores/tarkov/progressPersistence';
+import {
+  executeProgressMutation,
+  onTarkovUidConflict,
+  syncProgressState,
+} from '@/stores/tarkov/progressPersistence';
 import { repairCompletedProgress, repairFailedProgress } from '@/stores/tarkov/progressRepair';
 import {
   acknowledgeStartupSync,
@@ -152,16 +156,22 @@ const persistPrestigeLevel = async (
   if (error) throw new Error(`Failed to sync prestige level: ${error.message}`);
   recordLocalSyncTime();
 };
-const syncProgressIfLoggedIn = async (store: TarkovStoreInstance, errorMessage: string) => {
+/** Resolves true once the cloud holds the state, or immediately for local-only sessions. */
+const syncProgressIfLoggedIn = async (
+  store: TarkovStoreInstance,
+  errorMessage: string
+): Promise<boolean> => {
   const { $supabase } = useNuxtApp();
   const userId = $supabase.user.id;
-  if (!$supabase.user.loggedIn || !userId) return;
+  if (!$supabase.user.loggedIn || !userId) return true;
   try {
     recordLocalSyncTime();
     const { error } = await syncProgressState($supabase.client, userId, store.$state);
     throwSyncError(error, errorMessage);
+    return true;
   } catch (error) {
     logger.error(errorMessage, error);
+    return false;
   }
 };
 const archivePrestigeRun = async (store: TarkovStoreInstance, mode: GameMode) => {
@@ -254,6 +264,10 @@ const tarkovActions = {
   async switchGameMode(this: TarkovStoreInstance, mode: GameMode) {
     actions.switchGameMode.call(this, mode);
     await syncProgressIfLoggedIn(this, 'Error syncing gamemode to backend:');
+  },
+  /** Saves now instead of after the sync debounce; false when a signed-in save fails. */
+  saveProgressNow(this: TarkovStoreInstance): Promise<boolean> {
+    return syncProgressIfLoggedIn(this, 'Error saving progress to backend:');
   },
   async migrateDataIfNeeded(this: TarkovStoreInstance) {
     const needsMigration = needsGameModeMigration(this.$state);
@@ -412,6 +426,7 @@ const tarkovActions = {
   },
 } satisfies UserActions & {
   switchGameMode(mode: GameMode): Promise<void>;
+  saveProgressNow(): Promise<boolean>;
   migrateDataIfNeeded(): Promise<void>;
   migrateStoryObjectiveIds(mode?: GameMode): StoryIdChanges;
   migrateTaskCompletionSchema(): number;
@@ -531,6 +546,8 @@ export function resetTarkovSync(
   }
 ) {
   invalidateStartupOwnership();
+  stopTarkovUidConflictWatch?.();
+  stopTarkovUidConflictWatch = null;
   progressSync.preserveSnapshot(options);
   const userId = options?.preserveStorageBaselineForUserId;
   progressSync.reset(
@@ -688,6 +705,22 @@ const persistPostLoadChanges = async (
     throw error;
   }
 };
+let stopTarkovUidConflictWatch: (() => void) | null = null;
+/** A UID another account owns is dropped locally so later syncs stop resubmitting it. */
+const watchTarkovUidConflicts = (
+  store: TarkovStore,
+  ownerId: string,
+  toastI18n: ReturnType<typeof useToastI18n>,
+  isCurrent: StartupOwnershipGuard
+): void => {
+  stopTarkovUidConflictWatch?.();
+  stopTarkovUidConflictWatch = onTarkovUidConflict((userId, conflict) => {
+    if (!isCurrent()) return;
+    if (userId !== ownerId || store.$state.tarkovUid !== conflict.rejectedUid) return;
+    store.setTarkovUid(conflict.storedUid);
+    toastI18n.showTarkovUidConflict(conflict.rejectedUid);
+  });
+};
 const failBlockedRetention = (toastI18n: ReturnType<typeof useToastI18n>): never => {
   setActiveProgressWritesBlocked(true);
   toastI18n.showLoadFailed();
@@ -701,7 +734,7 @@ const selectStartupSnapshot = (userId: string, toastI18n: ReturnType<typeof useT
   // A new sign-in ends any device-data removal requested for the previous session.
   clearDeviceDataRemoval();
   clearIncompleteDeviceDataRemoval(userId);
-  if (!retryBlockedAccountRecoveryRetention() || !preserveForeignActiveCopy(userId)) {
+  if (!retryBlockedAccountRecoveryRetention(userId) || !preserveForeignActiveCopy(userId)) {
     failBlockedRetention(toastI18n);
   }
   const snapshot = selectFreshestOwnerProgressSnapshot(
@@ -785,6 +818,7 @@ export async function initializeTarkovSync() {
   }
   if (!claimSyncStartup(userId)) return;
   const isStartupCurrent = beginOwnedStartup(userId);
+  watchTarkovUidConflicts(tarkovStore, userId, toastI18n, isStartupCurrent);
   logger.debug('[TarkovStore] Setting up Supabase sync and listener');
   const preservedSnapshot = selectStartupSnapshot(userId, toastI18n);
   // Load completes BEFORE sync starts, so empty local state never overwrites server data.
