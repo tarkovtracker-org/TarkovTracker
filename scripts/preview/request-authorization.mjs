@@ -245,7 +245,7 @@ async function effectiveCommand(github, repo, comment, permissions, comments, ed
  * later successful revisions refresh automatically. A later /preview stop revokes that intent.
  * Exhaust pagination before choosing a command; a newer stop must never be hidden by a page cap.
  */
-export async function readPreviewRequest(github, repo, pullRequest) {
+export async function readPreviewRequest(github, repo, pullRequest, boundCommentId = null) {
   // Commands predating rollout activation used the one-revision contract and must never become
   // standing grants. Unset configuration falls back to the contract start; malformed values fail.
   const enabledAt = previewRolloutStart();
@@ -257,18 +257,67 @@ export async function readPreviewRequest(github, repo, pullRequest) {
   });
   const editTimes = await readCommentEditTimes(github, repo, pullRequest);
   assertMatchingCommentSnapshots(comments, editTimes);
-  const commands = comments
+  const originalCommands = comments
     .filter((comment) => originalCommand(comment, enabledAt, editTimes))
     .toSorted((a, b) => b.id - a.id);
+  const commands = originalCommands.filter((comment) =>
+    retainedForBinding(comment, boundCommentId)
+  );
   const permissions = new Map();
   for (const comment of commands) {
     if (!(await effectiveCommand(github, repo, comment, permissions, comments, editTimes)))
       continue;
-    return {
-      commentId: comment.id,
-      enabled: previewCommand(comment.body),
-      requestedBy: comment.user.login,
-    };
+    return requestWithGrant({
+      github,
+      repo,
+      comment,
+      commands: originalCommands,
+      permissions,
+      comments,
+      editTimes,
+    });
   }
   return null;
+}
+function commandIdentity(comment) {
+  return {
+    commentId: comment.id,
+    enabled: previewCommand(comment.body),
+    requestedBy: comment.user.login,
+  };
+}
+async function requestWithGrant(context) {
+  const request = commandIdentity(context.comment);
+  if (!request.enabled) return request;
+  const grant = await continuousGrant(context);
+  return grant.id === context.comment.id ? request : { ...request, grant: commandIdentity(grant) };
+}
+async function continuousGrant({
+  github,
+  repo,
+  comment,
+  commands,
+  permissions,
+  comments,
+  editTimes,
+}) {
+  let grant = comment;
+  for (const older of commands.filter((item) => item.id < comment.id)) {
+    if (!(await effectiveCommand(github, repo, older, permissions, comments, editTimes))) continue;
+    if (previewCommand(older.body) === false) break;
+    grant = older;
+  }
+  return grant;
+}
+/** Bind dispatches to the oldest still-live enable in this uninterrupted grant, never across stop. */
+export function previewGrant(request) {
+  return request?.grant ?? request;
+}
+function retainedForBinding(comment, boundCommentId) {
+  // Repeated enables preserve the original grant; any later accepted stop remains a barrier.
+  return (
+    !boundCommentId ||
+    comment.id === boundCommentId ||
+    (comment.id > boundCommentId && previewCommand(comment.body) === false)
+  );
 }

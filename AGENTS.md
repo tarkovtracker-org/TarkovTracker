@@ -64,6 +64,9 @@ or test logic changes make it relevant.
 
 ## Preview authorization
 
+Ready-PR automation, command collapse, stop controls and fork gates are owned by the
+[preview system spec](docs/systems/previews.md).
+
 Implementation and production-readiness work authorize agents to commit and push in-scope
 feature-branch changes, post `/preview`, deploy previews through the trusted workflow, and run
 preview smoke tests without asking the user again. Preserve workflow access checks, artifact

@@ -665,6 +665,8 @@ availability is advisory and can fail for reasons unrelated to the change.
 
 ### 8. Preview Controller (`.github/workflows/preview.yml`)
 
+Ordinary same-repository ready PRs request previews automatically after current successful PR CI.
+Drafts pause; marking ready or reopening reuses already-passed CI without another build.
 Maintainers and administrators can comment `/preview` once to enable previews for a PR, including
 fork PRs. The current revision is requested immediately if CI is ready; otherwise the next
 successful CI run requests it. Later revisions refresh automatically after successful CI.
@@ -688,12 +690,17 @@ enabled opt-in stays in control; resuming always happens with a fresh command fr
 maintainer. Manual `workflow_dispatch` previews on the trusted default branch own their
 authorization directly: they carry no standing command authority and cannot be revoked by a later
 stop, while requests bound through `request_comment_id` are re-verified before upload.
+Readiness dispatches carry explicit policy provenance and the exact CI attempt; they recheck
+stop state, readiness, current head/base/main and current successful CI immediately before upload.
+Accepted original commands are collapsed with `minimizeComment` (`RESOLVED`); cosmetic API failures
+do not fail previews. Stop receipts are preserved. Repeated enable commands retain an original
+live grant, but any intervening accepted stop revokes that queued grant even after a resume.
 Dependabot retains its dedicated automatic preview owner; `/preview` can request its current
 revision, but does not add a second automatic dispatcher.
 Enabling auto-merge also requests previews when no explicit preview command overrides it.
 The status controller dispatches `preview.yml` on `main`, carrying the CI run ID;
 it checks for a matching active dispatch created after the current CI attempt completed so repeated events preserve in-flight previews
-and fork approval requests. Failed or cancelled dispatches remain retryable. Manual `/preview`
+and fork approval requests. Manual commands use that same lookup. Failed or cancelled dispatches remain retryable. Manual `/preview`
 and workflow dispatch remain available. Repository `allow_auto_merge` must be enabled to use
 this optional request path. Automatic events do not upload artifacts themselves.
 
@@ -707,7 +714,7 @@ rollout verifies that enforcement. The design, result contract, and invariants a
 [previews spec](systems/previews.md).
 
 **Triggers:** `preview-state.yml` receives `workflow_run` for completed CI and metadata-only
-`pull_request_target` events (`ready_for_review`, `converted_to_draft`, `auto_merge_enabled`,
+`pull_request_target` events (`ready_for_review`, `converted_to_draft`, `reopened`, `auto_merge_enabled`,
 `closed`). Ordinary pushes are evaluated after CI completes; main-push CI completions skip the
 state job. An hourly fallback refreshes only open PRs whose head lacks the required
 status, or is pending only on an unready test merge, after GitHub finishes computing it. It refreshes status without creating deployment
