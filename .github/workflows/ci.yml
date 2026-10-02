@@ -76,6 +76,12 @@ jobs:
         env:
           FALLOW_BASE: ${{ steps.fallow-base.outputs.base }}
         run: pnpm run lint:fallow --base "$FALLOW_BASE"
+      # Advisory: reports base-to-head size and Fallow health deltas in the job summary.
+      - name: Codebase metrics
+        continue-on-error: true
+        env:
+          FALLOW_BASE: ${{ steps.fallow-base.outputs.base }}
+        run: pnpm run metrics --base "$FALLOW_BASE" --summary "$GITHUB_STEP_SUMMARY"
   lint-format:
     needs: changes
     name: Lint & Format

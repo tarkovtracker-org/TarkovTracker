@@ -308,6 +308,24 @@ wrong line and leaves the finding unsuppressed. A suppression is a reviewable de
 formality. Existing suppressions are grandfathered; remove them opportunistically when already
 editing that function rather than as unrelated cleanup in someone else's change.
 
+#### Codebase metrics
+
+`pnpm run metrics` prints a JSON snapshot of the working tree: lines and files for runtime code,
+tests, tooling, and migrations, plus the Fallow health score, severity counts, vitals, dead exports,
+and CRAP. `--base <ref>` instead compares the merge base with the working tree as a Markdown table,
+using the same temporary-clone approach as the Fallow gate; `--summary <file>` also appends the
+output to that file. Use the table as before/after evidence in PRs that claim a size or complexity
+improvement. Fewer runtime lines, findings, and CRAP are better; test lines are shown but neutral.
+
+CRAP is estimated (`static_estimated`) unless Istanbul coverage exists. Fallow reads
+`coverage/coverage-final.json` automatically, and `--coverage <dir>` points it elsewhere; run
+`pnpm run test:coverage` first for measured scores. Coverage changes CRAP and every severity count,
+so a comparison fails when the base and head use different models: move `coverage/` aside to
+compare refs.
+
+CI runs `--base <event-base-sha>` as an advisory step after the Fallow gate and writes the table
+to the job summary. The step cannot fail the build. Tests live in `scripts/ci/metrics.test.mjs`.
+
 ### 2. Security Scanning (`.github/workflows/security.yml`)
 
 Reusable security gate called by CI, plus the weekly standalone audit:
