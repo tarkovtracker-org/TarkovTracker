@@ -1,9 +1,13 @@
 // Pure model for metrics.mjs: classifies files, summarizes Fallow health, and compares snapshots.
 const codeExtension = /\.(?:[cm]?[jt]sx?|vue)$/;
-const testPath = /(?:^|\/)(?:__tests__|tests)\/|\.(?:test|spec)\.[^/]+$/;
+const testDirectory = /(?:^|\/)(?:__tests__|tests)\//;
+const testFilename = /\.(?:test|spec)\.[^/]+$/;
 const runtimeRoots = [/^app\//, /^shared\//, /^workers\/[^/]+\/src\//, /^supabase\/functions\//];
 const categoryRules = [
-  ['tests', (path) => codeExtension.test(path) && testPath.test(path)],
+  [
+    'tests',
+    (path) => codeExtension.test(path) && (testDirectory.test(path) || testFilename.test(path)),
+  ],
   ['runtime', (path) => codeExtension.test(path) && runtimeRoots.some((root) => root.test(path))],
   ['tooling', (path) => codeExtension.test(path) && path.startsWith('scripts/')],
   ['migrations', (path) => /^supabase\/migrations\/.+\.sql$/.test(path)],
@@ -27,13 +31,11 @@ export function summarizeLoc(entries) {
 const countBySeverity = (findings, severity) =>
   findings.filter((finding) => finding.severity === severity).length;
 const finiteOrNull = (value) => (Number.isFinite(value) ? value : null);
-function summarizeCrap({ findings, summary }) {
-  const threshold = finiteOrNull(summary.max_crap_threshold) ?? 30;
-  const scores = findings.map((finding) => finding.crap).filter(Number.isFinite);
+function summarizeCrap({ file_scores: files, summary }) {
   return {
     model: summary.coverage_model ?? 'unknown',
-    above_threshold: scores.filter((score) => score >= threshold).length,
-    max: Math.max(0, ...scores),
+    above_threshold: files?.reduce((total, file) => total + file.crap_above_threshold, 0) ?? null,
+    max: files?.reduce((max, file) => Math.max(max, file.crap_max), 0) ?? null,
   };
 }
 const vitalFields = ['maintainability_avg', 'avg_cyclomatic', 'p90_cyclomatic', 'duplication_pct'];
@@ -41,6 +43,7 @@ export function summarizeHealth(report) {
   const {
     findings = [],
     summary = {},
+    file_scores,
     vital_signs: vitals = {},
     health_score: score = {},
   } = report;
@@ -53,7 +56,7 @@ export function summarizeHealth(report) {
     functions_above_threshold: finiteOrNull(summary.functions_above_threshold),
     ...Object.fromEntries(vitalFields.map((field) => [field, finiteOrNull(vitals[field])])),
     dead_exports: finiteOrNull(vitals.counts?.dead_exports),
-    crap: summarizeCrap({ findings, summary }),
+    crap: summarizeCrap({ file_scores, summary }),
   };
 }
 const higherIsBetter = new Set(['health.score', 'health.maintainability_avg']);
@@ -89,6 +92,9 @@ function verdict(key, delta) {
 // count, so a measured snapshot is never compared with an estimated one.
 export function assertComparable(base, head) {
   const [before, after] = [base.health.crap.model, head.health.crap.model];
+  if (base.analysis_config !== head.analysis_config) {
+    throw new Error('Fallow configurations differ; compare refs with the same .fallowrc.json');
+  }
   if (before === after) return;
   throw new Error(
     `CRAP models differ (base ${before}, head ${after}); move coverage/ aside to compare refs`
@@ -123,7 +129,7 @@ export function renderComparison(rows, meta) {
     '## Codebase metrics',
     '',
     `Base \`${meta.base.slice(0, 12)}\` → head \`${meta.head.slice(0, 12)}\`. ` +
-      `CRAP model: ${meta.crapModel}.`,
+      `CRAP model: ${meta.crapModel}.${meta.dirty ? ' Head includes uncommitted working-tree changes.' : ''}`,
     '',
     '| Metric | Base | Head | Change | |',
     '| --- | ---: | ---: | ---: | --- |',

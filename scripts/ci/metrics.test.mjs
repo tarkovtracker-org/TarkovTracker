@@ -15,6 +15,7 @@ const report = (overrides = {}) => ({
     { severity: 'high' },
     { severity: 'moderate', crap: 12 },
   ],
+  file_scores: [{ crap_max: 120, crap_above_threshold: 2 }],
   summary: {
     functions_above_threshold: 4,
     max_crap_threshold: 30,
@@ -50,6 +51,7 @@ describe('classifyPath', () => {
     ['workers/api-gateway/src/__tests__/gateway.test.ts', 'tests'],
     ['tests/test-setup.ts', 'tests'],
     ['scripts/ci/metrics.test.mjs', 'tests'],
+    ['app/tests/helper.ts', 'tests'],
     ['scripts/ci/metrics.mjs', 'tooling'],
     ['supabase/migrations/20260804043342_normalize.sql', 'migrations'],
   ])('puts %s in %s', (path, category) => {
@@ -59,6 +61,7 @@ describe('classifyPath', () => {
     'app/locales/en.json',
     'docs/api.md',
     'nuxt.config.ts',
+    'app/testing/helper.json',
     'workers/api-gateway/wrangler.toml',
   ])('ignores %s', (path) => {
     expect(classifyPath(path)).toBeUndefined();
@@ -93,6 +96,18 @@ describe('summarizeLoc', () => {
   });
 });
 describe('summarizeHealth', () => {
+  it('includes CRAP below reporting thresholds and honors per-file threshold counts', () => {
+    const health = summarizeHealth(
+      report({
+        findings: [],
+        file_scores: [
+          { crap_max: 12, crap_above_threshold: 1 },
+          { crap_max: 20, crap_above_threshold: 2 },
+        ],
+      })
+    );
+    expect(health.crap).toEqual({ model: 'istanbul', above_threshold: 3, max: 20 });
+  });
   it('extracts the score, severity counts, vitals, and CRAP from a Fallow report', () => {
     expect(summarizeHealth(report())).toEqual({
       score: 77,
@@ -113,7 +128,7 @@ describe('summarizeHealth', () => {
     const health = summarizeHealth({});
     expect(health.score).toBeNull();
     expect(health.dead_exports).toBeNull();
-    expect(health.crap).toEqual({ model: 'unknown', above_threshold: 0, max: 0 });
+    expect(health.crap).toEqual({ model: 'unknown', above_threshold: null, max: null });
   });
 });
 describe('compareSnapshots', () => {
@@ -121,7 +136,9 @@ describe('compareSnapshots', () => {
   it('marks lower complexity and fewer runtime lines as better', () => {
     const head = snapshot(
       90,
-      summarizeHealth(report({ findings: [], health_score: { score: 80, grade: 'B' } }))
+      summarizeHealth(
+        report({ findings: [], file_scores: [], health_score: { score: 80, grade: 'B' } })
+      )
     );
     const rows = Object.fromEntries(compareSnapshots(base, head).map((row) => [row.key, row]));
     expect(rows['loc.runtime.lines']).toMatchObject({ delta: -10, verdict: 'better' });
@@ -156,6 +173,11 @@ describe('assertComparable', () => {
       assertComparable(withModel('static_estimated'), withModel('static_estimated'))
     ).not.toThrow();
   });
+  it('rejects different analyzer configurations', () => {
+    const base = { ...withModel('static_estimated'), analysis_config: 'before' };
+    const head = { ...withModel('static_estimated'), analysis_config: 'after' };
+    expect(() => assertComparable(base, head)).toThrow('Fallow configurations differ');
+  });
   it('rejects a measured head against an estimated base', () => {
     expect(() => assertComparable(withModel('static_estimated'), withModel('istanbul'))).toThrow(
       'CRAP models differ (base static_estimated, head istanbul)'
@@ -163,6 +185,11 @@ describe('assertComparable', () => {
   });
 });
 describe('renderComparison', () => {
+  it('labels working-tree evidence explicitly', () => {
+    expect(
+      renderComparison([], { base: 'a', head: 'a', crapModel: 'static_estimated', dirty: true })
+    ).toContain('Head includes uncommitted working-tree changes.');
+  });
   it('renders a Markdown table with signed changes', () => {
     const base = snapshot(100, summarizeHealth(report()));
     const markdown = renderComparison(compareSnapshots(base, snapshot(90, base.health)), {
@@ -174,5 +201,6 @@ describe('renderComparison', () => {
     expect(markdown).toContain('CRAP model: static_estimated.');
     expect(markdown).toContain('| Runtime LOC | 100 | 90 | -10 | ✅ better |');
     expect(markdown).toContain('| Health score | 77 | 77 | 0 | same |');
+    expect(markdown).not.toContain('uncommitted');
   });
 });
