@@ -9,7 +9,7 @@ contribution workflow overview (issues, branches, labels, project board), see
 
 ### Prerequisites
 
-- **Node.js** >= 24.21.0
+- **Node.js** at the version in [`.nvmrc`](../.nvmrc) (`fnm use` / `nvm use`)
 - **pnpm** 11.14.0 (via Corepack; matches `packageManager` in `package.json`)
 - **Git**
 
