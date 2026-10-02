@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import {
+  closeSync,
+  fstatSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { applyRequestDispositions, publishReceipt } from './codex-review-disposition.mjs';
@@ -147,7 +155,12 @@ test('receipt publication is complete, restricted, exclusive and cleans temporar
   const path = join(context.stateDirectory, 'receipt.json');
   publishReceipt(path, { original: true });
   assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), { original: true });
-  assert.equal(statSync(path).mode & 0o777, 0o600);
+  const descriptor = openSync(path, 'r');
+  try {
+    assert.equal(fstatSync(descriptor).mode & 0o777, 0o600);
+  } finally {
+    closeSync(descriptor);
+  }
   assert.throws(() => publishReceipt(path, { replacement: true }), { code: 'EEXIST' });
   assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), { original: true });
   assert.deepEqual(readdirSync(context.stateDirectory), ['receipt.json']);
