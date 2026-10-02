@@ -8,8 +8,7 @@ work. Extends the root `AGENTS.md`; paths below are relative to the repository r
 - Relevant checks: `pnpm run supabase:check` (local database replay) for migration or SQL changes.
   Edge Functions run on Deno; their `supabase/functions/_shared/*.deno.test.ts` tests are not
   covered by root Vitest.
-- Auth, billing, migration, and concurrency changes require independent review (root `AGENTS.md`
-  → Review).
+- Independent-review triggers: root `AGENTS.md` → Workflow and review.
 
 ## Functions and grants
 
@@ -24,19 +23,18 @@ Full procedure: `docs/runbook.md#database-migrations`.
   formatting or static-analysis findings. Treat migrations on `main` as applied unless proven
   otherwise. Use a new forward migration for behavior changes; disposition historical lint findings
   individually.
-- Before migration work, compare the migration diff with `origin/main`
-  (`git diff --name-status origin/main...HEAD -- supabase/migrations`) and obtain operator evidence
-  of remote history and pending migrations. Matching timestamps do not prove matching SQL or schema.
-- Consolidate only unmerged migrations proven unapplied to every shared environment. Never run
-  remote history repair, reset, or squash as routine cleanup.
+- After `git fetch`, `git diff --name-status origin/main...HEAD -- supabase/migrations` must list
+  only added files, timestamped after the latest migration on `origin/main`.
+- Edit, rename, or consolidate an unmerged migration only with operator evidence that it is
+  unapplied to every shared environment; matching timestamps do not prove matching SQL or schema.
 - Never put bulk data rewrites in migrations. Ship schema separately and make reads tolerate missing
   rows.
 
 ## Production database
 
-Inspect production only through the read-only `scripts/ops/prod-db` observer
-(`docs/runbook.md#production-database-observer`, `docs/systems/prod-db-observer.md`), using a dedicated observer
-role; never supply `service_role`, `postgres`, migration, or Management API credentials.
+Use the read-only `scripts/ops/prod-db` observer (`docs/runbook.md#production-database-observer`,
+`docs/systems/prod-db-observer.md`) with a dedicated observer role; never supply `service_role`,
+`postgres`, migration, or Management API credentials.
 
 ## Account lifecycle
 
